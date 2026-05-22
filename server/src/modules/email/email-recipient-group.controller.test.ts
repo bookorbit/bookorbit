@@ -7,6 +7,7 @@ import type { AddGroupMemberDto } from './dto/add-group-member.dto';
 import type { CreateEmailRecipientGroupDto } from './dto/create-email-recipient-group.dto';
 import type { UpdateEmailRecipientGroupDto } from './dto/update-email-recipient-group.dto';
 import { EmailRecipientGroupService } from './email-recipient-group.service';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 describe('EmailRecipientGroupController', () => {
   const user: RequestUser = {
@@ -22,6 +23,8 @@ describe('EmailRecipientGroupController', () => {
     provisioningMethod: 'manual',
     isSuperuser: false,
     permissions: [],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
   const service = {

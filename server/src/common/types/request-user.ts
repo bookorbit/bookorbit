@@ -1,4 +1,5 @@
 import { Permission } from '@bookorbit/types';
+import type { ContentFilterRules } from '@bookorbit/types';
 
 export interface RequestUser {
   id: number;
@@ -15,4 +16,5 @@ export interface RequestUser {
   avatarVersion?: number | null;
   provisioningMethod: string;
   permissions: Permission[];
+  contentFilters: ContentFilterRules;
 }

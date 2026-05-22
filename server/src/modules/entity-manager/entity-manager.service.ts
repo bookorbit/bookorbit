@@ -208,6 +208,7 @@ export class EntityManagerService {
       pageSize: params.pageSize ?? 25,
       sortBy: (params.sortBy as 'name' | 'bookCount') || 'name',
       sortOrder: (params.sortOrder as 'asc' | 'desc') || 'asc',
+      contentFilters: user.isSuperuser ? undefined : user.contentFilters,
     });
 
     return { items: result.items, total: result.total, page: params.page ?? 1, pageSize: params.pageSize ?? 25 };

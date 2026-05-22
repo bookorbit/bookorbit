@@ -2,6 +2,7 @@ import type { CurrentlyReadingWidgetData, LibraryOverviewWidgetData, NeglectedGe
 
 import type { RequestUser } from '../../common/types/request-user';
 import { DashboardWidgetService } from './dashboard-widget.service';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
   return {
@@ -18,6 +19,8 @@ function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
     provisioningMethod: 'local',
     permissions: [],
     ...overrides,
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 }
 
@@ -62,7 +65,7 @@ describe('DashboardWidgetService', () => {
       const result = await service.getReadingGoal(user);
 
       expect(libraryService.findAccessibleLibraryIds).toHaveBeenCalledWith(user);
-      expect(widgetRepo.getCompletedBooksThisYear).toHaveBeenCalledWith(42, [1, 2]);
+      expect(widgetRepo.getCompletedBooksThisYear).toHaveBeenCalledWith(42, [1, 2], EMPTY_CONTENT_FILTER_RULES);
       expect(result).toEqual({
         goalBooks: 24,
         completedBooks: 7,
@@ -106,7 +109,7 @@ describe('DashboardWidgetService', () => {
       const result = await service.getCurrentlyReading(user);
 
       expect(libraryService.findAccessibleLibraryIds).toHaveBeenCalledWith(user);
-      expect(widgetRepo.getCurrentlyReadingBooks).toHaveBeenCalledWith(7, [3, 5]);
+      expect(widgetRepo.getCurrentlyReadingBooks).toHaveBeenCalledWith(7, [3, 5], EMPTY_CONTENT_FILTER_RULES);
       expect(result).toEqual(mockData);
     });
   });
@@ -126,7 +129,7 @@ describe('DashboardWidgetService', () => {
       const result = await service.getReadingStreak(user);
 
       expect(libraryService.findAccessibleLibraryIds).toHaveBeenCalledWith(user);
-      expect(widgetRepo.getReadingStreak).toHaveBeenCalledWith(99, [1, 2]);
+      expect(widgetRepo.getReadingStreak).toHaveBeenCalledWith(99, [1, 2], EMPTY_CONTENT_FILTER_RULES);
       expect(result).toEqual(mockData);
     });
   });
@@ -148,7 +151,7 @@ describe('DashboardWidgetService', () => {
       const result = await service.getLibraryOverview(user);
 
       expect(libraryService.findAccessibleLibraryIds).toHaveBeenCalledWith(user);
-      expect(widgetRepo.getLibraryOverview).toHaveBeenCalledWith([10]);
+      expect(widgetRepo.getLibraryOverview).toHaveBeenCalledWith([10], EMPTY_CONTENT_FILTER_RULES);
       expect(result).toEqual(mockData);
     });
   });

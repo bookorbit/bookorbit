@@ -3,7 +3,8 @@ import { SQL, and, asc, count, eq, inArray, isNotNull, ne, or, sql } from 'drizz
 import { SUPPORTED_BOOK_FORMATS } from '../upload/upload-validator.service';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import type { SortSpec } from '@bookorbit/types';
+import type { ContentFilterRules, SortSpec } from '@bookorbit/types';
+import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -494,6 +495,18 @@ export class BookRepository {
     return row?.libraryId ?? null;
   }
 
+  async checkBookPassesContentFilters(bookId: number, contentFilters: ContentFilterRules): Promise<boolean> {
+    const filterClauses = buildContentFilterClauses(contentFilters, this.db);
+    if (filterClauses.length === 0) return true;
+
+    const [row] = await this.db
+      .select({ id: books.id })
+      .from(books)
+      .where(and(eq(books.id, bookId), ...filterClauses))
+      .limit(1);
+    return !!row;
+  }
+
   async findFileById(fileId: number) {
     const [file] = await this.db
       .select({
@@ -579,7 +592,7 @@ export class BookRepository {
     return rows.map((r) => r.name);
   }
 
-  async searchAcrossLibraries(libraryIds: number[], q: string, limit: number) {
+  async searchAcrossLibraries(libraryIds: number[], q: string, limit: number, contentFilters?: ContentFilterRules) {
     if (libraryIds.length === 0) return [];
 
     const pattern = '%' + q + '%';
@@ -590,6 +603,8 @@ export class BookRepository {
       .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
       .where(sql`${authors.name} ILIKE ${pattern}`)
       .as('matched_authors');
+
+    const contentFilterClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
 
     const rows = await this.db
       .select({
@@ -608,6 +623,7 @@ export class BookRepository {
           inArray(books.libraryId, libraryIds),
           ne(books.status, 'processing'),
           or(sql`${bookMetadata.title} ILIKE ${pattern}`, sql`${bookMetadata.seriesName} ILIKE ${pattern}`, isNotNull(matchedAuthors.bookId)),
+          ...contentFilterClauses,
         ),
       )
       .orderBy(bookMetadata.title)

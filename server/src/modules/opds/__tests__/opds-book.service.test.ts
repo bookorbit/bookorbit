@@ -79,7 +79,7 @@ describe('OpdsBookService', () => {
     accessSpy.mockResolvedValueOnce([1, 2]);
     smartScopeSpy.mockResolvedValueOnce({ entries: [{ id: 5 }], total: 1 });
     await expect(service.getBooksPage(7, 'recent', 3, 25, { smartScopeId: 4 })).resolves.toEqual({ entries: [{ id: 5 }], total: 1 });
-    expect(smartScopeSpy).toHaveBeenCalledWith(7, 4, [1, 2], 'recent', 3, 25);
+    expect(smartScopeSpy).toHaveBeenCalledWith(7, 4, [1, 2], 'recent', 3, 25, undefined);
 
     accessSpy.mockResolvedValueOnce([1, 2]);
     paginatedSpy.mockResolvedValueOnce({ entries: [{ id: 9 }], total: 1 });

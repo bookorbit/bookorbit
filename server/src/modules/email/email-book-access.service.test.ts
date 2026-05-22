@@ -4,6 +4,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { BookReadService } from '../book/book-read.service';
 import { LibraryService } from '../library/library.service';
 import { EmailBookAccessService } from './email-book-access.service';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 describe('EmailBookAccessService', () => {
   const user: RequestUser = {
@@ -19,6 +20,8 @@ describe('EmailBookAccessService', () => {
     provisioningMethod: 'manual',
     isSuperuser: false,
     permissions: [],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
   let service: EmailBookAccessService;
@@ -28,6 +31,7 @@ describe('EmailBookAccessService', () => {
   beforeEach(() => {
     bookReadService = {
       findLibraryIdsByBookIds: vi.fn(),
+      checkBookPassesContentFilters: vi.fn().mockResolvedValue(true),
     };
     libraryService = {
       verifyUserAccess: vi.fn().mockResolvedValue(undefined),

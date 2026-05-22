@@ -55,7 +55,12 @@ export class RecommendationService {
       const accessibleLibraries = await this.libraryService.findAll(user);
       const accessibleLibraryIds = accessibleLibraries.map((library) => library.id);
 
-      const candidates = await this.recRepo.findAnnCandidates(embedding, bookId, accessibleLibraryIds);
+      const candidates = await this.recRepo.findAnnCandidates(
+        embedding,
+        bookId,
+        accessibleLibraryIds,
+        user.isSuperuser ? undefined : user.contentFilters,
+      );
       if (candidates.length === 0) {
         this.logger.log(
           `[${RECOMMENDATION_EVENT}] [end] bookId=${bookId} userId=${user.id} libraryId=${libraryId} durationMs=${Date.now() - startedAt} accessibleLibraryCount=${accessibleLibraryIds.length} candidateCount=0 resultCount=0 - recommendation lookup completed`,
@@ -120,7 +125,7 @@ export class RecommendationService {
       }
 
       const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
-      const rows = await this.recRepo.findSeriesBooks(meta, libraryIds);
+      const rows = await this.recRepo.findSeriesBooks(meta, libraryIds, user.isSuperuser ? undefined : user.contentFilters);
 
       this.logger.log(
         `[${SERIES_BOOKS_EVENT}] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} seriesName="${meta}" resultCount=${rows.length} - series books lookup completed`,
@@ -152,7 +157,7 @@ export class RecommendationService {
       await this.libraryService.verifyUserAccess(user.id, libraryId, user.isSuperuser);
 
       const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
-      const rows = await this.recRepo.findAuthorBooks(bookId, libraryIds);
+      const rows = await this.recRepo.findAuthorBooks(bookId, libraryIds, user.isSuperuser ? undefined : user.contentFilters);
 
       this.logger.log(
         `[${AUTHOR_BOOKS_EVENT}] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} resultCount=${rows.length} - author books lookup completed`,

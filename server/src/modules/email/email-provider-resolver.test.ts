@@ -4,6 +4,7 @@ import { EmailProviderResolver } from './email-provider-resolver';
 import { EmailProviderService } from './email-provider.service';
 import { EmailPreferencesService } from './email-preferences.service';
 import type { RequestUser } from '../../common/types/request-user';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 describe('EmailProviderResolver', () => {
   let resolver: EmailProviderResolver;
@@ -23,6 +24,8 @@ describe('EmailProviderResolver', () => {
     provisioningMethod: 'manual',
     isSuperuser: false,
     permissions: [],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
   const mockProvider = {
     id: 10,

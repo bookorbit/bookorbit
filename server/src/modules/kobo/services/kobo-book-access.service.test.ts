@@ -24,9 +24,19 @@ describe('KoboBookAccessService', () => {
       }),
     };
 
+    const contentFilterRepository = {
+      findByUserId: vi.fn().mockResolvedValue({
+        includeTagIds: [],
+        excludeTagIds: [],
+        includeGenreIds: [],
+        excludeGenreIds: [],
+      }),
+    };
+
     return {
-      service: new KoboBookAccessService(db as never),
+      service: new KoboBookAccessService(db as never, contentFilterRepository as never),
       db,
+      contentFilterRepository,
     };
   }
 

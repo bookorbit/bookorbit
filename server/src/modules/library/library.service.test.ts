@@ -9,6 +9,7 @@ vi.mock('../scanner/lib/classify', () => ({
 }));
 
 import { BadRequestException, ConflictException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 import { readdir, rm, stat } from 'fs/promises';
 
 import { ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED } from '../achievement/achievement-events.service';
@@ -90,21 +91,38 @@ describe('LibraryService', () => {
     libraryRepo.findAllForUser.mockResolvedValue([{ id: 10, name: 'A', coverAspectRatio: '1/1' }]);
     libraryRepo.findFoldersByLibraryIds.mockResolvedValue([{ id: 1, libraryId: 10, path: '/a', createdAt: new Date() }]);
 
-    const result = await service.findAll({ id: 7, isSuperuser: false } as any);
+    const result = await service.findAll({ id: 7, isSuperuser: false, contentFilters: EMPTY_CONTENT_FILTER_RULES } as any);
 
-    expect(libraryRepo.findAllForUser).toHaveBeenCalledWith(7);
+    expect(libraryRepo.findAllForUser).toHaveBeenCalledWith(7, EMPTY_CONTENT_FILTER_RULES);
     expect(libraryRepo.findFoldersByLibraryIds).toHaveBeenCalledWith([10]);
     expect(libraryRepo.findAllFolders).not.toHaveBeenCalled();
     expect(result[0].folders).toEqual([{ id: 1, path: '/a', createdAt: expect.any(Date) }]);
     expect(result[0].coverAspectRatio).toBe('1/1');
   });
 
+  it('passes contentFilters to findAllForUser for non-superuser and skips for superuser', async () => {
+    libraryRepo.findAllForUser.mockResolvedValue([]);
+    libraryRepo.findFoldersByLibraryIds.mockResolvedValue([]);
+    libraryRepo.findAll.mockResolvedValue([]);
+    libraryRepo.findAllFolders.mockResolvedValue([]);
+
+    await service.findAll({ id: 7, isSuperuser: false, contentFilters: EMPTY_CONTENT_FILTER_RULES } as any);
+    await service.findAll({ id: 1, isSuperuser: true, contentFilters: EMPTY_CONTENT_FILTER_RULES } as any);
+
+    expect(libraryRepo.findAllForUser).toHaveBeenCalledWith(7, EMPTY_CONTENT_FILTER_RULES);
+    expect(libraryRepo.findAll).toHaveBeenCalled();
+  });
+
   it('findAccessibleLibraryIds reads all IDs for superusers and scoped IDs for normal users', async () => {
     libraryRepo.findAllIds.mockResolvedValue([{ id: 1 }, { id: 2 }]);
     libraryRepo.findAccessibleIdsForUser.mockResolvedValue([{ id: 3 }, { id: 4 }]);
 
-    await expect(service.findAccessibleLibraryIds({ id: 99, isSuperuser: true } as any)).resolves.toEqual([1, 2]);
-    await expect(service.findAccessibleLibraryIds({ id: 42, isSuperuser: false } as any)).resolves.toEqual([3, 4]);
+    await expect(service.findAccessibleLibraryIds({ id: 99, isSuperuser: true, contentFilters: EMPTY_CONTENT_FILTER_RULES } as any)).resolves.toEqual(
+      [1, 2],
+    );
+    await expect(
+      service.findAccessibleLibraryIds({ id: 42, isSuperuser: false, contentFilters: EMPTY_CONTENT_FILTER_RULES } as any),
+    ).resolves.toEqual([3, 4]);
   });
 
   it('findOne returns library details and normalizes organization mode', async () => {

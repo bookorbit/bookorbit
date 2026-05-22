@@ -2,6 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { SQL, and, asc, count, desc, eq, ilike, inArray, isNotNull, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+import type { ContentFilterRules } from '@bookorbit/types';
+import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { authors, bookAuthors, bookMetadata, books, userBookStatus } from '../../db/schema';
@@ -61,11 +63,13 @@ export class SeriesRepository {
     userId: number;
     completionStatus?: string;
     author?: string;
+    contentFilters?: ContentFilterRules;
   }): Promise<{ items: SeriesSummaryRow[]; total: number; page: number; size: number }> {
     const normalized = this.normalizedSeriesName();
     const libraryFilter = this.buildLibraryFilter(params.libraryIds);
+    const filterClauses = params.contentFilters ? buildContentFilterClauses(params.contentFilters, this.db) : [];
 
-    const conditions: SQL[] = [isNotNull(bookMetadata.seriesName), sql`btrim(${bookMetadata.seriesName}) != ''`, libraryFilter];
+    const conditions: SQL[] = [isNotNull(bookMetadata.seriesName), sql`btrim(${bookMetadata.seriesName}) != ''`, libraryFilter, ...filterClauses];
 
     if (params.q) {
       const qPattern = `%${this.escapeLikePattern(params.q)}%`;
@@ -141,8 +145,8 @@ export class SeriesRepository {
 
     const seriesNames = seriesRows.map((r) => r.name);
     const [authorData, coverData] = await Promise.all([
-      this.fetchAuthorsForSeries(seriesNames, params.libraryIds),
-      this.fetchCoverBookIds(seriesNames, params.libraryIds),
+      this.fetchAuthorsForSeries(seriesNames, params.libraryIds, params.contentFilters),
+      this.fetchCoverBookIds(seriesNames, params.libraryIds, params.contentFilters),
     ]);
 
     const items: SeriesSummaryRow[] = seriesRows.map((row) => ({
@@ -157,8 +161,14 @@ export class SeriesRepository {
     return { items, total, page: params.page, size: params.size };
   }
 
-  async findDetail(params: { seriesName: string; userId: number; libraryIds: number[] }): Promise<SeriesDetailRow | null> {
+  async findDetail(params: {
+    seriesName: string;
+    userId: number;
+    libraryIds: number[];
+    contentFilters?: ContentFilterRules;
+  }): Promise<SeriesDetailRow | null> {
     const libraryFilter = this.buildLibraryFilter(params.libraryIds);
+    const filterClauses = params.contentFilters ? buildContentFilterClauses(params.contentFilters, this.db) : [];
 
     const rows = await this.db
       .select({
@@ -169,7 +179,7 @@ export class SeriesRepository {
       .from(books)
       .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .leftJoin(userBookStatus, and(eq(userBookStatus.bookId, books.id), eq(userBookStatus.userId, params.userId)))
-      .where(and(sql`lower(btrim(${bookMetadata.seriesName})) = lower(btrim(${params.seriesName}))`, libraryFilter))
+      .where(and(sql`lower(btrim(${bookMetadata.seriesName})) = lower(btrim(${params.seriesName}))`, libraryFilter, ...filterClauses))
       .groupBy(this.normalizedSeriesName());
 
     if (rows.length === 0) return null;
@@ -178,13 +188,18 @@ export class SeriesRepository {
     const normalizedName = params.seriesName.toLowerCase().trim();
 
     const [authorsMap, indicesRows] = await Promise.all([
-      this.fetchAuthorsForSeries([row.displayName], params.libraryIds),
+      this.fetchAuthorsForSeries([row.displayName], params.libraryIds, params.contentFilters),
       this.db
         .select({ idx: bookMetadata.seriesIndex })
         .from(books)
         .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
         .where(
-          and(sql`lower(btrim(${bookMetadata.seriesName})) = lower(btrim(${params.seriesName}))`, libraryFilter, isNotNull(bookMetadata.seriesIndex)),
+          and(
+            sql`lower(btrim(${bookMetadata.seriesName})) = lower(btrim(${params.seriesName}))`,
+            libraryFilter,
+            ...filterClauses,
+            isNotNull(bookMetadata.seriesIndex),
+          ),
         ),
     ]);
 
@@ -206,10 +221,12 @@ export class SeriesRepository {
     sort: SeriesBookSort;
     order: SortDirection;
     libraryIds: number[];
+    contentFilters?: ContentFilterRules;
   }): Promise<{ bookIds: number[]; total: number }> {
     const libraryFilter = this.buildLibraryFilter(params.libraryIds);
     const seriesMatch = sql`lower(btrim(${bookMetadata.seriesName})) = lower(btrim(${params.seriesName}))`;
-    const where = and(seriesMatch, libraryFilter)!;
+    const filterClauses = params.contentFilters ? buildContentFilterClauses(params.contentFilters, this.db) : [];
+    const where = and(seriesMatch, libraryFilter, ...filterClauses)!;
 
     const orderBy = this.buildBookSortExpression(params.sort, params.order);
 
@@ -228,10 +245,15 @@ export class SeriesRepository {
     return { bookIds: dataRows.map((r) => r.id), total: Number(total) };
   }
 
-  private async fetchAuthorsForSeries(seriesNames: string[], libraryIds: number[]): Promise<Map<string, string[]>> {
+  private async fetchAuthorsForSeries(
+    seriesNames: string[],
+    libraryIds: number[],
+    contentFilters?: ContentFilterRules,
+  ): Promise<Map<string, string[]>> {
     if (seriesNames.length === 0) return new Map();
 
     const normalized = seriesNames.map((n) => n.toLowerCase().trim());
+    const filterClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
     const rows = await this.db
       .select({
         normalizedSeries: sql<string>`lower(btrim(${bookMetadata.seriesName}))`,
@@ -248,6 +270,7 @@ export class SeriesRepository {
             sql`, `,
           )})`,
           this.buildLibraryFilter(libraryIds),
+          ...filterClauses,
         ),
       )
       .groupBy(sql`lower(btrim(${bookMetadata.seriesName}))`, authors.name);
@@ -262,10 +285,11 @@ export class SeriesRepository {
     return result;
   }
 
-  private async fetchCoverBookIds(seriesNames: string[], libraryIds: number[]): Promise<Map<string, number[]>> {
+  private async fetchCoverBookIds(seriesNames: string[], libraryIds: number[], contentFilters?: ContentFilterRules): Promise<Map<string, number[]>> {
     if (seriesNames.length === 0) return new Map();
 
     const normalized = seriesNames.map((n) => n.toLowerCase().trim());
+    const filterClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
     const rows = await this.db
       .select({
         normalizedSeries: sql<string>`lower(btrim(${bookMetadata.seriesName}))`,
@@ -281,6 +305,7 @@ export class SeriesRepository {
             sql`, `,
           )})`,
           this.buildLibraryFilter(libraryIds),
+          ...filterClauses,
           isNotNull(bookMetadata.coverSource),
         ),
       )

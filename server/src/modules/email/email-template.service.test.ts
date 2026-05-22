@@ -5,6 +5,7 @@ import { EmailTemplateRepository } from './email-template.repository';
 import { EmailTemplateContextService } from './email-template-context.service';
 import { EmailBookAccessService } from './email-book-access.service';
 import type { RequestUser } from '../../common/types/request-user';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 describe('EmailTemplateService', () => {
   let service: EmailTemplateService;
@@ -24,11 +25,15 @@ describe('EmailTemplateService', () => {
     avatarUrl: null,
     provisioningMethod: 'manual',
     permissions: [],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
   const mockAdmin: RequestUser = {
     ...mockUser,
     isSuperuser: true,
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
   const mockTemplate = { id: 10, userId: 1, name: 'Template', subject: 'S', bodyText: 'B', isSystem: false, isDefault: true };

@@ -7,6 +7,7 @@ import type { CreateEmailTemplateDto } from './dto/create-email-template.dto';
 import type { PreviewTemplateDto } from './dto/preview-template.dto';
 import type { UpdateEmailTemplateDto } from './dto/update-email-template.dto';
 import { EmailTemplateService } from './email-template.service';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 describe('EmailTemplateController', () => {
   const user: RequestUser = {
@@ -22,6 +23,8 @@ describe('EmailTemplateController', () => {
     provisioningMethod: 'manual',
     isSuperuser: false,
     permissions: [],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
   const service = {

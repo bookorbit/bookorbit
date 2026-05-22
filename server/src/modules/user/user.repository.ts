@@ -58,6 +58,7 @@ export class UserRepository {
       provisioningMethod: string;
       createdAt: Date;
       permissions: Permission[];
+      hasContentFilters: boolean;
     };
 
     const usersMap = new Map<number, UserListItem>();
@@ -74,10 +75,30 @@ export class UserRepository {
           provisioningMethod: row.provisioningMethod,
           createdAt: row.createdAt,
           permissions: [],
+          hasContentFilters: false,
         });
       }
       if (row.permissionName) {
         usersMap.get(row.id)!.permissions.push(row.permissionName as Permission);
+      }
+    }
+
+    if (userIds.length > 0) {
+      const [tagFilterUsers, genreFilterUsers] = await Promise.all([
+        this.db
+          .select({ userId: schema.userContentFilterTags.userId })
+          .from(schema.userContentFilterTags)
+          .where(inArray(schema.userContentFilterTags.userId, userIds)),
+        this.db
+          .select({ userId: schema.userContentFilterGenres.userId })
+          .from(schema.userContentFilterGenres)
+          .where(inArray(schema.userContentFilterGenres.userId, userIds)),
+      ]);
+      const usersWithFilters = new Set<number>();
+      for (const r of tagFilterUsers) usersWithFilters.add(r.userId);
+      for (const r of genreFilterUsers) usersWithFilters.add(r.userId);
+      for (const [id, user] of usersMap) {
+        if (usersWithFilters.has(id)) user.hasContentFilters = true;
       }
     }
 
@@ -98,26 +119,36 @@ export class UserRepository {
   }
 
   async findByIdWithPermissions(id: number): Promise<RequestUser | null> {
-    const rows = await this.db
-      .select({
-        id: schema.users.id,
-        username: schema.users.username,
-        name: schema.users.name,
-        email: schema.users.email,
-        active: schema.users.active,
-        isSuperuser: schema.users.isSuperuser,
-        isDefaultPassword: schema.users.isDefaultPassword,
-        tokenVersion: schema.users.tokenVersion,
-        settings: schema.users.settings,
-        avatarUrl: schema.users.avatarUrl,
-        avatarSource: schema.users.avatarSource,
-        avatarVersion: schema.users.avatarVersion,
-        provisioningMethod: schema.users.provisioningMethod,
-        permissionName: schema.userPermissions.permissionName,
-      })
-      .from(schema.users)
-      .leftJoin(schema.userPermissions, eq(schema.userPermissions.userId, schema.users.id))
-      .where(eq(schema.users.id, id));
+    const [rows, tagFilterRows, genreFilterRows] = await Promise.all([
+      this.db
+        .select({
+          id: schema.users.id,
+          username: schema.users.username,
+          name: schema.users.name,
+          email: schema.users.email,
+          active: schema.users.active,
+          isSuperuser: schema.users.isSuperuser,
+          isDefaultPassword: schema.users.isDefaultPassword,
+          tokenVersion: schema.users.tokenVersion,
+          settings: schema.users.settings,
+          avatarUrl: schema.users.avatarUrl,
+          avatarSource: schema.users.avatarSource,
+          avatarVersion: schema.users.avatarVersion,
+          provisioningMethod: schema.users.provisioningMethod,
+          permissionName: schema.userPermissions.permissionName,
+        })
+        .from(schema.users)
+        .leftJoin(schema.userPermissions, eq(schema.userPermissions.userId, schema.users.id))
+        .where(eq(schema.users.id, id)),
+      this.db
+        .select({ filterType: schema.userContentFilterTags.filterType, tagId: schema.userContentFilterTags.tagId })
+        .from(schema.userContentFilterTags)
+        .where(eq(schema.userContentFilterTags.userId, id)),
+      this.db
+        .select({ filterType: schema.userContentFilterGenres.filterType, genreId: schema.userContentFilterGenres.genreId })
+        .from(schema.userContentFilterGenres)
+        .where(eq(schema.userContentFilterGenres.userId, id)),
+    ]);
 
     if (rows.length === 0) return null;
 
@@ -145,6 +176,12 @@ export class UserRepository {
       avatarVersion: first.avatarVersion,
       provisioningMethod: first.provisioningMethod,
       permissions,
+      contentFilters: {
+        includeTagIds: tagFilterRows.filter((r) => r.filterType === 'include').map((r) => r.tagId),
+        excludeTagIds: tagFilterRows.filter((r) => r.filterType === 'exclude').map((r) => r.tagId),
+        includeGenreIds: genreFilterRows.filter((r) => r.filterType === 'include').map((r) => r.genreId),
+        excludeGenreIds: genreFilterRows.filter((r) => r.filterType === 'exclude').map((r) => r.genreId),
+      },
     };
   }
 

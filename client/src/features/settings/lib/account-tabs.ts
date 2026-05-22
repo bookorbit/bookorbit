@@ -1,4 +1,4 @@
-export const ACCOUNT_TABS = ['profile', 'notifications'] as const
+export const ACCOUNT_TABS = ['profile', 'notifications', 'restrictions'] as const
 
 export type AccountTab = (typeof ACCOUNT_TABS)[number]
 
@@ -18,6 +18,11 @@ export const ACCOUNT_TAB_INFO: Record<AccountTab, AccountTabInfo> = {
     navLabel: 'Notifications',
     titleLabel: 'Notifications',
     subtitle: 'Choose which notification categories you want to receive.',
+  },
+  restrictions: {
+    navLabel: 'Restrictions',
+    titleLabel: 'Content Restrictions',
+    subtitle: 'View content restrictions applied to your account.',
   },
 }
 

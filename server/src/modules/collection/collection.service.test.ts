@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 
 import type { RequestUser } from '../../common/types/request-user';
 import { CollectionService } from './collection.service';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 function makeUser(overrides?: Partial<RequestUser>): RequestUser {
   return {
@@ -18,6 +19,8 @@ function makeUser(overrides?: Partial<RequestUser>): RequestUser {
     provisioningMethod: 'local',
     permissions: [],
     ...overrides,
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 }
 
@@ -357,6 +360,7 @@ describe('CollectionService', () => {
         userId: 1,
         q: undefined,
         timeZone: 'UTC',
+        contentFilters: EMPTY_CONTENT_FILTER_RULES,
       });
       expect(collectionRepo.buildMembershipWhere).toHaveBeenCalledWith(10);
       expect(bookService.executeBooksQuery).toHaveBeenCalledWith(1, expect.anything(), {
@@ -388,6 +392,7 @@ describe('CollectionService', () => {
           userId: 1,
           q: 'science',
           timeZone: 'UTC',
+          contentFilters: EMPTY_CONTENT_FILTER_RULES,
         },
       );
       expect(bookService.executeBooksQuery).toHaveBeenCalledWith(

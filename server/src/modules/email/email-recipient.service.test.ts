@@ -4,6 +4,7 @@ import { EmailRecipientService } from './email-recipient.service';
 import { EmailRecipientRepository } from './email-recipient.repository';
 import { EmailTemplateService } from './email-template.service';
 import type { RequestUser } from '../../common/types/request-user';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 describe('EmailRecipientService', () => {
   let service: EmailRecipientService;
@@ -23,6 +24,8 @@ describe('EmailRecipientService', () => {
     provisioningMethod: 'manual',
     isSuperuser: false,
     permissions: [],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
   const mockRecipient = { id: 10, userId: 1, name: 'Recipient', email: 'r@test.com' };

@@ -13,6 +13,7 @@ import { ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED } from '../achievement/achievemen
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookService } from './book.service';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 vi.mock('fs/promises', async () => {
   const actual = await vi.importActual('fs/promises');
@@ -74,6 +75,8 @@ function makeUser(overrides?: Partial<RequestUser>): RequestUser {
     provisioningMethod: 'local',
     permissions: [],
     ...overrides,
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 }
 
@@ -109,6 +112,7 @@ function makeService() {
     findAllIds: vi.fn(),
     findIdsByWhere: vi.fn(),
     findCardsCollapsed: vi.fn(),
+    checkBookPassesContentFilters: vi.fn().mockResolvedValue(true),
   };
   const libraryService = {
     verifyUserAccess: vi.fn().mockResolvedValue(undefined),
@@ -1948,7 +1952,13 @@ describe('BookService', () => {
 
       await service.globalQuery(user, { filter: null, sort: [], pagination: { page: 0, size: 10 } } as never);
 
-      expect(queryBuilder.buildWhere).toHaveBeenCalledWith(null, { accessibleLibraryIds: [3, 4], userId: 7, timeZone: 'UTC' });
+      expect(queryBuilder.buildWhere).toHaveBeenCalledWith(null, {
+        accessibleLibraryIds: [3, 4],
+        userId: 7,
+        timeZone: 'UTC',
+        contentFilters: EMPTY_CONTENT_FILTER_RULES,
+        q: undefined,
+      });
       expect(bookRepo.findCards).toHaveBeenCalledWith({
         where: 'GLOBAL_WHERE',
         orderBy: ['GLOBAL_ORDER'],
@@ -2990,6 +3000,7 @@ describe('BookService', () => {
         userId: 42,
         q: 'dune',
         timeZone: 'UTC',
+        contentFilters: EMPTY_CONTENT_FILTER_RULES,
       });
       expect(bookRepo.findIdsByWhere).toHaveBeenCalledWith('where-clause');
     });
@@ -3008,6 +3019,7 @@ describe('BookService', () => {
         userId: 7,
         q: undefined,
         timeZone: 'UTC',
+        contentFilters: EMPTY_CONTENT_FILTER_RULES,
       });
       expect(bookRepo.findIdsByWhere).toHaveBeenCalledWith('library-where');
     });

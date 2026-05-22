@@ -3,6 +3,7 @@ import { and, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, notInArray, sql
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type {
+  ContentFilterRules,
   CurrentlyReadingBook,
   CurrentlyReadingWidgetData,
   HighlightOfTheDayWidgetData,
@@ -30,6 +31,7 @@ import {
   userBookStatus,
   userReadingDailyStats,
 } from '../../db/schema';
+import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { computeLongestStreak, computeStreakData, formatDay } from './dashboard-widget.calculations';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -41,9 +43,14 @@ const DEFAULT_VIRTUAL_PAGE_COUNT = 300;
 export class DashboardWidgetRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  async getCompletedBooksThisYear(userId: number, accessibleLibraryIds: number[]): Promise<number> {
+  private getContentFilterClauses(contentFilters?: ContentFilterRules) {
+    return contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
+  }
+
+  async getCompletedBooksThisYear(userId: number, accessibleLibraryIds: number[], contentFilters?: ContentFilterRules): Promise<number> {
     if (accessibleLibraryIds.length === 0) return 0;
 
+    const cfClauses = this.getContentFilterClauses(contentFilters);
     const yearStart = sql`date_trunc('year', current_date)`;
     const [row] = await this.db
       .select({ count: sql<number>`count(*)::int` })
@@ -56,14 +63,20 @@ export class DashboardWidgetRepository {
           isNotNull(userBookStatus.finishedAt),
           gte(userBookStatus.finishedAt, yearStart),
           inArray(books.libraryId, accessibleLibraryIds),
+          ...cfClauses,
         ),
       );
     return row?.count ?? 0;
   }
 
-  async getCurrentlyReadingBooks(userId: number, accessibleLibraryIds: number[]): Promise<CurrentlyReadingWidgetData> {
+  async getCurrentlyReadingBooks(
+    userId: number,
+    accessibleLibraryIds: number[],
+    contentFilters?: ContentFilterRules,
+  ): Promise<CurrentlyReadingWidgetData> {
     if (accessibleLibraryIds.length === 0) return { books: [] };
 
+    const cfClauses = this.getContentFilterClauses(contentFilters);
     const mergedProgress = sql<number>`
       coalesce(
         (
@@ -102,6 +115,7 @@ export class DashboardWidgetRepository {
           eq(userBookStatus.userId, userId),
           inArray(userBookStatus.status, ['reading', 'rereading']),
           inArray(books.libraryId, accessibleLibraryIds),
+          ...cfClauses,
         ),
       )
       .orderBy(desc(sql`coalesce(${readingProgress.updatedAt}, ${audiobookProgress.updatedAt}, ${userBookStatus.updatedAt})`))
@@ -139,7 +153,8 @@ export class DashboardWidgetRepository {
     return { books: result };
   }
 
-  async getReadingStreak(userId: number, accessibleLibraryIds: number[]): Promise<ReadingStreakWidgetData> {
+  async getReadingStreak(userId: number, accessibleLibraryIds: number[], contentFilters?: ContentFilterRules): Promise<ReadingStreakWidgetData> {
+    void contentFilters;
     if (accessibleLibraryIds.length === 0) {
       return { currentStreak: 0, longestStreak: 0, lastSevenDays: [false, false, false, false, false, false, false] };
     }
@@ -158,37 +173,38 @@ export class DashboardWidgetRepository {
     return computeStreakData(readDays, new Date());
   }
 
-  async getLibraryOverview(accessibleLibraryIds: number[]): Promise<LibraryOverviewWidgetData> {
+  async getLibraryOverview(accessibleLibraryIds: number[], contentFilters?: ContentFilterRules): Promise<LibraryOverviewWidgetData> {
     if (accessibleLibraryIds.length === 0) {
       return { totalBooks: 0, totalAuthors: 0, totalSeries: 0, totalStorageBytes: 0, booksAddedThisYear: 0 };
     }
 
-    const filter = inArray(books.libraryId, accessibleLibraryIds);
+    const cfClauses = this.getContentFilterClauses(contentFilters);
+    const libraryFilter = inArray(books.libraryId, accessibleLibraryIds);
 
     const [[booksRow], [authorsRow], [seriesRow], [storageRow], [thisYearRow]] = await Promise.all([
       this.db
         .select({ count: sql<number>`count(distinct ${books.id})::int` })
         .from(books)
-        .where(filter),
+        .where(and(libraryFilter, ...cfClauses)),
       this.db
         .select({ count: sql<number>`count(distinct ${bookAuthors.authorId})::int` })
         .from(bookAuthors)
         .innerJoin(books, eq(books.id, bookAuthors.bookId))
-        .where(filter),
+        .where(and(libraryFilter, ...cfClauses)),
       this.db
         .select({ count: sql<number>`count(distinct ${bookMetadata.seriesName})::int` })
         .from(bookMetadata)
         .innerJoin(books, eq(books.id, bookMetadata.bookId))
-        .where(and(isNotNull(bookMetadata.seriesName), filter)),
+        .where(and(isNotNull(bookMetadata.seriesName), libraryFilter, ...cfClauses)),
       this.db
         .select({ total: sql<number>`coalesce(sum(${bookFiles.sizeBytes}), 0)::bigint` })
         .from(bookFiles)
         .innerJoin(books, eq(books.id, bookFiles.bookId))
-        .where(filter),
+        .where(and(libraryFilter, ...cfClauses)),
       this.db
         .select({ count: sql<number>`count(*)::int` })
         .from(books)
-        .where(and(gte(books.addedAt, sql`date_trunc('year', current_date)`), filter)),
+        .where(and(gte(books.addedAt, sql`date_trunc('year', current_date)`), libraryFilter, ...cfClauses)),
     ]);
 
     return {
@@ -202,21 +218,28 @@ export class DashboardWidgetRepository {
 
   // ── Highlight of the Day ────────────────────────────────────────
 
-  async getAnnotationCount(userId: number, accessibleLibraryIds: number[]): Promise<number> {
+  async getAnnotationCount(userId: number, accessibleLibraryIds: number[], contentFilters?: ContentFilterRules): Promise<number> {
     if (accessibleLibraryIds.length === 0) return 0;
 
+    const cfClauses = this.getContentFilterClauses(contentFilters);
     const [row] = await this.db
       .select({ count: sql<number>`count(*)::int` })
       .from(annotations)
       .innerJoin(books, eq(books.id, annotations.bookId))
-      .where(and(eq(annotations.userId, userId), inArray(books.libraryId, accessibleLibraryIds)));
+      .where(and(eq(annotations.userId, userId), inArray(books.libraryId, accessibleLibraryIds), ...cfClauses));
 
     return row?.count ?? 0;
   }
 
-  async getAnnotationByOffset(userId: number, accessibleLibraryIds: number[], offset: number): Promise<HighlightOfTheDayWidgetData | null> {
+  async getAnnotationByOffset(
+    userId: number,
+    accessibleLibraryIds: number[],
+    offset: number,
+    contentFilters?: ContentFilterRules,
+  ): Promise<HighlightOfTheDayWidgetData | null> {
     if (accessibleLibraryIds.length === 0) return null;
 
+    const cfClauses = this.getContentFilterClauses(contentFilters);
     const rows = await this.db
       .select({
         text: annotations.text,
@@ -230,7 +253,7 @@ export class DashboardWidgetRepository {
       .from(annotations)
       .innerJoin(books, eq(books.id, annotations.bookId))
       .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-      .where(and(eq(annotations.userId, userId), inArray(books.libraryId, accessibleLibraryIds)))
+      .where(and(eq(annotations.userId, userId), inArray(books.libraryId, accessibleLibraryIds), ...cfClauses))
       .orderBy(annotations.id)
       .limit(1)
       .offset(offset);
@@ -256,6 +279,7 @@ export class DashboardWidgetRepository {
     accessibleLibraryIds: number[],
     monthStart: Date,
     sixMonthsAgo: Date,
+    contentFilters?: ContentFilterRules,
   ): Promise<{
     avgPageCount: number;
     uniqueGenresLast6Months: number;
@@ -289,6 +313,7 @@ export class DashboardWidgetRepository {
       };
     }
 
+    const cfClauses = this.getContentFilterClauses(contentFilters);
     const libFilter = inArray(books.libraryId, accessibleLibraryIds);
     const presentFilter = eq(books.status, 'present');
 
@@ -297,7 +322,7 @@ export class DashboardWidgetRepository {
       .from(userBookStatus)
       .innerJoin(books, eq(books.id, userBookStatus.bookId))
       .innerJoin(bookAuthors, eq(bookAuthors.bookId, books.id))
-      .where(and(eq(userBookStatus.userId, userId), eq(userBookStatus.status, 'read'), libFilter, presentFilter))
+      .where(and(eq(userBookStatus.userId, userId), eq(userBookStatus.status, 'read'), libFilter, presentFilter, ...cfClauses))
       .groupBy(bookAuthors.authorId)
       .as('author_counts');
 
@@ -322,7 +347,7 @@ export class DashboardWidgetRepository {
         .from(userBookStatus)
         .innerJoin(books, eq(books.id, userBookStatus.bookId))
         .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-        .where(and(eq(userBookStatus.userId, userId), eq(userBookStatus.status, 'read'), libFilter, presentFilter)),
+        .where(and(eq(userBookStatus.userId, userId), eq(userBookStatus.status, 'read'), libFilter, presentFilter, ...cfClauses)),
       this.db
         .select({ count: sql<number>`count(distinct ${bookGenres.genreId})::int` })
         .from(userBookStatus)
@@ -335,6 +360,7 @@ export class DashboardWidgetRepository {
             gte(userBookStatus.finishedAt, sixMonthsAgo),
             libFilter,
             presentFilter,
+            ...cfClauses,
           ),
         ),
       this.db
@@ -348,6 +374,7 @@ export class DashboardWidgetRepository {
             lt(userBookStatus.updatedAt, sixMonthsAgo),
             libFilter,
             presentFilter,
+            ...cfClauses,
           ),
         ),
       this.db.select({ count: sql<number>`coalesce(max(${authorCountsSubq.c}), 0)::int` }).from(authorCountsSubq),
@@ -355,7 +382,7 @@ export class DashboardWidgetRepository {
         .select({ count: sql<number>`count(*)::int` })
         .from(userBookStatus)
         .innerJoin(books, eq(books.id, userBookStatus.bookId))
-        .where(and(eq(userBookStatus.userId, userId), eq(userBookStatus.status, 'read'), libFilter, presentFilter)),
+        .where(and(eq(userBookStatus.userId, userId), eq(userBookStatus.status, 'read'), libFilter, presentFilter, ...cfClauses)),
       this.db
         .select({ total: sql<number>`coalesce(sum(${bookMetadata.pageCount}), 0)::int` })
         .from(userBookStatus)
@@ -368,6 +395,7 @@ export class DashboardWidgetRepository {
             gte(userBookStatus.finishedAt, monthStart),
             libFilter,
             presentFilter,
+            ...cfClauses,
           ),
         ),
       this.db
@@ -383,6 +411,7 @@ export class DashboardWidgetRepository {
             lt(bookMetadata.pageCount, 200),
             libFilter,
             presentFilter,
+            ...cfClauses,
           ),
         ),
       this.db
@@ -397,6 +426,7 @@ export class DashboardWidgetRepository {
             gte(userBookStatus.finishedAt, monthStart),
             libFilter,
             presentFilter,
+            ...cfClauses,
           ),
         ),
       this.db
@@ -411,6 +441,7 @@ export class DashboardWidgetRepository {
             gte(userBookStatus.finishedAt, monthStart),
             libFilter,
             presentFilter,
+            ...cfClauses,
           ),
         ),
       this.db
@@ -429,6 +460,7 @@ export class DashboardWidgetRepository {
             isNotNull(bookMetadata.pageCount),
             libFilter,
             presentFilter,
+            ...cfClauses,
           ),
         ),
       this.db
@@ -447,6 +479,7 @@ export class DashboardWidgetRepository {
             isNull(bookMetadata.pageCount),
             libFilter,
             presentFilter,
+            ...cfClauses,
           ),
         ),
       this.db
@@ -473,6 +506,7 @@ export class DashboardWidgetRepository {
             gte(userBookStatus.finishedAt, monthStart),
             libFilter,
             presentFilter,
+            ...cfClauses,
           ),
         ),
       // Reading days within this month for max-streak computation
@@ -490,7 +524,7 @@ export class DashboardWidgetRepository {
         .groupBy(userReadingDailyStats.day),
     ]);
 
-    const streakData = await this.getReadingStreak(userId, accessibleLibraryIds);
+    const streakData = await this.getReadingStreak(userId, accessibleLibraryIds, contentFilters);
     const avgPageCount = avgRow?.avg ?? 0;
     const inferredPageCount = avgPageCount > 0 ? avgPageCount : DEFAULT_VIRTUAL_PAGE_COUNT;
     const pagesFromUnknownPageCountSessions = Math.floor(((sessionUnknownProgressRow?.totalProgress ?? 0) * inferredPageCount) / 100);
@@ -524,6 +558,7 @@ export class DashboardWidgetRepository {
     accessibleLibraryIds: number[],
     yearStart: Date,
     thirtyDaysAgo: Date,
+    contentFilters?: ContentFilterRules,
   ): Promise<{
     booksCompletedYtd: number;
     pagesReadLast30Days: number;
@@ -534,6 +569,7 @@ export class DashboardWidgetRepository {
       return { booksCompletedYtd: 0, pagesReadLast30Days: 0, hoursReadLast30Days: 0, booksCompletedLast30Days: 0 };
     }
 
+    const cfClauses = this.getContentFilterClauses(contentFilters);
     const libFilter = inArray(books.libraryId, accessibleLibraryIds);
     const presentFilter = eq(books.status, 'present');
 
@@ -549,6 +585,7 @@ export class DashboardWidgetRepository {
             gte(userBookStatus.finishedAt, yearStart),
             libFilter,
             presentFilter,
+            ...cfClauses,
           ),
         ),
       this.db
@@ -566,6 +603,7 @@ export class DashboardWidgetRepository {
             gte(userBookStatus.finishedAt, thirtyDaysAgo),
             libFilter,
             presentFilter,
+            ...cfClauses,
           ),
         ),
       this.db
@@ -592,9 +630,15 @@ export class DashboardWidgetRepository {
 
   // ── Neglected Gems ──────────────────────────────────────────────
 
-  async getNeglectedGems(userId: number, accessibleLibraryIds: number[], today: Date): Promise<NeglectedGemsWidgetData> {
+  async getNeglectedGems(
+    userId: number,
+    accessibleLibraryIds: number[],
+    today: Date,
+    contentFilters?: ContentFilterRules,
+  ): Promise<NeglectedGemsWidgetData> {
     if (accessibleLibraryIds.length === 0) return { gems: [] };
 
+    const cfClauses = this.getContentFilterClauses(contentFilters);
     const booksAlreadyRead = this.db
       .select({ bookId: userBookStatus.bookId })
       .from(userBookStatus)
@@ -622,6 +666,7 @@ export class DashboardWidgetRepository {
           eq(books.status, 'present'),
           gte(userBookRatings.rating, 4),
           isNull(booksAlreadyRead.bookId),
+          ...cfClauses,
         ),
       )
       .orderBy(books.addedAt)
@@ -645,6 +690,7 @@ export class DashboardWidgetRepository {
     userId: number,
     accessibleLibraryIds: number[],
     since: Date,
+    contentFilters?: ContentFilterRules,
   ): Promise<{
     avgPageCount: number;
     uniqueGenres: number;
@@ -657,6 +703,7 @@ export class DashboardWidgetRepository {
       return { avgPageCount: 0, uniqueGenres: 0, totalBooks: 0, readingDaysRatio: 0, peakHour: 12, avgPagesPerHour: null };
     }
 
+    const cfClauses = this.getContentFilterClauses(contentFilters);
     const libFilter = inArray(books.libraryId, accessibleLibraryIds);
     const presentFilter = eq(books.status, 'present');
 
@@ -669,13 +716,13 @@ export class DashboardWidgetRepository {
         .from(userBookStatus)
         .innerJoin(books, eq(books.id, userBookStatus.bookId))
         .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-        .where(and(eq(userBookStatus.userId, userId), eq(userBookStatus.status, 'read'), libFilter, presentFilter)),
+        .where(and(eq(userBookStatus.userId, userId), eq(userBookStatus.status, 'read'), libFilter, presentFilter, ...cfClauses)),
       this.db
         .select({ count: sql<number>`count(distinct ${bookGenres.genreId})::int` })
         .from(userBookStatus)
         .innerJoin(books, eq(books.id, userBookStatus.bookId))
         .innerJoin(bookGenres, eq(bookGenres.bookId, books.id))
-        .where(and(eq(userBookStatus.userId, userId), eq(userBookStatus.status, 'read'), libFilter, presentFilter)),
+        .where(and(eq(userBookStatus.userId, userId), eq(userBookStatus.status, 'read'), libFilter, presentFilter, ...cfClauses)),
       this.db
         .select({
           day: userReadingDailyStats.day,
@@ -698,7 +745,7 @@ export class DashboardWidgetRepository {
         .from(readingSessions)
         .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
         .innerJoin(books, eq(books.id, bookFiles.bookId))
-        .where(and(eq(readingSessions.userId, userId), libFilter, presentFilter))
+        .where(and(eq(readingSessions.userId, userId), libFilter, presentFilter, ...cfClauses))
         .groupBy(sql`extract(hour from ${readingSessions.startedAt})`)
         .orderBy(desc(sql`sum(${readingSessions.durationSeconds})`))
         .limit(1),
@@ -716,6 +763,7 @@ export class DashboardWidgetRepository {
             eq(readingSessions.userId, userId),
             libFilter,
             presentFilter,
+            ...cfClauses,
             gte(readingSessions.startedAt, since),
             isNotNull(readingSessions.progressDelta),
             gt(readingSessions.progressDelta, 0),
@@ -739,6 +787,7 @@ export class DashboardWidgetRepository {
             eq(readingSessions.userId, userId),
             libFilter,
             presentFilter,
+            ...cfClauses,
             gte(readingSessions.startedAt, since),
             isNotNull(readingSessions.progressDelta),
             gt(readingSessions.progressDelta, 0),
@@ -769,9 +818,15 @@ export class DashboardWidgetRepository {
 
   // ── The Long Wait ───────────────────────────────────────────────
 
-  async getLongWait(userId: number, accessibleLibraryIds: number[], today: Date): Promise<LongWaitWidgetData | null> {
+  async getLongWait(
+    userId: number,
+    accessibleLibraryIds: number[],
+    today: Date,
+    contentFilters?: ContentFilterRules,
+  ): Promise<LongWaitWidgetData | null> {
     if (accessibleLibraryIds.length === 0) return null;
 
+    const cfClauses = this.getContentFilterClauses(contentFilters);
     const booksWithProgress = this.db
       .select({ bookId: bookFiles.bookId })
       .from(readingProgress)
@@ -809,6 +864,7 @@ export class DashboardWidgetRepository {
           eq(books.status, 'present'),
           isNull(booksWithProgress.bookId),
           isNull(booksWithStatus.bookId),
+          ...cfClauses,
         ),
       )
       .orderBy(books.addedAt)
@@ -835,6 +891,7 @@ export class DashboardWidgetRepository {
   async getDiversityData(
     userId: number,
     accessibleLibraryIds: number[],
+    contentFilters?: ContentFilterRules,
   ): Promise<{
     uniqueGenresRead: number;
     totalGenresInLibrary: number;
@@ -847,6 +904,7 @@ export class DashboardWidgetRepository {
       return { uniqueGenresRead: 0, totalGenresInLibrary: 0, uniqueAuthorsRead: 0, totalBooksRead: 0, publicationYears: [], uniqueLanguages: 0 };
     }
 
+    const cfClauses = this.getContentFilterClauses(contentFilters);
     const libFilter = inArray(books.libraryId, accessibleLibraryIds);
     const presentFilter = eq(books.status, 'present');
     const readFilter = and(eq(userBookStatus.userId, userId), eq(userBookStatus.status, 'read'));
@@ -857,35 +915,35 @@ export class DashboardWidgetRepository {
         .from(userBookStatus)
         .innerJoin(books, eq(books.id, userBookStatus.bookId))
         .innerJoin(bookGenres, eq(bookGenres.bookId, books.id))
-        .where(and(readFilter, libFilter, presentFilter)),
+        .where(and(readFilter, libFilter, presentFilter, ...cfClauses)),
       this.db
         .select({ count: sql<number>`count(distinct ${bookGenres.genreId})::int` })
         .from(bookGenres)
         .innerJoin(books, eq(books.id, bookGenres.bookId))
-        .where(and(libFilter, presentFilter)),
+        .where(and(libFilter, presentFilter, ...cfClauses)),
       this.db
         .select({ count: sql<number>`count(distinct ${bookAuthors.authorId})::int` })
         .from(userBookStatus)
         .innerJoin(books, eq(books.id, userBookStatus.bookId))
         .innerJoin(bookAuthors, eq(bookAuthors.bookId, books.id))
-        .where(and(readFilter, libFilter, presentFilter)),
+        .where(and(readFilter, libFilter, presentFilter, ...cfClauses)),
       this.db
         .select({ count: sql<number>`count(*)::int` })
         .from(userBookStatus)
         .innerJoin(books, eq(books.id, userBookStatus.bookId))
-        .where(and(readFilter, libFilter, presentFilter)),
+        .where(and(readFilter, libFilter, presentFilter, ...cfClauses)),
       this.db
         .select({ year: bookMetadata.publishedYear })
         .from(userBookStatus)
         .innerJoin(books, eq(books.id, userBookStatus.bookId))
         .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-        .where(and(readFilter, libFilter, presentFilter, isNotNull(bookMetadata.publishedYear))),
+        .where(and(readFilter, libFilter, presentFilter, isNotNull(bookMetadata.publishedYear), ...cfClauses)),
       this.db
         .select({ count: sql<number>`count(distinct ${bookMetadata.language})::int` })
         .from(userBookStatus)
         .innerJoin(books, eq(books.id, userBookStatus.bookId))
         .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-        .where(and(readFilter, libFilter, presentFilter, isNotNull(bookMetadata.language))),
+        .where(and(readFilter, libFilter, presentFilter, isNotNull(bookMetadata.language), ...cfClauses)),
     ]);
 
     return {
@@ -900,7 +958,13 @@ export class DashboardWidgetRepository {
 
   // ── Reading Rhythm (raw daily data) ─────────────────────────────
 
-  async getReadingRhythmData(userId: number, accessibleLibraryIds: number[], since: string): Promise<{ day: string; readingSeconds: number }[]> {
+  async getReadingRhythmData(
+    userId: number,
+    accessibleLibraryIds: number[],
+    since: string,
+    contentFilters?: ContentFilterRules,
+  ): Promise<{ day: string; readingSeconds: number }[]> {
+    void contentFilters;
     if (accessibleLibraryIds.length === 0) return [];
 
     const rows = await this.db

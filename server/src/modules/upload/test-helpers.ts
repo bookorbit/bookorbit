@@ -1,3 +1,4 @@
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 
 export function makeRequestUser(overrides?: Partial<RequestUser>): RequestUser {
@@ -15,6 +16,7 @@ export function makeRequestUser(overrides?: Partial<RequestUser>): RequestUser {
     provisioningMethod: 'local',
     permissions: [],
     ...overrides,
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 }
 

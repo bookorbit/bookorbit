@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { UserPlus, Plus, Pencil, KeyRound, Trash2, ShieldCheck, MoreVertical } from 'lucide-vue-next'
+import { UserPlus, Plus, Pencil, KeyRound, Trash2, ShieldCheck, MoreVertical, ShieldAlert } from 'lucide-vue-next'
 import { api } from '@/lib/api'
 import type { AuthUser } from '@bookorbit/types'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -23,6 +23,7 @@ interface Library {
 
 interface UserRow extends AuthUser {
   id: number
+  hasContentFilters?: boolean
 }
 
 const route = useRoute()
@@ -192,8 +193,19 @@ function openMagicLinkCreate() {
     </button>
   </div>
 
+  <!-- Embedded CTA -->
+  <div v-if="props.embedded && activeTab === 'users'" class="mb-4 flex items-center justify-end md:mb-5">
+    <button class="settings-btn-primary w-full justify-center md:w-auto" @click="openCreate">
+      <UserPlus :size="14" />
+      Create user
+    </button>
+  </div>
+
   <!-- Mobile CTA (when no tab bar is shown, keep the sticky button) -->
-  <div v-if="!isSuperuser" class="md:hidden sticky top-0 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2 mt-4 mb-3">
+  <div
+    v-if="!isSuperuser && !props.embedded"
+    class="md:hidden sticky top-0 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2 mt-4 mb-3"
+  >
     <button class="settings-btn-primary w-full min-h-10 justify-center" @click="openCreate">
       <UserPlus :size="14" />
       Create user
@@ -235,6 +247,17 @@ function openMagicLinkCreate() {
                   <span v-else class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                     {{ user.permissions?.length ?? 0 }} permissions
                   </span>
+                  <Tooltip v-if="user.hasContentFilters">
+                    <TooltipTrigger as-child>
+                      <span
+                        class="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400"
+                      >
+                        <ShieldAlert :size="11" />
+                        Filtered
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>Content restrictions active</TooltipContent>
+                  </Tooltip>
                 </div>
               </td>
               <td class="px-4 py-3">

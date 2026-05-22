@@ -1,6 +1,7 @@
 import type { RequestUser } from '../../common/types/request-user';
 import { BookmarkController } from './bookmark.controller';
 import type { CreateBookmarkDto } from './dto/create-bookmark.dto';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 describe('BookmarkController', () => {
   const user: RequestUser = {
@@ -16,6 +17,8 @@ describe('BookmarkController', () => {
     provisioningMethod: 'local',
     isSuperuser: false,
     permissions: [],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
   const service = {

@@ -9,6 +9,7 @@ import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
 import { IdentifiableProvider, MetadataProvider } from './providers/metadata-provider';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 function candidate(provider: MetadataProviderKey, providerId: string, title = `${provider}-${providerId}`): MetadataCandidate {
   return { provider, providerId, title };
@@ -29,6 +30,8 @@ function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
     provisioningMethod: 'local',
     permissions: [],
     ...overrides,
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 }
 

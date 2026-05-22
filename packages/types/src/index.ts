@@ -1,6 +1,7 @@
 export * from "./audit";
 export * from "./auth";
 export * from "./permissions";
+export * from "./content-filter";
 export * from "./metadata-preferences";
 export * from "./metadata-lock";
 export * from "./dashboard";

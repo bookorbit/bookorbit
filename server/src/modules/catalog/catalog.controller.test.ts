@@ -4,6 +4,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { SearchCatalogQueryDto } from './dto/search-catalog-query.dto';
 import { CatalogController } from './catalog.controller';
 import { CatalogService } from './catalog.service';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 function makeController() {
   const service = {
@@ -95,7 +96,7 @@ describe('CatalogController', () => {
 
   it('passes current user id to collection search', async () => {
     const { controller, service } = makeController();
-    const user = { id: 42 } as RequestUser;
+    const user = { id: 42, contentFilters: EMPTY_CONTENT_FILTER_RULES } as RequestUser;
 
     await controller.searchCollections(user, { q: 'Favorites' });
 

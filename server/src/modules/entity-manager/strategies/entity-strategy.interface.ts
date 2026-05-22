@@ -19,6 +19,7 @@ export interface BrowseParams {
   pageSize: number;
   sortBy: 'name' | 'bookCount';
   sortOrder: 'asc' | 'desc';
+  contentFilters?: import('@bookorbit/types').ContentFilterRules;
 }
 
 export interface BrowseResult {

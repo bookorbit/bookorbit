@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 
+import { ContentFilterRepository } from './content-filter.repository';
 import { OidcIdentityRepository } from './oidc-identity.repository';
 import { UserController } from './user.controller';
 import { UserAvatarStorageService } from './user-avatar-storage.service';
@@ -17,6 +18,7 @@ describe('UserModule', () => {
       UserAvatarService,
       UserAvatarStorageService,
       OidcIdentityRepository,
+      ContentFilterRepository,
     ]);
     expect(Reflect.getMetadata('exports', UserModule)).toEqual([
       UserService,
@@ -24,6 +26,7 @@ describe('UserModule', () => {
       UserAvatarService,
       UserAvatarStorageService,
       OidcIdentityRepository,
+      ContentFilterRepository,
     ]);
   });
 });

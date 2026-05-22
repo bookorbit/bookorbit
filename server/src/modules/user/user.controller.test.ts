@@ -35,6 +35,8 @@ describe('UserController', () => {
     getLibraryIds: vi.fn(),
     setLibraries: vi.fn(),
     adminResetPassword: vi.fn(),
+    getContentFilters: vi.fn(),
+    setContentFilters: vi.fn(),
   };
   const userAvatarService = {
     uploadOwnAvatar: vi.fn(),
@@ -180,6 +182,31 @@ describe('UserController', () => {
     expect(userService.getLibraryIds).toHaveBeenCalledWith(8);
     expect(userService.setLibraries).toHaveBeenCalledWith(8, [1, 2], requester);
     expect(userService.adminResetPassword).toHaveBeenCalledWith(8, requester);
+  });
+
+  describe('content filter endpoints', () => {
+    it('delegates content filter reads and writes to the service', async () => {
+      const requester = { id: 1, isSuperuser: true } as any;
+      const currentUser = { id: 7 } as any;
+      const filters = {
+        includeTags: [{ id: 1, name: 'Sci-Fi' }],
+        excludeTags: [],
+        includeGenres: [{ id: 2, name: 'Fantasy' }],
+        excludeGenres: [],
+      };
+      const dto = { includeTagIds: [1], excludeGenreIds: [2] };
+
+      userService.getContentFilters.mockResolvedValueOnce(filters).mockResolvedValueOnce(filters);
+      userService.setContentFilters.mockResolvedValue(undefined);
+
+      await expect(controller.getMyContentFilters(currentUser)).resolves.toEqual(filters);
+      await expect(controller.getContentFilters(9, requester)).resolves.toEqual(filters);
+      await expect(controller.setContentFilters(9, dto as any, requester)).resolves.toBeUndefined();
+
+      expect(userService.getContentFilters).toHaveBeenNthCalledWith(1, 7, currentUser);
+      expect(userService.getContentFilters).toHaveBeenNthCalledWith(2, 9, requester);
+      expect(userService.setContentFilters).toHaveBeenCalledWith(9, dto, requester);
+    });
   });
 
   it('defines auditable metadata for create/update/delete/superuser operations', () => {

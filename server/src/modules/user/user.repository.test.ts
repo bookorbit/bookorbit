@@ -152,7 +152,18 @@ describe('UserRepository', () => {
     const rowsJoin = vi.fn().mockReturnValue({ where: rowsWhere });
     const rowsFrom = vi.fn().mockReturnValue({ leftJoin: rowsJoin });
 
-    select.mockReturnValueOnce({ from: idFrom }).mockReturnValueOnce({ from: countFrom }).mockReturnValueOnce({ from: rowsFrom });
+    const tagFilterWhere = vi.fn().mockResolvedValue([]);
+    const tagFilterFrom = vi.fn().mockReturnValue({ where: tagFilterWhere });
+
+    const genreFilterWhere = vi.fn().mockResolvedValue([]);
+    const genreFilterFrom = vi.fn().mockReturnValue({ where: genreFilterWhere });
+
+    select
+      .mockReturnValueOnce({ from: idFrom })
+      .mockReturnValueOnce({ from: countFrom })
+      .mockReturnValueOnce({ from: rowsFrom })
+      .mockReturnValueOnce({ from: tagFilterFrom })
+      .mockReturnValueOnce({ from: genreFilterFrom });
 
     const result = await repo.findAll(0, 25);
 
@@ -170,7 +181,11 @@ describe('UserRepository', () => {
     const where = vi.fn().mockResolvedValue([]);
     const join = vi.fn().mockReturnValue({ where });
     const from = vi.fn().mockReturnValue({ leftJoin: join });
-    select.mockReturnValue({ from });
+
+    const filterWhere = vi.fn().mockResolvedValue([]);
+    const filterFrom = vi.fn().mockReturnValue({ where: filterWhere });
+
+    select.mockReturnValueOnce({ from }).mockReturnValueOnce({ from: filterFrom }).mockReturnValueOnce({ from: filterFrom });
 
     await expect(repo.findByIdWithPermissions(99)).resolves.toBeNull();
   });
@@ -222,7 +237,11 @@ describe('UserRepository', () => {
     ]);
     const join = vi.fn().mockReturnValue({ where });
     const from = vi.fn().mockReturnValue({ leftJoin: join });
-    select.mockReturnValue({ from });
+
+    const filterWhere = vi.fn().mockResolvedValue([]);
+    const filterFrom = vi.fn().mockReturnValue({ where: filterWhere });
+
+    select.mockReturnValueOnce({ from }).mockReturnValueOnce({ from: filterFrom }).mockReturnValueOnce({ from: filterFrom });
 
     const user = await repo.findByIdWithPermissions(3);
 

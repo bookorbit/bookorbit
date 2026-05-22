@@ -17,7 +17,8 @@ import {
   userLibraryAccess,
 } from '../../db/schema';
 import { BookQueryBuilder } from '../book/book-query-builder.service';
-import type { GroupRule } from '@bookorbit/types';
+import type { ContentFilterRules, GroupRule } from '@bookorbit/types';
+import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -101,6 +102,7 @@ export class OpdsBookService {
     size: number,
     filters?: { libraryId?: number; collectionId?: number; smartScopeId?: number; author?: string; series?: string; q?: string },
     isSuperuser = false,
+    contentFilters?: ContentFilterRules,
   ): Promise<{ entries: OpdsBookEntry[]; total: number }> {
     const accessibleIds = await this.getAccessibleLibraryIds(userId, isSuperuser);
     if (accessibleIds.length === 0) return { entries: [], total: 0 };
@@ -121,7 +123,7 @@ export class OpdsBookService {
     }
 
     if (filters?.smartScopeId) {
-      return this.getBooksBySmartScope(userId, filters.smartScopeId, accessibleIds, sortOrder, page, size);
+      return this.getBooksBySmartScope(userId, filters.smartScopeId, accessibleIds, sortOrder, page, size, contentFilters);
     }
 
     const clauses: SQL[] = [inArray(books.libraryId, accessibleIds), eq(books.status, 'present')];
@@ -147,6 +149,10 @@ export class OpdsBookService {
     if (filters?.q) {
       const searchClause = this.buildCatalogSearchClause(filters.q);
       if (searchClause) clauses.push(searchClause);
+    }
+
+    if (!isSuperuser && contentFilters) {
+      clauses.push(...buildContentFilterClauses(contentFilters, this.db));
     }
 
     return this.paginatedBookQuery(and(...clauses)!, sortOrder, page, size);
@@ -175,19 +181,33 @@ export class OpdsBookService {
     return or(...clauses)!;
   }
 
-  async getRecentBooksPage(userId: number, page: number, size: number, isSuperuser = false): Promise<{ entries: OpdsBookEntry[]; total: number }> {
+  async getRecentBooksPage(
+    userId: number,
+    page: number,
+    size: number,
+    isSuperuser = false,
+    contentFilters?: ContentFilterRules,
+  ): Promise<{ entries: OpdsBookEntry[]; total: number }> {
     const accessibleIds = await this.getAccessibleLibraryIds(userId, isSuperuser);
     if (accessibleIds.length === 0) return { entries: [], total: 0 };
-    const where = and(inArray(books.libraryId, accessibleIds), eq(books.status, 'present'));
+    const clauses: SQL[] = [inArray(books.libraryId, accessibleIds), eq(books.status, 'present')];
+    if (!isSuperuser && contentFilters) {
+      clauses.push(...buildContentFilterClauses(contentFilters, this.db));
+    }
+    const where = and(...clauses);
     return this.paginatedBookQuery(where!, 'recent', page, size);
   }
 
-  async getRandomBooks(userId: number, count: number, isSuperuser = false): Promise<OpdsBookEntry[]> {
+  async getRandomBooks(userId: number, count: number, isSuperuser = false, contentFilters?: ContentFilterRules): Promise<OpdsBookEntry[]> {
     if (count <= 0) return [];
     const accessibleIds = await this.getAccessibleLibraryIds(userId, isSuperuser);
     if (accessibleIds.length === 0) return [];
 
-    const baseFilter = and(inArray(books.libraryId, accessibleIds), eq(books.status, 'present'))!;
+    const baseClauses: SQL[] = [inArray(books.libraryId, accessibleIds), eq(books.status, 'present')];
+    if (!isSuperuser && contentFilters) {
+      baseClauses.push(...buildContentFilterClauses(contentFilters, this.db));
+    }
+    const baseFilter = and(...baseClauses)!;
     const [bounds] = await this.db
       .select({
         minId: sql<number | null>`min(${books.id})`,
@@ -224,9 +244,11 @@ export class OpdsBookService {
     return this.fetchBookEntries(ids);
   }
 
-  async getDistinctAuthors(userId: number, isSuperuser = false): Promise<{ name: string; bookCount: number }[]> {
+  async getDistinctAuthors(userId: number, isSuperuser = false, contentFilters?: ContentFilterRules): Promise<{ name: string; bookCount: number }[]> {
     const accessibleIds = await this.getAccessibleLibraryIds(userId, isSuperuser);
     if (accessibleIds.length === 0) return [];
+
+    const filterClauses = !isSuperuser && contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
 
     return this.db
       .select({
@@ -235,15 +257,21 @@ export class OpdsBookService {
       })
       .from(authors)
       .innerJoin(bookAuthors, eq(bookAuthors.authorId, authors.id))
-      .innerJoin(books, and(eq(books.id, bookAuthors.bookId), eq(books.status, 'present')))
+      .innerJoin(books, and(eq(books.id, bookAuthors.bookId), eq(books.status, 'present'), ...filterClauses))
       .where(inArray(books.libraryId, accessibleIds))
       .groupBy(authors.name, authors.sortName)
       .orderBy(sql`${authors.sortName} ASC NULLS LAST`);
   }
 
-  async getDistinctSeries(userId: number, isSuperuser = false): Promise<{ name: string | null; bookCount: number }[]> {
+  async getDistinctSeries(
+    userId: number,
+    isSuperuser = false,
+    contentFilters?: ContentFilterRules,
+  ): Promise<{ name: string | null; bookCount: number }[]> {
     const accessibleIds = await this.getAccessibleLibraryIds(userId, isSuperuser);
     if (accessibleIds.length === 0) return [];
+
+    const filterClauses = !isSuperuser && contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
 
     return this.db
       .select({
@@ -251,7 +279,7 @@ export class OpdsBookService {
         bookCount: sql<number>`count(DISTINCT ${books.id})::int`,
       })
       .from(bookMetadata)
-      .innerJoin(books, and(eq(books.id, bookMetadata.bookId), eq(books.status, 'present')))
+      .innerJoin(books, and(eq(books.id, bookMetadata.bookId), eq(books.status, 'present'), ...filterClauses))
       .where(and(inArray(books.libraryId, accessibleIds), sql`${bookMetadata.seriesName} IS NOT NULL`))
       .groupBy(bookMetadata.seriesName)
       .orderBy(sql`${bookMetadata.seriesName} ASC`);
@@ -283,11 +311,22 @@ export class OpdsBookService {
       .orderBy(smartScopes.name);
   }
 
-  async validateBookAccess(bookId: number, userId: number, isSuperuser = false): Promise<void> {
+  async validateBookAccess(bookId: number, userId: number, isSuperuser = false, contentFilters?: ContentFilterRules): Promise<void> {
     const accessibleIds = await this.getAccessibleLibraryIds(userId, isSuperuser);
     const [row] = await this.db.select({ libraryId: books.libraryId }).from(books).where(eq(books.id, bookId)).limit(1);
     if (!row || !accessibleIds.includes(row.libraryId)) {
       throw new ForbiddenException('No access to this book');
+    }
+    if (!isSuperuser && contentFilters) {
+      const filterClauses = buildContentFilterClauses(contentFilters, this.db);
+      if (filterClauses.length > 0) {
+        const [filtered] = await this.db
+          .select({ id: books.id })
+          .from(books)
+          .where(and(eq(books.id, bookId), ...filterClauses))
+          .limit(1);
+        if (!filtered) throw new ForbiddenException('No access to this book');
+      }
     }
   }
 
@@ -330,12 +369,17 @@ export class OpdsBookService {
     sortOrder: OpdsSortOrder,
     page: number,
     size: number,
+    contentFilters?: ContentFilterRules,
   ): Promise<{ entries: OpdsBookEntry[]; total: number }> {
     const [smartScope] = await this.db.select().from(smartScopes).where(eq(smartScopes.id, smartScopeId)).limit(1);
     if (!smartScope) return { entries: [], total: 0 };
     if (!smartScope.isPublic && smartScope.userId !== userId) return { entries: [], total: 0 };
 
-    const where = this.queryBuilder.buildWhere(smartScope.filter as GroupRule | null, { accessibleLibraryIds: accessibleIds, userId });
+    const where = this.queryBuilder.buildWhere(smartScope.filter as GroupRule | null, {
+      accessibleLibraryIds: accessibleIds,
+      userId,
+      contentFilters,
+    });
     const statusClause = eq(books.status, 'present');
     const combinedWhere = where ? and(where, statusClause) : statusClause;
     return this.paginatedBookQuery(combinedWhere!, sortOrder, page, size);

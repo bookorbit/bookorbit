@@ -3,12 +3,12 @@ import { ACCOUNT_TABS, ACCOUNT_TAB_INFO, normalizeAccountTab } from '../lib/acco
 
 describe('account-tabs', () => {
   describe('ACCOUNT_TABS', () => {
-    it('contains exactly profile and notifications', () => {
-      expect(ACCOUNT_TABS).toEqual(['profile', 'notifications'])
+    it('contains exactly profile, notifications, and restrictions', () => {
+      expect(ACCOUNT_TABS).toEqual(['profile', 'notifications', 'restrictions'])
     })
 
-    it('has length 2', () => {
-      expect(ACCOUNT_TABS.length).toBe(2)
+    it('has length 3', () => {
+      expect(ACCOUNT_TABS.length).toBe(3)
     })
   })
 
@@ -40,6 +40,11 @@ describe('account-tabs', () => {
       expect(ACCOUNT_TAB_INFO.notifications.navLabel).toBe('Notifications')
       expect(ACCOUNT_TAB_INFO.notifications.titleLabel).toBe('Notifications')
     })
+
+    it('restrictions entry has correct labels', () => {
+      expect(ACCOUNT_TAB_INFO.restrictions.navLabel).toBe('Restrictions')
+      expect(ACCOUNT_TAB_INFO.restrictions.titleLabel).toBe('Content Restrictions')
+    })
   })
 
   describe('normalizeAccountTab', () => {
@@ -69,6 +74,10 @@ describe('account-tabs', () => {
 
     it('returns notifications when given "notifications"', () => {
       expect(normalizeAccountTab('notifications')).toBe('notifications')
+    })
+
+    it('returns restrictions when given "restrictions"', () => {
+      expect(normalizeAccountTab('restrictions')).toBe('restrictions')
     })
 
     it('is case-sensitive (Profile is not valid)', () => {

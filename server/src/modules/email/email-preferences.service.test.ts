@@ -5,6 +5,7 @@ import { EmailProviderService } from './email-provider.service';
 import { EmailRecipientService } from './email-recipient.service';
 import { EmailTemplateService } from './email-template.service';
 import type { RequestUser } from '../../common/types/request-user';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 describe('EmailPreferencesService', () => {
   let service: EmailPreferencesService;
@@ -26,6 +27,8 @@ describe('EmailPreferencesService', () => {
     provisioningMethod: 'manual',
     isSuperuser: false,
     permissions: [],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
   const mockPrefs = { userId: 1, defaultProviderId: 10, defaultRecipientId: 20 };

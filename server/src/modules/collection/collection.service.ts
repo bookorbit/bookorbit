@@ -237,6 +237,7 @@ export class CollectionService {
         userId: user.id,
         q: query.q,
         timeZone,
+        contentFilters: user.isSuperuser ? undefined : user.contentFilters,
       });
       const where = and(filterWhere, this.collectionRepo.buildMembershipWhere(id));
       const page = await this.bookService.executeBooksQuery(user.id, where, query);

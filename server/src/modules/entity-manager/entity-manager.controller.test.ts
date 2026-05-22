@@ -1,7 +1,8 @@
 import { EntityManagerController } from './entity-manager.controller';
 import type { RequestUser } from '../../common/types/request-user';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
-const mockUser: RequestUser = { id: 1, username: 'test', isSuperuser: false, permissions: [] };
+const mockUser: RequestUser = { id: 1, username: 'test', isSuperuser: false, permissions: [], contentFilters: EMPTY_CONTENT_FILTER_RULES };
 
 function makeController() {
   const service = {

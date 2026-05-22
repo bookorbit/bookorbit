@@ -33,5 +33,14 @@ export class EmailBookAccessService {
         await this.libraryService.verifyUserAccess(user.id, libraryId, user.isSuperuser);
       }),
     );
+
+    if (!user.isSuperuser) {
+      await Promise.all(
+        uniqueBookIds.map(async (bookId) => {
+          const passes = await this.bookReadService.checkBookPassesContentFilters(bookId, user.contentFilters);
+          if (!passes) throw new NotFoundException(`Book ${bookId} not found`);
+        }),
+      );
+    }
   }
 }

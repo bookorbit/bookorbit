@@ -5,6 +5,7 @@ import { EmailRecipientGroupRepository } from './email-recipient-group.repositor
 import { EmailRecipientRepository } from './email-recipient.repository';
 import { EmailTemplateService } from './email-template.service';
 import type { RequestUser } from '../../common/types/request-user';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 describe('EmailRecipientGroupService', () => {
   let service: EmailRecipientGroupService;
@@ -25,6 +26,8 @@ describe('EmailRecipientGroupService', () => {
     provisioningMethod: 'manual',
     isSuperuser: false,
     permissions: [],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
   const mockGroup = { id: 10, userId: 1, name: 'Test Group' };

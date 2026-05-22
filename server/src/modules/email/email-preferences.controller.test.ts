@@ -2,6 +2,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { EmailPreferencesController } from './email-preferences.controller';
 import type { UpdateEmailPreferencesDto } from './dto/update-email-preferences.dto';
 import { EmailPreferencesService } from './email-preferences.service';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 describe('EmailPreferencesController', () => {
   const user: RequestUser = {
@@ -17,6 +18,8 @@ describe('EmailPreferencesController', () => {
     provisioningMethod: 'manual',
     isSuperuser: false,
     permissions: [],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
   it('delegates findForUser with current user', async () => {

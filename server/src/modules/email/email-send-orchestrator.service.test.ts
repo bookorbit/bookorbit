@@ -16,6 +16,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import type { SendBookDto } from './dto/send-book.dto';
 import * as fs from 'fs';
 import { KINDLE_CONVERT_SUBJECT } from './email-send.constants';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 vi.mock('fs');
 
@@ -43,6 +44,8 @@ describe('EmailSendOrchestrator', () => {
     provisioningMethod: 'manual',
     isSuperuser: false,
     permissions: [],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
   const mockRecipient = {

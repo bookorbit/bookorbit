@@ -43,6 +43,10 @@ describe('UserService', () => {
     replaceViewerLibraries: vi.fn(),
     findExistingLibraryIds: vi.fn(),
   };
+  const contentFilterRepo = {
+    findByUserIdWithNames: vi.fn(),
+    replaceFilters: vi.fn(),
+  };
 
   const config = { get: vi.fn() };
 
@@ -50,7 +54,7 @@ describe('UserService', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    service = new UserService(userRepo as any, config as any);
+    service = new UserService(userRepo as any, config as any, contentFilterRepo as any);
 
     mockHash.mockResolvedValue('hashed-secret');
     mockRandomBytes.mockReturnValue(Buffer.from('abcd', 'hex'));
@@ -404,6 +408,85 @@ describe('UserService', () => {
     expect(userRepo.replaceViewerLibraries).toHaveBeenCalledWith(2, [3, 7]);
   });
 
+  it('getContentFilters throws when the target user does not exist', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue(null);
+
+    await expect(service.getContentFilters(5, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('getContentFilters allows reading your own filters', async () => {
+    const filters = {
+      includeTags: [{ id: 1, name: 'Sci-Fi' }],
+      excludeTags: [],
+      includeGenres: [],
+      excludeGenres: [{ id: 2, name: 'Horror' }],
+    };
+    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 5, isSuperuser: false });
+    contentFilterRepo.findByUserIdWithNames.mockResolvedValue(filters);
+
+    await expect(service.getContentFilters(5, reqUser({ id: 5 }))).resolves.toEqual(filters);
+    expect(contentFilterRepo.findByUserIdWithNames).toHaveBeenCalledWith(5);
+  });
+
+  it('getContentFilters blocks non-superusers from reading another user filters', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 5, isSuperuser: false });
+
+    await expect(service.getContentFilters(5, reqUser({ id: 1, isSuperuser: false }))).rejects.toBeInstanceOf(ForbiddenException);
+    expect(contentFilterRepo.findByUserIdWithNames).not.toHaveBeenCalled();
+  });
+
+  it('getContentFilters allows superusers to read another user filters', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 5, isSuperuser: false });
+    contentFilterRepo.findByUserIdWithNames.mockResolvedValue({
+      includeTags: [],
+      excludeTags: [],
+      includeGenres: [],
+      excludeGenres: [],
+    });
+
+    await expect(service.getContentFilters(5, reqUser({ id: 1, isSuperuser: true }))).resolves.toEqual({
+      includeTags: [],
+      excludeTags: [],
+      includeGenres: [],
+      excludeGenres: [],
+    });
+  });
+
+  it('setContentFilters throws when the target user does not exist', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue(null);
+
+    await expect(service.setContentFilters(5, {} as any, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('setContentFilters blocks non-superusers from updating filters', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 5, isSuperuser: false });
+
+    await expect(service.setContentFilters(5, {} as any, reqUser({ isSuperuser: false }))).rejects.toBeInstanceOf(ForbiddenException);
+    expect(contentFilterRepo.replaceFilters).not.toHaveBeenCalled();
+  });
+
+  it('setContentFilters rejects administrator targets', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 5, isSuperuser: true });
+
+    await expect(service.setContentFilters(5, {} as any, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(BadRequestException);
+    expect(contentFilterRepo.replaceFilters).not.toHaveBeenCalled();
+  });
+
+  it('setContentFilters fills missing arrays before replacing filters', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 5, isSuperuser: false });
+
+    await expect(
+      service.setContentFilters(5, { includeTagIds: [1], excludeGenreIds: [3] } as any, reqUser({ isSuperuser: true })),
+    ).resolves.toBeUndefined();
+
+    expect(contentFilterRepo.replaceFilters).toHaveBeenCalledWith(5, {
+      includeTagIds: [1],
+      excludeTagIds: [],
+      includeGenreIds: [],
+      excludeGenreIds: [3],
+    });
+  });
+
   it('adminResetPassword forbids non-superuser reset of superuser account', async () => {
     userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: true, provisioningMethod: 'local' });
 
@@ -457,12 +540,16 @@ describe('UserService.updateSeriesCollapsePreferences', () => {
     replaceViewerLibraries: vi.fn(),
     findExistingLibraryIds: vi.fn(),
   };
+  const contentFilterRepo = {
+    findByUserIdWithNames: vi.fn(),
+    replaceFilters: vi.fn(),
+  };
   const config = { get: vi.fn() };
 
   beforeEach(() => {
     vi.resetAllMocks();
     config.get.mockReturnValue('http://localhost:5173');
-    service = new UserService(userRepo as any, config as any);
+    service = new UserService(userRepo as any, config as any, contentFilterRepo as any);
   });
 
   it('throws NotFoundException when user does not exist', async () => {

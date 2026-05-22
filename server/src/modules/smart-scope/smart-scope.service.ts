@@ -180,6 +180,7 @@ export class SmartScopeService {
       userId: user.id,
       q: query.q,
       timeZone,
+      contentFilters: user.isSuperuser ? undefined : user.contentFilters,
     });
 
     try {

@@ -78,14 +78,14 @@ export class OpdsController {
 
   @Get('authors')
   async authors(@OpdsUser() user: OpdsRequestUser, @Res() reply: FastifyReply) {
-    const items = await this.opdsBookService.getDistinctAuthors(user.userId, user.isSuperuser);
+    const items = await this.opdsBookService.getDistinctAuthors(user.userId, user.isSuperuser, user.contentFilters);
     const xml = this.opdsService.generateAuthorsNavigation(items);
     this.sendXml(reply, xml, OPDS_MIME_NAV);
   }
 
   @Get('series')
   async series(@OpdsUser() user: OpdsRequestUser, @Res() reply: FastifyReply) {
-    const items = await this.opdsBookService.getDistinctSeries(user.userId, user.isSuperuser);
+    const items = await this.opdsBookService.getDistinctSeries(user.userId, user.isSuperuser, user.contentFilters);
     const xml = this.opdsService.generateSeriesNavigation(items.filter((s): s is { name: string; bookCount: number } => s.name !== null));
     this.sendXml(reply, xml, OPDS_MIME_NAV);
   }
@@ -126,6 +126,7 @@ export class OpdsController {
       clampedSize,
       filters,
       user.isSuperuser,
+      user.contentFilters,
     );
 
     const selfParams = new URLSearchParams();
@@ -159,7 +160,13 @@ export class OpdsController {
     const clampedPage = Math.max(page, 1);
     this.assertPaginationWindow(clampedPage, clampedSize);
 
-    const { entries, total } = await this.opdsBookService.getRecentBooksPage(user.userId, clampedPage, clampedSize, user.isSuperuser);
+    const { entries, total } = await this.opdsBookService.getRecentBooksPage(
+      user.userId,
+      clampedPage,
+      clampedSize,
+      user.isSuperuser,
+      user.contentFilters,
+    );
     const selfPath = `/api/v1/opds/recent?page=${clampedPage}&size=${clampedSize}`;
     const xml = this.opdsService.generateAcquisitionFeed(
       'Recent Books',
@@ -176,7 +183,7 @@ export class OpdsController {
 
   @Get('surprise')
   async surprise(@OpdsUser() user: OpdsRequestUser, @Res() reply: FastifyReply) {
-    const entries = await this.opdsBookService.getRandomBooks(user.userId, 25, user.isSuperuser);
+    const entries = await this.opdsBookService.getRandomBooks(user.userId, 25, user.isSuperuser, user.contentFilters);
     const xml = this.opdsService.generateAcquisitionFeed(
       'Random Books',
       'urn:bookorbit:surprise',
@@ -203,7 +210,7 @@ export class OpdsController {
     @Res() reply: FastifyReply,
     @Headers('if-none-match') ifNoneMatch?: string,
   ) {
-    await this.opdsBookService.validateBookAccess(bookId, user.userId, user.isSuperuser);
+    await this.opdsBookService.validateBookAccess(bookId, user.userId, user.isSuperuser, user.contentFilters);
     reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
     const dir = bookCoverDirPath(this.appDataPath, bookId);
     try {
@@ -233,7 +240,7 @@ export class OpdsController {
     @Res() reply: FastifyReply,
     @Headers('if-none-match') ifNoneMatch?: string,
   ) {
-    await this.opdsBookService.validateBookAccess(bookId, user.userId, user.isSuperuser);
+    await this.opdsBookService.validateBookAccess(bookId, user.userId, user.isSuperuser, user.contentFilters);
     reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
     const thumbnailPath = bookThumbnailPath(this.appDataPath, bookId);
     try {
@@ -259,7 +266,7 @@ export class OpdsController {
     @OpdsUser() user: OpdsRequestUser,
     @Res() reply: FastifyReply,
   ) {
-    await this.opdsBookService.validateBookAccess(bookId, user.userId, user.isSuperuser);
+    await this.opdsBookService.validateBookAccess(bookId, user.userId, user.isSuperuser, user.contentFilters);
 
     const bookFiles = await this.opdsBookService.getBookFiles(bookId, fileId);
     if (!bookFiles) throw new NotFoundException('File not found');

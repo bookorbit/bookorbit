@@ -39,12 +39,17 @@ export class DashboardWidgetService {
     private readonly libraryService: LibraryService,
   ) {}
 
+  private getContentFilters(user: RequestUser) {
+    return user.isSuperuser ? undefined : user.contentFilters;
+  }
+
   async getReadingGoal(user: RequestUser): Promise<ReadingGoalWidgetData> {
     const settings = user.settings as UserSettings | undefined;
     const goalBooks = settings?.dashboardConfig?.readingGoal ?? null;
 
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
-    const completedBooks = await this.widgetRepo.getCompletedBooksThisYear(user.id, accessibleLibraryIds);
+    const contentFilters = this.getContentFilters(user);
+    const completedBooks = await this.widgetRepo.getCompletedBooksThisYear(user.id, accessibleLibraryIds, contentFilters);
 
     return {
       goalBooks,
@@ -55,31 +60,36 @@ export class DashboardWidgetService {
 
   async getCurrentlyReading(user: RequestUser): Promise<CurrentlyReadingWidgetData> {
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
-    return this.widgetRepo.getCurrentlyReadingBooks(user.id, accessibleLibraryIds);
+    const contentFilters = this.getContentFilters(user);
+    return this.widgetRepo.getCurrentlyReadingBooks(user.id, accessibleLibraryIds, contentFilters);
   }
 
   async getReadingStreak(user: RequestUser): Promise<ReadingStreakWidgetData> {
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
-    return this.widgetRepo.getReadingStreak(user.id, accessibleLibraryIds);
+    const contentFilters = this.getContentFilters(user);
+    return this.widgetRepo.getReadingStreak(user.id, accessibleLibraryIds, contentFilters);
   }
 
   async getLibraryOverview(user: RequestUser): Promise<LibraryOverviewWidgetData> {
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
-    return this.widgetRepo.getLibraryOverview(accessibleLibraryIds);
+    const contentFilters = this.getContentFilters(user);
+    return this.widgetRepo.getLibraryOverview(accessibleLibraryIds, contentFilters);
   }
 
   async getHighlightOfTheDay(user: RequestUser): Promise<HighlightOfTheDayWidgetData | null> {
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
-    const total = await this.widgetRepo.getAnnotationCount(user.id, accessibleLibraryIds);
+    const contentFilters = this.getContentFilters(user);
+    const total = await this.widgetRepo.getAnnotationCount(user.id, accessibleLibraryIds, contentFilters);
     if (total === 0) return null;
 
     const dateStr = formatDay(new Date());
     const offset = pickAnnotationIndex(user.id, dateStr, total);
-    return this.widgetRepo.getAnnotationByOffset(user.id, accessibleLibraryIds, offset);
+    return this.widgetRepo.getAnnotationByOffset(user.id, accessibleLibraryIds, offset, contentFilters);
   }
 
   async getMonthlyChallenge(user: RequestUser): Promise<MonthlyChallengeWidgetData> {
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const contentFilters = this.getContentFilters(user);
     const today = new Date();
     const year = today.getUTCFullYear();
     const month = today.getUTCMonth() + 1;
@@ -87,7 +97,7 @@ export class DashboardWidgetService {
     const sixMonthsAgo = new Date(today);
     sixMonthsAgo.setUTCMonth(sixMonthsAgo.getUTCMonth() - 6);
 
-    const data = await this.widgetRepo.getChallengePatternData(user.id, accessibleLibraryIds, monthStart, sixMonthsAgo);
+    const data = await this.widgetRepo.getChallengePatternData(user.id, accessibleLibraryIds, monthStart, sixMonthsAgo, contentFilters);
     const eligible = findEligibleChallenges(data);
     const challengeType = selectChallenge(eligible, user.id, year, month);
 
@@ -110,6 +120,7 @@ export class DashboardWidgetService {
 
   async getYearProjection(user: RequestUser): Promise<YearProjectionWidgetData> {
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const contentFilters = this.getContentFilters(user);
     const today = new Date();
     const year = today.getUTCFullYear();
     const yearStart = new Date(Date.UTC(year, 0, 1));
@@ -120,7 +131,7 @@ export class DashboardWidgetService {
     const daysInYear = isLeapYear ? 366 : 365;
     const dayOfYear = Math.ceil((today.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24));
 
-    const data = await this.widgetRepo.getYearProjectionData(user.id, accessibleLibraryIds, yearStart, thirtyDaysAgo);
+    const data = await this.widgetRepo.getYearProjectionData(user.id, accessibleLibraryIds, yearStart, thirtyDaysAgo, contentFilters);
 
     return computeProjection({
       ...data,
@@ -132,27 +143,31 @@ export class DashboardWidgetService {
 
   async getNeglectedGems(user: RequestUser): Promise<NeglectedGemsWidgetData> {
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
-    return this.widgetRepo.getNeglectedGems(user.id, accessibleLibraryIds, new Date());
+    const contentFilters = this.getContentFilters(user);
+    return this.widgetRepo.getNeglectedGems(user.id, accessibleLibraryIds, new Date(), contentFilters);
   }
 
   async getReadingDna(user: RequestUser): Promise<ReadingDnaWidgetData> {
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const contentFilters = this.getContentFilters(user);
     const since = new Date();
     since.setUTCMonth(since.getUTCMonth() - 6);
 
-    const data = await this.widgetRepo.getReadingDnaData(user.id, accessibleLibraryIds, since);
+    const data = await this.widgetRepo.getReadingDnaData(user.id, accessibleLibraryIds, since, contentFilters);
 
     return computeReadingDna(data.avgPageCount, data.uniqueGenres, data.totalBooks, data.readingDaysRatio, data.peakHour, data.avgPagesPerHour);
   }
 
   async getLongWait(user: RequestUser): Promise<LongWaitWidgetData | null> {
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
-    return this.widgetRepo.getLongWait(user.id, accessibleLibraryIds, new Date());
+    const contentFilters = this.getContentFilters(user);
+    return this.widgetRepo.getLongWait(user.id, accessibleLibraryIds, new Date(), contentFilters);
   }
 
   async getDiversityScore(user: RequestUser): Promise<DiversityScoreWidgetData> {
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
-    const data = await this.widgetRepo.getDiversityData(user.id, accessibleLibraryIds);
+    const contentFilters = this.getContentFilters(user);
+    const data = await this.widgetRepo.getDiversityData(user.id, accessibleLibraryIds, contentFilters);
 
     return computeDiversityScore(
       data.uniqueGenresRead,
@@ -166,12 +181,13 @@ export class DashboardWidgetService {
 
   async getReadingRhythm(user: RequestUser): Promise<ReadingRhythmWidgetData> {
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const contentFilters = this.getContentFilters(user);
     const today = new Date();
     const since = new Date(today);
     since.setUTCDate(since.getUTCDate() - 13);
     const sinceStr = formatDay(since);
 
-    const rawDays = await this.widgetRepo.getReadingRhythmData(user.id, accessibleLibraryIds, sinceStr);
+    const rawDays = await this.widgetRepo.getReadingRhythmData(user.id, accessibleLibraryIds, sinceStr, contentFilters);
     const days = buildDaysSeries(rawDays, today, 14);
     const rhythm = computeRhythm(days);
 

@@ -4,6 +4,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { EmailAdminLogController } from './email-admin-log.controller';
 import type { QuerySendLogDto } from './dto/query-send-log.dto';
 import { EmailSendLogService } from './email-send-log.service';
+import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 describe('EmailAdminLogController', () => {
   const superuser: RequestUser = {
@@ -19,12 +20,16 @@ describe('EmailAdminLogController', () => {
     avatarUrl: null,
     provisioningMethod: 'manual',
     permissions: [],
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
   const normalUser: RequestUser = {
     ...superuser,
     id: 2,
     isSuperuser: false,
+
+    contentFilters: EMPTY_CONTENT_FILTER_RULES,
   };
 
   it('uses default pagination values when query is empty', async () => {
