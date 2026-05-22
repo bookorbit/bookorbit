@@ -56,6 +56,7 @@ watch(
       fetchTemplates().catch(() => {})
     }
   },
+  { immediate: true },
 )
 
 function toggleRecipient(id: number) {
