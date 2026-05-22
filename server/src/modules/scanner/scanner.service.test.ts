@@ -579,6 +579,100 @@ describe('file identity resolution', () => {
     expect(repo.createBookFile).not.toHaveBeenCalled();
   });
 
+  it('reuses existing book id when an entire book folder is renamed via inode match', async () => {
+    const renamedFile = makeFileStat({
+      absolutePath: '/library/Author/NewName/book.epub',
+      relPath: 'Author/NewName/book.epub',
+      ino: 9090,
+    });
+    const existingFile = makeBookFile({
+      id: 21,
+      bookId: 10,
+      absolutePath: '/library/Author/OldName/book.epub',
+      relPath: 'Author/OldName/book.epub',
+      ino: 9090,
+      fileHash: 'rename-hash',
+    });
+
+    const repo = makeRepo({
+      findBooksByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([{ id: 10, libraryId: 1, libraryFolderId: 1, folderPath: '/library/Author/OldName', status: 'present' }]),
+      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([existingFile]),
+    });
+    mockFindCandidates.mockResolvedValue({
+      candidates: [makeCandidate('/library/Author/NewName', [renamedFile])],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(repo.updateBookFolderPath).toHaveBeenCalledWith(10, '/library/Author/NewName');
+    expect(repo.updateBookFile).toHaveBeenCalledWith(
+      21,
+      expect.objectContaining({
+        bookId: 10,
+        absolutePath: '/library/Author/NewName/book.epub',
+        relPath: 'Author/NewName/book.epub',
+      }),
+    );
+    expect(repo.createBook).not.toHaveBeenCalled();
+    expect(repo.markBooksAsMissing).not.toHaveBeenCalled();
+  });
+
+  it('reuses existing book id for renamed folders when inode is 0 using hash fallback', async () => {
+    const renamedFile = makeFileStat({
+      absolutePath: '/library/Author/NewName/book.epub',
+      relPath: 'Author/NewName/book.epub',
+      ino: 0,
+    });
+    const existingFile = makeBookFile({
+      id: 31,
+      bookId: 11,
+      absolutePath: '/library/Author/OldName/book.epub',
+      relPath: 'Author/OldName/book.epub',
+      ino: 0,
+      fileHash: 'rename-hash',
+    });
+
+    const repo = makeRepo({
+      findBooksByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([{ id: 11, libraryId: 1, libraryFolderId: 1, folderPath: '/library/Author/OldName', status: 'present' }]),
+      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([existingFile]),
+      findBookFileByHash: vi.fn().mockResolvedValue(existingFile),
+    });
+    mockFindCandidates.mockResolvedValue({
+      candidates: [makeCandidate('/library/Author/NewName', [renamedFile])],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+    mockFingerprint.mockResolvedValue('rename-hash');
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(repo.updateBookFolderPath).toHaveBeenCalledWith(11, '/library/Author/NewName');
+    expect(repo.updateBookFile).toHaveBeenCalledWith(
+      31,
+      expect.objectContaining({
+        bookId: 11,
+        absolutePath: '/library/Author/NewName/book.epub',
+        relPath: 'Author/NewName/book.epub',
+      }),
+    );
+    expect(repo.createBook).not.toHaveBeenCalled();
+    expect(repo.markBooksAsMissing).not.toHaveBeenCalled();
+  });
+
   it('gracefully skips a file that disappears during fingerprinting (ENOENT) — scan still completes', async () => {
     const fileStat = makeFileStat({ ino: 7777 }); // different ino so inode match fails
     mockFindCandidates.mockResolvedValue({

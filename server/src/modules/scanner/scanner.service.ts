@@ -1188,7 +1188,7 @@ export class ScannerService implements OnApplicationBootstrap {
     const fileCounts: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
     const retainedFileIds = new Set<number>();
 
-    const book = await this.upsertBook(candidate, libraryId, libraryFolderId, bookByFolderPath, booksByParentDir, fileCounts);
+    const book = await this.upsertBook(candidate, libraryId, libraryFolderId, bookByFolderPath, booksByParentDir, fileByPath, fileByIno, fileCounts);
     // If the book was transferred from another library, its files exist globally
     // but not in our local maps - we need global lookups even on a "first scan"
     const skipGlobalLookups = isFirstScan && fileCounts.addedCount > 0;
@@ -1345,6 +1345,8 @@ export class ScannerService implements OnApplicationBootstrap {
     libraryFolderId: number,
     bookByFolderPath: Map<string, { id: number; status: string; folderPath: string }>,
     booksByParentDir: Map<string, Array<{ id: number; status: string; folderPath: string }>>,
+    fileByPath: Map<string, FileByPathEntry>,
+    fileByIno: Map<number, FileByInoEntry>,
     counts: ScanCounts,
   ) {
     const existing = bookByFolderPath.get(candidate.folderPath);
@@ -1374,6 +1376,9 @@ export class ScannerService implements OnApplicationBootstrap {
         );
         return { ...survivor, folderPath: candidate.folderPath };
       }
+
+      const movedInLibrary = await this.tryReuseMovedBookInLibrary(candidate, libraryId, bookByFolderPath, fileByPath, fileByIno, counts);
+      if (movedInLibrary) return movedInLibrary;
 
       const transferred = await this.tryTransferMissingBook(candidate, libraryId, libraryFolderId, bookByFolderPath, counts);
       if (transferred) return transferred;
@@ -1422,6 +1427,92 @@ export class ScannerService implements OnApplicationBootstrap {
     }
 
     return existing;
+  }
+
+  private async tryReuseMovedBookInLibrary(
+    candidate: BookCandidate,
+    libraryId: number,
+    bookByFolderPath: Map<string, BookEntry>,
+    fileByPath: Map<string, FileByPathEntry>,
+    fileByIno: Map<number, FileByInoEntry>,
+    counts: ScanCounts,
+  ): Promise<BookEntry | null> {
+    const contentFiles = candidate.files.filter((file) => {
+      const role = file.role ?? classifyFile(file.absolutePath).role;
+      return role === 'content' && file.sizeBytes > 0;
+    });
+    if (contentFiles.length === 0) return null;
+    const isFileAsBookCandidate = contentFiles.length === 1 && candidate.folderPath === contentFiles[0].absolutePath;
+
+    let sourceBookId: number | null = null;
+
+    for (const file of contentFiles) {
+      if (file.ino === 0) continue;
+      const byIno = fileByIno.get(file.ino);
+      if (!byIno || byIno.absolutePath === file.absolutePath) continue;
+      sourceBookId = byIno.bookId;
+      break;
+    }
+
+    if (sourceBookId == null && !isFileAsBookCandidate) {
+      for (const file of contentFiles) {
+        let fileHash: string;
+        try {
+          fileHash = await computeFileHash(file.absolutePath);
+        } catch (err) {
+          const code = (err as NodeJS.ErrnoException).code;
+          if (code === 'ENOENT' || code === 'EACCES') continue;
+          throw err;
+        }
+        const byHash = this.findLocalFileByHash(fileHash, file.absolutePath, fileByPath);
+        if (!byHash) continue;
+        sourceBookId = byHash.bookId;
+        break;
+      }
+    }
+
+    if (sourceBookId == null) return null;
+
+    const sourceBook = this.findBookEntryById(bookByFolderPath, sourceBookId);
+    if (!sourceBook) return null;
+    if (sourceBook.folderPath === candidate.folderPath) return sourceBook;
+
+    await this.scannerRepo.updateBookFolderPath(sourceBook.id, candidate.folderPath);
+
+    const restored = sourceBook.status === 'missing';
+    if (restored) {
+      await this.scannerRepo.updateBookStatus(sourceBook.id, 'present');
+      counts.updatedCount++;
+      this.scanGateway.emitBookRestored({ libraryId, bookIds: [sourceBook.id] });
+      this.bufferBooksRestoredNotification(libraryId, [sourceBook.id]);
+    }
+
+    const moved: BookEntry = {
+      id: sourceBook.id,
+      status: restored ? 'present' : sourceBook.status,
+      folderPath: candidate.folderPath,
+    };
+    bookByFolderPath.delete(sourceBook.folderPath);
+    bookByFolderPath.set(candidate.folderPath, moved);
+    this.logger.log(
+      `[scanner.upsert_book] [end] libraryId=${libraryId} bookId=${moved.id} folder="${sanitizeLogValue(candidate.folderPath)}" action=reuse_moved_book - reused existing book for moved folder`,
+    );
+    return moved;
+  }
+
+  private findBookEntryById(bookByFolderPath: Map<string, BookEntry>, bookId: number): BookEntry | null {
+    for (const entry of bookByFolderPath.values()) {
+      if (entry.id === bookId) return entry;
+    }
+    return null;
+  }
+
+  private findLocalFileByHash(fileHash: string, absolutePath: string, fileByPath: Map<string, FileByPathEntry>): FileByPathEntry | null {
+    for (const [path, entry] of fileByPath) {
+      if (path === absolutePath) continue;
+      if (entry.fileHash === fileHash) return entry;
+    }
+    return null;
   }
 
   private async tryTransferMissingBook(
