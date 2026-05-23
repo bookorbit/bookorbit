@@ -25,13 +25,13 @@ type Db = NodePgDatabase<typeof schema>;
 type OpdsSortOrder = 'recent' | 'title_asc' | 'title_desc' | 'author_asc' | 'author_desc' | 'series_asc' | 'series_desc';
 
 const OPDS_SORT_MAP: Record<OpdsSortOrder, SQL[]> = {
-  recent: [sql`${books.addedAt} DESC`],
-  title_asc: [sql`${bookMetadata.title} ASC NULLS LAST`],
-  title_desc: [sql`${bookMetadata.title} DESC NULLS LAST`],
-  author_asc: [sql`min(${authors.sortName}) ASC NULLS LAST`, sql`${bookMetadata.title} ASC NULLS LAST`],
-  author_desc: [sql`min(${authors.sortName}) DESC NULLS LAST`, sql`${bookMetadata.title} ASC NULLS LAST`],
-  series_asc: [sql`${bookMetadata.seriesName} ASC NULLS LAST`, sql`${bookMetadata.seriesIndex} ASC NULLS LAST`],
-  series_desc: [sql`${bookMetadata.seriesName} DESC NULLS LAST`, sql`${bookMetadata.seriesIndex} DESC NULLS LAST`],
+  recent: [sql`${books.addedAt} DESC`, sql`${books.id} ASC`],
+  title_asc: [sql`${bookMetadata.title} ASC NULLS LAST`, sql`${books.id} ASC`],
+  title_desc: [sql`${bookMetadata.title} DESC NULLS LAST`, sql`${books.id} ASC`],
+  author_asc: [sql`min(${authors.sortName}) ASC NULLS LAST`, sql`${bookMetadata.title} ASC NULLS LAST`, sql`${books.id} ASC`],
+  author_desc: [sql`min(${authors.sortName}) DESC NULLS LAST`, sql`${bookMetadata.title} ASC NULLS LAST`, sql`${books.id} ASC`],
+  series_asc: [sql`${bookMetadata.seriesName} ASC NULLS LAST`, sql`${bookMetadata.seriesIndex} ASC NULLS LAST`, sql`${books.id} ASC`],
+  series_desc: [sql`${bookMetadata.seriesName} DESC NULLS LAST`, sql`${bookMetadata.seriesIndex} DESC NULLS LAST`, sql`${books.id} ASC`],
 };
 
 const LIKE_SPECIAL_CHARS = /[%_\\]/g;
@@ -393,13 +393,6 @@ export class OpdsBookService {
   ): Promise<{ entries: OpdsBookEntry[]; total: number }> {
     const offset = (page - 1) * size;
     const needsAuthorJoin = sortOrder === 'author_asc' || sortOrder === 'author_desc';
-
-    const idQuery = this.db.select({ id: books.id }).from(books).leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id)).where(where).$dynamic();
-
-    if (needsAuthorJoin) {
-      idQuery.leftJoin(bookAuthors, eq(bookAuthors.bookId, books.id)).leftJoin(authors, eq(authors.id, bookAuthors.authorId));
-    }
-
     const orderClauses = OPDS_SORT_MAP[sortOrder];
 
     const [idRows, [{ total }]] = await Promise.all([

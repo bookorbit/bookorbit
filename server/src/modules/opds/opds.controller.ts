@@ -135,17 +135,14 @@ export class OpdsController {
     selfParams.set('size', String(clampedSize));
     const selfPath = `/api/v1/opds/catalog?${selfParams.toString()}`;
 
+    const filterSuffix = Object.entries(filters)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${k}:${encodeURIComponent(String(v))}`)
+      .join(':');
+    const feedId = filterSuffix ? `urn:bookorbit:catalog:${filterSuffix}` : 'urn:bookorbit:catalog';
+
     const feedTitle = q ? `Search: ${q}` : 'Catalog';
-    const xml = this.opdsService.generateAcquisitionFeed(
-      feedTitle,
-      'urn:bookorbit:catalog',
-      entries,
-      total,
-      clampedPage,
-      clampedSize,
-      selfPath,
-      user.coverToken,
-    );
+    const xml = this.opdsService.generateAcquisitionFeed(feedTitle, feedId, entries, total, clampedPage, clampedSize, selfPath, user.coverToken);
     this.sendXml(reply!, xml, OPDS_MIME_ACQ);
   }
 
