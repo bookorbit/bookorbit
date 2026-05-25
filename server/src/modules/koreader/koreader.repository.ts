@@ -153,7 +153,11 @@ export class KoreaderRepository {
         // Deliberately do NOT update updatedAt here. reading_progress.updatedAt must only
         // change when the web reader writes it, so getProgress can use it as an accurate
         // "last web-reader sync time" for comparison against koreader_device_progress.updatedAt.
-        set: { percentage, updatedAt: sql`"reading_progress"."updated_at"` },
+        // KOReader sends percentage + XPointer, while the web reader stores CFI. If we keep a
+        // stale CFI from a previous web session, the web reader may resume at an older location
+        // even when KOReader synced newer percentage. Clear incompatible web locator fields so
+        // the reader resumes from percentage fallback.
+        set: { percentage, cfi: null, pageNumber: null, updatedAt: sql`"reading_progress"."updated_at"` },
       });
   }
 

@@ -475,6 +475,14 @@ describe('BookCoverCard', () => {
       expect(wrapper.text()).toContain('#3')
     })
 
+    it('marks badge as a card-click blocker and disables hit-testing on hover', () => {
+      mockCardOverlays.value = ['series-position']
+      const wrapper = mountCard({ book: makeBook({ seriesIndex: 3, seriesName: 'Dune' }) })
+      const badge = wrapper.find('[data-card-click-blocker]')
+      expect(badge.exists()).toBe(true)
+      expect(badge.classes()).toContain('group-hover:pointer-events-none')
+    })
+
     it('shows #1.5 badge when seriesIndex is 1.5', () => {
       mockCardOverlays.value = ['series-position']
       const wrapper = mountCard({ book: makeBook({ seriesIndex: 1.5, seriesName: 'Dune' }) })
@@ -516,6 +524,16 @@ describe('BookCoverCard', () => {
       mockCardOverlays.value = ['series-position']
       const wrapper = mountCard({ book: makeBook({ seriesIndex: 3, seriesName: null }) })
       expect(wrapper.text()).toContain('#3')
+    })
+
+    it('does not open the reader when the series badge is clicked', async () => {
+      setTouchMode(false)
+      mockCardOverlays.value = ['series-position']
+      const wrapper = mountCard({ book: makeBook({ seriesIndex: 3, seriesName: 'Dune' }) })
+      const badge = wrapper.find('[data-card-click-blocker]')
+      expect(badge.exists()).toBe(true)
+      await badge.trigger('click')
+      expect(mockRouterPush).not.toHaveBeenCalledWith(expect.objectContaining({ name: 'reader' }))
     })
   })
 })

@@ -214,10 +214,10 @@ describe('OpdsBookService', () => {
   });
 
   it('paginates ids and only fetches entries when rows are present', async () => {
-    const empty = makeService([[], [], [{ total: 5 }]]);
+    const empty = makeService([[], [{ total: 5 }]]);
     await expect((empty.service as never).paginatedBookQuery({ kind: 'where' }, 'recent', 2, 10)).resolves.toEqual({ entries: [], total: 5 });
 
-    const filled = makeService([[], [{ id: 3 }, { id: 1 }], [{ total: 2 }]]);
+    const filled = makeService([[{ id: 3 }, { id: 1 }], [{ total: 2 }]]);
     const fetchSpy = vi.spyOn(filled.service as never, 'fetchBookEntries').mockResolvedValue([{ id: 3 }, { id: 1 }]);
 
     await expect((filled.service as never).paginatedBookQuery({ kind: 'where' }, 'author_asc', 1, 25)).resolves.toEqual({
@@ -225,6 +225,26 @@ describe('OpdsBookService', () => {
       total: 2,
     });
     expect(fetchSpy).toHaveBeenCalledWith([3, 1]);
+  });
+
+  it('every sort order includes a books.id tiebreaker as its final ORDER BY clause', async () => {
+    const sortOrders = ['recent', 'title_asc', 'title_desc', 'author_asc', 'author_desc', 'series_asc', 'series_desc'] as const;
+
+    for (const sortOrder of sortOrders) {
+      const { service, db } = makeService([[], [{ total: 0 }]]);
+      await (service as never).paginatedBookQuery({ kind: 'where' }, sortOrder, 1, 25);
+
+      const chains = (db.select as ReturnType<typeof vi.fn>).mock.results.map((r: { value: Record<string, unknown> }) => r.value);
+      const orderByArgs = chains.flatMap((chain: Record<string, unknown>) => {
+        const fn = chain['orderBy'] as ReturnType<typeof vi.fn>;
+        return fn.mock.calls.flat() as unknown[];
+      });
+
+      const allValues = orderByArgs.flatMap((arg: unknown) => collectValues(arg));
+      const hasIdTiebreaker = allValues.some((v) => v === 'id');
+
+      expect(hasIdTiebreaker, `sort order "${sortOrder}" is missing books.id tiebreaker`).toBe(true);
+    }
   });
 
   it('maps metadata, authors, and files into ordered OPDS entries', async () => {

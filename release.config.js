@@ -4,11 +4,6 @@ const { spawnSync } = require("child_process");
 
 const DOCKER_IMAGE = "ghcr.io/bookorbit/bookorbit";
 
-// Maps local git author names to GitHub usernames for @-mentions in release notes.
-const AUTHOR_MAP = {
-  neon: "neonsolstice",
-};
-
 const TYPES = [
   { type: "feat", section: "Features" },
   { type: "fix", section: "Bug Fixes" },
@@ -42,7 +37,7 @@ const commitPartial = `\
     {{~#if this.owner}}
       {{~this.owner}}/
     {{~/if}}
-    {{~this.repository}}{{this.prefix}}{{this.issue}}]({{issueUrlFormat}})
+    {{~this.repository}}{{this.prefix}}{{this.issue}}]({{@root.host}}/{{@root.owner}}/{{@root.repository}}/issues/{{this.issue}})
   {{~else}}
     {{~#if this.owner}}
       {{~this.owner}}/
@@ -94,26 +89,57 @@ const mainTemplate = [
 // for the commitPartial.
 function finalizeContext(ctx) {
   try {
-    const result = spawnSync("git", ["log", "--format=%h %aN", "--max-count=500"], {
+    const shaToGithubUser = new Map();
+
+    try {
+      const ghToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+      if (ghToken && ctx.owner && ctx.repository) {
+        const curlResult = spawnSync(
+          "curl",
+          [
+            "-s",
+            "-H", `Authorization: Bearer ${ghToken}`,
+            "-H", "X-GitHub-Api-Version: 2022-11-28",
+            `https://api.github.com/repos/${ctx.owner}/${ctx.repository}/commits?per_page=100`
+          ],
+          { encoding: "utf8" }
+        );
+        if (curlResult.status === 0) {
+          const apiCommits = JSON.parse(curlResult.stdout);
+          if (Array.isArray(apiCommits)) {
+            for (const c of apiCommits) {
+              if (c.sha && c.author && c.author.login) {
+                shaToGithubUser.set(c.sha, c.author.login);
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore API errors, fall back to local git log
+    }
+
+    const result = spawnSync("git", ["log", "--format=%H %aN", "--max-count=500"], {
       encoding: "utf8",
       cwd: process.cwd(),
     });
 
-    const shaToGithubUser = new Map();
     if (result.status === 0) {
       for (const line of result.stdout.split("\n").filter(Boolean)) {
         const spaceIdx = line.indexOf(" ");
-        const shortSha = line.substring(0, spaceIdx);
+        const hash = line.substring(0, spaceIdx);
         const authorName = line.substring(spaceIdx + 1).trim();
         if (!authorName || /\[bot\]/i.test(authorName)) continue;
-        shaToGithubUser.set(shortSha, AUTHOR_MAP[authorName] ?? authorName);
+        if (!shaToGithubUser.has(hash)) {
+          shaToGithubUser.set(hash, authorName);
+        }
       }
     }
 
     for (const group of ctx.commitGroups ?? []) {
       for (const commit of group.commits ?? []) {
-        if (commit.shortHash) {
-          const githubUser = shaToGithubUser.get(commit.shortHash);
+        if (commit.hash) {
+          const githubUser = shaToGithubUser.get(commit.hash);
           if (githubUser) commit.githubUser = githubUser;
         }
         // Pre-compute commit URL — {{commitUrlFormat}} does not resolve inside

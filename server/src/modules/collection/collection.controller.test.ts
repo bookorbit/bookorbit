@@ -191,7 +191,9 @@ describe('CollectionController', () => {
     expect(removeMeta.description({ params: { id: '10' } })).toBe('Deleted collection #10');
     expect(addBooksMeta.getResourceId({ params: { id: '10' } })).toBe(10);
     expect(addBooksMeta.description({ params: { id: '10' }, body: { bookIds: [1, 2] } })).toBe('Added 2 books to collection #10');
+    expect(addBooksMeta.description({ params: { id: '10' }, body: {} })).toBe('Added 0 books to collection #10');
     expect(removeBooksMeta.getResourceId({ params: { id: '10' } })).toBe(10);
     expect(removeBooksMeta.description({ params: { id: '10' }, body: { bookIds: [1] } })).toBe('Removed 1 book from collection #10');
+    expect(removeBooksMeta.description({ params: { id: '10' }, body: {} })).toBe('Removed 0 books from collection #10');
   });
 });

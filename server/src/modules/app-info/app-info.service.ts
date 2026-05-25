@@ -13,6 +13,7 @@ export class AppInfoService implements OnApplicationBootstrap {
   private readonly logger = new Logger(AppInfoService.name);
   private updateAvailable: boolean | null = null;
   private latestVersion: string | null = null;
+  private lastCheckTime = 0;
 
   constructor(
     private readonly config: ConfigService,
@@ -27,13 +28,25 @@ export class AppInfoService implements OnApplicationBootstrap {
       return;
     }
 
+    this.lastCheckTime = Date.now();
     await this.checkForUpdate(version);
   }
 
-  getAppInfo(): AppInfoResponse {
+  async getAppInfo(): Promise<AppInfoResponse> {
+    const version = this.config.get<string>('app.version') ?? 'Local build';
+    const enabled = await this.appSettingsService.isUpdateCheckEnabled();
     const appDataPath = this.config.get<string>('storage.appDataPath') ?? '/data';
+
+    if (enabled && SEMVER_RE.test(version)) {
+      const now = Date.now();
+      if (now - this.lastCheckTime > 600_000) {
+        this.lastCheckTime = now;
+        await this.checkForUpdate(version);
+      }
+    }
+
     return {
-      version: this.config.get<string>('app.version') ?? 'Local build',
+      version,
       updateAvailable: this.updateAvailable,
       latestVersion: this.latestVersion,
       bookDockPath: join(appDataPath, 'book-dock'),

@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 const props = defineProps<{
   modelValue: string
   placeholder?: string
+  hideText?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -124,21 +125,38 @@ onUnmounted(() => document.removeEventListener('mousedown', handleOutsideClick))
     ref="triggerRef"
     type="button"
     @click="toggle"
-    class="h-10 w-full flex items-center gap-2.5 rounded-lg border border-input bg-card text-sm px-3 hover:bg-muted transition-colors"
+    class="h-9 flex items-center justify-center gap-2 rounded-md border border-input bg-background shadow-xs text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+    :class="[!hideText ? 'w-full px-3' : '', hideText && modelValue ? 'w-9 px-0' : '', hideText && !modelValue ? 'px-3 whitespace-nowrap' : '']"
   >
-    <component v-if="selectedIconComponent" :is="selectedIconComponent" :size="16" class="shrink-0 text-foreground" />
-    <span v-else class="h-4 w-4 rounded bg-muted/60 shrink-0" />
-    <span v-if="modelValue" class="flex-1 text-left text-foreground truncate">{{ modelValue }}</span>
-    <span v-else class="flex-1 text-left text-muted-foreground/60 truncate">{{ placeholder ?? 'Choose an icon...' }}</span>
-    <button
-      v-if="modelValue"
-      type="button"
-      @click.stop="clearValue"
-      class="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition-colors shrink-0"
-    >
-      <X :size="12" />
-    </button>
-    <ChevronDown :size="14" class="text-muted-foreground shrink-0 transition-transform duration-200" :class="open ? 'rotate-180' : ''" />
+    <component v-if="selectedIconComponent" :is="selectedIconComponent" :size="16" class="shrink-0" />
+
+    <template v-if="!modelValue">
+      <span v-if="!hideText" class="text-muted-foreground flex-1 text-left font-normal truncate">
+        {{ placeholder ?? 'Choose an icon...' }}
+      </span>
+      <span v-else class="text-foreground flex items-center gap-1.5">
+        <component :is="LucideIcons.Shapes" :size="14" class="text-muted-foreground" />
+        {{ placeholder ?? 'Select icon' }}
+      </span>
+      <ChevronDown
+        v-if="!hideText"
+        :size="14"
+        class="text-muted-foreground shrink-0 transition-transform duration-200"
+        :class="open ? 'rotate-180' : ''"
+      />
+    </template>
+
+    <template v-else-if="!hideText">
+      <span class="flex-1 text-left text-foreground truncate">{{ modelValue }}</span>
+      <button
+        type="button"
+        @click.stop="clearValue"
+        class="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition-colors shrink-0"
+      >
+        <X :size="12" />
+      </button>
+      <ChevronDown :size="14" class="text-muted-foreground shrink-0 transition-transform duration-200" :class="open ? 'rotate-180' : ''" />
+    </template>
   </button>
 
   <!-- Floating panel (teleported to avoid overflow clipping) -->

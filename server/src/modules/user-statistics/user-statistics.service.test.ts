@@ -556,4 +556,48 @@ describe('UserStatisticsService', () => {
     expect(repo.getReadingPacePoints).toHaveBeenCalledTimes(1);
     expect(repo.getAuthorGenreChord).toHaveBeenCalledTimes(1);
   });
+
+  it('updateSessionTimelineSession clears only the requesting user cache, not other users', async () => {
+    const existing = {
+      sessionId: 1,
+      libraryId: 1,
+      bookId: 1,
+      bookTitle: 'Book',
+      bookFormat: 'EPUB',
+      startedAt: new Date('2026-04-07T08:00:00.000Z'),
+      endedAt: new Date('2026-04-07T08:30:00.000Z'),
+      durationSeconds: 1800,
+    };
+    const updated = {
+      ...existing,
+      startedAt: new Date('2026-04-08T09:00:00.000Z'),
+      endedAt: new Date('2026-04-08T09:30:00.000Z'),
+    };
+    const repo = {
+      getProgressFunnelInRange: vi.fn().mockResolvedValue({ started: 5, reached25: 4, reached50: 3, reached75: 2, completed: 1 }),
+      getSessionTimelineSessionById: vi.fn().mockResolvedValue(existing),
+      moveSessionTimelineSessionAtomic: vi.fn().mockResolvedValue({ updated, conflict: null }),
+    };
+    const service = new UserStatisticsService(repo as any);
+    const userA = { id: 10, isSuperuser: false } as any;
+    const userB = { id: 20, isSuperuser: false } as any;
+    const query = { libraryIds: [1] };
+
+    await service.getProgressFunnel(userA, query);
+    await service.getProgressFunnel(userB, query);
+    expect(repo.getProgressFunnelInRange).toHaveBeenCalledTimes(2);
+
+    await service.updateSessionTimelineSession(
+      userA,
+      1,
+      { startedAt: '2026-04-08T09:00:00.000Z', endedAt: '2026-04-08T09:30:00.000Z' },
+      { libraryIds: [1] },
+    );
+
+    await service.getProgressFunnel(userA, query);
+    expect(repo.getProgressFunnelInRange).toHaveBeenCalledTimes(3);
+
+    await service.getProgressFunnel(userB, query);
+    expect(repo.getProgressFunnelInRange).toHaveBeenCalledTimes(3);
+  });
 });

@@ -192,7 +192,8 @@ function openFile(file: BookFileRef) {
 }
 
 function handleCardClick(event: MouseEvent) {
-  if ((event.target as Element).closest('button')) return
+  const target = event.target
+  if (target instanceof Element && target.closest('button, [data-card-click-blocker]')) return
   if (props.selectionMode) {
     emit('select', event)
     return
@@ -333,7 +334,8 @@ async function handleSetStatus(status: ReadStatus) {
         <Tooltip v-if="showSeriesPositionBadge">
           <TooltipTrigger as-child>
             <div
-              class="pointer-events-auto flex items-center bg-black/60 rounded-full px-1.5 py-0.5 group-hover:opacity-0 transition-opacity duration-150 cursor-default"
+              data-card-click-blocker
+              class="pointer-events-auto group-hover:pointer-events-none flex items-center bg-black/60 rounded-full px-1.5 py-0.5 group-hover:opacity-0 transition-opacity duration-150 cursor-default"
             >
               <span class="text-[9px] font-bold text-white leading-none">{{ seriesPositionLabel }}</span>
             </div>

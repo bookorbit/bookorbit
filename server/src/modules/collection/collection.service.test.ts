@@ -459,6 +459,46 @@ describe('CollectionService', () => {
       expect(result).toEqual(expect.objectContaining({ bookCount: 1 }));
     });
 
+    it('skips book access checks while removing books from a collection', async () => {
+      const { service, collectionRepo, bookReadService, libraryService } = makeService();
+      collectionRepo.findById.mockResolvedValueOnce([makeCollection()]).mockResolvedValueOnce([makeCollection({ bookCount: 0 })]);
+      collectionRepo.removeBooks.mockResolvedValue([{ collectionId: 10, bookId: 7 }]);
+
+      await service.removeBooks(10, { bookIds: [7] }, makeUser());
+
+      expect(bookReadService.findLibraryIdsByBookIds).not.toHaveBeenCalled();
+      expect(libraryService.verifyUserAccess).not.toHaveBeenCalled();
+    });
+
+    it('rejects removeBooks calls from non-owners', async () => {
+      const { service, collectionRepo } = makeService();
+      collectionRepo.findById.mockResolvedValue([makeCollection({ userId: 88 })]);
+
+      await expect(service.removeBooks(10, { bookIds: [7] }, makeUser({ id: 1 }))).rejects.toThrow(ForbiddenException);
+      expect(collectionRepo.removeBooks).not.toHaveBeenCalled();
+    });
+
+    it('allows superusers to remove books from collections they do not own', async () => {
+      const { service, collectionRepo } = makeService();
+      collectionRepo.findById
+        .mockResolvedValueOnce([makeCollection({ userId: 88 })])
+        .mockResolvedValueOnce([makeCollection({ userId: 88, bookCount: 0 })]);
+      collectionRepo.removeBooks.mockResolvedValue([{ collectionId: 10, bookId: 7 }]);
+
+      const result = await service.removeBooks(10, { bookIds: [7] }, makeUser({ id: 1, isSuperuser: true }));
+
+      expect(collectionRepo.removeBooks).toHaveBeenCalledWith(10, [7]);
+      expect(result).toEqual(expect.objectContaining({ userId: 88, bookCount: 0 }));
+    });
+
+    it('throws NotFoundException when removing books from a missing collection', async () => {
+      const { service, collectionRepo } = makeService();
+      collectionRepo.findById.mockResolvedValue([]);
+
+      await expect(service.removeBooks(10, { bookIds: [7] }, makeUser())).rejects.toThrow(NotFoundException);
+      expect(collectionRepo.removeBooks).not.toHaveBeenCalled();
+    });
+
     it('rethrows repository errors while removing books', async () => {
       const { service, collectionRepo } = makeService();
       collectionRepo.findById.mockResolvedValue([makeCollection()]);

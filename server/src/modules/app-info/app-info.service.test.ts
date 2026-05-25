@@ -43,44 +43,80 @@ describe('AppInfoService', () => {
   });
 
   describe('getAppInfo', () => {
-    it('returns version from config', () => {
+    it('returns version from config', async () => {
       const service = new AppInfoService(makeConfig('v2.0.0'), makeAppSettings());
-      expect(service.getAppInfo().version).toBe('v2.0.0');
+      expect((await service.getAppInfo()).version).toBe('v2.0.0');
     });
 
-    it('defaults to "Local build" when config returns undefined', () => {
+    it('defaults to "Local build" when config returns undefined', async () => {
       const config = { get: vi.fn().mockReturnValue(undefined) } as unknown as ConfigService;
       const service = new AppInfoService(config, makeAppSettings());
-      expect(service.getAppInfo().version).toBe('Local build');
+      expect((await service.getAppInfo()).version).toBe('Local build');
     });
 
-    it('returns null for updateAvailable before bootstrap', () => {
-      const service = new AppInfoService(makeConfig(), makeAppSettings());
-      const info = service.getAppInfo();
+    it('returns null for updateAvailable when update check is skipped', async () => {
+      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings());
+      const info = await service.getAppInfo();
       expect(info.updateAvailable).toBeNull();
       expect(info.latestVersion).toBeNull();
     });
 
-    it('returns bookDockPath as appDataPath/book-dock', () => {
+    it('returns bookDockPath as appDataPath/book-dock', async () => {
       const service = new AppInfoService(makeConfig('v1.0.0', '/custom/data'), makeAppSettings());
-      expect(service.getAppInfo().bookDockPath).toBe('/custom/data/book-dock');
+      expect((await service.getAppInfo()).bookDockPath).toBe('/custom/data/book-dock');
     });
 
-    it('falls back to /data/book-dock when storage.appDataPath is not configured', () => {
+    it('falls back to /data/book-dock when storage.appDataPath is not configured', async () => {
       const config = { get: vi.fn().mockReturnValue(undefined) } as unknown as ConfigService;
       const service = new AppInfoService(config, makeAppSettings());
-      expect(service.getAppInfo().bookDockPath).toBe('/data/book-dock');
+      expect((await service.getAppInfo()).bookDockPath).toBe('/data/book-dock');
     });
 
-    it('includes bookDockPath in full response shape', () => {
-      const service = new AppInfoService(makeConfig('v1.2.3', '/app/data'), makeAppSettings());
-      const info = service.getAppInfo();
+    it('includes bookDockPath in full response shape', async () => {
+      const service = new AppInfoService(makeConfig('Local build', '/app/data'), makeAppSettings());
+      const info = await service.getAppInfo();
       expect(info).toMatchObject({
-        version: 'v1.2.3',
+        version: 'Local build',
         updateAvailable: null,
         latestVersion: null,
         bookDockPath: '/app/data/book-dock',
       });
+    });
+
+    it('fetches from GitHub if checked for the first time', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValue(makeGithubResponse('v1.3.0'));
+      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true));
+
+      const info = await service.getAppInfo();
+      expect(info.updateAvailable).toBe(true);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns cached result and does not fetch if less than 10 minutes have passed', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(makeGithubResponse('v1.3.0'));
+      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true));
+
+      await service.getAppInfo(); // First call triggers fetch
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      await service.getAppInfo(); // Second call within 10 min uses cache
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('re-fetches if more than 10 minutes have elapsed', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(makeGithubResponse('v1.3.0'));
+      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true));
+
+      await service.getAppInfo(); // First call
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      // Fast-forward time by 10 minutes and 1 millisecond
+      vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 600001);
+
+      await service.getAppInfo(); // Second call after TTL expires
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+
+      vi.restoreAllMocks();
     });
   });
 
@@ -91,7 +127,7 @@ describe('AppInfoService', () => {
       const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true));
       await service.onApplicationBootstrap();
 
-      const info = service.getAppInfo();
+      const info = await service.getAppInfo();
       expect(info.updateAvailable).toBe(true);
       expect(info.latestVersion).toBe('v1.3.0');
       expect(fetch).toHaveBeenCalledWith(GITHUB_RELEASES_API, expect.objectContaining({ headers: expect.any(Object) }));
@@ -103,7 +139,7 @@ describe('AppInfoService', () => {
       const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true));
       await service.onApplicationBootstrap();
 
-      expect(service.getAppInfo().updateAvailable).toBe(false);
+      expect((await service.getAppInfo()).updateAvailable).toBe(false);
     });
 
     it('sets updateAvailable: false when running newer than latest (downgrade scenario)', async () => {
@@ -112,7 +148,7 @@ describe('AppInfoService', () => {
       const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true));
       await service.onApplicationBootstrap();
 
-      expect(service.getAppInfo().updateAvailable).toBe(false);
+      expect((await service.getAppInfo()).updateAvailable).toBe(false);
     });
 
     it('correctly compares minor version bumps', async () => {
@@ -121,7 +157,7 @@ describe('AppInfoService', () => {
       const service = new AppInfoService(makeConfig('v1.2.9'), makeAppSettings(true));
       await service.onApplicationBootstrap();
 
-      expect(service.getAppInfo().updateAvailable).toBe(true);
+      expect((await service.getAppInfo()).updateAvailable).toBe(true);
     });
 
     it('correctly compares major version bumps', async () => {
@@ -130,7 +166,7 @@ describe('AppInfoService', () => {
       const service = new AppInfoService(makeConfig('v1.9.9'), makeAppSettings(true));
       await service.onApplicationBootstrap();
 
-      expect(service.getAppInfo().updateAvailable).toBe(true);
+      expect((await service.getAppInfo()).updateAvailable).toBe(true);
     });
 
     it('skips fetch and leaves updateAvailable: null when version is "Local build"', async () => {
@@ -140,7 +176,7 @@ describe('AppInfoService', () => {
       await service.onApplicationBootstrap();
 
       expect(fetchSpy).not.toHaveBeenCalled();
-      expect(service.getAppInfo().updateAvailable).toBeNull();
+      expect((await service.getAppInfo()).updateAvailable).toBeNull();
     });
 
     it('skips fetch when version is a sha-prefixed string', async () => {
@@ -150,7 +186,7 @@ describe('AppInfoService', () => {
       await service.onApplicationBootstrap();
 
       expect(fetchSpy).not.toHaveBeenCalled();
-      expect(service.getAppInfo().updateAvailable).toBeNull();
+      expect((await service.getAppInfo()).updateAvailable).toBeNull();
     });
 
     it('skips fetch when update checks are disabled', async () => {
@@ -160,7 +196,7 @@ describe('AppInfoService', () => {
       await service.onApplicationBootstrap();
 
       expect(fetchSpy).not.toHaveBeenCalled();
-      expect(service.getAppInfo().updateAvailable).toBeNull();
+      expect((await service.getAppInfo()).updateAvailable).toBeNull();
     });
 
     it('leaves updateAvailable: null on network error (does not throw)', async () => {
@@ -169,7 +205,7 @@ describe('AppInfoService', () => {
       const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true));
       await expect(service.onApplicationBootstrap()).resolves.not.toThrow();
 
-      expect(service.getAppInfo().updateAvailable).toBeNull();
+      expect((await service.getAppInfo()).updateAvailable).toBeNull();
       expect(warnSpy).toHaveBeenCalledOnce();
     });
 
@@ -181,7 +217,7 @@ describe('AppInfoService', () => {
       const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true));
       await expect(service.onApplicationBootstrap()).resolves.not.toThrow();
 
-      expect(service.getAppInfo().updateAvailable).toBeNull();
+      expect((await service.getAppInfo()).updateAvailable).toBeNull();
       expect(warnSpy).toHaveBeenCalledOnce();
     });
 
@@ -196,7 +232,7 @@ describe('AppInfoService', () => {
       const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true));
       await service.onApplicationBootstrap();
 
-      expect(service.getAppInfo().updateAvailable).toBeNull();
+      expect((await service.getAppInfo()).updateAvailable).toBeNull();
       expect(warnSpy).toHaveBeenCalledOnce();
     });
 
@@ -211,7 +247,7 @@ describe('AppInfoService', () => {
       const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true));
       await service.onApplicationBootstrap();
 
-      expect(service.getAppInfo().updateAvailable).toBeNull();
+      expect((await service.getAppInfo()).updateAvailable).toBeNull();
       expect(warnSpy).toHaveBeenCalledOnce();
     });
 
@@ -226,7 +262,7 @@ describe('AppInfoService', () => {
       const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true));
       await service.onApplicationBootstrap();
 
-      expect(service.getAppInfo().updateAvailable).toBeNull();
+      expect((await service.getAppInfo()).updateAvailable).toBeNull();
       expect(warnSpy).toHaveBeenCalledOnce();
     });
 
@@ -241,7 +277,7 @@ describe('AppInfoService', () => {
       const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true));
       await service.onApplicationBootstrap();
 
-      expect(service.getAppInfo().updateAvailable).toBeNull();
+      expect((await service.getAppInfo()).updateAvailable).toBeNull();
       expect(warnSpy).toHaveBeenCalledOnce();
     });
 
@@ -256,7 +292,7 @@ describe('AppInfoService', () => {
       const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true));
       await service.onApplicationBootstrap();
 
-      expect(service.getAppInfo().updateAvailable).toBeNull();
+      expect((await service.getAppInfo()).updateAvailable).toBeNull();
       expect(warnSpy).toHaveBeenCalledOnce();
     });
 

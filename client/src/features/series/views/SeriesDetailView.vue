@@ -19,6 +19,7 @@ import { usePageTitle } from '@/composables/usePageTitle'
 import { useSafeHtml } from '@/features/book/composables/useSafeHtml'
 import { api } from '@/lib/api'
 import EntityNotFound from '@/components/EntityNotFound.vue'
+import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import SeriesCompletionBar from '../components/SeriesCompletionBar.vue'
 import SeriesGapBanner from '../components/SeriesGapBanner.vue'
 import { fetchSeriesBooks } from '../api/series'
@@ -87,6 +88,8 @@ const canEditMetadata = computed(() => hasPermission('library_edit_metadata'))
 const safeLeadDescription = useSafeHtml(() => leadBook.value?.description)
 const visibleSeriesAuthors = computed(() => (seriesInfo.value?.authors ?? []).slice(0, 5))
 const hiddenSeriesAuthorsCount = computed(() => Math.max(0, (seriesInfo.value?.authors.length ?? 0) - visibleSeriesAuthors.value.length))
+const addToCollectionOpen = ref(false)
+const addToCollectionBookId = ref<number | null>(null)
 const leadFallbackStyle = computed(() => {
   const name = seriesInfo.value?.name ?? seriesName.value
   return bookCoverStyle(name || 'Series')
@@ -113,10 +116,26 @@ const leadMetaItems = computed(() => {
   return items
 })
 
-function handleBookAction(book: BookCard, action: string) {
+type BookActionType = 'quick-view' | 'add-to-collection' | 'delete'
+
+function handleBookAction(book: BookCard, action: BookActionType) {
   if (action === 'quick-view') {
+    addToCollectionOpen.value = false
+    addToCollectionBookId.value = null
     void router.push({ name: 'book-detail', params: { bookId: book.id } })
+    return
   }
+
+  if (action === 'add-to-collection') {
+    addToCollectionBookId.value = book.id
+    addToCollectionOpen.value = true
+    return
+  }
+}
+
+function handleAddToCollectionOpenChange(open: boolean) {
+  addToCollectionOpen.value = open
+  if (!open) addToCollectionBookId.value = null
 }
 
 function handleTableBookUpdate(updated: BookCard) {
@@ -585,4 +604,10 @@ watch(
       </section>
     </template>
   </main>
+
+  <AddToCollectionSheet
+    :open="addToCollectionOpen"
+    :book-ids="addToCollectionBookId ? [addToCollectionBookId] : []"
+    @update:open="handleAddToCollectionOpenChange"
+  />
 </template>

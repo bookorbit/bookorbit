@@ -163,6 +163,28 @@ describe('StatisticsService additional coverage', () => {
     expect(repo.getGenreCooccurrence).toHaveBeenCalledTimes(1);
   });
 
+  it('caches results per user scope: two different users get independent cache entries', async () => {
+    const { service, repo } = makeService();
+    repo.getSummary.mockResolvedValueOnce({ totalBooks: 10 }).mockResolvedValueOnce({ totalBooks: 20 });
+
+    const userA = makeUser();
+    const userB = { ...makeUser(), id: 3 };
+
+    const firstA = await service.getSummary(userA, { libraryIds: [] });
+    const firstB = await service.getSummary(userB, { libraryIds: [] });
+
+    expect(repo.getSummary).toHaveBeenCalledTimes(2);
+    expect(firstA.totalBooks).toBe(10);
+    expect(firstB.totalBooks).toBe(20);
+
+    const secondA = await service.getSummary(userA, { libraryIds: [] });
+    const secondB = await service.getSummary(userB, { libraryIds: [] });
+
+    expect(repo.getSummary).toHaveBeenCalledTimes(2);
+    expect(secondA.totalBooks).toBe(10);
+    expect(secondB.totalBooks).toBe(20);
+  });
+
   it('filters invalid entries for largest-books and top-series payloads', async () => {
     const { service, repo } = makeService();
     repo.largestBooks.mockResolvedValue([

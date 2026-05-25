@@ -134,13 +134,69 @@ describe('OpdsController', () => {
     );
     expect(opdsService.generateAcquisitionFeed).toHaveBeenCalledWith(
       'Search: arrakis',
-      'urn:bookorbit:catalog',
+      'urn:bookorbit:catalog:author:Frank%20Herbert:collectionId:11:libraryId:2:q:arrakis:series:Dune:smartScopeId:15',
       [{ id: 1 }],
       1,
       1,
       100,
       expect.stringContaining('/api/v1/opds/catalog?'),
       'token',
+    );
+  });
+
+  it('catalog generates unique feed ids per filter context', async () => {
+    const user = { userId: 5, isSuperuser: false, sortOrder: 'recent', coverToken: 'tok' } as never;
+
+    const noFilters = makeController();
+    await noFilters.controller.catalog(user, 1, 50, undefined, undefined, undefined, undefined, undefined, undefined, makeReply());
+    expect(noFilters.opdsService.generateAcquisitionFeed).toHaveBeenCalledWith(
+      expect.anything(),
+      'urn:bookorbit:catalog',
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
+
+    const libraryOnly = makeController();
+    await libraryOnly.controller.catalog(user, 1, 50, '1', undefined, undefined, undefined, undefined, undefined, makeReply());
+    expect(libraryOnly.opdsService.generateAcquisitionFeed).toHaveBeenCalledWith(
+      expect.anything(),
+      'urn:bookorbit:catalog:libraryId:1',
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
+
+    const searchOnly = makeController();
+    await searchOnly.controller.catalog(user, 1, 50, undefined, undefined, undefined, undefined, undefined, 'dune', makeReply());
+    expect(searchOnly.opdsService.generateAcquisitionFeed).toHaveBeenCalledWith(
+      expect.anything(),
+      'urn:bookorbit:catalog:q:dune',
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
+
+    const multiFilter = makeController();
+    await multiFilter.controller.catalog(user, 1, 50, '2', undefined, undefined, 'Frank Herbert', undefined, undefined, makeReply());
+    expect(multiFilter.opdsService.generateAcquisitionFeed).toHaveBeenCalledWith(
+      expect.anything(),
+      'urn:bookorbit:catalog:author:Frank%20Herbert:libraryId:2',
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
     );
   });
 

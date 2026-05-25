@@ -152,4 +152,37 @@ describe('KoreaderRepository', () => {
       expect(result).toBe(date);
     });
   });
+
+  describe('upsertReadingProgress', () => {
+    it('upserts percentage and clears stale web locator fields on conflict', async () => {
+      const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+      const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
+      db.insert.mockReturnValue({ values });
+
+      await repo.upsertReadingProgress(44, 12, 41.25);
+
+      expect(db.insert).toHaveBeenCalledTimes(1);
+      expect(values).toHaveBeenCalledWith(
+        expect.objectContaining({
+          bookFileId: 44,
+          userId: 12,
+          percentage: 41.25,
+        }),
+      );
+
+      expect(onConflictDoUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          target: expect.any(Array),
+          set: expect.objectContaining({
+            percentage: 41.25,
+            cfi: null,
+            pageNumber: null,
+          }),
+        }),
+      );
+
+      const conflictArg = onConflictDoUpdate.mock.calls[0]?.[0] as { set?: Record<string, unknown> } | undefined;
+      expect(conflictArg?.set?.['updatedAt']).toBeDefined();
+    });
+  });
 });

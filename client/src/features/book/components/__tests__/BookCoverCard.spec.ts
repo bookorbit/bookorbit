@@ -290,6 +290,14 @@ describe('BookCoverCard — series position overlay', () => {
     expect(wrapper.text()).toContain('#3')
   })
 
+  it('marks the series badge as a card click blocker and disables hit-testing on hover', () => {
+    cardOverlays.value = ['series-position']
+    const wrapper = mountCard(bookWithSeries)
+    const badge = wrapper.find('[data-card-click-blocker]')
+    expect(badge.exists()).toBe(true)
+    expect(badge.classes()).toContain('group-hover:pointer-events-none')
+  })
+
   it('does not render the badge when series-position is not in overlays', () => {
     cardOverlays.value = []
     const wrapper = mountCard(bookWithSeries)

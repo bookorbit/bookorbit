@@ -306,45 +306,10 @@ export class BookRepository {
     const orderBy = BookQueryBuilder.buildCollapseOrderBy(sort, userId);
 
     const result = await this.db.execute<CollapsedRawRow>(sql`
-      WITH series_agg AS (
+      WITH base_rows AS (
         SELECT
-          NULLIF(lower(btrim(book_metadata.series_name)), '') AS norm_series,
-          books.library_id,
-          COUNT(*) AS book_count,
-          SUM(CASE WHEN user_book_status.status = 'read' THEN 1 ELSE 0 END) AS read_count,
-          MAX(books.added_at) AS latest_added_at
-        FROM books
-        LEFT JOIN book_metadata ON book_metadata.book_id = books.id
-        LEFT JOIN user_book_status ON user_book_status.book_id = books.id AND user_book_status.user_id = ${userId}
-        WHERE ${whereFragment}
-          AND NULLIF(lower(btrim(book_metadata.series_name)), '') IS NOT NULL
-        GROUP BY NULLIF(lower(btrim(book_metadata.series_name)), ''), books.library_id
-      ),
-      series_covers AS (
-        SELECT
-          sa.norm_series,
-          sa.library_id,
-          covers.cover_book_ids
-        FROM series_agg sa
-        CROSS JOIN LATERAL (
-          SELECT COALESCE(
-            ARRAY_AGG(sub.id ORDER BY sub.series_index ASC NULLS LAST, sub.added_at ASC),
-            ARRAY[]::int[]
-          ) AS cover_book_ids
-          FROM (
-            SELECT b2.id, bm2.series_index, b2.added_at
-            FROM books b2
-            JOIN book_metadata bm2 ON bm2.book_id = b2.id
-            WHERE NULLIF(lower(btrim(bm2.series_name)), '') = sa.norm_series
-              AND b2.library_id = sa.library_id
-            ORDER BY bm2.series_index ASC NULLS LAST, b2.added_at ASC
-            LIMIT 4
-          ) sub
-        ) covers
-      ),
-      representatives AS (
-        SELECT DISTINCT ON (books.library_id, COALESCE(NULLIF(lower(btrim(book_metadata.series_name)), ''), 'book_' || books.id::text))
           books.id,
+          books.library_id,
           books.status,
           books.primary_file_id,
           books.folder_path,
@@ -355,7 +320,6 @@ export class BookRepository {
           book_metadata.series_index,
           book_metadata.published_year,
           book_metadata.language,
-          ubr.rating,
           book_metadata.cover_source,
           book_metadata.locked_fields,
           book_metadata.publisher,
@@ -363,28 +327,88 @@ export class BookRepository {
           book_metadata.subtitle,
           book_metadata.isbn13,
           book_metadata.metadata_score,
-          books.updated_at,
-          COALESCE(NULLIF(lower(btrim(book_metadata.series_name)), ''), lower(book_metadata.title)) AS sort_title,
-          COALESCE(sa.latest_added_at, books.added_at) AS sort_added_at,
+          NULLIF(lower(btrim(book_metadata.series_name)), '') AS norm_series
+        FROM books
+        LEFT JOIN book_metadata ON book_metadata.book_id = books.id
+        WHERE ${whereFragment}
+      ),
+      series_agg AS (
+        SELECT
+          base.norm_series,
+          base.library_id,
+          COUNT(*) AS book_count,
+          SUM(CASE WHEN user_book_status.status = 'read' THEN 1 ELSE 0 END) AS read_count,
+          MAX(base.added_at) AS latest_added_at
+        FROM base_rows base
+        LEFT JOIN user_book_status ON user_book_status.book_id = base.id AND user_book_status.user_id = ${userId}
+        WHERE base.norm_series IS NOT NULL
+        GROUP BY base.norm_series, base.library_id
+      ),
+      series_cover_candidates AS (
+        SELECT
+          base.norm_series,
+          base.library_id,
+          base.id,
+          base.series_index,
+          base.added_at,
+          ROW_NUMBER() OVER (
+            PARTITION BY base.norm_series, base.library_id
+            ORDER BY base.series_index ASC NULLS LAST, base.added_at ASC, base.id ASC
+          ) AS rn
+        FROM base_rows base
+        WHERE base.norm_series IS NOT NULL
+      ),
+      series_covers AS (
+        SELECT
+          scc.norm_series,
+          scc.library_id,
+          COALESCE(
+            ARRAY_AGG(scc.id ORDER BY scc.series_index ASC NULLS LAST, scc.added_at ASC, scc.id ASC) FILTER (WHERE scc.rn <= 4),
+            ARRAY[]::int[]
+          ) AS cover_book_ids
+        FROM series_cover_candidates scc
+        GROUP BY scc.norm_series, scc.library_id
+      ),
+      representatives AS (
+        SELECT DISTINCT ON (base.library_id, COALESCE(base.norm_series, 'book_' || base.id::text))
+          base.id,
+          base.status,
+          base.primary_file_id,
+          base.folder_path,
+          base.added_at,
+          base.updated_at,
+          base.title,
+          base.series_name,
+          base.series_index,
+          base.published_year,
+          base.language,
+          ubr.rating,
+          base.cover_source,
+          base.locked_fields,
+          base.publisher,
+          base.page_count,
+          base.subtitle,
+          base.isbn13,
+          base.metadata_score,
+          COALESCE(base.norm_series, lower(base.title)) AS sort_title,
+          COALESCE(sa.latest_added_at, base.added_at) AS sort_added_at,
           sa.book_count,
           sa.read_count,
           sc.cover_book_ids
-        FROM books
-        LEFT JOIN book_metadata ON book_metadata.book_id = books.id
-        LEFT JOIN user_book_ratings ubr ON ubr.book_id = books.id AND ubr.user_id = ${userId}
+        FROM base_rows base
+        LEFT JOIN user_book_ratings ubr ON ubr.book_id = base.id AND ubr.user_id = ${userId}
         LEFT JOIN series_agg sa
-          ON sa.norm_series = NULLIF(lower(btrim(book_metadata.series_name)), '')
-          AND sa.library_id = books.library_id
+          ON sa.norm_series = base.norm_series
+          AND sa.library_id = base.library_id
         LEFT JOIN series_covers sc
           ON sc.norm_series = sa.norm_series
           AND sc.library_id = sa.library_id
-        WHERE ${whereFragment}
         ORDER BY
-          books.library_id,
-          COALESCE(NULLIF(lower(btrim(book_metadata.series_name)), ''), 'book_' || books.id::text),
-          book_metadata.series_index ASC NULLS LAST,
-          books.added_at ASC,
-          books.id ASC
+          base.library_id,
+          COALESCE(base.norm_series, 'book_' || base.id::text),
+          base.series_index ASC NULLS LAST,
+          base.added_at ASC,
+          base.id ASC
       )
       SELECT r.*,
         COUNT(*) OVER () AS total_count

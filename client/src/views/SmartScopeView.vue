@@ -356,7 +356,7 @@ watch(debouncedQuery, () => {
     :open="addToCollectionOpen"
     :book-ids="[...selectedIds]"
     @update:open="addToCollectionOpen = $event"
-    @added="exitSelectionMode"
+    @done="exitSelectionMode"
   />
   <BulkUpdateTagsDialog :open="bulkTagsOpen" :book-count="selectedCount" @update:open="bulkTagsOpen = $event" @confirm="handleBulkUpdateTags" />
   <SendBookDialog :open="sendBookOpen" :book-ids="[...selectedIds]" @update:open="sendBookOpen = $event" @sent="exitSelectionMode" />

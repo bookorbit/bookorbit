@@ -384,4 +384,64 @@ describe('DashboardWidgetService', () => {
       expect(result.consistencyPercent).toBe(0);
     });
   });
+
+  describe('caching', () => {
+    it('live cache: second call to getReadingStreak does not hit repo', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
+      widgetRepo.getReadingStreak.mockResolvedValue({ currentStreak: 5, longestStreak: 10, todayRead: false });
+
+      const user = makeUser();
+      await service.getReadingStreak(user);
+      await service.getReadingStreak(user);
+
+      expect(widgetRepo.getReadingStreak).toHaveBeenCalledTimes(1);
+    });
+
+    it('stale cache: second call to getLibraryOverview does not hit repo', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
+      widgetRepo.getLibraryOverview.mockResolvedValue({ totalBooks: 100, formats: [] });
+
+      const user = makeUser();
+      await service.getLibraryOverview(user);
+      await service.getLibraryOverview(user);
+
+      expect(widgetRepo.getLibraryOverview).toHaveBeenCalledTimes(1);
+    });
+
+    it('getReadingGoal returns fresh goalBooks from user settings but reuses cached completedBooks', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
+      widgetRepo.getCompletedBooksThisYear.mockResolvedValue(5);
+
+      const userWithOldGoal = makeUser({ settings: { dashboardConfig: { readingGoal: 12, widgets: [] } } });
+      const userWithNewGoal = makeUser({ settings: { dashboardConfig: { readingGoal: 24, widgets: [] } } });
+
+      const first = await service.getReadingGoal(userWithOldGoal);
+      const second = await service.getReadingGoal(userWithNewGoal);
+
+      expect(widgetRepo.getCompletedBooksThisYear).toHaveBeenCalledTimes(1);
+      expect(first.goalBooks).toBe(12);
+      expect(second.goalBooks).toBe(24);
+      expect(second.completedBooks).toBe(5);
+    });
+
+    it('cache is scoped per user: different users get independent cache entries', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
+      widgetRepo.getLibraryOverview.mockResolvedValue({ totalBooks: 100, formats: [] });
+
+      const userA = makeUser();
+      const userB = makeUser({ id: 99 });
+
+      await service.getLibraryOverview(userA);
+      await service.getLibraryOverview(userB);
+      expect(widgetRepo.getLibraryOverview).toHaveBeenCalledTimes(2);
+
+      await service.getLibraryOverview(userA);
+      await service.getLibraryOverview(userB);
+      expect(widgetRepo.getLibraryOverview).toHaveBeenCalledTimes(2);
+    });
+  });
 });

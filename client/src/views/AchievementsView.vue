@@ -3,7 +3,7 @@ import AchievementsPage from '@/features/achievements/components/AchievementsPag
 </script>
 
 <template>
-  <main class="py-4 sm:py-6">
+  <main>
     <AchievementsPage />
   </main>
 </template>

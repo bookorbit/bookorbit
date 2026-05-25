@@ -352,6 +352,19 @@ async function handleRefresh() {
           <p class="pt-1">Reading progress will sync automatically when you open and close books.</p>
         </div>
       </div>
+
+      <div class="mt-4">
+        <p class="settings-group-label">Sync Accuracy</p>
+        <div class="border border-border rounded-lg overflow-hidden shadow-xs">
+          <div class="px-4 py-3.5 bg-card md:px-5">
+            <p class="settings-label">Cross-reader compatibility</p>
+            <p class="settings-hint">
+              KOReader and BookOrbit use different internal progress formats, so cross-reader location restore is not fully compatible. KOReader to
+              BookOrbit is typically more precise, while BookOrbit to KOReader for EPUB usually resumes at chapter level.
+            </p>
+          </div>
+        </div>
+      </div>
     </template>
 
     <!-- Delete Confirmation Modal -->

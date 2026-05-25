@@ -10,7 +10,7 @@ export class AppInfoController {
   constructor(private readonly appInfoService: AppInfoService) {}
 
   @Get()
-  getAppInfo(): AppInfoResponse {
+  async getAppInfo(): Promise<AppInfoResponse> {
     return this.appInfoService.getAppInfo();
   }
 }

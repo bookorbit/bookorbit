@@ -24,29 +24,29 @@ describe('AppInfoController', () => {
   });
 
   describe('getAppInfo', () => {
-    it('delegates to the service and returns the result', () => {
+    it('delegates to the service and returns the result', async () => {
       const service = makeService();
       const expected: AppInfoResponse = {
         version: 'v1.2.3',
         updateAvailable: true,
         latestVersion: 'v1.3.0',
       };
-      service.getAppInfo.mockReturnValue(expected);
+      service.getAppInfo.mockResolvedValue(expected);
       const controller = new AppInfoController(service);
 
-      const result = controller.getAppInfo();
+      const result = await controller.getAppInfo();
 
       expect(result).toEqual(expected);
       expect(service.getAppInfo).toHaveBeenCalledOnce();
     });
 
-    it('returns updateAvailable: null when service returns null', () => {
+    it('returns updateAvailable: null when service returns null', async () => {
       const service = makeService();
       const expected: AppInfoResponse = { version: 'Local build', updateAvailable: null, latestVersion: null };
-      service.getAppInfo.mockReturnValue(expected);
+      service.getAppInfo.mockResolvedValue(expected);
       const controller = new AppInfoController(service);
 
-      expect(controller.getAppInfo()).toEqual(expected);
+      expect(await controller.getAppInfo()).toEqual(expected);
     });
   });
 });
