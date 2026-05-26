@@ -117,9 +117,12 @@ describe('BookRepository', () => {
     expect(result.progressRows).toEqual([{ bookFileId: 1001, percentage: 48 }]);
   });
 
-  it('findCards maps newer Kobo progress onto the primary file for cards', async () => {
+  it('findCards picks highest progress across reading, audio, and Kobo sources', async () => {
+    // Kobo has lower progress (11%) but newer timestamp (Jan 2).
+    // Reading has higher progress (48%) but older timestamp (Jan 1).
+    // "Highest progress wins" should pick 48%.
     const rows = [{ id: 10, primaryFileId: 1001, _total: 1 }];
-    const readingProgressRows = [{ bookFileId: 1001, percentage: 0.2, updatedAt: new Date('2026-01-01T00:00:00.000Z') }];
+    const readingProgressRows = [{ bookFileId: 1001, percentage: 48, updatedAt: new Date('2026-01-01T00:00:00.000Z') }];
     const koboProgressRows = [
       {
         bookId: 10,
@@ -146,7 +149,8 @@ describe('BookRepository', () => {
 
     const result = await repo.findCards({ where: undefined as never, orderBy: [] as never, limit: 25, offset: 0, userId: 7 });
 
-    expect(result.progressRows).toEqual([{ bookFileId: 1001, percentage: 11 }]);
+    // Picks 48% from reading_progress (highest) even though Kobo is newer
+    expect(result.progressRows).toEqual([{ bookFileId: 1001, percentage: 48 }]);
   });
 
   it('findCardsByBookIds returns empty payload when no ids are requested', async () => {

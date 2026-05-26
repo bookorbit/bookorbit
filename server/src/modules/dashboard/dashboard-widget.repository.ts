@@ -1031,7 +1031,7 @@ function extractKoboProgressPercent(bookmark: unknown): number | null {
 function latestProgressValue(...candidates: Array<ProgressCandidate | null>): number {
   const latest = candidates.reduce<ProgressCandidate | null>((best, candidate) => {
     if (!candidate) return best;
-    if (!best || candidate.updatedAt >= best.updatedAt) return candidate;
+    if (!best || candidate.percentage >= best.percentage) return candidate;
     return best;
   }, null);
   return latest?.percentage ?? 0;

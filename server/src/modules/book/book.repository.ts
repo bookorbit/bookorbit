@@ -257,7 +257,7 @@ export class BookRepository {
   private latestProgressCandidate(...candidates: Array<ProgressCandidate | null>): ProgressCandidate | null {
     return candidates.reduce<ProgressCandidate | null>((latest, candidate) => {
       if (!candidate) return latest;
-      if (!latest || candidate.updatedAt >= latest.updatedAt) return candidate;
+      if (!latest || candidate.percentage >= latest.percentage) return candidate;
       return latest;
     }, null);
   }
