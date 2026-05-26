@@ -5,6 +5,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { ContentFilterRules, SortSpec } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
+import { extractKoboProgressPercent, latestProgressCandidate, type ProgressCandidate } from '../../common/utils/reading-progress.utils';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -75,11 +76,6 @@ type PatternMetadataRow = {
   seriesIndex: number | null;
   isbn13: string | null;
   authors: string[];
-};
-
-type ProgressCandidate = {
-  percentage: number;
-  updatedAt: Date;
 };
 
 @Injectable()
@@ -231,7 +227,7 @@ export class BookRepository {
     const audiobookProgressByBookId = new Map(audiobookProgressRows.map((row) => [row.bookId, row]));
     const koboProgressByBookId = new Map(
       koboProgressRows.flatMap((row) => {
-        const percentage = this.extractKoboProgressPercent(row.currentBookmark);
+        const percentage = extractKoboProgressPercent(row.currentBookmark);
         return percentage == null ? [] : [[row.bookId, { percentage, updatedAt: row.updatedAt } satisfies ProgressCandidate]];
       }),
     );
@@ -241,7 +237,7 @@ export class BookRepository {
       const fileProgress = fileProgressById.get(book.primaryFileId);
       const audioProgress = audiobookProgressByBookId.get(book.id);
       const koboProgress = koboProgressByBookId.get(book.id);
-      const latestProgress = this.latestProgressCandidate(
+      const latestProgress = latestProgressCandidate(
         fileProgress ? { percentage: fileProgress.percentage, updatedAt: fileProgress.updatedAt } : null,
         audioProgress ? { percentage: audioProgress.percentage, updatedAt: audioProgress.updatedAt } : null,
         koboProgress ?? null,
@@ -252,25 +248,6 @@ export class BookRepository {
     });
 
     return { authorRows, fileRows, genreRows, tagRows, progressRows, statusRows, narratorRows };
-  }
-
-  private latestProgressCandidate(...candidates: Array<ProgressCandidate | null>): ProgressCandidate | null {
-    return candidates.reduce<ProgressCandidate | null>((latest, candidate) => {
-      if (!candidate) return latest;
-      if (!latest || candidate.percentage >= latest.percentage) return candidate;
-      return latest;
-    }, null);
-  }
-
-  private extractKoboProgressPercent(bookmark: unknown): number | null {
-    if (!bookmark || typeof bookmark !== 'object') return null;
-    const { ProgressPercent: progressPercent, ContentSourceProgressPercent: contentSourceProgressPercent } = bookmark as {
-      ProgressPercent?: unknown;
-      ContentSourceProgressPercent?: unknown;
-    };
-    const value = progressPercent ?? contentSourceProgressPercent;
-    if (typeof value !== 'number' || !Number.isFinite(value)) return null;
-    return Math.min(100, Math.max(0, value));
   }
 
   async findCardsByBookIds(bookIds: number[], userId: number) {

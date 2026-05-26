@@ -32,17 +32,13 @@ import {
   userReadingDailyStats,
 } from '../../db/schema';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
+import { extractKoboProgressPercent, latestProgressCandidate, type ProgressCandidate } from '../../common/utils/reading-progress.utils';
 import { computeLongestStreak, computeStreakData, formatDay } from './dashboard-widget.calculations';
 
 type Db = NodePgDatabase<typeof schema>;
 
 const CURRENTLY_READING_LIMIT = 10;
 const DEFAULT_VIRTUAL_PAGE_COUNT = 300;
-
-type ProgressCandidate = {
-  percentage: number;
-  updatedAt: Date;
-};
 
 @Injectable()
 export class DashboardWidgetRepository {
@@ -167,7 +163,7 @@ export class DashboardWidgetRepository {
     const result: CurrentlyReadingBook[] = rows.map((row) => {
       const koboProgress = koboByBookId.get(row.bookId) ?? null;
       const inAppProgress = row.lastReadAt != null ? ({ percentage: row.progress, updatedAt: row.lastReadAt } satisfies ProgressCandidate) : null;
-      const progressValue = latestProgressValue(inAppProgress, koboProgress);
+      const progressValue = latestProgressCandidate(inAppProgress, koboProgress)?.percentage ?? 0;
 
       return {
         bookId: row.bookId,
@@ -1015,24 +1011,4 @@ export class DashboardWidgetRepository {
 
     return rows;
   }
-}
-
-function extractKoboProgressPercent(bookmark: unknown): number | null {
-  if (!bookmark || typeof bookmark !== 'object') return null;
-  const { ProgressPercent: progressPercent, ContentSourceProgressPercent: contentSourceProgressPercent } = bookmark as {
-    ProgressPercent?: unknown;
-    ContentSourceProgressPercent?: unknown;
-  };
-  const value = progressPercent ?? contentSourceProgressPercent;
-  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
-  return Math.min(100, Math.max(0, value));
-}
-
-function latestProgressValue(...candidates: Array<ProgressCandidate | null>): number {
-  const latest = candidates.reduce<ProgressCandidate | null>((best, candidate) => {
-    if (!candidate) return best;
-    if (!best || candidate.percentage >= best.percentage) return candidate;
-    return best;
-  }, null);
-  return latest?.percentage ?? 0;
 }
