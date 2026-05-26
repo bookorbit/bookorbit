@@ -39,6 +39,11 @@ type Db = NodePgDatabase<typeof schema>;
 const CURRENTLY_READING_LIMIT = 10;
 const DEFAULT_VIRTUAL_PAGE_COUNT = 300;
 
+type ProgressCandidate = {
+  percentage: number;
+  updatedAt: Date;
+};
+
 @Injectable()
 export class DashboardWidgetRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
@@ -124,6 +129,25 @@ export class DashboardWidgetRepository {
     if (rows.length === 0) return { books: [] };
 
     const bookIds = rows.map((r) => r.bookId);
+
+    // Fetch Kobo reading states to merge into displayed progress
+    const koboRows =
+      bookIds.length > 0
+        ? await this.db
+            .select({
+              bookId: schema.koboReadingStates.bookId,
+              currentBookmark: schema.koboReadingStates.currentBookmark,
+              updatedAt: schema.koboReadingStates.updatedAt,
+            })
+            .from(schema.koboReadingStates)
+            .where(and(eq(schema.koboReadingStates.userId, userId), inArray(schema.koboReadingStates.bookId, bookIds)))
+        : [];
+    const koboByBookId = new Map(
+      koboRows.flatMap((row) => {
+        const percentage = extractKoboProgressPercent(row.currentBookmark);
+        return percentage == null ? [] : [[row.bookId, { percentage, updatedAt: row.updatedAt } satisfies ProgressCandidate]];
+      }),
+    );
     const authorRows = await this.db
       .select({
         bookId: bookAuthors.bookId,
@@ -140,15 +164,21 @@ export class DashboardWidgetRepository {
       authorsByBookId.set(row.bookId, list);
     }
 
-    const result: CurrentlyReadingBook[] = rows.map((row) => ({
-      bookId: row.bookId,
-      title: row.title,
-      authors: authorsByBookId.get(row.bookId) ?? [],
-      progress: row.progress ?? 0,
-      hasCover: row.coverSource != null,
-      fileId: row.fileId ?? null,
-      fileFormat: row.fileFormat ?? null,
-    }));
+    const result: CurrentlyReadingBook[] = rows.map((row) => {
+      const koboProgress = koboByBookId.get(row.bookId) ?? null;
+      const inAppProgress = row.lastReadAt != null ? ({ percentage: row.progress, updatedAt: row.lastReadAt } satisfies ProgressCandidate) : null;
+      const progressValue = latestProgressValue(inAppProgress, koboProgress);
+
+      return {
+        bookId: row.bookId,
+        title: row.title,
+        authors: authorsByBookId.get(row.bookId) ?? [],
+        progress: progressValue,
+        hasCover: row.coverSource != null,
+        fileId: row.fileId ?? null,
+        fileFormat: row.fileFormat ?? null,
+      };
+    });
 
     return { books: result };
   }
@@ -985,4 +1015,24 @@ export class DashboardWidgetRepository {
 
     return rows;
   }
+}
+
+function extractKoboProgressPercent(bookmark: unknown): number | null {
+  if (!bookmark || typeof bookmark !== 'object') return null;
+  const { ProgressPercent: progressPercent, ContentSourceProgressPercent: contentSourceProgressPercent } = bookmark as {
+    ProgressPercent?: unknown;
+    ContentSourceProgressPercent?: unknown;
+  };
+  const value = progressPercent ?? contentSourceProgressPercent;
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  return Math.min(100, Math.max(0, value));
+}
+
+function latestProgressValue(...candidates: Array<ProgressCandidate | null>): number {
+  const latest = candidates.reduce<ProgressCandidate | null>((best, candidate) => {
+    if (!candidate) return best;
+    if (!best || candidate.updatedAt >= best.updatedAt) return candidate;
+    return best;
+  }, null);
+  return latest?.percentage ?? 0;
 }
