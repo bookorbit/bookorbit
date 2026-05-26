@@ -106,7 +106,9 @@ export class OidcProviderService {
   async testConnection(issuerUri: string) {
     if (!issuerUri) throw new BadRequestException('Issuer URI is required');
 
-    const parsed = await ensureSafeUrl(issuerUri, { allowLocal: this.config.get<string>('app.nodeEnv') !== 'production' });
+    const isProduction = this.config.get<string>('app.nodeEnv') === 'production';
+    const allowPrivateOidcIssuers = !isProduction || this.config.get<boolean>('app.oidcAllowLocalIssuers') === true;
+    const parsed = await ensureSafeUrl(issuerUri, { allowLocal: allowPrivateOidcIssuers, allowPrivate: allowPrivateOidcIssuers });
     const normalized = parsed.href.replace(/\/$/, '');
     const discoveryUrl = `${normalized}/.well-known/openid-configuration`;
 

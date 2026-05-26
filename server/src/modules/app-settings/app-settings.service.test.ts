@@ -22,8 +22,14 @@ function makeRepo(): jest.Mocked<AppSettingsRepository> {
   } as unknown as jest.Mocked<AppSettingsRepository>;
 }
 
-function makeConfig(nodeEnv = 'development'): ConfigService {
-  return { get: vi.fn().mockReturnValue(nodeEnv) } as unknown as ConfigService;
+function makeConfig(nodeEnv = 'development', oidcAllowLocalIssuers = false): ConfigService {
+  return {
+    get: vi.fn().mockImplementation((key: string) => {
+      if (key === 'app.nodeEnv') return nodeEnv;
+      if (key === 'app.oidcAllowLocalIssuers') return oidcAllowLocalIssuers;
+      return undefined;
+    }),
+  } as unknown as ConfigService;
 }
 
 describe('AppSettingsService', () => {
@@ -285,7 +291,7 @@ describe('AppSettingsService', () => {
     it('passes allowLocal: true when nodeEnv is development', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(discoveryDoc) }));
       await service.testOidcConnection('https://auth.bookorbit.app:9093');
-      expect(vi.mocked(ensureSafeUrl)).toHaveBeenCalledWith('https://auth.bookorbit.app:9093', { allowLocal: true });
+      expect(vi.mocked(ensureSafeUrl)).toHaveBeenCalledWith('https://auth.bookorbit.app:9093', { allowLocal: true, allowPrivate: true });
       vi.unstubAllGlobals();
     });
 
@@ -293,7 +299,15 @@ describe('AppSettingsService', () => {
       const prodService = new AppSettingsService(repo, makeConfig('production'));
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(discoveryDoc) }));
       await prodService.testOidcConnection('https://kc.example.com/realms/main');
-      expect(vi.mocked(ensureSafeUrl)).toHaveBeenCalledWith('https://kc.example.com/realms/main', { allowLocal: false });
+      expect(vi.mocked(ensureSafeUrl)).toHaveBeenCalledWith('https://kc.example.com/realms/main', { allowLocal: false, allowPrivate: false });
+      vi.unstubAllGlobals();
+    });
+
+    it('passes allowLocal: true when production override is enabled', async () => {
+      const prodService = new AppSettingsService(repo, makeConfig('production', true));
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(discoveryDoc) }));
+      await prodService.testOidcConnection('https://kc.example.com/realms/main');
+      expect(vi.mocked(ensureSafeUrl)).toHaveBeenCalledWith('https://kc.example.com/realms/main', { allowLocal: true, allowPrivate: true });
       vi.unstubAllGlobals();
     });
   });

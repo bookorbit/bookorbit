@@ -141,7 +141,9 @@ export class AppSettingsService {
       throw new BadRequestException('Issuer URI is not configured');
     }
 
-    const parsedIssuer = await ensureSafeUrl(uri, { allowLocal: this.config.get<string>('app.nodeEnv') !== 'production' });
+    const isProduction = this.config.get<string>('app.nodeEnv') === 'production';
+    const allowPrivateOidcIssuers = !isProduction || this.config.get<boolean>('app.oidcAllowLocalIssuers') === true;
+    const parsedIssuer = await ensureSafeUrl(uri, { allowLocal: allowPrivateOidcIssuers, allowPrivate: allowPrivateOidcIssuers });
     const normalizedIssuer = parsedIssuer.href.replace(/\/$/, '');
     const discoveryUrl = `${normalizedIssuer}/.well-known/openid-configuration`;
 

@@ -17,10 +17,11 @@ const RAW_DOC = {
   backchannel_logout_supported: true,
 };
 
-function makeService(nodeEnv = 'development') {
+function makeService(nodeEnv = 'development', oidcAllowLocalIssuers = false) {
   const configService = {
     get: vi.fn().mockImplementation((key: string) => {
       if (key === 'app.nodeEnv') return nodeEnv;
+      if (key === 'app.oidcAllowLocalIssuers') return oidcAllowLocalIssuers;
       return undefined;
     }),
   };
@@ -215,14 +216,21 @@ describe('OidcDiscoveryService', () => {
       mockFetchSuccess();
       const service = makeService('development');
       await service.getDiscoveryDoc('https://idp.example.com');
-      expect(ensureSafeUrl).toHaveBeenCalledWith(expect.any(String), { allowLocal: true });
+      expect(ensureSafeUrl).toHaveBeenCalledWith(expect.any(String), { allowLocal: true, allowPrivate: true });
     });
 
     it('passes allowLocal=false in production environment', async () => {
       mockFetchSuccess();
       const service = makeService('production');
       await service.getDiscoveryDoc('https://idp.example.com');
-      expect(ensureSafeUrl).toHaveBeenCalledWith(expect.any(String), { allowLocal: false });
+      expect(ensureSafeUrl).toHaveBeenCalledWith(expect.any(String), { allowLocal: false, allowPrivate: false });
+    });
+
+    it('passes allowLocal=true in production when OIDC_ALLOW_LOCAL_ISSUERS override is enabled', async () => {
+      mockFetchSuccess();
+      const service = makeService('production', true);
+      await service.getDiscoveryDoc('https://idp.example.com');
+      expect(ensureSafeUrl).toHaveBeenCalledWith(expect.any(String), { allowLocal: true, allowPrivate: true });
     });
   });
 });

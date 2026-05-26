@@ -9,6 +9,7 @@ function resetEnv(): void {
   delete process.env.NODE_ENV;
   delete process.env.APP_URL;
   delete process.env.APP_VERSION;
+  delete process.env.OIDC_ALLOW_LOCAL_ISSUERS;
   delete process.env.DATABASE_URL;
   delete process.env.JWT_SECRET;
   delete process.env.JWT_EXPIRES_IN;
@@ -40,6 +41,7 @@ describe('config', () => {
       nodeEnv: 'development',
       appUrl: 'http://localhost:5173',
       version: 'Local build',
+      oidcAllowLocalIssuers: false,
     });
   });
 
@@ -47,12 +49,19 @@ describe('config', () => {
     process.env.NODE_ENV = 'production';
     process.env.APP_URL = 'https://bookorbit.local';
     process.env.APP_VERSION = 'v2.3.4';
+    process.env.OIDC_ALLOW_LOCAL_ISSUERS = 'true';
 
     expect(appConfig()).toEqual({
       nodeEnv: 'production',
       appUrl: 'https://bookorbit.local',
       version: 'v2.3.4',
+      oidcAllowLocalIssuers: true,
     });
+  });
+
+  it('falls back to false when OIDC_ALLOW_LOCAL_ISSUERS is invalid', () => {
+    process.env.OIDC_ALLOW_LOCAL_ISSUERS = 'maybe';
+    expect(appConfig().oidcAllowLocalIssuers).toBe(false);
   });
 
   it('uses defaults for database, auth, email, and migration config', () => {
