@@ -71,6 +71,7 @@ describe('BookRepository', () => {
         .mockReturnValueOnce(makeSelectChain('orderBy', narratorRows))
         .mockReturnValueOnce(makeSelectChain('where', statusRows))
         .mockReturnValueOnce(makeSelectChain('where', fileProgressRows))
+        .mockReturnValueOnce(makeSelectChain('where', []))
         .mockReturnValueOnce(makeSelectChain('where', [])),
     };
     const repo = new BookRepository(db as never);
@@ -106,13 +107,46 @@ describe('BookRepository', () => {
         .mockReturnValueOnce(makeSelectChain('orderBy', []))
         .mockReturnValueOnce(makeSelectChain('where', []))
         .mockReturnValueOnce(makeSelectChain('where', readingProgressRows))
-        .mockReturnValueOnce(makeSelectChain('where', audiobookProgressRows)),
+        .mockReturnValueOnce(makeSelectChain('where', audiobookProgressRows))
+        .mockReturnValueOnce(makeSelectChain('where', [])),
     };
     const repo = new BookRepository(db as never);
 
     const result = await repo.findCards({ where: undefined as never, orderBy: [] as never, limit: 25, offset: 0, userId: 7 });
 
     expect(result.progressRows).toEqual([{ bookFileId: 1001, percentage: 48 }]);
+  });
+
+  it('findCards maps newer Kobo progress onto the primary file for cards', async () => {
+    const rows = [{ id: 10, primaryFileId: 1001, _total: 1 }];
+    const readingProgressRows = [{ bookFileId: 1001, percentage: 0.2, updatedAt: new Date('2026-01-01T00:00:00.000Z') }];
+    const koboProgressRows = [
+      {
+        bookId: 10,
+        currentBookmark: { ProgressPercent: 11, ContentSourceProgressPercent: 72 },
+        updatedAt: new Date('2026-01-02T00:00:00.000Z'),
+      },
+    ];
+
+    const db = {
+      select: vi
+        .fn()
+        .mockReturnValueOnce(makeSelectChain('offset', rows))
+        .mockReturnValueOnce(makeSelectChain('orderBy', []))
+        .mockReturnValueOnce(makeSelectChain('where', []))
+        .mockReturnValueOnce(makeSelectChain('where', []))
+        .mockReturnValueOnce(makeSelectChain('where', []))
+        .mockReturnValueOnce(makeSelectChain('orderBy', []))
+        .mockReturnValueOnce(makeSelectChain('where', []))
+        .mockReturnValueOnce(makeSelectChain('where', readingProgressRows))
+        .mockReturnValueOnce(makeSelectChain('where', []))
+        .mockReturnValueOnce(makeSelectChain('where', koboProgressRows)),
+    };
+    const repo = new BookRepository(db as never);
+
+    const result = await repo.findCards({ where: undefined as never, orderBy: [] as never, limit: 25, offset: 0, userId: 7 });
+
+    expect(result.progressRows).toEqual([{ bookFileId: 1001, percentage: 11 }]);
   });
 
   it('findCardsByBookIds returns empty payload when no ids are requested', async () => {
