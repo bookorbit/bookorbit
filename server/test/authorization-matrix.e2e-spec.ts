@@ -421,6 +421,11 @@ describe('Authorization matrix (e2e)', () => {
           path: '/koreader/credentials',
           token: 'allPerms',
         },
+        [Permission.HardcoverSync]: {
+          method: 'GET',
+          path: '/hardcover/settings',
+          token: 'allPerms',
+        },
         [Permission.DemoRestricted]: {
           method: 'GET',
           path: '/notifications',

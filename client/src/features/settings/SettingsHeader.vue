@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { Permission } from '@bookorbit/types'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 
 const route = useRoute()
@@ -33,7 +34,9 @@ const sections = computed<Section[]>(() => {
     result.push({ label: 'Metadata', routeName: 'settings-admin-metadata' })
   }
 
-  result.push({ label: 'Integrations', routeName: 'settings-integrations' })
+  if (su || perms.includes(Permission.KoboSync) || perms.includes(Permission.KoreaderSync) || perms.includes(Permission.HardcoverSync)) {
+    result.push({ label: 'Integrations', routeName: 'settings-integrations' })
+  }
 
   if (su || perms.includes('email_send') || perms.includes('manage_email')) {
     result.push({ label: 'Email', routeName: 'settings-email' })

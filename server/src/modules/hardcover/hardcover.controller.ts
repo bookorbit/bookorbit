@@ -1,13 +1,16 @@
+import { Permission } from '@bookorbit/types';
 import { Body, Controller, Delete, Get, MessageEvent, Patch, Post, Sse } from '@nestjs/common';
 import { map, Observable } from 'rxjs';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { UpsertHardcoverSettingsDto, ValidateHardcoverTokenDto } from './dto';
 import { HardcoverSettingsService } from './hardcover-settings.service';
 import { HardcoverSyncService } from './hardcover-sync.service';
 
 @Controller('hardcover')
+@RequirePermission(Permission.HardcoverSync)
 export class HardcoverController {
   constructor(
     private readonly settingsService: HardcoverSettingsService,

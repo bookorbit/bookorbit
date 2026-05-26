@@ -1,11 +1,16 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { Permission } from '@bookorbit/types'
 import IntegrationsAllSettings from '../IntegrationsAllSettings.vue'
 
-// --- Router mock state ---
+const permissionState = {
+  isSuperuser: false,
+  permissions: [] as string[],
+}
+
 const routerState = {
   currentQuery: {} as Record<string, string>,
-  replacedQuery: null as Record<string, string> | null,
+  replaceCalls: [] as Array<{ name: string; query?: Record<string, string> }>,
 }
 
 vi.mock('vue-router', () => ({
@@ -13,9 +18,15 @@ vi.mock('vue-router', () => ({
     query: routerState.currentQuery,
   }),
   useRouter: () => ({
-    replace: vi.fn<(to: { name: string; query: Record<string, string> }) => void>((to) => {
-      routerState.replacedQuery = to.query
+    replace: vi.fn<(to: { name: string; query?: Record<string, string> }) => void>((to) => {
+      routerState.replaceCalls.push(to)
     }),
+  }),
+}))
+
+vi.mock('@/features/auth/composables/usePermissions', () => ({
+  usePermissions: () => ({
+    hasPermission: (name: string) => permissionState.isSuperuser || permissionState.permissions.includes(name),
   }),
 }))
 
@@ -26,10 +37,21 @@ vi.mock('@/features/hardcover/components/HardcoverSettings.vue', () => ({
 }))
 vi.mock('../SettingsPageHeader.vue', () => ({ default: { template: '<div />' } }))
 
-function mountComponent(queryTab?: string) {
-  routerState.currentQuery = queryTab ? { tab: queryTab } : {}
-  routerState.replacedQuery = null
+function mountComponent(opts?: { queryTab?: string; perms?: string[]; su?: boolean }) {
+  permissionState.permissions = opts?.perms ?? []
+  permissionState.isSuperuser = opts?.su ?? false
+  routerState.currentQuery = opts?.queryTab ? { tab: opts.queryTab } : {}
+  routerState.replaceCalls = []
   return mount(IntegrationsAllSettings)
+}
+
+function labels(wrapper: ReturnType<typeof mount>): string[] {
+  return wrapper.findAll('button').map((button) => button.text())
+}
+
+function lastReplace() {
+  if (routerState.replaceCalls.length === 0) return null
+  return routerState.replaceCalls[routerState.replaceCalls.length - 1] ?? null
 }
 
 describe('IntegrationsAllSettings', () => {
@@ -37,112 +59,53 @@ describe('IntegrationsAllSettings', () => {
     vi.clearAllMocks()
   })
 
-  describe('default tab', () => {
-    it('shows kobo tab content when no ?tab param is present', () => {
-      const wrapper = mountComponent()
-      expect(wrapper.find('[data-testid="kobo-settings"]').exists()).toBe(true)
-    })
-
-    it('replaces URL with ?tab=kobo when no tab param is present', () => {
-      mountComponent()
-      expect(routerState.replacedQuery?.tab).toBe('kobo')
-    })
-
-    it('does not replace URL when tab param is already set', () => {
-      mountComponent('koreader')
-      expect(routerState.replacedQuery).toBeNull()
-    })
+  it('redirects to appearance when user has no integration permissions', () => {
+    const wrapper = mountComponent()
+    expect(labels(wrapper)).toEqual([])
+    expect(lastReplace()).toEqual({ name: 'settings-appearance' })
   })
 
-  describe('tab rendering', () => {
-    it('renders KoboSettings when tab=kobo', () => {
-      const wrapper = mountComponent('kobo')
-      expect(wrapper.find('[data-testid="kobo-settings"]').exists()).toBe(true)
-      expect(wrapper.find('[data-testid="koreader-settings"]').exists()).toBe(false)
-      expect(wrapper.find('[data-testid="hardcover-settings"]').exists()).toBe(false)
-    })
-
-    it('renders KoreaderSettings when tab=koreader', () => {
-      const wrapper = mountComponent('koreader')
-      expect(wrapper.find('[data-testid="koreader-settings"]').exists()).toBe(true)
-      expect(wrapper.find('[data-testid="kobo-settings"]').exists()).toBe(false)
-    })
-
-    it('renders HardcoverSettings when tab=hardcover', () => {
-      const wrapper = mountComponent('hardcover')
-      expect(wrapper.find('[data-testid="hardcover-settings"]').exists()).toBe(true)
-      expect(wrapper.find('[data-testid="kobo-settings"]').exists()).toBe(false)
-    })
-
-    it('falls back to kobo for unknown tab value', () => {
-      const wrapper = mountComponent('unknown-tab')
-      expect(wrapper.find('[data-testid="kobo-settings"]').exists()).toBe(true)
-    })
+  it('shows only Kobo tab for kobo_sync users and defaults URL to ?tab=kobo', () => {
+    const wrapper = mountComponent({ perms: [Permission.KoboSync] })
+    expect(labels(wrapper)).toEqual(['Kobo'])
+    expect(wrapper.find('[data-testid="kobo-settings"]').exists()).toBe(true)
+    expect(lastReplace()).toEqual({ name: 'settings-integrations', query: { tab: 'kobo' } })
   })
 
-  describe('tab navigation', () => {
-    it('renders three tab buttons', () => {
-      const wrapper = mountComponent('kobo')
-      const buttons = wrapper.findAll('button')
-      expect(buttons).toHaveLength(3)
-    })
-
-    it('tab buttons have correct labels', () => {
-      const wrapper = mountComponent('kobo')
-      const labels = wrapper.findAll('button').map((b) => b.text())
-      expect(labels).toContain('Kobo')
-      expect(labels).toContain('KOReader')
-      expect(labels).toContain('Hardcover')
-    })
-
-    it('active tab button has border-primary class', () => {
-      const wrapper = mountComponent('kobo')
-      const koboBtn = wrapper.findAll('button').find((b) => b.text() === 'Kobo')
-      expect(koboBtn?.classes()).toContain('border-primary')
-    })
-
-    it('inactive tab buttons have border-transparent class', () => {
-      const wrapper = mountComponent('kobo')
-      const koreaderBtn = wrapper.findAll('button').find((b) => b.text() === 'KOReader')
-      expect(koreaderBtn?.classes()).toContain('border-transparent')
-    })
-
-    it('clicking a tab button calls router.replace with the correct tab', async () => {
-      routerState.currentQuery = { tab: 'kobo' }
-      routerState.replacedQuery = null
-      const wrapper = mount(IntegrationsAllSettings)
-
-      const koreaderBtn = wrapper.findAll('button').find((b) => b.text() === 'KOReader')
-      await koreaderBtn!.trigger('click')
-
-      expect(routerState.replacedQuery!['tab']).toBe('koreader')
-    })
-
-    it('clicking a tab updates the displayed component', async () => {
-      routerState.currentQuery = { tab: 'kobo' }
-      const wrapper = mount(IntegrationsAllSettings)
-
-      expect(wrapper.find('[data-testid="kobo-settings"]').exists()).toBe(true)
-
-      const hardcoverBtn = wrapper.findAll('button').find((b) => b.text() === 'Hardcover')
-      await hardcoverBtn!.trigger('click')
-
-      expect(wrapper.find('[data-testid="hardcover-settings"]').exists()).toBe(true)
-      expect(wrapper.find('[data-testid="kobo-settings"]').exists()).toBe(false)
-    })
+  it('shows only KOReader tab for koreader_sync users and defaults URL to ?tab=koreader', () => {
+    const wrapper = mountComponent({ perms: [Permission.KoreaderSync] })
+    expect(labels(wrapper)).toEqual(['KOReader'])
+    expect(wrapper.find('[data-testid="koreader-settings"]').exists()).toBe(true)
+    expect(lastReplace()).toEqual({ name: 'settings-integrations', query: { tab: 'koreader' } })
   })
 
-  describe('tab nav sticky bar', () => {
-    it('tab nav container has sticky class', () => {
-      const wrapper = mountComponent('kobo')
-      const nav = wrapper.find('div.sticky')
-      expect(nav.exists()).toBe(true)
+  it('shows only Hardcover tab for hardcover_sync users and defaults URL to ?tab=hardcover', () => {
+    const wrapper = mountComponent({ perms: [Permission.HardcoverSync] })
+    expect(labels(wrapper)).toEqual(['Hardcover'])
+    expect(wrapper.find('[data-testid="hardcover-settings"]').exists()).toBe(true)
+    expect(lastReplace()).toEqual({ name: 'settings-integrations', query: { tab: 'hardcover' } })
+  })
+
+  it('falls back to the first allowed tab when query tab is not permitted', () => {
+    const wrapper = mountComponent({ queryTab: 'hardcover', perms: [Permission.KoreaderSync] })
+    expect(wrapper.find('[data-testid="koreader-settings"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="hardcover-settings"]').exists()).toBe(false)
+    expect(lastReplace()).toEqual({ name: 'settings-integrations', query: { tab: 'koreader' } })
+  })
+
+  it('renders and switches all three tabs when user has all three permissions', async () => {
+    const wrapper = mountComponent({
+      queryTab: 'kobo',
+      perms: [Permission.KoboSync, Permission.KoreaderSync, Permission.HardcoverSync],
     })
 
-    it('tab nav container has z-20 class', () => {
-      const wrapper = mountComponent('kobo')
-      const nav = wrapper.find('div.z-20')
-      expect(nav.exists()).toBe(true)
-    })
+    expect(labels(wrapper)).toEqual(['Kobo', 'KOReader', 'Hardcover'])
+    expect(wrapper.find('[data-testid="kobo-settings"]').exists()).toBe(true)
+
+    const hardcoverButton = wrapper.findAll('button').find((button) => button.text() === 'Hardcover')
+    await hardcoverButton!.trigger('click')
+
+    expect(wrapper.find('[data-testid="hardcover-settings"]').exists()).toBe(true)
+    expect(lastReplace()).toEqual({ name: 'settings-integrations', query: { tab: 'hardcover' } })
   })
 })

@@ -41,7 +41,7 @@ describe('SettingsHeader', () => {
     vi.clearAllMocks()
   })
 
-  describe('tabs always visible to all users', () => {
+  describe('tab visibility', () => {
     it('shows Appearance tab', () => {
       const labels = getTabLabels(mountHeader())
       expect(labels).toContain('Appearance')
@@ -57,8 +57,28 @@ describe('SettingsHeader', () => {
       expect(labels).toContain('Account')
     })
 
-    it('shows Integrations tab for all users (Hardcover has no permission gate)', () => {
+    it('hides Integrations tab when user has no integration permissions', () => {
       const labels = getTabLabels(mountHeader())
+      expect(labels).not.toContain('Integrations')
+    })
+
+    it('shows Integrations tab for users with kobo_sync', () => {
+      const labels = getTabLabels(mountHeader({ perms: ['kobo_sync'] }))
+      expect(labels).toContain('Integrations')
+    })
+
+    it('shows Integrations tab for users with koreader_sync', () => {
+      const labels = getTabLabels(mountHeader({ perms: ['koreader_sync'] }))
+      expect(labels).toContain('Integrations')
+    })
+
+    it('shows Integrations tab for users with hardcover_sync', () => {
+      const labels = getTabLabels(mountHeader({ perms: ['hardcover_sync'] }))
+      expect(labels).toContain('Integrations')
+    })
+
+    it('shows Integrations tab for superusers', () => {
+      const labels = getTabLabels(mountHeader({ su: true }))
       expect(labels).toContain('Integrations')
     })
   })
@@ -210,7 +230,7 @@ describe('SettingsHeader', () => {
     })
 
     it('integrations tab is active when route is settings-integrations', () => {
-      const wrapper = mountHeader({ routeName: 'settings-integrations' })
+      const wrapper = mountHeader({ routeName: 'settings-integrations', perms: ['kobo_sync'] })
       const btn = wrapper.findAll('button').find((b) => b.text() === 'Integrations')
       expect(btn?.classes()).toContain('border-primary')
     })
