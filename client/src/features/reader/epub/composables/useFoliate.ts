@@ -25,6 +25,11 @@ export interface FoliateRenderer {
   getContents?: () => { index: number }[]
 }
 
+export interface FoliateLocationContext {
+  chapterTitle: string | null
+  fraction: number | null
+}
+
 export function useFoliate(
   container: () => HTMLElement | null,
   onRelocate?: (detail: RelocateDetail) => void,
@@ -177,11 +182,45 @@ export function useFoliate(
           goTo?: (t: string | number) => Promise<void>
           goToFraction?: (f: number) => void
           getSectionFractions?: () => number[]
+          resolveNavigation?: (target: string | number) => { index?: number } | Promise<{ index?: number }>
+          getTOCItemOf?: (target: string | number) => Promise<{ label?: string } | null>
           book?: { toc?: unknown[] }
           renderer?: FoliateRenderer
           destroy?: () => void
         })
       | null
+  }
+
+  async function getLocationContext(target: string): Promise<FoliateLocationContext> {
+    const view = getViewEl()
+    if (!view) return { chapterTitle: null, fraction: null }
+
+    let chapterTitle: string | null = null
+    let fraction: number | null = null
+
+    try {
+      const tocItem = await view.getTOCItemOf?.(target)
+      const label = tocItem?.label
+      chapterTitle = typeof label === 'string' && label.trim() ? label.trim() : null
+    } catch {
+      chapterTitle = null
+    }
+
+    try {
+      const resolved = await Promise.resolve(view.resolveNavigation?.(target))
+      const index = resolved?.index
+      if (typeof index === 'number') {
+        const fractions = view.getSectionFractions?.() ?? []
+        const sectionFraction = fractions[index]
+        if (typeof sectionFraction === 'number' && Number.isFinite(sectionFraction)) {
+          fraction = Math.max(0, Math.min(1, sectionFraction))
+        }
+      }
+    } catch {
+      fraction = null
+    }
+
+    return { chapterTitle, fraction }
   }
 
   onUnmounted(() => {
@@ -206,6 +245,7 @@ export function useFoliate(
     getSectionFractions: (): number[] => getViewEl()?.getSectionFractions?.() ?? [],
     getChapters: (): unknown[] => getViewEl()?.book?.toc ?? [],
     getRenderer: (): FoliateRenderer | null => getViewEl()?.renderer ?? null,
+    getLocationContext: (target: string): Promise<FoliateLocationContext> => getLocationContext(target),
     addAnnotation: (cfi: string, color = '#FACC15', style = 'highlight') => annotations.addAnnotation(viewRef.value, cfi, color, style),
     addAnnotations: (anns: { cfi: string; color: string; style: string }[]) => annotations.addAnnotations(viewRef.value, anns),
     deleteAnnotation: (cfi: string) => annotations.deleteAnnotation(viewRef.value, cfi),

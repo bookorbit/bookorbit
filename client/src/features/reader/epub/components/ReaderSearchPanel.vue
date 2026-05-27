@@ -53,7 +53,10 @@ function onClear() {
   <div class="fixed inset-0 z-50 flex justify-end">
     <div class="flex-1" @click="emit('close')" />
 
-    <div class="search-panel w-80 h-full bg-card text-card-foreground flex flex-col shadow-2xl border-l border-border" @click.stop>
+    <div
+      class="search-panel w-[19rem] sm:w-[20rem] md:w-[21.5rem] lg:w-[22.5rem] h-full bg-card text-card-foreground flex flex-col shadow-2xl border-l border-border"
+      @click.stop
+    >
       <div class="flex items-center gap-2 px-3 py-2.5 border-b border-border shrink-0">
         <Tooltip>
           <TooltipTrigger as-child>

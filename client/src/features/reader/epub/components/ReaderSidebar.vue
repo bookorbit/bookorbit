@@ -1,17 +1,18 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Bookmark, BookOpen, Highlighter, Trash2 } from 'lucide-vue-next'
 import type { TocItem } from '../composables/useToc'
 import type { Bookmark as BookmarkType } from '../composables/useBookmarks'
 import type { Annotation } from '../composables/useAnnotations'
-import { stripFragment, formatDate } from '../utils'
+import { stripFragment, findNearestCfi, formatCfiLocation, formatDate, getCfiSortKey } from '../utils'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const props = defineProps<{
   chapters: TocItem[]
   bookmarks: BookmarkType[]
   annotations: Annotation[]
+  currentCfi: string | null
+  locationMetaByCfi: Record<string, { chapterTitle: string | null; percentage: number | null }>
   activeHref: string
   expandedHrefs: Set<string>
 }>()
@@ -19,6 +20,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   navigateChapter: [href: string]
+  navigateBookmark: [cfi: string]
+  navigateAnnotation: [cfi: string]
   deleteBookmark: [id: number]
   deleteAnnotation: [id: number]
   toggleExpand: [href: string]
@@ -26,11 +29,158 @@ const emit = defineEmits<{
 
 type Tab = 'chapters' | 'bookmarks' | 'highlights'
 const activeTab = ref<Tab>('chapters')
+type SortMode = 'location' | 'newest' | 'oldest'
+const bookmarkQuery = ref('')
+const bookmarkSort = ref<SortMode>('location')
+const highlightQuery = ref('')
+const highlightSort = ref<SortMode>('location')
+const highlightColorFilter = ref('all')
+const highlightChapterFilter = ref('all')
+const highlightNotesOnly = ref(false)
+
+const HIGHLIGHT_COLOR_META: Record<string, { label: string; sample: string }> = {
+  '#FACC15': { label: 'Yellow', sample: '🟡' },
+  '#4ADE80': { label: 'Green', sample: '🟢' },
+  '#38BDF8': { label: 'Blue', sample: '🔵' },
+  '#F472B6': { label: 'Pink', sample: '🩷' },
+  '#FB923C': { label: 'Orange', sample: '🟠' },
+}
+
+function getHighlightColorLabel(color: string): string {
+  const normalized = color.trim().toUpperCase()
+  return HIGHLIGHT_COLOR_META[normalized]?.label ?? `Custom (${normalized})`
+}
+
+function getHighlightColorSample(color: string): string {
+  const normalized = color.trim().toUpperCase()
+  return HIGHLIGHT_COLOR_META[normalized]?.sample ?? '◉'
+}
+
+const highlightColorOptions = computed(() =>
+  Array.from(new Set(props.annotations.map((ann) => ann.color)))
+    .map((hex) => ({ hex, label: getHighlightColorLabel(hex), sample: getHighlightColorSample(hex) }))
+    .sort((a, b) => a.label.localeCompare(b.label)),
+)
+const highlightChapterOptions = computed(() =>
+  Array.from(new Set(props.annotations.map((ann) => getContextChapter(ann)).filter((value): value is string => !!value))).sort((a, b) =>
+    a.localeCompare(b),
+  ),
+)
+
+const filteredAndSortedBookmarks = computed(() => {
+  const q = bookmarkQuery.value.trim().toLowerCase()
+  const filtered = props.bookmarks.filter((bm) => {
+    if (!q) return true
+    const haystack = `${bm.title ?? ''} ${getBookmarkContextLine(bm)} ${formatCfiLocation(bm.cfi) ?? ''}`.toLowerCase()
+    return haystack.includes(q)
+  })
+  return sortByMode(filtered, bookmarkSort.value)
+})
+
+const filteredAndSortedHighlights = computed(() => {
+  const q = highlightQuery.value.trim().toLowerCase()
+  const filtered = props.annotations.filter((ann) => {
+    if (highlightColorFilter.value !== 'all' && ann.color !== highlightColorFilter.value) return false
+    const chapterLabel = getContextChapter(ann)
+    if (highlightChapterFilter.value !== 'all' && chapterLabel !== highlightChapterFilter.value) return false
+    if (highlightNotesOnly.value && !ann.note?.trim()) return false
+    if (!q) return true
+    const haystack = `${ann.text} ${ann.note ?? ''} ${chapterLabel ?? ''} ${getHighlightContextLine(ann)}`.toLowerCase()
+    return haystack.includes(q)
+  })
+  return sortByMode(filtered, highlightSort.value)
+})
+
+const activeBookmarkId = computed(() => findNearestCfi(filteredAndSortedBookmarks.value, props.currentCfi)?.id ?? null)
+const activeAnnotationId = computed(() => findNearestCfi(filteredAndSortedHighlights.value, props.currentCfi)?.id ?? null)
+
+function getLocationLabel(cfi: string | null | undefined): string {
+  return formatCfiLocation(cfi) ?? 'Location unavailable'
+}
+
+function getContextChapter(item: { cfi: string | null | undefined; chapterTitle?: string | null }): string | null {
+  const fromMap = item.cfi ? props.locationMetaByCfi[item.cfi]?.chapterTitle : null
+  const fromItem = item.chapterTitle ?? null
+  return fromMap || fromItem || null
+}
+
+function getContextPercent(cfi: string | null | undefined): string | null {
+  if (!cfi) return null
+  const percentage = props.locationMetaByCfi[cfi]?.percentage
+  if (typeof percentage !== 'number') return null
+  return `${percentage}%`
+}
+
+function joinContext(parts: Array<string | null>): string {
+  const usable = parts.filter((value): value is string => Boolean(value))
+  return usable.join(' - ')
+}
+
+function getBookmarkContextLine(bm: BookmarkType): string {
+  const context = joinContext([getContextChapter(bm), getContextPercent(bm.cfi)])
+  return context || getLocationLabel(bm.cfi)
+}
+
+function getHighlightContextLine(ann: Annotation): string {
+  const context = joinContext([getContextChapter(ann), getContextPercent(ann.cfi)])
+  return context || getLocationLabel(ann.cfi)
+}
+
+function toCreatedAt(row: { createdAt: string }): number {
+  const value = Date.parse(row.createdAt)
+  return Number.isFinite(value) ? value : 0
+}
+
+function toLocationKey(row: { cfi: string | null | undefined }): bigint | null {
+  return getCfiSortKey(row.cfi)
+}
+
+function sortByMode<T extends { cfi: string | null | undefined; createdAt: string }>(items: T[], mode: SortMode): T[] {
+  const sorted = [...items]
+  if (mode === 'newest') {
+    sorted.sort((a, b) => toCreatedAt(b) - toCreatedAt(a))
+    return sorted
+  }
+  if (mode === 'oldest') {
+    sorted.sort((a, b) => toCreatedAt(a) - toCreatedAt(b))
+    return sorted
+  }
+  sorted.sort((a, b) => {
+    const aKey = toLocationKey(a)
+    const bKey = toLocationKey(b)
+    if (aKey != null && bKey != null) return aKey < bKey ? -1 : aKey > bKey ? 1 : 0
+    if (aKey != null) return -1
+    if (bKey != null) return 1
+    return toCreatedAt(a) - toCreatedAt(b)
+  })
+  return sorted
+}
+
+function navigateBookmark(cfi: string | null | undefined) {
+  if (!cfi) return
+  emit('navigateBookmark', cfi)
+}
+
+function navigateAnnotation(cfi: string | null | undefined) {
+  if (!cfi) return
+  emit('navigateAnnotation', cfi)
+}
+
+function deleteBookmark(id: number) {
+  emit('deleteBookmark', id)
+}
+
+function deleteAnnotation(id: number) {
+  emit('deleteAnnotation', id)
+}
 </script>
 
 <template>
   <div class="fixed inset-0 z-50 flex">
-    <div class="sidebar-panel w-80 h-full bg-card text-card-foreground flex flex-col shadow-2xl border-r border-border" @click.stop>
+    <div
+      class="sidebar-panel w-[19rem] sm:w-[20rem] md:w-[21.5rem] lg:w-[22.5rem] h-full bg-card text-card-foreground flex flex-col shadow-2xl border-r border-border"
+      @click.stop
+    >
       <div class="flex items-stretch border-b border-border shrink-0">
         <button
           v-for="tab in [
@@ -39,7 +189,7 @@ const activeTab = ref<Tab>('chapters')
             { id: 'highlights', icon: Highlighter, label: 'Highlights' },
           ] as const"
           :key="tab.id"
-          class="flex-1 flex items-center justify-center gap-1.5 py-3 text-[13.5px] relative transition-colors"
+          class="flex-1 flex items-center justify-center gap-1 py-2.5 text-[13px] relative transition-colors"
           :class="activeTab === tab.id ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
           @click="activeTab = tab.id"
         >
@@ -64,51 +214,134 @@ const activeTab = ref<Tab>('chapters')
 
         <template v-if="activeTab === 'bookmarks'">
           <div v-if="bookmarks.length === 0" class="px-4 py-8 text-center text-sm text-muted-foreground">No bookmarks yet</div>
-          <ul v-else class="divide-y divide-border">
-            <li v-for="bm in bookmarks" :key="bm.id" class="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 group">
-              <Bookmark :size="14" class="mt-0.5 shrink-0 text-muted-foreground" />
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium leading-snug truncate">{{ bm.title || 'Bookmark' }}</p>
-                <p class="text-xs text-muted-foreground mt-0.5">{{ formatDate(bm.createdAt) }}</p>
+          <template v-else>
+            <div class="sticky top-0 z-10 border-b border-border/70 bg-card/95 backdrop-blur px-3 py-3 space-y-2">
+              <input
+                v-model="bookmarkQuery"
+                type="text"
+                placeholder="Search bookmarks..."
+                class="h-8 w-full rounded-md border border-border bg-background px-2.5 text-sm outline-none focus:border-primary"
+              />
+              <div class="flex items-center gap-2">
+                <select
+                  v-model="bookmarkSort"
+                  class="h-8 flex-1 rounded-md border border-border bg-background px-2 text-xs text-muted-foreground outline-none focus:border-primary"
+                >
+                  <option value="location">Reading order</option>
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                </select>
+                <span class="text-[11px] text-muted-foreground tabular-nums">{{ filteredAndSortedBookmarks.length }}</span>
               </div>
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <button
-                    class="opacity-0 group-hover:opacity-100 flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-destructive transition-all shrink-0"
-                    @click="emit('deleteBookmark', bm.id)"
-                  >
-                    <Trash2 :size="13" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>Delete bookmark</TooltipContent>
-              </Tooltip>
-            </li>
-          </ul>
-        </template>
-
-        <template v-if="activeTab === 'highlights'">
-          <div v-if="annotations.length === 0" class="px-4 py-8 text-center text-sm text-muted-foreground">No highlights yet</div>
-          <ul v-else class="divide-y divide-border">
-            <li v-for="ann in annotations" :key="ann.id" class="px-4 py-3 hover:bg-muted/50 group">
-              <div class="flex items-start gap-2 mb-1">
-                <span class="mt-1.5 w-2.5 h-2.5 rounded-full shrink-0" :style="{ background: ann.color }" />
-                <p class="text-sm leading-relaxed flex-1 min-w-0">{{ ann.text }}</p>
+            </div>
+            <ul v-if="filteredAndSortedBookmarks.length > 0" class="divide-y divide-border">
+              <li
+                v-for="bm in filteredAndSortedBookmarks"
+                :key="bm.id"
+                class="flex items-start gap-2.5 px-3 py-2.5 group transition-colors"
+                :class="bm.id === activeBookmarkId ? 'bg-primary/10 ring-1 ring-primary/25' : 'hover:bg-muted/50'"
+              >
+                <button type="button" class="flex flex-1 min-w-0 items-start gap-2.5 text-left cursor-pointer" @click="navigateBookmark(bm.cfi)">
+                  <Bookmark :size="14" class="mt-0.5 shrink-0 text-muted-foreground" />
+                  <div class="flex-1 min-w-0">
+                    <p class="text-[13px] font-medium leading-snug truncate">{{ bm.title || 'Bookmark' }}</p>
+                    <p class="text-[11px] text-muted-foreground mt-0.5">{{ getBookmarkContextLine(bm) }}</p>
+                    <p class="text-[11px] text-muted-foreground mt-0.5">{{ formatDate(bm.createdAt) }}</p>
+                  </div>
+                </button>
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <button
+                      type="button"
                       class="opacity-0 group-hover:opacity-100 flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-destructive transition-all shrink-0"
-                      @click="emit('deleteAnnotation', ann.id)"
+                      @click.stop="deleteBookmark(bm.id)"
                     >
                       <Trash2 :size="13" />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent>Delete highlight</TooltipContent>
+                  <TooltipContent>Delete bookmark</TooltipContent>
                 </Tooltip>
+              </li>
+            </ul>
+            <div v-else class="px-4 py-8 text-center text-sm text-muted-foreground">No bookmarks match your filters</div>
+          </template>
+        </template>
+
+        <template v-if="activeTab === 'highlights'">
+          <div v-if="annotations.length === 0" class="px-4 py-8 text-center text-sm text-muted-foreground">No highlights yet</div>
+          <template v-else>
+            <div class="sticky top-0 z-10 border-b border-border/70 bg-card/95 backdrop-blur px-3 py-3 space-y-2">
+              <input
+                v-model="highlightQuery"
+                type="text"
+                placeholder="Search highlights..."
+                class="h-8 w-full rounded-md border border-border bg-background px-2.5 text-sm outline-none focus:border-primary"
+              />
+              <div class="grid grid-cols-2 gap-2">
+                <select
+                  v-model="highlightSort"
+                  class="h-8 rounded-md border border-border bg-background px-2 text-xs text-muted-foreground outline-none focus:border-primary"
+                >
+                  <option value="location">Reading order</option>
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                </select>
+                <select
+                  v-model="highlightColorFilter"
+                  class="h-8 rounded-md border border-border bg-background px-2 text-xs text-muted-foreground outline-none focus:border-primary"
+                >
+                  <option value="all">All colors</option>
+                  <option v-for="color in highlightColorOptions" :key="color.hex" :value="color.hex">{{ color.sample }} {{ color.label }}</option>
+                </select>
+                <select
+                  v-model="highlightChapterFilter"
+                  class="col-span-2 h-8 rounded-md border border-border bg-background px-2 text-xs text-muted-foreground outline-none focus:border-primary"
+                >
+                  <option value="all">All chapters</option>
+                  <option v-for="chapter in highlightChapterOptions" :key="chapter" :value="chapter">{{ chapter }}</option>
+                </select>
               </div>
-              <p v-if="ann.chapterTitle" class="text-xs text-muted-foreground pl-4">{{ ann.chapterTitle }}</p>
-              <p v-if="ann.note" class="text-xs text-muted-foreground mt-1 pl-4 italic">{{ ann.note }}</p>
-            </li>
-          </ul>
+              <label class="flex items-center gap-2 text-xs text-muted-foreground">
+                <input v-model="highlightNotesOnly" type="checkbox" class="h-3.5 w-3.5 rounded border-border accent-primary" />
+                Notes only
+                <span class="ml-auto tabular-nums">{{ filteredAndSortedHighlights.length }}</span>
+              </label>
+            </div>
+
+            <ul v-if="filteredAndSortedHighlights.length > 0" class="divide-y divide-border">
+              <li
+                v-for="ann in filteredAndSortedHighlights"
+                :key="ann.id"
+                class="px-3 py-2.5 group transition-colors"
+                :class="ann.id === activeAnnotationId ? 'bg-primary/10 ring-1 ring-primary/25' : 'hover:bg-muted/50'"
+              >
+                <div class="flex items-start gap-2">
+                  <button type="button" class="flex flex-1 min-w-0 items-start gap-2 text-left cursor-pointer" @click="navigateAnnotation(ann.cfi)">
+                    <span class="mt-1.5 w-2.5 h-2.5 rounded-full shrink-0" :style="{ background: ann.color }" />
+                    <div class="flex-1 min-w-0">
+                      <p class="text-[13px] leading-relaxed line-clamp-3">{{ ann.text }}</p>
+                      <p class="text-[11px] text-muted-foreground mt-1">{{ getHighlightContextLine(ann) }}</p>
+                      <p class="text-[11px] text-muted-foreground mt-0.5">{{ formatDate(ann.createdAt) }}</p>
+                      <p v-if="ann.note" class="text-[11px] text-muted-foreground mt-1 italic">{{ ann.note }}</p>
+                    </div>
+                  </button>
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <button
+                        type="button"
+                        class="opacity-0 group-hover:opacity-100 flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-destructive transition-all shrink-0"
+                        @click.stop="deleteAnnotation(ann.id)"
+                      >
+                        <Trash2 :size="13" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Delete highlight</TooltipContent>
+                  </Tooltip>
+                </div>
+              </li>
+            </ul>
+            <div v-else class="px-4 py-8 text-center text-sm text-muted-foreground">No highlights match your filters</div>
+          </template>
         </template>
       </div>
     </div>
@@ -154,10 +387,10 @@ const TocList = defineComponent({
               'button',
               {
                 class: [
-                  'w-full text-left flex items-center gap-1.5 px-4 py-2 text-sm transition-colors hover:bg-muted/50',
+                  'w-full text-left flex items-center gap-1 px-3 py-1.5 text-[13px] leading-snug transition-colors hover:bg-muted/50',
                   active ? 'text-primary font-medium bg-primary/8' : 'text-foreground',
                 ],
-                style: { paddingLeft: `${16 + props.depth * 12}px` },
+                style: { paddingLeft: `${12 + props.depth * 10}px` },
                 onClick: () => {
                   emit('navigate', item.href)
                 },

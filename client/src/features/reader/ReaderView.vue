@@ -31,7 +31,7 @@ import PdfV4ReaderView from './pdf-v4/PdfV4ReaderView.vue'
 import CbzReaderView from './cbz/CbzReaderView.vue'
 import AudiobookReaderView from './audiobook/AudiobookReaderView.vue'
 import type { ReaderState } from './epub/composables/useReaderState'
-import type { FoliateRenderer } from './epub/composables/useFoliate'
+import type { FoliateLocationContext, FoliateRenderer } from './epub/composables/useFoliate'
 import type { EpubReaderSettings } from '@bookorbit/types'
 import { getFormatGroup } from '@bookorbit/types'
 
@@ -51,6 +51,8 @@ const showSearch = ref(false)
 const searchInitialQuery = ref('')
 const isFullscreen = ref(false)
 const sectionFractions = ref<number[]>([])
+const sidebarLocationMetaByCfi = ref<Record<string, { chapterTitle: string | null; percentage: number | null }>>({})
+let sidebarLocationResolveSeq = 0
 
 const bookSettings = useReaderSettings(fileId, fileFormat)
 // False when overrideBookFormatting is off and the book has no per-book delta.
@@ -211,6 +213,7 @@ const {
   goToSection,
   getSectionFractions,
   getChapters,
+  getLocationContext,
   getRenderer,
   addAnnotation,
   addAnnotations,
@@ -261,6 +264,7 @@ onMounted(async () => {
   if (annotations.annotations.value.length > 0) {
     addAnnotations(annotations.annotations.value.map((a) => ({ cfi: a.cfi, color: a.color, style: a.style })))
   }
+  void hydrateSidebarLocationMeta()
 
   if (hadProgress) {
     const pct = Math.round(progress.percentage.value)
@@ -378,6 +382,63 @@ function handleSidebarDeleteAnnotation(id: number) {
   }
 }
 
+function handleSidebarDeleteBookmark(id: number) {
+  bookmarks.remove(bookId, id)
+}
+
+function getSidebarCfiTargets(): string[] {
+  const targets = new Set<string>()
+  for (const bm of bookmarks.bookmarks.value) {
+    if (bm.cfi) targets.add(bm.cfi)
+  }
+  for (const ann of annotations.annotations.value) {
+    if (ann.cfi) targets.add(ann.cfi)
+  }
+  return Array.from(targets)
+}
+
+function pruneSidebarLocationMeta(targets: string[]) {
+  const targetSet = new Set(targets)
+  const next: Record<string, { chapterTitle: string | null; percentage: number | null }> = {}
+  for (const [cfiKey, meta] of Object.entries(sidebarLocationMetaByCfi.value)) {
+    if (targetSet.has(cfiKey)) {
+      next[cfiKey] = meta
+    }
+  }
+  if (Object.keys(next).length === Object.keys(sidebarLocationMetaByCfi.value).length) return
+  sidebarLocationMetaByCfi.value = next
+}
+
+function toSidebarLocationMeta(context: FoliateLocationContext): { chapterTitle: string | null; percentage: number | null } {
+  const percentage =
+    typeof context.fraction === 'number' && Number.isFinite(context.fraction) ? Math.max(0, Math.min(100, Math.round(context.fraction * 100))) : null
+  return { chapterTitle: context.chapterTitle, percentage }
+}
+
+async function hydrateSidebarLocationMeta() {
+  const targets = getSidebarCfiTargets()
+  pruneSidebarLocationMeta(targets)
+  if (targets.length === 0) return
+
+  const unresolved = targets.filter((target) => !sidebarLocationMetaByCfi.value[target])
+  if (unresolved.length === 0) return
+
+  const requestSeq = ++sidebarLocationResolveSeq
+  const entries = await Promise.all(
+    unresolved.map(async (target) => {
+      try {
+        const context = await getLocationContext(target)
+        return [target, toSidebarLocationMeta(context)] as const
+      } catch {
+        return [target, { chapterTitle: null, percentage: null }] as const
+      }
+    }),
+  )
+
+  if (requestSeq !== sidebarLocationResolveSeq) return
+  sidebarLocationMetaByCfi.value = { ...sidebarLocationMetaByCfi.value, ...Object.fromEntries(entries) }
+}
+
 function onSearchQuery(q: string) {
   if (!foliateView.value) return
   doSearch(foliateView.value as FoliateView, q)
@@ -399,11 +460,41 @@ function navigateSearch(cfiTarget: string) {
   goTo(cfiTarget)
 }
 
+async function navigateFromSidebar(cfiTarget: string) {
+  const goToPromise = goTo(cfiTarget)
+  if (!goToPromise) return
+  const navigated = await Promise.resolve(goToPromise)
+    .then(() => true)
+    .catch(() => false)
+  if (!navigated) return
+  showSidebar.value = false
+}
+
+function navigateChapterFromSidebar(href: string) {
+  goTo(href)
+  showSidebar.value = false
+}
+
 function closeSearch() {
   onSearchClear()
   searchInitialQuery.value = ''
   showSearch.value = false
 }
+
+watch(showSidebar, (open) => {
+  if (open) {
+    void hydrateSidebarLocationMeta()
+  }
+})
+
+watch(
+  () => [bookmarks.bookmarks.value.map((bm) => bm.cfi).join('|'), annotations.annotations.value.map((ann) => ann.cfi).join('|')],
+  () => {
+    if (showSidebar.value) {
+      void hydrateSidebarLocationMeta()
+    }
+  },
+)
 </script>
 
 <template>
@@ -482,16 +573,15 @@ function closeSearch() {
       :chapters="chapters"
       :bookmarks="bookmarks.bookmarks.value"
       :annotations="annotations.annotations.value"
+      :currentCfi="cfi"
+      :locationMetaByCfi="sidebarLocationMetaByCfi"
       :activeHref="activeHref"
       :expandedHrefs="expandedHrefs"
       @close="showSidebar = false"
-      @navigateChapter="
-        (href) => {
-          goTo(href)
-          showSidebar = false
-        }
-      "
-      @deleteBookmark="(id) => bookmarks.remove(bookId, id)"
+      @navigateChapter="navigateChapterFromSidebar"
+      @navigateBookmark="navigateFromSidebar"
+      @navigateAnnotation="navigateFromSidebar"
+      @deleteBookmark="handleSidebarDeleteBookmark"
       @deleteAnnotation="handleSidebarDeleteAnnotation"
       @toggleExpand="toggleExpand"
     />
