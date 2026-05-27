@@ -33,10 +33,11 @@ export class OidcDiscoveryService {
   private readonly logger = new Logger(OidcDiscoveryService.name);
   private readonly cache = new Map<string, CacheEntry>();
   private readonly TTL: number;
-  private readonly allowLocal: boolean;
+  private readonly allowPrivateOidcIssuers: boolean;
 
   constructor(private readonly configService: ConfigService) {
-    this.allowLocal = this.configService.get<string>('app.nodeEnv') !== 'production';
+    const isProduction = this.configService.get<string>('app.nodeEnv') === 'production';
+    this.allowPrivateOidcIssuers = !isProduction || this.configService.get<boolean>('app.oidcAllowLocalIssuers') === true;
     this.TTL = this.configService.get<number>('oidcRuntime.discoveryCacheTtlMs') ?? 60 * 60 * 1000;
   }
 
@@ -62,7 +63,7 @@ export class OidcDiscoveryService {
       }
 
       // P0-4: Validate all endpoint URLs are SSRF-safe
-      const ssrfOpts = { allowLocal: this.allowLocal };
+      const ssrfOpts = { allowLocal: this.allowPrivateOidcIssuers, allowPrivate: this.allowPrivateOidcIssuers };
       await Promise.all([
         ensureSafeUrl(raw.token_endpoint, ssrfOpts),
         ensureSafeUrl(raw.jwks_uri, ssrfOpts),

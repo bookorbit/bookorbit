@@ -5,6 +5,7 @@ export const appConfig = registerAs('app', () => ({
   nodeEnv: process.env.NODE_ENV ?? 'development',
   appUrl: process.env.APP_URL ?? 'http://localhost:5173',
   version: process.env.APP_VERSION ?? 'Local build',
+  oidcAllowLocalIssuers: parseBooleanFlag(process.env.OIDC_ALLOW_LOCAL_ISSUERS, false),
 }));
 
 export const dbConfig = registerAs('db', () => ({
@@ -49,4 +50,12 @@ function parsePositiveInteger(value: string | undefined, fallback: number): numb
     return fallback;
   }
   return Math.floor(parsed);
+}
+
+function parseBooleanFlag(value: string | undefined, fallback: boolean): boolean {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return fallback;
+  if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
+  if (['false', '0', 'no', 'off'].includes(normalized)) return false;
+  return fallback;
 }

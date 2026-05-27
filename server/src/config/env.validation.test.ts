@@ -58,4 +58,24 @@ describe('validateEnv', () => {
       }),
     ).toThrow('DATABASE_URL must be a valid PostgreSQL connection string');
   });
+
+  it('accepts boolean-like values for OIDC_ALLOW_LOCAL_ISSUERS', () => {
+    for (const OIDC_ALLOW_LOCAL_ISSUERS of ['true', 'false', '1', '0', 'yes', 'no', 'on', 'off']) {
+      expect(() =>
+        validateEnv({
+          ...BASE_ENV,
+          OIDC_ALLOW_LOCAL_ISSUERS,
+        }),
+      ).not.toThrow();
+    }
+  });
+
+  it('rejects invalid OIDC_ALLOW_LOCAL_ISSUERS values', () => {
+    expect(() =>
+      validateEnv({
+        ...BASE_ENV,
+        OIDC_ALLOW_LOCAL_ISSUERS: 'maybe',
+      }),
+    ).toThrow('OIDC_ALLOW_LOCAL_ISSUERS must be one of true/false/1/0/yes/no/on/off');
+  });
 });

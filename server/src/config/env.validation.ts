@@ -39,6 +39,14 @@ const envSchema = z.object({
   TRUST_PROXY: z.string().optional(),
   EMAIL_ENCRYPTION_KEY: z.string().optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).optional(),
+  OIDC_ALLOW_LOCAL_ISSUERS: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .refine((val) => ['true', 'false', '1', '0', 'yes', 'no', 'on', 'off'].includes(val), {
+      message: 'OIDC_ALLOW_LOCAL_ISSUERS must be one of true/false/1/0/yes/no/on/off',
+    })
+    .optional(),
   CSP_ALLOW_CLOUDFLARE_INSIGHTS: z
     .string()
     .trim()

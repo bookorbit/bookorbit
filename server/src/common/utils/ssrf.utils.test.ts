@@ -22,6 +22,11 @@ describe('ensureSafeRemoteHost', () => {
     await expect(ensureSafeRemoteHost('localhost')).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('allows localhost when allowLocal is enabled', async () => {
+    await expect(ensureSafeRemoteHost('localhost', { allowLocal: true })).resolves.toBeUndefined();
+    expect(lookupMock).not.toHaveBeenCalled();
+  });
+
   it('throws BadRequestException for private IPv4 (10.x.x.x)', async () => {
     lookupMock.mockResolvedValue([{ address: '10.0.0.1', family: 4 }] as never);
     await expect(ensureSafeRemoteHost('internal')).rejects.toBeInstanceOf(BadRequestException);
@@ -59,6 +64,24 @@ describe('ensureSafeRemoteHost', () => {
     lookupMock.mockResolvedValue([{ address: '::1', family: 6 }] as never);
     await expect(ensureSafeRemoteHost('ip6-localhost')).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  it('allows private IPv4 literals when allowPrivate is enabled', async () => {
+    await expect(ensureSafeRemoteHost('192.168.1.10', { allowPrivate: true })).resolves.toBeUndefined();
+    expect(lookupMock).not.toHaveBeenCalled();
+  });
+
+  it('allows private DNS resolutions when allowPrivate is enabled', async () => {
+    lookupMock.mockResolvedValue([{ address: '10.0.0.7', family: 4 }] as never);
+    await expect(ensureSafeRemoteHost('internal', { allowPrivate: true })).resolves.toBeUndefined();
+  });
+
+  it('allows mixed public/private DNS resolutions when allowPrivate is enabled', async () => {
+    lookupMock.mockResolvedValue([
+      { address: '93.184.216.34', family: 4 },
+      { address: '10.0.0.1', family: 4 },
+    ] as never);
+    await expect(ensureSafeRemoteHost('mixed', { allowPrivate: true })).resolves.toBeUndefined();
+  });
 });
 
 describe('ensureSafeUrl', () => {
@@ -82,5 +105,10 @@ describe('ensureSafeUrl', () => {
   it('throws BadRequestException when host resolves to private IP', async () => {
     lookupMock.mockResolvedValue([{ address: '192.168.1.1', family: 4 }] as never);
     await expect(ensureSafeUrl('https://internal.lan')).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('allows private targets when allowPrivate is enabled', async () => {
+    lookupMock.mockResolvedValue([{ address: '192.168.1.1', family: 4 }] as never);
+    await expect(ensureSafeUrl('https://internal.lan', { allowPrivate: true })).resolves.toBeInstanceOf(URL);
   });
 });

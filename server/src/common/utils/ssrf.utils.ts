@@ -4,7 +4,12 @@ import { isIP } from 'net';
 
 const SAFE_PROTOCOLS = new Set(['http:', 'https:']);
 
-export async function ensureSafeUrl(rawUrl: string, options?: { allowLocal?: boolean }): Promise<URL> {
+export interface SafeRemoteHostOptions {
+  allowLocal?: boolean;
+  allowPrivate?: boolean;
+}
+
+export async function ensureSafeUrl(rawUrl: string, options?: SafeRemoteHostOptions): Promise<URL> {
   const candidate = rawUrl.trim();
   if (!candidate) throw new BadRequestException('Invalid URL');
 
@@ -23,15 +28,15 @@ export async function ensureSafeUrl(rawUrl: string, options?: { allowLocal?: boo
   return parsed;
 }
 
-export async function ensureSafeRemoteHost(hostname: string, options?: { allowLocal?: boolean }): Promise<void> {
+export async function ensureSafeRemoteHost(hostname: string, options?: SafeRemoteHostOptions): Promise<void> {
   const normalizedHost = hostname.trim().toLowerCase();
   if (!normalizedHost) throw new BadRequestException('URL host is required');
 
   if (normalizedHost === 'localhost' || normalizedHost.endsWith('.localhost') || normalizedHost.endsWith('.local')) {
-    if (!options?.allowLocal) {
+    if (!options?.allowLocal && !options?.allowPrivate) {
       throw new BadRequestException('URL host is not allowed');
     }
-    return; // explicitly local host, allowed in non-production — skip DNS/IP checks
+    return; // explicitly local host, allowed when local/private override is enabled
   }
 
   // URL.hostname wraps IPv6 in brackets (e.g. [::1]); strip them for isIP/range checks
@@ -39,7 +44,7 @@ export async function ensureSafeRemoteHost(hostname: string, options?: { allowLo
 
   const ipFamily = isIP(bareHost);
   if (ipFamily > 0) {
-    if (isPrivateOrLocalAddress(bareHost)) {
+    if (isPrivateOrLocalAddress(bareHost) && !options?.allowPrivate) {
       throw new BadRequestException('URL host is not allowed');
     }
     return;
@@ -53,7 +58,7 @@ export async function ensureSafeRemoteHost(hostname: string, options?: { allowLo
   }
 
   if (resolved.length === 0) throw new BadRequestException('Unable to resolve URL host');
-  if (resolved.some((entry) => isPrivateOrLocalAddress(entry.address))) {
+  if (resolved.some((entry) => isPrivateOrLocalAddress(entry.address)) && !options?.allowPrivate) {
     throw new BadRequestException('URL host is not allowed');
   }
 }
