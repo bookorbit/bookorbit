@@ -15,9 +15,11 @@ import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
 import EntityNotFound from '@/components/EntityNotFound.vue'
+import { useKoreaderBookStats, KOREADER_BOOK_STATS_KEY } from '@/features/koreader/composables/useKoreaderBookStats'
 
 const ReadingLogTab = defineAsyncComponent(() => import('@/features/book/components/detail/tabs/ReadingLogTab.vue'))
 const HighlightsTab = defineAsyncComponent(() => import('@/features/book/components/detail/tabs/HighlightsTab.vue'))
+const KoreaderTab = defineAsyncComponent(() => import('@/features/book/components/detail/tabs/KoreaderTab.vue'))
 
 const route = useRoute()
 const { hasPermission } = usePermissions()
@@ -43,6 +45,7 @@ const pageTitle = computed(() => {
   if (tab.value === 'files') return `Files · ${base}`
   if (tab.value === 'reading-log') return `Reading Log · ${base}`
   if (tab.value === 'highlights') return `Highlights · ${base}`
+  if (tab.value === 'koreader') return `KOReader Log · ${base}`
   return `Book · ${base}`
 })
 usePageTitle(pageTitle)
@@ -54,6 +57,13 @@ watch(
     if (id !== undefined) subscribeLibrary(id)
   },
 )
+
+const koreaderStats = useKoreaderBookStats(bookId)
+provide(KOREADER_BOOK_STATS_KEY, koreaderStats)
+
+const showKoreaderTab = computed(() => hasPermission('koreader_sync') && koreaderStats.hasData.value)
+
+provide('showKoreaderTab', showKoreaderTab)
 
 const { onBookMissing, onBookRestored, onBookMoved } = useBookEvents()
 onBookMissing((bookIds) => {
@@ -98,6 +108,7 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
         <FilesTab v-else-if="tab === 'files'" :book="detail" />
         <ReadingLogTab v-else-if="tab === 'reading-log'" :book="detail" />
         <HighlightsTab v-else-if="tab === 'highlights'" :book="detail" />
+        <KoreaderTab v-else-if="tab === 'koreader' && showKoreaderTab" />
       </div>
 
       <div v-else-if="loading" key="loading">
@@ -148,6 +159,15 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
           </div>
           <div class="space-y-3">
             <div v-for="i in 3" :key="i" class="h-24 rounded-lg bg-muted animate-shimmer" />
+          </div>
+        </div>
+        <div v-else-if="tab === 'koreader'" class="space-y-4">
+          <div class="grid grid-cols-2 sm:grid-cols-6 gap-3">
+            <div v-for="i in 6" :key="i" class="h-16 rounded-lg bg-muted animate-shimmer" />
+          </div>
+          <div class="h-48 rounded-lg bg-muted animate-shimmer" />
+          <div class="space-y-2">
+            <div v-for="i in 5" :key="i" class="h-12 rounded-md bg-muted animate-shimmer" />
           </div>
         </div>
       </div>

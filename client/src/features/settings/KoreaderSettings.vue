@@ -30,6 +30,17 @@ const syncUrl = computed(() => getSyncUrl())
 const hasCredentials = computed(() => !!credentials.value)
 const deviceCount = computed(() => syncStatus.value?.devices.length ?? 0)
 const totalSyncedBooks = computed(() => syncStatus.value?.totalSyncedBooks ?? 0)
+const booksWithStats = computed(() => syncStatus.value?.booksWithStats ?? 0)
+const totalReadingSeconds = computed(() => syncStatus.value?.totalReadingSeconds ?? 0)
+
+function formatReadingTime(seconds: number): string {
+  if (seconds === 0) return '0m'
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  if (h === 0) return `${m}m`
+  if (m === 0) return `${h}h`
+  return `${h}h ${m}m`
+}
 
 function formatLastSync(dateStr: string | null): string {
   if (!dateStr) return 'Never'
@@ -286,6 +297,18 @@ async function handleRefresh() {
             <div>
               <p class="settings-label">Synced Books</p>
               <p class="settings-hint">{{ totalSyncedBooks }} {{ totalSyncedBooks === 1 ? 'book' : 'books' }}</p>
+            </div>
+          </div>
+          <div class="flex items-center justify-between px-4 py-3.5 bg-card md:px-5">
+            <div>
+              <p class="settings-label">Books with Stats</p>
+              <p class="settings-hint">{{ booksWithStats }} {{ booksWithStats === 1 ? 'book' : 'books' }}</p>
+            </div>
+          </div>
+          <div class="flex items-center justify-between px-4 py-3.5 bg-card md:px-5">
+            <div>
+              <p class="settings-label">Total Reading Time</p>
+              <p class="settings-hint">{{ formatReadingTime(totalReadingSeconds) }}</p>
             </div>
           </div>
           <div class="flex items-center justify-between px-4 py-3.5 bg-card md:px-5">

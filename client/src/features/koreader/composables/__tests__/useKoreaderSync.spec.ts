@@ -29,6 +29,8 @@ function makeSyncStatus(overrides: Partial<KoreaderSyncStatus> = {}): KoreaderSy
     ],
     totalSyncedBooks: 14,
     lastSyncAt: '2026-01-02T00:00:00.000Z',
+    booksWithStats: 9,
+    totalReadingSeconds: 18_000,
     ...overrides,
   }
 }

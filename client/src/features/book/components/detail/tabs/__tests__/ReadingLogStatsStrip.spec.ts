@@ -43,14 +43,14 @@ describe('ReadingLogStatsStrip', () => {
     const wrapper = mount(ReadingLogStatsStrip, {
       props: makeProps(),
     })
-    expect(wrapper.findAll('.rounded-lg.border').length).toBe(8)
+    expect(wrapper.findAll('[data-testid="stat-card"]').length).toBe(8)
   })
 
   it('renders 8 stat cards when stats loaded even while re-fetching', () => {
     const wrapper = mount(ReadingLogStatsStrip, {
       props: makeProps({ loading: true }),
     })
-    expect(wrapper.findAll('.rounded-lg.border').length).toBe(8)
+    expect(wrapper.findAll('[data-testid="stat-card"]').length).toBe(8)
   })
 
   it('formats 3780 seconds as "1h 3m"', () => {

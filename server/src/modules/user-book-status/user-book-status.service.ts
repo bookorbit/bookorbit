@@ -132,6 +132,13 @@ export class UserBookStatusService {
     return row ? this.toDto(row) : null;
   }
 
+  async setStartedAtIfNull(userId: number, bookId: number, startedAt: Date): Promise<void> {
+    const existing = await this.repo.findOne(userId, bookId);
+    if (!existing) return;
+    if (existing.source === 'manual') return;
+    await this.repo.setStartedAtIfNull(userId, bookId, startedAt);
+  }
+
   async findByBookIds(userId: number, bookIds: number[]): Promise<Map<number, UserBookStatus>> {
     const rows = await this.repo.findByBookIds(userId, bookIds);
     const map = new Map<number, UserBookStatus>();

@@ -41,6 +41,14 @@ const CHART_COMPONENTS: Record<StatisticsChartId, Component> = {
   'reading-clock': defineAsyncComponent(() => import('./user/ReadingClockChart.vue')),
   'reading-session-timeline': defineAsyncComponent(() => import('./user/ReadingSessionTimelineChart.vue')),
   'session-archetypes': defineAsyncComponent(() => import('./user/SessionArchetypesChart.vue')),
+  'ko-activity-heatmap': defineAsyncComponent(() => import('./koreader/KoreaderActivityHeatmapChart.vue')),
+  'ko-monthly-reading': defineAsyncComponent(() => import('./koreader/KoreaderMonthlyReadingChart.vue')),
+  'ko-time-of-day': defineAsyncComponent(() => import('./koreader/KoreaderTimeOfDayChart.vue')),
+  'ko-session-lengths': defineAsyncComponent(() => import('./koreader/KoreaderSessionLengthsChart.vue')),
+  'ko-top-books': defineAsyncComponent(() => import('./koreader/KoreaderTopBooksChart.vue')),
+  'ko-top-annotated': defineAsyncComponent(() => import('./koreader/KoreaderTopAnnotatedChart.vue')),
+  'ko-weekly-rhythm': defineAsyncComponent(() => import('./koreader/KoreaderWeeklyRhythmChart.vue')),
+  'ko-devices': defineAsyncComponent(() => import('./koreader/KoreaderDevicesChart.vue')),
 }
 
 const { reorder } = useStatisticsConfig()

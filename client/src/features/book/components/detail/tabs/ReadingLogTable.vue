@@ -100,7 +100,7 @@ const SORTABLE_COLS = [
 
 <template>
   <div @click.self="clearConfirmDelete">
-    <div v-if="sessions.length === 0 && !loading" class="flex items-center justify-center py-16 text-muted-foreground text-sm">
+    <div v-if="sessions.length === 0 && !loading" class="flex items-center justify-center py-10 text-muted-foreground text-sm">
       No reading sessions recorded yet.
     </div>
 
@@ -111,7 +111,7 @@ const SORTABLE_COLS = [
             <th
               v-for="col in SORTABLE_COLS"
               :key="col.id"
-              class="px-2 py-2.5 text-left text-[11px] font-medium text-muted-foreground uppercase tracking-wide sm:px-4 sm:py-3 sm:text-xs"
+              class="px-2 py-2 text-left text-[11px] font-medium text-muted-foreground uppercase tracking-wide sm:px-3 sm:py-2.5 sm:text-xs"
             >
               <button class="flex items-center gap-1 whitespace-nowrap hover:text-foreground transition-colors" @click="() => handleSort(col.id)">
                 <span class="sm:hidden">{{ col.mobileLabel }}</span>
@@ -123,12 +123,12 @@ const SORTABLE_COLS = [
             </th>
             <th
               v-if="hasMultipleFormats"
-              class="px-2 py-2.5 text-left text-[11px] font-medium text-muted-foreground uppercase tracking-wide sm:px-4 sm:py-3 sm:text-xs"
+              class="px-2 py-2 text-left text-[11px] font-medium text-muted-foreground uppercase tracking-wide sm:px-3 sm:py-2.5 sm:text-xs"
             >
               <span class="sm:hidden">Fmt</span>
               <span class="hidden sm:inline">Format</span>
             </th>
-            <th class="w-28 px-2 py-2.5 sm:px-4 sm:py-3" />
+            <th class="w-24 px-2 py-2 sm:px-3 sm:py-2.5" />
           </tr>
         </thead>
         <tbody>
@@ -137,34 +137,34 @@ const SORTABLE_COLS = [
             :key="session.id"
             class="border-b border-border odd:bg-muted/20 last:border-0 hover:bg-muted/30 transition-colors"
           >
-            <td class="px-2 py-2.5 text-foreground whitespace-nowrap sm:px-4 sm:py-3">
+            <td class="px-2 py-2 text-foreground whitespace-nowrap sm:px-3 sm:py-2.5">
               <span class="sm:hidden">{{ formatDateCompact(session.startedAt) }}</span>
               <span class="hidden sm:inline">{{ formatDate(session.startedAt) }}</span>
             </td>
-            <td class="px-2 py-2.5 text-foreground whitespace-nowrap sm:px-4 sm:py-3">{{ formatDuration(session.durationSeconds) }}</td>
+            <td class="px-2 py-2 text-foreground whitespace-nowrap sm:px-3 sm:py-2.5">{{ formatDuration(session.durationSeconds) }}</td>
             <td
-              class="px-2 py-2.5 whitespace-nowrap sm:px-4 sm:py-3"
+              class="px-2 py-2 whitespace-nowrap sm:px-3 sm:py-2.5"
               :class="session.progressDelta != null && session.progressDelta > 0 ? 'text-green-600' : 'text-muted-foreground'"
             >
               {{ session.progressDelta != null ? `+${session.progressDelta.toFixed(1)}%` : '-' }}
             </td>
-            <td class="px-2 py-2.5 text-foreground whitespace-nowrap sm:px-4 sm:py-3">
+            <td class="px-2 py-2 text-foreground whitespace-nowrap sm:px-3 sm:py-2.5">
               {{ session.endProgress != null ? `${session.endProgress.toFixed(1)}%` : '-' }}
             </td>
-            <td v-if="hasMultipleFormats" class="px-2 py-2.5 text-foreground whitespace-nowrap sm:px-4 sm:py-3">{{ session.format ?? '-' }}</td>
-            <td class="w-28 px-2 py-2.5 sm:px-4 sm:py-3">
-              <div class="ml-auto flex h-7 w-[5.75rem] items-center justify-end gap-1">
+            <td v-if="hasMultipleFormats" class="px-2 py-2 text-foreground whitespace-nowrap sm:px-3 sm:py-2.5">{{ session.format ?? '-' }}</td>
+            <td class="w-24 px-2 py-2 sm:px-3 sm:py-2.5">
+              <div class="ml-auto flex h-6 w-[5.25rem] items-center justify-end gap-1">
                 <template v-if="confirmDeleteId === session.id">
                   <button
-                    class="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    class="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     title="Cancel delete"
                     aria-label="Cancel delete session"
                     @click="clearConfirmDelete"
                   >
-                    <X :size="14" />
+                    <X :size="12" />
                   </button>
                   <button
-                    class="inline-flex h-7 items-center justify-center rounded px-2 text-xs font-medium uppercase tracking-wide transition-colors bg-destructive/15 text-destructive ring-1 ring-destructive/40"
+                    class="inline-flex h-6 items-center justify-center rounded px-2 text-[10px] font-medium uppercase tracking-wide transition-colors bg-destructive/15 text-destructive ring-1 ring-destructive/40"
                     title="Click again to confirm delete"
                     aria-label="Confirm delete session"
                     @click="() => handleDeleteClick(session.id)"
@@ -174,12 +174,12 @@ const SORTABLE_COLS = [
                 </template>
                 <button
                   v-else
-                  class="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                  class="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
                   title="Delete"
                   aria-label="Delete session"
                   @click="() => handleDeleteClick(session.id)"
                 >
-                  <Trash2 :size="14" />
+                  <Trash2 :size="12" />
                 </button>
               </div>
             </td>
@@ -188,11 +188,11 @@ const SORTABLE_COLS = [
       </table>
     </div>
 
-    <div v-if="total > 0" class="flex items-center justify-between mt-4 text-sm text-muted-foreground">
+    <div v-if="total > 0" class="mt-3 flex items-center justify-between text-xs text-muted-foreground sm:text-sm">
       <span>Showing {{ startItem }}-{{ endItem }} of {{ total }} sessions</span>
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-1.5 sm:gap-2">
         <button
-          class="px-3 py-1.5 rounded border border-border bg-card hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed text-foreground text-sm"
+          class="rounded border border-border bg-card px-2.5 py-1 text-xs text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:px-3 sm:py-1.5 sm:text-sm"
           :disabled="page <= 1"
           @click="handlePrevPage"
         >
@@ -200,7 +200,7 @@ const SORTABLE_COLS = [
         </button>
         <span class="text-xs">{{ page }} / {{ totalPages }}</span>
         <button
-          class="px-3 py-1.5 rounded border border-border bg-card hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed text-foreground text-sm"
+          class="rounded border border-border bg-card px-2.5 py-1 text-xs text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:px-3 sm:py-1.5 sm:text-sm"
           :disabled="page >= totalPages"
           @click="handleNextPage"
         >

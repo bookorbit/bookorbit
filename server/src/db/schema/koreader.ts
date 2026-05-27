@@ -108,3 +108,56 @@ export const bookFileChapters = pgTable(
 
 export type BookFileChapter = typeof bookFileChapters.$inferSelect;
 export type NewBookFileChapter = typeof bookFileChapters.$inferInsert;
+
+export const koreaderReadingSessions = pgTable(
+  'koreader_reading_sessions',
+  {
+    id: serial('id').primaryKey(),
+    bookFileId: integer('book_file_id')
+      .notNull()
+      .references(() => bookFiles.id, { onDelete: 'cascade' }),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    sessionHash: varchar('session_hash', { length: 64 }).notNull(),
+    page: integer('page').notNull(),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
+    durationSeconds: integer('duration_seconds').notNull(),
+    totalPages: integer('total_pages').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex('koreader_reading_sessions_session_hash_uidx').on(t.sessionHash),
+    index('koreader_reading_sessions_book_user_started_idx').on(t.bookFileId, t.userId, t.startedAt),
+    index('koreader_reading_sessions_user_idx').on(t.userId),
+  ],
+);
+
+export type KoreaderReadingSessionRow = typeof koreaderReadingSessions.$inferSelect;
+export type NewKoreaderReadingSession = typeof koreaderReadingSessions.$inferInsert;
+
+export const koreaderBookStats = pgTable(
+  'koreader_book_stats',
+  {
+    id: serial('id').primaryKey(),
+    bookFileId: integer('book_file_id')
+      .notNull()
+      .references(() => bookFiles.id, { onDelete: 'cascade' }),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    totalReadSecs: integer('total_read_secs').notNull().default(0),
+    totalReadPages: integer('total_read_pages').notNull().default(0),
+    highlightsCount: integer('highlights_count').notNull().default(0),
+    notesCount: integer('notes_count').notNull().default(0),
+    lastOpenAt: timestamp('last_open_at', { withTimezone: true }),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [uniqueIndex('koreader_book_stats_user_book_file_uidx').on(t.userId, t.bookFileId), index('koreader_book_stats_user_idx').on(t.userId)],
+);
+
+export type KoreaderBookStatsRow = typeof koreaderBookStats.$inferSelect;
+export type NewKoreaderBookStats = typeof koreaderBookStats.$inferInsert;

@@ -8,21 +8,27 @@ import type { ChartConfigEntry, StatisticsChartId } from '@bookorbit/types'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { STATISTICS_CHART_META } from '../statistics-chart-meta'
 import { useStatisticsConfig } from '../composables/useStatisticsConfig'
+import KoreaderSummaryStrip from './koreader/KoreaderSummaryStrip.vue'
 import StatisticsGrid from './StatisticsGrid.vue'
 import StatisticsSummaryCard from './StatisticsSummaryCard.vue'
 
 const {
   orderedLibraryCharts,
   orderedUserCharts,
+  orderedKoreaderCharts,
   visibleLibraryCharts,
   visibleUserCharts,
+  visibleKoreaderCharts,
   libraryChartCount,
   userChartCount,
+  koreaderChartCount,
   visibleLibraryChartCount,
   visibleUserChartCount,
+  visibleKoreaderChartCount,
   filters,
   init,
   toggleVisibility,
@@ -34,16 +40,19 @@ const {
 const route = useRoute()
 const router = useRouter()
 const { libraries, fetchLibraries } = useLibraries()
+const { hasPermission } = usePermissions()
 const configOpen = ref(false)
+const canViewKoreaderStats = computed(() => hasPermission('koreader_sync'))
 
-type StatisticsTab = 'library' | 'user'
+type StatisticsTab = 'library' | 'user' | 'koreader'
 
-function resolveStatisticsTab(tabQuery: unknown): StatisticsTab {
+function resolveStatisticsTab(tabQuery: unknown, allowKoreader: boolean): StatisticsTab {
   const tab = Array.isArray(tabQuery) ? tabQuery[0] : tabQuery
+  if (tab === 'koreader' && allowKoreader) return 'koreader'
   return tab === 'user' ? 'user' : 'library'
 }
 
-const initialTab = resolveStatisticsTab(route.query.tab)
+const initialTab = resolveStatisticsTab(route.query.tab, canViewKoreaderStats.value)
 const activeTab = ref<StatisticsTab>(initialTab)
 const loaded = ref<Set<StatisticsTab>>(new Set([initialTab]))
 
@@ -54,12 +63,31 @@ onMounted(fetchLibraries)
 watch(
   () => route.query.tab,
   (tabQuery) => {
-    const tab = resolveStatisticsTab(tabQuery)
+    const rawTab = Array.isArray(tabQuery) ? tabQuery[0] : tabQuery
+    if (rawTab === 'koreader' && !canViewKoreaderStats.value) {
+      void router.replace({ query: { ...route.query, tab: 'library' } })
+      return
+    }
+    const tab = resolveStatisticsTab(tabQuery, canViewKoreaderStats.value)
     if (tab === activeTab.value) return
     activeTab.value = tab
     loaded.value.add(tab)
   },
+  { immediate: true },
 )
+
+watch(canViewKoreaderStats, (canView) => {
+  if (!canView) {
+    if (activeTab.value !== 'koreader') return
+    setTab('library')
+    return
+  }
+
+  const tab = resolveStatisticsTab(route.query.tab, true)
+  if (tab === activeTab.value) return
+  activeTab.value = tab
+  loaded.value.add(tab)
+})
 
 watch(
   libraries,
@@ -76,9 +104,23 @@ watch(
   { immediate: true },
 )
 
-const activeVisibleCount = computed(() => (activeTab.value === 'library' ? visibleLibraryChartCount.value : visibleUserChartCount.value))
-const activeTotalCount = computed(() => (activeTab.value === 'library' ? libraryChartCount.value : userChartCount.value))
-const activeOrderedCharts = computed(() => (activeTab.value === 'library' ? orderedLibraryCharts.value : orderedUserCharts.value))
+const activeVisibleCount = computed(() => {
+  if (activeTab.value === 'library') return visibleLibraryChartCount.value
+  if (activeTab.value === 'user') return visibleUserChartCount.value
+  return visibleKoreaderChartCount.value
+})
+
+const activeTotalCount = computed(() => {
+  if (activeTab.value === 'library') return libraryChartCount.value
+  if (activeTab.value === 'user') return userChartCount.value
+  return koreaderChartCount.value
+})
+
+const activeOrderedCharts = computed(() => {
+  if (activeTab.value === 'library') return orderedLibraryCharts.value
+  if (activeTab.value === 'user') return orderedUserCharts.value
+  return orderedKoreaderCharts.value
+})
 
 const libraryLabel = computed(() => {
   const count = filters.value.libraryIds.length
@@ -130,6 +172,7 @@ function chartMeta(id: StatisticsChartId) {
 }
 
 function setTab(tab: StatisticsTab) {
+  if (tab === 'koreader' && !canViewKoreaderStats.value) return
   activeTab.value = tab
   loaded.value.add(tab)
   void router.replace({ query: { ...route.query, tab } })
@@ -158,10 +201,20 @@ function setTab(tab: StatisticsTab) {
         >
           My Reading
         </button>
+        <button
+          v-if="canViewKoreaderStats"
+          :class="[
+            'flex-1 rounded-md px-4 py-1.5 text-sm font-medium transition-colors sm:flex-none',
+            activeTab === 'koreader' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+          ]"
+          @click="setTab('koreader')"
+        >
+          KOReader Stats
+        </button>
       </div>
 
       <div class="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:justify-end">
-        <Popover v-if="libraries.length > 1">
+        <Popover v-if="libraries.length > 1 && activeTab !== 'koreader'">
           <PopoverTrigger as-child>
             <button
               :class="[
@@ -213,7 +266,8 @@ function setTab(tab: StatisticsTab) {
       </div>
     </div>
 
-    <StatisticsSummaryCard />
+    <StatisticsSummaryCard v-if="activeTab !== 'koreader'" />
+    <KoreaderSummaryStrip v-else />
 
     <Sheet v-model:open="configOpen">
       <SheetContent side="right" class="w-[90dvw] max-w-[90dvw] sm:w-[420px] sm:max-w-[420px]">
@@ -269,6 +323,9 @@ function setTab(tab: StatisticsTab) {
     </div>
     <div v-if="loaded.has('user')" v-show="activeTab === 'user'">
       <StatisticsGrid :charts="visibleUserCharts" />
+    </div>
+    <div v-if="canViewKoreaderStats && loaded.has('koreader')" v-show="activeTab === 'koreader'">
+      <StatisticsGrid :charts="visibleKoreaderCharts" />
     </div>
   </div>
 </template>

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, ForbiddenException, Get, Headers, Param, ParseIntPipe, Patch, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, Headers, Param, ParseIntPipe, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 
 import { Permission } from '@bookorbit/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -7,7 +7,7 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import type { RequestUser } from '../../common/types/request-user';
 import { KoreaderAuthGuard } from './koreader-auth.guard';
 import { KoreaderService } from './koreader.service';
-import { CreateKoreaderUserDto, SaveProgressDto, TestConnectionDto, UpdateKoreaderUserDto } from './dto';
+import { CreateKoreaderUserDto, SaveProgressDto, SaveStatsDto, TestConnectionDto, UpdateKoreaderUserDto } from './dto';
 
 @Controller('koreader')
 export class KoreaderController {
@@ -33,6 +33,20 @@ export class KoreaderController {
   @Put('syncs/progress')
   async saveProgress(@CurrentUser() user: RequestUser, @Body() dto: SaveProgressDto) {
     return this.koreaderService.saveProgress(user.id, dto);
+  }
+
+  @Public()
+  @UseGuards(KoreaderAuthGuard)
+  @Put('progress')
+  async saveProgressAlias(@CurrentUser() user: RequestUser, @Body() dto: SaveProgressDto) {
+    return this.koreaderService.saveProgress(user.id, dto);
+  }
+
+  @Public()
+  @UseGuards(KoreaderAuthGuard)
+  @Post('stats')
+  async saveStats(@CurrentUser() user: RequestUser, @Body() dto: SaveStatsDto) {
+    return this.koreaderService.saveStats(user.id, dto);
   }
 
   @Public()
@@ -91,9 +105,80 @@ export class KoreaderController {
   }
 
   @RequirePermission(Permission.KoreaderSync)
+  @Get('books/:bookId/stats')
+  async getBookStats(
+    @CurrentUser() user: RequestUser,
+    @Param('bookId', ParseIntPipe) bookId: number,
+    @Query('page', new ParseIntPipe({ optional: true })) page = 1,
+    @Query('pageSize', new ParseIntPipe({ optional: true })) pageSize = 20,
+  ) {
+    return this.koreaderService.getKoreaderTabData(user.id, bookId, page, pageSize);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Get('aggregate-stats')
+  async getAggregateStats(@CurrentUser() user: RequestUser) {
+    return this.koreaderService.getKoreaderAggregateSyncStats(user.id);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
   @Post('test-connection')
   async testConnection(@CurrentUser() user: RequestUser, @Body() dto: TestConnectionDto) {
     const success = await this.koreaderService.testConnection(user.id, dto.username, dto.password);
     return { success, username: dto.username, serverUrl: '/api/koreader' };
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Get('statistics/summary')
+  getStatsSummary(@CurrentUser() user: RequestUser) {
+    return this.koreaderService.getKoreaderStatsSummary(user.id);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Get('statistics/heatmap')
+  getActivityHeatmap(@CurrentUser() user: RequestUser) {
+    return this.koreaderService.getKoreaderActivityHeatmap(user.id);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Get('statistics/monthly')
+  getMonthlyReading(@CurrentUser() user: RequestUser) {
+    return this.koreaderService.getKoreaderMonthlyReading(user.id);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Get('statistics/time-of-day')
+  getTimeOfDay(@CurrentUser() user: RequestUser) {
+    return this.koreaderService.getKoreaderTimeOfDay(user.id);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Get('statistics/session-lengths')
+  getSessionLengths(@CurrentUser() user: RequestUser) {
+    return this.koreaderService.getKoreaderSessionLengths(user.id);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Get('statistics/top-books')
+  getTopBooks(@CurrentUser() user: RequestUser) {
+    return this.koreaderService.getKoreaderTopBooks(user.id);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Get('statistics/top-annotated')
+  getTopAnnotated(@CurrentUser() user: RequestUser) {
+    return this.koreaderService.getKoreaderTopAnnotated(user.id);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Get('statistics/weekly-rhythm')
+  getKoreaderWeeklyRhythm(@CurrentUser() user: RequestUser) {
+    return this.koreaderService.getKoreaderWeeklyRhythm(user.id);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Get('statistics/devices')
+  getKoreaderStatDevices(@CurrentUser() user: RequestUser) {
+    return this.koreaderService.getKoreaderDevices(user.id);
   }
 }

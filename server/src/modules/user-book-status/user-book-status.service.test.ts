@@ -29,6 +29,7 @@ const mockRepo = {
         ...args: [number, number, { status: ReadStatus; source: ReadStatusSource; startedAt: Date | null; finishedAt: Date | null; updatedAt: Date }]
       ) => Promise<void>
     >(),
+  setStartedAtIfNull: vi.fn<(...args: [number, number, Date]) => Promise<void>>(),
 };
 const mockAchievementEvents = {
   emit: vi.fn(),
@@ -42,6 +43,7 @@ beforeEach(() => {
   mockRepo.findByBookIds.mockResolvedValue([]);
   mockRepo.upsert.mockResolvedValue(undefined);
   mockRepo.upsertState.mockResolvedValue(undefined);
+  mockRepo.setStartedAtIfNull.mockResolvedValue(undefined);
   service = new UserBookStatusService(mockRepo as unknown as UserBookStatusRepository, mockAchievementEvents as never);
 });
 
@@ -307,6 +309,33 @@ describe('autoUpdate normalization and guard behavior', () => {
 
     expect(mockRepo.upsert).toHaveBeenCalledOnce();
     expect(mockRepo.upsert.mock.calls[0][2]).toBe('unread');
+  });
+});
+
+describe('setStartedAtIfNull', () => {
+  it('returns early when no row exists', async () => {
+    mockRepo.findOne.mockResolvedValue(null);
+
+    await service.setStartedAtIfNull(1, 10, new Date('2026-04-01T00:00:00.000Z'));
+
+    expect(mockRepo.setStartedAtIfNull).not.toHaveBeenCalled();
+  });
+
+  it('returns early for manual rows', async () => {
+    mockRepo.findOne.mockResolvedValue(makeRow({ source: 'manual' }));
+
+    await service.setStartedAtIfNull(1, 10, new Date('2026-04-01T00:00:00.000Z'));
+
+    expect(mockRepo.setStartedAtIfNull).not.toHaveBeenCalled();
+  });
+
+  it('delegates to the repository for auto rows', async () => {
+    const startedAt = new Date('2026-04-01T00:00:00.000Z');
+    mockRepo.findOne.mockResolvedValue(makeRow({ source: 'auto' }));
+
+    await service.setStartedAtIfNull(1, 10, startedAt);
+
+    expect(mockRepo.setStartedAtIfNull).toHaveBeenCalledWith(1, 10, startedAt);
   });
 });
 

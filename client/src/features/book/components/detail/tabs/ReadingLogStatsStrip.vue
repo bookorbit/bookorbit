@@ -10,7 +10,7 @@ const props = defineProps<{
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const CARD_COUNT = 8
-const CARD_CLASS = 'rounded-lg border border-border bg-card px-3 py-2.5 sm:px-4 sm:py-3'
+const CARD_CLASS = 'rounded-md border border-border bg-card px-2.5 py-2 sm:px-3 sm:py-2.5'
 
 function toUtcDayStart(date: Date): number {
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
@@ -163,7 +163,7 @@ const statCards = computed(() => [
 
 <template>
   <div
-    class="grid grid-cols-2 gap-2 sm:gap-3 transition-opacity md:grid-cols-8"
+    class="grid grid-cols-2 gap-1.5 transition-opacity sm:gap-2 md:grid-cols-8"
     :class="{ 'opacity-50 pointer-events-none': loading && stats !== null }"
   >
     <template v-if="stats === null && loading">
@@ -173,9 +173,9 @@ const statCards = computed(() => [
       </div>
     </template>
     <template v-else>
-      <div v-for="card in statCards" :key="card.label" :class="CARD_CLASS">
-        <p class="mb-0.5 text-[11px] text-muted-foreground sm:mb-1 sm:text-xs">{{ card.label }}</p>
-        <p class="text-lg font-semibold sm:text-xl" :class="card.tone">{{ card.value }}</p>
+      <div v-for="card in statCards" :key="card.label" data-testid="stat-card" :class="CARD_CLASS">
+        <p class="mb-0.5 text-[10px] text-muted-foreground sm:text-[11px]">{{ card.label }}</p>
+        <p class="text-base font-semibold sm:text-lg" :class="card.tone">{{ card.value }}</p>
       </div>
     </template>
   </div>

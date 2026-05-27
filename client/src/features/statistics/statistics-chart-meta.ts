@@ -1,34 +1,40 @@
 import type { Component } from 'vue'
 import {
+  BarChart2,
   BarChart3,
   BookCheck,
+  BookOpen,
   Calendar,
   CalendarDays,
   CalendarRange,
   Clock,
   Clock3,
-  BookOpen,
   GitMerge,
   Goal,
   Globe,
   Gauge,
   HardDrive,
+  Highlighter,
   Layers,
   ListChecks,
   PieChart,
   Rabbit,
+  Repeat,
   ShieldCheck,
+  Sun,
+  Tablet,
   Tag,
+  Timer,
   TrendingUp,
   Users,
   Waypoints,
   Zap,
 } from 'lucide-vue-next'
 
-import { DEFAULT_LIBRARY_CHART_ORDER, DEFAULT_USER_CHART_ORDER, type StatisticsChartId } from '@bookorbit/types'
+import { DEFAULT_KOREADER_CHART_ORDER, DEFAULT_LIBRARY_CHART_ORDER, DEFAULT_USER_CHART_ORDER, type StatisticsChartId } from '@bookorbit/types'
 
 export type StatisticsChartSize = '1x1' | '2x1' | '2x2' | '1x2' | '3x1' | '4x1'
-export type StatisticsChartCategory = 'library' | 'user'
+export type StatisticsChartCategory = 'library' | 'user' | 'koreader'
 
 export interface StatisticsChartMetaEntry {
   label: string
@@ -230,10 +236,62 @@ export const STATISTICS_CHART_META: Record<StatisticsChartId, StatisticsChartMet
     size: '2x1',
     category: 'user',
   },
+  'ko-activity-heatmap': {
+    label: 'Activity Heatmap',
+    icon: Calendar,
+    size: '2x1',
+    category: 'koreader',
+  },
+  'ko-monthly-reading': {
+    label: 'Monthly Reading Time',
+    icon: BarChart2,
+    size: '2x1',
+    category: 'koreader',
+  },
+  'ko-time-of-day': {
+    label: 'Time of Day',
+    icon: Sun,
+    size: '1x1',
+    category: 'koreader',
+  },
+  'ko-session-lengths': {
+    label: 'Session Length Distribution',
+    icon: Timer,
+    size: '1x1',
+    category: 'koreader',
+  },
+  'ko-top-books': {
+    label: 'Top Books by Reading Time',
+    icon: BookOpen,
+    size: '2x1',
+    category: 'koreader',
+  },
+  'ko-top-annotated': {
+    label: 'Most Annotated Books',
+    icon: Highlighter,
+    size: '2x1',
+    category: 'koreader',
+  },
+  'ko-weekly-rhythm': {
+    label: 'Weekly Reading Rhythm',
+    icon: Repeat,
+    size: '1x1',
+    category: 'koreader',
+  },
+  'ko-devices': {
+    label: 'Reading by Device',
+    icon: Tablet,
+    size: '1x1',
+    category: 'koreader',
+  },
 }
 
 export const LIBRARY_CHART_IDS: StatisticsChartId[] = DEFAULT_LIBRARY_CHART_ORDER.filter((id): id is StatisticsChartId => id in STATISTICS_CHART_META)
 
 export const USER_CHART_IDS: StatisticsChartId[] = DEFAULT_USER_CHART_ORDER.filter((id): id is StatisticsChartId => id in STATISTICS_CHART_META)
 
-export const STATISTICS_CHART_IDS: StatisticsChartId[] = [...LIBRARY_CHART_IDS, ...USER_CHART_IDS]
+export const KOREADER_CHART_IDS: StatisticsChartId[] = DEFAULT_KOREADER_CHART_ORDER.filter(
+  (id): id is StatisticsChartId => id in STATISTICS_CHART_META,
+)
+
+export const STATISTICS_CHART_IDS: StatisticsChartId[] = [...LIBRARY_CHART_IDS, ...USER_CHART_IDS, ...KOREADER_CHART_IDS]

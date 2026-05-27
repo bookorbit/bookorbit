@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -92,5 +92,12 @@ export class UserBookStatusRepository {
           updatedAt: state.updatedAt,
         },
       });
+  }
+
+  async setStartedAtIfNull(userId: number, bookId: number, startedAt: Date): Promise<void> {
+    await this.db
+      .update(userBookStatus)
+      .set({ startedAt, updatedAt: new Date() })
+      .where(and(eq(userBookStatus.userId, userId), eq(userBookStatus.bookId, bookId), isNull(userBookStatus.startedAt)));
   }
 }

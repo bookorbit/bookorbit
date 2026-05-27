@@ -25,6 +25,8 @@ export interface KoreaderSyncStatus {
   devices: KoreaderDeviceInfo[];
   totalSyncedBooks: number;
   lastSyncAt: string | null;
+  booksWithStats: number;
+  totalReadingSeconds: number;
 }
 
 export interface KoreaderBookSyncInfo {
@@ -54,4 +56,36 @@ export interface TestKoreaderConnectionResult {
   success: boolean;
   username: string;
   serverUrl: string;
+}
+
+export interface KoreaderReadingSession {
+  id: number;
+  page: number;
+  startedAt: string;
+  durationSeconds: number;
+  totalPages: number;
+}
+
+export interface KoreaderBookStats {
+  bookFileId: number;
+  totalReadSecs: number;
+  totalReadPages: number;
+  highlightsCount: number;
+  notesCount: number;
+  lastOpenAt: string | null;
+  updatedAt: string;
+}
+
+export interface KoreaderTabData {
+  stats: KoreaderBookStats;
+  sessions: KoreaderReadingSession[];
+  dailySummary: { day: string; durationSeconds: number }[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface KoreaderStatsResponse {
+  processed: number;
+  unmatched: number;
 }

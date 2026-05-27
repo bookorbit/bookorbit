@@ -30,7 +30,15 @@ export type StatisticsChartId =
   | "acquisition-lag-scatter"
   | "largest-books"
   | "top-series"
-  | "publication-year-timeline";
+  | "publication-year-timeline"
+  | "ko-activity-heatmap"
+  | "ko-monthly-reading"
+  | "ko-time-of-day"
+  | "ko-session-lengths"
+  | "ko-top-books"
+  | "ko-top-annotated"
+  | "ko-weekly-rhythm"
+  | "ko-devices";
 
 export type StatisticsGranularity = "monthly" | "yearly";
 export type StatisticsDateRange = "last-year" | "last-5-years" | "all-time";
@@ -92,7 +100,18 @@ export const DEFAULT_USER_CHART_ORDER: StatisticsChartId[] = [
   "session-archetypes",
 ];
 
-export const DEFAULT_STATISTICS_CHART_ORDER: StatisticsChartId[] = [...DEFAULT_LIBRARY_CHART_ORDER, ...DEFAULT_USER_CHART_ORDER];
+export const DEFAULT_KOREADER_CHART_ORDER: StatisticsChartId[] = [
+  "ko-activity-heatmap",
+  "ko-monthly-reading",
+  "ko-time-of-day",
+  "ko-session-lengths",
+  "ko-top-books",
+  "ko-top-annotated",
+  "ko-weekly-rhythm",
+  "ko-devices",
+];
+
+export const DEFAULT_STATISTICS_CHART_ORDER: StatisticsChartId[] = [...DEFAULT_LIBRARY_CHART_ORDER, ...DEFAULT_USER_CHART_ORDER, ...DEFAULT_KOREADER_CHART_ORDER];
 
 export const DEFAULT_STATISTICS_FILTERS: StatisticsFilterConfig = {
   libraryIds: [],
@@ -271,4 +290,63 @@ export interface StatisticsSummary {
   publicationYearMin: number | null;
   publicationYearMax: number | null;
   booksAddedThisYear: number;
+}
+
+// KOReader Statistics types
+
+export interface KoreaderStatsSummary {
+  totalReadSecs: number;
+  totalSessions: number;
+  totalHighlights: number;
+  totalNotes: number;
+  booksWithStats: number;
+  currentStreak: number;
+  longestStreak: number;
+}
+
+export interface KoreaderHeatmapPoint {
+  date: string;
+  durationSeconds: number;
+}
+
+export interface KoreaderMonthlyPoint {
+  year: number;
+  month: number;
+  durationSeconds: number;
+}
+
+export interface KoreaderHourPoint {
+  hour: number;
+  durationSeconds: number;
+}
+
+export interface KoreaderSessionLengthBin {
+  label: string;
+  minSecs: number;
+  maxSecs: number | null;
+  count: number;
+}
+
+export interface KoreaderTopBookItem {
+  bookId: number;
+  title: string;
+  totalReadSecs: number;
+}
+
+export interface KoreaderTopAnnotatedItem {
+  bookId: number;
+  title: string;
+  highlightsCount: number;
+  notesCount: number;
+}
+
+export interface KoreaderWeekdayPoint {
+  dow: number;
+  label: string;
+  durationSeconds: number;
+}
+
+export interface KoreaderDevicePoint {
+  device: string;
+  booksTracked: number;
 }

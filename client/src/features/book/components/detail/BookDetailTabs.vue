@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, inject } from 'vue'
+import type { ComputedRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { normalizeBookDetailTab, type BookDetailTab } from '@/features/book/lib/book-detail-tabs'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -9,16 +10,21 @@ const route = useRoute()
 const router = useRouter()
 const { hasPermission } = usePermissions()
 
+const showKoreaderTab = inject<ComputedRef<boolean>>('showKoreaderTab')
+
 const activeTab = computed(() => normalizeBookDetailTab(route.query.tab))
 
 const tabs = computed<{ label: string; tab: BookDetailTab }[]>(() => {
-  const result: { label: string; tab: BookDetailTab }[] = [{ label: 'Details', tab: 'details' }]
+  const result: { label: string; tab: BookDetailTab }[] = [{ label: 'Book Details', tab: 'details' }]
   if (hasPermission('library_edit_metadata')) {
     result.push({ label: 'Edit Metadata', tab: 'edit' })
   }
-  result.push({ label: 'Files', tab: 'files' })
   result.push({ label: 'Reading Log', tab: 'reading-log' })
+  if (showKoreaderTab?.value) {
+    result.push({ label: 'KOReader Log', tab: 'koreader' })
+  }
   result.push({ label: 'Highlights', tab: 'highlights' })
+  result.push({ label: 'Files', tab: 'files' })
   return result
 })
 

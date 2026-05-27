@@ -62,6 +62,23 @@ describe('KoreaderService', () => {
     getBookProgressForDashboard: ReturnType<typeof vi.fn>;
     getChapters: ReturnType<typeof vi.fn>;
     getLastFileWriteTime: ReturnType<typeof vi.fn>;
+    upsertKoreaderBookStats: ReturnType<typeof vi.fn>;
+    bulkInsertKoreaderReadingSessions: ReturnType<typeof vi.fn>;
+    getKoreaderBookStats: ReturnType<typeof vi.fn>;
+    getKoreaderReadingSessions: ReturnType<typeof vi.fn>;
+    getKoreaderAggregateStats: ReturnType<typeof vi.fn>;
+    hasKoreaderBookStats: ReturnType<typeof vi.fn>;
+    getKoreaderSessionsDailySummary: ReturnType<typeof vi.fn>;
+    getKoreaderStatsActiveDates: ReturnType<typeof vi.fn>;
+    getKoreaderStatsTotals: ReturnType<typeof vi.fn>;
+    getKoreaderActivityHeatmap: ReturnType<typeof vi.fn>;
+    getKoreaderMonthlyReading: ReturnType<typeof vi.fn>;
+    getKoreaderTimeOfDay: ReturnType<typeof vi.fn>;
+    getKoreaderSessionLengths: ReturnType<typeof vi.fn>;
+    getKoreaderTopBooks: ReturnType<typeof vi.fn>;
+    getKoreaderTopAnnotated: ReturnType<typeof vi.fn>;
+    getKoreaderWeeklyRhythm: ReturnType<typeof vi.fn>;
+    getKoreaderDevices: ReturnType<typeof vi.fn>;
   };
   let mockChapterService: {
     parseChapterIndexFromProgress: ReturnType<typeof vi.fn>;
@@ -72,6 +89,7 @@ describe('KoreaderService', () => {
   };
   let mockUserBookStatusService: {
     autoUpdate: ReturnType<typeof vi.fn>;
+    setStartedAtIfNull: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -110,6 +128,23 @@ describe('KoreaderService', () => {
       getBookProgressForDashboard: vi.fn(),
       getChapters: vi.fn(),
       getLastFileWriteTime: vi.fn(),
+      upsertKoreaderBookStats: vi.fn(),
+      bulkInsertKoreaderReadingSessions: vi.fn(),
+      getKoreaderBookStats: vi.fn(),
+      getKoreaderReadingSessions: vi.fn(),
+      getKoreaderAggregateStats: vi.fn(),
+      hasKoreaderBookStats: vi.fn(),
+      getKoreaderSessionsDailySummary: vi.fn(),
+      getKoreaderStatsActiveDates: vi.fn(),
+      getKoreaderStatsTotals: vi.fn(),
+      getKoreaderActivityHeatmap: vi.fn(),
+      getKoreaderMonthlyReading: vi.fn(),
+      getKoreaderTimeOfDay: vi.fn(),
+      getKoreaderSessionLengths: vi.fn(),
+      getKoreaderTopBooks: vi.fn(),
+      getKoreaderTopAnnotated: vi.fn(),
+      getKoreaderWeeklyRhythm: vi.fn(),
+      getKoreaderDevices: vi.fn(),
     };
 
     mockChapterService = {
@@ -123,16 +158,38 @@ describe('KoreaderService', () => {
 
     mockUserBookStatusService = {
       autoUpdate: vi.fn(),
+      setStartedAtIfNull: vi.fn(),
     };
 
     mockRepo.deleteKoreaderUser.mockResolvedValue(undefined);
     mockRepo.updateKoreaderUser.mockResolvedValue(undefined);
     mockRepo.upsertDeviceProgress.mockResolvedValue(undefined);
     mockRepo.upsertReadingProgress.mockResolvedValue(undefined);
+    mockRepo.upsertKoreaderBookStats.mockResolvedValue(undefined);
+    mockRepo.bulkInsertKoreaderReadingSessions.mockResolvedValue(undefined);
     mockRepo.getAccessibleLibraryIds.mockResolvedValue([1, 2]);
+    mockRepo.getKoreaderAggregateStats.mockResolvedValue({ booksWithStats: 0, totalReadingSeconds: 0 });
+    mockRepo.getKoreaderSessionsDailySummary.mockResolvedValue([]);
+    mockRepo.getKoreaderStatsActiveDates.mockResolvedValue([]);
+    mockRepo.getKoreaderStatsTotals.mockResolvedValue({
+      totalSessions: 0,
+      totalDurationSecs: 0,
+      totalHighlights: 0,
+      totalNotes: 0,
+      booksWithStats: 0,
+    });
+    mockRepo.getKoreaderActivityHeatmap.mockResolvedValue([]);
+    mockRepo.getKoreaderMonthlyReading.mockResolvedValue([]);
+    mockRepo.getKoreaderTimeOfDay.mockResolvedValue([]);
+    mockRepo.getKoreaderSessionLengths.mockResolvedValue([]);
+    mockRepo.getKoreaderTopBooks.mockResolvedValue([]);
+    mockRepo.getKoreaderTopAnnotated.mockResolvedValue([]);
+    mockRepo.getKoreaderWeeklyRhythm.mockResolvedValue([]);
+    mockRepo.getKoreaderDevices.mockResolvedValue([]);
     mockChapterService.parseChapterIndexFromProgress.mockReturnValue(null);
     mockChapterExtractor.extractAndStoreChapters.mockResolvedValue([]);
     mockUserBookStatusService.autoUpdate.mockResolvedValue(undefined);
+    mockUserBookStatusService.setStartedAtIfNull.mockResolvedValue(undefined);
 
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
@@ -287,6 +344,108 @@ describe('KoreaderService', () => {
       bcryptCompareMock.mockResolvedValue(false);
 
       await expect(service.testConnection(7, 'reader', 'legacy-secret')).resolves.toBe(true);
+    });
+  });
+
+  describe('saveStats', () => {
+    it('returns processed=0 unmatched=0 for empty book list', async () => {
+      const result = await service.saveStats(7, { books: [], device: 'KOReader', device_id: 'abc' });
+      expect(result).toEqual({ processed: 0, unmatched: 0 });
+      expect(mockRepo.resolveBookFileByHash).not.toHaveBeenCalled();
+    });
+
+    it('counts unmatched books that cannot be resolved', async () => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue(null);
+
+      const result = await service.saveStats(7, {
+        books: [{ document: 'unknownhash', page_sessions: [] }],
+      });
+
+      expect(result.unmatched).toBe(1);
+      expect(result.processed).toBe(0);
+    });
+
+    it('processes a matched book and upserts stats and sessions', async () => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20 });
+
+      const result = await service.saveStats(7, {
+        books: [
+          {
+            document: 'abc123',
+            md5: 'abc123',
+            total_read_secs: 3600,
+            total_read_pages: 100,
+            highlights: 3,
+            notes: 1,
+            last_open: 1700000000,
+            page_sessions: [{ page: 5, start_time: 1700000000, duration: 120, total_pages: 300 }],
+          },
+        ],
+      });
+
+      expect(result).toEqual({ processed: 1, unmatched: 0 });
+      expect(mockRepo.upsertKoreaderBookStats).toHaveBeenCalledWith(expect.objectContaining({ bookFileId: 10, userId: 7, totalReadSecs: 3600 }));
+      expect(mockRepo.bulkInsertKoreaderReadingSessions).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ bookFileId: 10, userId: 7, page: 5, durationSeconds: 120 })]),
+      );
+      expect(mockUserBookStatusService.setStartedAtIfNull).toHaveBeenCalledWith(7, 20, expect.any(Date));
+    });
+
+    it('filters out zero-duration sessions', async () => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20 });
+
+      await service.saveStats(7, {
+        books: [
+          {
+            document: 'abc',
+            page_sessions: [
+              { page: 1, start_time: 1700000000, duration: 0, total_pages: 300 },
+              { page: 2, start_time: 1700000001, duration: 60, total_pages: 300 },
+            ],
+          },
+        ],
+      });
+
+      const sessions = mockRepo.bulkInsertKoreaderReadingSessions.mock.calls[0][0];
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0].page).toBe(2);
+    });
+
+    it('does not call setStartedAtIfNull when last_open is 0', async () => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20 });
+
+      await service.saveStats(7, {
+        books: [{ document: 'abc', last_open: 0, page_sessions: [] }],
+      });
+
+      expect(mockUserBookStatusService.setStartedAtIfNull).not.toHaveBeenCalled();
+    });
+
+    it('uses md5 field over document for hash lookup when md5 is non-empty', async () => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20 });
+
+      await service.saveStats(7, {
+        books: [{ document: '/path/to/book.epub', md5: 'actualmd5', page_sessions: [] }],
+      });
+
+      expect(mockRepo.resolveBookFileByHash).toHaveBeenCalledWith('actualmd5', expect.anything());
+    });
+
+    it('processes multiple books independently', async () => {
+      mockRepo.resolveBookFileByHash
+        .mockResolvedValueOnce({ id: 10, bookId: 20 })
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 11, bookId: 21 });
+
+      const result = await service.saveStats(7, {
+        books: [
+          { document: 'hash1', page_sessions: [] },
+          { document: 'hash2', page_sessions: [] },
+          { document: 'hash3', page_sessions: [] },
+        ],
+      });
+
+      expect(result).toEqual({ processed: 2, unmatched: 1 });
     });
   });
 
@@ -483,6 +642,65 @@ describe('KoreaderService', () => {
     });
   });
 
+  describe('getKoreaderTabData', () => {
+    it('returns null when no book file found', async () => {
+      mockRepo.findBookFileIdByBookId.mockResolvedValue(null);
+
+      const result = await service.getKoreaderTabData(7, 99, 1, 20);
+
+      expect(result).toBeNull();
+    });
+
+    it('returns null when no stats exist for the book', async () => {
+      mockRepo.findBookFileIdByBookId.mockResolvedValue(10);
+      mockRepo.getKoreaderBookStats.mockResolvedValue(null);
+
+      const result = await service.getKoreaderTabData(7, 99, 1, 20);
+
+      expect(result).toBeNull();
+    });
+
+    it('returns tab data when stats exist', async () => {
+      mockRepo.findBookFileIdByBookId.mockResolvedValue(10);
+      mockRepo.getKoreaderBookStats.mockResolvedValue({
+        id: 1,
+        bookFileId: 10,
+        userId: 7,
+        totalReadSecs: 3600,
+        totalReadPages: 100,
+        highlightsCount: 3,
+        notesCount: 1,
+        lastOpenAt: new Date('2024-01-15T10:00:00Z'),
+        updatedAt: new Date('2024-01-15T10:00:00Z'),
+      });
+      mockRepo.getKoreaderReadingSessions.mockResolvedValue({
+        rows: [
+          {
+            id: 1,
+            bookFileId: 10,
+            userId: 7,
+            sessionHash: 'abc',
+            page: 5,
+            startedAt: new Date('2024-01-15T09:00:00Z'),
+            durationSeconds: 120,
+            totalPages: 300,
+            createdAt: new Date('2024-01-15T10:00:00Z'),
+          },
+        ],
+        total: 1,
+      });
+      mockRepo.getKoreaderSessionsDailySummary.mockResolvedValue([{ day: '2024-01-15', durationSeconds: 120 }]);
+
+      const result = await service.getKoreaderTabData(7, 99, 1, 20);
+
+      expect(result).not.toBeNull();
+      expect(result!.stats.totalReadSecs).toBe(3600);
+      expect(result!.sessions).toHaveLength(1);
+      expect(result!.total).toBe(1);
+      expect(result!.dailySummary).toEqual([{ day: '2024-01-15', durationSeconds: 120 }]);
+    });
+  });
+
   describe('getSyncStatus', () => {
     it('aggregates credentials, devices, totals, and last sync time', async () => {
       const credentials = {
@@ -507,11 +725,25 @@ describe('KoreaderService', () => {
         devices,
         totalSyncedBooks: 14,
         lastSyncAt: '2026-02-01T10:00:00.000Z',
+        booksWithStats: 0,
+        totalReadingSeconds: 0,
       });
 
       expect(getCredentialsSpy).toHaveBeenCalledWith(7);
       expect(getDevicesSpy).toHaveBeenCalledWith(7);
       expect(mockRepo.getTotalSyncedBooks).toHaveBeenCalledWith(7);
+    });
+
+    it('includes booksWithStats and totalReadingSeconds from aggregate stats', async () => {
+      mockRepo.findKoreaderUser.mockResolvedValue(makeKoreaderUserRow());
+      mockRepo.getDevicesList.mockResolvedValue([]);
+      mockRepo.getTotalSyncedBooks.mockResolvedValue(5);
+      mockRepo.getKoreaderAggregateStats.mockResolvedValue({ booksWithStats: 3, totalReadingSeconds: 7200 });
+
+      const result = await service.getSyncStatus(7);
+
+      expect(result.booksWithStats).toBe(3);
+      expect(result.totalReadingSeconds).toBe(7200);
     });
   });
 
@@ -739,6 +971,224 @@ describe('KoreaderService', () => {
 
       expect(result?.canonicalSource).toBe('koreader');
       expect(result?.fileModifiedSinceLastSync).toBe(false);
+    });
+  });
+
+  describe('getKoreaderStatsSummary', () => {
+    it('returns zeros and 0 streaks when no data', async () => {
+      mockRepo.getKoreaderStatsActiveDates.mockResolvedValue([]);
+      mockRepo.getKoreaderStatsTotals.mockResolvedValue({
+        totalSessions: 0,
+        totalDurationSecs: 0,
+        totalHighlights: 0,
+        totalNotes: 0,
+        booksWithStats: 0,
+      });
+
+      const result = await service.getKoreaderStatsSummary(7);
+
+      expect(result.totalReadSecs).toBe(0);
+      expect(result.totalSessions).toBe(0);
+      expect(result.currentStreak).toBe(0);
+      expect(result.longestStreak).toBe(0);
+    });
+
+    it('computes correct streak for consecutive days ending today', async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+      const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
+      mockRepo.getKoreaderStatsActiveDates.mockResolvedValue([twoDaysAgo, yesterday, today]);
+      mockRepo.getKoreaderStatsTotals.mockResolvedValue({
+        totalSessions: 5,
+        totalDurationSecs: 3600,
+        totalHighlights: 2,
+        totalNotes: 1,
+        booksWithStats: 1,
+      });
+
+      const result = await service.getKoreaderStatsSummary(7);
+
+      expect(result.currentStreak).toBe(3);
+      expect(result.longestStreak).toBe(3);
+      expect(result.totalReadSecs).toBe(3600);
+      expect(result.totalSessions).toBe(5);
+    });
+
+    it('normalizes unsorted and duplicate streak dates before computing streaks', async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+      const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
+      mockRepo.getKoreaderStatsActiveDates.mockResolvedValue([today, yesterday, today, twoDaysAgo]);
+      mockRepo.getKoreaderStatsTotals.mockResolvedValue({
+        totalSessions: 3,
+        totalDurationSecs: 1800,
+        totalHighlights: 0,
+        totalNotes: 0,
+        booksWithStats: 1,
+      });
+
+      const result = await service.getKoreaderStatsSummary(7);
+
+      expect(result.currentStreak).toBe(3);
+      expect(result.longestStreak).toBe(3);
+    });
+
+    it('returns 0 current streak when last session was 2+ days ago', async () => {
+      const threeDaysAgo = new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10);
+      const fourDaysAgo = new Date(Date.now() - 4 * 86_400_000).toISOString().slice(0, 10);
+      mockRepo.getKoreaderStatsActiveDates.mockResolvedValue([fourDaysAgo, threeDaysAgo]);
+      mockRepo.getKoreaderStatsTotals.mockResolvedValue({
+        totalSessions: 2,
+        totalDurationSecs: 7200,
+        totalHighlights: 0,
+        totalNotes: 0,
+        booksWithStats: 1,
+      });
+
+      const result = await service.getKoreaderStatsSummary(7);
+
+      expect(result.currentStreak).toBe(0);
+      expect(result.longestStreak).toBe(2);
+    });
+
+    it('counts longest streak correctly across a gap', async () => {
+      mockRepo.getKoreaderStatsActiveDates.mockResolvedValue(['2026-01-01', '2026-01-02', '2026-01-03', '2026-01-10', '2026-01-11']);
+      mockRepo.getKoreaderStatsTotals.mockResolvedValue({
+        totalSessions: 5,
+        totalDurationSecs: 0,
+        totalHighlights: 0,
+        totalNotes: 0,
+        booksWithStats: 0,
+      });
+
+      const result = await service.getKoreaderStatsSummary(7);
+
+      expect(result.longestStreak).toBe(3);
+    });
+
+    it('returns highlights and notes from totals', async () => {
+      mockRepo.getKoreaderStatsActiveDates.mockResolvedValue([]);
+      mockRepo.getKoreaderStatsTotals.mockResolvedValue({
+        totalSessions: 0,
+        totalDurationSecs: 0,
+        totalHighlights: 42,
+        totalNotes: 7,
+        booksWithStats: 3,
+      });
+
+      const result = await service.getKoreaderStatsSummary(7);
+
+      expect(result.totalHighlights).toBe(42);
+      expect(result.totalNotes).toBe(7);
+      expect(result.booksWithStats).toBe(3);
+    });
+  });
+
+  describe('getKoreaderWeeklyRhythm', () => {
+    it('maps DOW to labels and fills missing weekdays', async () => {
+      mockRepo.getKoreaderWeeklyRhythm.mockResolvedValue([
+        { dow: 1, durationSeconds: 600 },
+        { dow: 7, durationSeconds: 1200 },
+      ]);
+
+      const result = await service.getKoreaderWeeklyRhythm(7);
+
+      expect(result[0]).toEqual({ dow: 1, label: 'Mon', durationSeconds: 600 });
+      expect(result[1]).toEqual({ dow: 2, label: 'Tue', durationSeconds: 0 });
+      expect(result[6]).toEqual({ dow: 7, label: 'Sun', durationSeconds: 1200 });
+      expect(result).toHaveLength(7);
+    });
+
+    it('returns seven zero-filled weekday entries when no data', async () => {
+      mockRepo.getKoreaderWeeklyRhythm.mockResolvedValue([]);
+      const result = await service.getKoreaderWeeklyRhythm(7);
+      expect(result).toHaveLength(7);
+      expect(result.every((item) => item.durationSeconds === 0)).toBe(true);
+      expect(result[0]?.label).toBe('Mon');
+      expect(result[6]?.label).toBe('Sun');
+    });
+  });
+
+  describe('getKoreaderActivityHeatmap', () => {
+    it('delegates to repository', async () => {
+      const heatmap = [{ date: '2026-01-01', durationSeconds: 3600 }];
+      mockRepo.getKoreaderActivityHeatmap.mockResolvedValue(heatmap);
+
+      const result = await service.getKoreaderActivityHeatmap(7);
+
+      expect(result).toEqual(heatmap);
+      expect(mockRepo.getKoreaderActivityHeatmap).toHaveBeenCalledWith(7);
+    });
+  });
+
+  describe('getKoreaderMonthlyReading', () => {
+    it('delegates to repository', async () => {
+      const monthly = [{ year: 2026, month: 1, durationSeconds: 7200 }];
+      mockRepo.getKoreaderMonthlyReading.mockResolvedValue(monthly);
+
+      const result = await service.getKoreaderMonthlyReading(7);
+
+      expect(result).toEqual(monthly);
+    });
+  });
+
+  describe('getKoreaderSessionLengths', () => {
+    it('delegates to repository', async () => {
+      const bins = [{ label: '0-5m', minSecs: 0, maxSecs: 300, count: 5 }];
+      mockRepo.getKoreaderSessionLengths.mockResolvedValue(bins);
+
+      const result = await service.getKoreaderSessionLengths(7);
+
+      expect(result).toEqual(bins);
+    });
+  });
+
+  describe('getKoreaderTopBooks', () => {
+    it('delegates to repository', async () => {
+      const books = [{ bookId: 1, title: 'Test Book', totalReadSecs: 3600 }];
+      mockRepo.getKoreaderTopBooks.mockResolvedValue(books);
+
+      const result = await service.getKoreaderTopBooks(7);
+
+      expect(result).toEqual(books);
+      expect(mockRepo.getKoreaderTopBooks).toHaveBeenCalledWith(7);
+    });
+  });
+
+  describe('getKoreaderTopAnnotated', () => {
+    it('delegates to repository', async () => {
+      const annotated = [{ bookId: 1, title: 'Annotated Book', highlightsCount: 10, notesCount: 2 }];
+      mockRepo.getKoreaderTopAnnotated.mockResolvedValue(annotated);
+
+      const result = await service.getKoreaderTopAnnotated(7);
+
+      expect(result).toEqual(annotated);
+    });
+  });
+
+  describe('getKoreaderDevices', () => {
+    it('delegates to repository', async () => {
+      const devices = [{ device: 'Kobo Libra', booksTracked: 5 }];
+      mockRepo.getKoreaderDevices.mockResolvedValue(devices);
+
+      const result = await service.getKoreaderDevices(7);
+
+      expect(result).toEqual(devices);
+      expect(mockRepo.getKoreaderDevices).toHaveBeenCalledWith(7);
+    });
+  });
+
+  describe('getKoreaderTimeOfDay', () => {
+    it('fills all 24 hours when repository returns partial data', async () => {
+      const hours = [{ hour: 9, durationSeconds: 1800 }];
+      mockRepo.getKoreaderTimeOfDay.mockResolvedValue(hours);
+
+      const result = await service.getKoreaderTimeOfDay(7);
+
+      expect(result).toHaveLength(24);
+      expect(result[9]).toEqual({ hour: 9, durationSeconds: 1800 });
+      expect(result[8]).toEqual({ hour: 8, durationSeconds: 0 });
+      expect(result[23]).toEqual({ hour: 23, durationSeconds: 0 });
     });
   });
 });

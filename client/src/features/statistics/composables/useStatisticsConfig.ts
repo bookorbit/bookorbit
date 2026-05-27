@@ -12,7 +12,7 @@ import {
 } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { useAuth } from '@/features/auth/composables/useAuth'
-import { LIBRARY_CHART_IDS, STATISTICS_CHART_IDS, STATISTICS_CHART_META, USER_CHART_IDS } from '../statistics-chart-meta'
+import { KOREADER_CHART_IDS, LIBRARY_CHART_IDS, STATISTICS_CHART_IDS, STATISTICS_CHART_META, USER_CHART_IDS } from '../statistics-chart-meta'
 
 const KNOWN_CHART_IDS: StatisticsChartId[] = [...STATISTICS_CHART_IDS]
 
@@ -39,6 +39,7 @@ function normalizeCharts(saved: ChartConfigEntry[] | undefined): ChartConfigEntr
 
 const libraryChartIdSet = new Set<StatisticsChartId>(LIBRARY_CHART_IDS)
 const userChartIdSet = new Set<StatisticsChartId>(USER_CHART_IDS)
+const koreaderChartIdSet = new Set<StatisticsChartId>(KOREADER_CHART_IDS)
 
 function normalizeFilters(saved: StatisticsFilterConfig | undefined): StatisticsFilterConfig {
   return {
@@ -81,13 +82,17 @@ export function useStatisticsConfig() {
 
   const orderedLibraryCharts = computed(() => orderedCharts.value.filter((c) => libraryChartIdSet.has(c.id)))
   const orderedUserCharts = computed(() => orderedCharts.value.filter((c) => userChartIdSet.has(c.id)))
+  const orderedKoreaderCharts = computed(() => orderedCharts.value.filter((c) => koreaderChartIdSet.has(c.id)))
   const visibleLibraryCharts = computed(() => orderedLibraryCharts.value.filter((c) => c.visible))
   const visibleUserCharts = computed(() => orderedUserCharts.value.filter((c) => c.visible))
+  const visibleKoreaderCharts = computed(() => orderedKoreaderCharts.value.filter((c) => c.visible))
 
   const libraryChartCount = computed(() => orderedLibraryCharts.value.length)
   const userChartCount = computed(() => orderedUserCharts.value.length)
+  const koreaderChartCount = computed(() => orderedKoreaderCharts.value.length)
   const visibleLibraryChartCount = computed(() => visibleLibraryCharts.value.length)
   const visibleUserChartCount = computed(() => visibleUserCharts.value.length)
+  const visibleKoreaderChartCount = computed(() => visibleKoreaderCharts.value.length)
 
   function toggleVisibility(id: StatisticsChartId) {
     const entry = config.value.find((c) => c.id === id)
@@ -151,12 +156,16 @@ export function useStatisticsConfig() {
     visibleCharts,
     orderedLibraryCharts,
     orderedUserCharts,
+    orderedKoreaderCharts,
     visibleLibraryCharts,
     visibleUserCharts,
+    visibleKoreaderCharts,
     libraryChartCount,
     userChartCount,
+    koreaderChartCount,
     visibleLibraryChartCount,
     visibleUserChartCount,
+    visibleKoreaderChartCount,
     filters,
     init,
     toggleVisibility,

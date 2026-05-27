@@ -1,4 +1,4 @@
-export const BOOK_DETAIL_TABS = ['details', 'edit', 'files', 'reading-log', 'highlights'] as const
+export const BOOK_DETAIL_TABS = ['details', 'edit', 'reading-log', 'koreader', 'highlights', 'files'] as const
 
 export type BookDetailTab = (typeof BOOK_DETAIL_TABS)[number]
 

@@ -63,16 +63,16 @@ const quickFilters: { label: string; value: QuickFilter }[] = [
 </script>
 
 <template>
-  <div class="space-y-5">
+  <div class="space-y-4">
     <div v-if="error" class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive">
       {{ error }}
     </div>
 
-    <div class="flex flex-wrap items-center gap-2">
+    <div class="flex flex-wrap items-center gap-1.5">
       <button
         v-for="qf in quickFilters"
         :key="qf.value"
-        class="px-3 py-1.5 rounded-md text-sm font-medium border transition-colors"
+        class="rounded-md border px-2.5 py-1 text-xs font-medium transition-colors sm:px-3 sm:py-1.5 sm:text-sm"
         :class="
           activeQuick === qf.value
             ? 'bg-primary text-primary-foreground border-primary'
@@ -85,7 +85,7 @@ const quickFilters: { label: string; value: QuickFilter }[] = [
 
       <select
         v-if="hasMultipleFormats"
-        class="ml-auto px-3 py-1.5 rounded-md text-sm border border-border bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+        class="ml-auto rounded-md border border-border bg-card px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary sm:px-3 sm:py-1.5 sm:text-sm"
         :value="selectedFormat ?? ''"
         @change="handleFormatChange"
       >
