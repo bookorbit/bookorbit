@@ -305,9 +305,21 @@ export async function findBookCandidates(
     if (primaryFiles.length === 0) continue;
 
     if (dir === libraryFolderPath) {
-      // Root-level: each primary file is its own book.
+      // Root-level: each primary file is its own book. Sidecar files (non-primary)
+      // are grouped with their primary by matching stem (e.g. book.epub + book.opf + book.jpg).
+      const sidecarsByStem = new Map<string, FileStat[]>();
+      for (const file of files) {
+        if (isPrimaryFormat(file.absolutePath)) continue;
+        const stem = stemOf(basename(file.absolutePath));
+        const existing = sidecarsByStem.get(stem);
+        if (existing) existing.push(file);
+        else sidecarsByStem.set(stem, [file]);
+      }
       for (const file of primaryFiles) {
-        candidates.push({ folderPath: file.absolutePath, files: [file] });
+        const stem = stemOf(basename(file.absolutePath));
+        const sidecars = sidecarsByStem.get(stem) ?? [];
+        sidecarsByStem.delete(stem);
+        candidates.push({ folderPath: file.absolutePath, files: [file, ...sidecars] });
       }
       continue;
     }

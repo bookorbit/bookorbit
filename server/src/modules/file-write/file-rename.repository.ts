@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { asc, eq } from 'drizzle-orm';
+import { asc, eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -161,5 +161,26 @@ export class FileRenameRepository {
       .limit(1);
 
     return rows.length > 0 && rows[0].bookId !== currentBookId;
+  }
+
+  async findExistingPaths(absolutePaths: string[]): Promise<Map<string, number>> {
+    if (absolutePaths.length === 0) return new Map();
+
+    const result = new Map<string, number>();
+    const batchSize = 500;
+
+    for (let i = 0; i < absolutePaths.length; i += batchSize) {
+      const batch = absolutePaths.slice(i, i + batchSize);
+      const rows = await this.db
+        .select({ absolutePath: bookFiles.absolutePath, bookId: bookFiles.bookId })
+        .from(bookFiles)
+        .where(inArray(bookFiles.absolutePath, batch));
+
+      for (const row of rows) {
+        result.set(row.absolutePath, row.bookId);
+      }
+    }
+
+    return result;
   }
 }

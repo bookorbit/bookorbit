@@ -18,6 +18,8 @@ export const NotificationType = {
   FileWriteBackFailed: "file_write_back_failed",
   FileRenameCompleted: "file_rename_completed",
   FileRenameFailed: "file_rename_failed",
+  BulkRenameCompleted: "bulk_rename_completed",
+  BulkRenameFailed: "bulk_rename_failed",
   AchievementUnlocked: "achievement_unlocked",
 } as const;
 
@@ -33,6 +35,7 @@ export const NOTIFICATION_CATEGORIES = {
   migration: [NotificationType.MigrationCompleted, NotificationType.MigrationFailed],
   fileWriteBack: [NotificationType.FileWriteBackCompleted, NotificationType.FileWriteBackFailed],
   fileRename: [NotificationType.FileRenameCompleted, NotificationType.FileRenameFailed],
+  bulkRename: [NotificationType.BulkRenameCompleted, NotificationType.BulkRenameFailed],
   achievements: [NotificationType.AchievementUnlocked],
 } as const;
 
@@ -48,6 +51,7 @@ export const NOTIFICATION_CATEGORY_LABELS: Record<NotificationCategory, string> 
   migration: "Data Migration",
   fileWriteBack: "File Write-back",
   fileRename: "File Rename",
+  bulkRename: "Bulk Rename",
   achievements: "Achievements",
 };
 

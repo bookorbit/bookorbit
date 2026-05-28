@@ -17,6 +17,7 @@ const sections = computed<ToolSection[]>(() => {
 
   if (hasPermission('manage_libraries')) {
     result.push({ label: 'Entity Manager', routeName: 'tools-entity-manager' })
+    result.push({ label: 'Bulk Rename', routeName: 'tools-bulk-rename' })
   }
 
   return result

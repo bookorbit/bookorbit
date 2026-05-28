@@ -296,6 +296,12 @@ export const routes: RouteRecordRaw[] = [
             component: () => import('@/features/tools/entity-manager/views/EntityManagerView.vue'),
             meta: { title: 'Entity Manager' },
           },
+          {
+            path: 'bulk-rename',
+            name: 'tools-bulk-rename',
+            component: () => import('@/features/tools/bulk-rename/views/BulkRenameView.vue'),
+            meta: { title: 'Bulk Rename' },
+          },
           { path: ':pathMatch(.*)*', redirect: { name: 'tools-entity-manager' } },
         ],
       },

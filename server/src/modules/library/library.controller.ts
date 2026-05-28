@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPip
 import type { FastifyReply } from 'fastify';
 
 import { Permission, AuditAction, AuditResource } from '@bookorbit/types';
-import type { BookQuery, LibraryFileSyncProgressEvent } from '@bookorbit/types';
+import type { BookQuery, BulkRenameProgressEvent, LibraryFileSyncProgressEvent } from '@bookorbit/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequireLibraryAccess } from '../../common/decorators/require-library-access.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -10,12 +10,14 @@ import { Auditable } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookQueryPipe } from '../book/pipes/book-query.pipe';
 import { BookService } from '../book/book.service';
+import { BulkRenamePreviewQueryDto } from './dto/bulk-rename-preview-query.dto';
 import { CreateLibraryDto } from './dto/create-library.dto';
 import { GrantLibraryAccessDto } from './dto/grant-library-access.dto';
 import { PrescanLibraryDto } from './dto/prescan-library.dto';
 import { ReorderLibrariesDto } from './dto/reorder-libraries.dto';
 import { UpdateLibraryAccessDto } from './dto/update-library-access.dto';
 import { UpdateLibraryDto } from './dto/update-library.dto';
+import { BulkRenameService } from './bulk-rename.service';
 import { LibraryService } from './library.service';
 
 @Controller('libraries')
@@ -23,6 +25,7 @@ export class LibraryController {
   constructor(
     private readonly libraryService: LibraryService,
     private readonly bookService: BookService,
+    private readonly bulkRenameService: BulkRenameService,
   ) {}
 
   @Get()
@@ -218,5 +221,87 @@ export class LibraryController {
   })
   revokeAccess(@Param('libraryId', ParseIntPipe) libraryId: number, @Param('userId', ParseIntPipe) userId: number) {
     return this.libraryService.revokeAccess(libraryId, userId);
+  }
+
+  // ── Bulk rename ────────────────────────────────────────────────────────────
+
+  @Get(':id/bulk-rename/preview')
+  @RequireLibraryAccess('editor')
+  @RequirePermission(Permission.ManageLibraries)
+  getBulkRenamePreview(@Param('id', ParseIntPipe) libraryId: number, @Query() query: BulkRenamePreviewQueryDto) {
+    return this.bulkRenameService.getPreview(libraryId, query.page, query.pageSize, query.status);
+  }
+
+  @Get(':id/bulk-rename/status')
+  @RequireLibraryAccess('editor')
+  @RequirePermission(Permission.ManageLibraries)
+  getBulkRenameStatus(@Param('id', ParseIntPipe) libraryId: number) {
+    return { running: this.bulkRenameService.isRunning(libraryId) };
+  }
+
+  @Post(':id/bulk-rename/execute')
+  @RequireLibraryAccess('editor')
+  @RequirePermission(Permission.ManageLibraries)
+  @Auditable({
+    action: AuditAction.LibraryBulkRename,
+    resource: AuditResource.Library,
+    getResourceId: (req) => parseInt(req.params['id'], 10),
+    description: (req) => `Bulk renamed books in library #${req.params['id']}`,
+  })
+  async executeBulkRename(@Param('id', ParseIntPipe) libraryId: number, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
+    let disconnected = false;
+    let streamStarted = false;
+    const handleDisconnect = () => {
+      disconnected = true;
+    };
+
+    const ensureStreamStarted = () => {
+      if (streamStarted) return;
+      streamStarted = true;
+      reply.raw.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      });
+      reply.raw.on('close', handleDisconnect);
+      reply.raw.on('aborted', handleDisconnect);
+    };
+
+    const writeEvent = (event: BulkRenameProgressEvent) => {
+      if (disconnected || reply.raw.writableEnded || reply.raw.destroyed) return;
+      ensureStreamStarted();
+      reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
+    };
+
+    try {
+      const summary = await this.bulkRenameService.execute(libraryId, user.id, {
+        onProgress: writeEvent,
+        isCancelled: () => disconnected || reply.raw.writableEnded || reply.raw.destroyed,
+      });
+
+      const doneEvent: BulkRenameProgressEvent = {
+        done: true,
+        processed: summary.processed,
+        succeeded: summary.succeeded,
+        failed: summary.failed,
+        skipped: summary.skipped,
+      };
+      writeEvent(doneEvent);
+
+      if (streamStarted && !reply.raw.writableEnded && !reply.raw.destroyed) {
+        reply.raw.end();
+      }
+    } catch (error) {
+      if (streamStarted && !reply.raw.writableEnded && !reply.raw.destroyed) {
+        reply.raw.end();
+        return;
+      }
+      throw error;
+    } finally {
+      if (streamStarted) {
+        reply.raw.off('close', handleDisconnect);
+        reply.raw.off('aborted', handleDisconnect);
+      }
+    }
   }
 }

@@ -488,4 +488,192 @@ describe('FileRenameService', () => {
     service.scheduleRename(2, 10);
     expect(() => service.onModuleDestroy()).not.toThrow();
   });
+
+  it('moves files individually when new folder is nested inside old folder (deepening)', async () => {
+    const { service, renameRepo } = makeService();
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        organizationMode: 'book_per_folder',
+        fileNamingPattern: '{authors}/{title}/{title}',
+        file: {
+          absolutePath: '/library/Frank Herbert/Dune.epub',
+          relPath: 'Frank Herbert/Dune.epub',
+        },
+        bookFolderPath: '/library/Frank Herbert',
+      }),
+    );
+    renameRepo.findAllBookFiles.mockResolvedValue([
+      { id: 10, absolutePath: '/library/Frank Herbert/Dune.epub', relPath: 'Frank Herbert/Dune.epub', role: 'primary' },
+      { id: 11, absolutePath: '/library/Frank Herbert/cover.jpg', relPath: 'Frank Herbert/cover.jpg', role: 'cover' },
+    ]);
+
+    const result = await service.performRename(5, 12);
+
+    expect(result).toEqual(expect.objectContaining({ status: 'success' }));
+    expect(mockMkdir).toHaveBeenCalledWith('/library/Frank Herbert/Dune', { recursive: true });
+    expect(mockRename).toHaveBeenCalledWith('/library/Frank Herbert/Dune.epub', '/library/Frank Herbert/Dune/Dune.epub');
+    expect(mockRename).toHaveBeenCalledWith('/library/Frank Herbert/cover.jpg', '/library/Frank Herbert/Dune/cover.jpg');
+    expect(renameRepo.applyFolderRename).toHaveBeenCalledWith(
+      5,
+      expect.arrayContaining([
+        expect.objectContaining({ id: 10, absolutePath: '/library/Frank Herbert/Dune/Dune.epub' }),
+        expect.objectContaining({ id: 11, absolutePath: '/library/Frank Herbert/Dune/cover.jpg' }),
+      ]),
+      '/library/Frank Herbert/Dune',
+    );
+  });
+
+  it('moves files individually when old folder is nested inside new folder (flattening)', async () => {
+    const { service, renameRepo } = makeService();
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        organizationMode: 'book_per_folder',
+        fileNamingPattern: '{authors}/{title}',
+        file: {
+          absolutePath: '/library/Frank Herbert/Dune/Dune.epub',
+          relPath: 'Frank Herbert/Dune/Dune.epub',
+        },
+        bookFolderPath: '/library/Frank Herbert/Dune',
+      }),
+    );
+    renameRepo.findAllBookFiles.mockResolvedValue([
+      { id: 10, absolutePath: '/library/Frank Herbert/Dune/Dune.epub', relPath: 'Frank Herbert/Dune/Dune.epub', role: 'primary' },
+    ]);
+
+    const result = await service.performRename(5, 12);
+
+    expect(result).toEqual(expect.objectContaining({ status: 'success' }));
+    expect(mockMkdir).toHaveBeenCalledWith('/library/Frank Herbert', { recursive: true });
+    expect(mockRename).toHaveBeenCalledWith('/library/Frank Herbert/Dune/Dune.epub', '/library/Frank Herbert/Dune.epub');
+  });
+
+  it('moves a flat file into a new per-book folder when bookFolderPath equals the file path', async () => {
+    const { service, renameRepo } = makeService();
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        organizationMode: 'book_per_folder',
+        fileNamingPattern: '{authors}/{title}/{title}',
+        file: {
+          absolutePath: '/library/2666.epub',
+          relPath: '2666.epub',
+        },
+        bookFolderPath: '/library/2666.epub',
+      }),
+    );
+    renameRepo.findAllBookFiles.mockResolvedValue([{ id: 10, absolutePath: '/library/2666.epub', relPath: '2666.epub', role: 'content' }]);
+
+    const result = await service.performRename(5, 12);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'success',
+        oldPath: '/library/2666.epub',
+        newPath: '/library/Frank Herbert/Dune/Dune.epub',
+      }),
+    );
+    expect(renameRepo.applyFolderRename).toHaveBeenCalledWith(
+      5,
+      [{ id: 10, absolutePath: '/library/Frank Herbert/Dune/Dune.epub', relPath: 'Frank Herbert/Dune/Dune.epub' }],
+      '/library/Frank Herbert/Dune',
+    );
+    expect(mockMkdir).toHaveBeenCalledWith('/library/Frank Herbert/Dune', { recursive: true });
+    expect(mockRename).toHaveBeenCalledTimes(1);
+    expect(mockRename).toHaveBeenCalledWith('/library/2666.epub', '/library/Frank Herbert/Dune/Dune.epub');
+  });
+
+  it('moves a flat file with sidecar files into a new per-book folder, preserving sidecar basenames', async () => {
+    const { service, renameRepo } = makeService();
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        organizationMode: 'book_per_folder',
+        fileNamingPattern: '{authors}/{title}/{title}',
+        file: {
+          absolutePath: '/library/2666.epub',
+          relPath: '2666.epub',
+        },
+        bookFolderPath: '/library/2666.epub',
+      }),
+    );
+    renameRepo.findAllBookFiles.mockResolvedValue([
+      { id: 10, absolutePath: '/library/2666.epub', relPath: '2666.epub', role: 'content' },
+      { id: 11, absolutePath: '/library/2666.opf', relPath: '2666.opf', role: 'metadata' },
+      { id: 12, absolutePath: '/library/2666.jpg', relPath: '2666.jpg', role: 'cover' },
+    ]);
+
+    const result = await service.performRename(5, 12);
+
+    expect(result).toEqual(expect.objectContaining({ status: 'success' }));
+    expect(renameRepo.applyFolderRename).toHaveBeenCalledWith(
+      5,
+      [
+        { id: 10, absolutePath: '/library/Frank Herbert/Dune/Dune.epub', relPath: 'Frank Herbert/Dune/Dune.epub' },
+        { id: 11, absolutePath: '/library/Frank Herbert/Dune/2666.opf', relPath: 'Frank Herbert/Dune/2666.opf' },
+        { id: 12, absolutePath: '/library/Frank Herbert/Dune/2666.jpg', relPath: 'Frank Herbert/Dune/2666.jpg' },
+      ],
+      '/library/Frank Herbert/Dune',
+    );
+    expect(mockRename).toHaveBeenCalledTimes(3);
+    expect(mockRename).toHaveBeenNthCalledWith(1, '/library/2666.epub', '/library/Frank Herbert/Dune/Dune.epub');
+    expect(mockRename).toHaveBeenNthCalledWith(2, '/library/2666.opf', '/library/Frank Herbert/Dune/2666.opf');
+    expect(mockRename).toHaveBeenNthCalledWith(3, '/library/2666.jpg', '/library/Frank Herbert/Dune/2666.jpg');
+  });
+
+  it('detects case-only nested folder moves and uses per-file individual moves (avoids EINVAL on case-insensitive filesystems)', async () => {
+    const { service, renameRepo } = makeService();
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        organizationMode: 'book_per_folder',
+        fileNamingPattern: '{authors}/{title}/{title} ({year})/{title} ({year})',
+        authors: ['Craig DiLouie'],
+        metadata: { title: 'The Infection', publishedYear: 2011 },
+        file: {
+          absolutePath: '/library/Craig Dilouie/The Infection/old.epub',
+          relPath: 'Craig Dilouie/The Infection/old.epub',
+        },
+        bookFolderPath: '/library/Craig Dilouie/The Infection',
+      }),
+    );
+    renameRepo.findAllBookFiles.mockResolvedValue([
+      { id: 10, absolutePath: '/library/Craig Dilouie/The Infection/old.epub', relPath: 'Craig Dilouie/The Infection/old.epub', role: 'content' },
+    ]);
+
+    const result = await service.performRename(5, 12);
+
+    expect(result).toEqual(expect.objectContaining({ status: 'success' }));
+    // Goes through moveBookFilesIndividually (not a folder rename), so mkdir creates the new folder
+    // and the file moves individually — avoiding the EINVAL that a folder-rename would hit.
+    expect(mockMkdir).toHaveBeenCalledWith('/library/Craig DiLouie/The Infection/The Infection (2011)', { recursive: true });
+    expect(mockRename).toHaveBeenCalledWith(
+      '/library/Craig Dilouie/The Infection/old.epub',
+      '/library/Craig DiLouie/The Infection/The Infection (2011)/The Infection (2011).epub',
+    );
+  });
+
+  it('rolls back individually moved files on error during nested folder move', async () => {
+    const { service, renameRepo } = makeService();
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        organizationMode: 'book_per_folder',
+        fileNamingPattern: '{authors}/{title}/{title}',
+        file: {
+          absolutePath: '/library/Frank Herbert/Dune.epub',
+          relPath: 'Frank Herbert/Dune.epub',
+        },
+        bookFolderPath: '/library/Frank Herbert',
+      }),
+    );
+    renameRepo.findAllBookFiles.mockResolvedValue([
+      { id: 10, absolutePath: '/library/Frank Herbert/Dune.epub', relPath: 'Frank Herbert/Dune.epub', role: 'primary' },
+      { id: 11, absolutePath: '/library/Frank Herbert/cover.jpg', relPath: 'Frank Herbert/cover.jpg', role: 'cover' },
+    ]);
+
+    mockRename.mockResolvedValueOnce(undefined as never).mockRejectedValueOnce(new Error('disk full') as never);
+
+    const result = await service.performRename(5, 12);
+
+    expect(result).toEqual(expect.objectContaining({ status: 'failed', reason: 'disk full' }));
+    expect(mockRename).toHaveBeenCalledTimes(3);
+    expect(mockRename).toHaveBeenNthCalledWith(3, '/library/Frank Herbert/Dune/Dune.epub', '/library/Frank Herbert/Dune.epub');
+    expect(renameRepo.applyFolderRename).toHaveBeenCalledTimes(2);
+  });
 });

@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 
 import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { NotificationModule } from '../notification/notification.module';
+import { BulkRenameRepository } from './bulk-rename.repository';
 import { FileLockService } from './file-lock.service';
 import { FileRenameRepository } from './file-rename.repository';
 import { FileRenameService } from './file-rename.service';
@@ -22,6 +23,7 @@ import { FORMAT_WRITERS } from './interfaces/format-writer.interface';
     FileRenameRepository,
     FileRenameService,
     FileLockService,
+    BulkRenameRepository,
     EpubFormatWriter,
     PdfFormatWriter,
     CbzFormatWriter,
@@ -33,6 +35,6 @@ import { FORMAT_WRITERS } from './interfaces/format-writer.interface';
     },
     FormatWriterRegistry,
   ],
-  exports: [FileWriteService, FileWriteRepository, FileRenameService],
+  exports: [FileWriteService, FileWriteRepository, FileRenameService, FileRenameRepository, BulkRenameRepository],
 })
 export class FileWriteModule {}

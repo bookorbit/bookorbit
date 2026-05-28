@@ -87,11 +87,36 @@ describe('root-level primary files', () => {
     expect(paths).toContain(join(root, 'book2.pdf'));
   });
 
-  it('root-level candidate contains only the primary file', async () => {
+  it('root-level candidate contains only the primary file when no sidecars share its stem', async () => {
     await file('book.epub');
     const { candidates } = await findBookCandidates(root);
     expect(candidates[0].files).toHaveLength(1);
     expect(candidates[0].files[0].absolutePath).toBe(join(root, 'book.epub'));
+  });
+
+  it('root-level candidate includes sidecar files that share its stem', async () => {
+    await file('book.epub');
+    await file('book.opf');
+    await file('book.jpg');
+
+    const { candidates } = await findBookCandidates(root);
+    expect(candidates).toHaveLength(1);
+    const paths = candidates[0].files.map((f) => f.absolutePath).sort();
+    expect(paths).toEqual([join(root, 'book.epub'), join(root, 'book.jpg'), join(root, 'book.opf')]);
+  });
+
+  it('root-level: each primary pulls in only sidecars with its own stem', async () => {
+    await file('A.epub');
+    await file('A.opf');
+    await file('B.epub');
+    await file('B.jpg');
+    await file('orphan.txt');
+
+    const { candidates } = await findBookCandidates(root);
+    expect(candidates).toHaveLength(2);
+    const byPrimary = new Map(candidates.map((c) => [c.folderPath, c.files.map((f) => f.absolutePath).sort()]));
+    expect(byPrimary.get(join(root, 'A.epub'))).toEqual([join(root, 'A.epub'), join(root, 'A.opf')]);
+    expect(byPrimary.get(join(root, 'B.epub'))).toEqual([join(root, 'B.epub'), join(root, 'B.jpg')]);
   });
 });
 
