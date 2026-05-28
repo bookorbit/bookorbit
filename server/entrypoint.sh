@@ -56,6 +56,12 @@ check_cpu_sse42() {
   if [ ! -f /proc/cpuinfo ]; then
     return 0
   fi
+  # SSE4.2 is an x86-only feature; ARM and other architectures don't have it
+  # but sharp works natively on them, so skip the check entirely.
+  case "$(uname -m)" in
+    x86_64 | i386 | i686) ;;
+    *) return 0 ;;
+  esac
   if ! grep -q 'sse4_2' /proc/cpuinfo; then
     log "CPU does not support SSE4.2 instructions."
     log "The image processing library (sharp) requires a CPU with SSE4.2 support."
