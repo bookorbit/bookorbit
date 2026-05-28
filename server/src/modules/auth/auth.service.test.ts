@@ -27,7 +27,7 @@ function makeDb(overrides?: Record<string, unknown>) {
     from: vi.fn().mockResolvedValue([{ total: 0 }]),
     update: vi.fn().mockReturnThis(),
     set: vi.fn().mockReturnThis(),
-    where: vi.fn().mockResolvedValue(undefined),
+    where: vi.fn().mockResolvedValue({ rowCount: 1 }),
     delete: vi.fn().mockReturnThis(),
     transaction: vi.fn().mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => fn(db)),
   };
@@ -81,6 +81,7 @@ function makeService(dbOverrides?: Record<string, unknown>) {
       if (key === 'auth.jwtExpiresIn') return '15m';
       if (key === 'app.nodeEnv') return 'test';
       if (key === 'auth.setupBootstrapToken') return 'bootstrap-token';
+      if (key === 'auth.refreshRotationGraceMs') return 30_000;
       return undefined;
     }),
   };
@@ -452,7 +453,80 @@ describe('AuthService', () => {
       await expect(service.refresh(makeRequest({ refresh_token: 'unknown-token' }), makeReply())).rejects.toThrow(UnauthorizedException);
     });
 
-    it('throws UnauthorizedException and revokes all sessions when revoked token is reused', async () => {
+    it('returns access-only success for a recently rotated token reuse', async () => {
+      const { service, db, jwtService } = makeService();
+      const reply = makeReply();
+      const rotatedAt = new Date();
+      (db.query as never as Record<string, Record<string, vi.Mock>>).refreshTokens.findFirst
+        .mockResolvedValueOnce({
+          id: 1,
+          userId: 5,
+          revokedAt: rotatedAt,
+          rotatedAt,
+          replacedByTokenHash: 'replacement-hash',
+          expiresAt: new Date(Date.now() + 100_000),
+        })
+        .mockResolvedValueOnce({
+          id: 2,
+          userId: 5,
+          revokedAt: null,
+          expiresAt: new Date(Date.now() + 100_000),
+        });
+      (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValue({
+        id: 5,
+        tokenVersion: 7,
+        active: true,
+        provisioningMethod: 'local',
+      });
+
+      await expect(service.refresh(makeRequest({ refresh_token: 'recently-rotated-token' }), reply)).resolves.toEqual({ accessToken: 'signed-jwt' });
+
+      expect(jwtService.sign).toHaveBeenCalledWith({ sub: 5, ver: 7 });
+      expect(db.transaction).not.toHaveBeenCalled();
+      expect(db.update).not.toHaveBeenCalled();
+      expect(db.delete).not.toHaveBeenCalled();
+
+      const setCookieCalls = (reply as unknown as { setCookie: vi.Mock }).setCookie.mock.calls;
+      expect(setCookieCalls.map(([name]) => name)).toEqual(['access_token']);
+      expect(setCookieCalls[0]).toEqual(['access_token', 'signed-jwt', expect.objectContaining({ path: '/api', maxAge: 900 })]);
+    });
+
+    it('does not resurrect a recently rotated token after its replacement session is revoked', async () => {
+      const { service, db } = makeService();
+      const reply = makeReply();
+      const rotatedAt = new Date();
+      (db.query as never as Record<string, Record<string, vi.Mock>>).refreshTokens.findFirst
+        .mockResolvedValueOnce({
+          id: 1,
+          userId: 5,
+          revokedAt: rotatedAt,
+          rotatedAt,
+          replacedByTokenHash: 'replacement-hash',
+          expiresAt: new Date(Date.now() + 100_000),
+        })
+        .mockResolvedValueOnce({
+          id: 2,
+          userId: 5,
+          revokedAt: new Date(),
+          expiresAt: new Date(Date.now() + 100_000),
+        });
+
+      await expect(service.refresh(makeRequest({ refresh_token: 'recently-rotated-token' }), reply)).rejects.toThrow(UnauthorizedException);
+      expect(db.transaction).toHaveBeenCalled();
+      expect(db.delete).toHaveBeenCalled();
+      expect((reply as unknown as { setCookie: vi.Mock }).setCookie).toHaveBeenCalledWith(
+        'refresh_token',
+        '',
+        expect.objectContaining({ path: '/api/v1/auth', maxAge: 0 }),
+      );
+      expect((reply as unknown as { setCookie: vi.Mock }).setCookie).toHaveBeenCalledWith(
+        'access_token',
+        '',
+        expect.objectContaining({ path: '/api', maxAge: 0 }),
+      );
+    });
+
+    it('does not accept a recently revoked token unless it was revoked by refresh rotation', async () => {
       const { service, db } = makeService();
       const reply = makeReply();
       (db.query as never as Record<string, Record<string, vi.Mock>>).refreshTokens.findFirst.mockResolvedValue({
@@ -475,6 +549,317 @@ describe('AuthService', () => {
         '',
         expect.objectContaining({ path: '/api', maxAge: 0 }),
       );
+    });
+
+    it('revokes all sessions when a rotated token is reused after the grace window', async () => {
+      const { service, db } = makeService();
+      const reply = makeReply();
+      const rotatedAt = new Date(Date.now() - 31_000);
+      (db.query as never as Record<string, Record<string, vi.Mock>>).refreshTokens.findFirst.mockResolvedValue({
+        id: 1,
+        userId: 5,
+        revokedAt: rotatedAt,
+        rotatedAt,
+        replacedByTokenHash: 'replacement-hash',
+        expiresAt: new Date(Date.now() + 100_000),
+      });
+
+      await expect(service.refresh(makeRequest({ refresh_token: 'old-rotated-token' }), reply)).rejects.toThrow(UnauthorizedException);
+      expect(db.transaction).toHaveBeenCalled();
+      expect(db.delete).toHaveBeenCalled();
+      expect((reply as unknown as { setCookie: vi.Mock }).setCookie).toHaveBeenCalledWith(
+        'refresh_token',
+        '',
+        expect.objectContaining({ path: '/api/v1/auth', maxAge: 0 }),
+      );
+      expect((reply as unknown as { setCookie: vi.Mock }).setCookie).toHaveBeenCalledWith(
+        'access_token',
+        '',
+        expect.objectContaining({ path: '/api', maxAge: 0 }),
+      );
+    });
+
+    it('rejects a recently rotated token reuse for disabled users and clears cookies', async () => {
+      const { service, db } = makeService();
+      const reply = makeReply();
+      const rotatedAt = new Date();
+      (db.query as never as Record<string, Record<string, vi.Mock>>).refreshTokens.findFirst
+        .mockResolvedValueOnce({
+          id: 1,
+          userId: 5,
+          revokedAt: rotatedAt,
+          rotatedAt,
+          replacedByTokenHash: 'replacement-hash',
+          expiresAt: new Date(Date.now() + 100_000),
+        })
+        .mockResolvedValueOnce({
+          id: 2,
+          userId: 5,
+          revokedAt: null,
+          expiresAt: new Date(Date.now() + 100_000),
+        });
+      (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValue({
+        id: 5,
+        tokenVersion: 7,
+        active: false,
+        provisioningMethod: 'local',
+      });
+
+      await expect(service.refresh(makeRequest({ refresh_token: 'recently-rotated-token' }), reply)).rejects.toThrow(UnauthorizedException);
+      expect((reply as unknown as { setCookie: vi.Mock }).setCookie).toHaveBeenCalledWith(
+        'refresh_token',
+        '',
+        expect.objectContaining({ path: '/api/v1/auth', maxAge: 0 }),
+      );
+      expect((reply as unknown as { setCookie: vi.Mock }).setCookie).toHaveBeenCalledWith(
+        'access_token',
+        '',
+        expect.objectContaining({ path: '/api', maxAge: 0 }),
+      );
+    });
+
+    it('rejects a recently rotated shared-user token reuse when all magic links are revoked', async () => {
+      const { service, db, magicLinkRepo } = makeService();
+      const reply = makeReply();
+      const rotatedAt = new Date();
+      (db.query as never as Record<string, Record<string, vi.Mock>>).refreshTokens.findFirst
+        .mockResolvedValueOnce({
+          id: 1,
+          userId: 5,
+          revokedAt: rotatedAt,
+          rotatedAt,
+          replacedByTokenHash: 'replacement-hash',
+          expiresAt: new Date(Date.now() + 100_000),
+        })
+        .mockResolvedValueOnce({
+          id: 2,
+          userId: 5,
+          revokedAt: null,
+          expiresAt: new Date(Date.now() + 100_000),
+        });
+      (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValue({
+        id: 5,
+        tokenVersion: 7,
+        active: true,
+        provisioningMethod: 'shared',
+      });
+      magicLinkRepo.hasActiveByUserId.mockResolvedValue(false);
+
+      await expect(service.refresh(makeRequest({ refresh_token: 'recently-rotated-token' }), reply)).rejects.toThrow(UnauthorizedException);
+      expect(db.transaction).toHaveBeenCalled();
+      expect((reply as unknown as { setCookie: vi.Mock }).setCookie).toHaveBeenCalledWith(
+        'refresh_token',
+        '',
+        expect.objectContaining({ path: '/api/v1/auth', maxAge: 0 }),
+      );
+      expect((reply as unknown as { setCookie: vi.Mock }).setCookie).toHaveBeenCalledWith(
+        'access_token',
+        '',
+        expect.objectContaining({ path: '/api', maxAge: 0 }),
+      );
+    });
+
+    it('returns access-only success across a chained rotation (N -> N+1 -> live N+2) within grace', async () => {
+      const { service, db, jwtService } = makeService();
+      const reply = makeReply();
+      const rotatedAt = new Date(Date.now() - 5_000);
+      (db.query as never as Record<string, Record<string, vi.Mock>>).refreshTokens.findFirst
+        // 1st findFirst: the presented (oldest) token, already rotated to hash-1
+        .mockResolvedValueOnce({
+          id: 1,
+          userId: 5,
+          revokedAt: rotatedAt,
+          rotatedAt,
+          replacedByTokenHash: 'hash-1',
+          expiresAt: new Date(Date.now() + 100_000),
+        })
+        // 2nd findFirst: intermediate link, itself rotated to hash-2 (revoked-but-rotated => keep walking)
+        .mockResolvedValueOnce({
+          id: 2,
+          userId: 5,
+          revokedAt: new Date(Date.now() - 1_000),
+          rotatedAt: new Date(Date.now() - 1_000),
+          replacedByTokenHash: 'hash-2',
+          expiresAt: new Date(Date.now() + 100_000),
+        })
+        // 3rd findFirst: final live row
+        .mockResolvedValueOnce({
+          id: 3,
+          userId: 5,
+          revokedAt: null,
+          rotatedAt: null,
+          replacedByTokenHash: null,
+          expiresAt: new Date(Date.now() + 100_000),
+        });
+      (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValue({
+        id: 5,
+        tokenVersion: 9,
+        active: true,
+        provisioningMethod: 'local',
+      });
+
+      await expect(service.refresh(makeRequest({ refresh_token: 'oldest-token' }), reply)).resolves.toEqual({ accessToken: 'signed-jwt' });
+      expect(jwtService.sign).toHaveBeenCalledWith({ sub: 5, ver: 9 });
+      expect(db.transaction).not.toHaveBeenCalled();
+      const setCookieCalls = (reply as unknown as { setCookie: vi.Mock }).setCookie.mock.calls;
+      expect(setCookieCalls.map(([name]) => name)).toEqual(['access_token']);
+    });
+
+    it('treats a chain that ends in a logout-revoked link (no rotatedAt) as theft', async () => {
+      const { service, db } = makeService();
+      const reply = makeReply();
+      const rotatedAt = new Date(Date.now() - 5_000);
+      (db.query as never as Record<string, Record<string, vi.Mock>>).refreshTokens.findFirst
+        .mockResolvedValueOnce({
+          id: 1,
+          userId: 5,
+          revokedAt: rotatedAt,
+          rotatedAt,
+          replacedByTokenHash: 'hash-1',
+          expiresAt: new Date(Date.now() + 100_000),
+        })
+        .mockResolvedValueOnce({
+          id: 2,
+          userId: 5,
+          revokedAt: new Date(),
+          rotatedAt: null, // <- explicitly logged out, not rotated
+          replacedByTokenHash: null,
+          expiresAt: new Date(Date.now() + 100_000),
+        });
+
+      await expect(service.refresh(makeRequest({ refresh_token: 'oldest-token' }), reply)).rejects.toThrow(UnauthorizedException);
+      expect(db.transaction).toHaveBeenCalled();
+      expect(db.delete).toHaveBeenCalled();
+    });
+
+    it('falls back to access-only when the rotation UPDATE matches zero rows AND re-fetch confirms rotation', async () => {
+      const { service, db, jwtService } = makeService();
+      const reply = makeReply();
+      (db.query as never as Record<string, Record<string, vi.Mock>>).refreshTokens.findFirst
+        // 1st: refresh() initial lookup - presented token still looks live in our snapshot.
+        .mockResolvedValueOnce({
+          id: 1,
+          userId: 5,
+          revokedAt: null,
+          rotatedAt: null,
+          replacedByTokenHash: null,
+          expiresAt: new Date(Date.now() + 100_000),
+        })
+        // 2nd: re-fetch after rowCount=0 — concurrent rotation winner already flipped the row.
+        .mockResolvedValueOnce({
+          id: 1,
+          userId: 5,
+          revokedAt: new Date(),
+          rotatedAt: new Date(),
+          replacedByTokenHash: 'replacement-hash',
+          expiresAt: new Date(Date.now() + 100_000),
+        })
+        // 3rd: chain walk inside isRecentRefreshRotationReuse — replacement is live.
+        .mockResolvedValueOnce({
+          id: 2,
+          userId: 5,
+          revokedAt: null,
+          rotatedAt: null,
+          replacedByTokenHash: null,
+          expiresAt: new Date(Date.now() + 100_000),
+        });
+      (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValue({
+        id: 5,
+        tokenVersion: 3,
+        active: true,
+        provisioningMethod: 'local',
+      });
+      // Simulate the racing competitor: our UPDATE matches 0 rows.
+      (db.where as vi.Mock).mockResolvedValueOnce({ rowCount: 0 });
+
+      await expect(service.refresh(makeRequest({ refresh_token: 'racing-token' }), reply)).resolves.toEqual({ accessToken: 'signed-jwt' });
+      expect(jwtService.sign).toHaveBeenCalledWith({ sub: 5, ver: 3 });
+      // No refresh cookie was set on the race-loser path
+      const setCookieCalls = (reply as unknown as { setCookie: vi.Mock }).setCookie.mock.calls;
+      expect(setCookieCalls.map(([name]) => name)).toEqual(['access_token']);
+    });
+
+    it('rejects (and does NOT issue an access token) when the concurrent revoke was a logout, not a rotation', async () => {
+      const { service, db, jwtService } = makeService();
+      const reply = makeReply();
+      (db.query as never as Record<string, Record<string, vi.Mock>>).refreshTokens.findFirst
+        // 1st: initial lookup - token still appears live to us.
+        .mockResolvedValueOnce({
+          id: 1,
+          userId: 5,
+          revokedAt: null,
+          rotatedAt: null,
+          replacedByTokenHash: null,
+          expiresAt: new Date(Date.now() + 100_000),
+        })
+        // 2nd: re-fetch after rowCount=0 — concurrent LOGOUT revoked the row (rotatedAt is null).
+        .mockResolvedValueOnce({
+          id: 1,
+          userId: 5,
+          revokedAt: new Date(),
+          rotatedAt: null,
+          replacedByTokenHash: null,
+          expiresAt: new Date(Date.now() + 100_000),
+        });
+      (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValue({
+        id: 5,
+        tokenVersion: 3,
+        active: true,
+        provisioningMethod: 'local',
+      });
+      (db.where as vi.Mock).mockResolvedValueOnce({ rowCount: 0 });
+
+      await expect(service.refresh(makeRequest({ refresh_token: 'racing-token' }), reply)).rejects.toThrow(UnauthorizedException);
+      // CRITICAL: no access token cookie set, both cookies cleared (maxAge: 0).
+      // (jwtService.sign may have been called speculatively before the transaction lost the race,
+      //  but the resulting token must NEVER be sent to the client.)
+      const setCookieCalls = (reply as unknown as { setCookie: vi.Mock }).setCookie.mock.calls;
+      expect(setCookieCalls.map(([name]) => name)).toEqual(['refresh_token', 'access_token']);
+      expect(setCookieCalls[0]).toEqual(['refresh_token', '', expect.objectContaining({ path: '/api/v1/auth', maxAge: 0 })]);
+      expect(setCookieCalls[1]).toEqual(['access_token', '', expect.objectContaining({ path: '/api', maxAge: 0 })]);
+      // No setCookie call ever emitted a non-empty access token value.
+      const accessTokenSetCalls = setCookieCalls.filter(([name, value]) => name === 'access_token' && value !== '');
+      expect(accessTokenSetCalls).toHaveLength(0);
+      void jwtService;
+    });
+
+    it('honours refreshRotationGraceMs from config when widened', async () => {
+      const { service, db, config, jwtService } = makeService();
+      (config.get as vi.Mock).mockImplementation((key: string) => {
+        if (key === 'auth.jwtRefreshExpiresIn') return '7d';
+        if (key === 'auth.jwtExpiresIn') return '15m';
+        if (key === 'auth.refreshRotationGraceMs') return 120_000; // widen to 2m
+        if (key === 'app.nodeEnv') return 'test';
+        return undefined;
+      });
+      const reply = makeReply();
+      const rotatedAt = new Date(Date.now() - 90_000); // outside default 30s window, inside widened 120s
+      (db.query as never as Record<string, Record<string, vi.Mock>>).refreshTokens.findFirst
+        .mockResolvedValueOnce({
+          id: 1,
+          userId: 5,
+          revokedAt: rotatedAt,
+          rotatedAt,
+          replacedByTokenHash: 'replacement-hash',
+          expiresAt: new Date(Date.now() + 100_000),
+        })
+        .mockResolvedValueOnce({
+          id: 2,
+          userId: 5,
+          revokedAt: null,
+          rotatedAt: null,
+          replacedByTokenHash: null,
+          expiresAt: new Date(Date.now() + 100_000),
+        });
+      (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValue({
+        id: 5,
+        tokenVersion: 4,
+        active: true,
+        provisioningMethod: 'local',
+      });
+
+      await expect(service.refresh(makeRequest({ refresh_token: 'widened-grace-token' }), reply)).resolves.toEqual({ accessToken: 'signed-jwt' });
+      expect(jwtService.sign).toHaveBeenCalledWith({ sub: 5, ver: 4 });
     });
 
     it('throws UnauthorizedException when token is expired', async () => {
@@ -506,7 +891,11 @@ describe('AuthService', () => {
 
       const result = await service.refresh(makeRequest({ refresh_token: 'ok-token' }), reply);
       expect(result).toEqual({ accessToken: 'signed-jwt' });
-      expect(db.update).toHaveBeenCalled();
+      expect(db.transaction).toHaveBeenCalled();
+      const rotationSetArg = (db as unknown as Record<string, vi.Mock>).set.mock.calls[0]?.[0] as { revokedAt?: Date; rotatedAt?: Date };
+      expect(rotationSetArg.revokedAt).toBeInstanceOf(Date);
+      expect(rotationSetArg.rotatedAt).toBe(rotationSetArg.revokedAt);
+      expect(rotationSetArg).toEqual(expect.objectContaining({ replacedByTokenHash: expect.any(String) }));
       expect(oidcSessionRepo.touchActiveByUserId).toHaveBeenCalledWith(5, expect.any(Date));
       expect((reply as unknown as { setCookie: vi.Mock }).setCookie).toHaveBeenCalled();
     });

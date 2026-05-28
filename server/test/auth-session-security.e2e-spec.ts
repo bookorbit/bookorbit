@@ -412,7 +412,7 @@ describe('Auth session security (e2e)', () => {
   });
 
   describe('revoked refresh token reuse', () => {
-    it('revokes all sessions and invalidates access tokens when a revoked token is reused', async () => {
+    it('treats immediate rotated token reuse as benign and keeps the replacement session active', async () => {
       const credentials = await createLocalUser(context.db);
       const initialLogin = await login(context.app, credentials.username, credentials.password);
       const revokedRefreshToken = initialLogin.refreshToken;
@@ -426,7 +426,7 @@ describe('Auth session security (e2e)', () => {
       });
 
       expect(rotateResponse.statusCode).toBe(200);
-      const rotatedAccessToken = (rotateResponse.json() as { accessToken: string }).accessToken;
+      mergeCookieJar(initialLogin.jar, getSetCookieLines(rotateResponse.headers));
 
       const reuseResponse = await context.app.inject({
         method: 'POST',
@@ -436,33 +436,41 @@ describe('Auth session security (e2e)', () => {
         },
       });
 
-      expect(reuseResponse.statusCode).toBe(401);
-      const reuseCookies = getSetCookieLines(reuseResponse.headers);
-      expect(cookieValue(reuseCookies, 'refresh_token')).toBe('');
-      expect(cookieValue(reuseCookies, 'access_token')).toBe('');
+      expect(reuseResponse.statusCode).toBe(200);
+      const replayAccessToken = (reuseResponse.json() as { accessToken: string }).accessToken;
+      expect(replayAccessToken).toEqual(expect.any(String));
 
-      const remainingSessions = await context.db
-        .select({ id: schema.refreshTokens.id })
-        .from(schema.refreshTokens)
-        .where(eq(schema.refreshTokens.userId, credentials.userId));
-      expect(remainingSessions).toHaveLength(0);
+      const reuseCookies = getSetCookieLines(reuseResponse.headers);
+      expect(cookieValue(reuseCookies, 'refresh_token')).toBeNull();
+      expect(cookieValue(reuseCookies, 'access_token')).toEqual(expect.any(String));
+
+      expect(await activeSessionCount(context.db, credentials.userId)).toBe(1);
 
       const [userAfterReuse] = await context.db
         .select({ tokenVersion: schema.users.tokenVersion })
         .from(schema.users)
         .where(eq(schema.users.id, credentials.userId))
         .limit(1);
-      expect(userAfterReuse?.tokenVersion).toBeGreaterThan(1);
+      expect(userAfterReuse?.tokenVersion).toBe(1);
 
       const meResponse = await context.app.inject({
         method: 'GET',
         url: '/api/v1/auth/me',
         headers: {
-          authorization: `Bearer ${rotatedAccessToken}`,
+          authorization: `Bearer ${replayAccessToken}`,
+        },
+      });
+      expect(meResponse.statusCode).toBe(200);
+
+      const nextRefreshResponse = await context.app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/refresh',
+        headers: {
+          cookie: cookieHeader(initialLogin.jar),
         },
       });
 
-      expect(meResponse.statusCode).toBe(401);
+      expect(nextRefreshResponse.statusCode).toBe(200);
     });
   });
 

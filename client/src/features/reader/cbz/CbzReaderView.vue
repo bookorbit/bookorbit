@@ -98,7 +98,7 @@ const VIEW_OPTIONS: { value: ViewMode; label: string; icon: Component }[] = [
 const SCROLL_OPTIONS: { value: ScrollMode; label: string; icon: Component }[] = [
   { value: 'paginated', label: 'Paged', icon: ScanLine },
   { value: 'infinite', label: 'Infinite', icon: Layers },
-  { value: 'long-strip', label: 'Strip', icon: AlignJustify },
+  { value: 'long-strip', label: 'No gaps', icon: AlignJustify },
 ]
 const DIRECTION_OPTIONS: { value: Direction; label: string; icon: Component }[] = [
   { value: 'ltr', label: 'L to R', icon: ArrowRight },
@@ -256,6 +256,26 @@ const sliderFillPercent = computed(() => {
   const max = Math.max(0, pageCount.value - 1)
   if (max === 0) return 0
   return (Math.max(0, Math.min(currentPage.value, max)) / max) * 100
+})
+
+const stripFrameClass = computed(() => {
+  if (fitMode.value === 'fit-height' || fitMode.value === 'fit-page') {
+    return 'w-full h-[100dvh] flex items-center justify-center overflow-hidden'
+  }
+  return 'w-full flex justify-center'
+})
+
+const stripImageClass = computed(() => {
+  switch (fitMode.value) {
+    case 'fit-width':
+      return 'w-full h-auto max-w-full block'
+    case 'fit-height':
+      return 'h-full w-auto max-h-full block'
+    case 'actual':
+      return 'max-w-none max-h-none block'
+    default: // fit-page
+      return 'max-w-full max-h-full object-contain block'
+  }
 })
 
 const canGoPrev = computed(() => {
@@ -701,6 +721,7 @@ onUnmounted(() => {
                           <span class="truncate whitespace-nowrap">{{ opt.label }}</span>
                         </button>
                       </div>
+                      <p class="mt-1.5 text-[11px] leading-tight text-muted-foreground">Use "No gaps" for webtoons and vertical strips.</p>
                     </div>
 
                     <div class="h-px bg-border/70" />
@@ -909,16 +930,9 @@ onUnmounted(() => {
       :class="scrollMode === 'long-strip' ? '' : 'flex flex-col items-center'"
     >
       <div :class="scrollMode === 'long-strip' ? '' : 'flex flex-col items-center w-full gap-2 py-4 px-2'">
-        <img
-          v-for="i in pageCount"
-          :key="i - 1"
-          :data-page="i - 1"
-          :src="pageUrl(i - 1)"
-          :class="scrollMode === 'long-strip' ? 'w-full block' : 'max-w-full'"
-          loading="lazy"
-          draggable="false"
-          @load="onStripImageLoad(i - 1, $event)"
-        />
+        <div v-for="i in pageCount" :key="i - 1" :data-page="i - 1" :class="stripFrameClass">
+          <img :src="pageUrl(i - 1)" :class="stripImageClass" loading="lazy" draggable="false" @load="onStripImageLoad(i - 1, $event)" />
+        </div>
       </div>
     </div>
 

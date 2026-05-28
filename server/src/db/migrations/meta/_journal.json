@@ -57,6 +57,13 @@
       "when": 1779391608076,
       "tag": "0007_add_content_filter_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1779941161092,
+      "tag": "0008_auth_refresh_rotation_metadata",
+      "breakpoints": true
     }
   ]
 }

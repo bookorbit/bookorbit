@@ -51,7 +51,7 @@ onMounted(load)
           <div>
             <p class="settings-label">Reading mode</p>
             <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:overflow-visible md:whitespace-normal">
-              How pages are navigated
+              How pages are navigated - use "Infinite (no gaps)" for webtoons
             </p>
           </div>
           <div class="flex flex-wrap items-center gap-1.5 p-1 rounded-lg border border-border bg-muted/50 self-start">
@@ -69,7 +69,7 @@ onMounted(load)
               :class="effective.scrollMode === 'infinite' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
               @click="update({ scrollMode: 'infinite' })"
             >
-              Infinite
+              Infinite (spaced)
             </button>
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
@@ -78,7 +78,7 @@ onMounted(load)
               "
               @click="update({ scrollMode: 'long-strip' })"
             >
-              Long strip
+              Infinite (no gaps)
             </button>
           </div>
         </div>

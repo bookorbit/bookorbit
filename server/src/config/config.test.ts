@@ -71,6 +71,7 @@ describe('config', () => {
       jwtExpiresIn: '15m',
       jwtRefreshExpiresIn: '7d',
       setupBootstrapToken: '',
+      refreshRotationGraceMs: 30_000,
     });
     expect(emailConfig().encryptionKey).toBe('');
     expect(migrationConfig().encryptionKey).toBe('');

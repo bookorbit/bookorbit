@@ -66,10 +66,7 @@ export function useAuth() {
   async function init(): Promise<void> {
     isLoading.value = true
     try {
-      const res = await fetch('/api/v1/auth/refresh', { method: 'POST', credentials: 'include' })
-      if (!res.ok) return
-      const { accessToken } = await res.json()
-      setAccessToken(accessToken)
+      await refreshAccessToken()
       await me()
       startSessionRefresh()
     } catch {

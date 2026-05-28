@@ -31,6 +31,13 @@ const selectedIconComponent = computed(() => (props.modelValue ? ((LucideIcons a
 
 const COLS = 10
 const ROW_HEIGHT = 44
+const VIEWPORT_MARGIN = 8
+const PANEL_OFFSET = 4
+const PANEL_MIN_WIDTH = 440
+const PANEL_MAX_HEIGHT = 400
+const PANEL_SEARCH_ROW_HEIGHT = 44
+const PANEL_DEFAULT_GRID_HEIGHT = 320
+const PANEL_MIN_GRID_HEIGHT = 140
 
 const query = ref('')
 
@@ -60,25 +67,44 @@ const triggerRef = ref<HTMLElement | null>(null)
 const panelRef = ref<HTMLElement | null>(null)
 const searchRef = ref<HTMLInputElement | null>(null)
 const panelStyle = ref<Record<string, string>>({})
+const gridHeight = ref(PANEL_DEFAULT_GRID_HEIGHT)
 
 function positionPanel() {
   const rect = triggerRef.value?.getBoundingClientRect()
   if (!rect) return
-  const width = Math.max(rect.width, 440)
+  const width = Math.max(rect.width, PANEL_MIN_WIDTH)
   let left = rect.left
-  if (left + width > window.innerWidth - 8) left = window.innerWidth - width - 8
-  if (left < 8) left = 8
-  let top = rect.bottom + 4
-  // Flip upward if panel would overflow viewport bottom
-  if (top + 400 > window.innerHeight - 8) top = rect.top - 400 - 4
+  if (left + width > window.innerWidth - VIEWPORT_MARGIN) left = window.innerWidth - width - VIEWPORT_MARGIN
+  if (left < VIEWPORT_MARGIN) left = VIEWPORT_MARGIN
+
+  const maxViewportHeight = Math.max(PANEL_SEARCH_ROW_HEIGHT + PANEL_MIN_GRID_HEIGHT, window.innerHeight - VIEWPORT_MARGIN * 2)
+  const desiredPanelHeight = PANEL_SEARCH_ROW_HEIGHT + PANEL_DEFAULT_GRID_HEIGHT
+  const panelHeight = Math.min(PANEL_MAX_HEIGHT, Math.min(desiredPanelHeight, maxViewportHeight))
+  const availableGridHeight = Math.max(PANEL_MIN_GRID_HEIGHT, panelHeight - PANEL_SEARCH_ROW_HEIGHT)
+  gridHeight.value = Math.min(PANEL_DEFAULT_GRID_HEIGHT, availableGridHeight)
+
+  const spaceBelow = window.innerHeight - rect.bottom - PANEL_OFFSET - VIEWPORT_MARGIN
+  const spaceAbove = rect.top - PANEL_OFFSET - VIEWPORT_MARGIN
+  const shouldOpenUpward = spaceBelow < panelHeight && spaceAbove > spaceBelow
+
+  let top = shouldOpenUpward ? rect.top - panelHeight - PANEL_OFFSET : rect.bottom + PANEL_OFFSET
+  if (top < VIEWPORT_MARGIN) top = VIEWPORT_MARGIN
+  if (top + panelHeight > window.innerHeight - VIEWPORT_MARGIN) top = window.innerHeight - VIEWPORT_MARGIN - panelHeight
+
   panelStyle.value = {
     position: 'fixed',
     top: `${top}px`,
     left: `${left}px`,
     width: `${width}px`,
+    maxHeight: `${panelHeight}px`,
     zIndex: '200',
     pointerEvents: 'auto',
   }
+}
+
+function handleViewportChange() {
+  if (!open.value) return
+  positionPanel()
 }
 
 function toggle() {
@@ -89,8 +115,15 @@ function toggle() {
 watch(open, (isOpen) => {
   if (!isOpen) {
     query.value = ''
+    window.removeEventListener('resize', handleViewportChange)
+    window.visualViewport?.removeEventListener('resize', handleViewportChange)
   } else {
-    nextTick(() => searchRef.value?.focus())
+    nextTick(() => {
+      positionPanel()
+      searchRef.value?.focus()
+      window.addEventListener('resize', handleViewportChange)
+      window.visualViewport?.addEventListener('resize', handleViewportChange)
+    })
   }
 })
 
@@ -117,6 +150,8 @@ watch(open, (isOpen) => {
 })
 
 onUnmounted(() => document.removeEventListener('mousedown', handleOutsideClick))
+onUnmounted(() => window.removeEventListener('resize', handleViewportChange))
+onUnmounted(() => window.visualViewport?.removeEventListener('resize', handleViewportChange))
 </script>
 
 <template>
@@ -193,7 +228,14 @@ onUnmounted(() => document.removeEventListener('mousedown', handleOutsideClick))
         </div>
 
         <!-- Virtual icon grid -->
-        <RecycleScroller v-else class="overflow-y-auto px-2 py-1.5" style="height: 320px" :items="rows" :item-size="ROW_HEIGHT" key-field="id">
+        <RecycleScroller
+          v-else
+          class="overflow-y-auto px-2 py-1.5"
+          :style="{ height: `${gridHeight}px` }"
+          :items="rows"
+          :item-size="ROW_HEIGHT"
+          key-field="id"
+        >
           <template #default="{ item }">
             <div class="flex gap-0.5">
               <Tooltip v-for="name in item.icons" :key="name">

@@ -46,7 +46,7 @@ const hasMenu = () => props.canAdd || props.canReorder
     <DropdownMenu v-if="hasMenu()">
       <DropdownMenuTrigger
         class="ml-1 flex h-6 w-6 shrink-0 items-center justify-center transition-colors hover:bg-sidebar-accent"
-        :class="[isReordering ? 'text-primary' : 'text-sidebar-foreground/45 hover:text-sidebar-foreground/90', iconRadiusClass]"
+        :class="[isReordering ? 'text-primary' : 'text-primary/90 hover:text-primary', iconRadiusClass]"
         @click.stop
       >
         <MoreVertical :size="15" :stroke-width="2.2" />

@@ -56,7 +56,10 @@ function sha256(value: string): string {
 
 const LOGIN_LOCKOUT_THRESHOLD = 5;
 const LOGIN_LOCKOUT_DURATION_MS = 15 * 60_000;
+const ROTATION_CHAIN_MAX_HOPS = 5;
 const DUMMY_HASH = '$2a$12$LJ3m4ys3Lk0TSwHBbqP8b.3bFfR1oVDMhPzX8KPrPeuMEJBJJPa.G';
+
+class ConcurrentRotationError extends Error {}
 
 function maskEmail(email: string): string {
   const at = email.indexOf('@');
@@ -289,9 +292,13 @@ export class AuthService {
       throw new UnauthorizedException();
     }
 
-    // Reuse of a revoked token indicates possible theft.
-    // Revoke refresh sessions and bump tokenVersion to invalidate active access tokens.
     if (row.revokedAt) {
+      if (await this.isRecentRefreshRotationReuse(row)) {
+        return this.issueAccessOnlyForRefreshReuse(row.userId, reply);
+      }
+
+      // Reuse of a revoked token outside a fresh rotation indicates possible theft.
+      // Revoke refresh sessions and bump tokenVersion to invalidate active access tokens.
       this.logger.warn(
         `[auth.refresh] [fail] userId=${row.userId} errorClass=UnauthorizedException error="token revoked - reuse attempt" - refresh failed`,
       );
@@ -313,33 +320,52 @@ export class AuthService {
       throw new UnauthorizedException();
     }
 
-    const userForToken = await this.db.query.users.findFirst({ where: eq(schema.users.id, row.userId) });
-    if (!userForToken) throw new UnauthorizedException();
-    if (!userForToken.active) {
-      this.logger.warn(`[auth.refresh] [fail] userId=${row.userId} errorClass=UnauthorizedException error="account disabled" - refresh failed`);
-      this.clearRefreshCookie(reply);
-      this.clearAccessCookie(reply);
-      throw new UnauthorizedException('Account disabled');
-    }
+    const userForToken = await this.assertUserCanRefresh(row.userId, reply);
 
-    if (userForToken.provisioningMethod === 'shared') {
-      const hasActive = await this.magicLinkRepo.hasActiveByUserId(row.userId);
+    // Rotate: revoke old, issue new. Guard against the SPA race where two requests
+    // present the same (still-valid) refresh: the loser's UPDATE matches zero rows
+    // and we treat it as a benign reuse of an already-rotated token.
+    const { accessToken, rawRefreshToken, refreshExpiresAt, refreshTokenHash } = this.createTokenPair(row.userId, userForToken.tokenVersion);
 
-      if (!hasActive) {
+    const rotatedAt = new Date();
+    try {
+      await this.db.transaction(async (tx) => {
+        const updateResult = await tx
+          .update(schema.refreshTokens)
+          .set({ revokedAt: rotatedAt, rotatedAt, replacedByTokenHash: refreshTokenHash })
+          .where(and(eq(schema.refreshTokens.id, row.id), isNull(schema.refreshTokens.revokedAt)));
+        if ((updateResult.rowCount ?? 0) === 0) {
+          throw new ConcurrentRotationError();
+        }
+        await tx.insert(schema.refreshTokens).values({ userId: row.userId, tokenHash: refreshTokenHash, expiresAt: refreshExpiresAt });
+      });
+    } catch (err) {
+      if (err instanceof ConcurrentRotationError) {
+        // rowCount=0 only proves "someone else changed this row first" — it could be a
+        // concurrent rotation OR a concurrent logout/security revoke. Re-fetch and only
+        // accept the race as benign if the revoke came from rotation. Otherwise the user
+        // (or admin) explicitly killed this session and we must NOT resurrect it.
+        const refreshedRow = await this.db.query.refreshTokens.findFirst({
+          where: eq(schema.refreshTokens.id, row.id),
+        });
+        if (refreshedRow && (await this.isRecentRefreshRotationReuse(refreshedRow))) {
+          this.logger.log(`[auth.refresh] [end] userId=${row.userId} reason="rotation-race-lost" - access-only refresh issued`);
+          return this.issueAccessOnlyForRefreshReuse(row.userId, reply);
+        }
+        // Concurrent non-rotation revoke = the user (logout) or an admin (disable/security)
+        // just killed this specific session. Honor that intent: fail this refresh and clear
+        // cookies, but do NOT touch other devices' sessions (logout deliberately only revoked
+        // this token; admin actions have their own scope).
         this.logger.warn(
-          `[auth.refresh] [fail] userId=${row.userId} errorClass=UnauthorizedException error="all magic links revoked" - refresh failed`,
+          `[auth.refresh] [fail] userId=${row.userId} errorClass=UnauthorizedException error="concurrent non-rotation revoke" - refresh failed`,
         );
-        await this.revokeAllUserSessions(row.userId);
         this.clearRefreshCookie(reply);
         this.clearAccessCookie(reply);
         throw new UnauthorizedException();
       }
+      throw err;
     }
-
-    // Rotate: revoke old, issue new
-    await this.db.update(schema.refreshTokens).set({ revokedAt: new Date() }).where(eq(schema.refreshTokens.id, row.id));
-
-    const { accessToken, rawRefreshToken, refreshExpiresAt } = await this.issueTokenPair(row.userId, userForToken.tokenVersion);
+    // touchActive must run outside the transaction (oidc sessions are best-effort sliding TTL).
     await this.oidcSessionRepo.touchActiveByUserId(row.userId, refreshExpiresAt);
     this.setRefreshCookie(reply, rawRefreshToken);
     this.setAccessCookie(reply, accessToken);
@@ -594,15 +620,85 @@ export class AuthService {
   }
 
   private async issueTokenPair(userId: number, tokenVersion: number) {
+    const pair = this.createTokenPair(userId, tokenVersion);
+
+    await this.db.insert(schema.refreshTokens).values({ userId, tokenHash: pair.refreshTokenHash, expiresAt: pair.refreshExpiresAt });
+
+    return pair;
+  }
+
+  private createTokenPair(userId: number, tokenVersion: number) {
     const accessToken = this.jwtService.sign({ sub: userId, ver: tokenVersion });
 
     const rawRefreshToken = randomBytes(32).toString('hex');
     const tokenHash = sha256(rawRefreshToken);
     const expiresAt = this.getRefreshTokenExpiryDate();
 
-    await this.db.insert(schema.refreshTokens).values({ userId, tokenHash, expiresAt });
+    return { accessToken, rawRefreshToken, refreshExpiresAt: expiresAt, refreshTokenHash: tokenHash };
+  }
 
-    return { accessToken, rawRefreshToken, refreshExpiresAt: expiresAt };
+  private getRefreshRotationGraceMs(): number {
+    return this.config.get<number>('auth.refreshRotationGraceMs') ?? 30_000;
+  }
+
+  /**
+   * Distinguishes a benign rotation race (or a chained rotation) from refresh-token theft.
+   *
+   * Accepts the presented (revoked) token only when:
+   *   - it was revoked by rotation (rotatedAt + replacedByTokenHash set)
+   *   - the rotation happened within the configured grace window
+   *   - walking the rotation chain (up to ROTATION_CHAIN_MAX_HOPS) reaches a live row
+   *     for the same user. A revoked link in the chain is OK only if it was itself rotated
+   *     (so we don't resurrect a session that was explicitly logged out).
+   */
+  private async isRecentRefreshRotationReuse(row: typeof schema.refreshTokens.$inferSelect) {
+    if (!row.rotatedAt || !row.replacedByTokenHash) return false;
+    if (row.expiresAt < new Date()) return false;
+    const elapsedMs = Date.now() - row.rotatedAt.getTime();
+    if (elapsedMs < 0 || elapsedMs > this.getRefreshRotationGraceMs()) return false;
+
+    let nextHash: string | null = row.replacedByTokenHash;
+    for (let hop = 0; hop < ROTATION_CHAIN_MAX_HOPS && nextHash; hop++) {
+      const next: typeof schema.refreshTokens.$inferSelect | undefined = await this.db.query.refreshTokens.findFirst({
+        where: eq(schema.refreshTokens.tokenHash, nextHash),
+      });
+      if (!next || next.userId !== row.userId || next.expiresAt < new Date()) return false;
+      if (!next.revokedAt) return true;
+      // Revoked-but-rotated link: keep walking. Revoked-without-rotation means logout/security revoke.
+      if (!next.rotatedAt || !next.replacedByTokenHash) return false;
+      nextHash = next.replacedByTokenHash;
+    }
+    return false;
+  }
+
+  private async assertUserCanRefresh(userId: number, reply: FastifyReply) {
+    const userForToken = await this.db.query.users.findFirst({ where: eq(schema.users.id, userId) });
+    if (!userForToken) throw new UnauthorizedException();
+    if (!userForToken.active) {
+      this.logger.warn(`[auth.refresh] [fail] userId=${userId} errorClass=UnauthorizedException error="account disabled" - refresh failed`);
+      this.clearRefreshCookie(reply);
+      this.clearAccessCookie(reply);
+      throw new UnauthorizedException('Account disabled');
+    }
+    if (userForToken.provisioningMethod === 'shared') {
+      const hasActive = await this.magicLinkRepo.hasActiveByUserId(userId);
+      if (!hasActive) {
+        this.logger.warn(`[auth.refresh] [fail] userId=${userId} errorClass=UnauthorizedException error="all magic links revoked" - refresh failed`);
+        await this.revokeAllUserSessions(userId);
+        this.clearRefreshCookie(reply);
+        this.clearAccessCookie(reply);
+        throw new UnauthorizedException();
+      }
+    }
+    return userForToken;
+  }
+
+  private async issueAccessOnlyForRefreshReuse(userId: number, reply: FastifyReply) {
+    const userForToken = await this.assertUserCanRefresh(userId, reply);
+    const accessToken = this.jwtService.sign({ sub: userId, ver: userForToken.tokenVersion });
+    this.setAccessCookie(reply, accessToken);
+    this.logger.log(`[auth.refresh] [end] userId=${userId} reason="rotation-race" - access-only refresh issued`);
+    return { accessToken };
   }
 
   private assertSetupToken(setupToken: string | undefined) {
