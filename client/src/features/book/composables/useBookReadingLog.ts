@@ -1,11 +1,12 @@
 import { ref, watch, type Ref } from 'vue'
-import type { BookReadingSession, BookReadingSessionListResponse, BookReadingSessionStats } from '@bookorbit/types'
+import type { BookReadingSession, BookReadingSessionListResponse, BookReadingSessionStats, KoboReadingSessionEntry } from '@bookorbit/types'
 import { api } from '@/lib/api'
 
 export function useBookReadingLog(bookIdRef: Ref<number>) {
   const sessions = ref<BookReadingSession[]>([])
   const total = ref(0)
   const stats = ref<BookReadingSessionStats | null>(null)
+  const koboReadingState = ref<KoboReadingSessionEntry | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
   const page = ref(1)
@@ -36,6 +37,7 @@ export function useBookReadingLog(bookIdRef: Ref<number>) {
       sessions.value = data.items
       total.value = data.total
       stats.value = data.stats
+      koboReadingState.value = data.koboReadingState ?? null
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to load reading sessions'
     } finally {
@@ -96,6 +98,7 @@ export function useBookReadingLog(bookIdRef: Ref<number>) {
     sessions,
     total,
     stats,
+    koboReadingState,
     loading,
     error,
     page,

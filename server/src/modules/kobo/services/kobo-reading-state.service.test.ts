@@ -19,9 +19,10 @@ function makeDb() {
 describe('KoboReadingStateService', () => {
   const bookAccessService = { assertBookAccessible: vi.fn() };
   const userBookStatusService = { autoUpdate: vi.fn() };
+  const achievementEvents = { emit: vi.fn() };
 
   function makeService(db: ReturnType<typeof makeDb>) {
-    return new KoboReadingStateService(db as never, bookAccessService as never, userBookStatusService as never);
+    return new KoboReadingStateService(db as never, bookAccessService as never, userBookStatusService as never, achievementEvents as never);
   }
 
   beforeEach(() => {
@@ -52,7 +53,7 @@ describe('KoboReadingStateService', () => {
     const db = makeDb();
     const stateInsert = makeInsertChain();
     db.insert.mockReturnValue(stateInsert);
-    db.query.books.findFirst.mockResolvedValue({ id: 12 });
+    db.query.books.findFirst.mockResolvedValue({ id: 12, libraryId: 1 });
     db.query.koboReadingStates.findFirst
       .mockResolvedValueOnce({
         currentBookmark: { LastModified: '2026-01-02T00:00:00.000Z', ProgressPercent: 34 },
@@ -104,7 +105,7 @@ describe('KoboReadingStateService', () => {
     const db = makeDb();
     const stateInsert = makeInsertChain();
     db.insert.mockReturnValue(stateInsert);
-    db.query.books.findFirst.mockResolvedValue({ id: 5 });
+    db.query.books.findFirst.mockResolvedValue({ id: 5, libraryId: 1 });
     db.query.koboReadingStates.findFirst
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ entitlementId: '5', currentBookmark: { ProgressPercent: 42.5 } });
@@ -118,12 +119,97 @@ describe('KoboReadingStateService', () => {
     const db = makeDb();
     const stateInsert = makeInsertChain();
     db.insert.mockReturnValue(stateInsert);
-    db.query.books.findFirst.mockResolvedValue({ id: 7 });
+    db.query.books.findFirst.mockResolvedValue({ id: 7, libraryId: 1 });
     db.query.koboReadingStates.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ entitlementId: '7' });
 
     await makeService(db).upsertState(2, 7, { Statistics: { LastModified: '2026-01-01T00:00:00Z' } }, 1, 99);
 
     expect(userBookStatusService.autoUpdate).not.toHaveBeenCalled();
+  });
+
+  it('upserts daily reading stats when progress percent is greater than 0', async () => {
+    const db = makeDb();
+    const stateInsert = makeInsertChain();
+    const dailyInsert = makeInsertChain();
+    db.insert.mockImplementation(() => {
+      return stateInsert;
+    });
+    // We need to handle two insert calls - one for koboReadingStates and one for userReadingDailyStats
+    let insertCallCount = 0;
+    db.insert = vi.fn().mockImplementation(() => {
+      insertCallCount++;
+      if (insertCallCount === 1) return stateInsert;
+      return dailyInsert;
+    });
+
+    db.query.books.findFirst.mockResolvedValue({ id: 5, libraryId: 10 });
+    db.query.koboReadingStates.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ entitlementId: '5', currentBookmark: { ProgressPercent: 42.5 } });
+
+    await makeService(db).upsertState(1, 5, { CurrentBookmark: { LastModified: '2026-01-01T00:00:00Z', ProgressPercent: 42.5 } }, 1, 99);
+
+    expect(db.insert).toHaveBeenCalledTimes(2);
+    expect(dailyInsert.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 1,
+        libraryId: 10,
+        readingSeconds: 0,
+        progressDelta: 42.5,
+        sessionsCount: 1,
+      }),
+    );
+    expect(achievementEvents.emit).toHaveBeenCalledWith(
+      'reading-session.saved',
+      expect.objectContaining({
+        userId: 1,
+        progressDelta: 42.5,
+        endProgress: 42.5,
+      }),
+    );
+  });
+
+  it('computes progressDelta from previous percent when updating existing state', async () => {
+    const db = makeDb();
+    const stateInsert = makeInsertChain();
+    const dailyInsert = makeInsertChain();
+    let insertCallCount = 0;
+    db.insert = vi.fn().mockImplementation(() => {
+      insertCallCount++;
+      if (insertCallCount === 1) return stateInsert;
+      return dailyInsert;
+    });
+
+    db.query.books.findFirst.mockResolvedValue({ id: 5, libraryId: 10 });
+    db.query.koboReadingStates.findFirst
+      .mockResolvedValueOnce({
+        currentBookmark: { ProgressPercent: 30 },
+      })
+      .mockResolvedValueOnce({ entitlementId: '5', currentBookmark: { ProgressPercent: 42.5 } });
+
+    await makeService(db).upsertState(1, 5, { CurrentBookmark: { ProgressPercent: 42.5 } }, 1, 99);
+
+    // progressDelta should be 42.5 - 30 = 12.5
+    expect(dailyInsert.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        progressDelta: 12.5,
+      }),
+    );
+  });
+
+  it('does not upsert daily stats when progress percent is 0', async () => {
+    const db = makeDb();
+    const stateInsert = makeInsertChain();
+    db.insert.mockReturnValue(stateInsert);
+    db.query.books.findFirst.mockResolvedValue({ id: 5, libraryId: 10 });
+    db.query.koboReadingStates.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ entitlementId: '5', currentBookmark: { ProgressPercent: 0 } });
+
+    await makeService(db).upsertState(1, 5, { CurrentBookmark: { ProgressPercent: 0 } }, 1, 99);
+
+    // Only one insert call for koboReadingStates, none for userReadingDailyStats
+    expect(db.insert).toHaveBeenCalledTimes(1);
   });
 
   it('getRawState returns null when absent and maps persisted fields when present', async () => {

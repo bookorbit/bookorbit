@@ -8,6 +8,12 @@ export interface BookReadingSession {
   format: string | null;
 }
 
+export interface KoboReadingSessionEntry {
+  progressPercent: number | null;
+  lastModified: string | null;
+  status: string | null;
+}
+
 export interface BookReadingSessionStats {
   totalSessions: number;
   totalSeconds: number;
@@ -23,4 +29,5 @@ export interface BookReadingSessionListResponse {
   page: number;
   pageSize: number;
   stats: BookReadingSessionStats;
+  koboReadingState: KoboReadingSessionEntry | null;
 }

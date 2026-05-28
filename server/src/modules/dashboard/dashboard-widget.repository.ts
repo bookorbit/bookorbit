@@ -189,13 +189,14 @@ export class DashboardWidgetRepository {
       .select({
         day: userReadingDailyStats.day,
         totalSeconds: sql<number>`sum(${userReadingDailyStats.readingSeconds})::int`,
+        sessionsCount: sql<number>`sum(${userReadingDailyStats.sessionsCount})::int`,
       })
       .from(userReadingDailyStats)
       .where(and(eq(userReadingDailyStats.userId, userId), inArray(userReadingDailyStats.libraryId, accessibleLibraryIds)))
       .groupBy(userReadingDailyStats.day)
       .orderBy(desc(userReadingDailyStats.day));
 
-    const readDays = new Set(rows.filter((r) => r.totalSeconds > 0).map((r) => r.day));
+    const readDays = new Set(rows.filter((r) => r.totalSeconds > 0 || r.sessionsCount > 0).map((r) => r.day));
     return computeStreakData(readDays, new Date());
   }
 
