@@ -427,6 +427,27 @@ export const E2E_SUITES = Object.freeze({
       ...SHARED_DB_AND_HELPER_PATHS,
     ],
   },
+  "file-rename": {
+    id: "file-rename",
+    name: "File Rename",
+    timeout: 120,
+    lane: "full",
+    description: "Bulk file rename end-to-end suite covering all library/file structure permutations",
+    vitestTarget: "test/file-rename.e2e-spec.ts",
+    junitOutput: `${TEST_RESULTS_DIR}/file-rename-e2e-junit.xml`,
+    prepareDedicatedDatabase: true,
+    useDedicatedDatabase: true,
+    changedPaths: [
+      "server/src/modules/library/**",
+      "server/src/modules/file-write/**",
+      "server/src/modules/scanner/**",
+      "server/src/modules/app-settings/**",
+      "server/test/file-rename.e2e-spec.ts",
+      "server/test/e2e/file-rename/**",
+      "packages/types/src/file-write.ts",
+      ...SHARED_DB_AND_HELPER_PATHS,
+    ],
+  },
 });
 
 export function listE2ESuites() {

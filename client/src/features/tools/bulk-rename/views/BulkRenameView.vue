@@ -152,7 +152,7 @@ function isStatusActive(status: BulkRenameStatus | undefined): boolean {
 }
 
 function normalizePath(value: string): string {
-  const normalized = value.replaceAll('\\', '/').replace(/\/+/g, '/')
+  const normalized = value.replace(/\\/g, '/').replace(/\/+/g, '/')
   if (normalized.length > 1 && normalized.endsWith('/')) {
     return normalized.slice(0, -1)
   }
