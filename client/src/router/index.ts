@@ -215,7 +215,7 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'admin/magic-links',
             name: 'settings-admin-magic-links',
-            redirect: () => ({ name: 'settings-admin', query: { tab: 'users' } }),
+            redirect: () => ({ name: 'settings-admin', query: { tab: 'magic-links' } }),
           },
           { path: ':pathMatch(.*)*', redirect: { name: 'settings-libraries' } },
         ],

@@ -1,4 +1,4 @@
-export const ADMIN_TABS = ['users', 'oidc'] as const
+export const ADMIN_TABS = ['users', 'magic-links', 'oidc'] as const
 
 export type AdminTab = (typeof ADMIN_TABS)[number]
 
@@ -15,6 +15,12 @@ export const ADMIN_TAB_INFO: Record<AdminTab, AdminTabInfo> = {
     titleLabel: 'Users',
     subtitle: 'Manage user accounts and permission assignments.',
     permission: 'manage_users',
+  },
+  'magic-links': {
+    navLabel: 'Magic Links',
+    titleLabel: 'Magic Links',
+    subtitle: 'Create shareable login links for shared accounts.',
+    permission: null,
   },
   oidc: {
     navLabel: 'OIDC / SSO',

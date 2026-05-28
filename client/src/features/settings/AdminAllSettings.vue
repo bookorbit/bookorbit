@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import UsersPage from '@/features/admin/UsersPage.vue'
 import OidcSettings from './OidcSettings.vue'
+import MagicLinksSettings from './MagicLinksSettings.vue'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { ADMIN_TAB_INFO, ADMIN_TABS, normalizeAdminTab, type AdminTab as Tab } from './lib/admin-tabs'
 
@@ -47,6 +48,7 @@ watch(availableTabs, (tabs) => {
 
 const tabWidths: Record<Tab, string> = {
   users: 'max-w-6xl',
+  'magic-links': 'max-w-6xl',
   oidc: 'max-w-3xl',
 }
 
@@ -80,6 +82,7 @@ function selectTab(tab: Tab) {
 
   <div :class="tabWidths[activeTab]">
     <UsersPage v-if="activeTab === 'users'" embedded />
+    <MagicLinksSettings v-else-if="activeTab === 'magic-links'" :with-header="false" />
     <OidcSettings v-else-if="activeTab === 'oidc'" embedded />
   </div>
 </template>

@@ -3,12 +3,12 @@ import { ADMIN_TABS, ADMIN_TAB_INFO, normalizeAdminTab } from '../lib/admin-tabs
 
 describe('admin-tabs', () => {
   describe('ADMIN_TABS', () => {
-    it('contains exactly users and oidc', () => {
-      expect(ADMIN_TABS).toEqual(['users', 'oidc'])
+    it('contains exactly users, magic-links, and oidc', () => {
+      expect(ADMIN_TABS).toEqual(['users', 'magic-links', 'oidc'])
     })
 
-    it('has length 2', () => {
-      expect(ADMIN_TABS.length).toBe(2)
+    it('has length 3', () => {
+      expect(ADMIN_TABS.length).toBe(3)
     })
   })
 
@@ -40,9 +40,18 @@ describe('admin-tabs', () => {
       expect(ADMIN_TAB_INFO.oidc.permission).toBe('manage_app_settings')
     })
 
+    it('magic-links entry is superuser-only', () => {
+      expect(ADMIN_TAB_INFO['magic-links'].permission).toBeNull()
+    })
+
     it('users entry has correct labels', () => {
       expect(ADMIN_TAB_INFO.users.navLabel).toBe('Users')
       expect(ADMIN_TAB_INFO.users.titleLabel).toBe('Users')
+    })
+
+    it('magic-links entry has correct labels', () => {
+      expect(ADMIN_TAB_INFO['magic-links'].navLabel).toBe('Magic Links')
+      expect(ADMIN_TAB_INFO['magic-links'].titleLabel).toBe('Magic Links')
     })
 
     it('oidc entry has correct labels', () => {
@@ -78,6 +87,10 @@ describe('admin-tabs', () => {
 
     it('returns oidc when given "oidc"', () => {
       expect(normalizeAdminTab('oidc')).toBe('oidc')
+    })
+
+    it('returns magic-links when given "magic-links"', () => {
+      expect(normalizeAdminTab('magic-links')).toBe('magic-links')
     })
 
     it('is case-sensitive (Users is not valid)', () => {

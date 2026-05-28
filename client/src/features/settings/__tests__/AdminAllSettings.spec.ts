@@ -31,6 +31,7 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
 }))
 
 vi.mock('@/features/admin/UsersPage.vue', () => ({ default: { template: '<div data-testid="users-page" />' } }))
+vi.mock('../MagicLinksSettings.vue', () => ({ default: { template: '<div data-testid="magic-links-settings" />' } }))
 vi.mock('../OidcSettings.vue', () => ({ default: { template: '<div data-testid="oidc-settings" />' } }))
 vi.mock('../SettingsPageHeader.vue', () => ({ default: { template: '<div />' } }))
 
@@ -48,10 +49,11 @@ describe('AdminAllSettings', () => {
   })
 
   describe('superuser', () => {
-    it('sees both Users and OIDC tabs', () => {
+    it('sees Users, Magic Links, and OIDC tabs', () => {
       const wrapper = mountComponent(undefined, { su: true })
       const labels = wrapper.findAll('button').map((b) => b.text())
       expect(labels).toContain('Users')
+      expect(labels).toContain('Magic Links')
       expect(labels).toContain('OIDC / SSO')
     })
 
@@ -70,6 +72,13 @@ describe('AdminAllSettings', () => {
       const wrapper = mountComponent('users', { su: true })
       expect(wrapper.find('[data-testid="users-page"]').exists()).toBe(true)
     })
+
+    it('renders MagicLinksSettings when tab=magic-links', () => {
+      const wrapper = mountComponent('magic-links', { su: true })
+      expect(wrapper.find('[data-testid="magic-links-settings"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="users-page"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="oidc-settings"]').exists()).toBe(false)
+    })
   })
 
   describe('user with manage_users only', () => {
@@ -77,6 +86,7 @@ describe('AdminAllSettings', () => {
       const wrapper = mountComponent(undefined, { perms: ['manage_users'] })
       const labels = wrapper.findAll('button').map((b) => b.text())
       expect(labels).toContain('Users')
+      expect(labels).not.toContain('Magic Links')
       expect(labels).not.toContain('OIDC / SSO')
     })
 
@@ -111,6 +121,7 @@ describe('AdminAllSettings', () => {
       const wrapper = mountComponent(undefined, { perms: ['manage_users', 'manage_app_settings'] })
       const labels = wrapper.findAll('button').map((b) => b.text())
       expect(labels).toContain('Users')
+      expect(labels).not.toContain('Magic Links')
       expect(labels).toContain('OIDC / SSO')
     })
   })

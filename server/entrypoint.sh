@@ -52,20 +52,6 @@ check_writable_current_user() {
   fi
 }
 
-check_cpu_sse42() {
-  if [ ! -f /proc/cpuinfo ]; then
-    return 0
-  fi
-  if ! grep -q 'sse4_2' /proc/cpuinfo; then
-    log "CPU does not support SSE4.2 instructions."
-    log "The image processing library (sharp) requires a CPU with SSE4.2 support."
-    log "Minimum supported CPUs: Intel Core (Nehalem, 2008 or newer) or AMD (Bulldozer, 2011 or newer)."
-    log "Incompatible CPUs include: Intel Core 2 series, AMD Phenom, AMD Turion, and other pre-2011 AMD chips."
-    log "Run 'docker stop <container-name>' to stop this container, then upgrade your hardware."
-    exit 1
-  fi
-}
-
 if [ -z "$DATABASE_URL" ]; then
   export DATABASE_URL="postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/${POSTGRES_DB}"
 fi
@@ -105,8 +91,6 @@ if [ "$NODE_MAX_OLD_SPACE_SIZE" -lt 1 ]; then
 fi
 
 export NODE_MAX_OLD_SPACE_SIZE
-
-check_cpu_sse42
 
 ensure_dir "$APP_DATA_PATH"
 ensure_dir "$APP_DATA_PATH/covers"

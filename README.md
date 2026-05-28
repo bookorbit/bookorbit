@@ -72,18 +72,6 @@ Note: The demo includes a sample library of public domain books. Some features a
 
 ---
 
-## System Requirements
-
-| Component    | Minimum                                                                         |
-| ------------ | ------------------------------------------------------------------------------- |
-| CPU (x86-64) | SSE4.2 support required - Intel Core (Nehalem, 2008+) or AMD (Bulldozer, 2011+) |
-| RAM          | 1 GB (2 GB+ recommended)                                                        |
-| Docker       | 20.10+                                                                          |
-
-> **CPU note:** The image processing library used for book covers requires SSE4.2 instructions. CPUs that pre-date Intel Nehalem (2008) or AMD Bulldozer (2011) do not meet this requirement - including the entire Intel Core 2 series, AMD Phenom, and AMD Turion families. If your CPU is incompatible, the container will exit immediately with a clear error message rather than looping silently.
-
----
-
 ## Quick Start
 
 ```bash
