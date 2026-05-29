@@ -191,9 +191,15 @@ describe('buildCspDirectives', () => {
   });
 
   describe('static directives', () => {
-    it('imgSrc allows self, data, and blob', () => {
+    it('imgSrc allows self, data, blob, and https (for admin-configured OIDC provider icons)', () => {
       const { imgSrc } = buildCspDirectives();
-      expect(imgSrc).toEqual(["'self'", 'data:', 'blob:']);
+      expect(imgSrc).toEqual(["'self'", 'data:', 'blob:', 'https:']);
+    });
+
+    it('imgSrc does not allow plain http to keep mixed-content protection', () => {
+      const { imgSrc } = buildCspDirectives();
+      expect(imgSrc).not.toContain('http:');
+      expect(imgSrc).not.toContain('*');
     });
 
     it('mediaSrc allows self, data, and blob', () => {

@@ -41,7 +41,7 @@ export function buildCspDirectives(options: CspOptions = {}) {
     defaultSrc: ["'self'"],
     scriptSrc,
     styleSrc: ["'self'", "'unsafe-inline'", 'blob:', 'https://fonts.googleapis.com'],
-    imgSrc: ["'self'", 'data:', 'blob:'],
+    imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
     connectSrc,
     mediaSrc: ["'self'", 'data:', 'blob:'],
     fontSrc: ["'self'", 'data:', 'blob:', 'https://fonts.gstatic.com'],
