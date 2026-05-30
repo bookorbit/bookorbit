@@ -52,8 +52,17 @@ check_writable_current_user() {
   fi
 }
 
+# Percent-encode a single URL component so credentials containing reserved
+# characters (#, /, ?, @, :, spaces, ...) don't corrupt the DATABASE_URL.
+urlencode() {
+  node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$1"
+}
+
 if [ -z "$DATABASE_URL" ]; then
-  export DATABASE_URL="postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/${POSTGRES_DB}"
+  encoded_user="$(urlencode "$POSTGRES_USER")"
+  encoded_password="$(urlencode "$POSTGRES_PASSWORD")"
+  encoded_db="$(urlencode "$POSTGRES_DB")"
+  export DATABASE_URL="postgres://${encoded_user}:${encoded_password}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/${encoded_db}"
 fi
 
 export APP_DATA_PATH="${APP_DATA_PATH:-/data}"
