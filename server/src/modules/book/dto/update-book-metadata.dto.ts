@@ -34,7 +34,7 @@ export class UpdateBookMetadataDto {
   @IsOptional() @IsString() description?: string | null;
   @IsOptional() @IsString() @MaxLength(500) publisher?: string | null;
   @IsOptional() @IsInt() @Min(1000) @Max(2200) publishedYear?: number | null;
-  @IsOptional() @IsString() @MaxLength(10) language?: string | null;
+  @IsOptional() @IsString() @MaxLength(100) language?: string | null;
   @IsOptional() @IsInt() @Min(1) pageCount?: number | null;
   @IsOptional() @IsString() @MaxLength(500) seriesName?: string | null;
   @IsOptional() @IsNumber() seriesIndex?: number | null;

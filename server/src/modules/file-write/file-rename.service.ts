@@ -57,6 +57,14 @@ export class FileRenameService implements OnModuleDestroy {
     this.debounceMap.set(bookId, timer);
   }
 
+  cancelPendingRename(bookId: number): void {
+    const existing = this.debounceMap.get(bookId);
+    if (existing) {
+      clearTimeout(existing);
+      this.debounceMap.delete(bookId);
+    }
+  }
+
   onModuleDestroy(): void {
     for (const timer of this.debounceMap.values()) clearTimeout(timer);
     this.debounceMap.clear();
@@ -68,16 +76,16 @@ export class FileRenameService implements OnModuleDestroy {
     }
   }
 
-  async performRename(bookId: number, userId: number): Promise<FileRenameResult> {
+  async performRename(bookId: number, userId: number, force = false, suppressNotification = false): Promise<FileRenameResult> {
     const startedAt = Date.now();
-    this.logger.log(`[${FILE_RENAME_EVENT}] [start] bookId=${bookId} userId=${userId} - file rename started`);
+    this.logger.log(`[${FILE_RENAME_EVENT}] [start] bookId=${bookId} userId=${userId} force=${force} - file rename started`);
 
     const data = await this.renameRepo.findBookRenameData(bookId);
     if (!data) {
       return this.logAndReturn(bookId, startedAt, { status: 'skipped', reason: 'book not found' });
     }
 
-    if (!data.fileRenameEnabled) {
+    if (!data.fileRenameEnabled && !force) {
       return this.logAndReturn(bookId, startedAt, { status: 'skipped', reason: 'disabled' });
     }
 
@@ -116,7 +124,7 @@ export class FileRenameService implements OnModuleDestroy {
       this.logger.warn(
         `[${FILE_RENAME_EVENT}] [end] bookId=${bookId} userId=${userId} durationMs=${Date.now() - startedAt} status=skipped reason="collision" newPath="${sanitizeLogValue(newAbsolutePath)}" - rename skipped: path already taken`,
       );
-      await this.notifyFailure(userId, bookId, 'File rename skipped: target path already taken by another book.');
+      await this.notifyFailure(userId, bookId, 'File rename skipped: target path already taken by another book.', suppressNotification);
       return { status: 'skipped', reason: 'collision', oldPath: currentAbsolutePath, newPath: newAbsolutePath, durationMs: Date.now() - startedAt };
     }
 
@@ -129,7 +137,7 @@ export class FileRenameService implements OnModuleDestroy {
       this.logger.warn(
         `[${FILE_RENAME_EVENT}] [end] bookId=${bookId} userId=${userId} durationMs=${Date.now() - startedAt} status=skipped reason="${sanitizeLogValue(reason)}" newPath="${sanitizeLogValue(newAbsolutePath)}" - rename skipped: target already exists on disk`,
       );
-      await this.notifyFailure(userId, bookId, `File rename skipped: ${reason}.`);
+      await this.notifyFailure(userId, bookId, `File rename skipped: ${reason}.`, suppressNotification);
       return { status: 'skipped', reason, oldPath: currentAbsolutePath, newPath: newAbsolutePath, durationMs: Date.now() - startedAt };
     }
 
@@ -148,7 +156,7 @@ export class FileRenameService implements OnModuleDestroy {
       this.logger.warn(
         `[${FILE_RENAME_EVENT}] [fail] bookId=${bookId} userId=${userId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - file rename failed`,
       );
-      await this.notifyFailure(userId, bookId, err instanceof Error ? err.message : String(err));
+      await this.notifyFailure(userId, bookId, err instanceof Error ? err.message : String(err), suppressNotification);
       return { status: 'failed', reason: errorMessage, oldPath: currentAbsolutePath, newPath: newAbsolutePath, durationMs: Date.now() - startedAt };
     }
 
@@ -156,7 +164,7 @@ export class FileRenameService implements OnModuleDestroy {
       `[${FILE_RENAME_EVENT}] [end] bookId=${bookId} userId=${userId} durationMs=${Date.now() - startedAt} status=success oldPath="${sanitizeLogValue(currentAbsolutePath)}" newPath="${sanitizeLogValue(newAbsolutePath)}" - file rename completed`,
     );
 
-    await this.notifySuccess(userId, bookId, currentAbsolutePath, newAbsolutePath);
+    await this.notifySuccess(userId, bookId, currentAbsolutePath, newAbsolutePath, suppressNotification);
     return { status: 'success', oldPath: currentAbsolutePath, newPath: newAbsolutePath, durationMs: Date.now() - startedAt };
   }
 
@@ -388,7 +396,8 @@ export class FileRenameService implements OnModuleDestroy {
     return full;
   }
 
-  private async notifySuccess(userId: number, bookId: number, oldPath: string, newPath: string): Promise<void> {
+  private async notifySuccess(userId: number, bookId: number, oldPath: string, newPath: string, suppress = false): Promise<void> {
+    if (suppress) return;
     await this.notificationService
       .notify({
         type: NotificationType.FileRenameCompleted,
@@ -400,7 +409,8 @@ export class FileRenameService implements OnModuleDestroy {
       .catch(() => {});
   }
 
-  private async notifyFailure(userId: number, bookId: number, reason: string): Promise<void> {
+  private async notifyFailure(userId: number, bookId: number, reason: string, suppress = false): Promise<void> {
+    if (suppress) return;
     await this.notificationService
       .notify({
         type: NotificationType.FileRenameFailed,

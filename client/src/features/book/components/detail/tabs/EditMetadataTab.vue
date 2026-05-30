@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { Check, ChevronDown, HardDriveUpload, Loader2, Lock, LockOpen, RefreshCw, Sparkles, Star, X } from 'lucide-vue-next'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { Check, ChevronDown, HardDriveDownload, HardDriveUpload, Loader2, Lock, LockOpen, RefreshCw, Sparkles, Star, X } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import type { BookDetail, BookMetadataLockField } from '@bookorbit/types'
 import { FORMAT_TO_GROUP } from '@bookorbit/types'
@@ -9,10 +9,12 @@ import ChipInput from '@/components/ui/ChipInput.vue'
 import CoverEditorPanel from './CoverEditorPanel.vue'
 import MetadataSearchDrawer from './MetadataSearchDrawer.vue'
 import MetadataFieldLabel from './MetadataFieldLabel.vue'
+import WriteAndRenameResultPanel from '../WriteAndRenameResultPanel.vue'
 import type { MetadataPatch } from '../../../composables/useMetadataDiff'
 import { useMetadataEditor } from '../../../composables/useMetadataEditor'
 import { type MetadataRefreshPreview, useRefreshMetadata } from '../../../composables/useRefreshMetadata'
 import { type FileMetadata, useFileMetadata } from '../../../composables/useFileMetadata'
+import { useWriteAndRename } from '../../../composables/useWriteAndRename'
 import { useMetadataLocks } from '../../../composables/useMetadataLocks'
 import { useAuthorSearch } from '../../../composables/useAuthorSearch'
 import { useNarratorSearch } from '../../../composables/useNarratorSearch'
@@ -26,6 +28,7 @@ const emit = defineEmits<{
   saved: [BookDetail]
   locksChanged: [BookMetadataLockField[]]
   coverChanged: ['extracted' | 'custom' | null]
+  fileRenamed: []
 }>()
 
 const DIRECT_PATCH_FIELDS = [
@@ -263,6 +266,14 @@ function handleApply({ formPatch, coverUrl }: { formPatch: MetadataPatch; coverU
 
 const { refreshing: autoFilling, previewRefresh } = useRefreshMetadata()
 const { loading: loadingFromFile, loadFromFile } = useFileMetadata()
+const {
+  loading: writingAndRenaming,
+  result: writeAndRenameResult,
+  error: writeAndRenameError,
+  writeAndRename,
+  dismiss: dismissWriteAndRenameResult,
+} = useWriteAndRename()
+let dismissTimer: ReturnType<typeof setTimeout> | null = null
 
 function buildPreviewPatch(preview: MetadataRefreshPreview): MetadataPatch {
   return {
@@ -353,6 +364,32 @@ async function handleLoadFromFile() {
   toast.info(count > 0 ? `Loaded ${count} field${count === 1 ? '' : 's'} from file` : 'No metadata found in file')
 }
 
+async function handleWriteAndRename() {
+  if (dismissTimer !== null) {
+    clearTimeout(dismissTimer)
+    dismissTimer = null
+  }
+  const res = await writeAndRename(props.book.id)
+  if (!res) return
+
+  if (res.rename.status === 'success') emit('fileRenamed')
+
+  const isFullSuccess =
+    res.write.status === 'success' && (res.rename.status === 'success' || (res.rename.status === 'skipped' && res.rename.reason === 'path unchanged'))
+  const hasWarning = !res.libraryAutoWriteEnabled || !res.libraryAutoRenameEnabled
+
+  if (isFullSuccess && !hasWarning) {
+    dismissTimer = setTimeout(() => {
+      dismissWriteAndRenameResult()
+      dismissTimer = null
+    }, 4000)
+  }
+}
+
+onBeforeUnmount(() => {
+  if (dismissTimer !== null) clearTimeout(dismissTimer)
+})
+
 async function handleLockToggle(field: BookMetadataLockField) {
   const updated = await toggle(props.book.id, field)
   if (updated) emit('locksChanged', updated.lockedFields)
@@ -411,6 +448,23 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
             </TooltipTrigger>
             <TooltipContent>{{
               loadingFromFile ? 'Loading...' : !primaryFile ? 'No primary file available' : 'Load metadata from the primary book file'
+            }}</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="flex-none flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-40"
+                :disabled="writingAndRenaming || !primaryFile"
+                @click="handleWriteAndRename"
+              >
+                <Loader2 v-if="writingAndRenaming" class="size-3.5 animate-spin" />
+                <HardDriveDownload v-else class="size-3.5" />
+                <span class="hidden sm:inline">Write to file</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{{
+              writingAndRenaming ? 'Writing...' : !primaryFile ? 'No primary file available' : 'Write metadata to file and rename if pattern is set'
             }}</TooltipContent>
           </Tooltip>
 
@@ -493,6 +547,20 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           </button>
         </div>
       </div>
+
+      <!-- Write & rename result panel -->
+      <WriteAndRenameResultPanel
+        v-if="writeAndRenameResult || writeAndRenameError"
+        :result="
+          writeAndRenameResult ?? {
+            write: { status: 'failed', fieldsWritten: [], durationMs: 0, reason: writeAndRenameError ?? 'Unknown error' },
+            rename: { status: 'skipped', durationMs: 0, reason: 'not attempted' },
+            libraryAutoWriteEnabled: true,
+            libraryAutoRenameEnabled: true,
+          }
+        "
+        @dismiss="dismissWriteAndRenameResult"
+      />
 
       <!-- Title + Subtitle -->
       <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">

@@ -158,4 +158,22 @@ describe('FileWriteRepository', () => {
       },
     ]);
   });
+
+  it('findLibraryWriteSettingsForBook returns settings or null without joining bookFiles', async () => {
+    const settings = { fileWriteEnabled: true, fileRenameEnabled: false };
+    const c1 = chain([settings]);
+    const c2 = chain([]);
+
+    const db = {
+      select: vi.fn().mockReturnValueOnce(c1).mockReturnValueOnce(c2),
+    };
+
+    const repo = new FileWriteRepository(db as never);
+
+    await expect(repo.findLibraryWriteSettingsForBook(1)).resolves.toEqual(settings);
+    await expect(repo.findLibraryWriteSettingsForBook(2)).resolves.toBeNull();
+
+    // innerJoin is called exactly once per query (books -> libraries only, no bookFiles join)
+    expect(c1.innerJoin).toHaveBeenCalledTimes(1);
+  });
 });

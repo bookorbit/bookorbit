@@ -160,7 +160,7 @@ describe('Book DTO validation', () => {
     expect((await errorsFor(UpdateBookMetadataDto, { publishedYear: 999 })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookMetadataDto, { publishedYear: 2201 })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookMetadataDto, { authors: ['ok', 1] })).length).toBeGreaterThan(0);
-    expect((await errorsFor(UpdateBookMetadataDto, { language: 'english-too-long' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { language: 'a'.repeat(101) })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookMetadataDto, { isbn10: '12345678901' })).length).toBeGreaterThan(0);
   });
 
@@ -173,6 +173,8 @@ describe('Book DTO validation', () => {
     expect((await errorsFor(UpdateBookMetadataDto, { seriesName: null, seriesIndex: null })).length).toBe(0);
     // Language valid 2-letter code
     expect((await errorsFor(UpdateBookMetadataDto, { language: 'en' })).length).toBe(0);
+    // Language full name (e.g. from epub/provider)
+    expect((await errorsFor(UpdateBookMetadataDto, { language: 'Spanish; Castilian' })).length).toBe(0);
     // Language cleared to null
     expect((await errorsFor(UpdateBookMetadataDto, { language: null })).length).toBe(0);
     // Rating null (clear rating)

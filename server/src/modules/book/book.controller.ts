@@ -538,6 +538,18 @@ export class BookController {
     return this.bookService.getMetadataFromFile(id, user);
   }
 
+  @Post(':id/write-and-rename')
+  @RequirePermission(Permission.LibraryEditMetadata)
+  @Auditable({
+    action: AuditAction.BookWriteAndRename,
+    resource: AuditResource.Book,
+    getResourceId: (req) => parseInt(req.params['id'], 10),
+    description: (req) => `Wrote metadata to file and renamed book #${req.params['id']}`,
+  })
+  writeAndRename(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
+    return this.bookService.writeAndRename(id, user);
+  }
+
   @Get(':id/write-log')
   @RequirePermission(Permission.LibraryEditMetadata)
   async getWriteLog(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {

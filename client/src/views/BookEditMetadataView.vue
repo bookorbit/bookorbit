@@ -28,11 +28,15 @@ function onMetadataSaved(updated: BookDetail) {
 function onCoverChanged(source: 'extracted' | 'custom' | null) {
   if (detail.value) detail.value = { ...detail.value, coverSource: source }
 }
+
+function onFileRenamed() {
+  fetch(bookId.value)
+}
 </script>
 
 <template>
   <BookDetailLayout :book-id="bookId">
-    <EditMetadataTab v-if="detail" :book="detail" @saved="onMetadataSaved" @cover-changed="onCoverChanged" />
+    <EditMetadataTab v-if="detail" :book="detail" @saved="onMetadataSaved" @cover-changed="onCoverChanged" @file-renamed="onFileRenamed" />
     <div v-else-if="loading" class="max-w-2xl space-y-4">
       <div class="h-9 rounded-md bg-muted animate-pulse" />
       <div class="h-9 rounded-md bg-muted animate-pulse" />

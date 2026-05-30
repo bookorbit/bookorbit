@@ -72,6 +72,14 @@ export class FileWriteService implements OnModuleDestroy {
     this.debounceMap.set(bookId, timer);
   }
 
+  cancelPendingWrite(bookId: number): void {
+    const existing = this.debounceMap.get(bookId);
+    if (existing) {
+      clearTimeout(existing);
+      this.debounceMap.delete(bookId);
+    }
+  }
+
   onModuleDestroy(): void {
     this.clearScheduledWrites();
     for (const release of this.writeQueue) {
@@ -92,12 +100,19 @@ export class FileWriteService implements OnModuleDestroy {
     this.debounceMap.clear();
   }
 
-  async writeToFile(bookId: number, triggeredBy: 'auto' | 'sync', userId?: number, dryRun = false): Promise<WriteResult> {
+  async writeToFile(
+    bookId: number,
+    triggeredBy: 'auto' | 'sync',
+    userId?: number,
+    dryRun = false,
+    force = false,
+    suppressNotification = false,
+  ): Promise<WriteResult> {
     await this.acquireWriteSlot();
 
     const startedAt = Date.now();
     this.logger.debug(
-      `[${FILE_WRITE_EVENT}] [start] bookId=${bookId} triggeredBy=${triggeredBy} userId=${formatUserId(userId)} dryRun=${dryRun} - file write started`,
+      `[${FILE_WRITE_EVENT}] [start] bookId=${bookId} triggeredBy=${triggeredBy} userId=${formatUserId(userId)} dryRun=${dryRun} force=${force} - file write started`,
     );
 
     try {
@@ -132,7 +147,7 @@ export class FileWriteService implements OnModuleDestroy {
         return result;
       }
 
-      if (!libConfig.fileWriteEnabled && !dryRun) {
+      if (!libConfig.fileWriteEnabled && !dryRun && !force) {
         const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'disabled' };
         this.logWriteEnd(bookId, format || UNKNOWN_FORMAT, triggeredBy, userId, dryRun, startedAt, result);
         return result;
@@ -188,7 +203,7 @@ export class FileWriteService implements OnModuleDestroy {
         this.logWriteFail(bookId, format, triggeredBy, userId, dryRun, startedAt, error);
         await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result, triggeredBy });
 
-        if (userId && triggeredBy === 'sync') {
+        if (userId && triggeredBy === 'sync' && !suppressNotification) {
           this.notificationService
             .notify({
               type: NotificationType.FileWriteBackFailed,
@@ -217,7 +232,7 @@ export class FileWriteService implements OnModuleDestroy {
           await this.fileWriteRepo.updateFileHash(file.id, newHash);
         }
 
-        if (userId && triggeredBy === 'sync') {
+        if (userId && triggeredBy === 'sync' && !suppressNotification) {
           this.notificationService
             .notify({
               type: NotificationType.FileWriteBackCompleted,
@@ -242,6 +257,10 @@ export class FileWriteService implements OnModuleDestroy {
 
   findNonMissingPrimaryFilesByLibrary(libraryId: number) {
     return this.fileWriteRepo.findNonMissingPrimaryFilesByLibrary(libraryId);
+  }
+
+  findLibraryWriteSettingsForBook(bookId: number) {
+    return this.fileWriteRepo.findLibraryWriteSettingsForBook(bookId);
   }
 
   private async loadCoverBytes(bookId: number): Promise<Buffer | null> {

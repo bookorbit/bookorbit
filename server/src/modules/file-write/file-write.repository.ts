@@ -30,6 +30,19 @@ export class FileWriteRepository {
     return row ?? null;
   }
 
+  async findLibraryWriteSettingsForBook(bookId: number): Promise<{ fileWriteEnabled: boolean; fileRenameEnabled: boolean } | null> {
+    const [row] = await this.db
+      .select({
+        fileWriteEnabled: libraries.fileWriteEnabled,
+        fileRenameEnabled: libraries.fileRenameEnabled,
+      })
+      .from(books)
+      .innerJoin(libraries, eq(libraries.id, books.libraryId))
+      .where(eq(books.id, bookId))
+      .limit(1);
+    return row ?? null;
+  }
+
   async findLibraryFileWriteConfig(libraryId: number) {
     const [row] = await this.db
       .select({

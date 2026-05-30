@@ -37,10 +37,13 @@ import type {
   BookKoboState,
   BookMetadataLockField,
   BookQuery,
+  BookWriteAndRenameResult,
   BooksPage,
+  FileRenameResult,
   MetadataField,
   ReadStatus,
   UserBookStatus,
+  WriteResult,
 } from '@bookorbit/types';
 import type { ContentFilterRules } from '@bookorbit/types';
 import { assembleBookCards, assembleCollapsedBookCards } from './utils/assemble-book-cards';
@@ -2280,6 +2283,54 @@ export class BookService {
     };
   }
 
+  async writeAndRename(bookId: number, user: RequestUser): Promise<BookWriteAndRenameResult> {
+    await this.verifyBookAccess(bookId, user);
+
+    this.fileWriteService?.cancelPendingWrite(bookId);
+    this.fileRenameService?.cancelPendingRename(bookId);
+
+    const settings = (await this.fileWriteService?.findLibraryWriteSettingsForBook(bookId)) ?? null;
+
+    let write: WriteResult;
+    try {
+      write = (await this.fileWriteService?.writeToFile(bookId, 'sync', user.id, false, true, true)) ?? {
+        status: 'skipped',
+        fieldsWritten: [],
+        durationMs: 0,
+        reason: 'file write service unavailable',
+      };
+    } catch (err) {
+      write = {
+        status: 'failed',
+        fieldsWritten: [],
+        durationMs: 0,
+        reason: err instanceof Error ? err.message : String(err),
+      };
+    }
+
+    let rename: FileRenameResult;
+    try {
+      rename = (await this.fileRenameService?.performRename(bookId, user.id, true, true)) ?? {
+        status: 'skipped',
+        durationMs: 0,
+        reason: 'file rename service unavailable',
+      };
+    } catch (err) {
+      rename = {
+        status: 'failed',
+        durationMs: 0,
+        reason: err instanceof Error ? err.message : String(err),
+      };
+    }
+
+    return {
+      write,
+      rename,
+      libraryAutoWriteEnabled: settings?.fileWriteEnabled ?? false,
+      libraryAutoRenameEnabled: settings?.fileRenameEnabled ?? false,
+    };
+  }
+
   async getMetadataFromFile(id: number, user: RequestUser): Promise<Record<string, unknown>> {
     await this.verifyBookAccess(id, user);
     const file = await this.bookRepo.findPrimaryFile(id);
@@ -2299,12 +2350,13 @@ export class BookService {
           publisher: parsed.publisher,
           publishedYear: parsed.publishedYear,
           language: parsed.language,
+          pageCount: parsed.pageCount,
           isbn10: parsed.isbn10,
           isbn13: parsed.isbn13,
           seriesName: parsed.seriesName,
           seriesIndex: parsed.seriesIndex,
           authors: parsed.authors.length > 0 ? parsed.authors.map((a) => a.name) : undefined,
-          genres: parsed.tags.length > 0 ? parsed.tags : undefined,
+          genres: parsed.genres.length > 0 ? parsed.genres : undefined,
         };
       }
       case 'pdf': {
@@ -2315,8 +2367,16 @@ export class BookService {
         if (!parsed) return {};
         return {
           title: parsed.title,
+          subtitle: parsed.subtitle,
+          description: parsed.description,
           publisher: parsed.publisher,
+          publishedYear: parsed.publishedYear,
+          language: parsed.language,
           pageCount: parsed.pageCount,
+          isbn10: parsed.isbn10,
+          isbn13: parsed.isbn13,
+          seriesName: parsed.seriesName,
+          seriesIndex: parsed.seriesIndex,
           authors: parsed.authors.length > 0 ? parsed.authors.map((a) => a.name) : undefined,
           genres: parsed.genres.length > 0 ? parsed.genres : undefined,
         };
@@ -2344,6 +2404,7 @@ export class BookService {
         const extractor = format === 'cbz' ? extractCbzMetadata : format === 'cbr' ? extractCbrMetadata : extractCb7Metadata;
         const parsed = await extractor(absolutePath);
         if (!parsed) return {};
+        const cbzGenres = parsed.genres.length > 0 ? parsed.genres : parsed.tags;
         return {
           title: parsed.title,
           subtitle: parsed.subtitle,
@@ -2357,7 +2418,7 @@ export class BookService {
           seriesName: parsed.seriesName,
           seriesIndex: parsed.seriesIndex,
           authors: parsed.authors.length > 0 ? parsed.authors.map((a) => a.name) : undefined,
-          genres: parsed.tags.length > 0 ? parsed.tags : undefined,
+          genres: cbzGenres.length > 0 ? cbzGenres : undefined,
           comicMetadata: parsed.comicMetadata ?? undefined,
         };
       }
@@ -2371,7 +2432,7 @@ export class BookService {
           language: parsed.language,
           seriesName: parsed.seriesName,
           seriesIndex: parsed.seriesIndex,
-          authors: parsed.authors.length > 0 ? parsed.authors : undefined,
+          authors: parsed.authors.length > 0 ? parsed.authors.map((a) => a.name) : undefined,
           genres: parsed.genres.length > 0 ? parsed.genres : undefined,
         };
       }

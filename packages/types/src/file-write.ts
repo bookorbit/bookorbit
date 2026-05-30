@@ -28,6 +28,13 @@ export interface FileRenameResult {
   durationMs: number;
 }
 
+export interface BookWriteAndRenameResult {
+  write: WriteResult;
+  rename: FileRenameResult;
+  libraryAutoWriteEnabled: boolean;
+  libraryAutoRenameEnabled: boolean;
+}
+
 // ── Bulk Rename ─────────────────────────────────────────────────────────────
 
 export type BulkRenameStatus = "will_rename" | "unchanged" | "collision" | "no_pattern" | "error";

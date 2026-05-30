@@ -698,4 +698,85 @@ describe('FileRenameService', () => {
     expect(mockRename).toHaveBeenNthCalledWith(3, '/library/Frank Herbert/Dune/Dune.epub', '/library/Frank Herbert/Dune.epub');
     expect(renameRepo.applyFolderRename).toHaveBeenCalledTimes(2);
   });
+
+  describe('force parameter', () => {
+    it('bypasses fileRenameEnabled=false when force=true', async () => {
+      const { service, renameRepo } = makeService();
+      renameRepo.findBookRenameData.mockResolvedValue(
+        makeRenameData({
+          fileRenameEnabled: false,
+          file: { absolutePath: '/library/Old Title.epub', relPath: 'Old Title.epub' },
+          bookFolderPath: '/library/Old Title.epub',
+        }),
+      );
+      renameRepo.applyFileRename.mockResolvedValue(undefined);
+
+      const result = await service.performRename(5, 12, true);
+
+      expect(result.status).not.toBe('skipped');
+    });
+
+    it('returns skipped/disabled when force=false and fileRenameEnabled=false', async () => {
+      const { service, renameRepo } = makeService();
+      renameRepo.findBookRenameData.mockResolvedValue(makeRenameData({ fileRenameEnabled: false }));
+
+      const result = await service.performRename(5, 12, false);
+
+      expect(result).toEqual(expect.objectContaining({ status: 'skipped', reason: 'disabled' }));
+    });
+  });
+
+  describe('suppressNotification parameter', () => {
+    it('does not send success notification when suppressNotification=true', async () => {
+      const { service, renameRepo, notificationService } = makeService();
+      renameRepo.findBookRenameData.mockResolvedValue(
+        makeRenameData({
+          file: { absolutePath: '/library/Old Title.epub', relPath: 'Old Title.epub' },
+          bookFolderPath: '/library/Old Title.epub',
+        }),
+      );
+      renameRepo.applyFileRename.mockResolvedValue(undefined);
+
+      const result = await service.performRename(5, 12, false, true);
+
+      expect(result.status).toBe('success');
+      expect(notificationService.notify).not.toHaveBeenCalled();
+    });
+
+    it('does not send failure notification when suppressNotification=true', async () => {
+      const { service, renameRepo, notificationService } = makeService();
+      renameRepo.findBookRenameData.mockResolvedValue(
+        makeRenameData({
+          file: { absolutePath: '/library/Old Title.epub', relPath: 'Old Title.epub' },
+          bookFolderPath: '/library/Old Title.epub',
+        }),
+      );
+      renameRepo.checkPathTakenByOtherBook.mockResolvedValue(true);
+
+      const result = await service.performRename(5, 12, false, true);
+
+      expect(result.status).toBe('skipped');
+      expect(notificationService.notify).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('cancelPendingRename', () => {
+    it('clears the debounce timer so the rename does not fire', async () => {
+      vi.useFakeTimers();
+      const { service } = makeService({ 'fileWrite.debounceMs': 3000 });
+      const spy = vi.spyOn(service, 'performRename').mockResolvedValue({ status: 'skipped', durationMs: 0, reason: 'disabled' });
+
+      service.scheduleRename(99, 1);
+      service.cancelPendingRename(99);
+
+      await vi.runAllTimersAsync();
+
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op when no timer is pending', () => {
+      const { service } = makeService();
+      expect(() => service.cancelPendingRename(42)).not.toThrow();
+    });
+  });
 });

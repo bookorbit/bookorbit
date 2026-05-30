@@ -424,4 +424,155 @@ describe('FileWriteService', () => {
 
     expect(order).toEqual(['start:/books/1.epub', 'end:/books/1.epub', 'start:/books/2.epub', 'end:/books/2.epub']);
   });
+
+  describe('force parameter', () => {
+    it('bypasses fileWriteEnabled=false when force=true', async () => {
+      const { service, fileWriteRepo, writer } = makeService();
+      fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
+        id: 1,
+        absolutePath: '/books/lib/book.epub',
+        format: 'epub',
+        sizeBytes: 40,
+        libraryId: 2,
+      });
+      fileWriteRepo.loadPayload.mockResolvedValue({ title: 'Dune' });
+      fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteEnabled: false, fileWriteWriteCover: false });
+      writer.write.mockResolvedValue({ status: 'success', fieldsWritten: ['title'], durationMs: 5 });
+
+      const result = await service.writeToFile(5, 'sync', 1, false, true);
+
+      expect(result.status).toBe('success');
+      expect(writer.write).toHaveBeenCalled();
+    });
+
+    it('returns disabled when force=false and fileWriteEnabled=false', async () => {
+      const { service, fileWriteRepo, writer } = makeService();
+      fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
+        id: 1,
+        absolutePath: '/books/x.epub',
+        format: 'epub',
+        sizeBytes: 10,
+        libraryId: 2,
+      });
+      fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteEnabled: false });
+
+      const result = await service.writeToFile(5, 'sync', 1, false, false);
+
+      expect(result).toEqual({ status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'disabled' });
+      expect(writer.write).not.toHaveBeenCalled();
+    });
+
+    it('still skips when format is disabled even with force=true', async () => {
+      const { service, fileWriteRepo, writer } = makeService();
+      fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
+        id: 1,
+        absolutePath: '/books/x.pdf',
+        format: 'pdf',
+        sizeBytes: 10,
+        libraryId: 2,
+      });
+      fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteEnabled: false, fileWritePdfEnabled: false });
+
+      const result = await service.writeToFile(5, 'sync', 1, false, true);
+
+      expect(result).toEqual({ status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'format disabled' });
+      expect(writer.write).not.toHaveBeenCalled();
+    });
+
+    it('still skips when file exceeds size limit even with force=true', async () => {
+      const { service, fileWriteRepo, writer } = makeService();
+      fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
+        id: 1,
+        absolutePath: '/books/big.epub',
+        format: 'epub',
+        sizeBytes: 200 * 1024 * 1024,
+        libraryId: 2,
+      });
+      fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteEnabled: false, fileWriteEpubMaxFileSizeMb: 100 });
+
+      const result = await service.writeToFile(5, 'sync', 1, false, true);
+
+      expect(result.status).toBe('skipped');
+      expect(result.reason).toBe('file exceeds size limit');
+      expect(writer.write).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('suppressNotification parameter', () => {
+    it('does not send success notification when suppressNotification=true', async () => {
+      const { fileWriteRepo, writer } = makeService();
+      const notificationService = { notify: vi.fn().mockResolvedValue(undefined) };
+      const serviceWithNotif = new (FileWriteService as never)(
+        fileWriteRepo as never,
+        { supports: vi.fn().mockReturnValue(true), get: vi.fn().mockReturnValue(writer) } as never,
+        { withLock: vi.fn().mockImplementation(async (_: string, fn: () => Promise<unknown>) => fn()) } as never,
+        { get: vi.fn().mockImplementation((key: string) => (key === 'storage.appDataPath' ? '/books' : undefined)) } as unknown as ConfigService,
+        notificationService as never,
+      );
+
+      fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
+        id: 1,
+        absolutePath: '/books/lib/book.epub',
+        format: 'epub',
+        sizeBytes: 40,
+        libraryId: 2,
+      });
+      fileWriteRepo.loadPayload.mockResolvedValue({ title: 'Dune' });
+      fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteWriteCover: false });
+      writer.write.mockResolvedValue({ status: 'success', fieldsWritten: ['title'], durationMs: 5 });
+
+      await serviceWithNotif.writeToFile(5, 'sync', 1, false, false, true);
+
+      expect(notificationService.notify).not.toHaveBeenCalled();
+    });
+
+    it('does not send failure notification when suppressNotification=true', async () => {
+      const { fileWriteRepo, writer } = makeService();
+      const notificationService = { notify: vi.fn().mockResolvedValue(undefined) };
+      const serviceWithNotif = new (FileWriteService as never)(
+        fileWriteRepo as never,
+        { supports: vi.fn().mockReturnValue(true), get: vi.fn().mockReturnValue(writer) } as never,
+        { withLock: vi.fn().mockImplementation(async (_: string, fn: () => Promise<unknown>) => fn()) } as never,
+        { get: vi.fn().mockImplementation((key: string) => (key === 'storage.appDataPath' ? '/books' : undefined)) } as unknown as ConfigService,
+        notificationService as never,
+      );
+
+      fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
+        id: 1,
+        absolutePath: '/books/lib/book.epub',
+        format: 'epub',
+        sizeBytes: 40,
+        libraryId: 2,
+      });
+      fileWriteRepo.loadPayload.mockResolvedValue({ title: 'Dune' });
+      fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteWriteCover: false });
+      writer.write.mockRejectedValue(new Error('disk full'));
+
+      await serviceWithNotif.writeToFile(5, 'sync', 1, false, false, true);
+
+      expect(notificationService.notify).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('cancelPendingWrite', () => {
+    it('clears the debounce timer so the write does not fire', async () => {
+      vi.useFakeTimers();
+      const { service } = makeService();
+      const spy = vi.spyOn(service, 'writeToFile').mockResolvedValue({ status: 'success', fieldsWritten: [], durationMs: 1 });
+
+      service.scheduleWrite(99, 'auto');
+      service.cancelPendingWrite(99);
+
+      vi.runAllTimers();
+      await Promise.resolve();
+
+      expect(spy).not.toHaveBeenCalled();
+      vi.useRealTimers();
+    });
+
+    it('is a no-op when no timer is pending', () => {
+      const { service } = makeService();
+      expect(() => service.cancelPendingWrite(42)).not.toThrow();
+    });
+  });
 });

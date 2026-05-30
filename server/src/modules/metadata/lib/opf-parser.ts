@@ -285,7 +285,8 @@ export function parseOpf(xml: string): ParsedOpf {
   }
 
   // ── Scalar fields ──────────────────────────────────────────────────────────
-  const description = getText(metadata['description']) || null;
+  const descriptionNode = toArray(metadata['description'])[0];
+  const description = getText(descriptionNode) || null;
   const publisher = getText(metadata['publisher']) || null;
   const language = getText(metadata['language']) || null;
 

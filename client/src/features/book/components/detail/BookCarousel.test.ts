@@ -123,12 +123,12 @@ describe('BookCarousel', () => {
     expect(cover.attributes('style')).toContain('aspect-ratio: 1/1')
   })
 
-  it('renders audiobook cards 1.2x wider than non-audiobook cards', () => {
+  it('renders audiobook cards wider than non-audiobook cards', () => {
     const wrapper = mountCarousel([makeBook({ id: 1, isAudiobook: false }), makeBook({ id: 2, isAudiobook: true })])
     const nonAudioCard = wrapper.find('[data-book-id="1"]')
     const audioCard = wrapper.find('[data-book-id="2"]')
     expect(nonAudioCard.classes()).toContain('w-30')
-    expect(audioCard.classes()).toContain('w-36')
+    expect(audioCard.classes()).toContain('w-38')
   })
 
   it('renders an img when book.hasCover is true', () => {

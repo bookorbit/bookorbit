@@ -152,9 +152,14 @@ function makeService() {
   };
   const fileWriteService = {
     scheduleWrite: vi.fn(),
+    cancelPendingWrite: vi.fn(),
+    writeToFile: vi.fn(),
+    findLibraryWriteSettingsForBook: vi.fn().mockResolvedValue({ fileWriteEnabled: false, fileRenameEnabled: false }),
   };
   const fileRenameService = {
     scheduleRename: vi.fn(),
+    cancelPendingRename: vi.fn(),
+    performRename: vi.fn(),
   };
   const achievementEvents = {
     emit: vi.fn(),
@@ -2931,18 +2936,21 @@ describe('BookService', () => {
         publisher: 'Ace',
         publishedYear: 1965,
         language: 'en',
+        pageCount: 412,
         isbn10: '0441172717',
         isbn13: '9780441172719',
         seriesName: 'Dune',
         seriesIndex: 1,
         authors: [{ name: 'Frank Herbert', sortName: null }],
-        tags: ['Sci-Fi'],
+        genres: ['Sci-Fi'],
+        tags: [],
       } as never);
 
       await expect(service.getMetadataFromFile(5, makeUser())).resolves.toEqual(
         expect.objectContaining({
           title: 'Dune',
           subtitle: 'Book One',
+          pageCount: 412,
           authors: ['Frank Herbert'],
           genres: ['Sci-Fi'],
         }),
@@ -3030,6 +3038,7 @@ describe('BookService', () => {
         seriesName: 'Series',
         seriesIndex: 4,
         authors: [{ name: 'Writer', sortName: null }],
+        genres: [],
         tags: ['Comics'],
         comicMetadata: { issueNumber: '4' },
       } as never);
@@ -3355,6 +3364,193 @@ describe('BookService', () => {
       const { service } = makeService();
 
       await expect(service.resolveSelectionToIds({}, makeUser())).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('writeAndRename', () => {
+    it('throws NotFoundException when book does not exist', async () => {
+      const { service, bookRepo } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(null);
+
+      await expect(service.writeAndRename(999, makeUser())).rejects.toThrow(NotFoundException);
+    });
+
+    it('cancels pending write and rename before executing', async () => {
+      const { service, bookRepo, fileWriteService, fileRenameService } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(1);
+      fileWriteService.writeToFile.mockResolvedValue({ status: 'success', fieldsWritten: [], durationMs: 0 });
+      fileRenameService.performRename.mockResolvedValue({ status: 'skipped', durationMs: 0, reason: 'path unchanged' });
+
+      await service.writeAndRename(10, makeUser());
+
+      expect(fileWriteService.cancelPendingWrite).toHaveBeenCalledWith(10);
+      expect(fileRenameService.cancelPendingRename).toHaveBeenCalledWith(10);
+    });
+
+    it('calls writeToFile with force=true and suppressNotification=true', async () => {
+      const { service, bookRepo, fileWriteService, fileRenameService } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(1);
+      fileWriteService.writeToFile.mockResolvedValue({ status: 'success', fieldsWritten: ['title'], durationMs: 5 });
+      fileRenameService.performRename.mockResolvedValue({ status: 'skipped', durationMs: 0, reason: 'path unchanged' });
+
+      await service.writeAndRename(10, makeUser({ id: 7 }));
+
+      expect(fileWriteService.writeToFile).toHaveBeenCalledWith(10, 'sync', 7, false, true, true);
+    });
+
+    it('calls performRename with force=true and suppressNotification=true', async () => {
+      const { service, bookRepo, fileWriteService, fileRenameService } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(1);
+      fileWriteService.writeToFile.mockResolvedValue({ status: 'success', fieldsWritten: [], durationMs: 0 });
+      fileRenameService.performRename.mockResolvedValue({ status: 'success', durationMs: 10, oldPath: '/a', newPath: '/b' });
+
+      await service.writeAndRename(10, makeUser({ id: 7 }));
+
+      expect(fileRenameService.performRename).toHaveBeenCalledWith(10, 7, true, true);
+    });
+
+    it('returns write and rename results combined', async () => {
+      const { service, bookRepo, fileWriteService, fileRenameService } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(1);
+      fileWriteService.writeToFile.mockResolvedValue({ status: 'success', fieldsWritten: ['title', 'authors'], durationMs: 20 });
+      fileRenameService.performRename.mockResolvedValue({ status: 'success', durationMs: 10, oldPath: '/old', newPath: '/new' });
+      fileWriteService.findLibraryWriteSettingsForBook.mockResolvedValue({ fileWriteEnabled: true, fileRenameEnabled: false });
+
+      const result = await service.writeAndRename(10, makeUser());
+
+      expect(result.write).toEqual({ status: 'success', fieldsWritten: ['title', 'authors'], durationMs: 20 });
+      expect(result.rename).toEqual({ status: 'success', durationMs: 10, oldPath: '/old', newPath: '/new' });
+    });
+
+    it('includes libraryAutoWriteEnabled and libraryAutoRenameEnabled from settings', async () => {
+      const { service, bookRepo, fileWriteService, fileRenameService } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(1);
+      fileWriteService.writeToFile.mockResolvedValue({ status: 'success', fieldsWritten: [], durationMs: 0 });
+      fileRenameService.performRename.mockResolvedValue({ status: 'skipped', durationMs: 0, reason: 'path unchanged' });
+      fileWriteService.findLibraryWriteSettingsForBook.mockResolvedValue({ fileWriteEnabled: true, fileRenameEnabled: true });
+
+      const result = await service.writeAndRename(10, makeUser());
+
+      expect(result.libraryAutoWriteEnabled).toBe(true);
+      expect(result.libraryAutoRenameEnabled).toBe(true);
+    });
+
+    it('returns write=failed but still runs rename when writeToFile throws', async () => {
+      const { service, bookRepo, fileWriteService, fileRenameService } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(1);
+      fileWriteService.writeToFile.mockRejectedValue(new Error('disk error'));
+      fileRenameService.performRename.mockResolvedValue({ status: 'success', durationMs: 5, oldPath: '/old', newPath: '/new' });
+
+      const result = await service.writeAndRename(10, makeUser());
+
+      expect(result.write.status).toBe('failed');
+      expect(result.write.reason).toBe('disk error');
+      expect(result.rename.status).toBe('success');
+    });
+
+    it('returns rename=failed but reports write result when performRename throws', async () => {
+      const { service, bookRepo, fileWriteService, fileRenameService } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(1);
+      fileWriteService.writeToFile.mockResolvedValue({ status: 'success', fieldsWritten: ['title'], durationMs: 5 });
+      fileRenameService.performRename.mockRejectedValue(new Error('rename crashed'));
+
+      const result = await service.writeAndRename(10, makeUser());
+
+      expect(result.write.status).toBe('success');
+      expect(result.rename.status).toBe('failed');
+      expect(result.rename.reason).toBe('rename crashed');
+    });
+
+    it('returns skipped write when fileWriteService is null', async () => {
+      const {
+        bookRepo,
+        libraryService,
+        queryBuilder,
+        metadataService,
+        scoreService,
+        pipeline,
+        config,
+        appSettings,
+        userBookStatusService,
+        narratorService,
+        comicMetadataService,
+        bookMetadataLockService,
+        embedder,
+        fileRenameService,
+        achievementEvents,
+      } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(1);
+      fileRenameService.performRename.mockResolvedValue({ status: 'skipped', durationMs: 0, reason: 'disabled' });
+
+      const serviceWithoutFileWrite = new BookService(
+        bookRepo as never,
+        libraryService as never,
+        queryBuilder as never,
+        metadataService as never,
+        scoreService as never,
+        pipeline as never,
+        config as never,
+        appSettings as never,
+        userBookStatusService as never,
+        narratorService as never,
+        comicMetadataService as never,
+        bookMetadataLockService as never,
+        embedder as never,
+        null as never,
+        fileRenameService as never,
+        achievementEvents as never,
+      );
+
+      const result = await serviceWithoutFileWrite.writeAndRename(10, makeUser());
+
+      expect(result.write.status).toBe('skipped');
+      expect(result.write.reason).toContain('unavailable');
+    });
+
+    it('returns skipped rename when fileRenameService is null', async () => {
+      const {
+        bookRepo,
+        libraryService,
+        queryBuilder,
+        metadataService,
+        scoreService,
+        pipeline,
+        config,
+        appSettings,
+        userBookStatusService,
+        narratorService,
+        comicMetadataService,
+        bookMetadataLockService,
+        embedder,
+        fileWriteService,
+        achievementEvents,
+      } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(1);
+      fileWriteService.writeToFile.mockResolvedValue({ status: 'success', fieldsWritten: [], durationMs: 0 });
+
+      const serviceWithoutRename = new BookService(
+        bookRepo as never,
+        libraryService as never,
+        queryBuilder as never,
+        metadataService as never,
+        scoreService as never,
+        pipeline as never,
+        config as never,
+        appSettings as never,
+        userBookStatusService as never,
+        narratorService as never,
+        comicMetadataService as never,
+        bookMetadataLockService as never,
+        embedder as never,
+        fileWriteService as never,
+        null as never,
+        achievementEvents as never,
+      );
+
+      const result = await serviceWithoutRename.writeAndRename(10, makeUser());
+
+      expect(result.rename.status).toBe('skipped');
+      expect(result.rename.reason).toContain('unavailable');
     });
   });
 });
