@@ -11,6 +11,7 @@ import { parseMobiFile } from '../metadata/lib/mobi-parser';
 import { parsePdfFile } from '../metadata/lib/pdf-parser';
 import { ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED } from '../achievement/achievement-events.service';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
+import { BulkEditFieldsDto } from './dto/bulk-edit-metadata.dto';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookService } from './book.service';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
@@ -89,6 +90,9 @@ function makeService() {
     findPrimaryFilesByBookIds: vi.fn(),
     findAllFilesByBookIds: vi.fn(),
     findTagsByBookIds: vi.fn(),
+    findAuthorsByBookIds: vi.fn(),
+    findGenresByBookIds: vi.fn(),
+    findNarratorsByBookIds: vi.fn(),
     findPrimaryFile: vi.fn(),
     findById: vi.fn(),
     findRatingByBookAndUser: vi.fn().mockResolvedValue(null),
@@ -176,6 +180,7 @@ function makeService() {
     assertFieldsUnlocked: vi.fn().mockResolvedValue(undefined),
     getCoverLockedBookIds: vi.fn().mockResolvedValue(new Set()),
     getBookIdsWithLockedField: vi.fn().mockResolvedValue(new Set()),
+    getLockedFieldsMap: vi.fn().mockResolvedValue(new Map()),
     replaceLockedFields: vi.fn().mockResolvedValue([]),
   };
   const userBookStatusService = {
@@ -2383,6 +2388,319 @@ describe('BookService', () => {
 
       expect(bookRepo.findTagsByBookIds).not.toHaveBeenCalled();
       expect(metadataService.replaceTags).toHaveBeenCalledWith(9, ['fresh'], { executor: tx });
+    });
+  });
+
+  describe('bulkEditMetadata', () => {
+    function makeFields(overrides: Record<string, unknown> = {}): BulkEditFieldsDto {
+      const dto = new BulkEditFieldsDto();
+      Object.assign(dto, overrides);
+      return dto;
+    }
+
+    it('updates scalar fields and triggers post-metadata effects', async () => {
+      const { service, bookRepo, bookMetadataLockService } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+      bookMetadataLockService.getLockedFieldsMap.mockResolvedValue(new Map());
+      const tx = {};
+      bookRepo.withTransaction.mockImplementation(async (cb: (value: unknown) => Promise<unknown>) => cb(tx));
+      const triggerSpy = vi.spyOn(service, 'triggerPostMetadataUpdateEffects' as never).mockReturnValue(undefined as never);
+
+      const fields = makeFields({
+        publisher: { value: 'Bloomsbury' },
+        language: { value: 'en' },
+      });
+
+      const result = await service.bulkEditMetadata([7, 9], fields, user);
+
+      expect(bookRepo.bulkUpdateMetadataFields).toHaveBeenCalled();
+      expect(result.updatedBooks).toBe(2);
+      expect(result.fields.publisher).toEqual({ updated: 2, skippedLocked: 0 });
+      expect(result.fields.language).toEqual({ updated: 2, skippedLocked: 0 });
+      expect(triggerSpy).toHaveBeenCalledWith([7, 9], user.id);
+    });
+
+    it('updates publishedYear as integer', async () => {
+      const { service, bookRepo, bookMetadataLockService } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+      bookMetadataLockService.getLockedFieldsMap.mockResolvedValue(new Map());
+      const tx = {};
+      bookRepo.withTransaction.mockImplementation(async (cb: (value: unknown) => Promise<unknown>) => cb(tx));
+
+      const fields = makeFields({
+        publishedYear: { value: 2001 },
+      });
+
+      const result = await service.bulkEditMetadata([7], fields, user);
+
+      expect(result.fields.publishedYear).toEqual({ updated: 1, skippedLocked: 0 });
+    });
+
+    it('replaces authors in replace mode', async () => {
+      const { service, bookRepo, metadataService, bookMetadataLockService } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+      bookMetadataLockService.getLockedFieldsMap.mockResolvedValue(new Map());
+      const tx = {};
+      bookRepo.withTransaction.mockImplementation(async (cb: (value: unknown) => Promise<unknown>) => cb(tx));
+
+      const fields = makeFields({
+        authors: { mode: 'replace', values: ['Author A', 'Author B'] },
+      });
+
+      await service.bulkEditMetadata([7, 9], fields, user);
+
+      expect(metadataService.replaceAuthors).toHaveBeenCalledTimes(2);
+      expect(metadataService.replaceAuthors).toHaveBeenCalledWith(
+        7,
+        [
+          { name: 'Author A', sortName: null },
+          { name: 'Author B', sortName: null },
+        ],
+        { executor: tx },
+      );
+    });
+
+    it('adds authors in add mode by merging with existing', async () => {
+      const { service, bookRepo, metadataService, bookMetadataLockService } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+      bookMetadataLockService.getLockedFieldsMap.mockResolvedValue(new Map());
+      const tx = {};
+      bookRepo.withTransaction.mockImplementation(async (cb: (value: unknown) => Promise<unknown>) => cb(tx));
+      bookRepo.findAuthorsByBookIds.mockResolvedValue(new Map([[7, ['Existing Author']]]));
+
+      const fields = makeFields({
+        authors: { mode: 'add', values: ['New Author'] },
+      });
+
+      await service.bulkEditMetadata([7], fields, user);
+
+      expect(bookRepo.findAuthorsByBookIds).toHaveBeenCalledWith([7], tx);
+      expect(metadataService.replaceAuthors).toHaveBeenCalledWith(
+        7,
+        [
+          { name: 'Existing Author', sortName: null },
+          { name: 'New Author', sortName: null },
+        ],
+        { executor: tx },
+      );
+    });
+
+    it('removes authors in remove mode', async () => {
+      const { service, bookRepo, metadataService, bookMetadataLockService } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+      bookMetadataLockService.getLockedFieldsMap.mockResolvedValue(new Map());
+      const tx = {};
+      bookRepo.withTransaction.mockImplementation(async (cb: (value: unknown) => Promise<unknown>) => cb(tx));
+      bookRepo.findAuthorsByBookIds.mockResolvedValue(new Map([[7, ['Author A', 'Author B']]]));
+
+      const fields = makeFields({
+        authors: { mode: 'remove', values: ['Author A'] },
+      });
+
+      await service.bulkEditMetadata([7], fields, user);
+
+      expect(metadataService.replaceAuthors).toHaveBeenCalledWith(7, [{ name: 'Author B', sortName: null }], { executor: tx });
+    });
+
+    it('replaces tags in replace mode', async () => {
+      const { service, bookRepo, metadataService, bookMetadataLockService } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+      bookMetadataLockService.getLockedFieldsMap.mockResolvedValue(new Map());
+      const tx = {};
+      bookRepo.withTransaction.mockImplementation(async (cb: (value: unknown) => Promise<unknown>) => cb(tx));
+
+      const fields = makeFields({
+        tags: { mode: 'replace', values: ['favorite', 'reading'] },
+      });
+
+      await service.bulkEditMetadata([7, 9], fields, user);
+
+      expect(metadataService.replaceTags).toHaveBeenCalledTimes(2);
+      expect(metadataService.replaceTags).toHaveBeenCalledWith(7, ['favorite', 'reading'], { executor: tx });
+      expect(metadataService.replaceTags).toHaveBeenCalledWith(9, ['favorite', 'reading'], { executor: tx });
+    });
+
+    it('adds tags in add mode by merging with existing', async () => {
+      const { service, bookRepo, metadataService, bookMetadataLockService } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+      bookMetadataLockService.getLockedFieldsMap.mockResolvedValue(new Map());
+      const tx = {};
+      bookRepo.withTransaction.mockImplementation(async (cb: (value: unknown) => Promise<unknown>) => cb(tx));
+      bookRepo.findTagsByBookIds.mockResolvedValue(new Map([[7, ['existing']]]));
+
+      const fields = makeFields({
+        tags: { mode: 'add', values: ['new'] },
+      });
+
+      await service.bulkEditMetadata([7], fields, user);
+
+      expect(metadataService.replaceTags).toHaveBeenCalledWith(7, ['existing', 'new'], { executor: tx });
+    });
+
+    it('replaces genres in replace mode', async () => {
+      const { service, bookRepo, metadataService, bookMetadataLockService } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+      bookMetadataLockService.getLockedFieldsMap.mockResolvedValue(new Map());
+      const tx = {};
+      bookRepo.withTransaction.mockImplementation(async (cb: (value: unknown) => Promise<unknown>) => cb(tx));
+
+      const fields = makeFields({
+        genres: { mode: 'replace', values: ['Fantasy'] },
+      });
+
+      await service.bulkEditMetadata([7], fields, user);
+
+      expect(metadataService.replaceGenres).toHaveBeenCalledWith(7, ['Fantasy'], { executor: tx });
+    });
+
+    it('replaces narrators in replace mode', async () => {
+      const { service, bookRepo, narratorService, bookMetadataLockService } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+      bookMetadataLockService.getLockedFieldsMap.mockResolvedValue(new Map());
+      const tx = {};
+      bookRepo.withTransaction.mockImplementation(async (cb: (value: unknown) => Promise<unknown>) => cb(tx));
+
+      const fields = makeFields({
+        narrators: { mode: 'replace', values: ['Stephen Fry'] },
+      });
+
+      await service.bulkEditMetadata([7], fields, user);
+
+      expect(narratorService.replaceForBook).toHaveBeenCalledWith(7, ['Stephen Fry'], { executor: tx });
+    });
+
+    it('skips locked fields per-field and reports correctly', async () => {
+      const { service, bookRepo, metadataService, bookMetadataLockService } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+      bookMetadataLockService.getLockedFieldsMap.mockResolvedValue(
+        new Map([
+          [7, ['authors']],
+          [9, []],
+        ]),
+      );
+      const tx = {};
+      bookRepo.withTransaction.mockImplementation(async (cb: (value: unknown) => Promise<unknown>) => cb(tx));
+
+      const fields = makeFields({
+        authors: { mode: 'replace', values: ['New Author'] },
+        genres: { mode: 'replace', values: ['Fantasy'] },
+      });
+
+      const result = await service.bulkEditMetadata([7, 9], fields, user);
+
+      expect(result.fields.authors).toEqual({ updated: 1, skippedLocked: 1 });
+      expect(result.fields.genres).toEqual({ updated: 2, skippedLocked: 0 });
+      expect(metadataService.replaceAuthors).toHaveBeenCalledTimes(1);
+      expect(metadataService.replaceAuthors).toHaveBeenCalledWith(9, [{ name: 'New Author', sortName: null }], { executor: tx });
+      expect(metadataService.replaceGenres).toHaveBeenCalledTimes(2);
+    });
+
+    it('handles mixed scalar and array fields in one call', async () => {
+      const { service, bookRepo, metadataService, bookMetadataLockService } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+      bookMetadataLockService.getLockedFieldsMap.mockResolvedValue(new Map());
+      const tx = {};
+      bookRepo.withTransaction.mockImplementation(async (cb: (value: unknown) => Promise<unknown>) => cb(tx));
+
+      const fields = makeFields({
+        publisher: { value: 'Penguin' },
+        tags: { mode: 'replace', values: ['classic'] },
+      });
+
+      const result = await service.bulkEditMetadata([7], fields, user);
+
+      expect(result.updatedBooks).toBe(1);
+      expect(result.fields.publisher).toEqual({ updated: 1, skippedLocked: 0 });
+      expect(result.fields.tags).toEqual({ updated: 1, skippedLocked: 0 });
+      expect(bookRepo.bulkUpdateMetadataFields).toHaveBeenCalled();
+      expect(metadataService.replaceTags).toHaveBeenCalledWith(7, ['classic'], { executor: tx });
+    });
+
+    it('throws BadRequestException when no fields are provided', async () => {
+      const { service } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+
+      const fields = makeFields({});
+
+      await expect(service.bulkEditMetadata([7], fields, user)).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException when add mode has empty values', async () => {
+      const { service } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+
+      const fields = makeFields({
+        authors: { mode: 'add', values: [] },
+      });
+
+      await expect(service.bulkEditMetadata([7], fields, user)).rejects.toThrow(BadRequestException);
+    });
+
+    it('returns zero updatedBooks when all books have all fields locked', async () => {
+      const { service, bookRepo, bookMetadataLockService } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+      bookMetadataLockService.getLockedFieldsMap.mockResolvedValue(new Map([[7, ['publisher']]]));
+      const tx = {};
+      bookRepo.withTransaction.mockImplementation(async (cb: (value: unknown) => Promise<unknown>) => cb(tx));
+
+      const fields = makeFields({
+        publisher: { value: 'Test' },
+      });
+
+      const result = await service.bulkEditMetadata([7], fields, user);
+
+      expect(result.updatedBooks).toBe(0);
+      expect(result.fields.publisher).toEqual({ updated: 0, skippedLocked: 1 });
+      expect(bookRepo.bulkUpdateMetadataFields).not.toHaveBeenCalled();
+    });
+
+    it('clears a scalar field when value is null', async () => {
+      const { service, bookRepo, bookMetadataLockService } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+      bookMetadataLockService.getLockedFieldsMap.mockResolvedValue(new Map());
+      const tx = {};
+      bookRepo.withTransaction.mockImplementation(async (cb: (value: unknown) => Promise<unknown>) => cb(tx));
+
+      const fields = makeFields({
+        seriesName: { value: null },
+      });
+
+      const result = await service.bulkEditMetadata([7], fields, user);
+
+      expect(result.fields.seriesName).toEqual({ updated: 1, skippedLocked: 0 });
+      expect(bookRepo.bulkUpdateMetadataFields).toHaveBeenCalledWith([7], expect.objectContaining({ seriesName: null }), tx);
+    });
+
+    it('verifies library access for all book IDs', async () => {
+      const { service, bookRepo, bookMetadataLockService } = makeService();
+      const user = makeUser();
+      const verifySpy = vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+      bookMetadataLockService.getLockedFieldsMap.mockResolvedValue(new Map());
+      const tx = {};
+      bookRepo.withTransaction.mockImplementation(async (cb: (value: unknown) => Promise<unknown>) => cb(tx));
+
+      const fields = makeFields({
+        publisher: { value: 'Test' },
+      });
+
+      await service.bulkEditMetadata([7, 8, 9], fields, user);
+
+      expect(verifySpy).toHaveBeenCalledWith([7, 8, 9], user);
     });
   });
 

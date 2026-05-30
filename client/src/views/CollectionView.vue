@@ -13,6 +13,7 @@ import ViewHeader from '@/components/ViewHeader.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import BulkUpdateTagsDialog from '@/features/book/components/BulkUpdateTagsDialog.vue'
+import BulkEditMetadataDialog from '@/features/book/components/BulkEditMetadataDialog.vue'
 import MetadataExportDialog from '@/features/book/components/MetadataExportDialog.vue'
 import EditCollectionDialog from '@/features/collection/components/EditCollectionDialog.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
@@ -34,6 +35,8 @@ import { useBookViewContext } from '@/features/book/composables/useBookViewConte
 import { useBookTableShell } from '@/features/book/composables/useBookTableShell'
 import { useInfiniteScrollSentinel } from '@/features/book/composables/useInfiniteScrollSentinel'
 import { useSavedViews, type SavedView } from '@/features/book/composables/useSavedViews'
+import { useBulkEditMetadata } from '@/features/book/composables/useBulkEditMetadata'
+import type { BulkEditFields } from '@/features/book/composables/useBulkEditMetadata'
 import type { BookCard, SortSpec } from '@bookorbit/types'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 
@@ -176,6 +179,7 @@ const {
   handleDeleteSelected,
   addToCollectionOpen,
   bulkTagsOpen,
+  bulkEditOpen,
   sendBookOpen,
   quickViewBookId,
   quickViewOpen,
@@ -243,12 +247,27 @@ function openMetadataExport() {
   collapseMobileControlsIfNeeded()
 }
 
+const { submit: submitBulkEdit, submitting: bulkEditSubmitting, selectedCount: bulkEditCount } = useBulkEditMetadata(selectedIds, books)
+
 function handleEditSelected() {
+  const count = selectedIds.value.size
+  if (count === 0) return
+  if (count >= 2) {
+    bulkEditOpen.value = true
+    return
+  }
   const ids = [...selectedIds.value]
-  if (ids.length === 0) return
   setBookContext(ids, ids.length)
   router.push({ name: 'book-detail', params: { bookId: ids[0] }, query: { tab: 'edit' } })
   exitSelectionMode()
+}
+
+async function handleBulkEditConfirm(fields: BulkEditFields) {
+  const result = await submitBulkEdit(fields)
+  if (result) {
+    bulkEditOpen.value = false
+    load(true)
+  }
 }
 
 async function handleToggleCollapse() {
@@ -340,6 +359,14 @@ watch(debouncedQuery, () => {
     @done="exitSelectionMode"
   />
   <BulkUpdateTagsDialog :open="bulkTagsOpen" :book-count="selectedCount" @update:open="bulkTagsOpen = $event" @confirm="handleBulkUpdateTags" />
+
+  <BulkEditMetadataDialog
+    :open="bulkEditOpen"
+    :book-count="bulkEditCount"
+    :submitting="bulkEditSubmitting"
+    @update:open="bulkEditOpen = $event"
+    @confirm="handleBulkEditConfirm"
+  />
 
   <EditCollectionDialog
     v-if="collection"

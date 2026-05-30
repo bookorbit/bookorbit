@@ -29,6 +29,9 @@ import ViewHeader from '@/components/ViewHeader.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import BulkUpdateTagsDialog from '@/features/book/components/BulkUpdateTagsDialog.vue'
+import BulkEditMetadataDialog from '@/features/book/components/BulkEditMetadataDialog.vue'
+import { useBulkEditMetadata } from '@/features/book/composables/useBulkEditMetadata'
+import type { BulkEditFields } from '@/features/book/composables/useBulkEditMetadata'
 import MetadataExportDialog from '@/features/book/components/MetadataExportDialog.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import SaveAsSmartScopeDialog from '@/features/smart-scope/components/SaveAsSmartScopeDialog.vue'
@@ -399,6 +402,7 @@ const {
   handleDeleteSelected,
   addToCollectionOpen,
   bulkTagsOpen,
+  bulkEditOpen,
   sendBookOpen,
   quickViewBookId,
   quickViewOpen,
@@ -439,12 +443,37 @@ watch(selectionMode, (active) => {
   }
 })
 
+const {
+  submit: submitBulkEdit,
+  submitting: bulkEditSubmitting,
+  selectedCount: bulkEditCount,
+} = useBulkEditMetadata(selectedIds, books, querySelection)
+
 function handleEditSelected() {
+  const count = querySelection.value ? querySelection.value.total : selectedIds.value.size
+  if (count === 0) return
+  if (count >= 2 || querySelection.value) {
+    bulkEditOpen.value = true
+    return
+  }
   const ids = [...selectedIds.value]
-  if (ids.length === 0) return
   setBookContext(ids, ids.length)
   router.push({ name: 'book-detail', params: { bookId: ids[0] }, query: { tab: 'edit' } })
   exitSelectionMode()
+}
+
+async function handleBulkEditConfirm(fields: BulkEditFields) {
+  const result = await submitBulkEdit(fields)
+  if (result) {
+    bulkEditOpen.value = false
+    if (querySelection.value || hasAddOrRemoveFields(fields)) {
+      load(true)
+    }
+  }
+}
+
+function hasAddOrRemoveFields(fields: BulkEditFields): boolean {
+  return [fields.authors, fields.genres, fields.tags, fields.narrators].some((f) => f && f.mode !== 'replace')
 }
 
 async function handleToggleCollapse() {
@@ -918,6 +947,14 @@ async function handleToggleCollapse() {
   />
 
   <BulkUpdateTagsDialog :open="bulkTagsOpen" :book-count="selectedCount" @update:open="bulkTagsOpen = $event" @confirm="handleBulkUpdateTags" />
+
+  <BulkEditMetadataDialog
+    :open="bulkEditOpen"
+    :book-count="bulkEditCount"
+    :submitting="bulkEditSubmitting"
+    @update:open="bulkEditOpen = $event"
+    @confirm="handleBulkEditConfirm"
+  />
 
   <SendBookDialog :open="sendBookOpen" :book-ids="[...selectedIds]" @update:open="sendBookOpen = $event" @sent="exitSelectionMode" />
 

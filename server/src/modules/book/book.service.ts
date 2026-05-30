@@ -64,6 +64,7 @@ import { BookRepository } from './book.repository';
 import { ComicMetadataRepository } from '../metadata/comic-metadata.repository';
 import { BookDetailDto } from './dto/book-detail.dto';
 import type { BulkMetadataField } from './dto/bulk-set-metadata.dto';
+import type { BulkEditFieldsDto } from './dto/bulk-edit-metadata.dto';
 import type { BulkSelectionDto } from './dto/bulk-selection.dto';
 import type { MetadataExportDto, MetadataExportFormat, MetadataExportViewType } from './dto/metadata-export.dto';
 import type { MetadataExportColumnMode } from './dto/metadata-export-options.dto';
@@ -85,6 +86,12 @@ const METADATA_UPDATE_FAILPOINTS = [
 
 export type MetadataUpdateFailpoint = (typeof METADATA_UPDATE_FAILPOINTS)[number];
 export type ExportScope = 'primary' | 'all' | 'audio';
+
+export type BulkEditFieldResult = { updated: number; skippedLocked: number };
+export type BulkEditMetadataResult = {
+  updatedBooks: number;
+  fields: Record<string, BulkEditFieldResult>;
+};
 const BULK_METADATA_LOCK_FIELD_BY_FIELD: Record<BulkMetadataField, BookMetadataLockField> = {
   seriesName: 'seriesName',
   publisher: 'publisher',
@@ -1590,6 +1597,180 @@ export class BookService {
     this.logger.log(
       `[${event}] [end] userId=${user.id} count=${bookIds.length} locked=${locked} durationMs=${Date.now() - startedAt} - bulk set metadata lock completed`,
     );
+  }
+
+  async bulkEditMetadata(bookIds: number[], fields: BulkEditFieldsDto, user: RequestUser): Promise<BulkEditMetadataResult> {
+    const event = 'book.bulk.edit_metadata';
+    const startedAt = Date.now();
+    const fieldNames = Object.keys(fields).filter((k) => (fields as unknown as Record<string, unknown>)[k] !== undefined);
+    this.logger.log(`[${event}] [start] userId=${user.id} count=${bookIds.length} fields=${fieldNames.join(',')} - bulk edit metadata started`);
+
+    if (!fields.hasAtLeastOneField()) {
+      throw new BadRequestException('fields must contain at least one editable field');
+    }
+    if (!fields.hasValidArrayValues()) {
+      throw new BadRequestException('array fields with add or remove mode must have a non-empty values array');
+    }
+
+    await this.verifyLibraryAccessForBookIds(bookIds, user);
+
+    const locksMap = await this.bookMetadataLockService.getLockedFieldsMap(bookIds);
+    const fieldResults: Record<string, BulkEditFieldResult> = {};
+    const allUpdatedBookIds = new Set<number>();
+
+    const getUpdatableIds = (lockField: BookMetadataLockField): number[] => {
+      return bookIds.filter((id) => {
+        const locked = locksMap.get(id) ?? [];
+        return !locked.includes(lockField);
+      });
+    };
+
+    const recordResult = (fieldName: string, updatableIds: number[]) => {
+      const skippedLocked = bookIds.length - updatableIds.length;
+      fieldResults[fieldName] = { updated: updatableIds.length, skippedLocked };
+      for (const id of updatableIds) allUpdatedBookIds.add(id);
+    };
+
+    try {
+      await this.bookRepo.withTransaction(async (tx) => {
+        for (const fieldName of ['seriesName', 'publisher', 'language'] as const) {
+          if (!fields[fieldName]) continue;
+          const ids = getUpdatableIds(BULK_METADATA_LOCK_FIELD_BY_FIELD[fieldName]);
+          recordResult(fieldName, ids);
+          if (ids.length === 0) continue;
+          const val = fields[fieldName].value;
+          const textValue = val === null ? null : String(val).trim() || null;
+          await this.bookRepo.bulkUpdateMetadataFields(ids, { [fieldName]: textValue, updatedAt: new Date() }, tx);
+        }
+
+        if (fields.publishedYear) {
+          const ids = getUpdatableIds('publishedYear');
+          recordResult('publishedYear', ids);
+          if (ids.length > 0) {
+            const val = fields.publishedYear.value;
+            if (val !== null && (!Number.isFinite(val) || !Number.isInteger(val))) {
+              throw new BadRequestException('Invalid publishedYear value');
+            }
+            await this.bookRepo.bulkUpdateMetadataFields(ids, { publishedYear: val, updatedAt: new Date() }, tx);
+          }
+        }
+
+        if (fields.authors) {
+          const ids = getUpdatableIds('authors');
+          recordResult('authors', ids);
+          if (ids.length > 0) {
+            const names = this.normalizeListValues(fields.authors.values);
+            if (fields.authors.mode === 'replace') {
+              for (const bookId of ids) {
+                await this.metadataService.replaceAuthors(
+                  bookId,
+                  names.map((name) => ({ name, sortName: null })),
+                  { executor: tx },
+                );
+              }
+            } else {
+              const currentMap = await this.bookRepo.findAuthorsByBookIds(ids, tx);
+              for (const bookId of ids) {
+                const current = currentMap.get(bookId) ?? [];
+                const merged = fields.authors!.mode === 'add' ? [...new Set([...current, ...names])] : current.filter((n) => !names.includes(n));
+                await this.metadataService.replaceAuthors(
+                  bookId,
+                  merged.map((name) => ({ name, sortName: null })),
+                  { executor: tx },
+                );
+              }
+            }
+          }
+        }
+
+        if (fields.genres) {
+          const ids = getUpdatableIds('genres');
+          recordResult('genres', ids);
+          if (ids.length > 0) {
+            const names = this.normalizeListValues(fields.genres.values);
+            if (fields.genres.mode === 'replace') {
+              for (const bookId of ids) {
+                await this.metadataService.replaceGenres(bookId, names, { executor: tx });
+              }
+            } else {
+              const currentMap = await this.bookRepo.findGenresByBookIds(ids, tx);
+              for (const bookId of ids) {
+                const current = currentMap.get(bookId) ?? [];
+                const merged = fields.genres!.mode === 'add' ? [...new Set([...current, ...names])] : current.filter((n) => !names.includes(n));
+                await this.metadataService.replaceGenres(bookId, merged, { executor: tx });
+              }
+            }
+          }
+        }
+
+        if (fields.tags) {
+          const ids = getUpdatableIds('tags');
+          recordResult('tags', ids);
+          if (ids.length > 0) {
+            const names = this.normalizeListValues(fields.tags.values);
+            if (fields.tags.mode === 'replace') {
+              for (const bookId of ids) {
+                await this.metadataService.replaceTags(bookId, names, { executor: tx });
+              }
+            } else {
+              const currentMap = await this.bookRepo.findTagsByBookIds(ids, tx);
+              for (const bookId of ids) {
+                const current = currentMap.get(bookId) ?? [];
+                const merged = fields.tags!.mode === 'add' ? [...new Set([...current, ...names])] : current.filter((n) => !names.includes(n));
+                await this.metadataService.replaceTags(bookId, merged, { executor: tx });
+              }
+            }
+          }
+        }
+
+        if (fields.narrators) {
+          const ids = getUpdatableIds('narrators');
+          recordResult('narrators', ids);
+          if (ids.length > 0) {
+            const names = this.normalizeListValues(fields.narrators.values);
+            if (fields.narrators.mode === 'replace') {
+              for (const bookId of ids) {
+                await this.narratorService.replaceForBook(bookId, names, { executor: tx });
+              }
+            } else {
+              const currentMap = await this.bookRepo.findNarratorsByBookIds(ids, tx);
+              for (const bookId of ids) {
+                const current = currentMap.get(bookId) ?? [];
+                const merged = fields.narrators!.mode === 'add' ? [...new Set([...current, ...names])] : current.filter((n) => !names.includes(n));
+                await this.narratorService.replaceForBook(bookId, merged, { executor: tx });
+              }
+            }
+          }
+        }
+      });
+    } catch (error) {
+      const durationMs = Date.now() - startedAt;
+      const errorClass = error instanceof Error ? error.constructor.name : 'UnknownError';
+      const errorMessage = error instanceof Error ? sanitizeLogValue(error.message) : 'unknown';
+      this.logger.error(
+        `[${event}] [fail] userId=${user.id} count=${bookIds.length} durationMs=${durationMs} errorClass=${errorClass} error="${errorMessage}" - bulk edit metadata failed`,
+      );
+      throw error;
+    }
+
+    if (allUpdatedBookIds.size > 0) {
+      this.triggerPostMetadataUpdateEffects([...allUpdatedBookIds], user.id);
+    }
+
+    const result: BulkEditMetadataResult = {
+      updatedBooks: allUpdatedBookIds.size,
+      fields: fieldResults,
+    };
+
+    this.logger.log(
+      `[${event}] [end] userId=${user.id} count=${bookIds.length} updatedBooks=${allUpdatedBookIds.size} fieldCount=${fieldNames.length} durationMs=${Date.now() - startedAt} - bulk edit metadata completed`,
+    );
+
+    return result;
+  }
+
+  private normalizeListValues(values: string[]): string[] {
+    return [...new Set(values.map((v) => v.trim()).filter((v) => v.length > 0))];
   }
 
   async getKoboState(id: number, user: RequestUser): Promise<BookKoboState> {

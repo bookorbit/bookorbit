@@ -24,6 +24,7 @@ import SmartScopeEditorPanel from '@/features/smart-scope/components/SmartScopeE
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import BulkUpdateTagsDialog from '@/features/book/components/BulkUpdateTagsDialog.vue'
+import BulkEditMetadataDialog from '@/features/book/components/BulkEditMetadataDialog.vue'
 import MetadataExportDialog from '@/features/book/components/MetadataExportDialog.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
@@ -44,6 +45,8 @@ import { useBookTableShell } from '@/features/book/composables/useBookTableShell
 import { useInfiniteScrollSentinel } from '@/features/book/composables/useInfiniteScrollSentinel'
 import { useSavedViews, type SavedView } from '@/features/book/composables/useSavedViews'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useBulkEditMetadata } from '@/features/book/composables/useBulkEditMetadata'
+import type { BulkEditFields } from '@/features/book/composables/useBulkEditMetadata'
 import type { BookCard, GroupRule, SortField, SortSpec } from '@bookorbit/types'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 
@@ -184,6 +187,7 @@ const {
   handleDeleteSelected,
   addToCollectionOpen,
   bulkTagsOpen,
+  bulkEditOpen,
   sendBookOpen,
   quickViewBookId,
   quickViewOpen,
@@ -199,12 +203,27 @@ const visibleExportColumns = computed(() => {
   return tableRef.value.allColumns.filter((column) => column.visible).map((column) => column.id)
 })
 
+const { submit: submitBulkEdit, submitting: bulkEditSubmitting, selectedCount: bulkEditCount } = useBulkEditMetadata(selectedIds, books)
+
 function handleEditSelected() {
+  const count = selectedIds.value.size
+  if (count === 0) return
+  if (count >= 2) {
+    bulkEditOpen.value = true
+    return
+  }
   const ids = [...selectedIds.value]
-  if (ids.length === 0) return
   setBookContext(ids, ids.length)
   router.push({ name: 'book-detail', params: { bookId: ids[0] }, query: { tab: 'edit' } })
   exitSelectionMode()
+}
+
+async function handleBulkEditConfirm(fields: BulkEditFields) {
+  const result = await submitBulkEdit(fields)
+  if (result) {
+    bulkEditOpen.value = false
+    load(true)
+  }
 }
 
 watch(
@@ -359,6 +378,14 @@ watch(debouncedQuery, () => {
     @done="exitSelectionMode"
   />
   <BulkUpdateTagsDialog :open="bulkTagsOpen" :book-count="selectedCount" @update:open="bulkTagsOpen = $event" @confirm="handleBulkUpdateTags" />
+
+  <BulkEditMetadataDialog
+    :open="bulkEditOpen"
+    :book-count="bulkEditCount"
+    :submitting="bulkEditSubmitting"
+    @update:open="bulkEditOpen = $event"
+    @confirm="handleBulkEditConfirm"
+  />
   <SendBookDialog :open="sendBookOpen" :book-ids="[...selectedIds]" @update:open="sendBookOpen = $event" @sent="exitSelectionMode" />
 
   <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelDelete" />

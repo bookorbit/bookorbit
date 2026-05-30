@@ -37,6 +37,7 @@ import { BulkSetRatingDto } from './dto/bulk-set-rating.dto';
 import { BulkSetMetadataDto } from './dto/bulk-set-metadata.dto';
 import { BulkUpdateTagsDto } from './dto/bulk-update-tags.dto';
 import { BulkSetMetadataLockDto } from './dto/bulk-set-metadata-lock.dto';
+import { BulkEditMetadataDto } from './dto/bulk-edit-metadata.dto';
 import { DeleteBooksDto } from './dto/delete-books.dto';
 import { ExportBooksDto } from './dto/export-books.dto';
 import { MetadataExportDto } from './dto/metadata-export.dto';
@@ -648,6 +649,24 @@ export class BookController {
   async bulkSetMetadataLock(@Body() dto: BulkSetMetadataLockDto, @CurrentUser() user: RequestUser) {
     const ids = await this.bookService.resolveSelectionToIds(dto, user);
     return this.bookService.bulkSetMetadataLock(ids, dto.locked, user);
+  }
+
+  @Post('bulk-edit-metadata')
+  @RequirePermission(Permission.LibraryEditMetadata)
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk edits')
+  @Auditable({
+    action: AuditAction.BookBulkEditMetadata,
+    resource: AuditResource.Book,
+    description: (req) => {
+      const body = req.body as { bookIds?: number[]; query?: unknown };
+      const count = body?.bookIds?.length ?? 0;
+      const via = body?.query ? 'query' : `${count} id${count !== 1 ? 's' : ''}`;
+      return `Bulk edit metadata for ${via}`;
+    },
+  })
+  async bulkEditMetadata(@Body() dto: BulkEditMetadataDto, @CurrentUser() user: RequestUser) {
+    const ids = await this.bookService.resolveSelectionToIds(dto, user);
+    return this.bookService.bulkEditMetadata(ids, dto.fields, user);
   }
 
   @Get(':id')

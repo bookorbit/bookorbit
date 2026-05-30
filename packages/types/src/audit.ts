@@ -52,6 +52,7 @@ export enum AuditAction {
   BookBulkSetMetadata = "book.bulk.set_metadata",
   BookBulkUpdateTags = "book.bulk.update_tags",
   BookBulkSetMetadataLock = "book.bulk.set_metadata_lock",
+  BookBulkEditMetadata = "book.bulk.edit_metadata",
 
   CollectionCreate = "collection.create",
   CollectionUpdate = "collection.update",

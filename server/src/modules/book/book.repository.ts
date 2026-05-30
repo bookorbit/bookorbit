@@ -872,6 +872,56 @@ export class BookRepository {
     return result;
   }
 
+  async findAuthorsByBookIds(bookIds: number[], executor: MetadataReadExecutor = this.db): Promise<Map<number, string[]>> {
+    if (bookIds.length === 0) return new Map();
+    const rows = await executor
+      .select({ bookId: bookAuthors.bookId, name: authors.name })
+      .from(bookAuthors)
+      .innerJoin(authors, eq(bookAuthors.authorId, authors.id))
+      .where(inArray(bookAuthors.bookId, bookIds))
+      .orderBy(asc(bookAuthors.bookId), asc(bookAuthors.displayOrder));
+    const result = new Map<number, string[]>();
+    for (const row of rows) {
+      const existing = result.get(row.bookId) ?? [];
+      existing.push(row.name);
+      result.set(row.bookId, existing);
+    }
+    return result;
+  }
+
+  async findGenresByBookIds(bookIds: number[], executor: MetadataReadExecutor = this.db): Promise<Map<number, string[]>> {
+    if (bookIds.length === 0) return new Map();
+    const rows = await executor
+      .select({ bookId: bookGenres.bookId, name: genres.name })
+      .from(bookGenres)
+      .innerJoin(genres, eq(bookGenres.genreId, genres.id))
+      .where(inArray(bookGenres.bookId, bookIds));
+    const result = new Map<number, string[]>();
+    for (const row of rows) {
+      const existing = result.get(row.bookId) ?? [];
+      existing.push(row.name);
+      result.set(row.bookId, existing);
+    }
+    return result;
+  }
+
+  async findNarratorsByBookIds(bookIds: number[], executor: MetadataReadExecutor = this.db): Promise<Map<number, string[]>> {
+    if (bookIds.length === 0) return new Map();
+    const rows = await executor
+      .select({ bookId: bookNarrators.bookId, name: narrators.name })
+      .from(bookNarrators)
+      .innerJoin(narrators, eq(bookNarrators.narratorId, narrators.id))
+      .where(inArray(bookNarrators.bookId, bookIds))
+      .orderBy(asc(bookNarrators.bookId), asc(bookNarrators.displayOrder));
+    const result = new Map<number, string[]>();
+    for (const row of rows) {
+      const existing = result.get(row.bookId) ?? [];
+      existing.push(row.name);
+      result.set(row.bookId, existing);
+    }
+    return result;
+  }
+
   async updateMetadataFields(
     bookId: number,
     fields: Partial<typeof bookMetadata.$inferInsert>,

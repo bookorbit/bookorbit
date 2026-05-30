@@ -45,6 +45,7 @@ export function useBookTableShell({ books, querySelection }: BookTableShellOptio
 
   const addToCollectionOpen = ref(false)
   const bulkTagsOpen = ref(false)
+  const bulkEditOpen = ref(false)
   const sendBookOpen = ref(false)
   const quickViewBookId = ref<number | null>(null)
   const quickViewOpen = ref(false)
@@ -88,6 +89,7 @@ export function useBookTableShell({ books, querySelection }: BookTableShellOptio
     ...bulk,
     addToCollectionOpen,
     bulkTagsOpen,
+    bulkEditOpen,
     sendBookOpen,
     quickViewBookId,
     quickViewOpen,
