@@ -167,7 +167,8 @@ describe('ReadingSessionRepository - listByBook', () => {
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(rowData)) })
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(countData)) })
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(statsData)) })
-      .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(dailyData)) });
+      .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(dailyData)) })
+      .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain([])) });
 
     const db = { select };
     const repo = new ReadingSessionRepository(db as never);
@@ -189,12 +190,13 @@ describe('ReadingSessionRepository - listByBook', () => {
 
     await repo.listByBook(1, 2, 2, 25, 'startedAt', 'desc');
 
-    expect(select).toHaveBeenCalledTimes(4);
+    expect(select).toHaveBeenCalledTimes(5);
   });
 
   it('returns empty items and zero stats when no data', async () => {
     const select = vi
       .fn()
+      .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain([])) })
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain([])) })
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain([])) })
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain([])) })
@@ -209,11 +211,13 @@ describe('ReadingSessionRepository - listByBook', () => {
     expect(result.total).toBe(0);
     expect(result.stats.totalSessions).toBe(0);
     expect(result.stats.dailySummary).toEqual([]);
+    expect(result.koboReadingState).toBeNull();
   });
 
   it('handles null statsRow gracefully', async () => {
     const select = vi
       .fn()
+      .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain([])) })
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain([])) })
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain([])) })
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain([])) })
@@ -227,6 +231,7 @@ describe('ReadingSessionRepository - listByBook', () => {
     expect(result.stats.totalSessions).toBe(0);
     expect(result.stats.firstSessionAt).toBeNull();
     expect(result.stats.lastSessionAt).toBeNull();
+    expect(result.koboReadingState).toBeNull();
   });
 
   it('converts Date stats fields to ISO strings', async () => {
@@ -238,6 +243,7 @@ describe('ReadingSessionRepository - listByBook', () => {
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain([])) })
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain([{ total: 1 }])) })
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(statsData)) })
+      .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain([])) })
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain([])) });
 
     const db = { select };
@@ -247,6 +253,7 @@ describe('ReadingSessionRepository - listByBook', () => {
 
     expect(result.stats.firstSessionAt).toBe(now.toISOString());
     expect(result.stats.lastSessionAt).toBe(now.toISOString());
+    expect(result.koboReadingState).toBeNull();
   });
 
   it('uses desc order when sortDir is desc', async () => {
@@ -282,6 +289,7 @@ describe('ReadingSessionRepository - listByBook', () => {
             makeQueryChain([{ totalSessions: 1, totalSeconds: 60, avgDurationSeconds: 60, firstSessionAt: null, lastSessionAt: null }]),
           ),
       })
+      .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain([])) })
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain([])) });
 
     const db = { select };
@@ -290,6 +298,7 @@ describe('ReadingSessionRepository - listByBook', () => {
     const result = await repo.listByBook(1, 2, 1, 25, 'startedAt', 'desc');
 
     expect(result.items[0]?.format).toBeNull();
+    expect(result.koboReadingState).toBeNull();
   });
 
   it('applies dateFrom and dateTo when provided', async () => {

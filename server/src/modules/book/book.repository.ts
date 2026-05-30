@@ -6,6 +6,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { ContentFilterRules, SortSpec } from '@bookorbit/types';
 import { isAudioFormat } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
+import { extractKoboProgressPercent, latestProgressCandidate, type ProgressCandidate } from '../../common/utils/reading-progress.utils';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -156,81 +157,95 @@ export class BookRepository {
       };
     }
 
-    const [authorRows, fileRows, genreRows, tagRows, narratorRows, statusRows, fileProgressRows, audiobookProgressRows] = await Promise.all([
-      this.db
-        .select({ bookId: bookAuthors.bookId, name: authors.name })
-        .from(bookAuthors)
-        .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
-        .where(inArray(bookAuthors.bookId, bookIds))
-        .orderBy(bookAuthors.displayOrder),
-      this.db
-        .select({ bookId: bookFiles.bookId, id: bookFiles.id, format: bookFiles.format, role: bookFiles.role, sizeBytes: bookFiles.sizeBytes })
-        .from(bookFiles)
-        .where(inArray(bookFiles.bookId, bookIds)),
-      this.db
-        .select({ bookId: bookGenres.bookId, name: genres.name })
-        .from(bookGenres)
-        .innerJoin(genres, eq(genres.id, bookGenres.genreId))
-        .where(inArray(bookGenres.bookId, bookIds)),
-      this.db
-        .select({ bookId: bookTags.bookId, name: tags.name })
-        .from(bookTags)
-        .innerJoin(tags, eq(tags.id, bookTags.tagId))
-        .where(inArray(bookTags.bookId, bookIds)),
-      this.db
-        .select({ bookId: bookNarrators.bookId, name: narrators.name })
-        .from(bookNarrators)
-        .innerJoin(narrators, eq(narrators.id, bookNarrators.narratorId))
-        .where(inArray(bookNarrators.bookId, bookIds))
-        .orderBy(bookNarrators.displayOrder),
-      this.db
-        .select({
-          bookId: userBookStatus.bookId,
-          status: userBookStatus.status,
-          source: userBookStatus.source,
-          startedAt: userBookStatus.startedAt,
-          finishedAt: userBookStatus.finishedAt,
-          updatedAt: userBookStatus.updatedAt,
-        })
-        .from(userBookStatus)
-        .where(and(eq(userBookStatus.userId, userId), inArray(userBookStatus.bookId, bookIds))),
-      primaryFileIds.length > 0
-        ? this.db
-            .select({
-              bookFileId: readingProgress.bookFileId,
-              percentage: readingProgress.percentage,
-              updatedAt: readingProgress.updatedAt,
-            })
-            .from(readingProgress)
-            .where(and(eq(readingProgress.userId, userId), inArray(readingProgress.bookFileId, primaryFileIds)))
-        : Promise.resolve([] as { bookFileId: number; percentage: number; updatedAt: Date }[]),
-      this.db
-        .select({
-          bookId: audiobookProgress.bookId,
-          percentage: audiobookProgress.percentage,
-          updatedAt: audiobookProgress.updatedAt,
-        })
-        .from(audiobookProgress)
-        .where(and(eq(audiobookProgress.userId, userId), inArray(audiobookProgress.bookId, bookIds))),
-    ]);
+    const [authorRows, fileRows, genreRows, tagRows, narratorRows, statusRows, fileProgressRows, audiobookProgressRows, koboProgressRows] =
+      await Promise.all([
+        this.db
+          .select({ bookId: bookAuthors.bookId, name: authors.name })
+          .from(bookAuthors)
+          .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
+          .where(inArray(bookAuthors.bookId, bookIds))
+          .orderBy(bookAuthors.displayOrder),
+        this.db
+          .select({ bookId: bookFiles.bookId, id: bookFiles.id, format: bookFiles.format, role: bookFiles.role, sizeBytes: bookFiles.sizeBytes })
+          .from(bookFiles)
+          .where(inArray(bookFiles.bookId, bookIds)),
+        this.db
+          .select({ bookId: bookGenres.bookId, name: genres.name })
+          .from(bookGenres)
+          .innerJoin(genres, eq(genres.id, bookGenres.genreId))
+          .where(inArray(bookGenres.bookId, bookIds)),
+        this.db
+          .select({ bookId: bookTags.bookId, name: tags.name })
+          .from(bookTags)
+          .innerJoin(tags, eq(tags.id, bookTags.tagId))
+          .where(inArray(bookTags.bookId, bookIds)),
+        this.db
+          .select({ bookId: bookNarrators.bookId, name: narrators.name })
+          .from(bookNarrators)
+          .innerJoin(narrators, eq(narrators.id, bookNarrators.narratorId))
+          .where(inArray(bookNarrators.bookId, bookIds))
+          .orderBy(bookNarrators.displayOrder),
+        this.db
+          .select({
+            bookId: userBookStatus.bookId,
+            status: userBookStatus.status,
+            source: userBookStatus.source,
+            startedAt: userBookStatus.startedAt,
+            finishedAt: userBookStatus.finishedAt,
+            updatedAt: userBookStatus.updatedAt,
+          })
+          .from(userBookStatus)
+          .where(and(eq(userBookStatus.userId, userId), inArray(userBookStatus.bookId, bookIds))),
+        primaryFileIds.length > 0
+          ? this.db
+              .select({
+                bookFileId: readingProgress.bookFileId,
+                percentage: readingProgress.percentage,
+                updatedAt: readingProgress.updatedAt,
+              })
+              .from(readingProgress)
+              .where(and(eq(readingProgress.userId, userId), inArray(readingProgress.bookFileId, primaryFileIds)))
+          : Promise.resolve([] as { bookFileId: number; percentage: number; updatedAt: Date }[]),
+        this.db
+          .select({
+            bookId: audiobookProgress.bookId,
+            percentage: audiobookProgress.percentage,
+            updatedAt: audiobookProgress.updatedAt,
+          })
+          .from(audiobookProgress)
+          .where(and(eq(audiobookProgress.userId, userId), inArray(audiobookProgress.bookId, bookIds))),
+        this.db
+          .select({
+            bookId: koboReadingStates.bookId,
+            currentBookmark: koboReadingStates.currentBookmark,
+            updatedAt: koboReadingStates.updatedAt,
+          })
+          .from(koboReadingStates)
+          .where(and(eq(koboReadingStates.userId, userId), inArray(koboReadingStates.bookId, bookIds))),
+      ]);
 
     const fileProgressById = new Map(fileProgressRows.map((row) => [row.bookFileId, row]));
     const audiobookProgressByBookId = new Map(audiobookProgressRows.map((row) => [row.bookId, row]));
+    const koboProgressByBookId = new Map(
+      koboProgressRows.flatMap((row) => {
+        const percentage = extractKoboProgressPercent(row.currentBookmark);
+        return percentage == null ? [] : [[row.bookId, { percentage, updatedAt: row.updatedAt } satisfies ProgressCandidate]];
+      }),
+    );
     const progressRows = bookRefs.flatMap((book) => {
       if (book.primaryFileId == null) return [];
 
       const fileProgress = fileProgressById.get(book.primaryFileId);
       const audioProgress = audiobookProgressByBookId.get(book.id);
-      if (!fileProgress && !audioProgress) return [];
+      const koboProgress = koboProgressByBookId.get(book.id);
+      const latestProgress = latestProgressCandidate(
+        fileProgress ? { percentage: fileProgress.percentage, updatedAt: fileProgress.updatedAt } : null,
+        audioProgress ? { percentage: audioProgress.percentage, updatedAt: audioProgress.updatedAt } : null,
+        koboProgress ?? null,
+      );
+      if (!latestProgress) return [];
 
-      const mergedPercentage =
-        fileProgress && audioProgress
-          ? fileProgress.updatedAt >= audioProgress.updatedAt
-            ? fileProgress.percentage
-            : audioProgress.percentage
-          : (fileProgress?.percentage ?? audioProgress?.percentage ?? null);
-
-      return [{ bookFileId: book.primaryFileId, percentage: mergedPercentage }];
+      return [{ bookFileId: book.primaryFileId, percentage: latestProgress.percentage }];
     });
 
     return { authorRows, fileRows, genreRows, tagRows, progressRows, statusRows, narratorRows };

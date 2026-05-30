@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { CommonModule } from '../../common/common.module';
 import { UserModule } from '../user/user.module';
 import { UserBookStatusModule } from '../user-book-status/user-book-status.module';
+import { AchievementModule } from '../achievement/achievement.module';
 import { KoboAuthController } from './kobo-auth.controller';
 import { KoboDeviceController } from './kobo-device.controller';
 import { KoboSyncController } from './kobo-sync.controller';
@@ -19,7 +20,7 @@ import { KoboSyncService } from './services/kobo-sync.service';
 import { KoboThumbnailService } from './services/kobo-thumbnail.service';
 
 @Module({
-  imports: [CommonModule, UserModule, UserBookStatusModule],
+  imports: [CommonModule, UserModule, UserBookStatusModule, AchievementModule],
   controllers: [KoboUserController, KoboAuthController, KoboSyncController, KoboDeviceController],
   providers: [
     KoboTokenGuard,

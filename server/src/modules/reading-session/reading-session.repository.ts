@@ -2,10 +2,10 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, count, desc, eq, gte, lte, max, min, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import type { BookReadingSession, BookReadingSessionListResponse, BookReadingSessionStats } from '@bookorbit/types';
+import type { BookReadingSession, BookReadingSessionListResponse, BookReadingSessionStats, KoboReadingSessionEntry } from '@bookorbit/types';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { bookFiles, books, readingSessions, userReadingDailyStats } from '../../db/schema';
+import { bookFiles, books, koboReadingStates, readingSessions, userReadingDailyStats } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -194,7 +194,36 @@ export class ReadingSessionRepository {
       format: r.format ?? null,
     }));
 
-    return { items, total, page, pageSize, stats };
+    // Include Kobo reading state if available so the reading log can display it
+    const [koboRow] = await this.db
+      .select({
+        currentBookmark: koboReadingStates.currentBookmark,
+        statusInfo: koboReadingStates.statusInfo,
+        updatedAt: koboReadingStates.updatedAt,
+      })
+      .from(koboReadingStates)
+      .where(and(eq(koboReadingStates.userId, userId), eq(koboReadingStates.bookId, bookId)))
+      .limit(1);
+
+    let koboReadingState: KoboReadingSessionEntry | null = null;
+    if (koboRow) {
+      const bm = (koboRow.currentBookmark ?? {}) as Record<string, unknown>;
+      const pct = bm.ProgressPercent ?? bm.ContentSourceProgressPercent;
+      const progressPercent = typeof pct === 'number' ? Math.max(0, Math.min(100, pct)) : null;
+      const status =
+        typeof (koboRow.statusInfo as Record<string, unknown> | null)?.Status === 'string'
+          ? ((koboRow.statusInfo as Record<string, unknown>).Status as string)
+          : null;
+      if (progressPercent != null || status != null) {
+        koboReadingState = {
+          progressPercent,
+          lastModified: koboRow.updatedAt?.toISOString() ?? null,
+          status,
+        };
+      }
+    }
+
+    return { items, total, page, pageSize, stats, koboReadingState };
   }
 
   async deleteSessionByBook(userId: number, bookId: number, sessionId: number): Promise<{ found: boolean }> {

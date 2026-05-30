@@ -9,7 +9,7 @@ import ReadingLogTable from './ReadingLogTable.vue'
 const props = defineProps<{ book: BookDetail }>()
 
 const bookIdRef = computed(() => props.book.id)
-const { sessions, total, stats, loading, error, page, pageSize, sortBy, sortDir, deleteSession, setPage, setSort, setFilters } =
+const { sessions, total, stats, koboReadingState, loading, error, page, pageSize, sortBy, sortDir, deleteSession, setPage, setSort, setFilters } =
   useBookReadingLog(bookIdRef)
 
 type QuickFilter = 'all' | 'last30' | 'last90' | 'thisYear'
@@ -52,6 +52,10 @@ function handlePageChange(p: number) {
 
 async function handleDeleteSession(sessionId: number) {
   await deleteSession(sessionId)
+}
+
+function formatDateShort(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 const quickFilters: { label: string; value: QuickFilter }[] = [
@@ -98,6 +102,27 @@ const quickFilters: { label: string; value: QuickFilter }[] = [
 
     <ReadingLogStatsStrip :stats="stats" :loading="loading" :quick-filter="activeQuick" />
 
+    <div v-if="koboReadingState" class="rounded-lg border border-border bg-card p-3 space-y-1.5">
+      <div class="flex items-center gap-2">
+        <span
+          class="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
+          style="background-color: #6366f11a; color: #6366f1; border: 1px solid #6366f140"
+          >Kobo</span
+        >
+        <span class="text-sm text-foreground">Kobo reading progress</span>
+      </div>
+      <div class="flex items-center gap-4 text-xs text-muted-foreground">
+        <span v-if="koboReadingState.progressPercent != null">
+          Progress: <span class="text-foreground font-medium">{{ koboReadingState.progressPercent.toFixed(1) }}%</span>
+        </span>
+        <span v-if="koboReadingState.status">
+          Status: <span class="text-foreground font-medium">{{ koboReadingState.status }}</span>
+        </span>
+        <span v-if="koboReadingState.lastModified">
+          Last synced: <span class="text-foreground font-medium">{{ formatDateShort(koboReadingState.lastModified) }}</span>
+        </span>
+      </div>
+    </div>
     <ReadingLogTable
       :sessions="sessions"
       :total="total"

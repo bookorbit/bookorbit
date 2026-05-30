@@ -1,10 +1,11 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db';
 import * as schema from '../../../db/schema';
 import { UserBookStatusService } from '../../user-book-status/user-book-status.service';
+import { AchievementEventsService, ACHIEVEMENT_EVENT_READING_SESSION_SAVED } from '../../achievement/achievement-events.service';
 import { KoboBookAccessService } from './kobo-book-access.service';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -21,10 +22,13 @@ function mergeSubObject(incoming: JsonObj | null | undefined, existing: JsonObj 
 
 @Injectable()
 export class KoboReadingStateService {
+  private readonly logger = new Logger(KoboReadingStateService.name);
+
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly bookAccessService: KoboBookAccessService,
     private readonly userBookStatusService: UserBookStatusService,
+    private readonly achievementEvents: AchievementEventsService,
   ) {}
 
   async upsertState(userId: number, bookId: number, payload: Record<string, unknown>, readingThreshold: number, finishedThreshold: number) {
@@ -35,7 +39,7 @@ export class KoboReadingStateService {
 
     const book = await this.db.query.books.findFirst({
       where: eq(schema.books.id, bookId),
-      columns: { id: true },
+      columns: { id: true, libraryId: true },
     });
     if (!book) {
       return {
@@ -96,6 +100,48 @@ export class KoboReadingStateService {
     const percent = this.extractPercent(mergedBookmark);
     if (percent !== null) {
       void this.userBookStatusService.autoUpdate(userId, bookId, percent, readingThreshold, finishedThreshold);
+    }
+
+    // Upsert daily reading stats so Kobo activity counts toward the reading streak.
+    if (percent !== null && percent > 0) {
+      try {
+        const previousPercent = existing ? this.extractPercent(existing.currentBookmark as JsonObj | null) : null;
+        const progressDelta = previousPercent != null ? Math.max(0, percent - previousPercent) : percent;
+
+        await this.db
+          .insert(schema.userReadingDailyStats)
+          .values({
+            userId,
+            libraryId: book.libraryId,
+            day: sql<string>`current_date`,
+            readingSeconds: 0,
+            progressDelta,
+            sessionsCount: 1,
+            updatedAt: new Date(),
+          })
+          .onConflictDoUpdate({
+            target: [schema.userReadingDailyStats.userId, schema.userReadingDailyStats.libraryId, schema.userReadingDailyStats.day],
+            set: {
+              progressDelta: sql`${schema.userReadingDailyStats.progressDelta} + ${progressDelta}`,
+              sessionsCount: sql`${schema.userReadingDailyStats.sessionsCount} + 1`,
+              updatedAt: new Date(),
+            },
+          });
+
+        this.achievementEvents.emit(ACHIEVEMENT_EVENT_READING_SESSION_SAVED, {
+          userId,
+          bookFileId: 0,
+          durationSeconds: 0,
+          startedAt: new Date(),
+          endedAt: new Date(),
+          progressDelta,
+          endProgress: percent,
+          timezone: 'UTC',
+        });
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'unknown error';
+        this.logger.warn(`Failed to upsert daily stats for Kobo reading state (userId=${userId} bookId=${bookId}): ${msg}`);
+      }
     }
 
     return this.getRawState(userId, bookId);
