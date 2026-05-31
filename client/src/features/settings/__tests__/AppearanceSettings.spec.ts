@@ -34,6 +34,9 @@ const displaySnapshot = {
   bookSpineOverlay: 'off',
   bookShadowStrength: 'default',
   bookCoverDisplayMode: 'blurred-fit',
+  gridCardPrimaryLabel: 'hidden',
+  gridCardSecondaryLabel: 'hidden',
+  cardInfoMode: 'hover-overlay',
 }
 
 const displayRefs = {
@@ -50,6 +53,9 @@ const displayRefs = {
   bookSpineOverlay: ref('off'),
   bookShadowStrength: ref('default'),
   bookCoverDisplayMode: ref('blurred-fit'),
+  gridCardPrimaryLabel: ref('hidden'),
+  gridCardSecondaryLabel: ref('hidden'),
+  cardInfoMode: ref('hover-overlay'),
 }
 
 const themeStore = {

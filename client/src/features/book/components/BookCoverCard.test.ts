@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { defineComponent, h, ref } from 'vue'
 import type { BookCard } from '@bookorbit/types'
 import BookCoverCard from './BookCoverCard.vue'
@@ -8,6 +8,7 @@ import BookCoverCard from './BookCoverCard.vue'
 
 const mockRouterPush = vi.fn<() => void>()
 vi.mock('vue-router', () => ({
+  useRoute: () => ({ fullPath: '/' }),
   useRouter: () => ({ push: mockRouterPush }),
 }))
 
@@ -37,14 +38,34 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({ hasPermission: mockHasPermission }),
 }))
 
+const mockFetchAuthors = vi.hoisted(() =>
+  vi.fn<
+    (params: { q?: string; page: number; size: number; sort: string; order: string }) => Promise<{
+      items: Array<{ id: number; name: string; sortName: string | null; bookCount: number; lastAddedAt: string | null }>
+      total: number
+      page: number
+      size: number
+    }>
+  >(),
+)
+vi.mock('@/features/author/api/author', () => ({
+  fetchAuthors: mockFetchAuthors,
+}))
+
 const mockCardOverlays = ref<string[]>([])
 const mockBookCoverDisplayMode = ref('blurred-fit')
+const mockGridCardPrimaryLabel = ref('hidden')
+const mockGridCardSecondaryLabel = ref('hidden')
+const mockCardInfoMode = ref('hover-overlay')
 vi.mock('@/composables/useDisplaySettings', () => ({
   useDisplaySettings: () => ({
     cardOverlays: mockCardOverlays,
     bookSpineOverlay: ref('off'),
     bookShadowStrength: ref('default'),
     bookCoverDisplayMode: mockBookCoverDisplayMode,
+    gridCardPrimaryLabel: mockGridCardPrimaryLabel,
+    gridCardSecondaryLabel: mockGridCardSecondaryLabel,
+    cardInfoMode: mockCardInfoMode,
   }),
 }))
 
@@ -137,7 +158,9 @@ function makeBook(overrides: Partial<BookCard> = {}): BookCard {
   }
 }
 
-function mountCard(props: Partial<{ book: BookCard; selectionMode: boolean; selected: boolean; onSelect: (e: MouseEvent) => void }> = {}) {
+function mountCard(
+  props: Partial<{ book: BookCard; selectionMode: boolean; selected: boolean; showLabel: boolean; onSelect: (e: MouseEvent) => void }> = {},
+) {
   return mount(BookCoverCard, {
     props: { book: makeBook(), selectionMode: false, selected: false, ...props },
     global: {
@@ -188,6 +211,15 @@ describe('BookCoverCard', () => {
     mockRefreshing.value = false
     mockCardOverlays.value = []
     mockBookCoverDisplayMode.value = 'blurred-fit'
+    mockGridCardPrimaryLabel.value = 'hidden'
+    mockGridCardSecondaryLabel.value = 'hidden'
+    mockCardInfoMode.value = 'hover-overlay'
+    mockFetchAuthors.mockResolvedValue({
+      items: [{ id: 7, name: 'Frank Herbert', sortName: null, bookCount: 1, lastAddedAt: '2024-01-01T00:00:00Z' }],
+      total: 1,
+      page: 0,
+      size: 5,
+    })
     setTouchMode(false)
   })
 
@@ -311,6 +343,46 @@ describe('BookCoverCard', () => {
       const wrapper = mountCard({ book })
       await wrapper.find('.group').trigger('click')
       expect(mockRouterPush).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('below-cover label click behavior', () => {
+    it('opens book details when the primary label text is clicked', async () => {
+      mockCardInfoMode.value = 'below-cover'
+      mockGridCardPrimaryLabel.value = 'book-title'
+      const book = makeBook({ id: 42, files: [makeFile({ id: 10, format: 'epub', role: 'primary' })] })
+      const wrapper = mountCard({ book, showLabel: true })
+
+      await wrapper.get('[data-testid="grid-card-label-primary"]').trigger('click')
+
+      expect(mockRouterPush).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 42 } })
+      expect(mockRouterPush).not.toHaveBeenCalledWith(expect.objectContaining({ name: 'reader' }))
+    })
+
+    it('opens author details when the author label text is clicked', async () => {
+      mockCardInfoMode.value = 'below-cover'
+      mockGridCardSecondaryLabel.value = 'author'
+      const book = makeBook({ id: 43, files: [makeFile({ id: 11, format: 'epub', role: 'primary' })] })
+      const wrapper = mountCard({ book, showLabel: true })
+
+      await wrapper.get('[data-testid="grid-card-label-secondary"]').trigger('click')
+      await flushPromises()
+
+      expect(mockFetchAuthors).toHaveBeenCalledWith({ q: 'Frank Herbert', page: 0, size: 5, sort: 'name', order: 'asc' })
+      expect(mockRouterPush).toHaveBeenCalledWith({ name: 'author-detail', params: { id: 7 }, query: { from: '/' } })
+      expect(mockRouterPush).not.toHaveBeenCalledWith(expect.objectContaining({ name: 'reader' }))
+    })
+
+    it('opens series details when the series label text is clicked', async () => {
+      mockCardInfoMode.value = 'below-cover'
+      mockGridCardPrimaryLabel.value = 'series-title-position'
+      const book = makeBook({ id: 44, seriesName: 'Dune Chronicles', seriesIndex: 1, files: [makeFile({ id: 12, format: 'epub', role: 'primary' })] })
+      const wrapper = mountCard({ book, showLabel: true })
+
+      await wrapper.get('[data-testid="grid-card-label-primary"]').trigger('click')
+
+      expect(mockRouterPush).toHaveBeenCalledWith({ name: 'series-detail', params: { seriesName: 'Dune Chronicles' }, query: { from: '/' } })
+      expect(mockRouterPush).not.toHaveBeenCalledWith(expect.objectContaining({ name: 'reader' }))
     })
   })
 

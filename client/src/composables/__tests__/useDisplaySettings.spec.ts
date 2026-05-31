@@ -21,6 +21,8 @@ function resetDisplaySettings() {
   settings.bookShadowStrength.value = 'default'
   settings.bookCoverDisplayMode.value = 'blurred-fit'
   settings.seriesCardCoverMode.value = 'mosaic'
+  settings.gridCardPrimaryLabel.value = 'hidden'
+  settings.gridCardSecondaryLabel.value = 'hidden'
 }
 
 afterEach(() => {
@@ -114,5 +116,46 @@ describe('useDisplaySettings preferences helpers', () => {
   it('defaults seriesCardCoverMode to mosaic', () => {
     resetDisplaySettings()
     expect(settings.seriesCardCoverMode.value).toBe('mosaic')
+  })
+
+  it('includes gridCardPrimaryLabel and gridCardSecondaryLabel in snapshot', () => {
+    settings.gridCardPrimaryLabel.value = 'book-title'
+    settings.gridCardSecondaryLabel.value = 'author'
+    const snap = getDisplayPreferencesSnapshot()
+    expect(snap.gridCardPrimaryLabel).toBe('book-title')
+    expect(snap.gridCardSecondaryLabel).toBe('author')
+  })
+
+  it('defaults both label fields to hidden', () => {
+    resetDisplaySettings()
+    expect(settings.gridCardPrimaryLabel.value).toBe('hidden')
+    expect(settings.gridCardSecondaryLabel.value).toBe('hidden')
+  })
+
+  it('sanitizes valid gridCardPrimaryLabel values', () => {
+    for (const value of ['hidden', 'book-title', 'series-title', 'series-title-position', 'author'] as const) {
+      expect(sanitizeDisplayPreferences({ gridCardPrimaryLabel: value })).toEqual({ gridCardPrimaryLabel: value })
+    }
+  })
+
+  it('sanitizes valid gridCardSecondaryLabel values', () => {
+    for (const value of ['hidden', 'book-title', 'series-title', 'series-title-position', 'author'] as const) {
+      expect(sanitizeDisplayPreferences({ gridCardSecondaryLabel: value })).toEqual({ gridCardSecondaryLabel: value })
+    }
+  })
+
+  it('drops invalid gridCardPrimaryLabel values', () => {
+    expect(sanitizeDisplayPreferences({ gridCardPrimaryLabel: 'unknown-field' })).toEqual({})
+    expect(sanitizeDisplayPreferences({ gridCardPrimaryLabel: 42 })).toEqual({})
+  })
+
+  it('drops invalid gridCardSecondaryLabel values', () => {
+    expect(sanitizeDisplayPreferences({ gridCardSecondaryLabel: 'bad-value' })).toEqual({})
+  })
+
+  it('applies gridCardPrimaryLabel and gridCardSecondaryLabel from preferences', () => {
+    applyDisplayPreferences({ gridCardPrimaryLabel: 'series-title', gridCardSecondaryLabel: 'author' })
+    expect(settings.gridCardPrimaryLabel.value).toBe('series-title')
+    expect(settings.gridCardSecondaryLabel.value).toBe('author')
   })
 })

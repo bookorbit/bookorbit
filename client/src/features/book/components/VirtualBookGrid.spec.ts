@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 import { mount } from '@vue/test-utils'
 import type { BookCard } from '@bookorbit/types'
 import VirtualBookGrid from './VirtualBookGrid.vue'
@@ -14,21 +15,32 @@ vi.mock('vue-virtual-scroller', () => ({
 vi.mock('./BookCoverCard.vue', () => ({
   default: {
     name: 'BookCoverCard',
-    props: ['book', 'selectionMode', 'selected'],
+    props: ['book', 'selectionMode', 'selected', 'showLabel'],
     emits: ['action', 'select', 'update:book'],
-    template: '<button data-testid="book-card" @click="$emit(\'action\', \'quick-view\')">{{ book.id }}</button>',
+    template:
+      '<button data-testid="book-card" @click="$emit(\'action\', \'quick-view\')">{{ book.id }}<span v-if="showLabel" data-testid="book-card-label-slot" /></button>',
   },
 }))
 
 vi.mock('./CollapsedSeriesCard.vue', () => ({
   default: {
     name: 'CollapsedSeriesCard',
-    props: ['book'],
-    template: '<div data-testid="collapsed-series-card">{{ book.id }}</div>',
+    props: ['book', 'showLabel'],
+    template: '<div data-testid="collapsed-series-card">{{ book.id }}<span v-if="showLabel" data-testid="series-card-label-slot" /></div>',
   },
 }))
 
-function makeBook(id: number): BookCard {
+const displaySettingsState = {
+  gridCardPrimaryLabel: ref('hidden'),
+  gridCardSecondaryLabel: ref('hidden'),
+  cardInfoMode: ref('hover-overlay'),
+}
+
+vi.mock('@/composables/useDisplaySettings', () => ({
+  useDisplaySettings: () => displaySettingsState,
+}))
+
+function makeBook(id: number, overrides: Partial<BookCard> = {}): BookCard {
   return {
     id,
     status: 'present',
@@ -55,6 +67,7 @@ function makeBook(id: number): BookCard {
     pageCount: null,
     isbn13: null,
     narrators: [],
+    ...overrides,
   }
 }
 
@@ -101,5 +114,62 @@ describe('VirtualBookGrid', () => {
     await wrapper.get('[data-testid="book-card"]').trigger('click')
 
     expect(wrapper.emitted('action')).toEqual([[books[0], 'quick-view']])
+  })
+
+  describe('show-label prop forwarding', () => {
+    afterEach(() => {
+      displaySettingsState.cardInfoMode.value = 'hover-overlay'
+    })
+
+    it('does not pass showLabel when cardInfoMode is hover-overlay', () => {
+      displaySettingsState.cardInfoMode.value = 'hover-overlay'
+
+      const wrapper = mount(VirtualBookGrid, {
+        props: { books: [makeBook(1)], coverSize: 120, gridGap: 12, virtualized: false },
+      })
+
+      expect(wrapper.find('[data-testid="book-card-label-slot"]').exists()).toBe(false)
+    })
+
+    it('passes showLabel=true when cardInfoMode is below-cover', () => {
+      displaySettingsState.cardInfoMode.value = 'below-cover'
+
+      const wrapper = mount(VirtualBookGrid, {
+        props: { books: [makeBook(1)], coverSize: 120, gridGap: 12, virtualized: false },
+      })
+
+      expect(wrapper.find('[data-testid="book-card-label-slot"]').exists()).toBe(true)
+    })
+
+    it('does not pass showLabel when cardInfoMode is off', () => {
+      displaySettingsState.cardInfoMode.value = 'off'
+
+      const wrapper = mount(VirtualBookGrid, {
+        props: { books: [makeBook(1)], coverSize: 120, gridGap: 12, virtualized: false },
+      })
+
+      expect(wrapper.find('[data-testid="book-card-label-slot"]').exists()).toBe(false)
+    })
+
+    it('passes showLabel to CollapsedSeriesCard when cardInfoMode is below-cover', () => {
+      displaySettingsState.cardInfoMode.value = 'below-cover'
+
+      const seriesBook = makeBook(1, {
+        collapsedSeries: {
+          bookCount: 3,
+          readCount: 0,
+          coverBookIds: [],
+          seriesLatestAddedAt: null,
+          firstVolumeBookId: null,
+          latestVolumeBookId: null,
+          firstUnreadBookId: null,
+        },
+      })
+      const wrapper = mount(VirtualBookGrid, {
+        props: { books: [seriesBook], coverSize: 120, gridGap: 12, virtualized: false },
+      })
+
+      expect(wrapper.find('[data-testid="series-card-label-slot"]').exists()).toBe(true)
+    })
   })
 })

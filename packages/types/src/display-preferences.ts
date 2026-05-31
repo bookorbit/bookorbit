@@ -1,6 +1,9 @@
 export const CARD_OVERLAY_KEYS = ["progress-bar", "format", "rating", "read-status", "lock-status", "series-position"] as const;
 export type CardOverlayKey = (typeof CARD_OVERLAY_KEYS)[number];
 
+export const GRID_CARD_LABEL_FIELDS = ["hidden", "book-title", "series-title", "series-title-position", "author"] as const;
+export type GridCardLabelField = (typeof GRID_CARD_LABEL_FIELDS)[number];
+
 export const COVER_SIZE_SCOPES = ["per-view", "synced"] as const;
 export type CoverSizeScope = (typeof COVER_SIZE_SCOPES)[number];
 
@@ -25,6 +28,9 @@ export type BookCoverDisplayMode = (typeof BOOK_COVER_DISPLAY_MODES)[number];
 export const SERIES_CARD_COVER_MODES = ["mosaic", "first-volume", "latest-volume", "first-unread"] as const;
 export type SeriesCardCoverMode = (typeof SERIES_CARD_COVER_MODES)[number];
 
+export const CARD_INFO_MODES = ["hover-overlay", "below-cover", "off"] as const;
+export type CardInfoMode = (typeof CARD_INFO_MODES)[number];
+
 export interface DisplayPreferences {
   portraitCoverSize: number;
   squareCoverSize: number;
@@ -43,4 +49,7 @@ export interface DisplayPreferences {
   bookShadowStrength: BookShadowStrength;
   bookCoverDisplayMode: BookCoverDisplayMode;
   seriesCardCoverMode: SeriesCardCoverMode;
+  gridCardPrimaryLabel: GridCardLabelField;
+  gridCardSecondaryLabel: GridCardLabelField;
+  cardInfoMode: CardInfoMode;
 }

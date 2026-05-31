@@ -20,7 +20,10 @@ function validDisplayPreferences(overrides: Partial<DisplayPreferences> = {}): D
     bookSpineOverlay: 'subtle',
     bookShadowStrength: 'strong',
     bookCoverDisplayMode: 'blurred-fit',
+    cardInfoMode: 'hover-overlay',
     seriesCardCoverMode: 'mosaic',
+    gridCardPrimaryLabel: 'hidden',
+    gridCardSecondaryLabel: 'hidden',
     ...overrides,
   }
 }
@@ -251,5 +254,57 @@ describe('useDisplaySettingsSync', () => {
     await sync.loadDisplaySettingsFromServer()
 
     expect(displaySettings.useDisplaySettings().seriesCardCoverMode.value).toBe('latest-volume')
+  })
+
+  it('syncs gridCardPrimaryLabel changes to the server', async () => {
+    vi.useFakeTimers()
+    const { apiMock, displaySettings, sync } = await loadModules()
+    apiMock.mockResolvedValue({ ok: true })
+
+    sync.initDisplaySettingsSync()
+    displaySettings.useDisplaySettings().gridCardPrimaryLabel.value = 'book-title'
+    await vi.advanceTimersByTimeAsync(1500)
+
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/v1/user-preferences/display',
+      expect.objectContaining({
+        method: 'PUT',
+        body: expect.stringContaining('"gridCardPrimaryLabel":"book-title"'),
+      }),
+    )
+  })
+
+  it('syncs gridCardSecondaryLabel changes to the server', async () => {
+    vi.useFakeTimers()
+    const { apiMock, displaySettings, sync } = await loadModules()
+    apiMock.mockResolvedValue({ ok: true })
+
+    sync.initDisplaySettingsSync()
+    displaySettings.useDisplaySettings().gridCardSecondaryLabel.value = 'author'
+    await vi.advanceTimersByTimeAsync(1500)
+
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/v1/user-preferences/display',
+      expect.objectContaining({
+        method: 'PUT',
+        body: expect.stringContaining('"gridCardSecondaryLabel":"author"'),
+      }),
+    )
+  })
+
+  it('loads gridCardPrimaryLabel and gridCardSecondaryLabel from the server', async () => {
+    const { apiMock, displaySettings, sync } = await loadModules()
+    apiMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        settings: validDisplayPreferences({ gridCardPrimaryLabel: 'series-title', gridCardSecondaryLabel: 'author' }),
+      }),
+    })
+
+    await sync.loadDisplaySettingsFromServer()
+
+    const s = displaySettings.useDisplaySettings()
+    expect(s.gridCardPrimaryLabel.value).toBe('series-title')
+    expect(s.gridCardSecondaryLabel.value).toBe('author')
   })
 })

@@ -6,6 +6,7 @@ import type { BookCard } from '@bookorbit/types'
 import BookCoverCard from './BookCoverCard.vue'
 import CollapsedSeriesCard from './CollapsedSeriesCard.vue'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
+import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
 type BookActionType = 'quick-view' | 'add-to-collection' | 'delete'
 
@@ -75,12 +76,22 @@ const aspectMultiplier = computed(() => (coverAspectRatio.value === '1/1' ? 1 : 
 
 const cardWidth = computed(() => Math.max(1, itemSecondarySize.value - gapPx.value))
 const cardHeight = computed(() => Math.max(1, Math.round(cardWidth.value * aspectMultiplier.value)))
-const itemSize = computed(() => cardHeight.value + gapPx.value)
+
+const { gridCardSecondaryLabel, cardInfoMode } = useDisplaySettings()
+const labelAreaHeight = computed(() => {
+  if (cardInfoMode.value !== 'below-cover') return 0
+  const hasSecondary = gridCardSecondaryLabel.value !== 'hidden'
+  return hasSecondary ? 40 : 24
+})
+const showLabel = computed(() => cardInfoMode.value === 'below-cover')
+
+const itemSize = computed(() => cardHeight.value + labelAreaHeight.value + gapPx.value)
 const buffer = computed(() => Math.max(itemSize.value * 2, 240))
 
 const scrollerStyle = computed(() => ({
   '--book-grid-gap': `${gapPx.value}px`,
   '--book-grid-height': `${cardHeight.value}px`,
+  '--book-grid-label-height': `${labelAreaHeight.value}px`,
 }))
 
 const staticGridStyle = computed(() => ({
@@ -93,10 +104,11 @@ const staticGridStyle = computed(() => ({
   <div ref="containerRef" class="w-full">
     <div v-if="!virtualized" class="grid w-full max-w-full items-start" :style="staticGridStyle" data-testid="book-grid-static">
       <div v-for="book in books" :key="book.id" class="min-w-0" :class="{ 'book-grid-cell--new': props.newBookIds.has(book.id) }">
-        <CollapsedSeriesCard v-if="book.collapsedSeries" :book="book" />
+        <CollapsedSeriesCard v-if="book.collapsedSeries" :book="book" :show-label="showLabel" />
         <BookCoverCard
           v-else
           :book="book"
+          :show-label="showLabel"
           :selection-mode="selectionMode"
           :selected="isSelected?.(book.id) ?? false"
           @action="emit('action', book, $event)"
@@ -120,10 +132,11 @@ const staticGridStyle = computed(() => ({
     >
       <template #default="{ item: book }">
         <div class="book-grid-cell" :class="{ 'book-grid-cell--new': props.newBookIds.has(book.id) }">
-          <CollapsedSeriesCard v-if="book.collapsedSeries" :book="book" />
+          <CollapsedSeriesCard v-if="book.collapsedSeries" :book="book" :show-label="showLabel" />
           <BookCoverCard
             v-else
             :book="book"
+            :show-label="showLabel"
             :selection-mode="selectionMode"
             :selected="isSelected?.(book.id) ?? false"
             @action="emit('action', book, $event)"
@@ -155,7 +168,7 @@ const staticGridStyle = computed(() => ({
 }
 
 .book-grid-cell {
-  height: var(--book-grid-height);
+  height: calc(var(--book-grid-height) + var(--book-grid-label-height, 0px));
   box-sizing: border-box;
   padding-left: 0;
   padding-right: var(--book-grid-gap);

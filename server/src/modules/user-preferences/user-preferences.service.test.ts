@@ -31,6 +31,9 @@ const validDisplayPreferences: DisplayPreferences = {
   bookShadowStrength: 'strong',
   bookCoverDisplayMode: 'natural-bottom',
   seriesCardCoverMode: 'mosaic',
+  gridCardPrimaryLabel: 'hidden',
+  gridCardSecondaryLabel: 'hidden',
+  cardInfoMode: 'hover-overlay',
 };
 
 const repo = {
@@ -219,5 +222,50 @@ describe('UserPreferencesService', () => {
 
     await expect(service.upsertDisplayPreferences(11, validDisplayPreferences as unknown as Record<string, unknown>)).rejects.toBe(err);
     expect(repo.upsert).toHaveBeenCalledWith(11, 'display', validDisplayPreferences);
+  });
+
+  it('upsertDisplayPreferences accepts all valid gridCardPrimaryLabel values', async () => {
+    for (const value of ['hidden', 'book-title', 'series-title', 'series-title-position', 'author']) {
+      await expect(
+        service.upsertDisplayPreferences(11, { ...validDisplayPreferences, gridCardPrimaryLabel: value } as unknown as Record<string, unknown>),
+      ).resolves.toBeUndefined();
+    }
+  });
+
+  it('upsertDisplayPreferences accepts all valid gridCardSecondaryLabel values', async () => {
+    for (const value of ['hidden', 'book-title', 'series-title', 'series-title-position', 'author']) {
+      await expect(
+        service.upsertDisplayPreferences(11, { ...validDisplayPreferences, gridCardSecondaryLabel: value } as unknown as Record<string, unknown>),
+      ).resolves.toBeUndefined();
+    }
+  });
+
+  it('upsertDisplayPreferences rejects invalid gridCardPrimaryLabel value', async () => {
+    await expect(
+      service.upsertDisplayPreferences(11, { ...validDisplayPreferences, gridCardPrimaryLabel: 'unknown-field' } as unknown as Record<
+        string,
+        unknown
+      >),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('upsertDisplayPreferences rejects invalid gridCardSecondaryLabel value', async () => {
+    await expect(
+      service.upsertDisplayPreferences(11, { ...validDisplayPreferences, gridCardSecondaryLabel: 'bad-value' } as unknown as Record<string, unknown>),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('upsertDisplayPreferences defaults gridCardPrimaryLabel to hidden when omitted', async () => {
+    const { gridCardPrimaryLabel, ...withoutPrimary } = validDisplayPreferences;
+    void gridCardPrimaryLabel;
+    await expect(service.upsertDisplayPreferences(11, withoutPrimary as unknown as Record<string, unknown>)).resolves.toBeUndefined();
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'display', expect.objectContaining({ gridCardPrimaryLabel: 'hidden' }));
+  });
+
+  it('upsertDisplayPreferences defaults gridCardSecondaryLabel to hidden when omitted', async () => {
+    const { gridCardSecondaryLabel, ...withoutSecondary } = validDisplayPreferences;
+    void gridCardSecondaryLabel;
+    await expect(service.upsertDisplayPreferences(11, withoutSecondary as unknown as Record<string, unknown>)).resolves.toBeUndefined();
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'display', expect.objectContaining({ gridCardSecondaryLabel: 'hidden' }));
   });
 });

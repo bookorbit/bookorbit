@@ -59,6 +59,8 @@ vi.mock('@/composables/useDisplaySettings', () => ({
   useDisplaySettings: () => ({
     portraitCoverSize: ref(160),
     gridGap: ref(16),
+    gridCardPrimaryLabel: ref('hidden'),
+    gridCardSecondaryLabel: ref('hidden'),
   }),
 }))
 

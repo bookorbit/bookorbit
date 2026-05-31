@@ -5,8 +5,10 @@ import {
   BOOK_SHADOW_STRENGTHS,
   BOOK_SPINE_OVERLAYS,
   BOOK_VIEW_MODES,
+  CARD_INFO_MODES,
   CARD_OVERLAY_KEYS,
   COVER_SIZE_SCOPES,
+  GRID_CARD_LABEL_FIELDS,
   SERIES_CARD_COVER_MODES,
   TABLE_DENSITIES,
   type AuthorCoverShape,
@@ -14,9 +16,11 @@ import {
   type BookShadowStrength,
   type BookSpineOverlay,
   type BookViewMode,
+  type CardInfoMode,
   type CardOverlayKey,
   type CoverSizeScope,
   type DisplayPreferences,
+  type GridCardLabelField,
   type SeriesCardCoverMode,
   type TableDensity,
 } from '@bookorbit/types'
@@ -28,9 +32,11 @@ export type {
   BookShadowStrength,
   BookSpineOverlay,
   BookViewMode,
+  CardInfoMode,
   CardOverlayKey,
   CoverSizeScope,
   DisplayPreferences,
+  GridCardLabelField,
   SeriesCardCoverMode,
   TableDensity,
 } from '@bookorbit/types'
@@ -66,6 +72,14 @@ function normalizeSeriesCardCoverMode(value: unknown): SeriesCardCoverMode {
   return typeof value === 'string' && SERIES_CARD_COVER_MODES.includes(value as SeriesCardCoverMode)
     ? (value as SeriesCardCoverMode)
     : DEFAULT_SERIES_CARD_COVER_MODE
+}
+
+function normalizeCardInfoMode(value: unknown): CardInfoMode {
+  return typeof value === 'string' && CARD_INFO_MODES.includes(value as CardInfoMode) ? (value as CardInfoMode) : 'hover-overlay'
+}
+
+function normalizeGridCardLabelField(value: unknown): GridCardLabelField {
+  return typeof value === 'string' && GRID_CARD_LABEL_FIELDS.includes(value as GridCardLabelField) ? (value as GridCardLabelField) : 'hidden'
 }
 
 function normalizeCoverSizeScope(value: unknown): CoverSizeScope {
@@ -127,6 +141,9 @@ const bookCoverDisplayMode = ref<BookCoverDisplayMode>(
   normalizeBookCoverDisplayMode(storage.get('bookCoverDisplayMode', DEFAULT_BOOK_COVER_DISPLAY_MODE)),
 )
 const seriesCardCoverMode = ref<SeriesCardCoverMode>(normalizeSeriesCardCoverMode(storage.get('seriesCardCoverMode', DEFAULT_SERIES_CARD_COVER_MODE)))
+const gridCardPrimaryLabel = ref<GridCardLabelField>(normalizeGridCardLabelField(storage.get('gridCardPrimaryLabel', 'hidden')))
+const gridCardSecondaryLabel = ref<GridCardLabelField>(normalizeGridCardLabelField(storage.get('gridCardSecondaryLabel', 'hidden')))
+const cardInfoMode = ref<CardInfoMode>(normalizeCardInfoMode(storage.get('cardInfoMode', 'hover-overlay')))
 
 watch(portraitCoverSize, (v) => storage.set('portraitCoverSize', v))
 watch(squareCoverSize, (v) => storage.set('squareCoverSize', v))
@@ -145,6 +162,9 @@ watch(bookSpineOverlay, (value) => storage.set('bookSpineOverlay', normalizeBook
 watch(bookShadowStrength, (value) => storage.set('bookShadowStrength', normalizeBookShadowStrength(value)))
 watch(bookCoverDisplayMode, (value) => storage.set('bookCoverDisplayMode', normalizeBookCoverDisplayMode(value)))
 watch(seriesCardCoverMode, (value) => storage.set('seriesCardCoverMode', normalizeSeriesCardCoverMode(value)))
+watch(gridCardPrimaryLabel, (value) => storage.set('gridCardPrimaryLabel', normalizeGridCardLabelField(value)))
+watch(gridCardSecondaryLabel, (value) => storage.set('gridCardSecondaryLabel', normalizeGridCardLabelField(value)))
+watch(cardInfoMode, (value) => storage.set('cardInfoMode', normalizeCardInfoMode(value)))
 
 export function getDisplayPreferencesSnapshot(): DisplayPreferences {
   return {
@@ -165,6 +185,9 @@ export function getDisplayPreferencesSnapshot(): DisplayPreferences {
     bookShadowStrength: normalizeBookShadowStrength(bookShadowStrength.value),
     bookCoverDisplayMode: normalizeBookCoverDisplayMode(bookCoverDisplayMode.value),
     seriesCardCoverMode: normalizeSeriesCardCoverMode(seriesCardCoverMode.value),
+    gridCardPrimaryLabel: normalizeGridCardLabelField(gridCardPrimaryLabel.value),
+    gridCardSecondaryLabel: normalizeGridCardLabelField(gridCardSecondaryLabel.value),
+    cardInfoMode: normalizeCardInfoMode(cardInfoMode.value),
   }
 }
 
@@ -197,6 +220,15 @@ export function sanitizeDisplayPreferences(raw: unknown): Partial<DisplayPrefere
   if (SERIES_CARD_COVER_MODES.includes(obj.seriesCardCoverMode as SeriesCardCoverMode)) {
     out.seriesCardCoverMode = obj.seriesCardCoverMode as SeriesCardCoverMode
   }
+  if (GRID_CARD_LABEL_FIELDS.includes(obj.gridCardPrimaryLabel as GridCardLabelField)) {
+    out.gridCardPrimaryLabel = obj.gridCardPrimaryLabel as GridCardLabelField
+  }
+  if (GRID_CARD_LABEL_FIELDS.includes(obj.gridCardSecondaryLabel as GridCardLabelField)) {
+    out.gridCardSecondaryLabel = obj.gridCardSecondaryLabel as GridCardLabelField
+  }
+  if (CARD_INFO_MODES.includes(obj.cardInfoMode as CardInfoMode)) {
+    out.cardInfoMode = obj.cardInfoMode as CardInfoMode
+  }
 
   return out
 }
@@ -220,6 +252,9 @@ export function applyDisplayPreferences(raw: unknown): void {
   if (prefs.bookShadowStrength !== undefined) bookShadowStrength.value = prefs.bookShadowStrength
   if (prefs.bookCoverDisplayMode !== undefined) bookCoverDisplayMode.value = prefs.bookCoverDisplayMode
   if (prefs.seriesCardCoverMode !== undefined) seriesCardCoverMode.value = prefs.seriesCardCoverMode
+  if (prefs.gridCardPrimaryLabel !== undefined) gridCardPrimaryLabel.value = prefs.gridCardPrimaryLabel
+  if (prefs.gridCardSecondaryLabel !== undefined) gridCardSecondaryLabel.value = prefs.gridCardSecondaryLabel
+  if (prefs.cardInfoMode !== undefined) cardInfoMode.value = prefs.cardInfoMode
 }
 
 export function useDisplaySettings() {
@@ -241,5 +276,8 @@ export function useDisplaySettings() {
     bookShadowStrength,
     bookCoverDisplayMode,
     seriesCardCoverMode,
+    gridCardPrimaryLabel,
+    gridCardSecondaryLabel,
+    cardInfoMode,
   }
 }
