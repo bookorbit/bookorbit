@@ -61,6 +61,7 @@ import { KoreaderModule } from './modules/koreader/koreader.module';
 import { AppInfoModule } from './modules/app-info/app-info.module';
 import { AchievementModule } from './modules/achievement/achievement.module';
 import { HardcoverModule } from './modules/hardcover/hardcover.module';
+import { AnnasArchiveModule } from './modules/annas-archive/annas-archive.module';
 
 @Module({
   imports: [
@@ -130,6 +131,7 @@ import { HardcoverModule } from './modules/hardcover/hardcover.module';
     AppInfoModule,
     AchievementModule,
     HardcoverModule,
+    AnnasArchiveModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

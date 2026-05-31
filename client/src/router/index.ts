@@ -308,6 +308,12 @@ export const routes: RouteRecordRaw[] = [
             component: () => import('@/features/tools/bulk-rename/views/BulkRenameView.vue'),
             meta: { title: 'Bulk Rename' },
           },
+          {
+            path: 'annas-archive',
+            name: 'tools-annas-archive',
+            component: () => import('@/features/annas-archive/components/AnnasArchiveView.vue'),
+            meta: { title: "Anna's Archive" },
+          },
           { path: ':pathMatch(.*)*', redirect: { name: 'tools-entity-manager' } },
         ],
       },

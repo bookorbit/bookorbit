@@ -20,6 +20,10 @@ const sections = computed<ToolSection[]>(() => {
     result.push({ label: 'Bulk Rename', routeName: 'tools-bulk-rename' })
   }
 
+  if (hasPermission('library_upload')) {
+    result.push({ label: "Anna's Archive", routeName: 'tools-annas-archive' })
+  }
+
   return result
 })
 
