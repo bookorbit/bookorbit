@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, onUnmounted } from 'vue'
 import { Loader2 } from 'lucide-vue-next'
+import { useCoverVersions } from '../../composables/useCoverVersions'
+import BookCoverArtwork from '../BookCoverArtwork.vue'
 import BookCoverImage from '../BookCoverImage.vue'
-import BookCoverPlaceholder from '../BookCoverPlaceholder.vue'
 import BookCoverSurface from '../BookCoverSurface.vue'
 import { useRefreshingBooks } from '@/features/book/composables/useRefreshingBooks'
 
@@ -18,6 +19,8 @@ const { isRefreshing } = useRefreshingBooks()
 
 const seed = computed(() => props.title ?? String(props.bookId))
 const isRefreshingBook = computed(() => isRefreshing(props.bookId))
+const { coverUrl } = useCoverVersions()
+const thumbnailSrc = computed(() => coverUrl(props.bookId, 'thumbnail'))
 const showPreview = ref(false)
 const previewPos = ref({ x: 0, y: 0 })
 let hoverTimer: ReturnType<typeof setTimeout> | null = null
@@ -50,6 +53,10 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
+function handleCoverClick() {
+  emit('cover-click')
+}
+
 const adjustedLeft = computed(() => {
   const previewWidth = 180
   if (previewPos.value.x + previewWidth > window.innerWidth - 8) {
@@ -72,12 +79,21 @@ const adjustedTop = computed(() => {
       tabindex="0"
       role="button"
       aria-label="View cover"
-      class="relative flex h-9 w-9 shrink-0 cursor-pointer overflow-hidden rounded-sm transition-opacity hover:opacity-80"
-      @click="emit('cover-click')"
+      class="book-cover-surface--spine-fitted relative flex h-9 w-9 shrink-0 cursor-pointer overflow-hidden rounded-sm transition-opacity hover:opacity-80"
+      @click="handleCoverClick"
       @keydown="handleKeydown"
     >
-      <BookCoverImage v-if="hasCover" :book-id="bookId" type="thumbnail" class="h-full w-full object-cover" />
-      <BookCoverPlaceholder v-else :title="title" :author-line="null" :is-audio="false" :seed="seed" class="h-full w-full" />
+      <BookCoverArtwork
+        :src="thumbnailSrc"
+        :has-cover="hasCover"
+        :title="title"
+        :author-line="null"
+        :is-audio="isAudio"
+        :seed="seed"
+        :alt="title ?? ''"
+        frame-aspect-ratio="1/1"
+        :spine="!isAudio"
+      />
       <div v-if="isRefreshingBook" class="absolute inset-0 flex items-center justify-center bg-black/50">
         <Loader2 :size="12" class="animate-spin text-white" />
       </div>

@@ -27,7 +27,7 @@ const sections = computed<Section[]>(() => {
     result.push({ label: 'Libraries', routeName: 'settings-libraries' })
   }
 
-  result.push({ label: 'Appearance', routeName: 'settings-appearance' })
+  result.push({ label: 'Display', routeName: 'settings-appearance' })
   result.push({ label: 'Reader', routeName: 'settings-reader-general' })
 
   if (su || perms.includes('manage_metadata_config')) {

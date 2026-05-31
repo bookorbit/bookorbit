@@ -87,25 +87,26 @@ function mountDetails(book: BookDetail) {
     props: { book },
     global: {
       stubs: {
+        BookCoverArtwork: false,
         BookCoverSurface: false,
       },
     },
   })
 }
 
-async function loadCoverImages(wrapper: ReturnType<typeof mountDetails>) {
+async function loadCoverImages(wrapper: ReturnType<typeof mountDetails>, naturalWidth = 1000, naturalHeight = 1000) {
   const imgs = wrapper.findAll(`img[alt="${wrapper.props('book').title}"]`)
   expect(imgs.length).toBe(2)
 
   for (const img of imgs) {
-    Object.defineProperty(img.element, 'naturalWidth', { configurable: true, value: 1000 })
-    Object.defineProperty(img.element, 'naturalHeight', { configurable: true, value: 1000 })
+    Object.defineProperty(img.element, 'naturalWidth', { configurable: true, value: naturalWidth })
+    Object.defineProperty(img.element, 'naturalHeight', { configurable: true, value: naturalHeight })
     await img.trigger('load')
   }
 }
 
 describe('DetailsTab cover surface', () => {
-  const { bookSpineOverlay } = useDisplaySettings()
+  const { bookSpineOverlay, bookCoverDisplayMode } = useDisplaySettings()
 
   beforeEach(() => {
     mocks.api.mockReset()
@@ -146,6 +147,7 @@ describe('DetailsTab cover surface', () => {
 
   afterEach(() => {
     bookSpineOverlay.value = 'off'
+    bookCoverDisplayMode.value = 'blurred-fit'
     vi.unstubAllGlobals()
   })
 
@@ -165,6 +167,18 @@ describe('DetailsTab cover surface', () => {
     const spineLayers = wrapper.findAll('.book-cover-spine-layer')
     expect(spineLayers.length).toBe(2)
     expect(spineLayers[0]!.attributes('style')).toContain('translateY(-50%)')
+  })
+
+  it('shrinks natural-bottom detail cover surfaces to the loaded cover ratio', async () => {
+    bookCoverDisplayMode.value = 'natural-bottom'
+
+    const wrapper = mountDetails(makeBook())
+    await flushPromises()
+    await loadCoverImages(wrapper, 1200, 600)
+
+    const surfaces = wrapper.findAll('.book-cover-surface')
+    expect(surfaces.length).toBe(2)
+    expect(surfaces.every((surface) => surface.attributes('style')?.includes('aspect-ratio: 2 / 1'))).toBe(true)
   })
 
   it('forces spine overlay off for audiobook details covers', async () => {

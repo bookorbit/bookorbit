@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import type { BookCard, BookFileRef } from '@bookorbit/types'
 import { FORMAT_TO_GROUP } from '@bookorbit/types'
-import { bookCoverStyle } from '../lib/book-cover'
-import BookCoverPlaceholder from './BookCoverPlaceholder.vue'
+import BookCoverArtwork from './BookCoverArtwork.vue'
 import BookCoverSurface from './BookCoverSurface.vue'
 import { api } from '@/lib/api'
 import { computed, inject, ref, watch } from 'vue'
@@ -25,7 +24,7 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useCoverVersions } from '../composables/useCoverVersions'
-import { coverAspectRatioValue, COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO, fittedCoverFrameStyle } from '../lib/cover-aspect-ratio'
+import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
 import { useRefreshMetadata } from '../composables/useRefreshMetadata'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
@@ -49,7 +48,6 @@ const emit = defineEmits<{
 const { hasPermission } = usePermissions()
 const showSendDialog = ref(false)
 
-const coverStyle = computed(() => bookCoverStyle(props.book.title ?? String(props.book.id)))
 const authorLine = computed(() => props.book.authors.join(', ') || null)
 const authorQuery = computed(() => props.book.authors[0] ?? null)
 const seriesLine = computed(() => {
@@ -71,10 +69,6 @@ const metaLine = computed(() => {
 })
 
 const visibleTags = computed(() => props.book.genres.slice(0, 2))
-
-const coverLoaded = ref(false)
-const coverFailed = ref(false)
-const coverImageRatio = ref<number | null>(null)
 
 const localRating = ref<number | null>(props.book.rating)
 const hoverRating = ref<number | null>(null)
@@ -101,24 +95,8 @@ async function setRating(star: number) {
 const { coverUrl } = useCoverVersions()
 const coverSrc = computed(() => coverUrl(props.book.id))
 
-watch(coverSrc, () => {
-  coverLoaded.value = false
-  coverFailed.value = false
-  coverImageRatio.value = null
-})
-
 const { refreshing, refreshWithFeedback } = useRefreshMetadata()
 const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
-const slotAspectRatio = computed(() => coverAspectRatioValue(String(coverAspectRatio.value)))
-const fittedCoverSpineStyle = computed(() => fittedCoverFrameStyle(coverImageRatio.value, slotAspectRatio.value))
-
-function handleCoverLoad(event: Event) {
-  const target = event.target as HTMLImageElement | null
-  if (target && target.naturalWidth > 0 && target.naturalHeight > 0) {
-    coverImageRatio.value = target.naturalWidth / target.naturalHeight
-  }
-  coverLoaded.value = true
-}
 
 function openFile(file: BookFileRef) {
   router.push({
@@ -159,37 +137,18 @@ function openAuthorBrowse() {
       class="book-cover-surface--spine-fitted w-16 rounded shrink-0 overflow-hidden relative"
       :disable-spine="isAudiobook"
       :class="isMissing ? 'opacity-50 grayscale' : ''"
-      :style="[{ aspectRatio: coverAspectRatio }, !book.hasCover || !coverLoaded || coverFailed ? coverStyle : {}]"
+      :style="{ aspectRatio: coverAspectRatio }"
     >
-      <!-- Blurred background fill for mismatched aspect ratios -->
-      <img
-        v-if="book.hasCover && coverLoaded && !coverFailed"
+      <BookCoverArtwork
         :src="coverSrc"
-        class="absolute inset-0 w-full h-full object-cover scale-110 blur-md brightness-50"
-        aria-hidden="true"
-        loading="lazy"
-      />
-      <img
-        v-if="book.hasCover && !coverFailed"
-        :src="coverSrc"
-        class="absolute inset-0 w-full h-full object-contain"
-        loading="lazy"
-        decoding="async"
-        :alt="book.title ?? ''"
-        @load="handleCoverLoad"
-        @error="coverFailed = true"
-      />
-      <div
-        v-if="!isAudiobook && book.hasCover && coverLoaded && !coverFailed"
-        class="book-cover-spine-layer absolute z-[3]"
-        :style="fittedCoverSpineStyle"
-      />
-      <BookCoverPlaceholder
-        v-if="!book.hasCover || coverFailed"
+        :has-cover="book.hasCover"
         :title="book.title"
         :author-line="authorLine"
         :is-audio="isAudiobook"
         :seed="book.title ?? String(book.id)"
+        :alt="book.title ?? ''"
+        backdrop-class="blur-md brightness-50"
+        :spine="!isAudiobook"
       />
     </BookCoverSurface>
 

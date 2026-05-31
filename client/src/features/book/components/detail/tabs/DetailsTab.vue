@@ -17,23 +17,17 @@ import {
   X,
 } from 'lucide-vue-next'
 import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot } from 'reka-ui'
-import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { getFormatColor } from '@/features/book/lib/format-colors'
 import { providerIconPath } from '@/features/book/lib/provider-icons'
 import { getProviderColor } from '@/lib/provider-colors'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
-import {
-  coverAspectRatioValue,
-  COVER_ASPECT_RATIO_KEY,
-  DEFAULT_COVER_ASPECT_RATIO,
-  fittedCoverFrameStyle,
-} from '@/features/book/lib/cover-aspect-ratio'
+import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
 import { FORMAT_TO_GROUP, READER_OPENABLE_FORMATS } from '@bookorbit/types'
 import type { BookDetail, BookKoboState, ReadStatus, UserBookStatus } from '@bookorbit/types'
 import { STATUS_OPTIONS, STATUS_ICONS, STATUS_COLORS, useBookStatus } from '@/features/book/composables/useBookStatus'
 import BookDownloadButton from '@/features/book/components/BookDownloadButton.vue'
 import DiscoverRow from '@/features/book/components/detail/DiscoverRow.vue'
-import BookCoverPlaceholder from '@/features/book/components/BookCoverPlaceholder.vue'
+import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -50,6 +44,7 @@ import { useSafeHtml } from '@/features/book/composables/useSafeHtml'
 import { useKoreaderBookProgress } from '@/features/koreader/composables/useKoreaderBookProgress'
 import { RATING_STARS, getRatingStarClass } from '@/features/book/lib/rating-stars'
 import BookCoverSurface from '@/features/book/components/BookCoverSurface.vue'
+import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
 type FileProgress = {
   percentage: number
@@ -106,6 +101,7 @@ const {
 
 const coverLoaded = ref(false)
 const coverFailed = ref(false)
+const coverImageRatio = ref<number | null>(null)
 const coverLightboxOpen = ref(false)
 const descriptionExpanded = ref(false)
 const genresExpanded = ref(false)
@@ -263,12 +259,10 @@ const canViewKoreader = computed(() => hasPermission('koreader_sync'))
 const canEditMetadata = computed(() => hasPermission('library_edit_metadata'))
 
 const coverSeed = computed(() => props.book.title ?? props.book.folderPath.split('/').pop() ?? String(props.book.id))
-const coverStyle = computed(() => bookCoverStyle(coverSeed.value))
 const coverPlaceholderTitle = computed(() => props.book.title ?? props.book.folderPath.split('/').pop() ?? null)
 const hasCover = computed(() => props.book.coverSource !== null)
 const { coverUrl } = useCoverVersions()
 const coverSrc = computed(() => coverUrl(props.book.id, 'cover'))
-const coverImageRatio = ref<number | null>(null)
 
 watch(coverSrc, () => {
   coverLoaded.value = false
@@ -277,8 +271,14 @@ watch(coverSrc, () => {
 })
 
 const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
-const slotAspectRatio = computed(() => coverAspectRatioValue(String(coverAspectRatio.value)))
-const fittedCoverSpineStyle = computed(() => fittedCoverFrameStyle(coverImageRatio.value, slotAspectRatio.value))
+const { bookCoverDisplayMode } = useDisplaySettings()
+const detailCoverAspectRatio = computed(() => {
+  if (bookCoverDisplayMode.value !== 'natural-bottom' || !hasCover.value || !coverLoaded.value || coverFailed.value || !coverImageRatio.value) {
+    return coverAspectRatio.value
+  }
+
+  return `${coverImageRatio.value} / 1`
+})
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
 const isPrimaryAudio = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
 const readableFiles = computed(() => props.book.files.filter((f) => f.format && READER_OPENABLE_FORMATS.has(f.format)))
@@ -727,12 +727,16 @@ function handleDeleteFromMenu() {
   promptDelete(props.book.id)
 }
 
-function handleCoverLoad(event: Event) {
-  const target = event.target as HTMLImageElement | null
-  if (target && target.naturalWidth > 0 && target.naturalHeight > 0) {
-    coverImageRatio.value = target.naturalWidth / target.naturalHeight
-  }
+function handleCoverLoad(ratio: number | null) {
   coverLoaded.value = true
+  coverFailed.value = false
+  coverImageRatio.value = ratio
+}
+
+function handleCoverError() {
+  coverLoaded.value = false
+  coverFailed.value = true
+  coverImageRatio.value = null
 }
 
 function handleCoverClick() {
@@ -912,37 +916,23 @@ watch(
           class="book-cover-surface--spine-fitted relative w-full rounded-sm overflow-hidden"
           :disable-spine="isPrimaryAudio"
           :class="hasCover && coverLoaded && !coverFailed ? 'cursor-zoom-in' : ''"
-          :style="[{ aspectRatio: coverAspectRatio }, !hasCover || !coverLoaded || coverFailed ? coverStyle : {}]"
+          :style="{ aspectRatio: detailCoverAspectRatio }"
           @click="handleCoverClick"
         >
-          <img
-            v-if="hasCover && !coverFailed"
+          <BookCoverArtwork
             :src="coverSrc"
-            class="absolute inset-0 w-full h-full object-cover scale-110 blur-lg brightness-50 transition-opacity duration-200"
-            :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
-            aria-hidden="true"
-          />
-          <img
-            v-if="hasCover && !coverFailed"
-            :src="coverSrc"
-            class="absolute inset-0 w-full h-full object-contain transition-opacity duration-200"
-            :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
-            :alt="book.title ?? ''"
-            @load="handleCoverLoad"
-            @error="coverFailed = true"
-          />
-          <div
-            v-if="!isPrimaryAudio && hasCover && coverLoaded && !coverFailed"
-            class="book-cover-spine-layer absolute z-[3]"
-            :style="fittedCoverSpineStyle"
-          />
-          <div v-if="hasCover && !coverLoaded && !coverFailed" class="absolute inset-0 animate-pulse bg-white/10" />
-          <BookCoverPlaceholder
-            v-if="!hasCover || coverFailed"
+            :has-cover="hasCover"
             :title="coverPlaceholderTitle"
             :author-line="book.authors.map((a) => a.name).join(', ') || null"
             :is-audio="isPrimaryAudio"
             :seed="coverSeed"
+            :alt="book.title ?? ''"
+            :frame-aspect-ratio="detailCoverAspectRatio"
+            loading="eager"
+            backdrop-class="blur-lg brightness-50"
+            :spine="!isPrimaryAudio"
+            @load="handleCoverLoad"
+            @error="handleCoverError"
           />
         </BookCoverSurface>
       </div>
@@ -1121,7 +1111,7 @@ watch(
           class="book-cover-surface--spine-fitted group relative w-full rounded-sm overflow-hidden"
           :disable-spine="isPrimaryAudio"
           :class="hasCover && coverLoaded && !coverFailed ? 'cursor-zoom-in' : ''"
-          :style="[{ aspectRatio: coverAspectRatio }, !hasCover || !coverLoaded || coverFailed ? coverStyle : {}]"
+          :style="{ aspectRatio: detailCoverAspectRatio }"
           @click="handleCoverClick"
         >
           <Tooltip>
@@ -1135,35 +1125,20 @@ watch(
             </TooltipTrigger>
             <TooltipContent>Edit cover</TooltipContent>
           </Tooltip>
-          <!-- Blurred background fill for mismatched aspect ratios -->
-          <img
-            v-if="hasCover && !coverFailed"
+          <BookCoverArtwork
             :src="coverSrc"
-            class="absolute inset-0 w-full h-full object-cover scale-110 blur-lg brightness-50 transition-opacity duration-200"
-            :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
-            aria-hidden="true"
-          />
-          <img
-            v-if="hasCover && !coverFailed"
-            :src="coverSrc"
-            class="absolute inset-0 w-full h-full object-contain transition-opacity duration-200"
-            :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
-            :alt="book.title ?? ''"
-            @load="handleCoverLoad"
-            @error="coverFailed = true"
-          />
-          <div
-            v-if="!isPrimaryAudio && hasCover && coverLoaded && !coverFailed"
-            class="book-cover-spine-layer absolute z-[3]"
-            :style="fittedCoverSpineStyle"
-          />
-          <div v-if="hasCover && !coverLoaded && !coverFailed" class="absolute inset-0 animate-pulse bg-white/10" />
-          <BookCoverPlaceholder
-            v-if="!hasCover || coverFailed"
+            :has-cover="hasCover"
             :title="coverPlaceholderTitle"
             :author-line="book.authors.map((a) => a.name).join(', ') || null"
             :is-audio="isPrimaryAudio"
             :seed="coverSeed"
+            :alt="book.title ?? ''"
+            :frame-aspect-ratio="detailCoverAspectRatio"
+            loading="eager"
+            backdrop-class="blur-lg brightness-50"
+            :spine="!isPrimaryAudio"
+            @load="handleCoverLoad"
+            @error="handleCoverError"
           />
         </BookCoverSurface>
 

@@ -42,9 +42,9 @@ describe('SettingsHeader', () => {
   })
 
   describe('tab visibility', () => {
-    it('shows Appearance tab', () => {
+    it('shows Display tab', () => {
       const labels = getTabLabels(mountHeader())
-      expect(labels).toContain('Appearance')
+      expect(labels).toContain('Display')
     })
 
     it('shows Reader tab', () => {
@@ -219,8 +219,8 @@ describe('SettingsHeader', () => {
   describe('active state', () => {
     it('active tab has border-primary class when route matches', () => {
       const wrapper = mountHeader({ routeName: 'settings-appearance' })
-      const appearanceBtn = wrapper.findAll('button').find((b) => b.text() === 'Appearance')
-      expect(appearanceBtn?.classes()).toContain('border-primary')
+      const displayBtn = wrapper.findAll('button').find((b) => b.text() === 'Display')
+      expect(displayBtn?.classes()).toContain('border-primary')
     })
 
     it('inactive tabs have border-transparent class', () => {

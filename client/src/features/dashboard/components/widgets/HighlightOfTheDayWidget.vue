@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { Highlighter, BookOpen, ExternalLink } from 'lucide-vue-next'
+import { Highlighter, ExternalLink } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
+import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
 import BookCoverSurface from '@/features/book/components/BookCoverSurface.vue'
 import { useHighlightOfTheDayWidget } from '../../composables/useHighlightOfTheDayWidget'
 
@@ -48,12 +49,18 @@ function goToBook() {
         "{{ data.text.length > 200 ? data.text.slice(0, 200) + '...' : data.text }}"
       </blockquote>
       <button class="flex cursor-pointer items-center gap-2 rounded-lg pb-1 pl-1 text-left transition-colors hover:bg-muted/40" @click="goToBook">
-        <BookCoverSurface v-if="data.hasCover" size="mini" class="h-9 w-6 shrink-0 overflow-hidden rounded">
-          <img :src="coverUrl(data.bookId)" :alt="data.bookTitle ?? 'Cover'" class="h-full w-full object-cover" />
+        <BookCoverSurface size="mini" class="book-cover-surface--spine-fitted h-9 w-6 shrink-0 overflow-hidden rounded">
+          <BookCoverArtwork
+            :src="coverUrl(data.bookId)"
+            :has-cover="data.hasCover"
+            :title="data.bookTitle"
+            :author-line="null"
+            :is-audio="false"
+            :seed="data.bookTitle ?? String(data.bookId)"
+            :alt="data.bookTitle ?? 'Cover'"
+            frame-aspect-ratio="2/3"
+          />
         </BookCoverSurface>
-        <div v-else class="flex h-8 w-5 shrink-0 items-center justify-center rounded bg-muted">
-          <BookOpen :size="10" class="text-muted-foreground" />
-        </div>
         <div class="min-w-0 flex-1">
           <p class="truncate text-[12px] font-medium leading-tight">{{ data.bookTitle ?? 'Untitled' }}</p>
           <p v-if="data.chapterTitle" class="truncate text-[11px] text-muted-foreground">{{ data.chapterTitle }}</p>

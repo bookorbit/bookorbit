@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { Gem, Star, BookOpen, BookMarked, Check } from 'lucide-vue-next'
+import { Gem, Star, BookMarked, Check } from 'lucide-vue-next'
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
+import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
 import BookCoverSurface from '@/features/book/components/BookCoverSurface.vue'
 import { useBookStatus } from '@/features/book/composables/useBookStatus'
 import { useNeglectedGemsWidget } from '../../composables/useNeglectedGemsWidget'
@@ -65,13 +66,19 @@ async function addToQueue() {
         tag="button"
         type="button"
         size="mini"
-        class="h-19 w-13 cursor-pointer overflow-hidden rounded transition-opacity hover:opacity-80"
+        class="book-cover-surface--spine-fitted h-19 w-13 cursor-pointer overflow-hidden rounded transition-opacity hover:opacity-80"
         @click="goToBook"
       >
-        <img v-if="currentGem.hasCover" :src="coverUrl(currentGem.bookId)" :alt="currentGem.title ?? 'Cover'" class="h-full w-full object-cover" />
-        <div v-else class="flex h-full w-full items-center justify-center bg-muted">
-          <BookOpen :size="14" class="text-muted-foreground" />
-        </div>
+        <BookCoverArtwork
+          :src="coverUrl(currentGem.bookId)"
+          :has-cover="currentGem.hasCover"
+          :title="currentGem.title"
+          :author-line="null"
+          :is-audio="false"
+          :seed="currentGem.title ?? String(currentGem.bookId)"
+          :alt="currentGem.title ?? 'Cover'"
+          frame-aspect-ratio="13/19"
+        />
       </BookCoverSurface>
       <button class="max-w-full cursor-pointer truncate text-center text-xs font-semibold hover:underline" @click="goToBook">
         {{ currentGem.title ?? 'Untitled' }}

@@ -262,19 +262,19 @@ describe('BookCarousel', () => {
   it('shows series index badge when showSeriesIndex is true and seriesIndex is set', () => {
     const book = makeBook({ seriesIndex: 3 })
     const wrapper = mountCarousel([book], { showSeriesIndex: true })
-    expect(wrapper.find('span').text()).toContain('#3')
+    expect(wrapper.text()).toContain('#3')
   })
 
   it('does not show series index badge when showSeriesIndex is false', () => {
     const book = makeBook({ seriesIndex: 3 })
     const wrapper = mountCarousel([book], { showSeriesIndex: false })
-    expect(wrapper.find('span').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('#3')
   })
 
   it('does not show series index badge when seriesIndex is null', () => {
     const book = makeBook({ seriesIndex: null })
     const wrapper = mountCarousel([book], { showSeriesIndex: true })
-    expect(wrapper.find('span').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('#')
   })
 
   it('renders multiple books', () => {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { BookCoverDisplayMode } from '@bookorbit/types'
 import { computed } from 'vue'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
@@ -8,16 +9,18 @@ const props = withDefaults(
     interactive?: boolean
     tag?: string
     disableSpine?: boolean
+    displayMode?: BookCoverDisplayMode
   }>(),
   {
     size: 'default',
     interactive: false,
     tag: 'div',
     disableSpine: false,
+    displayMode: undefined,
   },
 )
 
-const { bookSpineOverlay, bookShadowStrength } = useDisplaySettings()
+const { bookSpineOverlay, bookShadowStrength, bookCoverDisplayMode } = useDisplaySettings()
 
 const spineOverlayMode = computed(() => {
   if (props.disableSpine) return 'off'
@@ -25,6 +28,7 @@ const spineOverlayMode = computed(() => {
 })
 
 const shadowStrengthMode = computed(() => bookShadowStrength?.value ?? 'default')
+const coverDisplayMode = computed(() => props.displayMode ?? bookCoverDisplayMode?.value ?? 'blurred-fit')
 
 const classes = computed(() => [
   'book-cover-surface',
@@ -40,6 +44,7 @@ const classes = computed(() => [
     :data-cover-size="size"
     :data-cover-shadow="shadowStrengthMode"
     :data-cover-spine="spineOverlayMode"
+    :data-cover-fit="coverDisplayMode"
     :data-cover-interactive="interactive ? 'true' : 'false'"
   >
     <slot />

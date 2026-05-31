@@ -41,4 +41,14 @@ describe('fittedCoverFrameStyle', () => {
     expect(style.transform).toBe('translateX(-50%)')
     expect(parseFloat(style.width ?? '0')).toBeCloseTo(75, 2)
   })
+
+  it('bottom-aligns wider images when requested', () => {
+    const style = fittedCoverFrameStyle(1, 2 / 3, 'bottom')
+    expect(style.width).toBe('100%')
+    expect(style.left).toBe('0')
+    expect(style.bottom).toBe('0')
+    expect(style.top).toBeUndefined()
+    expect(style.transform).toBeUndefined()
+    expect(parseFloat(style.height ?? '0')).toBeCloseTo(66.6667, 2)
+  })
 })

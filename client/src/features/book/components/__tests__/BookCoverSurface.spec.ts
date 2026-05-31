@@ -3,11 +3,12 @@ import { afterEach, describe, expect, it } from 'vitest'
 import BookCoverSurface from '../BookCoverSurface.vue'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
-const { bookSpineOverlay, bookShadowStrength } = useDisplaySettings()
+const { bookSpineOverlay, bookShadowStrength, bookCoverDisplayMode } = useDisplaySettings()
 
 afterEach(() => {
   bookSpineOverlay.value = 'off'
   bookShadowStrength.value = 'default'
+  bookCoverDisplayMode.value = 'blurred-fit'
 })
 
 describe('BookCoverSurface', () => {
@@ -30,8 +31,26 @@ describe('BookCoverSurface', () => {
     const wrapper = mount(BookCoverSurface)
     expect(wrapper.attributes('data-cover-spine')).toBe('strong')
     expect(wrapper.attributes('data-cover-shadow')).toBe('strong')
+    expect(wrapper.attributes('data-cover-fit')).toBe('blurred-fit')
     expect(wrapper.attributes('data-cover-size')).toBe('default')
     expect(wrapper.attributes('data-cover-interactive')).toBe('false')
+  })
+
+  it('applies the selected cover display mode from display settings', async () => {
+    const wrapper = mount(BookCoverSurface)
+    bookCoverDisplayMode.value = 'natural-bottom'
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.attributes('data-cover-fit')).toBe('natural-bottom')
+  })
+
+  it('allows an explicit display mode override', () => {
+    bookCoverDisplayMode.value = 'natural-bottom'
+    const wrapper = mount(BookCoverSurface, {
+      props: { displayMode: 'fill-crop' },
+    })
+
+    expect(wrapper.attributes('data-cover-fit')).toBe('fill-crop')
   })
 
   it('renders dynamic tag and forwards native attrs', () => {

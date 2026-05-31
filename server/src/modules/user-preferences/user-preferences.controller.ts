@@ -15,9 +15,21 @@ export class UserPreferencesController {
     return { settings };
   }
 
+  @Get('display')
+  async getDisplayPreferences(@CurrentUser() user: RequestUser) {
+    const settings = await this.userPreferencesService.getDisplayPreferences(user.id);
+    return { settings };
+  }
+
   @Put('theme')
   @HttpCode(204)
   async upsertThemePreferences(@Body() dto: UpsertUserPreferenceDto, @CurrentUser() user: RequestUser) {
     await this.userPreferencesService.upsertThemePreferences(user.id, dto.settings);
+  }
+
+  @Put('display')
+  @HttpCode(204)
+  async upsertDisplayPreferences(@Body() dto: UpsertUserPreferenceDto, @CurrentUser() user: RequestUser) {
+    await this.userPreferencesService.upsertDisplayPreferences(user.id, dto.settings);
   }
 }

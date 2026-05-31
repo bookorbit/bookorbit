@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import type { AuthUser, AuthResponse } from '@bookorbit/types'
 import { api, refreshAccessToken, setAccessToken, setOnAuthFailure } from '@/lib/api'
 import router from '@/router'
+import { cancelPendingDisplaySettingsSync, initDisplaySettingsSync, loadDisplaySettingsFromServer } from '@/composables/useDisplaySettingsSync'
 import { cancelPendingThemeSync, initThemeSync, loadFromServer } from '@/composables/useThemeSync'
 import { useSetupStatus } from './useSetupStatus'
 import { disconnectAuthorEnrichmentSocket } from '@/features/settings/composables/useAuthorEnrichmentStatus'
@@ -45,6 +46,7 @@ if (typeof document !== 'undefined') {
 
 function clearAuth() {
   cancelPendingThemeSync()
+  cancelPendingDisplaySettingsSync()
   stopSessionRefresh()
   user.value = null
   setAccessToken(null)
@@ -71,9 +73,11 @@ async function hydrateThemeSync(options: { refreshUser?: boolean } = {}): Promis
 
   if (user.value?.settings?.syncThemePreferences) {
     await loadFromServer()
+    await loadDisplaySettingsFromServer()
   }
 
   initThemeSync()
+  initDisplaySettingsSync()
 }
 
 export function useAuth() {
@@ -88,6 +92,7 @@ export function useAuth() {
       // no valid session
     } finally {
       initThemeSync()
+      initDisplaySettingsSync()
       isLoading.value = false
     }
   }

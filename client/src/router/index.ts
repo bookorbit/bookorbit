@@ -6,6 +6,7 @@ import { INTEGRATIONS_TAB_INFO, normalizeIntegrationsTab } from '@/features/sett
 import { ADMIN_TAB_INFO, normalizeAdminTab } from '@/features/settings/lib/admin-tabs'
 import { SYSTEM_TAB_INFO, normalizeSystemTab } from '@/features/settings/lib/system-tabs'
 import { ACCOUNT_TAB_INFO, normalizeAccountTab } from '@/features/settings/lib/account-tabs'
+import { APPEARANCE_TAB_TITLE_LABELS, normalizeAppearanceTab } from '@/features/settings/lib/appearance-tabs'
 import { registerAuthGuard } from './guards/auth.guard'
 import { registerRouteTitleHook } from './title-resolver'
 
@@ -30,6 +31,11 @@ function fallbackById(prefix: string, id: number | null): string {
 function resolveReaderTitle(to: RouteLocationNormalizedLoaded): string {
   const tab = normalizeReaderTab(to.query.tab)
   return READER_TAB_TITLE_LABELS[tab]
+}
+
+function resolveAppearanceTitle(to: RouteLocationNormalizedLoaded): string {
+  const tab = normalizeAppearanceTab(to.query.tab)
+  return APPEARANCE_TAB_TITLE_LABELS[tab]
 }
 
 function resolveEmailTitle(to: RouteLocationNormalizedLoaded): string {
@@ -103,7 +109,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'appearance',
             name: 'settings-appearance',
             component: () => import('@/features/settings/AppearanceSettings.vue'),
-            meta: { title: 'Appearance' },
+            meta: { title: resolveAppearanceTitle },
           },
           {
             path: 'opds',

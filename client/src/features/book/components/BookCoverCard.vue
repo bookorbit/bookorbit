@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import type { BookCard, BookFileRef } from '@bookorbit/types'
 import { FORMAT_TO_GROUP, READER_OPENABLE_FORMATS } from '@bookorbit/types'
-import { bookCoverStyle } from '../lib/book-cover'
 import { getFormatColor } from '../lib/format-colors'
-import { computed, inject, ref, watch, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
+import { computed, inject, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   BookOpen,
@@ -43,11 +42,11 @@ import { useRefreshingBooks } from '../composables/useRefreshingBooks'
 import { mergeBookCardWithDetail } from '../lib/book-card-mapper'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
-import { coverAspectRatioValue, COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO, fittedCoverFrameStyle } from '../lib/cover-aspect-ratio'
+import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO, coverAspectRatioValue, fittedCoverFrameStyle } from '../lib/cover-aspect-ratio'
 import { useBookDownload } from '@/features/book/composables/useBookDownload'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
-import BookCoverPlaceholder from './BookCoverPlaceholder.vue'
+import BookCoverArtwork from './BookCoverArtwork.vue'
 import BookCoverSurface from './BookCoverSurface.vue'
 
 const router = useRouter()
@@ -65,7 +64,6 @@ const emit = defineEmits<{
   'update:book': [updated: BookCard]
 }>()
 
-const coverStyle = computed(() => bookCoverStyle(props.book.title ?? String(props.book.id)))
 const authorLine = computed(() => props.book.authors.join(', ') || null)
 const authorQuery = computed(() => props.book.authors[0] ?? null)
 
@@ -112,7 +110,7 @@ async function handleRefreshMetadata() {
   if (updated) emit('update:book', mergeBookCardWithDetail(props.book, updated))
 }
 const { hasPermission } = usePermissions()
-const { cardOverlays } = useDisplaySettings()
+const { cardOverlays, bookCoverDisplayMode } = useDisplaySettings()
 const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 const showSendDialog = ref(false)
 
@@ -152,6 +150,11 @@ const coverImageRatio = ref<number | null>(null)
 const isMissing = computed(() => props.book.status === 'missing')
 const showMobileOverlay = ref(false)
 const root = ref<HTMLElement | null>(null)
+const coverSlotRatio = computed(() => coverAspectRatioValue(String(coverAspectRatio.value)))
+const coverOverlayFrameStyle = computed(() => {
+  if (bookCoverDisplayMode.value !== 'natural-bottom' || !props.book.hasCover || !coverLoaded.value || coverFailed.value) return { inset: '0' }
+  return fittedCoverFrameStyle(coverImageRatio.value, coverSlotRatio.value, 'bottom')
+})
 
 const isTouch = computed(() => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches)
 
@@ -161,26 +164,16 @@ watch(coverSrc, () => {
   coverImageRatio.value = null
 })
 
-const slotAspectRatio = computed(() => coverAspectRatioValue(String(coverAspectRatio.value)))
-const fittedCoverSpineStyle = computed(() => fittedCoverFrameStyle(coverImageRatio.value, slotAspectRatio.value))
-
-function updateCoverImageRatio(img: HTMLImageElement | null) {
-  if (!img || img.naturalWidth <= 0 || img.naturalHeight <= 0) return
-  coverImageRatio.value = img.naturalWidth / img.naturalHeight
-}
-
-function onMainImgRef(el: Element | ComponentPublicInstance | null) {
-  const img = el as HTMLImageElement | null
-  if (img?.complete && img.naturalWidth > 0) {
-    coverLoaded.value = true
-    updateCoverImageRatio(img)
-  }
-}
-
-function handleMainImageLoad(event: Event) {
-  const target = event.target as HTMLImageElement | null
-  updateCoverImageRatio(target)
+function handleArtworkLoad(ratio: number | null) {
   coverLoaded.value = true
+  coverFailed.value = false
+  coverImageRatio.value = ratio
+}
+
+function handleArtworkError() {
+  coverLoaded.value = false
+  coverFailed.value = true
+  coverImageRatio.value = null
 }
 
 function openFile(file: BookFileRef) {
@@ -283,298 +276,273 @@ async function handleSetStatus(status: ReadStatus) {
       :class="isMissing || selectionMode ? '' : 'group-hover:scale-[1.02]'"
       :interactive="!isMissing && !selectionMode"
       :disable-spine="isAudiobook"
-      :style="[{ aspectRatio: coverAspectRatio }, !book.hasCover || !coverLoaded || coverFailed ? coverStyle : {}]"
+      :style="{ aspectRatio: coverAspectRatio }"
     >
       <!-- Missing border overlay: mirror selected overlay pattern so border is never clipped/hidden -->
       <div v-if="isMissing" class="absolute inset-0 z-30 pointer-events-none rounded-sm ring-2 ring-inset ring-amber-500" />
 
-      <!-- Blurred background fill for mismatched aspect ratios -->
-      <img
-        v-if="book.hasCover && coverLoaded && !coverFailed"
+      <BookCoverArtwork
         :src="coverSrc"
-        class="absolute inset-0 w-full h-full object-cover scale-110 blur-md brightness-90 transition-opacity duration-300 ease-out"
-        aria-hidden="true"
-        loading="lazy"
-      />
-
-      <img
-        v-if="book.hasCover && !coverFailed"
-        :ref="onMainImgRef"
-        :src="coverSrc"
-        class="absolute inset-0 w-full h-full object-contain transition-opacity duration-300 ease-out"
-        :class="[isMissing ? 'brightness-50' : '', coverLoaded ? 'opacity-100' : 'opacity-0']"
-        loading="lazy"
-        decoding="async"
-        :alt="book.title ?? ''"
-        @load="handleMainImageLoad"
-        @error="coverFailed = true"
-      />
-
-      <div
-        v-if="!isAudiobook && book.hasCover && coverLoaded && !coverFailed"
-        class="book-cover-spine-layer absolute z-[3]"
-        :style="fittedCoverSpineStyle"
-      />
-
-      <!-- Skeleton shimmer while a known-cover loads -->
-      <div v-if="book.hasCover && !coverLoaded && !coverFailed" class="absolute inset-0 animate-pulse bg-white/10" />
-
-      <!-- Top-left overlay: read status -->
-      <div
-        v-if="showReadBadge && !isMissing"
-        class="absolute top-1.5 left-1.5 z-10 flex items-center justify-center rounded-full bg-black/60 p-1 pointer-events-none group-hover:opacity-0 transition-opacity duration-150"
-      >
-        <component :is="STATUS_ICONS[localReadStatus!]" :size="12" :class="STATUS_COLORS[localReadStatus!]" />
-      </div>
-
-      <!-- Top-right overlay container: lock status (above) + series position (below) -->
-      <div class="absolute top-1.5 right-1.5 z-10 flex flex-col items-end gap-1 pointer-events-none">
-        <div
-          v-if="showLockStatusPill"
-          class="flex items-center justify-center rounded-full bg-black/60 p-1 group-hover:opacity-0 transition-opacity duration-150"
-        >
-          <component :is="metadataLocked ? Lock : LockOpen" :size="12" :class="metadataLocked ? 'text-amber-400' : 'text-emerald-400'" />
-        </div>
-
-        <Tooltip v-if="showSeriesPositionBadge">
-          <TooltipTrigger as-child>
-            <div
-              data-card-click-blocker
-              class="pointer-events-auto group-hover:pointer-events-none flex items-center bg-black/60 rounded-full px-1.5 py-0.5 group-hover:opacity-0 transition-opacity duration-150 cursor-default"
-            >
-              <span class="text-[9px] font-bold text-white leading-none">{{ seriesPositionLabel }}</span>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{{ seriesPositionTooltip }}</p>
-          </TooltipContent>
-        </Tooltip>
-      </div>
-
-      <!-- Bottom-left overlay: rating -->
-      <div
-        v-if="showRatingOverlay && !selectionMode"
-        class="absolute bottom-1.5 left-1.5 z-10 flex items-center gap-0.5 bg-black/60 rounded-full px-1.5 py-0.5 pointer-events-none group-hover:opacity-0 transition-opacity duration-150"
-      >
-        <Star class="size-3" :style="{ fill: ratingColor, color: ratingColor }" />
-        <span class="text-[9px] font-bold text-white leading-none">{{ Math.round(book.rating!) }}</span>
-      </div>
-
-      <!-- Bottom-right overlay: format badge -->
-      <div
-        v-if="showFormatOverlay && !selectionMode"
-        class="absolute bottom-1.5 right-1.5 z-10 group-hover:opacity-0 transition-opacity duration-150 pointer-events-none"
-      >
-        <span
-          class="text-[8px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded text-white"
-          :style="{ backgroundColor: getFormatColor(primaryFile!.format!) + 'cc' }"
-        >
-          {{ primaryFile!.format!.toUpperCase() }}
-        </span>
-      </div>
-
-      <!-- Reading progress bar - bottom edge -->
-      <div
-        v-if="showProgressBar && !selectionMode"
-        class="absolute bottom-0 left-0 z-10 h-0.75 transition-[width] duration-500 [box-shadow:0_-1px_0_rgba(255,255,255,0.25)]"
-        style="transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)"
-        :class="book.readingProgress === 100 ? 'bg-green-500/80' : 'bg-primary/70'"
-        :style="{ width: `${book.readingProgress}%` }"
-      />
-
-      <!-- Selection checkbox overlay -->
-      <div
-        v-if="selectionMode"
-        class="absolute inset-0 z-30 pointer-events-none rounded-sm"
-        :class="selected ? 'bg-primary/20 ring-2 ring-inset ring-primary' : ''"
-      >
-        <div
-          class="absolute top-1.5 left-1.5 h-5 w-5 rounded flex items-center justify-center transition-colors"
-          :class="selected ? 'bg-primary' : 'bg-black/40 border border-white/50'"
-        >
-          <Check v-if="selected" class="text-primary-foreground" :size="12" />
-        </div>
-      </div>
-
-      <!-- Missing badge -->
-      <div v-if="isMissing" class="absolute top-1.5 right-1.5 z-20">
-        <span class="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded bg-amber-600/95 text-white">
-          <TriangleAlert class="size-2.5 shrink-0" />
-          Missing
-        </span>
-      </div>
-
-      <!-- Placeholder shown when book has no cover or cover failed to load -->
-      <BookCoverPlaceholder
-        v-if="!book.hasCover || coverFailed"
+        :has-cover="book.hasCover"
         :title="book.title"
         :author-line="authorLine"
         :is-audio="isAudiobook"
         :seed="book.title ?? String(book.id)"
+        :alt="book.title ?? ''"
+        :image-class="isMissing ? 'brightness-50' : ''"
+        :spine="!isAudiobook"
+        @load="handleArtworkLoad"
+        @error="handleArtworkError"
       />
 
-      <!-- Refresh spinner overlay -->
-      <Transition name="fade">
-        <div v-if="anyRefreshing" class="absolute inset-0 z-40 flex items-center justify-center bg-black/50">
-          <Loader2 class="size-[32cqi] animate-spin text-white drop-shadow-lg" />
-        </div>
-      </Transition>
-
-      <!-- Hover overlay -->
-      <div
-        v-if="!selectionMode"
-        class="absolute inset-0 flex flex-col p-2 bg-black/70 transition-opacity duration-150"
-        :class="[showMobileOverlay ? 'opacity-100' : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto']"
-      >
-        <!-- Top row: Quick View -->
-        <div class="shrink-0 flex justify-end">
-          <button class="p-[3cqi] rounded-[2.5cqi] bg-black/50 hover:bg-black/30 transition-colors text-white" @click="openQuickView">
-            <PanelRight class="size-[12cqi]" />
-          </button>
+      <div data-testid="cover-overlay-frame" class="absolute z-10 overflow-hidden rounded-[inherit]" :style="coverOverlayFrameStyle">
+        <!-- Top-left overlay: read status -->
+        <div
+          v-if="showReadBadge && !isMissing"
+          class="absolute top-1.5 left-1.5 z-10 flex items-center justify-center rounded-full bg-black/60 p-1 pointer-events-none group-hover:opacity-0 transition-opacity duration-150"
+        >
+          <component :is="STATUS_ICONS[localReadStatus!]" :size="12" :class="STATUS_COLORS[localReadStatus!]" />
         </div>
 
-        <!-- Center: Play/Read button -->
-        <div class="flex-1 flex items-center justify-center">
-          <button
-            v-if="primaryFile && !isMissing"
-            class="size-[30cqi] flex items-center justify-center rounded-full bg-primary text-white shadow-2xl transition-all duration-300 scale-75 hover:scale-110 active:scale-90"
-            :class="[showMobileOverlay || 'group-hover:scale-100', showMobileOverlay ? 'scale-100' : '']"
-            @click.stop="openFile(primaryFile)"
+        <!-- Top-right overlay container: lock status (above) + series position (below) -->
+        <div class="absolute top-1.5 right-1.5 z-10 flex flex-col items-end gap-1 pointer-events-none">
+          <div
+            v-if="showLockStatusPill"
+            class="flex items-center justify-center rounded-full bg-black/60 p-1 group-hover:opacity-0 transition-opacity duration-150"
           >
-            <component :is="isAudiobook ? Play : BookOpen" class="size-[16cqi]" :class="{ 'ml-[2cqi]': isAudiobook }" />
-          </button>
-        </div>
-
-        <!-- Bottom: title/author -->
-        <div class="shrink-0 flex flex-col pr-10">
-          <div class="flex items-start justify-between gap-2">
-            <p v-if="showHoverText" class="text-xs font-semibold text-white leading-tight min-w-0 flex-1" :class="hoverTitleClampClass">
-              {{ book.title ?? '-' }}
-            </p>
-            <div v-else class="flex-1" />
+            <component :is="metadataLocked ? Lock : LockOpen" :size="12" :class="metadataLocked ? 'text-amber-400' : 'text-emerald-400'" />
           </div>
 
-          <div v-if="showAuthorOnHover" class="min-w-0">
-            <button class="text-[10px] text-white/70 truncate hover:underline text-left block w-full" @click.stop="openAuthorBrowse">
-              {{ authorLine }}
+          <Tooltip v-if="showSeriesPositionBadge">
+            <TooltipTrigger as-child>
+              <div
+                data-card-click-blocker
+                class="pointer-events-auto group-hover:pointer-events-none flex items-center bg-black/60 rounded-full px-1.5 py-0.5 group-hover:opacity-0 transition-opacity duration-150 cursor-default"
+              >
+                <span class="text-[9px] font-bold text-white leading-none">{{ seriesPositionLabel }}</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{{ seriesPositionTooltip }}</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+
+        <!-- Bottom-left overlay: rating -->
+        <div
+          v-if="showRatingOverlay && !selectionMode"
+          class="absolute bottom-1.5 left-1.5 z-10 flex items-center gap-0.5 bg-black/60 rounded-full px-1.5 py-0.5 pointer-events-none group-hover:opacity-0 transition-opacity duration-150"
+        >
+          <Star class="size-3" :style="{ fill: ratingColor, color: ratingColor }" />
+          <span class="text-[9px] font-bold text-white leading-none">{{ Math.round(book.rating!) }}</span>
+        </div>
+
+        <!-- Bottom-right overlay: format badge -->
+        <div
+          v-if="showFormatOverlay && !selectionMode"
+          class="absolute bottom-1.5 right-1.5 z-10 group-hover:opacity-0 transition-opacity duration-150 pointer-events-none"
+        >
+          <span
+            class="text-[8px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded text-white"
+            :style="{ backgroundColor: getFormatColor(primaryFile!.format!) + 'cc' }"
+          >
+            {{ primaryFile!.format!.toUpperCase() }}
+          </span>
+        </div>
+
+        <!-- Reading progress bar - bottom edge -->
+        <div
+          v-if="showProgressBar && !selectionMode"
+          class="absolute bottom-0 left-0 z-10 h-0.75 transition-[width] duration-500 [box-shadow:0_-1px_0_rgba(255,255,255,0.25)]"
+          style="transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)"
+          :class="book.readingProgress === 100 ? 'bg-green-500/80' : 'bg-primary/70'"
+          :style="{ width: `${book.readingProgress}%` }"
+        />
+
+        <div
+          v-if="selectionMode"
+          class="absolute inset-0 z-30 pointer-events-none rounded-sm"
+          :class="selected ? 'bg-primary/20 ring-2 ring-inset ring-primary' : ''"
+        >
+          <div
+            class="absolute top-1.5 left-1.5 h-5 w-5 rounded flex items-center justify-center transition-colors"
+            :class="selected ? 'bg-primary' : 'bg-black/40 border border-white/50'"
+          >
+            <Check v-if="selected" class="text-primary-foreground" :size="12" />
+          </div>
+        </div>
+
+        <!-- Missing badge -->
+        <div v-if="isMissing" class="absolute top-1.5 right-1.5 z-20">
+          <span class="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded bg-amber-600/95 text-white">
+            <TriangleAlert class="size-2.5 shrink-0" />
+            Missing
+          </span>
+        </div>
+
+        <!-- Refresh spinner overlay -->
+        <Transition name="fade">
+          <div v-if="anyRefreshing" class="absolute inset-0 z-40 flex items-center justify-center bg-black/50">
+            <Loader2 class="size-[32cqi] animate-spin text-white drop-shadow-lg" />
+          </div>
+        </Transition>
+
+        <!-- Hover overlay -->
+        <div
+          v-if="!selectionMode"
+          class="absolute inset-0 flex flex-col p-2 bg-black/70 transition-opacity duration-150"
+          :class="[showMobileOverlay ? 'opacity-100' : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto']"
+        >
+          <!-- Top row: Quick View -->
+          <div class="shrink-0 flex justify-end">
+            <button class="p-[3cqi] rounded-[2.5cqi] bg-black/50 hover:bg-black/30 transition-colors text-white" @click="openQuickView">
+              <PanelRight class="size-[12cqi]" />
             </button>
           </div>
-        </div>
 
-        <!-- Kebab menu anchored to lower-right -->
-        <div class="absolute bottom-2 right-2 z-20">
-          <DropdownMenu>
-            <DropdownMenuTrigger as-child>
-              <button class="px-0.75 py-1.5 rounded-md bg-black/40 hover:bg-white/30 transition-colors text-white shrink-0">
-                <MoreVertical class="size-3.5" />
+          <!-- Center: Play/Read button -->
+          <div class="flex-1 flex items-center justify-center">
+            <button
+              v-if="primaryFile && !isMissing"
+              class="size-[30cqi] flex items-center justify-center rounded-full bg-primary text-white shadow-2xl transition-all duration-300 scale-75 hover:scale-110 active:scale-90"
+              :class="[showMobileOverlay || 'group-hover:scale-100', showMobileOverlay ? 'scale-100' : '']"
+              @click.stop="openFile(primaryFile)"
+            >
+              <component :is="isAudiobook ? Play : BookOpen" class="size-[16cqi]" :class="{ 'ml-[2cqi]': isAudiobook }" />
+            </button>
+          </div>
+
+          <!-- Bottom: title/author -->
+          <div class="shrink-0 flex flex-col pr-10">
+            <div class="flex items-start justify-between gap-2">
+              <p v-if="showHoverText" class="text-xs font-semibold text-white leading-tight min-w-0 flex-1" :class="hoverTitleClampClass">
+                {{ book.title ?? '-' }}
+              </p>
+              <div v-else class="flex-1" />
+            </div>
+
+            <div v-if="showAuthorOnHover" class="min-w-0">
+              <button class="text-[10px] text-white/70 truncate hover:underline text-left block w-full" @click.stop="openAuthorBrowse">
+                {{ authorLine }}
               </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem v-if="openableFiles.length <= 1 && primaryFile && !isMissing" @click="openFile(primaryFile)">
-                <BookOpen class="size-4 mr-2" />
-                Open
-              </DropdownMenuItem>
-              <DropdownMenuSub v-else-if="openableFiles.length > 1 && !isMissing">
-                <DropdownMenuSubTrigger>
+            </div>
+          </div>
+
+          <!-- Kebab menu anchored to lower-right -->
+          <div class="absolute bottom-2 right-2 z-20">
+            <DropdownMenu>
+              <DropdownMenuTrigger as-child>
+                <button class="px-0.75 py-1.5 rounded-md bg-black/40 hover:bg-white/30 transition-colors text-white shrink-0">
+                  <MoreVertical class="size-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem v-if="openableFiles.length <= 1 && primaryFile && !isMissing" @click="openFile(primaryFile)">
                   <BookOpen class="size-4 mr-2" />
                   Open
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="openFile(file)">
-                    <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">Audiobook</span>
-                    <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
-                    <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">Primary</span>
-                  </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
+                </DropdownMenuItem>
+                <DropdownMenuSub v-else-if="openableFiles.length > 1 && !isMissing">
+                  <DropdownMenuSubTrigger>
+                    <BookOpen class="size-4 mr-2" />
+                    Open
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="openFile(file)">
+                      <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">Audiobook</span>
+                      <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
+                      <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">Primary</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
 
-              <!-- Download submenu -->
-              <DropdownMenuItem
-                v-if="hasPermission('library_download') && openableFiles.length === 1 && primaryFile"
-                @click="handleDownloadFile(primaryFile)"
-              >
-                <Download class="size-4 mr-2" />
-                Download
-              </DropdownMenuItem>
-              <DropdownMenuSub v-else-if="hasPermission('library_download') && openableFiles.length > 1">
-                <DropdownMenuSubTrigger>
+                <!-- Download submenu -->
+                <DropdownMenuItem
+                  v-if="hasPermission('library_download') && openableFiles.length === 1 && primaryFile"
+                  @click="handleDownloadFile(primaryFile)"
+                >
                   <Download class="size-4 mr-2" />
                   Download
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="handleDownloadFile(file)">
-                    <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">Audiobook</span>
-                    <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
-                    <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">Primary</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem @click="handleExportAll"> All formats (ZIP) </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
+                </DropdownMenuItem>
+                <DropdownMenuSub v-else-if="hasPermission('library_download') && openableFiles.length > 1">
+                  <DropdownMenuSubTrigger>
+                    <Download class="size-4 mr-2" />
+                    Download
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="handleDownloadFile(file)">
+                      <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">Audiobook</span>
+                      <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
+                      <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">Primary</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem @click="handleExportAll"> All formats (ZIP) </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
 
-              <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id } })">
-                <ExternalLink class="size-4 mr-2" />
-                Book Details
-              </DropdownMenuItem>
-              <DropdownMenuSeparator v-if="hasPermission('library_edit_metadata')" />
-              <DropdownMenuSub v-if="hasPermission('library_edit_metadata')">
-                <DropdownMenuSubTrigger>
-                  <Pencil class="size-4 mr-2" />
-                  Metadata
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })">
+                <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id } })">
+                  <ExternalLink class="size-4 mr-2" />
+                  Book Details
+                </DropdownMenuItem>
+                <DropdownMenuSeparator v-if="hasPermission('library_edit_metadata')" />
+                <DropdownMenuSub v-if="hasPermission('library_edit_metadata')">
+                  <DropdownMenuSubTrigger>
                     <Pencil class="size-4 mr-2" />
-                    Edit Metadata
-                  </DropdownMenuItem>
-                  <DropdownMenuItem :disabled="anyRefreshing" @click="handleRefreshMetadata">
-                    <Loader2 v-if="anyRefreshing" class="size-4 mr-2 animate-spin" />
-                    <RefreshCw v-else class="size-4 mr-2" />
-                    Refresh Metadata
-                  </DropdownMenuItem>
-                  <DropdownMenuItem :disabled="reExtractingCover" @click="reExtractCover()">
-                    <Loader2 v-if="reExtractingCover" class="size-4 mr-2 animate-spin" />
-                    <Image v-else class="size-4 mr-2" />
-                    Regenerate Cover
-                  </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              <DropdownMenuItem @click="emit('action', 'add-to-collection')">
-                <FolderPlus class="size-4 mr-2" />
-                Add to Collection
-              </DropdownMenuItem>
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>
-                  <component
-                    :is="STATUS_ICONS[localReadStatus ?? 'unread']"
-                    class="size-4 mr-2"
-                    :class="STATUS_COLORS[localReadStatus ?? 'unread']"
-                  />
-                  Set Status
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="handleSetStatus(opt.value)">
-                    <component :is="STATUS_ICONS[opt.value]" class="size-4 mr-2" :class="STATUS_COLORS[opt.value]" />
-                    {{ opt.label }}
-                    <Check v-if="localReadStatus === opt.value" class="size-3 ml-auto text-primary" />
-                  </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              <DropdownMenuItem v-if="hasPermission('email_send')" @click="showSendDialog = true">
-                <Send class="size-4 mr-2" />
-                Send via Email
-              </DropdownMenuItem>
-              <DropdownMenuSeparator v-if="hasPermission('email_send') || hasPermission('library_delete_books')" />
-              <DropdownMenuItem
-                v-if="hasPermission('library_delete_books')"
-                class="text-destructive focus:text-destructive"
-                @click="emit('action', 'delete')"
-              >
-                <Trash2 class="size-4 mr-2" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                    Metadata
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })">
+                      <Pencil class="size-4 mr-2" />
+                      Edit Metadata
+                    </DropdownMenuItem>
+                    <DropdownMenuItem :disabled="anyRefreshing" @click="handleRefreshMetadata">
+                      <Loader2 v-if="anyRefreshing" class="size-4 mr-2 animate-spin" />
+                      <RefreshCw v-else class="size-4 mr-2" />
+                      Refresh Metadata
+                    </DropdownMenuItem>
+                    <DropdownMenuItem :disabled="reExtractingCover" @click="reExtractCover()">
+                      <Loader2 v-if="reExtractingCover" class="size-4 mr-2 animate-spin" />
+                      <Image v-else class="size-4 mr-2" />
+                      Regenerate Cover
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuItem @click="emit('action', 'add-to-collection')">
+                  <FolderPlus class="size-4 mr-2" />
+                  Add to Collection
+                </DropdownMenuItem>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <component
+                      :is="STATUS_ICONS[localReadStatus ?? 'unread']"
+                      class="size-4 mr-2"
+                      :class="STATUS_COLORS[localReadStatus ?? 'unread']"
+                    />
+                    Set Status
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="handleSetStatus(opt.value)">
+                      <component :is="STATUS_ICONS[opt.value]" class="size-4 mr-2" :class="STATUS_COLORS[opt.value]" />
+                      {{ opt.label }}
+                      <Check v-if="localReadStatus === opt.value" class="size-3 ml-auto text-primary" />
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuItem v-if="hasPermission('email_send')" @click="showSendDialog = true">
+                  <Send class="size-4 mr-2" />
+                  Send via Email
+                </DropdownMenuItem>
+                <DropdownMenuSeparator v-if="hasPermission('email_send') || hasPermission('library_delete_books')" />
+                <DropdownMenuItem
+                  v-if="hasPermission('library_delete_books')"
+                  class="text-destructive focus:text-destructive"
+                  @click="emit('action', 'delete')"
+                >
+                  <Trash2 class="size-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
     </BookCoverSurface>

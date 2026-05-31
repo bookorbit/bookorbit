@@ -38,8 +38,14 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
 }))
 
 const mockCardOverlays = ref<string[]>([])
+const mockBookCoverDisplayMode = ref('blurred-fit')
 vi.mock('@/composables/useDisplaySettings', () => ({
-  useDisplaySettings: () => ({ cardOverlays: mockCardOverlays }),
+  useDisplaySettings: () => ({
+    cardOverlays: mockCardOverlays,
+    bookSpineOverlay: ref('off'),
+    bookShadowStrength: ref('default'),
+    bookCoverDisplayMode: mockBookCoverDisplayMode,
+  }),
 }))
 
 const mockDownloadFile = vi.fn<() => void>()
@@ -181,6 +187,7 @@ describe('BookCoverCard', () => {
     vi.clearAllMocks()
     mockRefreshing.value = false
     mockCardOverlays.value = []
+    mockBookCoverDisplayMode.value = 'blurred-fit'
     setTouchMode(false)
   })
 
@@ -325,6 +332,21 @@ describe('BookCoverCard', () => {
       const book = makeBook({ id: 42, hasCover: true })
       mountCard({ book })
       expect(mockCoverUrl).toHaveBeenCalledWith(42)
+    })
+
+    it('constrains overlays to the natural fitted cover frame after image load', async () => {
+      mockBookCoverDisplayMode.value = 'natural-bottom'
+      const wrapper = mountCard({ book: makeBook({ hasCover: true }) })
+      const image = wrapper.find('img[alt="Dune"]')
+      Object.defineProperty(image.element, 'naturalWidth', { configurable: true, value: 1200 })
+      Object.defineProperty(image.element, 'naturalHeight', { configurable: true, value: 600 })
+
+      await image.trigger('load')
+
+      const frame = wrapper.find('[data-testid="cover-overlay-frame"]')
+      expect(frame.attributes('style')).toContain('height:')
+      expect(frame.attributes('style')).toContain('bottom: 0')
+      expect(frame.attributes('style')).not.toContain('top: 50%')
     })
 
     it('shows missing badge when book status is missing', () => {

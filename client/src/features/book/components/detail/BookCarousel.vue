@@ -3,11 +3,10 @@ import { nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
 
-import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
-import BookCoverPlaceholder from '@/features/book/components/BookCoverPlaceholder.vue'
+import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
 import BookCoverSurface from '@/features/book/components/BookCoverSurface.vue'
-import { coverAspectRatioValue, DEFAULT_COVER_ASPECT_RATIO, fittedCoverFrameStyle } from '@/features/book/lib/cover-aspect-ratio'
+import { DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
 
 export interface CarouselBook {
   id: number
@@ -36,15 +35,7 @@ const props = withDefaults(
 const router = useRouter()
 const { coverUrl } = useCoverVersions()
 const scrollEl = ref<HTMLElement | null>(null)
-const slotAspectRatio = coverAspectRatioValue(DEFAULT_COVER_ASPECT_RATIO)
-
-type CoverState = {
-  loaded: boolean
-  failed: boolean
-  imageRatio: number | null
-}
-
-const coverStateByBookId = ref<Record<number, CoverState>>({})
+const coverResetVersion = ref(0)
 
 function scroll(direction: 'left' | 'right') {
   if (!scrollEl.value) return
@@ -68,48 +59,10 @@ function cardAspectRatio(book: CarouselBook): string {
   return isAudiobook(book) ? '1/1' : DEFAULT_COVER_ASPECT_RATIO
 }
 
-function coverState(bookId: number): CoverState {
-  return coverStateByBookId.value[bookId] ?? { loaded: false, failed: false, imageRatio: null }
-}
-
-function isCoverLoaded(bookId: number): boolean {
-  return coverState(bookId).loaded
-}
-
-function isCoverFailed(bookId: number): boolean {
-  return coverState(bookId).failed
-}
-
-function fittedCoverSpineStyle(bookId: number): Record<string, string> {
-  return fittedCoverFrameStyle(coverState(bookId).imageRatio, slotAspectRatio)
-}
-
-function handleCoverLoad(bookId: number, event: Event): void {
-  const target = event.target as HTMLImageElement | null
-  const imageRatio = target && target.naturalWidth > 0 && target.naturalHeight > 0 ? target.naturalWidth / target.naturalHeight : null
-  coverStateByBookId.value = {
-    ...coverStateByBookId.value,
-    [bookId]: { loaded: true, failed: false, imageRatio },
-  }
-}
-
-function handleCoverError(bookId: number): void {
-  coverStateByBookId.value = {
-    ...coverStateByBookId.value,
-    [bookId]: { loaded: false, failed: true, imageRatio: null },
-  }
-}
-
 watch(
   () => props.books,
-  (books) => {
-    const previous = coverStateByBookId.value
-    const next: Record<number, CoverState> = {}
-    for (const book of books) {
-      const existing = previous[book.id]
-      next[book.id] = existing ? { ...existing, failed: false } : { loaded: false, failed: false, imageRatio: null }
-    }
-    coverStateByBookId.value = next
+  () => {
+    coverResetVersion.value += 1
   },
   { immediate: true },
 )
@@ -168,40 +121,21 @@ defineExpose({ scroll })
           class="book-cover-surface--spine-fitted relative w-full rounded-sm overflow-hidden transition-transform duration-150 group-hover:scale-[1.02]"
           :interactive="true"
           :disable-spine="isAudiobook(book)"
-          :style="[
-            { aspectRatio: cardAspectRatio(book) },
-            !book.hasCover || !isCoverLoaded(book.id) || isCoverFailed(book.id) ? bookCoverStyle(book.title ?? String(book.id)) : {},
-          ]"
+          :display-mode="isAudiobook(book) ? 'fill-crop' : undefined"
+          :style="{ aspectRatio: cardAspectRatio(book) }"
         >
-          <img
-            v-if="book.hasCover && isCoverLoaded(book.id) && !isCoverFailed(book.id) && !isAudiobook(book)"
+          <BookCoverArtwork
             :src="coverUrl(book.id, 'thumbnail')"
-            class="absolute inset-0 w-full h-full object-cover scale-110 blur-md brightness-90 transition-opacity duration-300 ease-out"
-            aria-hidden="true"
-            loading="lazy"
-          />
-          <img
-            v-if="book.hasCover && !isCoverFailed(book.id)"
-            :src="coverUrl(book.id, 'thumbnail')"
-            :alt="book.title ?? ''"
-            class="absolute inset-0 w-full h-full transition-opacity duration-300 ease-out"
-            :class="[isAudiobook(book) ? 'object-cover' : 'object-contain', isCoverLoaded(book.id) ? 'opacity-100' : 'opacity-0']"
-            loading="lazy"
-            @load="handleCoverLoad(book.id, $event)"
-            @error="handleCoverError(book.id)"
-          />
-          <div v-if="book.hasCover && !isCoverLoaded(book.id) && !isCoverFailed(book.id)" class="absolute inset-0 animate-pulse bg-white/10" />
-          <div
-            v-if="!isAudiobook(book) && book.hasCover && isCoverLoaded(book.id) && !isCoverFailed(book.id)"
-            class="book-cover-spine-layer absolute z-[3]"
-            :style="fittedCoverSpineStyle(book.id)"
-          />
-          <BookCoverPlaceholder
-            v-if="!book.hasCover || isCoverFailed(book.id)"
+            :has-cover="book.hasCover"
             :title="book.title"
             :author-line="book.authors.length > 0 ? book.authors.join(', ') : null"
             :is-audio="isAudiobook(book)"
             :seed="book.title ?? String(book.id)"
+            :alt="book.title ?? ''"
+            :frame-aspect-ratio="cardAspectRatio(book)"
+            :mode="isAudiobook(book) ? 'fill-crop' : undefined"
+            :reset-key="`${coverResetVersion}:${book.id}`"
+            :spine="!isAudiobook(book)"
           />
           <span
             v-if="showSeriesIndex && book.seriesIndex != null"

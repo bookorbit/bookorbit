@@ -8,10 +8,49 @@ const userState = {
 }
 
 const permissionState = { isDemo: false }
+const routeState = { query: {} as Record<string, unknown> }
 
 const apiMock = vi.fn<(...args: unknown[]) => Promise<{ ok: boolean; json?: () => Promise<unknown> }>>()
 const loadFromServerMock = vi.fn<() => Promise<void>>()
 const seedToServerMock = vi.fn<(...args: unknown[]) => Promise<void>>()
+const loadDisplaySettingsFromServerMock = vi.fn<() => Promise<void>>()
+const seedDisplaySettingsToServerMock = vi.fn<(...args: unknown[]) => Promise<void>>()
+const routerReplaceMock = vi.fn<(location: unknown) => void>()
+
+const displaySnapshot = {
+  portraitCoverSize: 180,
+  squareCoverSize: 180,
+  coverSizeScope: 'per-view',
+  gridGap: 28,
+  portraitGridGap: 12,
+  squareGridGap: 12,
+  viewMode: 'grid',
+  cardOverlays: [],
+  smartScopeFilterExpanded: false,
+  authorCoverSize: 120,
+  authorCoverShape: 'circle',
+  tableZebraStriping: true,
+  tableDensity: 'comfortable',
+  bookSpineOverlay: 'off',
+  bookShadowStrength: 'default',
+  bookCoverDisplayMode: 'blurred-fit',
+}
+
+const displayRefs = {
+  portraitCoverSize: ref(180),
+  squareCoverSize: ref(180),
+  coverSizeScope: ref('per-view'),
+  portraitGridGap: ref(12),
+  squareGridGap: ref(12),
+  cardOverlays: ref([]),
+  smartScopeFilterExpanded: ref(false),
+  authorCoverSize: ref(120),
+  authorCoverShape: ref('circle'),
+  tableZebraStriping: ref(true),
+  bookSpineOverlay: ref('off'),
+  bookShadowStrength: ref('default'),
+  bookCoverDisplayMode: ref('blurred-fit'),
+}
 
 const themeStore = {
   theme: 'dark',
@@ -34,6 +73,11 @@ vi.mock('@/features/auth/composables/useAuth', () => ({
   },
 }))
 
+vi.mock('vue-router', () => ({
+  useRoute: () => routeState,
+  useRouter: () => ({ replace: routerReplaceMock }),
+}))
+
 vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({
     isDemoRestrictedAccount: computed(() => permissionState.isDemo),
@@ -49,29 +93,22 @@ vi.mock('@/composables/useThemeSync', () => ({
   seedToServer: (...args: unknown[]) => seedToServerMock(...args),
 }))
 
+vi.mock('@/composables/useDisplaySettingsSync', () => ({
+  loadDisplaySettingsFromServer: () => loadDisplaySettingsFromServerMock(),
+  seedDisplaySettingsToServer: (...args: unknown[]) => seedDisplaySettingsToServerMock(...args),
+}))
+
 vi.mock('@/stores/theme', () => ({
   ACCENT_VIVID: [{ id: 'blue', label: 'Blue', color: '#0000ff' }],
   ACCENT_PASTEL: [{ id: 'grey', label: 'Grey', color: '#999999' }],
   RADIUS_OPTIONS: [{ id: 'rounded', label: 'Rounded', className: 'rounded-lg' }],
-  BACKGROUND_OPTIONS: [{ id: 'vinyl', label: 'Vinyl', previewClass: 'bg-muted' }],
+  BACKGROUND_OPTIONS: [{ id: 'vinyl', label: 'Vinyl', cssClass: 'bg-muted' }],
   useThemeStore: () => themeStore,
 }))
 
 vi.mock('@/composables/useDisplaySettings', () => ({
-  useDisplaySettings: () => ({
-    portraitCoverSize: ref(180),
-    squareCoverSize: ref(180),
-    coverSizeScope: ref('separate'),
-    portraitGridGap: ref(12),
-    squareGridGap: ref(12),
-    cardOverlays: ref([]),
-    smartScopeFilterExpanded: ref(false),
-    authorCoverSize: ref(120),
-    authorCoverShape: ref('portrait'),
-    tableZebraStriping: ref(true),
-    bookSpineOverlay: ref('off'),
-    bookShadowStrength: ref('default'),
-  }),
+  getDisplayPreferencesSnapshot: () => displaySnapshot,
+  useDisplaySettings: () => displayRefs,
 }))
 
 vi.mock('@/features/book/composables/useSeriesCollapsePreference', () => ({
@@ -109,7 +146,9 @@ describe('AppearanceSettings', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     permissionState.isDemo = false
+    routeState.query = {}
     userState.settings = { syncThemePreferences: false }
+    displayRefs.bookCoverDisplayMode.value = 'blurred-fit'
     apiMock.mockResolvedValue({ ok: true, json: async () => ({ settings: null }) })
   })
 
@@ -120,6 +159,49 @@ describe('AppearanceSettings', () => {
     const deviceCard = cards[0]!
     expect(deviceCard.classes()).toContain('border-primary')
     expect(deviceCard.text()).toContain('Active')
+  })
+
+  it('defaults to the theme tab and shows the persistent storage section above tabs', () => {
+    const wrapper = mountComponent()
+
+    expect(wrapper.findAll('.settings-group-label').map((label) => label.text())).toEqual([
+      'Where to save appearance preferences',
+      'Theme',
+      'Library Background',
+    ])
+    expect(routerReplaceMock).toHaveBeenCalledWith({ name: 'settings-appearance', query: { tab: 'theme' } })
+  })
+
+  it('renders appearance tabs in the recommended order', () => {
+    const wrapper = mountComponent()
+
+    expect(['theme', 'book-covers', 'layout', 'behavior'].map((id) => wrapper.get(`[data-testid="appearance-tab-${id}"]`).text())).toEqual([
+      'Theme',
+      'Book Covers',
+      'Layout',
+      'Behavior',
+    ])
+  })
+
+  it('switches tabs through the appearance query param', async () => {
+    const wrapper = mountComponent()
+
+    await wrapper.get('[data-testid="appearance-tab-layout"]').trigger('click')
+
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({ name: 'settings-appearance', query: { tab: 'layout' } })
+    expect(wrapper.findAll('.settings-group-label').map((label) => label.text())).toEqual([
+      'Library Grid Layout',
+      'Author Grid',
+      'List and Table Views',
+    ])
+  })
+
+  it('normalizes invalid appearance tabs back to theme', () => {
+    routeState.query = { tab: 'unknown' }
+
+    mountComponent()
+
+    expect(routerReplaceMock).toHaveBeenCalledWith({ name: 'settings-appearance', query: { tab: 'theme' } })
   })
 
   it('shows My account as active when theme sync is enabled', () => {
@@ -133,7 +215,10 @@ describe('AppearanceSettings', () => {
   })
 
   it('enabling account sync seeds current local preferences when no server row exists', async () => {
-    apiMock.mockResolvedValueOnce({ ok: true, json: async () => ({}) }).mockResolvedValueOnce({ ok: true, json: async () => ({ settings: null }) })
+    apiMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({}) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ settings: null }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ settings: null }) })
 
     const wrapper = mountComponent()
     const cards = wrapper.findAll('.rounded-lg.border-2')
@@ -146,6 +231,7 @@ describe('AppearanceSettings', () => {
       expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ sync: true }) }),
     )
     expect(apiMock).toHaveBeenNthCalledWith(2, '/api/v1/user-preferences/theme')
+    expect(apiMock).toHaveBeenNthCalledWith(3, '/api/v1/user-preferences/display')
     expect(seedToServerMock).toHaveBeenCalledWith({
       theme: 'dark',
       accent: 'blue',
@@ -153,7 +239,9 @@ describe('AppearanceSettings', () => {
       background: 'vinyl',
       brightness: 35,
     })
+    expect(seedDisplaySettingsToServerMock).toHaveBeenCalledWith(displaySnapshot)
     expect(loadFromServerMock).not.toHaveBeenCalled()
+    expect(loadDisplaySettingsFromServerMock).not.toHaveBeenCalled()
     expect(vi.mocked(toast.success)).toHaveBeenCalledWith('Preferences will now be synced')
   })
 
@@ -161,6 +249,7 @@ describe('AppearanceSettings', () => {
     apiMock
       .mockResolvedValueOnce({ ok: true, json: async () => ({}) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ settings: { theme: 'light' } }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ settings: { bookCoverDisplayMode: 'natural-bottom' } }) })
 
     const wrapper = mountComponent()
     const cards = wrapper.findAll('.rounded-lg.border-2')
@@ -168,7 +257,9 @@ describe('AppearanceSettings', () => {
     await flushPromises()
 
     expect(loadFromServerMock).toHaveBeenCalled()
+    expect(loadDisplaySettingsFromServerMock).toHaveBeenCalled()
     expect(seedToServerMock).not.toHaveBeenCalled()
+    expect(seedDisplaySettingsToServerMock).not.toHaveBeenCalled()
   })
 
   it('switching back to This device only calls the storage mode endpoint with sync false', async () => {
@@ -208,5 +299,17 @@ describe('AppearanceSettings', () => {
     expect(wrapper.text()).toContain('Not available')
     expect(apiMock).not.toHaveBeenCalled()
     expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Demo-restricted account cannot change theme storage mode')
+  })
+
+  it('lets the user choose the natural-bottom cover display mode', async () => {
+    const wrapper = mountComponent()
+    await wrapper.get('[data-testid="appearance-tab-book-covers"]').trigger('click')
+
+    const naturalButton = wrapper.findAll('button').find((button) => button.text().includes('Natural bottom'))
+    expect(naturalButton).toBeDefined()
+
+    await naturalButton!.trigger('click')
+
+    expect(displayRefs.bookCoverDisplayMode.value).toBe('natural-bottom')
   })
 })

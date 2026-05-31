@@ -31,11 +31,47 @@
   box-shadow: var(--book-cover-mini-shadow);
 }
 
+.book-cover-surface[data-cover-fit='natural-bottom']:has(.book-cover-artwork-frame--natural),
+.book-cover-surface[data-cover-fit='natural-bottom']:has(.book-cover-artwork-placeholder-natural) {
+  background-color: transparent;
+  box-shadow: none;
+}
+
 .book-cover-surface--interactive {
   transition: box-shadow 180ms ease;
 }
 
 .group:hover .book-cover-surface--interactive {
+  box-shadow: var(--book-cover-shadow-hover);
+}
+
+.group:hover .book-cover-surface--interactive[data-cover-fit='natural-bottom']:has(.book-cover-artwork-frame--natural),
+.group:hover .book-cover-surface--interactive[data-cover-fit='natural-bottom']:has(.book-cover-artwork-placeholder-natural) {
+  box-shadow: none;
+}
+
+.book-cover-artwork-frame {
+  position: absolute;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+.book-cover-artwork-frame--full {
+  inset: 0;
+}
+
+.book-cover-artwork-frame--natural,
+.book-cover-artwork-placeholder-natural {
+  box-shadow: var(--book-cover-shadow);
+}
+
+.book-cover-surface--mini .book-cover-artwork-frame--natural,
+.book-cover-surface--mini .book-cover-artwork-placeholder-natural {
+  box-shadow: var(--book-cover-mini-shadow);
+}
+
+.group:hover .book-cover-surface--interactive .book-cover-artwork-frame--natural,
+.group:hover .book-cover-surface--interactive .book-cover-artwork-placeholder-natural {
   box-shadow: var(--book-cover-shadow-hover);
 }
 
@@ -87,5 +123,12 @@
 
 .book-cover-surface.book-cover-surface--spine-fitted::before,
 .book-cover-surface.book-cover-surface--spine-fitted::after {
+  opacity: 0;
+}
+
+.book-cover-surface[data-cover-fit='natural-bottom']:has(.book-cover-artwork-frame--natural)::before,
+.book-cover-surface[data-cover-fit='natural-bottom']:has(.book-cover-artwork-frame--natural)::after,
+.book-cover-surface[data-cover-fit='natural-bottom']:has(.book-cover-artwork-placeholder-natural)::before,
+.book-cover-surface[data-cover-fit='natural-bottom']:has(.book-cover-artwork-placeholder-natural)::after {
   opacity: 0;
 }

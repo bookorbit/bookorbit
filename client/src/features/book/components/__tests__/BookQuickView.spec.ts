@@ -4,6 +4,10 @@ import { ref } from 'vue'
 import type { BookDetail } from '@bookorbit/types'
 import BookQuickView from '../BookQuickView.vue'
 
+const displaySettings = {
+  bookCoverDisplayMode: ref('blurred-fit'),
+}
+
 const permissionState = {
   canDelete: true,
   canEditMetadata: true,
@@ -51,6 +55,10 @@ vi.mock('@/features/book/composables/useCoverVersions', () => ({
 
 vi.mock('@/features/book/composables/useSafeHtml', () => ({
   useSafeHtml: () => '',
+}))
+
+vi.mock('@/composables/useDisplaySettings', () => ({
+  useDisplaySettings: () => displaySettings,
 }))
 
 function makeDetail(overrides: Partial<BookDetail> = {}): BookDetail {
@@ -131,6 +139,7 @@ describe('BookQuickView', () => {
     fetchMock.mockReset()
     pushMock.mockReset()
     loadingRef.value = false
+    displaySettings.bookCoverDisplayMode.value = 'blurred-fit'
     detailRef.value = makeDetail()
   })
 
@@ -188,5 +197,26 @@ describe('BookQuickView', () => {
     })
 
     expect(wrapper.find('[data-testid="quick-view-action-delete"]').exists()).toBe(false)
+  })
+
+  it('shrinks natural-bottom quick-view cover to the loaded cover ratio', async () => {
+    displaySettings.bookCoverDisplayMode.value = 'natural-bottom'
+    detailRef.value = makeDetail({ coverSource: 'extracted' })
+
+    const wrapper = mount(BookQuickView, {
+      props: {
+        open: true,
+        bookId: 42,
+      },
+      global: globalStubs,
+    })
+    const image = wrapper.get('img[alt="Quick View Book"]')
+    Object.defineProperty(image.element, 'naturalWidth', { configurable: true, value: 1200 })
+    Object.defineProperty(image.element, 'naturalHeight', { configurable: true, value: 600 })
+
+    await image.trigger('load')
+
+    const surface = wrapper.get('.book-cover-surface')
+    expect(surface.attributes('style')).toContain('aspect-ratio: 2 / 1')
   })
 })

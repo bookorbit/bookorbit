@@ -15,7 +15,9 @@ export function coverAspectRatioValue(value: string): number {
   return 2 / 3
 }
 
-export function fittedCoverFrameStyle(imageRatio: number | null, slotRatio: number): Record<string, string> {
+export type FittedCoverFrameAlign = 'center' | 'bottom'
+
+export function fittedCoverFrameStyle(imageRatio: number | null, slotRatio: number, align: FittedCoverFrameAlign = 'center'): Record<string, string> {
   if (!imageRatio || imageRatio <= 0 || !slotRatio || slotRatio <= 0) {
     return { inset: '0' }
   }
@@ -26,13 +28,20 @@ export function fittedCoverFrameStyle(imageRatio: number | null, slotRatio: numb
 
   if (imageRatio > slotRatio) {
     const heightPercent = (slotRatio / imageRatio) * 100
-    return {
+    const style: Record<string, string> = {
       width: '100%',
       height: `${heightPercent}%`,
-      top: '50%',
       left: '0',
-      transform: 'translateY(-50%)',
     }
+
+    if (align === 'bottom') {
+      style.bottom = '0'
+    } else {
+      style.top = '50%'
+      style.transform = 'translateY(-50%)'
+    }
+
+    return style
   }
 
   const widthPercent = (imageRatio / slotRatio) * 100

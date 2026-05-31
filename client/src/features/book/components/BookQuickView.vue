@@ -11,13 +11,14 @@ import { getProviderColor } from '@/lib/provider-colors'
 import { providerIconPath } from '@/features/book/lib/provider-icons'
 import { useBookDetail } from '../composables/useBookDetail'
 import { useCoverVersions } from '../composables/useCoverVersions'
-import { bookCoverStyle } from '../lib/book-cover'
-import BookCoverPlaceholder from './BookCoverPlaceholder.vue'
 import { getFormatColor } from '../lib/format-colors'
 import { FORMAT_TO_GROUP } from '@bookorbit/types'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
+import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useSafeHtml } from '@/features/book/composables/useSafeHtml'
+import BookCoverArtwork from './BookCoverArtwork.vue'
+import BookCoverSurface from './BookCoverSurface.vue'
 
 const props = defineProps<{ bookId: number | null; open: boolean }>()
 const { hasPermission } = usePermissions()
@@ -39,6 +40,7 @@ const { detail, loading, fetch } = useBookDetail()
 
 const coverLoaded = ref(false)
 const coverFailed = ref(false)
+const coverImageRatio = ref<number | null>(null)
 const providerIconErrors = ref<Record<string, boolean>>({})
 const descriptionExpanded = ref(false)
 const genresExpanded = ref(false)
@@ -50,6 +52,7 @@ watch(
     if (id !== null) {
       coverLoaded.value = false
       coverFailed.value = false
+      coverImageRatio.value = null
       descriptionExpanded.value = false
       genresExpanded.value = false
       providerIconErrors.value = {}
@@ -64,7 +67,6 @@ const coverSrc = computed(() => (detail.value ? coverUrl(detail.value.id, 'cover
 
 const coverSeed = computed(() => (detail.value ? (detail.value.title ?? detail.value.folderPath.split('/').pop() ?? String(detail.value.id)) : ''))
 const coverPlaceholderTitle = computed(() => (detail.value ? (detail.value.title ?? detail.value.folderPath.split('/').pop() ?? null) : null))
-const coverStyle = computed(() => (detail.value ? bookCoverStyle(coverSeed.value) : {}))
 
 const seriesLine = computed(() => {
   if (!detail.value?.seriesName) return null
@@ -139,6 +141,20 @@ const providerLinks = computed<ProviderLink[]>(() => {
 const safeDescription = useSafeHtml(() => detail.value?.description)
 
 const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
+const { bookCoverDisplayMode } = useDisplaySettings()
+const quickViewCoverAspectRatio = computed(() => {
+  if (
+    bookCoverDisplayMode.value !== 'natural-bottom' ||
+    detail.value?.coverSource == null ||
+    !coverLoaded.value ||
+    coverFailed.value ||
+    !coverImageRatio.value
+  ) {
+    return coverAspectRatio.value
+  }
+
+  return `${coverImageRatio.value} / 1`
+})
 
 const primaryFile = computed(() => detail.value?.files.find((f) => f.role === 'primary') ?? detail.value?.files[0] ?? null)
 const isPrimaryAudio = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
@@ -161,6 +177,22 @@ function formatBadgeStyle(fmt: string) {
     borderColor: `${color}66`,
     backgroundColor: `${color}1a`,
   }
+}
+
+function handleCoverLoad(ratio: number | null) {
+  coverLoaded.value = true
+  coverFailed.value = false
+  coverImageRatio.value = ratio
+}
+
+function handleCoverError() {
+  coverLoaded.value = false
+  coverFailed.value = true
+  coverImageRatio.value = null
+}
+
+function handleCoverClick() {
+  if (coverLoaded.value && !coverFailed.value) coverLightboxOpen.value = true
 }
 
 function openBook() {
@@ -220,29 +252,29 @@ function handleDelete() {
 
             <div v-else-if="detail" class="flex gap-4 items-start">
               <!-- Cover -->
-              <div
-                class="w-24 shrink-0 rounded overflow-hidden shadow-md relative"
+              <BookCoverSurface
+                size="mini"
+                class="book-cover-surface--spine-fitted w-24 shrink-0 rounded overflow-hidden relative"
+                :disable-spine="isPrimaryAudio"
                 :class="detail.coverSource && !coverFailed ? 'cursor-zoom-in' : ''"
-                :style="[{ aspectRatio: coverAspectRatio }, !detail.coverSource || !coverLoaded || coverFailed ? coverStyle : {}]"
-                @click="coverLoaded && !coverFailed && (coverLightboxOpen = true)"
+                :style="{ aspectRatio: quickViewCoverAspectRatio }"
+                @click="handleCoverClick"
               >
-                <img
-                  v-if="detail.coverSource && !coverFailed"
-                  :src="coverSrc!"
-                  class="w-full h-full object-contain transition-opacity duration-200"
-                  :class="coverLoaded ? 'opacity-100' : 'opacity-0'"
-                  :alt="detail.title ?? ''"
-                  @load="coverLoaded = true"
-                  @error="coverFailed = true"
-                />
-                <BookCoverPlaceholder
-                  v-if="!detail.coverSource || coverFailed"
+                <BookCoverArtwork
+                  :src="coverSrc"
+                  :has-cover="detail.coverSource !== null"
                   :title="coverPlaceholderTitle"
                   :author-line="authorLine"
                   :is-audio="isPrimaryAudio"
                   :seed="coverSeed"
+                  :alt="detail.title ?? ''"
+                  :frame-aspect-ratio="quickViewCoverAspectRatio"
+                  loading="eager"
+                  :spine="!isPrimaryAudio"
+                  @load="handleCoverLoad"
+                  @error="handleCoverError"
                 />
-              </div>
+              </BookCoverSurface>
 
               <!-- Info -->
               <div class="flex-1 min-w-0 pr-2">
@@ -482,7 +514,7 @@ function handleDelete() {
         >
           <DialogTitle class="sr-only">{{ detail?.title ? `${detail.title} cover preview` : 'Book cover preview' }}</DialogTitle>
           <DialogDescription class="sr-only">Enlarged cover image preview dialog.</DialogDescription>
-          <img v-if="detail" :src="coverSrc!" :alt="detail.title ?? ''" class="max-w-[90vw] max-h-[90vh] rounded-md shadow-2xl object-contain" />
+          <img v-if="detail" :src="coverSrc ?? ''" :alt="detail.title ?? ''" class="max-w-[90vw] max-h-[90vh] rounded-md shadow-2xl object-contain" />
           <DialogClose
             class="absolute -top-3 -right-3 p-1 rounded-full bg-background border border-border text-muted-foreground hover:text-foreground transition-colors"
           >
