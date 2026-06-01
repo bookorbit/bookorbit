@@ -203,6 +203,21 @@ export class KoboSyncService {
 
       await tx.execute(sql`
         UPDATE ${schema.koboSnapshotBooks} AS sb
+        SET removed_by_device = false,
+            synced = false,
+            is_new = true,
+            file_hash = e.file_hash,
+            metadata_hash = e.metadata_hash
+        FROM kobo_eligible_books_tmp e
+        WHERE sb.snapshot_id = ${snapshotId}
+          AND sb.book_id = e.book_id
+          AND sb.removed_by_device = true
+          AND sb.synced = true
+          AND sb.pending_delete = false
+      `);
+
+      await tx.execute(sql`
+        UPDATE ${schema.koboSnapshotBooks} AS sb
         SET synced = false,
             is_new = false,
             file_hash = e.file_hash,

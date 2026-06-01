@@ -350,15 +350,15 @@ describe('KoboSyncService', () => {
       return [];
     }
 
-    it('issues only CREATE TEMP and 5 maintenance queries when eligibleBooks is empty', async () => {
+    it('issues only CREATE TEMP and 6 maintenance queries when eligibleBooks is empty', async () => {
       const { fn: txExecute } = makeTxExecute();
       const db = makeReconcileDb(txExecute);
       const service = new KoboSyncService(db as never, {} as never, {} as never);
 
       await (service as any).reconcileSnapshot(42, []);
 
-      // CREATE TEMP + 5 maintenance queries (no batch insert when list is empty)
-      expect(txExecute).toHaveBeenCalledTimes(6);
+      // CREATE TEMP + 6 maintenance queries (no batch insert when list is empty)
+      expect(txExecute).toHaveBeenCalledTimes(7);
     });
 
     it('issues one batch INSERT when eligibleBooks fits in a single batch', async () => {
@@ -371,8 +371,8 @@ describe('KoboSyncService', () => {
         { bookId: 2, fileHash: null, metadataHash: 'm2' },
       ]);
 
-      // CREATE TEMP + 1 batch INSERT + 5 maintenance queries
-      expect(txExecute).toHaveBeenCalledTimes(7);
+      // CREATE TEMP + 1 batch INSERT + 6 maintenance queries
+      expect(txExecute).toHaveBeenCalledTimes(8);
 
       const batchInsert = captured[1];
       const sqlStrings = extractSqlStrings(batchInsert);
@@ -419,8 +419,8 @@ describe('KoboSyncService', () => {
       }));
       await (service as any).reconcileSnapshot(99, eligible);
 
-      // CREATE TEMP + 2 batch INSERTs + 5 maintenance queries
-      expect(txExecute).toHaveBeenCalledTimes(8);
+      // CREATE TEMP + 2 batch INSERTs + 6 maintenance queries
+      expect(txExecute).toHaveBeenCalledTimes(9);
     });
 
     it('includes snapshotId as a param in all maintenance queries', async () => {
@@ -431,8 +431,8 @@ describe('KoboSyncService', () => {
       const snapshotId = 77;
       await (service as any).reconcileSnapshot(snapshotId, [{ bookId: 1, fileHash: 'f', metadataHash: 'm' }]);
 
-      // Statements at index 2-6 are the 5 maintenance queries
-      const maintenanceStmts = captured.slice(2);
+      // Statements at index 2-7 are the 6 maintenance queries
+      const maintenanceStmts = captured.slice(2, 8);
       for (const stmt of maintenanceStmts) {
         const params = extractSqlParams(stmt);
         expect(params).toContain(snapshotId);
@@ -462,6 +462,24 @@ describe('KoboSyncService', () => {
       expect(batch2Params).toContain(5001);
       expect(batch2Params).toContain(5002);
       expect(batch2Params).not.toContain(1);
+    });
+
+    it('resets device-removed rows that remain eligible for re-delivery', async () => {
+      const { fn: txExecute, captured } = makeTxExecute();
+      const db = makeReconcileDb(txExecute);
+      const service = new KoboSyncService(db as never, {} as never, {} as never);
+
+      await (service as any).reconcileSnapshot(5, [{ bookId: 7, fileHash: 'abc', metadataHash: 'xyz' }]);
+
+      const resetStmt = captured.find((stmt) => {
+        const sql = extractSqlStrings(stmt).join(' ');
+        return sql.includes('removed_by_device = false') && sql.includes('removed_by_device = true');
+      });
+
+      expect(resetStmt).toBeDefined();
+      const sql = extractSqlStrings(resetStmt).join(' ');
+      expect(sql).toContain('synced = false');
+      expect(sql).toContain('is_new = true');
     });
   });
 
