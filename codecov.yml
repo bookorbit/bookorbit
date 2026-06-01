@@ -5,6 +5,21 @@ coverage:
         target: auto
         threshold: 0%
         base: auto
+        flags:
+          - server
+          - client
+      server:
+        target: auto
+        threshold: 0%
+        base: auto
+        flags:
+          - server
+      client:
+        target: auto
+        threshold: 0%
+        base: auto
+        flags:
+          - client
 
 comment:
   layout: "diff, flags, files"
@@ -13,3 +28,14 @@ comment:
   require_base: false
   require_head: true
   hide_project_coverage: false
+  show_carryforward_flags: true
+
+flags:
+  server:
+    paths:
+      - server/**
+    carryforward: true
+  client:
+    paths:
+      - client/**
+    carryforward: true
