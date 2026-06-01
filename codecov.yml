@@ -20,6 +20,26 @@ coverage:
         base: auto
         flags:
           - client
+    patch:
+      default:
+        target: auto
+        threshold: 0%
+        base: auto
+        flags:
+          - server
+          - client
+      server:
+        target: auto
+        threshold: 0%
+        base: auto
+        flags:
+          - server
+      client:
+        target: auto
+        threshold: 0%
+        base: auto
+        flags:
+          - client
 
 comment:
   layout: "diff, flags, files"

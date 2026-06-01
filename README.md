@@ -31,6 +31,8 @@ A self-hosted library management and reading platform for ebooks, PDFs, audioboo
 <details>
 <summary>Coverage Map (Codecov Grid)</summary>
 
+[![Server coverage](https://codecov.io/gh/bookorbit/bookorbit/graph/badge.svg?token=F6TADEFCUV&flag=server)](https://codecov.io/gh/bookorbit/bookorbit?flags%5B0%5D=server) Server &nbsp; [![Client coverage](https://codecov.io/gh/bookorbit/bookorbit/graph/badge.svg?token=F6TADEFCUV&flag=client)](https://codecov.io/gh/bookorbit/bookorbit?flags%5B0%5D=client) Client
+
 ![Codecov Grid](https://codecov.io/gh/bookorbit/bookorbit/graphs/tree.svg?token=F6TADEFCUV)
 
 </details>
