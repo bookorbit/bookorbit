@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { BookCard, BookFileRef } from '@bookorbit/types'
+import type { BookCard, BookFileRef, CoverAspectRatio } from '@bookorbit/types'
 import { FORMAT_TO_GROUP, READER_OPENABLE_FORMATS } from '@bookorbit/types'
 import { getFormatColor } from '../lib/format-colors'
 import { computed, inject, ref, watch, onMounted, onUnmounted } from 'vue'
@@ -58,6 +58,7 @@ const props = defineProps<{
   selectionMode?: boolean
   selected?: boolean
   showLabel?: boolean
+  coverAspectRatio?: CoverAspectRatio
 }>()
 
 type BookActionType = 'quick-view' | 'add-to-collection' | 'delete'
@@ -114,7 +115,8 @@ async function handleRefreshMetadata() {
 }
 const { hasPermission } = usePermissions()
 const { cardOverlays, bookCoverDisplayMode, gridCardPrimaryLabel, gridCardSecondaryLabel, cardInfoMode } = useDisplaySettings()
-const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
+const injectedCoverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
+const effectiveCoverAspectRatio = computed<CoverAspectRatio>(() => props.coverAspectRatio ?? injectedCoverAspectRatio.value)
 const showSendDialog = ref(false)
 
 const hasProgress = computed(() => props.book.readingProgress != null && props.book.readingProgress > 0)
@@ -153,7 +155,7 @@ const coverImageRatio = ref<number | null>(null)
 const isMissing = computed(() => props.book.status === 'missing')
 const showMobileOverlay = ref(false)
 const root = ref<HTMLElement | null>(null)
-const coverSlotRatio = computed(() => coverAspectRatioValue(String(coverAspectRatio.value)))
+const coverSlotRatio = computed(() => coverAspectRatioValue(String(effectiveCoverAspectRatio.value)))
 const coverOverlayFrameStyle = computed(() => {
   if (bookCoverDisplayMode.value !== 'natural-bottom' || !props.book.hasCover || !coverLoaded.value || coverFailed.value) return { inset: '0' }
   return fittedCoverFrameStyle(coverImageRatio.value, coverSlotRatio.value, 'bottom')
@@ -289,7 +291,7 @@ const showHoverTitle = computed(
   () => (cardInfoMode.value === 'hover-overlay' || !props.showLabel) && (coverLoaded.value || !props.book.hasCover || coverFailed.value),
 )
 const showAuthorOnHover = computed(() => showHoverTitle.value && !!authorLine.value)
-const hoverTitleClampClass = computed(() => (coverAspectRatio.value === '1/1' ? 'line-clamp-1' : 'line-clamp-2'))
+const hoverTitleClampClass = computed(() => (effectiveCoverAspectRatio.value === '1/1' ? 'line-clamp-1' : 'line-clamp-2'))
 
 const overlayBackground = computed(() => (cardInfoMode.value === 'hover-overlay' || !props.showLabel ? 'bg-black/70' : 'bg-black/20'))
 const overlayFadeClass = computed(() => (cardInfoMode.value === 'hover-overlay' || !props.showLabel ? 'group-hover:opacity-0' : ''))
@@ -360,7 +362,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
         :class="isMissing || selectionMode ? '' : 'group-hover:scale-[1.02]'"
         :interactive="!isMissing && !selectionMode"
         :disable-spine="isAudiobook"
-        :style="{ aspectRatio: coverAspectRatio }"
+        :style="{ aspectRatio: effectiveCoverAspectRatio }"
       >
         <!-- Missing border overlay: mirror selected overlay pattern so border is never clipped/hidden -->
         <div v-if="isMissing" class="absolute inset-0 z-30 pointer-events-none rounded-sm ring-2 ring-inset ring-amber-500" />
@@ -373,6 +375,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
           :is-audio="isAudiobook"
           :seed="book.title ?? String(book.id)"
           :alt="book.title ?? ''"
+          :frame-aspect-ratio="effectiveCoverAspectRatio"
           :image-class="isMissing ? 'brightness-50' : ''"
           :spine="!isAudiobook"
           @load="handleArtworkLoad"
@@ -836,7 +839,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
 }
 
 .grid-card-label__secondary {
-  font-size: 0.625rem;
+  font-size: 0.675rem;
   line-height: 0.875rem;
   overflow: hidden;
   text-overflow: ellipsis;

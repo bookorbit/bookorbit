@@ -56,19 +56,42 @@ const resolvedCoverId = computed<number | null>(() => {
 })
 
 const failedCovers = ref(new Set<number>())
+const loadedCovers = ref(new Set<number>())
 const singleCoverFailed = ref(false)
+const singleCoverLoaded = ref(false)
 
 watch(resolvedCoverId, () => {
   singleCoverFailed.value = false
+  singleCoverLoaded.value = false
 })
+watch(
+  coverIds,
+  (ids) => {
+    const activeIds = new Set(ids)
+    failedCovers.value = new Set([...failedCovers.value].filter((id) => activeIds.has(id)))
+    loadedCovers.value = new Set([...loadedCovers.value].filter((id) => activeIds.has(id)))
+  },
+  { immediate: true },
+)
 const primaryFile = computed(() => props.book.files.find((file) => file.role === 'primary') ?? props.book.files[0] ?? null)
 const isAudiobook = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
 
+function handleCoverLoad(bookId: number) {
+  loadedCovers.value = new Set([...loadedCovers.value, bookId])
+}
+
 function handleCoverError(bookId: number) {
+  loadedCovers.value = new Set([...loadedCovers.value].filter((id) => id !== bookId))
   failedCovers.value = new Set([...failedCovers.value, bookId])
 }
 
+function handleSingleCoverLoad() {
+  singleCoverLoaded.value = true
+  singleCoverFailed.value = false
+}
+
 function handleSingleCoverError() {
+  singleCoverLoaded.value = false
   singleCoverFailed.value = true
 }
 
@@ -145,30 +168,48 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
       >
         <!-- Single cover mode -->
         <div v-if="!isMosaic && resolvedCoverId != null" class="absolute inset-0" data-testid="series-single-cover">
+          <div
+            class="absolute inset-0 transition-opacity duration-200 ease-out"
+            :class="singleCoverLoaded && !singleCoverFailed ? 'opacity-0 pointer-events-none' : 'opacity-100'"
+            aria-hidden="true"
+          >
+            <BookCoverPlaceholder title="" author-line="" :is-audio="false" :seed="`series-${resolvedCoverId}`" />
+          </div>
           <img
             v-if="!singleCoverFailed"
             :src="coverUrl(resolvedCoverId)"
-            class="absolute inset-0 h-full w-full object-cover"
+            class="absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ease-out"
+            :class="singleCoverLoaded ? 'opacity-100' : 'opacity-0'"
             loading="lazy"
             alt=""
+            @load="handleSingleCoverLoad"
             @error="handleSingleCoverError"
           />
-          <BookCoverPlaceholder v-else title="" author-line="" :is-audio="false" :seed="`series-${resolvedCoverId}`" />
+          <span v-if="!singleCoverLoaded && !singleCoverFailed" class="absolute inset-0 z-[1] animate-pulse bg-foreground/5" />
         </div>
 
         <!-- Adaptive cover mosaic (default mode) -->
         <div v-else class="absolute inset-0 grid grid-cols-2 grid-rows-2">
           <template v-for="(bookId, i) in coverIds" :key="bookId">
             <div class="relative overflow-hidden" :class="tileClass(i)" data-testid="series-cover-tile">
+              <div
+                class="absolute inset-0 transition-opacity duration-200 ease-out"
+                :class="loadedCovers.has(bookId) && !failedCovers.has(bookId) ? 'opacity-0 pointer-events-none' : 'opacity-100'"
+                aria-hidden="true"
+              >
+                <BookCoverPlaceholder title="" author-line="" :is-audio="false" :seed="`series-${bookId}`" />
+              </div>
               <img
                 v-if="!failedCovers.has(bookId)"
                 :src="coverUrl(bookId)"
-                class="absolute inset-0 h-full w-full object-cover"
+                class="absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ease-out"
+                :class="loadedCovers.has(bookId) ? 'opacity-100' : 'opacity-0'"
                 loading="lazy"
                 alt=""
+                @load="() => handleCoverLoad(bookId)"
                 @error="() => handleCoverError(bookId)"
               />
-              <BookCoverPlaceholder v-else title="" author-line="" :is-audio="false" :seed="`series-${bookId}`" />
+              <span v-if="!loadedCovers.has(bookId) && !failedCovers.has(bookId)" class="absolute inset-0 z-[1] animate-pulse bg-foreground/5" />
             </div>
           </template>
           <div v-if="coverIds.length === 0" class="relative overflow-hidden" :class="tileClass(0)" data-testid="series-cover-fallback">
@@ -276,7 +317,7 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
 }
 
 .grid-card-label__secondary {
-  font-size: 0.625rem;
+  font-size: 0.675rem;
   line-height: 0.875rem;
   overflow: hidden;
   text-overflow: ellipsis;

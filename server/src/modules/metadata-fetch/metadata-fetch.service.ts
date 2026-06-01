@@ -70,6 +70,7 @@ export class MetadataFetchService {
       [MetadataProviderKey.ITUNES]: row.itunesId ?? undefined,
       [MetadataProviderKey.AUDIBLE]: row.audibleId ?? undefined,
       [MetadataProviderKey.COMICVINE]: row.comicvineId ?? undefined,
+      [MetadataProviderKey.RANOBEDB]: row.ranobedbId ?? undefined,
     };
   }
 
@@ -113,9 +114,16 @@ export class MetadataFetchService {
     const existingProviderId = params.existingProviderIds?.[provider.key];
     if (isIdentifiable(provider) && existingProviderId) {
       const lookupResult = await provider.lookupById(existingProviderId, params.signal);
-      return lookupResult ? [lookupResult] : [];
+      if (lookupResult) {
+        const rankedLookup = filterAndRank([lookupResult], params, 1);
+        if (rankedLookup.length > 0) return rankedLookup;
+      }
     }
 
+    return this.searchAndRankProvider(provider, params);
+  }
+
+  private async searchAndRankProvider(provider: MetadataProvider, params: MetadataSearchParams): Promise<MetadataCandidate[]> {
     const primary = filterAndRank(await provider.search(params), params);
     const hasIsbn = hasText(params.isbn);
     if (!hasIsbn) return primary;

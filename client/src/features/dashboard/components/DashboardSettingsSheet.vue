@@ -46,7 +46,7 @@ const {
   moveDown: widgetMoveDown,
 } = useDraggableList(widgetDraft)
 // ── Add / Remove ─────────────────────────────────────────────
-const ALL_TYPES: ScrollerType[] = ['continue-reading', 'recently-added', 'random', 'smart-scope']
+const ALL_TYPES: ScrollerType[] = ['continue-reading', 'up-next-in-series', 'recently-added', 'random', 'smart-scope']
 
 function addScroller() {
   if (draft.value.length >= MAX_SCROLLERS) return

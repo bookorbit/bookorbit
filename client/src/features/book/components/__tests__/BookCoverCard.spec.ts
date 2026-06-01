@@ -49,9 +49,12 @@ const globalStubs = {
   },
 }
 
-function mountCard(book: BookCard, coverAspectRatio: '2/3' | '1/1' = '2/3') {
+function mountCard(book: BookCard, coverAspectRatio: '2/3' | '1/1' = '2/3', coverAspectRatioOverride?: '2/3' | '1/1') {
   return mount(BookCoverCard, {
-    props: { book },
+    props: {
+      book,
+      ...(coverAspectRatioOverride ? { coverAspectRatio: coverAspectRatioOverride } : {}),
+    },
     global: {
       ...globalStubs,
       provide: {
@@ -161,6 +164,15 @@ describe('BookCoverCard — missing state', () => {
     const wrapper = mountCard(missingBook)
     const root = wrapper.find('div')
     expect(root.classes()).toContain('cursor-default')
+  })
+})
+
+describe('BookCoverCard — cover aspect override', () => {
+  it('uses explicit coverAspectRatio prop over injected ratio', () => {
+    const wrapper = mountCard(presentBookWithCover, '2/3', '1/1')
+    const coverDiv = wrapper.find('[style*="aspect-ratio"]')
+    const style = coverDiv.attributes('style') ?? ''
+    expect(style.includes('aspect-ratio: 1 / 1') || style.includes('aspect-ratio: 1/1')).toBe(true)
   })
 })
 
@@ -277,11 +289,6 @@ describe('BookCoverCard — placeholder state', () => {
     const wrapper = mountCard(presentBook)
     const imgs = wrapper.findAll('img')
     expect(imgs).toHaveLength(0)
-  })
-
-  it('does not show BookCoverPlaceholder when hasCover is true', () => {
-    const wrapper = mountCard(presentBookWithCover)
-    expect(wrapper.findComponent({ name: 'BookCoverPlaceholder' }).exists()).toBe(false)
   })
 
   it('renders cover img when hasCover is true', () => {

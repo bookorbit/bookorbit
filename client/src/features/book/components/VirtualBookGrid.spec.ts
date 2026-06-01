@@ -15,10 +15,15 @@ vi.mock('vue-virtual-scroller', () => ({
 vi.mock('./BookCoverCard.vue', () => ({
   default: {
     name: 'BookCoverCard',
-    props: ['book', 'selectionMode', 'selected', 'showLabel'],
+    props: ['book', 'selectionMode', 'selected', 'showLabel', 'coverAspectRatio'],
     emits: ['action', 'select', 'update:book'],
     template:
-      '<button data-testid="book-card" @click="$emit(\'action\', \'quick-view\')">{{ book.id }}<span v-if="showLabel" data-testid="book-card-label-slot" /></button>',
+      '<div>' +
+      '<button data-testid="book-card" :data-cover-ratio="coverAspectRatio || \'\'" @click="$emit(\'action\', \'quick-view\')">' +
+      '{{ book.id }}<span v-if="showLabel" data-testid="book-card-label-slot" /></button>' +
+      '<button data-testid="book-card-select" @click="$emit(\'select\', $event)">select</button>' +
+      '<button data-testid="book-card-update" @click="$emit(\'update:book\', { ...book, title: \'Updated\' })">update</button>' +
+      '</div>',
   },
 }))
 
@@ -114,6 +119,79 @@ describe('VirtualBookGrid', () => {
     await wrapper.get('[data-testid="book-card"]').trigger('click')
 
     expect(wrapper.emitted('action')).toEqual([[books[0], 'quick-view']])
+  })
+
+  it('forwards select and update events in direct render mode', async () => {
+    const books = [makeBook(1)]
+    const wrapper = mount(VirtualBookGrid, {
+      props: {
+        books,
+        coverSize: 120,
+        gridGap: 12,
+        virtualized: false,
+      },
+    })
+
+    await wrapper.get('[data-testid="book-card-select"]').trigger('click')
+    await wrapper.get('[data-testid="book-card-update"]').trigger('click')
+
+    expect(wrapper.emitted('select')?.[0]?.[0]).toBe(1)
+    const updateEvent = wrapper.emitted('update:book')
+    expect(updateEvent).toBeDefined()
+    const updatedBook = updateEvent?.[0]?.[0] as BookCard | undefined
+    expect(updatedBook).toBeDefined()
+    expect(updatedBook?.title).toBe('Updated')
+  })
+
+  it('forwards select and update events in virtualized mode', async () => {
+    const books = [makeBook(2)]
+    const wrapper = mount(VirtualBookGrid, {
+      props: {
+        books,
+        coverSize: 120,
+        gridGap: 12,
+      },
+    })
+
+    await wrapper.get('[data-testid="book-card-select"]').trigger('click')
+    await wrapper.get('[data-testid="book-card-update"]').trigger('click')
+
+    expect(wrapper.emitted('select')?.[0]?.[0]).toBe(2)
+    const updateEvent = wrapper.emitted('update:book')
+    expect(updateEvent).toBeDefined()
+    const updatedBook = updateEvent?.[0]?.[0] as BookCard | undefined
+    expect(updatedBook).toBeDefined()
+    expect(updatedBook?.title).toBe('Updated')
+  })
+
+  it('renders audiobook cards 1.25x wider in static mode when audioCoverScale is set', () => {
+    const books = [
+      makeBook(1, { files: [{ id: 11, format: 'epub', role: 'primary', sizeBytes: null }] }),
+      makeBook(2, { files: [{ id: 22, format: 'MP3', role: 'primary', sizeBytes: null }] }),
+    ]
+
+    const wrapper = mount(VirtualBookGrid, {
+      props: {
+        books,
+        coverSize: 120,
+        gridGap: 12,
+        virtualized: false,
+        audioCoverScale: 1.25,
+      },
+    })
+
+    const itemWrappers = wrapper.findAll('.min-w-0.shrink-0')
+    expect(itemWrappers).toHaveLength(2)
+    expect(wrapper.get('[data-testid="book-grid-static"]').classes()).toContain('content-start')
+    const cards = wrapper.findAll('[data-testid="book-card"]')
+    expect(cards[0]!.attributes('data-cover-ratio')).toBe('2/3')
+    expect(cards[1]!.attributes('data-cover-ratio')).toBe('1/1')
+
+    const ebookWrapperStyle = itemWrappers[0]!.attributes('style')
+    const audioWrapperStyle = itemWrappers[1]!.attributes('style')
+
+    expect(ebookWrapperStyle).toContain('width: 120px;')
+    expect(audioWrapperStyle).toContain('width: 150px;')
   })
 
   describe('show-label prop forwarding', () => {

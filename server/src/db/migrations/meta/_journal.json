@@ -78,6 +78,13 @@
       "when": 1780190394625,
       "tag": "0010_fix_reading_threshold",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1780269274384,
+      "tag": "0011_add_ranobedb_id",
+      "breakpoints": true
     }
   ]
 }

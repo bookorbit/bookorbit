@@ -7,12 +7,14 @@ const MAX_SCROLLERS = 6
 
 export const DEFAULT_SCROLLERS: ScrollerConfig[] = [
   { id: '1', type: 'continue-reading', label: 'Continue Reading', enabled: false, order: 1, limit: 20 },
-  { id: '2', type: 'recently-added', label: 'Recently Added', enabled: true, order: 2, limit: 20 },
-  { id: '3', type: 'random', label: 'Discover Something New', enabled: true, order: 3, limit: 20 },
+  { id: '4', type: 'up-next-in-series', label: 'Up Next in Series', enabled: false, order: 2, limit: 20 },
+  { id: '2', type: 'recently-added', label: 'Recently Added', enabled: true, order: 3, limit: 20 },
+  { id: '3', type: 'random', label: 'Discover Something New', enabled: true, order: 4, limit: 20 },
 ]
 
 export const SCROLLER_LABELS: Record<ScrollerType, string> = {
   'continue-reading': 'Continue Reading',
+  'up-next-in-series': 'Up Next in Series',
   'recently-added': 'Recently Added',
   random: 'Discover Something New',
   'smart-scope': 'Smart Scope',
@@ -106,6 +108,23 @@ function loadConfig(): ScrollerConfig[] {
   }
 }
 
+function areScrollersEqual(left: ScrollerConfig[], right: ScrollerConfig[]): boolean {
+  if (left.length !== right.length) return false
+  return left.every((scroller, index) => {
+    const other = right[index]
+    if (!other) return false
+    return (
+      scroller.id === other.id &&
+      scroller.type === other.type &&
+      scroller.label === other.label &&
+      scroller.enabled === other.enabled &&
+      scroller.order === other.order &&
+      scroller.limit === other.limit &&
+      scroller.smartScopeId === other.smartScopeId
+    )
+  })
+}
+
 // Module-level singleton — all callers share the same reactive ref
 const scrollers = ref<ScrollerConfig[]>(loadConfig())
 
@@ -135,10 +154,25 @@ export function useDashboardConfig() {
     save()
   }
 
+  function pruneDeletedSmartScopeScrollers(validSmartScopeIds: readonly number[]) {
+    const validIds = new Set(validSmartScopeIds.filter((id) => Number.isFinite(id) && id > 0))
+    const next = scrollers.value
+      .filter((scroller) => {
+        if (scroller.type !== 'smart-scope') return true
+        if (!scroller.smartScopeId) return false
+        return validIds.has(scroller.smartScopeId)
+      })
+      .map((scroller, index) => ({ ...scroller, order: index + 1 }))
+
+    if (areScrollersEqual(scrollers.value, next)) return
+    scrollers.value = next
+    save()
+  }
+
   function reset() {
     scrollers.value = cloneDefaultScrollers()
     localStorage.removeItem(STORAGE_KEY)
   }
 
-  return { scrollers, saveScrollers, addScroller, reset, MAX_SCROLLERS }
+  return { scrollers, saveScrollers, addScroller, pruneDeletedSmartScopeScrollers, reset, MAX_SCROLLERS }
 }

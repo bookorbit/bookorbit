@@ -116,7 +116,7 @@ describe('CollapsedSeriesCard', () => {
 
     expect(wrapper.findAll('[data-testid="series-cover-tile"]')).toHaveLength(1)
     expect(wrapper.findAll('[data-testid="series-cover-fallback"]')).toHaveLength(0)
-    expect(wrapper.findAll('.book-cover-placeholder')).toHaveLength(0)
+    expect(wrapper.findAll('.book-cover-placeholder')).toHaveLength(1)
   })
 
   it('shows a single fallback tile when coverBookIds is empty', () => {
@@ -199,7 +199,7 @@ describe('CollapsedSeriesCard', () => {
     await firstImg.trigger('error')
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.findAll('.book-cover-placeholder')).toHaveLength(1)
+    expect(wrapper.findAll('.book-cover-placeholder')).toHaveLength(2)
   })
 
   it('uses at most 4 cover tiles even if more are provided', () => {

@@ -135,12 +135,6 @@ describe('BookCarousel', () => {
     const book = makeBook({ hasCover: true })
     const wrapper = mountCarousel([book])
     expect(wrapper.find('img').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="placeholder"]').exists()).toBe(false)
-  })
-
-  it('does not render placeholder for audiobook recommendations that have a cover', () => {
-    const wrapper = mountCarousel([makeBook({ hasCover: true, isAudiobook: true })])
-    expect(wrapper.find('[data-testid="placeholder"]').exists()).toBe(false)
   })
 
   it('renders BookCoverPlaceholder when book.hasCover is false', () => {
@@ -197,7 +191,6 @@ describe('BookCarousel', () => {
 
     await wrapper.setProps({ books: [makeBook({ id: 42, hasCover: true, title: 'Retried' })] })
     expect(wrapper.find('[data-book-id="42"] img').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="placeholder"]').exists()).toBe(false)
   })
 
   it('renders centered cover with blurred backdrop after non-audiobook cover image loads', async () => {
@@ -212,7 +205,6 @@ describe('BookCarousel', () => {
     expect(backdrop?.classes()).toContain('blur-md')
     expect(backdrop?.classes()).toContain('object-cover')
     expect(cover?.classes()).toContain('object-contain')
-    expect(wrapper.find('[data-testid="placeholder"]').exists()).toBe(false)
   })
 
   it('renders audiobook covers as square without blurred backdrop', async () => {
@@ -282,7 +274,7 @@ describe('BookCarousel', () => {
     const wrapper = mountCarousel(books)
     expect(wrapper.findAll('[data-book-id]').length).toBe(3)
     expect(wrapper.findAll('img').length).toBe(2)
-    expect(wrapper.findAll('[data-testid="placeholder"]').length).toBe(1)
+    expect(wrapper.findAll('[data-testid="placeholder"]').length).toBe(3)
   })
 
   it('uses book id as seed when title is null', () => {

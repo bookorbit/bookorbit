@@ -37,6 +37,7 @@ const baseConfig: ProviderConfigurations = {
   audible: { enabled: true, domain: 'com' },
   audnexus: { enabled: false },
   comicvine: { enabled: false, apiKey: '' },
+  ranobedb: { enabled: false },
 };
 
 function makeProvider(config: ProviderConfigurations = baseConfig): {

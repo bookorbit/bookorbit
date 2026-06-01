@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { Settings2, Sparkles } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -12,12 +12,14 @@ import DashboardWelcome from '@/features/dashboard/components/DashboardWelcome.v
 import DashboardWidgetRow from '@/features/dashboard/components/DashboardWidgetRow.vue'
 import { useDashboardConfig } from '@/features/dashboard/composables/useDashboardConfig'
 import { useOnboardingTour } from '@/features/onboarding/composables/useOnboardingTour'
+import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
 
 const { hasPermission } = usePermissions()
 const { user } = useAuth()
 const { libraries, loading: librariesLoading, fetchLibraries } = useLibraries()
-const { scrollers } = useDashboardConfig()
+const { scrollers, pruneDeletedSmartScopeScrollers } = useDashboardConfig()
 const { maybeStartTour } = useOnboardingTour()
+const { smartScopes, loaded: smartScopesLoaded, fetchSmartScopes } = useSmartScopes()
 
 const settingsOpen = ref(false)
 
@@ -38,8 +40,18 @@ const greetingName = computed(() => {
   return user.value?.username?.trim() || 'there'
 })
 
+watch(
+  [smartScopesLoaded, smartScopes],
+  ([isLoaded, allSmartScopes]) => {
+    if (!isLoaded) return
+    pruneDeletedSmartScopeScrollers(allSmartScopes.map((smartScope) => smartScope.id))
+  },
+  { immediate: true },
+)
+
 onMounted(() => {
   fetchLibraries()
+  fetchSmartScopes()
   nextTick(() => {
     setTimeout(maybeStartTour, 500)
   })

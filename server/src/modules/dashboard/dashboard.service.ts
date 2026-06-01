@@ -54,6 +54,9 @@ export class DashboardService {
       case ScrollerType.CONTINUE_READING:
         bookIds = await this.dashboardRepo.findContinueReadingBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters);
         break;
+      case ScrollerType.UP_NEXT_IN_SERIES:
+        bookIds = await this.dashboardRepo.findUpNextInSeriesBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters);
+        break;
       case ScrollerType.RANDOM:
         bookIds = await this.dashboardRepo.findRandomBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters);
         break;

@@ -357,8 +357,10 @@ describe('BookRepository', () => {
 
     expect(db.delete).toHaveBeenCalledTimes(1);
     expect(deleteWhere).toHaveBeenCalledTimes(1);
-    expect(db.update).toHaveBeenCalledTimes(1);
-    expect(updateWhere).toHaveBeenCalledTimes(1);
+    expect(db.update).toHaveBeenCalledTimes(2);
+    expect(updateBuilder.set).toHaveBeenNthCalledWith(1, { title: 'Updated' });
+    expect(updateBuilder.set).toHaveBeenNthCalledWith(2, expect.objectContaining({ updatedAt: expect.any(Date) }));
+    expect(updateWhere).toHaveBeenCalledTimes(2);
     expect(db.insert).toHaveBeenCalledTimes(1);
   });
 

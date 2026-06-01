@@ -26,13 +26,15 @@ describe('DashboardRepository', () => {
   });
 
   it('returns empty results without querying when no libraries are accessible', async () => {
-    const db = { select: vi.fn() };
+    const db = { select: vi.fn(), execute: vi.fn() };
     const repo = new DashboardRepository(db as never);
 
     await expect(repo.findRecentlyAddedBookIds([], 20)).resolves.toEqual([]);
     await expect(repo.findContinueReadingBookIds([], 1, 20)).resolves.toEqual([]);
+    await expect(repo.findUpNextInSeriesBookIds([], 1, 20)).resolves.toEqual([]);
     await expect(repo.findRandomBookIds([], 1, 20)).resolves.toEqual([]);
     expect(db.select).not.toHaveBeenCalled();
+    expect(db.execute).not.toHaveBeenCalled();
   });
 
   it('maps recently added rows to id list', async () => {
@@ -95,5 +97,44 @@ describe('DashboardRepository', () => {
 
     expect(result).toEqual([]);
     expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('maps up-next-in-series rows to id list', async () => {
+    const db = {
+      select: vi.fn(),
+      execute: vi.fn().mockResolvedValue({ rows: [{ id: 17 }, { id: 4 }] }),
+    };
+    const repo = new DashboardRepository(db as never);
+
+    const result = await repo.findUpNextInSeriesBookIds([9], 55, 10);
+
+    expect(result).toEqual([17, 4]);
+    expect(db.execute).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns empty up-next-in-series ids and does not query when limit is zero', async () => {
+    const db = {
+      select: vi.fn(),
+      execute: vi.fn(),
+    };
+    const repo = new DashboardRepository(db as never);
+
+    const result = await repo.findUpNextInSeriesBookIds([9], 55, 0);
+
+    expect(result).toEqual([]);
+    expect(db.execute).not.toHaveBeenCalled();
+  });
+
+  it('returns empty up-next-in-series ids when query returns no rows', async () => {
+    const db = {
+      select: vi.fn(),
+      execute: vi.fn().mockResolvedValue({ rows: [] }),
+    };
+    const repo = new DashboardRepository(db as never);
+
+    const result = await repo.findUpNextInSeriesBookIds([2], 101, 20);
+
+    expect(result).toEqual([]);
+    expect(db.execute).toHaveBeenCalledTimes(1);
   });
 });

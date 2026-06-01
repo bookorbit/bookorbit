@@ -1,6 +1,7 @@
 export const SCROLLER_TYPE = {
   RECENTLY_ADDED: "recently-added",
   CONTINUE_READING: "continue-reading",
+  UP_NEXT_IN_SERIES: "up-next-in-series",
   RANDOM: "random",
   SMART_SCOPE: "smart-scope",
 } as const;

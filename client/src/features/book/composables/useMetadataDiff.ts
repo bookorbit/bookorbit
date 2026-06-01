@@ -94,6 +94,7 @@ export interface MetadataPatch {
   itunesId?: string | null
   audibleId?: string | null
   comicvineId?: string | null
+  ranobedbId?: string | null
   comicMetadata?: ComicMetadataFields
 }
 
@@ -154,6 +155,7 @@ export type ProviderIdPatchField =
   | 'itunesId'
   | 'audibleId'
   | 'comicvineId'
+  | 'ranobedbId'
 
 export const PROVIDER_ID_FIELD: Record<MetadataProviderKey, ProviderIdPatchField | undefined> = {
   google: 'googleBooksId',
@@ -165,6 +167,7 @@ export const PROVIDER_ID_FIELD: Record<MetadataProviderKey, ProviderIdPatchField
   audible: 'audibleId',
   audnexus: undefined,
   comicvine: 'comicvineId',
+  ranobedb: 'ranobedbId',
 }
 
 const PROVIDER_ID_PATCH_FIELDS = new Set<string>(Object.values(PROVIDER_ID_FIELD).filter((v): v is ProviderIdPatchField => v !== undefined))
@@ -183,6 +186,7 @@ export const PROVIDER_ID_LABEL: Record<MetadataProviderKey, string> = {
   audible: 'Audible ID',
   audnexus: 'AudNexus ID',
   comicvine: 'ComicVine ID',
+  ranobedb: 'RanobeDB ID',
 }
 
 export function getCandidateValueFrom(candidate: MetadataCandidate, key: DiffFieldKey): string {

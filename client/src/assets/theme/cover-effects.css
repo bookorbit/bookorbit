@@ -6,7 +6,7 @@
   --book-cover-spine-width: 6%;
   position: relative;
   isolation: isolate;
-  background-color: white;
+  background-color: color-mix(in oklch, var(--foreground) 12%, var(--background));
   background-size: cover;
   box-shadow: var(--book-cover-shadow);
 }

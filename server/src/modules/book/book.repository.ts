@@ -988,6 +988,7 @@ export class BookRepository {
     executor: MetadataUpdateExecutor = this.db,
   ): Promise<void> {
     await executor.update(bookMetadata).set(fields).where(eq(bookMetadata.bookId, bookId));
+    await executor.update(books).set({ updatedAt: new Date() }).where(eq(books.id, bookId));
   }
 
   async bulkUpdateMetadataFields(
@@ -997,6 +998,7 @@ export class BookRepository {
   ): Promise<void> {
     if (bookIds.length === 0) return;
     await executor.update(bookMetadata).set(fields).where(inArray(bookMetadata.bookId, bookIds));
+    await executor.update(books).set({ updatedAt: new Date() }).where(inArray(books.id, bookIds));
   }
 
   async upsertProgress(

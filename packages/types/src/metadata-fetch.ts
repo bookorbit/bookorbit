@@ -10,6 +10,7 @@ export const MetadataProviderKey = {
   AUDIBLE: "audible",
   AUDNEXUS: "audnexus",
   COMICVINE: "comicvine",
+  RANOBEDB: "ranobedb",
 } as const;
 
 export interface ComicMetadataFields {

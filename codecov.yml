@@ -59,3 +59,22 @@ flags:
     paths:
       - client/**
     carryforward: true
+
+ignore:
+  - "server/src/**/*.test.ts"
+  - "server/src/scripts/**"
+  - "server/src/**/*.module.ts"
+  - "server/src/main.ts"
+  - "server/src/db/schema/**"
+  - "server/src/**/*.types.ts"
+  - "server/src/**/*.interface.ts"
+  - "server/src/**/*.constants.ts"
+  - "server/src/**/*.enum.ts"
+  - "server/src/config/**"
+  - "server/src/common/types/**"
+  - "client/src/**/*.test.ts"
+  - "client/src/**/*.spec.ts"
+  - "client/src/**/__tests__/**"
+  - "client/src/main.ts"
+  - "client/src/**/*.d.ts"
+  - "client/src/**/*.types.ts"

@@ -2,7 +2,7 @@
 import { computed, inject, ref } from 'vue'
 import { useElementSize, useWindowSize } from '@vueuse/core'
 import { RecycleScroller } from 'vue-virtual-scroller'
-import type { BookCard } from '@bookorbit/types'
+import { isAudioFormat, type BookCard, type CoverAspectRatio } from '@bookorbit/types'
 import BookCoverCard from './BookCoverCard.vue'
 import CollapsedSeriesCard from './CollapsedSeriesCard.vue'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
@@ -19,12 +19,14 @@ const props = withDefaults(
     isSelected?: (bookId: number) => boolean
     newBookIds?: Set<number>
     virtualized?: boolean
+    audioCoverScale?: number
   }>(),
   {
     selectionMode: false,
     isSelected: undefined,
     newBookIds: () => new Set<number>(),
     virtualized: true,
+    audioCoverScale: 1,
   },
 )
 
@@ -44,8 +46,15 @@ function asPositiveInt(value: unknown, fallback: number) {
   return Math.round(n)
 }
 
+function normalizeScale(value: unknown): number {
+  const n = Number(value)
+  if (!Number.isFinite(n) || n <= 1) return 1
+  return n
+}
+
 const coverPx = computed(() => asPositiveInt(props.coverSize, 140))
 const gapPx = computed(() => asPositiveInt(props.gridGap, 20))
+const audioCoverScale = computed(() => normalizeScale(props.audioCoverScale))
 
 const availableWidth = computed(() => {
   const observed = Number(containerWidth.value)
@@ -98,11 +107,60 @@ const staticGridStyle = computed(() => ({
   gap: `${gapPx.value}px`,
   gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${coverPx.value}px), 1fr))`,
 }))
+
+const staticVariableWrapStyle = computed(() => ({
+  gap: `${gapPx.value}px`,
+}))
+
+const useVariableStaticWidths = computed(() => !props.virtualized && audioCoverScale.value > 1)
+
+function isAudiobook(book: BookCard): boolean {
+  return book.files.some((file) => (file.format ? isAudioFormat(file.format) : false))
+}
+
+function staticItemStyle(book: BookCard): { width: string; maxWidth: string } {
+  const scale = isAudiobook(book) ? audioCoverScale.value : 1
+  const width = Math.max(1, Math.round(coverPx.value * scale))
+  return { width: `${width}px`, maxWidth: '100%' }
+}
+
+function staticCoverAspectRatio(book: BookCard): CoverAspectRatio {
+  if (isAudiobook(book)) return '1/1'
+  return coverAspectRatio.value
+}
 </script>
 
 <template>
   <div ref="containerRef" class="w-full">
-    <div v-if="!virtualized" class="grid w-full max-w-full items-start" :style="staticGridStyle" data-testid="book-grid-static">
+    <div
+      v-if="!virtualized && useVariableStaticWidths"
+      class="flex w-full flex-wrap content-start items-start"
+      :style="staticVariableWrapStyle"
+      data-testid="book-grid-static"
+    >
+      <div
+        v-for="book in books"
+        :key="book.id"
+        class="min-w-0 shrink-0"
+        :class="{ 'book-grid-cell--new': props.newBookIds.has(book.id) }"
+        :style="staticItemStyle(book)"
+      >
+        <CollapsedSeriesCard v-if="book.collapsedSeries" :book="book" :show-label="showLabel" />
+        <BookCoverCard
+          v-else
+          :book="book"
+          :show-label="showLabel"
+          :cover-aspect-ratio="staticCoverAspectRatio(book)"
+          :selection-mode="selectionMode"
+          :selected="isSelected?.(book.id) ?? false"
+          @action="emit('action', book, $event)"
+          @select="emit('select', book.id, $event)"
+          @update:book="emit('update:book', $event)"
+        />
+      </div>
+    </div>
+
+    <div v-else-if="!virtualized" class="grid w-full max-w-full items-start" :style="staticGridStyle" data-testid="book-grid-static">
       <div v-for="book in books" :key="book.id" class="min-w-0" :class="{ 'book-grid-cell--new': props.newBookIds.has(book.id) }">
         <CollapsedSeriesCard v-if="book.collapsedSeries" :book="book" :show-label="showLabel" />
         <BookCoverCard

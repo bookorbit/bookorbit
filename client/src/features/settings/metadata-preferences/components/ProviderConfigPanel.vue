@@ -171,6 +171,7 @@ const rows: RowDef[] = [
       blockedMessage: 'ComicVine requires an API key before it can be enabled',
     },
   },
+  { key: 'ranobedb', label: 'RanobeDB', hint: 'Japanese light novel metadata from RanobeDB. No setup required.', fields: [] },
 ]
 
 const TESTABLE_PROVIDERS: MetadataProviderKey[] = [MetadataProviderKey.AMAZON, MetadataProviderKey.HARDCOVER]

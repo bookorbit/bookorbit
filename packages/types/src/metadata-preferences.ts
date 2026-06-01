@@ -118,6 +118,7 @@ export interface ProviderConfigurations {
   audible: AudibleProviderConfig;
   audnexus: AudnexusProviderConfig;
   comicvine: ComicVineProviderConfig;
+  ranobedb: SimpleProviderConfig;
 }
 
 export interface ProviderStatus {

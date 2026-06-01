@@ -31,11 +31,12 @@ import { useRefreshMetadata } from '@/features/book/composables/useRefreshMetada
 import { useRefreshingBooks } from '@/features/book/composables/useRefreshingBooks'
 import { useBookRefreshFeedback } from '@/features/book/composables/useBookRefreshFeedback'
 import type { InFlightOp } from '@/features/book/composables/useBookBulkActions'
+import { useRouter } from 'vue-router'
 import { detectChangedColumns, mergeBookCardWithDetail } from '@/features/book/lib/book-card-mapper'
 import { buildLockStateBookUpdate, mergeBookPatchWithLatest, sameLockFields } from '@/features/book/lib/table-row-state-sync'
 import BookCoverDialog from './table/BookCoverDialog.vue'
 import BookTableCellDispatcher from './table/BookTableCellDispatcher.vue'
-import BookTableCollapsedSeriesRow from './table/BookTableCollapsedSeriesRow.vue'
+import BookTableCollapsedSeriesCell from './table/BookTableCollapsedSeriesCell.vue'
 import BookTableContextMenu from './table/BookTableContextMenu.vue'
 import BookTableHeader from './table/BookTableHeader.vue'
 import BookTableHeaderContextMenu from './table/BookTableHeaderContextMenu.vue'
@@ -79,6 +80,7 @@ const emit = defineEmits<{
 const { md } = useBreakpoints(breakpointsTailwind)
 const isReadOnly = computed(() => !md.value)
 const { tableDensity, tableZebraStriping } = useDisplaySettings()
+const router = useRouter()
 
 const { layout, visibleColumns, allColumns, toggleColumn, setColumnOrder, setColumnWidth, setLayout, pinColumn, unpinColumn, resetLayout } =
   useTableColumns(props.viewType)
@@ -508,6 +510,10 @@ function handleNavigate(book: BookCard, colId: ColumnId, direction: 'next' | 'pr
 function handleRowClick(book: BookCard, e: MouseEvent) {
   if (props.selectionMode) {
     emit('select', book.id, e)
+    return
+  }
+  if (book.collapsedSeries) {
+    router.push({ name: 'series-detail', params: { seriesName: book.seriesName ?? '' } })
   }
 }
 
@@ -705,92 +711,74 @@ defineExpose({
             @click="handleRowClick(books[vItem.index]!, $event)"
             @contextmenu.prevent="(event) => handleRowContextMenu(event, books[vItem.index]!)"
           >
-            <!-- Collapsed series row: span all columns with dedicated component -->
-            <template v-if="books[vItem.index]!.collapsedSeries">
-              <td
-                v-if="selectionMode"
-                role="gridcell"
-                class="overflow-hidden px-2 bg-background"
-                :class="rowPaddingClass"
-                :style="{ width: '36px', minWidth: '36px', position: 'sticky', left: '0px', zIndex: 20 }"
-              >
-                <div class="flex items-center justify-center">
-                  <input
-                    type="checkbox"
-                    class="accent-primary h-3.5 w-3.5 cursor-pointer"
-                    :checked="isSelected?.(books[vItem.index]!.id) ?? false"
-                    @click.stop="handleCheckboxClick(books[vItem.index]!.id, $event)"
-                  />
-                </div>
-              </td>
-              <BookTableCollapsedSeriesRow :book="books[vItem.index]!" :colspan="displayColumns.length" :selection-mode="selectionMode" />
-            </template>
+            <!-- Checkbox cell -->
+            <td
+              v-if="selectionMode"
+              role="gridcell"
+              class="overflow-hidden px-2 bg-background"
+              :class="rowPaddingClass"
+              :style="{ width: '36px', minWidth: '36px', position: 'sticky', left: '0px', zIndex: 20 }"
+            >
+              <div class="flex items-center justify-center">
+                <input
+                  type="checkbox"
+                  class="accent-primary h-3.5 w-3.5 cursor-pointer"
+                  :checked="isSelected?.(books[vItem.index]!.id) ?? false"
+                  @click.stop="handleCheckboxClick(books[vItem.index]!.id, $event)"
+                />
+              </div>
+            </td>
 
-            <template v-else>
-              <!-- Checkbox cell -->
-              <td
-                v-if="selectionMode"
-                role="gridcell"
-                class="overflow-hidden px-2 bg-background"
-                :class="rowPaddingClass"
-                :style="{ width: '36px', minWidth: '36px', position: 'sticky', left: '0px', zIndex: 20 }"
-              >
-                <div class="flex items-center justify-center">
-                  <input
-                    type="checkbox"
-                    class="accent-primary h-3.5 w-3.5 cursor-pointer"
-                    :checked="isSelected?.(books[vItem.index]!.id) ?? false"
-                    @click.stop="handleCheckboxClick(books[vItem.index]!.id, $event)"
-                  />
-                </div>
-              </td>
-
-              <td
-                v-for="(col, colIdx) in displayColumns"
-                :key="col.id"
-                :data-col-id="col.id"
-                :data-row-index="vItem.index"
-                role="gridcell"
-                class="relative overflow-hidden px-2 align-middle"
-                :class="[
-                  rowPaddingClass,
-                  col.pinned === 'right' ? 'border-l border-border/60' : '',
-                  col.pinned === null ? (isMandatoryFieldEmpty(books[vItem.index]!, col.id) ? 'bg-amber-500/5' : '') : '',
-                  isCellChanged(books[vItem.index]!.id, col.id) ? 'book-cell--changed' : '',
-                  isFocusedCell(vItem.index, colIdx) && !editor.isActive(books[vItem.index]!.id, col.id)
-                    ? 'outline outline-2 outline-primary/50 -outline-offset-2 rounded-sm'
-                    : '',
-                ]"
-                :style="{
-                  width: `${col.defaultWidth}px`,
-                  minWidth: `${col.minWidth}px`,
-                  ...(col.pinned === 'left' || col.id === 'lockRow'
-                    ? {
-                        position: 'sticky',
-                        left: `${(selectionMode ? 36 : 0) + (pinnedLeftOffsets.get(col.id) ?? 0)}px`,
-                        zIndex: col.id === 'lockRow' ? 20 : 2,
-                        background: getPinnedCellBackground(
-                          books[vItem.index]!,
-                          col.id,
-                          selectionMode && (isSelected?.(books[vItem.index]!.id) ?? false),
-                        ),
-                      }
-                    : {}),
-                  ...(col.pinned === 'right'
-                    ? {
-                        position: 'sticky',
-                        right: '0',
-                        zIndex: 2,
-                        background: getPinnedCellBackground(
-                          books[vItem.index]!,
-                          col.id,
-                          selectionMode && (isSelected?.(books[vItem.index]!.id) ?? false),
-                        ),
-                      }
-                    : {}),
-                }"
-                @click="focusTableCell(vItem.index, colIdx, $event, books[vItem.index]!.id, col.id)"
-              >
+            <td
+              v-for="(col, colIdx) in displayColumns"
+              :key="col.id"
+              :data-col-id="col.id"
+              :data-row-index="vItem.index"
+              role="gridcell"
+              class="relative overflow-hidden px-2 align-middle"
+              :class="[
+                rowPaddingClass,
+                col.pinned === 'right' ? 'border-l border-border/60' : '',
+                col.pinned === null ? (isMandatoryFieldEmpty(books[vItem.index]!, col.id) ? 'bg-amber-500/5' : '') : '',
+                isCellChanged(books[vItem.index]!.id, col.id) ? 'book-cell--changed' : '',
+                isFocusedCell(vItem.index, colIdx) && !editor.isActive(books[vItem.index]!.id, col.id)
+                  ? 'outline outline-2 outline-primary/50 -outline-offset-2 rounded-sm'
+                  : '',
+              ]"
+              :style="{
+                width: `${col.defaultWidth}px`,
+                minWidth: `${col.minWidth}px`,
+                ...(col.pinned === 'left' || col.id === 'lockRow'
+                  ? {
+                      position: 'sticky',
+                      left: `${(selectionMode ? 36 : 0) + (pinnedLeftOffsets.get(col.id) ?? 0)}px`,
+                      zIndex: col.id === 'lockRow' ? 20 : 2,
+                      background: getPinnedCellBackground(
+                        books[vItem.index]!,
+                        col.id,
+                        selectionMode && (isSelected?.(books[vItem.index]!.id) ?? false),
+                      ),
+                    }
+                  : {}),
+                ...(col.pinned === 'right'
+                  ? {
+                      position: 'sticky',
+                      right: '0',
+                      zIndex: 2,
+                      background: getPinnedCellBackground(
+                        books[vItem.index]!,
+                        col.id,
+                        selectionMode && (isSelected?.(books[vItem.index]!.id) ?? false),
+                      ),
+                    }
+                  : {}),
+              }"
+              @click="focusTableCell(vItem.index, colIdx, $event, books[vItem.index]!.id, col.id)"
+            >
+              <template v-if="books[vItem.index]!.collapsedSeries">
+                <BookTableCollapsedSeriesCell :book="books[vItem.index]!" :col-id="col.id" />
+              </template>
+              <template v-else>
                 <BookTableCellDispatcher
                   :book="books[vItem.index]!"
                   :col-id="col.id"
@@ -855,8 +843,8 @@ defineExpose({
                     </button>
                   </span>
                 </div>
-              </td>
-            </template>
+              </template>
+            </td>
           </tr>
 
           <tr v-if="virtualItems.length > 0" role="row">

@@ -50,6 +50,20 @@ describe('DashboardController', () => {
     vi.clearAllMocks();
   });
 
+  describe('scroller endpoint', () => {
+    it('getScroller delegates to dashboardService with the provided scroller type and params', async () => {
+      const { controller, dashboardService } = makeController();
+      const user = makeUser({ id: 7 });
+      const mockResult = [{ id: 101 }];
+      dashboardService.getScroller.mockResolvedValue(mockResult);
+
+      const result = await controller.getScroller('up-next-in-series', 33, 0, user);
+
+      expect(dashboardService.getScroller).toHaveBeenCalledWith('up-next-in-series', user, 33, 0);
+      expect(result).toEqual(mockResult);
+    });
+  });
+
   describe('widget endpoints', () => {
     it('getReadingGoal delegates to widgetService', async () => {
       const { controller, widgetService } = makeController();

@@ -245,6 +245,7 @@ export class BookService {
     itunesId?: string | null;
     audibleId?: string | null;
     comicvineId?: string | null;
+    ranobedbId?: string | null;
   }): Partial<Record<MetadataProviderKey, string>> {
     const providerIds: Partial<Record<MetadataProviderKey, string>> = {};
     if (meta.googleBooksId) providerIds[MetadataProviderKey.GOOGLE] = meta.googleBooksId;
@@ -255,13 +256,14 @@ export class BookService {
     if (meta.itunesId) providerIds[MetadataProviderKey.ITUNES] = meta.itunesId;
     if (meta.audibleId) providerIds[MetadataProviderKey.AUDIBLE] = meta.audibleId;
     if (meta.comicvineId) providerIds[MetadataProviderKey.COMICVINE] = meta.comicvineId;
+    if (meta.ranobedbId) providerIds[MetadataProviderKey.RANOBEDB] = meta.ranobedbId;
     return providerIds;
   }
 
   private applyResolvedProviderIds(
     dto: Pick<
       UpdateBookMetadataDto,
-      'googleBooksId' | 'goodreadsId' | 'amazonId' | 'hardcoverId' | 'openLibraryId' | 'itunesId' | 'audibleId' | 'comicvineId'
+      'googleBooksId' | 'goodreadsId' | 'amazonId' | 'hardcoverId' | 'openLibraryId' | 'itunesId' | 'audibleId' | 'comicvineId' | 'ranobedbId'
     >,
     providerIds: Partial<Record<MetadataProviderKey, string>>,
   ): void {
@@ -273,6 +275,7 @@ export class BookService {
     if (providerIds[MetadataProviderKey.ITUNES]) dto.itunesId = providerIds[MetadataProviderKey.ITUNES];
     if (providerIds[MetadataProviderKey.AUDIBLE]) dto.audibleId = providerIds[MetadataProviderKey.AUDIBLE];
     if (providerIds[MetadataProviderKey.COMICVINE]) dto.comicvineId = providerIds[MetadataProviderKey.COMICVINE];
+    if (providerIds[MetadataProviderKey.RANOBEDB]) dto.ranobedbId = providerIds[MetadataProviderKey.RANOBEDB];
   }
 
   async verifyBookAccess(bookId: number, user: RequestUser): Promise<void> {
@@ -1177,6 +1180,7 @@ export class BookService {
     if (dto.itunesId !== undefined) scalarFields.itunesId = dto.itunesId ?? null;
     if (dto.audibleId !== undefined) scalarFields.audibleId = dto.audibleId ?? null;
     if (dto.comicvineId !== undefined) scalarFields.comicvineId = dto.comicvineId ?? null;
+    if (dto.ranobedbId !== undefined) scalarFields.ranobedbId = dto.ranobedbId ?? null;
     if (dto.rating !== undefined) scalarFields.rating = dto.rating ?? null;
     if (dto.audioMetadata) {
       if (dto.audioMetadata.durationSeconds !== undefined) scalarFields.durationSeconds = dto.audioMetadata.durationSeconds ?? null;
@@ -2312,6 +2316,7 @@ export class BookService {
         [MetadataProviderKey.ITUNES]: meta?.itunesId ?? null,
         [MetadataProviderKey.AUDIBLE]: meta?.audibleId ?? null,
         [MetadataProviderKey.COMICVINE]: meta?.comicvineId ?? null,
+        [MetadataProviderKey.RANOBEDB]: meta?.ranobedbId ?? null,
       },
       authors: authorRows,
       genres: genreRows.map((g) => g.name),

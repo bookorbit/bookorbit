@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, nextTick, reactive, ref, type PropType } from 'vue'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import type { BookCard, SeriesDetail } from '@bookorbit/types'
 import SeriesDetailView from './SeriesDetailView.vue'
 
@@ -59,6 +59,7 @@ vi.mock('@/composables/useDisplaySettings', () => ({
   useDisplaySettings: () => ({
     portraitCoverSize: ref(160),
     gridGap: ref(16),
+    bookCoverDisplayMode: ref('blurred-fit'),
     gridCardPrimaryLabel: ref('hidden'),
     gridCardSecondaryLabel: ref('hidden'),
   }),
@@ -179,6 +180,12 @@ const VirtualBookTableStub = defineComponent({
   template: `<button data-testid="table-add-action" @click="$emit('action', { id: 91 }, 'add-to-collection')">add</button>`,
 })
 
+const BookCoverArtworkStub = defineComponent({
+  name: 'BookCoverArtwork',
+  emits: ['load', 'error'],
+  template: '<div data-testid="lead-cover-artwork" />',
+})
+
 const AddToCollectionSheetStub = defineComponent({
   name: 'AddToCollectionSheet',
   props: {
@@ -209,6 +216,7 @@ function mountView(mode: ViewMode) {
         BookListRow: BookListRowStub,
         VirtualBookTable: VirtualBookTableStub,
         AddToCollectionSheet: AddToCollectionSheetStub,
+        BookCoverArtwork: BookCoverArtworkStub,
         EntityNotFound: true,
         SeriesCompletionBar: true,
         SeriesGapBanner: true,
@@ -306,5 +314,34 @@ describe('SeriesDetailView', () => {
     const sheet = wrapper.get('[data-testid="collection-sheet"]')
     expect(sheet.attributes('data-open')).toBe('false')
     expect(sheet.attributes('data-book-ids')).toBe('')
+  })
+
+  it('scales and centers square lead covers in the series header stack', async () => {
+    const lead = makeBook({ id: 7, seriesIndex: 1, hasCover: true })
+    mocks.fetchSeriesBooks.mockResolvedValueOnce({
+      items: [lead],
+      total: 1,
+      page: 0,
+      size: 8,
+      seriesInfo: makeSeriesInfo(),
+    })
+
+    const wrapper = mountView('grid')
+    await flushPromises()
+    await nextTick()
+
+    const artwork = wrapper.getComponent(BookCoverArtworkStub)
+    artwork.vm.$emit('load', 1)
+    await nextTick()
+
+    const style = wrapper.get('[data-testid="lead-cover-artwork"]').element.parentElement?.getAttribute('style') ?? ''
+    expect(style).toContain('scale(1.25)')
+    expect(style).toContain('transform-origin: center bottom')
+    expect(style).toContain('translateY(-12.5%)')
+
+    artwork.vm.$emit('load', 1)
+    await nextTick()
+    const secondStyle = wrapper.get('[data-testid="lead-cover-artwork"]').element.parentElement?.getAttribute('style') ?? ''
+    expect(secondStyle).toBe(style)
   })
 })

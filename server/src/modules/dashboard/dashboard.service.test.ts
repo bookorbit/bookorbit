@@ -29,6 +29,7 @@ function makeService() {
   const dashboardRepo = {
     findRecentlyAddedBookIds: vi.fn(),
     findContinueReadingBookIds: vi.fn(),
+    findUpNextInSeriesBookIds: vi.fn(),
     findRandomBookIds: vi.fn(),
   };
   const bookReadService = {
@@ -147,6 +148,43 @@ describe('DashboardService', () => {
 
     expect(dashboardRepo.findContinueReadingBookIds).toHaveBeenCalledWith([301], 9, 50, EMPTY_CONTENT_FILTER_RULES);
     expect(result.map((card) => card.id)).toEqual([4]);
+  });
+
+  it('routes up-next-in-series requests to repository and preserves response order', async () => {
+    const { service, dashboardRepo, bookReadService, libraryService } = makeService();
+    const user = makeUser({ id: 11 });
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([707]);
+    dashboardRepo.findUpNextInSeriesBookIds.mockResolvedValue([19, 8]);
+    bookReadService.findCardsByBookIds.mockResolvedValue(makeFindCardsResult([8, 19]));
+
+    const result = await service.getScroller(ScrollerType.UP_NEXT_IN_SERIES, user, 25);
+
+    expect(dashboardRepo.findUpNextInSeriesBookIds).toHaveBeenCalledWith([707], 11, 25, EMPTY_CONTENT_FILTER_RULES);
+    expect(result.map((card) => card.id)).toEqual([19, 8]);
+  });
+
+  it('passes undefined content filters for up-next-in-series when user is superuser', async () => {
+    const { service, dashboardRepo, bookReadService, libraryService } = makeService();
+    const superuser = makeUser({ id: 17, isSuperuser: true, contentFilters: EMPTY_CONTENT_FILTER_RULES });
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
+    dashboardRepo.findUpNextInSeriesBookIds.mockResolvedValue([55]);
+    bookReadService.findCardsByBookIds.mockResolvedValue(makeFindCardsResult([55]));
+
+    await service.getScroller(ScrollerType.UP_NEXT_IN_SERIES, superuser, 20);
+
+    expect(dashboardRepo.findUpNextInSeriesBookIds).toHaveBeenCalledWith([1], 17, 20, undefined);
+  });
+
+  it('clamps up-next-in-series limit to minimum of 1', async () => {
+    const { service, dashboardRepo, bookReadService, libraryService } = makeService();
+    const user = makeUser({ id: 18 });
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([91]);
+    dashboardRepo.findUpNextInSeriesBookIds.mockResolvedValue([3]);
+    bookReadService.findCardsByBookIds.mockResolvedValue(makeFindCardsResult([3]));
+
+    await service.getScroller(ScrollerType.UP_NEXT_IN_SERIES, user, 0);
+
+    expect(dashboardRepo.findUpNextInSeriesBookIds).toHaveBeenCalledWith([91], 18, 1, EMPTY_CONTENT_FILTER_RULES);
   });
 
   it('routes random requests to repository and skips card fetch when no ids are returned', async () => {

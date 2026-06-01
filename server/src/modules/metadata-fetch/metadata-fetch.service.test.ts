@@ -186,7 +186,7 @@ describe('MetadataFetchService', () => {
     expect(google.search).not.toHaveBeenCalled();
   });
 
-  it('returns no result when lookupById returns null for an existing provider id', async () => {
+  it('falls back to provider search when lookupById returns null for an existing provider id', async () => {
     const google: IdentifiableProvider = {
       key: MetadataProviderKey.GOOGLE,
       label: 'Google',
@@ -200,9 +200,36 @@ describe('MetadataFetchService', () => {
       service.search({ title: 'Dune', existingProviderIds: { [MetadataProviderKey.GOOGLE]: 'missing' } }).pipe(toArray()),
     );
 
-    expect(results).toEqual([]);
+    expect(results).toEqual([candidate(MetadataProviderKey.GOOGLE, 'search-id', 'Dune')]);
     expect(google.lookupById).toHaveBeenCalledWith('missing', expect.anything());
-    expect(google.search).not.toHaveBeenCalled();
+    expect(google.search).toHaveBeenCalledTimes(1);
+    expect(google.search).toHaveBeenCalledWith(expect.objectContaining({ title: 'Dune' }));
+  });
+
+  it('falls back to provider search when lookupById returns an irrelevant candidate', async () => {
+    const google: IdentifiableProvider = {
+      key: MetadataProviderKey.GOOGLE,
+      label: 'Google',
+      identifiable: true,
+      search: vi.fn().mockResolvedValue([candidate(MetadataProviderKey.GOOGLE, 'search-id', 'Dune')]),
+      lookupById: vi.fn().mockResolvedValue(candidate(MetadataProviderKey.GOOGLE, 'stored-id', 'Completely Unrelated')),
+    };
+    registry.select.mockReturnValue([google]);
+
+    const results = await firstValueFrom(
+      service
+        .search({
+          title: 'Dune',
+          author: 'Frank Herbert',
+          existingProviderIds: { [MetadataProviderKey.GOOGLE]: 'stored-id' },
+        })
+        .pipe(toArray()),
+    );
+
+    expect(results).toEqual([candidate(MetadataProviderKey.GOOGLE, 'search-id', 'Dune')]);
+    expect(google.lookupById).toHaveBeenCalledWith('stored-id', expect.anything());
+    expect(google.search).toHaveBeenCalledTimes(1);
+    expect(google.search).toHaveBeenCalledWith(expect.objectContaining({ title: 'Dune', author: 'Frank Herbert' }));
   });
 
   it('isolates provider failures so one provider error does not fail the full stream', async () => {

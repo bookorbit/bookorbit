@@ -47,4 +47,5 @@ export class UpdateProviderConfigDto {
   @IsOptional() @ValidateNested() @Type(() => AudibleProviderConfigDto) audible?: AudibleProviderConfigDto;
   @IsOptional() @ValidateNested() @Type(() => SimpleProviderConfigDto) audnexus?: SimpleProviderConfigDto;
   @IsOptional() @ValidateNested() @Type(() => ComicVineProviderConfigDto) comicvine?: ComicVineProviderConfigDto;
+  @IsOptional() @ValidateNested() @Type(() => SimpleProviderConfigDto) ranobedb?: SimpleProviderConfigDto;
 }

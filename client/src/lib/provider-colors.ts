@@ -10,6 +10,7 @@ const PROVIDER_HEX: Record<string, string> = {
   audible: '#FF8A00',
   audnexus: '#FF5ADD',
   comicvine: '#ffdb0f',
+  ranobedb: '#a78cff',
   auto: '#8B5CF6',
 }
 
@@ -25,6 +26,7 @@ export const PROVIDER_SHORT_LABELS: Record<string, string> = {
   audible: 'Audible',
   audnexus: 'AudNexus',
   comicvine: 'ComicVine',
+  ranobedb: 'RanobeDB',
   auto: 'Fetched',
 }
 
