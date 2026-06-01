@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 import { getProviderColor, providerBadgeStyle, providerChipStyle, PROVIDER_SHORT_LABELS } from '../provider-colors'
 
+const RANOBEDB_COLOR = '#a78cff'
+
 describe('getProviderColor', () => {
   it('returns correct color for ranobedb', () => {
-    expect(getProviderColor('ranobedb')).toBe('#E53935')
+    expect(getProviderColor('ranobedb')).toBe(RANOBEDB_COLOR)
   })
 
   it('returns correct color for comicvine', () => {
@@ -14,7 +16,7 @@ describe('getProviderColor', () => {
   it('returns default color for unknown provider', () => {
     const result = getProviderColor('unknown-provider')
     expect(result).toBeTruthy()
-    expect(result).not.toBe('#E53935')
+    expect(result).not.toBe(RANOBEDB_COLOR)
   })
 
   it('returns a color for all known providers', () => {
@@ -44,7 +46,7 @@ describe('providerBadgeStyle', () => {
     expect(style).toHaveProperty('backgroundColor')
     expect(style).toHaveProperty('color')
     expect(style).toHaveProperty('outlineColor')
-    expect(style.color).toBe('#E53935')
+    expect(style.color).toBe(RANOBEDB_COLOR)
   })
 
   it('returns a style object for unknown providers without throwing', () => {
@@ -56,7 +58,7 @@ describe('providerChipStyle', () => {
   it('returns a style object for ranobedb when not disabled', () => {
     const style = providerChipStyle('ranobedb', false)
     expect(style).toHaveProperty('backgroundColor')
-    expect(style.color).toBe('#E53935')
+    expect(style.color).toBe(RANOBEDB_COLOR)
     expect(style.opacity).toBeUndefined()
   })
 
