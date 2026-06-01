@@ -40,6 +40,23 @@ function makeDb() {
   };
 }
 
+function getSqlTextFromExecuteCall(arg: unknown): string {
+  if (!arg || typeof arg !== 'object' || !('queryChunks' in arg)) return '';
+  const queryChunks = (arg as { queryChunks?: unknown }).queryChunks;
+  if (!Array.isArray(queryChunks)) return '';
+
+  return queryChunks
+    .map((chunk) => {
+      if (chunk && typeof chunk === 'object' && 'value' in chunk) {
+        const value = (chunk as { value?: unknown }).value;
+        return Array.isArray(value) ? value.join('') : '';
+      }
+
+      return '?';
+    })
+    .join('');
+}
+
 describe('KoreaderRepository', () => {
   let db: ReturnType<typeof makeDb>;
   let repo: KoreaderRepository;
@@ -565,8 +582,14 @@ describe('KoreaderRepository', () => {
       });
 
       const result = await repo.getKoreaderTopBooks(7);
+      const sqlText = getSqlTextFromExecuteCall(db.execute.mock.calls[0]?.[0]);
 
       expect(result).toEqual([{ bookId: 11, title: 'Book A', totalReadSecs: 5400 }]);
+      expect(sqlText).toContain('LEFT JOIN book_metadata bm ON bm.book_id = b.id');
+      expect(sqlText).toContain("coalesce(nullif(bm.title, ''), 'Unknown Book') AS title");
+      expect(sqlText).toContain('GROUP BY b.id, bm.title');
+      expect(sqlText).not.toContain('coalesce(b.title');
+      expect(sqlText).not.toContain('GROUP BY b.id, b.title');
     });
 
     it('getKoreaderTopAnnotated maps annotation aggregates', async () => {
@@ -575,8 +598,14 @@ describe('KoreaderRepository', () => {
       });
 
       const result = await repo.getKoreaderTopAnnotated(7);
+      const sqlText = getSqlTextFromExecuteCall(db.execute.mock.calls[0]?.[0]);
 
       expect(result).toEqual([{ bookId: 11, title: 'Book A', highlightsCount: 12, notesCount: 2 }]);
+      expect(sqlText).toContain('LEFT JOIN book_metadata bm ON bm.book_id = b.id');
+      expect(sqlText).toContain("coalesce(nullif(bm.title, ''), 'Unknown Book') AS title");
+      expect(sqlText).toContain('GROUP BY b.id, bm.title');
+      expect(sqlText).not.toContain('coalesce(b.title');
+      expect(sqlText).not.toContain('GROUP BY b.id, b.title');
     });
 
     it('getKoreaderWeeklyRhythm maps weekday aggregates', async () => {

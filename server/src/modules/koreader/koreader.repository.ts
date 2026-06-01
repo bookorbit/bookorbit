@@ -517,13 +517,14 @@ export class KoreaderRepository {
     const result = await this.db.execute<{ book_id: number; title: string; total_read_secs: number }>(sql`
       SELECT
         b.id AS book_id,
-        coalesce(b.title, 'Unknown Book') AS title,
+        coalesce(nullif(bm.title, ''), 'Unknown Book') AS title,
         sum(ks.total_read_secs)::integer AS total_read_secs
       FROM koreader_book_stats ks
       INNER JOIN book_files bf ON bf.id = ks.book_file_id
       INNER JOIN books b ON b.id = bf.book_id
+      LEFT JOIN book_metadata bm ON bm.book_id = b.id
       WHERE ks.user_id = ${userId} AND ks.total_read_secs > 0
-      GROUP BY b.id, b.title
+      GROUP BY b.id, bm.title
       ORDER BY total_read_secs DESC
       LIMIT ${limit}
     `);
@@ -537,15 +538,16 @@ export class KoreaderRepository {
     const result = await this.db.execute<{ book_id: number; title: string; highlights_count: number; notes_count: number }>(sql`
       SELECT
         b.id AS book_id,
-        coalesce(b.title, 'Unknown Book') AS title,
+        coalesce(nullif(bm.title, ''), 'Unknown Book') AS title,
         sum(ks.highlights_count)::integer AS highlights_count,
         sum(ks.notes_count)::integer AS notes_count
       FROM koreader_book_stats ks
       INNER JOIN book_files bf ON bf.id = ks.book_file_id
       INNER JOIN books b ON b.id = bf.book_id
+      LEFT JOIN book_metadata bm ON bm.book_id = b.id
       WHERE ks.user_id = ${userId}
         AND (ks.highlights_count > 0 OR ks.notes_count > 0)
-      GROUP BY b.id, b.title
+      GROUP BY b.id, bm.title
       HAVING sum(ks.highlights_count) + sum(ks.notes_count) > 0
       ORDER BY sum(ks.highlights_count) + sum(ks.notes_count) DESC
       LIMIT ${limit}
