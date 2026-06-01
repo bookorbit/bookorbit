@@ -133,7 +133,7 @@ describe('BookCoverArtwork', () => {
 
     await wrapper.setProps({ resetKey: 'retry-1' })
     expect(wrapper.find('img[alt="Dune cover"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="placeholder"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="placeholder"]').exists()).toBe(true)
   })
 
   it('does not render the fitted spine layer when spine is disabled', async () => {

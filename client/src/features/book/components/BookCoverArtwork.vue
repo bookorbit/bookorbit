@@ -115,6 +115,16 @@ function handleImageError() {
 
 <template>
   <template v-if="canRenderImage">
+    <span
+      :class="[
+        'absolute inset-0 z-0 transition-opacity duration-200 ease-out',
+        loaded ? 'opacity-0 pointer-events-none' : 'opacity-100',
+        effectiveMode === 'natural-bottom' ? 'book-cover-artwork-placeholder-natural overflow-hidden rounded-[inherit]' : '',
+      ]"
+      aria-hidden="true"
+    >
+      <BookCoverPlaceholder :title="title" :author-line="authorLine" :is-audio="isAudio" :seed="seed" />
+    </span>
     <img
       v-if="showBlurredBackdrop"
       :src="src ?? ''"
@@ -143,7 +153,7 @@ function handleImageError() {
       />
       <span v-if="showSpineLayer" class="book-cover-spine-layer absolute inset-0 z-[3]" :style="spineStyle" />
     </span>
-    <span v-if="!loaded" class="absolute inset-0 z-[2] animate-pulse bg-white/10" />
+    <span v-if="!loaded" class="absolute inset-0 z-[2] animate-pulse bg-foreground/5" />
   </template>
   <span
     v-else
