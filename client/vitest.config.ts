@@ -11,7 +11,7 @@ export default mergeConfig(
       root: fileURLToPath(new URL('./', import.meta.url)),
       coverage: {
         provider: 'v8',
-        reporter: ['text', 'html'],
+        reporter: ['text', 'html', 'lcov'],
         reportsDirectory: './coverage',
         thresholds: {
           lines: 1,

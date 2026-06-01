@@ -7,6 +7,7 @@ A self-hosted library management and reading platform for ebooks, PDFs, audioboo
 [![Stars](https://img.shields.io/github/stars/bookorbit/bookorbit?style=flat)](https://github.com/bookorbit/bookorbit/stargazers)
 [![CI](https://github.com/bookorbit/bookorbit/actions/workflows/ci.yml/badge.svg)](https://github.com/bookorbit/bookorbit/actions/workflows/ci.yml)
 [![Release](https://github.com/bookorbit/bookorbit/actions/workflows/release.yml/badge.svg)](https://github.com/bookorbit/bookorbit/actions/workflows/release.yml)
+[![codecov](https://codecov.io/gh/bookorbit/bookorbit/graph/badge.svg?token=F6TADEFCUV)](https://codecov.io/gh/bookorbit/bookorbit)
 [![Latest release](https://img.shields.io/github/v/release/bookorbit/bookorbit?label=latest)](https://github.com/bookorbit/bookorbit/releases)
 [![Commits/month](https://img.shields.io/github/commit-activity/m/bookorbit/bookorbit?label=commits%2Fmonth)](https://github.com/bookorbit/bookorbit/commits/main)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
@@ -26,6 +27,13 @@ A self-hosted library management and reading platform for ebooks, PDFs, audioboo
 ---
 
 ![BookOrbit dashboard showing reading stats, widgets, and book shelves](https://bookorbit.app/images/home/dashboard-overview.webp)
+
+<details>
+<summary>Coverage Map (Codecov Grid)</summary>
+
+![Codecov Grid](https://codecov.io/gh/bookorbit/bookorbit/graphs/tree.svg?token=F6TADEFCUV)
+
+</details>
 
 ---
 

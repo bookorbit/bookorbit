@@ -392,6 +392,8 @@ jobs:
     permissions:
       contents: read
       checks: write
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     steps:
       - name: Check for package changes
         id: has-changes
@@ -435,8 +437,18 @@ jobs:
           if [[ "$PACKAGE" == "server" ]]; then
             pnpm --filter server exec vitest --run --coverage --reporter=default --reporter=github-actions --reporter=junit --outputFile.junit="$JUNIT_OUTPUT"
           else
-            pnpm --filter client exec vitest --run --reporter=default --reporter=junit --outputFile="$JUNIT_OUTPUT"
+            pnpm --filter client exec vitest --run --coverage --reporter=default --reporter=junit --outputFile="$JUNIT_OUTPUT"
           fi
+
+      - name: Upload coverage reports to Codecov
+        if: steps.has-changes.outputs.run == 'true' && env.CODECOV_TOKEN != ''
+        uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe # v5
+        with:
+          token: ${{ env.CODECOV_TOKEN }}
+          files: ${{ matrix.package == 'server' && 'server/coverage/lcov.info' || 'client/coverage/lcov.info' }}
+          flags: ${{ matrix.package }}
+          name: ${{ matrix.package }}-coverage
+          verbose: true
 
       - name: Publish test report annotations
         if: >
