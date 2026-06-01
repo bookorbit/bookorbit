@@ -28,17 +28,6 @@ A self-hosted library management and reading platform for ebooks, PDFs, audioboo
 
 ![BookOrbit dashboard showing reading stats, widgets, and book shelves](https://bookorbit.app/images/home/dashboard-overview.webp)
 
-<details>
-<summary>Coverage Map (Codecov Grid)</summary>
-
-[![Server coverage](https://codecov.io/gh/bookorbit/bookorbit/graph/badge.svg?token=F6TADEFCUV&flag=server)](https://codecov.io/gh/bookorbit/bookorbit?flags%5B0%5D=server) Server &nbsp; [![Client coverage](https://codecov.io/gh/bookorbit/bookorbit/graph/badge.svg?token=F6TADEFCUV&flag=client)](https://codecov.io/gh/bookorbit/bookorbit?flags%5B0%5D=client) Client
-
-![Codecov Grid](https://codecov.io/gh/bookorbit/bookorbit/graphs/tree.svg?token=F6TADEFCUV)
-
-</details>
-
----
-
 ## What is BookOrbit?
 
 BookOrbit is a self-hosted digital library and reading platform. Organize and read your books, sync seamlessly with Kobo and KOReader devices, enrich your collection with metadata from multiple providers, and support multiple users with OIDC/SSO authentication and detailed reading statistics. Built-in features include OPDS support, customizable dashboard widgets, Send-to-Kindle delivery, and Smart Scopes for dynamic rule-based shelves and filters - all running on infrastructure you control.
@@ -131,6 +120,12 @@ For the full installation guide including reverse proxy setup, file permissions 
 Full documentation is at **[bookorbit.app](https://bookorbit.app)** - covering libraries, metadata, readers, Kobo sync, OPDS, users and permissions, OIDC setup, and more.
 
 For local development, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). To contribute, see [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for the full workflow: branch naming, test expectations, PR checklist, and commit format.
+
+---
+
+## Code Coverage Map
+
+![Codecov Grid](https://codecov.io/gh/bookorbit/bookorbit/graphs/tree.svg?token=F6TADEFCUV)
 
 ---
 
