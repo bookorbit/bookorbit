@@ -42,6 +42,7 @@ const DEFAULT_CONFIG: ProviderConfigurations = {
   audible: { enabled: false, domain: 'com' },
   audnexus: { enabled: false },
   comicvine: { enabled: false, apiKey: '' },
+  ranobedb: { enabled: false },
 };
 
 function asObject(value: unknown): Record<string, unknown> {
@@ -124,6 +125,7 @@ const PROVIDER_LABELS: Record<MetadataProviderKey, string> = {
   [MetadataProviderKey.AUDIBLE]: 'Audible',
   [MetadataProviderKey.AUDNEXUS]: 'AudNexus',
   [MetadataProviderKey.COMICVINE]: 'ComicVine',
+  [MetadataProviderKey.RANOBEDB]: 'RanobeDB',
 };
 
 type ProviderEnableRule = {
@@ -167,6 +169,7 @@ export class ProviderConfigService {
       audible: { ...DEFAULT_CONFIG.audible },
       audnexus: { ...DEFAULT_CONFIG.audnexus },
       comicvine: { ...DEFAULT_CONFIG.comicvine },
+      ranobedb: { ...DEFAULT_CONFIG.ranobedb },
     };
   }
 
@@ -182,6 +185,7 @@ export class ProviderConfigService {
       audible: mergeAudibleConfig(base.audible, next.audible),
       audnexus: mergeSimpleConfig(base.audnexus, next.audnexus),
       comicvine: mergeComicVineConfig(base.comicvine, next.comicvine),
+      ranobedb: mergeSimpleConfig(base.ranobedb, next.ranobedb),
     };
   }
 
@@ -382,6 +386,12 @@ export class ProviderConfigService {
         enabled: cfg.comicvine.enabled,
         configured: !!this.getEnableRule('comicvine')?.canEnable(cfg),
         hint: !this.getEnableRule('comicvine')?.canEnable(cfg) ? this.getEnableRule('comicvine')?.setupHint : undefined,
+      },
+      {
+        key: MetadataProviderKey.RANOBEDB,
+        label: PROVIDER_LABELS[MetadataProviderKey.RANOBEDB],
+        enabled: cfg.ranobedb.enabled,
+        configured: true,
       },
     ];
   }

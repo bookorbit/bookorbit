@@ -53,6 +53,7 @@ const DIRECT_PATCH_FIELDS = [
   'itunesId',
   'audibleId',
   'comicvineId',
+  'ranobedbId',
 ] as const
 
 const COMIC_FIELD_MAP = {
@@ -112,6 +113,7 @@ const providerIdFields = [
   { field: 'itunesId' as const, label: 'iTunes' },
   { field: 'audibleId' as const, label: 'Audible' },
   { field: 'comicvineId' as const, label: 'ComicVine' },
+  { field: 'ranobedbId' as const, label: 'RanobeDB' },
 ]
 
 function setIntField(field: 'publishedYear' | 'pageCount' | 'durationSeconds', e: Event) {
@@ -310,6 +312,7 @@ function buildPreviewPatch(preview: MetadataRefreshPreview): MetadataPatch {
     itunesId: preview.itunesId,
     audibleId: preview.audibleId,
     comicvineId: preview.comicvineId,
+    ranobedbId: preview.ranobedbId,
     comicMetadata: preview.comicMetadata,
     narrators: preview.audioMetadata?.narrators,
     durationSeconds: preview.audioMetadata?.durationSeconds ?? undefined,

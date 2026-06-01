@@ -70,6 +70,7 @@ export class MetadataFetchService {
       [MetadataProviderKey.ITUNES]: row.itunesId ?? undefined,
       [MetadataProviderKey.AUDIBLE]: row.audibleId ?? undefined,
       [MetadataProviderKey.COMICVINE]: row.comicvineId ?? undefined,
+      [MetadataProviderKey.RANOBEDB]: row.ranobedbId ?? undefined,
     };
   }
 

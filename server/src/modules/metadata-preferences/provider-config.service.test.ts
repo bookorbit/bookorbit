@@ -72,6 +72,7 @@ describe('ProviderConfigService', () => {
       audible: { enabled: false, domain: 'com' },
       audnexus: { enabled: false },
       comicvine: { enabled: false, apiKey: '' },
+      ranobedb: { enabled: false },
     });
   });
 
@@ -352,6 +353,7 @@ describe('ProviderConfigService', () => {
       audible: { enabled: false, domain: 'com' },
       audnexus: { enabled: false },
       comicvine: { enabled: false, apiKey: '' },
+      ranobedb: { enabled: false },
     });
 
     expect(statuses.map((s) => s.key)).toEqual([
@@ -364,6 +366,7 @@ describe('ProviderConfigService', () => {
       MetadataProviderKey.AUDIBLE,
       MetadataProviderKey.AUDNEXUS,
       MetadataProviderKey.COMICVINE,
+      MetadataProviderKey.RANOBEDB,
     ]);
     expect(statuses.find((s) => s.key === MetadataProviderKey.GOOGLE)?.configured).toBe(false);
     expect(statuses.find((s) => s.key === MetadataProviderKey.GOOGLE)?.hint).toContain('API key required');
@@ -386,6 +389,7 @@ describe('ProviderConfigService', () => {
       audible: { enabled: false, domain: 'com' },
       audnexus: { enabled: false },
       comicvine: { enabled: false, apiKey: '' },
+      ranobedb: { enabled: false },
     });
 
     expect(statuses.find((s) => s.key === MetadataProviderKey.HARDCOVER)?.configured).toBe(true);

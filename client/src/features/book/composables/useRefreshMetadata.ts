@@ -26,6 +26,7 @@ export interface MetadataRefreshPreview {
   itunesId?: string | null
   audibleId?: string | null
   comicvineId?: string | null
+  ranobedbId?: string | null
   audioMetadata?: {
     narrators?: string[]
     durationSeconds?: number | null

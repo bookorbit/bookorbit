@@ -16,6 +16,7 @@ const mockConfig: ProviderConfigurations = {
   audible: { enabled: false, domain: 'com' },
   audnexus: { enabled: false },
   comicvine: { enabled: false, apiKey: '' },
+  ranobedb: { enabled: false },
 };
 
 const mockDocument: HardcoverSearchDocument = {
