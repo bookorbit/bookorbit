@@ -442,9 +442,23 @@ jobs:
 
       - name: Upload coverage reports to Codecov
         if: steps.has-changes.outputs.run == 'true' && env.CODECOV_TOKEN != ''
-        uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe # v5
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
         with:
           token: ${{ env.CODECOV_TOKEN }}
+          files: ${{ matrix.package == 'server' && 'server/coverage/lcov.info' || 'client/coverage/lcov.info' }}
+          flags: ${{ matrix.package }}
+          name: ${{ matrix.package }}-coverage
+          verbose: true
+
+      - name: Upload coverage reports to Codecov for fork PR
+        if: >
+          steps.has-changes.outputs.run == 'true' &&
+          env.CODECOV_TOKEN == '' &&
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name != github.repository &&
+          github.event.repository.private == false
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
+        with:
           files: ${{ matrix.package == 'server' && 'server/coverage/lcov.info' || 'client/coverage/lcov.info' }}
           flags: ${{ matrix.package }}
           name: ${{ matrix.package }}-coverage
