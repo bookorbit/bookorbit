@@ -50,6 +50,7 @@ export class SeriesService {
     });
 
     const items: SeriesSummary[] = result.items.map((row) => ({
+      id: row.id,
       name: row.name,
       bookCount: row.bookCount,
       readCount: row.readCount,
@@ -61,7 +62,7 @@ export class SeriesService {
     return { items, total: result.total, page: result.page, size: result.size };
   }
 
-  async findBooks(user: RequestUser, seriesName: string, dto: ListSeriesBooksDto): Promise<SeriesBooksPage> {
+  async findBooks(user: RequestUser, seriesId: number, dto: ListSeriesBooksDto): Promise<SeriesBooksPage> {
     const page = dto.page ?? 0;
     const size = dto.size ?? 50;
     this.assertPaginationWindow(page, size);
@@ -73,13 +74,13 @@ export class SeriesService {
 
     const [detail, bookPage] = await Promise.all([
       this.seriesRepo.findDetail({
-        seriesName,
+        seriesId,
         userId: user.id,
         libraryIds,
         contentFilters: user.isSuperuser ? undefined : user.contentFilters,
       }),
       this.seriesRepo.findBookIds({
-        seriesName,
+        seriesId,
         page,
         size,
         sort: dto.sort ?? 'seriesIndex',
@@ -93,13 +94,14 @@ export class SeriesService {
       if (dto.libraryId) {
         const allLibraryIds = await this.resolveLibraryIds(user);
         const existsInAnyLibrary = await this.seriesRepo.findDetail({
-          seriesName,
+          seriesId,
           userId: user.id,
           libraryIds: allLibraryIds,
           contentFilters: user.isSuperuser ? undefined : user.contentFilters,
         });
         if (existsInAnyLibrary) {
           const emptyInfo: SeriesDetail = {
+            id: existsInAnyLibrary.id,
             name: existsInAnyLibrary.name,
             bookCount: 0,
             readCount: 0,
@@ -130,6 +132,7 @@ export class SeriesService {
     }
 
     const seriesInfo: SeriesDetail = {
+      id: detail.id,
       name: detail.name,
       bookCount: detail.bookCount,
       readCount: detail.readCount,

@@ -30,6 +30,7 @@ const embedding256 = customType<{ data: number[]; driverData: string }>({
 });
 
 import { books } from './books';
+import { bookSeries } from './series';
 
 export const bookMetadata = pgTable(
   'book_metadata',
@@ -46,6 +47,7 @@ export const bookMetadata = pgTable(
     publishedYear: integer('published_year'),
     language: varchar('language', { length: 100 }),
     pageCount: integer('page_count'),
+    seriesId: integer('series_id').references(() => bookSeries.id, { onDelete: 'set null' }),
     seriesName: varchar('series_name', { length: 500 }),
     seriesIndex: real('series_index'),
     rating: integer('rating'),
@@ -79,6 +81,7 @@ export const bookMetadata = pgTable(
     index('bm_title_trgm_idx').using('gin', t.title.op('gin_trgm_ops')),
     index('bm_title_lower_idx').on(sql`lower(${t.title})`),
     index('bm_series_trgm_idx').using('gin', t.seriesName.op('gin_trgm_ops')),
+    index('bm_series_id_idx').on(t.seriesId),
     index('bm_publisher_trgm_idx').using('gin', t.publisher.op('gin_trgm_ops')),
     index('bm_language_idx').on(t.language),
     index('bm_language_trgm_idx').using('gin', t.language.op('gin_trgm_ops')),

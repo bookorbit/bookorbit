@@ -10,7 +10,7 @@ type LoadOptions = {
   keepPreviousData?: boolean
 }
 
-export function useSeriesDetail(seriesName: Ref<string>) {
+export function useSeriesDetail(seriesId: Ref<number | null>) {
   const seriesInfo = ref<SeriesDetail | null>(null)
   const items = ref<BookCard[]>([])
   const total = ref(0)
@@ -30,7 +30,18 @@ export function useSeriesDetail(seriesName: Ref<string>) {
   async function load(input: boolean | LoadOptions = false): Promise<void> {
     const reset = typeof input === 'boolean' ? input : Boolean(input.reset)
     const keepPreviousData = typeof input === 'boolean' ? false : Boolean(input.keepPreviousData)
-    if (!seriesName.value) return
+    const currentSeriesId = seriesId.value
+    if (currentSeriesId == null) {
+      requestToken++
+      loading.value = false
+      error.value = null
+      notFound.value = true
+      page.value = 0
+      items.value = []
+      seriesInfo.value = null
+      total.value = 0
+      return
+    }
     if (!reset && loading.value) return
     if (!reset && !hasMore.value) return
     const requestPage = reset ? 0 : page.value
@@ -50,7 +61,7 @@ export function useSeriesDetail(seriesName: Ref<string>) {
     }
 
     try {
-      const data = await fetchSeriesBooks(seriesName.value, {
+      const data = await fetchSeriesBooks(currentSeriesId, {
         page: requestPage,
         size: PAGE_SIZE,
         sort: sort.value,

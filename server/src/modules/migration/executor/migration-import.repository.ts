@@ -1,9 +1,10 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db';
 import * as schema from '../../../db/schema';
+import { SeriesIdentityService } from '../../../common/services/series-identity.service';
 import { uniqueNumbers } from './executor-utils';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -40,6 +41,7 @@ const BOOK_METADATA_COLUMN_BY_PROPERTY = {
   isbn10: 'isbn10',
   isbn13: 'isbn13',
   seriesName: 'series_name',
+  seriesId: 'series_id',
   seriesIndex: 'series_index',
   rating: 'rating',
   googleBooksId: 'google_books_id',
@@ -67,19 +69,23 @@ function bookMetadataConflictSet(item: Record<string, unknown>): Record<string, 
 
 @Injectable()
 export class MigrationImportRepository {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    @Optional() private readonly seriesIdentity?: SeriesIdentityService,
+  ) {}
 
   async withTransaction<T>(handler: (repo: MigrationImportRepository) => Promise<T>): Promise<T> {
-    return this.db.transaction(async (tx) => handler(new MigrationImportRepository(tx as unknown as Db)));
+    return this.db.transaction(async (tx) => handler(new MigrationImportRepository(tx as unknown as Db, this.seriesIdentity)));
   }
 
   // --- Metadata ---
 
   async upsertBookMetadata(bookId: number, values: Partial<typeof schema.bookMetadata.$inferInsert>): Promise<void> {
+    const patch = (await this.seriesIdentity?.resolveMetadataPatch(values, this.db)) ?? values;
     await this.db
       .insert(schema.bookMetadata)
-      .values({ bookId, ...values })
-      .onConflictDoUpdate({ target: schema.bookMetadata.bookId, set: values });
+      .values({ bookId, ...patch })
+      .onConflictDoUpdate({ target: schema.bookMetadata.bookId, set: patch });
   }
 
   // --- Authors ---
@@ -292,8 +298,9 @@ export class MigrationImportRepository {
     if (items.length === 0) return;
     for (const batch of chunk(items, BATCH_CHUNK_SIZE)) {
       for (const item of batch) {
-        const set = bookMetadataConflictSet(item);
-        await this.db.insert(schema.bookMetadata).values(item).onConflictDoUpdate({
+        const patch = (await this.seriesIdentity?.resolveMetadataPatch(item, this.db)) ?? item;
+        const set = bookMetadataConflictSet(patch);
+        await this.db.insert(schema.bookMetadata).values(patch).onConflictDoUpdate({
           target: schema.bookMetadata.bookId,
           set,
         });

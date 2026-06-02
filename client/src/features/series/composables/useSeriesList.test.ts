@@ -10,6 +10,19 @@ import { useSeriesList } from './useSeriesList'
 
 const mockFetchSeries = vi.mocked(fetchSeries)
 
+function makeSeries(overrides: Partial<SeriesPage['items'][number]> = {}): SeriesPage['items'][number] {
+  return {
+    id: 42,
+    name: 'Series',
+    bookCount: 1,
+    readCount: 0,
+    authors: [],
+    coverBookIds: [],
+    lastAddedAt: null,
+    ...overrides,
+  }
+}
+
 describe('useSeriesList', () => {
   beforeEach(() => {
     vi.resetAllMocks()
@@ -30,7 +43,7 @@ describe('useSeriesList', () => {
 
   it('loads first page and populates items', async () => {
     mockFetchSeries.mockResolvedValue({
-      items: [{ name: 'Harry Potter', bookCount: 7, readCount: 3, authors: ['J.K. Rowling'], coverBookIds: [1], lastAddedAt: null }],
+      items: [makeSeries({ name: 'Harry Potter', bookCount: 7, readCount: 3, authors: ['J.K. Rowling'], coverBookIds: [1] })],
       total: 1,
       page: 0,
       size: 50,
@@ -49,13 +62,13 @@ describe('useSeriesList', () => {
   it('appends items on subsequent loads', async () => {
     mockFetchSeries
       .mockResolvedValueOnce({
-        items: [{ name: 'Series A', bookCount: 3, readCount: 0, authors: [], coverBookIds: [], lastAddedAt: null }],
+        items: [makeSeries({ id: 1, name: 'Series A', bookCount: 3 })],
         total: 2,
         page: 0,
         size: 50,
       })
       .mockResolvedValueOnce({
-        items: [{ name: 'Series B', bookCount: 5, readCount: 1, authors: [], coverBookIds: [], lastAddedAt: null }],
+        items: [makeSeries({ id: 2, name: 'Series B', bookCount: 5, readCount: 1 })],
         total: 2,
         page: 1,
         size: 50,
@@ -72,7 +85,7 @@ describe('useSeriesList', () => {
 
   it('resets state on load(true)', async () => {
     mockFetchSeries.mockResolvedValue({
-      items: [{ name: 'Series A', bookCount: 1, readCount: 0, authors: [], coverBookIds: [], lastAddedAt: null }],
+      items: [makeSeries({ name: 'Series A' })],
       total: 1,
       page: 0,
       size: 50,
@@ -83,7 +96,7 @@ describe('useSeriesList', () => {
     expect(items.value).toHaveLength(1)
 
     mockFetchSeries.mockResolvedValue({
-      items: [{ name: 'Series B', bookCount: 2, readCount: 0, authors: [], coverBookIds: [], lastAddedAt: null }],
+      items: [makeSeries({ id: 2, name: 'Series B', bookCount: 2 })],
       total: 1,
       page: 0,
       size: 50,
@@ -115,7 +128,7 @@ describe('useSeriesList', () => {
   it('does not load when already loading (non-reset)', async () => {
     // First load some data so hasMore becomes true
     mockFetchSeries.mockResolvedValueOnce({
-      items: [{ name: 'Series A', bookCount: 1, readCount: 0, authors: [], coverBookIds: [], lastAddedAt: null }],
+      items: [makeSeries({ name: 'Series A' })],
       total: 3,
       page: 0,
       size: 50,
@@ -169,7 +182,7 @@ describe('useSeriesList', () => {
 
     // Resolve second (reset) first
     resolveSecond!({
-      items: [{ name: 'Fresh', bookCount: 1, readCount: 0, authors: [], coverBookIds: [], lastAddedAt: null }],
+      items: [makeSeries({ name: 'Fresh' })],
       total: 1,
       page: 0,
       size: 50,
@@ -178,7 +191,7 @@ describe('useSeriesList', () => {
 
     // Resolve first (stale)
     resolveFirst!({
-      items: [{ name: 'Stale', bookCount: 1, readCount: 0, authors: [], coverBookIds: [], lastAddedAt: null }],
+      items: [makeSeries({ id: 2, name: 'Stale' })],
       total: 1,
       page: 0,
       size: 50,
@@ -212,7 +225,7 @@ describe('useSeriesList', () => {
     const resetLoad = load(true)
 
     resolveSecond!({
-      items: [{ name: 'OK', bookCount: 1, readCount: 0, authors: [], coverBookIds: [], lastAddedAt: null }],
+      items: [makeSeries({ name: 'OK' })],
       total: 1,
       page: 0,
       size: 50,
@@ -226,7 +239,7 @@ describe('useSeriesList', () => {
 
   it('does not load more when no more items', async () => {
     mockFetchSeries.mockResolvedValue({
-      items: [{ name: 'Only One', bookCount: 1, readCount: 0, authors: [], coverBookIds: [], lastAddedAt: null }],
+      items: [makeSeries({ name: 'Only One' })],
       total: 1,
       page: 0,
       size: 50,

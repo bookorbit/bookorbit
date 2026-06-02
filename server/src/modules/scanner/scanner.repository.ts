@@ -59,6 +59,7 @@ export class ScannerRepository {
       .select({
         allowedFormats: libraries.allowedFormats,
         formatPriority: libraries.formatPriority,
+        metadataPrecedence: libraries.metadataPrecedence,
         excludePatterns: libraries.excludePatterns,
         organizationMode: libraries.organizationMode,
       })

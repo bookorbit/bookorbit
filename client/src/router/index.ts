@@ -21,7 +21,7 @@ function numericParam(to: RouteLocationNormalizedLoaded, key: string): number | 
   const value = firstText(to.params[key])
   if (!value) return null
   const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : null
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
 }
 
 function fallbackById(prefix: string, id: number | null): string {
@@ -286,10 +286,10 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: 'Series' },
       },
       {
-        path: '/series/:seriesName',
+        path: '/series/:seriesId',
         name: 'series-detail',
         component: () => import('@/features/series/views/SeriesDetailView.vue'),
-        meta: { title: (to) => `Series · ${firstText(to.params.seriesName) ?? 'Series'}` },
+        meta: { title: (to) => fallbackById('Series', numericParam(to, 'seriesId')) },
       },
       {
         path: '/tools',

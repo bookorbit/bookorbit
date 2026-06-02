@@ -1,7 +1,5 @@
 import 'reflect-metadata';
 
-import { BadRequestException } from '@nestjs/common';
-
 import type { RequestUser } from '../../common/types/request-user';
 import { SeriesController } from './series.controller';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
@@ -50,7 +48,7 @@ describe('SeriesController', () => {
     expect(result).toBe(expected);
   });
 
-  it('findBooks delegates to service with decoded param', async () => {
+  it('findBooks delegates to service with numeric series id', async () => {
     const { controller, seriesService } = makeController();
     const user = makeUser();
     const dto = { page: 0, size: 50 };
@@ -59,72 +57,13 @@ describe('SeriesController', () => {
       total: 0,
       page: 0,
       size: 50,
-      seriesInfo: { name: 'Harry Potter', bookCount: 0, readCount: 0, authors: [], possibleGaps: [] },
+      seriesInfo: { id: 42, name: 'Harry Potter', bookCount: 0, readCount: 0, authors: [], possibleGaps: [] },
     };
     seriesService.findBooks.mockResolvedValue(expected);
 
-    const result = await controller.findBooks(user, 'Harry Potter', dto as any);
+    const result = await controller.findBooks(user, 42, dto as any);
 
-    expect(seriesService.findBooks).toHaveBeenCalledWith(user, 'Harry Potter', dto);
+    expect(seriesService.findBooks).toHaveBeenCalledWith(user, 42, dto);
     expect(result).toBe(expected);
-  });
-
-  describe('seriesName validation', () => {
-    it('trims whitespace from seriesName', async () => {
-      const { controller, seriesService } = makeController();
-      seriesService.findBooks.mockResolvedValue({ items: [] });
-
-      await controller.findBooks(makeUser(), '  Harry Potter  ', {} as any);
-      expect(seriesService.findBooks).toHaveBeenCalledWith(expect.anything(), 'Harry Potter', expect.anything());
-    });
-
-    it('passes already-decoded param as-is', async () => {
-      const { controller, seriesService } = makeController();
-      seriesService.findBooks.mockResolvedValue({ items: [] });
-
-      await controller.findBooks(makeUser(), 'Harry Potter', {} as any);
-      expect(seriesService.findBooks).toHaveBeenCalledWith(expect.anything(), 'Harry Potter', expect.anything());
-    });
-
-    it('handles names with special characters', async () => {
-      const { controller, seriesService } = makeController();
-      seriesService.findBooks.mockResolvedValue({ items: [] });
-
-      await controller.findBooks(makeUser(), 'A & B / C', {} as any);
-      expect(seriesService.findBooks).toHaveBeenCalledWith(expect.anything(), 'A & B / C', expect.anything());
-    });
-
-    it('handles names with percent sign', async () => {
-      const { controller, seriesService } = makeController();
-      seriesService.findBooks.mockResolvedValue({ items: [] });
-
-      await controller.findBooks(makeUser(), '100% Complete', {} as any);
-      expect(seriesService.findBooks).toHaveBeenCalledWith(expect.anything(), '100% Complete', expect.anything());
-    });
-
-    it('throws BadRequestException for empty seriesName', () => {
-      const { controller } = makeController();
-      expect(() => controller.findBooks(makeUser(), '', {} as any)).toThrow(BadRequestException);
-    });
-
-    it('throws BadRequestException for whitespace-only seriesName', () => {
-      const { controller } = makeController();
-      expect(() => controller.findBooks(makeUser(), '   ', {} as any)).toThrow(BadRequestException);
-    });
-
-    it('throws BadRequestException for seriesName exceeding max length', () => {
-      const { controller } = makeController();
-      const longName = 'A'.repeat(501);
-      expect(() => controller.findBooks(makeUser(), longName, {} as any)).toThrow(BadRequestException);
-    });
-
-    it('accepts seriesName at max length boundary', async () => {
-      const { controller, seriesService } = makeController();
-      seriesService.findBooks.mockResolvedValue({ items: [] });
-      const name = 'A'.repeat(500);
-
-      await controller.findBooks(makeUser(), name, {} as any);
-      expect(seriesService.findBooks).toHaveBeenCalledWith(expect.anything(), name, expect.anything());
-    });
   });
 });

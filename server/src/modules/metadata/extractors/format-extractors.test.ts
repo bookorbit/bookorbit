@@ -1,5 +1,9 @@
 import type { MockedFunction } from 'vitest';
 
+vi.mock('fs/promises', () => ({
+  readFile: vi.fn(),
+}));
+
 vi.mock('../lib/epub', () => ({
   extractEpubMetadata: vi.fn(),
 }));
@@ -56,6 +60,7 @@ vi.mock('../../../common/comic-format-detect', () => ({
 }));
 
 import { extractEpubCover } from '../lib/cover-epub';
+import { readFile } from 'fs/promises';
 import { extractFb2Cover } from '../lib/cover-fb2';
 import { extractCbrCover } from '../lib/cover-cbr';
 import { extractCbzCover } from '../lib/cover-cbz';
@@ -71,9 +76,11 @@ import { ComicFormatExtractor } from './comic-format.extractor';
 import { EpubFormatExtractor } from './epub-format.extractor';
 import { Fb2FormatExtractor } from './fb2-format.extractor';
 import { MobiFormatExtractor } from './mobi-format.extractor';
+import { OpfFormatExtractor } from './opf-format.extractor';
 import { PdfFormatExtractor } from './pdf-format.extractor';
 import { detectComicContainerFormat } from '../../../common/comic-format-detect';
 
+const mockReadFile = readFile as MockedFunction<typeof readFile>;
 const mockExtractEpubMetadata = extractEpubMetadata as MockedFunction<typeof extractEpubMetadata>;
 const mockExtractEpubCover = extractEpubCover as MockedFunction<typeof extractEpubCover>;
 const mockParseFb2File = parseFb2File as MockedFunction<typeof parseFb2File>;
@@ -178,6 +185,49 @@ describe('metadata format extractors', () => {
         cover: null,
       }),
     );
+  });
+
+  it('opf extractor parses standalone sidecar OPF metadata', async () => {
+    mockReadFile.mockResolvedValue(`
+      <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+          <dc:title>Sidecar Title</dc:title>
+          <dc:creator opf:role="aut" opf:file-as="Author, Sidecar">Sidecar Author</dc:creator>
+          <dc:identifier opf:scheme="ISBN">9780441013593</dc:identifier>
+          <dc:identifier opf:scheme="GOOGLE">google-sidecar</dc:identifier>
+          <dc:subject>Science Fiction</dc:subject>
+          <dc:publisher>Ace</dc:publisher>
+          <dc:date>1965-08-01</dc:date>
+          <dc:language>en</dc:language>
+          <meta name="calibre:series" content="Dune Chronicles" />
+          <meta name="calibre:series_index" content="1" />
+          <meta name="bookorbit:tags" content="Classic, Imported" />
+          <meta name="bookorbit:page_count" content="412" />
+          <meta name="bookorbit:rating" content="9" />
+        </metadata>
+      </package>
+    `);
+
+    await expect(new OpfFormatExtractor().extract('/books/metadata.opf')).resolves.toEqual(
+      expect.objectContaining({
+        title: 'Sidecar Title',
+        isbn13: '9780441013593',
+        authors: [{ name: 'Sidecar Author', sortName: 'Author, Sidecar' }],
+        genres: ['Science Fiction'],
+        tags: ['Classic', 'Imported'],
+        rating: 9,
+        pageCount: 412,
+        googleBooksId: 'google-sidecar',
+        cover: null,
+      }),
+    );
+    expect(mockReadFile).toHaveBeenCalledWith('/books/metadata.opf', 'utf8');
+  });
+
+  it('opf extractor returns null for sidecars without usable metadata', async () => {
+    mockReadFile.mockResolvedValue('<package><metadata></metadata></package>');
+
+    await expect(new OpfFormatExtractor().extract('/books/empty.opf')).resolves.toBeNull();
   });
 
   it('fb2 extractor maps parsed metadata and nulls cover when extraction fails', async () => {

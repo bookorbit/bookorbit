@@ -1,4 +1,5 @@
 import { bookMetadata } from './metadata';
+import { bookSeries } from './series';
 import { users, appSettings } from './auth';
 import { opdsUsers } from './opds';
 import { bookDockFiles } from './book-dock';
@@ -84,6 +85,7 @@ describe('Database Schema Logic', () => {
     testOnUpdate('books.updatedAt', books.updatedAt);
     testOnUpdate('bookFiles.updatedAt', bookFiles.updatedAt);
     testOnUpdate('bookMetadata.updatedAt', bookMetadata.updatedAt);
+    testOnUpdate('bookSeries.updatedAt', bookSeries.updatedAt);
     testOnUpdate('emailProviders.updatedAt', emailProviders.updatedAt);
     testOnUpdate('emailTemplates.updatedAt', emailTemplates.updatedAt);
     testOnUpdate('collections.updatedAt', collections.updatedAt);

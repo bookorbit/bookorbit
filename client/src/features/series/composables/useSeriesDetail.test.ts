@@ -17,8 +17,8 @@ describe('useSeriesDetail', () => {
   })
 
   it('initializes with empty state', () => {
-    const name = ref('Test')
-    const { seriesInfo, items, total, loading, error, notFound, hasMore } = useSeriesDetail(name)
+    const seriesId = ref(42)
+    const { seriesInfo, items, total, loading, error, notFound, hasMore } = useSeriesDetail(seriesId)
 
     expect(seriesInfo.value).toBeNull()
     expect(items.value).toEqual([])
@@ -30,16 +30,16 @@ describe('useSeriesDetail', () => {
   })
 
   it('loads series detail and books', async () => {
-    const name = ref('Dune')
+    const seriesId = ref(42)
     mockFetchSeriesBooks.mockResolvedValue({
       items: [{ id: 1, title: 'Dune' } as BookCard],
       total: 1,
       page: 0,
       size: 50,
-      seriesInfo: { name: 'Dune', bookCount: 6, readCount: 2, authors: ['Frank Herbert'], possibleGaps: [3] },
+      seriesInfo: { id: 42, name: 'Dune', bookCount: 6, readCount: 2, authors: ['Frank Herbert'], possibleGaps: [3] },
     })
 
-    const { seriesInfo, items, total, load } = useSeriesDetail(name)
+    const { seriesInfo, items, total, load } = useSeriesDetail(seriesId)
     await load(true)
 
     expect(seriesInfo.value?.name).toBe('Dune')
@@ -49,10 +49,10 @@ describe('useSeriesDetail', () => {
   })
 
   it('sets notFound on 404 error', async () => {
-    const name = ref('Nonexistent')
+    const seriesId = ref(42)
     mockFetchSeriesBooks.mockRejectedValue(new Error('404: Not Found'))
 
-    const { notFound, error, load } = useSeriesDetail(name)
+    const { notFound, error, load } = useSeriesDetail(seriesId)
     await load(true)
 
     expect(notFound.value).toBe(true)
@@ -60,43 +60,79 @@ describe('useSeriesDetail', () => {
   })
 
   it('sets error on non-404 errors', async () => {
-    const name = ref('Test')
+    const seriesId = ref(42)
     mockFetchSeriesBooks.mockRejectedValue(new Error('500: Server Error'))
 
-    const { notFound, error, load } = useSeriesDetail(name)
+    const { notFound, error, load } = useSeriesDetail(seriesId)
     await load(true)
 
     expect(notFound.value).toBe(false)
     expect(error.value).toBe('500: Server Error')
   })
 
-  it('does not load when seriesName is empty', async () => {
-    const name = ref('')
-    const { load } = useSeriesDetail(name)
+  it('does not load when seriesId is missing', async () => {
+    const seriesId = ref<number | null>(null)
+    const { notFound, load } = useSeriesDetail(seriesId)
     await load(true)
 
     expect(mockFetchSeriesBooks).not.toHaveBeenCalled()
+    expect(notFound.value).toBe(true)
+  })
+
+  it('clears state and ignores stale responses when seriesId becomes missing', async () => {
+    const seriesId = ref<number | null>(42)
+    let resolveLoad!: (v: SeriesBooksPage) => void
+    mockFetchSeriesBooks.mockImplementation(
+      () =>
+        new Promise<SeriesBooksPage>((resolve) => {
+          resolveLoad = resolve
+        }),
+    )
+
+    const { items, seriesInfo, total, loading, notFound, load } = useSeriesDetail(seriesId)
+    const pendingLoad = load(true)
+
+    seriesId.value = null
+    await load(true)
+
+    expect(items.value).toEqual([])
+    expect(seriesInfo.value).toBeNull()
+    expect(total.value).toBe(0)
+    expect(loading.value).toBe(false)
+    expect(notFound.value).toBe(true)
+
+    resolveLoad({
+      items: [{ id: 1 } as BookCard],
+      total: 1,
+      page: 0,
+      size: 50,
+      seriesInfo: { id: 42, name: 'Stale', bookCount: 1, readCount: 0, authors: [], possibleGaps: [] },
+    })
+    await pendingLoad
+
+    expect(items.value).toEqual([])
+    expect(seriesInfo.value).toBeNull()
   })
 
   it('appends books on subsequent loads', async () => {
-    const name = ref('Test')
+    const seriesId = ref(42)
     mockFetchSeriesBooks
       .mockResolvedValueOnce({
         items: [{ id: 1 } as BookCard],
         total: 2,
         page: 0,
         size: 50,
-        seriesInfo: { name: 'Test', bookCount: 2, readCount: 0, authors: [], possibleGaps: [] },
+        seriesInfo: { id: 42, name: 'Test', bookCount: 2, readCount: 0, authors: [], possibleGaps: [] },
       })
       .mockResolvedValueOnce({
         items: [{ id: 2 } as BookCard],
         total: 2,
         page: 1,
         size: 50,
-        seriesInfo: { name: 'Test', bookCount: 2, readCount: 0, authors: [], possibleGaps: [] },
+        seriesInfo: { id: 42, name: 'Test', bookCount: 2, readCount: 0, authors: [], possibleGaps: [] },
       })
 
-    const { items, load } = useSeriesDetail(name)
+    const { items, load } = useSeriesDetail(seriesId)
     await load(true)
     await load()
 
@@ -104,20 +140,20 @@ describe('useSeriesDetail', () => {
   })
 
   it('resets notFound on fresh load', async () => {
-    const name = ref('Missing')
+    const seriesId = ref(42)
     mockFetchSeriesBooks.mockRejectedValue(new Error('404: Not Found'))
 
-    const { notFound, load } = useSeriesDetail(name)
+    const { notFound, load } = useSeriesDetail(seriesId)
     await load(true)
     expect(notFound.value).toBe(true)
 
-    name.value = 'Found'
+    seriesId.value = 43
     mockFetchSeriesBooks.mockResolvedValue({
       items: [],
       total: 0,
       page: 0,
       size: 50,
-      seriesInfo: { name: 'Found', bookCount: 0, readCount: 0, authors: [], possibleGaps: [] },
+      seriesInfo: { id: 42, name: 'Found', bookCount: 0, readCount: 0, authors: [], possibleGaps: [] },
     })
 
     await load(true)
@@ -125,16 +161,16 @@ describe('useSeriesDetail', () => {
   })
 
   it('clears seriesInfo and total on reset', async () => {
-    const name = ref('Test')
+    const seriesId = ref(42)
     mockFetchSeriesBooks.mockResolvedValue({
       items: [{ id: 1 } as BookCard],
       total: 5,
       page: 0,
       size: 50,
-      seriesInfo: { name: 'Test', bookCount: 5, readCount: 2, authors: ['Author'], possibleGaps: [] },
+      seriesInfo: { id: 42, name: 'Test', bookCount: 5, readCount: 2, authors: ['Author'], possibleGaps: [] },
     })
 
-    const { seriesInfo, total, load } = useSeriesDetail(name)
+    const { seriesInfo, total, load } = useSeriesDetail(seriesId)
     await load(true)
     expect(seriesInfo.value?.name).toBe('Test')
     expect(total.value).toBe(5)
@@ -156,22 +192,22 @@ describe('useSeriesDetail', () => {
       total: 0,
       page: 0,
       size: 50,
-      seriesInfo: { name: 'New', bookCount: 0, readCount: 0, authors: [], possibleGaps: [] },
+      seriesInfo: { id: 42, name: 'New', bookCount: 0, readCount: 0, authors: [], possibleGaps: [] },
     })
     await pendingLoad
   })
 
   it('keeps previous seriesInfo and total during preserve reset', async () => {
-    const name = ref('Test')
+    const seriesId = ref(42)
     mockFetchSeriesBooks.mockResolvedValue({
       items: [{ id: 1 } as BookCard],
       total: 5,
       page: 0,
       size: 50,
-      seriesInfo: { name: 'Test', bookCount: 5, readCount: 2, authors: ['Author'], possibleGaps: [] },
+      seriesInfo: { id: 42, name: 'Test', bookCount: 5, readCount: 2, authors: ['Author'], possibleGaps: [] },
     })
 
-    const { seriesInfo, total, load } = useSeriesDetail(name)
+    const { seriesInfo, total, load } = useSeriesDetail(seriesId)
     await load(true)
     expect(seriesInfo.value?.name).toBe('Test')
     expect(total.value).toBe(5)
@@ -193,29 +229,29 @@ describe('useSeriesDetail', () => {
       total: 0,
       page: 0,
       size: 50,
-      seriesInfo: { name: 'New', bookCount: 0, readCount: 0, authors: [], possibleGaps: [] },
+      seriesInfo: { id: 42, name: 'New', bookCount: 0, readCount: 0, authors: [], possibleGaps: [] },
     })
     await pendingLoad
   })
 
   it('passes sort/order/libraryId to fetch', async () => {
-    const name = ref('Test')
+    const seriesId = ref(42)
     mockFetchSeriesBooks.mockResolvedValue({
       items: [],
       total: 0,
       page: 0,
       size: 50,
-      seriesInfo: { name: 'Test', bookCount: 0, readCount: 0, authors: [], possibleGaps: [] },
+      seriesInfo: { id: 42, name: 'Test', bookCount: 0, readCount: 0, authors: [], possibleGaps: [] },
     })
 
-    const { sort, order, libraryId, load } = useSeriesDetail(name)
+    const { sort, order, libraryId, load } = useSeriesDetail(seriesId)
     sort.value = 'title'
     order.value = 'desc'
     libraryId.value = 3
 
     await load(true)
 
-    expect(mockFetchSeriesBooks).toHaveBeenCalledWith('Test', {
+    expect(mockFetchSeriesBooks).toHaveBeenCalledWith(42, {
       page: 0,
       size: 50,
       sort: 'title',
@@ -225,7 +261,7 @@ describe('useSeriesDetail', () => {
   })
 
   it('discards stale response when a reset supersedes an in-flight load', async () => {
-    const name = ref('Test')
+    const seriesId = ref(42)
     let resolveFirst!: (v: SeriesBooksPage) => void
     let resolveSecond!: (v: SeriesBooksPage) => void
     mockFetchSeriesBooks
@@ -242,7 +278,7 @@ describe('useSeriesDetail', () => {
           }),
       )
 
-    const { items, seriesInfo, load } = useSeriesDetail(name)
+    const { items, seriesInfo, load } = useSeriesDetail(seriesId)
 
     const firstLoad = load(true)
     const resetLoad = load(true)
@@ -252,7 +288,7 @@ describe('useSeriesDetail', () => {
       total: 1,
       page: 0,
       size: 50,
-      seriesInfo: { name: 'Fresh', bookCount: 1, readCount: 0, authors: [], possibleGaps: [] },
+      seriesInfo: { id: 42, name: 'Fresh', bookCount: 1, readCount: 0, authors: [], possibleGaps: [] },
     })
     await resetLoad
 
@@ -261,7 +297,7 @@ describe('useSeriesDetail', () => {
       total: 1,
       page: 0,
       size: 50,
-      seriesInfo: { name: 'Stale', bookCount: 999, readCount: 0, authors: [], possibleGaps: [] },
+      seriesInfo: { id: 42, name: 'Stale', bookCount: 999, readCount: 0, authors: [], possibleGaps: [] },
     })
     await firstLoad
 
@@ -271,7 +307,7 @@ describe('useSeriesDetail', () => {
   })
 
   it('discards stale error when superseded by newer request', async () => {
-    const name = ref('Test')
+    const seriesId = ref(42)
     let resolveSecond!: (v: SeriesBooksPage) => void
     mockFetchSeriesBooks
       .mockImplementationOnce(
@@ -287,7 +323,7 @@ describe('useSeriesDetail', () => {
           }),
       )
 
-    const { error, items, load } = useSeriesDetail(name)
+    const { error, items, load } = useSeriesDetail(seriesId)
 
     const firstLoad = load(true)
     const resetLoad = load(true)
@@ -297,7 +333,7 @@ describe('useSeriesDetail', () => {
       total: 1,
       page: 0,
       size: 50,
-      seriesInfo: { name: 'OK', bookCount: 1, readCount: 0, authors: [], possibleGaps: [] },
+      seriesInfo: { id: 42, name: 'OK', bookCount: 1, readCount: 0, authors: [], possibleGaps: [] },
     })
     await resetLoad
     await firstLoad

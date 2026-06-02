@@ -6,13 +6,14 @@ import type { ContentFilterRules } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookAuthors, bookMetadata, books, userBookStatus } from '../../db/schema';
+import { authors, bookAuthors, bookMetadata, books, bookSeries, userBookStatus } from '../../db/schema';
 import type { SeriesListSort, SortDirection } from './dto/list-series.dto';
 import type { SeriesBookSort } from './dto/list-series-books.dto';
 
 type Db = NodePgDatabase<typeof schema>;
 
 type SeriesSummaryRow = {
+  id: number;
   name: string;
   bookCount: number;
   readCount: number;
@@ -22,6 +23,7 @@ type SeriesSummaryRow = {
 };
 
 type SeriesDetailRow = {
+  id: number;
   name: string;
   bookCount: number;
   readCount: number;
@@ -32,10 +34,6 @@ type SeriesDetailRow = {
 @Injectable()
 export class SeriesRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
-
-  private normalizedSeriesName() {
-    return sql<string>`lower(btrim(${bookMetadata.seriesName}))`;
-  }
 
   private buildLibraryFilter(libraryIds: number[]): SQL {
     return inArray(books.libraryId, libraryIds);
@@ -65,16 +63,15 @@ export class SeriesRepository {
     author?: string;
     contentFilters?: ContentFilterRules;
   }): Promise<{ items: SeriesSummaryRow[]; total: number; page: number; size: number }> {
-    const normalized = this.normalizedSeriesName();
     const libraryFilter = this.buildLibraryFilter(params.libraryIds);
     const filterClauses = params.contentFilters ? buildContentFilterClauses(params.contentFilters, this.db) : [];
 
-    const conditions: SQL[] = [isNotNull(bookMetadata.seriesName), sql`btrim(${bookMetadata.seriesName}) != ''`, libraryFilter, ...filterClauses];
+    const conditions: SQL[] = [isNotNull(bookMetadata.seriesId), libraryFilter, ...filterClauses];
 
     if (params.q) {
       const qPattern = `%${this.escapeLikePattern(params.q)}%`;
       const authorNameMatch = this.buildAuthorNameMatchCondition(qPattern);
-      conditions.push(sql`(${ilike(bookMetadata.seriesName, qPattern)} OR ${authorNameMatch})`);
+      conditions.push(sql`(${ilike(bookSeries.name, qPattern)} OR ${authorNameMatch})`);
     }
 
     if (params.author) {
@@ -91,24 +88,25 @@ export class SeriesRepository {
       CASE WHEN count(distinct ${books.id}) = 0 THEN 0
       ELSE (count(distinct CASE WHEN ${userBookStatus.status} = 'read' THEN ${books.id} END)::float / count(distinct ${books.id})::float)
       END`;
-    const displayNameExpr = sql<string>`min(btrim(${bookMetadata.seriesName}))`;
+    const nameExpr = sql<string>`${bookSeries.name}`;
 
     const completionHaving = this.buildCompletionHaving(params.completionStatus, bookCountExpr, readCountExpr);
-
-    const sortExpr = this.buildSortExpression(params.sort, params.order, displayNameExpr, bookCountExpr, lastAddedExpr, readProgressExpr);
+    const sortExpr = this.buildSortExpression(params.sort, params.order, nameExpr, bookCountExpr, lastAddedExpr, readProgressExpr);
 
     const baseQuery = this.db
       .select({
-        name: displayNameExpr,
+        id: bookSeries.id,
+        name: bookSeries.name,
         bookCount: bookCountExpr,
         readCount: readCountExpr,
         lastAddedAt: lastAddedExpr,
       })
       .from(books)
       .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .innerJoin(bookSeries, eq(bookSeries.id, bookMetadata.seriesId))
       .leftJoin(userBookStatus, and(eq(userBookStatus.bookId, books.id), eq(userBookStatus.userId, params.userId)))
       .where(baseWhere)
-      .groupBy(normalized);
+      .groupBy(bookSeries.id, bookSeries.name);
 
     const countQuery = this.db
       .select({ total: sql<number>`count(*)::int` })
@@ -116,16 +114,18 @@ export class SeriesRepository {
 
     const dataQuery = this.db
       .select({
-        name: displayNameExpr,
+        id: bookSeries.id,
+        name: bookSeries.name,
         bookCount: bookCountExpr,
         readCount: readCountExpr,
         lastAddedAt: lastAddedExpr,
       })
       .from(books)
       .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .innerJoin(bookSeries, eq(bookSeries.id, bookMetadata.seriesId))
       .leftJoin(userBookStatus, and(eq(userBookStatus.bookId, books.id), eq(userBookStatus.userId, params.userId)))
       .where(baseWhere)
-      .groupBy(normalized)
+      .groupBy(bookSeries.id, bookSeries.name)
       .$dynamic();
 
     if (completionHaving) {
@@ -143,18 +143,19 @@ export class SeriesRepository {
       return { items: [], total, page: params.page, size: params.size };
     }
 
-    const seriesNames = seriesRows.map((r) => r.name);
+    const seriesIds = seriesRows.map((row) => row.id);
     const [authorData, coverData] = await Promise.all([
-      this.fetchAuthorsForSeries(seriesNames, params.libraryIds, params.contentFilters),
-      this.fetchCoverBookIds(seriesNames, params.libraryIds, params.contentFilters),
+      this.fetchAuthorsForSeries(seriesIds, params.libraryIds, params.contentFilters),
+      this.fetchCoverBookIds(seriesIds, params.libraryIds, params.contentFilters),
     ]);
 
     const items: SeriesSummaryRow[] = seriesRows.map((row) => ({
+      id: row.id,
       name: row.name,
       bookCount: row.bookCount,
       readCount: row.readCount,
-      authors: authorData.get(row.name.toLowerCase().trim()) ?? [],
-      coverBookIds: coverData.get(row.name.toLowerCase().trim()) ?? [],
+      authors: authorData.get(row.id) ?? [],
+      coverBookIds: coverData.get(row.id) ?? [],
       lastAddedAt: row.lastAddedAt,
     }));
 
@@ -162,7 +163,7 @@ export class SeriesRepository {
   }
 
   async findDetail(params: {
-    seriesName: string;
+    seriesId: number;
     userId: number;
     libraryIds: number[];
     contentFilters?: ContentFilterRules;
@@ -172,50 +173,45 @@ export class SeriesRepository {
 
     const rows = await this.db
       .select({
-        displayName: sql<string>`min(btrim(${bookMetadata.seriesName}))`,
+        id: bookSeries.id,
+        name: bookSeries.name,
         bookCount: sql<number>`count(distinct ${books.id})::int`,
         readCount: sql<number>`count(distinct CASE WHEN ${userBookStatus.status} = 'read' THEN ${books.id} END)::int`,
       })
       .from(books)
       .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .innerJoin(bookSeries, eq(bookSeries.id, bookMetadata.seriesId))
       .leftJoin(userBookStatus, and(eq(userBookStatus.bookId, books.id), eq(userBookStatus.userId, params.userId)))
-      .where(and(sql`lower(btrim(${bookMetadata.seriesName})) = lower(btrim(${params.seriesName}))`, libraryFilter, ...filterClauses))
-      .groupBy(this.normalizedSeriesName());
+      .where(and(eq(bookSeries.id, params.seriesId), libraryFilter, ...filterClauses))
+      .groupBy(bookSeries.id, bookSeries.name);
 
     if (rows.length === 0) return null;
 
     const row = rows[0];
-    const normalizedName = params.seriesName.toLowerCase().trim();
 
     const [authorsMap, indicesRows] = await Promise.all([
-      this.fetchAuthorsForSeries([row.displayName], params.libraryIds, params.contentFilters),
+      this.fetchAuthorsForSeries([params.seriesId], params.libraryIds, params.contentFilters),
       this.db
         .select({ idx: bookMetadata.seriesIndex })
         .from(books)
         .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-        .where(
-          and(
-            sql`lower(btrim(${bookMetadata.seriesName})) = lower(btrim(${params.seriesName}))`,
-            libraryFilter,
-            ...filterClauses,
-            isNotNull(bookMetadata.seriesIndex),
-          ),
-        ),
+        .where(and(eq(bookMetadata.seriesId, params.seriesId), libraryFilter, ...filterClauses, isNotNull(bookMetadata.seriesIndex))),
     ]);
 
     const indices = indicesRows.map((r) => r.idx!);
 
     return {
-      name: row.displayName,
+      id: row.id,
+      name: row.name,
       bookCount: row.bookCount,
       readCount: row.readCount,
-      authors: authorsMap.get(normalizedName) ?? [],
+      authors: authorsMap.get(params.seriesId) ?? [],
       indices,
     };
   }
 
   async findBookIds(params: {
-    seriesName: string;
+    seriesId: number;
     page: number;
     size: number;
     sort: SeriesBookSort;
@@ -224,9 +220,8 @@ export class SeriesRepository {
     contentFilters?: ContentFilterRules;
   }): Promise<{ bookIds: number[]; total: number }> {
     const libraryFilter = this.buildLibraryFilter(params.libraryIds);
-    const seriesMatch = sql`lower(btrim(${bookMetadata.seriesName})) = lower(btrim(${params.seriesName}))`;
     const filterClauses = params.contentFilters ? buildContentFilterClauses(params.contentFilters, this.db) : [];
-    const where = and(seriesMatch, libraryFilter, ...filterClauses)!;
+    const where = and(eq(bookMetadata.seriesId, params.seriesId), libraryFilter, ...filterClauses)!;
 
     const orderBy = this.buildBookSortExpression(params.sort, params.order);
 
@@ -246,79 +241,60 @@ export class SeriesRepository {
   }
 
   private async fetchAuthorsForSeries(
-    seriesNames: string[],
+    seriesIds: number[],
     libraryIds: number[],
     contentFilters?: ContentFilterRules,
-  ): Promise<Map<string, string[]>> {
-    if (seriesNames.length === 0) return new Map();
+  ): Promise<Map<number, string[]>> {
+    if (seriesIds.length === 0) return new Map();
 
-    const normalized = seriesNames.map((n) => n.toLowerCase().trim());
     const filterClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
     const rows = await this.db
       .select({
-        normalizedSeries: sql<string>`lower(btrim(${bookMetadata.seriesName}))`,
+        seriesId: bookMetadata.seriesId,
         authorName: authors.name,
       })
       .from(books)
       .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .innerJoin(bookAuthors, eq(bookAuthors.bookId, books.id))
       .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
-      .where(
-        and(
-          sql`lower(btrim(${bookMetadata.seriesName})) IN (${sql.join(
-            normalized.map((n) => sql`${n}`),
-            sql`, `,
-          )})`,
-          this.buildLibraryFilter(libraryIds),
-          ...filterClauses,
-        ),
-      )
-      .groupBy(sql`lower(btrim(${bookMetadata.seriesName}))`, authors.name);
+      .where(and(inArray(bookMetadata.seriesId, seriesIds), this.buildLibraryFilter(libraryIds), ...filterClauses))
+      .groupBy(bookMetadata.seriesId, authors.name);
 
-    const result = new Map<string, string[]>();
+    const result = new Map<number, string[]>();
     for (const row of rows) {
-      const key = row.normalizedSeries;
-      const list = result.get(key) ?? [];
+      if (row.seriesId == null) continue;
+      const list = result.get(row.seriesId) ?? [];
       list.push(row.authorName);
-      result.set(key, list);
+      result.set(row.seriesId, list);
     }
     return result;
   }
 
-  private async fetchCoverBookIds(seriesNames: string[], libraryIds: number[], contentFilters?: ContentFilterRules): Promise<Map<string, number[]>> {
-    if (seriesNames.length === 0) return new Map();
+  private async fetchCoverBookIds(seriesIds: number[], libraryIds: number[], contentFilters?: ContentFilterRules): Promise<Map<number, number[]>> {
+    if (seriesIds.length === 0) return new Map();
 
-    const normalized = seriesNames.map((n) => n.toLowerCase().trim());
     const filterClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
     const rows = await this.db
       .select({
-        normalizedSeries: sql<string>`lower(btrim(${bookMetadata.seriesName}))`,
+        seriesId: bookMetadata.seriesId,
         bookId: books.id,
         seriesIndex: bookMetadata.seriesIndex,
       })
       .from(books)
       .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .where(
-        and(
-          sql`lower(btrim(${bookMetadata.seriesName})) IN (${sql.join(
-            normalized.map((n) => sql`${n}`),
-            sql`, `,
-          )})`,
-          this.buildLibraryFilter(libraryIds),
-          ...filterClauses,
-          isNotNull(bookMetadata.coverSource),
-        ),
+        and(inArray(bookMetadata.seriesId, seriesIds), this.buildLibraryFilter(libraryIds), ...filterClauses, isNotNull(bookMetadata.coverSource)),
       )
-      .orderBy(sql`lower(btrim(${bookMetadata.seriesName}))`, asc(bookMetadata.seriesIndex), asc(books.addedAt));
+      .orderBy(bookMetadata.seriesId, asc(bookMetadata.seriesIndex), asc(books.addedAt));
 
-    const result = new Map<string, number[]>();
+    const result = new Map<number, number[]>();
     for (const row of rows) {
-      const key = row.normalizedSeries;
-      const list = result.get(key) ?? [];
+      if (row.seriesId == null) continue;
+      const list = result.get(row.seriesId) ?? [];
       if (list.length < 9) {
         list.push(row.bookId);
       }
-      result.set(key, list);
+      result.set(row.seriesId, list);
     }
     return result;
   }

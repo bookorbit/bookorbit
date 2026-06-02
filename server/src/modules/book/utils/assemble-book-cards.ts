@@ -18,6 +18,7 @@ type BookRow = {
   addedAt: Date;
   updatedAt?: Date;
   title: string | null;
+  seriesId?: number | null;
   seriesName: string | null;
   seriesIndex: number | null;
   publishedYear: number | null;
@@ -136,6 +137,7 @@ export function assembleBookCards(
       id: row.id,
       status: row.status,
       title: row.title ?? basename(row.folderPath),
+      seriesId: row.seriesId ?? null,
       seriesName: row.seriesName ?? null,
       seriesIndex: row.seriesIndex ?? null,
       authors: authorsByBook.get(row.id) ?? [],

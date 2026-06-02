@@ -2302,6 +2302,7 @@ export class BookService {
       publishedYear: meta?.publishedYear ?? null,
       language: meta?.language ?? null,
       pageCount: meta?.pageCount ?? null,
+      seriesId: meta?.seriesId ?? null,
       seriesName: meta?.seriesName ?? null,
       seriesIndex: meta?.seriesIndex ?? null,
       rating: personalRating,

@@ -9,6 +9,7 @@ import { appConfig, authConfig, dbConfig, emailConfig, fileWriteConfig, migratio
 import { validateEnv } from './config/env.validation';
 import { loggerConfig } from './common/logger.config';
 import { CommonModule } from './common/common.module';
+import { SeriesIdentityModule } from './common/series-identity.module';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { LibraryAccessGuard } from './common/guards/library-access.guard';
@@ -82,6 +83,7 @@ import { HardcoverModule } from './modules/hardcover/hardcover.module';
       ],
     }),
     DbModule,
+    SeriesIdentityModule,
     CommonModule,
     SeedModule,
     AuthModule,

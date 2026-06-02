@@ -97,8 +97,8 @@ function syncRouteQuery() {
   })
 }
 
-function openSeries(seriesName: string) {
-  void router.push({ name: 'series-detail', params: { seriesName }, query: { from: route.fullPath } })
+function openSeries(seriesId: number) {
+  void router.push({ name: 'series-detail', params: { seriesId }, query: { from: route.fullPath } })
 }
 
 function setSortField(field: SeriesListSort) {

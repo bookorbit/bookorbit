@@ -31,6 +31,7 @@ export interface MergeInput {
   targetId: number | string;
   sourceIds: (number | string)[];
   userId: number;
+  libraryIds?: number[];
 }
 
 export interface StrategyMergeResult {

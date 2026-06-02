@@ -158,5 +158,15 @@ export class UpdateLibraryDto {
 
   @IsOptional()
   @IsBoolean()
+  fileWriteAudioEnabled?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(LIBRARY_FILE_WRITE_MAX_SIZE_MB_MIN)
+  @Max(LIBRARY_FILE_WRITE_MAX_SIZE_MB_MAX)
+  fileWriteAudioMaxFileSizeMb?: number;
+
+  @IsOptional()
+  @IsBoolean()
   fileRenameEnabled?: boolean;
 }

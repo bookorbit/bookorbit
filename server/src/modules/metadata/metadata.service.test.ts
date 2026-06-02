@@ -1,5 +1,6 @@
 vi.mock('fs/promises', () => ({
   mkdir: vi.fn(),
+  readFile: vi.fn(),
   writeFile: vi.fn(),
   readdir: vi.fn().mockResolvedValue([]),
   rm: vi.fn(),
@@ -76,7 +77,7 @@ vi.mock('./extractors/audio.extractor', () => ({
   parseAudioDuration: vi.fn().mockImplementation(() => Promise.resolve(null)),
 }));
 
-import { mkdir, readdir, rm, writeFile } from 'fs/promises';
+import { mkdir, readFile, readdir, rm, writeFile } from 'fs/promises';
 import { Logger } from '@nestjs/common';
 
 import { authors, bookAuthors, bookGenres, bookMetadata, bookTags, genres, tags } from '../../db/schema';
@@ -91,6 +92,7 @@ import { METADATA_AUTHORS_REPLACED } from './metadata-events.service';
 import { MetadataService } from './metadata.service';
 
 const mockMkdir = mkdir as MockedFunction<typeof mkdir>;
+const mockReadFile = readFile as MockedFunction<typeof readFile>;
 const mockWriteFile = writeFile as MockedFunction<typeof writeFile>;
 const mockReaddir = readdir as MockedFunction<typeof readdir>;
 const mockRm = rm as MockedFunction<typeof rm>;
@@ -153,6 +155,7 @@ describe('MetadataService', () => {
     embedder.embedBook.mockResolvedValue(undefined);
 
     mockMkdir.mockResolvedValue(undefined);
+    mockReadFile.mockResolvedValue('');
     mockWriteFile.mockResolvedValue(undefined);
     mockReaddir.mockResolvedValue([]);
     mockRm.mockResolvedValue(undefined);
@@ -285,6 +288,33 @@ describe('MetadataService', () => {
     mockParsePdfFile.mockResolvedValueOnce(null);
     await expect(service.extractAndSave(2, '/tmp/book.pdf', 'pdf')).resolves.toBeUndefined();
     expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('extractAndSaveIfAvailable(opf) persists standalone sidecar OPF metadata', async () => {
+    const { db, updateSet } = makeDb();
+    const service = makeService(db);
+    const replaceAuthorsSpy = vi.spyOn(service, 'replaceAuthors').mockResolvedValue(undefined);
+
+    mockReadFile.mockResolvedValue(`
+      <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+          <dc:title>Sidecar Title</dc:title>
+          <dc:creator opf:role="aut">Sidecar Author</dc:creator>
+          <dc:identifier opf:scheme="GOOGLE">google-sidecar</dc:identifier>
+        </metadata>
+      </package>
+    `);
+
+    await expect(service.extractAndSaveIfAvailable(55, '/books/metadata.opf', 'opf')).resolves.toBe(true);
+
+    expect(updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Sidecar Title',
+        googleBooksId: 'google-sidecar',
+        updatedAt: expect.any(Date),
+      }),
+    );
+    expect(replaceAuthorsSpy).toHaveBeenCalledWith(55, [{ name: 'Sidecar Author', sortName: null }]);
   });
 
   it('refreshCoverForBook returns false and avoids db writes when extractor reports no cover', async () => {

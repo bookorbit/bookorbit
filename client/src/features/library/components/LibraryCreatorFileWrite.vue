@@ -9,6 +9,8 @@ const props = defineProps<{
   fileWritePdfMaxFileSizeMb: number
   fileWriteCbxEnabled: boolean
   fileWriteCbxMaxFileSizeMb: number
+  fileWriteAudioEnabled: boolean
+  fileWriteAudioMaxFileSizeMb: number
 }>()
 
 const emit = defineEmits<{
@@ -21,6 +23,8 @@ const emit = defineEmits<{
   'update:fileWritePdfMaxFileSizeMb': [value: number]
   'update:fileWriteCbxEnabled': [value: boolean]
   'update:fileWriteCbxMaxFileSizeMb': [value: number]
+  'update:fileWriteAudioEnabled': [value: boolean]
+  'update:fileWriteAudioMaxFileSizeMb': [value: number]
 }>()
 
 function handleFileRenameToggle() {
@@ -32,7 +36,11 @@ function handleFileWriteToggle() {
 }
 
 function handleWriteCoverToggle() {
-  emit('update:fileWriteWriteCover', !props.fileWriteWriteCover)
+  const next = !props.fileWriteWriteCover
+  emit('update:fileWriteWriteCover', next)
+  if (!next && props.fileWriteAudioEnabled) {
+    emit('update:fileWriteAudioEnabled', false)
+  }
 }
 
 function handleEpubToggle() {
@@ -47,12 +55,17 @@ function handleCbxToggle() {
   emit('update:fileWriteCbxEnabled', !props.fileWriteCbxEnabled)
 }
 
-function onMaxSizeInput(field: 'epub' | 'pdf' | 'cbx', e: Event) {
+function handleAudioToggle() {
+  emit('update:fileWriteAudioEnabled', !props.fileWriteAudioEnabled)
+}
+
+function onMaxSizeInput(field: 'epub' | 'pdf' | 'cbx' | 'audio', e: Event) {
   const val = parseInt((e.target as HTMLInputElement).value, 10)
   if (!isNaN(val) && val >= 1) {
     if (field === 'epub') emit('update:fileWriteEpubMaxFileSizeMb', val)
     else if (field === 'pdf') emit('update:fileWritePdfMaxFileSizeMb', val)
-    else emit('update:fileWriteCbxMaxFileSizeMb', val)
+    else if (field === 'cbx') emit('update:fileWriteCbxMaxFileSizeMb', val)
+    else emit('update:fileWriteAudioMaxFileSizeMb', val)
   }
 }
 
@@ -66,6 +79,10 @@ function onPdfMaxSizeInput(e: Event) {
 
 function onCbxMaxSizeInput(e: Event) {
   onMaxSizeInput('cbx', e)
+}
+
+function onAudioMaxSizeInput(e: Event) {
+  onMaxSizeInput('audio', e)
 }
 </script>
 
@@ -115,7 +132,7 @@ function onCbxMaxSizeInput(e: Event) {
       <div class="flex items-center justify-between">
         <div>
           <p class="text-sm font-medium text-foreground">Include cover image</p>
-          <p class="text-xs text-muted-foreground mt-0.5">Writes the stored cover back into the file (EPUB only).</p>
+          <p class="text-xs text-muted-foreground mt-0.5">Writes the stored cover back into supported file formats.</p>
         </div>
         <button
           class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none"
@@ -225,6 +242,38 @@ function onCbxMaxSizeInput(e: Event) {
             max="10000"
             class="w-24 rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
             @input="onCbxMaxSizeInput"
+          />
+        </div>
+      </div>
+
+      <div v-if="fileWriteWriteCover" class="space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-foreground">Audio</p>
+            <p class="text-xs text-muted-foreground mt-0.5">Embeds the stored cover into M4B, M4A, MP3, and FLAC files.</p>
+          </div>
+          <button
+            class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none"
+            :class="fileWriteAudioEnabled ? 'bg-primary' : 'bg-muted-foreground/30'"
+            role="switch"
+            :aria-checked="fileWriteAudioEnabled"
+            @click="handleAudioToggle"
+          >
+            <span
+              class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+              :class="fileWriteAudioEnabled ? 'translate-x-4' : 'translate-x-0'"
+            />
+          </button>
+        </div>
+        <div v-if="fileWriteAudioEnabled" class="flex items-center justify-between gap-4">
+          <p class="text-xs text-muted-foreground">Max file size (MB)</p>
+          <input
+            type="number"
+            :value="fileWriteAudioMaxFileSizeMb"
+            min="1"
+            max="10000"
+            class="w-24 rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            @input="onAudioMaxSizeInput"
           />
         </div>
       </div>

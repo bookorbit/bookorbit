@@ -33,10 +33,9 @@ export async function fetchSeries(params: ListSeriesParams): Promise<SeriesPage>
   return res.json()
 }
 
-export async function fetchSeriesBooks(seriesName: string, params: ListSeriesBooksParams): Promise<SeriesBooksPage> {
+export async function fetchSeriesBooks(seriesId: number, params: ListSeriesBooksParams): Promise<SeriesBooksPage> {
   const qs = toQuery(params)
-  const encoded = encodeURIComponent(seriesName)
-  const res = await api(`/api/v1/series/${encoded}/books?${qs}`)
+  const res = await api(`/api/v1/series/${seriesId}/books?${qs}`)
   if (!res.ok) throw new Error(`Failed to fetch series books: ${res.status}`)
   return res.json()
 }

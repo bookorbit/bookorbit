@@ -15,6 +15,7 @@ import type {
   BulkDeleteResult,
 } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
+import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { FileWriteService } from '../file-write/file-write.service';
 import { LibraryService } from '../library/library.service';
 import { EntityManagerRepository } from './entity-manager.repository';
@@ -32,6 +33,11 @@ const BOOK_TITLES_LIMIT = 5;
 const DEFAULT_MIN_SIMILARITY = 0.5;
 const DEFAULT_SCAN_PAGE = 1;
 const DEFAULT_SCAN_PAGE_SIZE = 20;
+
+function logErrorFields(err: unknown): { errorClass: string; error: string } {
+  const error = err instanceof Error ? err : new Error(String(err));
+  return { errorClass: error.name, error: sanitizeLogValue(error.message) };
+}
 
 @Injectable()
 export class EntityManagerService {
@@ -144,8 +150,9 @@ export class EntityManagerService {
         pageSize,
       };
     } catch (err) {
+      const error = logErrorFields(err);
       this.logger.warn(
-        `[${event}] [fail] userId=${user.id} entityType=${entityType} durationMs=${Date.now() - startedAt} errorClass=${(err as Error).name} error="${(err as Error).message}" - duplicate scan failed`,
+        `[${event}] [fail] userId=${user.id} entityType=${entityType} durationMs=${Date.now() - startedAt} errorClass=${error.errorClass} error="${error.error}" - duplicate scan failed`,
       );
       throw err;
     }
@@ -229,7 +236,8 @@ export class EntityManagerService {
 
     try {
       const strategy = this.getStrategy(entityType);
-      const result = await strategy.merge({ targetId, sourceIds, userId: user.id });
+      const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+      const result = await strategy.merge({ targetId, sourceIds, userId: user.id, libraryIds });
 
       const nonInlineSourceIds: number[] = [];
       for (const sourceId of sourceIds) {
@@ -261,8 +269,9 @@ export class EntityManagerService {
         fieldsResolved: result.fieldsResolved,
       };
     } catch (err) {
+      const error = logErrorFields(err);
       this.logger.warn(
-        `[${event}] [fail] userId=${user.id} entityType=${entityType} durationMs=${Date.now() - startedAt} errorClass=${(err as Error).name} error="${(err as Error).message}" - merge failed`,
+        `[${event}] [fail] userId=${user.id} entityType=${entityType} durationMs=${Date.now() - startedAt} errorClass=${error.errorClass} error="${error.error}" - merge failed`,
       );
       throw err;
     }
@@ -295,8 +304,9 @@ export class EntityManagerService {
         mergedEntityId: result.mergedEntityId,
       };
     } catch (err) {
+      const error = logErrorFields(err);
       this.logger.warn(
-        `[${event}] [fail] userId=${user.id} entityType=${entityType} durationMs=${Date.now() - startedAt} errorClass=${(err as Error).name} error="${(err as Error).message}" - rename failed`,
+        `[${event}] [fail] userId=${user.id} entityType=${entityType} durationMs=${Date.now() - startedAt} errorClass=${error.errorClass} error="${error.error}" - rename failed`,
       );
       throw err;
     }
@@ -335,8 +345,9 @@ export class EntityManagerService {
 
       return { entityId, name: result.name, affectedBookCount: result.affectedBookIds.length, mode };
     } catch (err) {
+      const error = logErrorFields(err);
       this.logger.warn(
-        `[${event}] [fail] userId=${user.id} entityType=${entityType} durationMs=${Date.now() - startedAt} errorClass=${(err as Error).name} error="${(err as Error).message}" - delete failed`,
+        `[${event}] [fail] userId=${user.id} entityType=${entityType} durationMs=${Date.now() - startedAt} errorClass=${error.errorClass} error="${error.error}" - delete failed`,
       );
       throw err;
     }
@@ -398,8 +409,9 @@ export class EntityManagerService {
         affectedBookCount: result.affectedBookIds.length,
       };
     } catch (err) {
+      const error = logErrorFields(err);
       this.logger.warn(
-        `[${event}] [fail] userId=${user.id} entityType=${entityType} durationMs=${Date.now() - startedAt} errorClass=${(err as Error).name} error="${(err as Error).message}" - split failed`,
+        `[${event}] [fail] userId=${user.id} entityType=${entityType} durationMs=${Date.now() - startedAt} errorClass=${error.errorClass} error="${error.error}" - split failed`,
       );
       throw err;
     }

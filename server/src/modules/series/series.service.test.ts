@@ -42,6 +42,7 @@ describe('SeriesService', () => {
       seriesRepo.findPage.mockResolvedValue({
         items: [
           {
+            id: 42,
             name: 'Harry Potter',
             bookCount: 7,
             readCount: 3,
@@ -88,7 +89,7 @@ describe('SeriesService', () => {
 
     it('converts null lastAddedAt to null', async () => {
       seriesRepo.findPage.mockResolvedValue({
-        items: [{ name: 'Test', bookCount: 1, readCount: 0, authors: [], coverBookIds: [], lastAddedAt: null }],
+        items: [{ id: 42, name: 'Test', bookCount: 1, readCount: 0, authors: [], coverBookIds: [], lastAddedAt: null }],
         total: 1,
         page: 0,
         size: 50,
@@ -102,17 +103,18 @@ describe('SeriesService', () => {
   describe('findBooks', () => {
     it('throws NotFoundException when no libraries accessible', async () => {
       libraryService.findAll.mockResolvedValue([]);
-      await expect(service.findBooks(reqUser(), 'Harry Potter', {})).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.findBooks(reqUser(), 42, {})).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('throws NotFoundException when series not found', async () => {
       seriesRepo.findDetail.mockResolvedValue(null);
       seriesRepo.findBookIds.mockResolvedValue({ bookIds: [], total: 0 });
-      await expect(service.findBooks(reqUser(), 'Nonexistent', {})).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.findBooks(reqUser(), 42, {})).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('returns books with series info and gap detection', async () => {
       seriesRepo.findDetail.mockResolvedValue({
+        id: 42,
         name: 'Dune',
         bookCount: 3,
         readCount: 1,
@@ -173,7 +175,7 @@ describe('SeriesService', () => {
         total: 3,
       });
 
-      const result = await service.findBooks(reqUser(), 'Dune', {});
+      const result = await service.findBooks(reqUser(), 42, {});
 
       expect(result.seriesInfo.possibleGaps).toEqual([3]);
       expect(result.seriesInfo.authors).toEqual(['Frank Herbert']);
@@ -182,7 +184,7 @@ describe('SeriesService', () => {
     });
 
     it('preserves book order from repository', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ name: 'Test', bookCount: 2, readCount: 0, authors: [], indices: [1, 2] });
+      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'Test', bookCount: 2, readCount: 0, authors: [], indices: [1, 2] });
       seriesRepo.findBookIds.mockResolvedValue({ bookIds: [20, 10], total: 2 });
       bookReadService.findCardsByBookIds.mockResolvedValue({
         rows: [
@@ -223,22 +225,22 @@ describe('SeriesService', () => {
         total: 2,
       });
 
-      const result = await service.findBooks(reqUser(), 'Test', {});
+      const result = await service.findBooks(reqUser(), 42, {});
       expect(result.items[0]!.id).toBe(20);
       expect(result.items[1]!.id).toBe(10);
     });
 
     it('handles empty book list gracefully', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ name: 'Empty', bookCount: 0, readCount: 0, authors: [], indices: [] });
+      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'Empty', bookCount: 0, readCount: 0, authors: [], indices: [] });
       seriesRepo.findBookIds.mockResolvedValue({ bookIds: [], total: 0 });
 
-      const result = await service.findBooks(reqUser(), 'Empty', {});
+      const result = await service.findBooks(reqUser(), 42, {});
       expect(result.items).toEqual([]);
       expect(result.seriesInfo.possibleGaps).toEqual([]);
     });
 
     it('rejects deep pagination', async () => {
-      await expect(service.findBooks(reqUser(), 'Test', { page: 10000, size: 100 })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.findBooks(reqUser(), 42, { page: 10000, size: 100 })).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 
@@ -260,20 +262,20 @@ describe('SeriesService', () => {
     });
 
     it('passes contentFilters to findDetail and findBookIds for non-superuser', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ name: 'Dune', bookCount: 0, readCount: 0, authors: [], indices: [] });
+      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'Dune', bookCount: 0, readCount: 0, authors: [], indices: [] });
       seriesRepo.findBookIds.mockResolvedValue({ bookIds: [], total: 0 });
 
-      await service.findBooks({ ...reqUser(), contentFilters: EMPTY_CONTENT_FILTER_RULES }, 'Dune', {});
+      await service.findBooks({ ...reqUser(), contentFilters: EMPTY_CONTENT_FILTER_RULES }, 42, {});
 
       expect(seriesRepo.findDetail).toHaveBeenCalledWith(expect.objectContaining({ contentFilters: EMPTY_CONTENT_FILTER_RULES }));
       expect(seriesRepo.findBookIds).toHaveBeenCalledWith(expect.objectContaining({ contentFilters: EMPTY_CONTENT_FILTER_RULES }));
     });
 
     it('passes undefined to findDetail and findBookIds for superuser', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ name: 'Dune', bookCount: 0, readCount: 0, authors: [], indices: [] });
+      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'Dune', bookCount: 0, readCount: 0, authors: [], indices: [] });
       seriesRepo.findBookIds.mockResolvedValue({ bookIds: [], total: 0 });
 
-      await service.findBooks({ ...reqUser(7, true), contentFilters: EMPTY_CONTENT_FILTER_RULES }, 'Dune', {});
+      await service.findBooks({ ...reqUser(7, true), contentFilters: EMPTY_CONTENT_FILTER_RULES }, 42, {});
 
       expect(seriesRepo.findDetail).toHaveBeenCalledWith(expect.objectContaining({ contentFilters: undefined }));
       expect(seriesRepo.findBookIds).toHaveBeenCalledWith(expect.objectContaining({ contentFilters: undefined }));
@@ -284,10 +286,10 @@ describe('SeriesService', () => {
     it('returns empty state when series exists in another library', async () => {
       seriesRepo.findDetail
         .mockResolvedValueOnce(null) // first call with scoped library [2]
-        .mockResolvedValueOnce({ name: 'Dune', bookCount: 5, readCount: 2, authors: ['Frank Herbert'], indices: [1, 2, 3, 4, 5] }); // second call with all libraries [1, 2]
+        .mockResolvedValueOnce({ id: 42, name: 'Dune', bookCount: 5, readCount: 2, authors: ['Frank Herbert'], indices: [1, 2, 3, 4, 5] }); // second call with all libraries [1, 2]
       seriesRepo.findBookIds.mockResolvedValue({ bookIds: [], total: 0 });
 
-      const result = await service.findBooks(reqUser(), 'Dune', { libraryId: 2 });
+      const result = await service.findBooks(reqUser(), 42, { libraryId: 2 });
 
       expect(result.items).toEqual([]);
       expect(result.total).toBe(0);
@@ -301,14 +303,14 @@ describe('SeriesService', () => {
       seriesRepo.findDetail.mockResolvedValue(null);
       seriesRepo.findBookIds.mockResolvedValue({ bookIds: [], total: 0 });
 
-      await expect(service.findBooks(reqUser(), 'Nonexistent', { libraryId: 1 })).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.findBooks(reqUser(), 42, { libraryId: 1 })).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('throws 404 when no library filter and series not found', async () => {
       seriesRepo.findDetail.mockResolvedValue(null);
       seriesRepo.findBookIds.mockResolvedValue({ bookIds: [], total: 0 });
 
-      await expect(service.findBooks(reqUser(), 'Nonexistent', {})).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.findBooks(reqUser(), 42, {})).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
@@ -318,32 +320,32 @@ describe('SeriesService', () => {
     });
 
     it('returns empty gaps when all indices are non-integer', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ name: 'S', bookCount: 3, readCount: 0, authors: [], indices: [0.5, 1.5, 2.5] });
-      const result = await service.findBooks(reqUser(), 'S', {});
+      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 3, readCount: 0, authors: [], indices: [0.5, 1.5, 2.5] });
+      const result = await service.findBooks(reqUser(), 42, {});
       expect(result.seriesInfo.possibleGaps).toEqual([]);
     });
 
     it('returns empty gaps when min index < 1', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ name: 'S', bookCount: 2, readCount: 0, authors: [], indices: [0, 5] });
-      const result = await service.findBooks(reqUser(), 'S', {});
+      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 2, readCount: 0, authors: [], indices: [0, 5] });
+      const result = await service.findBooks(reqUser(), 42, {});
       expect(result.seriesInfo.possibleGaps).toEqual([]);
     });
 
     it('returns empty gaps when max index > 10000', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ name: 'S', bookCount: 2, readCount: 0, authors: [], indices: [1, 10001] });
-      const result = await service.findBooks(reqUser(), 'S', {});
+      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 2, readCount: 0, authors: [], indices: [1, 10001] });
+      const result = await service.findBooks(reqUser(), 42, {});
       expect(result.seriesInfo.possibleGaps).toEqual([]);
     });
 
     it('handles duplicate indices', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ name: 'S', bookCount: 3, readCount: 0, authors: [], indices: [1, 1, 3] });
-      const result = await service.findBooks(reqUser(), 'S', {});
+      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 3, readCount: 0, authors: [], indices: [1, 1, 3] });
+      const result = await service.findBooks(reqUser(), 42, {});
       expect(result.seriesInfo.possibleGaps).toEqual([2]);
     });
 
     it('handles empty indices array', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ name: 'S', bookCount: 0, readCount: 0, authors: [], indices: [] });
-      const result = await service.findBooks(reqUser(), 'S', {});
+      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 0, readCount: 0, authors: [], indices: [] });
+      const result = await service.findBooks(reqUser(), 42, {});
       expect(result.seriesInfo.possibleGaps).toEqual([]);
     });
   });

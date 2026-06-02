@@ -1,9 +1,9 @@
 export type EntityType = "author" | "genre" | "tag" | "narrator" | "publisher" | "language" | "series";
-export type FirstClassEntityType = "author" | "genre" | "tag" | "narrator";
-export type InlineEntityType = "publisher" | "language" | "series";
+export type FirstClassEntityType = "author" | "genre" | "tag" | "narrator" | "series";
+export type InlineEntityType = "publisher" | "language";
 
-export const FIRST_CLASS_ENTITY_TYPES: readonly FirstClassEntityType[] = ["author", "genre", "tag", "narrator"] as const;
-export const INLINE_ENTITY_TYPES: readonly InlineEntityType[] = ["publisher", "language", "series"] as const;
+export const FIRST_CLASS_ENTITY_TYPES: readonly FirstClassEntityType[] = ["author", "genre", "tag", "narrator", "series"] as const;
+export const INLINE_ENTITY_TYPES: readonly InlineEntityType[] = ["publisher", "language"] as const;
 export const ALL_ENTITY_TYPES: readonly EntityType[] = [...FIRST_CLASS_ENTITY_TYPES, ...INLINE_ENTITY_TYPES] as const;
 
 export interface EntityTypeCapabilities {

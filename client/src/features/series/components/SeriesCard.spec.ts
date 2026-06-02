@@ -18,6 +18,7 @@ const BookCoverArtworkStub = defineComponent({
 
 function makeSeries(overrides: Partial<SeriesSummary> = {}): SeriesSummary {
   return {
+    id: 42,
     name: 'Harry Potter Audio',
     bookCount: 7,
     readCount: 2,
@@ -56,7 +57,7 @@ describe('SeriesCard', () => {
 
     await wrapper.get('.group.flex.h-full.cursor-pointer.flex-col').trigger('click')
 
-    expect(wrapper.emitted('open')).toEqual([['Harry Potter Audio']])
+    expect(wrapper.emitted('open')).toEqual([[42]])
     expect(wrapper.text()).toContain('A1, A2 +1')
   })
 

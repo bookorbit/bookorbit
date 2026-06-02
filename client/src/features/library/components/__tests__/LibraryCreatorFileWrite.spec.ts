@@ -16,6 +16,8 @@ describe('LibraryCreatorFileWrite', () => {
         fileWritePdfMaxFileSizeMb: 100,
         fileWriteCbxEnabled: false,
         fileWriteCbxMaxFileSizeMb: 500,
+        fileWriteAudioEnabled: false,
+        fileWriteAudioMaxFileSizeMb: 500,
         ...props,
       },
     })
@@ -44,28 +46,59 @@ describe('LibraryCreatorFileWrite', () => {
       fileWritePdfMaxFileSizeMb: 20,
       fileWriteCbxEnabled: true,
       fileWriteCbxMaxFileSizeMb: 30,
+      fileWriteAudioEnabled: true,
+      fileWriteAudioMaxFileSizeMb: 40,
     })
 
     const switches = wrapper.findAll('[role="switch"]')
-    expect(switches).toHaveLength(6)
+    expect(switches).toHaveLength(7)
     await switches[1]!.trigger('click')
     await switches[2]!.trigger('click')
     await switches[3]!.trigger('click')
     await switches[4]!.trigger('click')
     await switches[5]!.trigger('click')
+    await switches[6]!.trigger('click')
 
     const inputs = wrapper.findAll('input[type="number"]')
-    expect(inputs).toHaveLength(3)
+    expect(inputs).toHaveLength(4)
     await inputs[0]!.setValue('15')
     await inputs[1]!.setValue('25')
     await inputs[2]!.setValue('35')
+    await inputs[3]!.setValue('45')
     expect(wrapper.emitted('update:fileWriteEnabled')).toEqual([[false]])
     expect(wrapper.emitted('update:fileWriteWriteCover')).toEqual([[false]])
     expect(wrapper.emitted('update:fileWriteEpubEnabled')).toEqual([[false]])
     expect(wrapper.emitted('update:fileWritePdfEnabled')).toEqual([[false]])
     expect(wrapper.emitted('update:fileWriteCbxEnabled')).toEqual([[false]])
+    expect(wrapper.emitted('update:fileWriteAudioEnabled')).toEqual([[false], [false]])
     expect(wrapper.emitted('update:fileWriteEpubMaxFileSizeMb')).toEqual([[15]])
     expect(wrapper.emitted('update:fileWritePdfMaxFileSizeMb')).toEqual([[25]])
     expect(wrapper.emitted('update:fileWriteCbxMaxFileSizeMb')).toEqual([[35]])
+    expect(wrapper.emitted('update:fileWriteAudioMaxFileSizeMb')).toEqual([[45]])
+  })
+
+  it('renders audio controls only when file write details and cover writing are enabled', () => {
+    const hidden = mountComponent({ fileWriteEnabled: false, fileWriteAudioEnabled: true })
+    expect(hidden.text()).not.toContain('Audio')
+
+    const coverDisabled = mountComponent({ fileWriteEnabled: true, fileWriteWriteCover: false, fileWriteAudioEnabled: true })
+    expect(coverDisabled.text()).not.toContain('Audio')
+
+    const visible = mountComponent({ fileWriteEnabled: true, fileWriteWriteCover: true, fileWriteAudioEnabled: true })
+    expect(visible.text()).toContain('Audio')
+    expect(visible.text()).toContain('M4B, M4A, MP3, and FLAC')
+  })
+
+  it('disables audio embedding when cover writing is turned off', async () => {
+    const wrapper = mountComponent({
+      fileWriteEnabled: true,
+      fileWriteWriteCover: true,
+      fileWriteAudioEnabled: true,
+    })
+
+    await wrapper.findAll('[role="switch"]')[2]!.trigger('click')
+
+    expect(wrapper.emitted('update:fileWriteWriteCover')).toEqual([[false]])
+    expect(wrapper.emitted('update:fileWriteAudioEnabled')).toEqual([[false]])
   })
 })

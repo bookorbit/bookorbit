@@ -143,7 +143,7 @@ function getChipsActionFn(colId: ColumnId): ((chip: string) => void) | undefined
 
 function getTextCellOpenLink(book: BookCard, colId: ColumnId): string | null {
   if (colId === 'title') return `/book/${book.id}`
-  if (colId === 'seriesName' && book.seriesName) return `/series/${encodeURIComponent(book.seriesName)}`
+  if (colId === 'seriesName' && book.seriesId != null) return `/series/${book.seriesId}`
   return null
 }
 
@@ -513,7 +513,7 @@ function handleRowClick(book: BookCard, e: MouseEvent) {
     return
   }
   if (book.collapsedSeries) {
-    router.push({ name: 'series-detail', params: { seriesName: book.seriesName ?? '' } })
+    if (book.seriesId != null) router.push({ name: 'series-detail', params: { seriesId: book.seriesId } })
   }
 }
 

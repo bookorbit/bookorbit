@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, nextTick, reactive, ref, type PropType } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
-import type { BookCard, SeriesDetail } from '@bookorbit/types'
+import type { BookCard, SeriesBooksPage, SeriesDetail } from '@bookorbit/types'
 import SeriesDetailView from './SeriesDetailView.vue'
 
 type ViewMode = 'grid' | 'list' | 'table'
@@ -14,7 +14,7 @@ class MockIntersectionObserver {
 }
 
 const mocks = vi.hoisted(() => ({
-  route: null as unknown as { params: { seriesName: string }; query: Record<string, unknown> },
+  route: null as unknown as { params: { seriesId: string }; query: Record<string, unknown> },
   routerPush: vi.fn<(to: unknown) => Promise<void>>(),
   fetchLibraries: vi.fn<() => Promise<void>>(),
   setBookContext: vi.fn<(ids: number[], total: number) => void>(),
@@ -116,6 +116,7 @@ function makeBook(overrides: Partial<BookCard> = {}): BookCard {
     status: 'present',
     title: 'Series Book',
     authors: ['Author'],
+    seriesId: 42,
     seriesName: 'The Series',
     seriesIndex: 1,
     files: [],
@@ -143,6 +144,7 @@ function makeBook(overrides: Partial<BookCard> = {}): BookCard {
 
 function makeSeriesInfo(): SeriesDetail {
   return {
+    id: 42,
     name: 'The Series',
     bookCount: 1,
     readCount: 0,
@@ -228,7 +230,7 @@ function mountView(mode: ViewMode) {
 describe('SeriesDetailView', () => {
   beforeEach(() => {
     mocks.route = reactive({
-      params: { seriesName: 'The%20Series' },
+      params: { seriesId: '42' },
       query: {},
     })
 
@@ -343,5 +345,33 @@ describe('SeriesDetailView', () => {
     await nextTick()
     const secondStyle = wrapper.get('[data-testid="lead-cover-artwork"]').element.parentElement?.getAttribute('style') ?? ''
     expect(secondStyle).toBe(style)
+  })
+
+  it('ignores stale lead preview responses after route id becomes invalid', async () => {
+    let resolveLeadPreview!: (value: SeriesBooksPage) => void
+    mocks.fetchSeriesBooks.mockImplementationOnce(
+      () =>
+        new Promise<SeriesBooksPage>((resolve) => {
+          resolveLeadPreview = resolve
+        }),
+    )
+
+    const wrapper = mountView('grid')
+    await nextTick()
+
+    mocks.route.params.seriesId = 'invalid'
+    await nextTick()
+
+    resolveLeadPreview({
+      items: [makeBook({ id: 7, seriesIndex: 1, hasCover: true })],
+      total: 1,
+      page: 0,
+      size: 8,
+      seriesInfo: makeSeriesInfo(),
+    })
+    await flushPromises()
+
+    expect(mocks.api).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="lead-cover-artwork"]').exists()).toBe(false)
   })
 })

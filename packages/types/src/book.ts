@@ -35,6 +35,7 @@ export type BookCard = {
   status: string;
   title: string | null;
   authors: string[];
+  seriesId?: number | null;
   seriesName: string | null;
   seriesIndex: number | null;
   files: BookFileRef[];
@@ -95,6 +96,7 @@ export type BookDetail = {
   publishedYear: number | null;
   language: string | null;
   pageCount: number | null;
+  seriesId?: number | null;
   seriesName: string | null;
   seriesIndex: number | null;
   rating: number | null;

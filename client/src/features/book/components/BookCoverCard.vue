@@ -200,9 +200,8 @@ function openBookDetails() {
 }
 
 function openSeriesDetails() {
-  const seriesName = props.book.seriesName?.trim()
-  if (!seriesName) return
-  void router.push({ name: 'series-detail', params: { seriesName }, query: { from: route.fullPath } })
+  if (props.book.seriesId == null) return
+  void router.push({ name: 'series-detail', params: { seriesId: props.book.seriesId }, query: { from: route.fullPath } })
 }
 
 async function openAuthorDetails() {

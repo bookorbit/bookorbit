@@ -133,7 +133,8 @@ export const makeBook = async (file) => {
       book = await new EPUB(loader).init()
     }
   } else if (await isPDF(file)) {
-    const { makePDF } = await import('./pdf.js')
+    const pdfModule = './pdf.js'
+    const { makePDF } = await import(pdfModule)
     book = await makePDF(file)
   } else {
     const { isMOBI, MOBI } = await import('./mobi.js')
@@ -536,11 +537,16 @@ export class View extends HTMLElement {
 
   async goTo(target) {
     const resolved = this.resolveNavigation(target)
-    const hasContent = () => (this.renderer.getContents?.()?.length ?? 0) > 0
+    const hasContentFor = (nextResolved) => {
+      const contents = this.renderer.getContents?.() ?? []
+      if (!contents.length) return false
+      if (typeof nextResolved?.index !== 'number') return true
+      return contents.some((content) => content?.index === nextResolved.index)
+    }
     const tryGoTo = async (nextResolved) => {
       try {
         await this.renderer.goTo(nextResolved)
-        return hasContent()
+        return hasContentFor(nextResolved)
       } catch (e) {
         console.warn(e)
         return false

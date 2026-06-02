@@ -28,7 +28,7 @@ function makeService() {
     getTargetBookData: vi.fn(),
     findAnnCandidates: vi.fn(),
     getCandidateMetadata: vi.fn(),
-    getSeriesName: vi.fn(),
+    getSeriesIdentity: vi.fn(),
     findSeriesBooks: vi.fn(),
     findAuthorBooks: vi.fn(),
   };
@@ -81,7 +81,7 @@ describe('RecommendationService', () => {
     recRepo.getTargetBookData.mockResolvedValue(null);
     embedder.embedBook.mockResolvedValue([0.4, 0.6]);
     libraryService.findAll.mockResolvedValue([{ id: 7 }, { id: 9 }]);
-    recRepo.findAnnCandidates.mockResolvedValue([{ bookId: 91, cosineSim: 0.78, seriesName: null, rating: null }]);
+    recRepo.findAnnCandidates.mockResolvedValue([{ bookId: 91, cosineSim: 0.78, seriesId: null, seriesName: null, rating: null }]);
     recRepo.getCandidateMetadata.mockResolvedValue([{ bookId: 91, authorNames: [], genreTagNames: [] }]);
     bookRepo.findRecommendationTitlesByBookIds.mockResolvedValue([
       { id: 91, title: 'Fallback Match', hasCover: false, authors: [], isAudiobook: false },
@@ -100,6 +100,7 @@ describe('RecommendationService', () => {
     bookRepo.findLibraryIdByBookId.mockResolvedValue(3);
     recRepo.getTargetBookData.mockResolvedValue({
       embedding: null,
+      seriesId: null,
       seriesName: null,
       rating: null,
       authorNames: [],
@@ -128,14 +129,15 @@ describe('RecommendationService', () => {
     bookRepo.findLibraryIdByBookId.mockResolvedValue(9);
     recRepo.getTargetBookData.mockResolvedValue({
       embedding: [0.1, 0.2],
+      seriesId: 45,
       seriesName: 'Dune Saga',
       rating: 4,
       authorNames: ['Frank Herbert'],
       genreTagNames: ['Sci-Fi', 'Classic'],
     });
     recRepo.findAnnCandidates.mockResolvedValue([
-      { bookId: 100, cosineSim: 1.5, seriesName: ' dune saga ', rating: 9 },
-      { bookId: 200, cosineSim: -2, seriesName: 'Other', rating: 4 },
+      { bookId: 100, cosineSim: 1.5, seriesId: 45, seriesName: ' dune saga ', rating: 9 },
+      { bookId: 200, cosineSim: -2, seriesId: 99, seriesName: 'Other', rating: 4 },
     ]);
     recRepo.getCandidateMetadata.mockResolvedValue([
       { bookId: 100, authorNames: ['Frank Herbert'], genreTagNames: ['Sci-Fi'] },
@@ -159,14 +161,15 @@ describe('RecommendationService', () => {
     bookRepo.findLibraryIdByBookId.mockResolvedValue(13);
     recRepo.getTargetBookData.mockResolvedValue({
       embedding: [0.4, 0.2],
+      seriesId: null,
       seriesName: null,
       rating: null,
       authorNames: [' Frank Herbert '],
       genreTagNames: [' Sci-Fi '],
     });
     recRepo.findAnnCandidates.mockResolvedValue([
-      { bookId: 1, cosineSim: 0.7, seriesName: null, rating: null },
-      { bookId: 2, cosineSim: 0.85, seriesName: null, rating: null },
+      { bookId: 1, cosineSim: 0.7, seriesId: null, seriesName: null, rating: null },
+      { bookId: 2, cosineSim: 0.85, seriesId: null, seriesName: null, rating: null },
     ]);
     recRepo.getCandidateMetadata.mockResolvedValue([
       { bookId: 1, authorNames: ['frank herbert'], genreTagNames: ['sci-fi'] },
@@ -190,14 +193,15 @@ describe('RecommendationService', () => {
     bookRepo.findLibraryIdByBookId.mockResolvedValue(2);
     recRepo.getTargetBookData.mockResolvedValue({
       embedding: [0.2],
+      seriesId: null,
       seriesName: null,
       rating: null,
       authorNames: [],
       genreTagNames: [],
     });
     recRepo.findAnnCandidates.mockResolvedValue([
-      { bookId: 10, cosineSim: 0.9, seriesName: null, rating: null },
-      { bookId: 11, cosineSim: 0.8, seriesName: null, rating: null },
+      { bookId: 10, cosineSim: 0.9, seriesId: null, seriesName: null, rating: null },
+      { bookId: 11, cosineSim: 0.8, seriesId: null, seriesName: null, rating: null },
     ]);
     recRepo.getCandidateMetadata.mockResolvedValue([
       { bookId: 10, authorNames: [], genreTagNames: [] },
@@ -217,6 +221,7 @@ describe('RecommendationService', () => {
     bookRepo.findLibraryIdByBookId.mockResolvedValue(15);
     recRepo.getTargetBookData.mockResolvedValue({
       embedding: [0.2],
+      seriesId: null,
       seriesName: null,
       rating: null,
       authorNames: [],
@@ -236,6 +241,7 @@ describe('RecommendationService', () => {
     bookRepo.findLibraryIdByBookId.mockResolvedValue(8);
     recRepo.getTargetBookData.mockResolvedValue({
       embedding: [0.3],
+      seriesId: null,
       seriesName: null,
       rating: null,
       authorNames: [],
@@ -245,6 +251,7 @@ describe('RecommendationService', () => {
     const candidates = Array.from({ length: 30 }, (_, i) => ({
       bookId: i + 1,
       cosineSim: 1 - i * 0.01,
+      seriesId: null,
       seriesName: null,
       rating: null,
     }));
@@ -272,7 +279,7 @@ describe('RecommendationService', () => {
     it('verifies user access to the book library', async () => {
       const { service, bookRepo, libraryService, recRepo } = makeService();
       bookRepo.findLibraryIdByBookId.mockResolvedValue(21);
-      recRepo.getSeriesName.mockResolvedValue(null);
+      recRepo.getSeriesIdentity.mockResolvedValue(null);
 
       await service.getSeriesBooks(1, makeUser(true));
 
@@ -282,7 +289,7 @@ describe('RecommendationService', () => {
     it('returns empty array when the book has no series', async () => {
       const { service, bookRepo, recRepo } = makeService();
       bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
-      recRepo.getSeriesName.mockResolvedValue(null);
+      recRepo.getSeriesIdentity.mockResolvedValue(null);
 
       await expect(service.getSeriesBooks(10, makeUser())).resolves.toEqual([]);
       expect(recRepo.findSeriesBooks).not.toHaveBeenCalled();
@@ -291,7 +298,7 @@ describe('RecommendationService', () => {
     it('returns series books ordered by index when book has a series', async () => {
       const { service, bookRepo, recRepo, libraryService } = makeService();
       bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
-      recRepo.getSeriesName.mockResolvedValue('Stormlight Archive');
+      recRepo.getSeriesIdentity.mockResolvedValue({ id: 42, name: 'Stormlight Archive' });
       libraryService.findAccessibleLibraryIds.mockResolvedValue([5, 6]);
       recRepo.findSeriesBooks.mockResolvedValue([
         { bookId: 1, title: 'The Way of Kings', seriesIndex: 1, coverSource: 'extracted', authorNames: ['Brandon Sanderson'], isAudiobook: false },
@@ -306,13 +313,13 @@ describe('RecommendationService', () => {
         { id: 2, title: 'Words of Radiance', seriesIndex: 2, hasCover: false, authors: [], isAudiobook: false },
         { id: 3, title: 'Oathbringer', seriesIndex: 3, hasCover: true, authors: ['Brandon Sanderson'], isAudiobook: false },
       ]);
-      expect(recRepo.findSeriesBooks).toHaveBeenCalledWith('Stormlight Archive', [5, 6], EMPTY_CONTENT_FILTER_RULES);
+      expect(recRepo.findSeriesBooks).toHaveBeenCalledWith(42, [5, 6], EMPTY_CONTENT_FILTER_RULES);
     });
 
     it('uses findAccessibleLibraryIds instead of findAll', async () => {
       const { service, bookRepo, recRepo, libraryService } = makeService();
       bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
-      recRepo.getSeriesName.mockResolvedValue('Test Series');
+      recRepo.getSeriesIdentity.mockResolvedValue({ id: 99, name: 'Test Series' });
       libraryService.findAccessibleLibraryIds.mockResolvedValue([5]);
       recRepo.findSeriesBooks.mockResolvedValue([]);
 
@@ -390,7 +397,14 @@ describe('RecommendationService', () => {
       const user: RequestUser = { ...makeUser(false), contentFilters: filters };
 
       bookRepo.findLibraryIdByBookId.mockResolvedValue(3);
-      recRepo.getTargetBookData.mockResolvedValue({ embedding: [0.5], seriesName: null, rating: null, authorNames: [], genreTagNames: [] });
+      recRepo.getTargetBookData.mockResolvedValue({
+        embedding: [0.5],
+        seriesId: null,
+        seriesName: null,
+        rating: null,
+        authorNames: [],
+        genreTagNames: [],
+      });
       libraryService.findAll.mockResolvedValue([{ id: 7 }]);
       recRepo.findAnnCandidates.mockResolvedValue([]);
 
@@ -405,7 +419,14 @@ describe('RecommendationService', () => {
       const user: RequestUser = { ...makeUser(true), contentFilters: filters };
 
       bookRepo.findLibraryIdByBookId.mockResolvedValue(3);
-      recRepo.getTargetBookData.mockResolvedValue({ embedding: [0.5], seriesName: null, rating: null, authorNames: [], genreTagNames: [] });
+      recRepo.getTargetBookData.mockResolvedValue({
+        embedding: [0.5],
+        seriesId: null,
+        seriesName: null,
+        rating: null,
+        authorNames: [],
+        genreTagNames: [],
+      });
       libraryService.findAll.mockResolvedValue([{ id: 7 }]);
       recRepo.findAnnCandidates.mockResolvedValue([]);
 
@@ -420,13 +441,13 @@ describe('RecommendationService', () => {
       const user: RequestUser = { ...makeUser(false), contentFilters: filters };
 
       bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
-      recRepo.getSeriesName.mockResolvedValue('Wheel of Time');
+      recRepo.getSeriesIdentity.mockResolvedValue({ id: 17, name: 'Wheel of Time' });
       libraryService.findAccessibleLibraryIds.mockResolvedValue([5]);
       recRepo.findSeriesBooks.mockResolvedValue([]);
 
       await service.getSeriesBooks(1, user);
 
-      expect(recRepo.findSeriesBooks).toHaveBeenCalledWith('Wheel of Time', [5], filters);
+      expect(recRepo.findSeriesBooks).toHaveBeenCalledWith(17, [5], filters);
     });
 
     it('passes undefined to findSeriesBooks for superuser', async () => {
@@ -435,13 +456,13 @@ describe('RecommendationService', () => {
       const user: RequestUser = { ...makeUser(true), contentFilters: filters };
 
       bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
-      recRepo.getSeriesName.mockResolvedValue('Wheel of Time');
+      recRepo.getSeriesIdentity.mockResolvedValue({ id: 17, name: 'Wheel of Time' });
       libraryService.findAccessibleLibraryIds.mockResolvedValue([5]);
       recRepo.findSeriesBooks.mockResolvedValue([]);
 
       await service.getSeriesBooks(1, user);
 
-      expect(recRepo.findSeriesBooks).toHaveBeenCalledWith('Wheel of Time', [5], undefined);
+      expect(recRepo.findSeriesBooks).toHaveBeenCalledWith(17, [5], undefined);
     });
 
     it('passes contentFilters to findAuthorBooks for non-superuser', async () => {

@@ -973,11 +973,12 @@ watch(
             <span class="ml-1 font-medium text-foreground">{{ narratorLine }}</span>
           </p>
           <RouterLink
-            v-if="seriesLine"
-            :to="{ name: 'series-detail', params: { seriesName: book.seriesName! } }"
+            v-if="seriesLine && book.seriesId != null"
+            :to="{ name: 'series-detail', params: { seriesId: book.seriesId } }"
             class="inline-block text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
             >{{ seriesLine }}</RouterLink
           >
+          <span v-else-if="seriesLine" class="inline-block text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{{ seriesLine }}</span>
         </div>
         <!-- Stars: own row -->
         <div class="mt-2 flex items-center gap-0.5" @mouseleave="hoverRating = null">
@@ -1336,10 +1337,12 @@ watch(
           <template v-if="seriesLine">
             <span class="text-muted-foreground/60 text-xs">·</span>
             <RouterLink
-              :to="{ name: 'series-detail', params: { seriesName: book.seriesName! } }"
+              v-if="book.seriesId != null"
+              :to="{ name: 'series-detail', params: { seriesId: book.seriesId } }"
               class="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
               >{{ seriesLine }}</RouterLink
             >
+            <span v-else class="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{{ seriesLine }}</span>
           </template>
         </div>
 

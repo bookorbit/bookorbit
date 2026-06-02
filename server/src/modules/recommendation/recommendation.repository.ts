@@ -34,6 +34,7 @@ export interface AuthorBookRow {
 export interface AnnCandidate {
   bookId: number;
   cosineSim: number;
+  seriesId: number | null;
   seriesName: string | null;
   rating: number | null;
 }
@@ -46,10 +47,16 @@ export interface CandidateMetadata {
 
 export interface TargetBookData {
   embedding: number[] | null;
+  seriesId: number | null;
   seriesName: string | null;
   rating: number | null;
   authorNames: string[];
   genreTagNames: string[];
+}
+
+export interface SeriesIdentity {
+  id: number;
+  name: string | null;
 }
 
 @Injectable()
@@ -60,6 +67,7 @@ export class RecommendationRepository {
     const [meta] = await this.db
       .select({
         embedding: bookMetadata.embedding,
+        seriesId: bookMetadata.seriesId,
         seriesName: bookMetadata.seriesName,
         rating: bookMetadata.rating,
       })
@@ -73,6 +81,7 @@ export class RecommendationRepository {
 
     return {
       embedding: meta.embedding,
+      seriesId: meta.seriesId,
       seriesName: meta.seriesName,
       rating: meta.rating,
       authorNames: candidateMetadata?.authorNames ?? [],
@@ -80,10 +89,15 @@ export class RecommendationRepository {
     };
   }
 
-  async getSeriesName(bookId: number): Promise<string | null> {
-    const [row] = await this.db.select({ seriesName: bookMetadata.seriesName }).from(bookMetadata).where(eq(bookMetadata.bookId, bookId)).limit(1);
+  async getSeriesIdentity(bookId: number): Promise<SeriesIdentity | null> {
+    const [row] = await this.db
+      .select({ seriesId: bookMetadata.seriesId, seriesName: bookMetadata.seriesName })
+      .from(bookMetadata)
+      .where(eq(bookMetadata.bookId, bookId))
+      .limit(1);
 
-    return row?.seriesName?.trim() || null;
+    if (row?.seriesId == null) return null;
+    return { id: row.seriesId, name: row.seriesName?.trim() || null };
   }
 
   async findAnnCandidates(
@@ -101,6 +115,7 @@ export class RecommendationRepository {
       .select({
         bookId: bookMetadata.bookId,
         cosineSim: sql<number>`(1 - (${bookMetadata.embedding} <=> ${vecStr}::vector))::float`,
+        seriesId: bookMetadata.seriesId,
         seriesName: bookMetadata.seriesName,
         rating: bookMetadata.rating,
       })
@@ -142,10 +157,9 @@ export class RecommendationRepository {
     }));
   }
 
-  async findSeriesBooks(seriesName: string, libraryIds: number[], contentFilters?: ContentFilterRules): Promise<SeriesBookRow[]> {
-    if (libraryIds.length === 0 || !seriesName.trim()) return [];
+  async findSeriesBooks(seriesId: number, libraryIds: number[], contentFilters?: ContentFilterRules): Promise<SeriesBookRow[]> {
+    if (libraryIds.length === 0) return [];
 
-    const normalized = seriesName.trim().toLowerCase();
     const filterClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
 
     const rows = await this.db
@@ -159,7 +173,7 @@ export class RecommendationRepository {
       .from(books)
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .leftJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
-      .where(and(inArray(books.libraryId, libraryIds), sql`lower(trim(${bookMetadata.seriesName})) = ${normalized}`, ...filterClauses))
+      .where(and(inArray(books.libraryId, libraryIds), eq(bookMetadata.seriesId, seriesId), ...filterClauses))
       .orderBy(sql`${bookMetadata.seriesIndex} ASC NULLS LAST`, asc(bookMetadata.title), asc(books.id))
       .limit(SERIES_BOOKS_LIMIT);
 

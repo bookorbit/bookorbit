@@ -215,14 +215,14 @@ export class AchievementRepository {
   async hasCompletedSeries(userId: number): Promise<boolean> {
     const result = await this.db.execute(sql`
       SELECT 1 FROM (
-        SELECT bm.series_name,
+	        SELECT bm.series_id,
           COUNT(DISTINCT bm.book_id) AS total_in_series,
           COUNT(DISTINCT ubs.book_id) AS read_count
         FROM book_metadata bm
         LEFT JOIN user_book_status ubs
           ON ubs.book_id = bm.book_id AND ubs.user_id = ${userId} AND ubs.status = 'read'
-        WHERE bm.series_name IS NOT NULL AND bm.series_name != ''
-        GROUP BY bm.series_name
+	        WHERE bm.series_id IS NOT NULL
+	        GROUP BY bm.series_id
         HAVING COUNT(DISTINCT bm.book_id) >= 2
           AND COUNT(DISTINCT bm.book_id) = COUNT(DISTINCT ubs.book_id)
       ) complete_series
@@ -571,14 +571,14 @@ export class AchievementRepository {
   async hasCompletedSeriesOfSize(userId: number, size: number): Promise<boolean> {
     const result = await this.db.execute(sql`
       SELECT 1 FROM (
-        SELECT bm.series_name,
+	        SELECT bm.series_id,
           COUNT(DISTINCT bm.book_id) AS total_in_series,
           COUNT(DISTINCT ubs.book_id) AS read_count
         FROM book_metadata bm
         LEFT JOIN user_book_status ubs
           ON ubs.book_id = bm.book_id AND ubs.user_id = ${userId} AND ubs.status = 'read'
-        WHERE bm.series_name IS NOT NULL AND bm.series_name != ''
-        GROUP BY bm.series_name
+	        WHERE bm.series_id IS NOT NULL
+	        GROUP BY bm.series_id
         HAVING COUNT(DISTINCT bm.book_id) = ${size}
           AND COUNT(DISTINCT bm.book_id) = COUNT(DISTINCT ubs.book_id)
       ) complete_series

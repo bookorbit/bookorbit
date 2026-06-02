@@ -34,6 +34,7 @@ export class BookDetailDto {
   publishedYear: number | null;
   language: string | null;
   pageCount: number | null;
+  seriesId: number | null;
   seriesName: string | null;
   seriesIndex: number | null;
   rating: number | null;

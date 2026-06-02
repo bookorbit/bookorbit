@@ -133,6 +133,7 @@ function makeBook(overrides: Partial<BookCard> = {}): BookCard {
     status: 'present',
     title: 'Dune',
     authors: ['Frank Herbert'],
+    seriesId: null,
     seriesName: null,
     seriesIndex: null,
     files: [makeFile()],
@@ -376,12 +377,18 @@ describe('BookCoverCard', () => {
     it('opens series details when the series label text is clicked', async () => {
       mockCardInfoMode.value = 'below-cover'
       mockGridCardPrimaryLabel.value = 'series-title-position'
-      const book = makeBook({ id: 44, seriesName: 'Dune Chronicles', seriesIndex: 1, files: [makeFile({ id: 12, format: 'epub', role: 'primary' })] })
+      const book = makeBook({
+        id: 44,
+        seriesId: 42,
+        seriesName: 'Dune Chronicles',
+        seriesIndex: 1,
+        files: [makeFile({ id: 12, format: 'epub', role: 'primary' })],
+      })
       const wrapper = mountCard({ book, showLabel: true })
 
       await wrapper.get('[data-testid="grid-card-label-primary"]').trigger('click')
 
-      expect(mockRouterPush).toHaveBeenCalledWith({ name: 'series-detail', params: { seriesName: 'Dune Chronicles' }, query: { from: '/' } })
+      expect(mockRouterPush).toHaveBeenCalledWith({ name: 'series-detail', params: { seriesId: 42 }, query: { from: '/' } })
       expect(mockRouterPush).not.toHaveBeenCalledWith(expect.objectContaining({ name: 'reader' }))
     })
   })

@@ -8,6 +8,8 @@ import { FileWriteModule } from './file-write.module';
 import { FileWriteRepository } from './file-write.repository';
 import { FileWriteService } from './file-write.service';
 import { FormatWriterRegistry } from './format-writer.registry';
+import { AudioCoverEmbedder } from './formats/audio/audio-cover-embedder';
+import { FlacAudioFormatWriter, M4aAudioFormatWriter, M4bAudioFormatWriter, Mp3AudioFormatWriter } from './formats/audio/audio-format-writer';
 import { Cb7FormatWriter } from './formats/cbx/cb7-format-writer';
 import { CbzFormatWriter } from './formats/cbx/cbz-format-writer';
 import { EpubFormatWriter } from './formats/epub/epub-format-writer';
@@ -28,10 +30,15 @@ describe('FileWriteModule', () => {
         FileRenameRepository,
         FileRenameService,
         FileLockService,
+        AudioCoverEmbedder,
         EpubFormatWriter,
         PdfFormatWriter,
         CbzFormatWriter,
         Cb7FormatWriter,
+        M4bAudioFormatWriter,
+        M4aAudioFormatWriter,
+        Mp3AudioFormatWriter,
+        FlacAudioFormatWriter,
         FormatWriterRegistry,
       ]),
     );
@@ -44,12 +51,25 @@ describe('FileWriteModule', () => {
     };
 
     expect(writerProvider).toBeDefined();
-    expect(writerProvider.inject).toEqual([EpubFormatWriter, PdfFormatWriter, CbzFormatWriter, Cb7FormatWriter]);
+    expect(writerProvider.inject).toEqual([
+      EpubFormatWriter,
+      PdfFormatWriter,
+      CbzFormatWriter,
+      Cb7FormatWriter,
+      M4bAudioFormatWriter,
+      M4aAudioFormatWriter,
+      Mp3AudioFormatWriter,
+      FlacAudioFormatWriter,
+    ]);
 
     const epub = { format: 'epub' };
     const pdf = { format: 'pdf' };
     const cbz = { format: 'cbz' };
     const cb7 = { format: 'cb7' };
-    expect(writerProvider.useFactory(epub, pdf, cbz, cb7)).toEqual([epub, pdf, cbz, cb7]);
+    const m4b = { format: 'm4b' };
+    const m4a = { format: 'm4a' };
+    const mp3 = { format: 'mp3' };
+    const flac = { format: 'flac' };
+    expect(writerProvider.useFactory(epub, pdf, cbz, cb7, m4b, m4a, mp3, flac)).toEqual([epub, pdf, cbz, cb7, m4b, m4a, mp3, flac]);
   });
 });

@@ -196,6 +196,8 @@ describe('LibraryService', () => {
         fileWritePdfMaxFileSizeMb: 100,
         fileWriteCbxEnabled: false,
         fileWriteCbxMaxFileSizeMb: 500,
+        fileWriteAudioEnabled: true,
+        fileWriteAudioMaxFileSizeMb: 500,
         fileRenameEnabled: false,
       }),
     );

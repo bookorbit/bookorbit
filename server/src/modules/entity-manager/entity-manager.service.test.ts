@@ -57,7 +57,7 @@ function makeService() {
   const narratorStrategy = mockStrategy({ entityType: 'narrator', isInline: false });
   const publisherStrategy = mockStrategy({ entityType: 'publisher', isInline: true });
   const languageStrategy = mockStrategy({ entityType: 'language', isInline: true });
-  const seriesStrategy = mockStrategy({ entityType: 'series', isInline: true });
+  const seriesStrategy = mockStrategy({ entityType: 'series', isInline: false });
 
   const service = new EntityManagerService(
     repo as any,
@@ -100,6 +100,7 @@ describe('EntityManagerService', () => {
       expect(service.getStrategy('author')).toBeDefined();
       expect(service.getStrategy('genre')).toBeDefined();
       expect(service.getStrategy('publisher')).toBeDefined();
+      expect(service.getStrategy('series')).toBeDefined();
     });
 
     it('throws for unknown entity type', () => {
@@ -560,7 +561,7 @@ describe('EntityManagerService', () => {
 
       const result = await service.merge('author', mockUser, 1, [2, 3], false);
 
-      expect(strategies.author.merge).toHaveBeenCalledWith({ targetId: 1, sourceIds: [2, 3], userId: 1 });
+      expect(strategies.author.merge).toHaveBeenCalledWith({ targetId: 1, sourceIds: [2, 3], userId: 1, libraryIds: [1, 2] });
       expect(repo.deleteDismissedPairsForEntity).toHaveBeenCalledTimes(2);
       expect(repo.deleteDismissedPairsForEntity).toHaveBeenCalledWith('author', 2);
       expect(repo.deleteDismissedPairsForEntity).toHaveBeenCalledWith('author', 3);

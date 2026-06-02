@@ -32,6 +32,7 @@ function makeBook(overrides?: Partial<BookCard>): BookCard {
     status: 'present',
     title: 'Book One',
     authors: ['Author A'],
+    seriesId: 42,
     seriesName: 'The Arc',
     seriesIndex: 1,
     files: [],
@@ -158,28 +159,28 @@ describe('CollapsedSeriesCard', () => {
     expect(wrapper.text()).toContain('Author A')
   })
 
-  it('navigates to /series/:encodedName on click', async () => {
+  it('navigates to series detail by id on click', async () => {
     const wrapper = mount(CollapsedSeriesCard, { props: { book: makeBook() } })
 
     await wrapper.trigger('click')
 
     expect(mockRouterPush).toHaveBeenCalledWith({
       name: 'series-detail',
-      params: { seriesName: 'The Arc' },
+      params: { seriesId: 42 },
       query: { from: '/test-path' },
     })
   })
 
-  it('encodes series name with special characters in URL', async () => {
+  it('uses series id even when series name has special characters', async () => {
     const wrapper = mount(CollapsedSeriesCard, {
-      props: { book: makeBook({ seriesName: 'The Wheel & Time' }) },
+      props: { book: makeBook({ seriesId: 43, seriesName: 'The Wheel & Time' }) },
     })
 
     await wrapper.trigger('click')
 
     expect(mockRouterPush).toHaveBeenCalledWith({
       name: 'series-detail',
-      params: { seriesName: 'The Wheel & Time' },
+      params: { seriesId: 43 },
       query: { from: '/test-path' },
     })
   })
@@ -477,7 +478,7 @@ describe('CollapsedSeriesCard', () => {
 
       expect(mockRouterPush).toHaveBeenCalledWith({
         name: 'series-detail',
-        params: { seriesName: 'The Arc' },
+        params: { seriesId: 42 },
         query: { from: '/test-path' },
       })
     })
@@ -490,8 +491,8 @@ describe('CollapsedSeriesCard', () => {
       expect(mockRouterPush).toHaveBeenCalledTimes(1)
     })
 
-    it('does not navigate when seriesName is empty', async () => {
-      const wrapper = mount(CollapsedSeriesCard, { props: { book: makeBook({ seriesName: '' }) } })
+    it('does not navigate when series id is missing', async () => {
+      const wrapper = mount(CollapsedSeriesCard, { props: { book: makeBook({ seriesId: null }) } })
 
       await wrapper.find('[data-testid="series-hover-action"]').trigger('click')
 
@@ -595,7 +596,7 @@ describe('CollapsedSeriesCard', () => {
 
       expect(mockRouterPush).toHaveBeenCalledWith({
         name: 'series-detail',
-        params: { seriesName: 'The Arc' },
+        params: { seriesId: 42 },
         query: { from: '/test-path' },
       })
     })

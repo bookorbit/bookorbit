@@ -100,9 +100,8 @@ function handleClick() {
 }
 
 function openSeriesDetails() {
-  const name = seriesName.value.trim()
-  if (!name) return
-  void router.push({ name: 'series-detail', params: { seriesName: name }, query: { from: route.fullPath } })
+  if (props.book.seriesId == null) return
+  void router.push({ name: 'series-detail', params: { seriesId: props.book.seriesId }, query: { from: route.fullPath } })
 }
 
 async function openAuthorDetails() {

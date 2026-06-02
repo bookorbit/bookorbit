@@ -192,10 +192,10 @@ export class DashboardWidgetRepository {
         .innerJoin(books, eq(books.id, bookAuthors.bookId))
         .where(and(libraryFilter, ...cfClauses)),
       this.db
-        .select({ count: sql<number>`count(distinct ${bookMetadata.seriesName})::int` })
+        .select({ count: sql<number>`count(distinct ${bookMetadata.seriesId})::int` })
         .from(bookMetadata)
         .innerJoin(books, eq(books.id, bookMetadata.bookId))
-        .where(and(isNotNull(bookMetadata.seriesName), libraryFilter, ...cfClauses)),
+        .where(and(isNotNull(bookMetadata.seriesId), libraryFilter, ...cfClauses)),
       this.db
         .select({ total: sql<number>`coalesce(sum(${bookFiles.sizeBytes}), 0)::bigint` })
         .from(bookFiles)

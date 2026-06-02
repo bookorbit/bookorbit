@@ -114,7 +114,7 @@ export class DashboardRepository {
         select
           ${books.id} as id,
           ${books.libraryId} as library_id,
-          lower(btrim(${bookMetadata.seriesName})) as normalized_series_name,
+	          ${bookMetadata.seriesId} as series_id,
           ${bookMetadata.seriesIndex} as series_index,
           ${books.addedAt} as added_at,
           ${mergedProgress} as current_progress,
@@ -138,8 +138,7 @@ export class DashboardRepository {
         left join ${userBookStatus} on ${userBookStatus.bookId} = ${books.id} and ${userBookStatus.userId} = ${userId}
         where ${books.libraryId} in (${libraryIdList})
           and ${books.status} = 'present'
-          and ${bookMetadata.seriesName} is not null
-          and btrim(${bookMetadata.seriesName}) != ''
+	          and ${bookMetadata.seriesId} is not null
           and ${bookMetadata.seriesIndex} is not null
           ${filterSql}
       ),
@@ -147,31 +146,31 @@ export class DashboardRepository {
         select
           ssb.id,
           ssb.library_id,
-          ssb.normalized_series_name,
+	          ssb.series_id,
           ssb.series_index,
           ssb.added_at,
           ssb.current_progress,
           ssb.is_completed,
           ssb.completion_updated_at,
           lag(ssb.is_completed) over (
-            partition by ssb.library_id, ssb.normalized_series_name
+	            partition by ssb.library_id, ssb.series_id
             order by ssb.series_index asc, ssb.added_at asc, ssb.id asc
           ) as previous_is_completed,
           lag(ssb.completion_updated_at) over (
-            partition by ssb.library_id, ssb.normalized_series_name
+	            partition by ssb.library_id, ssb.series_id
             order by ssb.series_index asc, ssb.added_at asc, ssb.id asc
           ) as previous_completion_updated_at
         from scoped_series_books ssb
       ),
       next_candidates as (
-        select distinct on (os.library_id, os.normalized_series_name)
+	        select distinct on (os.library_id, os.series_id)
           os.id,
           os.previous_completion_updated_at
         from ordered_series os
         where os.previous_is_completed = true
           and os.is_completed = false
           and os.current_progress = 0
-        order by os.library_id, os.normalized_series_name, os.series_index asc, os.added_at asc, os.id asc
+	        order by os.library_id, os.series_id, os.series_index asc, os.added_at asc, os.id asc
       )
       select nc.id
       from next_candidates nc

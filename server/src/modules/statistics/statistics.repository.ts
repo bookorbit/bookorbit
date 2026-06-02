@@ -270,7 +270,7 @@ export class StatisticsRepository {
         hasLanguage: sql<number>`count(${bookMetadata.language})::int`,
         hasPageCount: sql<number>`count(${bookMetadata.pageCount})::int`,
         hasRating: sql<number>`count(${bookMetadata.rating})::int`,
-        hasSeries: sql<number>`count(${bookMetadata.seriesName})::int`,
+        hasSeries: sql<number>`count(${bookMetadata.seriesId})::int`,
         hasIsbn: sql<number>`count(case when ${bookMetadata.isbn13} is not null or ${bookMetadata.isbn10} is not null then 1 end)::int`,
       })
       .from(books)
@@ -528,7 +528,7 @@ export class StatisticsRepository {
         hasLanguage: sql<number>`count(${bookMetadata.language})::int`,
         hasPageCount: sql<number>`count(${bookMetadata.pageCount})::int`,
         hasRating: sql<number>`count(${bookMetadata.rating})::int`,
-        hasSeries: sql<number>`count(${bookMetadata.seriesName})::int`,
+        hasSeries: sql<number>`count(${bookMetadata.seriesId})::int`,
         hasIsbn: sql<number>`count(case when ${bookMetadata.isbn13} is not null or ${bookMetadata.isbn10} is not null then 1 end)::int`,
         hasAuthor: sql<number>`count(distinct ba.book_id)::int`,
       })
@@ -606,10 +606,10 @@ export class StatisticsRepository {
           .innerJoin(books, eq(books.id, bookAuthors.bookId))
           .where(and(filter, ...cfClauses)),
         this.db
-          .select({ count: sql<number>`count(distinct ${bookMetadata.seriesName})::int` })
+          .select({ count: sql<number>`count(distinct ${bookMetadata.seriesId})::int` })
           .from(bookMetadata)
           .innerJoin(books, eq(books.id, bookMetadata.bookId))
-          .where(and(isNotNull(bookMetadata.seriesName), filter, ...cfClauses)),
+          .where(and(isNotNull(bookMetadata.seriesId), filter, ...cfClauses)),
         this.db
           .select({ count: sql<number>`count(distinct ${bookMetadata.publisher})::int` })
           .from(bookMetadata)
@@ -868,8 +868,8 @@ export class StatisticsRepository {
       })
       .from(books)
       .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-      .where(and(isNotNull(bookMetadata.seriesName), filter, ...cfClauses))
-      .groupBy(bookMetadata.seriesName)
+      .where(and(isNotNull(bookMetadata.seriesId), filter, ...cfClauses))
+      .groupBy(bookMetadata.seriesId, bookMetadata.seriesName)
       .orderBy(desc(sql`count(*)`))
       .limit(50);
   }

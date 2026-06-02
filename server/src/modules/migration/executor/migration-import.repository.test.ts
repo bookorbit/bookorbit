@@ -54,6 +54,30 @@ describe('MigrationImportRepository', () => {
     );
   });
 
+  it('resolves series identity for batch metadata imports', async () => {
+    const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+    const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
+    const insert = vi.fn().mockReturnValue({ values });
+    const db = { insert };
+    const seriesIdentity = {
+      resolveMetadataPatch: vi.fn().mockResolvedValue({ bookId: 1, seriesName: 'Dune', seriesId: 88 }),
+    };
+
+    const repo = new MigrationImportRepository(db as never, seriesIdentity as never);
+    await repo.batchUpsertBookMetadata([{ bookId: 1, seriesName: '  Dune  ' }]);
+
+    expect(seriesIdentity.resolveMetadataPatch).toHaveBeenCalledWith({ bookId: 1, seriesName: '  Dune  ' }, db);
+    expect(values).toHaveBeenCalledWith({ bookId: 1, seriesName: 'Dune', seriesId: 88 });
+    expect(onConflictDoUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        set: expect.objectContaining({
+          seriesName: expect.anything(),
+          seriesId: expect.anything(),
+        }),
+      }),
+    );
+  });
+
   it('clearUserBookStatuses no-ops for empty targets and deduplicates ids otherwise', async () => {
     const where = vi.fn().mockResolvedValue(undefined);
     const deleteFn = vi.fn().mockReturnValue({ where });

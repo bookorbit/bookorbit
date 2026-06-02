@@ -82,7 +82,15 @@ describe('ScannerRepository', () => {
   it('reads library folders/settings and returns null when rows are absent', async () => {
     const { repo, queues } = makeRepo();
     queues.select.push([{ id: 1, path: '/books' }]);
-    queues.select.push([{ allowedFormats: ['epub'], formatPriority: ['epub'], excludePatterns: [], organizationMode: 'book_per_folder' }]);
+    queues.select.push([
+      {
+        allowedFormats: ['epub'],
+        formatPriority: ['epub'],
+        metadataPrecedence: ['opfFile', 'embedded'],
+        excludePatterns: [],
+        organizationMode: 'book_per_folder',
+      },
+    ]);
     queues.select.push([]);
     queues.select.push([{ path: '/books' }]);
     queues.select.push([]);
@@ -91,6 +99,7 @@ describe('ScannerRepository', () => {
     await expect(repo.findLibrarySettings(1)).resolves.toEqual({
       allowedFormats: ['epub'],
       formatPriority: ['epub'],
+      metadataPrecedence: ['opfFile', 'embedded'],
       excludePatterns: [],
       organizationMode: 'book_per_folder',
     });

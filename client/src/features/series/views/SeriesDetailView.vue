@@ -40,9 +40,10 @@ const { portraitCoverSize, gridGap } = useDisplaySettings()
 const { effectiveViewMode } = useEffectiveViewMode()
 const { libraries, fetchLibraries } = useLibraries()
 
-const seriesName = computed(() => {
-  const raw = route.params.seriesName
-  return typeof raw === 'string' ? raw : ''
+const seriesId = computed(() => {
+  const raw = route.params.seriesId
+  const value = typeof raw === 'string' ? Number(raw) : NaN
+  return Number.isInteger(value) && value > 0 ? value : null
 })
 
 const {
@@ -57,11 +58,11 @@ const {
   order,
   libraryId,
   load: loadBooks,
-} = useSeriesDetail(seriesName)
+} = useSeriesDetail(seriesId)
 
 const pageTitle = computed(() => {
   if (seriesInfo.value?.name) return `Series · ${seriesInfo.value.name}`
-  return seriesName.value || 'Series'
+  return seriesId.value != null ? `Series #${seriesId.value}` : 'Series'
 })
 usePageTitle(pageTitle)
 
@@ -94,10 +95,10 @@ const hiddenSeriesAuthorsCount = computed(() => Math.max(0, (seriesInfo.value?.a
 const addToCollectionOpen = ref(false)
 const addToCollectionBookId = ref<number | null>(null)
 const leadFallbackStyle = computed(() => {
-  const name = seriesInfo.value?.name ?? seriesName.value
+  const name = seriesInfo.value?.name ?? pageTitle.value
   return bookCoverStyle(name || 'Series')
 })
-const leadInitial = computed(() => (seriesInfo.value?.name ?? seriesName.value).trim().charAt(0).toUpperCase() || '?')
+const leadInitial = computed(() => (seriesInfo.value?.name ?? 'Series').trim().charAt(0).toUpperCase() || '?')
 const activeCoverIds = computed(() => leadCoverBookIds.value.filter((id) => !failedLeadCovers.value.has(id)))
 const { visibleCovers: visibleLeadCoverBookIds, baseStyles: leadCoverStyles } = useCoverStack(activeCoverIds)
 const displayedLeadGenres = computed(() => {
@@ -201,15 +202,16 @@ const scaledLeadCoverStyles = computed(() =>
 )
 
 async function loadLeadBookPreview(preserveCurrent = false) {
-  if (!seriesName.value) {
+  const token = ++leadBookRequestToken
+  if (seriesId.value == null) {
     leadBook.value = null
     leadBookError.value = null
+    loadingLeadBook.value = false
     leadCoverBookIds.value = []
     leadCoverRatios.value = new Map<number, number>()
     return
   }
 
-  const token = ++leadBookRequestToken
   loadingLeadBook.value = true
   leadBookError.value = null
   if (!preserveCurrent) {
@@ -222,7 +224,7 @@ async function loadLeadBookPreview(preserveCurrent = false) {
   leadGenresExpanded.value = false
 
   try {
-    const firstPage = await fetchSeriesBooks(seriesName.value, {
+    const firstPage = await fetchSeriesBooks(seriesId.value, {
       page: 0,
       size: MAX_STACK_VISIBLE,
       sort: 'seriesIndex',
@@ -356,14 +358,14 @@ watch([sort, order, libraryId], () => {
   void loadBooks({ reset: true, keepPreviousData: true })
 })
 
-watch(seriesName, () => {
+watch(seriesId, () => {
   void loadBooks({ reset: true })
 })
 
 watch(
-  [seriesName, libraryId],
-  ([nextSeriesName], [prevSeriesName]) => {
-    void loadLeadBookPreview(nextSeriesName === prevSeriesName)
+  [seriesId, libraryId],
+  ([nextSeriesId], [prevSeriesId]) => {
+    void loadLeadBookPreview(nextSeriesId === prevSeriesId)
   },
   { immediate: true },
 )

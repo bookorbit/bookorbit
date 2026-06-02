@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { SQL, and, asc, count, eq, inArray, isNotNull, ne, or, sql } from 'drizzle-orm';
 import { SUPPORTED_BOOK_FORMATS } from '../upload/upload-validator.service';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -6,6 +6,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { ContentFilterRules, SortSpec } from '@bookorbit/types';
 import { isAudioFormat } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
+import { SeriesIdentityService } from '../../common/services/series-identity.service';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -35,7 +36,7 @@ import {
 
 type Db = NodePgDatabase<typeof schema>;
 type DbTransaction = Parameters<Parameters<Db['transaction']>[0]>[0];
-type MetadataUpdateExecutor = Pick<Db, 'update'>;
+type MetadataUpdateExecutor = Pick<Db, 'update' | 'insert'>;
 type MetadataReadExecutor = Pick<Db, 'select'>;
 
 type CollapsedRawRow = {
@@ -46,6 +47,7 @@ type CollapsedRawRow = {
   added_at: string;
   updated_at: string;
   title: string | null;
+  series_id: number | null;
   series_name: string | null;
   series_index: number | null;
   published_year: number | null;
@@ -75,6 +77,7 @@ type PatternMetadataRow = {
   publisher: string | null;
   publishedYear: number | null;
   language: string | null;
+  seriesId: number | null;
   seriesName: string | null;
   seriesIndex: number | null;
   isbn13: string | null;
@@ -83,7 +86,10 @@ type PatternMetadataRow = {
 
 @Injectable()
 export class BookRepository {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    @Optional() private readonly seriesIdentity?: SeriesIdentityService,
+  ) {}
 
   private visibleWhere(where: SQL | undefined): SQL {
     return where ? and(where, ne(books.status, 'processing'))! : ne(books.status, 'processing');
@@ -106,6 +112,7 @@ export class BookRepository {
         addedAt: books.addedAt,
         updatedAt: books.updatedAt,
         title: bookMetadata.title,
+        seriesId: bookMetadata.seriesId,
         seriesName: bookMetadata.seriesName,
         seriesIndex: bookMetadata.seriesIndex,
         publishedYear: bookMetadata.publishedYear,
@@ -273,6 +280,7 @@ export class BookRepository {
       updatedAt: Date;
       title: string | null;
       seriesName: string | null;
+      seriesId: number | null;
       seriesIndex: number | null;
       publishedYear: number | null;
       language: string | null;
@@ -323,6 +331,7 @@ export class BookRepository {
           books.added_at,
           books.updated_at,
           book_metadata.title,
+          book_metadata.series_id,
           book_metadata.series_name,
           book_metadata.series_index,
           book_metadata.published_year,
@@ -341,82 +350,82 @@ export class BookRepository {
       ),
       series_agg AS (
         SELECT
-          base.norm_series,
+          base.series_id,
           base.library_id,
           COUNT(*) AS book_count,
           SUM(CASE WHEN user_book_status.status = 'read' THEN 1 ELSE 0 END) AS read_count,
           MAX(base.added_at) AS latest_added_at
         FROM base_rows base
         LEFT JOIN user_book_status ON user_book_status.book_id = base.id AND user_book_status.user_id = ${userId}
-        WHERE base.norm_series IS NOT NULL
-        GROUP BY base.norm_series, base.library_id
+        WHERE base.series_id IS NOT NULL
+        GROUP BY base.series_id, base.library_id
       ),
       series_cover_candidates AS (
         SELECT
-          base.norm_series,
+          base.series_id,
           base.library_id,
           base.id,
           base.series_index,
           base.added_at,
           ROW_NUMBER() OVER (
-            PARTITION BY base.norm_series, base.library_id
+            PARTITION BY base.series_id, base.library_id
             ORDER BY base.series_index ASC NULLS LAST, base.added_at ASC, base.id ASC
           ) AS rn
         FROM base_rows base
-        WHERE base.norm_series IS NOT NULL
+        WHERE base.series_id IS NOT NULL
       ),
       series_covers AS (
         SELECT
-          scc.norm_series,
+          scc.series_id,
           scc.library_id,
           COALESCE(
             ARRAY_AGG(scc.id ORDER BY scc.series_index ASC NULLS LAST, scc.added_at ASC, scc.id ASC) FILTER (WHERE scc.rn <= 4),
             ARRAY[]::int[]
           ) AS cover_book_ids
         FROM series_cover_candidates scc
-        GROUP BY scc.norm_series, scc.library_id
+        GROUP BY scc.series_id, scc.library_id
       ),
       series_first_volume AS (
-        SELECT scc.norm_series, scc.library_id, scc.id AS first_volume_book_id
+        SELECT scc.series_id, scc.library_id, scc.id AS first_volume_book_id
         FROM series_cover_candidates scc
         WHERE scc.rn = 1
       ),
       series_latest_volume AS (
-        SELECT slv.norm_series, slv.library_id, slv.id AS latest_volume_book_id
+        SELECT slv.series_id, slv.library_id, slv.id AS latest_volume_book_id
         FROM (
           SELECT
-            base.norm_series,
+            base.series_id,
             base.library_id,
             base.id,
             ROW_NUMBER() OVER (
-              PARTITION BY base.norm_series, base.library_id
+              PARTITION BY base.series_id, base.library_id
               ORDER BY base.series_index DESC NULLS LAST, base.added_at DESC, base.id DESC
             ) AS rn
           FROM base_rows base
-          WHERE base.norm_series IS NOT NULL
+          WHERE base.series_id IS NOT NULL
         ) slv
         WHERE slv.rn = 1
       ),
       series_first_unread AS (
-        SELECT sfu.norm_series, sfu.library_id, sfu.id AS first_unread_book_id
+        SELECT sfu.series_id, sfu.library_id, sfu.id AS first_unread_book_id
         FROM (
           SELECT
-            base.norm_series,
+            base.series_id,
             base.library_id,
             base.id,
             ROW_NUMBER() OVER (
-              PARTITION BY base.norm_series, base.library_id
+              PARTITION BY base.series_id, base.library_id
               ORDER BY base.series_index ASC NULLS LAST, base.added_at ASC, base.id ASC
             ) AS rn
           FROM base_rows base
           LEFT JOIN user_book_status ubs ON ubs.book_id = base.id AND ubs.user_id = ${userId}
-          WHERE base.norm_series IS NOT NULL
+          WHERE base.series_id IS NOT NULL
             AND ubs.status IS DISTINCT FROM 'read'
         ) sfu
         WHERE sfu.rn = 1
       ),
       representatives AS (
-        SELECT DISTINCT ON (base.library_id, COALESCE(base.norm_series, 'book_' || base.id::text))
+        SELECT DISTINCT ON (base.library_id, COALESCE(base.series_id::text, 'book_' || base.id::text))
           base.id,
           base.status,
           base.primary_file_id,
@@ -424,6 +433,7 @@ export class BookRepository {
           base.added_at,
           base.updated_at,
           base.title,
+          base.series_id,
           base.series_name,
           base.series_index,
           base.published_year,
@@ -447,23 +457,23 @@ export class BookRepository {
         FROM base_rows base
         LEFT JOIN user_book_ratings ubr ON ubr.book_id = base.id AND ubr.user_id = ${userId}
         LEFT JOIN series_agg sa
-          ON sa.norm_series = base.norm_series
+          ON sa.series_id = base.series_id
           AND sa.library_id = base.library_id
         LEFT JOIN series_covers sc
-          ON sc.norm_series = sa.norm_series
+          ON sc.series_id = sa.series_id
           AND sc.library_id = sa.library_id
         LEFT JOIN series_first_volume sfv
-          ON sfv.norm_series = base.norm_series
+          ON sfv.series_id = base.series_id
           AND sfv.library_id = base.library_id
         LEFT JOIN series_latest_volume slv2
-          ON slv2.norm_series = base.norm_series
+          ON slv2.series_id = base.series_id
           AND slv2.library_id = base.library_id
         LEFT JOIN series_first_unread sfu2
-          ON sfu2.norm_series = base.norm_series
+          ON sfu2.series_id = base.series_id
           AND sfu2.library_id = base.library_id
         ORDER BY
           base.library_id,
-          COALESCE(base.norm_series, 'book_' || base.id::text),
+          COALESCE(base.series_id::text, 'book_' || base.id::text),
           base.series_index ASC NULLS LAST,
           base.added_at ASC,
           base.id ASC
@@ -486,6 +496,7 @@ export class BookRepository {
       addedAt: new Date(r.added_at),
       updatedAt: new Date(r.updated_at),
       title: r.title,
+      seriesId: r.series_id,
       seriesName: r.series_name,
       seriesIndex: r.series_index,
       publishedYear: r.published_year,
@@ -695,6 +706,7 @@ export class BookRepository {
       .select({
         id: books.id,
         title: bookMetadata.title,
+        seriesId: bookMetadata.seriesId,
         seriesName: bookMetadata.seriesName,
         libraryId: books.libraryId,
         libraryName: libraries.name,
@@ -822,6 +834,7 @@ export class BookRepository {
           publisher: bookMetadata.publisher,
           publishedYear: bookMetadata.publishedYear,
           language: bookMetadata.language,
+          seriesId: bookMetadata.seriesId,
           seriesName: bookMetadata.seriesName,
           seriesIndex: bookMetadata.seriesIndex,
           isbn13: bookMetadata.isbn13,
@@ -987,7 +1000,8 @@ export class BookRepository {
     fields: Partial<typeof bookMetadata.$inferInsert>,
     executor: MetadataUpdateExecutor = this.db,
   ): Promise<void> {
-    await executor.update(bookMetadata).set(fields).where(eq(bookMetadata.bookId, bookId));
+    const patch = (await this.seriesIdentity?.resolveMetadataPatch(fields, executor)) ?? fields;
+    await executor.update(bookMetadata).set(patch).where(eq(bookMetadata.bookId, bookId));
     await executor.update(books).set({ updatedAt: new Date() }).where(eq(books.id, bookId));
   }
 
@@ -997,7 +1011,8 @@ export class BookRepository {
     executor: MetadataUpdateExecutor = this.db,
   ): Promise<void> {
     if (bookIds.length === 0) return;
-    await executor.update(bookMetadata).set(fields).where(inArray(bookMetadata.bookId, bookIds));
+    const patch = (await this.seriesIdentity?.resolveMetadataPatch(fields, executor)) ?? fields;
+    await executor.update(bookMetadata).set(patch).where(inArray(bookMetadata.bookId, bookIds));
     await executor.update(books).set({ updatedAt: new Date() }).where(inArray(books.id, bookIds));
   }
 

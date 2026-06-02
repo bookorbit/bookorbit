@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException, OnModuleInit, Optional } from '@nestjs/common';
 import { basename, dirname, extname, join } from 'path';
 import { access as fsAccess, readFile, stat, unlink } from 'fs/promises';
 import { and, eq, inArray, or, sql } from 'drizzle-orm';
@@ -7,6 +7,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { BookDockAutoFinalizeMetadataMode, BookDockFinalizeFileResult, BookDockFinalizeResult, BookDockMetadata } from '@bookorbit/types';
 import { NotificationType, resolveUploadPath } from '@bookorbit/types';
 import { NotificationService } from '../notification/notification.service';
+import { SeriesIdentityService } from '../../common/services/series-identity.service';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { authors, bookAuthors, bookMetadata, books, libraries, libraryFolders } from '../../db/schema';
@@ -63,6 +64,7 @@ export class BookDockFinalizeService implements OnModuleInit {
     private readonly events: BookDockEventsService,
     private readonly gateway: BookDockGateway,
     private readonly notificationService: NotificationService,
+    @Optional() private readonly seriesIdentity?: SeriesIdentityService,
   ) {}
 
   onModuleInit() {
@@ -565,23 +567,23 @@ export class BookDockFinalizeService implements OnModuleInit {
       }
     }
 
-    await this.db
-      .update(bookMetadata)
-      .set({
-        title: meta.title ?? null,
-        subtitle: meta.subtitle ?? null,
-        description: meta.description ?? null,
-        isbn10: meta.isbn10 ?? null,
-        isbn13: meta.isbn13 ?? null,
-        publisher: meta.publisher ?? null,
-        publishedYear: meta.publishedYear ?? null,
-        language: meta.language ?? null,
-        seriesName: meta.seriesName ?? null,
-        seriesIndex: meta.seriesIndex ?? null,
-        pageCount: meta.pageCount ?? null,
-        updatedAt: new Date(),
-      })
-      .where(eq(bookMetadata.bookId, bookId));
+    const scalarFields = {
+      title: meta.title ?? null,
+      subtitle: meta.subtitle ?? null,
+      description: meta.description ?? null,
+      isbn10: meta.isbn10 ?? null,
+      isbn13: meta.isbn13 ?? null,
+      publisher: meta.publisher ?? null,
+      publishedYear: meta.publishedYear ?? null,
+      language: meta.language ?? null,
+      seriesName: meta.seriesName ?? null,
+      seriesIndex: meta.seriesIndex ?? null,
+      pageCount: meta.pageCount ?? null,
+      updatedAt: new Date(),
+    };
+    const patch = (await this.seriesIdentity?.resolveMetadataPatch(scalarFields)) ?? scalarFields;
+
+    await this.db.update(bookMetadata).set(patch).where(eq(bookMetadata.bookId, bookId));
 
     if (meta.authors.length > 0) {
       await this.metadataService.replaceAuthors(

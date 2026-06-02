@@ -1,6 +1,7 @@
 import type { BooksPage } from "./book";
 
 export type SeriesSummary = {
+  id: number;
   name: string;
   bookCount: number;
   readCount: number;
@@ -17,6 +18,7 @@ export type SeriesPage = {
 };
 
 export type SeriesDetail = {
+  id: number;
   name: string;
   bookCount: number;
   readCount: number;

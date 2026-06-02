@@ -26,6 +26,48 @@ describe('FileWriteRepository', () => {
     await expect(repo.findPrimaryFileForBook(2)).resolves.toBeNull();
   });
 
+  it('findFilesForBook returns all file write targets in stable order', async () => {
+    const rows = [
+      { id: 1, absolutePath: '/a/01.mp3', format: 'mp3', sizeBytes: 5, fileHash: 'hash1', libraryId: 10 },
+      { id: 2, absolutePath: '/a/02.mp3', format: 'mp3', sizeBytes: 6, fileHash: 'hash2', libraryId: 10 },
+    ];
+    const c = chain(rows);
+    const db = {
+      select: vi.fn().mockReturnValue(c),
+    };
+
+    const repo = new FileWriteRepository(db as never);
+
+    await expect(repo.findFilesForBook(1)).resolves.toEqual(rows);
+    expect(c.orderBy).toHaveBeenCalledTimes(1);
+  });
+
+  it('findLibraryFileWriteConfig selects audio write-back settings', async () => {
+    const settings = {
+      fileWriteEnabled: true,
+      fileWriteWriteCover: true,
+      fileWriteEpubEnabled: true,
+      fileWriteEpubMaxFileSizeMb: 100,
+      fileWritePdfEnabled: true,
+      fileWritePdfMaxFileSizeMb: 100,
+      fileWriteCbxEnabled: false,
+      fileWriteCbxMaxFileSizeMb: 500,
+      fileWriteAudioEnabled: true,
+      fileWriteAudioMaxFileSizeMb: 500,
+    };
+    const c = chain([settings]);
+    const db = {
+      select: vi.fn().mockReturnValue(c),
+    };
+
+    const repo = new FileWriteRepository(db as never);
+
+    await expect(repo.findLibraryFileWriteConfig(10)).resolves.toEqual(settings);
+    expect(db.select).toHaveBeenCalledWith(
+      expect.objectContaining({ fileWriteAudioEnabled: expect.anything(), fileWriteAudioMaxFileSizeMb: expect.anything() }),
+    );
+  });
+
   it('loadPayload returns null when metadata row is absent', async () => {
     const metaChain = chain([]);
     const db = { select: vi.fn().mockReturnValue(metaChain) };

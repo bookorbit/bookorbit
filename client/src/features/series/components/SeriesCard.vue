@@ -17,7 +17,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  open: [seriesName: string]
+  open: [seriesId: number]
 }>()
 
 const { coverUrl } = useCoverVersions()
@@ -53,7 +53,7 @@ function handleCoverLoad(bookId: number, ratio: number | null) {
 }
 
 function handleClick() {
-  emit('open', props.series.name)
+  emit('open', props.series.id)
 }
 
 function handleCoverHover(bookId: number) {

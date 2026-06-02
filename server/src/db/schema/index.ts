@@ -6,6 +6,7 @@ export * from './libraries';
 export * from './books';
 export * from './collections';
 export * from './smart-scopes';
+export * from './series';
 export * from './metadata';
 export * from './narrators';
 export * from './scanner';
