@@ -70,19 +70,35 @@ describe('LibraryCreatorFileWrite', () => {
     expect(wrapper.emitted('update:fileWriteEpubEnabled')).toEqual([[false]])
     expect(wrapper.emitted('update:fileWritePdfEnabled')).toEqual([[false]])
     expect(wrapper.emitted('update:fileWriteCbxEnabled')).toEqual([[false]])
-    expect(wrapper.emitted('update:fileWriteAudioEnabled')).toEqual([[false]])
+    expect(wrapper.emitted('update:fileWriteAudioEnabled')).toEqual([[false], [false]])
     expect(wrapper.emitted('update:fileWriteEpubMaxFileSizeMb')).toEqual([[15]])
     expect(wrapper.emitted('update:fileWritePdfMaxFileSizeMb')).toEqual([[25]])
     expect(wrapper.emitted('update:fileWriteCbxMaxFileSizeMb')).toEqual([[35]])
     expect(wrapper.emitted('update:fileWriteAudioMaxFileSizeMb')).toEqual([[45]])
   })
 
-  it('renders audio controls only when file write details are visible', () => {
+  it('renders audio controls only when file write details and cover writing are enabled', () => {
     const hidden = mountComponent({ fileWriteEnabled: false, fileWriteAudioEnabled: true })
     expect(hidden.text()).not.toContain('Audio')
 
-    const visible = mountComponent({ fileWriteEnabled: true, fileWriteAudioEnabled: true })
+    const coverDisabled = mountComponent({ fileWriteEnabled: true, fileWriteWriteCover: false, fileWriteAudioEnabled: true })
+    expect(coverDisabled.text()).not.toContain('Audio')
+
+    const visible = mountComponent({ fileWriteEnabled: true, fileWriteWriteCover: true, fileWriteAudioEnabled: true })
     expect(visible.text()).toContain('Audio')
     expect(visible.text()).toContain('M4B, M4A, MP3, and FLAC')
+  })
+
+  it('disables audio embedding when cover writing is turned off', async () => {
+    const wrapper = mountComponent({
+      fileWriteEnabled: true,
+      fileWriteWriteCover: true,
+      fileWriteAudioEnabled: true,
+    })
+
+    await wrapper.findAll('[role="switch"]')[2]!.trigger('click')
+
+    expect(wrapper.emitted('update:fileWriteWriteCover')).toEqual([[false]])
+    expect(wrapper.emitted('update:fileWriteAudioEnabled')).toEqual([[false]])
   })
 })

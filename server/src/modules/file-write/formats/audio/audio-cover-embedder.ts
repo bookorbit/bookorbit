@@ -11,6 +11,7 @@ import { replaceFileAtomically } from '../shared/atomic-file-replace';
 
 const execFile = promisify(execFileCallback);
 const FFMPEG_OUTPUT_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
+const FFMPEG_TIMEOUT_MS = 60_000;
 
 @Injectable()
 export class AudioCoverEmbedder {
@@ -22,7 +23,10 @@ export class AudioCoverEmbedder {
 
     try {
       await writeFile(coverPath, await normalizeCoverJpeg(coverBytes));
-      await execFile(resolveFfmpegPath(), buildFfmpegArgs(filePath, coverPath, tempPath, format), { maxBuffer: FFMPEG_OUTPUT_MAX_BUFFER_BYTES });
+      await execFile(resolveFfmpegPath(), buildFfmpegArgs(filePath, coverPath, tempPath, format), {
+        maxBuffer: FFMPEG_OUTPUT_MAX_BUFFER_BYTES,
+        timeout: FFMPEG_TIMEOUT_MS,
+      });
       await replaceFileAtomically(tempPath, filePath);
     } catch (error) {
       await removeFileIfPresent(tempPath);

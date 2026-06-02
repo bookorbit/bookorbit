@@ -36,7 +36,11 @@ function handleFileWriteToggle() {
 }
 
 function handleWriteCoverToggle() {
-  emit('update:fileWriteWriteCover', !props.fileWriteWriteCover)
+  const next = !props.fileWriteWriteCover
+  emit('update:fileWriteWriteCover', next)
+  if (!next && props.fileWriteAudioEnabled) {
+    emit('update:fileWriteAudioEnabled', false)
+  }
 }
 
 function handleEpubToggle() {
@@ -242,7 +246,7 @@ function onAudioMaxSizeInput(e: Event) {
         </div>
       </div>
 
-      <div class="space-y-3">
+      <div v-if="fileWriteWriteCover" class="space-y-3">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-foreground">Audio</p>

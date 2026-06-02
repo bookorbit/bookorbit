@@ -2139,7 +2139,7 @@
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "default": true
+          "default": false
         },
         "file_write_audio_max_file_size_mb": {
           "name": "file_write_audio_max_file_size_mb",

@@ -88,7 +88,7 @@ describe('AudioCoverEmbedder', () => {
         '0',
         '/books/audio/.bookorbit-write-fixed-id.m4b',
       ]),
-      expect.objectContaining({ maxBuffer: expect.any(Number) }),
+      expect.objectContaining({ maxBuffer: expect.any(Number), timeout: 60_000 }),
       expect.any(Function),
     );
     expect(replaceFileAtomicallyMock).toHaveBeenCalledWith('/books/audio/.bookorbit-write-fixed-id.m4b', '/books/audio/book.m4b');
