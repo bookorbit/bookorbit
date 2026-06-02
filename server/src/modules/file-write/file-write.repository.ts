@@ -54,11 +54,29 @@ export class FileWriteRepository {
         fileWritePdfMaxFileSizeMb: libraries.fileWritePdfMaxFileSizeMb,
         fileWriteCbxEnabled: libraries.fileWriteCbxEnabled,
         fileWriteCbxMaxFileSizeMb: libraries.fileWriteCbxMaxFileSizeMb,
+        fileWriteAudioEnabled: libraries.fileWriteAudioEnabled,
+        fileWriteAudioMaxFileSizeMb: libraries.fileWriteAudioMaxFileSizeMb,
       })
       .from(libraries)
       .where(eq(libraries.id, libraryId))
       .limit(1);
     return row ?? null;
+  }
+
+  async findFilesForBook(bookId: number) {
+    return this.db
+      .select({
+        id: bookFiles.id,
+        absolutePath: bookFiles.absolutePath,
+        format: bookFiles.format,
+        sizeBytes: bookFiles.sizeBytes,
+        fileHash: bookFiles.fileHash,
+        libraryId: books.libraryId,
+      })
+      .from(bookFiles)
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .where(eq(bookFiles.bookId, bookId))
+      .orderBy(asc(bookFiles.sortOrder), asc(bookFiles.id));
   }
 
   async findNonMissingPrimaryFilesByLibrary(libraryId: number) {

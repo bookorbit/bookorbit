@@ -87,6 +87,8 @@ function makeLibrary(overrides: Partial<Library> = {}): Library {
     fileWritePdfMaxFileSizeMb: 100,
     fileWriteCbxEnabled: false,
     fileWriteCbxMaxFileSizeMb: 500,
+    fileWriteAudioEnabled: false,
+    fileWriteAudioMaxFileSizeMb: 500,
     fileRenameEnabled: false,
     folders: [{ id: 1, path: '/books', createdAt: '2024-01-01T00:00:00.000Z' }],
     createdAt: '2024-01-01T00:00:00.000Z',

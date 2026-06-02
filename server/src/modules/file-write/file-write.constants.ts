@@ -4,8 +4,13 @@ export const FORMAT_EPUB = 'epub';
 export const FORMAT_PDF = 'pdf';
 export const FORMAT_CBZ = 'cbz';
 export const FORMAT_CB7 = 'cb7';
+export const FORMAT_M4B = 'm4b';
+export const FORMAT_M4A = 'm4a';
+export const FORMAT_MP3 = 'mp3';
+export const FORMAT_FLAC = 'flac';
 
 export const CBX_FORMATS = [FORMAT_CBZ, FORMAT_CB7] as const;
+export const AUDIO_WRITE_FORMATS = [FORMAT_M4B, FORMAT_M4A, FORMAT_MP3, FORMAT_FLAC] as const;
 
 export const BOOK_WRITE_FIELD_KEYS: readonly BookWritePayloadKey[] = [
   'title',

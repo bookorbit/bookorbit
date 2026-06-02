@@ -85,6 +85,13 @@
       "when": 1780269274384,
       "tag": "0011_add_ranobedb_id",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1780359421901,
+      "tag": "0012_add_audio_file_write_settings",
+      "breakpoints": true
     }
   ]
 }

@@ -98,6 +98,7 @@ describe('Library DTO validation', () => {
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteEpubEnabled: false }))).toBe(false);
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWritePdfEnabled: false }))).toBe(false);
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteCbxEnabled: true }))).toBe(false);
+      expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteAudioEnabled: true }))).toBe(false);
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileRenameEnabled: true }))).toBe(false);
     });
 
@@ -105,6 +106,7 @@ describe('Library DTO validation', () => {
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteEnabled: 'yes' }))).toBe(true);
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteWriteCover: 1 }))).toBe(true);
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteEpubEnabled: 'true' }))).toBe(true);
+      expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteAudioEnabled: 'true' }))).toBe(true);
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileRenameEnabled: 'true' }))).toBe(true);
     });
 
@@ -129,10 +131,18 @@ describe('Library DTO validation', () => {
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteCbxMaxFileSizeMb: 10001 }))).toBe(true);
     });
 
+    it('CreateLibraryDto validates fileWriteAudioMaxFileSizeMb bounds', async () => {
+      expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteAudioMaxFileSizeMb: 0 }))).toBe(true);
+      expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteAudioMaxFileSizeMb: 1 }))).toBe(false);
+      expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteAudioMaxFileSizeMb: 10000 }))).toBe(false);
+      expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteAudioMaxFileSizeMb: 10001 }))).toBe(true);
+    });
+
     it('CreateLibraryDto rejects non-integer max size values', async () => {
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteEpubMaxFileSizeMb: 1.5 }))).toBe(true);
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWritePdfMaxFileSizeMb: 100.9 }))).toBe(true);
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteCbxMaxFileSizeMb: 0.5 }))).toBe(true);
+      expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteAudioMaxFileSizeMb: 0.5 }))).toBe(true);
     });
 
     it('UpdateLibraryDto applies the same max size constraints', async () => {
@@ -142,9 +152,11 @@ describe('Library DTO validation', () => {
       expect(await hasErrors(plainToInstance(UpdateLibraryDto, { fileWritePdfMaxFileSizeMb: 10000 }))).toBe(false);
       expect(await hasErrors(plainToInstance(UpdateLibraryDto, { fileWriteCbxMaxFileSizeMb: 0 }))).toBe(true);
       expect(await hasErrors(plainToInstance(UpdateLibraryDto, { fileWriteCbxMaxFileSizeMb: 500 }))).toBe(false);
+      expect(await hasErrors(plainToInstance(UpdateLibraryDto, { fileWriteAudioMaxFileSizeMb: 0 }))).toBe(true);
+      expect(await hasErrors(plainToInstance(UpdateLibraryDto, { fileWriteAudioMaxFileSizeMb: 500 }))).toBe(false);
     });
 
-    it('UpdateLibraryDto accepts all 9 file write fields simultaneously', async () => {
+    it('UpdateLibraryDto accepts all file write fields simultaneously', async () => {
       const dto = plainToInstance(UpdateLibraryDto, {
         fileWriteEnabled: true,
         fileWriteWriteCover: false,
@@ -154,6 +166,8 @@ describe('Library DTO validation', () => {
         fileWritePdfMaxFileSizeMb: 50,
         fileWriteCbxEnabled: true,
         fileWriteCbxMaxFileSizeMb: 1000,
+        fileWriteAudioEnabled: true,
+        fileWriteAudioMaxFileSizeMb: 750,
         fileRenameEnabled: true,
       });
       expect(await hasErrors(dto)).toBe(false);

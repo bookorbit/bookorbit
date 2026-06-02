@@ -145,6 +145,8 @@ const sectionProps = computed(() => ({
     fileWritePdfMaxFileSizeMb: form.fileWritePdfMaxFileSizeMb,
     fileWriteCbxEnabled: form.fileWriteCbxEnabled,
     fileWriteCbxMaxFileSizeMb: form.fileWriteCbxMaxFileSizeMb,
+    fileWriteAudioEnabled: form.fileWriteAudioEnabled,
+    fileWriteAudioMaxFileSizeMb: form.fileWriteAudioMaxFileSizeMb,
   },
   reading: {
     readingThreshold: form.readingThreshold,
@@ -182,6 +184,8 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
   else if (event === 'update:fileWritePdfMaxFileSizeMb') form.fileWritePdfMaxFileSizeMb = value as number
   else if (event === 'update:fileWriteCbxEnabled') form.fileWriteCbxEnabled = value as boolean
   else if (event === 'update:fileWriteCbxMaxFileSizeMb') form.fileWriteCbxMaxFileSizeMb = value as number
+  else if (event === 'update:fileWriteAudioEnabled') form.fileWriteAudioEnabled = value as boolean
+  else if (event === 'update:fileWriteAudioMaxFileSizeMb') form.fileWriteAudioMaxFileSizeMb = value as number
 }
 </script>
 
@@ -287,6 +291,8 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                 @update:fileWritePdfMaxFileSizeMb="onSectionEvent(activeId, 'update:fileWritePdfMaxFileSizeMb', $event)"
                 @update:fileWriteCbxEnabled="onSectionEvent(activeId, 'update:fileWriteCbxEnabled', $event)"
                 @update:fileWriteCbxMaxFileSizeMb="onSectionEvent(activeId, 'update:fileWriteCbxMaxFileSizeMb', $event)"
+                @update:fileWriteAudioEnabled="onSectionEvent(activeId, 'update:fileWriteAudioEnabled', $event)"
+                @update:fileWriteAudioMaxFileSizeMb="onSectionEvent(activeId, 'update:fileWriteAudioMaxFileSizeMb', $event)"
               />
             </div>
             <div class="shrink-0 px-4 py-4 border-t border-border">
@@ -423,6 +429,8 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                 @update:fileWritePdfMaxFileSizeMb="onSectionEvent(activeId, 'update:fileWritePdfMaxFileSizeMb', $event)"
                 @update:fileWriteCbxEnabled="onSectionEvent(activeId, 'update:fileWriteCbxEnabled', $event)"
                 @update:fileWriteCbxMaxFileSizeMb="onSectionEvent(activeId, 'update:fileWriteCbxMaxFileSizeMb', $event)"
+                @update:fileWriteAudioEnabled="onSectionEvent(activeId, 'update:fileWriteAudioEnabled', $event)"
+                @update:fileWriteAudioMaxFileSizeMb="onSectionEvent(activeId, 'update:fileWriteAudioMaxFileSizeMb', $event)"
               />
             </div>
 
