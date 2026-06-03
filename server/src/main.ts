@@ -32,6 +32,10 @@ async function bootstrap() {
     const isJson = ct.startsWith('application/json');
     const isEmpty = request.headers['content-length'] === '0' || request.headers['content-length'] === undefined;
     if (isJson && isEmpty) {
+      // Kobo sends Content-Length: 0 with application/json on DELETE; align header with injected body.
+      if (request.method === 'DELETE' && request.headers['content-length'] === '0') {
+        request.headers['content-length'] = '2';
+      }
       const fake = new Readable();
       fake.push('{}');
       fake.push(null);
