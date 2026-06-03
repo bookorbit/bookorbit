@@ -150,7 +150,7 @@ export class MetadataService {
 
   // Called when ebook is the winner but audio files are also present.
   // Saves audio-specific fields that no ebook format can provide: chapters and narrators.
-  // Cover is intentionally excluded — the winner ebook owns cover.
+  // Cover is intentionally excluded - the winner ebook owns cover.
   async extractAudioChaptersAndNarrators(bookId: number, absolutePath: string, format: string): Promise<void> {
     const extractor = this.extractorMap.get(format);
     if (!extractor) return;
@@ -494,11 +494,16 @@ export class MetadataService {
   private async persistAudioMetadata(bookId: number, data: ParsedBookData): Promise<void> {
     const { dto: filtered } = await this.bookMetadataLockService.filterAutomatedBookUpdate(bookId, {
       title: data.title,
+      subtitle: data.subtitle,
       description: data.description,
       publisher: data.publisher,
       publishedYear: data.publishedYear,
       language: data.language,
+      seriesName: data.seriesName,
+      seriesIndex: data.seriesIndex,
       authors: data.authors.map((author) => author.name),
+      genres: data.genres,
+      audibleId: data.audibleId,
       audioMetadata: {
         durationSeconds: data.durationSeconds ?? null,
         chapters: data.chapters && data.chapters.length > 0 ? data.chapters : null,
@@ -508,19 +513,27 @@ export class MetadataService {
 
     const scalarFields: Partial<typeof schema.bookMetadata.$inferInsert> = {};
     if (filtered.title !== undefined) scalarFields.title = filtered.title;
+    if (filtered.subtitle !== undefined) scalarFields.subtitle = filtered.subtitle;
     if (filtered.description !== undefined) scalarFields.description = filtered.description;
     if (filtered.publisher !== undefined) scalarFields.publisher = filtered.publisher;
     if (filtered.publishedYear !== undefined) scalarFields.publishedYear = normalizePublishedYear(filtered.publishedYear);
     if (filtered.language !== undefined) scalarFields.language = filtered.language;
+    if (filtered.seriesName !== undefined) scalarFields.seriesName = filtered.seriesName;
+    if (filtered.seriesIndex !== undefined) scalarFields.seriesIndex = filtered.seriesIndex;
+    if (filtered.audibleId !== undefined) scalarFields.audibleId = filtered.audibleId;
     if (filtered.audioMetadata?.durationSeconds !== undefined) scalarFields.durationSeconds = filtered.audioMetadata.durationSeconds;
     if (filtered.audioMetadata?.chapters !== undefined) scalarFields.chapters = filtered.audioMetadata.chapters;
     if (Object.keys(scalarFields).length > 0) {
       scalarFields.updatedAt = new Date();
-      await this.db.update(bookMetadata).set(scalarFields).where(eq(bookMetadata.bookId, bookId));
+      const patch = (await this.seriesIdentity?.resolveMetadataPatch(scalarFields)) ?? scalarFields;
+      await this.db.update(bookMetadata).set(patch).where(eq(bookMetadata.bookId, bookId));
     }
 
     if (filtered.authors !== undefined) {
       await this.replaceAuthors(bookId, data.authors);
+    }
+    if (filtered.genres !== undefined) {
+      await this.replaceGenres(bookId, filtered.genres);
     }
 
     if (filtered.audioMetadata?.narrators !== undefined) {
@@ -639,14 +652,16 @@ export class MetadataService {
   }
 
   private logPdfParseWarning(warning: PdfParseWarning): void {
+    const pathValue = sanitizeLogValue(warning.absolutePath);
     if (warning.code === 'buffered-large-pdf') {
       this.logger.warn(
-        `[metadata.pdf_parse] [end] path="${warning.absolutePath}" code=${warning.code} sizeBytes=${warning.sizeBytes ?? 0} thresholdBytes=${warning.thresholdBytes ?? 0} - large pdf buffered in memory`,
+        `[metadata.pdf_parse] [end] path="${pathValue}" code=${warning.code} sizeBytes=${warning.sizeBytes ?? 0} thresholdBytes=${warning.thresholdBytes ?? 0} - large pdf buffered in memory`,
       );
       return;
     }
+    const errorMessage = sanitizeLogValue(warning.errorMessage);
     this.logger.warn(
-      `[metadata.pdf_parse] [fail] path="${warning.absolutePath}" code=${warning.code} errorClass=${warning.errorClass} error="${warning.errorMessage}" - pdf parse warning emitted`,
+      `[metadata.pdf_parse] [fail] path="${pathValue}" code=${warning.code} errorClass=${warning.errorClass} error="${errorMessage}" - pdf parse warning emitted`,
     );
   }
 

@@ -14,8 +14,11 @@ export interface FileMetadata {
   seriesIndex?: number | null
   isbn10?: string | null
   isbn13?: string | null
+  audibleId?: string | null
   authors?: string[]
   genres?: string[]
+  narrators?: string[]
+  durationSeconds?: number | null
   comicMetadata?: ComicMetadataFields
 }
 

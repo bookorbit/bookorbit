@@ -36,8 +36,8 @@ vi.mock('../shared/atomic-file-replace', () => ({
   replaceFileAtomically: mocks.replaceFileAtomically,
 }));
 
-import { AudioCoverEmbedder, testing } from './audio-cover-embedder';
 import { replaceFileAtomically } from '../shared/atomic-file-replace';
+import { AudioMetadataEmbedder, testing } from './audio-metadata-embedder';
 
 const execFileMock = execFile as unknown as typeof mocks.execFile;
 const randomUUIDMock = randomUUID as unknown as typeof mocks.randomUUID;
@@ -46,7 +46,7 @@ const unlinkMock = unlink as unknown as typeof mocks.unlink;
 const sharpMock = sharp as unknown as typeof mocks.sharpFactory;
 const replaceFileAtomicallyMock = replaceFileAtomically as unknown as typeof mocks.replaceFileAtomically;
 
-describe('AudioCoverEmbedder', () => {
+describe('AudioMetadataEmbedder', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
@@ -64,11 +64,17 @@ describe('AudioCoverEmbedder', () => {
     replaceFileAtomicallyMock.mockResolvedValue(undefined);
   });
 
-  it('normalizes cover bytes to JPEG, embeds them with ffmpeg, and atomically replaces the source file', async () => {
+  it('writes text metadata, replaces cover when cover bytes are present, and atomically replaces the source file', async () => {
     vi.stubEnv('FFMPEG_PATH', '/opt/bin/ffmpeg');
-    const embedder = new AudioCoverEmbedder();
+    const embedder = new AudioMetadataEmbedder();
 
-    await embedder.embedCover('/books/audio/book.m4b', Buffer.from('raw-cover'), 'm4b');
+    await embedder.embedMetadata('/books/audio/book.m4b', 'm4b', {
+      coverBytes: Buffer.from('raw-cover'),
+      metadata: [
+        { key: 'album', value: 'Dune' },
+        { key: 'composer', value: 'Scott Brick' },
+      ],
+    });
 
     expect(sharpMock).toHaveBeenCalledWith(Buffer.from('raw-cover'));
     expect(mocks.sharpJpeg).toHaveBeenCalledWith({ quality: 92 });
@@ -76,16 +82,26 @@ describe('AudioCoverEmbedder', () => {
     expect(execFileMock).toHaveBeenCalledWith(
       '/opt/bin/ffmpeg',
       expect.arrayContaining([
+        '-v',
+        'error',
         '-i',
         '/books/audio/book.m4b',
         '-i',
         '/books/audio/.bookorbit-cover-fixed-id.jpg',
         '-map',
         '0:a',
+        '-map',
+        '0:s?',
+        '-map',
+        '1:v:0',
         '-map_metadata',
         '0',
         '-map_chapters',
         '0',
+        '-metadata',
+        'album=Dune',
+        '-metadata',
+        'composer=Scott Brick',
         '/books/audio/.bookorbit-write-fixed-id.m4b',
       ]),
       expect.objectContaining({ maxBuffer: expect.any(Number), timeout: 60_000 }),
@@ -96,40 +112,73 @@ describe('AudioCoverEmbedder', () => {
     expect(unlinkMock).toHaveBeenCalledWith('/books/audio/.bookorbit-cover-fixed-id.jpg');
   });
 
-  it('falls back to the ffmpeg binary on PATH when no override is configured', async () => {
-    const embedder = new AudioCoverEmbedder();
+  it('preserves existing embedded cover streams when no replacement cover is provided', async () => {
+    const embedder = new AudioMetadataEmbedder();
 
-    await embedder.embedCover('/books/audio/book.flac', Buffer.from('raw-cover'), 'flac');
+    await embedder.embedMetadata('/books/audio/book.flac', 'flac', { coverBytes: null, metadata: [{ key: 'album', value: 'Book' }] });
 
+    expect(sharpMock).not.toHaveBeenCalled();
+    expect(writeFileMock).not.toHaveBeenCalled();
     expect(execFileMock).toHaveBeenCalledWith(
       'ffmpeg',
-      expect.arrayContaining(['/books/audio/book.flac', '/books/audio/.bookorbit-write-fixed-id.flac']),
+      expect.arrayContaining(['-map', '0', '-metadata', 'album=Book', '/books/audio/.bookorbit-write-fixed-id.flac']),
       expect.any(Object),
       expect.any(Function),
     );
+    expect(unlinkMock).not.toHaveBeenCalledWith('/books/audio/.bookorbit-cover-fixed-id.jpg');
   });
 
   it('ignores missing temporary files during cleanup', async () => {
     unlinkMock.mockRejectedValue(Object.assign(new Error('already removed'), { code: 'ENOENT' }));
-    const embedder = new AudioCoverEmbedder();
+    const embedder = new AudioMetadataEmbedder();
 
-    await expect(embedder.embedCover('/books/audio/book.flac', Buffer.from('raw-cover'), 'flac')).resolves.toBeUndefined();
+    await expect(
+      embedder.embedMetadata('/books/audio/book.flac', 'flac', { coverBytes: Buffer.from('raw-cover'), metadata: [] }),
+    ).resolves.toBeUndefined();
 
     expect(unlinkMock).toHaveBeenCalledWith('/books/audio/.bookorbit-cover-fixed-id.jpg');
   });
 
   it('adds MP3-specific ID3v2 compatibility args', () => {
-    const args = testing.buildFfmpegArgs('/books/audio/book.mp3', '/books/audio/cover.jpg', '/books/audio/out.mp3', 'mp3');
+    const args = testing.buildFfmpegArgs('/books/audio/book.mp3', '/books/audio/cover.jpg', '/books/audio/out.mp3', 'mp3', []);
 
     expect(args).toContain('-id3v2_version');
     expect(args[args.indexOf('-id3v2_version') + 1]).toBe('3');
   });
 
-  it('maps only source audio streams before adding the replacement cover', () => {
-    const args = testing.buildFfmpegArgs('/books/audio/book.flac', '/books/audio/cover.jpg', '/books/audio/out.flac', 'flac');
+  it.each(['m4b', 'm4a'])('enables extended metadata tags for %s output', (format) => {
+    const args = testing.buildFfmpegArgs('/books/audio/book.m4b', null, `/books/audio/out.${format}`, format, [{ key: 'series', value: 'Series' }]);
 
-    expect(args).toEqual(expect.arrayContaining(['-map', '0:a', '-map', '1:v:0', '-disposition:v:0', 'attached_pic']));
-    expect(getMapTargets(args)).toEqual(['0:a', '1:v:0']);
+    expect(args).toContain('-movflags');
+    expect(args[args.indexOf('-movflags') + 1]).toBe('use_metadata_tags');
+    expect(args.indexOf('-movflags')).toBeLessThan(args.length - 1);
+  });
+
+  it.each(['m4b', 'm4a'])('does not use extended metadata tags while replacing %s cover art', (format) => {
+    const args = testing.buildFfmpegArgs('/books/audio/book.m4b', '/books/audio/cover.jpg', `/books/audio/out.${format}`, format, []);
+
+    expect(args).not.toContain('-movflags');
+  });
+
+  it('does not enable MP4 metadata tags for non-MP4 audio output', () => {
+    const args = testing.buildFfmpegArgs('/books/audio/book.flac', null, '/books/audio/out.flac', 'flac', []);
+
+    expect(args).not.toContain('-movflags');
+  });
+
+  it('preserves source audio and subtitle streams before adding the replacement cover', () => {
+    const args = testing.buildFfmpegArgs('/books/audio/book.flac', '/books/audio/cover.jpg', '/books/audio/out.flac', 'flac', []);
+
+    expect(args).toEqual(expect.arrayContaining(['-map', '0:a', '-map', '0:s?', '-map', '1:v:0', '-disposition:v:0', 'attached_pic']));
+    expect(getMapTargets(args)).toEqual(['0:a', '0:s?', '1:v:0']);
+  });
+
+  it('writes stream-scoped metadata args', () => {
+    const args = testing.buildFfmpegArgs('/books/audio/book.m4b', null, '/books/audio/out.m4b', 'm4b', [
+      { key: 'language', value: 'eng', specifier: 's:a:0' },
+    ]);
+
+    expect(args).toEqual(expect.arrayContaining(['-metadata:s:a:0', 'language=eng']));
   });
 
   it('cleans both temporary files when ffmpeg fails', async () => {
@@ -138,9 +187,11 @@ describe('AudioCoverEmbedder', () => {
         callback(new Error('ffmpeg failed'), '', '');
       },
     );
-    const embedder = new AudioCoverEmbedder();
+    const embedder = new AudioMetadataEmbedder();
 
-    await expect(embedder.embedCover('/books/audio/book.m4a', Buffer.from('raw-cover'), 'm4a')).rejects.toThrow('ffmpeg failed');
+    await expect(embedder.embedMetadata('/books/audio/book.m4a', 'm4a', { coverBytes: Buffer.from('raw-cover'), metadata: [] })).rejects.toThrow(
+      'ffmpeg failed',
+    );
 
     expect(replaceFileAtomicallyMock).not.toHaveBeenCalled();
     expect(unlinkMock).toHaveBeenCalledWith('/books/audio/.bookorbit-write-fixed-id.m4a');

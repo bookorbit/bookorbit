@@ -66,6 +66,70 @@ describe('buildComicInfoXml', () => {
     expect(parsed.ComicInfo['@_xmlns:xsd']).toBeDefined();
   });
 
+  it('writes comic-specific ComicInfo fields and prefers comic issue number', () => {
+    const xml = buildComicInfoXml(
+      null,
+      {
+        seriesIndex: 1,
+        comicIssueNumber: '12A',
+        comicVolumeName: 'Year One',
+        comicPencillers: ['Penciller A', 'Penciller B'],
+        comicInkers: ['Inker A'],
+        comicColorists: ['Colorist A'],
+        comicLetterers: ['Letterer A'],
+        comicCoverArtists: ['Cover Artist A'],
+        comicCharacters: ['Character A'],
+        comicTeams: ['Team A'],
+        comicLocations: ['Location A'],
+        comicStoryArcs: ['Arc A'],
+      },
+      new Set([
+        'seriesIndex',
+        'comicIssueNumber',
+        'comicVolumeName',
+        'comicPencillers',
+        'comicInkers',
+        'comicColorists',
+        'comicLetterers',
+        'comicCoverArtists',
+        'comicCharacters',
+        'comicTeams',
+        'comicLocations',
+        'comicStoryArcs',
+      ]),
+    );
+
+    const parsed = parser.parse(xml) as { ComicInfo: Record<string, string> };
+
+    expect(parsed.ComicInfo.Number).toBe('12A');
+    expect(parsed.ComicInfo.Volume).toBe('Year One');
+    expect(parsed.ComicInfo.Penciller).toBe('Penciller A, Penciller B');
+    expect(parsed.ComicInfo.Inker).toBe('Inker A');
+    expect(parsed.ComicInfo.Colorist).toBe('Colorist A');
+    expect(parsed.ComicInfo.Letterer).toBe('Letterer A');
+    expect(parsed.ComicInfo.CoverArtist).toBe('Cover Artist A');
+    expect(parsed.ComicInfo.Characters).toBe('Character A');
+    expect(parsed.ComicInfo.Teams).toBe('Team A');
+    expect(parsed.ComicInfo.Locations).toBe('Location A');
+    expect(parsed.ComicInfo.StoryArc).toBe('Arc A');
+  });
+
+  it('clears selected comic-specific fields when payload values are empty', () => {
+    const existing = `<?xml version="1.0"?><ComicInfo><Number>12</Number><Penciller>A</Penciller><Colorist>B</Colorist></ComicInfo>`;
+
+    const xml = buildComicInfoXml(
+      existing,
+      { comicIssueNumber: null, comicPencillers: [], comicColorists: [] },
+      new Set(['comicIssueNumber', 'comicPencillers', 'comicColorists']),
+    );
+
+    const parsed = parser.parse(xml) as { ComicInfo: Record<string, string> };
+
+    expect(parsed.ComicInfo.Number).toBeUndefined();
+    expect(parsed.ComicInfo.Penciller).toBeUndefined();
+    expect(parsed.ComicInfo.Colorist).toBeUndefined();
+  });
+
   it('keeps existing non-bookorbit note lines while replacing managed lines', () => {
     const existing = `<?xml version="1.0"?><ComicInfo><Notes>Manual note\n[bookorbit:subtitle] old\n[bookorbit:goodreadsId] 1</Notes></ComicInfo>`;
 

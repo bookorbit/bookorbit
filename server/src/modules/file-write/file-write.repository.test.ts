@@ -95,6 +95,9 @@ describe('FileWriteRepository', () => {
       amazonId: 'a',
       hardcoverId: 'h',
       openLibraryId: 'ol',
+      itunesId: 'it',
+      audibleId: 'aud',
+      rating: 4,
     };
 
     const metaChain = chain([meta]);
@@ -116,9 +119,41 @@ describe('FileWriteRepository', () => {
       where: vi.fn().mockReturnThis(),
       orderBy: vi.fn().mockResolvedValue([{ name: 'Classic' }]),
     };
+    const narratorChain = {
+      from: vi.fn().mockReturnThis(),
+      innerJoin: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockResolvedValue([{ name: 'Simon Vance' }]),
+    };
+    const comicChain = {
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([
+        {
+          issueNumber: '12',
+          volumeName: 'Volume One',
+          pencillers: ['Penciller A'],
+          inkers: ['Inker A'],
+          colorists: ['Colorist A'],
+          letterers: ['Letterer A'],
+          coverArtists: ['Cover Artist A'],
+          characters: ['Character A'],
+          teams: ['Team A'],
+          locations: ['Location A'],
+          storyArcs: ['Arc A'],
+        },
+      ]),
+    };
 
     const db = {
-      select: vi.fn().mockReturnValueOnce(metaChain).mockReturnValueOnce(authorChain).mockReturnValueOnce(genreChain).mockReturnValueOnce(tagChain),
+      select: vi
+        .fn()
+        .mockReturnValueOnce(metaChain)
+        .mockReturnValueOnce(authorChain)
+        .mockReturnValueOnce(narratorChain)
+        .mockReturnValueOnce(genreChain)
+        .mockReturnValueOnce(tagChain)
+        .mockReturnValueOnce(comicChain),
     };
 
     const repo = new FileWriteRepository(db as never);
@@ -126,8 +161,20 @@ describe('FileWriteRepository', () => {
     await expect(repo.loadPayload(9)).resolves.toEqual({
       ...meta,
       authors: [{ name: 'Frank Herbert', sortName: 'Herbert, Frank' }],
+      narrators: ['Simon Vance'],
       genres: ['Sci-Fi'],
       tags: ['Classic'],
+      comicIssueNumber: '12',
+      comicVolumeName: 'Volume One',
+      comicPencillers: ['Penciller A'],
+      comicInkers: ['Inker A'],
+      comicColorists: ['Colorist A'],
+      comicLetterers: ['Letterer A'],
+      comicCoverArtists: ['Cover Artist A'],
+      comicCharacters: ['Character A'],
+      comicTeams: ['Team A'],
+      comicLocations: ['Location A'],
+      comicStoryArcs: ['Arc A'],
     });
   });
 

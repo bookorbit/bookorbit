@@ -3,7 +3,7 @@ import { readFile, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { randomUUID } from 'crypto';
 
-import type { WriteResult } from '@bookorbit/types';
+import { CBX_BOOK_FILE_WRITE_FIELDS, type WriteResult } from '@bookorbit/types';
 import { getSevenZip, type SevenZipFS } from '../../../../common/sevenzip';
 import type { BookWritePayload, BookWritePayloadKey } from '../../interfaces/book-write-payload.interface';
 import type { FormatWriter } from '../../interfaces/format-writer.interface';
@@ -19,28 +19,7 @@ import { buildComicInfoXml } from './comic-info-builder';
 // is always written before it is added to the archive, with no await in between.
 const VFS_XML_PATH = '/ComicInfo.xml';
 const ENOENT_ERRNO = 44;
-const CBX_WRITABLE_FIELDS = new Set<BookWritePayloadKey>([
-  'title',
-  'subtitle',
-  'description',
-  'publisher',
-  'publishedYear',
-  'language',
-  'pageCount',
-  'seriesName',
-  'seriesIndex',
-  'isbn10',
-  'isbn13',
-  'rating',
-  'authors',
-  'genres',
-  'tags',
-  'googleBooksId',
-  'goodreadsId',
-  'amazonId',
-  'hardcoverId',
-  'openLibraryId',
-]);
+const CBX_WRITABLE_FIELDS = new Set<BookWritePayloadKey>(CBX_BOOK_FILE_WRITE_FIELDS);
 
 @Injectable()
 export class Cb7FormatWriter implements FormatWriter {

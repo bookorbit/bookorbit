@@ -18,6 +18,7 @@ import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pag
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { isDateKey, resolveTimeZone, toDateKeyInTimeZone, toTimeZoneStartOfDay } from '../../common/utils/timezone.utils';
 import { extractEpubMetadata } from '../metadata/lib/epub';
+import { extractAudioMetadata } from '../metadata/extractors/audio.extractor';
 import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../metadata/lib/cbz-metadata';
 import { parseFb2File } from '../metadata/lib/fb2-parser';
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
@@ -181,6 +182,24 @@ type MetadataExportBuildResult = {
   contentType: string;
   fileName: string;
 };
+
+type MetadataSaveResult = {
+  book: BookDetailDto;
+  write: WriteResult | null;
+  libraryAutoWriteEnabled: boolean;
+};
+
+type LibraryWriteSettings = {
+  fileWriteEnabled: boolean;
+  fileRenameEnabled: boolean;
+};
+
+type LibraryWriteSettingsLookupResult = {
+  settings: LibraryWriteSettings | null;
+  writeFailure: WriteResult | null;
+};
+
+type PostMetadataSaveMode = 'sync' | 'schedule';
 
 @Injectable()
 export class BookService {
@@ -900,8 +919,9 @@ export class BookService {
       if (this.isMissingFilesystemEntry(err)) return null;
       const errorClass = err instanceof Error ? err.name : 'Error';
       const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      const pathValue = sanitizeLogValue(dir);
       this.logger.warn(
-        `[${event}] [fail] bookId=${id} userId=${user.id} path="${dir}" errorClass=${errorClass} error="${errorMessage}" - get cover path failed`,
+        `[${event}] [fail] bookId=${id} userId=${user.id} path="${pathValue}" errorClass=${errorClass} error="${errorMessage}" - get cover path failed`,
       );
       throw err;
     }
@@ -918,8 +938,9 @@ export class BookService {
       if (this.isMissingFilesystemEntry(err)) return null;
       const errorClass = err instanceof Error ? err.name : 'Error';
       const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      const pathValue = sanitizeLogValue(path);
       this.logger.warn(
-        `[${event}] [fail] bookId=${id} userId=${user.id} path="${path}" errorClass=${errorClass} error="${errorMessage}" - get thumbnail path failed`,
+        `[${event}] [fail] bookId=${id} userId=${user.id} path="${pathValue}" errorClass=${errorClass} error="${errorMessage}" - get thumbnail path failed`,
       );
       throw err;
     }
@@ -1088,8 +1109,9 @@ export class BookService {
         const reason = result.reason;
         const errorClass = reason instanceof Error ? reason.name : 'Error';
         const errorMessage = sanitizeLogValue(reason instanceof Error ? reason.message : String(reason));
+        const pathValue = sanitizeLogValue(target.path);
         this.logger.warn(
-          `[${event}] [fail] userId=${user.id} path="${target.path}" kind=${target.kind} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - delete books cleanup target failed`,
+          `[${event}] [fail] userId=${user.id} path="${pathValue}" kind=${target.kind} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - delete books cleanup target failed`,
         );
       }
       this.logger.log(
@@ -1105,18 +1127,25 @@ export class BookService {
     }
   }
 
-  async updateMetadata(id: number, dto: UpdateBookMetadataDto, user: RequestUser): Promise<BookDetailDto> {
+  async updateMetadata(
+    id: number,
+    dto: UpdateBookMetadataDto,
+    user: RequestUser,
+    options: { postSaveMode?: PostMetadataSaveMode } = {},
+  ): Promise<MetadataSaveResult> {
     const event = 'book.update_metadata';
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] bookId=${id} userId=${user.id} - metadata update started`);
     try {
       await this.verifyBookAccess(id, user);
       await this.bookMetadataLockService.assertManualUpdateAllowed(id, dto);
-      const { detail, scalarFieldCount } = await this.persistMetadataUpdate(id, dto, user);
+      const { detail, scalarFieldCount, write, libraryAutoWriteEnabled } = await this.persistMetadataUpdate(id, dto, user, {
+        postSaveMode: options.postSaveMode ?? 'schedule',
+      });
       this.logger.log(
         `[${event}] [end] bookId=${id} durationMs=${Date.now() - startedAt} scalarFields=${scalarFieldCount} authorsUpdated=${dto.authors !== undefined} narratorsUpdated=${dto.audioMetadata?.narrators !== undefined} genresUpdated=${dto.genres !== undefined} tagsUpdated=${dto.tags !== undefined} audioMetadataUpdated=${dto.audioMetadata !== undefined} comicMetadataUpdated=${dto.comicMetadata !== undefined} - metadata update completed`,
       );
-      return detail;
+      return { book: detail, write, libraryAutoWriteEnabled };
     } catch (err) {
       const errorClass = err instanceof Error ? err.name : 'Error';
       const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
@@ -1127,7 +1156,12 @@ export class BookService {
     }
   }
 
-  async updateMetadataAndLocks(id: number, dto: UpdateBookMetadataAndLocksDto, user: RequestUser): Promise<BookDetailDto> {
+  async updateMetadataAndLocks(
+    id: number,
+    dto: UpdateBookMetadataAndLocksDto,
+    user: RequestUser,
+    options: { postSaveMode?: PostMetadataSaveMode } = {},
+  ): Promise<MetadataSaveResult> {
     const event = 'book.update_metadata_and_locks';
     const startedAt = Date.now();
     const metadata = dto.metadata ?? {};
@@ -1137,13 +1171,19 @@ export class BookService {
     try {
       await this.verifyBookAccess(id, user);
       await this.bookMetadataLockService.assertManualUpdateAllowedForLockTransition(id, metadata, dto.lockedFields);
-      const { detail, scalarFieldCount, normalizedLockedFields } = await this.persistMetadataUpdate(id, metadata, user, {
-        lockedFields: dto.lockedFields,
-      });
+      const { detail, scalarFieldCount, normalizedLockedFields, write, libraryAutoWriteEnabled } = await this.persistMetadataUpdate(
+        id,
+        metadata,
+        user,
+        {
+          lockedFields: dto.lockedFields,
+          postSaveMode: options.postSaveMode ?? 'schedule',
+        },
+      );
       this.logger.log(
         `[${event}] [end] bookId=${id} durationMs=${Date.now() - startedAt} scalarFields=${scalarFieldCount} lockFields=${normalizedLockedFields?.length ?? 0} - metadata and lock update completed`,
       );
-      return detail;
+      return { book: detail, write, libraryAutoWriteEnabled };
     } catch (err) {
       const errorClass = err instanceof Error ? err.name : 'Error';
       const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
@@ -1158,8 +1198,14 @@ export class BookService {
     id: number,
     dto: UpdateBookMetadataDto,
     user: RequestUser,
-    options: { lockedFields?: readonly string[] } = {},
-  ): Promise<{ detail: BookDetailDto; scalarFieldCount: number; normalizedLockedFields?: BookMetadataLockField[] }> {
+    options: { lockedFields?: readonly string[]; postSaveMode?: PostMetadataSaveMode } = {},
+  ): Promise<{
+    detail: BookDetailDto;
+    scalarFieldCount: number;
+    normalizedLockedFields?: BookMetadataLockField[];
+    write: WriteResult | null;
+    libraryAutoWriteEnabled: boolean;
+  }> {
     const scalarFields: Parameters<BookRepository['updateMetadataFields']>[1] = {};
     if (dto.title !== undefined) scalarFields.title = dto.title ?? null;
     if (dto.subtitle !== undefined) scalarFields.subtitle = dto.subtitle ?? null;
@@ -1192,6 +1238,8 @@ export class BookService {
     const hasMetadataUpdate = Object.keys(dto).length > 0;
     let replacedAuthorIds: number[] = [];
     let normalizedLockedFields: BookMetadataLockField[] | undefined;
+    let write: WriteResult | null = null;
+    let libraryAutoWriteEnabled = false;
 
     await this.bookRepo.withTransaction(async (tx) => {
       if (scalarFieldCount > 0) {
@@ -1252,16 +1300,92 @@ export class BookService {
 
     if (hasMetadataUpdate) {
       this.embedder?.embedBook(id).catch((err: Error) => this.logger.warn(`Embedding failed for book ${id}: ${err.message}`));
-      this.fileWriteService?.scheduleWrite(id, 'auto', user.id);
       const hasRenameRelevantField = Array.from(RENAME_RELEVANT_FIELDS).some((field) => (dto as Record<string, unknown>)[field] !== undefined);
-      if (hasRenameRelevantField) {
-        this.fileRenameService?.scheduleRename(id, user.id);
+      const postSaveMode = options.postSaveMode ?? 'schedule';
+      if (postSaveMode === 'sync') {
+        const settingsResult = await this.findLibraryWriteSettingsAfterSave(id);
+        const settings = settingsResult.settings;
+        write = settingsResult.writeFailure;
+        libraryAutoWriteEnabled = settings?.fileWriteEnabled ?? false;
+        this.fileWriteService?.cancelPendingWrite(id);
+        this.fileRenameService?.cancelPendingRename(id);
+
+        if (libraryAutoWriteEnabled) {
+          write = await this.writeMetadataToFileAfterSave(id, user);
+        }
+
+        if (hasRenameRelevantField && settings?.fileRenameEnabled) {
+          await this.renameFileAfterSave(id, user);
+        }
+      } else {
+        this.fileWriteService?.scheduleWrite(id, 'auto', user.id);
+        if (hasRenameRelevantField) {
+          this.fileRenameService?.scheduleRename(id, user.id);
+        }
       }
       this.scoreService.calculateAndSave(id).catch((err: Error) => this.logger.warn(`Score calculation failed for book ${id}: ${err.message}`));
     }
 
     const detail = await this.getDetail(id, user);
-    return { detail, scalarFieldCount, normalizedLockedFields };
+    return { detail, scalarFieldCount, normalizedLockedFields, write, libraryAutoWriteEnabled };
+  }
+
+  private async findLibraryWriteSettingsAfterSave(bookId: number): Promise<LibraryWriteSettingsLookupResult> {
+    const startedAt = Date.now();
+    try {
+      return {
+        settings: (await this.fileWriteService?.findLibraryWriteSettingsForBook(bookId)) ?? null,
+        writeFailure: null,
+      };
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.warn(
+        `[book.update_metadata_file_write_settings] [fail] bookId=${bookId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - post-save file write settings lookup failed`,
+      );
+      return {
+        settings: null,
+        writeFailure: {
+          status: 'failed',
+          fieldsWritten: [],
+          durationMs: Date.now() - startedAt,
+          reason: 'file write settings unavailable',
+        },
+      };
+    }
+  }
+
+  private async writeMetadataToFileAfterSave(bookId: number, user: RequestUser): Promise<WriteResult> {
+    try {
+      return (
+        (await this.fileWriteService?.writeToFile(bookId, 'auto', user.id, false, false, true)) ?? {
+          status: 'skipped',
+          fieldsWritten: [],
+          durationMs: 0,
+          reason: 'file write service unavailable',
+        }
+      );
+    } catch (err) {
+      return {
+        status: 'failed',
+        fieldsWritten: [],
+        durationMs: 0,
+        reason: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  private async renameFileAfterSave(bookId: number, user: RequestUser): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      await this.fileRenameService?.performRename(bookId, user.id, false, true);
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.warn(
+        `[book.update_metadata_rename] [fail] bookId=${bookId} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - post-save file rename failed`,
+      );
+    }
   }
 
   async updateMetadataLocks(id: number, lockedFields: string[], user: RequestUser): Promise<BookDetailDto> {
@@ -1998,7 +2122,8 @@ export class BookService {
       const updatedFields = Object.keys(dto).length;
       let detail: BookDetailDto | undefined;
       if (updatedFields > 0) {
-        detail = await this.updateMetadata(id, dto, user);
+        const saveResult = await this.updateMetadata(id, dto, user, { postSaveMode: 'schedule' });
+        detail = saveResult.book;
       }
 
       // Mark successful non-preview provider refreshes so freshness analytics are accurate,
@@ -2335,6 +2460,12 @@ export class BookService {
       lastWrittenAt: meta?.lastWrittenAt ?? null,
       metadataScore: meta?.metadataScore ?? null,
       formatPriority: (book.libraries?.formatPriority as string[] | null) ?? [],
+      fileWriteStatus: this.fileWriteService?.resolveBookFileWriteStatus(book.libraries, fileRows, book.books.primaryFileId) ?? {
+        enabled: false,
+        reason: 'library_disabled',
+        writableFormats: [],
+        writableFields: [],
+      },
       ...supplementalFields,
     };
   }
@@ -2492,20 +2623,41 @@ export class BookService {
           genres: parsed.genres.length > 0 ? parsed.genres : undefined,
         };
       }
-      default:
+      default: {
+        if (isAudioFormat(format)) {
+          const parsed = await extractAudioMetadata(absolutePath);
+          const result: Record<string, unknown> = {};
+          if (parsed.title !== null) result.title = parsed.title;
+          if (parsed.subtitle !== null) result.subtitle = parsed.subtitle;
+          if (parsed.description !== null) result.description = parsed.description;
+          if (parsed.publisher !== null) result.publisher = parsed.publisher;
+          if (parsed.publishedYear !== null) result.publishedYear = parsed.publishedYear;
+          if (parsed.language !== null) result.language = parsed.language;
+          if (parsed.seriesName !== null) result.seriesName = parsed.seriesName;
+          if (parsed.seriesIndex !== null) result.seriesIndex = parsed.seriesIndex;
+          if (parsed.audibleId !== null) result.audibleId = parsed.audibleId;
+          if (parsed.durationSeconds !== null) result.durationSeconds = parsed.durationSeconds;
+          if (parsed.authors.length > 0) result.authors = parsed.authors.map((a) => a.name);
+          if (parsed.genres.length > 0) result.genres = parsed.genres;
+          if (parsed.narrators.length > 0) result.narrators = parsed.narrators;
+          return result;
+        }
         return {};
+      }
     }
   }
 
   private logPdfFileMetadataWarning(warning: PdfParseWarning): void {
+    const pathValue = sanitizeLogValue(warning.absolutePath);
     if (warning.code === 'buffered-large-pdf') {
       this.logger.warn(
-        `[book.file_metadata_pdf] [end] path="${warning.absolutePath}" code=${warning.code} sizeBytes=${warning.sizeBytes ?? 0} thresholdBytes=${warning.thresholdBytes ?? 0} - large pdf buffered in memory`,
+        `[book.file_metadata_pdf] [end] path="${pathValue}" code=${warning.code} sizeBytes=${warning.sizeBytes ?? 0} thresholdBytes=${warning.thresholdBytes ?? 0} - large pdf buffered in memory`,
       );
       return;
     }
+    const errorMessage = sanitizeLogValue(warning.errorMessage);
     this.logger.warn(
-      `[book.file_metadata_pdf] [fail] path="${warning.absolutePath}" code=${warning.code} errorClass=${warning.errorClass} error="${warning.errorMessage}" - pdf file metadata warning emitted`,
+      `[book.file_metadata_pdf] [fail] path="${pathValue}" code=${warning.code} errorClass=${warning.errorClass} error="${errorMessage}" - pdf file metadata warning emitted`,
     );
   }
 

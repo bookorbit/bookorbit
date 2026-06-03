@@ -121,10 +121,34 @@ describe('useMetadataEditor', () => {
     form.publisher = 'Updated Publisher'
     await save(book.id)
 
-    const [, req] = apiMock.mock.calls[0] as [string, RequestInit]
+    const [url, req] = apiMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('/api/v1/books/1/metadata?syncFileWrite=true')
     const payload = JSON.parse(String(req.body)) as Record<string, unknown>
     expect(payload).toEqual({
       publisher: 'Updated Publisher',
+    })
+  })
+
+  it('returns the metadata save result from the API response', async () => {
+    const book = makeBook({ title: 'Original Title' })
+    apiMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        book: { ...book, title: 'Updated Title' },
+        write: { status: 'success', fieldsWritten: ['title'], durationMs: 12 },
+        libraryAutoWriteEnabled: true,
+      }),
+    })
+
+    const { form, load, save } = useMetadataEditor()
+    load(book)
+    form.title = 'Updated Title'
+    const result = await save(book.id)
+
+    expect(result).toEqual({
+      book: { ...book, title: 'Updated Title' },
+      write: { status: 'success', fieldsWritten: ['title'], durationMs: 12 },
+      libraryAutoWriteEnabled: true,
     })
   })
 
@@ -138,7 +162,7 @@ describe('useMetadataEditor', () => {
     await save(book.id, { saveLocks: true, lockedFields: ['goodreadsId'] })
 
     const [url, req] = apiMock.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe('/api/v1/books/1/metadata-and-locks')
+    expect(url).toBe('/api/v1/books/1/metadata-and-locks?syncFileWrite=true')
     expect(JSON.parse(String(req.body))).toEqual({
       metadata: { goodreadsId: 'manual-goodreads-id' },
       lockedFields: ['goodreadsId'],
@@ -154,7 +178,7 @@ describe('useMetadataEditor', () => {
     await save(book.id, { saveLocks: true, lockedFields: ['title'] })
 
     const [url, req] = apiMock.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe('/api/v1/books/1/metadata-and-locks')
+    expect(url).toBe('/api/v1/books/1/metadata-and-locks?syncFileWrite=true')
     expect(JSON.parse(String(req.body))).toEqual({
       metadata: {},
       lockedFields: ['title'],

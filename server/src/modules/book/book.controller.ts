@@ -69,6 +69,10 @@ function stripLoneSurrogates(value: string): string {
   return out;
 }
 
+function shouldSyncFileWrite(value: string | undefined): boolean {
+  return value === 'true';
+}
+
 function encodeFilenameStar(value: string): string | null {
   try {
     const cleaned = stripLoneSurrogates(value);
@@ -505,8 +509,15 @@ export class BookController {
     getResourceId: (req) => parseInt(req.params['id'] as string, 10),
     description: (req) => `Updated metadata for book #${req.params['id']}`,
   })
-  updateMetadata(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateBookMetadataDto, @CurrentUser() user: RequestUser) {
-    return this.bookService.updateMetadata(id, dto, user);
+  async updateMetadata(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateBookMetadataDto,
+    @CurrentUser() user: RequestUser,
+    @Query('syncFileWrite') syncFileWrite?: string,
+  ) {
+    const sync = shouldSyncFileWrite(syncFileWrite);
+    const result = await this.bookService.updateMetadata(id, dto, user, { postSaveMode: sync ? 'sync' : 'schedule' });
+    return sync ? result : result.book;
   }
 
   @Patch(':id/metadata-and-locks')
@@ -517,8 +528,15 @@ export class BookController {
     getResourceId: (req) => parseInt(req.params['id'] as string, 10),
     description: (req) => `Updated metadata and locks for book #${req.params['id']}`,
   })
-  updateMetadataAndLocks(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateBookMetadataAndLocksDto, @CurrentUser() user: RequestUser) {
-    return this.bookService.updateMetadataAndLocks(id, dto, user);
+  async updateMetadataAndLocks(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateBookMetadataAndLocksDto,
+    @CurrentUser() user: RequestUser,
+    @Query('syncFileWrite') syncFileWrite?: string,
+  ) {
+    const sync = shouldSyncFileWrite(syncFileWrite);
+    const result = await this.bookService.updateMetadataAndLocks(id, dto, user, { postSaveMode: sync ? 'sync' : 'schedule' });
+    return sync ? result : result.book;
   }
 
   @Patch(':id/metadata-locks')

@@ -39,7 +39,8 @@ export function buildComicInfoXml(existingXml: string | null, payload: BookWrite
   setComicInfoField(info, fieldMask, 'description', 'Summary', payload.description, stripHtml);
   setComicInfoField(info, fieldMask, 'publisher', 'Publisher', payload.publisher);
   setComicInfoField(info, fieldMask, 'seriesName', 'Series', payload.seriesName);
-  setComicInfoField(info, fieldMask, 'seriesIndex', 'Number', payload.seriesIndex, formatSeriesIndex);
+  setIssueNumberField(info, fieldMask, payload);
+  setComicInfoField(info, fieldMask, 'comicVolumeName', 'Volume', payload.comicVolumeName);
   setComicInfoField(info, fieldMask, 'publishedYear', 'Year', payload.publishedYear);
   setComicInfoField(info, fieldMask, 'pageCount', 'PageCount', payload.pageCount);
   setComicInfoField(info, fieldMask, 'language', 'LanguageISO', payload.language);
@@ -48,6 +49,15 @@ export function buildComicInfoXml(existingXml: string | null, payload: BookWrite
   setComicInfoField(info, fieldMask, 'tags', 'Tags', payload.tags?.length ? payload.tags.join(', ') : null);
   setComicInfoField(info, fieldMask, 'rating', 'CommunityRating', payload.rating, formatRating);
   setComicInfoField(info, fieldMask, 'isbn13', 'GTIN', payload.isbn13);
+  setComicInfoListField(info, fieldMask, 'comicPencillers', 'Penciller', payload.comicPencillers);
+  setComicInfoListField(info, fieldMask, 'comicInkers', 'Inker', payload.comicInkers);
+  setComicInfoListField(info, fieldMask, 'comicColorists', 'Colorist', payload.comicColorists);
+  setComicInfoListField(info, fieldMask, 'comicLetterers', 'Letterer', payload.comicLetterers);
+  setComicInfoListField(info, fieldMask, 'comicCoverArtists', 'CoverArtist', payload.comicCoverArtists);
+  setComicInfoListField(info, fieldMask, 'comicCharacters', 'Characters', payload.comicCharacters);
+  setComicInfoListField(info, fieldMask, 'comicTeams', 'Teams', payload.comicTeams);
+  setComicInfoListField(info, fieldMask, 'comicLocations', 'Locations', payload.comicLocations);
+  setComicInfoListField(info, fieldMask, 'comicStoryArcs', 'StoryArc', payload.comicStoryArcs);
 
   const hasProviderSelection = COMIC_INFO_PROVIDER_ID_KEYS.some((key) => fieldMask.has(key));
   if (hasProviderSelection) {
@@ -97,6 +107,22 @@ function formatSeriesIndex(val: number): string {
 
 function formatRating(val: number): string {
   return Math.min(5.0, Math.max(0.0, val / 2.0)).toFixed(1);
+}
+
+function setIssueNumberField(info: ComicInfoObject, fieldMask: Set<BookWritePayloadKey>, payload: BookWritePayload): void {
+  const comicIssueNumber = payload.comicIssueNumber?.trim();
+  if (fieldMask.has('comicIssueNumber')) {
+    if (comicIssueNumber) {
+      setComicInfoField(info, fieldMask, 'comicIssueNumber', 'Number', comicIssueNumber);
+      return;
+    }
+    if (!fieldMask.has('seriesIndex')) {
+      setComicInfoField(info, fieldMask, 'comicIssueNumber', 'Number', payload.comicIssueNumber);
+      return;
+    }
+  }
+
+  setComicInfoField(info, fieldMask, 'seriesIndex', 'Number', payload.seriesIndex, formatSeriesIndex);
 }
 
 function resolveWebUrl(payload: BookWritePayload, fieldMask: Set<BookWritePayloadKey>): string | null {
@@ -153,6 +179,25 @@ function buildNotes(existing: string | null, payload: BookWritePayload, fieldMas
 function resolveManagedTextField(payload: BookWritePayload, key: BookWritePayloadKey): string | null {
   const value = payload[key];
   return typeof value === 'string' ? value : null;
+}
+
+function setComicInfoListField(
+  info: ComicInfoObject,
+  fieldMask: Set<BookWritePayloadKey>,
+  key: BookWritePayloadKey,
+  comicInfoKey: string,
+  values: string[] | null | undefined,
+): void {
+  setComicInfoField(
+    info,
+    fieldMask,
+    key,
+    comicInfoKey,
+    values
+      ?.map((value) => value.trim())
+      .filter(Boolean)
+      .join(', ') ?? null,
+  );
 }
 
 function setComicInfoField<TValue>(

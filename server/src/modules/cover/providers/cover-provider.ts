@@ -13,6 +13,7 @@ export interface CoverSearchParams {
   title: string;
   author?: string;
   isAudiobook?: boolean;
+  ignoreProviderEnabled?: boolean;
 }
 
 export interface CoverProvider {

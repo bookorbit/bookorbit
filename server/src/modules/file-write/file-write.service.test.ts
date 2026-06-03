@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import type { MockedFunction } from 'vitest';
 import { readdir, readFile } from 'fs/promises';
+import { AUDIO_BOOK_FILE_WRITE_FIELDS, EPUB_BOOK_FILE_WRITE_FIELDS } from '@bookorbit/types';
 
 const { computeFileHashMock } = vi.hoisted(() => ({
   computeFileHashMock: vi.fn(),
@@ -11,6 +12,7 @@ vi.mock('../scanner/lib/hash', () => ({
 }));
 
 import { FileWriteService } from './file-write.service';
+import { bookOperationLockKey } from './file-lock.service';
 
 vi.mock('fs/promises', async () => {
   const actual = await vi.importActual('fs/promises');
@@ -66,11 +68,12 @@ describe('FileWriteService', () => {
       get: vi.fn().mockImplementation((key: string) => (key === 'storage.appDataPath' ? '/books' : configValues[key])),
     } as unknown as ConfigService;
 
-    const service = new FileWriteService(fileWriteRepo as never, registry as never, lockService as never, config, {
+    const notificationService = {
       notify: vi.fn().mockResolvedValue(undefined),
-    } as never);
+    };
+    const service = new FileWriteService(fileWriteRepo as never, registry as never, lockService as never, config, notificationService as never);
 
-    return { service, fileWriteRepo, registry, writer, lockService };
+    return { service, fileWriteRepo, registry, writer, lockService, notificationService };
   }
 
   beforeEach(() => {
@@ -79,6 +82,84 @@ describe('FileWriteService', () => {
     mockReadFile.mockReset();
     computeFileHashMock.mockReset();
     computeFileHashMock.mockRejectedValue(new Error('missing file'));
+  });
+
+  describe('resolveBookFileWriteStatus', () => {
+    it('returns enabled for a writable primary file', () => {
+      const { service } = makeService();
+
+      expect(service.resolveBookFileWriteStatus(DEFAULT_LIB_CONFIG, [{ id: 1, format: 'epub', sizeBytes: 1024 }], 1)).toEqual({
+        enabled: true,
+        reason: null,
+        writableFormats: ['epub'],
+        writableFields: [...EPUB_BOOK_FILE_WRITE_FIELDS],
+      });
+    });
+
+    it('excludes cover from writable fields when cover writing is disabled', () => {
+      const { service } = makeService();
+
+      expect(
+        service.resolveBookFileWriteStatus({ ...DEFAULT_LIB_CONFIG, fileWriteWriteCover: false }, [{ id: 1, format: 'epub', sizeBytes: 1024 }], 1),
+      ).toEqual({
+        enabled: true,
+        reason: null,
+        writableFormats: ['epub'],
+        writableFields: EPUB_BOOK_FILE_WRITE_FIELDS.filter((field) => field !== 'coverBytes'),
+      });
+    });
+
+    it('uses all audio files when the primary file is audio', () => {
+      const { service, registry } = makeService();
+      registry.supports.mockImplementation((format: string) => ['mp3', 'm4b'].includes(format));
+
+      expect(
+        service.resolveBookFileWriteStatus(
+          DEFAULT_LIB_CONFIG,
+          [
+            { id: 1, format: 'mp3', sizeBytes: 1024 },
+            { id: 2, format: 'm4b', sizeBytes: 2048 },
+            { id: 3, format: 'opus', sizeBytes: 4096 },
+          ],
+          1,
+        ),
+      ).toEqual({
+        enabled: true,
+        reason: null,
+        writableFormats: ['mp3', 'm4b'],
+        writableFields: [...AUDIO_BOOK_FILE_WRITE_FIELDS],
+      });
+    });
+
+    it('returns disabled when library write-back is disabled', () => {
+      const { service } = makeService();
+
+      expect(
+        service.resolveBookFileWriteStatus({ ...DEFAULT_LIB_CONFIG, fileWriteEnabled: false }, [{ id: 1, format: 'epub', sizeBytes: 1024 }], 1),
+      ).toEqual({
+        enabled: false,
+        reason: 'library_disabled',
+        writableFormats: [],
+        writableFields: [],
+      });
+    });
+
+    it('returns disabled when the target exceeds its format size limit', () => {
+      const { service } = makeService();
+
+      expect(
+        service.resolveBookFileWriteStatus(
+          { ...DEFAULT_LIB_CONFIG, fileWriteEpubMaxFileSizeMb: 1 },
+          [{ id: 1, format: 'epub', sizeBytes: 2 * 1024 * 1024 }],
+          1,
+        ),
+      ).toEqual({
+        enabled: false,
+        reason: 'file_exceeds_size_limit',
+        writableFormats: [],
+        writableFields: [],
+      });
+    });
   });
 
   it('returns skip when no primary file exists', async () => {
@@ -185,7 +266,8 @@ describe('FileWriteService', () => {
     const result = await service.writeToFile(5, 'auto');
 
     expect(result).toEqual({ status: 'success', fieldsWritten: ['title'], durationMs: 13 });
-    expect(lockService.withLock).toHaveBeenCalledTimes(1);
+    expect(lockService.withLock).toHaveBeenCalledTimes(2);
+    expect(lockService.withLock).toHaveBeenNthCalledWith(1, bookOperationLockKey(5), expect.any(Function));
     expect(writer.write).toHaveBeenCalledWith(
       '/books/lib/book.epub',
       expect.objectContaining({ title: 'Dune', coverBytes }),
@@ -363,18 +445,19 @@ describe('FileWriteService', () => {
     expect(result.fieldsWritten).toEqual(['coverBytes']);
     expect(fileWriteRepo.findFilesForBook).toHaveBeenCalledWith(20);
     expect(mockReadFile).toHaveBeenCalledTimes(1);
-    expect(lockService.withLock).toHaveBeenCalledTimes(2);
+    expect(lockService.withLock).toHaveBeenCalledTimes(3);
+    expect(lockService.withLock).toHaveBeenNthCalledWith(1, bookOperationLockKey(20), expect.any(Function));
     expect(writer.write).toHaveBeenNthCalledWith(
       1,
       '/books/audio/book.m4b',
       expect.objectContaining({ title: 'Audio Book', coverBytes: Buffer.from('cover') }),
-      expect.objectContaining({ dryRun: false }),
+      expect.objectContaining({ dryRun: false, isMultiTrackAudio: true, trackNumber: 1, trackTotal: 2, trackTitle: 'book' }),
     );
     expect(writer.write).toHaveBeenNthCalledWith(
       2,
       '/books/audio/track-02.mp3',
       expect.objectContaining({ title: 'Audio Book', coverBytes: Buffer.from('cover') }),
-      expect.objectContaining({ dryRun: false }),
+      expect.objectContaining({ dryRun: false, isMultiTrackAudio: true, trackNumber: 2, trackTotal: 2, trackTitle: 'track-02' }),
     );
     expect(fileWriteRepo.insertLog).toHaveBeenCalledTimes(3);
     expect(fileWriteRepo.insertLog).toHaveBeenCalledWith(

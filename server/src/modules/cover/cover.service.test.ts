@@ -225,6 +225,28 @@ describe('CoverService', () => {
         'https://img.example/it-6.jpg',
       ]);
     });
+
+    it('marks explicit iTunes provider searches as user-selected even when provider config is disabled', async () => {
+      const provider = {
+        key: ITUNES_PROVIDER_KEY,
+        search: vi.fn().mockResolvedValue([makeResult('https://img.example/it.jpg', 'https://thumb.example/it.jpg')]),
+      };
+      const providerRegistry = {
+        select: vi.fn().mockReturnValue([provider]),
+      } as unknown as CoverProviderRegistry;
+      const service = createService(providerRegistry);
+
+      const results = await service.searchCovers({ title: 'The Martian', author: 'Andy Weir', isAudiobook: true, provider: 'itunes' });
+
+      expect(provider.search).toHaveBeenCalledWith({
+        title: 'The Martian',
+        author: 'Andy Weir',
+        isAudiobook: true,
+        ignoreProviderEnabled: true,
+      });
+      expect(results).toHaveLength(1);
+      expect(results[0].previewUrl).toBe('/api/v1/books/cover/proxy?url=https%3A%2F%2Fthumb.example%2Fit.jpg');
+    });
   });
 
   describe('proxyImage', () => {

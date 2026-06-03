@@ -10,7 +10,7 @@ import { AppSettingsService } from '../app-settings/app-settings.service';
 import { NotificationService } from '../notification/notification.service';
 import type { BookFilePathUpdate, BookRenameData } from './file-rename.repository';
 import { FileRenameRepository } from './file-rename.repository';
-import { FileLockService } from './file-lock.service';
+import { FileLockService, bookOperationLockKey } from './file-lock.service';
 import { buildTokens } from './file-rename.utils';
 
 const FILE_RENAME_EVENT = 'file.rename';
@@ -77,6 +77,10 @@ export class FileRenameService implements OnModuleDestroy {
   }
 
   async performRename(bookId: number, userId: number, force = false, suppressNotification = false): Promise<FileRenameResult> {
+    return this.lockService.withLock(bookOperationLockKey(bookId), () => this.performRenameLocked(bookId, userId, force, suppressNotification));
+  }
+
+  private async performRenameLocked(bookId: number, userId: number, force = false, suppressNotification = false): Promise<FileRenameResult> {
     const startedAt = Date.now();
     this.logger.log(`[${FILE_RENAME_EVENT}] [start] bookId=${bookId} userId=${userId} force=${force} - file rename started`);
 

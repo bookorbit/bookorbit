@@ -1,3 +1,4 @@
+import { BOOK_FILE_WRITE_FIELDS } from '@bookorbit/types';
 import type { BookWritePayloadKey } from './interfaces/book-write-payload.interface';
 
 export const FORMAT_EPUB = 'epub';
@@ -12,30 +13,7 @@ export const FORMAT_FLAC = 'flac';
 export const CBX_FORMATS = [FORMAT_CBZ, FORMAT_CB7] as const;
 export const AUDIO_WRITE_FORMATS = [FORMAT_M4B, FORMAT_M4A, FORMAT_MP3, FORMAT_FLAC] as const;
 
-export const BOOK_WRITE_FIELD_KEYS: readonly BookWritePayloadKey[] = [
-  'title',
-  'subtitle',
-  'description',
-  'publisher',
-  'publishedYear',
-  'language',
-  'pageCount',
-  'seriesName',
-  'seriesIndex',
-  'isbn10',
-  'isbn13',
-  'rating',
-  'authors',
-  'genres',
-  'tags',
-  'googleBooksId',
-  'goodreadsId',
-  'amazonId',
-  'hardcoverId',
-  'openLibraryId',
-  'itunesId',
-  'coverBytes',
-];
+export const BOOK_WRITE_FIELD_KEYS = BOOK_FILE_WRITE_FIELDS satisfies readonly BookWritePayloadKey[];
 
 export function createBookWriteFieldMask(): Set<BookWritePayloadKey> {
   return new Set(BOOK_WRITE_FIELD_KEYS);

@@ -4,7 +4,7 @@ import { dirname, join } from 'path';
 import { randomUUID } from 'crypto';
 import { PDFDocument, PDFName } from 'pdf-lib';
 
-import type { WriteResult } from '@bookorbit/types';
+import { PDF_BOOK_FILE_WRITE_FIELDS, type WriteResult } from '@bookorbit/types';
 import type { BookWritePayload, BookWritePayloadKey } from '../../interfaces/book-write-payload.interface';
 import type { FormatWriter } from '../../interfaces/format-writer.interface';
 import type { FormatWriteOptions } from '../../interfaces/format-write-options.interface';
@@ -13,6 +13,8 @@ import { BOOKORBIT_NS_PREFIX } from '../shared/bookorbit-ns';
 import { resolveFieldsWritten } from '../shared/resolve-fields-written';
 import { buildXmp } from './pdf-xmp-builder';
 
+const PDF_WRITABLE_FIELDS = new Set<BookWritePayloadKey>(PDF_BOOK_FILE_WRITE_FIELDS);
+
 @Injectable()
 export class PdfFormatWriter implements FormatWriter {
   readonly format = 'pdf';
@@ -20,7 +22,8 @@ export class PdfFormatWriter implements FormatWriter {
   async write(filePath: string, payload: BookWritePayload, options: FormatWriteOptions): Promise<WriteResult> {
     const start = Date.now();
     const { fieldMask, dryRun } = options;
-    const fieldsWritten = resolveFieldsWritten(payload, fieldMask);
+    const pdfFieldMask = new Set([...fieldMask].filter((key) => PDF_WRITABLE_FIELDS.has(key)));
+    const fieldsWritten = resolveFieldsWritten(payload, pdfFieldMask);
 
     if (dryRun) {
       return { status: 'skipped', reason: 'dry-run', fieldsWritten, durationMs: Date.now() - start };
@@ -29,8 +32,8 @@ export class PdfFormatWriter implements FormatWriter {
     const originalBytes = await readFile(filePath);
     const pdfDoc = await PDFDocument.load(originalBytes, { ignoreEncryption: true });
 
-    applyInfoDict(pdfDoc, payload, fieldMask);
-    embedXmp(pdfDoc, buildXmp(payload, fieldMask));
+    applyInfoDict(pdfDoc, payload, pdfFieldMask);
+    embedXmp(pdfDoc, buildXmp(payload, pdfFieldMask));
 
     const savedBytes = await pdfDoc.save();
 

@@ -24,3 +24,7 @@ export class FileLockService {
     }
   }
 }
+
+export function bookOperationLockKey(bookId: number): string {
+  return `book:${bookId}`;
+}

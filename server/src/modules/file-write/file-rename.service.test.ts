@@ -17,6 +17,7 @@ vi.mock('fs/promises', async () => {
 
 import type { BookRenameData } from './file-rename.repository';
 import { FileRenameService } from './file-rename.service';
+import { bookOperationLockKey } from './file-lock.service';
 
 const mockAccess = access as MockedFunction<typeof access>;
 const mockMkdir = mkdir as MockedFunction<typeof mkdir>;
@@ -208,6 +209,7 @@ describe('FileRenameService', () => {
     );
     expect(renameRepo.applyFileRename.mock.invocationCallOrder[0]).toBeLessThan(mockRename.mock.invocationCallOrder[0]);
     expect(mockMkdir).toHaveBeenCalledWith('/library/Frank Herbert', { recursive: true });
+    expect(lockService.withLock).toHaveBeenNthCalledWith(1, bookOperationLockKey(5), expect.any(Function));
     expect(lockService.withLock).toHaveBeenCalledWith('/library/Old Title.epub', expect.any(Function));
     expect(mockRename).toHaveBeenCalledWith('/library/Old Title.epub', '/library/Frank Herbert/Dune.epub');
     expect(notificationService.notify).toHaveBeenCalledWith(
@@ -326,8 +328,9 @@ describe('FileRenameService', () => {
     );
     expect(mockRename).toHaveBeenNthCalledWith(1, '/library/old-folder', '/library/Frank Herbert/Dune');
     expect(mockRename).toHaveBeenNthCalledWith(2, '/library/Frank Herbert/Dune/Old Title.epub', '/library/Frank Herbert/Dune/Dune.epub');
-    expect(lockService.withLock).toHaveBeenNthCalledWith(1, '/library/old-folder', expect.any(Function));
-    expect(lockService.withLock).toHaveBeenNthCalledWith(2, '/library/Frank Herbert/Dune/Old Title.epub', expect.any(Function));
+    expect(lockService.withLock).toHaveBeenNthCalledWith(1, bookOperationLockKey(5), expect.any(Function));
+    expect(lockService.withLock).toHaveBeenNthCalledWith(2, '/library/old-folder', expect.any(Function));
+    expect(lockService.withLock).toHaveBeenNthCalledWith(3, '/library/Frank Herbert/Dune/Old Title.epub', expect.any(Function));
   });
 
   it('rolls back database paths and reports failure when the filesystem rename fails', async () => {

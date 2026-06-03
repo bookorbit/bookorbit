@@ -8,8 +8,8 @@ import { FileWriteModule } from './file-write.module';
 import { FileWriteRepository } from './file-write.repository';
 import { FileWriteService } from './file-write.service';
 import { FormatWriterRegistry } from './format-writer.registry';
-import { AudioCoverEmbedder } from './formats/audio/audio-cover-embedder';
 import { FlacAudioFormatWriter, M4aAudioFormatWriter, M4bAudioFormatWriter, Mp3AudioFormatWriter } from './formats/audio/audio-format-writer';
+import { AudioMetadataEmbedder } from './formats/audio/audio-metadata-embedder';
 import { Cb7FormatWriter } from './formats/cbx/cb7-format-writer';
 import { CbzFormatWriter } from './formats/cbx/cbz-format-writer';
 import { EpubFormatWriter } from './formats/epub/epub-format-writer';
@@ -30,7 +30,7 @@ describe('FileWriteModule', () => {
         FileRenameRepository,
         FileRenameService,
         FileLockService,
-        AudioCoverEmbedder,
+        AudioMetadataEmbedder,
         EpubFormatWriter,
         PdfFormatWriter,
         CbzFormatWriter,

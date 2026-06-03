@@ -1,5 +1,6 @@
+import { EPUB_BOOK_FILE_WRITE_FIELDS } from '@bookorbit/types';
 import { XMLParser, XMLBuilder } from 'fast-xml-parser';
-import type { BookWritePayload } from '../../interfaces/book-write-payload.interface';
+import type { BookWritePayload, BookWritePayloadKey } from '../../interfaces/book-write-payload.interface';
 import { EPUB_PROVIDER_IDENTIFIER_SCHEMES } from '../../file-write.constants';
 import { BOOKORBIT_NS_PREFIX as APP_WRITE_NAMESPACE, BOOKORBIT_NS_URI as APP_NS_URI } from '../shared/bookorbit-ns';
 import { resolveFieldsWritten } from '../shared/resolve-fields-written';
@@ -23,6 +24,8 @@ const writerBuilder = new XMLBuilder({
 });
 
 type OrderedNode = Record<string, unknown>;
+
+const EPUB_WRITABLE_FIELDS = new Set<BookWritePayloadKey>(EPUB_BOOK_FILE_WRITE_FIELDS);
 
 function attr(obj: Record<string, unknown>, key: string): string {
   const v = obj[key];
@@ -366,7 +369,7 @@ export function build(opfXml: string, payload: BookWritePayload): { newOpfXml: s
 
   const newOpfXml = String(writerBuilder.build(parsed));
 
-  return { newOpfXml, fieldsWritten: resolveFieldsWritten(payload) };
+  return { newOpfXml, fieldsWritten: resolveFieldsWritten(payload, EPUB_WRITABLE_FIELDS) };
 }
 
 type EpubProviderIdentifierKey = keyof typeof EPUB_PROVIDER_IDENTIFIER_SCHEMES;

@@ -25,7 +25,7 @@ export class ITunesCoverProvider implements CoverProvider {
 
   async search(params: CoverSearchParams): Promise<CoverSearchResult[]> {
     const { enabled, coverResolution } = await this.providerConfig.getConfig().then((config) => config.itunes);
-    if (!enabled) return [];
+    if (!enabled && !params.ignoreProviderEnabled) return [];
 
     const query = this.buildQuery(params);
     if (!query) return [];

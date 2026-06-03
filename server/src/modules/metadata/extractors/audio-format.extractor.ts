@@ -6,12 +6,16 @@ export class AudioFormatExtractor implements FormatExtractor {
     const audio = await extractAudioMetadata(absolutePath);
     return {
       title: audio.title,
+      subtitle: audio.subtitle,
       description: audio.description,
       publisher: audio.publisher,
       publishedYear: audio.publishedYear,
       language: audio.language,
+      seriesName: audio.seriesName,
+      seriesIndex: audio.seriesIndex,
       authors: audio.authors,
-      genres: [],
+      genres: audio.genres,
+      audibleId: audio.audibleId,
       cover: audio.coverBytes,
       narrators: audio.narrators,
       durationSeconds: audio.durationSeconds,

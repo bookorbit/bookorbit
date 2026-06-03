@@ -1,6 +1,6 @@
 import { computed, reactive, ref } from 'vue'
 import { api } from '@/lib/api'
-import { FORMAT_TO_GROUP, type BookDetail, type BookMetadataLockField } from '@bookorbit/types'
+import { FORMAT_TO_GROUP, type BookDetail, type BookMetadataLockField, type BookMetadataSaveResult } from '@bookorbit/types'
 
 const ROOT_FIELDS = [
   'title',
@@ -184,21 +184,29 @@ export function useMetadataEditor() {
     return payload
   }
 
+  function normalizeSaveResult(data: BookDetail | BookMetadataSaveResult): BookMetadataSaveResult {
+    if ('book' in data && 'libraryAutoWriteEnabled' in data) {
+      return data
+    }
+    return { book: data, write: null, libraryAutoWriteEnabled: false }
+  }
+
   async function save(
     bookId: number,
     options: { lockedFields?: readonly BookMetadataLockField[]; saveLocks?: boolean } = {},
-  ): Promise<BookDetail | null> {
+  ): Promise<BookMetadataSaveResult | null> {
     saving.value = true
     error.value = null
     try {
       const metadata = buildPayload()
-      const res = await api(options.saveLocks ? `/api/v1/books/${bookId}/metadata-and-locks` : `/api/v1/books/${bookId}/metadata`, {
+      const path = options.saveLocks ? `/api/v1/books/${bookId}/metadata-and-locks` : `/api/v1/books/${bookId}/metadata`
+      const res = await api(`${path}?syncFileWrite=true`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(options.saveLocks ? { metadata, lockedFields: options.lockedFields ?? [] } : metadata),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const updated: BookDetail = await res.json()
+      const updated = normalizeSaveResult((await res.json()) as BookDetail | BookMetadataSaveResult)
       snapshot.value = JSON.stringify(form)
       return updated
     } catch (e) {

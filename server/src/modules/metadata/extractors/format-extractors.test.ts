@@ -392,11 +392,16 @@ describe('metadata format extractors', () => {
   it('audio extractor maps core metadata, narrators, duration, and chapters', async () => {
     mockExtractAudioMetadata.mockResolvedValue({
       title: 'Project Hail Mary',
+      subtitle: 'A Novel',
       description: 'Audiobook',
       publisher: 'Random House',
       publishedYear: 2021,
       language: 'en',
+      seriesName: 'Project Hail Mary',
+      seriesIndex: 1,
       authors: [{ name: 'Andy Weir', sortName: null }],
+      genres: ['Science Fiction'],
+      audibleId: 'B08G9PRS1K',
       narrators: ['Ray Porter'],
       durationSeconds: 3600,
       chapters: [{ title: 'Chapter 1', startMs: 0 }],
@@ -406,6 +411,11 @@ describe('metadata format extractors', () => {
     await expect(new AudioFormatExtractor().extract('/books/hail-mary.m4b')).resolves.toEqual(
       expect.objectContaining({
         title: 'Project Hail Mary',
+        subtitle: 'A Novel',
+        seriesName: 'Project Hail Mary',
+        seriesIndex: 1,
+        genres: ['Science Fiction'],
+        audibleId: 'B08G9PRS1K',
         narrators: ['Ray Porter'],
         durationSeconds: 3600,
         chapters: [{ title: 'Chapter 1', startMs: 0 }],

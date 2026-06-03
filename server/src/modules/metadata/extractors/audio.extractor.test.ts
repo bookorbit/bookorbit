@@ -75,7 +75,20 @@ function resetMocks() {
 describe('extractAudioMetadata — author/narrator split', () => {
   beforeEach(() => resetMocks());
 
-  it('uses albumartist as author and artist as narrator', async () => {
+  it('uses albumartist as author and composer as narrator for modern tags', async () => {
+    makeExecFileSuccess(
+      makeProbeOutput({
+        format: { tags: { album: 'The Lord of the Rings', albumartist: 'J.R.R. Tolkien', artist: 'J.R.R. Tolkien', composer: 'Andy Serkis' } },
+      }),
+    );
+
+    const result = await extractAudioMetadata('/path/lotr.m4b');
+
+    expect(result.authors).toEqual([{ name: 'J.R.R. Tolkien', sortName: null }]);
+    expect(result.narrators).toEqual(['Andy Serkis']);
+  });
+
+  it('uses artist as narrator for old BookOrbit tags when albumartist exists and composer is absent', async () => {
     makeExecFileSuccess(
       makeProbeOutput({ format: { tags: { album: 'The Lord of the Rings', albumartist: 'J.R.R. Tolkien', artist: 'Andy Serkis' } } }),
     );
@@ -93,6 +106,35 @@ describe('extractAudioMetadata — author/narrator split', () => {
 
     expect(result.authors).toEqual([{ name: 'Douglas Adams', sortName: null }]);
     expect(result.narrators).toEqual([]);
+  });
+
+  it('uses artist as author and composer as narrator when albumartist is absent', async () => {
+    makeExecFileSuccess(makeProbeOutput({ format: { tags: { album: 'Project Hail Mary', artist: 'Andy Weir', composer: 'Ray Porter' } } }));
+
+    const result = await extractAudioMetadata('/path/project-hail-mary.m4b');
+
+    expect(result.authors).toEqual([{ name: 'Andy Weir', sortName: null }]);
+    expect(result.narrators).toEqual(['Ray Porter']);
+  });
+
+  it('splits composer narrators by comma', async () => {
+    makeExecFileSuccess(
+      makeProbeOutput({
+        format: { tags: { album: 'The Eye of the Bedlam Bride', artist: 'Matt Dinniman', composer: 'Jeff Hays, Patrick Warburton, Travis Baldree' } },
+      }),
+    );
+
+    const result = await extractAudioMetadata('/path/bedlam-bride.m4b');
+
+    expect(result.narrators).toEqual(['Jeff Hays', 'Patrick Warburton', 'Travis Baldree']);
+  });
+
+  it('does not split authors by comma', async () => {
+    makeExecFileSuccess(makeProbeOutput({ format: { tags: { album: 'Star Surgeon', artist: 'Nourse, Alan E.' } } }));
+
+    const result = await extractAudioMetadata('/path/star-surgeon.m4b');
+
+    expect(result.authors).toEqual([{ name: 'Nourse, Alan E.', sortName: null }]);
   });
 
   it('splits albumartist by semicolons', async () => {
@@ -179,6 +221,15 @@ describe('extractAudioMetadata — title', () => {
 
     expect(result.title).toBeNull();
   });
+
+  it('maps subtitle tag separately from title', async () => {
+    makeExecFileSuccess(makeProbeOutput({ format: { tags: { album: 'Dungeon Crawler Carl', subtitle: 'A LitRPG/Gamelit Adventure' } } }));
+
+    const result = await extractAudioMetadata('/path/dcc.m4b');
+
+    expect(result.title).toBe('Dungeon Crawler Carl');
+    expect(result.subtitle).toBe('A LitRPG/Gamelit Adventure');
+  });
 });
 
 // ── DURATION ─────────────────────────────────────────────────────────────────
@@ -198,6 +249,14 @@ describe('extractAudioMetadata — duration', () => {
     makeExecFileSuccess(JSON.stringify({ format: { tags: {} }, streams: [], chapters: [] }));
 
     const result = await extractAudioMetadata('/path/no-duration.m4b');
+
+    expect(result.durationSeconds).toBeNull();
+  });
+
+  it('returns null duration when format.duration is not numeric', async () => {
+    makeExecFileSuccess(makeProbeOutput({ format: { duration: 'N/A', tags: {} } }));
+
+    const result = await extractAudioMetadata('/path/bad-duration.m4b');
 
     expect(result.durationSeconds).toBeNull();
   });
@@ -245,6 +304,21 @@ describe('extractAudioMetadata — chapters', () => {
     const result = await extractAudioMetadata('/path/no-chapters.mp3');
 
     expect(result.chapters).toEqual([]);
+  });
+
+  it('skips chapters with non-numeric start times', async () => {
+    makeExecFileSuccess(
+      makeProbeOutput({
+        chapters: [
+          { start_time: 'N/A', tags: { title: 'Bad Chapter' } },
+          { start_time: '42.500', tags: { title: 'Good Chapter' } },
+        ],
+      }),
+    );
+
+    const result = await extractAudioMetadata('/path/book.m4b');
+
+    expect(result.chapters).toEqual([{ title: 'Good Chapter', startMs: 42500 }]);
   });
 });
 
@@ -337,7 +411,19 @@ describe('extractAudioMetadata — misc fields', () => {
   it('maps publisher, publishedYear from date tag, description, and language from tags', async () => {
     makeExecFileSuccess(
       makeProbeOutput({
-        format: { duration: '100', tags: { publisher: 'Macmillan Audio', date: '2006-04-15', comment: 'An epic sci-fi audiobook', language: 'eng' } },
+        format: {
+          duration: '100',
+          tags: {
+            publisher: 'Macmillan Audio',
+            date: '2006-04-15',
+            comment: 'An epic sci-fi audiobook',
+            language: 'eng',
+            genre: 'Science Fiction; Adventure',
+            series: 'Dune',
+            'series-part': '1.5',
+            asin: 'B000R34YKC',
+          },
+        },
       }),
     );
 
@@ -347,6 +433,32 @@ describe('extractAudioMetadata — misc fields', () => {
     expect(result.publishedYear).toBe(2006);
     expect(result.description).toBe('An epic sci-fi audiobook');
     expect(result.language).toBe('eng');
+    expect(result.genres).toEqual(['Science Fiction', 'Adventure']);
+    expect(result.seriesName).toBe('Dune');
+    expect(result.seriesIndex).toBe(1.5);
+    expect(result.audibleId).toBe('B000R34YKC');
+  });
+
+  it('uses audible_asin when asin is absent and deduplicates semicolon-separated genres', async () => {
+    makeExecFileSuccess(makeProbeOutput({ format: { tags: { genre: 'Mystery; mystery; Thriller', audible_asin: 'AUDIBLE123' } } }));
+
+    const result = await extractAudioMetadata('/path/book.m4b');
+
+    expect(result.genres).toEqual(['Mystery', 'Thriller']);
+    expect(result.audibleId).toBe('AUDIBLE123');
+  });
+
+  it.each([
+    ['part', '6'],
+    ['series_part', '7'],
+    ['seriespart', '8'],
+  ])('uses %s as a series index fallback', async (tagName, rawIndex) => {
+    makeExecFileSuccess(makeProbeOutput({ format: { tags: { series: 'Dungeon Crawler Carl', [tagName]: rawIndex } } }));
+
+    const result = await extractAudioMetadata('/path/book.m4b');
+
+    expect(result.seriesName).toBe('Dungeon Crawler Carl');
+    expect(result.seriesIndex).toBe(Number(rawIndex));
   });
 
   it('parses year from a plain year string', async () => {
@@ -391,6 +503,32 @@ describe('extractAudioMetadata — misc fields', () => {
     const result = await extractAudioMetadata('/path/french.m4b');
 
     expect(result.language).toBe('fra');
+  });
+
+  it('ignores undefined format language and falls back to stream language', async () => {
+    makeExecFileSuccess(
+      makeProbeOutput({
+        format: { duration: '100', tags: { language: 'und' } },
+        streams: [{ codec_type: 'audio', codec_name: 'aac', tags: { language: 'eng' } }],
+      }),
+    );
+
+    const result = await extractAudioMetadata('/path/book.m4b');
+
+    expect(result.language).toBe('eng');
+  });
+
+  it('returns null when language tags are unknown placeholders', async () => {
+    makeExecFileSuccess(
+      makeProbeOutput({
+        format: { duration: '100', tags: { language: 'unknown' } },
+        streams: [{ codec_type: 'audio', codec_name: 'aac', tags: { language: 'und' } }],
+      }),
+    );
+
+    const result = await extractAudioMetadata('/path/book.m4b');
+
+    expect(result.language).toBeNull();
   });
 
   it('prefers format language tag over stream language', async () => {
@@ -498,6 +636,14 @@ describe('parseAudioDuration', () => {
     expect(result).toBeNull();
   });
 
+  it('returns null when format.duration is not numeric', async () => {
+    makeExecFileSuccess(JSON.stringify({ format: { duration: 'N/A' } }));
+
+    const result = await parseAudioDuration('/path/bad-duration.mp3');
+
+    expect(result).toBeNull();
+  });
+
   it('returns null when ffprobe throws', async () => {
     makeExecFileError('read error');
 
@@ -532,15 +678,51 @@ describe('extractAudioMetadata — description tag fallback', () => {
     expect(result.description).toBe('A great book');
   });
 
-  it('prefers comment tag over description tag', async () => {
-    makeExecFileSuccess(makeProbeOutput({ format: { tags: { comment: 'Comment wins', description: 'Description loses' } } }));
+  it('uses description tag when it is longer than comment tag', async () => {
+    makeExecFileSuccess(makeProbeOutput({ format: { tags: { comment: 'Truncated text', description: 'Longer complete description text' } } }));
 
     const result = await extractAudioMetadata('/path/book.m4b');
 
-    expect(result.description).toBe('Comment wins');
+    expect(result.description).toBe('Longer complete description text');
   });
 
-  it('returns null description when neither comment nor description tag is present', async () => {
+  it('uses comment tag when it is longer than description tag', async () => {
+    makeExecFileSuccess(makeProbeOutput({ format: { tags: { comment: 'Longer complete comment text', description: 'Short text' } } }));
+
+    const result = await extractAudioMetadata('/path/book.m4b');
+
+    expect(result.description).toBe('Longer complete comment text');
+  });
+
+  it('uses lyrics tag when it is longer than comment and description tags', async () => {
+    makeExecFileSuccess(
+      makeProbeOutput({
+        format: { tags: { comment: 'Short comment', description: 'Short description', lyrics: 'Longer complete synopsis from lyrics tag' } },
+      }),
+    );
+
+    const result = await extractAudioMetadata('/path/book.m4b');
+
+    expect(result.description).toBe('Longer complete synopsis from lyrics tag');
+  });
+
+  it('uses lyrics tag when comment and description tags are absent', async () => {
+    makeExecFileSuccess(makeProbeOutput({ format: { tags: { lyrics: 'LibriVox synopsis' } } }));
+
+    const result = await extractAudioMetadata('/path/book.m4b');
+
+    expect(result.description).toBe('LibriVox synopsis');
+  });
+
+  it('uses synopsis tag when it is the longest description-like tag', async () => {
+    makeExecFileSuccess(makeProbeOutput({ format: { tags: { comment: 'Short comment', synopsis: 'Longer long-description synopsis text' } } }));
+
+    const result = await extractAudioMetadata('/path/book.m4b');
+
+    expect(result.description).toBe('Longer long-description synopsis text');
+  });
+
+  it('returns null description when no description-like tags are present', async () => {
     makeExecFileSuccess(makeProbeOutput({ format: { tags: {} } }));
 
     const result = await extractAudioMetadata('/path/book.m4b');

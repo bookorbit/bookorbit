@@ -2,6 +2,7 @@ import type { MetadataProviderKey } from "./metadata-fetch";
 import type { BookMetadataLockField } from "./metadata-lock";
 import type { AudiobookChapter, NarratorRef } from "./audiobook";
 import type { ComicMetadataFields } from "./metadata-fetch";
+import type { BookFileWriteField, WriteResult } from "./file-write";
 
 export const BOOK_FORMATS = ["epub", "pdf", "mobi", "azw3", "cbz", "cbr", "cb7", "fb2", "m4b", "mp3", "m4a", "opus", "ogg", "flac"] as const;
 export type BookFormat = (typeof BOOK_FORMATS)[number];
@@ -80,6 +81,20 @@ export type AudioMetadata = {
   chapters: AudiobookChapter[] | null;
 };
 
+export type BookFileWriteDisabledReason =
+  | "library_disabled"
+  | "no_primary_file"
+  | "format_not_supported"
+  | "format_disabled"
+  | "file_exceeds_size_limit";
+
+export type BookFileWriteStatus = {
+  enabled: boolean;
+  reason: BookFileWriteDisabledReason | null;
+  writableFormats: string[];
+  writableFields: BookFileWriteField[];
+};
+
 export type BookDetail = {
   id: number;
   libraryId: number;
@@ -114,6 +129,13 @@ export type BookDetail = {
   comicMetadata: ComicMetadataFields | null;
   lockedFields: BookMetadataLockField[];
   collections: { id: number; name: string }[];
+  fileWriteStatus?: BookFileWriteStatus;
+};
+
+export type BookMetadataSaveResult = {
+  book: BookDetail;
+  write: WriteResult | null;
+  libraryAutoWriteEnabled: boolean;
 };
 
 export type BookKoboReadingState = {

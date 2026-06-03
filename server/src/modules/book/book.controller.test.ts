@@ -761,8 +761,12 @@ describe('BookController', () => {
   it('delegates remaining book endpoints to service methods', async () => {
     const { controller, bookService } = makeController();
     const user = makeUser();
-    bookService.updateMetadata.mockResolvedValue({ id: 7 });
-    bookService.updateMetadataAndLocks.mockResolvedValue({ id: 7, lockedFields: ['goodreadsId'] });
+    bookService.updateMetadata.mockResolvedValue({ book: { id: 7 }, write: null, libraryAutoWriteEnabled: false });
+    bookService.updateMetadataAndLocks.mockResolvedValue({
+      book: { id: 7, lockedFields: ['goodreadsId'] },
+      write: null,
+      libraryAutoWriteEnabled: false,
+    });
     bookService.updateMetadataLocks.mockResolvedValue({ id: 7, lockedFields: ['title'] });
     bookService.refreshMetadata.mockResolvedValue({ id: 7 });
     bookService.getMetadataFromFile.mockResolvedValue({ title: 'File Title' });
@@ -781,8 +785,10 @@ describe('BookController', () => {
     await controller.getAudioProgress(7, user);
     await controller.getDetail(7, user);
 
-    expect(bookService.updateMetadata).toHaveBeenCalledWith(7, { title: 'New' }, user);
-    expect(bookService.updateMetadataAndLocks).toHaveBeenCalledWith(7, { metadata: { goodreadsId: '123' }, lockedFields: ['goodreadsId'] }, user);
+    expect(bookService.updateMetadata).toHaveBeenCalledWith(7, { title: 'New' }, user, { postSaveMode: 'schedule' });
+    expect(bookService.updateMetadataAndLocks).toHaveBeenCalledWith(7, { metadata: { goodreadsId: '123' }, lockedFields: ['goodreadsId'] }, user, {
+      postSaveMode: 'schedule',
+    });
     expect(bookService.bulkSetMetadata).toHaveBeenCalledWith([7, 8], 'language', 'fr', user);
     expect(bookService.updateMetadataLocks).toHaveBeenCalledWith(7, ['title'], user);
     expect(bookService.refreshMetadata).toHaveBeenCalledWith(7, true, user);
@@ -791,6 +797,35 @@ describe('BookController', () => {
     expect(bookService.setReadStatus).toHaveBeenCalledWith(7, { status: 'reading' }, user);
     expect(bookService.getAudioProgress).toHaveBeenCalledWith(user.id, 7, user);
     expect(bookService.getDetail).toHaveBeenCalledWith(7, user);
+  });
+
+  it('returns the save result shape only when synchronous file write is requested', async () => {
+    const { controller, bookService } = makeController();
+    const user = makeUser();
+    const result = {
+      book: { id: 7, title: 'New' },
+      write: { status: 'success', fieldsWritten: ['title'], durationMs: 12 },
+      libraryAutoWriteEnabled: true,
+    };
+    const lockResult = {
+      book: { id: 7, lockedFields: ['goodreadsId'] },
+      write: { status: 'success', fieldsWritten: ['goodreadsId'], durationMs: 9 },
+      libraryAutoWriteEnabled: true,
+    };
+    bookService.updateMetadata.mockResolvedValue(result);
+    bookService.updateMetadataAndLocks.mockResolvedValue(lockResult);
+
+    await expect(controller.updateMetadata(7, { title: 'New' } as never, user)).resolves.toEqual({ id: 7, title: 'New' });
+    await expect(controller.updateMetadata(7, { title: 'New' } as never, user, 'true')).resolves.toEqual(result);
+    await expect(
+      controller.updateMetadataAndLocks(7, { metadata: { goodreadsId: '123' }, lockedFields: ['goodreadsId'] } as never, user, 'true'),
+    ).resolves.toEqual(lockResult);
+
+    expect(bookService.updateMetadata).toHaveBeenNthCalledWith(1, 7, { title: 'New' }, user, { postSaveMode: 'schedule' });
+    expect(bookService.updateMetadata).toHaveBeenNthCalledWith(2, 7, { title: 'New' }, user, { postSaveMode: 'sync' });
+    expect(bookService.updateMetadataAndLocks).toHaveBeenCalledWith(7, { metadata: { goodreadsId: '123' }, lockedFields: ['goodreadsId'] }, user, {
+      postSaveMode: 'sync',
+    });
   });
 
   it('throws when writing to a closed sse stream', () => {

@@ -9,12 +9,17 @@ const FFMPEG_PATH = process.env.FFMPEG_PATH || 'ffmpeg';
 
 export interface AudioExtractResult {
   title: string | null;
+  subtitle: string | null;
   authors: { name: string; sortName: string | null }[];
   narrators: string[];
   publisher: string | null;
   publishedYear: number | null;
   description: string | null;
   language: string | null;
+  seriesName: string | null;
+  seriesIndex: number | null;
+  genres: string[];
+  audibleId: string | null;
   durationSeconds: number | null;
   chapters: AudiobookChapter[];
   coverBytes: Buffer | null;
@@ -32,7 +37,7 @@ interface FfprobeChapter {
 }
 
 interface FfprobeOutput {
-  format: {
+  format?: {
     duration?: string;
     tags?: Record<string, string>;
   };
@@ -54,42 +59,59 @@ export async function extractAudioMetadata(absolutePath: string): Promise<AudioE
     ]);
 
     const data: FfprobeOutput = JSON.parse(stdout);
-    const tags = normalizeTags(data.format.tags ?? {});
+    const tags = normalizeTags(data.format?.tags ?? {});
     const streams = data.streams ?? [];
     const chapters = data.chapters ?? [];
 
-    // albumartist = book author, artist = narrator.
-    // If only artist is set, it is the author.
-    const rawAlbumArtist = tags.albumartist ?? tags.album_artist ?? null;
-    const rawArtist = tags.artist ?? null;
+    const rawAlbumArtist = tagValue(tags, 'albumartist') ?? tagValue(tags, 'album_artist');
+    const rawArtist = tagValue(tags, 'artist');
+    const rawComposer = tagValue(tags, 'composer');
 
     const authorNames = rawAlbumArtist ? splitArtists(rawAlbumArtist) : rawArtist ? splitArtists(rawArtist) : [];
-    const narratorNames = rawAlbumArtist && rawArtist ? splitArtists(rawArtist) : [];
+    const narratorNames = rawComposer ? splitNarrators(rawComposer) : rawAlbumArtist && rawArtist ? splitArtists(rawArtist) : [];
 
     // Album tag is the audiobook title; fall back to track title.
-    const title = tags.album ?? tags.title ?? null;
+    const title = tagValue(tags, 'album') ?? tagValue(tags, 'title');
+    const subtitle = tagValue(tags, 'subtitle');
 
-    const publisher = tags.publisher ?? null;
-    const publishedYear = parseYear(tags.date ?? tags.year ?? null);
-    const description = tags.comment ?? tags.description ?? null;
+    const publisher = tagValue(tags, 'publisher');
+    const publishedYear = parseYear(tagValue(tags, 'date') ?? tagValue(tags, 'year'));
+    const description = resolveDescription(
+      tagValue(tags, 'comment'),
+      tagValue(tags, 'description'),
+      tagValue(tags, 'lyrics'),
+      tagValue(tags, 'synopsis'),
+    );
     const language = resolveLanguage(tags, streams);
-    const durationSeconds = data.format.duration ? Math.round(parseFloat(data.format.duration)) : null;
+    const seriesName = tagValue(tags, 'series');
+    const seriesIndex = parseSeriesIndex(
+      tagValue(tags, 'series-part') ?? tagValue(tags, 'part') ?? tagValue(tags, 'series_part') ?? tagValue(tags, 'seriespart'),
+    );
+    const genres = splitTagList(tagValue(tags, 'genre'), ';');
+    const audibleId = tagValue(tags, 'asin') ?? tagValue(tags, 'audible_asin');
+    const durationSeconds = parseDurationSeconds(data.format?.duration);
 
-    const mappedChapters: AudiobookChapter[] = chapters.map((ch) => ({
-      title: ch.tags?.title ?? '',
-      startMs: Math.round(parseFloat(ch.start_time) * 1000),
-    }));
+    const mappedChapters: AudiobookChapter[] = chapters.flatMap((ch) => {
+      const startMs = parseChapterStartMs(ch.start_time);
+      if (startMs === null) return [];
+      return [{ title: ch.tags?.title ?? '', startMs }];
+    });
 
     const coverBytes = await extractCoverBytes(absolutePath, streams);
 
     return {
       title,
+      subtitle,
       authors: authorNames.map((name) => ({ name, sortName: null })),
       narrators: narratorNames,
       publisher,
       publishedYear,
       description,
       language,
+      seriesName,
+      seriesIndex,
+      genres,
+      audibleId,
       durationSeconds,
       chapters: mappedChapters,
       coverBytes,
@@ -103,8 +125,7 @@ export async function parseAudioDuration(absolutePath: string): Promise<number |
   try {
     const { stdout } = await execFile(FFPROBE_PATH, ['-v', 'quiet', '-print_format', 'json', '-show_format', absolutePath]);
     const data: FfprobeOutput = JSON.parse(stdout);
-    if (!data.format.duration) return null;
-    return Math.round(parseFloat(data.format.duration));
+    return parseDurationSeconds(data.format?.duration);
   } catch {
     return null;
   }
@@ -136,11 +157,39 @@ function normalizeTags(tags: Record<string, string>): Record<string, string> {
   return Object.fromEntries(Object.entries(tags).map(([k, v]) => [k.toLowerCase(), v]));
 }
 
+function tagValue(tags: Record<string, string>, key: string): string | null {
+  const value = tags[key];
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 function splitArtists(raw: string): string[] {
-  return raw
-    .split(/[;/]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+  return splitTagList(raw, ';/');
+}
+
+function splitNarrators(raw: string): string[] {
+  return splitTagList(raw, ',;/');
+}
+
+function splitTagList(raw: string | null, separators: string): string[] {
+  if (!raw) return [];
+  const pattern = new RegExp(`[${escapeCharClass(separators)}]`);
+  const seen = new Set<string>();
+  const values: string[] = [];
+  for (const part of raw.split(pattern)) {
+    const value = part.trim();
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    values.push(value);
+  }
+  return values;
+}
+
+function escapeCharClass(value: string): string {
+  return value.replace(/[\\\]^/-]/g, '\\$&');
 }
 
 function parseYear(raw: string | null): number | null {
@@ -149,25 +198,62 @@ function parseYear(raw: string | null): number | null {
   return match ? parseInt(match[0], 10) : null;
 }
 
+function parseDurationSeconds(raw: string | undefined): number | null {
+  if (!raw) return null;
+  const parsed = Number.parseFloat(raw);
+  return Number.isFinite(parsed) ? Math.round(parsed) : null;
+}
+
+function parseChapterStartMs(raw: string): number | null {
+  const parsed = Number.parseFloat(raw);
+  return Number.isFinite(parsed) ? Math.round(parsed * 1000) : null;
+}
+
+function parseSeriesIndex(raw: string | null): number | null {
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function resolveDescription(...values: (string | null)[]): string | null {
+  return values.filter((value): value is string => Boolean(value)).sort((a, b) => b.length - a.length)[0] ?? null;
+}
+
 function resolveLanguage(tags: Record<string, string>, streams: FfprobeStream[]): string | null {
-  if (tags.language) return tags.language;
+  const formatLanguage = normalizeLanguageValue(tagValue(tags, 'language'));
+  if (formatLanguage) return formatLanguage;
   for (const stream of streams) {
-    if (stream.codec_type === 'audio' && stream.tags?.language) {
-      return stream.tags.language;
+    const streamTags = normalizeTags(stream.tags ?? {});
+    const streamLanguage = normalizeLanguageValue(tagValue(streamTags, 'language'));
+    if (stream.codec_type === 'audio' && streamLanguage) {
+      return streamLanguage;
     }
   }
   return null;
 }
 
+function normalizeLanguageValue(value: string | null): string | null {
+  if (!value) return null;
+  const normalized = value.trim();
+  if (!normalized) return null;
+  const lower = normalized.toLowerCase();
+  return lower === 'und' || lower === 'unknown' ? null : normalized;
+}
+
 function emptyResult(): AudioExtractResult {
   return {
     title: null,
+    subtitle: null,
     authors: [],
     narrators: [],
     publisher: null,
     publishedYear: null,
     description: null,
     language: null,
+    seriesName: null,
+    seriesIndex: null,
+    genres: [],
+    audibleId: null,
     durationSeconds: null,
     chapters: [],
     coverBytes: null,

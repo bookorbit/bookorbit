@@ -64,7 +64,11 @@ export class CoverService {
     for (const coverProvider of providers) {
       let results: CoverSearchResult[] = [];
       try {
-        results = await coverProvider.search(searchParams);
+        const providerSearchParams =
+          provider === ITUNES_PROVIDER_KEY && coverProvider.key === ITUNES_PROVIDER_KEY
+            ? { ...searchParams, ignoreProviderEnabled: true }
+            : searchParams;
+        results = await coverProvider.search(providerSearchParams);
       } catch (error) {
         this.logger.warn(
           `[cover.search_provider] [fail] provider=${coverProvider.key} errorClass=${errorClass(error)} error="${sanitizeErrorMessage(error)}" - cover provider search failed`,
