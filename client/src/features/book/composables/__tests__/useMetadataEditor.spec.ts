@@ -178,7 +178,7 @@ describe('useMetadataEditor', () => {
     await save(book.id, { saveLocks: true, lockedFields: ['title'] })
 
     const [url, req] = apiMock.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe('/api/v1/books/1/metadata-and-locks?syncFileWrite=true')
+    expect(url).toBe('/api/v1/books/1/metadata-and-locks')
     expect(JSON.parse(String(req.body))).toEqual({
       metadata: {},
       lockedFields: ['title'],

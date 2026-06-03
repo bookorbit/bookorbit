@@ -119,7 +119,7 @@ describe('buildComicInfoXml', () => {
 
     const xml = buildComicInfoXml(
       existing,
-      { comicIssueNumber: null, comicPencillers: [], comicColorists: [] },
+      { comicIssueNumber: '   ', comicPencillers: [], comicColorists: [] },
       new Set(['comicIssueNumber', 'comicPencillers', 'comicColorists']),
     );
 

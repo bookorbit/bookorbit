@@ -200,7 +200,8 @@ export function useMetadataEditor() {
     try {
       const metadata = buildPayload()
       const path = options.saveLocks ? `/api/v1/books/${bookId}/metadata-and-locks` : `/api/v1/books/${bookId}/metadata`
-      const res = await api(`${path}?syncFileWrite=true`, {
+      const shouldSyncFileWrite = Object.keys(metadata).length > 0
+      const res = await api(`${path}${shouldSyncFileWrite ? '?syncFileWrite=true' : ''}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(options.saveLocks ? { metadata, lockedFields: options.lockedFields ?? [] } : metadata),

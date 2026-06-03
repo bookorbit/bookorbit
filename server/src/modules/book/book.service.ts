@@ -1358,7 +1358,7 @@ export class BookService {
   private async writeMetadataToFileAfterSave(bookId: number, user: RequestUser): Promise<WriteResult> {
     try {
       return (
-        (await this.fileWriteService?.writeToFile(bookId, 'auto', user.id, false, false, true)) ?? {
+        (await this.fileWriteService?.writeToFile(bookId, 'sync', user.id, false, false, true)) ?? {
           status: 'skipped',
           fieldsWritten: [],
           durationMs: 0,

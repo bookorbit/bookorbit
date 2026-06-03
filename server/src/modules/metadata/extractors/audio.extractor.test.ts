@@ -99,6 +99,17 @@ describe('extractAudioMetadata — author/narrator split', () => {
     expect(result.narrators).toEqual(['Andy Serkis']);
   });
 
+  it('does not use artist as narrator when it matches albumartist', async () => {
+    makeExecFileSuccess(
+      makeProbeOutput({ format: { tags: { album: 'The Lord of the Rings', albumartist: 'J.R.R. Tolkien', artist: ' j.r.r. tolkien ' } } }),
+    );
+
+    const result = await extractAudioMetadata('/path/lotr.m4b');
+
+    expect(result.authors).toEqual([{ name: 'J.R.R. Tolkien', sortName: null }]);
+    expect(result.narrators).toEqual([]);
+  });
+
   it('uses artist as author and leaves narrators empty when albumartist is absent', async () => {
     makeExecFileSuccess(makeProbeOutput({ format: { tags: { album: "The Hitchhiker's Guide", artist: 'Douglas Adams' } } }));
 

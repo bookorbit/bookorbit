@@ -3,8 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { readdir, readFile } from 'fs/promises';
 import { basename, extname, join } from 'path';
 
-import type { BookFileWriteDisabledReason, BookFileWriteField, BookFileWriteStatus, WriteResult } from '@bookorbit/types';
-import { getBookFileWriteFormatFields, isAudioFormat, NotificationType } from '@bookorbit/types';
+import type { BookFileWriteDisabledReason, BookFileWriteField, BookFileWriteStatus, BookFormat, WriteResult } from '@bookorbit/types';
+import { BOOK_FORMATS, getBookFileWriteFormatFields, isAudioFormat, NotificationType } from '@bookorbit/types';
 import { bookCoverDirPath, findPreferredBookCoverFileName } from '../../common/book-cover-storage';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { NotificationService } from '../notification/notification.service';
@@ -22,6 +22,7 @@ const FILE_WRITE_COVER_EVENT = 'file_write.cover_load';
 const UNKNOWN_FORMAT = 'unknown';
 const DEFAULT_WRITE_DEBOUNCE_MS = 3_000;
 const DEFAULT_MAX_CONCURRENT_WRITES = 2;
+const BOOK_FORMAT_SET = new Set<string>(BOOK_FORMATS);
 
 type FileWriteTarget = {
   id: number;
@@ -269,8 +270,10 @@ export class FileWriteService implements OnModuleDestroy {
       return skip ? { enabled: false, reason: mapFileWriteSkipReason(skip.reason), format } : { enabled: true, format };
     });
 
-    const writableTargetStatuses = targetStatuses.filter((status): status is { enabled: true; format: string } => status.enabled);
-    const writableFormats = uniqueStrings(writableTargetStatuses.map((status) => status.format));
+    const writableTargetStatuses = targetStatuses.filter(
+      (status): status is { enabled: true; format: BookFormat } => status.enabled && isBookFormat(status.format),
+    );
+    const writableFormats = uniqueBookFormats(writableTargetStatuses.map((status) => status.format));
     if (writableFormats.length > 0) {
       const writableFields = uniqueBookFileWriteFields(
         writableTargetStatuses.flatMap((status) => resolveWritableFieldsForFormat(status.format, libraryConfig)),
@@ -616,7 +619,7 @@ function disabledBookFileWriteStatus(reason: BookFileWriteDisabledReason): BookF
   return { enabled: false, reason, writableFormats: [], writableFields: [] };
 }
 
-function uniqueStrings(values: string[]): string[] {
+function uniqueBookFormats(values: BookFormat[]): BookFormat[] {
   return [...new Set(values)];
 }
 
@@ -630,6 +633,10 @@ function resolveWritableFieldsForFormat(format: string, config: LibraryFileWrite
 
 function normalizeFormat(format: string | null | undefined): string {
   return (format ?? '').toLowerCase();
+}
+
+function isBookFormat(format: string): format is BookFormat {
+  return BOOK_FORMAT_SET.has(format);
 }
 
 function resolvePositiveInteger(value: unknown, fallback: number): number {

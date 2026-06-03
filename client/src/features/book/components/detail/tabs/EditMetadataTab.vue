@@ -87,15 +87,40 @@ const COMIC_FIELD_MAP = {
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
 const isPrimaryAudio = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
 const isPrimaryComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'cbx')
-const fileWriteEnabledForBook = computed(() => props.book.fileWriteStatus?.enabled === true)
-const fileWriteWritableFormats = computed(() => props.book.fileWriteStatus?.writableFormats ?? [])
+const fileWriteStatus = computed(() => props.book.fileWriteStatus ?? null)
+const fileWriteEnabledForBook = computed(() => fileWriteStatus.value?.enabled === true)
+const fileWriteWritableFormats = computed(() => fileWriteStatus.value?.writableFormats ?? [])
 const fileWriteFormatLabels = computed(() => fileWriteWritableFormats.value.map((format) => format.toUpperCase()))
-const fileWriteFieldLabels = computed(() => (props.book.fileWriteStatus?.writableFields ?? []).map((field) => BOOK_FILE_WRITE_FIELD_LABELS[field]))
+const fileWriteFieldLabels = computed(() => (fileWriteStatus.value?.writableFields ?? []).map((field) => BOOK_FILE_WRITE_FIELD_LABELS[field]))
 const fileWriteFieldCountLabel = computed(() => `${fileWriteFieldLabels.value.length} field${fileWriteFieldLabels.value.length === 1 ? '' : 's'}`)
 const fileWriteTargetSummary = computed(() => {
   const formats = fileWriteWritableFormats.value
   if (formats.length === 0) return 'book files'
   return `${formatWritableFormatList(formats)} files`
+})
+const fileWriteManualDisabledReasonLabel = computed(() => {
+  if (!primaryFile.value) return 'No primary file available'
+  switch (fileWriteStatus.value?.reason) {
+    case 'no_primary_file':
+      return 'No primary file available'
+    case 'format_not_supported':
+      return 'This file format does not support write-back'
+    case 'format_disabled':
+      return 'Write-back is disabled for this format'
+    case 'file_exceeds_size_limit':
+      return 'This file exceeds the write-back size limit'
+    default:
+      return null
+  }
+})
+const fileWriteManualTooltip = computed(() => {
+  if (writingAndRenaming.value) return 'Writing...'
+  if (saving.value) return 'Save in progress'
+  if (fileWriteManualDisabledReasonLabel.value) return fileWriteManualDisabledReasonLabel.value
+  if (fileWriteStatus.value?.reason === 'library_disabled') {
+    return 'Write metadata to file and rename now; automatic write-back is disabled for this library'
+  }
+  return `Write ${fileWriteFieldCountLabel.value} to ${fileWriteTargetSummary.value} and rename if pattern is set`
 })
 const comicSectionOpen = ref(true)
 
@@ -549,7 +574,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
             <TooltipTrigger as-child>
               <button
                 class="flex-none flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-40"
-                :disabled="writingAndRenaming || saving || !primaryFile"
+                :disabled="writingAndRenaming || saving || fileWriteManualDisabledReasonLabel !== null"
                 @click="handleWriteAndRename"
               >
                 <Loader2 v-if="writingAndRenaming" class="size-3.5 animate-spin" />
@@ -557,15 +582,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
                 <span class="hidden sm:inline">Write to file</span>
               </button>
             </TooltipTrigger>
-            <TooltipContent>{{
-              writingAndRenaming
-                ? 'Writing...'
-                : saving
-                  ? 'Save in progress'
-                  : !primaryFile
-                    ? 'No primary file available'
-                    : 'Write metadata to file and rename if pattern is set'
-            }}</TooltipContent>
+            <TooltipContent>{{ fileWriteManualTooltip }}</TooltipContent>
           </Tooltip>
 
           <div class="flex-none w-px h-4 bg-border mx-0.5" />

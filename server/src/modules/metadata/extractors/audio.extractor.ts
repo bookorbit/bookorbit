@@ -68,7 +68,11 @@ export async function extractAudioMetadata(absolutePath: string): Promise<AudioE
     const rawComposer = tagValue(tags, 'composer');
 
     const authorNames = rawAlbumArtist ? splitArtists(rawAlbumArtist) : rawArtist ? splitArtists(rawArtist) : [];
-    const narratorNames = rawComposer ? splitNarrators(rawComposer) : rawAlbumArtist && rawArtist ? splitArtists(rawArtist) : [];
+    const narratorNames = rawComposer
+      ? splitNarrators(rawComposer)
+      : rawAlbumArtist && rawArtist && normalizePersonTag(rawAlbumArtist) !== normalizePersonTag(rawArtist)
+        ? splitNarrators(rawArtist)
+        : [];
 
     // Album tag is the audiobook title; fall back to track title.
     const title = tagValue(tags, 'album') ?? tagValue(tags, 'title');
@@ -170,6 +174,10 @@ function splitArtists(raw: string): string[] {
 
 function splitNarrators(raw: string): string[] {
   return splitTagList(raw, ',;/');
+}
+
+function normalizePersonTag(raw: string): string {
+  return raw.trim().toLowerCase();
 }
 
 function splitTagList(raw: string | null, separators: string): string[] {

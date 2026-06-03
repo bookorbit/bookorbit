@@ -818,14 +818,32 @@ describe('BookController', () => {
     await expect(controller.updateMetadata(7, { title: 'New' } as never, user)).resolves.toEqual({ id: 7, title: 'New' });
     await expect(controller.updateMetadata(7, { title: 'New' } as never, user, 'true')).resolves.toEqual(result);
     await expect(
+      controller.updateMetadataAndLocks(7, { metadata: { goodreadsId: '123' }, lockedFields: ['goodreadsId'] } as never, user),
+    ).resolves.toEqual(lockResult.book);
+    await expect(
       controller.updateMetadataAndLocks(7, { metadata: { goodreadsId: '123' }, lockedFields: ['goodreadsId'] } as never, user, 'true'),
     ).resolves.toEqual(lockResult);
 
     expect(bookService.updateMetadata).toHaveBeenNthCalledWith(1, 7, { title: 'New' }, user, { postSaveMode: 'schedule' });
     expect(bookService.updateMetadata).toHaveBeenNthCalledWith(2, 7, { title: 'New' }, user, { postSaveMode: 'sync' });
-    expect(bookService.updateMetadataAndLocks).toHaveBeenCalledWith(7, { metadata: { goodreadsId: '123' }, lockedFields: ['goodreadsId'] }, user, {
-      postSaveMode: 'sync',
-    });
+    expect(bookService.updateMetadataAndLocks).toHaveBeenNthCalledWith(
+      1,
+      7,
+      { metadata: { goodreadsId: '123' }, lockedFields: ['goodreadsId'] },
+      user,
+      {
+        postSaveMode: 'schedule',
+      },
+    );
+    expect(bookService.updateMetadataAndLocks).toHaveBeenNthCalledWith(
+      2,
+      7,
+      { metadata: { goodreadsId: '123' }, lockedFields: ['goodreadsId'] },
+      user,
+      {
+        postSaveMode: 'sync',
+      },
+    );
   });
 
   it('throws when writing to a closed sse stream', () => {

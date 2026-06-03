@@ -871,6 +871,7 @@ describe('MetadataService', () => {
       isFieldLocked: vi.fn().mockResolvedValue(false),
       filterAutomatedBookUpdate: vi.fn().mockResolvedValue({
         dto: {
+          audibleId: 'B0SIDE',
           audioMetadata: {
             chapters: [{ title: 'Chapter 1', startMs: 0 }],
             narrators: ['Narrator A'],
@@ -896,13 +897,29 @@ describe('MetadataService', () => {
       seriesName: null,
       seriesIndex: null,
       genres: [],
-      audibleId: null,
+      audibleId: 'B0SIDE',
       durationSeconds: null,
       chapters: [{ title: 'Chapter 1', startMs: 0 }],
       coverBytes: null,
     });
     await service.extractAudioChaptersAndNarrators(70, '/tmp/audio.m4b', 'm4b');
 
+    expect(lockService.filterAutomatedBookUpdate).toHaveBeenCalledWith(
+      70,
+      expect.objectContaining({
+        audibleId: 'B0SIDE',
+        audioMetadata: expect.objectContaining({
+          chapters: [{ title: 'Chapter 1', startMs: 0 }],
+          narrators: ['Narrator A'],
+        }),
+      }),
+    );
+    expect(updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        audibleId: 'B0SIDE',
+        updatedAt: expect.any(Date),
+      }),
+    );
     expect(updateSet).toHaveBeenCalledWith(
       expect.objectContaining({
         chapters: [{ title: 'Chapter 1', startMs: 0 }],

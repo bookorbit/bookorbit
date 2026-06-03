@@ -138,13 +138,9 @@ function resolveFfprobePath(): string {
 async function removeFileIfPresent(path: string): Promise<void> {
   try {
     await unlink(path);
-  } catch (error) {
-    if (!hasErrorCode(error, 'ENOENT')) throw error;
+  } catch {
+    // Cleanup is best-effort; preserve the primary write result or error.
   }
-}
-
-function hasErrorCode(error: unknown, code: string): boolean {
-  return Boolean(error && typeof error === 'object' && 'code' in error && (error as { code?: unknown }).code === code);
 }
 
 export const testing = {

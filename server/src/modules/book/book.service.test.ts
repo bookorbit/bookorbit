@@ -1179,7 +1179,7 @@ describe('BookService', () => {
       expect(metadataService.emitAuthorsReplaced).toHaveBeenCalledWith(5, []);
       expect(fileWriteService.cancelPendingWrite).toHaveBeenCalledWith(5);
       expect(fileRenameService.cancelPendingRename).toHaveBeenCalledWith(5);
-      expect(fileWriteService.writeToFile).toHaveBeenCalledWith(5, 'auto', user.id, false, false, true);
+      expect(fileWriteService.writeToFile).toHaveBeenCalledWith(5, 'sync', user.id, false, false, true);
       expect(fileRenameService.performRename).toHaveBeenCalledWith(5, user.id, false, true);
       expect(fileWriteService.scheduleWrite).not.toHaveBeenCalled();
       expect(fileRenameService.scheduleRename).not.toHaveBeenCalled();

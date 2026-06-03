@@ -117,7 +117,7 @@ function setIssueNumberField(info: ComicInfoObject, fieldMask: Set<BookWritePayl
       return;
     }
     if (!fieldMask.has('seriesIndex')) {
-      setComicInfoField(info, fieldMask, 'comicIssueNumber', 'Number', payload.comicIssueNumber);
+      setComicInfoField(info, fieldMask, 'comicIssueNumber', 'Number', comicIssueNumber ?? null);
       return;
     }
   }

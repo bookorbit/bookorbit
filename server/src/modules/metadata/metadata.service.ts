@@ -149,7 +149,7 @@ export class MetadataService {
   }
 
   // Called when ebook is the winner but audio files are also present.
-  // Saves audio-specific fields that no ebook format can provide: chapters and narrators.
+  // Saves audio-specific fields that no ebook format can provide, plus audio provider IDs.
   // Cover is intentionally excluded - the winner ebook owns cover.
   async extractAudioChaptersAndNarrators(bookId: number, absolutePath: string, format: string): Promise<void> {
     const extractor = this.extractorMap.get(format);
@@ -158,6 +158,7 @@ export class MetadataService {
     if (!data) return;
 
     const { dto: filtered } = await this.bookMetadataLockService.filterAutomatedBookUpdate(bookId, {
+      audibleId: data.audibleId,
       audioMetadata: {
         narrators: data.narrators,
         chapters: data.chapters && data.chapters.length > 0 ? data.chapters : null,
@@ -165,6 +166,10 @@ export class MetadataService {
     });
 
     const updates: Promise<unknown>[] = [];
+
+    if (filtered.audibleId !== undefined) {
+      updates.push(this.db.update(bookMetadata).set({ audibleId: filtered.audibleId, updatedAt: new Date() }).where(eq(bookMetadata.bookId, bookId)));
+    }
 
     if (filtered.audioMetadata?.chapters !== undefined) {
       updates.push(

@@ -128,8 +128,8 @@ describe('AudioMetadataEmbedder', () => {
     expect(unlinkMock).not.toHaveBeenCalledWith('/books/audio/.bookorbit-cover-fixed-id.jpg');
   });
 
-  it('ignores missing temporary files during cleanup', async () => {
-    unlinkMock.mockRejectedValue(Object.assign(new Error('already removed'), { code: 'ENOENT' }));
+  it('ignores temporary-file cleanup failures after a successful write', async () => {
+    unlinkMock.mockRejectedValue(new Error('cleanup failed'));
     const embedder = new AudioMetadataEmbedder();
 
     await expect(
@@ -181,12 +181,13 @@ describe('AudioMetadataEmbedder', () => {
     expect(args).toEqual(expect.arrayContaining(['-metadata:s:a:0', 'language=eng']));
   });
 
-  it('cleans both temporary files when ffmpeg fails', async () => {
+  it('preserves the ffmpeg error when cleanup also fails', async () => {
     execFileMock.mockImplementation(
       (_bin: string, _args: string[], _options: unknown, callback: (error: Error | null, stdout: string, stderr: string) => void) => {
         callback(new Error('ffmpeg failed'), '', '');
       },
     );
+    unlinkMock.mockRejectedValue(new Error('cleanup failed'));
     const embedder = new AudioMetadataEmbedder();
 
     await expect(embedder.embedMetadata('/books/audio/book.m4a', 'm4a', { coverBytes: Buffer.from('raw-cover'), metadata: [] })).rejects.toThrow(

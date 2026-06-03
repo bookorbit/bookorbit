@@ -91,7 +91,7 @@ export type BookFileWriteDisabledReason =
 export type BookFileWriteStatus = {
   enabled: boolean;
   reason: BookFileWriteDisabledReason | null;
-  writableFormats: string[];
+  writableFormats: BookFormat[];
   writableFields: BookFileWriteField[];
 };
 
