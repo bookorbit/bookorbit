@@ -11,5 +11,6 @@ import { ReadingSessionService } from './reading-session.service';
   imports: [BookModule, AchievementModule],
   controllers: [ReadingSessionController, BookReadingSessionController],
   providers: [ReadingSessionService, ReadingSessionRepository],
+  exports: [ReadingSessionService],
 })
 export class ReadingSessionModule {}

@@ -1,4 +1,4 @@
-import { All, Controller, Get, Headers, HttpCode, HttpStatus, Logger, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { All, Body, Controller, Get, Headers, HttpCode, HttpStatus, Logger, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
@@ -8,9 +8,11 @@ import type { KoboDeviceContext } from './guards/kobo-token.guard';
 import { KoboTokenGuard } from './guards/kobo-token.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
+import { KoboAnalyticsService } from './services/kobo-analytics.service';
 import { KoboThumbnailService } from './services/kobo-thumbnail.service';
 import { KoboDownloadService } from './services/kobo-download.service';
 import { KoboProxyService } from './services/kobo-proxy.service';
+import type { KoboAnalyticsBody } from './kobo-analytics.types';
 
 @Controller('kobo/:deviceToken')
 @Public()
@@ -22,6 +24,7 @@ export class KoboDeviceController {
     private readonly thumbnailService: KoboThumbnailService,
     private readonly downloadService: KoboDownloadService,
     private readonly proxyService: KoboProxyService,
+    private readonly analyticsService: KoboAnalyticsService,
   ) {}
 
   @Get('v1/books/:bookId/thumbnail/:width/:height/:quality/:isGreyscale/image.jpg')
@@ -99,7 +102,13 @@ export class KoboDeviceController {
 
   @Post('v1/analytics/event')
   @HttpCode(HttpStatus.OK)
-  analyticsEvent() {
+  async analyticsEvent(@Body() body: KoboAnalyticsBody, @CurrentUser() user: RequestUser, @KoboDevice() device: KoboDeviceContext) {
+    try {
+      await this.analyticsService.ingest(body, user, device);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'unknown error';
+      this.logger.warn(`[kobo.analytics] ingest failed userId=${user.id}: ${message}`);
+    }
     return {};
   }
 

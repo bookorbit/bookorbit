@@ -15,5 +15,6 @@ describe('ReadingSessionModule', () => {
     expect(Reflect.getMetadata(MODULE_METADATA.IMPORTS, ReadingSessionModule)).toEqual([BookModule, AchievementModule]);
     expect(Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, ReadingSessionModule)).toEqual([ReadingSessionController, BookReadingSessionController]);
     expect(Reflect.getMetadata(MODULE_METADATA.PROVIDERS, ReadingSessionModule)).toEqual([ReadingSessionService, ReadingSessionRepository]);
+    expect(Reflect.getMetadata(MODULE_METADATA.EXPORTS, ReadingSessionModule)).toEqual([ReadingSessionService]);
   });
 });

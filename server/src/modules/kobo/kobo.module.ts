@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { CommonModule } from '../../common/common.module';
+import { ReadingSessionModule } from '../reading-session/reading-session.module';
 import { UserModule } from '../user/user.module';
 import { UserBookStatusModule } from '../user-book-status/user-book-status.module';
 import { KoboAuthController } from './kobo-auth.controller';
@@ -17,9 +18,11 @@ import { KoboReadingStateService } from './services/kobo-reading-state.service';
 import { KoboSettingsService } from './services/kobo-settings.service';
 import { KoboSyncService } from './services/kobo-sync.service';
 import { KoboThumbnailService } from './services/kobo-thumbnail.service';
+import { KoboAnalyticsResolverService } from './services/kobo-analytics-resolver.service';
+import { KoboAnalyticsService } from './services/kobo-analytics.service';
 
 @Module({
-  imports: [CommonModule, UserModule, UserBookStatusModule],
+  imports: [CommonModule, UserModule, UserBookStatusModule, ReadingSessionModule],
   controllers: [KoboUserController, KoboAuthController, KoboSyncController, KoboDeviceController],
   providers: [
     KoboTokenGuard,
@@ -32,6 +35,8 @@ import { KoboThumbnailService } from './services/kobo-thumbnail.service';
     KoboThumbnailService,
     KoboDownloadService,
     KoboProxyService,
+    KoboAnalyticsResolverService,
+    KoboAnalyticsService,
   ],
 })
 export class KoboModule {}

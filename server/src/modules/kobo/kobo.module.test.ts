@@ -17,12 +17,17 @@ import { KoboReadingStateService } from './services/kobo-reading-state.service';
 import { KoboSettingsService } from './services/kobo-settings.service';
 import { KoboSyncService } from './services/kobo-sync.service';
 import { KoboThumbnailService } from './services/kobo-thumbnail.service';
+import { KoboAnalyticsResolverService } from './services/kobo-analytics-resolver.service';
+import { KoboAnalyticsService } from './services/kobo-analytics.service';
+import { ReadingSessionModule } from '../reading-session/reading-session.module';
 
 describe('KoboModule', () => {
   it('registers expected controllers and providers', () => {
     const controllers = Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, KoboModule);
     const providers = Reflect.getMetadata(MODULE_METADATA.PROVIDERS, KoboModule) as unknown[];
+    const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, KoboModule) as unknown[];
 
+    expect(imports).toContain(ReadingSessionModule);
     expect(controllers).toEqual([KoboUserController, KoboAuthController, KoboSyncController, KoboDeviceController]);
     expect(providers).toEqual([
       KoboTokenGuard,
@@ -35,6 +40,8 @@ describe('KoboModule', () => {
       KoboThumbnailService,
       KoboDownloadService,
       KoboProxyService,
+      KoboAnalyticsResolverService,
+      KoboAnalyticsService,
     ]);
   });
 });
