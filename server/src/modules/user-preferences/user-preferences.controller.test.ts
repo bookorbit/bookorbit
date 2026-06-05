@@ -53,6 +53,7 @@ const validDisplayPreferences: DisplayPreferences = {
   gridCardPrimaryLabel: 'hidden',
   gridCardSecondaryLabel: 'hidden',
   cardInfoMode: 'hover-overlay',
+  thumbnailClickAction: 'reader',
 };
 
 describe('UserPreferencesController', () => {

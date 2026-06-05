@@ -9,6 +9,11 @@ export interface RelocateDetail {
   cfi?: string | null
   fraction?: number
   index?: number
+  source?: string | null
+  koboLocationType?: string | null
+  koboLocationValue?: string | null
+  contentSourceProgressPercent?: number | null
+  koreaderProgress?: string | null
   total?: number
   tocItem?: { label?: string; href?: string }
   section?: { current: number; total: number }
@@ -118,6 +123,17 @@ export function useFoliate(
       view.addEventListener('relocate', (e: Event) => {
         const detail = (e as CustomEvent).detail
         fraction.value = detail?.fraction ?? 0
+        if (import.meta.env.DEV) {
+          console.info('[foliate.relocate]', {
+            source: detail?.source ?? null,
+            koboLocationType: detail?.koboLocationType ?? null,
+            koboLocationValue: detail?.koboLocationValue ?? null,
+            contentSourceProgressPercent: detail?.contentSourceProgressPercent ?? null,
+            koreaderProgress: detail?.koreaderProgress ?? null,
+            fraction: detail?.fraction ?? null,
+            cfi: detail?.cfi ?? null,
+          })
+        }
         onRelocate?.(detail)
       })
 
@@ -159,11 +175,26 @@ export function useFoliate(
         await view.open(file)
       }
       if (onApplyStyles) onApplyStyles(view.renderer)
+      let didNavigate = false
       if (cfi) {
-        await view.goTo(cfi).catch(() => {})
-      } else if (fallbackFraction !== undefined && fallbackFraction > 0) {
-        view.goToFraction?.(fallbackFraction)
-      } else {
+        await view
+          .goTo(cfi)
+          .then(() => {
+            didNavigate = true
+          })
+          .catch(() => {})
+      }
+      if (!didNavigate && fallbackFraction !== undefined && fallbackFraction > 0) {
+        if (typeof view.goToFraction === 'function') {
+          try {
+            view.goToFraction(fallbackFraction)
+            didNavigate = true
+          } catch {
+            didNavigate = false
+          }
+        }
+      }
+      if (!didNavigate) {
         await view.goTo(0).catch(() => {})
       }
     } catch (e) {

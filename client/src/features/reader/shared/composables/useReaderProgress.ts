@@ -28,6 +28,11 @@ export function useReaderProgress(
   const cfi = ref<string | null>(null)
   const pageNumber = ref<number | null>(null)
   const percentage = ref(0)
+  const koboLocationSource = ref<string | null>(null)
+  const koboLocationType = ref<string | null>(null)
+  const koboLocationValue = ref<string | null>(null)
+  const koboContentSourceProgressPercent = ref<number | null>(null)
+  const koreaderProgress = ref<string | null>(null)
   const chapterTitle = ref('')
   const sectionIndex = ref(0)
   const totalSections = ref(0)
@@ -57,12 +62,22 @@ export function useReaderProgress(
     cfi.value = data.cfi ?? null
     pageNumber.value = data.pageNumber ?? null
     percentage.value = data.percentage ?? 0
+    koboLocationSource.value = data.koboLocationSource ?? null
+    koboLocationType.value = data.koboLocationType ?? null
+    koboLocationValue.value = data.koboLocationValue ?? null
+    koboContentSourceProgressPercent.value = data.koboContentSourceProgressPercent ?? null
+    koreaderProgress.value = data.koreaderProgress ?? null
   }
 
   function onRelocate(detail: RelocateDetail) {
     cfi.value = detail?.cfi ?? null
     fraction.value = detail?.fraction ?? 0
     percentage.value = fraction.value * 100
+    koboLocationSource.value = detail?.source ?? null
+    koboLocationValue.value = detail?.koboLocationValue ?? null
+    koboLocationType.value = koboLocationValue.value ? (detail?.koboLocationType ?? 'KoboSpan') : null
+    koboContentSourceProgressPercent.value = detail?.contentSourceProgressPercent ?? null
+    koreaderProgress.value = detail?.koreaderProgress ?? null
     chapterTitle.value = detail?.tocItem?.label ?? ''
     sectionIndex.value = detail?.section?.current ?? detail?.index ?? 0
     totalSections.value = detail?.section?.total ?? detail?.total ?? 0
@@ -88,6 +103,11 @@ export function useReaderProgress(
         cfi: cfi.value,
         pageNumber: pageNumber.value,
         percentage: percentage.value,
+        koboLocationSource: koboLocationSource.value,
+        koboLocationType: koboLocationType.value,
+        koboLocationValue: koboLocationValue.value,
+        koboContentSourceProgressPercent: koboContentSourceProgressPercent.value,
+        koreaderProgress: koreaderProgress.value,
       }),
     })
   }
@@ -211,6 +231,11 @@ export function useReaderProgress(
     cfi,
     pageNumber,
     percentage,
+    koboLocationSource,
+    koboLocationType,
+    koboLocationValue,
+    koboContentSourceProgressPercent,
+    koreaderProgress,
     chapterTitle,
     sectionIndex,
     totalSections,

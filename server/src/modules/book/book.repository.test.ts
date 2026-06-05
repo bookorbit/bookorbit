@@ -38,6 +38,12 @@ function makeSelectChain<T>(terminalMethod: string, terminalResult: T) {
   return chain;
 }
 
+function makeInsertChain() {
+  const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+  const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
+  return { values, onConflictDoUpdate };
+}
+
 describe('BookRepository', () => {
   it('runs callbacks inside db transactions', async () => {
     const db = {
@@ -194,11 +200,26 @@ describe('BookRepository', () => {
     const findCollectionsChain = makeSelectChain('orderBy', [{ id: 1, name: 'Favorites' }]);
     const libraryIdChain = makeSelectChain('limit', [{ libraryId: 5 }]);
     const missingLibraryChain = makeSelectChain('limit', []);
-    const fileByIdChain = makeSelectChain('limit', [{ id: 9, absolutePath: '/books/a.epub', format: 'epub', bookId: 1, libraryId: 2 }]);
+    const fileByIdChain = makeSelectChain('limit', [
+      { id: 9, absolutePath: '/books/a.epub', format: 'epub', bookId: 1, libraryId: 2, fileHash: null, sizeBytes: null },
+    ]);
     const missingFileChain = makeSelectChain('limit', []);
     const progressChain = makeSelectChain('limit', [{ percentage: 12 }]);
     const missingProgressChain = makeSelectChain('limit', []);
-    const progressByBookChain = makeSelectChain('orderBy', [{ fileId: 1, cfi: null, pageNumber: null, percentage: 0, updatedAt: null }]);
+    const progressByBookChain = makeSelectChain('orderBy', [
+      {
+        fileId: 1,
+        cfi: null,
+        pageNumber: null,
+        percentage: 0,
+        koboLocationSource: null,
+        koboLocationType: null,
+        koboLocationValue: null,
+        koboContentSourceProgressPercent: null,
+        koreaderProgress: null,
+        updatedAt: null,
+      },
+    ]);
     const koboReadingChain = makeSelectChain('limit', [{ createdAtKobo: null }]);
     const koboSnapshotChain = makeSelectChain('limit', [{ snapshotId: 8 }]);
     const koboCollectionsChain = makeSelectChain('where', [{ name: 'Sync Me' }]);
@@ -222,11 +243,32 @@ describe('BookRepository', () => {
     await expect(repo.findCollectionsByBookId(10, 1)).resolves.toEqual([{ id: 1, name: 'Favorites' }]);
     await expect(repo.findLibraryIdByBookId(10)).resolves.toBe(5);
     await expect(repo.findLibraryIdByBookId(11)).resolves.toBeNull();
-    await expect(repo.findFileById(9)).resolves.toEqual({ id: 9, absolutePath: '/books/a.epub', format: 'epub', bookId: 1, libraryId: 2 });
+    await expect(repo.findFileById(9)).resolves.toEqual({
+      id: 9,
+      absolutePath: '/books/a.epub',
+      format: 'epub',
+      bookId: 1,
+      libraryId: 2,
+      fileHash: null,
+      sizeBytes: null,
+    });
     await expect(repo.findFileById(10)).resolves.toBeNull();
     await expect(repo.findProgress(1, 9)).resolves.toEqual({ percentage: 12 });
     await expect(repo.findProgress(1, 10)).resolves.toBeNull();
-    await expect(repo.findProgressByBook(1, 10)).resolves.toEqual([{ fileId: 1, cfi: null, pageNumber: null, percentage: 0, updatedAt: null }]);
+    await expect(repo.findProgressByBook(1, 10)).resolves.toEqual([
+      {
+        fileId: 1,
+        cfi: null,
+        pageNumber: null,
+        percentage: 0,
+        koboLocationSource: null,
+        koboLocationType: null,
+        koboLocationValue: null,
+        koboContentSourceProgressPercent: null,
+        koreaderProgress: null,
+        updatedAt: null,
+      },
+    ]);
     await expect(repo.findKoboReadingState(1, 10)).resolves.toEqual({ createdAtKobo: null });
     await expect(repo.findKoboSnapshotState(1, 10)).resolves.toEqual({ snapshotId: 8 });
     await expect(repo.findKoboSyncCollectionNamesForBook(1, 10)).resolves.toEqual(['Sync Me']);
@@ -532,7 +574,19 @@ describe('BookRepository', () => {
     const db = { insert };
     const repo = new BookRepository(db as never);
 
-    await repo.upsertProgress(5, 9, 'epubcfi(/6/2)', 7, 80);
+    await repo.upsertProgress(
+      5,
+      9,
+      'epubcfi(/6/2)',
+      7,
+      80,
+      null,
+      'OEBPS/ch1.xhtml',
+      'KoboSpan',
+      'kobo.25.1',
+      25,
+      '/body/DocFragment[2]/body/p[1]/text()[1].0',
+    );
 
     expect(insert).toHaveBeenCalledTimes(1);
     expect(values).toHaveBeenCalledWith(
@@ -542,14 +596,180 @@ describe('BookRepository', () => {
         cfi: 'epubcfi(/6/2)',
         pageNumber: 7,
         percentage: 80,
+        koboLocationSource: 'OEBPS/ch1.xhtml',
+        koboLocationType: 'KoboSpan',
+        koboLocationValue: 'kobo.25.1',
+        koboContentSourceProgressPercent: 25,
+        koreaderProgress: '/body/DocFragment[2]/body/p[1]/text()[1].0',
       }),
     );
     expect(onConflictDoUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         target: expect.any(Array),
-        set: expect.objectContaining({ cfi: 'epubcfi(/6/2)', pageNumber: 7, percentage: 80 }),
+        set: expect.objectContaining({
+          cfi: 'epubcfi(/6/2)',
+          pageNumber: 7,
+          percentage: 80,
+          koboLocationSource: 'OEBPS/ch1.xhtml',
+          koboLocationType: 'KoboSpan',
+          koboLocationValue: 'kobo.25.1',
+          koboContentSourceProgressPercent: 25,
+          koreaderProgress: '/body/DocFragment[2]/body/p[1]/text()[1].0',
+        }),
       }),
     );
+  });
+
+  it('syncs primary EPUB progress into Kobo reading state and marks snapshot row pending', async () => {
+    const insertChain = makeInsertChain();
+    const db = {
+      select: vi
+        .fn()
+        .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub' }]))
+        .mockReturnValueOnce(
+          makeSelectChain('limit', [
+            {
+              entitlementId: '10',
+              createdAtKobo: '2026-01-01T00:00:00.000Z',
+              currentBookmark: {
+                LastModified: '2026-01-01T00:00:00.000Z',
+                Location: { Source: 'old.xhtml', Type: 'KoboSpan', Value: 'kobo.1.1' },
+                ProgressPercent: 20,
+                ContentSourceProgressPercent: 2,
+                ChapterProgress: 2,
+              },
+              statistics: { LastModified: '2026-01-01T00:00:00.000Z' },
+              statusInfo: { LastModified: '2026-01-01T00:00:00.000Z', TimesStartedReading: 1 },
+            },
+          ]),
+        ),
+      insert: vi.fn().mockReturnValue(insertChain),
+      execute: vi.fn().mockResolvedValue(undefined),
+    };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.syncKoboReadingStateFromProgress(5, 9, 80, 'OEBPS/ch14.xhtml', 'KoboSpan', 'kobo.25.1', 33.5)).resolves.toBe(true);
+
+    expect(insertChain.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 5,
+        bookId: 10,
+        entitlementId: '10',
+        createdAtKobo: '2026-01-01T00:00:00.000Z',
+        currentBookmark: expect.objectContaining({
+          LastModified: expect.any(String),
+          ProgressPercent: 80,
+          ContentSourceProgressPercent: 33.5,
+          ChapterProgress: 2,
+          Location: { Source: 'OEBPS/ch14.xhtml', Type: 'KoboSpan', Value: 'kobo.25.1' },
+        }),
+        statusInfo: expect.objectContaining({
+          TimesStartedReading: 1,
+          Status: 'Reading',
+        }),
+      }),
+    );
+    expect(insertChain.onConflictDoUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: expect.any(Array),
+        set: expect.objectContaining({
+          currentBookmark: expect.objectContaining({
+            LastModified: expect.any(String),
+            ProgressPercent: 80,
+            ContentSourceProgressPercent: 33.5,
+            ChapterProgress: 2,
+            Location: { Source: 'OEBPS/ch14.xhtml', Type: 'KoboSpan', Value: 'kobo.25.1' },
+          }),
+          statusInfo: expect.objectContaining({ Status: 'Reading' }),
+        }),
+      }),
+    );
+    expect(db.execute).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears stale Kobo source-level percent while preserving device bookmark fields', async () => {
+    const insertChain = makeInsertChain();
+    const db = {
+      select: vi
+        .fn()
+        .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub' }]))
+        .mockReturnValueOnce(
+          makeSelectChain('limit', [
+            {
+              entitlementId: '10',
+              createdAtKobo: '2026-01-01T00:00:00.000Z',
+              currentBookmark: {
+                LastModified: '2026-01-01T00:00:00.000Z',
+                Location: { Source: 'old.xhtml', Type: 'KoboSpan', Value: 'kobo.1.1' },
+                ProgressPercent: 20,
+                ContentSourceProgressPercent: 2,
+                ChapterProgress: 2,
+              },
+              statistics: { LastModified: '2026-01-01T00:00:00.000Z' },
+              statusInfo: { LastModified: '2026-01-01T00:00:00.000Z' },
+            },
+          ]),
+        ),
+      insert: vi.fn().mockReturnValue(insertChain),
+      execute: vi.fn().mockResolvedValue(undefined),
+    };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.syncKoboReadingStateFromProgress(5, 9, 80, 'OEBPS/ch14.xhtml', 'KoboSpan', 'kobo.25.1', null)).resolves.toBe(true);
+
+    const insertedBookmark = insertChain.values.mock.calls[0][0].currentBookmark;
+    expect(insertedBookmark).toEqual(
+      expect.objectContaining({
+        LastModified: expect.any(String),
+        ProgressPercent: 80,
+        ChapterProgress: 2,
+        Location: { Source: 'OEBPS/ch14.xhtml', Type: 'KoboSpan', Value: 'kobo.25.1' },
+      }),
+    );
+    expect(insertedBookmark).not.toHaveProperty('ContentSourceProgressPercent');
+  });
+
+  it('does not overwrite Kobo reading state without an exact KoboSpan location', async () => {
+    const insertChain = makeInsertChain();
+    const db = {
+      select: vi.fn().mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub' }])),
+      insert: vi.fn().mockReturnValue(insertChain),
+      execute: vi.fn().mockResolvedValue(undefined),
+    };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.syncKoboReadingStateFromProgress(5, 9, 80, 'OEBPS/ch14.xhtml', null, null, 33.5)).resolves.toBe(false);
+
+    expect(db.select).toHaveBeenCalledTimes(1);
+    expect(db.insert).not.toHaveBeenCalled();
+    expect(db.execute).not.toHaveBeenCalled();
+  });
+
+  it('does not sync Kobo reading state for non-primary EPUB files', async () => {
+    const db = {
+      select: vi.fn().mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 99, format: 'epub' }])),
+      insert: vi.fn(),
+      execute: vi.fn(),
+    };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.syncKoboReadingStateFromProgress(5, 9, 80)).resolves.toBe(false);
+
+    expect(db.insert).not.toHaveBeenCalled();
+    expect(db.execute).not.toHaveBeenCalled();
+  });
+
+  it('reads whether Kobo two-way progress sync is enabled', async () => {
+    const db = {
+      select: vi
+        .fn()
+        .mockReturnValueOnce(makeSelectChain('limit', [{ twoWayProgressSync: true }]))
+        .mockReturnValueOnce(makeSelectChain('limit', [])),
+    };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.isKoboTwoWayProgressSyncEnabled(5)).resolves.toBe(true);
+    await expect(repo.isKoboTwoWayProgressSyncEnabled(6)).resolves.toBe(false);
   });
 
   it('clears both reading_progress and audiobook_progress rows for a file id', async () => {

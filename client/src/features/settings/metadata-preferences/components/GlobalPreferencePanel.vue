@@ -24,6 +24,7 @@ function withDefaultOptions(prefs: MetadataFetchPreferences): MetadataFetchPrefe
     options: {
       genres: {
         mode: prefs.options?.genres.mode ?? 'merge',
+        blocklist: prefs.options?.genres.blocklist ?? [],
       },
       saveProviderIds: prefs.options?.saveProviderIds ?? true,
     },

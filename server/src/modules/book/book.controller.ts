@@ -476,7 +476,18 @@ export class BookController {
 
   @Get('files/:fileId/progress')
   async getFileProgress(@Param('fileId', ParseIntPipe) fileId: number, @CurrentUser() user: RequestUser) {
-    return (await this.bookService.getProgress(user.id, fileId, user)) ?? { cfi: null, pageNumber: null, percentage: 0 };
+    return (
+      (await this.bookService.getProgress(user.id, fileId, user)) ?? {
+        cfi: null,
+        pageNumber: null,
+        percentage: 0,
+        koboLocationSource: null,
+        koboLocationType: null,
+        koboLocationValue: null,
+        koboContentSourceProgressPercent: null,
+        koreaderProgress: null,
+      }
+    );
   }
 
   @Post('files/:fileId/progress')

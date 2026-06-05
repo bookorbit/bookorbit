@@ -1504,6 +1504,11 @@ export class BookService {
       cfi: row.cfi ?? null,
       pageNumber: row.pageNumber ?? null,
       percentage: row.percentage ?? 0,
+      koboLocationSource: row.koboLocationSource ?? null,
+      koboLocationType: row.koboLocationType ?? null,
+      koboLocationValue: row.koboLocationValue ?? null,
+      koboContentSourceProgressPercent: row.koboContentSourceProgressPercent ?? null,
+      koreaderProgress: row.koreaderProgress ?? null,
       updatedAt: row.updatedAt ?? null,
     }));
   }
@@ -1530,7 +1535,30 @@ export class BookService {
 
   async saveProgress(userId: number, fileId: number, dto: SaveProgressDto, user: RequestUser) {
     const file = await this.verifyFileAccess(fileId, user);
-    await this.bookRepo.upsertProgress(userId, fileId, dto.cfi ?? null, dto.pageNumber ?? null, dto.percentage, dto.positionSeconds ?? null);
+    await this.bookRepo.upsertProgress(
+      userId,
+      fileId,
+      dto.cfi ?? null,
+      dto.pageNumber ?? null,
+      dto.percentage,
+      dto.positionSeconds ?? null,
+      dto.koboLocationSource ?? null,
+      dto.koboLocationType ?? null,
+      dto.koboLocationValue ?? null,
+      dto.koboContentSourceProgressPercent ?? null,
+      dto.koreaderProgress ?? null,
+    );
+    if (file.format === 'epub' && this.hasPermission(user, Permission.KoboSync) && (await this.bookRepo.isKoboTwoWayProgressSyncEnabled(userId))) {
+      await this.bookRepo.syncKoboReadingStateFromProgress(
+        userId,
+        fileId,
+        dto.percentage,
+        dto.koboLocationSource ?? null,
+        dto.koboLocationType ?? null,
+        dto.koboLocationValue ?? null,
+        dto.koboContentSourceProgressPercent ?? null,
+      );
+    }
     this.libraryService
       .findOne(file.libraryId)
       .then((lib) =>
@@ -1975,7 +2003,7 @@ export class BookService {
     const currentBookmark = (readingStateRow?.currentBookmark ?? null) as Record<string, unknown> | null;
     const statusInfo = (readingStateRow?.statusInfo ?? null) as Record<string, unknown> | null;
 
-    const progressCandidate = currentBookmark?.ProgressPercent ?? currentBookmark?.ContentSourceProgressPercent;
+    const progressCandidate = currentBookmark?.ProgressPercent;
     const progressPercent = typeof progressCandidate === 'number' ? Math.max(0, Math.min(100, progressCandidate)) : null;
     const status = typeof statusInfo?.Status === 'string' ? statusInfo.Status : null;
 

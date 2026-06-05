@@ -4,7 +4,10 @@ import * as unzipper from 'unzipper';
 import { XMLParser } from 'fast-xml-parser';
 
 import type { EpubBookInfo, EpubManifestItem, EpubSpineItem, EpubTocItem } from '@bookorbit/types';
+import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import { BookReadService } from '../../book/book-read.service';
+import { KepubConversionService } from '../../kobo/services/kepub-conversion.service';
+import { KoboSettingsService } from '../../kobo/services/kobo-settings.service';
 import { LibraryService } from '../../library/library.service';
 import type { RequestUser } from '../../../common/types/request-user';
 
@@ -284,6 +287,8 @@ export class EpubService {
   constructor(
     private readonly bookReadService: BookReadService,
     private readonly libraryService: LibraryService,
+    private readonly koboSettingsService: KoboSettingsService,
+    private readonly kepubConversionService: KepubConversionService,
   ) {}
 
   async getBookInfo(bookId: number, fileId: number | undefined, user: RequestUser): Promise<EpubBookInfo> {
@@ -325,12 +330,56 @@ export class EpubService {
       const file = await this.bookReadService.findFileById(fileId);
       if (!file || file.bookId !== bookId) throw new NotFoundException(`File ${fileId} not found for book ${bookId}`);
       if (file.format !== 'epub') throw new NotFoundException(`File ${fileId} is not an EPUB file`);
-      return file.absolutePath;
+      return this.resolveReaderEpubPath(user.id, bookId, {
+        absolutePath: file.absolutePath,
+        fileHash: file.fileHash,
+        sizeBytes: file.sizeBytes,
+      });
     }
 
     const [file] = await this.bookReadService.findPrimaryFilesByBookIds([bookId]);
     if (!file || file.format !== 'epub') throw new NotFoundException(`No primary EPUB file for book ${bookId}`);
-    return file.absolutePath;
+    return this.resolveReaderEpubPath(user.id, bookId, {
+      absolutePath: file.absolutePath,
+      sizeBytes: file.sizeBytes,
+    });
+  }
+
+  private async resolveReaderEpubPath(
+    userId: number,
+    bookId: number,
+    file: { absolutePath: string; fileHash?: string | null; sizeBytes?: number | null },
+  ): Promise<string> {
+    const start = Date.now();
+    let settings: Awaited<ReturnType<KoboSettingsService['getSettings']>>;
+    try {
+      settings = await this.koboSettingsService.getSettings(userId);
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.warn(
+        `[epub.reader_kepub] [fail] bookId=${bookId} userId=${userId} durationMs=${Date.now() - start} errorClass=${error.constructor.name} error="${sanitizeLogValue(error.message)}" - Kobo settings lookup failed, using original epub`,
+      );
+      return file.absolutePath;
+    }
+    if (!settings.twoWayProgressSync || !settings.convertToKepub) return file.absolutePath;
+
+    const limitBytes = settings.kepubConversionLimitMb * 1024 * 1024;
+    if (file.sizeBytes && file.sizeBytes > limitBytes) return file.absolutePath;
+
+    try {
+      return await this.kepubConversionService.getKepubPath({
+        sourcePath: file.absolutePath,
+        fileHash: file.fileHash,
+        bookId,
+        hyphenate: settings.forceEnableHyphenation,
+      });
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.warn(
+        `[epub.reader_kepub] [fail] bookId=${bookId} userId=${userId} durationMs=${Date.now() - start} errorClass=${error.constructor.name} error="${sanitizeLogValue(error.message)}" - kepub conversion failed, using original epub`,
+      );
+      return file.absolutePath;
+    }
   }
 
   private async getCachedEntry(epubPath: string): Promise<CacheEntry> {

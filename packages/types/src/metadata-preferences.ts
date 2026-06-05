@@ -51,6 +51,7 @@ export type FieldPreferenceOverrides = Partial<Record<MetadataField, FieldPrefer
 export interface MetadataFetchOptions {
   genres: {
     mode: GenreMergeMode;
+    blocklist: string[];
   };
   saveProviderIds: boolean;
 }

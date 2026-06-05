@@ -63,9 +63,19 @@ export class GoodreadsProvider implements IdentifiableProvider {
 
     // Goodreads search pages are frequently gated behind WAF challenges.
     // Prefer the JSON autocomplete endpoint, then fall back to HTML scraping.
-    const autocompleteUrl = `https://www.goodreads.com/book/auto_complete?format=json&q=${encodeURIComponent(query)}`;
-    const autocomplete = await this.fetchJson<GoodreadsAutocompleteItem[]>(autocompleteUrl, 'search-autocomplete', query, undefined, signal);
-    const autocompleteIds = extractBookIdsFromAutocomplete(autocomplete, params.title, PROVIDER_LIMITS.GOODREADS_MAX_RESULTS);
+    const autocompleteItems: GoodreadsAutocompleteItem[] = [];
+    for (const autocompleteQuery of buildAutocompleteQueries(params)) {
+      const autocompleteUrl = `https://www.goodreads.com/book/auto_complete?format=json&q=${encodeURIComponent(autocompleteQuery)}`;
+      const autocomplete = await this.fetchJson<GoodreadsAutocompleteItem[]>(
+        autocompleteUrl,
+        'search-autocomplete',
+        autocompleteQuery,
+        undefined,
+        signal,
+      );
+      if (Array.isArray(autocomplete)) autocompleteItems.push(...autocomplete);
+    }
+    const autocompleteIds = extractBookIdsFromAutocomplete(autocompleteItems, params, PROVIDER_LIMITS.GOODREADS_MAX_RESULTS);
     if (autocompleteIds.length > 0) return autocompleteIds;
 
     const searchUrl = `https://www.goodreads.com/search?q=${encodeURIComponent(query)}&search_type=books`;
@@ -177,6 +187,15 @@ interface GoodreadsAutocompleteItem {
   bookUrl?: string;
   title?: string;
   bookTitleBare?: string;
+  author?: string | { name?: string };
+  ratingsCount?: string | number;
+}
+
+function buildAutocompleteQueries(params: MetadataSearchParams): string[] {
+  const title = params.title?.trim();
+  const author = params.author?.trim();
+  const queries = title ? [title, [title, author].filter(Boolean).join(' ')] : [author ?? ''];
+  return [...new Set(queries.filter((q) => q.trim().length > 0))];
 }
 
 function extractBookIds(html: string, titleHint: string | undefined, limit: number): string[] {
@@ -200,21 +219,27 @@ function extractBookIds(html: string, titleHint: string | undefined, limit: numb
   return rankBookIds(entries, titleHint, limit);
 }
 
-function extractBookIdsFromAutocomplete(payload: GoodreadsAutocompleteItem[] | null, titleHint: string | undefined, limit: number): string[] {
+function extractBookIdsFromAutocomplete(payload: GoodreadsAutocompleteItem[] | null, params: MetadataSearchParams, limit: number): string[] {
   if (!Array.isArray(payload) || payload.length === 0) return [];
 
   const seen = new Set<string>();
-  const entries: Array<{ id: string; text: string }> = [];
+  const entries: Array<{ id: string; text: string; title?: string; author?: string; ratingsCount?: number }> = [];
   for (const item of payload) {
     const id = getAutocompleteBookId(item);
     if (!id || seen.has(id)) continue;
     seen.add(id);
 
     const text = [item.bookUrl ?? '', item.title ?? '', item.bookTitleBare ?? ''].join(' ');
-    entries.push({ id, text });
+    entries.push({
+      id,
+      text,
+      title: item.bookTitleBare ?? item.title,
+      author: getAutocompleteAuthor(item),
+      ratingsCount: parseRatingsCount(item.ratingsCount),
+    });
   }
 
-  return rankBookIds(entries, titleHint, limit);
+  return rankBookIds(entries, params.title, limit, params.author);
 }
 
 function getAutocompleteBookId(item: GoodreadsAutocompleteItem): string | null {
@@ -225,21 +250,95 @@ function getAutocompleteBookId(item: GoodreadsAutocompleteItem): string | null {
   return fromUrl ?? null;
 }
 
-function rankBookIds(entries: Array<{ id: string; text: string }>, titleHint: string | undefined, limit: number): string[] {
+function getAutocompleteAuthor(item: GoodreadsAutocompleteItem): string | undefined {
+  if (typeof item.author === 'string') return item.author;
+  return item.author?.name;
+}
+
+function parseRatingsCount(value: string | number | undefined): number | undefined {
+  if (value == null) return undefined;
+  const normalized = typeof value === 'string' ? value.replace(/,/g, '') : value;
+  const parsed = typeof normalized === 'string' ? parseInt(normalized, 10) : Math.round(normalized);
+  return Number.isNaN(parsed) || parsed < 0 ? undefined : parsed;
+}
+
+function rankBookIds(
+  entries: Array<{ id: string; text: string; title?: string; author?: string; ratingsCount?: number }>,
+  titleHint: string | undefined,
+  limit: number,
+  authorHint?: string,
+): string[] {
   if (!titleHint || entries.length <= limit) {
-    return entries.slice(0, limit).map((e) => e.id);
+    return entries
+      .map((entry, index) => ({ entry, index, score: scoreRankedEntry(entry, titleHint, authorHint) }))
+      .sort((a, b) => b.score - a.score || a.index - b.index)
+      .slice(0, limit)
+      .map(({ entry }) => entry.id);
   }
 
-  // Score entries by how many title words appear in result text (slug/title)
-  // so companion books and study guides rank below likely direct matches.
-  const titleWords = titleHint
+  const scored = entries.map((entry, index) => ({ entry, index, score: scoreRankedEntry(entry, titleHint, authorHint) }));
+  scored.sort((a, b) => b.score - a.score || a.index - b.index);
+  return scored.slice(0, limit).map(({ entry }) => entry.id);
+}
+
+function scoreRankedEntry(
+  entry: { text: string; title?: string; author?: string; ratingsCount?: number },
+  titleHint: string | undefined,
+  authorHint?: string,
+): number {
+  let score = 0;
+  const title = normalizeSearchText(entry.title ?? entry.text);
+  const queryTitle = titleHint ? normalizeSearchText(titleHint) : '';
+
+  if (queryTitle) {
+    if (title === queryTitle) score += 100;
+    else if (title.startsWith(queryTitle)) score += 70;
+    else if (queryTitle.startsWith(title)) score += 55;
+    else if (title.includes(queryTitle)) score += 45;
+    else score += titleOverlapScore(queryTitle, title);
+  }
+
+  const queryAuthor = authorHint ? normalizeSearchText(authorHint) : '';
+  const author = entry.author ? normalizeSearchText(entry.author) : '';
+  if (queryAuthor && author) {
+    if (author === queryAuthor || author.includes(queryAuthor) || queryAuthor.includes(author)) score += 30;
+    else score += authorOverlapScore(queryAuthor, author);
+  }
+
+  if (entry.ratingsCount) score += Math.min(Math.log10(entry.ratingsCount + 1) * 3, 20);
+  if (isDerivativeResult(entry.title ?? entry.text)) score -= 80;
+
+  return score;
+}
+
+function titleOverlapScore(queryTitle: string, title: string): number {
+  const queryTokens = tokenizeSearchText(queryTitle);
+  if (!queryTokens.length) return 0;
+  const titleTokens = new Set(tokenizeSearchText(title));
+  return (queryTokens.filter((token) => titleTokens.has(token)).length / queryTokens.length) * 30;
+}
+
+function authorOverlapScore(queryAuthor: string, author: string): number {
+  const queryTokens = tokenizeSearchText(queryAuthor).filter((token) => token.length > 1);
+  if (!queryTokens.length) return 0;
+  const authorTokens = new Set(tokenizeSearchText(author));
+  return (queryTokens.filter((token) => authorTokens.has(token)).length / queryTokens.length) * 15;
+}
+
+function isDerivativeResult(value: string): boolean {
+  return /\b(summary|study guide|analysis|book analysis|reading guide|literature guide|workbook|digest|breakdown|companion)\b/i.test(value);
+}
+
+function normalizeSearchText(value: string): string {
+  return value
     .toLowerCase()
-    .split(/\W+/)
-    .filter((w) => w.length > 2);
-  const scored = entries.map((e) => ({
-    id: e.id,
-    score: titleWords.filter((w) => e.text.toLowerCase().includes(w)).length,
-  }));
-  scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, limit).map((s) => s.id);
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function tokenizeSearchText(value: string): string[] {
+  return value.split(' ').filter((token) => token.length > 1);
 }

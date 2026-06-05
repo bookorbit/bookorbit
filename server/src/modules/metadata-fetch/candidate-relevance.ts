@@ -5,7 +5,10 @@ import { MetadataSearchParams } from './providers/metadata-search-params';
 
 const DEFAULT_LIMIT = 5;
 
-const SKIP_TITLE_PREFIXES = /^(summary|study guide|analysis|guide to|workbook|review of|summary of|chapter summary|chapter-by-chapter)\b/i;
+const SKIP_TITLE_PATTERNS = [
+  /^(summary|study guide|analysis|guide to|workbook|review of|summary of|chapter summary|chapter-by-chapter)\b/i,
+  /\b(summary|study guide|book analysis|reading guide|literature guide|workbook|digest|breakdown and analysis)\b/i,
+];
 
 /**
  * Scores, filters, and ranks candidates by relevance to the search params.
@@ -21,7 +24,7 @@ export function filterAndRank(candidates: MetadataCandidate[], params: MetadataS
   }
 
   return candidates
-    .filter((c) => !c.title || !SKIP_TITLE_PREFIXES.test(c.title))
+    .filter((c) => !c.title || !SKIP_TITLE_PATTERNS.some((pattern) => pattern.test(c.title)))
     .map((c) => ({ candidate: c, score: scoreCandidate(c, params) }))
     .filter(({ score }) => score > 0)
     .sort((a, b) => b.score - a.score)

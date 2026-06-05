@@ -5,6 +5,7 @@ import {
   BOOK_COVER_DISPLAY_MODES,
   BOOK_SHADOW_STRENGTHS,
   BOOK_SPINE_OVERLAYS,
+  BOOK_THUMBNAIL_CLICK_ACTION,
   BOOK_VIEW_MODES,
   CARD_INFO_MODES,
   CARD_OVERLAY_KEYS,
@@ -55,6 +56,7 @@ const DISPLAY_PREFERENCES_SCHEMA = z
     gridCardPrimaryLabel: z.enum(GRID_CARD_LABEL_FIELDS).default('hidden'),
     gridCardSecondaryLabel: z.enum(GRID_CARD_LABEL_FIELDS).default('hidden'),
     cardInfoMode: z.enum(CARD_INFO_MODES).default('hover-overlay'),
+    thumbnailClickAction: z.enum(BOOK_THUMBNAIL_CLICK_ACTION).default('reader'),
   })
   .strict()
   .superRefine((data, ctx) => {

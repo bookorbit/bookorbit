@@ -11,6 +11,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { KoboThumbnailService } from './services/kobo-thumbnail.service';
 import { KoboDownloadService } from './services/kobo-download.service';
 import { KoboProxyService } from './services/kobo-proxy.service';
+import { KoboBookIdentityService } from './services/kobo-book-identity.service';
 
 @Controller('kobo/:deviceToken')
 @Public()
@@ -22,6 +23,7 @@ export class KoboDeviceController {
     private readonly thumbnailService: KoboThumbnailService,
     private readonly downloadService: KoboDownloadService,
     private readonly proxyService: KoboProxyService,
+    private readonly bookIdentityService: KoboBookIdentityService,
   ) {}
 
   @Get('v1/books/:bookId/thumbnail/:width/:height/:quality/:isGreyscale/image.jpg')
@@ -68,8 +70,8 @@ export class KoboDeviceController {
     @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,
   ) {
-    const id = parseInt(bookId, 10);
-    if (isNaN(id)) return this.proxyService.forward(req, reply, device.deviceToken);
+    const id = await this.bookIdentityService.resolveBookIdByEntitlementId(user.id, bookId);
+    if (id === null) return this.proxyService.forward(req, reply, device.deviceToken);
     await this.downloadService.streamBook(user.id, id, reply);
   }
 
@@ -117,8 +119,8 @@ export class KoboDeviceController {
     req: FastifyRequest,
     reply: FastifyReply,
   ) {
-    const id = parseInt(bookId, 10);
-    if (isNaN(id)) return this.proxyService.forward(req, reply, device.deviceToken);
+    const id = await this.bookIdentityService.resolveBookIdByCoverImageId(user.id, bookId);
+    if (id === null) return this.proxyService.forward(req, reply, device.deviceToken);
     await this.thumbnailService.serveThumbnail(user.id, id, ifNoneMatch, reply);
   }
 }

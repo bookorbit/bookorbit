@@ -8,6 +8,7 @@ import * as schema from '../../../db/schema';
 import { buildContentFilterClauses } from '../../../common/utils/content-filter-sql.utils';
 import { ContentFilterRepository } from '../../user/content-filter.repository';
 import { KoboBookAccessService } from './kobo-book-access.service';
+import { KoboBookIdentityService } from './kobo-book-identity.service';
 import { KoboReadingStateService } from './kobo-reading-state.service';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -19,11 +20,28 @@ const TOKEN_PREFIX = 'PX.';
 type EligibleSnapshotRow = {
   bookId: number;
   fileHash: string | null;
+  deliveryHash: string;
   metadataHash: string;
+};
+
+type KoboDeliverySettings = {
+  convertToKepub: boolean;
+  forceEnableHyphenation: boolean;
+  kepubConversionLimitMb: number;
+};
+
+type KoboDeliveryFormat = 'EPUB3' | 'KEPUB' | 'PDF';
+
+type KoboDeliveryInfo = {
+  format: KoboDeliveryFormat;
+  hash: string;
 };
 
 export interface KoboBookEntry {
   bookId: number;
+  koboEntitlementId: string;
+  koboCoverImageId: string;
+  needsLegacyNumericRemoval: boolean;
   title: string;
   authors: string[];
   description: string | null;
@@ -36,6 +54,7 @@ export interface KoboBookEntry {
   fileSizeBytes: number | null;
   fileHash: string | null;
   metadataHash: string;
+  deliveryFormat: KoboDeliveryFormat;
   metadataUpdatedAt: Date | null;
   collectionNames: string[];
   addedAt: Date;
@@ -53,6 +72,7 @@ export class KoboSyncService {
     private readonly bookAccessService: KoboBookAccessService,
     private readonly readingStateService: KoboReadingStateService,
     private readonly contentFilterRepository: ContentFilterRepository,
+    private readonly bookIdentityService: KoboBookIdentityService,
   ) {}
 
   async getDelta(userId: number, deviceToken: string, baseUrl: string): Promise<{ entitlements: unknown[]; hasMore: boolean; syncToken: string }> {
@@ -60,7 +80,8 @@ export class KoboSyncService {
       where: eq(schema.koboLibrarySnapshots.userId, userId),
     });
 
-    const eligibleSnapshotRows = await this.fetchEligibleSnapshotRows(userId);
+    const hadSnapshot = Boolean(snapshot);
+    const eligibleSnapshotRows = await this.fetchEligibleSnapshotRows(userId, hadSnapshot);
 
     if (!snapshot) {
       await this.createSnapshot(userId, eligibleSnapshotRows);
@@ -72,7 +93,11 @@ export class KoboSyncService {
   }
 
   async getBookMetadata(userId: number, bookId: number, deviceToken: string, baseUrl: string): Promise<unknown[]> {
-    const booksById = await this.fetchEligibleBooksByIds(userId, [bookId]);
+    const snapshot = await this.db.query.koboLibrarySnapshots.findFirst({
+      where: eq(schema.koboLibrarySnapshots.userId, userId),
+      columns: { id: true },
+    });
+    const booksById = await this.fetchEligibleBooksByIds(userId, [bookId], Boolean(snapshot));
     const book = booksById.get(bookId) ?? null;
     if (!book) return [];
     return [this.buildBookMetadata(book, deviceToken, baseUrl)];
@@ -123,6 +148,7 @@ export class KoboSyncService {
             isNew: true,
             removedByDevice: false,
             fileHash: b.fileHash,
+            deliveryHash: b.deliveryHash,
             metadataHash: b.metadataHash,
           })),
         )
@@ -136,6 +162,7 @@ export class KoboSyncService {
         CREATE TEMP TABLE kobo_eligible_books_tmp (
           book_id integer PRIMARY KEY,
           file_hash varchar(64),
+          delivery_hash varchar(64) NOT NULL,
           metadata_hash varchar(64) NOT NULL
         ) ON COMMIT DROP
       `);
@@ -143,16 +170,17 @@ export class KoboSyncService {
       for (let index = 0; index < eligibleBooks.length; index += SNAPSHOT_RECONCILE_BATCH_SIZE) {
         const chunk = eligibleBooks.slice(index, index + SNAPSHOT_RECONCILE_BATCH_SIZE);
         const valueRows = sql.join(
-          chunk.map((b) => sql`(${b.bookId}, ${b.fileHash}, ${b.metadataHash})`),
+          chunk.map((b) => sql`(${b.bookId}, ${b.fileHash}, ${b.deliveryHash}, ${b.metadataHash})`),
           sql`, `,
         );
 
         await tx.execute(sql`
-          INSERT INTO kobo_eligible_books_tmp (book_id, file_hash, metadata_hash)
+          INSERT INTO kobo_eligible_books_tmp (book_id, file_hash, delivery_hash, metadata_hash)
           VALUES ${valueRows}
           ON CONFLICT (book_id)
           DO UPDATE
           SET file_hash = EXCLUDED.file_hash,
+              delivery_hash = EXCLUDED.delivery_hash,
               metadata_hash = EXCLUDED.metadata_hash
         `);
       }
@@ -178,8 +206,8 @@ export class KoboSyncService {
 
       await tx.execute(sql`
         INSERT INTO ${schema.koboSnapshotBooks}
-          (snapshot_id, book_id, synced, pending_delete, is_new, removed_by_device, file_hash, metadata_hash)
-        SELECT ${snapshotId}, e.book_id, false, false, true, false, e.file_hash, e.metadata_hash
+          (snapshot_id, book_id, synced, pending_delete, is_new, removed_by_device, file_hash, delivery_hash, metadata_hash)
+        SELECT ${snapshotId}, e.book_id, false, false, true, false, e.file_hash, e.delivery_hash, e.metadata_hash
         FROM kobo_eligible_books_tmp e
         LEFT JOIN ${schema.koboSnapshotBooks} sb
           ON sb.snapshot_id = ${snapshotId}
@@ -193,6 +221,7 @@ export class KoboSyncService {
             synced = false,
             is_new = true,
             file_hash = e.file_hash,
+            delivery_hash = e.delivery_hash,
             metadata_hash = e.metadata_hash
         FROM kobo_eligible_books_tmp e
         WHERE sb.snapshot_id = ${snapshotId}
@@ -207,6 +236,7 @@ export class KoboSyncService {
             synced = false,
             is_new = true,
             file_hash = e.file_hash,
+            delivery_hash = e.delivery_hash,
             metadata_hash = e.metadata_hash
         FROM kobo_eligible_books_tmp e
         WHERE sb.snapshot_id = ${snapshotId}
@@ -218,16 +248,48 @@ export class KoboSyncService {
 
       await tx.execute(sql`
         UPDATE ${schema.koboSnapshotBooks} AS sb
+        SET delivery_hash = e.delivery_hash
+        FROM kobo_eligible_books_tmp e
+        WHERE sb.snapshot_id = ${snapshotId}
+          AND sb.book_id = e.book_id
+          AND sb.pending_delete = false
+          AND sb.removed_by_device = false
+          AND sb.delivery_hash IS NULL
+          AND sb.file_hash IS NOT DISTINCT FROM e.file_hash
+      `);
+
+      await tx.execute(sql`
+        UPDATE ${schema.koboSnapshotBooks} AS sb
         SET synced = false,
-            is_new = false,
+            is_new = true,
             file_hash = e.file_hash,
+            delivery_hash = e.delivery_hash,
             metadata_hash = e.metadata_hash
         FROM kobo_eligible_books_tmp e
         WHERE sb.snapshot_id = ${snapshotId}
           AND sb.book_id = e.book_id
+          AND sb.pending_delete = false
           AND sb.removed_by_device = false
           AND sb.synced = true
-          AND (sb.file_hash IS DISTINCT FROM e.file_hash OR sb.metadata_hash IS DISTINCT FROM e.metadata_hash)
+          AND (sb.file_hash IS DISTINCT FROM e.file_hash OR sb.delivery_hash IS DISTINCT FROM e.delivery_hash)
+      `);
+
+      await tx.execute(sql`
+        UPDATE ${schema.koboSnapshotBooks} AS sb
+        SET synced = false,
+            is_new = false,
+            file_hash = e.file_hash,
+            delivery_hash = e.delivery_hash,
+            metadata_hash = e.metadata_hash
+        FROM kobo_eligible_books_tmp e
+        WHERE sb.snapshot_id = ${snapshotId}
+          AND sb.book_id = e.book_id
+          AND sb.pending_delete = false
+          AND sb.removed_by_device = false
+          AND sb.synced = true
+          AND sb.file_hash IS NOT DISTINCT FROM e.file_hash
+          AND sb.delivery_hash IS NOT DISTINCT FROM e.delivery_hash
+          AND sb.metadata_hash IS DISTINCT FROM e.metadata_hash
       `);
     });
   }
@@ -268,14 +330,29 @@ export class KoboSyncService {
       .where(and(eq(schema.koboSnapshotBooks.snapshotId, snapshot.id), inArray(schema.koboSnapshotBooks.bookId, pageIds)));
 
     const entitlements: unknown[] = [];
+    const identitiesById = await this.bookIdentityService.findByBookIds(
+      userId,
+      page.map((row) => row.bookId),
+    );
+    const legacyRemovalCompletedBookIds: number[] = [];
     const booksById = await this.fetchEligibleBooksByIds(
       userId,
       page.filter((row) => !row.pendingDelete).map((row) => row.bookId),
+      false,
     );
 
     for (const row of page) {
       if (row.pendingDelete) {
-        entitlements.push(this.buildRemovedEntitlement(row.bookId));
+        const identity = identitiesById.get(row.bookId) ?? null;
+        if (identity) {
+          if (identity.needsLegacyNumericRemoval) {
+            entitlements.push(this.buildRemovedEntitlement(row.bookId));
+            legacyRemovalCompletedBookIds.push(row.bookId);
+          }
+          entitlements.push(this.buildRemovedEntitlement(identity.entitlementId));
+        } else {
+          entitlements.push(this.buildRemovedEntitlement(row.bookId));
+        }
         await this.db
           .delete(schema.koboSnapshotBooks)
           .where(and(eq(schema.koboSnapshotBooks.snapshotId, snapshot.id), eq(schema.koboSnapshotBooks.bookId, row.bookId)));
@@ -285,13 +362,19 @@ export class KoboSyncService {
       const book = booksById.get(row.bookId) ?? null;
       if (!book) continue;
 
-      if (row.isNew) {
-        const readingState = (await this.readingStateService.getRawState(userId, row.bookId)) ?? this.buildDefaultReadingState(row.bookId);
+      const readingState = await this.readingStateService.getRawState(userId, row.bookId);
+      const defaultReadingState = readingState ?? this.buildDefaultReadingState(book.koboEntitlementId);
+
+      if (row.isNew || book.needsLegacyNumericRemoval) {
+        if (book.needsLegacyNumericRemoval) {
+          entitlements.push(this.buildRemovedEntitlement(row.bookId));
+          legacyRemovalCompletedBookIds.push(row.bookId);
+        }
         entitlements.push({
           NewEntitlement: {
             BookEntitlement: this.buildBookEntitlement(book),
             BookMetadata: this.buildBookMetadata(book, deviceToken, baseUrl),
-            ReadingState: readingState,
+            ReadingState: defaultReadingState,
           },
         });
       } else {
@@ -301,8 +384,17 @@ export class KoboSyncService {
             BookMetadata: this.buildBookMetadata(book, deviceToken, baseUrl),
           },
         });
+        if (readingState) {
+          entitlements.push({
+            ChangedReadingState: {
+              ReadingState: readingState,
+            },
+          });
+        }
       }
     }
+
+    await this.bookIdentityService.markLegacyNumericRemovalComplete(userId, legacyRemovalCompletedBookIds);
 
     return { entitlements, hasMore, syncToken };
   }
@@ -328,6 +420,8 @@ export class KoboSyncService {
     }
 
     const now = new Date().toISOString();
+    const allEligibleBookIds = [...eligibleIds];
+    const identitiesById = await this.bookIdentityService.ensureForBooks(userId, allEligibleBookIds, false);
     return collections.map((col) => {
       const bookIds = (booksByCollection.get(col.id) ?? []).filter((id) => eligibleIds.has(id));
       return {
@@ -338,14 +432,17 @@ export class KoboSyncService {
             Created: now,
             LastModified: now,
             Type: 'UserTag',
-            Items: bookIds.map((bookId) => ({ RevisionId: String(bookId), Type: 'ProductRevisionTagItem' })),
+            Items: bookIds.flatMap((bookId) => {
+              const identity = identitiesById.get(bookId);
+              return identity ? [{ RevisionId: identity.entitlementId, Type: 'ProductRevisionTagItem' }] : [];
+            }),
           },
         },
       };
     });
   }
 
-  private buildRemovedEntitlement(bookId: number) {
+  private buildRemovedEntitlement(bookId: number | string) {
     const id = String(bookId);
     const now = new Date().toISOString();
     return {
@@ -371,7 +468,7 @@ export class KoboSyncService {
   }
 
   private buildBookEntitlement(book: KoboBookEntry) {
-    const id = String(book.bookId);
+    const id = book.koboEntitlementId;
     const addedAt = book.addedAt.toISOString();
     const updatedAt = book.updatedAt.toISOString();
     return {
@@ -392,9 +489,8 @@ export class KoboSyncService {
   }
 
   private buildBookMetadata(book: KoboBookEntry, deviceToken: string, baseUrl: string) {
-    const id = String(book.bookId);
-    const format = book.fileFormat.toLowerCase() === 'pdf' ? 'PDF' : 'EPUB3';
-    const downloadUrl = `${baseUrl}/api/v1/kobo/${deviceToken}/v1/books/${book.bookId}/download`;
+    const id = book.koboEntitlementId;
+    const downloadUrl = `${baseUrl}/api/v1/kobo/${deviceToken}/v1/books/${id}/download`;
     const slug = book.title ? book.title.toLowerCase().replace(/[^a-z0-9]/g, '-') : id;
     const publicationDate = book.publishedYear ? new Date(Date.UTC(book.publishedYear, 0, 1)).toISOString() : null;
     const publisher = book.publisher ? { Name: book.publisher, Imprint: book.publisher } : null;
@@ -406,8 +502,6 @@ export class KoboSyncService {
           NumberFloat: book.seriesIndex ?? 1.0,
         }
       : { Id: '', Name: '', Number: '', NumberFloat: 0.0 };
-
-    const coverImageId = book.metadataUpdatedAt ? `${id}-${book.metadataUpdatedAt.getTime()}` : id;
 
     return {
       CrossRevisionId: id,
@@ -421,7 +515,7 @@ export class KoboSyncService {
       PublicationDate: publicationDate,
       Language: book.language ?? 'en',
       Genre: '00000000-0000-0000-0000-000000000001',
-      CoverImageId: coverImageId,
+      CoverImageId: book.koboCoverImageId,
       Contributors: book.authors,
       ContributorRoles: [],
       Series: series,
@@ -434,12 +528,12 @@ export class KoboSyncService {
       PhoneticPronunciations: {},
       CurrentDisplayPrice: { TotalAmount: 0, CurrencyCode: 'USD' },
       CurrentLoveDisplayPrice: { TotalAmount: 0 },
-      DownloadUrls: [{ Format: format, Size: book.fileSizeBytes ?? 0, Url: downloadUrl, Platform: 'Generic', DrmType: 'None' }],
+      DownloadUrls: [{ Format: book.deliveryFormat, Size: book.fileSizeBytes ?? 0, Url: downloadUrl, Platform: 'Generic', DrmType: 'None' }],
     };
   }
 
-  private buildDefaultReadingState(bookId: number) {
-    const id = String(bookId);
+  private buildDefaultReadingState(entitlementId: string) {
+    const id = entitlementId;
     const now = new Date().toISOString();
     return {
       EntitlementId: id,
@@ -448,7 +542,7 @@ export class KoboSyncService {
       PriorityTimestamp: now,
       StatusInfo: { LastModified: now, Status: 'ReadyToRead', TimesStartedReading: 0 },
       Statistics: { LastModified: now },
-      CurrentBookmark: { LastModified: now, ProgressPercent: 0, ContentSourceProgressPercent: 0 },
+      CurrentBookmark: { LastModified: now, ProgressPercent: 0 },
     };
   }
 
@@ -458,6 +552,8 @@ export class KoboSyncService {
     seriesName: string | null;
     seriesIndex: number | null;
     metadataUpdatedAt: Date | null;
+    entitlementId: string;
+    coverImageId: string;
   }): string {
     const metaStr = [
       params.title ?? '',
@@ -465,8 +561,54 @@ export class KoboSyncService {
       params.seriesName ?? '',
       String(params.seriesIndex ?? ''),
       String(params.metadataUpdatedAt ?? ''),
+      params.entitlementId,
+      params.coverImageId,
     ].join('|');
     return createHash('sha256').update(metaStr).digest('hex').slice(0, 16);
+  }
+
+  private buildDeliveryHash(format: KoboDeliveryFormat, hyphenate: boolean): string {
+    return createHash('sha256')
+      .update([format, format === 'KEPUB' && hyphenate ? 'hyphenate' : 'plain'].join('|'))
+      .digest('hex')
+      .slice(0, 16);
+  }
+
+  private getDeliveryInfo(fileFormat: string | null, fileSizeBytes: number | null, settings: KoboDeliverySettings): KoboDeliveryInfo {
+    const normalizedFormat = (fileFormat ?? 'epub').toLowerCase();
+
+    if (normalizedFormat === 'pdf') {
+      return { format: 'PDF', hash: this.buildDeliveryHash('PDF', false) };
+    }
+
+    if (normalizedFormat === 'epub') {
+      const limitBytes = settings.kepubConversionLimitMb * 1024 * 1024;
+      const withinLimit = !fileSizeBytes || fileSizeBytes <= limitBytes;
+
+      if (settings.convertToKepub && withinLimit) {
+        return { format: 'KEPUB', hash: this.buildDeliveryHash('KEPUB', settings.forceEnableHyphenation) };
+      }
+    }
+
+    return { format: 'EPUB3', hash: this.buildDeliveryHash('EPUB3', false) };
+  }
+
+  private async getDeliverySettings(userId: number): Promise<KoboDeliverySettings> {
+    const settings = await this.db.query.koboSyncSettings.findFirst({
+      where: eq(schema.koboSyncSettings.userId, userId),
+      columns: {
+        convertToKepub: true,
+        forceEnableHyphenation: true,
+        kepubConversionLimitMb: true,
+        twoWayProgressSync: true,
+      },
+    });
+
+    return {
+      convertToKepub: settings?.twoWayProgressSync ? true : (settings?.convertToKepub ?? true),
+      forceEnableHyphenation: settings?.forceEnableHyphenation ?? false,
+      kepubConversionLimitMb: settings?.kepubConversionLimitMb ?? 100,
+    };
   }
 
   private async buildEligibleBooksWhereClause(userId: number): Promise<SQL | undefined> {
@@ -503,9 +645,10 @@ export class KoboSyncService {
     );
   }
 
-  private async fetchEligibleSnapshotRows(userId: number): Promise<EligibleSnapshotRow[]> {
+  private async fetchEligibleSnapshotRows(userId: number, needsLegacyNumericRemovalForNewMappings: boolean): Promise<EligibleSnapshotRow[]> {
     const whereClause = await this.buildEligibleBooksWhereClause(userId);
     if (!whereClause) return [];
+    const deliverySettings = await this.getDeliverySettings(userId);
 
     const rows = await this.db
       .select({
@@ -514,6 +657,8 @@ export class KoboSyncService {
         seriesName: schema.bookMetadata.seriesName,
         seriesIndex: schema.bookMetadata.seriesIndex,
         metadataUpdatedAt: schema.bookMetadata.updatedAt,
+        fileFormat: schema.bookFiles.format,
+        fileSizeBytes: schema.bookFiles.sizeBytes,
         fileHash: schema.bookFiles.fileHash,
         authorNamesCsv: sql<string>`coalesce(string_agg(${schema.authors.name}, ',' ORDER BY ${schema.bookAuthors.displayOrder}, ${schema.bookAuthors.authorId}), '')`,
       })
@@ -529,28 +674,51 @@ export class KoboSyncService {
         schema.bookMetadata.seriesName,
         schema.bookMetadata.seriesIndex,
         schema.bookMetadata.updatedAt,
+        schema.bookFiles.format,
+        schema.bookFiles.sizeBytes,
         schema.bookFiles.fileHash,
       );
 
-    return rows.map((row) => ({
-      bookId: row.bookId,
-      fileHash: row.fileHash,
-      metadataHash: this.buildMetadataHash({
-        title: row.title,
-        authors: row.authorNamesCsv ? row.authorNamesCsv.split(',').filter((name) => name.length > 0) : [],
-        seriesName: row.seriesName,
-        seriesIndex: row.seriesIndex,
-        metadataUpdatedAt: row.metadataUpdatedAt,
-      }),
-    }));
+    const identitiesById = await this.bookIdentityService.ensureForBooks(
+      userId,
+      rows.map((row) => row.bookId),
+      needsLegacyNumericRemovalForNewMappings,
+    );
+
+    return rows.map((row) => {
+      const delivery = this.getDeliveryInfo(row.fileFormat, row.fileSizeBytes, deliverySettings);
+      const identity = identitiesById.get(row.bookId);
+      const coverImageId = identity
+        ? this.bookIdentityService.buildVersionedCoverImageId(identity.coverImageId, row.metadataUpdatedAt)
+        : String(row.bookId);
+      return {
+        bookId: row.bookId,
+        fileHash: row.fileHash,
+        deliveryHash: delivery.hash,
+        metadataHash: this.buildMetadataHash({
+          title: row.title,
+          authors: row.authorNamesCsv ? row.authorNamesCsv.split(',').filter((name) => name.length > 0) : [],
+          seriesName: row.seriesName,
+          seriesIndex: row.seriesIndex,
+          metadataUpdatedAt: row.metadataUpdatedAt,
+          entitlementId: identity?.entitlementId ?? String(row.bookId),
+          coverImageId,
+        }),
+      };
+    });
   }
 
-  private async fetchEligibleBooksByIds(userId: number, bookIds: number[]): Promise<Map<number, KoboBookEntry>> {
+  private async fetchEligibleBooksByIds(
+    userId: number,
+    bookIds: number[],
+    needsLegacyNumericRemovalForNewMappings: boolean,
+  ): Promise<Map<number, KoboBookEntry>> {
     const uniqueBookIds = [...new Set(bookIds)];
     if (uniqueBookIds.length === 0) return new Map();
 
     const whereClause = await this.buildEligibleBooksWhereClause(userId);
     if (!whereClause) return new Map();
+    const deliverySettings = await this.getDeliverySettings(userId);
 
     const rows = await this.db
       .select({
@@ -612,11 +780,19 @@ export class KoboSyncService {
       collectionsByBook.set(row.bookId, names);
     }
 
+    const identitiesById = await this.bookIdentityService.ensureForBooks(userId, fetchedBookIds, needsLegacyNumericRemovalForNewMappings);
     const byId = new Map<number, KoboBookEntry>();
     for (const row of rows) {
       const authors = authorsByBook.get(row.bookId) ?? [];
+      const delivery = this.getDeliveryInfo(row.fileFormat, row.fileSizeBytes, deliverySettings);
+      const identity = identitiesById.get(row.bookId);
+      if (!identity) continue;
+      const coverImageId = this.bookIdentityService.buildVersionedCoverImageId(identity.coverImageId, row.metadataUpdatedAt);
       byId.set(row.bookId, {
         bookId: row.bookId,
+        koboEntitlementId: identity.entitlementId,
+        koboCoverImageId: coverImageId,
+        needsLegacyNumericRemoval: identity.needsLegacyNumericRemoval,
         title: row.title ?? `Book ${row.bookId}`,
         authors,
         description: row.description,
@@ -628,12 +804,15 @@ export class KoboSyncService {
         fileFormat: row.fileFormat ?? 'epub',
         fileSizeBytes: row.fileSizeBytes,
         fileHash: row.fileHash,
+        deliveryFormat: delivery.format,
         metadataHash: this.buildMetadataHash({
           title: row.title,
           authors,
           seriesName: row.seriesName,
           seriesIndex: row.seriesIndex,
           metadataUpdatedAt: row.metadataUpdatedAt,
+          entitlementId: identity.entitlementId,
+          coverImageId,
         }),
         metadataUpdatedAt: row.metadataUpdatedAt,
         collectionNames: collectionsByBook.get(row.bookId) ?? [],

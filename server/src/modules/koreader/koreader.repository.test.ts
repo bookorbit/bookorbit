@@ -177,6 +177,7 @@ describe('KoreaderRepository', () => {
             percentage: 41.25,
             cfi: null,
             pageNumber: null,
+            koreaderProgress: null,
           }),
         }),
       );
