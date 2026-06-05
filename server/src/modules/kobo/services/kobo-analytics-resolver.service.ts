@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db/db.module';
@@ -37,6 +37,7 @@ export class KoboAnalyticsResolverService {
       .from(schema.koboSnapshotBooks)
       .innerJoin(schema.koboLibrarySnapshots, eq(schema.koboLibrarySnapshots.id, schema.koboSnapshotBooks.snapshotId))
       .where(and(eq(schema.koboLibrarySnapshots.userId, userId), eq(schema.koboSnapshotBooks.bookId, bookId)))
+      .orderBy(desc(schema.koboLibrarySnapshots.id))
       .limit(1);
 
     const snapHash = snap[0]?.fileHash ?? null;

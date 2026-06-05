@@ -133,4 +133,27 @@ describe('KoboAnalyticsResolverService', () => {
       reason: 'no_epub_file',
     });
   });
+
+  it('skips when the book row does not exist', async () => {
+    const db = makeDb();
+    db.query.books.findFirst.mockResolvedValue(null);
+
+    await expect(makeService(db).resolveBookFileId(1, 9)).resolves.toEqual({
+      kind: 'skipped',
+      reason: 'book_not_found',
+    });
+  });
+
+  it('skips when primary file id is set but no epub file exists', async () => {
+    const db = makeDb();
+    db.query.books.findFirst.mockResolvedValue({ id: 9, primaryFileId: 50 });
+    const snapChain = makeSelectChain([]);
+    db.select.mockReturnValueOnce(snapChain);
+    db.query.bookFiles.findFirst.mockResolvedValue(null);
+
+    await expect(makeService(db).resolveBookFileId(1, 9)).resolves.toEqual({
+      kind: 'skipped',
+      reason: 'no_epub_file',
+    });
+  });
 });

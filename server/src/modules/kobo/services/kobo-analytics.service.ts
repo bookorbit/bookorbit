@@ -5,6 +5,7 @@ import type { RequestUser } from '../../../common/types/request-user';
 import { ReadingSessionService } from '../../reading-session/reading-session.service';
 import type { KoboDeviceContext } from '../guards/kobo-token.guard';
 import type { KoboAnalyticsBody, KoboAnalyticsEvent } from '../kobo-analytics.types';
+import { KoboBookIdentityService } from './kobo-book-identity.service';
 import { KoboAnalyticsResolverService } from './kobo-analytics-resolver.service';
 
 const DEBUG_PAYLOAD_MAX_LENGTH = 4000;
@@ -39,6 +40,7 @@ export class KoboAnalyticsService {
   private readonly logger = new Logger(KoboAnalyticsService.name);
 
   constructor(
+    private readonly bookIdentityService: KoboBookIdentityService,
     private readonly resolver: KoboAnalyticsResolverService,
     private readonly readingSessionService: ReadingSessionService,
   ) {}
@@ -86,8 +88,9 @@ export class KoboAnalyticsService {
       return;
     }
 
-    const bookId = Number.parseInt(volumeid, 10);
-    if (Number.isNaN(bookId)) {
+    const trimmedVolumeId = volumeid.trim();
+    const bookId = await this.bookIdentityService.resolveBookIdByEntitlementId(user.id, trimmedVolumeId);
+    if (bookId === null) {
       this.logger.debug(
         `[kobo.analytics.session] [ignore] invalid volumeid userId=${user.id} eventId=${ev.Id} volumeid="${sanitizeLogValue(volumeid)}" event="${formatAnalyticsPayload(ev, 800)}"`,
       );

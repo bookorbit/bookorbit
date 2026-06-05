@@ -22,8 +22,6 @@ describe('KoboDeviceController', () => {
   const analyticsService = {
     ingest: vi.fn(),
   };
-
-  const controller = new KoboDeviceController(thumbnailService as never, downloadService as never, proxyService as never, analyticsService as never);
   const bookIdentityService = {
     resolveBookIdByEntitlementId: vi.fn(),
     resolveBookIdByCoverImageId: vi.fn(),
@@ -33,6 +31,7 @@ describe('KoboDeviceController', () => {
     thumbnailService as never,
     downloadService as never,
     proxyService as never,
+    analyticsService as never,
     bookIdentityService as never,
   );
 
@@ -128,7 +127,7 @@ describe('KoboDeviceController', () => {
     expect(thumbnailService.serveThumbnail).toHaveBeenCalledWith(11, 420, undefined, reply);
   });
 
-  it('returns static payload endpoints and analytics keys', () => {
+  it('returns static payload endpoints and analytics keys', async () => {
     expect(controller.affiliate()).toEqual({});
     expect(controller.remainingBookSeries()).toEqual({ TotalResultCount: 0, SearchResults: [] });
     expect(controller.productNextRead()).toEqual([]);
@@ -150,6 +149,12 @@ describe('KoboDeviceController', () => {
         } as never,
       ),
     ).resolves.toEqual({});
+  });
+
+  it('returns {} when analytics ingest throws a non-Error value', async () => {
+    analyticsService.ingest.mockRejectedValue('db down');
+
+    await expect(controller.analyticsEvent({ Events: [] }, { id: 1 } as never, { deviceToken: 't' } as never)).resolves.toEqual({});
   });
 
   it('forwards unmatched routes through proxy service', async () => {

@@ -4,17 +4,21 @@ import type { KoboAnalyticsEvent } from '../kobo-analytics.types';
 import { KoboAnalyticsService } from './kobo-analytics.service';
 
 describe('KoboAnalyticsService', () => {
+  const bookIdentityService = { resolveBookIdByEntitlementId: vi.fn() };
   const resolver = { resolveBookFileId: vi.fn() };
   const readingSessionService = { save: vi.fn() };
   const user = { id: 7 } as never;
   const device = { deviceId: 2, deviceToken: 'tok', userId: 7 } as never;
 
   function makeService() {
-    return new KoboAnalyticsService(resolver as never, readingSessionService as never);
+    return new KoboAnalyticsService(bookIdentityService as never, resolver as never, readingSessionService as never);
   }
 
   beforeEach(() => {
     vi.clearAllMocks();
+    bookIdentityService.resolveBookIdByEntitlementId.mockImplementation((_userId: number, id: string) =>
+      /^\d+$/.test(id) ? Promise.resolve(Number(id)) : Promise.resolve(null),
+    );
     resolver.resolveBookFileId.mockResolvedValue({ kind: 'resolved', bookFileId: 100 });
     readingSessionService.save.mockResolvedValue(undefined);
   });
@@ -135,6 +139,61 @@ describe('KoboAnalyticsService', () => {
     expect(readingSessionService.save).toHaveBeenCalledTimes(2);
   });
 
+  it('ignores volumeid values that do not resolve to a book', async () => {
+    bookIdentityService.resolveBookIdByEntitlementId.mockResolvedValue(null);
+
+    await makeService().ingest(
+      {
+        Events: [
+          {
+            Id: 'partial',
+            EventType: 'LeaveContent',
+            Timestamp: '2026-06-01T00:00:10Z',
+            Metrics: { SecondsRead: 12 },
+            Attributes: { volumeid: '12abc' },
+          },
+          {
+            Id: 'decimal',
+            EventType: 'LeaveContent',
+            Timestamp: '2026-06-01T00:00:20Z',
+            Metrics: { SecondsRead: 12 },
+            Attributes: { volumeid: '1.5' },
+          },
+        ],
+      },
+      user,
+      device,
+    );
+
+    expect(resolver.resolveBookFileId).not.toHaveBeenCalled();
+    expect(readingSessionService.save).not.toHaveBeenCalled();
+  });
+
+  it('resolves UUID entitlement volumeid values via book identity', async () => {
+    const entitlementId = '11111111-1111-4111-8111-111111111111';
+    bookIdentityService.resolveBookIdByEntitlementId.mockResolvedValue(9);
+
+    await makeService().ingest(
+      {
+        Events: [
+          {
+            Id: 'uuid-volume',
+            EventType: 'LeaveContent',
+            Timestamp: '2026-06-01T00:00:10Z',
+            Metrics: { SecondsRead: 20 },
+            Attributes: { volumeid: entitlementId, progress: '8' },
+          },
+        ],
+      },
+      user,
+      device,
+    );
+
+    expect(bookIdentityService.resolveBookIdByEntitlementId).toHaveBeenCalledWith(7, entitlementId);
+    expect(resolver.resolveBookFileId).toHaveBeenCalledWith(7, 9);
+    expect(readingSessionService.save).toHaveBeenCalledWith(100, expect.objectContaining({ sessionId: 'uuid-volume', endProgress: 8 }), user);
+  });
+
   it('skips LeaveContent without volumeid or SecondsRead', async () => {
     await makeService().ingest(
       {
@@ -190,5 +249,83 @@ describe('KoboAnalyticsService', () => {
     );
 
     expect(readingSessionService.save).not.toHaveBeenCalled();
+  });
+
+  it('ignores LeaveContent with an invalid timestamp', async () => {
+    await makeService().ingest(
+      {
+        Events: [
+          {
+            Id: 'bad-ts',
+            EventType: 'LeaveContent',
+            Timestamp: 'not-a-date',
+            Metrics: { SecondsRead: 20 },
+            Attributes: { volumeid: '1', progress: '5' },
+          },
+        ],
+      },
+      user,
+      device,
+    );
+
+    expect(readingSessionService.save).not.toHaveBeenCalled();
+  });
+
+  it('treats null or missing Events as an empty batch', async () => {
+    await makeService().ingest(null, user, device);
+    await makeService().ingest({}, user, device);
+
+    expect(readingSessionService.save).not.toHaveBeenCalled();
+  });
+
+  it('logs a warning when a non-Error is thrown during save', async () => {
+    const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    readingSessionService.save.mockRejectedValueOnce('boom');
+
+    await makeService().ingest(
+      {
+        Events: [
+          {
+            Id: 'err',
+            EventType: 'LeaveContent',
+            Timestamp: '2026-06-01T00:00:10Z',
+            Metrics: { SecondsRead: 12 },
+            Attributes: { volumeid: '1' },
+          },
+        ],
+      },
+      user,
+      device,
+    );
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('unknown error'));
+    warnSpy.mockRestore();
+  });
+
+  it('summarizes events with missing event types', async () => {
+    const debugSpy = vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+
+    await makeService().ingest(
+      {
+        Events: [{ Id: 'x', EventType: undefined as never, Timestamp: '2026-06-01T00:00:00Z' }],
+      },
+      user,
+      device,
+    );
+
+    expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('types=(missing):1'));
+    debugSpy.mockRestore();
+  });
+
+  it('falls back when analytics payload cannot be stringified', async () => {
+    const debugSpy = vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+
+    await makeService().ingest(circular as never, user, device);
+
+    expect(debugSpy).toHaveBeenCalled();
+    expect(readingSessionService.save).not.toHaveBeenCalled();
+    debugSpy.mockRestore();
   });
 });
