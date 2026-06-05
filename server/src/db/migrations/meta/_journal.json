@@ -99,6 +99,13 @@
       "when": 1780425838875,
       "tag": "0013_add_series_ids",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1780622112610,
+      "tag": "0014_kobo-two-way-progress-sync",
+      "breakpoints": true
     }
   ]
 }

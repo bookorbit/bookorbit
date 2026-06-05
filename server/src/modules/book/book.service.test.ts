@@ -3,7 +3,7 @@ import type { MockedFunction } from 'vitest';
 import { access, readdir, rm, stat } from 'fs/promises';
 
 import type { RequestUser } from '../../common/types/request-user';
-import { AUDIO_BOOK_FILE_WRITE_FIELDS, MetadataProviderKey, type BookQuery } from '@bookorbit/types';
+import { AUDIO_BOOK_FILE_WRITE_FIELDS, MetadataProviderKey, Permission, type BookQuery } from '@bookorbit/types';
 import { extractEpubMetadata } from '../metadata/lib/epub';
 import { extractAudioMetadata } from '../metadata/extractors/audio.extractor';
 import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../metadata/lib/cbz-metadata';
@@ -111,6 +111,8 @@ function makeService() {
     findProgress: vi.fn(),
     findProgressByBook: vi.fn(),
     upsertProgress: vi.fn(),
+    syncKoboReadingStateFromProgress: vi.fn(),
+    isKoboTwoWayProgressSyncEnabled: vi.fn().mockResolvedValue(false),
     clearFileProgress: vi.fn(),
     findAudioProgress: vi.fn(),
     upsertAudioProgress: vi.fn(),
@@ -1510,6 +1512,26 @@ describe('BookService', () => {
       expect(result.snapshot?.snapshotId).toBe(99);
     });
 
+    it('ignores source-level Kobo progress in book state summaries', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser({ permissions: ['kobo_sync'] } as never);
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      bookRepo.findKoboReadingState.mockResolvedValue({
+        currentBookmark: { ContentSourceProgressPercent: 75 },
+        statusInfo: { Status: 'Reading' },
+        createdAtKobo: 'created',
+        lastModifiedKobo: 'updated',
+        priorityTimestamp: 'priority',
+        updatedAt: new Date('2026-01-02T00:00:00.000Z'),
+      });
+      bookRepo.findKoboSnapshotState.mockResolvedValue(null);
+      bookRepo.findKoboSyncCollectionNamesForBook.mockResolvedValue(['Favorites']);
+
+      const result = await service.getKoboState(10, user);
+
+      expect(result.readingState?.progressPercent).toBeNull();
+    });
+
     it('bulkReExtractCover reports progress for every processed book file, including unchanged covers', async () => {
       const { service, bookRepo, libraryService, metadataService } = makeService();
       const user = makeUser();
@@ -1692,6 +1714,11 @@ describe('BookService', () => {
           cfi: null,
           pageNumber: null,
           percentage: null,
+          koboLocationSource: null,
+          koboLocationType: null,
+          koboLocationValue: null,
+          koboContentSourceProgressPercent: null,
+          koreaderProgress: null,
           updatedAt: null,
         },
         {
@@ -1699,6 +1726,11 @@ describe('BookService', () => {
           cfi: 'epubcfi(/6/4)',
           pageNumber: 12,
           percentage: 45,
+          koboLocationSource: 'OEBPS/chapter.xhtml',
+          koboLocationType: 'KoboSpan',
+          koboLocationValue: 'kobo.25.1',
+          koboContentSourceProgressPercent: 22,
+          koreaderProgress: '/body/DocFragment[2]/body/p[1]/text()[1].0',
           updatedAt: new Date('2026-01-04T00:00:00.000Z'),
         },
       ]);
@@ -1712,6 +1744,11 @@ describe('BookService', () => {
           cfi: null,
           pageNumber: null,
           percentage: 0,
+          koboLocationSource: null,
+          koboLocationType: null,
+          koboLocationValue: null,
+          koboContentSourceProgressPercent: null,
+          koreaderProgress: null,
           updatedAt: null,
         },
         {
@@ -1719,6 +1756,11 @@ describe('BookService', () => {
           cfi: 'epubcfi(/6/4)',
           pageNumber: 12,
           percentage: 45,
+          koboLocationSource: 'OEBPS/chapter.xhtml',
+          koboLocationType: 'KoboSpan',
+          koboLocationValue: 'kobo.25.1',
+          koboContentSourceProgressPercent: 22,
+          koreaderProgress: '/body/DocFragment[2]/body/p[1]/text()[1].0',
           updatedAt: new Date('2026-01-04T00:00:00.000Z'),
         },
       ]);
@@ -1737,7 +1779,7 @@ describe('BookService', () => {
 
       await service.saveProgress(user.id, 7, { percentage: 25, positionSeconds: 900 } as never, user);
 
-      expect(bookRepo.upsertProgress).toHaveBeenCalledWith(user.id, 7, null, null, 25, 900);
+      expect(bookRepo.upsertProgress).toHaveBeenCalledWith(user.id, 7, null, null, 25, 900, null, null, null, null, null);
     });
 
     it('passes null positionSeconds when not provided in DTO', async () => {
@@ -1751,7 +1793,66 @@ describe('BookService', () => {
 
       await service.saveProgress(user.id, 8, { percentage: 50 } as never, user);
 
-      expect(bookRepo.upsertProgress).toHaveBeenCalledWith(user.id, 8, null, null, 50, null);
+      expect(bookRepo.upsertProgress).toHaveBeenCalledWith(user.id, 8, null, null, 50, null, null, null, null, null, null);
+    });
+
+    it('mirrors EPUB percentage to Kobo state for users with Kobo sync permission', async () => {
+      const { service, bookRepo, libraryService } = makeService();
+      const user = makeUser({ permissions: [Permission.KoboSync] });
+
+      bookRepo.findFileById.mockResolvedValue({ id: 8, bookId: 11, libraryId: 2, absolutePath: '/books/b.epub', format: 'epub' });
+      bookRepo.upsertProgress.mockResolvedValue(undefined);
+      bookRepo.isKoboTwoWayProgressSyncEnabled.mockResolvedValue(true);
+      bookRepo.syncKoboReadingStateFromProgress.mockResolvedValue(true);
+      libraryService.verifyUserAccess.mockResolvedValue(undefined);
+      libraryService.findOne = vi.fn().mockResolvedValue({ readingThreshold: 1, markAsFinishedPercentComplete: 99 });
+
+      await service.saveProgress(
+        user.id,
+        8,
+        {
+          percentage: 50,
+          cfi: 'epubcfi(/6/2)',
+          koboLocationSource: 'OEBPS/ch1.xhtml',
+          koboLocationType: 'KoboSpan',
+          koboLocationValue: 'kobo.25.1',
+          koboContentSourceProgressPercent: 25,
+        } as never,
+        user,
+      );
+
+      expect(bookRepo.syncKoboReadingStateFromProgress).toHaveBeenCalledWith(user.id, 8, 50, 'OEBPS/ch1.xhtml', 'KoboSpan', 'kobo.25.1', 25);
+    });
+
+    it('does not mirror EPUB percentage to Kobo state when two-way sync is disabled', async () => {
+      const { service, bookRepo, libraryService } = makeService();
+      const user = makeUser({ permissions: [Permission.KoboSync] });
+
+      bookRepo.findFileById.mockResolvedValue({ id: 8, bookId: 11, libraryId: 2, absolutePath: '/books/b.epub', format: 'epub' });
+      bookRepo.upsertProgress.mockResolvedValue(undefined);
+      bookRepo.isKoboTwoWayProgressSyncEnabled.mockResolvedValue(false);
+      libraryService.verifyUserAccess.mockResolvedValue(undefined);
+      libraryService.findOne = vi.fn().mockResolvedValue({ readingThreshold: 1, markAsFinishedPercentComplete: 99 });
+
+      await service.saveProgress(user.id, 8, { percentage: 50 } as never, user);
+
+      expect(bookRepo.isKoboTwoWayProgressSyncEnabled).toHaveBeenCalledWith(user.id);
+      expect(bookRepo.syncKoboReadingStateFromProgress).not.toHaveBeenCalled();
+    });
+
+    it('does not mirror EPUB percentage to Kobo state without Kobo sync permission', async () => {
+      const { service, bookRepo, libraryService } = makeService();
+      const user = makeUser();
+
+      bookRepo.findFileById.mockResolvedValue({ id: 8, bookId: 11, libraryId: 2, absolutePath: '/books/b.epub', format: 'epub' });
+      bookRepo.upsertProgress.mockResolvedValue(undefined);
+      libraryService.verifyUserAccess.mockResolvedValue(undefined);
+      libraryService.findOne = vi.fn().mockResolvedValue({ readingThreshold: 1, markAsFinishedPercentComplete: 99 });
+
+      await service.saveProgress(user.id, 8, { percentage: 50 } as never, user);
+
+      expect(bookRepo.isKoboTwoWayProgressSyncEnabled).not.toHaveBeenCalled();
+      expect(bookRepo.syncKoboReadingStateFromProgress).not.toHaveBeenCalled();
     });
   });
 

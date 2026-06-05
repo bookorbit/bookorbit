@@ -25,6 +25,7 @@ import {
   koboLibrarySnapshots,
   koboReadingStates,
   koboSnapshotBooks,
+  koboSyncSettings,
   libraries,
   narrators,
   audiobookProgress,
@@ -38,6 +39,7 @@ type Db = NodePgDatabase<typeof schema>;
 type DbTransaction = Parameters<Parameters<Db['transaction']>[0]>[0];
 type MetadataUpdateExecutor = Pick<Db, 'update' | 'insert'>;
 type MetadataReadExecutor = Pick<Db, 'select'>;
+type JsonObj = Record<string, unknown>;
 
 type CollapsedRawRow = {
   id: number;
@@ -83,6 +85,8 @@ type PatternMetadataRow = {
   isbn13: string | null;
   authors: string[];
 };
+
+const PROGRESS_EPSILON = 0.0001;
 
 @Injectable()
 export class BookRepository {
@@ -611,6 +615,8 @@ export class BookRepository {
         format: bookFiles.format,
         bookId: bookFiles.bookId,
         libraryId: books.libraryId,
+        fileHash: bookFiles.fileHash,
+        sizeBytes: bookFiles.sizeBytes,
       })
       .from(bookFiles)
       .innerJoin(books, eq(books.id, bookFiles.bookId))
@@ -635,6 +641,11 @@ export class BookRepository {
         cfi: readingProgress.cfi,
         pageNumber: readingProgress.pageNumber,
         percentage: readingProgress.percentage,
+        koboLocationSource: readingProgress.koboLocationSource,
+        koboLocationType: readingProgress.koboLocationType,
+        koboLocationValue: readingProgress.koboLocationValue,
+        koboContentSourceProgressPercent: readingProgress.koboContentSourceProgressPercent,
+        koreaderProgress: readingProgress.koreaderProgress,
         updatedAt: readingProgress.updatedAt,
       })
       .from(bookFiles)
@@ -1023,15 +1034,168 @@ export class BookRepository {
     pageNumber: number | null,
     percentage: number,
     positionSeconds?: number | null,
+    koboLocationSource?: string | null,
+    koboLocationType?: string | null,
+    koboLocationValue?: string | null,
+    koboContentSourceProgressPercent?: number | null,
+    koreaderProgress?: string | null,
   ) {
     const now = new Date();
+    const normalizedKoboLocationSource = this.normalizeKoboLocationPart(koboLocationSource);
+    const normalizedKoboLocationType = this.normalizeKoboLocationPart(koboLocationType);
+    const normalizedKoboLocationValue = this.normalizeKoboLocationPart(koboLocationValue);
+    const normalizedKoboContentSourceProgressPercent = this.clampNullableProgressPercentage(koboContentSourceProgressPercent);
+    const normalizedKoreaderProgress = this.normalizeKoreaderProgress(koreaderProgress);
     await this.db
       .insert(readingProgress)
-      .values({ userId, bookFileId: fileId, cfi, pageNumber, percentage, positionSeconds: positionSeconds ?? null, updatedAt: now })
+      .values({
+        userId,
+        bookFileId: fileId,
+        cfi,
+        pageNumber,
+        percentage,
+        positionSeconds: positionSeconds ?? null,
+        koboLocationSource: normalizedKoboLocationSource,
+        koboLocationType: normalizedKoboLocationType,
+        koboLocationValue: normalizedKoboLocationValue,
+        koboContentSourceProgressPercent: normalizedKoboContentSourceProgressPercent,
+        koreaderProgress: normalizedKoreaderProgress,
+        updatedAt: now,
+      })
       .onConflictDoUpdate({
         target: [readingProgress.bookFileId, readingProgress.userId],
-        set: { cfi, pageNumber, percentage, positionSeconds: positionSeconds ?? null, updatedAt: now },
+        set: {
+          cfi,
+          pageNumber,
+          percentage,
+          positionSeconds: positionSeconds ?? null,
+          koboLocationSource: normalizedKoboLocationSource,
+          koboLocationType: normalizedKoboLocationType,
+          koboLocationValue: normalizedKoboLocationValue,
+          koboContentSourceProgressPercent: normalizedKoboContentSourceProgressPercent,
+          koreaderProgress: normalizedKoreaderProgress,
+          updatedAt: now,
+        },
       });
+  }
+
+  async syncKoboReadingStateFromProgress(
+    userId: number,
+    fileId: number,
+    percentage: number,
+    koboLocationSource?: string | null,
+    koboLocationType?: string | null,
+    koboLocationValue?: string | null,
+    koboContentSourceProgressPercent?: number | null,
+  ): Promise<boolean> {
+    const [file] = await this.db
+      .select({
+        bookId: bookFiles.bookId,
+        primaryFileId: books.primaryFileId,
+        format: bookFiles.format,
+      })
+      .from(bookFiles)
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .where(eq(bookFiles.id, fileId))
+      .limit(1);
+
+    if (!file || file.primaryFileId !== fileId || file.format !== 'epub') return false;
+
+    const clampedPercentage = this.clampProgressPercentage(percentage);
+    const normalizedKoboLocationSource = this.normalizeKoboLocationPart(koboLocationSource);
+    const normalizedKoboLocationType = this.normalizeKoboLocationPart(koboLocationType);
+    const normalizedKoboLocationValue = this.normalizeKoboLocationPart(koboLocationValue);
+    const normalizedKoboContentSourceProgressPercent = this.clampNullableProgressPercentage(koboContentSourceProgressPercent);
+    if (!normalizedKoboLocationSource || normalizedKoboLocationType !== 'KoboSpan' || !normalizedKoboLocationValue) return false;
+
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    const [existing] = await this.db
+      .select({
+        entitlementId: koboReadingStates.entitlementId,
+        createdAtKobo: koboReadingStates.createdAtKobo,
+        currentBookmark: koboReadingStates.currentBookmark,
+        statistics: koboReadingStates.statistics,
+        statusInfo: koboReadingStates.statusInfo,
+      })
+      .from(koboReadingStates)
+      .where(and(eq(koboReadingStates.userId, userId), eq(koboReadingStates.bookId, file.bookId)))
+      .limit(1);
+
+    const existingBookmark = this.asJsonObj(existing?.currentBookmark);
+    if (
+      this.isKoboBookmarkCurrent(
+        existingBookmark,
+        clampedPercentage,
+        normalizedKoboLocationSource,
+        normalizedKoboLocationType,
+        normalizedKoboLocationValue,
+        normalizedKoboContentSourceProgressPercent,
+      )
+    ) {
+      return true;
+    }
+
+    const currentBookmark: JsonObj = {
+      ...(existingBookmark ?? {}),
+      LastModified: nowIso,
+      ProgressPercent: clampedPercentage,
+      Location: {
+        Source: normalizedKoboLocationSource,
+        Type: normalizedKoboLocationType,
+        Value: normalizedKoboLocationValue,
+      },
+    };
+    if (normalizedKoboContentSourceProgressPercent !== null) {
+      currentBookmark.ContentSourceProgressPercent = normalizedKoboContentSourceProgressPercent;
+    } else {
+      delete currentBookmark.ContentSourceProgressPercent;
+    }
+    const statusInfo = {
+      ...(this.asJsonObj(existing?.statusInfo) ?? {}),
+      LastModified: nowIso,
+      Status: this.deriveKoboStatus(clampedPercentage),
+    };
+    const statistics = this.asJsonObj(existing?.statistics) ?? { LastModified: nowIso };
+
+    await this.db
+      .insert(koboReadingStates)
+      .values({
+        userId,
+        bookId: file.bookId,
+        entitlementId: existing?.entitlementId ?? String(file.bookId),
+        createdAtKobo: existing?.createdAtKobo ?? nowIso,
+        lastModifiedKobo: nowIso,
+        priorityTimestamp: nowIso,
+        currentBookmark,
+        statistics,
+        statusInfo,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [koboReadingStates.userId, koboReadingStates.bookId],
+        set: {
+          lastModifiedKobo: nowIso,
+          priorityTimestamp: nowIso,
+          currentBookmark,
+          statistics,
+          statusInfo,
+          updatedAt: now,
+        },
+      });
+
+    await this.markKoboSnapshotBookUnsyncedForReadingState(userId, file.bookId);
+    return true;
+  }
+
+  async isKoboTwoWayProgressSyncEnabled(userId: number): Promise<boolean> {
+    const [settings] = await this.db
+      .select({ twoWayProgressSync: koboSyncSettings.twoWayProgressSync })
+      .from(koboSyncSettings)
+      .where(eq(koboSyncSettings.userId, userId))
+      .limit(1);
+    return settings?.twoWayProgressSync === true;
   }
 
   async clearFileProgress(userId: number, fileId: number): Promise<void> {
@@ -1059,5 +1223,88 @@ export class BookRepository {
       })
       .returning();
     return row;
+  }
+
+  private clampProgressPercentage(value: number): number {
+    if (!Number.isFinite(value)) return 0;
+    return Math.max(0, Math.min(100, value));
+  }
+
+  private clampNullableProgressPercentage(value: number | null | undefined): number | null {
+    return typeof value === 'number' && Number.isFinite(value) ? this.clampProgressPercentage(value) : null;
+  }
+
+  private normalizeKoboLocationPart(value: string | null | undefined): string | null {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  private normalizeKoreaderProgress(value: string | null | undefined): string | null {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return trimmed.startsWith('/body/DocFragment[') ? trimmed : null;
+  }
+
+  private asJsonObj(value: unknown): JsonObj | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    return value as JsonObj;
+  }
+
+  private extractKoboPercent(bookmark: JsonObj | null): number | null {
+    const candidate = bookmark?.ProgressPercent;
+    return typeof candidate === 'number' ? this.clampProgressPercentage(candidate) : null;
+  }
+
+  private extractKoboContentSourceProgressPercent(bookmark: JsonObj | null): number | null {
+    const candidate = bookmark?.ContentSourceProgressPercent;
+    return typeof candidate === 'number' ? this.clampProgressPercentage(candidate) : null;
+  }
+
+  private isKoboBookmarkCurrent(
+    bookmark: JsonObj | null,
+    percentage: number,
+    koboLocationSource: string | null,
+    koboLocationType: string | null,
+    koboLocationValue: string | null,
+    koboContentSourceProgressPercent: number | null,
+  ): boolean {
+    const existingPercent = this.extractKoboPercent(bookmark);
+    if (existingPercent === null || Math.abs(existingPercent - percentage) >= PROGRESS_EPSILON) return false;
+
+    if (!koboLocationSource || !koboLocationType || !koboLocationValue) return !this.hasNonInternalBookmarkFields(bookmark);
+
+    const location = this.asJsonObj(bookmark?.Location);
+    if (location?.Source !== koboLocationSource || location.Type !== koboLocationType || location.Value !== koboLocationValue) return false;
+
+    if (koboContentSourceProgressPercent === null) {
+      return this.extractKoboContentSourceProgressPercent(bookmark) === null;
+    }
+    const existingSourcePercent = this.extractKoboContentSourceProgressPercent(bookmark);
+    return existingSourcePercent !== null && Math.abs(existingSourcePercent - koboContentSourceProgressPercent) < PROGRESS_EPSILON;
+  }
+
+  private hasNonInternalBookmarkFields(bookmark: JsonObj | null): boolean {
+    if (!bookmark) return false;
+    return Object.keys(bookmark).some((key) => key !== 'LastModified' && key !== 'ProgressPercent');
+  }
+
+  private deriveKoboStatus(percentage: number): string {
+    if (percentage >= 100) return 'Finished';
+    return percentage > 0 ? 'Reading' : 'ReadyToRead';
+  }
+
+  private async markKoboSnapshotBookUnsyncedForReadingState(userId: number, bookId: number): Promise<void> {
+    await this.db.execute(sql`
+      UPDATE ${koboSnapshotBooks} AS sb
+      SET synced = false,
+          is_new = false
+      FROM ${koboLibrarySnapshots} AS snap
+      WHERE snap.id = sb.snapshot_id
+        AND snap.user_id = ${userId}
+        AND sb.book_id = ${bookId}
+        AND sb.pending_delete = false
+        AND sb.removed_by_device = false
+    `);
   }
 }

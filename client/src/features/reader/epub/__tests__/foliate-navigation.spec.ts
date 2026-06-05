@@ -36,6 +36,9 @@ describe('Foliate navigation', () => {
     }
     goTo: (target: string) => Promise<{ index: number } | undefined>
   }
+  let getKoreaderProgress: (index: number, range: Range | null) => string | null
+  let getKoreaderDocFragmentIndex: (sections: { id: string }[], index: number) => number | null
+  let getKoboSpanValue: (range: Range | null) => string | null
   let Paginator: new () => {
     sections: { load: () => Promise<string | null> }[]
     goTo: (target: { index: number }) => Promise<void>
@@ -46,7 +49,12 @@ describe('Foliate navigation', () => {
 
     const viewModulePath = '../../../../../public/assets/foliate/view.js'
     const paginatorModulePath = '../../../../../public/assets/foliate/paginator.js'
-    ;({ View } = (await import(viewModulePath)) as { View: typeof View })
+    ;({ View, getKoreaderProgress, getKoreaderDocFragmentIndex, getKoboSpanValue } = (await import(viewModulePath)) as {
+      View: typeof View
+      getKoreaderProgress: typeof getKoreaderProgress
+      getKoreaderDocFragmentIndex: typeof getKoreaderDocFragmentIndex
+      getKoboSpanValue: typeof getKoboSpanValue
+    })
     ;({ Paginator } = (await import(paginatorModulePath)) as { Paginator: typeof Paginator })
   })
 
@@ -98,5 +106,111 @@ describe('Foliate navigation', () => {
     paginator.sections = [{ load: vi.fn<() => Promise<string | null>>().mockResolvedValue(null) }]
 
     await expect(paginator.goTo({ index: 0 })).rejects.toThrow('Failed to load section 0')
+  })
+
+  it('preserves real inline elements for KOReader XPointer progress', () => {
+    const doc = document.implementation.createHTMLDocument('chapter')
+    doc.body.innerHTML = '<p>First paragraph</p><p><span>Middle text</span> tail</p>'
+
+    const text = doc.querySelector('p:nth-of-type(2) span')?.firstChild
+    if (!text) throw new Error('Expected text node')
+
+    const range = doc.createRange()
+    range.setStart(text, 2)
+    range.setEnd(text, 8)
+
+    expect(getKoreaderProgress(8, range)).toBe('/body/DocFragment[8]/body/p[2]/span/text().2')
+  })
+
+  it('uses the text endpoint and strips Foliate layout wrappers when the range starts on a container', () => {
+    const doc = document.implementation.createHTMLDocument('chapter')
+    doc.body.innerHTML =
+      '<div id="book-columns"><div id="book-inner"><div id="filepos48449"></div><p><span id="kobo.10.6">Middle text</span></p></div></div>'
+
+    const start = doc.querySelector('#filepos48449')
+    const text = doc.querySelector('#kobo\\.10\\.6')?.firstChild
+    if (!start || !text) throw new Error('Expected test nodes')
+
+    const range = doc.createRange()
+    range.setStart(start, 0)
+    range.setEnd(text, 6)
+
+    expect(getKoreaderProgress(7, range)).toBe('/body/DocFragment[7]/body/p/span/text().6')
+  })
+
+  it('merges adjacent KoboSpan text wrappers for KOReader text node offsets', () => {
+    const doc = document.implementation.createHTMLDocument('chapter')
+    doc.body.innerHTML =
+      '<p><span class="koboSpan" id="kobo.5.1">“</span><span class="italic"><span class="koboSpan" id="kobo.5.2">Fascinating</span></span><span class="koboSpan" id="kobo.5.3">!” </span><span class="koboSpan" id="kobo.5.4">he would say as Harry talked him through using a telephone. </span><span class="koboSpan" id="kobo.5.5">“</span><span class="italic"><span class="koboSpan" id="kobo.5.6">Ingenious,</span></span><span class="koboSpan" id="kobo.5.7"> really, how many ways Muggles have found of getting along without magic.”</span></p>'
+
+    const text = doc.querySelector('#kobo\\.5\\.4')?.firstChild
+    if (!text) throw new Error('Expected text node')
+
+    const range = doc.createRange()
+    range.setStart(text, 33)
+    range.setEnd(text, 33)
+
+    expect(getKoreaderProgress(8, range)).toBe('/body/DocFragment[8]/body/p/text()[2].36')
+  })
+
+  it('uses the KoboSpan-local offset inside the original EPUB text node', () => {
+    const doc = document.implementation.createHTMLDocument('chapter')
+    doc.body.innerHTML =
+      '<p><span class="italic"><span class="koboSpan" id="kobo.13.1">Gadding with Ghouls</span></span><span class="koboSpan" id="kobo.13.2"> by Gilderoy Lockhart</span></p>'
+
+    const text = doc.querySelector('#kobo\\.13\\.2')?.firstChild
+    if (!text) throw new Error('Expected text node')
+
+    const range = doc.createRange()
+    range.setStart(text, 21)
+    range.setEnd(text, 21)
+
+    expect(getKoreaderProgress(8, range)).toBe('/body/DocFragment[8]/body/p/text().21')
+  })
+
+  it('maps KEPUB sections back to KOReader DocFragment indexes', () => {
+    const sections = [
+      { id: 'kepubify-titlepage-dummy.xhtml' },
+      { id: 'text/part0000_split_000.html' },
+      { id: 'text/part0000_split_000.html' },
+      { id: 'text/part0000_split_001.html' },
+      { id: 'text/part0001.html' },
+      { id: 'text/part0002.html' },
+      { id: 'text/part0003.html' },
+      { id: 'text/part0004.html' },
+      { id: 'text/part0005.html' },
+      { id: 'text/part0006.html' },
+      { id: 'text/part0007.html' },
+      { id: 'text/part0008.html' },
+      { id: 'text/part0009.html' },
+      { id: 'text/part0010.html' },
+      { id: 'text/part0011.html' },
+      { id: 'text/part0012.html' },
+      { id: 'text/part0013.html' },
+      { id: 'text/part0014.html' },
+      { id: 'text/part0015.html' },
+      { id: 'text/part0016.html' },
+    ]
+
+    expect(getKoreaderDocFragmentIndex(sections, 0)).toBeNull()
+    expect(getKoreaderDocFragmentIndex(sections, 1)).toBe(1)
+    expect(getKoreaderDocFragmentIndex(sections, 2)).toBe(2)
+    expect(getKoreaderDocFragmentIndex(sections, 19)).toBe(19)
+  })
+
+  it('uses the selected text point for KoboSpan instead of the first span in a wide range', () => {
+    const doc = document.implementation.createHTMLDocument('chapter')
+    doc.body.innerHTML =
+      '<div id="filepos48449"></div><p><span class="koboSpan" id="kobo.1.1">Start</span></p><p><span class="koboSpan" id="kobo.10.6">Middle text</span></p>'
+
+    const start = doc.querySelector('#filepos48449')
+    const text = doc.querySelector('#kobo\\.10\\.6')?.firstChild
+    if (!start || !text) throw new Error('Expected test nodes')
+
+    const range = doc.createRange()
+    range.setStart(start, 0)
+    range.setEnd(text, 6)
+
+    expect(getKoboSpanValue(range)).toBe('kobo.10.6')
   })
 })

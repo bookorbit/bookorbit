@@ -1,24 +1,19 @@
-import { execFile } from 'child_process';
 import { createReadStream } from 'fs';
-import { mkdir, stat } from 'fs/promises';
-import { join } from 'path';
-import { promisify } from 'util';
+import { stat } from 'fs/promises';
 
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { and, eq } from 'drizzle-orm';
 import type { FastifyReply } from 'fastify';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import { DB } from '../../../db/db.module';
 import * as schema from '../../../db/schema';
 import { KoboBookAccessService } from './kobo-book-access.service';
-import { KepubifyBinaryService } from './kepubify-binary.service';
+import { KepubConversionService } from './kepub-conversion.service';
 import { KoboSettingsService } from './kobo-settings.service';
 
 type Db = NodePgDatabase<typeof schema>;
-
-const execFileAsync = promisify(execFile);
 
 const MIME: Record<string, string> = {
   epub: 'application/epub+zip',
@@ -29,19 +24,13 @@ const MIME: Record<string, string> = {
 @Injectable()
 export class KoboDownloadService {
   private readonly logger = new Logger(KoboDownloadService.name);
-  private readonly appDataPath: string;
-  private readonly kepubCachePath: string;
 
   constructor(
     @Inject(DB) private readonly db: Db,
-    private readonly config: ConfigService,
-    private readonly kepubifyBinaryService: KepubifyBinaryService,
+    private readonly kepubConversionService: KepubConversionService,
     private readonly settingsService: KoboSettingsService,
     private readonly bookAccessService: KoboBookAccessService,
-  ) {
-    this.appDataPath = this.config.get<string>('storage.appDataPath')!;
-    this.kepubCachePath = join(this.appDataPath, '.kepub-cache');
-  }
+  ) {}
 
   async streamBook(userId: number, bookId: number, reply: FastifyReply) {
     const book = await this.db.query.books.findFirst({ where: eq(schema.books.id, bookId) });
@@ -66,7 +55,7 @@ export class KoboDownloadService {
       const limitBytes = settings.kepubConversionLimitMb * 1024 * 1024;
       const withinLimit = !file.sizeBytes || file.sizeBytes <= limitBytes;
       if (settings.convertToKepub && withinLimit) {
-        return this.streamKepub(file.absolutePath, file.hash ?? 'nohash', bookId, file.id, settings.forceEnableHyphenation, reply);
+        return this.streamKepub(file.absolutePath, file.fileHash ?? 'nohash', bookId, file.id, settings.forceEnableHyphenation, reply);
       }
     }
 
@@ -86,25 +75,15 @@ export class KoboDownloadService {
   }
 
   private async streamKepub(sourcePath: string, fileHash: string, bookId: number, fileId: number, hyphenate: boolean, reply: FastifyReply) {
-    const cacheDir = join(this.kepubCachePath, String(bookId));
-    const cacheKey = hyphenate ? `${fileHash}-hyph` : fileHash;
-    const cachedPath = join(cacheDir, `${cacheKey}.kepub.epub`);
-
+    const start = Date.now();
     try {
-      await stat(cachedPath);
-      return this.streamFile(cachedPath, fileId, 'kepub.epub', reply);
-    } catch {
-      // Cache miss - convert
-    }
-
-    try {
-      const binaryPath = await this.kepubifyBinaryService.getBinaryPath();
-      await mkdir(cacheDir, { recursive: true });
-      const args = hyphenate ? ['--hyphenate', '--output', cachedPath, sourcePath] : ['--output', cachedPath, sourcePath];
-      await execFileAsync(binaryPath, args);
+      const cachedPath = await this.kepubConversionService.getKepubPath({ sourcePath, fileHash, bookId, hyphenate });
       return this.streamFile(cachedPath, fileId, 'kepub.epub', reply);
     } catch (err) {
-      this.logger.warn(`kepubify conversion failed for book ${bookId}, falling back to EPUB: ${(err as Error).message}`);
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.warn(
+        `[kobo.download] [fail] bookId=${bookId} fileId=${fileId} durationMs=${Date.now() - start} errorClass=${error.constructor.name} error="${sanitizeLogValue(error.message)}" - kepub conversion failed, falling back to epub`,
+      );
       return this.streamFile(sourcePath, fileId, 'epub', reply);
     }
   }

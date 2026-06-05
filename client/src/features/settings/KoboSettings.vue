@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { Plus, Trash2, Copy, Check, Pencil, X, Tablet } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
@@ -37,8 +37,18 @@ const finishedThreshold = ref(99)
 const convertToKepub = ref(true)
 const forceEnableHyphenation = ref(false)
 const kepubConversionLimitMb = ref(100)
+const twoWayProgressSync = ref(false)
 const savingSettings = ref(false)
 const settingsError = ref<string | null>(null)
+
+function applySettingsToLocal() {
+  readingThreshold.value = settings.value.readingThreshold
+  finishedThreshold.value = settings.value.finishedThreshold
+  convertToKepub.value = settings.value.convertToKepub
+  forceEnableHyphenation.value = settings.value.forceEnableHyphenation
+  kepubConversionLimitMb.value = settings.value.kepubConversionLimitMb
+  twoWayProgressSync.value = settings.value.twoWayProgressSync
+}
 
 function formatLastSeen(date: string | null): string {
   if (!date) return 'Never'
@@ -57,16 +67,16 @@ function formatLastSeen(date: string | null): string {
 onMounted(async () => {
   try {
     await Promise.all([fetchDevices(), fetchSettings()])
-    readingThreshold.value = settings.value.readingThreshold
-    finishedThreshold.value = settings.value.finishedThreshold
-    convertToKepub.value = settings.value.convertToKepub
-    forceEnableHyphenation.value = settings.value.forceEnableHyphenation
-    kepubConversionLimitMb.value = settings.value.kepubConversionLimitMb
+    applySettingsToLocal()
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to load'
   } finally {
     loading.value = false
   }
+})
+
+watch(twoWayProgressSync, (enabled) => {
+  if (enabled) convertToKepub.value = true
 })
 
 async function submitCreate() {
@@ -154,7 +164,9 @@ async function saveSettings() {
       convertToKepub: convertToKepub.value,
       forceEnableHyphenation: forceEnableHyphenation.value,
       kepubConversionLimitMb: kepubConversionLimitMb.value,
+      twoWayProgressSync: twoWayProgressSync.value,
     })
+    applySettingsToLocal()
     toast.success('Kobo sync settings saved')
   } catch (e) {
     settingsError.value = e instanceof Error ? e.message : 'Failed to save'
@@ -289,10 +301,23 @@ async function saveSettings() {
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
         <div class="flex items-center justify-between px-5 py-4 bg-card">
           <div class="pr-8">
-            <p class="settings-label">Convert to KEPUB</p>
-            <p class="settings-hint">Optimizes ebooks for Kobo devices with better performance and features.</p>
+            <p class="settings-label">Two-way progress sync</p>
+            <p class="settings-hint">
+              Syncs reading position between BookOrbit and Kobo. For reliable page restore on Kobo, books must be sent as KEPUB.
+            </p>
           </div>
-          <ToggleSwitch v-model="convertToKepub" />
+          <ToggleSwitch v-model="twoWayProgressSync" />
+        </div>
+
+        <div class="flex items-center justify-between px-5 py-4 bg-card">
+          <div class="pr-8">
+            <p class="settings-label">Convert to KEPUB</p>
+            <p class="settings-hint">
+              Required when two-way progress sync is enabled. On the next Kobo sync, affected books are offered again as KEPUB downloads. If Kobo
+              keeps opening an old EPUB copy, remove that book from Kobo and sync again.
+            </p>
+          </div>
+          <ToggleSwitch v-model="convertToKepub" :disabled="twoWayProgressSync" />
         </div>
 
         <div v-if="convertToKepub" class="flex items-center justify-between px-5 py-4 bg-card">
@@ -334,7 +359,9 @@ async function saveSettings() {
               <span class="text-xs font-mono text-primary font-bold">{{ kepubConversionLimitMb }} MB</span>
             </div>
             <input v-model.number="kepubConversionLimitMb" type="range" min="1" max="500" step="5" class="w-full accent-primary cursor-pointer" />
-            <p class="text-[12px] text-muted-foreground mt-2">Skip conversion for files larger than this to save server resources.</p>
+            <p class="text-[12px] text-muted-foreground mt-2">
+              Books above this limit are sent as regular EPUBs, so BookOrbit will not sync their reader position back to Kobo.
+            </p>
           </div>
         </div>
 

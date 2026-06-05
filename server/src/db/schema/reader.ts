@@ -86,6 +86,15 @@ export const readingProgress = pgTable(
     pageNumber: integer('page_number'),
     // Audio: playback position in seconds
     positionSeconds: real('position_seconds'),
+    // Kobo: spine XHTML resource used as Location.Source
+    koboLocationSource: varchar('kobo_location_source', { length: 4096 }),
+    // Kobo: exact bookmark location kind/value, usually KoboSpan + kobo.x.y for KEPUB
+    koboLocationType: varchar('kobo_location_type', { length: 64 }),
+    koboLocationValue: varchar('kobo_location_value', { length: 255 }),
+    // Kobo: progress within Location.Source
+    koboContentSourceProgressPercent: real('kobo_content_source_progress_percent'),
+    // KOReader: XPointer progress string generated from the EPUB DOM
+    koreaderProgress: text('koreader_progress'),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow()
@@ -98,6 +107,10 @@ export const readingProgress = pgTable(
     check('reading_progress_percentage_range_chk', sql`${t.percentage} >= 0 and ${t.percentage} <= 100`),
     check('reading_progress_page_number_nonnegative_chk', sql`${t.pageNumber} is null or ${t.pageNumber} >= 0`),
     check('reading_progress_position_seconds_nonnegative_chk', sql`${t.positionSeconds} is null or ${t.positionSeconds} >= 0`),
+    check(
+      'reading_progress_kobo_content_source_progress_range_chk',
+      sql`${t.koboContentSourceProgressPercent} is null or (${t.koboContentSourceProgressPercent} >= 0 and ${t.koboContentSourceProgressPercent} <= 100)`,
+    ),
   ],
 );
 
