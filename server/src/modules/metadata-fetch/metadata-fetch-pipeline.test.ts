@@ -231,7 +231,7 @@ describe('MetadataFetchPipeline', () => {
       };
     });
     prefs.options = {
-      genres: { mode: 'merge' },
+      genres: { mode: 'merge', blocklist: [] },
       saveProviderIds: false,
     };
 
@@ -252,6 +252,66 @@ describe('MetadataFetchPipeline', () => {
     expect(sources.genres).toBe(MetadataProviderKey.GOOGLE);
   });
 
+  it('filters blocklisted genres before merging selected providers', async () => {
+    const prefs = createPreferences((fields) => {
+      fields.genres = {
+        enabled: true,
+        providers: [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+    });
+    prefs.options = {
+      genres: { mode: 'merge', blocklist: ['audiobook', ' Adult '] },
+      saveProviderIds: false,
+    };
+
+    preferencesService.getGlobal.mockResolvedValue(prefs);
+    resolver.resolve.mockReturnValue(prefs);
+    resolver.withForwardCompatibility.mockReturnValue(prefs);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
+    fetchService.search.mockReturnValue(
+      of(
+        candidate(MetadataProviderKey.GOOGLE, 'g1', { genres: ['Sci-Fi', 'Audiobook', 'Adult'] }),
+        candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { genres: ['audiobook', 'Fantasy'] }),
+      ),
+    );
+
+    const { resolved, sources } = await pipeline.runWithSources({ title: 'Query' }, {});
+
+    expect(resolved.genres).toEqual(['Sci-Fi', 'Fantasy']);
+    expect(sources.genres).toBe(MetadataProviderKey.GOOGLE);
+  });
+
+  it('filters blocklisted genres and falls back in first-provider mode when a provider has no remaining genres', async () => {
+    const prefs = createPreferences((fields) => {
+      fields.genres = {
+        enabled: true,
+        providers: [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+    });
+    prefs.options = {
+      genres: { mode: 'firstProvider', blocklist: ['Audiobook'] },
+      saveProviderIds: false,
+    };
+
+    preferencesService.getGlobal.mockResolvedValue(prefs);
+    resolver.resolve.mockReturnValue(prefs);
+    resolver.withForwardCompatibility.mockReturnValue(prefs);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
+    fetchService.search.mockReturnValue(
+      of(
+        candidate(MetadataProviderKey.GOOGLE, 'g1', { genres: ['audiobook'] }),
+        candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { genres: ['Fantasy', 'Adventure'] }),
+      ),
+    );
+
+    const { resolved, sources } = await pipeline.runWithSources({ title: 'Query' }, {});
+
+    expect(resolved.genres).toEqual(['Fantasy', 'Adventure']);
+    expect(sources.genres).toBe(MetadataProviderKey.OPEN_LIBRARY);
+  });
+
   it('returns provider ids for matched providers when saveProviderIds is enabled', async () => {
     const prefs = createPreferences((fields) => {
       fields.title = {
@@ -261,7 +321,7 @@ describe('MetadataFetchPipeline', () => {
       };
     });
     prefs.options = {
-      genres: { mode: 'firstProvider' },
+      genres: { mode: 'firstProvider', blocklist: [] },
       saveProviderIds: true,
     };
 
@@ -286,7 +346,7 @@ describe('MetadataFetchPipeline', () => {
       };
     });
     prefs.options = {
-      genres: { mode: 'firstProvider' },
+      genres: { mode: 'firstProvider', blocklist: [] },
       saveProviderIds: false,
     };
 

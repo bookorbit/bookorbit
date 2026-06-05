@@ -19,14 +19,28 @@ describe('KoboDeviceController', () => {
   const proxyService = {
     forward: vi.fn(),
   };
+  const bookIdentityService = {
+    resolveBookIdByEntitlementId: vi.fn(),
+    resolveBookIdByCoverImageId: vi.fn(),
+  };
 
-  const controller = new KoboDeviceController(thumbnailService as never, downloadService as never, proxyService as never);
+  const controller = new KoboDeviceController(
+    thumbnailService as never,
+    downloadService as never,
+    proxyService as never,
+    bookIdentityService as never,
+  );
 
   beforeEach(() => {
     vi.clearAllMocks();
+    bookIdentityService.resolveBookIdByEntitlementId.mockImplementation((_userId: number, id: string) => (/^\d+$/.test(id) ? Number(id) : null));
+    bookIdentityService.resolveBookIdByCoverImageId.mockImplementation((_userId: number, id: string) => {
+      const match = /^(\d+)(?:-\d+)?$/.exec(id);
+      return match ? Number(match[1]) : null;
+    });
   });
 
-  it('parses compound CoverImageId format (bookId-timestamp) correctly for thumbnails and downloads', async () => {
+  it('resolves legacy compound CoverImageId format (bookId-timestamp) for thumbnails', async () => {
     const req = { method: 'GET', url: '/api/v1/kobo/token/v1/books/42-1778450221186/thumbnail/355/530/80/False/image.jpg' };
     const reply = makeReply();
 
@@ -46,11 +60,9 @@ describe('KoboDeviceController', () => {
       req as never,
       reply as never,
     );
-    await controller.download('42-1778450221186', { id: 5 } as never, { deviceToken: 'token' } as never, req as never, reply as never);
 
     expect(thumbnailService.serveThumbnail).toHaveBeenNthCalledWith(1, 5, 42, undefined, reply);
     expect(thumbnailService.serveThumbnail).toHaveBeenNthCalledWith(2, 5, 42, undefined, reply);
-    expect(downloadService.streamBook).toHaveBeenCalledWith(5, 42, reply);
   });
 
   it('serves thumbnail for valid book ids across all thumbnail endpoints', async () => {
@@ -71,6 +83,8 @@ describe('KoboDeviceController', () => {
     const req = { method: 'GET', url: '/api/v1/kobo/token/v1/books/not-a-number/download' };
     const reply = makeReply();
     proxyService.forward.mockResolvedValue(undefined);
+    bookIdentityService.resolveBookIdByEntitlementId.mockResolvedValue(null);
+    bookIdentityService.resolveBookIdByCoverImageId.mockResolvedValue(null);
 
     await controller.thumbnailSimple('abc', undefined, { id: 9 } as never, { deviceToken: 'dev-token' } as never, req as never, reply as never);
     await controller.download('abc', { id: 9 } as never, { deviceToken: 'dev-token' } as never, req as never, reply as never);
@@ -87,6 +101,26 @@ describe('KoboDeviceController', () => {
     await controller.download('9', { id: 11 } as never, { deviceToken: 'dev-token' } as never, req as never, reply as never);
 
     expect(downloadService.streamBook).toHaveBeenCalledWith(11, 9, reply);
+  });
+
+  it('streams downloads and thumbnails for resolved Kobo UUID ids', async () => {
+    const req = { method: 'GET', url: '/api/v1/kobo/token/v1/books/kobo-id/download' };
+    const reply = makeReply();
+    bookIdentityService.resolveBookIdByEntitlementId.mockResolvedValue(420);
+    bookIdentityService.resolveBookIdByCoverImageId.mockResolvedValue(420);
+
+    await controller.download('kobo-entitlement-id', { id: 11 } as never, { deviceToken: 'dev-token' } as never, req as never, reply as never);
+    await controller.thumbnailSimple(
+      'kobo-cover-id',
+      undefined,
+      { id: 11 } as never,
+      { deviceToken: 'dev-token' } as never,
+      req as never,
+      reply as never,
+    );
+
+    expect(downloadService.streamBook).toHaveBeenCalledWith(11, 420, reply);
+    expect(thumbnailService.serveThumbnail).toHaveBeenCalledWith(11, 420, undefined, reply);
   });
 
   it('returns static payload endpoints and analytics keys', () => {

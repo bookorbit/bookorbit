@@ -9,12 +9,15 @@ import { MetadataFetchController } from './metadata-fetch.controller';
 import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
 import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
+import { MetadataPreferencesService } from '../metadata-preferences/metadata-preferences.service';
+import { MetadataPreferenceResolver } from '../metadata-preferences/metadata-preference-resolver';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
 
 describe('MetadataFetchController', () => {
   let service: Mocked<MetadataFetchService>;
   let registry: Mocked<ProviderRegistry>;
   let providerConfig: Mocked<ProviderConfigService>;
+  let metadataPreferences: Mocked<MetadataPreferencesService>;
   let throttleTracker: Mocked<ProviderThrottleTracker>;
   let controller: MetadataFetchController;
   let user: RequestUser;
@@ -35,11 +38,16 @@ describe('MetadataFetchController', () => {
       getProviderStatuses: vi.fn(),
     } as unknown as Mocked<ProviderConfigService>;
 
+    const resolver = new MetadataPreferenceResolver();
+    metadataPreferences = {
+      getGlobal: vi.fn().mockResolvedValue(resolver.getDefaultPreferences()),
+    } as unknown as Mocked<MetadataPreferencesService>;
+
     throttleTracker = {
       snapshot: vi.fn(),
     } as unknown as Mocked<ProviderThrottleTracker>;
 
-    controller = new MetadataFetchController(service, registry, providerConfig, throttleTracker);
+    controller = new MetadataFetchController(service, registry, providerConfig, throttleTracker, metadataPreferences);
     user = {
       id: 7,
       username: 'reader',
@@ -105,6 +113,21 @@ describe('MetadataFetchController', () => {
     ]);
   });
 
+  it('filters blocklisted genres from streamed metadata candidates', async () => {
+    const resolver = new MetadataPreferenceResolver();
+    const preferences = resolver.getDefaultPreferences();
+    preferences.options!.genres.blocklist = ['Audiobook'];
+    metadataPreferences.getGlobal.mockResolvedValue(preferences);
+    service.search.mockReturnValue(
+      of({ provider: MetadataProviderKey.GOOGLE, providerId: 'vol-1', title: 'First', genres: ['Science Fiction', 'audiobook'] }),
+    );
+
+    const stream = await controller.stream({ title: 'Dune' }, user);
+    const events = await firstValueFrom(stream.pipe(toArray()));
+
+    expect(events).toEqual([{ data: { provider: MetadataProviderKey.GOOGLE, providerId: 'vol-1', title: 'First', genres: ['Science Fiction'] } }]);
+  });
+
   it('skips stored provider lookup when bookId is not provided', async () => {
     service.search.mockReturnValue(of({ provider: MetadataProviderKey.GOOGLE, providerId: 'vol-2', title: 'Only' }));
 
@@ -164,14 +187,23 @@ describe('MetadataFetchController', () => {
     );
   });
 
-  it('delegates lookup requests directly to the metadata fetch service', async () => {
-    service.lookupById.mockResolvedValue({ provider: MetadataProviderKey.AMAZON, providerId: 'B123', title: 'Amazon Title' });
+  it('delegates lookup requests to the metadata fetch service and filters blocklisted genres', async () => {
+    const resolver = new MetadataPreferenceResolver();
+    const preferences = resolver.getDefaultPreferences();
+    preferences.options!.genres.blocklist = ['Adult'];
+    metadataPreferences.getGlobal.mockResolvedValue(preferences);
+    service.lookupById.mockResolvedValue({
+      provider: MetadataProviderKey.AMAZON,
+      providerId: 'B123',
+      title: 'Amazon Title',
+      genres: ['Adult', 'Mystery'],
+    });
 
     const dto: LookupMetadataDto = { provider: MetadataProviderKey.AMAZON, id: 'B123' };
     const result = await controller.lookup(dto);
 
     expect(service.lookupById).toHaveBeenCalledWith(MetadataProviderKey.AMAZON, 'B123');
-    expect(result).toEqual({ provider: MetadataProviderKey.AMAZON, providerId: 'B123', title: 'Amazon Title' });
+    expect(result).toEqual({ provider: MetadataProviderKey.AMAZON, providerId: 'B123', title: 'Amazon Title', genres: ['Mystery'] });
   });
 
   it('returns runtime provider throttle state for admin metadata settings', async () => {

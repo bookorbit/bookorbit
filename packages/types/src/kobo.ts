@@ -15,6 +15,7 @@ export interface KoboSyncSettings {
   convertToKepub: boolean;
   forceEnableHyphenation: boolean;
   kepubConversionLimitMb: number;
+  twoWayProgressSync: boolean;
 }
 
 export interface CreateKoboDeviceRequest {
@@ -31,4 +32,5 @@ export interface UpdateKoboSyncSettingsRequest {
   convertToKepub?: boolean;
   forceEnableHyphenation?: boolean;
   kepubConversionLimitMb?: number;
+  twoWayProgressSync?: boolean;
 }

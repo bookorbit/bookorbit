@@ -9,6 +9,7 @@ import {
   HttpStatus,
   Logger,
   Param,
+  Post,
   Put,
   Req,
   Res,
@@ -29,6 +30,7 @@ import { KoboSyncService } from './services/kobo-sync.service';
 import { KoboReadingStateService } from './services/kobo-reading-state.service';
 import { KoboProxyService } from './services/kobo-proxy.service';
 import { KOBO_STORE_RESOURCES } from './kobo-store-resources';
+import { KoboBookIdentityService } from './services/kobo-book-identity.service';
 
 function buildBaseUrl(req: FastifyRequest): string {
   const fwdHost = req.headers['x-forwarded-host'];
@@ -65,6 +67,7 @@ export class KoboSyncController {
     private readonly syncService: KoboSyncService,
     private readonly readingStateService: KoboReadingStateService,
     private readonly proxyService: KoboProxyService,
+    private readonly bookIdentityService: KoboBookIdentityService,
   ) {}
 
   @Get('v1/initialization')
@@ -99,6 +102,18 @@ export class KoboSyncController {
     reply.send(entitlements);
   }
 
+  @Post('v1/library/tags/:tagId/items/delete')
+  @HttpCode(HttpStatus.OK)
+  async deleteTagItems(
+    @Param('tagId') tagId: string,
+    @KoboDevice() device: KoboDeviceContext,
+    @Req() req: FastifyRequest,
+    @Res() reply: FastifyReply,
+  ) {
+    if (!tagId.startsWith('col-')) return this.proxyService.forward(req, reply, device.deviceToken);
+    reply.status(HttpStatus.OK).send({ RequestResult: 'Success' });
+  }
+
   @Get('v1/library/:bookId/metadata')
   async getBookMetadata(
     @Param('bookId') bookId: string,
@@ -107,8 +122,8 @@ export class KoboSyncController {
     @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,
   ) {
-    const id = parseInt(bookId, 10);
-    if (isNaN(id)) return this.proxyService.forward(req, reply, device.deviceToken);
+    const id = await this.bookIdentityService.resolveBookIdByEntitlementId(user.id, bookId);
+    if (id === null) return this.proxyService.forward(req, reply, device.deviceToken);
     const baseUrl = buildBaseUrl(req);
     const metadata = await this.syncService.getBookMetadata(user.id, id, device.deviceToken, baseUrl);
     reply.send(metadata);
@@ -123,8 +138,8 @@ export class KoboSyncController {
     @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,
   ) {
-    const id = parseInt(bookId, 10);
-    if (isNaN(id)) return this.proxyService.forward(req, reply, device.deviceToken);
+    const id = await this.bookIdentityService.resolveBookIdByEntitlementId(user.id, bookId);
+    if (id === null) return this.proxyService.forward(req, reply, device.deviceToken);
     await this.syncService.removeBookFromSync(user.id, id);
     reply.status(HttpStatus.OK).send();
   }
@@ -137,8 +152,8 @@ export class KoboSyncController {
     @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,
   ) {
-    const id = parseInt(bookId, 10);
-    if (isNaN(id)) return this.proxyService.forward(req, reply, device.deviceToken);
+    const id = await this.bookIdentityService.resolveBookIdByEntitlementId(user.id, bookId);
+    if (id === null) return this.proxyService.forward(req, reply, device.deviceToken);
     const state = await this.readingStateService.getRawState(user.id, id);
     reply.send(state ? [state] : []);
   }
@@ -153,12 +168,19 @@ export class KoboSyncController {
     @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,
   ) {
-    const id = parseInt(bookId, 10);
-    if (isNaN(id)) return this.proxyService.forward(req, reply, device.deviceToken);
+    const id = await this.bookIdentityService.resolveBookIdByEntitlementId(user.id, bookId);
+    if (id === null) return this.proxyService.forward(req, reply, device.deviceToken);
     const settings = await this.settingsService.getSettings(user.id);
     const states = body.ReadingStates as Record<string, unknown>[] | undefined;
     const statePayload = states?.[0] ?? body;
-    const result = await this.readingStateService.upsertState(user.id, id, statePayload, settings.readingThreshold, settings.finishedThreshold);
+    const result = await this.readingStateService.upsertState(
+      user.id,
+      id,
+      statePayload,
+      settings.readingThreshold,
+      settings.finishedThreshold,
+      settings.twoWayProgressSync,
+    );
     reply.send(result);
   }
 }

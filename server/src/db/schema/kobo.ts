@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, index, integer, jsonb, pgTable, primaryKey, real, serial, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { boolean, check, index, integer, jsonb, pgTable, primaryKey, real, serial, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
 
 import { books } from './books';
 import { users } from './auth';
@@ -29,9 +29,10 @@ export const koboSyncSettings = pgTable(
       .unique(),
     readingThreshold: real('reading_threshold').notNull().default(1),
     finishedThreshold: real('finished_threshold').notNull().default(99),
-    convertToKepub: boolean('convert_to_kepub').notNull().default(false),
+    convertToKepub: boolean('convert_to_kepub').notNull().default(true),
     forceEnableHyphenation: boolean('force_enable_hyphenation').notNull().default(false),
     kepubConversionLimitMb: integer('kepub_conversion_limit_mb').notNull().default(100),
+    twoWayProgressSync: boolean('two_way_progress_sync').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .defaultNow()
@@ -72,11 +73,40 @@ export const koboSnapshotBooks = pgTable(
     isNew: boolean('is_new').notNull().default(true),
     removedByDevice: boolean('removed_by_device').notNull().default(false),
     fileHash: varchar('file_hash', { length: 64 }),
+    deliveryHash: varchar('delivery_hash', { length: 64 }),
     metadataHash: varchar('metadata_hash', { length: 64 }),
   },
   (t) => [
     primaryKey({ columns: [t.snapshotId, t.bookId] }),
     index('kobo_snapshot_books_snapshot_synced_book_idx').on(t.snapshotId, t.synced, t.bookId),
+  ],
+);
+
+export const koboBookEntitlements = pgTable(
+  'kobo_book_entitlements',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bookId: integer('book_id')
+      .notNull()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    entitlementId: uuid('entitlement_id').notNull().defaultRandom(),
+    coverImageId: uuid('cover_image_id').notNull().defaultRandom(),
+    needsLegacyNumericRemoval: boolean('needs_legacy_numeric_removal').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [
+    unique('kobo_book_entitlements_user_book_unique').on(t.userId, t.bookId),
+    unique('kobo_book_entitlements_user_entitlement_unique').on(t.userId, t.entitlementId),
+    unique('kobo_book_entitlements_user_cover_unique').on(t.userId, t.coverImageId),
+    index('kobo_book_entitlements_user_id_idx').on(t.userId),
+    index('kobo_book_entitlements_book_id_idx').on(t.bookId),
   ],
 );
 
@@ -111,4 +141,5 @@ export type NewKoboDevice = typeof koboDevices.$inferInsert;
 export type KoboSyncSetting = typeof koboSyncSettings.$inferSelect;
 export type KoboLibrarySnapshot = typeof koboLibrarySnapshots.$inferSelect;
 export type KoboSnapshotBook = typeof koboSnapshotBooks.$inferSelect;
+export type KoboBookEntitlement = typeof koboBookEntitlements.$inferSelect;
 export type KoboReadingState = typeof koboReadingStates.$inferSelect;

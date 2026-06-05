@@ -1,5 +1,4 @@
 vi.mock('fs/promises', () => ({
-  mkdir: vi.fn(),
   stat: vi.fn(),
 }));
 
@@ -7,21 +6,14 @@ vi.mock('fs', () => ({
   createReadStream: vi.fn(),
 }));
 
-vi.mock('child_process', () => ({
-  execFile: vi.fn(),
-}));
-
 import { NotFoundException } from '@nestjs/common';
-import { execFile } from 'child_process';
 import { createReadStream } from 'fs';
-import { mkdir, stat } from 'fs/promises';
+import { stat } from 'fs/promises';
 
 import { KoboDownloadService } from './kobo-download.service';
 
 const statMock = vi.mocked(stat);
-const mkdirMock = vi.mocked(mkdir);
 const createReadStreamMock = vi.mocked(createReadStream);
-const execFileMock = vi.mocked(execFile);
 
 function makeReply() {
   return {
@@ -39,11 +31,19 @@ function makeDeps() {
         bookFiles: { findFirst: vi.fn() },
       },
     },
-    config: { get: vi.fn().mockReturnValue('/app-data') },
-    kepubifyBinaryService: { getBinaryPath: vi.fn() },
+    kepubConversionService: { getKepubPath: vi.fn() },
     settingsService: { getSettings: vi.fn() },
     bookAccessService: { assertBookAccessible: vi.fn() },
   };
+}
+
+function makeService(deps: ReturnType<typeof makeDeps>) {
+  return new KoboDownloadService(
+    deps.db as never,
+    deps.kepubConversionService as never,
+    deps.settingsService as never,
+    deps.bookAccessService as never,
+  );
 }
 
 describe('KoboDownloadService', () => {
@@ -54,13 +54,7 @@ describe('KoboDownloadService', () => {
   it('throws when target book does not exist', async () => {
     const deps = makeDeps();
     deps.db.query.books.findFirst.mockResolvedValue(null);
-    const service = new KoboDownloadService(
-      deps.db as never,
-      deps.config as never,
-      deps.kepubifyBinaryService as never,
-      deps.settingsService as never,
-      deps.bookAccessService as never,
-    );
+    const service = makeService(deps);
 
     await expect(service.streamBook(7, 11, makeReply() as never)).rejects.toThrow(NotFoundException);
   });
@@ -70,13 +64,7 @@ describe('KoboDownloadService', () => {
     deps.db.query.books.findFirst.mockResolvedValue({ id: 11, primaryFileId: 22 });
     deps.db.query.bookFiles.findFirst.mockResolvedValue(null);
     deps.bookAccessService.assertBookAccessible.mockResolvedValue(undefined);
-    const service = new KoboDownloadService(
-      deps.db as never,
-      deps.config as never,
-      deps.kepubifyBinaryService as never,
-      deps.settingsService as never,
-      deps.bookAccessService as never,
-    );
+    const service = makeService(deps);
 
     await expect(service.streamBook(7, 11, makeReply() as never)).rejects.toThrow('No file found for this book');
     expect(deps.bookAccessService.assertBookAccessible).toHaveBeenCalledWith(7, 11);
@@ -89,17 +77,11 @@ describe('KoboDownloadService', () => {
       id: 22,
       format: 'pdf',
       absolutePath: '/books/file.pdf',
-      hash: 'hash',
+      fileHash: 'hash',
       sizeBytes: 100,
     });
     deps.bookAccessService.assertBookAccessible.mockResolvedValue(undefined);
-    const service = new KoboDownloadService(
-      deps.db as never,
-      deps.config as never,
-      deps.kepubifyBinaryService as never,
-      deps.settingsService as never,
-      deps.bookAccessService as never,
-    );
+    const service = makeService(deps);
     const streamFileSpy = vi.spyOn(service as any, 'streamFile').mockResolvedValue(undefined);
 
     await service.streamBook(7, 11, makeReply() as never);
@@ -114,7 +96,7 @@ describe('KoboDownloadService', () => {
       id: 22,
       format: 'epub',
       absolutePath: '/books/file.epub',
-      hash: 'h1',
+      fileHash: 'h1',
       sizeBytes: 5 * 1024 * 1024,
     });
     deps.bookAccessService.assertBookAccessible.mockResolvedValue(undefined);
@@ -122,14 +104,9 @@ describe('KoboDownloadService', () => {
       convertToKepub: true,
       forceEnableHyphenation: true,
       kepubConversionLimitMb: 10,
+      twoWayProgressSync: false,
     });
-    const service = new KoboDownloadService(
-      deps.db as never,
-      deps.config as never,
-      deps.kepubifyBinaryService as never,
-      deps.settingsService as never,
-      deps.bookAccessService as never,
-    );
+    const service = makeService(deps);
     const streamKepubSpy = vi.spyOn(service as any, 'streamKepub').mockResolvedValue(undefined);
 
     await service.streamBook(7, 11, makeReply() as never);
@@ -144,7 +121,7 @@ describe('KoboDownloadService', () => {
       id: 22,
       format: 'epub',
       absolutePath: '/books/file.epub',
-      hash: null,
+      fileHash: null,
       sizeBytes: 20 * 1024 * 1024,
     });
     deps.bookAccessService.assertBookAccessible.mockResolvedValue(undefined);
@@ -152,14 +129,9 @@ describe('KoboDownloadService', () => {
       convertToKepub: true,
       forceEnableHyphenation: false,
       kepubConversionLimitMb: 10,
+      twoWayProgressSync: false,
     });
-    const service = new KoboDownloadService(
-      deps.db as never,
-      deps.config as never,
-      deps.kepubifyBinaryService as never,
-      deps.settingsService as never,
-      deps.bookAccessService as never,
-    );
+    const service = makeService(deps);
     const streamFileSpy = vi.spyOn(service as any, 'streamFile').mockResolvedValue(undefined);
 
     await service.streamBook(7, 11, makeReply() as never);
@@ -169,13 +141,7 @@ describe('KoboDownloadService', () => {
 
   it('streamFile writes headers and stream payload and throws when source path is missing', async () => {
     const deps = makeDeps();
-    const service = new KoboDownloadService(
-      deps.db as never,
-      deps.config as never,
-      deps.kepubifyBinaryService as never,
-      deps.settingsService as never,
-      deps.bookAccessService as never,
-    );
+    const service = makeService(deps);
     const reply = makeReply();
     const stream = {} as never;
     statMock.mockResolvedValueOnce({ size: 1234 } as never);
@@ -194,13 +160,7 @@ describe('KoboDownloadService', () => {
 
   it('streamFile uses application/epub+zip for kepub.epub format', async () => {
     const deps = makeDeps();
-    const service = new KoboDownloadService(
-      deps.db as never,
-      deps.config as never,
-      deps.kepubifyBinaryService as never,
-      deps.settingsService as never,
-      deps.bookAccessService as never,
-    );
+    const service = makeService(deps);
     const reply = makeReply();
     statMock.mockResolvedValueOnce({ size: 4096 } as never);
     createReadStreamMock.mockReturnValue({} as never);
@@ -213,13 +173,7 @@ describe('KoboDownloadService', () => {
 
   it('streamFile falls back to application/octet-stream for unknown formats', async () => {
     const deps = makeDeps();
-    const service = new KoboDownloadService(
-      deps.db as never,
-      deps.config as never,
-      deps.kepubifyBinaryService as never,
-      deps.settingsService as never,
-      deps.bookAccessService as never,
-    );
+    const service = makeService(deps);
     const reply = makeReply();
     statMock.mockResolvedValueOnce({ size: 100 } as never);
     createReadStreamMock.mockReturnValue({} as never);
@@ -229,52 +183,31 @@ describe('KoboDownloadService', () => {
     expect(reply.type).toHaveBeenCalledWith('application/octet-stream');
   });
 
-  it('streamKepub serves cached files when present', async () => {
+  it('streamKepub streams the shared conversion path', async () => {
     const deps = makeDeps();
-    const service = new KoboDownloadService(
-      deps.db as never,
-      deps.config as never,
-      deps.kepubifyBinaryService as never,
-      deps.settingsService as never,
-      deps.bookAccessService as never,
-    );
-    statMock.mockResolvedValueOnce({} as never);
+    const service = makeService(deps);
+    deps.kepubConversionService.getKepubPath.mockResolvedValue('/app-data/.kepub-cache/44/abc.kepub.epub');
     const streamFileSpy = vi.spyOn(service as any, 'streamFile').mockResolvedValue(undefined);
 
     await (service as any).streamKepub('/books/source.epub', 'abc', 44, 55, false, makeReply());
 
+    expect(deps.kepubConversionService.getKepubPath).toHaveBeenCalledWith({
+      sourcePath: '/books/source.epub',
+      fileHash: 'abc',
+      bookId: 44,
+      hyphenate: false,
+    });
     expect(streamFileSpy).toHaveBeenCalledWith('/app-data/.kepub-cache/44/abc.kepub.epub', 55, 'kepub.epub', expect.anything());
-    expect(execFileMock).not.toHaveBeenCalled();
   });
 
-  it('streamKepub converts and caches on miss, then falls back when conversion fails', async () => {
+  it('streamKepub falls back when conversion fails', async () => {
     const deps = makeDeps();
-    deps.kepubifyBinaryService.getBinaryPath.mockResolvedValue('/tools/kepubify');
-    const service = new KoboDownloadService(
-      deps.db as never,
-      deps.config as never,
-      deps.kepubifyBinaryService as never,
-      deps.settingsService as never,
-      deps.bookAccessService as never,
-    );
+    deps.kepubConversionService.getKepubPath.mockRejectedValue(new Error('convert failed'));
+    const service = makeService(deps);
     const streamFileSpy = vi.spyOn(service as any, 'streamFile').mockResolvedValue(undefined);
 
-    statMock.mockRejectedValueOnce(new Error('cache miss'));
-    execFileMock.mockImplementation((_path, _args, cb) => cb?.(null, '', ''));
-
-    await (service as any).streamKepub('/books/source.epub', 'hash', 44, 55, true, makeReply());
-
-    expect(mkdirMock).toHaveBeenCalledWith('/app-data/.kepub-cache/44', { recursive: true });
-    expect(execFileMock).toHaveBeenCalledWith(
-      '/tools/kepubify',
-      ['--hyphenate', '--output', '/app-data/.kepub-cache/44/hash-hyph.kepub.epub', '/books/source.epub'],
-      expect.any(Function),
-    );
-    expect(streamFileSpy).toHaveBeenCalledWith('/app-data/.kepub-cache/44/hash-hyph.kepub.epub', 55, 'kepub.epub', expect.anything());
-
-    statMock.mockRejectedValueOnce(new Error('cache miss'));
-    execFileMock.mockImplementationOnce((_path, _args, cb) => cb?.(new Error('convert failed')));
     await (service as any).streamKepub('/books/source.epub', 'hash', 44, 55, false, makeReply());
+
     expect(streamFileSpy).toHaveBeenLastCalledWith('/books/source.epub', 55, 'epub', expect.anything());
   });
 });

@@ -741,7 +741,16 @@ describe('BookController', () => {
     const user = makeUser();
     bookService.getProgress.mockResolvedValue(null);
 
-    await expect(controller.getFileProgress(9, user)).resolves.toEqual({ cfi: null, pageNumber: null, percentage: 0 });
+    await expect(controller.getFileProgress(9, user)).resolves.toEqual({
+      cfi: null,
+      pageNumber: null,
+      percentage: 0,
+      koboLocationSource: null,
+      koboLocationType: null,
+      koboLocationValue: null,
+      koboContentSourceProgressPercent: null,
+      koreaderProgress: null,
+    });
     expect(bookService.getProgress).toHaveBeenCalledWith(user.id, 9, user);
   });
 

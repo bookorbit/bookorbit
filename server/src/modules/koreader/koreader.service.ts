@@ -171,12 +171,8 @@ export class KoreaderService {
     }
 
     if (readingProg) {
-      // Convert the web reader's CFI spine index to a KOReader-compatible XPointer chapter start.
-      // The CFI encodes the spine item index directly (no file I/O needed — spine data is
-      // pre-computed in book_file_chapters during scan). KOReader will navigate to the
-      // beginning of the correct chapter. Percentage drives fine-grained position within it.
-      let xpointer: string | null = null;
-      if (readingProg.cfi) {
+      let xpointer = readingProg.koreaderProgress ?? null;
+      if (!xpointer && readingProg.cfi) {
         const chapterIndex = this.chapterService.parseChapterIndexFromCfi(readingProg.cfi);
         if (chapterIndex !== null && chapterIndex >= 0) {
           xpointer = `/body/DocFragment[${chapterIndex + 1}]/body`;

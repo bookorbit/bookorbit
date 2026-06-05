@@ -658,7 +658,7 @@ const leftColumnProgressRows = computed<ProgressRow[]>(() => {
   if (canViewKoreader.value && koreaderBookProgress.value != null && koreaderBookProgress.value.canonicalPercentage > 0) {
     const koreaderColor = '#b3b910'
     rows.push({
-      label: 'KO',
+      label: 'KO-R',
       percentage: koreaderBookProgress.value.canonicalPercentage,
       color: koreaderColor,
       badgeStyle: { color: koreaderColor, borderColor: `${koreaderColor}66`, backgroundColor: `${koreaderColor}1a` },
@@ -676,9 +676,9 @@ const koboAnomaly = computed(() => {
   if (!canViewKobo.value) return null
   const snap = koboState.value?.snapshot
   if (!snap) return null
-  if (snap.pendingDelete) return 'Pending delete from device'
-  if (snap.removedByDevice) return 'Removed by device'
-  if (snap.synced === false) return 'Not synced'
+  if (snap.pendingDelete) return { label: 'Pending delete from device', tooltip: 'Kobo will remove it on next sync.' }
+  if (snap.removedByDevice) return { label: 'Removed by device', tooltip: 'Kobo reported this book removed.' }
+  if (snap.synced === false) return { label: 'Not synced', tooltip: 'Queued for next Kobo sync.' }
   return null
 })
 
@@ -1309,10 +1309,15 @@ watch(
           </div>
           <p v-if="leftColumnProgressOverflow > 0" class="text-[11px] text-muted-foreground">+{{ leftColumnProgressOverflow }} more</p>
         </div>
-        <div v-if="koboAnomaly" class="mt-2 flex items-center gap-1.5">
-          <TriangleAlert class="size-3 text-amber-500 shrink-0" />
-          <p class="text-[11px] text-amber-500">{{ koboAnomaly }}</p>
-        </div>
+        <Tooltip v-if="koboAnomaly">
+          <TooltipTrigger as-child>
+            <div class="mt-2 flex items-center gap-1.5 cursor-help" tabindex="0">
+              <TriangleAlert class="size-3 text-amber-500 shrink-0" />
+              <p class="text-[11px] text-amber-500">{{ koboAnomaly.label }}</p>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>{{ koboAnomaly.tooltip }}</TooltipContent>
+        </Tooltip>
       </div>
     </div>
 
@@ -1686,10 +1691,15 @@ watch(
           </div>
           <p v-if="leftColumnProgressOverflow > 0" class="text-[11px] text-muted-foreground">+{{ leftColumnProgressOverflow }} more</p>
         </div>
-        <div v-if="koboAnomaly" class="flex items-center gap-1.5">
-          <TriangleAlert class="size-3 text-amber-500 shrink-0" />
-          <p class="text-[11px] text-amber-500">{{ koboAnomaly }}</p>
-        </div>
+        <Tooltip v-if="koboAnomaly">
+          <TooltipTrigger as-child>
+            <div class="flex items-center gap-1.5 cursor-help" tabindex="0">
+              <TriangleAlert class="size-3 text-amber-500 shrink-0" />
+              <p class="text-[11px] text-amber-500">{{ koboAnomaly.label }}</p>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>{{ koboAnomaly.tooltip }}</TooltipContent>
+        </Tooltip>
       </div>
 
       <!-- Synopsis -->

@@ -8,11 +8,13 @@ import { KoboDeviceController } from './kobo-device.controller';
 import { KoboSyncController } from './kobo-sync.controller';
 import { KoboUserController } from './kobo-user.controller';
 import { KoboTokenGuard } from './guards/kobo-token.guard';
+import { KepubConversionService } from './services/kepub-conversion.service';
 import { KoboBookAccessService } from './services/kobo-book-access.service';
 import { KepubifyBinaryService } from './services/kepubify-binary.service';
 import { KoboDeviceService } from './services/kobo-device.service';
 import { KoboDownloadService } from './services/kobo-download.service';
 import { KoboProxyService } from './services/kobo-proxy.service';
+import { KoboBookIdentityService } from './services/kobo-book-identity.service';
 import { KoboReadingStateService } from './services/kobo-reading-state.service';
 import { KoboSettingsService } from './services/kobo-settings.service';
 import { KoboSyncService } from './services/kobo-sync.service';
@@ -24,14 +26,17 @@ import { KoboThumbnailService } from './services/kobo-thumbnail.service';
   providers: [
     KoboTokenGuard,
     KepubifyBinaryService,
+    KepubConversionService,
     KoboDeviceService,
     KoboSettingsService,
     KoboBookAccessService,
     KoboSyncService,
+    KoboBookIdentityService,
     KoboReadingStateService,
     KoboThumbnailService,
     KoboDownloadService,
     KoboProxyService,
   ],
+  exports: [KepubConversionService, KoboSettingsService],
 })
 export class KoboModule {}

@@ -13,6 +13,7 @@ export interface KoboSettings {
   convertToKepub: boolean;
   forceEnableHyphenation: boolean;
   kepubConversionLimitMb: number;
+  twoWayProgressSync: boolean;
 }
 
 @Injectable()
@@ -30,12 +31,23 @@ export class KoboSettingsService {
     }
 
     if (!row) throw new InternalServerErrorException('Failed to create kobo settings row');
+    if (row.twoWayProgressSync && !row.convertToKepub) {
+      const [updated] = await this.db
+        .update(schema.koboSyncSettings)
+        .set({ convertToKepub: true, updatedAt: sql`now()` })
+        .where(eq(schema.koboSyncSettings.userId, userId))
+        .returning();
+      row = updated ?? { ...row, convertToKepub: true };
+      await this.markSnapshotDeliveryChanged(userId);
+    }
+
     return {
       readingThreshold: row.readingThreshold,
       finishedThreshold: row.finishedThreshold,
       convertToKepub: row.convertToKepub,
       forceEnableHyphenation: row.forceEnableHyphenation,
       kepubConversionLimitMb: row.kepubConversionLimitMb,
+      twoWayProgressSync: row.twoWayProgressSync,
     };
   }
 
@@ -44,6 +56,8 @@ export class KoboSettingsService {
 
     const newReading = patch.readingThreshold ?? current.readingThreshold;
     const newFinished = patch.finishedThreshold ?? current.finishedThreshold;
+    const newTwoWayProgressSync = patch.twoWayProgressSync ?? current.twoWayProgressSync;
+    const newConvertToKepub = newTwoWayProgressSync ? true : (patch.convertToKepub ?? current.convertToKepub);
 
     if (newReading >= newFinished) {
       throw new BadRequestException('Reading threshold must be less than finished threshold');
@@ -54,9 +68,10 @@ export class KoboSettingsService {
       .set({
         readingThreshold: newReading,
         finishedThreshold: newFinished,
-        convertToKepub: patch.convertToKepub ?? current.convertToKepub,
+        convertToKepub: newConvertToKepub,
         forceEnableHyphenation: patch.forceEnableHyphenation ?? current.forceEnableHyphenation,
         kepubConversionLimitMb: patch.kepubConversionLimitMb ?? current.kepubConversionLimitMb,
+        twoWayProgressSync: newTwoWayProgressSync,
         updatedAt: sql`now()`,
       })
       .where(eq(schema.koboSyncSettings.userId, userId))
@@ -66,12 +81,42 @@ export class KoboSettingsService {
       throw new InternalServerErrorException('Failed to update kobo settings row');
     }
 
+    if (this.deliverySettingsChanged(current, updated)) {
+      await this.markSnapshotDeliveryChanged(userId);
+    }
+
     return {
       readingThreshold: updated.readingThreshold,
       finishedThreshold: updated.finishedThreshold,
       convertToKepub: updated.convertToKepub,
       forceEnableHyphenation: updated.forceEnableHyphenation,
       kepubConversionLimitMb: updated.kepubConversionLimitMb,
+      twoWayProgressSync: updated.twoWayProgressSync,
     };
+  }
+
+  private deliverySettingsChanged(
+    current: Pick<KoboSettings, 'convertToKepub' | 'forceEnableHyphenation' | 'kepubConversionLimitMb'>,
+    updated: Pick<KoboSettings, 'convertToKepub' | 'forceEnableHyphenation' | 'kepubConversionLimitMb'>,
+  ): boolean {
+    return (
+      current.convertToKepub !== updated.convertToKepub ||
+      current.kepubConversionLimitMb !== updated.kepubConversionLimitMb ||
+      ((current.convertToKepub || updated.convertToKepub) && current.forceEnableHyphenation !== updated.forceEnableHyphenation)
+    );
+  }
+
+  private async markSnapshotDeliveryChanged(userId: number): Promise<void> {
+    await this.db.execute(sql`
+      UPDATE ${schema.koboSnapshotBooks} AS sb
+      SET synced = false,
+          is_new = true,
+          delivery_hash = NULL
+      FROM ${schema.koboLibrarySnapshots} AS snap
+      WHERE snap.id = sb.snapshot_id
+        AND snap.user_id = ${userId}
+        AND sb.pending_delete = false
+        AND sb.removed_by_device = false
+    `);
   }
 }
