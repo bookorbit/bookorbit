@@ -35,6 +35,7 @@ export class PdfFormatExtractor implements FormatExtractor {
       amazonId: pdf.amazonId,
       hardcoverId: pdf.hardcoverId,
       openLibraryId: pdf.openLibraryId,
+      ranobedbId: pdf.ranobedbId,
       itunesId: pdf.itunesId,
       cover: pdf.coverBuffer,
       pageCount: pdf.pageCount,

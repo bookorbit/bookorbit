@@ -104,6 +104,27 @@ describe('UpdateGlobalPreferencesDto', () => {
       options: {
         genres: {
           mode: 'merge',
+          blocklist: ['Audiobook', 'Adult'],
+        },
+        saveProviderIds: true,
+      },
+    });
+
+    expect(errors).toHaveLength(0);
+  });
+
+  it('accepts advanced options when the genre blocklist is omitted', async () => {
+    const { errors } = await validateInput({
+      fields: {
+        title: {
+          enabled: true,
+          providers: [MetadataProviderKey.GOOGLE],
+          mergeStrategy: 'fillMissing',
+        },
+      },
+      options: {
+        genres: {
+          mode: 'merge',
         },
         saveProviderIds: true,
       },
@@ -124,6 +145,7 @@ describe('UpdateGlobalPreferencesDto', () => {
       options: {
         genres: {
           mode: 'invalid',
+          blocklist: ['ok', 42],
         },
         saveProviderIds: 'yes',
       },

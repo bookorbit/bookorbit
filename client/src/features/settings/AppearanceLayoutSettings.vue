@@ -298,6 +298,13 @@ function handleAuthorCoverSizeInput(event: Event) {
           <div class="flex items-center gap-1 p-1 rounded-lg border border-border bg-muted/50 self-start">
             <button
               class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+              :class="seriesCardCoverMode === 'stack' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              @click="setSeriesCardCoverMode('stack')"
+            >
+              Stack
+            </button>
+            <button
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
               :class="seriesCardCoverMode === 'mosaic' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
               @click="setSeriesCardCoverMode('mosaic')"
             >

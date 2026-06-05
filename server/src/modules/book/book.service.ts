@@ -2060,6 +2060,7 @@ export class BookService {
           itunesId?: string;
           audibleId?: string;
           comicvineId?: string;
+          ranobedbId?: string;
           audioMetadata?: {
             narrators?: string[];
             durationSeconds?: number | null;
@@ -2542,6 +2543,13 @@ export class BookService {
           isbn13: parsed.isbn13,
           seriesName: parsed.seriesName,
           seriesIndex: parsed.seriesIndex,
+          googleBooksId: parsed.googleBooksId,
+          goodreadsId: parsed.goodreadsId,
+          amazonId: parsed.amazonId,
+          hardcoverId: parsed.hardcoverId,
+          openLibraryId: parsed.openLibraryId,
+          itunesId: parsed.itunesId,
+          ranobedbId: parsed.ranobedbId,
           authors: parsed.authors.length > 0 ? parsed.authors.map((a) => a.name) : undefined,
           genres: parsed.genres.length > 0 ? parsed.genres : undefined,
         };
@@ -2564,6 +2572,13 @@ export class BookService {
           isbn13: parsed.isbn13,
           seriesName: parsed.seriesName,
           seriesIndex: parsed.seriesIndex,
+          googleBooksId: parsed.googleBooksId,
+          goodreadsId: parsed.goodreadsId,
+          amazonId: parsed.amazonId,
+          hardcoverId: parsed.hardcoverId,
+          openLibraryId: parsed.openLibraryId,
+          itunesId: parsed.itunesId,
+          ranobedbId: parsed.ranobedbId,
           authors: parsed.authors.length > 0 ? parsed.authors.map((a) => a.name) : undefined,
           genres: parsed.genres.length > 0 ? parsed.genres : undefined,
         };
@@ -2604,6 +2619,13 @@ export class BookService {
           isbn13: parsed.isbn13,
           seriesName: parsed.seriesName,
           seriesIndex: parsed.seriesIndex,
+          googleBooksId: parsed.googleBooksId,
+          goodreadsId: parsed.goodreadsId,
+          amazonId: parsed.amazonId,
+          hardcoverId: parsed.hardcoverId,
+          openLibraryId: parsed.openLibraryId,
+          itunesId: parsed.itunesId,
+          ranobedbId: parsed.ranobedbId,
           authors: parsed.authors.length > 0 ? parsed.authors.map((a) => a.name) : undefined,
           genres: cbzGenres.length > 0 ? cbzGenres : undefined,
           comicMetadata: parsed.comicMetadata ?? undefined,

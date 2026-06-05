@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
+import { useLocalStorage } from '@vueuse/core'
 import { useRouter } from 'vue-router'
 import { BookOpen, Download, Eye, Files, Headphones, History, FolderOpen, ArrowUpDown, MoreVertical } from 'lucide-vue-next'
 import type { BookDetail, BookDetailFile, WriteLogEntry } from '@bookorbit/types'
@@ -122,7 +123,7 @@ function fileIconStyle(format: string | null): Record<string, string> {
   }
 }
 
-const showPaths = ref(false)
+const showPaths = useLocalStorage('bookDetailShowFilePaths', false)
 const writeLogOpen = ref(false)
 const writeLog = ref<WriteLogEntry[]>([])
 const writeLogLoading = ref(false)

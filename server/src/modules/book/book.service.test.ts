@@ -2925,6 +2925,7 @@ describe('BookService', () => {
             itunesId: null,
             audibleId: null,
             comicvineId: null,
+            ranobedbId: 'ranobe-detail',
             chapters: null,
             durationSeconds: 90,
             abridged: null,
@@ -2994,6 +2995,7 @@ describe('BookService', () => {
       expect(result.comicMetadata).toEqual(expect.objectContaining({ issueNumber: '1', teams: ['House Atreides'] }));
       expect(result.rating).toBe(5);
       expect(result.providerIds.google).toBe('g1');
+      expect(result.providerIds.ranobedb).toBe('ranobe-detail');
       expect(result.fileWriteStatus).toEqual({
         enabled: true,
         reason: null,
@@ -3045,6 +3047,7 @@ describe('BookService', () => {
             itunesId: null,
             audibleId: null,
             comicvineId: null,
+            ranobedbId: null,
             chapters: null,
             durationSeconds: null,
             abridged: null,
@@ -3126,6 +3129,8 @@ describe('BookService', () => {
         isbn13: '9780441172719',
         seriesName: 'Dune',
         seriesIndex: 1,
+        googleBooksId: 'google-file',
+        ranobedbId: 'ranobe-file',
         authors: [{ name: 'Frank Herbert', sortName: null }],
         genres: ['Sci-Fi'],
         tags: [],
@@ -3136,6 +3141,8 @@ describe('BookService', () => {
           title: 'Dune',
           subtitle: 'Book One',
           pageCount: 412,
+          googleBooksId: 'google-file',
+          ranobedbId: 'ranobe-file',
           authors: ['Frank Herbert'],
           genres: ['Sci-Fi'],
         }),
@@ -3238,19 +3245,23 @@ describe('BookService', () => {
             title: 'PDF Title',
             publisher: 'Pub',
             pageCount: 10,
+            ranobedbId: 'pdf-ranobe',
             authors: [{ name: 'Author One', sortName: null }],
             genres: ['Tech'],
           } as never;
         },
       );
 
-      await expect(service.getMetadataFromFile(5, makeUser())).resolves.toEqual({
-        title: 'PDF Title',
-        publisher: 'Pub',
-        pageCount: 10,
-        authors: ['Author One'],
-        genres: ['Tech'],
-      });
+      await expect(service.getMetadataFromFile(5, makeUser())).resolves.toEqual(
+        expect.objectContaining({
+          title: 'PDF Title',
+          publisher: 'Pub',
+          pageCount: 10,
+          ranobedbId: 'pdf-ranobe',
+          authors: ['Author One'],
+          genres: ['Tech'],
+        }),
+      );
       expect(warnSpy).toHaveBeenCalled();
     });
 
@@ -3286,6 +3297,7 @@ describe('BookService', () => {
         authors: [{ name: 'Writer', sortName: null }],
         genres: [],
         tags: ['Comics'],
+        ranobedbId: 'comic-ranobe',
         comicMetadata: { issueNumber: '4' },
       } as never);
       mockParseFb2File.mockResolvedValue({
@@ -3309,6 +3321,7 @@ describe('BookService', () => {
       await expect(service.getMetadataFromFile(5, makeUser())).resolves.toEqual(
         expect.objectContaining({
           title: 'Comic Title',
+          ranobedbId: 'comic-ranobe',
           comicMetadata: { issueNumber: '4' },
         }),
       );

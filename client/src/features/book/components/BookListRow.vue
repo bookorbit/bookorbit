@@ -30,6 +30,7 @@ import { useRefreshMetadata } from '../composables/useRefreshMetadata'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import { RATING_STARS, getRatingStarClass } from '@/features/book/lib/rating-stars'
+import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
 const router = useRouter()
 
@@ -47,6 +48,7 @@ const emit = defineEmits<{
 }>()
 
 const { hasPermission } = usePermissions()
+const { thumbnailClickAction } = useDisplaySettings()
 const showSendDialog = ref(false)
 
 const authorLine = computed(() => props.book.authors.join(', ') || null)
@@ -61,6 +63,19 @@ const isMissing = computed(() => props.book.status === 'missing')
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
 const isAudiobook = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
 const secondaryFiles = computed(() => props.book.files.filter((f) => f !== primaryFile.value))
+
+const uniqueSecondaryFiles = computed(() => {
+  const seenFormats = new Set<string>()
+  if (primaryFile.value?.format) seenFormats.add(primaryFile.value.format)
+
+  return secondaryFiles.value.filter((f) => {
+    const format = f.format
+    if (!format) return true
+    if (seenFormats.has(format)) return false
+    seenFormats.add(format)
+    return true
+  })
+})
 
 const metaLine = computed(() => {
   const parts: string[] = []
@@ -116,6 +131,24 @@ function openAuthorBrowse() {
   if (!authorQuery.value) return
   void router.push({ name: 'authors', query: { q: authorQuery.value } })
 }
+
+function openBookDetails() {
+  void router.push({ name: 'book-detail', params: { bookId: props.book.id } })
+}
+
+function handleRowClick(event: MouseEvent) {
+  if (props.selectionMode) {
+    emit('select', event)
+    return
+  }
+
+  if (thumbnailClickAction.value === 'details') {
+    openBookDetails()
+    return
+  }
+
+  emit('action', 'quick-view')
+}
 </script>
 
 <template>
@@ -126,7 +159,7 @@ function openAuthorBrowse() {
       selected ? 'bg-primary/8 ring-1 ring-primary/30' : '',
       isMissing ? 'grayscale opacity-60' : 'hover:bg-muted/50',
     ]"
-    @click="selectionMode ? emit('select', $event) : emit('action', 'quick-view')"
+    @click="handleRowClick"
   >
     <!-- Selection checkbox -->
     <div
@@ -213,7 +246,7 @@ function openAuthorBrowse() {
           </TooltipTrigger>
           <TooltipContent>Open as {{ primaryFile.format?.toUpperCase() ?? 'unknown' }}</TooltipContent>
         </Tooltip>
-        <Tooltip v-for="file in secondaryFiles" :key="file.id">
+        <Tooltip v-for="file in uniqueSecondaryFiles" :key="file.id">
           <TooltipTrigger as-child>
             <button
               class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/70 transition-colors"
@@ -245,7 +278,7 @@ function openAuthorBrowse() {
             <PanelRight class="size-4 mr-2" />
             Quick View
           </DropdownMenuItem>
-          <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id } })">
+          <DropdownMenuItem @click="openBookDetails">
             <ExternalLink class="size-4 mr-2" />
             Book Details
           </DropdownMenuItem>

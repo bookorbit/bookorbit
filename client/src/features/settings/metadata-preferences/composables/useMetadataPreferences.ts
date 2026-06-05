@@ -11,17 +11,22 @@ export function useMetadataPreferences() {
   const savingGlobal = ref(false)
   const savingLibrary = ref<number | null>(null)
 
-  async function fetchGlobal() {
+  async function fetchGlobal(): Promise<MetadataFetchPreferences | null> {
     loadingGlobal.value = true
     try {
       const res = await api('/api/v1/metadata-preferences/global')
-      if (res.ok) globalPrefs.value = await res.json()
+      if (!res.ok) return null
+      const prefs = (await res.json()) as MetadataFetchPreferences
+      globalPrefs.value = prefs
+      return prefs
+    } catch {
+      return null
     } finally {
       loadingGlobal.value = false
     }
   }
 
-  async function saveGlobal(prefs: MetadataFetchPreferences) {
+  async function saveGlobal(prefs: MetadataFetchPreferences): Promise<boolean> {
     savingGlobal.value = true
     try {
       const res = await api('/api/v1/metadata-preferences/global', {
@@ -30,11 +35,17 @@ export function useMetadataPreferences() {
         body: JSON.stringify(prefs),
       })
       if (res.ok) {
+        globalPrefs.value = prefs
         await fetchGlobal()
         toast.success('Global preferences saved')
+        return true
       } else {
         toast.error('Failed to save preferences')
+        return false
       }
+    } catch {
+      toast.error('Failed to save preferences')
+      return false
     } finally {
       savingGlobal.value = false
     }

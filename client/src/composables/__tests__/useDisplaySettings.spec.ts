@@ -20,9 +20,11 @@ function resetDisplaySettings() {
   settings.bookSpineOverlay.value = 'off'
   settings.bookShadowStrength.value = 'default'
   settings.bookCoverDisplayMode.value = 'blurred-fit'
-  settings.seriesCardCoverMode.value = 'mosaic'
+  settings.seriesCardCoverMode.value = 'stack'
   settings.gridCardPrimaryLabel.value = 'hidden'
   settings.gridCardSecondaryLabel.value = 'hidden'
+  settings.cardInfoMode.value = 'hover-overlay'
+  settings.thumbnailClickAction.value = 'reader'
 }
 
 afterEach(() => {
@@ -43,6 +45,7 @@ describe('useDisplaySettings preferences helpers', () => {
       cardOverlays: ['format', 'rating'],
       bookSpineOverlay: 'strong',
       bookCoverDisplayMode: 'natural-bottom',
+      thumbnailClickAction: 'reader',
     })
   })
 
@@ -53,6 +56,7 @@ describe('useDisplaySettings preferences helpers', () => {
       coverSizeScope: 'synced',
       cardOverlays: ['format', 'unknown', 'format', 'lock-status'],
       bookCoverDisplayMode: 'fill-crop',
+      thumbnailClickAction: 'details',
       tableDensity: 'huge',
       extra: true,
     })
@@ -62,6 +66,7 @@ describe('useDisplaySettings preferences helpers', () => {
       coverSizeScope: 'synced',
       cardOverlays: ['format', 'lock-status'],
       bookCoverDisplayMode: 'fill-crop',
+      thumbnailClickAction: 'details',
     })
   })
 
@@ -74,6 +79,7 @@ describe('useDisplaySettings preferences helpers', () => {
       tableZebraStriping: true,
       bookShadowStrength: 'strong',
       bookCoverDisplayMode: 'natural-bottom',
+      thumbnailClickAction: 'details',
       tableDensity: 'invalid',
     })
 
@@ -85,6 +91,7 @@ describe('useDisplaySettings preferences helpers', () => {
     expect(settings.tableDensity.value).toBe('comfortable')
     expect(settings.bookShadowStrength.value).toBe('strong')
     expect(settings.bookCoverDisplayMode.value).toBe('natural-bottom')
+    expect(settings.thumbnailClickAction.value).toBe('details')
   })
 
   it('ignores non-object payloads', () => {
@@ -99,8 +106,9 @@ describe('useDisplaySettings preferences helpers', () => {
   })
 
   it('sanitizes valid seriesCardCoverMode values', () => {
-    const sanitized = sanitizeDisplayPreferences({ seriesCardCoverMode: 'latest-volume' })
-    expect(sanitized).toEqual({ seriesCardCoverMode: 'latest-volume' })
+    for (const value of ['stack', 'mosaic', 'first-volume', 'latest-volume', 'first-unread'] as const) {
+      expect(sanitizeDisplayPreferences({ seriesCardCoverMode: value })).toEqual({ seriesCardCoverMode: value })
+    }
   })
 
   it('drops invalid seriesCardCoverMode values', () => {
@@ -113,9 +121,9 @@ describe('useDisplaySettings preferences helpers', () => {
     expect(settings.seriesCardCoverMode.value).toBe('first-unread')
   })
 
-  it('defaults seriesCardCoverMode to mosaic', () => {
+  it('defaults seriesCardCoverMode to stack', () => {
     resetDisplaySettings()
-    expect(settings.seriesCardCoverMode.value).toBe('mosaic')
+    expect(settings.seriesCardCoverMode.value).toBe('stack')
   })
 
   it('includes gridCardPrimaryLabel and gridCardSecondaryLabel in snapshot', () => {
@@ -157,5 +165,31 @@ describe('useDisplaySettings preferences helpers', () => {
     applyDisplayPreferences({ gridCardPrimaryLabel: 'series-title', gridCardSecondaryLabel: 'author' })
     expect(settings.gridCardPrimaryLabel.value).toBe('series-title')
     expect(settings.gridCardSecondaryLabel.value).toBe('author')
+  })
+
+  it('includes thumbnailClickAction in snapshot', () => {
+    settings.thumbnailClickAction.value = 'details'
+    const snap = getDisplayPreferencesSnapshot()
+    expect(snap.thumbnailClickAction).toBe('details')
+  })
+
+  it('defaults thumbnailClickAction to reader', () => {
+    resetDisplaySettings()
+    expect(settings.thumbnailClickAction.value).toBe('reader')
+  })
+
+  it('sanitizes valid thumbnailClickAction values', () => {
+    expect(sanitizeDisplayPreferences({ thumbnailClickAction: 'reader' })).toEqual({ thumbnailClickAction: 'reader' })
+    expect(sanitizeDisplayPreferences({ thumbnailClickAction: 'details' })).toEqual({ thumbnailClickAction: 'details' })
+  })
+
+  it('drops invalid thumbnailClickAction values', () => {
+    expect(sanitizeDisplayPreferences({ thumbnailClickAction: 'preview' })).toEqual({})
+    expect(sanitizeDisplayPreferences({ thumbnailClickAction: 1 })).toEqual({})
+  })
+
+  it('applies thumbnailClickAction from preferences', () => {
+    applyDisplayPreferences({ thumbnailClickAction: 'details' })
+    expect(settings.thumbnailClickAction.value).toBe('details')
   })
 })

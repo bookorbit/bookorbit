@@ -370,6 +370,7 @@ describe('MetadataService', () => {
       amazonId: null,
       hardcoverId: null,
       openLibraryId: null,
+      ranobedbId: null,
       itunesId: null,
       coverBuffer: null,
     });
@@ -423,6 +424,7 @@ describe('MetadataService', () => {
       amazonId: null,
       hardcoverId: null,
       openLibraryId: null,
+      ranobedbId: null,
       itunesId: null,
       coverBuffer: null,
     });
@@ -470,6 +472,7 @@ describe('MetadataService', () => {
         amazonId: null,
         hardcoverId: null,
         openLibraryId: null,
+        ranobedbId: null,
         itunesId: null,
         coverBuffer: null,
       });
@@ -509,6 +512,7 @@ describe('MetadataService', () => {
       amazonId: 'amazon-1',
       hardcoverId: 'hardcover-1',
       openLibraryId: 'open-library-1',
+      ranobedbId: 'ranobe-1',
       itunesId: 'itunes-1',
       coverBuffer: Buffer.from('jpeg-bytes'),
     });
@@ -537,6 +541,7 @@ describe('MetadataService', () => {
         amazonId: 'amazon-1',
         hardcoverId: 'hardcover-1',
         openLibraryId: 'open-library-1',
+        ranobedbId: 'ranobe-1',
         itunesId: 'itunes-1',
         updatedAt: expect.any(Date),
       }),

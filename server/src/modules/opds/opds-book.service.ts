@@ -455,9 +455,10 @@ export class OpdsBookService {
         .orderBy(bookAuthors.displayOrder),
       this.db
         .select({ bookId: books.id, id: bookFiles.id, format: bookFiles.format, role: bookFiles.role })
-        .from(books)
-        .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
-        .where(inArray(books.id, bookIds)),
+        .from(bookFiles)
+        .innerJoin(books, eq(books.id, bookFiles.bookId))
+        .where(and(inArray(bookFiles.bookId, bookIds), eq(bookFiles.role, 'content')))
+        .orderBy(sql`case when ${bookFiles.id} = ${books.primaryFileId} then 0 else 1 end`, bookFiles.sortOrder, bookFiles.id),
     ]);
 
     const authorsByBook = new Map<number, string[]>();
@@ -469,6 +470,7 @@ export class OpdsBookService {
 
     const filesByBook = new Map<number, { id: number; format: string }[]>();
     for (const row of fileRows) {
+      if (row.role !== 'content') continue;
       const list = filesByBook.get(row.bookId) ?? [];
       list.push({ id: row.id, format: row.format ?? 'unknown' });
       filesByBook.set(row.bookId, list);

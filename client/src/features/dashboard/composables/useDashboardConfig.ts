@@ -3,17 +3,21 @@ import { ref } from 'vue'
 import { SCROLLER_TYPES, type ScrollerConfig, type ScrollerType } from '@bookorbit/types'
 
 const STORAGE_KEY = 'bookorbit:dashboard:config'
-const MAX_SCROLLERS = 6
+const MAX_SCROLLERS = 8
 
 export const DEFAULT_SCROLLERS: ScrollerConfig[] = [
-  { id: '1', type: 'continue-reading', label: 'Continue Reading', enabled: false, order: 1, limit: 20 },
-  { id: '4', type: 'up-next-in-series', label: 'Up Next in Series', enabled: false, order: 2, limit: 20 },
-  { id: '2', type: 'recently-added', label: 'Recently Added', enabled: true, order: 3, limit: 20 },
-  { id: '3', type: 'random', label: 'Discover Something New', enabled: true, order: 4, limit: 20 },
+  { id: '2', type: 'recently-added', label: 'Recently Added', enabled: true, order: 1, limit: 20 },
+  { id: '3', type: 'random', label: 'Discover Something New', enabled: true, order: 2, limit: 20 },
+  { id: '1', type: 'continue-reading', label: 'Continue Reading', enabled: true, order: 3, limit: 20 },
+  { id: '5', type: 'continue-listening', label: 'Continue Listening', enabled: true, order: 4, limit: 20 },
+  { id: '6', type: 'want-to-read', label: 'Want to Read', enabled: false, order: 5, limit: 20 },
+  { id: '4', type: 'up-next-in-series', label: 'Up Next in Series', enabled: false, order: 6, limit: 20 },
 ]
 
 export const SCROLLER_LABELS: Record<ScrollerType, string> = {
   'continue-reading': 'Continue Reading',
+  'continue-listening': 'Continue Listening',
+  'want-to-read': 'Want to Read',
   'up-next-in-series': 'Up Next in Series',
   'recently-added': 'Recently Added',
   random: 'Discover Something New',

@@ -27,6 +27,7 @@ export interface PdfParsed {
   amazonId: string | null;
   hardcoverId: string | null;
   openLibraryId: string | null;
+  ranobedbId: string | null;
   itunesId: string | null;
   coverBuffer: Buffer | null;
 }
@@ -136,6 +137,7 @@ export async function parsePdfFile(absolutePath: string, options: PdfParseOption
       amazonId: xmp?.amazonId ?? null,
       hardcoverId: xmp?.hardcoverId ?? null,
       openLibraryId: xmp?.openLibraryId ?? null,
+      ranobedbId: xmp?.ranobedbId ?? null,
       itunesId: xmp?.itunesId ?? null,
       coverBuffer,
     };

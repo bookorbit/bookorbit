@@ -75,7 +75,7 @@ describe('CollapsedSeriesCard', () => {
 
   afterEach(() => {
     bookSpineOverlay.value = 'off'
-    seriesCardCoverMode.value = 'mosaic'
+    seriesCardCoverMode.value = 'stack'
     gridCardPrimaryLabel.value = 'hidden'
     gridCardSecondaryLabel.value = 'hidden'
     cardInfoMode.value = 'hover-overlay'
@@ -228,6 +228,93 @@ describe('CollapsedSeriesCard', () => {
 
     const cover = wrapper.find('.book-cover-surface')
     expect(cover.attributes('data-cover-spine')).toBe('off')
+  })
+
+  describe('stack cover mode', () => {
+    beforeEach(() => {
+      seriesCardCoverMode.value = 'stack'
+    })
+
+    it('renders stacked cover artwork for visible cover IDs', () => {
+      const wrapper = mount(CollapsedSeriesCard, {
+        props: {
+          book: makeBook({
+            collapsedSeries: { bookCount: 8, readCount: 0, coverBookIds: [1, 2, 3, 4, 5, 6, 7, 8], seriesLatestAddedAt: null },
+          }),
+        },
+      })
+
+      expect(wrapper.find('[data-testid="series-cover-stack"]').exists()).toBe(true)
+      expect(wrapper.findAll('[data-testid="series-stack-cover"]')).toHaveLength(3)
+      expect(wrapper.findAll('[data-testid="series-cover-tile"]')).toHaveLength(0)
+      expect(wrapper.find('[data-testid="series-single-cover"]').exists()).toBe(false)
+    })
+
+    it('places the first cover front-bottom-right and later covers behind to the top-left', () => {
+      const wrapper = mount(CollapsedSeriesCard, {
+        props: {
+          book: makeBook({
+            collapsedSeries: { bookCount: 4, readCount: 0, coverBookIds: [1, 2, 3], seriesLatestAddedAt: null },
+          }),
+        },
+      })
+
+      const covers = wrapper.findAll('[data-testid="series-stack-cover"]')
+      expect(covers[0]!.attributes('style')).toContain('right: 0%;')
+      expect(covers[0]!.attributes('style')).toContain('bottom: 0%;')
+      expect(covers[0]!.attributes('style')).toContain('width: 84%;')
+      expect(covers[0]!.attributes('style')).toContain('z-index: 100;')
+      expect(covers[1]!.attributes('style')).toContain('right: 8%;')
+      expect(covers[1]!.attributes('style')).toContain('bottom: 8%;')
+      expect(covers[1]!.attributes('style')).toContain('width: 84%;')
+      expect(covers[1]!.attributes('style')).toContain('z-index: 99;')
+      expect(covers[2]!.attributes('style')).toContain('right: 16%;')
+      expect(covers[2]!.attributes('style')).toContain('bottom: 16%;')
+      expect(covers[2]!.attributes('style')).toContain('width: 84%;')
+      expect(covers[2]!.attributes('style')).toContain('z-index: 98;')
+    })
+
+    it('removes failed covers from the visible stack', async () => {
+      const wrapper = mount(CollapsedSeriesCard, {
+        props: {
+          book: makeBook({
+            collapsedSeries: { bookCount: 2, readCount: 0, coverBookIds: [10, 20], seriesLatestAddedAt: null },
+          }),
+        },
+      })
+
+      const firstImg = wrapper.find('[data-testid="series-stack-cover"] img')
+      expect(firstImg.exists()).toBe(true)
+
+      await firstImg.trigger('error')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.findAll('[data-testid="series-stack-cover"]')).toHaveLength(1)
+      expect(wrapper.find('[data-testid="series-stack-cover"] img').attributes('src')).toBe('/api/v1/books/20/thumbnail')
+    })
+
+    it('shows a stack fallback when coverBookIds is empty', () => {
+      const wrapper = mount(CollapsedSeriesCard, {
+        props: {
+          book: makeBook({
+            collapsedSeries: { bookCount: 3, readCount: 0, coverBookIds: [], seriesLatestAddedAt: null },
+          }),
+        },
+      })
+
+      expect(wrapper.findAll('[data-testid="series-stack-cover"]')).toHaveLength(0)
+      expect(wrapper.find('[data-testid="series-cover-stack-fallback"]').exists()).toBe(true)
+      expect(wrapper.findAll('.book-cover-placeholder')).toHaveLength(1)
+    })
+
+    it('keeps the count badge without legacy stack overlays', () => {
+      const wrapper = mount(CollapsedSeriesCard, { props: { book: makeBook() } })
+
+      expect(wrapper.find('[data-testid="series-count-badge"]').text()).toBe('5')
+      expect(wrapper.find('[data-testid="series-type-badge"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="series-hover-action"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="series-progress-bar"]').exists()).toBe(false)
+    })
   })
 
   describe('single cover mode (non-mosaic)', () => {
@@ -427,7 +514,7 @@ describe('CollapsedSeriesCard', () => {
       expect(wrapper.find('[data-testid="series-single-cover"] .book-cover-placeholder').exists()).toBe(true)
     })
 
-    it('renders mosaic when mode is mosaic (default)', () => {
+    it('renders mosaic when mode is mosaic', () => {
       seriesCardCoverMode.value = 'mosaic'
       const wrapper = mount(CollapsedSeriesCard, {
         props: {
@@ -450,6 +537,10 @@ describe('CollapsedSeriesCard', () => {
   })
 
   describe('series type badge', () => {
+    beforeEach(() => {
+      seriesCardCoverMode.value = 'mosaic'
+    })
+
     it('renders series type badge on cover', () => {
       const wrapper = mount(CollapsedSeriesCard, { props: { book: makeBook() } })
 
@@ -458,6 +549,10 @@ describe('CollapsedSeriesCard', () => {
   })
 
   describe('hover action button', () => {
+    beforeEach(() => {
+      seriesCardCoverMode.value = 'mosaic'
+    })
+
     it('renders Library action button in hover overlay', () => {
       const wrapper = mount(CollapsedSeriesCard, { props: { book: makeBook() } })
 
@@ -501,6 +596,10 @@ describe('CollapsedSeriesCard', () => {
   })
 
   describe('read progress bar', () => {
+    beforeEach(() => {
+      seriesCardCoverMode.value = 'mosaic'
+    })
+
     it('renders progress bar when progress-bar overlay is enabled', () => {
       cardOverlays.value = ['progress-bar']
       const wrapper = mount(CollapsedSeriesCard, { props: { book: makeBook() } })

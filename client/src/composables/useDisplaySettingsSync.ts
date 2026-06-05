@@ -121,6 +121,7 @@ export function initDisplaySettingsSync(): void {
         settings.gridCardPrimaryLabel.value,
         settings.gridCardSecondaryLabel.value,
         settings.cardInfoMode.value,
+        settings.thumbnailClickAction.value,
       ] as const,
     () => {
       if (isApplyingServerPrefs || !isSyncEnabled()) return

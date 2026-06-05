@@ -21,6 +21,7 @@ export interface ParsedOpf {
   amazonId: string | null;
   hardcoverId: string | null;
   openLibraryId: string | null;
+  ranobedbId: string | null;
   itunesId: string | null;
 }
 
@@ -203,6 +204,7 @@ export function parseOpf(xml: string): ParsedOpf {
   let schemeAmazonId: string | null = null;
   let schemeHardcoverId: string | null = null;
   let schemeOpenLibraryId: string | null = null;
+  let schemeRanobedbId: string | null = null;
   let schemeItunesId: string | null = null;
 
   let urnGoogleBooksId: string | null = null;
@@ -210,6 +212,7 @@ export function parseOpf(xml: string): ParsedOpf {
   let urnAmazonId: string | null = null;
   let urnHardcoverId: string | null = null;
   let urnOpenLibraryId: string | null = null;
+  let urnRanobedbId: string | null = null;
   let urnItunesId: string | null = null;
 
   for (const ident of toArray(metadata['identifier'])) {
@@ -231,6 +234,7 @@ export function parseOpf(xml: string): ParsedOpf {
     if (scheme === 'goodreads') schemeGoodreadsId ??= value || null;
     if (scheme === 'hardcover') schemeHardcoverId ??= value || null;
     if (scheme === 'openlibrary') schemeOpenLibraryId ??= value || null;
+    if (scheme === 'ranobedb') schemeRanobedbId ??= value || null;
     if (scheme === 'itunes') schemeItunesId ??= value || null;
 
     // urn:-prefixed provider identifiers (legacy / backward-compat)
@@ -239,6 +243,7 @@ export function parseOpf(xml: string): ParsedOpf {
     if (value.startsWith('urn:hardcover:')) urnHardcoverId ??= value.slice('urn:hardcover:'.length) || null;
     if (value.startsWith('urn:google:')) urnGoogleBooksId ??= value.slice('urn:google:'.length) || null;
     if (value.startsWith('urn:openlibrary:')) urnOpenLibraryId ??= value.slice('urn:openlibrary:'.length) || null;
+    if (value.startsWith('urn:ranobedb:')) urnRanobedbId ??= value.slice('urn:ranobedb:'.length) || null;
     if (value.startsWith('urn:itunes:')) urnItunesId ??= value.slice('urn:itunes:'.length) || null;
   }
 
@@ -248,6 +253,7 @@ export function parseOpf(xml: string): ParsedOpf {
   const amazonId = schemeAmazonId ?? urnAmazonId;
   const hardcoverId = schemeHardcoverId ?? urnHardcoverId;
   const openLibraryId = schemeOpenLibraryId ?? urnOpenLibraryId;
+  const ranobedbId = schemeRanobedbId ?? urnRanobedbId;
   const itunesId = schemeItunesId ?? urnItunesId;
 
   isbn10 ??= propertyMeta('bookorbit:isbn10') ?? namedMeta('bookorbit:isbn10');
@@ -314,6 +320,7 @@ export function parseOpf(xml: string): ParsedOpf {
     amazonId,
     hardcoverId,
     openLibraryId,
+    ranobedbId,
     itunesId,
   };
 }

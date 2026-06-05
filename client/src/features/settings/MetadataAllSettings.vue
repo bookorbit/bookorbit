@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MetadataPreferencesSettings from './metadata-preferences/MetadataPreferencesSettings.vue'
 import MetadataFieldRulesSettings from './metadata-preferences/MetadataFieldRulesSettings.vue'
+import MetadataGenreBlocklistSettings from './metadata-preferences/MetadataGenreBlocklistSettings.vue'
 import MetadataScoreWeightsSettings from './MetadataScoreWeightsSettings.vue'
 import BookMetadataFetchSettings from './metadata-auto-fetch/BookMetadataFetchSettings.vue'
 import AuthorEnrichmentSettings from './AuthorEnrichmentSettings.vue'
@@ -37,6 +38,7 @@ const activeTabInfo = computed(() => METADATA_TAB_INFO[activeTab.value])
 const tabWidths: Record<Tab, string> = {
   providers: 'max-w-3xl',
   'field-rules': 'max-w-6xl',
+  'genre-blocklist': 'max-w-3xl',
   score: 'max-w-3xl',
   'auto-fetch': 'max-w-3xl',
   authors: 'max-w-3xl',
@@ -84,6 +86,7 @@ function selectTab(tab: Tab) {
     <div :class="tabWidths[activeTab]">
       <MetadataPreferencesSettings v-if="activeTab === 'providers'" />
       <MetadataFieldRulesSettings v-else-if="activeTab === 'field-rules'" />
+      <MetadataGenreBlocklistSettings v-else-if="activeTab === 'genre-blocklist'" />
       <MetadataScoreWeightsSettings v-else-if="activeTab === 'score'" />
       <BookMetadataFetchSettings v-else-if="activeTab === 'auto-fetch'" />
       <AuthorEnrichmentSettings v-else-if="activeTab === 'authors'" />

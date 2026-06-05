@@ -25,11 +25,14 @@ export type BookShadowStrength = (typeof BOOK_SHADOW_STRENGTHS)[number];
 export const BOOK_COVER_DISPLAY_MODES = ["blurred-fit", "fill-crop", "natural-bottom"] as const;
 export type BookCoverDisplayMode = (typeof BOOK_COVER_DISPLAY_MODES)[number];
 
-export const SERIES_CARD_COVER_MODES = ["mosaic", "first-volume", "latest-volume", "first-unread"] as const;
+export const SERIES_CARD_COVER_MODES = ["stack", "mosaic", "first-volume", "latest-volume", "first-unread"] as const;
 export type SeriesCardCoverMode = (typeof SERIES_CARD_COVER_MODES)[number];
 
 export const CARD_INFO_MODES = ["hover-overlay", "below-cover", "off"] as const;
 export type CardInfoMode = (typeof CARD_INFO_MODES)[number];
+
+export const BOOK_THUMBNAIL_CLICK_ACTION = ["reader", "details"] as const;
+export type BookThumbnailClickAction = (typeof BOOK_THUMBNAIL_CLICK_ACTION)[number];
 
 export interface DisplayPreferences {
   portraitCoverSize: number;
@@ -52,4 +55,5 @@ export interface DisplayPreferences {
   gridCardPrimaryLabel: GridCardLabelField;
   gridCardSecondaryLabel: GridCardLabelField;
   cardInfoMode: CardInfoMode;
+  thumbnailClickAction: BookThumbnailClickAction;
 }

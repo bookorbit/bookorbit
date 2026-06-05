@@ -199,6 +199,27 @@ describe('BookQuickView', () => {
     expect(wrapper.find('[data-testid="quick-view-action-delete"]').exists()).toBe(false)
   })
 
+  it('renders RanobeDB provider icon link', () => {
+    detailRef.value = makeDetail({
+      providerIds: {
+        ranobedb: '1287',
+      },
+    })
+
+    const wrapper = mount(BookQuickView, {
+      props: {
+        open: true,
+        bookId: 42,
+      },
+      global: globalStubs,
+    })
+
+    const ranobedbLink = wrapper.find('a[title="Open in RanobeDB"]')
+    expect(ranobedbLink.exists()).toBe(true)
+    expect(ranobedbLink.attributes('href')).toBe('https://ranobedb.org/book/1287')
+    expect(ranobedbLink.find('img[alt="RanobeDB"][src="/assets/provider-icons/ranobedb.svg"]').exists()).toBe(true)
+  })
+
   it('shrinks natural-bottom quick-view cover to the loaded cover ratio', async () => {
     displaySettings.bookCoverDisplayMode.value = 'natural-bottom'
     detailRef.value = makeDetail({ coverSource: 'extracted' })

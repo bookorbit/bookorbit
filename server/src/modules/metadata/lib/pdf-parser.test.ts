@@ -78,6 +78,7 @@ describe('parsePdfFile', () => {
       amazonId: 'a1',
       hardcoverId: 'h1',
       openLibraryId: 'ol1',
+      ranobedbId: 'ranobe-1',
       itunesId: 'it1',
     });
 
@@ -88,6 +89,7 @@ describe('parsePdfFile', () => {
         title: 'XMP Title',
         authors: [{ name: 'XMP Author', sortName: null }],
         tags: ['favorite'],
+        ranobedbId: 'ranobe-1',
         pageCount: 999,
         coverBuffer: Buffer.from([0xff, 0xd8, 0xff]),
       }),
@@ -179,6 +181,7 @@ describe('parsePdfFile', () => {
       amazonId: null,
       hardcoverId: null,
       openLibraryId: null,
+      ranobedbId: null,
       itunesId: null,
     });
 
@@ -216,6 +219,7 @@ describe('parsePdfFile', () => {
       amazonId: null,
       hardcoverId: null,
       openLibraryId: null,
+      ranobedbId: null,
       itunesId: null,
     });
 

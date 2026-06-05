@@ -49,11 +49,19 @@ describe('useDashboardConfig', () => {
 
     expect(scrollers.value).toEqual(DEFAULT_SCROLLERS)
     expect(scrollers.value).not.toBe(DEFAULT_SCROLLERS)
+    expect(DEFAULT_SCROLLERS.map((scroller) => [scroller.type, scroller.label, scroller.enabled, scroller.order])).toEqual([
+      ['recently-added', 'Recently Added', true, 1],
+      ['random', 'Discover Something New', true, 2],
+      ['continue-reading', 'Continue Reading', true, 3],
+      ['continue-listening', 'Continue Listening', true, 4],
+      ['want-to-read', 'Want to Read', false, 5],
+      ['up-next-in-series', 'Up Next in Series', false, 6],
+    ])
 
     addScroller('smart-scope')
 
-    expect(scrollers.value).toHaveLength(5)
-    expect(DEFAULT_SCROLLERS).toHaveLength(4)
+    expect(scrollers.value).toHaveLength(7)
+    expect(DEFAULT_SCROLLERS).toHaveLength(6)
   })
 
   it('prunes shelves that reference deleted smart scopes', async () => {
@@ -149,6 +157,49 @@ describe('useDashboardConfig', () => {
         enabled: true,
         order: 1,
         limit: 20,
+      },
+    ])
+  })
+
+  it('preserves and normalizes continue-listening and want-to-read shelves', async () => {
+    const { useDashboardConfig } = await import('../useDashboardConfig')
+    const { scrollers, saveScrollers } = useDashboardConfig()
+
+    saveScrollers([
+      {
+        id: '21',
+        type: 'continue-listening',
+        label: '',
+        enabled: 'true',
+        order: 10,
+        limit: '9',
+      },
+      {
+        id: '22',
+        type: 'want-to-read',
+        label: 'Reading Queue',
+        enabled: 'false',
+        order: 11,
+        limit: 12,
+      },
+    ] as unknown as ScrollerConfig[])
+
+    expect(scrollers.value).toEqual([
+      {
+        id: '21',
+        type: 'continue-listening',
+        label: 'Continue Listening',
+        enabled: true,
+        order: 1,
+        limit: 9,
+      },
+      {
+        id: '22',
+        type: 'want-to-read',
+        label: 'Reading Queue',
+        enabled: false,
+        order: 2,
+        limit: 12,
       },
     ])
   })

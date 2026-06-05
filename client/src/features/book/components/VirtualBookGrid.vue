@@ -134,7 +134,7 @@ function staticCoverAspectRatio(book: BookCard): CoverAspectRatio {
   <div ref="containerRef" class="w-full">
     <div
       v-if="!virtualized && useVariableStaticWidths"
-      class="flex w-full flex-wrap content-start items-start"
+      class="flex w-full flex-wrap content-start items-end"
       :style="staticVariableWrapStyle"
       data-testid="book-grid-static"
     >

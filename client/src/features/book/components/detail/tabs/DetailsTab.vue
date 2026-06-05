@@ -580,6 +580,15 @@ const providerLinks = computed<ProviderLink[]>(() => {
       fallback: 'Au',
     })
   }
+  if (ids.ranobedb) {
+    out.push({
+      key: 'ranobedb',
+      label: 'RanobeDB',
+      url: `https://ranobedb.org/book/${ids.ranobedb}`,
+      iconUrl: providerIconPath('ranobedb'),
+      fallback: 'RN',
+    })
+  }
   return out
 })
 

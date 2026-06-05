@@ -29,7 +29,6 @@ export class SearchCoversQueryDto {
   @IsOptional()
   @Transform(({ value }) => trimQueryString(value))
   @IsString()
-  @IsNotEmpty()
   author?: string;
 
   @IsOptional()

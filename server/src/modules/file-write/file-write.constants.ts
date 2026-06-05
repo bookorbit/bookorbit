@@ -35,6 +35,7 @@ export const COMIC_INFO_MANAGED_NOTES_KEYS = [
   'hardcoverId',
   'googleBooksId',
   'openLibraryId',
+  'ranobedbId',
 ] as const satisfies readonly BookWritePayloadKey[];
 
 type ComicInfoProviderKey = (typeof COMIC_INFO_PROVIDER_ID_KEYS)[number];
@@ -53,5 +54,6 @@ export const EPUB_PROVIDER_IDENTIFIER_SCHEMES = {
   hardcoverId: 'HARDCOVER',
   googleBooksId: 'GOOGLE',
   openLibraryId: 'OPENLIBRARY',
+  ranobedbId: 'RANOBEDB',
   itunesId: 'ITUNES',
 } as const satisfies Partial<Record<BookWritePayloadKey, string>>;

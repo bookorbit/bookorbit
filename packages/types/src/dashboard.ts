@@ -1,6 +1,8 @@
 export const SCROLLER_TYPE = {
   RECENTLY_ADDED: "recently-added",
   CONTINUE_READING: "continue-reading",
+  CONTINUE_LISTENING: "continue-listening",
+  WANT_TO_READ: "want-to-read",
   UP_NEXT_IN_SERIES: "up-next-in-series",
   RANDOM: "random",
   SMART_SCOPE: "smart-scope",

@@ -77,6 +77,7 @@ describe('epub-opf-builder', () => {
       goodreadsId: '42129393',
       openLibraryId: 'OL20652610W',
       hardcoverId: 'new-orleans-rush',
+      ranobedbId: 'ranobe-1',
       itunesId: '123456789',
     });
 
@@ -87,6 +88,8 @@ describe('epub-opf-builder', () => {
     expect(result.newOpfXml).toContain('opf:scheme="GOODREADS"');
     expect(result.newOpfXml).toContain('opf:scheme="OPENLIBRARY"');
     expect(result.newOpfXml).toContain('opf:scheme="HARDCOVER"');
+    expect(result.newOpfXml).toContain('opf:scheme="RANOBEDB"');
+    expect(result.newOpfXml).toContain('>ranobe-1<');
     expect(result.newOpfXml).toContain('opf:scheme="ITUNES"');
     // Must not use old urn: prefix style
     expect(result.newOpfXml).not.toContain('urn:google:');
@@ -161,5 +164,50 @@ describe('epub-opf-builder', () => {
 
     const parsed = parser.parse(result.newOpfXml) as Record<string, unknown>[];
     expect(parsed.length).toBeGreaterThan(0);
+  });
+
+  it('writes EPUB2-only BookOrbit metadata fields and preserves omitted values', () => {
+    const opf = `
+      <package version="2.0" unique-identifier="uid">
+        <metadata>
+          <dc:identifier id="uid">urn:uuid:abc</dc:identifier>
+        </metadata>
+      </package>
+    `;
+
+    const result = build(opf, {
+      subtitle: 'Book One',
+      isbn10: '0441172717',
+      isbn13: '9780441172719',
+      pageCount: 412,
+      rating: 5,
+      tags: ['classic', 'space'],
+      publishedYear: 1965,
+      language: 'en',
+      publisher: 'Ace',
+      description: 'Arrakis',
+    });
+
+    expect(result.newOpfXml).toContain('meta name="bookorbit:subtitle" content="Book One"');
+    expect(result.newOpfXml).toContain('meta name="bookorbit:isbn10" content="0441172717"');
+    expect(result.newOpfXml).toContain('meta name="bookorbit:page_count" content="412"');
+    expect(result.newOpfXml).toContain('meta name="bookorbit:rating" content="5"');
+    expect(result.newOpfXml).toContain('classic');
+    expect(result.newOpfXml).toContain('urn:isbn:9780441172719');
+    expect(result.fieldsWritten).toEqual(
+      expect.arrayContaining([
+        'subtitle',
+        'description',
+        'publisher',
+        'publishedYear',
+        'language',
+        'pageCount',
+        'isbn10',
+        'isbn13',
+        'rating',
+        'tags',
+      ]),
+    );
+    expect(result.fieldsWritten).toHaveLength(10);
   });
 });

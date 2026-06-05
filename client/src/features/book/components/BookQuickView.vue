@@ -135,6 +135,15 @@ const providerLinks = computed<ProviderLink[]>(() => {
       fallback: '',
     })
   }
+  if (ids.ranobedb) {
+    out.push({
+      key: 'ranobedb',
+      label: 'RanobeDB',
+      url: `https://ranobedb.org/book/${ids.ranobedb}`,
+      iconUrl: providerIconPath('ranobedb'),
+      fallback: 'RN',
+    })
+  }
   return out
 })
 
@@ -464,15 +473,6 @@ function handleDelete() {
               <span class="hidden sm:inline">{{ isPrimaryAudio ? 'Listen' : 'Read' }}</span>
             </button>
             <button
-              class="flex flex-1 items-center justify-center gap-2 h-9 rounded-md border border-input bg-background text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
-              :disabled="!primaryFile"
-              aria-label="Peek"
-              @click="peekBook"
-            >
-              <Eye class="size-4" />
-              <span class="hidden sm:inline">Peek</span>
-            </button>
-            <button
               class="flex flex-1 items-center justify-center text-primary-foreground gap-2 h-9 rounded-md bg-sky-600 text-sm font-medium hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600 transition-colors"
               aria-label="Details"
               @click="openDetails"
@@ -480,6 +480,19 @@ function handleDelete() {
               <ExternalLink class="size-4" />
               <span class="hidden sm:inline">Details</span>
             </button>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  class="flex items-center justify-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-50"
+                  :disabled="!primaryFile"
+                  aria-label="Peek"
+                  @click="peekBook"
+                >
+                  <Eye class="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Peek</TooltipContent>
+            </Tooltip>
             <Tooltip v-if="hasPermission('library_edit_metadata')">
               <TooltipTrigger as-child>
                 <button

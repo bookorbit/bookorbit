@@ -183,6 +183,7 @@ export class FileWriteRepository {
       amazonId: meta.amazonId,
       hardcoverId: meta.hardcoverId,
       openLibraryId: meta.openLibraryId,
+      ranobedbId: meta.ranobedbId,
       itunesId: meta.itunesId,
       audibleId: meta.audibleId,
       rating: meta.rating,

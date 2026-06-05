@@ -11,6 +11,8 @@ import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
 import { MetadataSearchParams } from './providers/metadata-search-params';
 import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
+import { MetadataPreferencesService } from '../metadata-preferences/metadata-preferences.service';
+import { createGenreBlocklistTokenSet, filterCandidateGenresAgainstBlocklist } from '../../common/utils/genre-blocklist.utils';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
 
 function normalizeSearchTitle(title: string | undefined): string | undefined {
@@ -26,6 +28,7 @@ export class MetadataFetchController {
     private readonly registry: ProviderRegistry,
     private readonly providerConfig: ProviderConfigService,
     private readonly throttleTracker: ProviderThrottleTracker,
+    private readonly metadataPreferences: MetadataPreferencesService,
   ) {}
 
   @Get('providers')
@@ -67,11 +70,22 @@ export class MetadataFetchController {
       isAudiobook,
     };
 
-    return this.metadataFetchService.search(params, dto.providers).pipe(map((candidate: MetadataCandidate) => ({ data: candidate })));
+    const preferences = await this.metadataPreferences.getGlobal();
+    const blockedGenreTokens = createGenreBlocklistTokenSet(preferences.options?.genres.blocklist);
+
+    return this.metadataFetchService
+      .search(params, dto.providers)
+      .pipe(map((candidate: MetadataCandidate) => ({ data: filterCandidateGenresAgainstBlocklist(candidate, blockedGenreTokens) })));
   }
 
   @Get('lookup')
   async lookup(@Query() dto: LookupMetadataDto): Promise<MetadataCandidate | null> {
-    return this.metadataFetchService.lookupById(dto.provider, dto.id);
+    const [candidate, preferences] = await Promise.all([
+      this.metadataFetchService.lookupById(dto.provider, dto.id),
+      this.metadataPreferences.getGlobal(),
+    ]);
+    if (!candidate) return null;
+    const blockedGenreTokens = createGenreBlocklistTokenSet(preferences.options?.genres.blocklist);
+    return filterCandidateGenresAgainstBlocklist(candidate, blockedGenreTokens);
   }
 }

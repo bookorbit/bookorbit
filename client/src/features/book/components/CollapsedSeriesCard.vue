@@ -3,12 +3,16 @@ import { computed, inject, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { FORMAT_TO_GROUP, type BookCard } from '@bookorbit/types'
 import { Library } from 'lucide-vue-next'
+import BookCoverArtwork from './BookCoverArtwork.vue'
 import BookCoverPlaceholder from './BookCoverPlaceholder.vue'
 import BookCoverSurface from './BookCoverSurface.vue'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
 import { useCoverVersions } from '../composables/useCoverVersions'
 import { useDisplaySettings, type GridCardLabelField } from '@/composables/useDisplaySettings'
 import { fetchAuthors } from '@/features/author/api/author'
+
+const MAX_COLLAPSED_STACK_COVERS = 3
+const STACK_COVER_STEP_PCT = 8
 
 const props = defineProps<{
   book: BookCard
@@ -36,13 +40,19 @@ const progressPercent = computed(() => {
 })
 
 const isMosaic = computed(() => seriesCardCoverMode.value === 'mosaic')
+const isStack = computed(() => seriesCardCoverMode.value === 'stack')
 
-const coverIds = computed(() => collapsed.value.coverBookIds.filter((bookId) => bookId > 0).slice(0, 4))
-const tileCount = computed(() => Math.max(coverIds.value.length, 1))
+const allCoverIds = computed(() => collapsed.value.coverBookIds.filter((bookId) => bookId > 0))
+const mosaicCoverIds = computed(() => allCoverIds.value.slice(0, 4))
+const tileCount = computed(() => Math.max(mosaicCoverIds.value.length, 1))
+const failedCovers = ref(new Set<number>())
+const loadedCovers = ref(new Set<number>())
+const activeStackCoverIds = computed(() => allCoverIds.value.filter((bookId) => !failedCovers.value.has(bookId)))
+const stackCoverIds = computed(() => activeStackCoverIds.value.slice(0, MAX_COLLAPSED_STACK_COVERS))
 
 const resolvedCoverId = computed<number | null>(() => {
   const c = collapsed.value
-  const fallback = coverIds.value[0] ?? null
+  const fallback = mosaicCoverIds.value[0] ?? null
   switch (seriesCardCoverMode.value) {
     case 'first-volume':
       return c.firstVolumeBookId ?? fallback
@@ -55,8 +65,6 @@ const resolvedCoverId = computed<number | null>(() => {
   }
 })
 
-const failedCovers = ref(new Set<number>())
-const loadedCovers = ref(new Set<number>())
 const singleCoverFailed = ref(false)
 const singleCoverLoaded = ref(false)
 
@@ -65,7 +73,7 @@ watch(resolvedCoverId, () => {
   singleCoverLoaded.value = false
 })
 watch(
-  coverIds,
+  allCoverIds,
   (ids) => {
     const activeIds = new Set(ids)
     failedCovers.value = new Set([...failedCovers.value].filter((id) => activeIds.has(id)))
@@ -145,6 +153,28 @@ function tileClass(index: number): string {
   return ''
 }
 
+const stackCoverStyles = computed(() =>
+  stackCoverIds.value.map((_, index) => {
+    const coverWidth = 100 - STACK_COVER_STEP_PCT * Math.max(0, stackCoverIds.value.length - 1)
+
+    return {
+      right: `${STACK_COVER_STEP_PCT * index}%`,
+      bottom: `${STACK_COVER_STEP_PCT * index}%`,
+      width: `${coverWidth}%`,
+      aspectRatio: coverAspectRatio.value,
+      zIndex: 100 - index,
+      boxShadow:
+        index === 0
+          ? '0 18px 34px -20px rgba(15, 23, 42, 0.72), 0 8px 14px -12px rgba(15, 23, 42, 0.28)'
+          : '0 14px 26px -20px rgba(15, 23, 42, 0.58), 0 6px 12px -12px rgba(15, 23, 42, 0.22)',
+      transformOrigin: 'center',
+      transform: 'translateY(0) scale(1)',
+      transition: 'transform 190ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 220ms ease',
+      willChange: 'transform',
+    }
+  }),
+)
+
 function resolveSeriesLabel(field: GridCardLabelField): string | null {
   if (field === 'hidden') return null
   if (field === 'author') return authorLine.value?.trim() || null
@@ -163,10 +193,50 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
         class="relative w-full rounded-sm overflow-hidden transition-[box-shadow,transform] duration-150 will-change-transform group-hover:scale-[1.02]"
         interactive
         :disable-spine="isAudiobook"
-        :style="{ aspectRatio: coverAspectRatio }"
+        :style="{ aspectRatio: coverAspectRatio, ...(isStack ? { backgroundColor: 'transparent', boxShadow: 'none' } : {}) }"
       >
+        <div v-if="isStack" class="absolute inset-0 isolate overflow-hidden" data-testid="series-cover-stack">
+          <div class="absolute inset-x-[12%] bottom-[5%] h-5 rounded-full bg-black/12 blur-2xl opacity-45" />
+          <div
+            v-for="(bookId, i) in stackCoverIds"
+            :key="bookId"
+            class="absolute overflow-hidden rounded-md"
+            :style="stackCoverStyles[i] ?? {}"
+            data-testid="series-stack-cover"
+          >
+            <BookCoverArtwork
+              :src="coverUrl(bookId)"
+              :has-cover="true"
+              :title="seriesName"
+              :author-line="authorLine"
+              :seed="`series-${bookId}`"
+              alt=""
+              loading="lazy"
+              decoding="async"
+              :spine="false"
+              @error="() => handleCoverError(bookId)"
+            />
+
+            <template v-if="i === 0">
+              <div
+                class="absolute right-1.5 top-1.5 z-20 rounded-sm bg-black/70 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-white group-hover:opacity-0 transition-opacity duration-150"
+                data-testid="series-count-badge"
+              >
+                {{ collapsed.bookCount }}
+              </div>
+            </template>
+          </div>
+          <div
+            v-if="stackCoverIds.length === 0"
+            class="absolute inset-x-[24%] bottom-[6%] top-[6%] overflow-hidden rounded-md shadow-[0_12px_28px_-18px_rgba(15,23,42,0.7)]"
+            data-testid="series-cover-stack-fallback"
+          >
+            <BookCoverPlaceholder title="" author-line="" :is-audio="false" seed="series-empty" />
+          </div>
+        </div>
+
         <!-- Single cover mode -->
-        <div v-if="!isMosaic && resolvedCoverId != null" class="absolute inset-0" data-testid="series-single-cover">
+        <div v-else-if="!isMosaic && resolvedCoverId != null" class="absolute inset-0" data-testid="series-single-cover">
           <div
             class="absolute inset-0 transition-opacity duration-200 ease-out"
             :class="singleCoverLoaded && !singleCoverFailed ? 'opacity-0 pointer-events-none' : 'opacity-100'"
@@ -187,9 +257,9 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
           <span v-if="!singleCoverLoaded && !singleCoverFailed" class="absolute inset-0 z-[1] animate-pulse bg-foreground/5" />
         </div>
 
-        <!-- Adaptive cover mosaic (default mode) -->
+        <!-- Adaptive cover mosaic -->
         <div v-else class="absolute inset-0 grid grid-cols-2 grid-rows-2">
-          <template v-for="(bookId, i) in coverIds" :key="bookId">
+          <template v-for="(bookId, i) in mosaicCoverIds" :key="bookId">
             <div class="relative overflow-hidden" :class="tileClass(i)" data-testid="series-cover-tile">
               <div
                 class="absolute inset-0 transition-opacity duration-200 ease-out"
@@ -211,13 +281,14 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
               <span v-if="!loadedCovers.has(bookId) && !failedCovers.has(bookId)" class="absolute inset-0 z-[1] animate-pulse bg-foreground/5" />
             </div>
           </template>
-          <div v-if="coverIds.length === 0" class="relative overflow-hidden" :class="tileClass(0)" data-testid="series-cover-fallback">
+          <div v-if="mosaicCoverIds.length === 0" class="relative overflow-hidden" :class="tileClass(0)" data-testid="series-cover-fallback">
             <BookCoverPlaceholder title="" author-line="" :is-audio="false" seed="series-empty" />
           </div>
         </div>
 
         <!-- Count badge -->
         <div
+          v-if="!isStack"
           class="absolute right-1.5 top-1.5 z-10 rounded-sm bg-black/70 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-white group-hover:opacity-0 transition-opacity duration-150"
           data-testid="series-count-badge"
         >
@@ -226,6 +297,7 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
 
         <!-- Series type badge -->
         <div
+          v-if="!isStack"
           class="absolute bottom-1.5 left-1.5 z-10 rounded-sm bg-black/70 p-1 text-white group-hover:opacity-0 transition-opacity duration-150"
           data-testid="series-type-badge"
         >
@@ -234,6 +306,7 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
 
         <!-- Hover overlay -->
         <div
+          v-if="!isStack"
           class="absolute inset-0 flex flex-col p-2 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-150 pointer-events-none group-hover:pointer-events-auto group-active:pointer-events-auto"
           :class="overlayBackground"
         >
@@ -257,7 +330,7 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
         </div>
 
         <!-- Read progress bar -->
-        <div v-if="showProgressBar" class="absolute bottom-0 left-0 right-0 h-[3px] z-20 bg-white/20" data-testid="series-progress-bar">
+        <div v-if="!isStack && showProgressBar" class="absolute bottom-0 left-0 right-0 h-[3px] z-20 bg-white/20" data-testid="series-progress-bar">
           <div class="h-full bg-primary" :style="{ width: `${progressPercent}%` }" data-testid="series-progress-fill" />
         </div>
       </BookCoverSurface>

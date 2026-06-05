@@ -344,18 +344,26 @@ describe('parseOpf', () => {
       expect(r.itunesId).toBe('123456789');
     });
 
+    it('parses RanobeDB ID from opf:scheme attribute', () => {
+      const xml = epub2Opf(`<dc:identifier opf:scheme="RANOBEDB">ranobe-1</dc:identifier>`);
+      const r = parseOpf(xml);
+      expect(r.ranobedbId).toBe('ranobe-1');
+    });
+
     it('parses provider IDs from legacy urn: format (backward compat)', () => {
       const xml = epub2Opf(`
         <dc:identifier>urn:google:RPyFDwAAQBAJ</dc:identifier>
         <dc:identifier>urn:amazon:198893706X</dc:identifier>
         <dc:identifier>urn:goodreads:42129393</dc:identifier>
         <dc:identifier>urn:openlibrary:OL20652610W</dc:identifier>
+        <dc:identifier>urn:ranobedb:ranobe-legacy</dc:identifier>
       `);
       const r = parseOpf(xml);
       expect(r.googleBooksId).toBe('RPyFDwAAQBAJ');
       expect(r.amazonId).toBe('198893706X');
       expect(r.goodreadsId).toBe('42129393');
       expect(r.openLibraryId).toBe('OL20652610W');
+      expect(r.ranobedbId).toBe('ranobe-legacy');
     });
 
     it('opf:scheme format wins over urn: when both are present for the same provider', () => {
@@ -384,6 +392,7 @@ describe('parseOpf', () => {
         <dc:identifier opf:scheme="AMAZON">198893706X</dc:identifier>
         <dc:identifier opf:scheme="GOODREADS">42129393</dc:identifier>
         <dc:identifier opf:scheme="OPENLIBRARY">OL20652610W</dc:identifier>
+        <dc:identifier opf:scheme="RANOBEDB">ranobe-1</dc:identifier>
       `);
       const r = parseOpf(xml);
       expect(r.isbn13).toBe('9781635766271');
@@ -391,6 +400,7 @@ describe('parseOpf', () => {
       expect(r.amazonId).toBe('198893706X');
       expect(r.goodreadsId).toBe('42129393');
       expect(r.openLibraryId).toBe('OL20652610W');
+      expect(r.ranobedbId).toBe('ranobe-1');
     });
 
     it('is case-insensitive for opf:scheme values', () => {
@@ -406,6 +416,7 @@ describe('parseOpf', () => {
       expect(r.goodreadsId).toBeNull();
       expect(r.hardcoverId).toBeNull();
       expect(r.openLibraryId).toBeNull();
+      expect(r.ranobedbId).toBeNull();
       expect(r.itunesId).toBeNull();
     });
   });

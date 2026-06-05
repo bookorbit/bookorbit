@@ -12,6 +12,7 @@ import { firstValueFrom, toArray } from 'rxjs';
 
 import { MetadataPreferenceResolver } from '../metadata-preferences/metadata-preference-resolver';
 import { MetadataPreferencesService } from '../metadata-preferences/metadata-preferences.service';
+import { createGenreBlocklistTokenSet, filterGenresAgainstBlocklist } from '../../common/utils/genre-blocklist.utils';
 import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
@@ -104,13 +105,14 @@ export class MetadataFetchPipeline {
   ): { resolved: ResolvedMetadataFields; sources: Record<string, string>; providerIds: ResolvedProviderIds } {
     const result: ResolvedMetadataFields = {};
     const sources: Record<string, string> = {};
+    const blockedGenreTokens = createGenreBlocklistTokenSet(preferences.options?.genres.blocklist);
 
     for (const field of Object.keys(preferences.fields) as MetadataField[]) {
       const fieldPreference = preferences.fields[field];
       if (!fieldPreference.enabled) continue;
 
       if (field === 'genres' && preferences.options?.genres.mode === 'merge') {
-        const { genres, sourceProvider } = this.mergeGenres(fieldPreference.providers as MetadataProviderKey[], byProvider);
+        const { genres, sourceProvider } = this.mergeGenres(fieldPreference.providers as MetadataProviderKey[], byProvider, blockedGenreTokens);
         if (!genres.length) continue;
 
         const existingValue = existing[field];
@@ -134,13 +136,20 @@ export class MetadataFetchPipeline {
         const candidate = byProvider.get(providerKey);
         if (!candidate) continue;
 
-        const value = this.extractField(candidate, field);
+        let value = this.extractField(candidate, field);
         if (value === undefined || value === null) continue;
 
         if (field === 'cover') {
           result.coverUrl = candidate.coverUrl;
           sources['coverUrl'] = providerKey;
           break;
+        }
+
+        if (field === 'genres' && blockedGenreTokens.size > 0) {
+          if (!Array.isArray(value)) continue;
+          const filteredGenres = filterGenresAgainstBlocklist(value, blockedGenreTokens);
+          if (!filteredGenres.length) continue;
+          value = filteredGenres;
         }
 
         const existingValue = existing[field];
@@ -208,7 +217,7 @@ export class MetadataFetchPipeline {
     return key ? candidate[key] : undefined;
   }
 
-  private mergeGenres(providerKeys: MetadataProviderKey[], byProvider: Map<string, MetadataCandidate>) {
+  private mergeGenres(providerKeys: MetadataProviderKey[], byProvider: Map<string, MetadataCandidate>, blockedGenreTokens: ReadonlySet<string>) {
     const merged: string[] = [];
     const seen = new Set<string>();
     let sourceProvider: MetadataProviderKey | undefined;
@@ -216,13 +225,11 @@ export class MetadataFetchPipeline {
     for (const providerKey of providerKeys) {
       const candidate = byProvider.get(providerKey);
       if (!candidate?.genres?.length) continue;
-      if (!sourceProvider) sourceProvider = providerKey;
 
-      for (const raw of candidate.genres) {
-        const genre = raw.trim();
-        if (!genre) continue;
+      for (const genre of filterGenresAgainstBlocklist(candidate.genres, blockedGenreTokens)) {
         const token = genre.toLowerCase();
         if (seen.has(token)) continue;
+        if (!sourceProvider) sourceProvider = providerKey;
         seen.add(token);
         merged.push(genre);
       }

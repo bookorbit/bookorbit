@@ -95,6 +95,7 @@ describe('FileWriteRepository', () => {
       amazonId: 'a',
       hardcoverId: 'h',
       openLibraryId: 'ol',
+      ranobedbId: 'rn',
       itunesId: 'it',
       audibleId: 'aud',
       rating: 4,

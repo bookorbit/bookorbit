@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, useAttrs } from 'vue'
-import { Aperture, BookMarked, ChevronLeft, ChevronRight, ListOrdered, RefreshCw, Shuffle, Sparkles } from 'lucide-vue-next'
+import { Aperture, BookMarked, BookmarkPlus, ChevronLeft, ChevronRight, Headphones, ListOrdered, RefreshCw, Shuffle, Sparkles } from 'lucide-vue-next'
 
 import { isAudioFormat, type BookCard, type CoverAspectRatio, type ScrollerType } from '@bookorbit/types'
 import BookCoverCard from '@/features/book/components/BookCoverCard.vue'
@@ -33,6 +33,8 @@ function scrollBy(delta: number) {
 
 const typeIcon = computed(() => {
   if (props.type === 'continue-reading') return BookMarked
+  if (props.type === 'continue-listening') return Headphones
+  if (props.type === 'want-to-read') return BookmarkPlus
   if (props.type === 'up-next-in-series') return ListOrdered
   if (props.type === 'recently-added') return Sparkles
   if (props.type === 'smart-scope') return Aperture
@@ -145,6 +147,8 @@ function coverAspectRatio(book: BookCard): CoverAspectRatio {
       </div>
       <p class="text-sm text-muted-foreground">
         <template v-if="type === 'continue-reading'">No books in progress yet. Start reading one to see it here.</template>
+        <template v-else-if="type === 'continue-listening'">No audiobooks in progress yet. Start listening to one to see it here.</template>
+        <template v-else-if="type === 'want-to-read'">No books marked want to read yet.</template>
         <template v-else-if="type === 'up-next-in-series'">No next-in-series picks yet. Finish a volume to surface the next one.</template>
         <template v-else-if="type === 'recently-added'">No books in your library yet.</template>
         <template v-else-if="type === 'smart-scope'">No books match this smartScope.</template>

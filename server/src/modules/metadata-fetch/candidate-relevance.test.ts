@@ -34,6 +34,19 @@ describe('candidate-relevance', () => {
       expect(result[0].title).toBe('The Great Gatsby');
     });
 
+    it('filters out derivative guides when the queried title appears first', () => {
+      const candidates = [
+        candidate('To Kill a Mockingbird'),
+        candidate('To Kill a Mockingbird by Harper Lee | Summary & Analysis'),
+        candidate('The Great Gatsby by F. Scott Fitzgerald (Book Analysis)'),
+      ];
+
+      const result = filterAndRank(candidates, { title: 'To Kill a Mockingbird' });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].title).toBe('To Kill a Mockingbird');
+    });
+
     it('always includes exact ISBN matches regardless of title', () => {
       const candidates = [candidate('Wrong Title', 'Wrong Author', '1234567890')];
       const params: MetadataSearchParams = { title: 'Right Title', isbn: '123-456-7890' }; // hyphens in query

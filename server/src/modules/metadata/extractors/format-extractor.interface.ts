@@ -20,6 +20,7 @@ export interface ParsedBookData {
   amazonId?: string | null;
   hardcoverId?: string | null;
   openLibraryId?: string | null;
+  ranobedbId?: string | null;
   itunesId?: string | null;
   audibleId?: string | null;
   cover: Buffer | null;

@@ -285,8 +285,10 @@ describe('OpdsBookService', () => {
         { bookId: 2, name: 'Author Two' },
       ],
       [
-        { bookId: 1, id: 10, format: 'epub', role: 'primary' },
-        { bookId: 2, id: 20, format: null, role: 'primary' },
+        { bookId: 1, id: 10, format: 'epub', role: 'content' },
+        { bookId: 1, id: 11, format: 'mobi', role: 'content' },
+        { bookId: 1, id: 12, format: 'jpg', role: 'cover' },
+        { bookId: 2, id: 20, format: null, role: 'content' },
       ],
     ]);
 
@@ -296,7 +298,10 @@ describe('OpdsBookService', () => {
         title: 'First',
         hasCover: true,
         authors: ['Author One'],
-        files: [{ id: 10, format: 'epub' }],
+        files: [
+          { id: 10, format: 'epub' },
+          { id: 11, format: 'mobi' },
+        ],
       }),
       expect.objectContaining({
         id: 2,

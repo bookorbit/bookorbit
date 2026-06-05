@@ -5,7 +5,14 @@ import { BookCopy } from 'lucide-vue-next'
 import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
-import { resolveSquareCoverScale, shouldPersistCoverRatio } from '../lib/cover-scale'
+import {
+  PORTRAIT_STACK_FRAME_ASPECT_RATIO,
+  resolveCoverStackAspectRatio,
+  resolveCoverStackDisplayMode,
+  resolveCoverStackFrameAspectRatio,
+  resolveSquareCoverScale,
+  shouldPersistCoverRatio,
+} from '../lib/cover-scale'
 import { useCoverStack } from '../composables/useCoverStack'
 import SeriesCompletionBar from './SeriesCompletionBar.vue'
 
@@ -64,6 +71,14 @@ function clearHoveredCover() {
   hoveredCoverId.value = null
 }
 
+function coverRatioAt(index: number): number | null {
+  const bookId = visibleCovers.value[index]
+  return bookId == null ? null : (coverRatios.value.get(bookId) ?? null)
+}
+
+const coverFrameAspectRatios = computed(() => visibleCovers.value.map((_, index) => resolveCoverStackFrameAspectRatio(coverRatioAt(index))))
+const coverDisplayModes = computed(() => visibleCovers.value.map((_, index) => resolveCoverStackDisplayMode(coverRatioAt(index))))
+
 const coverStyles = computed(() => {
   const total = visibleCovers.value.length
   if (total === 0) return []
@@ -73,8 +88,7 @@ const coverStyles = computed(() => {
   const hasActiveHover = hoveredIndex >= 0
 
   return baseStyles.value.map((base, index) => {
-    const bookId = visibleCovers.value[index]
-    const ratio = bookId == null ? null : (coverRatios.value.get(bookId) ?? null)
+    const ratio = coverRatioAt(index)
     const squareScale = resolveSquareCoverScale(ratio, SQUARE_COVER_SCALE)
     const isHovered = hasActiveHover && hoveredId === visibleCovers.value[index]
     const distanceFromHovered = hasActiveHover ? Math.abs(index - hoveredIndex) : 0
@@ -83,6 +97,7 @@ const coverStyles = computed(() => {
 
     return {
       ...base,
+      aspectRatio: resolveCoverStackAspectRatio(ratio),
       zIndex: hasActiveHover ? (isHovered ? HOVERED_COVER_Z_INDEX : base.zIndex) : base.zIndex,
       transformOrigin: squareScale > 1 ? 'center bottom' : 'center',
       transform: hasActiveHover
@@ -138,7 +153,8 @@ const coverStyles = computed(() => {
             :title="series.name"
             :seed="`${series.name}-${bookId}`"
             alt=""
-            frame-aspect-ratio="2/3"
+            :mode="coverDisplayModes[i]"
+            :frame-aspect-ratio="coverFrameAspectRatios[i] ?? PORTRAIT_STACK_FRAME_ASPECT_RATIO"
             loading="lazy"
             decoding="async"
             :spine="false"

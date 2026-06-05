@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { defineComponent } from 'vue'
+import type { ScrollerType } from '@bookorbit/types'
 
 vi.mock('@/lib/api', () => ({
   api: vi.fn<() => Promise<Response>>(),
@@ -18,7 +19,7 @@ function mockResponse(data: unknown, ok = true): Response {
   } as Response
 }
 
-function mountComposable(type: 'continue-reading' | 'up-next-in-series' | 'smart-scope', limit = 20, smartScopeId?: number) {
+function mountComposable(type: ScrollerType, limit = 20, smartScopeId?: number) {
   let result!: ReturnType<typeof useDashboardScroller>
   mount(
     defineComponent({
@@ -56,6 +57,18 @@ describe('useDashboardScroller', () => {
     await flushPromises()
 
     expect(mockApi).toHaveBeenCalledWith('/api/v1/dashboard/scrollers/smart-scope?limit=30&smartScopeId=99')
+  })
+
+  it.each([
+    ['continue-listening', '/api/v1/dashboard/scrollers/continue-listening?limit=8'],
+    ['want-to-read', '/api/v1/dashboard/scrollers/want-to-read?limit=9'],
+  ] as const)('loads books for %s on mount', async (type, expectedPath) => {
+    mockApi.mockResolvedValue(mockResponse([{ id: 1 }]))
+
+    mountComposable(type, type === 'continue-listening' ? 8 : 9)
+    await flushPromises()
+
+    expect(mockApi).toHaveBeenCalledWith(expectedPath)
   })
 
   it('sets error=true when API response is not ok', async () => {

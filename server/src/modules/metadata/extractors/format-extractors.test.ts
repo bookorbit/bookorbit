@@ -131,6 +131,7 @@ describe('metadata format extractors', () => {
       amazonId: 'B00B7NPRY8',
       hardcoverId: null,
       openLibraryId: 'OL7353617M',
+      ranobedbId: 'ranobe-1',
       itunesId: null,
     });
     mockExtractEpubCover.mockResolvedValue(Buffer.from('cover'));
@@ -147,6 +148,7 @@ describe('metadata format extractors', () => {
         goodreadsId: '234248',
         amazonId: 'B00B7NPRY8',
         openLibraryId: 'OL7353617M',
+        ranobedbId: 'ranobe-1',
       }),
     );
   });
@@ -173,6 +175,7 @@ describe('metadata format extractors', () => {
       amazonId: null,
       hardcoverId: null,
       openLibraryId: null,
+      ranobedbId: null,
       itunesId: null,
     });
     mockExtractEpubCover.mockRejectedValue(new Error('cover unavailable'));
@@ -279,6 +282,7 @@ describe('metadata format extractors', () => {
       authors: [{ name: 'Writer', sortName: null }],
       genres: ['Comics'],
       tags: ['Superhero'],
+      ranobedbId: 'comic-ranobe',
       comicMetadata: { issueNumber: '55', volumeName: 'Batman' },
     });
     mockExtractCbrCover.mockResolvedValue(null);
@@ -287,6 +291,7 @@ describe('metadata format extractors', () => {
       expect.objectContaining({
         title: 'Batman',
         genres: ['Comics'],
+        ranobedbId: 'comic-ranobe',
         comicMetadata: { issueNumber: '55', volumeName: 'Batman' },
       }),
     );
@@ -365,6 +370,7 @@ describe('metadata format extractors', () => {
       amazonId: null,
       hardcoverId: null,
       openLibraryId: null,
+      ranobedbId: null,
       itunesId: null,
       coverBuffer: null,
       pageCount: 320,

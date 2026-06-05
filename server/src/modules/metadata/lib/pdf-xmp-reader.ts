@@ -24,6 +24,7 @@ export interface XmpParsed {
   amazonId: string | null;
   hardcoverId: string | null;
   openLibraryId: string | null;
+  ranobedbId: string | null;
   itunesId: string | null;
 }
 
@@ -155,6 +156,7 @@ export function parseXmp(xmpXml: string): XmpParsed | null {
     amazonId: str(merged[`${px}:amazonId`]),
     hardcoverId: str(merged[`${px}:hardcoverId`]),
     openLibraryId: str(merged[`${px}:openLibraryId`]),
+    ranobedbId: str(merged[`${px}:ranobedbId`]),
     itunesId: str(merged[`${px}:itunesId`]),
   };
 }

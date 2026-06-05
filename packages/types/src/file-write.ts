@@ -16,7 +16,14 @@ export const CORE_BOOK_FILE_WRITE_FIELDS = [
   "tags",
 ] as const;
 
-export const COMMON_PROVIDER_BOOK_FILE_WRITE_FIELDS = ["googleBooksId", "goodreadsId", "amazonId", "hardcoverId", "openLibraryId"] as const;
+export const COMMON_PROVIDER_BOOK_FILE_WRITE_FIELDS = [
+  "googleBooksId",
+  "goodreadsId",
+  "amazonId",
+  "hardcoverId",
+  "openLibraryId",
+  "ranobedbId",
+] as const;
 
 export const COMIC_BOOK_FILE_WRITE_FIELDS = [
   "comicIssueNumber",
@@ -65,6 +72,7 @@ export const BOOK_FILE_WRITE_FIELD_LABELS = {
   amazonId: "Amazon ID",
   hardcoverId: "Hardcover ID",
   openLibraryId: "Open Library ID",
+  ranobedbId: "RanobeDB ID",
   comicIssueNumber: "Issue number",
   comicVolumeName: "Volume",
   comicPencillers: "Pencillers",

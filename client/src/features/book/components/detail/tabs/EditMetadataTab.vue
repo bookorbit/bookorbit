@@ -36,6 +36,7 @@ import { useGenreSearch, useTagSearch } from '../../../composables/useTagSearch'
 import { usePublisherSearch, useSeriesNameSearch, useLanguageSearch } from '../../../composables/useMetadataFieldSearch'
 import InputWithSuggestions from '@/components/ui/InputWithSuggestions.vue'
 import { RATING_STARS, getRatingStarClass } from '@/features/book/lib/rating-stars'
+import { buildFileMetadataPatch } from '@/features/book/lib/file-metadata-patch'
 
 const props = defineProps<{ book: BookDetail }>()
 const emit = defineEmits<{
@@ -435,44 +436,8 @@ async function autoFill() {
 }
 
 function applyFileMetadataToForm(meta: FileMetadata): number {
-  let count = 0
-  const directFields = [
-    'title',
-    'subtitle',
-    'description',
-    'publisher',
-    'publishedYear',
-    'language',
-    'pageCount',
-    'seriesName',
-    'seriesIndex',
-    'isbn10',
-    'isbn13',
-    'audibleId',
-    'authors',
-    'genres',
-    'narrators',
-    'durationSeconds',
-  ] as const
-  for (const field of directFields) {
-    if (meta[field] !== undefined) {
-      form[field] = meta[field] as never
-      count++
-    }
-  }
-  if (meta.comicMetadata) {
-    for (const [comicKey, formKey] of Object.entries(COMIC_FIELD_MAP) as [
-      keyof typeof COMIC_FIELD_MAP,
-      (typeof COMIC_FIELD_MAP)[keyof typeof COMIC_FIELD_MAP],
-    ][]) {
-      const value = meta.comicMetadata[comicKey]
-      if (value !== undefined) {
-        form[formKey] = value as never
-        count++
-      }
-    }
-  }
-  return count
+  const { updatedCount } = applyPatchToForm(buildFileMetadataPatch(meta), undefined)
+  return updatedCount
 }
 
 async function handleLoadFromFile() {

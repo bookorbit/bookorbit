@@ -11,6 +11,15 @@ export interface OpdsFixtureRoot {
   cleanup: () => Promise<void>;
 }
 
+export interface Fb2FixtureInput {
+  title?: string;
+  authors?: string[];
+  language?: string;
+  genre?: string;
+  description?: string;
+  year?: number;
+}
+
 function assertRelativePath(path: string): void {
   if (path.startsWith('/')) {
     throw new Error(`Fixture paths must be relative. Received "${path}"`);
@@ -40,4 +49,50 @@ export async function writeFixtureFile(rootPath: string, relativePath: string, c
   await mkdir(dirname(absolutePath), { recursive: true });
   await writeFile(absolutePath, content);
   return absolutePath;
+}
+
+export async function createFb2Fixture(rootPath: string, relativePath: string, input: Fb2FixtureInput = {}): Promise<string> {
+  return writeFixtureFile(rootPath, relativePath, buildFb2Fixture(input));
+}
+
+function buildFb2Fixture(input: Fb2FixtureInput = {}): string {
+  const title = input.title ?? 'OPDS Fixture FB2';
+  const authors = input.authors ?? ['OPDS Fixture Author'];
+  const language = input.language ?? 'en';
+  const genre = input.genre ?? 'fiction';
+  const description = input.description ?? 'OPDS raw FB2 fixture content';
+  const year = input.year ?? 2026;
+
+  const authorXml = authors
+    .map((name) => {
+      const [firstName = 'Unknown', ...rest] = name.trim().split(/\s+/);
+      const lastName = rest.length > 0 ? rest.join(' ') : 'Author';
+      return `<author><first-name>${escapeXml(firstName)}</first-name><last-name>${escapeXml(lastName)}</last-name></author>`;
+    })
+    .join('');
+
+  return `<?xml version="1.0" encoding="utf-8"?>
+<FictionBook xmlns:l="http://www.w3.org/1999/xlink">
+  <description>
+    <title-info>
+      <genre>${escapeXml(genre)}</genre>
+      ${authorXml}
+      <book-title>${escapeXml(title)}</book-title>
+      <annotation><p>${escapeXml(description)}</p></annotation>
+      <date>${year}</date>
+      <lang>${escapeXml(language)}</lang>
+    </title-info>
+    <publish-info>
+      <year>${year}</year>
+    </publish-info>
+  </description>
+  <body>
+    <section><p>fixture content</p></section>
+  </body>
+</FictionBook>
+`;
+}
+
+function escapeXml(value: string): string {
+  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&apos;');
 }

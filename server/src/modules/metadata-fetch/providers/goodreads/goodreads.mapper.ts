@@ -8,7 +8,7 @@ export function mapGoodreadsApolloState(state: Record<string, unknown>, bookId: 
 
   const firstSeries = book.bookSeries?.[0];
   const seriesRef = firstSeries?.series?.__ref;
-  const series = findSeries(state, seriesRef);
+  const series = findSeries(state, seriesRef) ?? firstSeries?.series;
 
   const primaryContributorRef = book.primaryContributorEdge?.node?.__ref;
   const contributor = findContributor(state, primaryContributorRef);
@@ -52,9 +52,33 @@ function findByKeyPrefix<T>(state: Record<string, unknown>, prefix: string): T |
 
 function findBook(state: Record<string, unknown>, bookId: string): GoodreadsApolloBook | undefined {
   const exact = state[`Book:kca:${bookId}`] as GoodreadsApolloBook | undefined;
-  if (exact?.title) return exact;
+  if (isTitledBook(exact)) return exact;
 
-  return findByKeyPrefix<GoodreadsApolloBook>(state, 'Book:kca:');
+  const books = Object.keys(state)
+    .filter((key) => key.startsWith('Book:kca:'))
+    .map((key) => state[key] as GoodreadsApolloBook | undefined)
+    .filter((book): book is GoodreadsApolloBook => !!book);
+
+  const legacyMatch = books.find((book) => isTitledBook(book) && String(book.legacyId) === bookId);
+  if (legacyMatch) return legacyMatch;
+
+  return books.filter(isTitledBook).sort((a, b) => scoreBookShape(b) - scoreBookShape(a))[0];
+}
+
+function isTitledBook(book: GoodreadsApolloBook | undefined): book is GoodreadsApolloBook & { title: string } {
+  return typeof book?.title === 'string' && book.title.trim().length > 0;
+}
+
+function scoreBookShape(book: GoodreadsApolloBook): number {
+  let score = 0;
+  if (book.title) score += 8;
+  if (book.description) score += 4;
+  if (book.details) score += 4;
+  if (book.primaryContributorEdge) score += 2;
+  if (book.bookGenres?.length) score += 2;
+  if (book.imageUrl) score += 2;
+  if (book.bookSeries?.length) score += 1;
+  return score;
 }
 
 function findContributor(state: Record<string, unknown>, ref: string | undefined): GoodreadsApolloContributor | undefined {

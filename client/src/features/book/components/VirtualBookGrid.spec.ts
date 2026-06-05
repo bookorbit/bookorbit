@@ -183,6 +183,7 @@ describe('VirtualBookGrid', () => {
     const itemWrappers = wrapper.findAll('.min-w-0.shrink-0')
     expect(itemWrappers).toHaveLength(2)
     expect(wrapper.get('[data-testid="book-grid-static"]').classes()).toContain('content-start')
+    expect(wrapper.get('[data-testid="book-grid-static"]').classes()).toContain('items-end')
     const cards = wrapper.findAll('[data-testid="book-card"]')
     expect(cards[0]!.attributes('data-cover-ratio')).toBe('2/3')
     expect(cards[1]!.attributes('data-cover-ratio')).toBe('1/1')

@@ -44,8 +44,23 @@ export function computeBasePositions(count: number): CoverStackBaseStyle[] {
   }))
 }
 
+export function rearrangeForStack<T>(items: T[]): T[] {
+  const result: T[] = []
+  items.forEach((item, i) => {
+    if (i === 0 || i % 2 === 1) {
+      result.push(item)
+    } else {
+      result.unshift(item)
+    }
+  })
+  return result
+}
+
 export function useCoverStack(coverIds: Ref<number[]>) {
-  const visibleCovers = computed(() => coverIds.value.slice(0, MAX_VISIBLE))
+  const visibleCovers = computed(() => {
+    const sliced = coverIds.value.slice(0, MAX_VISIBLE)
+    return rearrangeForStack(sliced)
+  })
 
   const baseStyles = computed(() => computeBasePositions(visibleCovers.value.length))
 

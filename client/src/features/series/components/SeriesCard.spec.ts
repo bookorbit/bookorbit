@@ -12,8 +12,18 @@ vi.mock('@/features/book/composables/useCoverVersions', () => ({
 
 const BookCoverArtworkStub = defineComponent({
   name: 'BookCoverArtwork',
+  props: {
+    mode: {
+      type: String,
+      default: undefined,
+    },
+    frameAspectRatio: {
+      type: String,
+      default: undefined,
+    },
+  },
   emits: ['load', 'error'],
-  template: '<div data-testid="series-cover-artwork" />',
+  template: '<div data-testid="series-cover-artwork" :data-mode="mode ?? \'\'" :data-frame-aspect-ratio="frameAspectRatio ?? \'\'" />',
 })
 
 function makeSeries(overrides: Partial<SeriesSummary> = {}): SeriesSummary {
@@ -71,9 +81,12 @@ describe('SeriesCard', () => {
     const style = getCoverStyle(wrapper)
     expect(style).toContain('scale(1)')
     expect(style).toContain('transform-origin: center')
+    expect(style).toContain('aspect-ratio: 2 / 3')
+    expect(wrapper.get('[data-testid="series-cover-artwork"]').attributes('data-mode')).toBe('')
+    expect(wrapper.get('[data-testid="series-cover-artwork"]').attributes('data-frame-aspect-ratio')).toBe('2/3')
   })
 
-  it('enlarges square covers and anchors them to the bottom', async () => {
+  it('enlarges square covers in a square frame without the blurred portrait backdrop', async () => {
     const wrapper = mountCard(makeSeries())
     const artwork = wrapper.getComponent(BookCoverArtworkStub)
 
@@ -83,6 +96,9 @@ describe('SeriesCard', () => {
     const style = getCoverStyle(wrapper)
     expect(style).toContain('scale(1.25)')
     expect(style).toContain('transform-origin: center bottom')
+    expect(style).toContain('aspect-ratio: 1 / 1')
+    expect(wrapper.get('[data-testid="series-cover-artwork"]').attributes('data-mode')).toBe('natural-bottom')
+    expect(wrapper.get('[data-testid="series-cover-artwork"]').attributes('data-frame-aspect-ratio')).toBe('1/1')
   })
 
   it('applies and clears hover transforms across the stack', async () => {

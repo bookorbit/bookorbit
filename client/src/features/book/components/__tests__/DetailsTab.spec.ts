@@ -156,6 +156,7 @@ describe('DetailsTab - present state', () => {
           providerIds: {
             amazon: '0345415000',
             goodreads: '12345',
+            ranobedb: '1287',
           },
         }),
       },
@@ -164,6 +165,10 @@ describe('DetailsTab - present state', () => {
 
     expect(wrapper.find('a[title="Open in Amazon"]').exists()).toBe(true)
     expect(wrapper.find('a[title="Open in Goodreads"]').exists()).toBe(true)
+    const ranobedbLink = wrapper.find('a[title="Open in RanobeDB"]')
+    expect(ranobedbLink.exists()).toBe(true)
+    expect(ranobedbLink.attributes('href')).toBe('https://ranobedb.org/book/1287')
+    expect(ranobedbLink.find('img[alt="RanobeDB"][src="/assets/provider-icons/ranobedb.svg"]').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('Info Links')
   })
 

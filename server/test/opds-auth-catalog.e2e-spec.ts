@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
-import { mkdir, writeFile } from 'fs/promises';
-import { dirname, join } from 'path';
+import { mkdir, readFile, stat, writeFile } from 'fs/promises';
+import { dirname, join, relative } from 'path';
 
 import { eq } from 'drizzle-orm';
 import { Permission } from '@bookorbit/types';
@@ -8,7 +8,7 @@ import { ConfigService } from '@nestjs/config';
 
 import { createCoverToken } from '../src/modules/opds/opds-auth.guard';
 import * as schema from '../src/db/schema';
-import { createEpubFixture } from './e2e/opds/opds-fixture-builder';
+import { createEpubFixture, createFb2Fixture, writeFixtureFile } from './e2e/opds/opds-fixture-builder';
 import {
   authHeader,
   basicAuth,
@@ -72,17 +72,23 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
   let disabledParent!: TestUserSession;
   let revokedParent!: TestUserSession;
   let noOpdsPermissionUser!: TestUserSession;
+  let fb2Reader!: TestUserSession;
 
   let visibleLibrary!: CreatedLibrary;
   let hiddenLibrary!: CreatedLibrary;
+  let fb2Library!: CreatedLibrary;
 
   let visibleBookAlpha!: LocatedBookFile;
   let visibleBookBeta!: LocatedBookFile;
   let hiddenBook!: LocatedBookFile;
+  let rawFb2Book!: LocatedBookFile;
+  let rawFb2FixtureContent!: string;
+  let visibleAlphaAlternativeFileIds!: Record<'mobi' | 'azw3' | 'fb2', number>;
 
   let ownerCredentials!: OpdsCredentials;
   let disabledCredentials!: OpdsCredentials;
   let revokedCredentials!: OpdsCredentials;
+  let fb2Credentials!: OpdsCredentials;
 
   let ownerCollectionId!: number;
   let foreignCollectionId!: number;
@@ -93,23 +99,56 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
   let hiddenAuthorName!: string;
   let visibleSeriesName!: string;
   let hiddenSeriesName!: string;
+  const rawFb2Title = 'Visible Raw FB2';
 
   beforeAll(async () => {
     ctx = await createOpdsE2EContext();
 
     visibleLibrary = await createLibraryWithFolder(ctx, { name: `opds-visible-library-${randomUUID()}` });
     hiddenLibrary = await createLibraryWithFolder(ctx, { name: `opds-hidden-library-${randomUUID()}` });
+    fb2Library = await createLibraryWithFolder(ctx, { name: `opds-fb2-library-${randomUUID()}` });
 
     const visibleAlphaPath = await createEpubFixture(visibleLibrary.folderPath, 'visible-alpha.epub', { title: 'Visible Alpha' });
     const visibleBetaPath = await createEpubFixture(visibleLibrary.folderPath, 'visible-beta.epub', { title: 'Visible Beta' });
     const hiddenGammaPath = await createEpubFixture(hiddenLibrary.folderPath, 'hidden-gamma.epub', { title: 'Hidden Gamma' });
+    const rawFb2Path = await createFb2Fixture(fb2Library.folderPath, 'visible-raw.fb2', {
+      title: rawFb2Title,
+      authors: ['OPDS FB2 Author'],
+      description: 'OPDS raw FB2 download fixture',
+    });
+    rawFb2FixtureContent = await readFile(rawFb2Path, 'utf8');
 
     await triggerAndWaitForLibraryScan(ctx, visibleLibrary.libraryId);
     await triggerAndWaitForLibraryScan(ctx, hiddenLibrary.libraryId);
+    await triggerAndWaitForLibraryScan(ctx, fb2Library.libraryId);
 
     visibleBookAlpha = await locateBookByAbsolutePath(ctx, visibleAlphaPath);
     visibleBookBeta = await locateBookByAbsolutePath(ctx, visibleBetaPath);
     hiddenBook = await locateBookByAbsolutePath(ctx, hiddenGammaPath);
+    rawFb2Book = await locateBookByAbsolutePath(ctx, rawFb2Path);
+    visibleAlphaAlternativeFileIds = {
+      mobi: await attachContentFileToBook(
+        visibleBookAlpha.bookId,
+        visibleLibrary,
+        await writeFixtureFile(visibleLibrary.folderPath, 'visible-alpha.mobi', 'mock mobi content'),
+        'mobi',
+        1,
+      ),
+      azw3: await attachContentFileToBook(
+        visibleBookAlpha.bookId,
+        visibleLibrary,
+        await writeFixtureFile(visibleLibrary.folderPath, 'visible-alpha.azw3', 'mock azw3 content'),
+        'azw3',
+        2,
+      ),
+      fb2: await attachContentFileToBook(
+        visibleBookAlpha.bookId,
+        visibleLibrary,
+        await createFb2Fixture(visibleLibrary.folderPath, 'visible-alpha.fb2', { title: 'Visible Alpha' }),
+        'fb2',
+        3,
+      ),
+    };
 
     await createBookCoverArtifacts(ctx, visibleBookAlpha.bookId);
     await createBookCoverArtifacts(ctx, visibleBookBeta.bookId);
@@ -123,6 +162,7 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
     await seedBookMetadata(visibleBookAlpha.bookId, 'Visible Alpha', visibleSeriesName, 1, '9780141187761');
     await seedBookMetadata(visibleBookBeta.bookId, 'Visible Beta', visibleSeriesName, 2);
     await seedBookMetadata(hiddenBook.bookId, 'Hidden Gamma', hiddenSeriesName, 1, '9780300000000');
+    await seedBookMetadata(rawFb2Book.bookId, rawFb2Title, `Raw FB2 Series ${randomUUID().slice(0, 8)}`, 1);
 
     await linkBookAuthor(visibleBookAlpha.bookId, visibleAuthorName);
     await linkBookAuthor(visibleBookBeta.bookId, visibleAuthorName);
@@ -133,11 +173,13 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
     disabledParent = await createUserAndLogin(ctx, { permissions: [Permission.OpdsAccess] });
     revokedParent = await createUserAndLogin(ctx, { permissions: [Permission.OpdsAccess] });
     noOpdsPermissionUser = await createUserAndLogin(ctx);
+    fb2Reader = await createUserAndLogin(ctx, { permissions: [Permission.OpdsAccess] });
 
     await grantLibraryAccess(ctx, owner.userId, visibleLibrary.libraryId, 'viewer');
     await grantLibraryAccess(ctx, intruder.userId, visibleLibrary.libraryId, 'viewer');
     await grantLibraryAccess(ctx, disabledParent.userId, visibleLibrary.libraryId, 'viewer');
     await grantLibraryAccess(ctx, revokedParent.userId, visibleLibrary.libraryId, 'viewer');
+    await grantLibraryAccess(ctx, fb2Reader.userId, fb2Library.libraryId, 'viewer');
 
     const ownerOpds = await createOpdsUserCredential(ctx, {
       userId: owner.userId,
@@ -154,10 +196,16 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
       username: `opds-revoked-${randomUUID().slice(0, 8)}`,
       password: 'RevokedOpdsPass123',
     });
+    const fb2Opds = await createOpdsUserCredential(ctx, {
+      userId: fb2Reader.userId,
+      username: `opds-fb2-${randomUUID().slice(0, 8)}`,
+      password: 'Fb2OpdsPass123',
+    });
 
     ownerCredentials = { username: ownerOpds.row.username, password: ownerOpds.password };
     disabledCredentials = { username: disabledOpds.row.username, password: disabledOpds.password };
     revokedCredentials = { username: revokedOpds.row.username, password: revokedOpds.password };
+    fb2Credentials = { username: fb2Opds.row.username, password: fb2Opds.password };
 
     await setUserActive(ctx, disabledParent.userId, false);
     await replaceUserPermissions(ctx, revokedParent.userId, []);
@@ -553,7 +601,82 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
       );
       expectError(forbiddenBookDownloadResponse, 403, 'No access to this book');
     });
+
+    it('exposes every content file for multi-format books', async () => {
+      const catalogResponse = await opdsGet('/api/v1/opds/catalog?page=1&size=10', ownerCredentials);
+
+      expect(catalogResponse.statusCode).toBe(200);
+      expect(catalogResponse.body).toContain('Visible Alpha');
+
+      const expectedLinks = [
+        { fileId: visibleBookAlpha.bookFileId, mime: 'application/epub+zip', title: 'EPUB' },
+        { fileId: visibleAlphaAlternativeFileIds.mobi, mime: 'application/x-mobipocket-ebook', title: 'MOBI' },
+        { fileId: visibleAlphaAlternativeFileIds.azw3, mime: 'application/vnd.amazon.ebook', title: 'AZW3' },
+        { fileId: visibleAlphaAlternativeFileIds.fb2, mime: 'application/x-fictionbook+xml', title: 'FB2' },
+      ];
+
+      for (const link of expectedLinks) {
+        expect(catalogResponse.body).toContain(`/api/v1/opds/${visibleBookAlpha.bookId}/download?fileId=${link.fileId}`);
+        expect(catalogResponse.body).toContain(`type="${link.mime}"`);
+        expect(catalogResponse.body).toContain(`title="${link.title}"`);
+      }
+
+      const mobiDownloadResponse = await opdsGet(
+        `/api/v1/opds/${visibleBookAlpha.bookId}/download?fileId=${visibleAlphaAlternativeFileIds.mobi}`,
+        ownerCredentials,
+      );
+      expect(mobiDownloadResponse.statusCode).toBe(200);
+      expect(mobiDownloadResponse.headers['content-type']).toContain('application/x-mobipocket-ebook');
+      expect(mobiDownloadResponse.headers['content-disposition']).toMatch(/\.mobi"$/);
+    });
+
+    it('exposes and downloads raw FB2 acquisition files', async () => {
+      const downloadHref = `/api/v1/opds/${rawFb2Book.bookId}/download?fileId=${rawFb2Book.bookFileId}`;
+      const catalogResponse = await opdsGet('/api/v1/opds/catalog?page=1&size=10', fb2Credentials);
+
+      expect(catalogResponse.statusCode).toBe(200);
+      expect(catalogResponse.body).toContain(rawFb2Title);
+      expect(catalogResponse.body).toContain('rel="http://opds-spec.org/acquisition"');
+      expect(catalogResponse.body).toContain(`href="${downloadHref}"`);
+      expect(catalogResponse.body).toContain('type="application/x-fictionbook+xml"');
+      expect(catalogResponse.body).toContain('title="FB2"');
+
+      const downloadResponse = await opdsGet(downloadHref, fb2Credentials);
+      expect(downloadResponse.statusCode).toBe(200);
+      expect(downloadResponse.headers['content-type']).toContain('application/x-fictionbook+xml');
+      expect(downloadResponse.headers['content-disposition']).toContain('attachment;');
+      expect(downloadResponse.headers['content-disposition']).toMatch(/\.fb2"$/);
+      expect(downloadResponse.body).toBe(rawFb2FixtureContent);
+    });
   });
+
+  async function attachContentFileToBook(
+    bookId: number,
+    library: CreatedLibrary,
+    absolutePath: string,
+    format: string,
+    sortOrder: number,
+  ): Promise<number> {
+    const fileStat = await stat(absolutePath);
+    const [file] = await ctx.db
+      .insert(schema.bookFiles)
+      .values({
+        bookId,
+        libraryFolderId: library.libraryFolderId,
+        absolutePath,
+        relPath: relative(library.folderPath, absolutePath),
+        ino: fileStat.ino,
+        sizeBytes: fileStat.size,
+        mtime: fileStat.mtime,
+        format,
+        role: 'content',
+        sortOrder,
+      })
+      .returning({ id: schema.bookFiles.id });
+
+    if (!file) throw new Error(`Failed to attach ${format} file to book ${bookId}`);
+    return file.id;
+  }
 
   async function seedBookMetadata(bookId: number, title: string, seriesName: string, seriesIndex: number, isbn13?: string): Promise<void> {
     const values = { bookId, title, seriesName, seriesIndex, ...(isbn13 !== undefined ? { isbn13 } : {}) };

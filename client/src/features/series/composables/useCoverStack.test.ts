@@ -47,13 +47,13 @@ describe('useCoverStack', () => {
     const ids = ref([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     const { visibleCovers } = useCoverStack(ids)
     expect(visibleCovers.value).toHaveLength(7)
-    expect(visibleCovers.value).toEqual([1, 2, 3, 4, 5, 6, 7])
+    expect(visibleCovers.value).toEqual([7, 5, 3, 1, 2, 4, 6])
   })
 
   it('returns all covers when fewer than MAX_VISIBLE', () => {
     const ids = ref([10, 20, 30])
     const { visibleCovers } = useCoverStack(ids)
-    expect(visibleCovers.value).toEqual([10, 20, 30])
+    expect(visibleCovers.value).toEqual([30, 10, 20])
   })
 
   it('returns empty for empty input', () => {

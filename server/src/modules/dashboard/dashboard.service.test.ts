@@ -29,6 +29,8 @@ function makeService() {
   const dashboardRepo = {
     findRecentlyAddedBookIds: vi.fn(),
     findContinueReadingBookIds: vi.fn(),
+    findContinueListeningBookIds: vi.fn(),
+    findWantToReadBookIds: vi.fn(),
     findUpNextInSeriesBookIds: vi.fn(),
     findRandomBookIds: vi.fn(),
   };
@@ -148,6 +150,33 @@ describe('DashboardService', () => {
 
     expect(dashboardRepo.findContinueReadingBookIds).toHaveBeenCalledWith([301], 9, 50, EMPTY_CONTENT_FILTER_RULES);
     expect(result.map((card) => card.id)).toEqual([4]);
+  });
+
+  it('routes continue listening requests to repository with user scope and content filters', async () => {
+    const { service, dashboardRepo, bookReadService, libraryService } = makeService();
+    const user = makeUser({ id: 14 });
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([302, 303]);
+    dashboardRepo.findContinueListeningBookIds.mockResolvedValue([6]);
+    bookReadService.findCardsByBookIds.mockResolvedValue(makeFindCardsResult([6]));
+
+    const result = await service.getScroller(ScrollerType.CONTINUE_LISTENING, user, 500);
+
+    expect(dashboardRepo.findContinueListeningBookIds).toHaveBeenCalledWith([302, 303], 14, 50, EMPTY_CONTENT_FILTER_RULES);
+    expect(bookReadService.findCardsByBookIds).toHaveBeenCalledWith([6], 14);
+    expect(result.map((card) => card.id)).toEqual([6]);
+  });
+
+  it('routes want-to-read requests to repository and preserves response order', async () => {
+    const { service, dashboardRepo, bookReadService, libraryService } = makeService();
+    const user = makeUser({ id: 21 });
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([404]);
+    dashboardRepo.findWantToReadBookIds.mockResolvedValue([31, 22]);
+    bookReadService.findCardsByBookIds.mockResolvedValue(makeFindCardsResult([22, 31]));
+
+    const result = await service.getScroller(ScrollerType.WANT_TO_READ, user, 7);
+
+    expect(dashboardRepo.findWantToReadBookIds).toHaveBeenCalledWith([404], 21, 7, EMPTY_CONTENT_FILTER_RULES);
+    expect(result.map((card) => card.id)).toEqual([31, 22]);
   });
 
   it('routes up-next-in-series requests to repository and preserves response order', async () => {

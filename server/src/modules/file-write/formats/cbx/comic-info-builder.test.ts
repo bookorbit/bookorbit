@@ -28,6 +28,7 @@ describe('buildComicInfoXml', () => {
         rating: 8,
         isbn13: '9780441172719',
         goodreadsId: '44767458-dune',
+        ranobedbId: 'ranobe-1',
         subtitle: 'Anniversary Edition',
         isbn10: '0441172717',
       },
@@ -46,6 +47,7 @@ describe('buildComicInfoXml', () => {
         'rating',
         'isbn13',
         'goodreadsId',
+        'ranobedbId',
         'subtitle',
         'isbn10',
       ]),
@@ -62,6 +64,7 @@ describe('buildComicInfoXml', () => {
     expect(parsed.ComicInfo.Web).toBe('https://www.goodreads.com/book/show/44767458-dune');
     expect(parsed.ComicInfo.Notes).toContain('[bookorbit:subtitle] Anniversary Edition');
     expect(parsed.ComicInfo.Notes).toContain('[bookorbit:isbn10] 0441172717');
+    expect(parsed.ComicInfo.Notes).toContain('[bookorbit:ranobedbId] ranobe-1');
     expect(parsed.ComicInfo['@_xmlns:xsi']).toBeDefined();
     expect(parsed.ComicInfo['@_xmlns:xsd']).toBeDefined();
   });

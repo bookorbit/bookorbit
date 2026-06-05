@@ -178,6 +178,11 @@ describe('parseXmp', () => {
       expect(r?.googleBooksId).toBe('abc123');
     });
 
+    it('parses bookorbit:ranobedbId', () => {
+      const r = parseXmp(xmpDoc('<bookorbit:ranobedbId>ranobe-1</bookorbit:ranobedbId>'));
+      expect(r?.ranobedbId).toBe('ranobe-1');
+    });
+
     it('parses bookorbit:goodreadsId', () => {
       const r = parseXmp(xmpDoc('<bookorbit:goodreadsId>1234567</bookorbit:goodreadsId>'));
       expect(r?.goodreadsId).toBe('1234567');

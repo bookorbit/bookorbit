@@ -8,6 +8,7 @@ export interface GoodreadsNextData {
 
 // Inline nested objects — NOT __ref pointers
 export interface GoodreadsApolloBook {
+  legacyId?: string | number;
   title?: string;
   description?: string;
   imageUrl?: string;

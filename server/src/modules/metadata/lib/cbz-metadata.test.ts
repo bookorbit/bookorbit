@@ -192,6 +192,21 @@ describe('extractCbzMetadata', () => {
       const r = await extractCbzMetadata('/book.cbz');
       expect(r?.title).toBe('Descriptor Comic');
     });
+
+    it('extracts RanobeDB ID from managed BookOrbit notes', async () => {
+      const xml = `<ComicInfo>
+        <Notes>
+          Manual note
+          [bookorbit:ranobedbId] ranobe-1
+          [bookorbit:googleBooksId] google-1
+        </Notes>
+      </ComicInfo>`;
+      mockReadFile.mockResolvedValue(buildZipWithComicInfo(xml) as unknown as Buffer);
+
+      const r = await extractCbzMetadata('/book.cbz');
+      expect(r?.ranobedbId).toBe('ranobe-1');
+      expect(r?.googleBooksId).toBe('google-1');
+    });
   });
 
   describe('ComicBookInfo/1.0 JSON comment fallback', () => {

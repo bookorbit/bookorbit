@@ -44,6 +44,7 @@ export interface ParsedCbzMetadata {
   amazonId: string | null;
   hardcoverId: string | null;
   openLibraryId: string | null;
+  ranobedbId: string | null;
   itunesId: string | null;
   comicMetadata: ParsedCbzComicMetadata | null;
 }
@@ -260,6 +261,7 @@ function parseComicInfoXml(xmlBuf: Buffer): ParsedCbzMetadata | null {
       amazonId: managedNotes.get('amazonId') ?? providerIdsFromWeb.amazonId ?? null,
       hardcoverId: managedNotes.get('hardcoverId') ?? providerIdsFromWeb.hardcoverId ?? null,
       openLibraryId: managedNotes.get('openLibraryId') ?? providerIdsFromWeb.openLibraryId ?? null,
+      ranobedbId: managedNotes.get('ranobedbId') ?? null,
       itunesId: null,
       comicMetadata: hasComicFields
         ? {
@@ -315,6 +317,7 @@ function parseComicBookInfoJson(comment: string): ParsedCbzMetadata | null {
       amazonId: null,
       hardcoverId: null,
       openLibraryId: null,
+      ranobedbId: null,
       itunesId: null,
       comicMetadata: null,
     };

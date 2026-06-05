@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, notInArray, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { ContentFilterRules } from '@bookorbit/types';
+import { BOOK_FORMATS, isAudioFormat, type ContentFilterRules } from '@bookorbit/types';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -10,6 +10,7 @@ import { buildContentFilterClauses } from '../../common/utils/content-filter-sql
 
 type Db = NodePgDatabase<typeof schema>;
 type UpNextInSeriesRow = { id: number };
+const AUDIO_FORMATS = BOOK_FORMATS.filter(isAudioFormat);
 
 @Injectable()
 export class DashboardRepository {
@@ -35,27 +36,6 @@ export class DashboardRepository {
     contentFilters?: ContentFilterRules,
   ): Promise<number[]> {
     if (accessibleLibraryIds.length === 0) return [];
-    const mergedProgress = sql<number>`
-      coalesce(
-        case
-          when ${readingProgress.updatedAt} is null then ${audiobookProgress.percentage}
-          when ${audiobookProgress.updatedAt} is null then ${readingProgress.percentage}
-          when ${readingProgress.updatedAt} >= ${audiobookProgress.updatedAt} then ${readingProgress.percentage}
-          else ${audiobookProgress.percentage}
-        end,
-        ${readingProgress.percentage},
-        ${audiobookProgress.percentage},
-        0
-      )
-    `;
-    const mergedUpdatedAt = sql<Date | null>`
-      case
-        when ${readingProgress.updatedAt} is null then ${audiobookProgress.updatedAt}
-        when ${audiobookProgress.updatedAt} is null then ${readingProgress.updatedAt}
-        when ${readingProgress.updatedAt} >= ${audiobookProgress.updatedAt} then ${readingProgress.updatedAt}
-        else ${audiobookProgress.updatedAt}
-      end
-    `;
 
     const cfClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
     const rows = await this.db
@@ -63,9 +43,69 @@ export class DashboardRepository {
       .from(books)
       .leftJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
       .leftJoin(readingProgress, and(eq(readingProgress.bookFileId, bookFiles.id), eq(readingProgress.userId, userId)))
-      .leftJoin(audiobookProgress, and(eq(audiobookProgress.bookId, books.id), eq(audiobookProgress.userId, userId)))
-      .where(and(inArray(books.libraryId, accessibleLibraryIds), sql`${mergedProgress} > 0 and ${mergedProgress} < 100`, ...cfClauses))
-      .orderBy(desc(mergedUpdatedAt), desc(books.id))
+      .where(
+        and(
+          inArray(books.libraryId, accessibleLibraryIds),
+          eq(books.status, 'present'),
+          or(isNull(bookFiles.format), notInArray(bookFiles.format, AUDIO_FORMATS)),
+          sql`${readingProgress.percentage} > 0 and ${readingProgress.percentage} < 100`,
+          ...cfClauses,
+        ),
+      )
+      .orderBy(desc(readingProgress.updatedAt), desc(books.id))
+      .limit(limit);
+
+    return rows.map((row) => row.id);
+  }
+
+  async findContinueListeningBookIds(
+    accessibleLibraryIds: number[],
+    userId: number,
+    limit: number,
+    contentFilters?: ContentFilterRules,
+  ): Promise<number[]> {
+    if (accessibleLibraryIds.length === 0) return [];
+
+    const cfClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
+    const rows = await this.db
+      .select({ id: books.id })
+      .from(books)
+      .innerJoin(audiobookProgress, and(eq(audiobookProgress.bookId, books.id), eq(audiobookProgress.userId, userId)))
+      .innerJoin(
+        bookFiles,
+        and(
+          eq(bookFiles.id, audiobookProgress.currentFileId),
+          eq(bookFiles.bookId, books.id),
+          eq(bookFiles.role, 'content'),
+          inArray(bookFiles.format, AUDIO_FORMATS),
+        ),
+      )
+      .where(
+        and(
+          inArray(books.libraryId, accessibleLibraryIds),
+          eq(books.status, 'present'),
+          sql`${audiobookProgress.percentage} > 0 and ${audiobookProgress.percentage} < 100`,
+          ...cfClauses,
+        ),
+      )
+      .orderBy(desc(audiobookProgress.updatedAt), desc(books.id))
+      .limit(limit);
+
+    return rows.map((row) => row.id);
+  }
+
+  async findWantToReadBookIds(accessibleLibraryIds: number[], userId: number, limit: number, contentFilters?: ContentFilterRules): Promise<number[]> {
+    if (accessibleLibraryIds.length === 0) return [];
+
+    const cfClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
+    const rows = await this.db
+      .select({ id: books.id })
+      .from(books)
+      .innerJoin(userBookStatus, and(eq(userBookStatus.bookId, books.id), eq(userBookStatus.userId, userId)))
+      .where(
+        and(inArray(books.libraryId, accessibleLibraryIds), eq(books.status, 'present'), eq(userBookStatus.status, 'want_to_read'), ...cfClauses),
+      )
+      .orderBy(desc(userBookStatus.updatedAt), desc(books.id))
       .limit(limit);
 
     return rows.map((row) => row.id);
