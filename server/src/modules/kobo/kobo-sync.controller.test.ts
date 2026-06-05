@@ -26,11 +26,21 @@ describe('KoboSyncController', () => {
   const proxyService = {
     forward: vi.fn(),
   };
+  const bookIdentityService = {
+    resolveBookIdByEntitlementId: vi.fn(),
+  };
 
-  const controller = new KoboSyncController(settingsService as never, syncService as never, readingStateService as never, proxyService as never);
+  const controller = new KoboSyncController(
+    settingsService as never,
+    syncService as never,
+    readingStateService as never,
+    proxyService as never,
+    bookIdentityService as never,
+  );
 
   beforeEach(() => {
     vi.clearAllMocks();
+    bookIdentityService.resolveBookIdByEntitlementId.mockImplementation((_userId: number, id: string) => (/^\d+$/.test(id) ? Number(id) : null));
   });
 
   it('initialization builds resource URLs from forwarded headers', () => {
@@ -182,9 +192,31 @@ describe('KoboSyncController', () => {
     expect(reply.send).toHaveBeenCalledWith([{ NewEntitlement: { BookEntitlement: { Id: '12' } } }]);
   });
 
+  it('acknowledges delete-items requests for synced BookOrbit collection tags', async () => {
+    const req = { method: 'POST', url: '/api/v1/kobo/token/v1/library/tags/col-1/items/delete' };
+    const reply = makeReply();
+
+    await controller.deleteTagItems('col-1', { deviceToken: 'token-1' } as never, req as never, reply as never);
+
+    expect(reply.status).toHaveBeenCalledWith(HttpStatus.OK);
+    expect(reply.send).toHaveBeenCalledWith({ RequestResult: 'Success' });
+    expect(proxyService.forward).not.toHaveBeenCalled();
+  });
+
+  it('proxies delete-items requests for non-BookOrbit Kobo tags', async () => {
+    const req = { method: 'POST', url: '/api/v1/kobo/token/v1/library/tags/kobo-tag/items/delete' };
+    const reply = makeReply();
+
+    await controller.deleteTagItems('kobo-tag', { deviceToken: 'token-1' } as never, req as never, reply as never);
+
+    expect(proxyService.forward).toHaveBeenCalledWith(req, reply, 'token-1');
+    expect(reply.send).not.toHaveBeenCalled();
+  });
+
   it('proxies metadata/state/delete for non-numeric book ids', async () => {
     const req = { method: 'GET', url: '/api/v1/kobo/token/v1/library/abc/metadata' };
     const reply = makeReply();
+    bookIdentityService.resolveBookIdByEntitlementId.mockResolvedValue(null);
 
     await controller.getBookMetadata('abc', { id: 1 } as never, { deviceToken: 'token-1' } as never, req as never, reply as never);
     await controller.deleteFromLibrary('abc', { id: 1 } as never, { deviceToken: 'token-1' } as never, req as never, reply as never);
@@ -215,6 +247,18 @@ describe('KoboSyncController', () => {
     expect(reply.send).toHaveBeenNthCalledWith(4, [{ EntitlementId: '5' }]);
   });
 
+  it('resolves Kobo UUID entitlement ids before calling services', async () => {
+    const req = { headers: { host: 'localhost:3000' }, protocol: 'http', hostname: 'localhost', socket: { localPort: 3000 } };
+    const reply = makeReply();
+    bookIdentityService.resolveBookIdByEntitlementId.mockResolvedValue(420);
+    syncService.getBookMetadata.mockResolvedValue([{ Title: 'Mapped' }]);
+
+    await controller.getBookMetadata('a-kobo-uuid', { id: 4 } as never, { deviceToken: 'token-5' } as never, req as never, reply as never);
+
+    expect(syncService.getBookMetadata).toHaveBeenCalledWith(4, 420, 'token-5', 'http://localhost:3000');
+    expect(reply.send).toHaveBeenCalledWith([{ Title: 'Mapped' }]);
+  });
+
   it('updateReadingState uses first ReadingStates element when provided', async () => {
     settingsService.getSettings.mockResolvedValue({
       readingThreshold: 1,
@@ -222,6 +266,7 @@ describe('KoboSyncController', () => {
       convertToKepub: true,
       forceEnableHyphenation: false,
       kepubConversionLimitMb: 100,
+      twoWayProgressSync: true,
     });
     readingStateService.upsertState.mockResolvedValue({ RequestResult: 'Success' });
     const reply = makeReply();
@@ -238,7 +283,14 @@ describe('KoboSyncController', () => {
       reply as never,
     );
 
-    expect(readingStateService.upsertState).toHaveBeenCalledWith(8, 77, { EntitlementId: '77', CurrentBookmark: { ProgressPercent: 56 } }, 1, 99);
+    expect(readingStateService.upsertState).toHaveBeenCalledWith(
+      8,
+      77,
+      { EntitlementId: '77', CurrentBookmark: { ProgressPercent: 56 } },
+      1,
+      99,
+      true,
+    );
     expect(reply.send).toHaveBeenCalledWith({ RequestResult: 'Success' });
   });
 });

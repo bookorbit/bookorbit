@@ -30,7 +30,6 @@ import { useRefreshMetadata } from '../composables/useRefreshMetadata'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import { RATING_STARS, getRatingStarClass } from '@/features/book/lib/rating-stars'
-import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
 const router = useRouter()
 
@@ -48,7 +47,6 @@ const emit = defineEmits<{
 }>()
 
 const { hasPermission } = usePermissions()
-const { thumbnailClickAction } = useDisplaySettings()
 const showSendDialog = ref(false)
 
 const authorLine = computed(() => props.book.authors.join(', ') || null)
@@ -131,24 +129,6 @@ function openAuthorBrowse() {
   if (!authorQuery.value) return
   void router.push({ name: 'authors', query: { q: authorQuery.value } })
 }
-
-function openBookDetails() {
-  void router.push({ name: 'book-detail', params: { bookId: props.book.id } })
-}
-
-function handleRowClick(event: MouseEvent) {
-  if (props.selectionMode) {
-    emit('select', event)
-    return
-  }
-
-  if (thumbnailClickAction.value === 'details') {
-    openBookDetails()
-    return
-  }
-
-  emit('action', 'quick-view')
-}
 </script>
 
 <template>
@@ -159,7 +139,7 @@ function handleRowClick(event: MouseEvent) {
       selected ? 'bg-primary/8 ring-1 ring-primary/30' : '',
       isMissing ? 'grayscale opacity-60' : 'hover:bg-muted/50',
     ]"
-    @click="handleRowClick"
+    @click="selectionMode ? emit('select', $event) : emit('action', 'quick-view')"
   >
     <!-- Selection checkbox -->
     <div
@@ -278,7 +258,7 @@ function handleRowClick(event: MouseEvent) {
             <PanelRight class="size-4 mr-2" />
             Quick View
           </DropdownMenuItem>
-          <DropdownMenuItem @click="openBookDetails">
+          <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id } })">
             <ExternalLink class="size-4 mr-2" />
             Book Details
           </DropdownMenuItem>

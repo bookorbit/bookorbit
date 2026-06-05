@@ -359,8 +359,8 @@ async function handleRefresh() {
           <div class="px-4 py-3.5 bg-card md:px-5">
             <p class="settings-label">Cross-reader compatibility</p>
             <p class="settings-hint">
-              KOReader and BookOrbit use different internal progress formats, so cross-reader location restore is not fully compatible. KOReader to
-              BookOrbit is typically more precise, while BookOrbit to KOReader for EPUB usually resumes at chapter level.
+              BookOrbit saves KOReader-compatible EPUB locations when progress is saved from the web reader. Restore should land close to the same
+              position in both directions, but exact line placement can still vary between readers and EPUB layouts.
             </p>
           </div>
         </div>

@@ -37,7 +37,6 @@ const displaySnapshot = {
   gridCardPrimaryLabel: 'hidden',
   gridCardSecondaryLabel: 'hidden',
   cardInfoMode: 'hover-overlay',
-  thumbnailClickAction: 'reader',
 }
 
 const displayRefs = {
@@ -57,7 +56,6 @@ const displayRefs = {
   gridCardPrimaryLabel: ref('hidden'),
   gridCardSecondaryLabel: ref('hidden'),
   cardInfoMode: ref('hover-overlay'),
-  thumbnailClickAction: ref('reader'),
 }
 
 const themeStore = {
@@ -157,7 +155,6 @@ describe('AppearanceSettings', () => {
     routeState.query = {}
     userState.settings = { syncThemePreferences: false }
     displayRefs.bookCoverDisplayMode.value = 'blurred-fit'
-    displayRefs.thumbnailClickAction.value = 'reader'
     apiMock.mockResolvedValue({ ok: true, json: async () => ({ settings: null }) })
   })
 
@@ -321,19 +318,5 @@ describe('AppearanceSettings', () => {
     await naturalButton!.trigger('click')
 
     expect(displayRefs.bookCoverDisplayMode.value).toBe('natural-bottom')
-  })
-
-  it('lets the user choose details-first thumbnail clicks from the behavior tab', async () => {
-    const wrapper = mountComponent()
-    await wrapper.get('[data-testid="appearance-tab-behavior"]').trigger('click')
-
-    const detailsButton = wrapper
-      .findAll('[data-testid="thumbnail-click-action-control"] button')
-      .find((button) => button.text().includes('Open details'))
-    expect(detailsButton).toBeDefined()
-
-    await detailsButton!.trigger('click')
-
-    expect(displayRefs.thumbnailClickAction.value).toBe('details')
   })
 })

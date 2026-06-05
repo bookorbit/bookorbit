@@ -123,6 +123,16 @@ describe('useFoliate.open', () => {
     await expect(foliate.open(1, 1, 'epub', 'epubcfi(/bad)', undefined)).resolves.toBeUndefined()
   })
 
+  it('falls back to fraction when CFI navigation rejects', async () => {
+    mockGoTo.mockRejectedValue(new Error('invalid CFI'))
+    const foliate = useFoliate(() => container)
+
+    await foliate.open(1, 1, 'epub', 'epubcfi(/bad)', 0.42)
+
+    expect(mockGoTo).toHaveBeenCalledWith('epubcfi(/bad)')
+    expect(mockGoToFraction).toHaveBeenCalledWith(0.42)
+  })
+
   it('does not call goTo or goToFraction when container is null', async () => {
     const foliate = useFoliate(() => null)
 

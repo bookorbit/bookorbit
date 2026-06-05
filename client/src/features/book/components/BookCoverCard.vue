@@ -115,7 +115,7 @@ async function handleRefreshMetadata() {
   if (updated) emit('update:book', mergeBookCardWithDetail(props.book, updated))
 }
 const { hasPermission } = usePermissions()
-const { cardOverlays, bookCoverDisplayMode, gridCardPrimaryLabel, gridCardSecondaryLabel, cardInfoMode, thumbnailClickAction } = useDisplaySettings()
+const { cardOverlays, bookCoverDisplayMode, gridCardPrimaryLabel, gridCardSecondaryLabel, cardInfoMode } = useDisplaySettings()
 const injectedCoverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 const effectiveCoverAspectRatio = computed<CoverAspectRatio>(() => props.coverAspectRatio ?? injectedCoverAspectRatio.value)
 const showSendDialog = ref(false)
@@ -162,9 +162,7 @@ const coverOverlayFrameStyle = computed(() => {
   return fittedCoverFrameStyle(coverImageRatio.value, coverSlotRatio.value, 'bottom')
 })
 
-const isTouch = computed(
-  () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches,
-)
+const isTouch = computed(() => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches)
 
 watch(coverSrc, () => {
   coverLoaded.value = false
@@ -254,18 +252,11 @@ function handleSecondaryLabelClick(event: MouseEvent) {
   handleLabelClick(gridCardSecondaryLabel.value, event)
 }
 
-const isPrimaryClickAvailable = computed(() => thumbnailClickAction.value === 'details' || (primaryFile.value != null && !isMissing.value))
-
 function handleCardClick(event: MouseEvent) {
   const target = event.target
   if (target instanceof Element && target.closest('button, [data-card-click-blocker]')) return
   if (props.selectionMode) {
     emit('select', event)
-    return
-  }
-
-  if (thumbnailClickAction.value === 'details') {
-    openBookDetails()
     return
   }
 
@@ -365,7 +356,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
   <div
     ref="root"
     class="flex flex-col @container touch-manipulation"
-    :class="[selectionMode || isPrimaryClickAvailable ? 'cursor-pointer' : 'cursor-default', selectionMode ? 'select-none' : '']"
+    :class="[selectionMode || (primaryFile && !isMissing) ? 'cursor-pointer' : 'cursor-default', selectionMode ? 'select-none' : '']"
     @click="handleCardClick"
     @contextmenu.prevent
   >

@@ -24,7 +24,6 @@ function validDisplayPreferences(overrides: Partial<DisplayPreferences> = {}): D
     seriesCardCoverMode: 'stack',
     gridCardPrimaryLabel: 'hidden',
     gridCardSecondaryLabel: 'hidden',
-    thumbnailClickAction: 'reader',
     ...overrides,
   }
 }
@@ -67,14 +66,13 @@ describe('useDisplaySettingsSync', () => {
     const { apiMock, displaySettings, sync } = await loadModules()
     apiMock.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ settings: validDisplayPreferences({ bookCoverDisplayMode: 'natural-bottom', thumbnailClickAction: 'details' }) }),
+      json: async () => ({ settings: validDisplayPreferences({ bookCoverDisplayMode: 'natural-bottom' }) }),
     })
 
     await sync.loadDisplaySettingsFromServer()
 
     expect(apiMock).toHaveBeenCalledWith('/api/v1/user-preferences/display')
     expect(displaySettings.useDisplaySettings().bookCoverDisplayMode.value).toBe('natural-bottom')
-    expect(displaySettings.useDisplaySettings().thumbnailClickAction.value).toBe('details')
   })
 
   it('ignores missing or non-ok server display settings responses', async () => {
@@ -308,35 +306,5 @@ describe('useDisplaySettingsSync', () => {
     const s = displaySettings.useDisplaySettings()
     expect(s.gridCardPrimaryLabel.value).toBe('series-title')
     expect(s.gridCardSecondaryLabel.value).toBe('author')
-  })
-
-  it('syncs thumbnailClickAction changes to the server', async () => {
-    vi.useFakeTimers()
-    const { apiMock, displaySettings, sync } = await loadModules()
-    apiMock.mockResolvedValue({ ok: true })
-
-    sync.initDisplaySettingsSync()
-    displaySettings.useDisplaySettings().thumbnailClickAction.value = 'details'
-    await vi.advanceTimersByTimeAsync(1500)
-
-    expect(apiMock).toHaveBeenCalledWith(
-      '/api/v1/user-preferences/display',
-      expect.objectContaining({
-        method: 'PUT',
-        body: expect.stringContaining('"thumbnailClickAction":"details"'),
-      }),
-    )
-  })
-
-  it('loads thumbnailClickAction from the server', async () => {
-    const { apiMock, displaySettings, sync } = await loadModules()
-    apiMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ settings: validDisplayPreferences({ thumbnailClickAction: 'details' }) }),
-    })
-
-    await sync.loadDisplaySettingsFromServer()
-
-    expect(displaySettings.useDisplaySettings().thumbnailClickAction.value).toBe('details')
   })
 })

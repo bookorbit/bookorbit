@@ -24,7 +24,6 @@ function resetDisplaySettings() {
   settings.gridCardPrimaryLabel.value = 'hidden'
   settings.gridCardSecondaryLabel.value = 'hidden'
   settings.cardInfoMode.value = 'hover-overlay'
-  settings.thumbnailClickAction.value = 'reader'
 }
 
 afterEach(() => {
@@ -45,7 +44,6 @@ describe('useDisplaySettings preferences helpers', () => {
       cardOverlays: ['format', 'rating'],
       bookSpineOverlay: 'strong',
       bookCoverDisplayMode: 'natural-bottom',
-      thumbnailClickAction: 'reader',
     })
   })
 
@@ -56,7 +54,6 @@ describe('useDisplaySettings preferences helpers', () => {
       coverSizeScope: 'synced',
       cardOverlays: ['format', 'unknown', 'format', 'lock-status'],
       bookCoverDisplayMode: 'fill-crop',
-      thumbnailClickAction: 'details',
       tableDensity: 'huge',
       extra: true,
     })
@@ -66,7 +63,6 @@ describe('useDisplaySettings preferences helpers', () => {
       coverSizeScope: 'synced',
       cardOverlays: ['format', 'lock-status'],
       bookCoverDisplayMode: 'fill-crop',
-      thumbnailClickAction: 'details',
     })
   })
 
@@ -79,7 +75,6 @@ describe('useDisplaySettings preferences helpers', () => {
       tableZebraStriping: true,
       bookShadowStrength: 'strong',
       bookCoverDisplayMode: 'natural-bottom',
-      thumbnailClickAction: 'details',
       tableDensity: 'invalid',
     })
 
@@ -91,7 +86,6 @@ describe('useDisplaySettings preferences helpers', () => {
     expect(settings.tableDensity.value).toBe('comfortable')
     expect(settings.bookShadowStrength.value).toBe('strong')
     expect(settings.bookCoverDisplayMode.value).toBe('natural-bottom')
-    expect(settings.thumbnailClickAction.value).toBe('details')
   })
 
   it('ignores non-object payloads', () => {
@@ -165,31 +159,5 @@ describe('useDisplaySettings preferences helpers', () => {
     applyDisplayPreferences({ gridCardPrimaryLabel: 'series-title', gridCardSecondaryLabel: 'author' })
     expect(settings.gridCardPrimaryLabel.value).toBe('series-title')
     expect(settings.gridCardSecondaryLabel.value).toBe('author')
-  })
-
-  it('includes thumbnailClickAction in snapshot', () => {
-    settings.thumbnailClickAction.value = 'details'
-    const snap = getDisplayPreferencesSnapshot()
-    expect(snap.thumbnailClickAction).toBe('details')
-  })
-
-  it('defaults thumbnailClickAction to reader', () => {
-    resetDisplaySettings()
-    expect(settings.thumbnailClickAction.value).toBe('reader')
-  })
-
-  it('sanitizes valid thumbnailClickAction values', () => {
-    expect(sanitizeDisplayPreferences({ thumbnailClickAction: 'reader' })).toEqual({ thumbnailClickAction: 'reader' })
-    expect(sanitizeDisplayPreferences({ thumbnailClickAction: 'details' })).toEqual({ thumbnailClickAction: 'details' })
-  })
-
-  it('drops invalid thumbnailClickAction values', () => {
-    expect(sanitizeDisplayPreferences({ thumbnailClickAction: 'preview' })).toEqual({})
-    expect(sanitizeDisplayPreferences({ thumbnailClickAction: 1 })).toEqual({})
-  })
-
-  it('applies thumbnailClickAction from preferences', () => {
-    applyDisplayPreferences({ thumbnailClickAction: 'details' })
-    expect(settings.thumbnailClickAction.value).toBe('details')
   })
 })

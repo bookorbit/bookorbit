@@ -453,6 +453,28 @@ describe('KoreaderService', () => {
       expect(mockChapterService.parseChapterIndexFromCfi).toHaveBeenCalledWith('epubcfi(/6/4!/4/2/2:10)');
     });
 
+    it('returns exact web reader KOReader XPointer when it is stored', async () => {
+      const readerTime = new Date('2026-02-01T11:00:00.000Z');
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20 });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
+      mockRepo.getReadingProgress.mockResolvedValue({
+        percentage: 50,
+        cfi: 'epubcfi(/6/4!/4/2/2:10)',
+        koreaderProgress: '/body/DocFragment[2]/body/p[137]/text()[1].0',
+        updatedAt: readerTime,
+      });
+
+      await expect(service.getProgress(7, 'doc-hash')).resolves.toEqual({
+        document: 'doc-hash',
+        percentage: 0.5,
+        progress: '/body/DocFragment[2]/body/p[137]/text()[1].0',
+        device: 'web',
+        device_id: 'bookorbit-web',
+        timestamp: Math.floor(readerTime.getTime() / 1000),
+      });
+      expect(mockChapterService.parseChapterIndexFromCfi).not.toHaveBeenCalled();
+    });
+
     it('returns null XPointer when chapter service cannot parse CFI spine index', async () => {
       const readerTime = new Date('2026-02-01T11:00:00.000Z');
       mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20 });

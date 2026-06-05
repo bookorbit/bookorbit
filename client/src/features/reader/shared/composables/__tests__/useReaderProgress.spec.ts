@@ -60,6 +60,11 @@ describe('useReaderProgress', () => {
       cfi: 'epubcfi(/6/4)',
       fraction: 0.35,
       index: 2,
+      source: 'OEBPS/html/ch3.xhtml',
+      koboLocationType: 'KoboSpan',
+      koboLocationValue: 'kobo.25.1',
+      contentSourceProgressPercent: 25,
+      koreaderProgress: '/body/DocFragment[3]/body/p[4]/text()[1].2',
       total: 10,
       tocItem: { label: 'Chapter 3', href: 'ch3.xhtml' },
       section: { current: 2, total: 10 },
@@ -76,6 +81,11 @@ describe('useReaderProgress', () => {
     expect(progress.cfi.value).toBe('epubcfi(/6/4)')
     expect(progress.fraction.value).toBe(0.35)
     expect(progress.percentage.value).toBe(35)
+    expect(progress.koboLocationSource.value).toBe('OEBPS/html/ch3.xhtml')
+    expect(progress.koboLocationType.value).toBe('KoboSpan')
+    expect(progress.koboLocationValue.value).toBe('kobo.25.1')
+    expect(progress.koboContentSourceProgressPercent.value).toBe(25)
+    expect(progress.koreaderProgress.value).toBe('/body/DocFragment[3]/body/p[4]/text()[1].2')
     expect(progress.chapterTitle.value).toBe('Chapter 3')
     expect(progress.sectionIndex.value).toBe(2)
     expect(progress.totalSections.value).toBe(10)
@@ -190,6 +200,19 @@ describe('useReaderProgress', () => {
       (c: unknown[]) => typeof c[0] === 'string' && (c[0] as string).includes('/progress') && (c[1] as { method?: string })?.method === 'POST',
     )
     expect(saveCalls.length).toBe(1)
+    const saveCall = saveCalls[0]
+    if (!saveCall) throw new Error('Expected one progress save call')
+    const saveBody = JSON.parse((saveCall[1] as { body: string }).body)
+    expect(saveBody).toEqual(
+      expect.objectContaining({
+        percentage: 30,
+        koboLocationSource: 'OEBPS/html/ch3.xhtml',
+        koboLocationType: 'KoboSpan',
+        koboLocationValue: 'kobo.25.1',
+        koboContentSourceProgressPercent: 25,
+        koreaderProgress: '/body/DocFragment[3]/body/p[4]/text()[1].2',
+      }),
+    )
 
     vi.useRealTimers()
   })
