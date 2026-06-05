@@ -656,12 +656,13 @@ describe('BookRepository', () => {
         bookId: 10,
         entitlementId: '10',
         createdAtKobo: '2026-01-01T00:00:00.000Z',
-        currentBookmark: {
+        currentBookmark: expect.objectContaining({
           LastModified: expect.any(String),
           ProgressPercent: 80,
           ContentSourceProgressPercent: 33.5,
+          ChapterProgress: 2,
           Location: { Source: 'OEBPS/ch14.xhtml', Type: 'KoboSpan', Value: 'kobo.25.1' },
-        },
+        }),
         statusInfo: expect.objectContaining({
           TimesStartedReading: 1,
           Status: 'Reading',
@@ -672,17 +673,60 @@ describe('BookRepository', () => {
       expect.objectContaining({
         target: expect.any(Array),
         set: expect.objectContaining({
-          currentBookmark: {
+          currentBookmark: expect.objectContaining({
             LastModified: expect.any(String),
             ProgressPercent: 80,
             ContentSourceProgressPercent: 33.5,
+            ChapterProgress: 2,
             Location: { Source: 'OEBPS/ch14.xhtml', Type: 'KoboSpan', Value: 'kobo.25.1' },
-          },
+          }),
           statusInfo: expect.objectContaining({ Status: 'Reading' }),
         }),
       }),
     );
     expect(db.execute).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears stale Kobo source-level percent while preserving device bookmark fields', async () => {
+    const insertChain = makeInsertChain();
+    const db = {
+      select: vi
+        .fn()
+        .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub' }]))
+        .mockReturnValueOnce(
+          makeSelectChain('limit', [
+            {
+              entitlementId: '10',
+              createdAtKobo: '2026-01-01T00:00:00.000Z',
+              currentBookmark: {
+                LastModified: '2026-01-01T00:00:00.000Z',
+                Location: { Source: 'old.xhtml', Type: 'KoboSpan', Value: 'kobo.1.1' },
+                ProgressPercent: 20,
+                ContentSourceProgressPercent: 2,
+                ChapterProgress: 2,
+              },
+              statistics: { LastModified: '2026-01-01T00:00:00.000Z' },
+              statusInfo: { LastModified: '2026-01-01T00:00:00.000Z' },
+            },
+          ]),
+        ),
+      insert: vi.fn().mockReturnValue(insertChain),
+      execute: vi.fn().mockResolvedValue(undefined),
+    };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.syncKoboReadingStateFromProgress(5, 9, 80, 'OEBPS/ch14.xhtml', 'KoboSpan', 'kobo.25.1', null)).resolves.toBe(true);
+
+    const insertedBookmark = insertChain.values.mock.calls[0][0].currentBookmark;
+    expect(insertedBookmark).toEqual(
+      expect.objectContaining({
+        LastModified: expect.any(String),
+        ProgressPercent: 80,
+        ChapterProgress: 2,
+        Location: { Source: 'OEBPS/ch14.xhtml', Type: 'KoboSpan', Value: 'kobo.25.1' },
+      }),
+    );
+    expect(insertedBookmark).not.toHaveProperty('ContentSourceProgressPercent');
   });
 
   it('does not overwrite Kobo reading state without an exact KoboSpan location', async () => {

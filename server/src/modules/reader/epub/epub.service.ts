@@ -350,13 +350,22 @@ export class EpubService {
     bookId: number,
     file: { absolutePath: string; fileHash?: string | null; sizeBytes?: number | null },
   ): Promise<string> {
-    const settings = await this.koboSettingsService.getSettings(userId);
+    const start = Date.now();
+    let settings: Awaited<ReturnType<KoboSettingsService['getSettings']>>;
+    try {
+      settings = await this.koboSettingsService.getSettings(userId);
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.warn(
+        `[epub.reader_kepub] [fail] bookId=${bookId} userId=${userId} durationMs=${Date.now() - start} errorClass=${error.constructor.name} error="${sanitizeLogValue(error.message)}" - Kobo settings lookup failed, using original epub`,
+      );
+      return file.absolutePath;
+    }
     if (!settings.twoWayProgressSync || !settings.convertToKepub) return file.absolutePath;
 
     const limitBytes = settings.kepubConversionLimitMb * 1024 * 1024;
     if (file.sizeBytes && file.sizeBytes > limitBytes) return file.absolutePath;
 
-    const start = Date.now();
     try {
       return await this.kepubConversionService.getKepubPath({
         sourcePath: file.absolutePath,

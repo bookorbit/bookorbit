@@ -6,6 +6,10 @@ import { KoboTokenGuard } from './guards/kobo-token.guard';
 
 type KoboAuthBody = Record<string, unknown>;
 
+function asAuthBody(value: unknown): KoboAuthBody {
+  return value !== null && typeof value === 'object' && !Array.isArray(value) ? (value as KoboAuthBody) : {};
+}
+
 function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
@@ -16,22 +20,24 @@ function optionalString(value: unknown): string | undefined {
 export class KoboAuthController {
   @Post('v1/auth/device')
   @HttpCode(HttpStatus.OK)
-  authDevice(@Body() body: KoboAuthBody = {}) {
+  authDevice(@Body() body: unknown = {}) {
+    const payload = asAuthBody(body);
     return {
       AccessToken: randomUUID(),
       RefreshToken: randomUUID(),
       TokenType: 'Bearer',
       TrackingId: randomUUID(),
-      UserKey: optionalString(body.UserKey) ?? '',
+      UserKey: optionalString(payload.UserKey) ?? '',
     };
   }
 
   @Post('v1/auth/refresh')
   @HttpCode(HttpStatus.OK)
-  authRefresh(@Body() body: KoboAuthBody = {}) {
+  authRefresh(@Body() body: unknown = {}) {
+    const payload = asAuthBody(body);
     return {
       AccessToken: randomUUID(),
-      RefreshToken: optionalString(body.RefreshToken) ?? randomUUID(),
+      RefreshToken: optionalString(payload.RefreshToken) ?? randomUUID(),
       TokenType: 'Bearer',
       TrackingId: randomUUID(),
     };

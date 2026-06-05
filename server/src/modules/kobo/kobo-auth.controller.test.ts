@@ -31,6 +31,13 @@ describe('KoboAuthController', () => {
     expect(result.RefreshToken).toEqual(expect.any(String));
   });
 
+  it('authDevice falls back to empty UserKey when body is null', () => {
+    const result = controller.authDevice(null);
+
+    expect(result.UserKey).toBe('');
+    expect(result.RefreshToken).toEqual(expect.any(String));
+  });
+
   it('authRefresh preserves incoming RefreshToken when provided', () => {
     const result = controller.authRefresh({ ...nativeKoboAuthPayload, RefreshToken: 'existing-refresh' });
 
@@ -42,6 +49,13 @@ describe('KoboAuthController', () => {
 
   it('authRefresh generates RefreshToken when request does not provide one', () => {
     const result = controller.authRefresh({});
+
+    expect(result.RefreshToken).toEqual(expect.any(String));
+    expect(result.AccessToken).toEqual(expect.any(String));
+  });
+
+  it('authRefresh generates RefreshToken when body is null', () => {
+    const result = controller.authRefresh(null);
 
     expect(result.RefreshToken).toEqual(expect.any(String));
     expect(result.AccessToken).toEqual(expect.any(String));

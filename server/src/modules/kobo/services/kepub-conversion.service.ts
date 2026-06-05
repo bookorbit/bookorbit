@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { KepubifyBinaryService } from './kepubify-binary.service';
 
 const execFileAsync = promisify(execFile);
+const KEPUBIFY_TIMEOUT_MS = 60_000;
 
 interface KepubConversionInput {
   sourcePath: string;
@@ -44,7 +45,7 @@ export class KepubConversionService {
     const binaryPath = await this.kepubifyBinaryService.getBinaryPath();
     await mkdir(cacheDir, { recursive: true });
     const args = input.hyphenate ? ['--hyphenate', '--output', cachedPath, input.sourcePath] : ['--output', cachedPath, input.sourcePath];
-    await execFileAsync(binaryPath, args);
+    await execFileAsync(binaryPath, args, { timeout: KEPUBIFY_TIMEOUT_MS });
     return cachedPath;
   }
 }

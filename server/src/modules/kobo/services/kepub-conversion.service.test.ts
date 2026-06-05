@@ -42,7 +42,7 @@ describe('KepubConversionService', () => {
   it('converts and caches a kepub when the cache is missing', async () => {
     const { service } = makeService();
     statMock.mockRejectedValueOnce(new Error('cache miss'));
-    execFileMock.mockImplementation((_path, _args, cb) => {
+    execFileMock.mockImplementation((_path, _args, _options, cb) => {
       cb?.(null, '', '');
       return {} as never;
     });
@@ -55,6 +55,7 @@ describe('KepubConversionService', () => {
     expect(execFileMock).toHaveBeenCalledWith(
       '/tools/kepubify',
       ['--hyphenate', '--output', '/app-data/.kepub-cache/44/hash-hyph.kepub.epub', '/books/source.epub'],
+      { timeout: 60_000 },
       expect.any(Function),
     );
   });
@@ -62,7 +63,7 @@ describe('KepubConversionService', () => {
   it('uses a stable nohash cache key when file hash is unavailable', async () => {
     const { service } = makeService();
     statMock.mockRejectedValueOnce(new Error('cache miss'));
-    execFileMock.mockImplementation((_path, _args, cb) => {
+    execFileMock.mockImplementation((_path, _args, _options, cb) => {
       cb?.(null, '', '');
       return {} as never;
     });
@@ -74,6 +75,7 @@ describe('KepubConversionService', () => {
     expect(execFileMock).toHaveBeenCalledWith(
       '/tools/kepubify',
       ['--output', '/app-data/.kepub-cache/44/nohash.kepub.epub', '/books/source.epub'],
+      { timeout: 60_000 },
       expect.any(Function),
     );
   });

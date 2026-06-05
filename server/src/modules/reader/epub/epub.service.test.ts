@@ -381,6 +381,41 @@ describe('EpubService', () => {
     expect(mockOpenFile).toHaveBeenCalledWith('/app-data/.kepub-cache/5/hash1-hyph.kepub.epub');
   });
 
+  it('falls back to the original EPUB path when Kobo settings lookup fails', async () => {
+    bookReadService.findFileById.mockResolvedValue({ bookId: 5, format: 'epub', absolutePath: '/books/alt.epub', fileHash: 'hash1', sizeBytes: 123 });
+    koboSettingsService.getSettings.mockRejectedValueOnce(new Error('settings unavailable'));
+    mockOpenFile.mockResolvedValueOnce(makeEpubArchive() as any);
+
+    await service.getBookInfo(5, 88, user);
+
+    expect(kepubConversionService.getKepubPath).not.toHaveBeenCalled();
+    expect(mockStat).toHaveBeenCalledWith('/books/alt.epub');
+    expect(mockOpenFile).toHaveBeenCalledWith('/books/alt.epub');
+  });
+
+  it('falls back to the original EPUB path when KEPUB conversion fails', async () => {
+    bookReadService.findFileById.mockResolvedValue({ bookId: 5, format: 'epub', absolutePath: '/books/alt.epub', fileHash: 'hash1', sizeBytes: 123 });
+    koboSettingsService.getSettings.mockResolvedValueOnce({
+      convertToKepub: true,
+      forceEnableHyphenation: true,
+      kepubConversionLimitMb: 100,
+      twoWayProgressSync: true,
+    });
+    kepubConversionService.getKepubPath.mockRejectedValueOnce(new Error('conversion failed'));
+    mockOpenFile.mockResolvedValueOnce(makeEpubArchive() as any);
+
+    await service.getBookInfo(5, 88, user);
+
+    expect(kepubConversionService.getKepubPath).toHaveBeenCalledWith({
+      sourcePath: '/books/alt.epub',
+      fileHash: 'hash1',
+      bookId: 5,
+      hyphenate: true,
+    });
+    expect(mockStat).toHaveBeenCalledWith('/books/alt.epub');
+    expect(mockOpenFile).toHaveBeenCalledWith('/books/alt.epub');
+  });
+
   it('evicts oldest cache entry when capacity is reached', () => {
     const cache = (service as any).cache as Map<string, any>;
     for (let i = 0; i < 50; i += 1) {

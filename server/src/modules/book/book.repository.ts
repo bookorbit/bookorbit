@@ -1138,18 +1138,19 @@ export class BookRepository {
     }
 
     const currentBookmark: JsonObj = {
+      ...(existingBookmark ?? {}),
       LastModified: nowIso,
       ProgressPercent: clampedPercentage,
-    };
-    if (normalizedKoboLocationSource && normalizedKoboLocationType && normalizedKoboLocationValue) {
-      currentBookmark.Location = {
+      Location: {
         Source: normalizedKoboLocationSource,
         Type: normalizedKoboLocationType,
         Value: normalizedKoboLocationValue,
-      };
-      if (normalizedKoboContentSourceProgressPercent !== null) {
-        currentBookmark.ContentSourceProgressPercent = normalizedKoboContentSourceProgressPercent;
-      }
+      },
+    };
+    if (normalizedKoboContentSourceProgressPercent !== null) {
+      currentBookmark.ContentSourceProgressPercent = normalizedKoboContentSourceProgressPercent;
+    } else {
+      delete currentBookmark.ContentSourceProgressPercent;
     }
     const statusInfo = {
       ...(this.asJsonObj(existing?.statusInfo) ?? {}),
@@ -1276,7 +1277,9 @@ export class BookRepository {
     const location = this.asJsonObj(bookmark?.Location);
     if (location?.Source !== koboLocationSource || location.Type !== koboLocationType || location.Value !== koboLocationValue) return false;
 
-    if (koboContentSourceProgressPercent === null) return true;
+    if (koboContentSourceProgressPercent === null) {
+      return this.extractKoboContentSourceProgressPercent(bookmark) === null;
+    }
     const existingSourcePercent = this.extractKoboContentSourceProgressPercent(bookmark);
     return existingSourcePercent !== null && Math.abs(existingSourcePercent - koboContentSourceProgressPercent) < PROGRESS_EPSILON;
   }

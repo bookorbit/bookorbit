@@ -185,8 +185,14 @@ export function useFoliate(
           .catch(() => {})
       }
       if (!didNavigate && fallbackFraction !== undefined && fallbackFraction > 0) {
-        view.goToFraction?.(fallbackFraction)
-        didNavigate = true
+        if (typeof view.goToFraction === 'function') {
+          try {
+            view.goToFraction(fallbackFraction)
+            didNavigate = true
+          } catch {
+            didNavigate = false
+          }
+        }
       }
       if (!didNavigate) {
         await view.goTo(0).catch(() => {})
