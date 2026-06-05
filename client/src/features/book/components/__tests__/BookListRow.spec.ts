@@ -1,12 +1,14 @@
 import { mount } from '@vue/test-utils'
-import { afterEach, describe, it, expect, vi } from 'vitest'
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest'
 import BookListRow from '../BookListRow.vue'
 import type { BookCard } from '@bookorbit/types'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
+const routerPushMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>())
+
 vi.mock('vue-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vue-router')>()
-  return { ...actual, useRouter: () => ({ push: vi.fn<(...args: unknown[]) => unknown>() }) }
+  return { ...actual, useRouter: () => ({ push: routerPushMock }) }
 })
 vi.mock('@/features/book/composables/useCoverVersions', () => ({
   useCoverVersions: () => ({ coverUrl: () => '/cover.jpg', bumpVersion: vi.fn<(...args: unknown[]) => void>() }),
@@ -36,10 +38,15 @@ const globalStubs = {
   },
 }
 
-const { bookSpineOverlay } = useDisplaySettings()
+const { bookSpineOverlay, thumbnailClickAction } = useDisplaySettings()
+
+beforeEach(() => {
+  routerPushMock.mockClear()
+})
 
 afterEach(() => {
   bookSpineOverlay.value = 'off'
+  thumbnailClickAction.value = 'reader'
 })
 
 const missingBook: BookCard = {
@@ -118,9 +125,59 @@ describe('BookListRow — missing state', () => {
     const root = wrapper.find('.flex.items-center')
     expect(root.classes().join(' ')).not.toContain('hover:bg-muted')
   })
+
+  it('opens book details for missing books when thumbnail clicks prefer details', async () => {
+    thumbnailClickAction.value = 'details'
+    const wrapper = mount(BookListRow, { props: { book: missingBook }, global: globalStubs })
+
+    await wrapper.find('.flex.items-center').trigger('click')
+
+    expect(routerPushMock).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 1 } })
+  })
 })
 
 describe('BookListRow — present state', () => {
+  it('emits quick-view on row click by default', async () => {
+    const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
+
+    await wrapper.find('.flex.items-center').trigger('click')
+
+    expect(wrapper.emitted('action')?.[0]).toEqual(['quick-view'])
+    expect(routerPushMock).not.toHaveBeenCalled()
+  })
+
+  it('opens book details on row click when thumbnail clicks prefer details', async () => {
+    thumbnailClickAction.value = 'details'
+    const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
+
+    await wrapper.find('.flex.items-center').trigger('click')
+
+    expect(routerPushMock).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 2 } })
+    expect(wrapper.emitted('action')).toBeUndefined()
+  })
+
+  it('selects instead of navigating in selection mode', async () => {
+    thumbnailClickAction.value = 'details'
+    const wrapper = mount(BookListRow, { props: { book: presentBook, selectionMode: true }, global: globalStubs })
+
+    await wrapper.find('.flex.items-center').trigger('click')
+
+    expect(wrapper.emitted('select')).toHaveLength(1)
+    expect(routerPushMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps the explicit format button opening the reader when thumbnail clicks prefer details', async () => {
+    thumbnailClickAction.value = 'details'
+    const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
+
+    const formatButton = wrapper.findAll('button').find((button) => button.text() === 'epub')
+    expect(formatButton).toBeDefined()
+    await formatButton!.trigger('click')
+
+    expect(routerPushMock).toHaveBeenCalledWith(expect.objectContaining({ name: 'reader', params: { bookId: 2, fileId: 10 } }))
+    expect(routerPushMock).not.toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 2 } })
+  })
+
   it('does not apply grayscale to the root row', () => {
     const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
     const root = wrapper.find('.flex.items-center')

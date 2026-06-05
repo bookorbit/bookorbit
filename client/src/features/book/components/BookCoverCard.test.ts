@@ -57,6 +57,7 @@ const mockBookCoverDisplayMode = ref('blurred-fit')
 const mockGridCardPrimaryLabel = ref('hidden')
 const mockGridCardSecondaryLabel = ref('hidden')
 const mockCardInfoMode = ref('hover-overlay')
+const mockThumbnailClickAction = ref('reader')
 vi.mock('@/composables/useDisplaySettings', () => ({
   useDisplaySettings: () => ({
     cardOverlays: mockCardOverlays,
@@ -66,6 +67,7 @@ vi.mock('@/composables/useDisplaySettings', () => ({
     gridCardPrimaryLabel: mockGridCardPrimaryLabel,
     gridCardSecondaryLabel: mockGridCardSecondaryLabel,
     cardInfoMode: mockCardInfoMode,
+    thumbnailClickAction: mockThumbnailClickAction,
   }),
 }))
 
@@ -215,6 +217,7 @@ describe('BookCoverCard', () => {
     mockGridCardPrimaryLabel.value = 'hidden'
     mockGridCardSecondaryLabel.value = 'hidden'
     mockCardInfoMode.value = 'hover-overlay'
+    mockThumbnailClickAction.value = 'reader'
     mockFetchAuthors.mockResolvedValue({
       items: [{ id: 7, name: 'Frank Herbert', sortName: null, bookCount: 1, lastAddedAt: '2024-01-01T00:00:00Z' }],
       total: 1,
@@ -296,6 +299,29 @@ describe('BookCoverCard', () => {
       expect(mockRouterPush).toHaveBeenCalledWith(expect.objectContaining({ name: 'reader', params: { bookId: 1, fileId: 10 } }))
     })
 
+    it('opens book details on desktop click when thumbnail clicks prefer details', async () => {
+      setTouchMode(false)
+      mockThumbnailClickAction.value = 'details'
+      const book = makeBook({ id: 42, files: [makeFile({ id: 10, format: 'epub', role: 'primary' })] })
+      const wrapper = mountCard({ book })
+
+      await wrapper.find('.group').trigger('click')
+
+      expect(mockRouterPush).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 42 } })
+      expect(mockRouterPush).not.toHaveBeenCalledWith(expect.objectContaining({ name: 'reader' }))
+    })
+
+    it('opens book details for missing books when thumbnail clicks prefer details', async () => {
+      setTouchMode(false)
+      mockThumbnailClickAction.value = 'details'
+      const book = makeBook({ id: 43, status: 'missing', files: [] })
+      const wrapper = mountCard({ book })
+
+      await wrapper.find('.group').trigger('click')
+
+      expect(mockRouterPush).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 43 } })
+    })
+
     it('does nothing on desktop click when no readable primary file exists', async () => {
       setTouchMode(false)
       const book = makeBook({ files: [] })
@@ -331,6 +357,7 @@ describe('BookCoverCard', () => {
     })
 
     it('emits select and does not open file in selection mode', async () => {
+      mockThumbnailClickAction.value = 'details'
       const mockSelect = vi.fn<(e: MouseEvent) => void>()
       const wrapper = mountCard({ selectionMode: true, onSelect: mockSelect })
       await wrapper.find('.group').trigger('click')
@@ -344,6 +371,19 @@ describe('BookCoverCard', () => {
       const wrapper = mountCard({ book })
       await wrapper.find('.group').trigger('click')
       expect(mockRouterPush).not.toHaveBeenCalled()
+    })
+
+    it('keeps the explicit read button opening the reader when thumbnail clicks prefer details', async () => {
+      setTouchMode(false)
+      mockThumbnailClickAction.value = 'details'
+      const book = makeBook({ id: 44, files: [makeFile({ id: 12, format: 'epub', role: 'primary' })] })
+      const wrapper = mountCard({ book })
+
+      const overlayButtons = wrapper.find('.bg-black\\/70').findAll('button')
+      await overlayButtons[1]!.trigger('click')
+
+      expect(mockRouterPush).toHaveBeenCalledWith(expect.objectContaining({ name: 'reader', params: { bookId: 44, fileId: 12 } }))
+      expect(mockRouterPush).not.toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 44 } })
     })
   })
 

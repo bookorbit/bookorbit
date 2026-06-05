@@ -4,6 +4,7 @@ import {
   BOOK_COVER_DISPLAY_MODES,
   BOOK_SHADOW_STRENGTHS,
   BOOK_SPINE_OVERLAYS,
+  BOOK_THUMBNAIL_CLICK_ACTION,
   BOOK_VIEW_MODES,
   CARD_INFO_MODES,
   CARD_OVERLAY_KEYS,
@@ -15,6 +16,7 @@ import {
   type BookCoverDisplayMode,
   type BookShadowStrength,
   type BookSpineOverlay,
+  type BookThumbnailClickAction,
   type BookViewMode,
   type CardInfoMode,
   type CardOverlayKey,
@@ -31,6 +33,7 @@ export type {
   BookCoverDisplayMode,
   BookShadowStrength,
   BookSpineOverlay,
+  BookThumbnailClickAction,
   BookViewMode,
   CardInfoMode,
   CardOverlayKey,
@@ -48,6 +51,7 @@ const DEFAULT_BOOK_SPINE_OVERLAY: BookSpineOverlay = 'off'
 const DEFAULT_BOOK_SHADOW_STRENGTH: BookShadowStrength = 'default'
 const DEFAULT_BOOK_COVER_DISPLAY_MODE: BookCoverDisplayMode = 'blurred-fit'
 const DEFAULT_SERIES_CARD_COVER_MODE: SeriesCardCoverMode = 'stack'
+const DEFAULT_BOOK_THUMBNAIL_CLICK_ACTION: BookThumbnailClickAction = 'reader'
 const DEFAULT_CARD_OVERLAYS: CardOverlayKey[] = ['progress-bar', 'format', 'rating', 'read-status', 'series-position']
 
 function normalizeBookSpineOverlay(value: unknown): BookSpineOverlay {
@@ -76,6 +80,12 @@ function normalizeSeriesCardCoverMode(value: unknown): SeriesCardCoverMode {
 
 function normalizeCardInfoMode(value: unknown): CardInfoMode {
   return typeof value === 'string' && CARD_INFO_MODES.includes(value as CardInfoMode) ? (value as CardInfoMode) : 'hover-overlay'
+}
+
+function normalizeThumbnailClickAction(value: unknown): BookThumbnailClickAction {
+  return typeof value === 'string' && BOOK_THUMBNAIL_CLICK_ACTION.includes(value as BookThumbnailClickAction)
+    ? (value as BookThumbnailClickAction)
+    : DEFAULT_BOOK_THUMBNAIL_CLICK_ACTION
 }
 
 function normalizeGridCardLabelField(value: unknown): GridCardLabelField {
@@ -144,6 +154,9 @@ const seriesCardCoverMode = ref<SeriesCardCoverMode>(normalizeSeriesCardCoverMod
 const gridCardPrimaryLabel = ref<GridCardLabelField>(normalizeGridCardLabelField(storage.get('gridCardPrimaryLabel', 'hidden')))
 const gridCardSecondaryLabel = ref<GridCardLabelField>(normalizeGridCardLabelField(storage.get('gridCardSecondaryLabel', 'hidden')))
 const cardInfoMode = ref<CardInfoMode>(normalizeCardInfoMode(storage.get('cardInfoMode', 'hover-overlay')))
+const thumbnailClickAction = ref<BookThumbnailClickAction>(
+  normalizeThumbnailClickAction(storage.get('thumbnailClickAction', DEFAULT_BOOK_THUMBNAIL_CLICK_ACTION)),
+)
 
 watch(portraitCoverSize, (v) => storage.set('portraitCoverSize', v))
 watch(squareCoverSize, (v) => storage.set('squareCoverSize', v))
@@ -165,6 +178,7 @@ watch(seriesCardCoverMode, (value) => storage.set('seriesCardCoverMode', normali
 watch(gridCardPrimaryLabel, (value) => storage.set('gridCardPrimaryLabel', normalizeGridCardLabelField(value)))
 watch(gridCardSecondaryLabel, (value) => storage.set('gridCardSecondaryLabel', normalizeGridCardLabelField(value)))
 watch(cardInfoMode, (value) => storage.set('cardInfoMode', normalizeCardInfoMode(value)))
+watch(thumbnailClickAction, (value) => storage.set('thumbnailClickAction', normalizeThumbnailClickAction(value)))
 
 export function getDisplayPreferencesSnapshot(): DisplayPreferences {
   return {
@@ -188,6 +202,7 @@ export function getDisplayPreferencesSnapshot(): DisplayPreferences {
     gridCardPrimaryLabel: normalizeGridCardLabelField(gridCardPrimaryLabel.value),
     gridCardSecondaryLabel: normalizeGridCardLabelField(gridCardSecondaryLabel.value),
     cardInfoMode: normalizeCardInfoMode(cardInfoMode.value),
+    thumbnailClickAction: normalizeThumbnailClickAction(thumbnailClickAction.value),
   }
 }
 
@@ -229,6 +244,9 @@ export function sanitizeDisplayPreferences(raw: unknown): Partial<DisplayPrefere
   if (CARD_INFO_MODES.includes(obj.cardInfoMode as CardInfoMode)) {
     out.cardInfoMode = obj.cardInfoMode as CardInfoMode
   }
+  if (BOOK_THUMBNAIL_CLICK_ACTION.includes(obj.thumbnailClickAction as BookThumbnailClickAction)) {
+    out.thumbnailClickAction = obj.thumbnailClickAction as BookThumbnailClickAction
+  }
 
   return out
 }
@@ -255,6 +273,7 @@ export function applyDisplayPreferences(raw: unknown): void {
   if (prefs.gridCardPrimaryLabel !== undefined) gridCardPrimaryLabel.value = prefs.gridCardPrimaryLabel
   if (prefs.gridCardSecondaryLabel !== undefined) gridCardSecondaryLabel.value = prefs.gridCardSecondaryLabel
   if (prefs.cardInfoMode !== undefined) cardInfoMode.value = prefs.cardInfoMode
+  if (prefs.thumbnailClickAction !== undefined) thumbnailClickAction.value = prefs.thumbnailClickAction
 }
 
 export function useDisplaySettings() {
@@ -279,5 +298,6 @@ export function useDisplaySettings() {
     gridCardPrimaryLabel,
     gridCardSecondaryLabel,
     cardInfoMode,
+    thumbnailClickAction,
   }
 }

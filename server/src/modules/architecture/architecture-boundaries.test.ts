@@ -50,6 +50,7 @@ describe('Architecture boundaries', () => {
       'src/modules/cover/cover.service.ts',
       'src/modules/entity-manager/duplicate-compute.service.ts',
       'src/modules/kobo/services/kobo-book-access.service.ts',
+      'src/modules/kobo/services/kobo-book-identity.service.ts',
       'src/modules/kobo/services/kobo-device.service.ts',
       'src/modules/kobo/services/kobo-download.service.ts',
       'src/modules/kobo/services/kobo-reading-state.service.ts',
