@@ -200,6 +200,13 @@ describe('KoboAnalyticsService', () => {
         Events: [
           { Id: 'a', EventType: 'LeaveContent', Timestamp: '2026-06-01T00:00:00Z', Metrics: {} },
           { Id: 'b', EventType: 'LeaveContent', Timestamp: '2026-06-01T00:00:00Z', Attributes: { volumeid: '1' } },
+          {
+            Id: 'c',
+            EventType: 'LeaveContent',
+            Timestamp: '2026-06-01T00:00:00Z',
+            Metrics: { SecondsRead: 10 },
+            Attributes: { volumeid: 1 as never },
+          },
         ],
       },
       user,
@@ -207,6 +214,7 @@ describe('KoboAnalyticsService', () => {
     );
 
     expect(readingSessionService.save).not.toHaveBeenCalled();
+    expect(bookIdentityService.resolveBookIdByEntitlementId).not.toHaveBeenCalled();
   });
 
   it('ignores non-session analytics event types', async () => {

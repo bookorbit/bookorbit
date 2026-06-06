@@ -81,7 +81,7 @@ export class KoboAnalyticsService {
   private async handleLeaveContent(ev: KoboAnalyticsEvent, user: RequestUser): Promise<void> {
     const volumeid = ev.Attributes?.volumeid;
     const seconds = ev.Metrics?.SecondsRead;
-    if (!volumeid || typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 0) {
+    if (typeof volumeid !== 'string' || volumeid.length === 0 || typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 0) {
       this.logger.debug(
         `[kobo.analytics.session] [ignore] malformed LeaveContent userId=${user.id} eventId=${ev.Id} event="${formatAnalyticsPayload(ev, 800)}"`,
       );
