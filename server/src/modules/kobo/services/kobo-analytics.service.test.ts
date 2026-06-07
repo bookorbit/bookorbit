@@ -459,12 +459,43 @@ describe('KoboAnalyticsService', () => {
             Metrics: { stars: 6 },
             Attributes: { volumeid: '1' },
           },
+          {
+            Id: 'fractional-stars',
+            EventType: 'RateBook',
+            Timestamp: '2026-06-01T00:40:50Z',
+            Metrics: { stars: 3.5 },
+            Attributes: { volumeid: '1' },
+          },
         ],
       },
       user,
       device,
     );
 
+    expect(bookService.bulkSetRating).not.toHaveBeenCalled();
+    expect(bookIdentityService.resolveBookIdByEntitlementId).not.toHaveBeenCalled();
+  });
+
+  it('ignores RateBook when volumeid does not resolve to a book', async () => {
+    bookIdentityService.resolveBookIdByEntitlementId.mockResolvedValue(null);
+
+    await makeService().ingest(
+      {
+        Events: [
+          {
+            Id: 'bad-volume',
+            EventType: 'RateBook',
+            Timestamp: '2026-06-01T00:40:50Z',
+            Metrics: { stars: 4 },
+            Attributes: { volumeid: 'unknown-entitlement' },
+          },
+        ],
+      },
+      user,
+      device,
+    );
+
+    expect(bookIdentityService.resolveBookIdByEntitlementId).toHaveBeenCalledWith(7, 'unknown-entitlement');
     expect(bookService.bulkSetRating).not.toHaveBeenCalled();
   });
 
