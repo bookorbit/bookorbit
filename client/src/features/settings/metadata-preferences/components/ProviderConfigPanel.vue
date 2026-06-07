@@ -204,9 +204,19 @@ const rows: RowDef[] = [
     hint: 'Polish book catalog (lubimyczytac.pl). Scrapes public book pages. No setup required.',
     fields: [],
   },
+  {
+    key: 'aladin',
+    label: 'Aladin',
+    hint: 'Korean book metadata from Aladin (알라딘). A TTB Key from aladin.co.kr is required.',
+    fields: [{ key: 'ttbKey', label: 'TTB Key', type: 'password', placeholder: 'ttb...', alwaysEditable: true }],
+    enableRequirement: {
+      isConfigured: (c) => !!c.aladin.ttbKey.trim(),
+      blockedMessage: 'Aladin requires a TTB Key before it can be enabled',
+    },
+  },
 ]
 
-const TESTABLE_PROVIDERS: MetadataProviderKey[] = [MetadataProviderKey.AMAZON, MetadataProviderKey.HARDCOVER]
+const TESTABLE_PROVIDERS: MetadataProviderKey[] = [MetadataProviderKey.AMAZON, MetadataProviderKey.HARDCOVER, MetadataProviderKey.ALADIN]
 
 function statusFor(key: string) {
   return props.statuses.find((s) => s.key === key)
