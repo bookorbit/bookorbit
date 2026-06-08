@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { SQL, and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -67,6 +67,8 @@ function encodeSyncToken(snapshotId: number): string {
 
 @Injectable()
 export class KoboSyncService {
+  private readonly logger = new Logger(KoboSyncService.name);
+
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly bookAccessService: KoboBookAccessService,
@@ -130,8 +132,20 @@ export class KoboSyncService {
     const snapshot = await this.db.query.koboLibrarySnapshots.findFirst({
       where: eq(schema.koboLibrarySnapshots.userId, userId),
     });
-    if (!snapshot) return;
-    await this.db.update(schema.koboSnapshotBooks).set({ synced: false }).where(eq(schema.koboSnapshotBooks.snapshotId, snapshot.id));
+    if (!snapshot) {
+      this.logger.debug(`[kobo.snapshot] invalidate skipped userId=${userId} reason=no_snapshot`);
+      return;
+    }
+
+    const resetRows = await this.db
+      .update(schema.koboSnapshotBooks)
+      .set({ synced: false })
+      .where(and(eq(schema.koboSnapshotBooks.snapshotId, snapshot.id), eq(schema.koboSnapshotBooks.synced, true)))
+      .returning({ bookId: schema.koboSnapshotBooks.bookId });
+
+    this.logger.debug(
+      `[kobo.snapshot] invalidated userId=${userId} snapshotId=${snapshot.id} resetSyncedCount=${resetRows.length} bookIds=${resetRows.map((row) => row.bookId).join(',') || 'none'}`,
+    );
   }
 
   private async createSnapshot(userId: number, books: EligibleSnapshotRow[]) {
