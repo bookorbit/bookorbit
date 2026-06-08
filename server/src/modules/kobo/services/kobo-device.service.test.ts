@@ -135,9 +135,14 @@ describe('KoboDeviceService', () => {
     const service = makeService(db);
 
     await expect(service.revokeDevice(8, 111)).rejects.toThrow(NotFoundException);
+    expect(syncService.invalidateSnapshot).not.toHaveBeenCalled();
+    expect(db.delete).not.toHaveBeenCalled();
+    expect(db.deleteWhere).not.toHaveBeenCalled();
+
     await expect(service.revokeDevice(8, 7)).resolves.toBeUndefined();
-    expect(db.delete).toHaveBeenCalled();
-    expect(db.deleteWhere).toHaveBeenCalled();
+    expect(db.delete).toHaveBeenCalledTimes(1);
+    expect(db.deleteWhere).toHaveBeenCalledTimes(1);
+    expect(syncService.invalidateSnapshot).toHaveBeenCalledTimes(1);
     expect(syncService.invalidateSnapshot).toHaveBeenCalledWith(8);
   });
 });
