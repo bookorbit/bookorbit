@@ -1,20 +1,36 @@
-import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookMetadata, bookSeries } from '../../db/schema';
+import { sanitizeLogValue } from '../utils/log-sanitize.utils';
 
 type Db = NodePgDatabase<typeof schema>;
 type SeriesWriteExecutor = Pick<Db, 'insert'>;
 
 @Injectable()
 export class SeriesIdentityService implements OnModuleInit {
+  private readonly logger = new Logger(SeriesIdentityService.name);
+
   constructor(@Inject(DB) private readonly db: Db) {}
 
   async onModuleInit(): Promise<void> {
-    await this.backfillMissingSeriesIds();
+    const start = Date.now();
+    try {
+      await this.db.transaction(async (tx) => {
+        await tx.execute(sql`SET LOCAL statement_timeout = 0`);
+        await this.backfillMissingSeriesIds(tx);
+      });
+      this.logger.log(`[series.backfill] [end] durationMs=${Date.now() - start} - series id backfill completed`);
+    } catch (err) {
+      const e = err as Error & { cause?: unknown };
+      const cause = e.cause instanceof Error ? e.cause.message : e.message;
+      this.logger.error(
+        `[series.backfill] [fail] durationMs=${Date.now() - start} errorClass=${e.name} error="${sanitizeLogValue(cause)}" - series id backfill failed; continuing startup`,
+      );
+    }
   }
 
   normalizeName(name: string | null | undefined): string | null {

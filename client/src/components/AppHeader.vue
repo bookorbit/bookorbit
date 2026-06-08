@@ -53,6 +53,7 @@ import { useNotifications } from '@/features/notifications/composables/useNotifi
 import UserAvatar from '@/components/UserAvatar.vue'
 import { DEFAULT_FORMAT_PRIORITY } from '@bookorbit/types'
 import { useThemeStore } from '@/stores/theme'
+import { getFormatColor } from '@/features/book/lib/format-colors'
 
 const router = useRouter()
 const route = useRoute()
@@ -240,20 +241,12 @@ function sortFormats(formats: string[]): string[] {
   })
 }
 
-function formatBadgeClass(fmt: string): string {
-  switch (fmt.toLowerCase()) {
-    case 'epub':
-      return 'bg-blue-500/10 text-blue-500 border-blue-500/20'
-    case 'pdf':
-      return 'bg-red-500/10 text-red-500 border-red-500/20'
-    case 'mobi':
-    case 'azw3':
-      return 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-    case 'cbz':
-    case 'cbr':
-      return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-    default:
-      return 'bg-muted text-muted-foreground border-border'
+function formatBadgeStyle(fmt: string) {
+  const color = getFormatColor(fmt)
+  return {
+    color,
+    backgroundColor: `${color}1A`, // 10% opacity in hex
+    borderColor: `${color}33`, // ~20% opacity in hex
   }
 }
 </script>
@@ -337,7 +330,8 @@ function formatBadgeClass(fmt: string): string {
                   <span
                     v-for="fmt in sortFormats(result.formats)"
                     :key="fmt"
-                    :class="['text-[9px] font-semibold px-1 py-0.5 rounded border uppercase', formatBadgeClass(fmt)]"
+                    :class="['text-[9px] font-semibold px-1 py-0.5 rounded border uppercase']"
+                    :style="formatBadgeStyle(fmt)"
                   >
                     {{ fmt }}
                   </span>
@@ -445,7 +439,8 @@ function formatBadgeClass(fmt: string): string {
                   <span
                     v-for="fmt in sortFormats(result.formats)"
                     :key="fmt"
-                    :class="['text-[9px] font-semibold px-1 py-0.5 rounded border uppercase', formatBadgeClass(fmt)]"
+                    :class="['text-[9px] font-semibold px-1 py-0.5 rounded border uppercase']"
+                    :style="formatBadgeStyle(fmt)"
                   >
                     {{ fmt }}
                   </span>

@@ -83,6 +83,7 @@ export const bookMetadata = pgTable(
     index('bm_title_lower_idx').on(sql`lower(${t.title})`),
     index('bm_series_trgm_idx').using('gin', t.seriesName.op('gin_trgm_ops')),
     index('bm_series_id_idx').on(t.seriesId),
+    index('bm_series_name_lower_btrim_idx').on(sql`lower(btrim(${t.seriesName}))`),
     index('bm_publisher_trgm_idx').using('gin', t.publisher.op('gin_trgm_ops')),
     index('bm_language_idx').on(t.language),
     index('bm_language_trgm_idx').using('gin', t.language.op('gin_trgm_ops')),

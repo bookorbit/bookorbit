@@ -2,17 +2,19 @@
 import { ref, watch, computed } from 'vue'
 import { useLocalStorage } from '@vueuse/core'
 import { useRouter } from 'vue-router'
-import { BookOpen, Download, Eye, Files, Headphones, History, FolderOpen, ArrowUpDown, MoreVertical } from 'lucide-vue-next'
+import { BookOpen, Download, Eye, FilePlus, Files, Headphones, History, FolderOpen, ArrowUpDown, MoreVertical } from 'lucide-vue-next'
 import type { BookDetail, BookDetailFile, WriteLogEntry } from '@bookorbit/types'
-import { READER_OPENABLE_FORMATS } from '@bookorbit/types'
+import { Permission, READER_OPENABLE_FORMATS } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { api } from '@/lib/api'
 import { useBookDownload } from '@/features/book/composables/useBookDownload'
 import { getFormatColor } from '@/features/book/lib/format-colors'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import AddBookFileModal from './AddBookFileModal.vue'
 
 const props = defineProps<{ book: BookDetail }>()
+const emit = defineEmits<{ refetch: [] }>()
 const router = useRouter()
 
 const { downloadFile: downloadBookFile } = useBookDownload()
@@ -128,6 +130,71 @@ const writeLogOpen = ref(false)
 const writeLog = ref<WriteLogEntry[]>([])
 const writeLogLoading = ref(false)
 
+// Modals
+const renameFileTarget = ref<BookDetailFile | null>(null)
+const renameInput = ref('')
+const renaming = ref(false)
+
+const deleteFileTarget = ref<BookDetailFile | null>(null)
+const deletingFile = ref(false)
+
+const addFileModalOpen = ref(false)
+
+function openAddFileModal() {
+  addFileModalOpen.value = true
+}
+
+function onFilesAdded() {
+  addFileModalOpen.value = false
+  emit('refetch')
+}
+
+function openRenameModal(file: BookDetailFile) {
+  renameFileTarget.value = file
+  renameInput.value = file.filename ?? ''
+}
+
+async function submitRename() {
+  if (!renameFileTarget.value || renaming.value || !renameInput.value.trim()) return
+  renaming.value = true
+  try {
+    const res = await api(`/api/v1/books/files/${renameFileTarget.value.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: renameInput.value.trim() }),
+    })
+    if (!res.ok) throw new Error('Failed to rename file')
+    renameFileTarget.value = null
+    emit('refetch')
+  } catch (err) {
+    alert(err instanceof Error ? err.message : String(err))
+  } finally {
+    renaming.value = false
+    renameFileTarget.value = null
+  }
+}
+
+function openDeleteModal(file: BookDetailFile) {
+  deleteFileTarget.value = file
+}
+
+async function confirmDelete() {
+  if (!deleteFileTarget.value || deletingFile.value) return
+  deletingFile.value = true
+  try {
+    const res = await api(`/api/v1/books/files/${deleteFileTarget.value.id}`, {
+      method: 'DELETE',
+    })
+    if (!res.ok) throw new Error('Failed to delete file')
+    emit('refetch')
+  } catch (err) {
+    alert(err instanceof Error ? err.message : String(err))
+  } finally {
+    deletingFile.value = false
+    deleteFileTarget.value = null
+  }
+}
+
 watch(
   () => props.book.id,
   () => {
@@ -163,10 +230,19 @@ async function toggleWriteLog() {
       class="sticky top-0 z-20 -mx-4 border-b border-border/70 bg-card/95 px-4 pb-3 pt-2 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] backdrop-blur supports-[backdrop-filter]:bg-card/85 sm:static sm:mx-0 sm:border-b-0 sm:bg-transparent sm:px-0 sm:py-1 sm:backdrop-blur-none"
     >
       <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p v-if="book.lastWrittenAt" class="text-sm md:text-xs font-medium text-muted-foreground/90 truncate">
-          Last synced: {{ formatRelative(book.lastWrittenAt) }}
-        </p>
-        <span v-else class="hidden sm:inline" />
+        <div class="flex items-center gap-2">
+          <button
+            v-if="hasPermission(Permission.LibraryUpload)"
+            class="flex items-center gap-1.5 h-8 md:h-6 px-2.5 md:px-2 rounded-md text-sm md:text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
+            @click="openAddFileModal"
+          >
+            <FilePlus class="size-4 md:size-3" />
+            Add File
+          </button>
+          <p v-if="book.lastWrittenAt" class="text-sm md:text-xs font-medium text-muted-foreground/90 truncate">
+            Last synced: {{ formatRelative(book.lastWrittenAt) }}
+          </p>
+        </div>
         <div class="flex items-center gap-2 overflow-x-auto scrollbar-none pb-1 -mb-1 sm:overflow-visible sm:pb-0 sm:mb-0">
           <div class="flex items-center gap-1.5 whitespace-nowrap">
             <ArrowUpDown class="size-4 md:size-3 text-muted-foreground" />
@@ -319,6 +395,28 @@ async function toggleWriteLog() {
             </TooltipTrigger>
             <TooltipContent>Download</TooltipContent>
           </Tooltip>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child>
+              <button
+                class="flex items-center justify-center h-7 w-7 rounded border border-input bg-background hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                title="More actions"
+              >
+                <MoreVertical class="size-3.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" @click="openRenameModal(file)"> Rename </DropdownMenuItem>
+
+              <DropdownMenuItem
+                v-if="hasPermission('library_delete_books')"
+                class="text-destructive focus:text-destructive"
+                @click="openDeleteModal(file)"
+              >
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <!-- Mobile actions -->
@@ -348,6 +446,19 @@ async function toggleWriteLog() {
               <Download class="mr-2 size-4" />
               Download
             </DropdownMenuItem>
+            <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" @click="openRenameModal(file)">
+              <Pencil class="mr-2 size-4" />
+              Rename
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              v-if="hasPermission('library_delete_books')"
+              class="text-destructive focus:text-destructive"
+              @click="openDeleteModal(file)"
+            >
+              <Trash2 class="mr-2 size-4" />
+              Delete
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -360,5 +471,73 @@ async function toggleWriteLog() {
       <p class="text-base md:text-sm font-semibold md:font-medium">No files attached</p>
       <p class="text-sm md:text-xs text-muted-foreground/90 mt-1">This book has no associated files.</p>
     </div>
+
+    <!-- Rename Modal -->
+    <div
+      v-if="renameFileTarget"
+      class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4"
+      @click.self="renameFileTarget = null"
+    >
+      <button class="absolute inset-0 bg-black/45" @click="renameFileTarget = null" />
+      <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
+        <p class="text-base font-semibold text-foreground">Rename File</p>
+        <p class="mt-1 text-sm text-muted-foreground">Rename the physical file on disk.</p>
+        <div class="mt-4">
+          <input
+            v-model="renameInput"
+            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+            placeholder="New filename"
+            @keyup.enter="submitRename"
+          />
+        </div>
+        <div class="mt-4 flex items-center justify-end gap-2">
+          <button
+            class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+            @click="renameFileTarget = null"
+          >
+            Cancel
+          </button>
+          <button
+            class="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            :disabled="renaming"
+            @click="submitRename"
+          >
+            {{ renaming ? 'Saving...' : 'Save' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Modal -->
+    <div
+      v-if="deleteFileTarget"
+      class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4"
+      @click.self="deleteFileTarget = null"
+    >
+      <button class="absolute inset-0 bg-black/45" @click="deleteFileTarget = null" />
+      <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
+        <p class="text-base font-semibold text-foreground">Delete file?</p>
+        <p class="mt-1 text-sm text-muted-foreground">
+          Are you sure you want to delete "{{ deleteFileTarget.filename }}"? This action cannot be undone.
+        </p>
+        <div class="mt-4 flex items-center justify-end gap-2">
+          <button
+            class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+            @click="deleteFileTarget = null"
+          >
+            Cancel
+          </button>
+          <button
+            class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 transition-colors"
+            :disabled="deletingFile"
+            @click="confirmDelete"
+          >
+            {{ deletingFile ? 'Deleting...' : 'Delete' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
+
+  <AddBookFileModal v-if="addFileModalOpen" :book-id="book.id" @close="addFileModalOpen = false" @uploaded="onFilesAdded" />
 </template>

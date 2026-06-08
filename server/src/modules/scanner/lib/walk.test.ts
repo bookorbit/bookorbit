@@ -378,15 +378,16 @@ describe('disc folder flattening', () => {
     expect(candidates[0].files).toHaveLength(3);
   });
 
-  it('flattens Disc, Disk, Part, Side patterns', async () => {
+  it('flattens Disc, Disk, Part, Pt, Side patterns', async () => {
     await file('MultiDisc/Disc 1/track-01.mp3');
     await file('MultiDisc/Disk 2/track-02.mp3');
     await file('MultiDisc/Part 3/track-03.mp3');
-    await file('MultiDisc/Side A/track-04.mp3');
+    await file('MultiDisc/Pt 04/track-04.mp3');
+    await file('MultiDisc/Side A/track-05.mp3');
 
     const { candidates } = await findBookCandidates(root);
     expect(candidates).toHaveLength(1);
-    expect(candidates[0].files).toHaveLength(4);
+    expect(candidates[0].files).toHaveLength(5);
   });
 
   it('does NOT flatten directories that do not match the disc pattern', async () => {

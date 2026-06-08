@@ -45,7 +45,7 @@ const DIR_CONCURRENCY_LIMIT = 50;
 
 // Matches common disc subdirectory names: "CD 1", "Disc 2", "Disk03", "Part A", "Side IV"
 // but avoids broad matches like "Discography".
-const DISC_DIR_PATTERN = /^(?:cd|disc|disk|part|side)(?:[\s_-]*(?:\d+|[A-Za-z]|[IVXLCM]+))$/i;
+const DISC_DIR_PATTERN = /^(?:cd|disc|disk|part|pt|side)(?:[\s_-]*(?:\d+|[A-Za-z]|[IVXLCM]+))$/i;
 
 function isDiscDirectory(name: string): boolean {
   return DISC_DIR_PATTERN.test(name);

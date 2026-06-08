@@ -95,7 +95,7 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
           @locks-changed="onLocksChanged"
           @cover-changed="onCoverChanged"
         />
-        <FilesTab v-else-if="tab === 'files'" :book="detail" />
+        <FilesTab v-else-if="tab === 'files'" :book="detail" @refetch="fetch(detail.id)" />
         <ReadingLogTab v-else-if="tab === 'reading-log'" :book="detail" />
         <HighlightsTab v-else-if="tab === 'highlights'" :book="detail" />
       </div>

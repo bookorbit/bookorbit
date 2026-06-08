@@ -82,9 +82,9 @@ describe('FileRenameRepository', () => {
     });
   });
 
-  it('applyFileRename updates file and book paths in one transaction', async () => {
+  it('updateBookFilePath updates absolutePath and relPath', async () => {
     const setCalls: unknown[] = [];
-    const tx = {
+    const db = {
       update: vi.fn().mockImplementation(() => ({
         set: vi.fn().mockImplementation((values: unknown) => {
           setCalls.push(values);
@@ -92,19 +92,32 @@ describe('FileRenameRepository', () => {
         }),
       })),
     };
+
+    const repo = new FileRenameRepository(db as never);
+
+    await repo.updateBookFilePath(10, '/library/new-folder/Dune.epub', 'new-folder/Dune.epub');
+
+    expect(db.update).toHaveBeenCalledTimes(1);
+    expect(setCalls).toEqual([{ absolutePath: '/library/new-folder/Dune.epub', relPath: 'new-folder/Dune.epub' }]);
+  });
+
+  it('updateBookFolderPath updates folderPath', async () => {
+    const setCalls: unknown[] = [];
     const db = {
-      transaction: vi.fn().mockImplementation(async (callback: (value: unknown) => Promise<unknown>) => callback(tx)),
+      update: vi.fn().mockImplementation(() => ({
+        set: vi.fn().mockImplementation((values: unknown) => {
+          setCalls.push(values);
+          return { where: vi.fn().mockResolvedValue(undefined) };
+        }),
+      })),
     };
 
     const repo = new FileRenameRepository(db as never);
 
-    await repo.applyFileRename(5, 10, '/library/new-folder/Dune.epub', 'new-folder/Dune.epub', '/library/new-folder/Dune.epub');
+    await repo.updateBookFolderPath(5, '/library/new-folder');
 
-    expect(db.transaction).toHaveBeenCalledTimes(1);
-    expect(setCalls).toEqual([
-      { absolutePath: '/library/new-folder/Dune.epub', relPath: 'new-folder/Dune.epub' },
-      { folderPath: '/library/new-folder/Dune.epub' },
-    ]);
+    expect(db.update).toHaveBeenCalledTimes(1);
+    expect(setCalls).toEqual([{ folderPath: '/library/new-folder' }]);
   });
 
   it('applyFolderRename updates every file path and the stored book folder', async () => {

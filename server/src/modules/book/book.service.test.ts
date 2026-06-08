@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
 import type { MockedFunction } from 'vitest';
-import { access, readdir, rm, stat } from 'fs/promises';
+import { access, readdir, rm, stat, rename } from 'fs/promises';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { AUDIO_BOOK_FILE_WRITE_FIELDS, MetadataProviderKey, Permission, type BookQuery, type MetadataFetchDiagnostics } from '@bookorbit/types';
@@ -24,6 +24,7 @@ vi.mock('fs/promises', async () => {
     access: vi.fn(),
     readdir: vi.fn(),
     rm: vi.fn(),
+    rename: vi.fn(),
     stat: vi.fn(),
   };
 });
@@ -3945,6 +3946,110 @@ describe('BookService', () => {
 
       expect(result.rename.status).toBe('skipped');
       expect(result.rename.reason).toContain('unavailable');
+    });
+  });
+
+  describe('renameFile', () => {
+    it('renames file on disk and updates db', async () => {
+      const { service, bookRepo, libraryService } = makeService();
+      const user = makeUser({ id: 1 });
+      const fileId = 100;
+      const file = { absolutePath: '/path/to/old.epub', filename: 'old.epub', format: 'epub', role: 'content', bookId: 10, libraryId: 1 };
+
+      bookRepo.findFileById = vi.fn().mockResolvedValue(file);
+      libraryService.checkLibraryAccess = vi.fn().mockResolvedValue(true);
+
+      vi.mocked(rename).mockResolvedValue(undefined);
+      bookRepo.updateBookFile = vi.fn().mockResolvedValue(undefined);
+
+      await service.renameFile(fileId, { filename: 'new.epub' }, user);
+
+      expect(rename).toHaveBeenCalledWith('/path/to/old.epub', '/path/to/new.epub');
+      expect(bookRepo.updateBookFile).toHaveBeenCalledWith(fileId, {
+        absolutePath: '/path/to/new.epub',
+      });
+    });
+
+    it('throws BadRequestException for invalid filename', async () => {
+      const { service, bookRepo, libraryService } = makeService();
+      const user = makeUser({ id: 1 });
+      const fileId = 100;
+      const file = { absolutePath: '/path/to/old.epub', filename: 'old.epub', format: 'epub', role: 'content', bookId: 10, libraryId: 1 };
+
+      bookRepo.findFileById = vi.fn().mockResolvedValue(file);
+      libraryService.checkLibraryAccess = vi.fn().mockResolvedValue(true);
+
+      await expect(service.renameFile(fileId, { filename: '../new.epub' }, user)).rejects.toThrow(BadRequestException);
+      await expect(service.renameFile(fileId, { filename: 'dir/new.epub' }, user)).rejects.toThrow(BadRequestException);
+    });
+
+    it('only updates db if filename is not provided or unchanged', async () => {
+      const { service, bookRepo, libraryService } = makeService();
+      const user = makeUser({ id: 1 });
+      const fileId = 100;
+      const file = { absolutePath: '/path/to/old.epub', filename: 'old.epub', format: 'epub', role: 'content', bookId: 10, libraryId: 1 };
+
+      bookRepo.findFileById = vi.fn().mockResolvedValue(file);
+      libraryService.checkLibraryAccess = vi.fn().mockResolvedValue(true);
+
+      vi.mocked(rename).mockResolvedValue(undefined);
+      bookRepo.updateBookFile = vi.fn().mockResolvedValue(undefined);
+
+      await service.renameFile(fileId, { filename: 'old.epub' }, user);
+
+      expect(rename).not.toHaveBeenCalled();
+      expect(bookRepo.updateBookFile).toHaveBeenCalledWith(fileId, {
+        absolutePath: undefined,
+      });
+    });
+  });
+
+  describe('deleteFile', () => {
+    it('deletes file on disk and updates db and marks missing if last file', async () => {
+      const { service, bookRepo, libraryService } = makeService();
+      const user = makeUser({ id: 1 });
+      const fileId = 100;
+      const file = { absolutePath: '/path/to/old.epub', bookId: 10, libraryId: 1 };
+
+      bookRepo.findFileById = vi.fn().mockResolvedValue(file);
+      libraryService.checkLibraryAccess = vi.fn().mockResolvedValue(true);
+
+      vi.mocked(rm).mockResolvedValue(undefined);
+      bookRepo.deleteBookFile = vi.fn().mockResolvedValue(undefined);
+      bookRepo.findFilesForBook = vi.fn().mockResolvedValue([]);
+      bookRepo.findBookBase = vi.fn().mockResolvedValue({ id: 10, primaryFileId: 100 });
+      bookRepo.updateBookPrimaryFile = vi.fn().mockResolvedValue(undefined);
+
+      await service.deleteFile(fileId, user);
+
+      expect(rm).toHaveBeenCalledWith('/path/to/old.epub', { force: true });
+      expect(bookRepo.deleteBookFile).toHaveBeenCalledWith(fileId);
+      expect(bookRepo.updateBookPrimaryFile).toHaveBeenCalledWith(10, null);
+    });
+
+    it('elects new primary file if deleted file was primary and other files exist', async () => {
+      const { service, bookRepo, libraryService } = makeService();
+      const user = makeUser({ id: 1 });
+      const fileId = 100;
+      const file = { absolutePath: '/path/to/old.epub', bookId: 10, libraryId: 1 };
+
+      bookRepo.findFileById = vi.fn().mockResolvedValue(file);
+      libraryService.checkLibraryAccess = vi.fn().mockResolvedValue(true);
+
+      vi.mocked(rm).mockResolvedValue(undefined);
+      bookRepo.deleteBookFile = vi.fn().mockResolvedValue(undefined);
+      bookRepo.findFilesForBook = vi.fn().mockResolvedValue([
+        { id: 100, role: 'content' },
+        { id: 101, role: 'content' },
+      ]);
+      bookRepo.findBookBase = vi.fn().mockResolvedValue({ id: 10, primaryFileId: 100 });
+      bookRepo.updateBookPrimaryFile = vi.fn().mockResolvedValue(undefined);
+
+      await service.deleteFile(fileId, user);
+
+      expect(rm).toHaveBeenCalledWith('/path/to/old.epub', { force: true });
+      expect(bookRepo.deleteBookFile).toHaveBeenCalledWith(fileId);
+      expect(bookRepo.updateBookPrimaryFile).toHaveBeenCalledWith(10, 101);
     });
   });
 });

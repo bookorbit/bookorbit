@@ -46,6 +46,7 @@ import { UpsertAudioProgressDto } from './dto/upsert-audio-progress.dto';
 import { UpdateBookMetadataAndLocksDto } from './dto/update-book-metadata-and-locks.dto';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 import { SearchBooksDto } from './dto/search-books.dto';
+import { UpdateBookFileDto } from './dto/update-book-file.dto';
 import { SetStatusDto } from '../user-book-status/dto/set-status.dto';
 import { Permission, AuditAction, AuditResource } from '@bookorbit/types';
 import type { BookQuery } from '@bookorbit/types';
@@ -499,6 +500,18 @@ export class BookController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async clearFileProgress(@Param('fileId', ParseIntPipe) fileId: number, @CurrentUser() user: RequestUser) {
     await this.bookService.clearFileProgress(user.id, fileId, user);
+  }
+
+  @Patch('files/:fileId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async renameFile(@Param('fileId', ParseIntPipe) fileId: number, @Body() dto: UpdateBookFileDto, @CurrentUser() user: RequestUser) {
+    await this.bookService.renameFile(fileId, dto, user);
+  }
+
+  @Delete('files/:fileId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteFile(@Param('fileId', ParseIntPipe) fileId: number, @CurrentUser() user: RequestUser) {
+    await this.bookService.deleteFile(fileId, user);
   }
 
   @Get(':id/audio-progress')

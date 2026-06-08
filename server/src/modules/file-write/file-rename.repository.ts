@@ -122,6 +122,7 @@ export class FileRenameRepository {
         absolutePath: bookFiles.absolutePath,
         relPath: bookFiles.relPath,
         role: bookFiles.role,
+        format: bookFiles.format,
       })
       .from(bookFiles)
       .where(eq(bookFiles.bookId, bookId))
@@ -134,13 +135,6 @@ export class FileRenameRepository {
 
   async updateBookFolderPath(bookId: number, folderPath: string): Promise<void> {
     await this.db.update(books).set({ folderPath }).where(eq(books.id, bookId));
-  }
-
-  async applyFileRename(bookId: number, fileId: number, absolutePath: string, relPath: string | null, folderPath: string): Promise<void> {
-    await this.db.transaction(async (tx) => {
-      await tx.update(bookFiles).set({ absolutePath, relPath }).where(eq(bookFiles.id, fileId));
-      await tx.update(books).set({ folderPath }).where(eq(books.id, bookId));
-    });
   }
 
   async applyFolderRename(bookId: number, updates: BookFilePathUpdate[], folderPath: string): Promise<void> {

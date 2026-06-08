@@ -613,16 +613,48 @@ export class BookRepository {
         id: bookFiles.id,
         absolutePath: bookFiles.absolutePath,
         format: bookFiles.format,
+        role: bookFiles.role,
         bookId: bookFiles.bookId,
         libraryId: books.libraryId,
         fileHash: bookFiles.fileHash,
         sizeBytes: bookFiles.sizeBytes,
+        durationSeconds: bookFiles.durationSeconds,
       })
       .from(bookFiles)
       .innerJoin(books, eq(books.id, bookFiles.bookId))
       .where(eq(bookFiles.id, fileId))
       .limit(1);
     return file ?? null;
+  }
+
+  async deleteBookFile(fileId: number): Promise<void> {
+    await this.db.delete(bookFiles).where(eq(bookFiles.id, fileId));
+  }
+
+  async updateBookFile(fileId: number, data: { format?: string | null; role?: string; absolutePath?: string; sizeBytes?: number }): Promise<void> {
+    await this.db
+      .update(bookFiles)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(bookFiles.id, fileId));
+  }
+
+  async updateBookPrimaryFile(bookId: number, primaryFileId: number | null): Promise<void> {
+    await this.db.update(books).set({ primaryFileId, updatedAt: new Date() }).where(eq(books.id, bookId));
+  }
+
+  async findFilesForBook(bookId: number) {
+    return this.db
+      .select({
+        id: bookFiles.id,
+        role: bookFiles.role,
+      })
+      .from(bookFiles)
+      .where(eq(bookFiles.bookId, bookId));
+  }
+
+  async findBookBase(bookId: number) {
+    const [row] = await this.db.select().from(books).where(eq(books.id, bookId)).limit(1);
+    return row ?? null;
   }
 
   async findProgress(userId: number, fileId: number) {

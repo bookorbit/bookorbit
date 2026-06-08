@@ -21,6 +21,7 @@ import { KoboSyncService } from './services/kobo-sync.service';
 import { KoboThumbnailService } from './services/kobo-thumbnail.service';
 import { KoboAnalyticsResolverService } from './services/kobo-analytics-resolver.service';
 import { KoboAnalyticsService } from './services/kobo-analytics.service';
+import { BookModule } from '../book/book.module';
 import { ReadingSessionModule } from '../reading-session/reading-session.module';
 
 describe('KoboModule', () => {
@@ -29,6 +30,7 @@ describe('KoboModule', () => {
     const providers = Reflect.getMetadata(MODULE_METADATA.PROVIDERS, KoboModule) as unknown[];
     const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, KoboModule) as unknown[];
 
+    expect(imports).toContain(BookModule);
     expect(imports).toContain(ReadingSessionModule);
     expect(controllers).toEqual([KoboUserController, KoboAuthController, KoboSyncController, KoboDeviceController]);
     expect(providers).toEqual([

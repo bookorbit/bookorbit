@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import type { RequestUser } from '../../../common/types/request-user';
+import { BookService } from '../../book/book.service';
 import { ReadingSessionService } from '../../reading-session/reading-session.service';
 import type { KoboDeviceContext } from '../guards/kobo-token.guard';
 import type { KoboAnalyticsBody, KoboAnalyticsEvent } from '../kobo-analytics.types';
@@ -20,6 +21,18 @@ function parseKoboProgress(raw: unknown): number | null {
   const value = typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() !== '' ? Number(raw.trim()) : Number.NaN;
   if (!Number.isFinite(value) || value < 0 || value > 100) return null;
   return value;
+}
+
+type KoboStarsValue = { kind: 'rating'; value: number } | { kind: 'clear' } | { kind: 'invalid' };
+
+function parseKoboStars(metrics: KoboAnalyticsEvent['Metrics'] | undefined): KoboStarsValue {
+  if (metrics?.stars === undefined) return { kind: 'invalid' };
+
+  const stars = metrics.stars;
+  if (typeof stars !== 'number' || !Number.isInteger(stars)) return { kind: 'invalid' };
+  if (stars === 0) return { kind: 'clear' };
+  if (stars >= 1 && stars <= 5) return { kind: 'rating', value: stars };
+  return { kind: 'invalid' };
 }
 
 function parseKoboDurationSeconds(metrics: KoboAnalyticsEvent['Metrics'] | undefined): number | null {
@@ -58,6 +71,7 @@ export class KoboAnalyticsService {
     private readonly bookIdentityService: KoboBookIdentityService,
     private readonly resolver: KoboAnalyticsResolverService,
     private readonly readingSessionService: ReadingSessionService,
+    private readonly bookService: BookService,
   ) {}
 
   async ingest(body: KoboAnalyticsBody | null | undefined, user: RequestUser, device: KoboDeviceContext): Promise<void> {
@@ -66,13 +80,17 @@ export class KoboAnalyticsService {
     const leaveContentContexts = this.buildLeaveContentContexts(events);
 
     for (const ev of events) {
-      if (ev.EventType !== 'LeaveContent') continue;
       try {
-        await this.handleLeaveContent(ev, user, leaveContentContexts.get(ev) ?? { progressDelta: null, startedAtMs: null });
+        if (ev.EventType === 'LeaveContent') {
+          await this.handleLeaveContent(ev, user, leaveContentContexts.get(ev) ?? { progressDelta: null, startedAtMs: null });
+        } else if (ev.EventType === 'RateBook') {
+          await this.handleRateBook(ev, user);
+        }
       } catch (err) {
         const message = sanitizeLogValue(err instanceof Error ? err.message : 'unknown error');
+        const kind = ev.EventType === 'RateBook' ? 'rating' : 'session';
         this.logger.warn(
-          `[kobo.analytics.session] [fail] userId=${user.id} eventId=${ev.Id} error="${message}" event="${formatAnalyticsPayload(ev, 800)}" - leave content ingest failed`,
+          `[kobo.analytics.${kind}] [fail] userId=${user.id} eventId=${ev.Id} error="${message}" event="${formatAnalyticsPayload(ev, 800)}" - analytics ingest failed`,
         );
       }
     }
@@ -92,6 +110,28 @@ export class KoboAnalyticsService {
     this.logger.debug(
       `[kobo.analytics] batch userId=${userId} deviceId=${deviceId} eventCount=${events.length} types=${typeSummary} payload="${formatAnalyticsPayload(body)}"`,
     );
+  }
+
+  private async handleRateBook(ev: KoboAnalyticsEvent, user: RequestUser): Promise<void> {
+    const volumeid = this.extractVolumeId(ev);
+    const stars = parseKoboStars(ev.Metrics);
+    if (volumeid === null || stars.kind === 'invalid') {
+      this.logger.debug(
+        `[kobo.analytics.rating] [ignore] malformed RateBook userId=${user.id} eventId=${ev.Id} event="${formatAnalyticsPayload(ev, 800)}"`,
+      );
+      return;
+    }
+
+    const bookId = await this.bookIdentityService.resolveBookIdByEntitlementId(user.id, volumeid);
+    if (bookId === null) {
+      this.logger.debug(
+        `[kobo.analytics.rating] [ignore] invalid volumeid userId=${user.id} eventId=${ev.Id} volumeid="${sanitizeLogValue(volumeid)}" event="${formatAnalyticsPayload(ev, 800)}"`,
+      );
+      return;
+    }
+
+    const rating = stars.kind === 'clear' ? null : stars.value;
+    await this.bookService.bulkSetRating([bookId], rating, user);
   }
 
   private async handleLeaveContent(ev: KoboAnalyticsEvent, user: RequestUser, context: LeaveContentContext): Promise<void> {

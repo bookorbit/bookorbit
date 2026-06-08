@@ -7,11 +7,12 @@ describe('KoboAnalyticsService', () => {
   const bookIdentityService = { resolveBookIdByEntitlementId: vi.fn() };
   const resolver = { resolveBookFileId: vi.fn() };
   const readingSessionService = { save: vi.fn() };
+  const bookService = { bulkSetRating: vi.fn() };
   const user = { id: 7 } as never;
   const device = { deviceId: 2, deviceToken: 'tok', userId: 7 } as never;
 
   function makeService() {
-    return new KoboAnalyticsService(bookIdentityService as never, resolver as never, readingSessionService as never);
+    return new KoboAnalyticsService(bookIdentityService as never, resolver as never, readingSessionService as never, bookService as never);
   }
 
   beforeEach(() => {
@@ -21,6 +22,7 @@ describe('KoboAnalyticsService', () => {
     );
     resolver.resolveBookFileId.mockResolvedValue({ kind: 'resolved', bookFileId: 100 });
     readingSessionService.save.mockResolvedValue(undefined);
+    bookService.bulkSetRating.mockResolvedValue(undefined);
   });
 
   it('maps LeaveContent to reading sessions (duration minimum enforced in ReadingSessionService.save)', async () => {
@@ -390,6 +392,183 @@ describe('KoboAnalyticsService', () => {
     );
 
     expect(resolver.resolveBookFileId).not.toHaveBeenCalled();
+    expect(bookService.bulkSetRating).not.toHaveBeenCalled();
+  });
+
+  it('maps RateBook to user ratings via bulkSetRating', async () => {
+    await makeService().ingest(
+      {
+        Events: [
+          {
+            Id: '74db9ad6-152a-4a97-91d1-129308e4b591',
+            EventType: 'RateBook',
+            Timestamp: '2026-06-01T00:40:50Z',
+            Metrics: { stars: 4 },
+            Attributes: { volumeid: '1', title: 'Promise of Blood', progress: '7' },
+          },
+        ],
+      },
+      user,
+      device,
+    );
+
+    expect(bookIdentityService.resolveBookIdByEntitlementId).toHaveBeenCalledWith(7, '1');
+    expect(bookService.bulkSetRating).toHaveBeenCalledWith([1], 4, user);
+    expect(readingSessionService.save).not.toHaveBeenCalled();
+  });
+
+  it('resolves UUID entitlement volumeid values for RateBook', async () => {
+    const entitlementId = '11111111-1111-4111-8111-111111111111';
+    bookIdentityService.resolveBookIdByEntitlementId.mockResolvedValue(9);
+
+    await makeService().ingest(
+      {
+        Events: [
+          {
+            Id: 'rate-uuid',
+            EventType: 'RateBook',
+            Timestamp: '2026-06-01T00:40:50Z',
+            Metrics: { stars: 5 },
+            Attributes: { volumeid: entitlementId },
+          },
+        ],
+      },
+      user,
+      device,
+    );
+
+    expect(bookService.bulkSetRating).toHaveBeenCalledWith([9], 5, user);
+  });
+
+  it('ignores malformed RateBook events', async () => {
+    await makeService().ingest(
+      {
+        Events: [
+          { Id: 'no-stars', EventType: 'RateBook', Timestamp: '2026-06-01T00:40:50Z', Attributes: { volumeid: '1' } },
+          {
+            Id: 'no-volume',
+            EventType: 'RateBook',
+            Timestamp: '2026-06-01T00:40:50Z',
+            Metrics: { stars: 4 },
+            Attributes: {},
+          },
+          {
+            Id: 'too-high',
+            EventType: 'RateBook',
+            Timestamp: '2026-06-01T00:40:50Z',
+            Metrics: { stars: 6 },
+            Attributes: { volumeid: '1' },
+          },
+          {
+            Id: 'fractional-stars',
+            EventType: 'RateBook',
+            Timestamp: '2026-06-01T00:40:50Z',
+            Metrics: { stars: 3.5 },
+            Attributes: { volumeid: '1' },
+          },
+        ],
+      },
+      user,
+      device,
+    );
+
+    expect(bookService.bulkSetRating).not.toHaveBeenCalled();
+    expect(bookIdentityService.resolveBookIdByEntitlementId).not.toHaveBeenCalled();
+  });
+
+  it('ignores RateBook when volumeid does not resolve to a book', async () => {
+    bookIdentityService.resolveBookIdByEntitlementId.mockResolvedValue(null);
+
+    await makeService().ingest(
+      {
+        Events: [
+          {
+            Id: 'bad-volume',
+            EventType: 'RateBook',
+            Timestamp: '2026-06-01T00:40:50Z',
+            Metrics: { stars: 4 },
+            Attributes: { volumeid: 'unknown-entitlement' },
+          },
+        ],
+      },
+      user,
+      device,
+    );
+
+    expect(bookIdentityService.resolveBookIdByEntitlementId).toHaveBeenCalledWith(7, 'unknown-entitlement');
+    expect(bookService.bulkSetRating).not.toHaveBeenCalled();
+  });
+
+  it('clears the user rating when Kobo sends stars: 0', async () => {
+    await makeService().ingest(
+      {
+        Events: [
+          {
+            Id: 'clear-rating',
+            EventType: 'RateBook',
+            Timestamp: '2026-06-01T00:40:50Z',
+            Metrics: { stars: 0 },
+            Attributes: { volumeid: '1' },
+          },
+        ],
+      },
+      user,
+      device,
+    );
+
+    expect(bookService.bulkSetRating).toHaveBeenCalledWith([1], null, user);
+  });
+
+  it('processes RateBook and LeaveContent in the same batch', async () => {
+    await makeService().ingest(
+      {
+        Events: [
+          {
+            Id: 'rate',
+            EventType: 'RateBook',
+            Timestamp: '2026-06-01T00:40:50Z',
+            Metrics: { stars: 3 },
+            Attributes: { volumeid: '1' },
+          },
+          {
+            Id: 'leave',
+            EventType: 'LeaveContent',
+            Timestamp: '2026-06-01T00:41:00Z',
+            Metrics: { SecondsRead: 20 },
+            Attributes: { volumeid: '1', progress: '8' },
+          },
+        ],
+      },
+      user,
+      device,
+    );
+
+    expect(bookService.bulkSetRating).toHaveBeenCalledWith([1], 3, user);
+    expect(readingSessionService.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs a warning when bulkSetRating throws', async () => {
+    const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    bookService.bulkSetRating.mockRejectedValueOnce(new Error('forbidden'));
+
+    await makeService().ingest(
+      {
+        Events: [
+          {
+            Id: 'rate-fail',
+            EventType: 'RateBook',
+            Timestamp: '2026-06-01T00:40:50Z',
+            Metrics: { stars: 4 },
+            Attributes: { volumeid: '1' },
+          },
+        ],
+      },
+      user,
+      device,
+    );
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[kobo.analytics.rating] [fail]'));
+    warnSpy.mockRestore();
   });
 
   it('warns and skips ingest when Events is not an array', async () => {

@@ -10,7 +10,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { access, readdir, rm, stat } from 'fs/promises';
+import { access, readdir, rm, stat, rename } from 'fs/promises';
 import { inArray, type SQL } from 'drizzle-orm';
 
 import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName } from '../../common/book-cover-storage';
@@ -52,6 +52,7 @@ import type {
 import type { ContentFilterRules } from '@bookorbit/types';
 import { assembleBookCards, assembleCollapsedBookCards } from './utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
+import { UpdateBookFileDto } from './dto/update-book-file.dto';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
 import { MetadataService } from '../metadata/metadata.service';
@@ -1145,6 +1146,88 @@ export class BookService {
 
   async resolveDownloadFilename(file: { bookId: number; absolutePath: string; format: string | null }): Promise<string> {
     return this.resolveDownloadFilenameForFile(file);
+  }
+
+  async renameFile(fileId: number, dto: UpdateBookFileDto, user: RequestUser): Promise<void> {
+    const event = 'book.rename_file';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] fileId=${fileId} userId=${user.id} - rename file started`);
+    try {
+      const file = await this.verifyFileAccess(fileId, user);
+
+      let newAbsolutePath = file.absolutePath;
+      if (dto.filename && dto.filename !== basename(file.absolutePath)) {
+        if (dto.filename.includes('/') || dto.filename.includes('\\')) {
+          throw new BadRequestException('Filename cannot contain path separators');
+        }
+        newAbsolutePath = join(dirname(file.absolutePath), dto.filename);
+        if (newAbsolutePath !== file.absolutePath) {
+          try {
+            await rename(file.absolutePath, newAbsolutePath);
+          } catch (err) {
+            throw new BadRequestException(`Failed to rename file on disk: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }
+      }
+
+      await this.bookRepo.updateBookFile(fileId, {
+        absolutePath: newAbsolutePath !== file.absolutePath ? newAbsolutePath : undefined,
+      });
+
+      this.logger.log(`[${event}] [end] fileId=${fileId} durationMs=${Date.now() - startedAt} - rename file completed`);
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.warn(
+        `[${event}] [fail] fileId=${fileId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - rename file failed`,
+      );
+      throw err;
+    }
+  }
+
+  async deleteFile(fileId: number, user: RequestUser): Promise<void> {
+    const event = 'book.delete_file';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] fileId=${fileId} userId=${user.id} - delete file started`);
+    try {
+      const file = await this.verifyFileAccess(fileId, user);
+
+      try {
+        await rm(file.absolutePath, { force: true });
+      } catch {
+        this.logger.warn(`Failed to physically delete file at ${file.absolutePath}`);
+      }
+
+      // the file watcher will eventually catch the unlink and clean up the database.
+      // however, to be responsive, we can manually clean up the database here too,
+      // but if the file is the last file, the scanner logic is better suited to mark the book missing.
+      // So we leave the DB cleanup to the file watcher, which is more robust.
+      const book = await this.bookRepo.findBookBase(file.bookId);
+      const wasPrimary = book?.primaryFileId === fileId;
+
+      await this.bookRepo.deleteBookFile(fileId);
+
+      const allFiles = await this.bookRepo.findFilesForBook(file.bookId);
+      // deleteBookFile already removes it, but just in case
+      const remaining = allFiles.filter((f) => f.id !== fileId);
+      if (remaining.length === 0) {
+        // mark book as missing if no files left
+        await this.bookRepo.updateBookPrimaryFile(file.bookId, null);
+      } else if (wasPrimary) {
+        // pick the first remaining content file or just the first remaining
+        const newPrimary = remaining.find((f) => f.role === 'content') || remaining[0];
+        await this.bookRepo.updateBookPrimaryFile(file.bookId, newPrimary?.id ?? null);
+      }
+
+      this.logger.log(`[${event}] [end] fileId=${fileId} durationMs=${Date.now() - startedAt} - delete file completed`);
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.warn(
+        `[${event}] [fail] fileId=${fileId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - delete file failed`,
+      );
+      throw err;
+    }
   }
 
   async searchAcrossLibraries(q: string, limit: number, user: RequestUser) {

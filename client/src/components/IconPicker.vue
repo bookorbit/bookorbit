@@ -13,6 +13,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
+  'open-change': [value: boolean]
 }>()
 
 // ── Icon list ─────────────────────────────────────────────────────────────
@@ -113,6 +114,7 @@ function toggle() {
 }
 
 watch(open, (isOpen) => {
+  emit('open-change', isOpen)
   if (!isOpen) {
     query.value = ''
     window.removeEventListener('resize', handleViewportChange)
@@ -203,6 +205,8 @@ onUnmounted(() => window.visualViewport?.removeEventListener('resize', handleVie
         :style="panelStyle"
         data-icon-picker-panel
         class="flex flex-col rounded-lg border border-border bg-card shadow-2xl overflow-hidden"
+        @focusin.stop
+        @focusout.stop
       >
         <!-- Search bar -->
         <div class="flex items-center gap-2 px-3 py-2.5 border-b border-border shrink-0">
@@ -250,7 +254,7 @@ onUnmounted(() => window.visualViewport?.removeEventListener('resize', handleVie
                     <component :is="getIconComponent(name)" :size="16" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>{{ name }}</TooltipContent>
+                <TooltipContent class="z-300">{{ name }}</TooltipContent>
               </Tooltip>
             </div>
           </template>
