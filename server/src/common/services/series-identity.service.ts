@@ -19,7 +19,10 @@ export class SeriesIdentityService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     const start = Date.now();
     try {
-      await this.backfillMissingSeriesIds();
+      await this.db.transaction(async (tx) => {
+        await tx.execute(sql`SET LOCAL statement_timeout = 0`);
+        await this.backfillMissingSeriesIds(tx);
+      });
       this.logger.log(`[series.backfill] [end] durationMs=${Date.now() - start} - series id backfill completed`);
     } catch (err) {
       const e = err as Error & { cause?: unknown };

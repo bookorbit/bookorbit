@@ -1,0 +1,1 @@
+CREATE INDEX "bm_series_name_lower_btrim_idx" ON "book_metadata" USING btree (lower(btrim("series_name")));

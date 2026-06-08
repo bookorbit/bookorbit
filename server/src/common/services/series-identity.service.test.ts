@@ -111,13 +111,45 @@ describe('SeriesIdentityService', () => {
     expect(createSeriesSql).not.toContain('excluded.name');
   });
 
-  it('backfills on module initialization', async () => {
-    const service = new SeriesIdentityService({ execute: vi.fn().mockResolvedValue(undefined) } as never);
+  it('runs backfill inside a transaction on initialization', async () => {
+    const execute = vi.fn().mockResolvedValue(undefined);
+    const tx = { execute } as never;
+    const transaction = vi.fn().mockImplementation(async (cb: (tx: typeof tx) => Promise<void>) => cb(tx));
+    const service = new SeriesIdentityService({ transaction } as never);
     const backfill = vi.spyOn(service, 'backfillMissingSeriesIds').mockResolvedValue(undefined);
 
     await service.onModuleInit();
 
+    expect(transaction).toHaveBeenCalledTimes(1);
     expect(backfill).toHaveBeenCalledTimes(1);
+    expect(backfill).toHaveBeenCalledWith(tx);
+  });
+
+  it('disables statement timeout before running backfill', async () => {
+    const execute = vi.fn().mockResolvedValue(undefined);
+    const tx = { execute } as never;
+    const transaction = vi.fn().mockImplementation(async (cb: (tx: typeof tx) => Promise<void>) => cb(tx));
+    const service = new SeriesIdentityService({ transaction } as never);
+    vi.spyOn(service, 'backfillMissingSeriesIds').mockResolvedValue(undefined);
+
+    await service.onModuleInit();
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    const timeoutSql = flattenSql(execute.mock.calls[0]![0]);
+    expect(timeoutSql).toMatch(/SET LOCAL statement_timeout\s*=\s*0/i);
+  });
+
+  it('continues startup and logs error when backfill transaction fails', async () => {
+    const transaction = vi.fn().mockRejectedValue(new Error('connection reset'));
+    const service = new SeriesIdentityService({ transaction } as never);
+    const logError = vi.spyOn(service['logger' as never] as { error: (...args: unknown[]) => void }, 'error').mockImplementation(() => undefined);
+
+    await expect(service.onModuleInit()).resolves.toBeUndefined();
+
+    expect(logError).toHaveBeenCalledTimes(1);
+    const message = logError.mock.calls[0]![0] as string;
+    expect(message).toContain('[series.backfill] [fail]');
+    expect(message).toContain('connection reset');
   });
 
   it('finds an existing id by normalized name', async () => {
