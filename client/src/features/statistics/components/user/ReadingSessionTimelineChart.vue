@@ -56,8 +56,8 @@ const { filters } = useStatisticsConfig()
 const { coverUrl } = useCoverVersions()
 
 const now = new Date()
-const selectedYear = ref(getUtcIsoWeekYear(now))
-const selectedWeek = ref(getUtcIsoWeek(now))
+const selectedYear = ref(getIsoWeekYear(now))
+const selectedWeek = ref(getIsoWeek(now))
 
 const loading = ref(true)
 const error = ref(false)
@@ -71,25 +71,25 @@ const option = shallowRef({})
 const timeline = ref<UserReadingSessionTimeline>({
   year: selectedYear.value,
   week: selectedWeek.value,
-  weekStart: formatYmd(getUtcIsoWeekStart(selectedYear.value, selectedWeek.value)),
-  weekEnd: formatYmd(addUtcDays(getUtcIsoWeekStart(selectedYear.value, selectedWeek.value), 6)),
+  weekStart: formatYmd(getIsoWeekStart(selectedYear.value, selectedWeek.value)),
+  weekEnd: formatYmd(addDays(getIsoWeekStart(selectedYear.value, selectedWeek.value), 6)),
   items: [],
 })
 
 const isEmpty = computed(() => timeline.value.items.length === 0)
 
-const weekStartDate = computed(() => parseYmdUtc(timeline.value.weekStart) ?? getUtcIsoWeekStart(selectedYear.value, selectedWeek.value))
-const weekEndExclusive = computed(() => addUtcDays(weekStartDate.value, 7))
+const weekStartDate = computed(() => parseYmdLocal(timeline.value.weekStart) ?? getIsoWeekStart(selectedYear.value, selectedWeek.value))
+const weekEndExclusive = computed(() => addDays(weekStartDate.value, 7))
 
 const weekRangeLabel = computed(() => `${formatDateLabel(timeline.value.weekStart)} - ${formatDateLabel(timeline.value.weekEnd)}`)
 
 const weekOptions = computed(() => {
-  const count = getUtcIsoWeeksInYear(selectedYear.value)
+  const count = getIsoWeeksInYear(selectedYear.value)
   return Array.from({ length: count }, (_, i) => i + 1)
 })
 
 const yearOptions = computed(() => {
-  const currentIsoYear = getUtcIsoWeekYear(new Date())
+  const currentIsoYear = getIsoWeekYear(new Date())
   const years = Array.from({ length: 11 }, (_, i) => currentIsoYear - i)
   if (!years.includes(selectedYear.value)) {
     years.push(selectedYear.value)
@@ -109,7 +109,7 @@ const sessionsById = computed(() => {
 })
 
 watch(selectedYear, (year) => {
-  const maxWeek = getUtcIsoWeeksInYear(year)
+  const maxWeek = getIsoWeeksInYear(year)
   if (selectedWeek.value > maxWeek) selectedWeek.value = maxWeek
 })
 
@@ -329,10 +329,10 @@ function renderTimelineItem(
 }
 
 function shiftWeek(delta: number) {
-  const base = getUtcIsoWeekStart(selectedYear.value, selectedWeek.value)
-  base.setUTCDate(base.getUTCDate() + delta * 7)
-  selectedYear.value = getUtcIsoWeekYear(base)
-  selectedWeek.value = getUtcIsoWeek(base)
+  const base = getIsoWeekStart(selectedYear.value, selectedWeek.value)
+  base.setDate(base.getDate() + delta * 7)
+  selectedYear.value = getIsoWeekYear(base)
+  selectedWeek.value = getIsoWeek(base)
 }
 
 function handleChartMouseDown(params: { seriesId?: string; dataIndex?: number; event?: unknown } | null) {
@@ -472,16 +472,16 @@ function buildSegments(items: UserReadingSessionTimelineItem[], weekStart: Date,
 
     let cursor = new Date(clippedStart)
     while (cursor < clippedEnd) {
-      const dayStart = startOfUtcDay(cursor)
-      const nextDay = addUtcDays(dayStart, 1)
+      const dayStart = startOfDay(cursor)
+      const nextDay = addDays(dayStart, 1)
       const segmentEnd = clippedEnd < nextDay ? clippedEnd : nextDay
-      const dayIndex = (cursor.getUTCDay() + 6) % 7
+      const dayIndex = (cursor.getDay() + 6) % 7
 
-      const startMinute = cursor.getUTCHours() * 60 + cursor.getUTCMinutes() + cursor.getUTCSeconds() / 60
+      const startMinute = cursor.getHours() * 60 + cursor.getMinutes() + cursor.getSeconds() / 60
       const endMinute =
         segmentEnd.getTime() === nextDay.getTime()
           ? MINUTES_PER_DAY
-          : segmentEnd.getUTCHours() * 60 + segmentEnd.getUTCMinutes() + segmentEnd.getUTCSeconds() / 60
+          : segmentEnd.getHours() * 60 + segmentEnd.getMinutes() + segmentEnd.getSeconds() / 60
 
       if (!byDay.has(dayIndex)) byDay.set(dayIndex, [])
       byDay.get(dayIndex)!.push({
@@ -598,65 +598,65 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
 
-function parseYmdUtc(value: string): Date | null {
+function parseYmdLocal(value: string): Date | null {
   const [yearStr, monthStr, dayStr] = value.split('-')
   const year = Number(yearStr)
   const month = Number(monthStr)
   const day = Number(dayStr)
   if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null
-  return new Date(Date.UTC(year, month - 1, day))
+  return new Date(year, month - 1, day)
 }
 
 function formatYmd(date: Date): string {
-  const y = date.getUTCFullYear()
-  const m = String(date.getUTCMonth() + 1).padStart(2, '0')
-  const d = String(date.getUTCDate()).padStart(2, '0')
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
 }
 
-function startOfUtcDay(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
+function startOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
 }
 
-function addUtcDays(date: Date, days: number): Date {
+function addDays(date: Date, days: number): Date {
   const next = new Date(date)
-  next.setUTCDate(next.getUTCDate() + days)
+  next.setDate(next.getDate() + days)
   return next
 }
 
-function startOfUtcIsoWeek(date: Date): Date {
-  const start = startOfUtcDay(date)
-  const day = (start.getUTCDay() + 6) % 7
-  start.setUTCDate(start.getUTCDate() - day)
+function startOfIsoWeek(date: Date): Date {
+  const start = startOfDay(date)
+  const day = (start.getDay() + 6) % 7
+  start.setDate(start.getDate() - day)
   return start
 }
 
-function getUtcIsoWeekYear(date: Date): number {
-  const d = startOfUtcDay(date)
-  const day = (d.getUTCDay() + 6) % 7
-  d.setUTCDate(d.getUTCDate() - day + 3)
-  return d.getUTCFullYear()
+function getIsoWeekYear(date: Date): number {
+  const d = startOfDay(date)
+  const day = (d.getDay() + 6) % 7
+  d.setDate(d.getDate() - day + 3)
+  return d.getFullYear()
 }
 
-function getUtcIsoWeek(date: Date): number {
-  const d = startOfUtcDay(date)
-  const day = (d.getUTCDay() + 6) % 7
-  d.setUTCDate(d.getUTCDate() - day + 3)
-  const firstThursday = new Date(Date.UTC(d.getUTCFullYear(), 0, 4))
-  const firstDay = (firstThursday.getUTCDay() + 6) % 7
-  firstThursday.setUTCDate(firstThursday.getUTCDate() - firstDay + 3)
+function getIsoWeek(date: Date): number {
+  const d = startOfDay(date)
+  const day = (d.getDay() + 6) % 7
+  d.setDate(d.getDate() - day + 3)
+  const firstThursday = new Date(d.getFullYear(), 0, 4)
+  const firstDay = (firstThursday.getDay() + 6) % 7
+  firstThursday.setDate(firstThursday.getDate() - firstDay + 3)
   return 1 + Math.round((d.getTime() - firstThursday.getTime()) / 604_800_000)
 }
 
-function getUtcIsoWeeksInYear(year: number): number {
-  return getUtcIsoWeek(new Date(Date.UTC(year, 11, 28)))
+function getIsoWeeksInYear(year: number): number {
+  return getIsoWeek(new Date(year, 11, 28))
 }
 
-function getUtcIsoWeekStart(year: number, week: number): Date {
-  const jan4 = new Date(Date.UTC(year, 0, 4))
-  const week1Start = startOfUtcIsoWeek(jan4)
+function getIsoWeekStart(year: number, week: number): Date {
+  const jan4 = new Date(year, 0, 4)
+  const week1Start = startOfIsoWeek(jan4)
   const start = new Date(week1Start)
-  start.setUTCDate(start.getUTCDate() + (week - 1) * 7)
+  start.setDate(start.getDate() + (week - 1) * 7)
   return start
 }
 </script>

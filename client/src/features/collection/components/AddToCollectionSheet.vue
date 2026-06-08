@@ -137,9 +137,16 @@ function handleDone() {
   emit('update:open', false)
 }
 
-function handlePointerDownOutside(e: Event) {
+function handleOutsideInteraction(e: Event) {
   const target = (e as CustomEvent).detail?.originalEvent?.target as Element | null
   if (target?.closest('[data-icon-picker-panel]')) e.preventDefault()
+}
+
+function handleFocusOut(e: FocusEvent) {
+  const related = e.relatedTarget as Element | null
+  if (related?.closest?.('[data-icon-picker-panel]')) {
+    e.stopPropagation()
+  }
 }
 </script>
 
@@ -149,7 +156,10 @@ function handlePointerDownOutside(e: Event) {
       side="bottom"
       class="max-h-[80vh] overflow-y-auto sm:inset-x-auto sm:right-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-lg sm:rounded-t-lg"
       :style="keyboardHeight > 0 ? { bottom: `${keyboardHeight}px` } : undefined"
-      @pointer-down-outside="handlePointerDownOutside"
+      @pointer-down-outside="handleOutsideInteraction"
+      @focus-outside="handleOutsideInteraction"
+      @interact-outside="handleOutsideInteraction"
+      @focusout="handleFocusOut"
     >
       <SheetHeader>
         <SheetTitle class="flex items-center gap-2">
