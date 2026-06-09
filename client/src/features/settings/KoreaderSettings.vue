@@ -101,6 +101,15 @@ async function handleToggleSync(newValue: boolean) {
   }
 }
 
+async function handleToggleDiscardBackwardProgress(newValue: boolean) {
+  try {
+    await updateCredentials({ discardBackwardProgress: newValue })
+    toast.success(`Older progress updates ${newValue ? 'ignored' : 'accepted'}`)
+  } catch {
+    toast.error('Failed to update progress conflict setting')
+  }
+}
+
 async function handleDelete() {
   try {
     await deleteCredentials()
@@ -229,13 +238,24 @@ async function handleRefresh() {
       <!-- Sync Toggle -->
       <div class="mb-6">
         <p class="settings-group-label">Sync</p>
-        <div class="border border-border rounded-lg overflow-hidden shadow-xs">
+        <div class="border border-border rounded-lg overflow-hidden shadow-xs divide-y divide-border">
           <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
             <div class="min-w-0">
               <p class="settings-label">Progress Sync</p>
               <p class="settings-hint">Automatically sync reading progress between KOReader and BookOrbit</p>
             </div>
             <ToggleSwitch :model-value="credentials?.syncEnabled ?? false" class="self-start md:self-auto" @update:model-value="handleToggleSync" />
+          </div>
+          <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
+            <div class="min-w-0">
+              <p class="settings-label">Ignore older progress updates</p>
+              <p class="settings-hint">When enabled, KOReader sync updates that would move reading progress backwards are ignored.</p>
+            </div>
+            <ToggleSwitch
+              :model-value="credentials?.discardBackwardProgress ?? false"
+              class="self-start md:self-auto"
+              @update:model-value="handleToggleDiscardBackwardProgress"
+            />
           </div>
         </div>
       </div>

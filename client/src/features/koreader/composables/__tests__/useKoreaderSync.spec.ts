@@ -11,6 +11,7 @@ function makeCredentials(overrides: Partial<KoreaderCredentials> = {}): Koreader
   return {
     username: 'reader-user',
     syncEnabled: true,
+    discardBackwardProgress: false,
     createdAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
   }
@@ -124,9 +125,10 @@ describe('useKoreaderSync', () => {
     const payload: UpdateKoreaderCredentialsPayload = {
       username: 'updated-user',
       syncEnabled: false,
+      discardBackwardProgress: true,
     }
     const refreshedStatus = makeSyncStatus({
-      credentials: makeCredentials({ username: 'updated-user', syncEnabled: false }),
+      credentials: makeCredentials({ username: 'updated-user', syncEnabled: false, discardBackwardProgress: true }),
     })
     apiMock.mockResolvedValueOnce(makeResponse({})).mockResolvedValueOnce(makeResponse(refreshedStatus))
 

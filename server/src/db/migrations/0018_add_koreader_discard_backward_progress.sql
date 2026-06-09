@@ -1,0 +1,1 @@
+ALTER TABLE "koreader_users" ADD COLUMN "discard_backward_progress" boolean DEFAULT false NOT NULL;

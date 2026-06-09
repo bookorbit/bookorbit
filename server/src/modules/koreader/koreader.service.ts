@@ -13,6 +13,7 @@ const BCRYPT_ROUNDS = 12;
 const SYNC_EVENT = 'koreader.sync';
 const CREDENTIALS_EVENT = 'koreader.credentials';
 const DEFAULT_DEVICE = 'KOReader';
+const BACKWARD_PROGRESS_EPSILON = 0.0001;
 
 @Injectable()
 export class KoreaderService {
@@ -43,7 +44,7 @@ export class KoreaderService {
     return result;
   }
 
-  async updateCredentials(userId: number, data: { username?: string; password?: string; syncEnabled?: boolean }) {
+  async updateCredentials(userId: number, data: { username?: string; password?: string; syncEnabled?: boolean; discardBackwardProgress?: boolean }) {
     this.logger.log(`[${CREDENTIALS_EVENT}] [start] userId=${userId} - updating credentials`);
 
     const existing = await this.repo.findKoreaderUser(userId);
@@ -66,6 +67,10 @@ export class KoreaderService {
       updatePayload.syncEnabled = data.syncEnabled;
     }
 
+    if (data.discardBackwardProgress !== undefined) {
+      updatePayload.discardBackwardProgress = data.discardBackwardProgress;
+    }
+
     if (Object.keys(updatePayload).length > 0) {
       await this.repo.updateKoreaderUser(userId, updatePayload as Parameters<typeof this.repo.updateKoreaderUser>[1]);
     }
@@ -83,7 +88,12 @@ export class KoreaderService {
   async getCredentials(userId: number) {
     const row = await this.repo.findKoreaderUser(userId);
     if (!row) return null;
-    return { username: row.username, syncEnabled: row.syncEnabled, createdAt: row.createdAt.toISOString() };
+    return {
+      username: row.username,
+      syncEnabled: row.syncEnabled,
+      discardBackwardProgress: row.discardBackwardProgress,
+      createdAt: row.createdAt.toISOString(),
+    };
   }
 
   async testConnection(userId: number, username: string, password: string): Promise<boolean> {
@@ -118,6 +128,24 @@ export class KoreaderService {
       throw new NotFoundException('Book not found for the given document hash');
     }
 
+    const bookorbitPercentage = toBookorbitPercentage(data.percentage);
+    const credentials = await this.repo.findKoreaderUser(userId);
+
+    if (credentials?.discardBackwardProgress) {
+      const [latestDevice, readingProg] = await Promise.all([
+        this.repo.getLatestDeviceProgress(bookFile.id, userId),
+        this.repo.getReadingProgress(bookFile.id, userId),
+      ]);
+      const currentKnownPercentage = getHighestKnownProgressPercentage(readingProg?.percentage ?? null, latestDevice?.percentage ?? null);
+
+      if (isBackwardProgress(bookorbitPercentage, currentKnownPercentage)) {
+        this.logger.debug(
+          `[${SYNC_EVENT}] [discard] userId=${userId} bookFileId=${bookFile.id} device=${device} durationMs=${Date.now() - startedAt} incomingPercentage=${bookorbitPercentage} currentPercentage=${currentKnownPercentage} - backward progress ignored`,
+        );
+        return { document: data.document, timestamp: data.timestamp ?? Math.floor(Date.now() / 1000) };
+      }
+    }
+
     const chapterIndex = this.chapterService.parseChapterIndexFromProgress(data.progress ?? null);
 
     this.chapterExtractor.extractAndStoreChapters(bookFile.id).catch(() => {});
@@ -133,7 +161,6 @@ export class KoreaderService {
       syncTimestamp: data.timestamp ?? null,
     });
 
-    const bookorbitPercentage = toBookorbitPercentage(data.percentage);
     await this.repo.upsertReadingProgress(bookFile.id, userId, bookorbitPercentage);
     await this.userBookStatusService.autoUpdate(userId, bookFile.bookId, bookorbitPercentage);
     this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, {
@@ -271,4 +298,15 @@ function toBookorbitPercentage(koreaderPct: number): number {
 
 function toKoreaderPercentage(bookorbitPct: number): number {
   return Math.round(bookorbitPct * 100) / 10000;
+}
+
+function getHighestKnownProgressPercentage(readingPercentage: number | null, devicePercentage: number | null): number | null {
+  const values: number[] = [];
+  if (readingPercentage !== null) values.push(readingPercentage);
+  if (devicePercentage !== null) values.push(toBookorbitPercentage(devicePercentage));
+  return values.length > 0 ? Math.max(...values) : null;
+}
+
+function isBackwardProgress(incomingPercentage: number, currentKnownPercentage: number | null): boolean {
+  return currentKnownPercentage !== null && incomingPercentage < currentKnownPercentage - BACKWARD_PROGRESS_EPSILON;
 }

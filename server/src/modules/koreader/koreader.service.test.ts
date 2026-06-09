@@ -38,6 +38,7 @@ function makeKoreaderUserRow(overrides?: Record<string, unknown>) {
     passwordHash: 'stored-bcrypt-hash',
     passwordMd5: md5Hex('secret'),
     syncEnabled: true,
+    discardBackwardProgress: false,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     ...overrides,
   };
@@ -194,7 +195,7 @@ describe('KoreaderService', () => {
   });
 
   describe('updateCredentials', () => {
-    it('updates username, password, and syncEnabled together', async () => {
+    it('updates username, password, syncEnabled, and discardBackwardProgress together', async () => {
       mockRepo.findKoreaderUser.mockResolvedValue(makeKoreaderUserRow({ username: 'old-name' }));
       mockRepo.findKoreaderUserByUsername.mockResolvedValue(null);
 
@@ -202,6 +203,7 @@ describe('KoreaderService', () => {
         username: 'new-name',
         password: 'new-secret',
         syncEnabled: false,
+        discardBackwardProgress: true,
       });
 
       expect(mockRepo.updateKoreaderUser).toHaveBeenCalledWith(7, {
@@ -209,6 +211,7 @@ describe('KoreaderService', () => {
         passwordHash: 'fresh-bcrypt-hash',
         passwordMd5: md5Hex('new-secret'),
         syncEnabled: false,
+        discardBackwardProgress: true,
       });
     });
 
@@ -255,6 +258,7 @@ describe('KoreaderService', () => {
       await expect(service.getCredentials(7)).resolves.toEqual({
         username: 'reader',
         syncEnabled: true,
+        discardBackwardProgress: false,
         createdAt: '2026-01-01T00:00:00.000Z',
       });
     });
@@ -394,6 +398,71 @@ describe('KoreaderService', () => {
         }),
       );
     });
+
+    it('saves a backward update when discardBackwardProgress is disabled', async () => {
+      mockRepo.findKoreaderUser.mockResolvedValue(makeKoreaderUserRow({ userId: 12, discardBackwardProgress: false }));
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 44, bookId: 55 });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue({ percentage: 0.8 });
+      mockRepo.getReadingProgress.mockResolvedValue({ percentage: 80 });
+
+      await service.saveProgress(12, {
+        document: 'abcdef1234567890fedcba',
+        percentage: 0.5,
+        progress: '/body/DocFragment[7]',
+      });
+
+      expect(mockRepo.getLatestDeviceProgress).not.toHaveBeenCalled();
+      expect(mockRepo.getReadingProgress).not.toHaveBeenCalled();
+      expect(mockRepo.upsertDeviceProgress).toHaveBeenCalled();
+      expect(mockRepo.upsertReadingProgress).toHaveBeenCalledWith(44, 12, 50);
+      expect(mockUserBookStatusService.autoUpdate).toHaveBeenCalledWith(12, 55, 50);
+      expect(mockAchievementEvents.emit).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, expect.any(Object));
+    });
+
+    it('returns success without writing when discardBackwardProgress rejects a backward update', async () => {
+      mockRepo.findKoreaderUser.mockResolvedValue(makeKoreaderUserRow({ userId: 12, discardBackwardProgress: true }));
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 44, bookId: 55 });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue({ percentage: 0.7 });
+      mockRepo.getReadingProgress.mockResolvedValue({ percentage: 80 });
+
+      const result = await service.saveProgress(12, {
+        document: 'abcdef1234567890fedcba',
+        percentage: 0.5,
+        progress: '/body/DocFragment[7]',
+        timestamp: 1700000000,
+      });
+
+      expect(result).toEqual({
+        document: 'abcdef1234567890fedcba',
+        timestamp: 1700000000,
+      });
+      expect(mockRepo.getLatestDeviceProgress).toHaveBeenCalledWith(44, 12);
+      expect(mockRepo.getReadingProgress).toHaveBeenCalledWith(44, 12);
+      expect(mockChapterService.parseChapterIndexFromProgress).not.toHaveBeenCalled();
+      expect(mockChapterExtractor.extractAndStoreChapters).not.toHaveBeenCalled();
+      expect(mockRepo.upsertDeviceProgress).not.toHaveBeenCalled();
+      expect(mockRepo.upsertReadingProgress).not.toHaveBeenCalled();
+      expect(mockUserBookStatusService.autoUpdate).not.toHaveBeenCalled();
+      expect(mockAchievementEvents.emit).not.toHaveBeenCalled();
+    });
+
+    it('saves normally with discardBackwardProgress enabled when incoming progress is equal or newer', async () => {
+      mockRepo.findKoreaderUser.mockResolvedValue(makeKoreaderUserRow({ userId: 12, discardBackwardProgress: true }));
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 44, bookId: 55 });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue({ percentage: 0.6 });
+      mockRepo.getReadingProgress.mockResolvedValue({ percentage: 50 });
+
+      await service.saveProgress(12, {
+        document: 'abcdef1234567890fedcba',
+        percentage: 0.6,
+        progress: '/body/DocFragment[7]',
+      });
+
+      expect(mockRepo.upsertDeviceProgress).toHaveBeenCalled();
+      expect(mockRepo.upsertReadingProgress).toHaveBeenCalledWith(44, 12, 60);
+      expect(mockUserBookStatusService.autoUpdate).toHaveBeenCalledWith(12, 55, 60);
+      expect(mockAchievementEvents.emit).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, expect.any(Object));
+    });
   });
 
   describe('getProgress', () => {
@@ -530,6 +599,7 @@ describe('KoreaderService', () => {
       const credentials = {
         username: 'reader',
         syncEnabled: true,
+        discardBackwardProgress: false,
         createdAt: '2026-01-01T00:00:00.000Z',
       };
       const devices = [

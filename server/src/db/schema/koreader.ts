@@ -15,6 +15,7 @@ export const koreaderUsers = pgTable(
     passwordHash: varchar('password_hash', { length: 255 }).notNull(),
     passwordMd5: varchar('password_md5', { length: 32 }),
     syncEnabled: boolean('sync_enabled').notNull().default(true),
+    discardBackwardProgress: boolean('discard_backward_progress').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .defaultNow()

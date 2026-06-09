@@ -28,7 +28,10 @@ export class KoreaderRepository {
     return row!;
   }
 
-  async updateKoreaderUser(userId: number, data: Partial<{ username: string; passwordHash: string; passwordMd5: string; syncEnabled: boolean }>) {
+  async updateKoreaderUser(
+    userId: number,
+    data: Partial<{ username: string; passwordHash: string; passwordMd5: string; syncEnabled: boolean; discardBackwardProgress: boolean }>,
+  ) {
     await this.db.update(schema.koreaderUsers).set(data).where(eq(schema.koreaderUsers.userId, userId));
   }
 

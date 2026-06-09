@@ -1,6 +1,7 @@
 export interface KoreaderCredentials {
   username: string;
   syncEnabled: boolean;
+  discardBackwardProgress: boolean;
   createdAt: string;
 }
 
@@ -48,6 +49,7 @@ export interface UpdateKoreaderCredentialsPayload {
   username?: string;
   password?: string;
   syncEnabled?: boolean;
+  discardBackwardProgress?: boolean;
 }
 
 export interface TestKoreaderConnectionResult {

@@ -28,6 +28,10 @@ export class UpdateKoreaderUserDto {
   @IsBoolean()
   @IsOptional()
   syncEnabled?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  discardBackwardProgress?: boolean;
 }
 
 export class TestConnectionDto {
