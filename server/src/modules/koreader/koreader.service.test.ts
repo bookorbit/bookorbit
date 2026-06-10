@@ -20,6 +20,7 @@ import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED } fro
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import { KoreaderChapterExtractorService } from './koreader-chapter-extractor.service';
 import { KoreaderChapterService } from './koreader-chapter.service';
+import { KoreaderPluginRepository } from './koreader-plugin.repository';
 import { KoreaderRepository } from './koreader.repository';
 import { KoreaderService } from './koreader.service';
 
@@ -77,6 +78,10 @@ describe('KoreaderService', () => {
   let mockAchievementEvents: {
     emit: ReturnType<typeof vi.fn>;
   };
+  let mockPluginRepo: {
+    listSweeps: ReturnType<typeof vi.fn>;
+    getPluginTotals: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -133,6 +138,11 @@ describe('KoreaderService', () => {
       emit: vi.fn(),
     };
 
+    mockPluginRepo = {
+      listSweeps: vi.fn().mockResolvedValue([]),
+      getPluginTotals: vi.fn().mockResolvedValue({ matchedBooks: 0, pageStatEvents: 0, annotations: 0 }),
+    };
+
     mockRepo.deleteKoreaderUser.mockResolvedValue(undefined);
     mockRepo.updateKoreaderUser.mockResolvedValue(undefined);
     mockRepo.upsertDeviceProgress.mockResolvedValue(undefined);
@@ -148,6 +158,7 @@ describe('KoreaderService', () => {
 
     service = new KoreaderService(
       mockRepo as unknown as KoreaderRepository,
+      mockPluginRepo as unknown as KoreaderPluginRepository,
       mockChapterService as unknown as KoreaderChapterService,
       mockChapterExtractor as unknown as KoreaderChapterExtractorService,
       mockUserBookStatusService as unknown as UserBookStatusService,
@@ -549,11 +560,15 @@ describe('KoreaderService', () => {
         devices,
         totalSyncedBooks: 14,
         lastSyncAt: '2026-02-01T10:00:00.000Z',
+        sweeps: [],
+        pluginTotals: { matchedBooks: 0, pageStatEvents: 0, annotations: 0 },
       });
 
       expect(getCredentialsSpy).toHaveBeenCalledWith(7);
       expect(getDevicesSpy).toHaveBeenCalledWith(7);
       expect(mockRepo.getTotalSyncedBooks).toHaveBeenCalledWith(7);
+      expect(mockPluginRepo.listSweeps).toHaveBeenCalledWith(7);
+      expect(mockPluginRepo.getPluginTotals).toHaveBeenCalledWith(7);
     });
   });
 

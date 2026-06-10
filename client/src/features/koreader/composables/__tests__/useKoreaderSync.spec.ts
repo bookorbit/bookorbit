@@ -29,6 +29,8 @@ function makeSyncStatus(overrides: Partial<KoreaderSyncStatus> = {}): KoreaderSy
     ],
     totalSyncedBooks: 14,
     lastSyncAt: '2026-01-02T00:00:00.000Z',
+    sweeps: [],
+    pluginTotals: { matchedBooks: 0, pageStatEvents: 0, annotations: 0 },
     ...overrides,
   }
 }

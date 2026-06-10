@@ -131,8 +131,8 @@
     {
       "idx": 18,
       "version": "7",
-      "when": 1781214276180,
-      "tag": "0018_author_sort_key_and_listing_indexes",
+      "when": 1781069126227,
+      "tag": "0018_koreader-plugin-sync",
       "breakpoints": true
     },
     {

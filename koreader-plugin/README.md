@@ -1,0 +1,67 @@
+# BookOrbit Sync plugin for KOReader
+
+Syncs your KOReader reading life into BookOrbit:
+
+- Live reading progress of the open book (pull on open with conflict prompt, optional periodic push every N page turns, push on close and suspend), compatible with the kosync flow BookOrbit already speaks.
+- Reading statistics: the raw per-page time events from KOReader's statistics database. BookOrbit turns them into reading sessions and daily stats, so they show up in the existing dashboards.
+- Highlights and notes, shown read-only on the book details page in BookOrbit.
+- Book status (reading / complete / abandoned) and star ratings, with newest-change-wins conflict handling.
+
+The open book is captured from live memory when it is closed, on suspend, and via "Sync this book now", so highlights and status made mid-session sync without reopening the book. The full-library sweep ("Sync all books now") is manual-only.
+
+Only books that BookOrbit already knows are synced. Matching uses the same partial-MD5 file hash KOReader uses internally, which BookOrbit's scanner computes for every file. Books on the device that are not in any BookOrbit library are skipped and re-checked automatically when your library changes.
+
+## Install
+
+1. Copy the `bookorbit.koplugin/` folder to the `koreader/plugins/` directory on your device.
+2. Restart KOReader.
+
+## Setup
+
+1. In BookOrbit web settings, open Settings, KOReader and create sync credentials (username + password). The KOReader sync permission must be enabled for your account.
+2. On the device, open the main menu, Tools tab: "BookOrbit sync" sits directly below "Calibre" on the first page.
+   - Set the BookOrbit server address (e.g. `https://bookorbit.example.com`; the `/api/v1` suffix is added automatically).
+   - Login with the credentials from step 1.
+   - Enable "Auto sync this book" if you want the open book synced automatically. Leave the stock "Progress sync" plugin unconfigured to avoid double syncing.
+   - Optional: tune "Periodically sync every # pages" (default 10, 0 disables mid-session pushes).
+3. Optional: assign the "BookOrbit: sync this book" and "BookOrbit: sync all books" actions to gestures.
+
+Menu placement note: the plugin generates `settings/reader_menu_order.lua` and `settings/filemanager_menu_order.lua` to pin its entry below Calibre, and keeps them up to date across KOReader updates. Delete those files to reset the menu order. If you maintain your own menu order files, only the single `bookorbit_sync` entry is inserted (a one-time rewrite normalizes formatting and strips comments).
+
+## How syncing works
+
+- With "Auto sync this book" on: progress is pulled when a book opens (with conflict prompts), pushed every N page turns (10 seconds after you stop turning pages, 25 second debounce, silently skipped when offline), and the whole book (progress, highlights, status, rating, reading time) is snapshotted from live memory and uploaded when the book is closed and on suspend.
+- "Sync this book now" (menu item or gesture) does the same per-book snapshot on demand, including a forced statistics flush, so a highlight made seconds ago syncs immediately. If the book is not in any BookOrbit library it tells you so.
+- "Sync all books now" runs the full-library sweep: match new books, upload reading time for every matched book, then highlights, statuses and bulk progress. It never runs automatically. If a book is open when it starts, that book's sidecar and statistics are flushed first, so the sweep sees current data.
+- Everything is incremental: page-stat events are uploaded past a per-book watermark that only advances after the server acknowledges them, sidecars are only parsed when their modification time changed, and unmatched books are only re-checked when BookOrbit's library actually changed. An interrupted sync resumes where it left off; resends are server-side no-ops.
+- Local plugin state lives in `settings/bookorbit_sync_state.lua` next to your other KOReader settings. Deleting it is safe: the next sync re-uploads everything and the server deduplicates.
+
+## First sync on a device with lots of history
+
+Years of statistics upload in batches of 500 events. Roughly 200k events means about 400 requests, a few minutes of background work. The UI stays usable; progress is kept on every acknowledged batch, so you can suspend or lose wifi mid-way without losing anything.
+
+## Limitations
+
+- Highlight or note deletions on the device are not propagated; edits are. Deleted highlights stay visible in BookOrbit.
+- Books with reading statistics but no sidecar path in the reading history sync reading time only (no highlights/status/progress); the full sweep covers them.
+- Position-only bookmarks (no highlighted text) are not synced.
+- The full-library sweep is manual-only by design; books you never open again only sync when you press "Sync all books now".
+- A cloned device with a different KOReader `device_id` re-uploads its history under the new device identity, which double-counts reading time. Clones that keep the same `device_id` deduplicate naturally.
+
+## Hand-test checklist
+
+- Menu placement: "BookOrbit sync" appears on the Tools first page directly below Calibre, in both the file manager and the reader; `settings/reader_menu_order.lua` and `settings/filemanager_menu_order.lua` exist with the bookorbit marker line; a restart does not rewrite them.
+- Custom menu order: remove the marker line and shuffle the tools list; on restart only the `bookorbit_sync` id is re-inserted, the rest is preserved. A syntactically broken file is left untouched (warning in the log).
+- Login: wrong password shows a login error; server URL with and without trailing `/` and with `/api/v1` already appended all work.
+- Open a book that another device read further: pull prompt appears (with "Prompt" strategy); accepting jumps to the newer location.
+- Periodic push: with "Auto sync this book" on and the period set to 3, turn 3 pages and stop; about 10 seconds later one progress request hits the server. Turning 3 more pages within 25 seconds gets debounced. Toggling auto sync off cancels a pending push.
+- Mid-session highlight, then "Sync this book now": the highlight appears in BookOrbit immediately, no reopen needed.
+- Close a book after highlighting and changing status/rating: reading time, highlights, status, rating and progress all land in BookOrbit; reopening and closing again uploads nothing new.
+- "Sync this book now" on a book that is not in BookOrbit: shows "not in your BookOrbit library"; closing such a book stays silent.
+- Manual "Sync all books now": summary message shows matched books / events / highlights; settings page in BookOrbit shows the sweep. Running it with a freshly annotated book still open includes that book's data.
+- Re-running the manual sync immediately: all uploads are no-ops, counts stay stable.
+- Add a previously unmatched device book to BookOrbit, rescan the library, run a manual sync: its history backfills.
+- Suspend with a book open: the snapshot uploads before wifi drops (where the platform allows); suspend mid-sweep, resume, sync again: no duplicates, sweep completes.
+- Airplane mode: manual syncs report the server as unreachable; automatic ones stay silent.
+- Gestures: "BookOrbit: sync this book" is assignable from the file manager gesture settings and works inside the reader.
+- With the statistics plugin actively recording (book open), a sweep still reads the stats database without errors.

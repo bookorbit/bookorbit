@@ -20,11 +20,42 @@ export interface KoreaderBookProgress {
   updatedAt: string;
 }
 
+export interface KoreaderDeviceSweepInfo {
+  deviceId: string;
+  deviceModel: string;
+  pluginVersion: string | null;
+  lastSweepAt: string;
+  lastSweepBooksMatched: number;
+  lastSweepPageStats: number;
+  lastSweepAnnotations: number;
+}
+
+export interface KoreaderPluginTotals {
+  matchedBooks: number;
+  pageStatEvents: number;
+  annotations: number;
+}
+
 export interface KoreaderSyncStatus {
   credentials: KoreaderCredentials | null;
   devices: KoreaderDeviceInfo[];
   totalSyncedBooks: number;
   lastSyncAt: string | null;
+  sweeps: KoreaderDeviceSweepInfo[];
+  pluginTotals: KoreaderPluginTotals;
+}
+
+export interface KoreaderAnnotationItem {
+  id: number;
+  drawer: "lighten" | "underscore" | "strikeout" | "invert";
+  color: string | null;
+  text: string | null;
+  note: string | null;
+  chapter: string | null;
+  pageno: number | null;
+  posFormat: "xpointer" | "pdf";
+  deviceCreatedAt: string;
+  deviceUpdatedAt: string | null;
 }
 
 export interface KoreaderBookSyncInfo {

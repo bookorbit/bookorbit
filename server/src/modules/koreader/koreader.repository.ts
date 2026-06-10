@@ -63,6 +63,57 @@ export class KoreaderRepository {
     return null;
   }
 
+  async resolveBookFilesByHashes(
+    hashes: string[],
+    accessibleLibraryIds: number[] | null,
+  ): Promise<Map<string, { bookFileId: number; bookId: number; libraryId: number }>> {
+    const result = new Map<string, { bookFileId: number; bookId: number; libraryId: number }>();
+    if (hashes.length === 0) return result;
+    if (accessibleLibraryIds !== null && accessibleLibraryIds.length === 0) return result;
+
+    const libraryFilter = accessibleLibraryIds ? inArray(schema.books.libraryId, accessibleLibraryIds) : undefined;
+
+    const direct = await this.db
+      .select({
+        hash: schema.bookFiles.fileHash,
+        bookFileId: schema.bookFiles.id,
+        bookId: schema.bookFiles.bookId,
+        libraryId: schema.books.libraryId,
+      })
+      .from(schema.bookFiles)
+      .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
+      .where(and(inArray(schema.bookFiles.fileHash, hashes), libraryFilter));
+
+    for (const row of direct) {
+      if (row.hash && !result.has(row.hash)) {
+        result.set(row.hash, { bookFileId: row.bookFileId, bookId: row.bookId, libraryId: row.libraryId });
+      }
+    }
+
+    const missing = hashes.filter((hash) => !result.has(hash));
+    if (missing.length === 0) return result;
+
+    const history = await this.db
+      .select({
+        hash: schema.bookFileHashHistory.fileHash,
+        bookFileId: schema.bookFiles.id,
+        bookId: schema.bookFiles.bookId,
+        libraryId: schema.books.libraryId,
+      })
+      .from(schema.bookFileHashHistory)
+      .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.bookFileHashHistory.bookFileId))
+      .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
+      .where(and(inArray(schema.bookFileHashHistory.fileHash, missing), libraryFilter));
+
+    for (const row of history) {
+      if (!result.has(row.hash)) {
+        result.set(row.hash, { bookFileId: row.bookFileId, bookId: row.bookId, libraryId: row.libraryId });
+      }
+    }
+
+    return result;
+  }
+
   async getAccessibleLibraryIds(userId: number): Promise<number[] | null> {
     const user = await this.db.query.users.findFirst({
       where: eq(schema.users.id, userId),

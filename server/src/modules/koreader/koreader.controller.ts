@@ -6,12 +6,16 @@ import { Public } from '../../common/decorators/public.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { KoreaderAuthGuard } from './koreader-auth.guard';
+import { KoreaderPluginAnnotationService } from './koreader-plugin-annotation.service';
 import { KoreaderService } from './koreader.service';
 import { CreateKoreaderUserDto, SaveProgressDto, TestConnectionDto, UpdateKoreaderUserDto } from './dto';
 
 @Controller('koreader')
 export class KoreaderController {
-  constructor(private readonly koreaderService: KoreaderService) {}
+  constructor(
+    private readonly koreaderService: KoreaderService,
+    private readonly pluginAnnotationService: KoreaderPluginAnnotationService,
+  ) {}
 
   // --- KOReader kosync protocol endpoints (header-based auth) ---
 
@@ -91,9 +95,15 @@ export class KoreaderController {
   }
 
   @RequirePermission(Permission.KoreaderSync)
+  @Get('books/:bookId/annotations')
+  getBookAnnotations(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number) {
+    return this.pluginAnnotationService.getBookAnnotations(user.id, bookId);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
   @Post('test-connection')
   async testConnection(@CurrentUser() user: RequestUser, @Body() dto: TestConnectionDto) {
     const success = await this.koreaderService.testConnection(user.id, dto.username, dto.password);
-    return { success, username: dto.username, serverUrl: '/api/koreader' };
+    return { success, username: dto.username, serverUrl: '/api/v1/koreader' };
   }
 }

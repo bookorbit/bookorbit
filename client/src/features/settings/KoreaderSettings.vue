@@ -31,6 +31,8 @@ const syncUrl = computed(() => getSyncUrl())
 const hasCredentials = computed(() => !!credentials.value)
 const deviceCount = computed(() => syncStatus.value?.devices.length ?? 0)
 const totalSyncedBooks = computed(() => syncStatus.value?.totalSyncedBooks ?? 0)
+const sweeps = computed(() => syncStatus.value?.sweeps ?? [])
+const pluginTotals = computed(() => syncStatus.value?.pluginTotals ?? { matchedBooks: 0, pageStatEvents: 0, annotations: 0 })
 
 function formatLastSync(dateStr: string | null): string {
   if (!dateStr) return 'Never'
@@ -316,6 +318,33 @@ async function handleRefresh() {
                 }}<template v-if="device.lastBookTitle"> &middot; {{ device.lastBookTitle }}</template>
               </p>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Plugin full sync -->
+      <div v-if="sweeps.length > 0" class="mb-6">
+        <p class="settings-group-label">Plugin Full Sync</p>
+        <div class="border border-border rounded-lg overflow-hidden shadow-xs divide-y divide-border">
+          <div v-for="sweep in sweeps" :key="sweep.deviceId" class="flex items-center gap-3 px-4 py-3.5 bg-card md:px-5">
+            <Smartphone :size="16" class="text-muted-foreground shrink-0" />
+            <div class="flex-1 min-w-0">
+              <p class="settings-label truncate">
+                {{ sweep.deviceModel
+                }}<span v-if="sweep.pluginVersion" class="font-normal text-muted-foreground"> &middot; v{{ sweep.pluginVersion }}</span>
+              </p>
+              <p class="settings-hint">
+                Last full sync: {{ formatLastSync(sweep.lastSweepAt) }} &middot; {{ sweep.lastSweepBooksMatched }} books &middot;
+                {{ sweep.lastSweepPageStats }} reading events &middot; {{ sweep.lastSweepAnnotations }} highlights
+              </p>
+            </div>
+          </div>
+          <div class="px-4 py-3.5 bg-card md:px-5">
+            <p class="settings-label">Synced totals</p>
+            <p class="settings-hint">
+              {{ pluginTotals.matchedBooks }} matched books &middot; {{ pluginTotals.pageStatEvents }} reading events &middot;
+              {{ pluginTotals.annotations }} highlights
+            </p>
           </div>
         </div>
       </div>

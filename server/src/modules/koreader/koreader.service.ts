@@ -6,6 +6,7 @@ import type { KoreaderBookSyncInfo, KoreaderDeviceInfo, KoreaderSyncStatus } fro
 import { KoreaderRepository } from './koreader.repository';
 import { KoreaderChapterService } from './koreader-chapter.service';
 import { KoreaderChapterExtractorService } from './koreader-chapter-extractor.service';
+import { KoreaderPluginRepository } from './koreader-plugin.repository';
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED } from '../achievement/achievement-events.service';
 
@@ -20,6 +21,7 @@ export class KoreaderService {
 
   constructor(
     private readonly repo: KoreaderRepository,
+    private readonly pluginRepo: KoreaderPluginRepository,
     private readonly chapterService: KoreaderChapterService,
     private readonly chapterExtractor: KoreaderChapterExtractorService,
     private readonly userBookStatusService: UserBookStatusService,
@@ -118,6 +120,27 @@ export class KoreaderService {
       throw new NotFoundException('Book not found for the given document hash');
     }
 
+    await this.applyProgressForResolvedFile(userId, bookFile, {
+      percentage: data.percentage,
+      progress: data.progress,
+      device,
+      deviceId,
+      timestamp: data.timestamp,
+    });
+
+    this.logger.debug(
+      `[${SYNC_EVENT}] [end] userId=${userId} bookFileId=${bookFile.id} device=${device} durationMs=${Date.now() - startedAt} percentage=${data.percentage} - save progress completed`,
+    );
+
+    return { document: data.document, timestamp: data.timestamp ?? Math.floor(Date.now() / 1000) };
+  }
+
+  async applyProgressForResolvedFile(
+    userId: number,
+    bookFile: { id: number; bookId: number },
+    data: { percentage: number; progress?: string; device: string; deviceId: string; timestamp?: number },
+    options?: { skipSharedProgress?: boolean },
+  ) {
     const chapterIndex = this.chapterService.parseChapterIndexFromProgress(data.progress ?? null);
 
     this.chapterExtractor.extractAndStoreChapters(bookFile.id).catch(() => {});
@@ -125,13 +148,15 @@ export class KoreaderService {
     await this.repo.upsertDeviceProgress({
       bookFileId: bookFile.id,
       userId,
-      device,
-      deviceId,
+      device: data.device,
+      deviceId: data.deviceId,
       percentage: data.percentage,
       progress: data.progress ?? null,
       chapterIndex,
       syncTimestamp: data.timestamp ?? null,
     });
+
+    if (options?.skipSharedProgress) return;
 
     const bookorbitPercentage = toBookorbitPercentage(data.percentage);
     await this.repo.upsertReadingProgress(bookFile.id, userId, bookorbitPercentage);
@@ -143,12 +168,6 @@ export class KoreaderService {
       progress: bookorbitPercentage,
       source: 'koreader',
     });
-
-    this.logger.debug(
-      `[${SYNC_EVENT}] [end] userId=${userId} bookFileId=${bookFile.id} device=${device} durationMs=${Date.now() - startedAt} percentage=${data.percentage} - save progress completed`,
-    );
-
-    return { document: data.document, timestamp: data.timestamp ?? Math.floor(Date.now() / 1000) };
   }
 
   async getProgress(userId: number, documentHash: string) {
@@ -202,12 +221,25 @@ export class KoreaderService {
   }
 
   async getSyncStatus(userId: number): Promise<KoreaderSyncStatus> {
-    const credentials = await this.getCredentials(userId);
-    const devices = await this.getDevices(userId);
-    const totalSyncedBooks = await this.repo.getTotalSyncedBooks(userId);
+    const [credentials, devices, totalSyncedBooks, sweepRows, pluginTotals] = await Promise.all([
+      this.getCredentials(userId),
+      this.getDevices(userId),
+      this.repo.getTotalSyncedBooks(userId),
+      this.pluginRepo.listSweeps(userId),
+      this.pluginRepo.getPluginTotals(userId),
+    ]);
     const lastSyncAt = devices.length > 0 ? devices[0]!.lastSyncAt : null;
+    const sweeps = sweepRows.map((row) => ({
+      deviceId: row.deviceId,
+      deviceModel: row.deviceModel,
+      pluginVersion: row.pluginVersion,
+      lastSweepAt: row.lastSweepAt.toISOString(),
+      lastSweepBooksMatched: row.lastSweepBooksMatched,
+      lastSweepPageStats: row.lastSweepPageStats,
+      lastSweepAnnotations: row.lastSweepAnnotations,
+    }));
 
-    return { credentials, devices, totalSyncedBooks, lastSyncAt };
+    return { credentials, devices, totalSyncedBooks, lastSyncAt, sweeps, pluginTotals };
   }
 
   async getDevices(userId: number): Promise<KoreaderDeviceInfo[]> {
