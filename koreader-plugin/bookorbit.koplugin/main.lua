@@ -33,7 +33,7 @@ local BookOrbitBookSync = require("bookorbit_book_sync")
 local BookOrbitMenuPin = require("bookorbit_menu_pin")
 local BookOrbitSweep = require("bookorbit_sweep")
 
-local PLUGIN_VERSION = "0.2.0"
+local PLUGIN_VERSION = "0.3.0"
 
 local SYNC_STRATEGY = {
     PROMPT = 1,
@@ -92,6 +92,8 @@ function BookOrbit:init()
         self.settings.pages_before_update = 10
     end
 
+    self:applyProvision()
+
     if self.settings.auto_sync and Device:hasSeamlessWifiToggle() and G_reader_settings:readSetting("wifi_enable_action") ~= "turn_on" then
         self.settings.auto_sync = false
         logger.warn("BookOrbit: auto sync disabled because wifi_enable_action is not turn_on")
@@ -100,6 +102,51 @@ function BookOrbit:init()
     pcall(BookOrbitMenuPin.ensure)
     self:onDispatcherRegisterActions()
     self.ui.menu:registerToMainMenu(self)
+end
+
+local PROVISION_FILE = "bookorbit_provision.lua"
+
+-- Applies the connection settings bundled by "Download preconfigured plugin"
+-- in BookOrbit web settings. The fingerprint ties one download to one apply:
+-- a freshly generated zip always (re)configures, while reinstalling an old
+-- one never overrides a logout.
+function BookOrbit:applyProvision()
+    if not self.path then return end
+    local provision_path = self.path .. "/" .. PROVISION_FILE
+    local chunk = loadfile(provision_path)
+    if not chunk then return end
+
+    setfenv(chunk, {})
+    local ok, provision = pcall(chunk)
+    if not ok or type(provision) ~= "table" then
+        logger.warn("BookOrbit: ignoring unreadable provision file", provision_path)
+        return
+    end
+
+    local server_url = BookOrbitApi.normalizeServerUrl(provision.server_url)
+    if not server_url or type(provision.username) ~= "string" or type(provision.userkey) ~= "string" then
+        logger.warn("BookOrbit: ignoring incomplete provision file", provision_path)
+        return
+    end
+
+    local fingerprint = md5(table.concat({
+        server_url, provision.username, provision.userkey, tostring(provision.generated_at),
+    }, "\0"))
+    if self.settings.provision_fingerprint ~= fingerprint then
+        self.settings.server_url = server_url
+        self.settings.username = provision.username
+        self.settings.userkey = provision.userkey
+        self.settings.provision_fingerprint = fingerprint
+        G_reader_settings:flush()
+        logger.info("BookOrbit: applied provision file for", provision.username)
+        UIManager:nextTick(function()
+            UIManager:show(InfoMessage:new{
+                text = T(_("BookOrbit sync is set up for %1 as %2."), provision.server_url, provision.username),
+                timeout = 5,
+            })
+        end)
+    end
+    os.remove(provision_path)
 end
 
 function BookOrbit:apiOpts()

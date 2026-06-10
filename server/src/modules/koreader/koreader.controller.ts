@@ -1,4 +1,20 @@
-import { Body, Controller, Delete, ForbiddenException, Get, Headers, Param, ParseIntPipe, Patch, Post, Put, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  ForbiddenException,
+  Get,
+  Headers,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
+import type { FastifyReply } from 'fastify';
 
 import { Permission } from '@bookorbit/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -6,15 +22,17 @@ import { Public } from '../../common/decorators/public.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { KoreaderAuthGuard } from './koreader-auth.guard';
+import { KoreaderPackageService } from './koreader-package.service';
 import { KoreaderPluginAnnotationService } from './koreader-plugin-annotation.service';
 import { KoreaderService } from './koreader.service';
-import { CreateKoreaderUserDto, SaveProgressDto, TestConnectionDto, UpdateKoreaderUserDto } from './dto';
+import { CreateKoreaderUserDto, DownloadPluginPackageDto, SaveProgressDto, TestConnectionDto, UpdateKoreaderUserDto } from './dto';
 
 @Controller('koreader')
 export class KoreaderController {
   constructor(
     private readonly koreaderService: KoreaderService,
     private readonly pluginAnnotationService: KoreaderPluginAnnotationService,
+    private readonly packageService: KoreaderPackageService,
   ) {}
 
   // --- KOReader kosync protocol endpoints (header-based auth) ---
@@ -98,6 +116,17 @@ export class KoreaderController {
   @Get('books/:bookId/annotations')
   getBookAnnotations(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number) {
     return this.pluginAnnotationService.getBookAnnotations(user.id, bookId);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Get('plugin-package')
+  async downloadPluginPackage(@CurrentUser() user: RequestUser, @Query() query: DownloadPluginPackageDto, @Res() reply: FastifyReply) {
+    const zip = await this.packageService.buildPluginPackage(user.id, query.origin);
+    reply
+      .header('Content-Type', 'application/zip')
+      .header('Content-Disposition', 'attachment; filename="bookorbit.koplugin.zip"')
+      .header('Cache-Control', 'no-store')
+      .send(zip);
   }
 
   @RequirePermission(Permission.KoreaderSync)

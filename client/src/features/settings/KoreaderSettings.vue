@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { Copy, Trash2, BookOpen, Smartphone, Check, Eye, EyeOff, RefreshCw, ChevronDown, ChevronUp } from '@lucide/vue'
+import { Copy, Trash2, BookOpen, Download, Smartphone, Check, Eye, EyeOff, RefreshCw, ChevronDown, ChevronUp } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
@@ -9,7 +9,17 @@ import { useKoreaderSync } from '@/features/koreader/composables/useKoreaderSync
 
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
-const { credentials, syncStatus, loading, fetchSyncStatus, createCredentials, updateCredentials, deleteCredentials, getSyncUrl } = useKoreaderSync()
+const {
+  credentials,
+  syncStatus,
+  loading,
+  fetchSyncStatus,
+  createCredentials,
+  updateCredentials,
+  deleteCredentials,
+  getSyncUrl,
+  downloadPluginPackage,
+} = useKoreaderSync()
 
 const error = ref<string | null>(null)
 const showSetupForm = ref(false)
@@ -136,6 +146,20 @@ async function handleRefresh() {
     toast.success('Sync status refreshed')
   } catch {
     toast.error('Failed to refresh')
+  }
+}
+
+const downloadingPlugin = ref(false)
+
+async function handleDownloadPlugin() {
+  downloadingPlugin.value = true
+  try {
+    await downloadPluginPackage()
+    toast.success('Plugin downloaded. Copy bookorbit.koplugin from the zip to koreader/plugins/ on your device.')
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : 'Failed to download the plugin')
+  } finally {
+    downloadingPlugin.value = false
   }
 }
 </script>
@@ -271,6 +295,30 @@ async function handleRefresh() {
         </div>
       </div>
 
+      <!-- Plugin Download -->
+      <div class="mb-6">
+        <p class="settings-group-label">BookOrbit Plugin</p>
+        <div class="border border-border rounded-lg overflow-hidden shadow-xs">
+          <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
+            <div class="min-w-0">
+              <p class="settings-label">Download preconfigured plugin</p>
+              <p class="settings-hint">
+                A zip with the BookOrbit KOReader plugin, already set up with this server and your sync credentials. Copy the folder inside to
+                koreader/plugins/ on your device and restart KOReader.
+              </p>
+            </div>
+            <button
+              class="self-start md:self-auto flex items-center gap-1.5 px-3 py-2 md:py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 shrink-0"
+              :disabled="downloadingPlugin"
+              @click="handleDownloadPlugin"
+            >
+              <Download :size="12" />
+              {{ downloadingPlugin ? 'Preparing...' : 'Download' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Account Info -->
       <div class="mb-6">
         <div class="flex items-center justify-between mb-3">
@@ -377,12 +425,20 @@ async function handleRefresh() {
           <ChevronDown v-else :size="14" class="text-muted-foreground" />
         </button>
         <div v-if="helpOpen" class="px-4 pb-4 space-y-3 text-xs text-muted-foreground">
-          <p class="font-medium text-foreground/80">To configure KOReader:</p>
+          <p class="font-medium text-foreground/80">BookOrbit plugin (recommended):</p>
+          <ol class="list-decimal list-inside space-y-2 pl-1">
+            <li>Download the preconfigured plugin above</li>
+            <li>
+              Unzip it and copy <span class="font-mono text-foreground/70">bookorbit.koplugin</span> to the
+              <span class="font-mono text-foreground/70">koreader/plugins/</span> folder on your device
+            </li>
+            <li>Restart KOReader - the server and login are configured automatically</li>
+          </ol>
+          <p class="font-medium text-foreground/80 pt-2">Stock "Progress sync" plugin (progress only):</p>
           <ol class="list-decimal list-inside space-y-2 pl-1">
             <li>On your KOReader device, go to <span class="font-mono text-foreground/70">Tools > Progress sync</span></li>
             <li>Set the custom sync server to the URL shown above</li>
-            <li>Enter the username and password you created</li>
-            <li>Tap "Register" (first time) or "Login" to connect</li>
+            <li>Enter the username and password you created, then tap "Login"</li>
           </ol>
           <p class="pt-1">Reading progress will sync automatically when you open and close books.</p>
         </div>

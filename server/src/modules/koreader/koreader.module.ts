@@ -6,6 +6,7 @@ import { UserModule } from '../user/user.module';
 import { UserBookStatusModule } from '../user-book-status/user-book-status.module';
 import { KoreaderAuthGuard } from './koreader-auth.guard';
 import { KoreaderAnnotationRepository } from './koreader-annotation.repository';
+import { KoreaderPackageService } from './koreader-package.service';
 import { KoreaderChapterExtractorService } from './koreader-chapter-extractor.service';
 import { KoreaderChapterService } from './koreader-chapter.service';
 import { KoreaderController } from './koreader.controller';
@@ -24,6 +25,7 @@ import { KoreaderStatsService } from './koreader-stats.service';
     KoreaderService,
     KoreaderRepository,
     KoreaderAuthGuard,
+    KoreaderPackageService,
     KoreaderChapterService,
     KoreaderChapterExtractorService,
     KoreaderPluginService,

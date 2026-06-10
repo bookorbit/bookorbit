@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import { IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class SaveProgressDto {
@@ -9,6 +10,9 @@ export class SaveProgressDto {
   @Max(1)
   percentage!: number;
 
+  // KOReader sends an xpointer string for reflowable documents but a plain
+  // page number for paged ones (PDF/CBZ/DjVu), so numbers are normalized here.
+  @Transform(({ value }) => (typeof value === 'number' && Number.isFinite(value) ? String(value) : value))
   @IsString()
   @IsOptional()
   progress?: string;

@@ -191,4 +191,42 @@ describe('useKoreaderSync', () => {
 
     expect(getSyncUrl()).toBe(`${window.location.origin}/api/v1/koreader`)
   })
+
+  it('downloadPluginPackage requests the zip with the current origin and triggers a download', async () => {
+    const blob = new Blob(['zip'])
+    apiMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({}), blob: async () => blob } as unknown as Response)
+
+    const originalCreateObjectURL = URL.createObjectURL
+    const originalRevokeObjectURL = URL.revokeObjectURL
+    const createObjectURL = vi.fn(() => 'blob:plugin-zip')
+    const revokeObjectURL = vi.fn()
+    URL.createObjectURL = createObjectURL
+    URL.revokeObjectURL = revokeObjectURL
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+
+    try {
+      const { useKoreaderSync } = await import('../useKoreaderSync')
+      const { downloadPluginPackage } = useKoreaderSync()
+
+      await downloadPluginPackage()
+
+      expect(apiMock).toHaveBeenCalledWith(`/api/v1/koreader/plugin-package?origin=${encodeURIComponent(window.location.origin)}`)
+      expect(createObjectURL).toHaveBeenCalledWith(blob)
+      expect(clickSpy).toHaveBeenCalledTimes(1)
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:plugin-zip')
+    } finally {
+      URL.createObjectURL = originalCreateObjectURL
+      URL.revokeObjectURL = originalRevokeObjectURL
+      clickSpy.mockRestore()
+    }
+  })
+
+  it('downloadPluginPackage throws the server message on failure', async () => {
+    apiMock.mockResolvedValueOnce(makeResponse({ message: 'Create KOReader sync credentials first' }, { ok: false, status: 404 }))
+
+    const { useKoreaderSync } = await import('../useKoreaderSync')
+    const { downloadPluginPackage } = useKoreaderSync()
+
+    await expect(downloadPluginPackage()).rejects.toThrow('Create KOReader sync credentials first')
+  })
 })

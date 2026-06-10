@@ -128,7 +128,7 @@ export class KoreaderService {
       timestamp: data.timestamp,
     });
 
-    this.logger.debug(
+    this.logger.log(
       `[${SYNC_EVENT}] [end] userId=${userId} bookFileId=${bookFile.id} device=${device} durationMs=${Date.now() - startedAt} percentage=${data.percentage} - save progress completed`,
     );
 
