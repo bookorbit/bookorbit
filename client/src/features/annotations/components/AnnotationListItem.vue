@@ -21,6 +21,7 @@ import {
 } from 'lucide-vue-next'
 import { ANNOTATION_HIGHLIGHT_COLORS, type AnnotationHubItem, type AnnotationItem } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { PILL_CLASS, sourcePill, statusPill } from '@/features/annotations/lib/pill-styles'
 import HighlightNoteEditor from '@/features/book/components/detail/tabs/HighlightNoteEditor.vue'
 import AnnotationSyncDetailPanel from './AnnotationSyncDetailPanel.vue'
 
@@ -91,35 +92,8 @@ const styleIcon = computed(() => {
   return STYLES.find((s) => s.value === props.annotation.style)?.icon ?? Highlighter
 })
 
-const originLabel = computed(() => {
-  if (props.annotation.origin === 'koreader') return 'KOReader'
-  if (props.annotation.origin === 'kobo') return 'Kobo'
-  return 'Web'
-})
-
-const originClass = computed(() => {
-  if (props.annotation.origin === 'web') return 'border-primary/30 bg-primary/10 text-primary'
-  if (props.annotation.origin === 'kobo') return 'border-destructive/30 bg-destructive/10 text-destructive'
-  return 'border-border bg-secondary text-secondary-foreground'
-})
-
-const positionStatusLabel = computed(() => {
-  const status = props.annotation.positionStatus
-  if (!status) return isApproximate.value ? 'Approximate' : null
-  if (status === 'exact') return 'Exact'
-  if (status === 'repaired') return 'Repaired'
-  if (status === 'pending') return 'Pending'
-  return 'Failed'
-})
-
-const positionStatusClass = computed(() => {
-  const status = props.annotation.positionStatus
-  if (status === 'exact') return 'border-primary/30 bg-primary/10 text-primary'
-  if (status === 'repaired') return 'border-primary/30 bg-primary/10 text-primary'
-  if (status === 'pending') return 'border-border bg-muted text-muted-foreground'
-  if (status === 'failed') return 'border-destructive/30 bg-destructive/10 text-destructive'
-  return 'border-border bg-muted text-muted-foreground'
-})
+const originPill = computed(() => sourcePill(props.annotation.origin))
+const positionPill = computed(() => statusPill(props.annotation.positionStatus, isApproximate.value))
 
 const cardClass = computed(() => [
   props.selected ? 'ring-1 ring-primary border-primary/50' : 'hover:border-primary/30',
@@ -316,19 +290,14 @@ function handleStyleSelect(style: string) {
       <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
           <span v-for="item in metadataItems" :key="item" class="truncate max-w-[14rem]">{{ item }}</span>
-          <span class="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium" :class="originClass">
+          <span :class="[PILL_CLASS, originPill.class]">
             <Smartphone v-if="annotation.origin === 'koreader' || annotation.origin === 'kobo'" :size="10" />
-            {{ originLabel }}
+            {{ originPill.label }}
           </span>
-          <Tooltip v-if="positionStatusLabel">
+          <Tooltip v-if="positionPill">
             <TooltipTrigger as-child>
-              <button
-                type="button"
-                class="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
-                :class="positionStatusClass"
-                @click="toggleSyncDetail"
-              >
-                {{ positionStatusLabel }}
+              <button type="button" :class="[PILL_CLASS, positionPill.class, 'transition-colors hover:opacity-80']" @click="toggleSyncDetail">
+                {{ positionPill.label }}
               </button>
             </TooltipTrigger>
             <TooltipContent>{{ showSyncDetail ? 'Hide sync detail' : 'Show sync detail' }}</TooltipContent>

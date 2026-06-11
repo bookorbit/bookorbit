@@ -74,6 +74,14 @@
 
   --scrollbar-thumb: oklch(0.8 var(--tint-c) var(--tint-h));
   --scrollbar-thumb-hover: oklch(0.7 var(--tint-c) var(--tint-h));
+
+  /* Annotation pill hues — fixed, accent-independent. Sources get distinct
+     hues; status uses semantic tiers (Exact stays neutral via --muted). */
+  --pill-web: oklch(0.55 0.16 245);
+  --pill-koreader: oklch(0.52 0.2 295);
+  --pill-kobo: oklch(0.55 0.1 195);
+  --pill-repaired: oklch(0.62 0.14 70);
+  --pill-pending: oklch(0.55 0.09 255);
 }
 
 .dark {
@@ -137,4 +145,11 @@
 
   --scrollbar-thumb: oklch(0.35 var(--tint-c) var(--tint-h));
   --scrollbar-thumb-hover: oklch(0.45 var(--tint-c) var(--tint-h));
+
+  /* Lifted lightness so pills read on dark surfaces */
+  --pill-web: oklch(0.72 0.14 245);
+  --pill-koreader: oklch(0.72 0.17 295);
+  --pill-kobo: oklch(0.74 0.1 195);
+  --pill-repaired: oklch(0.78 0.13 70);
+  --pill-pending: oklch(0.72 0.09 255);
 }

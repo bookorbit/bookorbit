@@ -111,7 +111,7 @@ function handleExportJson() {
 </script>
 
 <template>
-  <div class="max-w-4xl mx-auto px-4 py-6">
+  <div class="w-full max-w-8xl py-4 sm:py-6">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
       <div class="flex items-center gap-2">
         <Highlighter :size="22" class="text-primary" />

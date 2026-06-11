@@ -1,9 +1,23 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowUpDown, CheckSquare, Highlighter, Maximize2, Minimize2, Palette, Trash2 } from 'lucide-vue-next'
+import {
+  ArrowUpDown,
+  CheckSquare,
+  Contrast,
+  Highlighter,
+  Maximize2,
+  Minimize2,
+  Palette,
+  Strikethrough,
+  Trash2,
+  Underline,
+  Waves,
+} from 'lucide-vue-next'
 import { ANNOTATION_HIGHLIGHT_COLORS, type AnnotationItem, type BookDetail } from '@bookorbit/types'
 import AnnotationListItem from '@/features/annotations/components/AnnotationListItem.vue'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { PILL_CLASS, sourcePill } from '@/features/annotations/lib/pill-styles'
 import { useBookHighlights } from '@/features/book/composables/useBookHighlights'
 import HighlightsFilterBar from './HighlightsFilterBar.vue'
 import HighlightChapterGroup from './HighlightChapterGroup.vue'
@@ -45,24 +59,12 @@ const {
 const BULK_COLORS = ANNOTATION_HIGHLIGHT_COLORS
 
 const BULK_STYLES = [
-  { value: 'highlight', label: 'Highlight' },
-  { value: 'underline', label: 'Underline' },
-  { value: 'strikethrough', label: 'Strike' },
-  { value: 'squiggly', label: 'Squiggle' },
-  { value: 'invert', label: 'Invert' },
+  { value: 'highlight', label: 'Highlight', icon: Highlighter },
+  { value: 'underline', label: 'Underline', icon: Underline },
+  { value: 'strikethrough', label: 'Strike', icon: Strikethrough },
+  { value: 'squiggly', label: 'Squiggle', icon: Waves },
+  { value: 'invert', label: 'Invert', icon: Contrast },
 ]
-
-const ORIGIN_LABELS: Record<AnnotationItem['origin'], string> = {
-  web: 'Web',
-  koreader: 'KOReader',
-  kobo: 'Kobo',
-}
-
-const ORIGIN_CLASSES: Record<AnnotationItem['origin'], string> = {
-  web: 'border-primary/30 bg-primary/10 text-primary',
-  koreader: 'border-border bg-secondary text-secondary-foreground',
-  kobo: 'border-destructive/30 bg-destructive/10 text-destructive',
-}
 
 const density = ref<'compact' | 'comfortable'>('comfortable')
 const selectedIds = ref<Set<number>>(new Set())
@@ -98,9 +100,7 @@ const sortLabel = computed(() => {
 })
 
 const originSummary = computed(() => {
-  return (stats.value?.originBreakdown ?? [])
-    .filter((entry) => entry.count > 0)
-    .map((entry) => ({ label: ORIGIN_LABELS[entry.origin], count: entry.count, class: ORIGIN_CLASSES[entry.origin] }))
+  return (stats.value?.originBreakdown ?? []).filter((entry) => entry.count > 0).map((entry) => ({ ...sourcePill(entry.origin), count: entry.count }))
 })
 
 const summaryItems = computed(() => {
@@ -241,7 +241,7 @@ function handleDateRangeChange(from: string | undefined, to: string | undefined)
 </script>
 
 <template>
-  <div class="space-y-5">
+  <div class="space-y-3">
     <div v-if="error" class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive">
       {{ error }}
     </div>
@@ -284,9 +284,8 @@ function handleDateRangeChange(from: string | undefined, to: string | undefined)
       class="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground"
     >
       <span v-for="item in summaryItems" :key="item" class="font-medium text-foreground">{{ item }}</span>
-      <span v-for="origin in originSummary" :key="origin.label" class="rounded border px-2 py-0.5" :class="origin.class">
-        {{ origin.label }} {{ origin.count }}
-      </span>
+      <span v-if="originSummary.length > 0" class="h-3 w-px bg-border" />
+      <span v-for="origin in originSummary" :key="origin.label" :class="[PILL_CLASS, origin.class]"> {{ origin.label }} {{ origin.count }} </span>
     </div>
 
     <div v-if="hasSelection" class="flex flex-wrap items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
@@ -314,20 +313,23 @@ function handleDateRangeChange(from: string | undefined, to: string | undefined)
           class="h-6 w-6 rounded-full border border-border transition-transform hover:scale-110"
           :style="{ background: color.hex }"
           :title="color.label"
-          @click="() => handleBulkColor(color.hex)"
+          @click="handleBulkColor(color.hex)"
         />
       </div>
 
       <div class="flex flex-wrap items-center gap-1">
-        <button
-          v-for="style in BULK_STYLES"
-          :key="style.value"
-          type="button"
-          class="rounded border border-border bg-card px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          @click="() => handleBulkStyle(style.value)"
-        >
-          {{ style.label }}
-        </button>
+        <Tooltip v-for="style in BULK_STYLES" :key="style.value">
+          <TooltipTrigger as-child>
+            <button
+              type="button"
+              class="flex h-7 w-7 items-center justify-center rounded border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              @click="handleBulkStyle(style.value)"
+            >
+              <component :is="style.icon" :size="14" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>{{ style.label }}</TooltipContent>
+        </Tooltip>
       </div>
 
       <div class="flex-1" />
