@@ -10,6 +10,7 @@ import {
   Copy,
   FileEdit,
   Highlighter,
+  Info,
   Palette,
   Smartphone,
   Strikethrough,
@@ -353,6 +354,18 @@ function shouldSeparateMetadataItem(index: number): boolean {
         </div>
 
         <div class="flex shrink-0 flex-wrap justify-start gap-0.5 sm:flex-nowrap sm:justify-end">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <RouterLink
+                :to="bookLink"
+                class="flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
+              >
+                <Info :size="15" />
+              </RouterLink>
+            </TooltipTrigger>
+            <TooltipContent>Book details</TooltipContent>
+          </Tooltip>
+
           <Tooltip v-if="canJump">
             <TooltipTrigger as-child>
               <button
