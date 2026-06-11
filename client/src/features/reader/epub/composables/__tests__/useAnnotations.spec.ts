@@ -17,11 +17,16 @@ function makeAnnotation(id: number, cfi = `epubcfi(/6/${id})`): Annotation {
     id,
     bookId: 9,
     cfi,
+    jumpFileId: 33,
+    pageno: null,
     text: `Selection ${id}`,
     color: '#FACC15',
     style: 'highlight',
     note: null,
     chapterTitle: 'Intro',
+    origin: 'web',
+    positionStatus: 'exact',
+    chapterIndex: null,
     createdAt: '2026-01-01T00:00:00.000Z',
   }
 }
@@ -62,11 +67,12 @@ describe('useAnnotations', () => {
 
   it('creates and appends annotation on success', async () => {
     const created = makeAnnotation(3)
+    const createdCfi = created.cfi ?? 'epubcfi(/6/3)'
     apiMock.mockResolvedValueOnce(response(true, created))
 
     const store = useAnnotations()
     const result = await store.create(9, {
-      cfi: created.cfi,
+      cfi: createdCfi,
       text: created.text,
       color: created.color,
       style: created.style,
@@ -78,7 +84,7 @@ describe('useAnnotations', () => {
     expect(url).toBe('/api/v1/books/9/annotations')
     expect(req.method).toBe('POST')
     expect(JSON.parse(String(req.body))).toEqual({
-      cfi: created.cfi,
+      cfi: createdCfi,
       text: created.text,
       color: created.color,
       style: created.style,

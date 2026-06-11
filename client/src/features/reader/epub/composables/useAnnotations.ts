@@ -1,20 +1,8 @@
 import { ref } from 'vue'
+import type { AnnotationItem } from '@bookorbit/types'
 import { api } from '@/lib/api'
 
-export interface Annotation {
-  id: number
-  bookId: number
-  cfi: string | null
-  text: string
-  color: string
-  style: string
-  note: string | null
-  chapterTitle: string | null
-  origin: 'web' | 'koreader' | 'kobo'
-  positionStatus: 'exact' | 'repaired' | 'failed' | 'pending' | null
-  chapterIndex: number | null
-  createdAt: string
-}
+export type Annotation = AnnotationItem
 
 export function useAnnotations() {
   const annotations = ref<Annotation[]>([])

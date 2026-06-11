@@ -3,10 +3,14 @@ import { ref } from 'vue'
 import { Download, FileText, FileJson, FileType } from '@lucide/vue'
 import type { AnnotationItem } from '@bookorbit/types'
 
-const props = defineProps<{
-  items: AnnotationItem[]
-  bookTitle: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    items: AnnotationItem[]
+    bookTitle: string
+    label?: string
+  }>(),
+  { label: 'Export' },
+)
 
 const open = ref(false)
 
@@ -107,7 +111,7 @@ function exportJson() {
       @click="toggleMenu"
     >
       <Download :size="14" />
-      Export
+      {{ label }}
     </button>
 
     <Teleport to="body">

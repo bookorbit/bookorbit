@@ -4,6 +4,8 @@ export interface AnnotationItem {
   id: number;
   bookId: number;
   cfi: string | null;
+  jumpFileId: number | null;
+  pageno: number | null;
   text: string;
   color: string;
   style: string;
@@ -18,6 +20,7 @@ export interface AnnotationItem {
 export interface AnnotationStats {
   totalHighlights: number;
   colorBreakdown: { color: string; count: number }[];
+  originBreakdown: { origin: AnnotationItem["origin"]; count: number }[];
   chaptersWithHighlights: number;
   highlightsWithNotes: number;
   chapters: string[];
@@ -34,8 +37,6 @@ export interface AnnotationListResponse {
 export interface AnnotationHubItem extends AnnotationItem {
   bookTitle: string | null;
   deletedAt: string | null;
-  jumpFileId: number | null;
-  pageno: number | null;
 }
 
 export interface AnnotationHubResponse {

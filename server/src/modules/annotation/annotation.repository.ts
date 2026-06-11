@@ -26,8 +26,14 @@ import { annotationPositions, annotationSyncState, annotations, bookMetadata, bo
 
 type Db = NodePgDatabase<typeof schema>;
 
-export type AnnotationWithCfi = AnnotationRow & { cfi: string | null; cfiStatus: string | null; cfiExtras: Record<string, unknown> | null };
-export type HubAnnotationRow = AnnotationWithCfi & { bookTitle: string | null; jumpFileId: number | null; pageno: number | null };
+export type AnnotationWithCfi = AnnotationRow & {
+  cfi: string | null;
+  cfiStatus: string | null;
+  cfiExtras: Record<string, unknown> | null;
+  jumpFileId: number | null;
+  pageno: number | null;
+};
+export type HubAnnotationRow = AnnotationWithCfi & { bookTitle: string | null };
 
 export interface HubFilters {
   bookId?: number;
@@ -67,6 +73,7 @@ export interface PaginatedAnnotations {
 export interface AnnotationStatsResult {
   totalHighlights: number;
   colorBreakdown: { color: string; count: number }[];
+  originBreakdown: { origin: AnnotationRow['origin']; count: number }[];
   chaptersWithHighlights: number;
   highlightsWithNotes: number;
 }
@@ -82,9 +89,16 @@ export class AnnotationRepository {
         cfi: annotationPositions.pos0,
         cfiStatus: annotationPositions.status,
         cfiExtras: annotationPositions.extras,
+        jumpFileId: sql<
+          number | null
+        >`coalesce(${annotationPositions.bookFileId}, (select ap2.book_file_id from annotation_positions ap2 where ap2.annotation_id = ${annotations.id} and ap2.format in ('xpointer', 'pdf') limit 1), ${books.primaryFileId})`,
+        pageno: sql<
+          number | null
+        >`(select (ap3.extras ->> 'pageno')::int from annotation_positions ap3 where ap3.annotation_id = ${annotations.id} and ap3.format in ('xpointer', 'pdf') limit 1)`,
       })
       .from(annotations)
-      .leftJoin(annotationPositions, and(eq(annotationPositions.annotationId, annotations.id), eq(annotationPositions.format, 'cfi')));
+      .leftJoin(annotationPositions, and(eq(annotationPositions.annotationId, annotations.id), eq(annotationPositions.format, 'cfi')))
+      .leftJoin(books, eq(books.id, annotations.bookId));
   }
 
   async findByBookId(bookId: number, userId: number): Promise<AnnotationWithCfi[]> {
@@ -132,7 +146,7 @@ export class AnnotationRepository {
     const conditions = this.buildConditions(bookId, userId, filters);
     const cfiJoin = and(eq(annotationPositions.annotationId, annotations.id), eq(annotationPositions.format, 'cfi'));
 
-    const [aggregateResult, colorResult] = await Promise.all([
+    const [aggregateResult, colorResult, originResult] = await Promise.all([
       this.db
         .select({
           totalHighlights: count(),
@@ -152,6 +166,16 @@ export class AnnotationRepository {
         .where(and(...conditions))
         .groupBy(annotations.color)
         .orderBy(desc(count())),
+      this.db
+        .select({
+          origin: annotations.origin,
+          count: count(),
+        })
+        .from(annotations)
+        .leftJoin(annotationPositions, cfiJoin)
+        .where(and(...conditions))
+        .groupBy(annotations.origin)
+        .orderBy(desc(count())),
     ]);
 
     const agg = aggregateResult[0];
@@ -161,6 +185,7 @@ export class AnnotationRepository {
       chaptersWithHighlights: agg?.chaptersWithHighlights ?? 0,
       highlightsWithNotes: agg?.highlightsWithNotes ?? 0,
       colorBreakdown: colorResult.map((r) => ({ color: r.color, count: r.count })),
+      originBreakdown: originResult.map((r) => ({ origin: r.origin, count: r.count })),
     };
   }
 
@@ -186,7 +211,7 @@ export class AnnotationRepository {
         pos0: cfi,
         status: 'exact',
       });
-      return { ...row, cfi, cfiStatus: 'exact', cfiExtras: null };
+      return { ...row, cfi, cfiStatus: 'exact', cfiExtras: null, jumpFileId: bookFileId ?? null, pageno: null };
     });
   }
 

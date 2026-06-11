@@ -80,6 +80,22 @@ export function useBookHighlights(bookIdRef: Ref<number>) {
     }
   }
 
+  async function updateStyle(annotationId: number, style: string) {
+    try {
+      const bookId = bookIdRef.value
+      const res = await api(`/api/v1/books/${bookId}/annotations/${annotationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ style }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const updated: AnnotationItem = await res.json()
+      items.value = items.value.map((a) => (a.id === annotationId ? updated : a))
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to update style'
+    }
+  }
+
   async function deleteHighlight(annotationId: number) {
     const bookId = bookIdRef.value
     const prev = items.value
@@ -94,6 +110,48 @@ export function useBookHighlights(bookIdRef: Ref<number>) {
       items.value = prev
       total.value = prevTotal
       error.value = e instanceof Error ? e.message : 'Failed to delete highlight'
+    }
+  }
+
+  async function bulkTrash(annotationIds: number[]): Promise<number> {
+    if (annotationIds.length === 0) return 0
+    const prev = items.value
+    const prevTotal = total.value
+    items.value = items.value.filter((a) => !annotationIds.includes(a.id))
+    total.value = Math.max(0, total.value - annotationIds.length)
+    try {
+      const res = await api('/api/v1/annotations/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: annotationIds, action: 'trash' }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const body = (await res.json()) as { affected: number }
+      await fetchHighlights()
+      return body.affected
+    } catch (e) {
+      items.value = prev
+      total.value = prevTotal
+      error.value = e instanceof Error ? e.message : 'Failed to move highlights to trash'
+      return 0
+    }
+  }
+
+  async function bulkRestyle(annotationIds: number[], patch: { color?: string; style?: string }): Promise<number> {
+    if (annotationIds.length === 0) return 0
+    try {
+      const res = await api('/api/v1/annotations/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: annotationIds, action: 'restyle', ...patch }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const body = (await res.json()) as { affected: number }
+      await fetchHighlights()
+      return body.affected
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to update selected highlights'
+      return 0
     }
   }
 
@@ -173,7 +231,10 @@ export function useBookHighlights(bookIdRef: Ref<number>) {
     fetchHighlights,
     updateNote,
     updateColor,
+    updateStyle,
     deleteHighlight,
+    bulkTrash,
+    bulkRestyle,
     setPage,
     setSort,
     toggleColor,

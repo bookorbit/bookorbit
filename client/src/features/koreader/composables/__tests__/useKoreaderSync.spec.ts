@@ -30,7 +30,7 @@ function makeSyncStatus(overrides: Partial<KoreaderSyncStatus> = {}): KoreaderSy
     totalSyncedBooks: 14,
     lastSyncAt: '2026-01-02T00:00:00.000Z',
     sweeps: [],
-    pluginTotals: { matchedBooks: 0, pageStatEvents: 0, annotations: 0 },
+    pluginTotals: { matchedBooks: 0, trashedAnnotations: 0, pendingDeletes: 0, failedPositions: 0, pageStatEvents: 0, annotations: 0 },
     ...overrides,
   }
 }
@@ -198,8 +198,8 @@ describe('useKoreaderSync', () => {
 
     const originalCreateObjectURL = URL.createObjectURL
     const originalRevokeObjectURL = URL.revokeObjectURL
-    const createObjectURL = vi.fn(() => 'blob:plugin-zip')
-    const revokeObjectURL = vi.fn()
+    const createObjectURL = vi.fn<(obj: Blob | MediaSource) => string>(() => 'blob:plugin-zip')
+    const revokeObjectURL = vi.fn<(url: string) => void>()
     URL.createObjectURL = createObjectURL
     URL.revokeObjectURL = revokeObjectURL
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})

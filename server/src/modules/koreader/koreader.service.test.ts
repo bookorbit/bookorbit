@@ -140,7 +140,14 @@ describe('KoreaderService', () => {
 
     mockPluginRepo = {
       listSweeps: vi.fn().mockResolvedValue([]),
-      getPluginTotals: vi.fn().mockResolvedValue({ matchedBooks: 0, pageStatEvents: 0, annotations: 0 }),
+      getPluginTotals: vi.fn().mockResolvedValue({
+        matchedBooks: 0,
+        trashedAnnotations: 0,
+        pendingDeletes: 0,
+        failedPositions: 0,
+        pageStatEvents: 0,
+        annotations: 0,
+      }),
     };
 
     mockRepo.deleteKoreaderUser.mockResolvedValue(undefined);
@@ -561,7 +568,7 @@ describe('KoreaderService', () => {
         totalSyncedBooks: 14,
         lastSyncAt: '2026-02-01T10:00:00.000Z',
         sweeps: [],
-        pluginTotals: { matchedBooks: 0, pageStatEvents: 0, annotations: 0 },
+        pluginTotals: { matchedBooks: 0, trashedAnnotations: 0, pendingDeletes: 0, failedPositions: 0, pageStatEvents: 0, annotations: 0 },
       });
 
       expect(getCredentialsSpy).toHaveBeenCalledWith(7);

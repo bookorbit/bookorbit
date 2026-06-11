@@ -4,6 +4,8 @@ export class AnnotationResponseDto {
   id!: number;
   bookId!: number;
   cfi!: string | null;
+  jumpFileId!: number | null;
+  pageno!: number | null;
   text!: string;
   color!: string;
   style!: string;
@@ -19,6 +21,8 @@ export class AnnotationResponseDto {
     dto.id = row.id;
     dto.bookId = row.bookId;
     dto.cfi = row.cfi;
+    dto.jumpFileId = row.jumpFileId;
+    dto.pageno = row.pageno;
     dto.text = row.text;
     dto.color = row.color;
     dto.style = row.style;

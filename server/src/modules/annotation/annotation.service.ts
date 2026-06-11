@@ -49,6 +49,8 @@ export class AnnotationService {
           id: dto.id,
           bookId: dto.bookId,
           cfi: dto.cfi,
+          jumpFileId: dto.jumpFileId,
+          pageno: dto.pageno,
           text: dto.text,
           color: dto.color,
           style: dto.style,

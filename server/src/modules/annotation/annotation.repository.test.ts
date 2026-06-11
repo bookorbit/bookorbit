@@ -284,6 +284,10 @@ describe('AnnotationRepository', () => {
           { color: 'yellow', count: 3 },
           { color: '#4ADE80', count: 2 },
         ],
+        [
+          { origin: 'web', count: 4 },
+          { origin: 'koreader', count: 1 },
+        ],
       );
       const repo = new AnnotationRepository(db as never);
 
@@ -296,16 +300,21 @@ describe('AnnotationRepository', () => {
         { color: 'yellow', count: 3 },
         { color: '#4ADE80', count: 2 },
       ]);
+      expect(result.originBreakdown).toEqual([
+        { origin: 'web', count: 4 },
+        { origin: 'koreader', count: 1 },
+      ]);
     });
 
     it('returns zero stats when no annotations exist', async () => {
-      const db = makeDb([{ totalHighlights: 0, chaptersWithHighlights: 0, highlightsWithNotes: 0 }], []);
+      const db = makeDb([{ totalHighlights: 0, chaptersWithHighlights: 0, highlightsWithNotes: 0 }], [], []);
       const repo = new AnnotationRepository(db as never);
 
       const result = await repo.getStats(5, 10, {});
 
       expect(result.totalHighlights).toBe(0);
       expect(result.colorBreakdown).toEqual([]);
+      expect(result.originBreakdown).toEqual([]);
     });
   });
 
