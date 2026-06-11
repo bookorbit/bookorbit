@@ -20,6 +20,7 @@ local util = require("util")
 local T = require("ffi/util").template
 local _ = require("gettext")
 
+local BookOrbitAnnotations = require("bookorbit_annotations")
 local BookOrbitApi = require("bookorbit_api")
 local BookOrbitSidecar = require("bookorbit_sidecar")
 local BookOrbitState = require("bookorbit_state")
@@ -273,6 +274,7 @@ end
 -- queue annotation/state/progress deltas.
 local function stepSidecars(ctx)
     ctx.pending_books = {}
+    ctx.ann_queue = {}
     ctx.ann_chunks = {}
     ctx.states_items = {}
     ctx.progress_items = {}
@@ -288,28 +290,21 @@ local function stepSidecars(ctx)
                         mtime = mtime,
                         ann_count = extract.annotations_count,
                         ann_max_datetime = extract.annotations_max_datetime,
-                        ann_chunks_left = 0,
+                        ann_done = false,
                         failed = false,
                         need_state = false,
                         need_progress = false,
                     }
 
-                    local ann_watermark = book.annWatermark or ""
-                    local delta = {}
-                    for _, annotation in ipairs(extract.annotations) do
-                        local effective = annotation.datetimeUpdated or annotation.datetime
-                        if effective > ann_watermark then
-                            table.insert(delta, annotation)
-                        end
-                    end
-                    for i = 1, #delta, ANN_BATCH_TOTAL do
-                        local chunk = {}
-                        for j = i, math.min(i + ANN_BATCH_TOTAL - 1, #delta) do
-                            table.insert(chunk, delta[j])
-                        end
-                        table.insert(ctx.ann_chunks, { md5 = md5, annotations = chunk })
-                        pending.ann_chunks_left = pending.ann_chunks_left + 1
-                    end
+                    -- Every changed sidecar goes through the exchange, even with
+                    -- no new local highlights: the full key set is what lets the
+                    -- server detect on-device deletions.
+                    table.insert(ctx.ann_queue, {
+                        md5 = md5,
+                        file = book.file,
+                        annotations = extract.annotations,
+                        ann_max_datetime = extract.annotations_max_datetime,
+                    })
 
                     if extract.status or extract.rating then
                         local state_changed = extract.status ~= nil
@@ -352,9 +347,98 @@ local function stepSidecars(ctx)
     step(ctx, ctx.steps.annotationsNext)
 end
 
--- Phase 5: upload annotation chunks, packing several books per request while
--- respecting both the per-request book and annotation caps.
+local buildLegacyAnnotationChunks
+
+local function currentlyOpenFile()
+    local ok, ReaderUI = pcall(require, "apps/reader/readerui")
+    if ok and ReaderUI and ReaderUI.instance and ReaderUI.instance.document then
+        return ReaderUI.instance.document.file
+    end
+end
+
+-- Phase 5: per-book annotation exchange. Uploads the local delta, reports the
+-- key set for deletion detection and applies server-side changes into the
+-- sidecar of closed books. Falls back to the legacy one-way upload when the
+-- server has no exchange endpoint.
 local function stepAnnotationsNext(ctx)
+    if ctx.use_legacy_annotations then
+        return step(ctx, ctx.steps.annotationsLegacyNext)
+    end
+    local entry = table.remove(ctx.ann_queue, 1)
+    if not entry then
+        step(ctx, ctx.steps.statesNext)
+        return
+    end
+
+    local pending = ctx.pending_books[entry.md5]
+    local apply_mode = "skip"
+    if ctx.annotation_sync and entry.file ~= currentlyOpenFile() then
+        apply_mode = "sidecar"
+    end
+
+    local result, err = BookOrbitAnnotations.exchangeBook({
+        client = ctx.client,
+        state = ctx.state,
+        digest = entry.md5,
+        annotations = entry.annotations,
+        ann_max_datetime = entry.ann_max_datetime,
+        apply_mode = apply_mode,
+        file = entry.file,
+    })
+    if not result then
+        if isAuthError(err) or err == "auth" then return finish(ctx, "auth") end
+        if err == "unsupported_server" then
+            -- Re-queue everything, including this entry, for the legacy path.
+            table.insert(ctx.ann_queue, 1, entry)
+            ctx.use_legacy_annotations = true
+            buildLegacyAnnotationChunks(ctx)
+            return step(ctx, ctx.steps.annotationsLegacyNext)
+        end
+        ctx.had_errors = true
+        if pending then pending.failed = true end
+        logger.dbg("BookOrbit: annotation exchange failed for", entry.md5, err)
+        return step(ctx, ctx.steps.annotationsNext)
+    end
+
+    if result.had_errors then
+        ctx.had_errors = true
+        if pending then pending.failed = true end
+    elseif pending then
+        pending.ann_done = true
+    end
+    ctx.counts.annotations = ctx.counts.annotations + result.uploaded
+    ctx.counts.ann_applied = (ctx.counts.ann_applied or 0) + result.applied
+    return step(ctx, ctx.steps.annotationsNext)
+end
+
+-- Legacy phase 5: one-way chunk upload, packing several books per request
+-- while respecting both the per-request book and annotation caps.
+buildLegacyAnnotationChunks = function(ctx)
+    for _, entry in ipairs(ctx.ann_queue) do
+        local book = ctx.state:getBook(entry.md5)
+        local ann_watermark = book and book.annWatermark or ""
+        local delta = {}
+        for _, annotation in ipairs(entry.annotations) do
+            local effective = annotation.datetimeUpdated or annotation.datetime
+            if effective > ann_watermark then
+                table.insert(delta, annotation)
+            end
+        end
+        local pending = ctx.pending_books[entry.md5]
+        if pending then pending.ann_chunks_left = 0 end
+        for i = 1, #delta, ANN_BATCH_TOTAL do
+            local chunk = {}
+            for j = i, math.min(i + ANN_BATCH_TOTAL - 1, #delta) do
+                table.insert(chunk, delta[j])
+            end
+            table.insert(ctx.ann_chunks, { md5 = entry.md5, annotations = chunk })
+            if pending then pending.ann_chunks_left = pending.ann_chunks_left + 1 end
+        end
+    end
+    ctx.ann_queue = {}
+end
+
+local function stepAnnotationsLegacyNext(ctx)
     if #ctx.ann_chunks == 0 then
         step(ctx, ctx.steps.statesNext)
         return
@@ -379,7 +463,7 @@ local function stepAnnotationsNext(ctx)
             local pending = ctx.pending_books[book.hash]
             if pending then pending.failed = true end
         end
-        step(ctx, ctx.steps.annotationsNext)
+        step(ctx, ctx.steps.annotationsLegacyNext)
         return
     end
 
@@ -399,7 +483,7 @@ local function stepAnnotationsNext(ctx)
         end
     end
 
-    step(ctx, ctx.steps.annotationsNext)
+    step(ctx, ctx.steps.annotationsLegacyNext)
 end
 
 -- Phase 6: book status + rating, batched.
@@ -495,7 +579,7 @@ local function stepDone(ctx)
     for md5, pending in pairs(ctx.pending_books) do
         local book = ctx.state:getBook(md5)
         if book and not pending.failed then
-            local ann_done = pending.ann_chunks_left <= 0
+            local ann_done = pending.ann_done or (pending.ann_chunks_left ~= nil and pending.ann_chunks_left <= 0)
             local state_done = not pending.need_state or pending.state_acked
             local progress_done = not pending.need_progress or pending.progress_acked
             if ann_done and state_done and progress_done then
@@ -573,8 +657,9 @@ function BookOrbitSweep.run(opts)
         client = client,
         state = state,
         interactive = opts.interactive or false,
+        annotation_sync = opts.annotation_sync ~= false,
         full_recheck = opts.interactive or state.global.needsFullRecheck or false,
-        counts = { books_matched = 0, page_stats = 0, annotations = 0 },
+        counts = { books_matched = 0, page_stats = 0, annotations = 0, ann_applied = 0 },
         had_errors = false,
     }
     ctx.steps = {
@@ -584,6 +669,7 @@ function BookOrbitSweep.run(opts)
         statsNext = stepStatsNext,
         sidecars = stepSidecars,
         annotationsNext = stepAnnotationsNext,
+        annotationsLegacyNext = stepAnnotationsLegacyNext,
         statesNext = stepStatesNext,
         progressNext = stepProgressNext,
         done = stepDone,

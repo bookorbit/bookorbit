@@ -239,6 +239,12 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: "What's New" },
       },
       {
+        path: '/annotations',
+        name: 'annotations',
+        component: () => import('@/features/annotations/views/AnnotationsHubView.vue'),
+        meta: { title: 'Annotations' },
+      },
+      {
         path: '/statistics',
         name: 'statistics',
         component: () => import('@/features/statistics/components/StatisticsPage.vue'),

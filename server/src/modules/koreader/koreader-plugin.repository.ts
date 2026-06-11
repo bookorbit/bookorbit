@@ -269,22 +269,48 @@ export class KoreaderPluginRepository {
       .orderBy(desc(schema.koreaderDeviceSweeps.lastSweepAt));
   }
 
-  async getPluginTotals(userId: number): Promise<{ matchedBooks: number; pageStatEvents: number; annotations: number }> {
-    const result = await this.db.execute<{ matched_books: string | number; page_stat_events: string | number; annotations: string | number }>(sql`
+  async getPluginTotals(userId: number): Promise<{
+    matchedBooks: number;
+    pageStatEvents: number;
+    annotations: number;
+    trashedAnnotations: number;
+    pendingDeletes: number;
+    failedPositions: number;
+  }> {
+    const result = await this.db.execute<{
+      matched_books: string | number;
+      page_stat_events: string | number;
+      annotations: string | number;
+      trashed_annotations: string | number;
+      pending_deletes: string | number;
+      failed_positions: string | number;
+    }>(sql`
       select
         (select count(distinct t.book_file_id) from (
           select book_file_id from koreader_page_stats where user_id = ${userId}
           union
-          select book_file_id from koreader_annotations where user_id = ${userId}
+          select ap.book_file_id from annotation_positions ap
+            join annotations a on a.id = ap.annotation_id
+            where a.user_id = ${userId} and a.origin = 'koreader' and ap.book_file_id is not null and ap.format in ('xpointer', 'pdf')
         ) t) as matched_books,
         (select count(*) from koreader_page_stats where user_id = ${userId}) as page_stat_events,
-        (select count(*) from koreader_annotations where user_id = ${userId}) as annotations
+        (select count(*) from annotations where user_id = ${userId} and origin = 'koreader' and deleted_at is null) as annotations,
+        (select count(*) from annotations where user_id = ${userId} and deleted_at is not null) as trashed_annotations,
+        (select count(*) from annotation_sync_state s
+          join annotations a on a.id = s.annotation_id
+          where s.user_id = ${userId} and a.deleted_at is not null and s.delete_acked_at is null) as pending_deletes,
+        (select count(*) from annotation_positions ap
+          join annotations a on a.id = ap.annotation_id
+          where ap.user_id = ${userId} and a.deleted_at is null and ap.status = 'failed') as failed_positions
     `);
     const row = result.rows[0];
     return {
       matchedBooks: Number(row?.matched_books ?? 0),
       pageStatEvents: Number(row?.page_stat_events ?? 0),
       annotations: Number(row?.annotations ?? 0),
+      trashedAnnotations: Number(row?.trashed_annotations ?? 0),
+      pendingDeletes: Number(row?.pending_deletes ?? 0),
+      failedPositions: Number(row?.failed_positions ?? 0),
     };
   }
 

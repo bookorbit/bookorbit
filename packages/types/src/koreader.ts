@@ -32,6 +32,9 @@ export interface KoreaderDeviceSweepInfo {
 
 export interface KoreaderPluginTotals {
   matchedBooks: number;
+  trashedAnnotations: number;
+  pendingDeletes: number;
+  failedPositions: number;
   pageStatEvents: number;
   annotations: number;
 }

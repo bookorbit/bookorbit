@@ -17,6 +17,7 @@ local logger = require("logger")
 local T = require("ffi/util").template
 local _ = require("gettext")
 
+local BookOrbitAnnotations = require("bookorbit_annotations")
 local BookOrbitApi = require("bookorbit_api")
 local BookOrbitSidecar = require("bookorbit_sidecar")
 local BookOrbitState = require("bookorbit_state")
@@ -122,16 +123,16 @@ local function finish(ctx, err)
         logger.dbg("BookOrbit: book sync skipped, book unmatched:", ctx.snap.digest)
     else
         if ctx.interactive then
-            local text = T(_("BookOrbit: book synced. %1 reading events, %2 highlights."),
-                ctx.counts.page_stats, ctx.counts.annotations)
+            local text = T(_("BookOrbit: book synced. %1 reading events, %2 highlights up, %3 applied."),
+                ctx.counts.page_stats, ctx.counts.annotations, ctx.counts.ann_applied or 0)
             if ctx.had_errors then
                 text = text .. "\n" .. _("Some uploads failed and will retry on the next sync.")
             end
             UIManager:show(InfoMessage:new{ text = text, timeout = 4 })
         end
         logger.info(string.format(
-            "BookOrbit: book sync done reason=%s pageStats=%d annotations=%d errors=%s",
-            ctx.reason, ctx.counts.page_stats, ctx.counts.annotations, tostring(ctx.had_errors)))
+            "BookOrbit: book sync done reason=%s pageStats=%d annotations=%d applied=%d errors=%s",
+            ctx.reason, ctx.counts.page_stats, ctx.counts.annotations, ctx.counts.ann_applied or 0, tostring(ctx.had_errors)))
     end
 
     if ctx.on_finish then
@@ -156,7 +157,7 @@ local function step(ctx, fn)
     end)
 end
 
-local stepMatch, stepStats, stepAnnotations, stepState, stepProgress
+local stepMatch, stepStats, stepAnnotations, stepAnnotationsLegacy, stepState, stepProgress
 
 stepMatch = function(ctx)
     local book = ctx.state:getBook(ctx.snap.digest)
@@ -222,7 +223,57 @@ stepStats = function(ctx)
     return step(ctx, stepAnnotations)
 end
 
+-- Two-way exchange: uploads the local delta, reports the full key set for
+-- deletion detection, applies server-side changes (live for the manual sync
+-- while the book is open, sidecar on the close path) and acks them.
 stepAnnotations = function(ctx)
+    local book = ctx.state:getBook(ctx.snap.digest)
+    if not book then return finish(ctx, "unmatched") end
+
+    local apply_mode = "skip"
+    if ctx.annotation_sync then
+        if ctx.reason == "close" then
+            apply_mode = "sidecar"
+        elseif ctx.reason == "manual" and ctx.plugin and ctx.plugin.ui and ctx.plugin.ui.document then
+            apply_mode = "live"
+        end
+    end
+
+    local result, err = BookOrbitAnnotations.exchangeBook({
+        client = ctx.client,
+        state = ctx.state,
+        digest = ctx.snap.digest,
+        annotations = ctx.snap.annotations,
+        ann_max_datetime = ctx.snap.ann_max_datetime,
+        apply_mode = apply_mode,
+        ui = apply_mode == "live" and ctx.plugin.ui or nil,
+        file = ctx.snap.file,
+    })
+    if not result then
+        if err == "auth" then return finish(ctx, "auth") end
+        if err == "network" then
+            ctx.had_errors = true
+            return finish(ctx, "network")
+        end
+        if err == "unmatched" then return finish(ctx, "unmatched") end
+        if err == "unsupported_server" then
+            return step(ctx, stepAnnotationsLegacy)
+        end
+        ctx.had_errors = true
+        return step(ctx, stepState)
+    end
+
+    if result.had_errors then ctx.had_errors = true end
+    ctx.counts.annotations = ctx.counts.annotations + result.uploaded
+    ctx.counts.ann_applied = (ctx.counts.ann_applied or 0) + result.applied
+    if not result.had_errors then
+        book.annCount = ctx.snap.ann_count
+    end
+    return step(ctx, stepState)
+end
+
+-- One-way upload for servers without the 0.4 exchange endpoint.
+stepAnnotationsLegacy = function(ctx)
     local book = ctx.state:getBook(ctx.snap.digest)
     if not book then return finish(ctx, "unmatched") end
 
@@ -269,7 +320,7 @@ stepAnnotations = function(ctx)
     end
 
     ctx.counts.annotations = ctx.counts.annotations + #chunk
-    return step(ctx, stepAnnotations)
+    return step(ctx, stepAnnotationsLegacy)
 end
 
 stepState = function(ctx)
@@ -371,9 +422,10 @@ function BookOrbitBookSync.run(opts)
         reason = opts.reason or "manual",
         interactive = opts.interactive or false,
         synchronous = opts.synchronous or false,
+        annotation_sync = opts.annotation_sync ~= false,
         plugin = opts.plugin,
         on_finish = opts.on_finish,
-        counts = { page_stats = 0, annotations = 0 },
+        counts = { page_stats = 0, annotations = 0, ann_applied = 0 },
         had_errors = false,
     }
 

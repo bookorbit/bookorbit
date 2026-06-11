@@ -28,12 +28,14 @@ local util = require("util")
 local T = require("ffi/util").template
 local _ = require("gettext")
 
+local BookOrbitAnnotations = require("bookorbit_annotations")
 local BookOrbitApi = require("bookorbit_api")
 local BookOrbitBookSync = require("bookorbit_book_sync")
+local BookOrbitState = require("bookorbit_state")
 local BookOrbitMenuPin = require("bookorbit_menu_pin")
 local BookOrbitSweep = require("bookorbit_sweep")
 
-local PLUGIN_VERSION = "0.3.0"
+local PLUGIN_VERSION = "0.4.0"
 
 local SYNC_STRATEGY = {
     PROMPT = 1,
@@ -60,6 +62,7 @@ BookOrbit.default_settings = {
     username = nil,
     userkey = nil,
     auto_sync = false,
+    annotation_sync = true,
     pages_before_update = 10,
     sync_forward = SYNC_STRATEGY.PROMPT,
     sync_backward = SYNC_STRATEGY.DISABLE,
@@ -90,6 +93,9 @@ function BookOrbit:init()
     self.settings.sweep_on_suspend = nil
     if self.settings.pages_before_update == nil then
         self.settings.pages_before_update = 10
+    end
+    if self.settings.annotation_sync == nil then
+        self.settings.annotation_sync = true
     end
 
     self:applyProvision()
@@ -198,10 +204,52 @@ function BookOrbit:onReaderReady()
         UIManager:nextTick(function()
             self:getProgress(true, false)
         end)
+        if self.settings.annotation_sync then
+            UIManager:scheduleIn(2, function()
+                self:exchangeAnnotationsForOpenBook()
+            end)
+        end
     end
     self:registerEvents()
 
     self.last_page = self.ui:getCurrentPage()
+end
+
+-- Two-way annotation pull/push for the open book. Runs once per book open;
+-- safe to call again manually, guarded against concurrent syncs.
+function BookOrbit:exchangeAnnotationsForOpenBook()
+    if self.annotation_exchange_running then return end
+    if not self:isLoggedIn() or not self.ui or not self.ui.document then return end
+    if BookOrbitBookSync.isRunning() or BookOrbitSweep.isRunning() then return end
+
+    local digest = self:getDocumentDigest()
+    if not digest then return end
+    local state = BookOrbitState.open()
+    if not state:getBook(digest) then
+        -- Unknown or unmatched book: the close-path snapshot sync matches it.
+        return
+    end
+
+    self.annotation_exchange_running = true
+    local ok, result, err = pcall(BookOrbitAnnotations.exchangeOpenBook, {
+        client = self:newClient(),
+        state = state,
+        digest = digest,
+        ui = self.ui,
+    })
+    state:flush()
+    self.annotation_exchange_running = false
+
+    if not ok then
+        logger.err("BookOrbit: annotation exchange error:", result)
+    elseif result then
+        local touched = (result.applied or 0) + (result.deleted or 0)
+        if touched > 0 then
+            Notification:notify(T(_("BookOrbit: %1 highlight(s) updated"), touched))
+        end
+    elseif err and err ~= "unmatched" and err ~= "unsupported_server" and err ~= "network" then
+        logger.dbg("BookOrbit: annotation exchange skipped:", err)
+    end
 end
 
 -- Menu
@@ -272,6 +320,14 @@ function BookOrbit:addToMainMenu(menu_items)
                 help_text = _([[Pulls progress when a book is opened; pushes progress, highlights, status, rating and reading time when it is closed and on suspend.]]),
                 callback = function()
                     self:onBookOrbitToggleAutoSync(nil, true)
+                end,
+            },
+            {
+                text = _("Two-way highlight sync"),
+                checked_func = function() return self.settings.annotation_sync end,
+                help_text = _([[Also applies highlights, notes and deletions made in BookOrbit to this device: on book open, after the manual book sync, and during the full sweep for closed books. Turning this off keeps uploads only.]]),
+                callback = function()
+                    self.settings.annotation_sync = not self.settings.annotation_sync
                 end,
             },
             {
@@ -677,10 +733,10 @@ function BookOrbit:startSweep()
     end
 
     local api_opts = self:apiOpts()
-    if NetworkMgr:willRerunWhenOnline(function() BookOrbitSweep.run{ api = api_opts, interactive = true } end) then
+    if NetworkMgr:willRerunWhenOnline(function() BookOrbitSweep.run{ api = api_opts, interactive = true, annotation_sync = self.settings.annotation_sync } end) then
         return
     end
-    BookOrbitSweep.run{ api = api_opts, interactive = true }
+    BookOrbitSweep.run{ api = api_opts, interactive = true, annotation_sync = self.settings.annotation_sync }
 end
 
 function BookOrbit:onBookOrbitSyncBook()
@@ -705,7 +761,8 @@ function BookOrbit:onBookOrbitSyncBook()
 
     local api_opts = self:apiOpts()
     local run = function()
-        BookOrbitBookSync.run{ api = api_opts, snap = snap, reason = "manual", interactive = true, plugin = self }
+        BookOrbitBookSync.run{ api = api_opts, snap = snap, reason = "manual", interactive = true, plugin = self,
+            annotation_sync = self.settings.annotation_sync }
     end
     if NetworkMgr:willRerunWhenOnline(run) then
         return
@@ -735,7 +792,8 @@ function BookOrbit:_onCloseDocument()
 
     local api_opts = self:apiOpts()
     NetworkMgr:goOnlineToRun(function()
-        BookOrbitBookSync.run{ api = api_opts, snap = snap, reason = "close", interactive = false }
+        BookOrbitBookSync.run{ api = api_opts, snap = snap, reason = "close", interactive = false,
+            annotation_sync = self.settings.annotation_sync }
     end)
 end
 
@@ -787,6 +845,7 @@ function BookOrbit:_onSuspend()
         BookOrbitBookSync.run{
             api = api_opts, snap = snap, reason = "suspend",
             interactive = false, synchronous = true, plugin = self, on_finish = on_finish,
+            annotation_sync = self.settings.annotation_sync,
         }
     end
     if NetworkMgr:willRerunWhenOnline(run) then

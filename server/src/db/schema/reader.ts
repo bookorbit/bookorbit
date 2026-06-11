@@ -257,12 +257,20 @@ export const annotations = pgTable(
     bookId: integer('book_id')
       .notNull()
       .references(() => books.id, { onDelete: 'cascade' }),
-    cfi: varchar('cfi', { length: 2000 }).notNull(),
     text: text('text').notNull(),
     color: varchar('color', { length: 20 }).notNull().default('yellow'),
     style: varchar('style', { length: 20 }).notNull().default('highlight'),
     note: text('note'),
     chapterTitle: varchar('chapter_title', { length: 500 }),
+    origin: varchar('origin', { length: 10 }).$type<'web' | 'koreader' | 'kobo'>().notNull().default('web'),
+    // Bumped on every content mutation (edit, soft delete, restore, device position
+    // correction); annotation_sync_state.lastAppliedVersion tracks per-device delivery.
+    version: integer('version').notNull().default(1),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    // Device-local "YYYY-MM-DD HH:MM:SS" strings stored verbatim (device has no timezone info).
+    // deviceCreatedAt doubles as the KOReader-side identity datetime for synced annotations.
+    deviceCreatedAt: varchar('device_created_at', { length: 19 }),
+    deviceUpdatedAt: varchar('device_updated_at', { length: 19 }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
@@ -272,12 +280,93 @@ export const annotations = pgTable(
   (t) => [
     index('annotations_user_id_idx').on(t.userId),
     index('annotations_user_book_idx').on(t.userId, t.bookId),
-    check('annotations_style_chk', sql`${t.style} in ('highlight', 'underline', 'strikethrough', 'squiggly')`),
+    index('annotations_user_book_active_idx')
+      .on(t.userId, t.bookId)
+      .where(sql`${t.deletedAt} is null`),
+    check('annotations_style_chk', sql`${t.style} in ('highlight', 'underline', 'strikethrough', 'squiggly', 'invert')`),
+    check('annotations_origin_chk', sql`${t.origin} in ('web', 'koreader', 'kobo')`),
   ],
 );
 
 export type AnnotationRow = typeof annotations.$inferSelect;
 export type NewAnnotation = typeof annotations.$inferInsert;
+
+export const annotationPositions = pgTable(
+  'annotation_positions',
+  {
+    id: serial('id').primaryKey(),
+    annotationId: integer('annotation_id')
+      .notNull()
+      .references(() => annotations.id, { onDelete: 'cascade' }),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bookFileId: integer('book_file_id').references(() => bookFiles.id, { onDelete: 'set null' }),
+    format: varchar('format', { length: 12 }).$type<'cfi' | 'xpointer' | 'pdf' | 'kobo_span'>().notNull(),
+    pos0: text('pos0'),
+    pos1: text('pos1'),
+    // exact: structurally resolved and text-verified; repaired: re-anchored via text search;
+    // pending: generated but not yet verified by the target renderer; failed: no usable position.
+    status: varchar('status', { length: 10 }).$type<'exact' | 'repaired' | 'failed' | 'pending'>().notNull().default('exact'),
+    converterVersion: integer('converter_version'),
+    extras: jsonb('extras').$type<Record<string, unknown>>(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [
+    uniqueIndex('annotation_positions_annotation_format_uidx').on(t.annotationId, t.format),
+    index('annotation_positions_user_idx').on(t.userId),
+    index('annotation_positions_format_status_idx').on(t.format, t.status),
+    check('annotation_positions_format_chk', sql`${t.format} in ('cfi', 'xpointer', 'pdf', 'kobo_span')`),
+    check('annotation_positions_status_chk', sql`${t.status} in ('exact', 'repaired', 'failed', 'pending')`),
+    check('annotation_positions_pos0_chk', sql`${t.status} in ('failed', 'pending') or ${t.pos0} is not null`),
+  ],
+);
+
+export type AnnotationPosition = typeof annotationPositions.$inferSelect;
+export type NewAnnotationPosition = typeof annotationPositions.$inferInsert;
+
+export const annotationSyncState = pgTable(
+  'annotation_sync_state',
+  {
+    id: serial('id').primaryKey(),
+    annotationId: integer('annotation_id')
+      .notNull()
+      .references(() => annotations.id, { onDelete: 'cascade' }),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    source: varchar('source', { length: 10 }).$type<'koreader' | 'kobo'>().notNull(),
+    deviceId: varchar('device_id', { length: 100 }).notNull(),
+    // KOReader: md5 hex of `${deviceCreatedAt}|${pos0}` (device-format pos0).
+    externalKey: varchar('external_key', { length: 64 }).notNull(),
+    externalCreatedAt: varchar('external_created_at', { length: 19 }),
+    // 0 = row exists from device upload but nothing pushed yet; otherwise the canonical
+    // version this device has acknowledged. Only the exchange ack advances it.
+    lastAppliedVersion: integer('last_applied_version').notNull().default(0),
+    deleteAckedAt: timestamp('delete_acked_at', { withTimezone: true }),
+    firstSyncedAt: timestamp('first_synced_at', { withTimezone: true }).defaultNow().notNull(),
+    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [
+    uniqueIndex('annotation_sync_state_annotation_source_device_uidx').on(t.annotationId, t.source, t.deviceId),
+    // Non-unique: the same external key can legitimately exist for two different books
+    // (the same file scanned into two libraries); lookups are book-scoped.
+    index('annotation_sync_state_user_source_device_key_idx').on(t.userId, t.source, t.deviceId, t.externalKey),
+    index('annotation_sync_state_user_key_idx').on(t.userId, t.externalKey),
+    index('annotation_sync_state_annotation_id_idx').on(t.annotationId),
+    check('annotation_sync_state_source_chk', sql`${t.source} in ('koreader', 'kobo')`),
+  ],
+);
+
+export type AnnotationSyncStateRow = typeof annotationSyncState.$inferSelect;
+export type NewAnnotationSyncState = typeof annotationSyncState.$inferInsert;
 
 export const readerDefaultPreferences = pgTable(
   'reader_default_preferences',

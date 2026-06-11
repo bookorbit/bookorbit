@@ -1,0 +1,44 @@
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Post, Query, Res } from '@nestjs/common';
+import type { FastifyReply } from 'fastify';
+
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { RequestUser } from '../../common/types/request-user';
+import { AnnotationHubService } from './annotation-hub.service';
+import { AnnotationBulkDto, AnnotationExportQueryDto, AnnotationHubQueryDto } from './dto/annotation-hub.dto';
+
+@Controller('annotations')
+export class AnnotationHubController {
+  constructor(private readonly hubService: AnnotationHubService) {}
+
+  @Get()
+  list(@CurrentUser() user: RequestUser, @Query() query: AnnotationHubQueryDto) {
+    return this.hubService.list(user.id, query);
+  }
+
+  @Post('bulk')
+  @HttpCode(200)
+  bulk(@CurrentUser() user: RequestUser, @Body() dto: AnnotationBulkDto) {
+    return this.hubService.bulk(user.id, dto);
+  }
+
+  @Post(':annotationId/restore')
+  @HttpCode(200)
+  restore(@CurrentUser() user: RequestUser, @Param('annotationId', ParseIntPipe) annotationId: number) {
+    return this.hubService.restore(user.id, annotationId);
+  }
+
+  @Delete(':annotationId')
+  @HttpCode(204)
+  async purge(@CurrentUser() user: RequestUser, @Param('annotationId', ParseIntPipe) annotationId: number) {
+    await this.hubService.purge(user.id, annotationId);
+  }
+
+  @Get('export')
+  async export(@CurrentUser() user: RequestUser, @Query() query: AnnotationExportQueryDto, @Res() reply: FastifyReply) {
+    const result = await this.hubService.export(user.id, query, query.bookId ? `book-${query.bookId}` : 'library');
+    return reply
+      .header('Content-Type', result.contentType)
+      .header('Content-Disposition', `attachment; filename="${result.filename}"`)
+      .send(result.content);
+  }
+}

@@ -4,7 +4,7 @@ Syncs your KOReader reading life into BookOrbit:
 
 - Live reading progress of the open book (pull on open with conflict prompt, optional periodic push every N page turns, push on close and suspend), compatible with the kosync flow BookOrbit already speaks.
 - Reading statistics: the raw per-page time events from KOReader's statistics database. BookOrbit turns them into reading sessions and daily stats, so they show up in the existing dashboards.
-- Highlights and notes, shown read-only on the book details page in BookOrbit.
+- Highlights and notes, two ways: device highlights appear in the BookOrbit web reader as native highlights, and highlights, note edits and deletions made in BookOrbit come back to the device.
 - Book status (reading / complete / abandoned) and star ratings, with newest-change-wins conflict handling.
 
 The open book is captured from live memory when it is closed, on suspend, and via "Sync this book now", so highlights and status made mid-session sync without reopening the book. The full-library sweep ("Sync all books now") is manual-only.
@@ -37,6 +37,17 @@ Re-downloading later (for example after changing the sync password or server add
 
 Menu placement note: the plugin generates `settings/reader_menu_order.lua` and `settings/filemanager_menu_order.lua` to pin its entry below Calibre, and keeps them up to date across KOReader updates. Delete those files to reset the menu order. If you maintain your own menu order files, only the single `bookorbit_sync` entry is inserted (a one-time rewrite normalizes formatting and strips comments).
 
+## Two-way highlight sync
+
+Plugin 0.4 exchanges highlights instead of only uploading them (server 0.4+; against an older server the plugin falls back to upload-only automatically):
+
+- Device to web: highlights upload as before. BookOrbit converts their crengine positions (xpointers) to reader positions (CFIs), verifying every conversion against the highlighted text, so they render as native highlights in the web reader where you can edit notes, recolor and delete them.
+- Web to device: on book open (with "Auto sync this book" on), after "Sync this book now", and during the full sweep for closed books, the plugin applies web-created highlights, edits and deletions. For the open book they are verified against the rendering engine first; a position that does not match its text is re-anchored by searching the text, and the corrected position is reported back to the server. For closed books they are merged into the sidecar the same way KOHighlights does, and KOReader re-validates them on next open.
+- Deletions go both ways: deleting in the web moves nothing until the device confirms; deleting on the device moves the highlight to the BookOrbit trash, where it can be restored (a restore pushes it back to devices).
+- Identity is the highlight's creation datetime plus position, so extending a highlight on the device is recognized as a move, never as a delete-and-recreate.
+- Styles map across: highlight/underline/strikethrough map 1:1, BookOrbit's squiggly renders as underline on the device (and stays squiggly on the web), KOReader's invert renders inverted on the web. Colors map between KOReader's named palette and hex.
+- "Two-way highlight sync" in the plugin settings turns the apply direction off; uploads continue either way.
+
 ## How syncing works
 
 - With "Auto sync this book" on: progress is pulled when a book opens (with conflict prompts), pushed every N page turns (10 seconds after you stop turning pages, 25 second debounce, silently skipped when offline), and the whole book (progress, highlights, status, rating, reading time) is snapshotted from live memory and uploaded when the book is closed and on suspend.
@@ -51,9 +62,11 @@ Years of statistics upload in batches of 500 events. Roughly 200k events means a
 
 ## Limitations
 
-- Highlight or note deletions on the device are not propagated; edits are. Deleted highlights stay visible in BookOrbit.
+- Web-side highlight changes reach a closed book's sidecar only through the manual sweep (and only when that book's sidecar changed since the last sweep) or on the next open of the book.
+- Web-created PDF highlights are not supported; device PDF highlights sync up and are listed (and jump to the page) in BookOrbit, but are not drawn over the PDF.
 - Books with reading statistics but no sidecar path in the reading history sync reading time only (no highlights/status/progress); the full sweep covers them.
 - Position-only bookmarks (no highlighted text) are not synced.
+- Device clocks far in the past can delay edit detection for highlights that were last modified from the web (the device edit must carry a newer timestamp than the applied one).
 - The full-library sweep is manual-only by design; books you never open again only sync when you press "Sync all books now".
 - A cloned device with a different KOReader `device_id` re-uploads its history under the new device identity, which double-counts reading time. Clones that keep the same `device_id` deduplicate naturally.
 
@@ -77,3 +90,15 @@ Years of statistics upload in batches of 500 events. Roughly 200k events means a
 - Airplane mode: manual syncs report the server as unreachable; automatic ones stay silent.
 - Gestures: "BookOrbit: sync this book" is assignable from the file manager gesture settings and works inside the reader.
 - With the statistics plugin actively recording (book open), a sweep still reads the stats database without errors.
+
+Two-way highlight checks:
+
+- Web highlight on a device-matched book, then open the book on the device: the highlight appears (notification shows the count), with the right color/style and note.
+- Edit the note and color of that highlight in the web reader, reopen the book (or "Sync this book now"): the device copy updates.
+- Delete a highlight in the web reader; on next device sync it disappears from the book and the bookmark list.
+- Delete a highlight on the device; after the book closes (or a sweep), it appears under Annotations, Trash in the web. Restoring it brings it back to the device on the next sync.
+- Extend an existing highlight on the device: the web copy moves, no duplicate and nothing lands in trash.
+- Create a squiggly highlight on the web: it arrives as underline on the device, and stays squiggly in the web after the device re-syncs it.
+- Create an invert highlight on the device: it renders inverted in the web reader.
+- Kill KOReader mid-sync and sync again: no duplicates, no lost highlights (acks make re-delivery idempotent).
+- Closed-book sweep with pending web highlights: the sidecar gains them with `annotations_externally_modified` set; opening the book shows them sorted and valid.

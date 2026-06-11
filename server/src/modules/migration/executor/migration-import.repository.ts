@@ -272,13 +272,25 @@ export class MigrationImportRepository {
     const targetUserIds = uniqueNumbers(userIds);
     const targetBookIds = uniqueNumbers(bookIds);
     if (targetUserIds.length === 0 || targetBookIds.length === 0) return;
+    // Only web-origin rows are replaced by an import; device-synced annotations stay.
     await this.db
       .delete(schema.annotations)
-      .where(and(inArray(schema.annotations.userId, targetUserIds), inArray(schema.annotations.bookId, targetBookIds)));
+      .where(
+        and(
+          inArray(schema.annotations.userId, targetUserIds),
+          inArray(schema.annotations.bookId, targetBookIds),
+          eq(schema.annotations.origin, 'web'),
+        ),
+      );
   }
 
-  async insertAnnotation(values: typeof schema.annotations.$inferInsert): Promise<void> {
-    await this.db.insert(schema.annotations).values(values);
+  async insertAnnotation(values: typeof schema.annotations.$inferInsert & { cfi: string }): Promise<void> {
+    const { cfi, ...annotation } = values;
+    const [row] = await this.db
+      .insert(schema.annotations)
+      .values(annotation)
+      .returning({ id: schema.annotations.id, userId: schema.annotations.userId });
+    await this.db.insert(schema.annotationPositions).values({ annotationId: row.id, userId: row.userId, format: 'cfi', pos0: cfi, status: 'exact' });
   }
 
   // --- Collections ---
@@ -513,10 +525,28 @@ export class MigrationImportRepository {
     }
   }
 
-  async batchInsertAnnotations(items: Array<typeof schema.annotations.$inferInsert>): Promise<void> {
+  async batchInsertAnnotations(items: Array<typeof schema.annotations.$inferInsert & { cfi: string }>): Promise<void> {
     if (items.length === 0) return;
     for (const batch of chunk(items, BATCH_CHUNK_SIZE)) {
-      await this.db.insert(schema.annotations).values(batch);
+      const rows = await this.db
+        .insert(schema.annotations)
+        .values(
+          batch.map((item) => {
+            const annotation: typeof schema.annotations.$inferInsert & { cfi?: string } = { ...item };
+            delete annotation.cfi;
+            return annotation;
+          }),
+        )
+        .returning({ id: schema.annotations.id, userId: schema.annotations.userId });
+      await this.db.insert(schema.annotationPositions).values(
+        rows.map((row, index) => ({
+          annotationId: row.id,
+          userId: row.userId,
+          format: 'cfi' as const,
+          pos0: batch[index].cfi,
+          status: 'exact' as const,
+        })),
+      );
     }
   }
 

@@ -138,8 +138,22 @@
     {
       "idx": 19,
       "version": "7",
-      "when": 1781330635947,
-      "tag": "0019_add_lubimyczytac_provider_id",
+      "when": 1781111474260,
+      "tag": "0019_annotation-hub-and-spoke",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1781111570798,
+      "tag": "0020_drop-legacy-annotation-storage",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1781131848588,
+      "tag": "0021_annotation-sync-key-scope",
       "breakpoints": true
     },
     {

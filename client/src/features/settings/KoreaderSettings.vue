@@ -42,7 +42,17 @@ const hasCredentials = computed(() => !!credentials.value)
 const deviceCount = computed(() => syncStatus.value?.devices.length ?? 0)
 const totalSyncedBooks = computed(() => syncStatus.value?.totalSyncedBooks ?? 0)
 const sweeps = computed(() => syncStatus.value?.sweeps ?? [])
-const pluginTotals = computed(() => syncStatus.value?.pluginTotals ?? { matchedBooks: 0, pageStatEvents: 0, annotations: 0 })
+const pluginTotals = computed(
+  () =>
+    syncStatus.value?.pluginTotals ?? {
+      matchedBooks: 0,
+      pageStatEvents: 0,
+      annotations: 0,
+      trashedAnnotations: 0,
+      pendingDeletes: 0,
+      failedPositions: 0,
+    },
+)
 
 function formatLastSync(dateStr: string | null): string {
   if (!dateStr) return 'Never'
@@ -392,6 +402,10 @@ async function handleDownloadPlugin() {
             <p class="settings-hint">
               {{ pluginTotals.matchedBooks }} matched books &middot; {{ pluginTotals.pageStatEvents }} reading events &middot;
               {{ pluginTotals.annotations }} highlights
+              <template v-if="pluginTotals.pendingDeletes > 0"> &middot; {{ pluginTotals.pendingDeletes }} deletion(s) awaiting device sync</template>
+              <template v-if="pluginTotals.failedPositions > 0">
+                &middot; {{ pluginTotals.failedPositions }} highlight position(s) need attention</template
+              >
             </p>
           </div>
         </div>

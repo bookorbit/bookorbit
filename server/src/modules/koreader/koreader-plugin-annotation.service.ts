@@ -1,12 +1,11 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { createHash } from 'crypto';
 
 import type { KoreaderAnnotationItem } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
-import type { NewKoreaderAnnotation } from '../../db/schema';
+import { drawerFromStyle } from '../annotation/annotation-style-map';
+import { AnnotationSyncService, buildAnnotationKey, type IncomingDeviceAnnotation } from '../annotation/annotation-sync.service';
 import type { AnnotationsUploadDto, KoreaderAnnotationDto } from './dto';
-import { KoreaderAnnotationRepository } from './koreader-annotation.repository';
 import { KoreaderRepository } from './koreader.repository';
 
 const ANNOTATIONS_EVENT = 'koreader.plugin.annotations';
@@ -23,9 +22,10 @@ export class KoreaderPluginAnnotationService {
 
   constructor(
     private readonly koreaderRepo: KoreaderRepository,
-    private readonly annotationRepo: KoreaderAnnotationRepository,
+    private readonly annotationSync: AnnotationSyncService,
   ) {}
 
+  /** Legacy one-way upload used by plugin 0.3.x; the 0.4+ exchange endpoint supersedes it. */
   async uploadAnnotations(user: RequestUser, dto: AnnotationsUploadDto): Promise<AnnotationsUploadResult> {
     const startedAtMs = Date.now();
     const totalAnnotations = dto.books.reduce((sum, book) => sum + book.annotations.length, 0);
@@ -54,8 +54,15 @@ export class KoreaderPluginAnnotationService {
           continue;
         }
 
-        const rows = this.toRows(user.id, match.bookId, match.bookFileId, book.annotations);
-        const upserted = await this.annotationRepo.upsertMany(rows);
+        const ingest = await this.annotationSync.ingestDeviceAnnotations({
+          userId: user.id,
+          source: 'koreader',
+          deviceId: dto.deviceId,
+          bookId: match.bookId,
+          bookFileId: match.bookFileId,
+          annotations: book.annotations.map((annotation) => this.toIncoming(annotation)),
+        });
+        const upserted = ingest.created + ingest.updated + ingest.moved;
         upsertedTotal += upserted;
         results.push({ hash, upserted });
       }
@@ -75,47 +82,38 @@ export class KoreaderPluginAnnotationService {
   }
 
   async getBookAnnotations(userId: number, bookId: number): Promise<KoreaderAnnotationItem[]> {
-    const rows = await this.annotationRepo.listByBook(userId, bookId);
-    return rows.map((row) => ({
-      id: row.id,
-      drawer: row.drawer as KoreaderAnnotationItem['drawer'],
-      color: row.color,
-      text: row.text,
-      note: row.note,
-      chapter: row.chapter,
-      pageno: row.pageno,
-      posFormat: row.posFormat as KoreaderAnnotationItem['posFormat'],
-      deviceCreatedAt: row.deviceCreatedAt,
-      deviceUpdatedAt: row.deviceUpdatedAt,
+    const rows = await this.annotationSync.listDeviceAnnotationsByBook(userId, bookId, 'koreader');
+    return rows.map(({ annotation, position }) => ({
+      id: annotation.id,
+      drawer: drawerFromStyle(annotation.style) as KoreaderAnnotationItem['drawer'],
+      color: annotation.color,
+      text: annotation.text || null,
+      note: annotation.note,
+      chapter: annotation.chapterTitle,
+      pageno: ((position.extras as { pageno?: number } | null)?.pageno ?? null) as number | null,
+      posFormat: position.format as KoreaderAnnotationItem['posFormat'],
+      deviceCreatedAt: annotation.deviceCreatedAt ?? '',
+      deviceUpdatedAt: annotation.deviceUpdatedAt,
     }));
   }
 
   buildAnnotationKey(deviceCreatedAt: string, pos0: string): string {
-    return createHash('md5').update(`${deviceCreatedAt}|${pos0}`).digest('hex'); // codeql[js/weak-cryptographic-algorithm] - non-security dedup key
+    return buildAnnotationKey(deviceCreatedAt, pos0);
   }
 
-  private toRows(userId: number, bookId: number, bookFileId: number, annotations: KoreaderAnnotationDto[]): NewKoreaderAnnotation[] {
-    const byKey = new Map<string, NewKoreaderAnnotation>();
-    for (const annotation of annotations) {
-      const annotationKey = this.buildAnnotationKey(annotation.datetime, annotation.pos0);
-      byKey.set(annotationKey, {
-        userId,
-        bookId,
-        bookFileId,
-        annotationKey,
-        drawer: annotation.drawer,
-        color: annotation.color ?? null,
-        text: annotation.text ?? null,
-        note: annotation.note ?? null,
-        chapter: annotation.chapter ?? null,
-        pageno: annotation.pageno ?? null,
-        posFormat: annotation.posFormat,
-        pos0: annotation.pos0,
-        pos1: annotation.pos1 ?? null,
-        deviceCreatedAt: annotation.datetime,
-        deviceUpdatedAt: annotation.datetimeUpdated ?? null,
-      });
-    }
-    return [...byKey.values()];
+  private toIncoming(annotation: KoreaderAnnotationDto): IncomingDeviceAnnotation {
+    return {
+      datetime: annotation.datetime,
+      datetimeUpdated: annotation.datetimeUpdated ?? null,
+      drawer: annotation.drawer,
+      color: annotation.color ?? null,
+      text: annotation.text ?? null,
+      note: annotation.note ?? null,
+      chapter: annotation.chapter ?? null,
+      pageno: annotation.pageno ?? null,
+      posFormat: annotation.posFormat as IncomingDeviceAnnotation['posFormat'],
+      pos0: annotation.pos0,
+      pos1: annotation.pos1 ?? null,
+    };
   }
 }

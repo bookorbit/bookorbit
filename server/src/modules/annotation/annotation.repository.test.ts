@@ -6,159 +6,100 @@ function makeRow(overrides?: Record<string, unknown>) {
     userId: 10,
     bookId: 5,
     cfi: 'epubcfi(/6/4!/4/2/1:0)',
+    cfiStatus: 'exact',
     text: 'selected text',
     color: 'yellow',
     style: 'highlight',
     note: null,
     chapterTitle: null,
+    origin: 'web',
+    version: 1,
+    deletedAt: null,
+    deviceCreatedAt: null,
+    deviceUpdatedAt: null,
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
     ...overrides,
   };
 }
 
-function makeDb() {
-  const selectResult = { from: vi.fn() };
-  const fromResult = { where: vi.fn() };
-  const whereResult = { orderBy: vi.fn() };
+type ChainQuery = Record<string, ReturnType<typeof vi.fn>> & {
+  then: (resolve: (value: unknown) => unknown, reject?: (error: unknown) => unknown) => Promise<unknown>;
+};
 
-  selectResult.from.mockReturnValue(fromResult);
-  fromResult.where.mockReturnValue(whereResult);
-  whereResult.orderBy.mockResolvedValue([]);
+function mockQuery(result: unknown): ChainQuery {
+  const query = {} as ChainQuery;
+  const methods = [
+    'from',
+    'leftJoin',
+    'innerJoin',
+    'where',
+    'orderBy',
+    'limit',
+    'offset',
+    'groupBy',
+    'values',
+    'set',
+    'returning',
+    'onConflictDoUpdate',
+  ];
+  for (const method of methods) {
+    query[method] = vi.fn().mockReturnValue(query);
+  }
+  query.then = (resolve, reject) => Promise.resolve(result).then(resolve, reject);
+  return query;
+}
 
-  const insertResult = { values: vi.fn() };
-  const valuesResult = { returning: vi.fn() };
-  insertResult.values.mockReturnValue(valuesResult);
-  valuesResult.returning.mockResolvedValue([]);
-
-  const updateResult = { set: vi.fn() };
-  const setResult = { where: vi.fn() };
-  const updateWhereResult = { returning: vi.fn() };
-  updateResult.set.mockReturnValue(setResult);
-  setResult.where.mockReturnValue(updateWhereResult);
-  updateWhereResult.returning.mockResolvedValue([]);
-
-  const deleteResult = { where: vi.fn() };
-  const deleteWhereResult = { returning: vi.fn() };
-  deleteResult.where.mockReturnValue(deleteWhereResult);
-  deleteWhereResult.returning.mockResolvedValue([]);
-
+function makeDb(...results: unknown[]) {
+  const queue = [...results];
+  const queries: ChainQuery[] = [];
+  const next = () => {
+    const query = mockQuery(queue.length > 0 ? queue.shift() : []);
+    queries.push(query);
+    return query;
+  };
   const db = {
-    select: vi.fn().mockReturnValue(selectResult),
-    insert: vi.fn().mockReturnValue(insertResult),
-    update: vi.fn().mockReturnValue(updateResult),
-    delete: vi.fn().mockReturnValue(deleteResult),
-    _select: selectResult,
-    _from: fromResult,
-    _where: whereResult,
-    _insert: insertResult,
-    _values: valuesResult,
-    _update: updateResult,
-    _set: setResult,
-    _updateWhere: updateWhereResult,
-    _delete: deleteResult,
-    _deleteWhere: deleteWhereResult,
+    select: vi.fn().mockImplementation(next),
+    selectDistinct: vi.fn().mockImplementation(next),
+    insert: vi.fn().mockImplementation(next),
+    update: vi.fn().mockImplementation(next),
+    delete: vi.fn().mockImplementation(next),
+    transaction: vi.fn().mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => fn(db)),
+    _queries: queries,
   };
   return db;
 }
 
-function makeRepository() {
-  const db = makeDb();
-  const repo = new AnnotationRepository(db as never);
-  return { repo, db };
-}
-
-function makePaginatedDb(items: ReturnType<typeof makeRow>[], total: number) {
-  const offsetFn = vi.fn().mockResolvedValue(items);
-  const limitFn = vi.fn().mockReturnValue({ offset: offsetFn });
-  const orderByFn = vi.fn().mockReturnValue({ limit: limitFn });
-  const whereFn = vi
-    .fn()
-    .mockReturnValueOnce({ orderBy: orderByFn })
-    .mockReturnValueOnce([{ count: total }]);
-  const fromFn = vi.fn().mockReturnValue({ where: whereFn });
-  const selectFn = vi.fn().mockReturnValue({ from: fromFn });
-
-  return {
-    select: selectFn,
-    _offset: offsetFn,
-  };
-}
-
-function makeStatsDb(
-  aggregate: { totalHighlights: number; chaptersWithHighlights: number; highlightsWithNotes: number },
-  colorBreakdown: { color: string; count: number }[],
-) {
-  let callCount = 0;
-  const selectFn = vi.fn().mockImplementation(() => {
-    callCount++;
-    if (callCount === 1) {
-      return {
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([aggregate]),
-        }),
-      };
-    }
-    return {
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          groupBy: vi.fn().mockReturnValue({
-            orderBy: vi.fn().mockResolvedValue(colorBreakdown),
-          }),
-        }),
-      }),
-    };
-  });
-
-  return { select: selectFn };
-}
-
-function makeDistinctChaptersDb(chapters: (string | null)[]) {
-  const orderByFn = vi.fn().mockResolvedValue(chapters.map((c) => ({ chapterTitle: c })));
-  const whereFn = vi.fn().mockReturnValue({ orderBy: orderByFn });
-  const fromFn = vi.fn().mockReturnValue({ where: whereFn });
-  const selectDistinctFn = vi.fn().mockReturnValue({ from: fromFn });
-
-  return { selectDistinct: selectDistinctFn };
-}
-
 describe('AnnotationRepository', () => {
   describe('findByBookId', () => {
-    it('queries with bookId and userId filters and applies createdAt ordering', async () => {
-      const { repo, db } = makeRepository();
+    it('queries with filters and returns the joined rows', async () => {
       const rows = [makeRow(), makeRow({ id: 2 })];
-      db._where.orderBy.mockResolvedValue(rows);
+      const db = makeDb(rows);
+      const repo = new AnnotationRepository(db as never);
 
       const result = await repo.findByBookId(5, 10);
 
       expect(db.select).toHaveBeenCalled();
+      expect(db._queries[0].leftJoin).toHaveBeenCalled();
+      expect(db._queries[0].orderBy).toHaveBeenCalled();
       expect(result).toEqual(rows);
     });
 
     it('returns empty array when no annotations match', async () => {
-      const { repo, db } = makeRepository();
-      db._where.orderBy.mockResolvedValue([]);
+      const db = makeDb([]);
+      const repo = new AnnotationRepository(db as never);
 
       const result = await repo.findByBookId(5, 10);
 
       expect(result).toEqual([]);
     });
-
-    it('calls orderBy on the query chain', async () => {
-      const { repo, db } = makeRepository();
-      db._where.orderBy.mockResolvedValue([]);
-
-      await repo.findByBookId(5, 10);
-
-      expect(db._where.orderBy).toHaveBeenCalled();
-    });
   });
 
   describe('create', () => {
-    it('inserts a new annotation and returns the created row', async () => {
-      const { repo, db } = makeRepository();
+    it('inserts the annotation and its cfi position in a transaction', async () => {
       const row = makeRow();
-      db._values.returning.mockResolvedValue([row]);
+      const db = makeDb([row], []);
+      const repo = new AnnotationRepository(db as never);
 
       const result = await repo.create({
         userId: 10,
@@ -171,16 +112,18 @@ describe('AnnotationRepository', () => {
         chapterTitle: null,
       });
 
-      expect(db.insert).toHaveBeenCalled();
-      expect(result).toEqual(row);
+      expect(db.transaction).toHaveBeenCalled();
+      expect(db.insert).toHaveBeenCalledTimes(2);
+      const positionValues = db._queries[1].values.mock.calls[0][0] as Record<string, unknown>;
+      expect(positionValues).toMatchObject({ annotationId: 1, format: 'cfi', pos0: 'epubcfi(/6/4!/4/2/1:0)', status: 'exact' });
+      expect(result).toMatchObject({ ...row, cfi: 'epubcfi(/6/4!/4/2/1:0)', cfiStatus: 'exact' });
     });
 
-    it('stores note value when provided', async () => {
-      const { repo, db } = makeRepository();
-      const row = makeRow({ note: 'my note' });
-      db._values.returning.mockResolvedValue([row]);
+    it('does not leak the cfi into the annotations insert payload', async () => {
+      const db = makeDb([makeRow()], []);
+      const repo = new AnnotationRepository(db as never);
 
-      const result = await repo.create({
+      await repo.create({
         userId: 10,
         bookId: 5,
         cfi: 'epubcfi(/6/4)',
@@ -191,74 +134,120 @@ describe('AnnotationRepository', () => {
         chapterTitle: null,
       });
 
-      expect(result.note).toBe('my note');
+      const annotationValues = db._queries[0].values.mock.calls[0][0] as Record<string, unknown>;
+      expect(annotationValues).not.toHaveProperty('cfi');
+      expect(annotationValues).toMatchObject({ note: 'my note' });
     });
   });
 
   describe('update', () => {
-    it('updates and returns the row when found', async () => {
-      const { repo, db } = makeRepository();
-      const row = makeRow({ note: 'updated' });
-      db._updateWhere.returning.mockResolvedValue([row]);
+    it('bumps the version and re-reads the row with its position', async () => {
+      const updated = makeRow({ note: 'updated', version: 2 });
+      const db = makeDb([{ id: 1 }], [updated]);
+      const repo = new AnnotationRepository(db as never);
 
       const result = await repo.update(5, 1, 10, { note: 'updated' });
 
-      expect(result).toEqual(row);
+      const setCall = db._queries[0].set.mock.calls[0][0] as Record<string, unknown>;
+      expect(setCall).toHaveProperty('version');
+      expect(setCall).toHaveProperty('updatedAt');
+      expect(result).toEqual(updated);
     });
 
     it('returns null when annotation does not exist or belongs to different user/book', async () => {
-      const { repo, db } = makeRepository();
-      db._updateWhere.returning.mockResolvedValue([]);
+      const db = makeDb([]);
+      const repo = new AnnotationRepository(db as never);
 
       const result = await repo.update(5, 99, 10, { note: 'x' });
 
       expect(result).toBeNull();
     });
-
-    it('sets updatedAt via sql expression', async () => {
-      const { repo, db } = makeRepository();
-      db._updateWhere.returning.mockResolvedValue([makeRow()]);
-
-      await repo.update(5, 1, 10, { color: '#FACC15' });
-
-      const setCall = db._update.set.mock.calls[0][0];
-      expect(setCall).toHaveProperty('updatedAt');
-    });
-
-    it('clears note when null is passed', async () => {
-      const { repo, db } = makeRepository();
-      const row = makeRow({ note: null });
-      db._updateWhere.returning.mockResolvedValue([row]);
-
-      const result = await repo.update(5, 1, 10, { note: null });
-
-      expect(result!.note).toBeNull();
-    });
   });
 
-  describe('delete', () => {
-    it('returns true when annotation is deleted', async () => {
-      const { repo, db } = makeRepository();
-      db._deleteWhere.returning.mockResolvedValue([{ id: 1 }]);
+  describe('softDelete', () => {
+    it('marks the row deleted instead of removing it', async () => {
+      const db = makeDb([{ id: 1 }]);
+      const repo = new AnnotationRepository(db as never);
 
-      const result = await repo.delete(5, 1, 10);
+      const result = await repo.softDelete(5, 1, 10);
 
+      expect(db.update).toHaveBeenCalled();
+      expect(db.delete).not.toHaveBeenCalled();
+      const setCall = db._queries[0].set.mock.calls[0][0] as Record<string, unknown>;
+      expect(setCall).toHaveProperty('deletedAt');
+      expect(setCall).toHaveProperty('version');
       expect(result).toBe(true);
     });
 
-    it('returns false when annotation does not exist or belongs to different user/book', async () => {
-      const { repo, db } = makeRepository();
-      db._deleteWhere.returning.mockResolvedValue([]);
+    it('returns false when nothing matched', async () => {
+      const db = makeDb([]);
+      const repo = new AnnotationRepository(db as never);
 
-      const result = await repo.delete(5, 99, 10);
+      const result = await repo.softDelete(5, 99, 10);
 
       expect(result).toBe(false);
     });
   });
 
+  describe('restore', () => {
+    it('clears deletedAt and bumps the version', async () => {
+      const restored = makeRow({ version: 3 });
+      const db = makeDb([restored]);
+      const repo = new AnnotationRepository(db as never);
+
+      const result = await repo.restore(1, 10);
+
+      const setCall = db._queries[0].set.mock.calls[0][0] as Record<string, unknown>;
+      expect(setCall).toMatchObject({ deletedAt: null });
+      expect(setCall).toHaveProperty('version');
+      expect(result).toEqual(restored);
+    });
+
+    it('returns null when the annotation is not trashed', async () => {
+      const db = makeDb([]);
+      const repo = new AnnotationRepository(db as never);
+
+      const result = await repo.restore(1, 10);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  // purge calls db.delete first, then builds the notExists subquery via db.select
+  // inside .where(), so the second queued result belongs to that subquery builder.
+  describe('purge', () => {
+    it('hard-deletes when every device acked the deletion', async () => {
+      const db = makeDb([{ id: 1 }], []);
+      const repo = new AnnotationRepository(db as never);
+
+      const result = await repo.purge(1, 10);
+
+      expect(db.delete).toHaveBeenCalled();
+      expect(result).toBe('purged');
+    });
+
+    it('reports pending_device_sync when unacked device state blocks the purge', async () => {
+      const db = makeDb([], [], [{ id: 1 }]);
+      const repo = new AnnotationRepository(db as never);
+
+      const result = await repo.purge(1, 10);
+
+      expect(result).toBe('pending_device_sync');
+    });
+
+    it('reports not_found when no trashed row exists', async () => {
+      const db = makeDb([], [], []);
+      const repo = new AnnotationRepository(db as never);
+
+      const result = await repo.purge(1, 10);
+
+      expect(result).toBe('not_found');
+    });
+  });
+
   describe('findPaginated', () => {
     it('returns items and total count', async () => {
-      const db = makePaginatedDb([makeRow()], 1);
+      const db = makeDb([makeRow()], [{ count: 1 }]);
       const repo = new AnnotationRepository(db as never);
 
       const result = await repo.findPaginated(5, 10, {}, { by: 'position', dir: 'asc' }, 1, 25);
@@ -268,7 +257,7 @@ describe('AnnotationRepository', () => {
     });
 
     it('returns empty result when no annotations match', async () => {
-      const db = makePaginatedDb([], 0);
+      const db = makeDb([], [{ count: 0 }]);
       const repo = new AnnotationRepository(db as never);
 
       const result = await repo.findPaginated(5, 10, {}, { by: 'position', dir: 'asc' }, 1, 25);
@@ -278,21 +267,24 @@ describe('AnnotationRepository', () => {
     });
 
     it('applies offset based on page and pageSize', async () => {
-      const db = makePaginatedDb([], 0);
+      const db = makeDb([], [{ count: 0 }]);
       const repo = new AnnotationRepository(db as never);
 
       await repo.findPaginated(5, 10, {}, { by: 'position', dir: 'asc' }, 3, 10);
 
-      expect(db._offset).toHaveBeenCalledWith(20);
+      expect(db._queries[0].offset).toHaveBeenCalledWith(20);
     });
   });
 
   describe('getStats', () => {
     it('returns aggregated stats', async () => {
-      const db = makeStatsDb({ totalHighlights: 5, chaptersWithHighlights: 2, highlightsWithNotes: 3 }, [
-        { color: 'yellow', count: 3 },
-        { color: '#4ADE80', count: 2 },
-      ]);
+      const db = makeDb(
+        [{ totalHighlights: 5, chaptersWithHighlights: 2, highlightsWithNotes: 3 }],
+        [
+          { color: 'yellow', count: 3 },
+          { color: '#4ADE80', count: 2 },
+        ],
+      );
       const repo = new AnnotationRepository(db as never);
 
       const result = await repo.getStats(5, 10, {});
@@ -307,7 +299,7 @@ describe('AnnotationRepository', () => {
     });
 
     it('returns zero stats when no annotations exist', async () => {
-      const db = makeStatsDb({ totalHighlights: 0, chaptersWithHighlights: 0, highlightsWithNotes: 0 }, []);
+      const db = makeDb([{ totalHighlights: 0, chaptersWithHighlights: 0, highlightsWithNotes: 0 }], []);
       const repo = new AnnotationRepository(db as never);
 
       const result = await repo.getStats(5, 10, {});
@@ -319,7 +311,7 @@ describe('AnnotationRepository', () => {
 
   describe('getDistinctChapters', () => {
     it('returns distinct chapter titles', async () => {
-      const db = makeDistinctChaptersDb(['Chapter 1', 'Chapter 2']);
+      const db = makeDb([{ chapterTitle: 'Chapter 1' }, { chapterTitle: 'Chapter 2' }]);
       const repo = new AnnotationRepository(db as never);
 
       const result = await repo.getDistinctChapters(5, 10);
@@ -327,17 +319,8 @@ describe('AnnotationRepository', () => {
       expect(result).toEqual(['Chapter 1', 'Chapter 2']);
     });
 
-    it('returns empty array when no chapters exist', async () => {
-      const db = makeDistinctChaptersDb([]);
-      const repo = new AnnotationRepository(db as never);
-
-      const result = await repo.getDistinctChapters(5, 10);
-
-      expect(result).toEqual([]);
-    });
-
     it('filters out null chapter titles', async () => {
-      const db = makeDistinctChaptersDb([null, 'Chapter 1']);
+      const db = makeDb([{ chapterTitle: null }, { chapterTitle: 'Chapter 1' }]);
       const repo = new AnnotationRepository(db as never);
 
       const result = await repo.getDistinctChapters(5, 10);

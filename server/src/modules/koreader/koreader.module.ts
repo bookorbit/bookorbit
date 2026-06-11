@@ -2,10 +2,12 @@ import { Module } from '@nestjs/common';
 
 import { CommonModule } from '../../common/common.module';
 import { AchievementModule } from '../achievement/achievement.module';
+import { AnnotationModule } from '../annotation/annotation.module';
+import { PositionConverterModule } from '../position-converter/position-converter.module';
 import { UserModule } from '../user/user.module';
 import { UserBookStatusModule } from '../user-book-status/user-book-status.module';
+import { KoreaderAnnotationExchangeService } from './koreader-annotation-exchange.service';
 import { KoreaderAuthGuard } from './koreader-auth.guard';
-import { KoreaderAnnotationRepository } from './koreader-annotation.repository';
 import { KoreaderPackageService } from './koreader-package.service';
 import { KoreaderChapterExtractorService } from './koreader-chapter-extractor.service';
 import { KoreaderChapterService } from './koreader-chapter.service';
@@ -19,7 +21,7 @@ import { KoreaderService } from './koreader.service';
 import { KoreaderStatsService } from './koreader-stats.service';
 
 @Module({
-  imports: [CommonModule, UserModule, UserBookStatusModule, AchievementModule],
+  imports: [CommonModule, UserModule, UserBookStatusModule, AchievementModule, AnnotationModule, PositionConverterModule],
   controllers: [KoreaderController, KoreaderPluginController],
   providers: [
     KoreaderService,
@@ -31,7 +33,7 @@ import { KoreaderStatsService } from './koreader-stats.service';
     KoreaderPluginService,
     KoreaderPluginRepository,
     KoreaderPluginAnnotationService,
-    KoreaderAnnotationRepository,
+    KoreaderAnnotationExchangeService,
     KoreaderStatsService,
   ],
   exports: [KoreaderService, KoreaderRepository],

@@ -1,3 +1,4 @@
+export * from './koreader-exchange.dto';
 export * from './koreader-package.dto';
 export * from './koreader-plugin.dto';
 export * from './koreader-progress.dto';

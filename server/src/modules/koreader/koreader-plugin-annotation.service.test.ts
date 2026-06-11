@@ -2,8 +2,8 @@ import { BadRequestException, Logger } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { RequestUser } from '../../common/types/request-user';
+import type { AnnotationSyncService, IncomingDeviceAnnotation } from '../annotation/annotation-sync.service';
 import type { AnnotationsUploadDto } from './dto';
-import type { KoreaderAnnotationRepository } from './koreader-annotation.repository';
 import { KoreaderPluginAnnotationService } from './koreader-plugin-annotation.service';
 import type { KoreaderRepository } from './koreader.repository';
 
@@ -33,7 +33,10 @@ function makeAnnotation(overrides: Record<string, unknown> = {}) {
 
 describe('KoreaderPluginAnnotationService', () => {
   let koreaderRepo: { getAccessibleLibraryIds: ReturnType<typeof vi.fn>; resolveBookFilesByHashes: ReturnType<typeof vi.fn> };
-  let annotationRepo: { upsertMany: ReturnType<typeof vi.fn>; listByBook: ReturnType<typeof vi.fn> };
+  let annotationSync: {
+    ingestDeviceAnnotations: ReturnType<typeof vi.fn>;
+    listDeviceAnnotationsByBook: ReturnType<typeof vi.fn>;
+  };
   let service: KoreaderPluginAnnotationService;
 
   beforeEach(() => {
@@ -45,15 +48,16 @@ describe('KoreaderPluginAnnotationService', () => {
       getAccessibleLibraryIds: vi.fn().mockResolvedValue([1]),
       resolveBookFilesByHashes: vi.fn().mockResolvedValue(new Map([[HASH_A, { bookFileId: 10, bookId: 20, libraryId: 1 }]])),
     };
-    annotationRepo = {
-      upsertMany: vi.fn().mockImplementation((rows: unknown[]) => Promise.resolve(rows.length)),
-      listByBook: vi.fn().mockResolvedValue([]),
+    annotationSync = {
+      ingestDeviceAnnotations: vi
+        .fn()
+        .mockImplementation((params: { annotations: unknown[] }) =>
+          Promise.resolve({ created: params.annotations.length, updated: 0, moved: 0, unchanged: 0, skippedDeleted: 0 }),
+        ),
+      listDeviceAnnotationsByBook: vi.fn().mockResolvedValue([]),
     };
 
-    service = new KoreaderPluginAnnotationService(
-      koreaderRepo as unknown as KoreaderRepository,
-      annotationRepo as unknown as KoreaderAnnotationRepository,
-    );
+    service = new KoreaderPluginAnnotationService(koreaderRepo as unknown as KoreaderRepository, annotationSync as unknown as AnnotationSyncService);
   });
 
   it('builds a stable annotation key from device datetime and pos0', () => {
@@ -66,44 +70,48 @@ describe('KoreaderPluginAnnotationService', () => {
     expect(different).not.toBe(first);
   });
 
-  it('maps annotations to rows and dedupes identical keys within one batch', async () => {
+  it('routes matched books through the sync ingest with mapped fields', async () => {
     const dto = makeDto([
-      {
-        hash: HASH_A,
-        annotations: [makeAnnotation({ note: 'first' }), makeAnnotation({ note: 'second' }), makeAnnotation({ datetime: '2026-06-02 10:00:00' })],
-      },
+      { hash: HASH_A, annotations: [makeAnnotation({ datetimeUpdated: '2026-06-03 09:30:00', note: 'edited note', color: 'red' })] },
     ]);
 
     const result = await service.uploadAnnotations(makeUser(), dto);
 
-    const rows = annotationRepo.upsertMany.mock.calls[0]![0] as { annotationKey: string; note: string | null }[];
-    expect(rows).toHaveLength(2);
-    expect(rows[0]!.note).toBe('second');
-    expect(result.results[0]).toEqual({ hash: HASH_A, upserted: 2 });
-  });
-
-  it('carries datetimeUpdated into deviceUpdatedAt for edits', async () => {
-    const dto = makeDto([{ hash: HASH_A, annotations: [makeAnnotation({ datetimeUpdated: '2026-06-03 09:30:00', note: 'edited note' })] }]);
-
-    await service.uploadAnnotations(makeUser(), dto);
-
-    const rows = annotationRepo.upsertMany.mock.calls[0]![0] as Record<string, unknown>[];
-    expect(rows[0]).toMatchObject({
-      userId: 7,
-      bookId: 20,
-      bookFileId: 10,
+    expect(annotationSync.ingestDeviceAnnotations).toHaveBeenCalledTimes(1);
+    const params = annotationSync.ingestDeviceAnnotations.mock.calls[0]![0] as {
+      userId: number;
+      source: string;
+      deviceId: string;
+      bookId: number;
+      bookFileId: number;
+      annotations: IncomingDeviceAnnotation[];
+    };
+    expect(params).toMatchObject({ userId: 7, source: 'koreader', deviceId: DEVICE_ID, bookId: 20, bookFileId: 10 });
+    expect(params.annotations[0]).toMatchObject({
+      datetime: '2026-06-01 21:14:03',
+      datetimeUpdated: '2026-06-03 09:30:00',
       drawer: 'lighten',
-      deviceCreatedAt: '2026-06-01 21:14:03',
-      deviceUpdatedAt: '2026-06-03 09:30:00',
+      color: 'red',
       note: 'edited note',
+      posFormat: 'xpointer',
+      pos0: '/body/DocFragment[8]/body/p[12]/text().0',
     });
+    expect(result.results[0]).toEqual({ hash: HASH_A, upserted: 1 });
   });
 
-  it('reports unmatched hashes without upserting', async () => {
+  it('counts created, updated and moved annotations as upserted', async () => {
+    annotationSync.ingestDeviceAnnotations.mockResolvedValue({ created: 1, updated: 2, moved: 1, unchanged: 3, skippedDeleted: 1 });
+
+    const result = await service.uploadAnnotations(makeUser(), makeDto([{ hash: HASH_A, annotations: [makeAnnotation()] }]));
+
+    expect(result.results[0]).toEqual({ hash: HASH_A, upserted: 4 });
+  });
+
+  it('reports unmatched hashes without ingesting', async () => {
     const result = await service.uploadAnnotations(makeUser(), makeDto([{ hash: HASH_B, annotations: [makeAnnotation()] }]));
 
     expect(result.unmatched).toEqual([HASH_B]);
-    expect(annotationRepo.upsertMany).not.toHaveBeenCalled();
+    expect(annotationSync.ingestDeviceAnnotations).not.toHaveBeenCalled();
   });
 
   it('rejects requests with more than 50 annotations in total', async () => {
@@ -114,30 +122,31 @@ describe('KoreaderPluginAnnotationService', () => {
     await expect(service.uploadAnnotations(makeUser(), makeDto([{ hash: HASH_A, annotations }]))).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('maps stored rows to UI annotation items', async () => {
-    annotationRepo.listByBook.mockResolvedValue([
+  it('maps canonical rows to device-view annotation items', async () => {
+    annotationSync.listDeviceAnnotationsByBook.mockResolvedValue([
       {
-        id: 1,
-        drawer: 'underscore',
-        color: 'red',
-        text: 'quote',
-        note: null,
-        chapter: 'Chapter 3',
-        pageno: 42,
-        posFormat: 'xpointer',
-        deviceCreatedAt: '2026-06-01 21:14:03',
-        deviceUpdatedAt: null,
+        annotation: {
+          id: 1,
+          style: 'underline',
+          color: '#FF3300',
+          text: 'quote',
+          note: null,
+          chapterTitle: 'Chapter 3',
+          deviceCreatedAt: '2026-06-01 21:14:03',
+          deviceUpdatedAt: null,
+        },
+        position: { format: 'xpointer', extras: { pageno: 42 } },
       },
     ]);
 
     const items = await service.getBookAnnotations(7, 20);
 
-    expect(annotationRepo.listByBook).toHaveBeenCalledWith(7, 20);
+    expect(annotationSync.listDeviceAnnotationsByBook).toHaveBeenCalledWith(7, 20, 'koreader');
     expect(items).toEqual([
       {
         id: 1,
         drawer: 'underscore',
-        color: 'red',
+        color: '#FF3300',
         text: 'quote',
         note: null,
         chapter: 'Chapter 3',
@@ -147,5 +156,27 @@ describe('KoreaderPluginAnnotationService', () => {
         deviceUpdatedAt: null,
       },
     ]);
+  });
+
+  it('projects squiggly style back to underscore for the device view', async () => {
+    annotationSync.listDeviceAnnotationsByBook.mockResolvedValue([
+      {
+        annotation: {
+          id: 2,
+          style: 'squiggly',
+          color: '#FFFF33',
+          text: 'wavy',
+          note: null,
+          chapterTitle: null,
+          deviceCreatedAt: '2026-06-01 21:14:03',
+          deviceUpdatedAt: null,
+        },
+        position: { format: 'xpointer', extras: null },
+      },
+    ]);
+
+    const items = await service.getBookAnnotations(7, 20);
+
+    expect(items[0]).toMatchObject({ drawer: 'underscore', pageno: null });
   });
 });

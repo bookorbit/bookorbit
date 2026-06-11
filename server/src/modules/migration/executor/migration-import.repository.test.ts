@@ -330,6 +330,7 @@ describe('MigrationImportRepository', () => {
       .mockResolvedValueOnce([{ id: 102 }])
       .mockResolvedValueOnce([{ id: 103 }])
       .mockResolvedValueOnce([{ id: 104 }])
+      .mockResolvedValueOnce([{ id: 105, userId: 1 }])
       .mockResolvedValueOnce([{ id: 500 }]);
     const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
     const onConflictDoNothing = vi.fn().mockReturnValue({ returning });
@@ -360,6 +361,7 @@ describe('MigrationImportRepository', () => {
     expect(insert).toHaveBeenCalledWith(schema.genres);
     expect(insert).toHaveBeenCalledWith(schema.tags);
     expect(insert).toHaveBeenCalledWith(schema.annotations);
+    expect(insert).toHaveBeenCalledWith(schema.annotationPositions);
     expect(insert).toHaveBeenCalledWith(schema.collections);
     expect(select).toHaveBeenCalled();
   });
@@ -430,7 +432,8 @@ describe('MigrationImportRepository', () => {
   it('runs batch user-state write methods for non-empty and empty batches', async () => {
     const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
     const onConflictDoNothing = vi.fn().mockResolvedValue(undefined);
-    const values = vi.fn().mockReturnValue({ onConflictDoUpdate, onConflictDoNothing });
+    const returning = vi.fn().mockResolvedValue([{ id: 1, userId: 1 }]);
+    const values = vi.fn().mockReturnValue({ onConflictDoUpdate, onConflictDoNothing, returning });
     const insert = vi.fn().mockReturnValue({ values });
     const repo = new MigrationImportRepository({ insert } as never);
 
@@ -456,6 +459,7 @@ describe('MigrationImportRepository', () => {
     expect(insert).toHaveBeenCalledWith(schema.audiobookProgress);
     expect(insert).toHaveBeenCalledWith(schema.bookmarks);
     expect(insert).toHaveBeenCalledWith(schema.annotations);
+    expect(insert).toHaveBeenCalledWith(schema.annotationPositions);
     expect(insert).toHaveBeenCalledWith(schema.collectionBooks);
   });
 });

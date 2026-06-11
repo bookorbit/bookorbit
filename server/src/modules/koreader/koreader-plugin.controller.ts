@@ -4,10 +4,20 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { KoreaderAuthGuard } from './koreader-auth.guard';
+import { KoreaderAnnotationExchangeService } from './koreader-annotation-exchange.service';
 import { KoreaderPluginAnnotationService } from './koreader-plugin-annotation.service';
 import { KoreaderPluginService } from './koreader-plugin.service';
 import { KoreaderStatsService } from './koreader-stats.service';
-import { AnnotationsUploadDto, BookStatesUploadDto, BulkProgressDto, MatchCheckDto, PageStatsUploadDto, SweepCompleteDto } from './dto';
+import {
+  AnnotationExchangeAckDto,
+  AnnotationExchangeDto,
+  AnnotationsUploadDto,
+  BookStatesUploadDto,
+  BulkProgressDto,
+  MatchCheckDto,
+  PageStatsUploadDto,
+  SweepCompleteDto,
+} from './dto';
 
 @Public()
 @UseGuards(KoreaderAuthGuard)
@@ -17,6 +27,7 @@ export class KoreaderPluginController {
     private readonly pluginService: KoreaderPluginService,
     private readonly statsService: KoreaderStatsService,
     private readonly annotationService: KoreaderPluginAnnotationService,
+    private readonly annotationExchangeService: KoreaderAnnotationExchangeService,
   ) {}
 
   @Post('match-check')
@@ -29,9 +40,20 @@ export class KoreaderPluginController {
     return this.statsService.uploadPageStats(user, dto);
   }
 
+  /** Deprecated one-way upload kept for plugin 0.3.x; 0.4+ uses the exchange below. */
   @Post('annotations')
   uploadAnnotations(@CurrentUser() user: RequestUser, @Body() dto: AnnotationsUploadDto) {
     return this.annotationService.uploadAnnotations(user, dto);
+  }
+
+  @Post('annotations/exchange')
+  exchangeAnnotations(@CurrentUser() user: RequestUser, @Body() dto: AnnotationExchangeDto) {
+    return this.annotationExchangeService.exchange(user, dto);
+  }
+
+  @Post('annotations/exchange-ack')
+  exchangeAnnotationsAck(@CurrentUser() user: RequestUser, @Body() dto: AnnotationExchangeAckDto) {
+    return this.annotationExchangeService.exchangeAck(user, dto);
   }
 
   @Post('book-states')

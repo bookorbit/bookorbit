@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { Bookmark, BookOpen, Highlighter, Trash2 } from '@lucide/vue'
+import { Bookmark, BookOpen, Highlighter, Trash2, TriangleAlert } from 'lucide-vue-next'
 import type { TocItem } from '../composables/useToc'
 import type { Bookmark as BookmarkType } from '../composables/useBookmarks'
 import type { Annotation } from '../composables/useAnnotations'
@@ -22,6 +22,7 @@ const emit = defineEmits<{
   navigateChapter: [href: string]
   navigateBookmark: [cfi: string]
   navigateAnnotation: [cfi: string]
+  navigateAnnotationChapter: [chapterIndex: number]
   deleteBookmark: [id: number]
   deleteAnnotation: [id: number]
   toggleExpand: [href: string]
@@ -182,9 +183,18 @@ function navigateBookmark(cfi: string | null | undefined) {
   emit('navigateBookmark', cfi)
 }
 
-function navigateAnnotation(cfi: string | null | undefined) {
-  if (!cfi) return
-  emit('navigateAnnotation', cfi)
+function navigateAnnotation(ann: Annotation) {
+  if (ann.cfi) {
+    emit('navigateAnnotation', ann.cfi)
+    return
+  }
+  if (ann.chapterIndex != null) {
+    emit('navigateAnnotationChapter', ann.chapterIndex)
+  }
+}
+
+function isApproximateAnnotation(ann: Annotation): boolean {
+  return ann.cfi == null
 }
 
 function deleteBookmark(id: number) {
@@ -339,11 +349,19 @@ function deleteAnnotation(id: number) {
                 :data-reader-active-row="ann.id === activeAnnotationId ? 'highlight' : undefined"
               >
                 <div class="flex items-start gap-2">
-                  <button type="button" class="flex flex-1 min-w-0 items-start gap-2 text-left cursor-pointer" @click="navigateAnnotation(ann.cfi)">
+                  <button type="button" class="flex flex-1 min-w-0 items-start gap-2 text-left cursor-pointer" @click="navigateAnnotation(ann)">
                     <span class="mt-1.5 w-2.5 h-2.5 rounded-full shrink-0" :style="{ background: ann.color }" />
                     <div class="flex-1 min-w-0">
                       <p class="text-[13px] leading-relaxed line-clamp-3">{{ ann.text }}</p>
-                      <p class="text-[11px] text-muted-foreground mt-1">{{ getHighlightContextLine(ann) }}</p>
+                      <p class="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+                        <Tooltip v-if="isApproximateAnnotation(ann)">
+                          <TooltipTrigger as-child>
+                            <TriangleAlert :size="11" class="shrink-0 text-amber-500" />
+                          </TooltipTrigger>
+                          <TooltipContent>Synced from device; exact position unavailable, jumps to the chapter</TooltipContent>
+                        </Tooltip>
+                        <span>{{ getHighlightContextLine(ann) }}</span>
+                      </p>
                       <p class="text-[11px] text-muted-foreground mt-0.5">{{ formatDate(ann.createdAt) }}</p>
                       <p v-if="ann.note" class="text-[11px] text-muted-foreground mt-1 italic">{{ ann.note }}</p>
                     </div>

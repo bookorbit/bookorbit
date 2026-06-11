@@ -133,8 +133,17 @@ function BookOrbitApi:uploadPageStats(books)
     return self:request("POST", "/koreader/plugin/page-stats", self:withDevice({ books = books }))
 end
 
+-- Deprecated one-way upload, kept as fallback for pre-0.4 servers.
 function BookOrbitApi:uploadAnnotations(books)
     return self:request("POST", "/koreader/plugin/annotations", self:withDevice({ books = books }))
+end
+
+function BookOrbitApi:exchangeAnnotations(books)
+    return self:request("POST", "/koreader/plugin/annotations/exchange", self:withDevice({ books = books }))
+end
+
+function BookOrbitApi:exchangeAck(books)
+    return self:request("POST", "/koreader/plugin/annotations/exchange-ack", self:withDevice({ books = books }))
 end
 
 function BookOrbitApi:uploadBookStates(books)

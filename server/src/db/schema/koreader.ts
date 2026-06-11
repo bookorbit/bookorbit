@@ -15,7 +15,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 
-import { bookFiles, books } from './books';
+import { bookFiles } from './books';
 import { users } from './auth';
 
 export const koreaderUsers = pgTable(
@@ -154,50 +154,6 @@ export const koreaderPageStats = pgTable(
 
 export type KoreaderPageStat = typeof koreaderPageStats.$inferSelect;
 export type NewKoreaderPageStat = typeof koreaderPageStats.$inferInsert;
-
-export const koreaderAnnotations = pgTable(
-  'koreader_annotations',
-  {
-    id: serial('id').primaryKey(),
-    userId: integer('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    bookId: integer('book_id')
-      .notNull()
-      .references(() => books.id, { onDelete: 'cascade' }),
-    bookFileId: integer('book_file_id')
-      .notNull()
-      .references(() => bookFiles.id, { onDelete: 'cascade' }),
-    // md5 hex of `${deviceCreatedAt}|${pos0}`; stable identity for upsert across edits.
-    annotationKey: varchar('annotation_key', { length: 32 }).notNull(),
-    drawer: varchar('drawer', { length: 20 }).notNull(),
-    color: varchar('color', { length: 30 }),
-    text: text('text'),
-    note: text('note'),
-    chapter: varchar('chapter', { length: 500 }),
-    pageno: integer('pageno'),
-    posFormat: varchar('pos_format', { length: 10 }).notNull(),
-    pos0: text('pos0').notNull(),
-    pos1: text('pos1'),
-    // Device-local "YYYY-MM-DD HH:MM:SS" strings stored verbatim (device has no timezone info).
-    deviceCreatedAt: varchar('device_created_at', { length: 19 }).notNull(),
-    deviceUpdatedAt: varchar('device_updated_at', { length: 19 }),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => new Date()),
-  },
-  (t) => [
-    uniqueIndex('koreader_annotations_user_file_key_uidx').on(t.userId, t.bookFileId, t.annotationKey),
-    index('koreader_annotations_user_book_idx').on(t.userId, t.bookId),
-    check('koreader_annotations_drawer_chk', sql`${t.drawer} in ('lighten', 'underscore', 'strikeout', 'invert')`),
-    check('koreader_annotations_pos_format_chk', sql`${t.posFormat} in ('xpointer', 'pdf')`),
-  ],
-);
-
-export type KoreaderAnnotation = typeof koreaderAnnotations.$inferSelect;
-export type NewKoreaderAnnotation = typeof koreaderAnnotations.$inferInsert;
 
 export const koreaderDeviceSweeps = pgTable(
   'koreader_device_sweeps',
