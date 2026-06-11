@@ -8,6 +8,7 @@ import {
   annotationPositions,
   annotationSyncState,
   annotations,
+  koboDevices,
   AnnotationPosition,
   AnnotationRow,
   AnnotationSyncStateRow,
@@ -388,5 +389,142 @@ export class AnnotationSyncRepository {
       .select()
       .from(annotationPositions)
       .where(and(inArray(annotationPositions.annotationId, annotationIds), inArray(annotationPositions.format, formats)));
+  }
+
+  async findActiveByBook(userId: number, bookId: number, ex: Executor = this.db): Promise<AnnotationRow[]> {
+    return ex
+      .select()
+      .from(annotations)
+      .where(and(eq(annotations.userId, userId), eq(annotations.bookId, bookId), isNull(annotations.deletedAt)))
+      .orderBy(asc(annotations.id));
+  }
+
+  async findStatesByAnnotation(annotationId: number, userId: number, ex: Executor = this.db): Promise<AnnotationSyncStateRow[]> {
+    return ex
+      .select()
+      .from(annotationSyncState)
+      .where(and(eq(annotationSyncState.annotationId, annotationId), eq(annotationSyncState.userId, userId)))
+      .orderBy(asc(annotationSyncState.id));
+  }
+
+  /** Display names for kobo device ids (sync-state deviceId holds the numeric id as text). */
+  async findKoboDeviceNames(deviceIds: number[], ex: Executor = this.db): Promise<Map<string, string>> {
+    if (deviceIds.length === 0) return new Map();
+    const rows = await ex.select({ id: koboDevices.id, name: koboDevices.name }).from(koboDevices).where(inArray(koboDevices.id, deviceIds));
+    return new Map(rows.map((row) => [String(row.id), row.name]));
+  }
+
+  /** Earliest external key any device of the source holds for this annotation. */
+  async findExternalKeyForAnnotation(annotationId: number, source: AnnotationSyncSource, ex: Executor = this.db): Promise<string | null> {
+    const [row] = await ex
+      .select({ externalKey: annotationSyncState.externalKey })
+      .from(annotationSyncState)
+      .where(and(eq(annotationSyncState.annotationId, annotationId), eq(annotationSyncState.source, source)))
+      .orderBy(asc(annotationSyncState.id))
+      .limit(1);
+    return row?.externalKey ?? null;
+  }
+
+  /** All sync states of a source for one book, across devices, with their annotations. */
+  async findStatesBySourceForBook(
+    userId: number,
+    source: AnnotationSyncSource,
+    bookId: number,
+    ex: Executor = this.db,
+  ): Promise<{ state: AnnotationSyncStateRow; annotation: AnnotationRow }[]> {
+    return ex
+      .select({ state: annotationSyncState, annotation: annotations })
+      .from(annotationSyncState)
+      .innerJoin(annotations, eq(annotations.id, annotationSyncState.annotationId))
+      .where(and(eq(annotationSyncState.userId, userId), eq(annotationSyncState.source, source), eq(annotations.bookId, bookId)));
+  }
+
+  /**
+   * Book ids with annotation changes a Kobo device has not seen: unacked deletions,
+   * edits past the acked version, and unserved additions. Additions exclude
+   * annotations whose kobo_span conversion already failed at the current resolver
+   * version, or checkforchanges would report them forever.
+   */
+  async findBookIdsWithPendingKoboChanges(
+    userId: number,
+    deviceId: string,
+    opts: { includeAllOrigins: boolean; resolverVersion: number },
+  ): Promise<number[]> {
+    const source: AnnotationSyncSource = 'kobo';
+    const bookIds = new Set<number>();
+
+    const tombstones = await this.db
+      .selectDistinct({ bookId: annotations.bookId })
+      .from(annotationSyncState)
+      .innerJoin(annotations, eq(annotations.id, annotationSyncState.annotationId))
+      .where(
+        and(
+          eq(annotationSyncState.userId, userId),
+          eq(annotationSyncState.source, source),
+          eq(annotationSyncState.deviceId, deviceId),
+          isNotNull(annotations.deletedAt),
+          isNull(annotationSyncState.deleteAckedAt),
+        ),
+      );
+    for (const row of tombstones) bookIds.add(row.bookId);
+
+    const edits = await this.db
+      .selectDistinct({ bookId: annotations.bookId })
+      .from(annotationSyncState)
+      .innerJoin(annotations, eq(annotations.id, annotationSyncState.annotationId))
+      .where(
+        and(
+          eq(annotationSyncState.userId, userId),
+          eq(annotationSyncState.source, source),
+          eq(annotationSyncState.deviceId, deviceId),
+          isNull(annotations.deletedAt),
+          sql`${annotations.version} > ${annotationSyncState.lastAppliedVersion}`,
+        ),
+      );
+    for (const row of edits) bookIds.add(row.bookId);
+
+    const notServedToThisDevice = notExists(
+      this.db
+        .select({ one: sql`1` })
+        .from(annotationSyncState)
+        .where(
+          and(
+            eq(annotationSyncState.annotationId, annotations.id),
+            eq(annotationSyncState.source, source),
+            eq(annotationSyncState.deviceId, deviceId),
+          ),
+        ),
+    );
+
+    const addConditions = opts.includeAllOrigins
+      ? and(
+          eq(annotations.userId, userId),
+          isNull(annotations.deletedAt),
+          notServedToThisDevice,
+          notExists(
+            this.db
+              .select({ one: sql`1` })
+              .from(annotationPositions)
+              .where(
+                and(
+                  eq(annotationPositions.annotationId, annotations.id),
+                  eq(annotationPositions.format, 'kobo_span'),
+                  eq(annotationPositions.status, 'failed'),
+                  eq(annotationPositions.converterVersion, opts.resolverVersion),
+                ),
+              ),
+          ),
+        )
+      : and(
+          eq(annotations.userId, userId),
+          isNull(annotations.deletedAt),
+          notServedToThisDevice,
+          sql`exists (select 1 from ${annotationSyncState} other where other.annotation_id = ${annotations.id} and other.source = ${source})`,
+        );
+
+    const adds = await this.db.selectDistinct({ bookId: annotations.bookId }).from(annotations).where(addConditions);
+    for (const row of adds) bookIds.add(row.bookId);
+
+    return [...bookIds];
   }
 }

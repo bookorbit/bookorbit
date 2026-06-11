@@ -131,29 +131,29 @@
     {
       "idx": 18,
       "version": "7",
-      "when": 1781069126227,
-      "tag": "0018_koreader-plugin-sync",
+      "when": 1781214276180,
+      "tag": "0018_author_sort_key_and_listing_indexes",
       "breakpoints": true
     },
     {
       "idx": 19,
       "version": "7",
-      "when": 1781111474260,
-      "tag": "0019_annotation-hub-and-spoke",
+      "when": 1781330635947,
+      "tag": "0019_add_lubimyczytac_provider_id",
       "breakpoints": true
     },
     {
       "idx": 20,
       "version": "7",
-      "when": 1781111570798,
-      "tag": "0020_drop-legacy-annotation-storage",
+      "when": 1781495568135,
+      "tag": "0020_achievements_devices_and_session_source",
       "breakpoints": true
     },
     {
       "idx": 21,
       "version": "7",
-      "when": 1781131848588,
-      "tag": "0021_annotation-sync-key-scope",
+      "when": 1781675709588,
+      "tag": "0021_add_book_series_memberships",
       "breakpoints": true
     },
     {
@@ -196,6 +196,13 @@
       "version": "7",
       "when": 1781155643115,
       "tag": "0027_consolidated-koreader-annotations",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1781162143195,
+      "tag": "0028_kobo-annotation-spoke",
       "breakpoints": true
     }
   ]

@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { CommonModule } from '../../common/common.module';
 import { AchievementModule } from '../achievement/achievement.module';
 import { AnnotationModule } from '../annotation/annotation.module';
+import { BookModule } from '../book/book.module';
 import { PositionConverterModule } from '../position-converter/position-converter.module';
 import { UserModule } from '../user/user.module';
 import { UserBookStatusModule } from '../user-book-status/user-book-status.module';
@@ -21,7 +22,7 @@ import { KoreaderService } from './koreader.service';
 import { KoreaderStatsService } from './koreader-stats.service';
 
 @Module({
-  imports: [CommonModule, UserModule, UserBookStatusModule, AchievementModule, AnnotationModule, PositionConverterModule],
+  imports: [CommonModule, UserModule, UserBookStatusModule, AchievementModule, AnnotationModule, BookModule, PositionConverterModule],
   controllers: [KoreaderController, KoreaderPluginController],
   providers: [
     KoreaderService,

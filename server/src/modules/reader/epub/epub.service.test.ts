@@ -156,27 +156,14 @@ describe('EpubService', () => {
   const libraryService = {
     verifyUserAccess: vi.fn(),
   };
-  const koboSettingsService = {
-    getSettings: vi.fn(),
-  };
-  const kepubConversionService = {
-    getKepubPath: vi.fn(),
-  };
-
   let service: EpubService;
 
   beforeEach(() => {
     vi.resetAllMocks();
-    service = new EpubService(bookReadService as any, libraryService as any, koboSettingsService as any, kepubConversionService as any);
+    service = new EpubService(bookReadService as any, libraryService as any);
     bookReadService.findLibraryIdByBookId.mockResolvedValue(3);
     bookReadService.findPrimaryFilesByBookIds.mockResolvedValue([{ format: 'epub', absolutePath: '/books/book.epub', sizeBytes: null }]);
     libraryService.verifyUserAccess.mockResolvedValue(undefined);
-    koboSettingsService.getSettings.mockResolvedValue({
-      convertToKepub: true,
-      forceEnableHyphenation: false,
-      kepubConversionLimitMb: 100,
-      twoWayProgressSync: false,
-    });
     mockStat.mockResolvedValue({ mtimeMs: 100 } as Awaited<ReturnType<typeof stat>>);
   });
 
@@ -358,60 +345,12 @@ describe('EpubService', () => {
     expect(bookReadService.findPrimaryFilesByBookIds).not.toHaveBeenCalled();
   });
 
-  it('uses the converted kepub path for reader endpoints when two-way Kobo progress sync is enabled', async () => {
+  it('always serves the original EPUB regardless of Kobo settings', async () => {
     bookReadService.findFileById.mockResolvedValue({ bookId: 5, format: 'epub', absolutePath: '/books/alt.epub', fileHash: 'hash1', sizeBytes: 123 });
-    koboSettingsService.getSettings.mockResolvedValueOnce({
-      convertToKepub: true,
-      forceEnableHyphenation: true,
-      kepubConversionLimitMb: 100,
-      twoWayProgressSync: true,
-    });
-    kepubConversionService.getKepubPath.mockResolvedValue('/app-data/.kepub-cache/5/hash1-hyph.kepub.epub');
     mockOpenFile.mockResolvedValueOnce(makeEpubArchive() as any);
 
     await service.getBookInfo(5, 88, user);
 
-    expect(kepubConversionService.getKepubPath).toHaveBeenCalledWith({
-      sourcePath: '/books/alt.epub',
-      fileHash: 'hash1',
-      bookId: 5,
-      hyphenate: true,
-    });
-    expect(mockStat).toHaveBeenCalledWith('/app-data/.kepub-cache/5/hash1-hyph.kepub.epub');
-    expect(mockOpenFile).toHaveBeenCalledWith('/app-data/.kepub-cache/5/hash1-hyph.kepub.epub');
-  });
-
-  it('falls back to the original EPUB path when Kobo settings lookup fails', async () => {
-    bookReadService.findFileById.mockResolvedValue({ bookId: 5, format: 'epub', absolutePath: '/books/alt.epub', fileHash: 'hash1', sizeBytes: 123 });
-    koboSettingsService.getSettings.mockRejectedValueOnce(new Error('settings unavailable'));
-    mockOpenFile.mockResolvedValueOnce(makeEpubArchive() as any);
-
-    await service.getBookInfo(5, 88, user);
-
-    expect(kepubConversionService.getKepubPath).not.toHaveBeenCalled();
-    expect(mockStat).toHaveBeenCalledWith('/books/alt.epub');
-    expect(mockOpenFile).toHaveBeenCalledWith('/books/alt.epub');
-  });
-
-  it('falls back to the original EPUB path when KEPUB conversion fails', async () => {
-    bookReadService.findFileById.mockResolvedValue({ bookId: 5, format: 'epub', absolutePath: '/books/alt.epub', fileHash: 'hash1', sizeBytes: 123 });
-    koboSettingsService.getSettings.mockResolvedValueOnce({
-      convertToKepub: true,
-      forceEnableHyphenation: true,
-      kepubConversionLimitMb: 100,
-      twoWayProgressSync: true,
-    });
-    kepubConversionService.getKepubPath.mockRejectedValueOnce(new Error('conversion failed'));
-    mockOpenFile.mockResolvedValueOnce(makeEpubArchive() as any);
-
-    await service.getBookInfo(5, 88, user);
-
-    expect(kepubConversionService.getKepubPath).toHaveBeenCalledWith({
-      sourcePath: '/books/alt.epub',
-      fileHash: 'hash1',
-      bookId: 5,
-      hyphenate: true,
-    });
     expect(mockStat).toHaveBeenCalledWith('/books/alt.epub');
     expect(mockOpenFile).toHaveBeenCalledWith('/books/alt.epub');
   });

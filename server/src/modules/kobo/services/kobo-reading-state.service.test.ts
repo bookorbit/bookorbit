@@ -38,6 +38,8 @@ describe('KoboReadingStateService', () => {
   const bookAccessService = { assertBookAccessible: vi.fn() };
   const userBookStatusService = { autoUpdate: vi.fn() };
   const bookIdentityService = { ensureForBook: vi.fn() };
+  const progressBridge = { koboBookmarkToCanonical: vi.fn(), cfiToKoboBookmark: vi.fn() };
+  const settingsService = { getSettings: vi.fn() };
   const achievementEvents = { emit: vi.fn() };
 
   function makeService(db: ReturnType<typeof makeDb>) {
@@ -46,6 +48,8 @@ describe('KoboReadingStateService', () => {
       bookAccessService as never,
       userBookStatusService as never,
       bookIdentityService as never,
+      progressBridge as never,
+      settingsService as never,
       achievementEvents as never,
     );
   }
@@ -54,6 +58,9 @@ describe('KoboReadingStateService', () => {
     vi.clearAllMocks();
     bookAccessService.assertBookAccessible.mockResolvedValue(undefined);
     userBookStatusService.autoUpdate.mockResolvedValue(undefined);
+    progressBridge.koboBookmarkToCanonical.mockResolvedValue(null);
+    progressBridge.cfiToKoboBookmark.mockResolvedValue(null);
+    settingsService.getSettings.mockResolvedValue({ twoWayProgressSync: false });
     bookIdentityService.ensureForBook.mockImplementation((_userId: number, bookId: number) => ({
       bookId,
       entitlementId: `entitlement-${bookId}`,

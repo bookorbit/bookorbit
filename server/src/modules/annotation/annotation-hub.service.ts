@@ -1,12 +1,22 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
-import type { AnnotationHubItem, AnnotationHubResponse } from '@bookorbit/types';
+import type {
+  AnnotationDeviceSyncInfo,
+  AnnotationHubItem,
+  AnnotationHubResponse,
+  AnnotationPositionFormat,
+  AnnotationPositionInfo,
+  AnnotationSyncDetail,
+} from '@bookorbit/types';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { AnnotationConversionService } from './annotation-conversion.service';
 import { AnnotationExportService, type AnnotationExportFormat, type AnnotationExportResult } from './annotation-export.service';
+import { AnnotationSyncRepository } from './annotation-sync.repository';
 import { AnnotationRepository, type HubAnnotationRow, type HubFilters, type HubSort } from './annotation.repository';
 import type { AnnotationBulkDto, AnnotationExportQueryDto, AnnotationHubQueryDto } from './dto/annotation-hub.dto';
 
 const BULK_EVENT = 'annotation.bulk';
+const RETRY_EVENT = 'annotation.position_retry';
 
 @Injectable()
 export class AnnotationHubService {
@@ -15,6 +25,8 @@ export class AnnotationHubService {
   constructor(
     private readonly annotationRepo: AnnotationRepository,
     private readonly exportService: AnnotationExportService,
+    private readonly syncRepo: AnnotationSyncRepository,
+    private readonly conversionService: AnnotationConversionService,
   ) {}
 
   async list(userId: number, query: AnnotationHubQueryDto): Promise<AnnotationHubResponse> {
@@ -63,6 +75,58 @@ export class AnnotationHubService {
       `[annotation.export] [end] userId=${userId} format=${format} rows=${rows.length} scope="${sanitizeLogValue(scopeLabel)}" - annotations exported`,
     );
     return this.exportService.export(rows, format, scopeLabel);
+  }
+
+  async syncDetail(userId: number, annotationId: number): Promise<AnnotationSyncDetail> {
+    const annotation = await this.syncRepo.findAnnotationById(annotationId, userId);
+    if (!annotation) throw new NotFoundException(`Annotation ${annotationId} not found`);
+
+    const [positionRows, stateRows] = await Promise.all([
+      this.syncRepo.findPositionsByAnnotationIds([annotationId], ['cfi', 'xpointer', 'pdf', 'kobo_span']),
+      this.syncRepo.findStatesByAnnotation(annotationId, userId),
+    ]);
+
+    const koboDeviceIds = stateRows.filter((state) => state.source === 'kobo' && /^\d+$/.test(state.deviceId)).map((state) => Number(state.deviceId));
+    const koboNames = await this.syncRepo.findKoboDeviceNames(koboDeviceIds);
+
+    const positions: AnnotationPositionInfo[] = positionRows.map((row) => ({
+      format: row.format as AnnotationPositionFormat,
+      status: row.status as AnnotationPositionInfo['status'],
+      reason: typeof (row.extras as { reason?: unknown } | null)?.reason === 'string' ? ((row.extras as { reason: string }).reason ?? null) : null,
+      converterVersion: row.converterVersion,
+      updatedAt: row.updatedAt.toISOString(),
+    }));
+
+    const devices: AnnotationDeviceSyncInfo[] = stateRows.map((state) => ({
+      source: state.source as AnnotationDeviceSyncInfo['source'],
+      deviceId: state.deviceId,
+      deviceName: state.source === 'kobo' ? (koboNames.get(state.deviceId) ?? null) : null,
+      lastAppliedVersion: state.lastAppliedVersion,
+      upToDate: annotation.deletedAt ? state.deleteAckedAt != null : state.lastAppliedVersion >= annotation.version,
+      deleteAckedAt: state.deleteAckedAt ? state.deleteAckedAt.toISOString() : null,
+      lastSyncedAt: state.lastSyncedAt.toISOString(),
+    }));
+
+    return { annotationId, origin: annotation.origin as AnnotationSyncDetail['origin'], version: annotation.version, positions, devices };
+  }
+
+  /**
+   * Resets a position to pending so converters recompute it. cfi recomputes
+   * immediately; device formats recompute on that device type's next sync.
+   */
+  async retryPosition(userId: number, annotationId: number, format: AnnotationPositionFormat): Promise<AnnotationSyncDetail> {
+    const annotation = await this.syncRepo.findAnnotationById(annotationId, userId);
+    if (!annotation) throw new NotFoundException(`Annotation ${annotationId} not found`);
+
+    await this.syncRepo.updatePosition(annotationId, format, { status: 'pending', converterVersion: null });
+    let converted = 0;
+    if (format === 'cfi') {
+      converted = await this.conversionService.ensureCfiPositionsForBook(userId, annotation.bookId);
+    }
+    this.logger.log(
+      `[${RETRY_EVENT}] [end] userId=${userId} annotationId=${annotationId} format=${format} converted=${converted} - position retry applied`,
+    );
+    return this.syncDetail(userId, annotationId);
   }
 
   private toHubItem(row: HubAnnotationRow): AnnotationHubItem {

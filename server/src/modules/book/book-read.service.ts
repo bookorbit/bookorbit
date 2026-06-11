@@ -19,6 +19,10 @@ export class BookReadService {
     return this.bookRepo.findPrimaryFilesByBookIds(bookIds);
   }
 
+  findPrimaryReaderFilesByBookIds(bookIds: number[]) {
+    return this.bookRepo.findPrimaryReaderFilesByBookIds(bookIds);
+  }
+
   findCards(opts: { where: SQL | undefined; orderBy: SQL[]; limit: number; offset: number; userId: number }) {
     return this.bookRepo.findCards(opts);
   }

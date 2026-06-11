@@ -4,7 +4,7 @@ import type { FastifyReply } from 'fastify';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { AnnotationHubService } from './annotation-hub.service';
-import { AnnotationBulkDto, AnnotationExportQueryDto, AnnotationHubQueryDto } from './dto/annotation-hub.dto';
+import { AnnotationBulkDto, AnnotationExportQueryDto, AnnotationHubQueryDto, AnnotationPositionRetryDto } from './dto/annotation-hub.dto';
 
 @Controller('annotations')
 export class AnnotationHubController {
@@ -25,6 +25,21 @@ export class AnnotationHubController {
   @HttpCode(200)
   restore(@CurrentUser() user: RequestUser, @Param('annotationId', ParseIntPipe) annotationId: number) {
     return this.hubService.restore(user.id, annotationId);
+  }
+
+  @Get(':annotationId/sync-detail')
+  syncDetail(@CurrentUser() user: RequestUser, @Param('annotationId', ParseIntPipe) annotationId: number) {
+    return this.hubService.syncDetail(user.id, annotationId);
+  }
+
+  @Post(':annotationId/positions/retry')
+  @HttpCode(200)
+  retryPosition(
+    @CurrentUser() user: RequestUser,
+    @Param('annotationId', ParseIntPipe) annotationId: number,
+    @Body() dto: AnnotationPositionRetryDto,
+  ) {
+    return this.hubService.retryPosition(user.id, annotationId, dto.format);
   }
 
   @Delete(':annotationId')

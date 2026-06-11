@@ -3,24 +3,40 @@ import { createHash } from 'crypto';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import type { AnnotationRow, AnnotationSyncStateRow } from '../../db/schema';
-import type { AnnotationSyncSource } from './annotation.constants';
-import { applyDeviceColor, applyDeviceStyle, hexFromKoreaderColor, styleFromDrawer } from './annotation-style-map';
+import type { AnnotationPositionFormat, AnnotationStyle, AnnotationSyncSource } from './annotation.constants';
+import {
+  applyDeviceColor,
+  applyDeviceStyle,
+  applyKoboDeviceColor,
+  hexFromKoboColor,
+  hexFromKoreaderColor,
+  styleFromDrawer,
+} from './annotation-style-map';
 import { AnnotationSyncRepository, type DbTx } from './annotation-sync.repository';
 
 const INGEST_EVENT = 'annotation.sync_ingest';
 
 export interface IncomingDeviceAnnotation {
+  /**
+   * Device-authoritative identity (Kobo annotation UUID). When present it replaces the
+   * datetime|pos0 dedup key and disables the datetime-based reconcile heuristics.
+   */
+  externalKey?: string;
   datetime: string;
   datetimeUpdated?: string | null;
-  drawer: string;
+  drawer?: string;
   color?: string | null;
+  /** Palette the incoming color belongs to; picks the projection mapping. */
+  colorSpace?: 'koreader' | 'kobo';
+  style?: AnnotationStyle;
   text?: string | null;
   note?: string | null;
   chapter?: string | null;
   pageno?: number | null;
-  posFormat: 'xpointer' | 'pdf';
+  posFormat: 'xpointer' | 'pdf' | 'kobo_span';
   pos0: string;
   pos1?: string | null;
+  posExtras?: Record<string, unknown> | null;
 }
 
 export interface IngestParams {
@@ -42,6 +58,17 @@ export interface IngestResult {
 
 export function buildAnnotationKey(deviceCreatedAt: string, pos0: string): string {
   return createHash('md5').update(`${deviceCreatedAt}|${pos0}`).digest('hex'); // codeql[js/weak-cryptographic-algorithm] - non-security dedup key
+}
+
+function keyOf(incoming: IncomingDeviceAnnotation): string {
+  return incoming.externalKey ?? buildAnnotationKey(incoming.datetime, incoming.pos0);
+}
+
+/** Other position formats that go stale when this device format moves. */
+function siblingFormatsOf(posFormat: IncomingDeviceAnnotation['posFormat']): AnnotationPositionFormat[] {
+  if (posFormat === 'xpointer') return ['cfi', 'kobo_span'];
+  if (posFormat === 'kobo_span') return ['cfi', 'xpointer'];
+  return ['cfi'];
 }
 
 @Injectable()
@@ -81,14 +108,14 @@ export class AnnotationSyncService {
   private dedupeByKey(annotations: IncomingDeviceAnnotation[]): IncomingDeviceAnnotation[] {
     const byKey = new Map<string, IncomingDeviceAnnotation>();
     for (const annotation of annotations) {
-      byKey.set(buildAnnotationKey(annotation.datetime, annotation.pos0), annotation);
+      byKey.set(keyOf(annotation), annotation);
     }
     return [...byKey.values()];
   }
 
   private async ingestOne(params: IngestParams, incoming: IncomingDeviceAnnotation, result: IngestResult, tx: DbTx): Promise<void> {
     const { userId, source, deviceId, bookId, bookFileId } = params;
-    const key = buildAnnotationKey(incoming.datetime, incoming.pos0);
+    const key = keyOf(incoming);
 
     const deviceState = await this.syncRepo.findStateByDeviceKey(userId, source, deviceId, bookId, key, tx);
     if (deviceState) {
@@ -150,7 +177,11 @@ export class AnnotationSyncService {
       return;
     }
 
-    const byDatetime = await this.syncRepo.findCanonicalByDeviceDatetime(userId, bookId, incoming.datetime, incoming.posFormat, tx);
+    // UUID-keyed sources have authoritative identity; the datetime heuristics below
+    // exist only for the datetime|pos0 key scheme where a move changes the key.
+    const byDatetime = incoming.externalKey
+      ? []
+      : await this.syncRepo.findCanonicalByDeviceDatetime(userId, bookId, incoming.datetime, incoming.posFormat, tx);
     const exact = byDatetime.find((c) => c.position?.pos0 === incoming.pos0);
     const candidate = exact ?? (byDatetime.length === 1 ? byDatetime[0] : undefined);
     if (candidate) {
@@ -181,7 +212,9 @@ export class AnnotationSyncService {
           { pos0: incoming.pos0, pos1: incoming.pos1 ?? null, status: 'exact', bookFileId },
           tx,
         );
-        await this.syncRepo.markPositionPending(annotation.id, 'cfi', tx);
+        for (const sibling of siblingFormatsOf(incoming.posFormat)) {
+          await this.syncRepo.markPositionPending(annotation.id, sibling, tx);
+        }
         version = await this.syncRepo.applyContentPatch(annotation.id, { deviceUpdatedAt: incoming.datetimeUpdated ?? null }, tx);
       }
       const state = await this.syncRepo.insertState(
@@ -209,8 +242,8 @@ export class AnnotationSyncService {
         userId,
         bookId,
         text: incoming.text ?? '',
-        color: hexFromKoreaderColor(incoming.color),
-        style: styleFromDrawer(incoming.drawer),
+        color: incoming.colorSpace === 'kobo' ? hexFromKoboColor(incoming.color) : hexFromKoreaderColor(incoming.color),
+        style: incoming.style ?? styleFromDrawer(incoming.drawer),
         note: incoming.note ?? null,
         chapterTitle: incoming.chapter ?? null,
         origin: source,
@@ -224,7 +257,7 @@ export class AnnotationSyncService {
         pos0: incoming.pos0,
         pos1: incoming.pos1 ?? null,
         status: 'exact',
-        extras: incoming.pageno != null ? { pageno: incoming.pageno } : null,
+        extras: this.buildPositionExtras(incoming),
       },
       {
         source,
@@ -254,10 +287,14 @@ export class AnnotationSyncService {
     const hasNewEdit = incomingEffective > storedEffective;
 
     const position = await this.syncRepo.findDevicePosition(annotation.id, incoming.posFormat, tx);
+    // pos0 can only change under UUID identity; with the datetime|pos0 key a changed
+    // pos0 is a different key and lands in the move path instead.
+    const pos0Changed = incoming.externalKey != null && position != null && position.pos0 !== incoming.pos0;
     const pos1Changed = position != null && (position.pos1 ?? null) !== (incoming.pos1 ?? null);
+    const posChanged = pos0Changed || pos1Changed;
     const pagenoChanged = incoming.pageno != null && (position?.extras as { pageno?: number } | null)?.pageno !== incoming.pageno && position != null;
 
-    if (!hasNewEdit && !pos1Changed) {
+    if (!hasNewEdit && !posChanged) {
       if (pagenoChanged) {
         await this.syncRepo.updatePosition(
           annotation.id,
@@ -274,7 +311,8 @@ export class AnnotationSyncService {
       const nextText = incoming.text ?? '';
       const nextNote = incoming.note ?? null;
       const nextStyle = applyDeviceStyle(annotation.style as Parameters<typeof applyDeviceStyle>[0], incoming.drawer);
-      const nextColor = applyDeviceColor(annotation.color, incoming.color);
+      const nextColor =
+        incoming.colorSpace === 'kobo' ? applyKoboDeviceColor(annotation.color, incoming.color) : applyDeviceColor(annotation.color, incoming.color);
       if (nextText !== annotation.text) patch.text = nextText;
       if (nextNote !== annotation.note) patch.note = nextNote;
       if (nextStyle !== annotation.style) patch.style = nextStyle;
@@ -282,24 +320,27 @@ export class AnnotationSyncService {
       if ((incoming.chapter ?? null) !== annotation.chapterTitle && incoming.chapter != null) patch.chapterTitle = incoming.chapter;
     }
 
-    if (pos1Changed || pagenoChanged) {
+    if (posChanged || pagenoChanged) {
       await this.syncRepo.updatePosition(
         annotation.id,
         incoming.posFormat,
         {
+          ...(pos0Changed ? { pos0: incoming.pos0, status: 'exact' as const } : {}),
           pos1: incoming.pos1 ?? null,
           bookFileId,
           ...(incoming.pageno != null ? { extras: { ...(position?.extras ?? {}), pageno: incoming.pageno } } : {}),
         },
         tx,
       );
-      if (pos1Changed) {
-        await this.syncRepo.markPositionPending(annotation.id, 'cfi', tx);
+      if (posChanged) {
+        for (const sibling of siblingFormatsOf(incoming.posFormat)) {
+          await this.syncRepo.markPositionPending(annotation.id, sibling, tx);
+        }
       }
     }
 
     const hasContentChanges = Object.keys(patch).length > 0;
-    if (!hasContentChanges && !pos1Changed) {
+    if (!hasContentChanges && !posChanged) {
       // A bumped device timestamp without content changes (e.g. the echo of an edit we
       // pushed down) is bookkeeping only and must not bump the version, or the same
       // no-op edit would ping-pong between server and device forever.
@@ -315,6 +356,142 @@ export class AnnotationSyncService {
       tx,
     );
     return { newVersion };
+  }
+
+  private buildPositionExtras(incoming: IncomingDeviceAnnotation): Record<string, unknown> | null {
+    const extras: Record<string, unknown> = { ...(incoming.posExtras ?? {}) };
+    if (incoming.pageno != null) extras.pageno = incoming.pageno;
+    return Object.keys(extras).length > 0 ? extras : null;
+  }
+
+  /**
+   * Applies explicit device delete operations (Kobo PATCH ops). Identity is the
+   * device-side external key; any device's state row of the source matches, so a
+   * deletion propagates even when reported by a device that did not create it.
+   */
+  async applyDeviceDeletes(params: {
+    userId: number;
+    source: AnnotationSyncSource;
+    deviceId: string;
+    bookId: number;
+    deletes: { externalKey: string }[];
+  }): Promise<number> {
+    if (params.deletes.length === 0) return 0;
+    let deleted = 0;
+
+    await this.syncRepo.transaction(async (tx) => {
+      for (const entry of params.deletes) {
+        const match = await this.syncRepo.findStateByKeyAnyDevice(params.userId, params.source, entry.externalKey, params.bookId, tx);
+        if (!match) continue;
+        if (!match.annotation.deletedAt) {
+          await this.syncRepo.softDeleteById(match.annotation.id, tx);
+          deleted += 1;
+        }
+        const reporterState =
+          match.state.deviceId === params.deviceId
+            ? match.state
+            : await this.syncRepo.findStateByAnnotationAndDevice(match.annotation.id, params.source, params.deviceId, tx);
+        if (reporterState) {
+          await this.syncRepo.setDeleteAcked(reporterState.id, tx);
+        } else {
+          const inserted = await this.syncRepo.insertState(
+            {
+              annotationId: match.annotation.id,
+              userId: params.userId,
+              source: params.source,
+              deviceId: params.deviceId,
+              externalKey: entry.externalKey,
+              externalCreatedAt: match.state.externalCreatedAt,
+              lastAppliedVersion: match.annotation.version,
+            },
+            tx,
+          );
+          await this.syncRepo.setDeleteAcked(inserted.id, tx);
+        }
+      }
+    });
+
+    if (deleted > 0) {
+      this.logger.log(
+        `[annotation.sync_delete_ops] [end] userId=${params.userId} bookId=${params.bookId} deviceId=${params.deviceId.slice(0, 8)} deleted=${deleted} - device delete operations applied`,
+      );
+    }
+    return deleted;
+  }
+
+  /**
+   * Marks annotations as applied on a device after they were served in a pull-style
+   * response (Kobo GET). This is the serve-side counterpart of applyExchangeAck:
+   * lastAppliedVersion advances to the served version, and deletions that propagated
+   * by omission are acked for this device.
+   */
+  async markServedApplied(params: {
+    userId: number;
+    source: AnnotationSyncSource;
+    deviceId: string;
+    entries: { annotationId: number; version: number; externalKey: string; externalCreatedAt: string | null }[];
+    tombstoneStateIds: number[];
+  }): Promise<void> {
+    if (params.entries.length === 0 && params.tombstoneStateIds.length === 0) return;
+    await this.syncRepo.transaction(async (tx) => {
+      for (const entry of params.entries) {
+        await this.syncRepo.insertState(
+          {
+            annotationId: entry.annotationId,
+            userId: params.userId,
+            source: params.source,
+            deviceId: params.deviceId,
+            externalKey: entry.externalKey,
+            externalCreatedAt: entry.externalCreatedAt,
+            lastAppliedVersion: entry.version,
+          },
+          tx,
+        );
+      }
+      for (const stateId of params.tombstoneStateIds) {
+        await this.syncRepo.setDeleteAcked(stateId, tx);
+      }
+    });
+  }
+
+  /**
+   * The stable device-side key for an annotation within a source, minting one when the
+   * annotation has never been served (Kobo ids are store-global, so every device of the
+   * user must see the same id).
+   */
+  async ensureExternalKey(annotationId: number, source: AnnotationSyncSource, mint: () => string): Promise<string> {
+    const existing = await this.syncRepo.findExternalKeyForAnnotation(annotationId, source);
+    return existing ?? mint();
+  }
+
+  async listActiveForBook(userId: number, bookId: number): Promise<AnnotationRow[]> {
+    return this.syncRepo.findActiveByBook(userId, bookId);
+  }
+
+  async listStatesBySourceForBook(
+    userId: number,
+    source: AnnotationSyncSource,
+    bookId: number,
+  ): Promise<{ state: AnnotationSyncStateRow; annotation: AnnotationRow }[]> {
+    return this.syncRepo.findStatesBySourceForBook(userId, source, bookId);
+  }
+
+  async listDeleteCandidates(
+    userId: number,
+    source: AnnotationSyncSource,
+    deviceId: string,
+    bookId: number,
+    limit: number,
+  ): Promise<{ state: AnnotationSyncStateRow; annotation: AnnotationRow }[]> {
+    return this.syncRepo.findDeleteCandidates(userId, source, deviceId, bookId, limit);
+  }
+
+  async listPendingKoboChangeBookIds(userId: number, deviceId: string, opts: { includeAllOrigins: boolean; resolverVersion: number }) {
+    return this.syncRepo.findBookIdsWithPendingKoboChanges(userId, deviceId, opts);
+  }
+
+  async setDeviceIdentity(annotationId: number, deviceCreatedAt: string): Promise<void> {
+    await this.syncRepo.setDeviceIdentitySilent(annotationId, deviceCreatedAt);
   }
 
   /**
@@ -481,7 +658,7 @@ export class AnnotationSyncService {
     annotationId: number;
     userId: number;
     bookFileId: number;
-    format: 'xpointer' | 'cfi';
+    format: 'xpointer' | 'cfi' | 'kobo_span';
     pos0: string | null;
     pos1: string | null;
     status: 'exact' | 'repaired' | 'failed' | 'pending';

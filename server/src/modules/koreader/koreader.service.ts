@@ -7,6 +7,8 @@ import { KoreaderRepository } from './koreader.repository';
 import { KoreaderChapterService } from './koreader-chapter.service';
 import { KoreaderChapterExtractorService } from './koreader-chapter-extractor.service';
 import { KoreaderPluginRepository } from './koreader-plugin.repository';
+import { BookService } from '../book/book.service';
+import { PositionConverterService } from '../position-converter/position-converter.service';
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED } from '../achievement/achievement-events.service';
 
@@ -26,6 +28,8 @@ export class KoreaderService {
     private readonly chapterExtractor: KoreaderChapterExtractorService,
     private readonly userBookStatusService: UserBookStatusService,
     private readonly achievementEvents: AchievementEventsService,
+    private readonly positionConverter: PositionConverterService,
+    private readonly bookService: BookService,
   ) {}
 
   async createCredentials(userId: number, username: string, password: string) {
@@ -159,7 +163,9 @@ export class KoreaderService {
     if (options?.skipSharedProgress) return;
 
     const bookorbitPercentage = toBookorbitPercentage(data.percentage);
-    await this.repo.upsertReadingProgress(bookFile.id, userId, bookorbitPercentage);
+    const cfi = data.progress ? await this.convertProgressToCfi(bookFile.id, data.progress) : null;
+    await this.repo.upsertReadingProgress(bookFile.id, userId, bookorbitPercentage, cfi, data.progress ?? null);
+    await this.bookService.syncKoboReadingStateForExternalProgress(userId, bookFile.id, bookorbitPercentage).catch(() => undefined);
     await this.userBookStatusService.autoUpdate(userId, bookFile.bookId, bookorbitPercentage);
     this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, {
       userId,
@@ -168,6 +174,15 @@ export class KoreaderService {
       progress: bookorbitPercentage,
       source: 'koreader',
     });
+  }
+
+  private async convertProgressToCfi(bookFileId: number, xpointer: string): Promise<string | null> {
+    try {
+      const outcome = await this.positionConverter.xpointerPointToCfi({ bookFileId, pos: xpointer });
+      return outcome.status === 'failed' ? null : (outcome.cfi ?? null);
+    } catch {
+      return null;
+    }
   }
 
   async getProgress(userId: number, documentHash: string) {

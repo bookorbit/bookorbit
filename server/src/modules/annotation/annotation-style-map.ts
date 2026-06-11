@@ -94,6 +94,72 @@ export function applyDeviceColor(currentHex: string, incomingColor: string | nul
   return hexFromKoreaderColor(incomingColor);
 }
 
+/** Kobo firmware's four fixed highlight colors. */
+export const KOBO_COLOR_HEX: Record<string, string> = {
+  yellow: '#F6F3B3',
+  green: '#C6E09E',
+  blue: '#B2E1E8',
+  pink: '#E8AFCF',
+};
+
+export const DEFAULT_KOBO_COLOR_HEX = KOBO_COLOR_HEX.yellow;
+
+const KOBO_TO_APP_COLOR: Record<string, string> = {
+  '#F6F3B3': '#FACC15',
+  '#C6E09E': '#4ADE80',
+  '#B2E1E8': '#38BDF8',
+  '#E8AFCF': '#F472B6',
+};
+
+const APP_TO_KOBO_COLOR: Record<string, string> = {
+  '#FACC15': KOBO_COLOR_HEX.yellow,
+  '#4ADE80': KOBO_COLOR_HEX.green,
+  '#38BDF8': KOBO_COLOR_HEX.blue,
+  '#F472B6': KOBO_COLOR_HEX.pink,
+  '#FB923C': KOBO_COLOR_HEX.yellow,
+};
+
+export function hexFromKoboColor(color: string | null | undefined): string {
+  const normalized = normalizeHex(color);
+  if (!normalized) return KOBO_TO_APP_COLOR[DEFAULT_KOBO_COLOR_HEX];
+  return KOBO_TO_APP_COLOR[normalized] ?? KOBO_TO_APP_COLOR[koboColorFromHex(normalized)];
+}
+
+export function koboColorFromHex(hex: string | null | undefined): string {
+  const normalized = normalizeHex(hex);
+  if (!normalized) return DEFAULT_KOBO_COLOR_HEX;
+  if (Object.values(KOBO_COLOR_HEX).includes(normalized)) return normalized;
+  const direct = APP_TO_KOBO_COLOR[normalized];
+  if (direct) return direct;
+  const rgb = parseHex(normalized);
+  if (!rgb) return DEFAULT_KOBO_COLOR_HEX;
+  let best = DEFAULT_KOBO_COLOR_HEX;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const koboHex of Object.values(KOBO_COLOR_HEX)) {
+    const named = parseHex(koboHex)!;
+    const distance = (rgb.r - named.r) ** 2 + (rgb.g - named.g) ** 2 + (rgb.b - named.b) ** 2;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = koboHex;
+    }
+  }
+  return best;
+}
+
+/** Same round-trip stability rule as applyDeviceColor, over Kobo's palette. */
+export function applyKoboDeviceColor(currentHex: string, incomingKoboColor: string | null | undefined): string {
+  const incoming = normalizeHex(incomingKoboColor);
+  if (!incoming) return currentHex;
+  if (koboColorFromHex(currentHex) === incoming) return currentHex;
+  return hexFromKoboColor(incoming);
+}
+
+function normalizeHex(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const match = /^#?([0-9a-f]{6})$/i.exec(value.trim());
+  return match ? `#${match[1].toUpperCase()}` : null;
+}
+
 function parseHex(hex: string | null | undefined): { r: number; g: number; b: number } | null {
   if (!hex) return null;
   const match = /^#?([0-9a-f]{6})$/i.exec(hex.trim());

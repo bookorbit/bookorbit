@@ -195,19 +195,31 @@ export class KoreaderRepository {
     return row ?? null;
   }
 
-  async upsertReadingProgress(bookFileId: number, userId: number, percentage: number) {
+  async upsertReadingProgress(bookFileId: number, userId: number, percentage: number, cfi: string | null = null, xpointer: string | null = null) {
     await this.db
       .insert(schema.readingProgress)
-      .values({ bookFileId, userId, percentage })
+      .values({ bookFileId, userId, percentage, cfi, koreaderProgress: xpointer })
       .onConflictDoUpdate({
         target: [schema.readingProgress.bookFileId, schema.readingProgress.userId],
         // Deliberately do NOT update updatedAt here. reading_progress.updatedAt must only
         // change when the web reader writes it, so getProgress can use it as an accurate
         // "last web-reader sync time" for comparison against koreader_device_progress.updatedAt.
-        // KOReader sends percentage + XPointer, while the web reader stores CFI and its own
-        // KOReader-compatible XPointer. If we keep stale web locator fields, clients may resume
-        // at an older location even when KOReader synced newer percentage.
-        set: { percentage, cfi: null, pageNumber: null, koreaderProgress: null, updatedAt: sql`"reading_progress"."updated_at"` },
+        // The cfi stored here is the server-side conversion of KOReader's XPointer (null when
+        // conversion fails) so the web reader resumes at the same paragraph; stale web locator
+        // fields are never kept, or clients may resume at an older location. Kobo location
+        // fields clear because the position no longer matches the device's bookmark; the Kobo
+        // pull path recomputes a precise Location from the cfi.
+        set: {
+          percentage,
+          cfi,
+          pageNumber: null,
+          koreaderProgress: xpointer,
+          koboLocationSource: null,
+          koboLocationType: null,
+          koboLocationValue: null,
+          koboContentSourceProgressPercent: null,
+          updatedAt: sql`"reading_progress"."updated_at"`,
+        },
       });
   }
 

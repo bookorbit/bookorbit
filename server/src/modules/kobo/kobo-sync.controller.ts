@@ -32,17 +32,21 @@ import { KoboProxyService } from './services/kobo-proxy.service';
 import { KOBO_STORE_RESOURCES } from './kobo-store-resources';
 import { KoboBookIdentityService } from './services/kobo-book-identity.service';
 
+function readHeaderValue(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 function buildBaseUrl(req: FastifyRequest): string {
-  const fwdHost = req.headers['x-forwarded-host'];
-  const fwdPort = req.headers['x-forwarded-port'];
-  const fwdProto = req.headers['x-forwarded-proto'];
+  const fwdHost = readHeaderValue(req.headers['x-forwarded-host']);
+  const fwdPort = readHeaderValue(req.headers['x-forwarded-port']);
+  const fwdProto = readHeaderValue(req.headers['x-forwarded-proto']);
   const hasForwarded = fwdHost || fwdPort || fwdProto;
-  const proto = (fwdProto as string | undefined) ?? req.protocol;
-  const headerHost = fwdHost ?? req.headers.host;
-  let host = headerHost ? (Array.isArray(headerHost) ? headerHost[0] : headerHost) : req.hostname;
+  const proto = fwdProto ?? req.protocol;
+  const headerHost = fwdHost ?? readHeaderValue(req.headers.host);
+  let host = headerHost ?? req.hostname;
 
   if (!host.includes(':')) {
-    const port = fwdPort ? (Array.isArray(fwdPort) ? fwdPort[0] : fwdPort) : null;
+    const port = fwdPort ?? null;
     if (port) {
       const isDefault = (proto === 'http' && port === '80') || (proto === 'https' && port === '443');
       if (!isDefault) host = host + ':' + port;
@@ -54,6 +58,19 @@ function buildBaseUrl(req: FastifyRequest): string {
   }
 
   return proto + '://' + host;
+}
+
+function buildReadingServicesBaseUrl(req: FastifyRequest, baseUrl: string): string {
+  const localPort = req.socket?.localPort;
+  if (!localPort) return baseUrl;
+
+  const url = new URL(baseUrl);
+  if (url.port !== '5173') return baseUrl;
+
+  const proto = readHeaderValue(req.headers['x-forwarded-proto']) ?? req.protocol;
+  url.protocol = proto + ':';
+  url.port = String(localPort);
+  return url.toString().replace(/\/$/, '');
 }
 
 @Controller('kobo/:deviceToken')
@@ -74,6 +91,7 @@ export class KoboSyncController {
   @Header('x-kobo-apitoken', 'e30=')
   initialization(@KoboDevice() device: KoboDeviceContext, @Req() req: FastifyRequest) {
     const baseUrl = buildBaseUrl(req);
+    const readingServicesBaseUrl = buildReadingServicesBaseUrl(req, baseUrl);
     const t = device.deviceToken;
     return {
       Resources: {
@@ -82,6 +100,7 @@ export class KoboSyncController {
         image_url_template: `${baseUrl}/api/v1/kobo/${t}/v1/books/{ImageId}/thumbnail/{Width}/{Height}/false/image.jpg`,
         image_url_quality_template: `${baseUrl}/api/v1/kobo/${t}/v1/books/{ImageId}/thumbnail/{Width}/{Height}/{Quality}/{IsGreyscale}/image.jpg`,
         library_sync: `${baseUrl}/api/v1/kobo/${t}/v1/library/sync`,
+        reading_services_host: readingServicesBaseUrl,
       },
     };
   }

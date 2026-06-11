@@ -141,7 +141,7 @@ describe('KOReader annotation exchange (e2e)', { timeout: 120_000 }, () => {
 
     const annotations = await ctx.app.inject({
       method: 'GET',
-      url: `/api/v1/koreader/books/${epub.bookId}/annotations`,
+      url: `/api/v1/books/${epub.bookId}/annotations`,
       headers: authHeader(ctx.adminToken),
     });
     expect(annotations.statusCode).toBe(200);

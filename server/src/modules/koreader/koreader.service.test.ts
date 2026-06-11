@@ -82,6 +82,12 @@ describe('KoreaderService', () => {
     listSweeps: ReturnType<typeof vi.fn>;
     getPluginTotals: ReturnType<typeof vi.fn>;
   };
+  let mockPositionConverter: {
+    xpointerPointToCfi: ReturnType<typeof vi.fn>;
+  };
+  let mockBookService: {
+    syncKoboReadingStateForExternalProgress: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -138,6 +144,14 @@ describe('KoreaderService', () => {
       emit: vi.fn(),
     };
 
+    mockPositionConverter = {
+      xpointerPointToCfi: vi.fn().mockResolvedValue({ status: 'failed', reason: 'chapter_unavailable' }),
+    };
+
+    mockBookService = {
+      syncKoboReadingStateForExternalProgress: vi.fn().mockResolvedValue(undefined),
+    };
+
     mockPluginRepo = {
       listSweeps: vi.fn().mockResolvedValue([]),
       getPluginTotals: vi.fn().mockResolvedValue({
@@ -170,6 +184,8 @@ describe('KoreaderService', () => {
       mockChapterExtractor as unknown as KoreaderChapterExtractorService,
       mockUserBookStatusService as unknown as UserBookStatusService,
       mockAchievementEvents as unknown as AchievementEventsService,
+      mockPositionConverter as never,
+      mockBookService as never,
     );
   });
 
@@ -345,7 +361,8 @@ describe('KoreaderService', () => {
         chapterIndex: 6,
         syncTimestamp: 1700000000,
       });
-      expect(mockRepo.upsertReadingProgress).toHaveBeenCalledWith(44, 12, 50);
+      expect(mockRepo.upsertReadingProgress).toHaveBeenCalledWith(44, 12, 50, null, '/body/DocFragment[7]');
+      expect(mockBookService.syncKoboReadingStateForExternalProgress).toHaveBeenCalledWith(12, 44, 50);
       expect(mockUserBookStatusService.autoUpdate).toHaveBeenCalledWith(12, 55, 50);
       expect(mockAchievementEvents.emit).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, {
         userId: 12,

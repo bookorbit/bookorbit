@@ -45,3 +45,31 @@ export interface AnnotationHubResponse {
   page: number;
   pageSize: number;
 }
+
+export type AnnotationPositionFormat = "cfi" | "xpointer" | "pdf" | "kobo_span";
+
+export interface AnnotationPositionInfo {
+  format: AnnotationPositionFormat;
+  status: AnnotationPositionStatus;
+  reason: string | null;
+  converterVersion: number | null;
+  updatedAt: string;
+}
+
+export interface AnnotationDeviceSyncInfo {
+  source: "koreader" | "kobo";
+  deviceId: string;
+  deviceName: string | null;
+  lastAppliedVersion: number;
+  upToDate: boolean;
+  deleteAckedAt: string | null;
+  lastSyncedAt: string;
+}
+
+export interface AnnotationSyncDetail {
+  annotationId: number;
+  origin: AnnotationItem["origin"];
+  version: number;
+  positions: AnnotationPositionInfo[];
+  devices: AnnotationDeviceSyncInfo[];
+}

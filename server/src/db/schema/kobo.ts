@@ -13,10 +13,11 @@ export const koboDevices = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 255 }).notNull(),
     token: varchar('token', { length: 64 }).notNull().unique(),
+    clientDeviceId: varchar('client_device_id', { length: 128 }),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [index('kobo_devices_user_id_idx').on(t.userId)],
+  (t) => [index('kobo_devices_user_id_idx').on(t.userId), unique('kobo_devices_client_device_id_unique').on(t.clientDeviceId)],
 );
 
 export const koboSyncSettings = pgTable(
@@ -33,6 +34,7 @@ export const koboSyncSettings = pgTable(
     forceEnableHyphenation: boolean('force_enable_hyphenation').notNull().default(false),
     kepubConversionLimitMb: integer('kepub_conversion_limit_mb').notNull().default(100),
     twoWayProgressSync: boolean('two_way_progress_sync').notNull().default(false),
+    syncBookOrbitAnnotationsToKobo: boolean('sync_bookorbit_annotations_to_kobo').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .defaultNow()

@@ -22,6 +22,7 @@ import {
 import type { AnnotationHubItem, AnnotationItem } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import HighlightNoteEditor from '@/features/book/components/detail/tabs/HighlightNoteEditor.vue'
+import AnnotationSyncDetailPanel from './AnnotationSyncDetailPanel.vue'
 
 type AnnotationListItemMode = 'book' | 'hub'
 type AnnotationListDensity = 'compact' | 'comfortable'
@@ -79,6 +80,7 @@ const STYLES = [
 const expanded = ref(false)
 const editingNote = ref(false)
 const showStylePanel = ref(false)
+const showSyncDetail = ref(false)
 const confirmTrash = ref(false)
 const copied = ref(false)
 const pendingNote = ref<string | null | undefined>(undefined)
@@ -220,6 +222,10 @@ function toggleStylePanel() {
   showStylePanel.value = !showStylePanel.value
 }
 
+function toggleSyncDetail() {
+  showSyncDetail.value = !showSyncDetail.value
+}
+
 function handleColorSelect(color: string) {
   if (color !== props.annotation.color) emit('updateColor', props.annotation.id, color)
 }
@@ -278,6 +284,8 @@ function handleStyleSelect(style: string) {
 
       <HighlightNoteEditor v-if="editingNote" :initial-note="annotation.note" :saving="saving" @save="handleNoteSave" @cancel="handleNoteCancel" />
 
+      <AnnotationSyncDetailPanel v-if="showSyncDetail" :annotation-id="annotation.id" />
+
       <div v-if="showStylePanel && canEdit" class="mt-2 flex flex-col gap-2 rounded-md border border-border bg-background p-2">
         <div class="flex flex-wrap items-center gap-1.5">
           <button
@@ -320,13 +328,19 @@ function handleStyleSelect(style: string) {
             <Smartphone v-if="annotation.origin === 'koreader' || annotation.origin === 'kobo'" :size="10" />
             {{ originLabel }}
           </span>
-          <span
-            v-if="positionStatusLabel"
-            class="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium"
-            :class="positionStatusClass"
-          >
-            {{ positionStatusLabel }}
-          </span>
+          <Tooltip v-if="positionStatusLabel">
+            <TooltipTrigger as-child>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80"
+                :class="positionStatusClass"
+                @click="toggleSyncDetail"
+              >
+                {{ positionStatusLabel }}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{{ showSyncDetail ? 'Hide sync detail' : 'Show sync detail' }}</TooltipContent>
+          </Tooltip>
           <Tooltip v-if="isApproximate">
             <TooltipTrigger as-child>
               <TriangleAlert :size="12" class="text-muted-foreground" />

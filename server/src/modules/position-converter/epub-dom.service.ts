@@ -125,6 +125,11 @@ export class EpubDomService {
     return entry ? entry.spine.hrefs.length : null;
   }
 
+  async getSpineHrefs(bookFileId: number): Promise<string[] | null> {
+    const entry = await this.getSpineEntry(bookFileId);
+    return entry ? entry.spine.hrefs : null;
+  }
+
   async getChapter(bookFileId: number, chapterIndex: number): Promise<ChapterDocument | null> {
     const entry = await this.getSpineEntry(bookFileId);
     if (!entry) return null;

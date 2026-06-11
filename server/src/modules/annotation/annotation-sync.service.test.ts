@@ -113,6 +113,9 @@ function makeRepo(): RepoMock {
     findStateByAnnotationAndDevice: vi.fn().mockResolvedValue(null),
     upsertPosition: vi.fn().mockResolvedValue(undefined),
     findPositionsByAnnotationIds: vi.fn().mockResolvedValue([]),
+    findExternalKeyForAnnotation: vi.fn().mockResolvedValue(null),
+    findStatesBySourceForBook: vi.fn().mockResolvedValue([]),
+    findBookIdsWithPendingKoboChanges: vi.fn().mockResolvedValue([]),
   } as unknown as RepoMock;
 }
 
@@ -526,6 +529,181 @@ describe('AnnotationSyncService', () => {
 
       expect(result.acked).toBe(0);
       expect(repo.insertState).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('kobo external-key identity', () => {
+    const KOBO_UUID = '11111111-2222-3333-4444-555555555555';
+
+    function makeKoboIncoming(overrides: Partial<IncomingDeviceAnnotation> = {}): IncomingDeviceAnnotation {
+      return {
+        externalKey: KOBO_UUID,
+        datetime: '2026-06-01 21:14:03',
+        datetimeUpdated: null,
+        color: '#F6F3B3',
+        colorSpace: 'kobo',
+        style: 'highlight',
+        text: 'highlighted text',
+        note: null,
+        chapter: 'Chapter 1',
+        posFormat: 'kobo_span',
+        pos0: 'kobo.3.1:0',
+        pos1: 'kobo.3.1:16',
+        posExtras: { koboLocation: { span: { startPath: 'span#kobo\\.3\\.1' } } },
+        ...overrides,
+      };
+    }
+
+    function ingestKobo(annotations: IncomingDeviceAnnotation[]) {
+      return service.ingestDeviceAnnotations({
+        userId: USER_ID,
+        source: 'kobo',
+        deviceId: '42',
+        bookId: BOOK_ID,
+        bookFileId: BOOK_FILE_ID,
+        annotations,
+      });
+    }
+
+    it('creates a canonical annotation with kobo color mapping and location extras', async () => {
+      const result = await ingestKobo([makeKoboIncoming()]);
+
+      expect(result.created).toBe(1);
+      expect(repo.findCanonicalByDeviceDatetime).not.toHaveBeenCalled();
+      const [annotation, position, state] = repo.createCanonical.mock.calls[0];
+      expect(annotation).toMatchObject({ color: '#FACC15', style: 'highlight', origin: 'kobo' });
+      expect(position).toMatchObject({
+        format: 'kobo_span',
+        pos0: 'kobo.3.1:0',
+        pos1: 'kobo.3.1:16',
+        extras: { koboLocation: { span: { startPath: 'span#kobo\\.3\\.1' } } },
+      });
+      expect(state).toMatchObject({ externalKey: KOBO_UUID });
+    });
+
+    it('dedupes incoming batches by the external key', async () => {
+      const result = await ingestKobo([makeKoboIncoming({ text: 'first' }), makeKoboIncoming({ text: 'second' })]);
+      expect(result.created).toBe(1);
+      expect(repo.createCanonical).toHaveBeenCalledTimes(1);
+      expect(repo.createCanonical.mock.calls[0][0]).toMatchObject({ text: 'second' });
+    });
+
+    it('updates the position and invalidates siblings when pos0 changes under the same key', async () => {
+      repo.findStateByDeviceKey.mockResolvedValue(makeStateRow({ externalKey: KOBO_UUID, source: 'kobo', deviceId: '42' }));
+      repo.findAnnotationById.mockResolvedValue(makeAnnotationRow({ origin: 'kobo', color: '#FACC15' }));
+      repo.findDevicePosition.mockResolvedValue(makePositionRow({ format: 'kobo_span', pos0: 'kobo.2.1:0', pos1: 'kobo.2.1:9' }));
+
+      const result = await ingestKobo([makeKoboIncoming()]);
+
+      expect(result.updated).toBe(1);
+      expect(repo.updatePosition).toHaveBeenCalledWith(
+        100,
+        'kobo_span',
+        expect.objectContaining({ pos0: 'kobo.3.1:0', pos1: 'kobo.3.1:16', status: 'exact' }),
+        TX,
+      );
+      expect(repo.markPositionPending).toHaveBeenCalledWith(100, 'cfi', TX);
+      expect(repo.markPositionPending).toHaveBeenCalledWith(100, 'xpointer', TX);
+    });
+
+    it('keeps the canonical color when the device echoes the projected kobo color', async () => {
+      repo.findStateByDeviceKey.mockResolvedValue(makeStateRow({ externalKey: KOBO_UUID, source: 'kobo', deviceId: '42' }));
+      repo.findAnnotationById.mockResolvedValue(makeAnnotationRow({ origin: 'web', color: '#FB923C' }));
+      repo.findDevicePosition.mockResolvedValue(makePositionRow({ format: 'kobo_span', pos0: 'kobo.3.1:0', pos1: 'kobo.3.1:16' }));
+
+      // Orange projects to kobo yellow; the echo of that yellow must not overwrite orange.
+      const result = await ingestKobo([makeKoboIncoming({ datetimeUpdated: '2026-06-02 08:00:00', note: 'new note' })]);
+
+      expect(result.updated).toBe(1);
+      const patch = repo.applyContentPatch.mock.calls[0][1];
+      expect(patch.note).toBe('new note');
+      expect(patch.color).toBeUndefined();
+    });
+  });
+
+  describe('applyDeviceDeletes', () => {
+    const KOBO_UUID = '99999999-8888-7777-6666-555555555555';
+
+    it('soft-deletes by any-device key and acks the reporting device', async () => {
+      const state = makeStateRow({ externalKey: KOBO_UUID, source: 'kobo', deviceId: '42' });
+      repo.findStateByKeyAnyDevice.mockResolvedValue({ state, annotation: makeAnnotationRow() });
+
+      const deleted = await service.applyDeviceDeletes({
+        userId: USER_ID,
+        source: 'kobo',
+        deviceId: '42',
+        bookId: BOOK_ID,
+        deletes: [{ externalKey: KOBO_UUID }],
+      });
+
+      expect(deleted).toBe(1);
+      expect(repo.softDeleteById).toHaveBeenCalledWith(100, TX);
+      expect(repo.setDeleteAcked).toHaveBeenCalledWith(900, TX);
+    });
+
+    it('inserts an acked state when another device reported the deletion', async () => {
+      const state = makeStateRow({ externalKey: KOBO_UUID, source: 'kobo', deviceId: '42' });
+      repo.findStateByKeyAnyDevice.mockResolvedValue({ state, annotation: makeAnnotationRow() });
+      repo.findStateByAnnotationAndDevice.mockResolvedValue(null);
+
+      await service.applyDeviceDeletes({
+        userId: USER_ID,
+        source: 'kobo',
+        deviceId: '77',
+        bookId: BOOK_ID,
+        deletes: [{ externalKey: KOBO_UUID }],
+      });
+
+      expect(repo.insertState).toHaveBeenCalledWith(expect.objectContaining({ deviceId: '77', externalKey: KOBO_UUID }), TX);
+      expect(repo.setDeleteAcked).toHaveBeenCalled();
+    });
+
+    it('ignores unknown keys', async () => {
+      repo.findStateByKeyAnyDevice.mockResolvedValue(null);
+      const deleted = await service.applyDeviceDeletes({
+        userId: USER_ID,
+        source: 'kobo',
+        deviceId: '42',
+        bookId: BOOK_ID,
+        deletes: [{ externalKey: KOBO_UUID }],
+      });
+      expect(deleted).toBe(0);
+      expect(repo.softDeleteById).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('markServedApplied', () => {
+    it('upserts served states and acks omitted tombstones', async () => {
+      await service.markServedApplied({
+        userId: USER_ID,
+        source: 'kobo',
+        deviceId: '42',
+        entries: [{ annotationId: 100, version: 4, externalKey: 'uuid-1', externalCreatedAt: '2026-06-01 21:14:03' }],
+        tombstoneStateIds: [901, 902],
+      });
+
+      expect(repo.insertState).toHaveBeenCalledWith(
+        expect.objectContaining({ annotationId: 100, lastAppliedVersion: 4, externalKey: 'uuid-1', deviceId: '42' }),
+        TX,
+      );
+      expect(repo.setDeleteAcked).toHaveBeenCalledWith(901, TX);
+      expect(repo.setDeleteAcked).toHaveBeenCalledWith(902, TX);
+    });
+
+    it('does nothing on empty input', async () => {
+      await service.markServedApplied({ userId: USER_ID, source: 'kobo', deviceId: '42', entries: [], tombstoneStateIds: [] });
+      expect(repo.transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('ensureExternalKey', () => {
+    it('returns the existing key when one device already holds it', async () => {
+      repo.findExternalKeyForAnnotation.mockResolvedValue('existing-uuid');
+      expect(await service.ensureExternalKey(100, 'kobo', () => 'minted')).toBe('existing-uuid');
+    });
+
+    it('mints a new key otherwise', async () => {
+      expect(await service.ensureExternalKey(100, 'kobo', () => 'minted')).toBe('minted');
     });
   });
 });

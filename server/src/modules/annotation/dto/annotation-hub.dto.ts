@@ -1,7 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsISO8601, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
-import { ANNOTATION_STYLES } from '../annotation.constants';
+import { ANNOTATION_POSITION_FORMATS, ANNOTATION_STYLES, type AnnotationPositionFormat } from '../annotation.constants';
 
 export class AnnotationHubQueryDto {
   @IsOptional()
@@ -99,4 +99,9 @@ export class AnnotationBulkDto {
   @IsOptional()
   @IsIn(ANNOTATION_STYLES)
   style?: string;
+}
+
+export class AnnotationPositionRetryDto {
+  @IsIn(ANNOTATION_POSITION_FORMATS)
+  format!: AnnotationPositionFormat;
 }

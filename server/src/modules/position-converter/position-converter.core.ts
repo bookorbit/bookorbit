@@ -11,6 +11,7 @@ import { ChapterTextIndex, normalizeForSearch, TextRun } from './chapter-text-in
 import {
   CfiNode,
   ResolvedCfiPoint,
+  cfiFromPoint,
   cfiFromRangePoints,
   isTextNode,
   joinCfiIndirection,
@@ -124,17 +125,45 @@ export function xpointerRangeToCfi(
 
   if (startCp == null || endCp == null || endCp <= startCp) return { status: 'failed', reason: 'empty_range' };
 
+  const cfi = collapsedRangeToCfi(doc, chapterIndex, startCp, endCp);
+  if (!cfi) return { status: 'failed', reason: 'cfi_generation_failed' };
+  return { status, pos0: cfi, pos1: null };
+}
+
+/** Builds a full range CFI (with spine indirection) from a collapsed cp range. */
+export function collapsedRangeToCfi(doc: ChapterDocument, chapterIndex: number, startCp: number, endCp: number): string | null {
   const startPoint = doc.index.startPointFromCollapsed(startCp);
   const endPoint = doc.index.endPointFromCollapsed(endCp);
-  if (!startPoint || !endPoint) return { status: 'failed', reason: 'unmappable_range' };
-
+  if (!startPoint || !endPoint) return null;
   try {
     const localCfi = cfiFromRangePoints(startPoint, endPoint);
-    const cfi = joinCfiIndirection(spineCfiForChapterIndex(chapterIndex), localCfi);
-    return { status, pos0: cfi, pos1: null };
+    return joinCfiIndirection(spineCfiForChapterIndex(chapterIndex), localCfi);
   } catch {
-    return { status: 'failed', reason: 'cfi_generation_failed' };
+    return null;
   }
+}
+
+/** Builds a full point CFI (with spine indirection) from a collapsed cp index. */
+export function collapsedPointToCfi(doc: ChapterDocument, chapterIndex: number, cp: number): string | null {
+  const point = doc.index.startPointFromCollapsed(cp);
+  if (!point) return null;
+  try {
+    return joinCfiIndirection(spineCfiForChapterIndex(chapterIndex), cfiFromPoint(point));
+  } catch {
+    return null;
+  }
+}
+
+/** Builds a point xpointer from a collapsed cp index. */
+export function collapsedPointToXPointer(doc: ChapterDocument, chapterIndex: number, cp: number): string | null {
+  const run = doc.index.runAtCollapsed(cp, 'forward') ?? doc.index.runAtCollapsed(cp, 'backward');
+  if (!run) return null;
+  return buildXPointer(run.parent, chapterIndex + 1, run.runIndex, run.runCount, doc.index.runOffsetOfCollapsed(cp, run));
+}
+
+/** Resolves a point xpointer to its collapsed cp index (null when structure is unresolvable). */
+export function xpointerPointToCollapsed(doc: ChapterDocument, pos: string): number | null {
+  return xpointerAnchor(doc, pos, false)?.cp ?? null;
 }
 
 function cfiPointToCollapsed(doc: ChapterDocument, point: ResolvedCfiPoint | null, exclusiveEnd: boolean): number | null {
@@ -168,6 +197,55 @@ export interface XPointerPair {
 }
 
 export type CfiToXPointerResult = XPointerPair | ConversionFailure;
+
+export interface CollapsedRange {
+  startCp: number;
+  endCp: number;
+}
+
+/** Structurally resolves a range (or point) CFI to its collapsed cp range, without text repair. */
+export function cfiRangeToCollapsed(doc: ChapterDocument, cfi: string): CollapsedRange | null {
+  const parsed = parseCfi(cfi);
+  if (!parsed) return null;
+  const startResolved = resolveCfiParts(doc.root, parsed.start);
+  const endResolved = resolveCfiParts(doc.root, parsed.end);
+  const startCp = cfiPointToCollapsed(doc, startResolved, false);
+  const endCp = cfiPointToCollapsed(doc, endResolved, true);
+  if (startCp == null || endCp == null || endCp <= startCp) return null;
+  return { startCp, endCp };
+}
+
+/** Structurally resolves a point CFI (or range start) to its collapsed cp index. */
+export function cfiPointToCollapsedCp(doc: ChapterDocument, cfi: string): number | null {
+  const parsed = parseCfi(cfi);
+  if (!parsed) return null;
+  const startResolved = resolveCfiParts(doc.root, parsed.start);
+  return cfiPointToCollapsed(doc, startResolved, false);
+}
+
+/** Builds an xpointer pair from a collapsed cp range. */
+export function collapsedRangeToXPointerPair(
+  doc: ChapterDocument,
+  chapterIndex: number,
+  startCp: number,
+  endCp: number,
+): { pos0: string; pos1: string } | null {
+  const startRun = doc.index.runAtCollapsed(startCp, 'forward');
+  const endRun = doc.index.runAtCollapsed(endCp - 1, 'backward');
+  if (!startRun || !endRun) return null;
+
+  const docFragmentIndex = chapterIndex + 1;
+  const pos0 = buildXPointer(
+    startRun.parent,
+    docFragmentIndex,
+    startRun.runIndex,
+    startRun.runCount,
+    doc.index.runOffsetOfCollapsed(startCp, startRun),
+  );
+  const pos1 = buildXPointer(endRun.parent, docFragmentIndex, endRun.runIndex, endRun.runCount, doc.index.runOffsetOfCollapsed(endCp, endRun));
+  if (!pos0 || !pos1) return null;
+  return { pos0, pos1 };
+}
 
 /** Converts a foliate range CFI (doc-local parts already split by caller) to xpointers. */
 export function cfiRangeToXPointer(doc: ChapterDocument, chapterIndex: number, cfi: string, text: string | null): CfiToXPointerResult {
@@ -204,20 +282,8 @@ export function cfiRangeToXPointer(doc: ChapterDocument, chapterIndex: number, c
 
   if (startCp == null || endCp == null || endCp <= startCp) return { status: 'failed', reason: 'empty_range' };
 
-  const startRun = doc.index.runAtCollapsed(startCp, 'forward');
-  const endRun = doc.index.runAtCollapsed(endCp - 1, 'backward');
-  if (!startRun || !endRun) return { status: 'failed', reason: 'unmappable_range' };
+  const pair = collapsedRangeToXPointerPair(doc, chapterIndex, startCp, endCp);
+  if (!pair) return { status: 'failed', reason: 'xpointer_generation_failed' };
 
-  const docFragmentIndex = chapterIndex + 1;
-  const pos0 = buildXPointer(
-    startRun.parent,
-    docFragmentIndex,
-    startRun.runIndex,
-    startRun.runCount,
-    doc.index.runOffsetOfCollapsed(startCp, startRun),
-  );
-  const pos1 = buildXPointer(endRun.parent, docFragmentIndex, endRun.runIndex, endRun.runCount, doc.index.runOffsetOfCollapsed(endCp, endRun));
-  if (!pos0 || !pos1) return { status: 'failed', reason: 'xpointer_generation_failed' };
-
-  return { status, pos0, pos1 };
+  return { status, pos0: pair.pos0, pos1: pair.pos1 };
 }

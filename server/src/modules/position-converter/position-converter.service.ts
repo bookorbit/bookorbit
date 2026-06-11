@@ -2,7 +2,15 @@ import { Injectable } from '@nestjs/common';
 
 import { chapterIndexFromSpineStep, parseCfi } from './cfi.utils';
 import { EpubDomService } from './epub-dom.service';
-import { CfiToXPointerResult, ConversionResult, CONVERTER_VERSION, cfiRangeToXPointer, xpointerRangeToCfi } from './position-converter.core';
+import {
+  CfiToXPointerResult,
+  ConversionResult,
+  CONVERTER_VERSION,
+  cfiRangeToXPointer,
+  collapsedPointToCfi,
+  xpointerPointToCollapsed,
+  xpointerRangeToCfi,
+} from './position-converter.core';
 import { parseXPointer } from './xpointer.utils';
 
 export interface XPointerToCfiParams {
@@ -51,6 +59,23 @@ export class PositionConverterService {
     const result: ConversionResult = xpointerRangeToCfi(doc, chapterIndex, params.pos0, params.pos1, params.text);
     if (result.status === 'failed') return { status: 'failed', reason: result.reason, chapterIndex };
     return { status: result.status, cfi: result.pos0, chapterIndex };
+  }
+
+  /** Converts a single reading-position xpointer (point, not range) to a point CFI. */
+  async xpointerPointToCfi(params: { bookFileId: number; pos: string }): Promise<XPointerToCfiOutcome> {
+    const parsed = parseXPointer(params.pos);
+    if (!parsed) return { status: 'failed', reason: 'unparsable_pos0' };
+    const chapterIndex = parsed.docFragmentIndex - 1;
+    if (chapterIndex < 0) return { status: 'failed', reason: 'invalid_fragment' };
+
+    const doc = await this.epubDom.getChapter(params.bookFileId, chapterIndex);
+    if (!doc) return { status: 'failed', reason: 'chapter_unavailable', chapterIndex };
+
+    const cp = xpointerPointToCollapsed(doc, params.pos);
+    if (cp == null) return { status: 'failed', reason: 'unresolvable_structure', chapterIndex };
+    const cfi = collapsedPointToCfi(doc, chapterIndex, cp);
+    if (!cfi) return { status: 'failed', reason: 'cfi_generation_failed', chapterIndex };
+    return { status: 'exact', cfi, chapterIndex };
   }
 
   async cfiToXpointer(params: CfiToXPointerParams): Promise<CfiToXPointerOutcome> {

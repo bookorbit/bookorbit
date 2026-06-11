@@ -1836,6 +1836,16 @@ export class BookService {
       .catch((err: Error) => this.logger.warn(`Auto status update failed for book ${bookId}: ${err.message}`));
   }
 
+  /**
+   * Advances the Kobo bookmark for progress reported by non-web readers (KOReader).
+   * Percent-only: the precise KoboSpan Location is computed at delivery time by the
+   * Kobo reading-state pull path.
+   */
+  async syncKoboReadingStateForExternalProgress(userId: number, fileId: number, percentage: number): Promise<void> {
+    if (!(await this.bookRepo.isKoboTwoWayProgressSyncEnabled(userId))) return;
+    await this.bookRepo.syncKoboReadingStateFromProgress(userId, fileId, percentage, null, null, null, null);
+  }
+
   async saveProgress(userId: number, fileId: number, dto: SaveProgressDto, user: RequestUser) {
     const file = await this.verifyFileAccess(fileId, user);
     await this.bookRepo.upsertProgress(

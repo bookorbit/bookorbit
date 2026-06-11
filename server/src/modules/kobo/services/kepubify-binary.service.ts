@@ -1,12 +1,18 @@
+import { execFile } from 'child_process';
 import { chmod, stat } from 'fs/promises';
 import { join } from 'path';
+import { promisify } from 'util';
 
 import { Injectable } from '@nestjs/common';
+
+const execFileAsync = promisify(execFile);
+const VERSION_TIMEOUT_MS = 5_000;
 
 @Injectable()
 export class KepubifyBinaryService {
   private readonly bundledBinDir = join(process.cwd(), 'bin', 'kepubify');
   private cachedBinaryPath: string | null = null;
+  private cachedVersion: string | null = null;
 
   async getBinaryPath(): Promise<string> {
     if (this.cachedBinaryPath) return this.cachedBinaryPath;
@@ -14,6 +20,24 @@ export class KepubifyBinaryService {
     const binaryPath = await this.resolveBinaryPath(binaryName);
     this.cachedBinaryPath = binaryPath;
     return binaryPath;
+  }
+
+  /** Reported binary version (e.g. "v4-dev"), or "unknown" when the probe fails. */
+  async getVersion(): Promise<string> {
+    if (this.cachedVersion) return this.cachedVersion;
+    try {
+      const binaryPath = await this.getBinaryPath();
+      const { stdout } = await execFileAsync(binaryPath, ['--version'], { timeout: VERSION_TIMEOUT_MS });
+      const version = stdout
+        .trim()
+        .split('\n')[0]
+        ?.replace(/^kepubify\s+/i, '')
+        .trim();
+      this.cachedVersion = version || 'unknown';
+    } catch {
+      this.cachedVersion = 'unknown';
+    }
+    return this.cachedVersion;
   }
 
   private async resolveBinaryPath(binaryName: string): Promise<string> {

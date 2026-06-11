@@ -1189,6 +1189,25 @@ export class BookRepository {
       .orderBy(asc(books.id));
   }
 
+  async findPrimaryReaderFilesByBookIds(
+    bookIds: number[],
+  ): Promise<{ id: number; bookId: number; absolutePath: string; format: string | null; fileHash: string | null; sizeBytes: number | null }[]> {
+    if (bookIds.length === 0) return [];
+    return this.db
+      .select({
+        id: bookFiles.id,
+        bookId: books.id,
+        absolutePath: bookFiles.absolutePath,
+        format: bookFiles.format,
+        fileHash: bookFiles.fileHash,
+        sizeBytes: bookFiles.sizeBytes,
+      })
+      .from(books)
+      .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
+      .where(inArray(books.id, bookIds))
+      .orderBy(asc(books.id));
+  }
+
   async findAllFilesByBookIds(
     bookIds: number[],
   ): Promise<{ bookId: number; absolutePath: string; format: string | null; sizeBytes: number | null; sortOrder: number }[]> {
@@ -1423,7 +1442,9 @@ export class BookRepository {
     const normalizedKoboLocationType = this.normalizeKoboLocationPart(koboLocationType);
     const normalizedKoboLocationValue = this.normalizeKoboLocationPart(koboLocationValue);
     const normalizedKoboContentSourceProgressPercent = this.clampNullableProgressPercentage(koboContentSourceProgressPercent);
-    if (!normalizedKoboLocationSource || normalizedKoboLocationType !== 'KoboSpan' || !normalizedKoboLocationValue) return false;
+    // Location values are optional: without them the bookmark advances percent-wise
+    // and the precise KoboSpan Location is computed server-side at delivery time.
+    const hasLocation = Boolean(normalizedKoboLocationSource && normalizedKoboLocationType === 'KoboSpan' && normalizedKoboLocationValue);
 
     const now = new Date();
     const nowIso = now.toISOString();
@@ -1442,6 +1463,7 @@ export class BookRepository {
 
     const existingBookmark = this.asJsonObj(existing?.currentBookmark);
     if (
+      hasLocation &&
       this.isKoboBookmarkCurrent(
         existingBookmark,
         clampedPercentage,
@@ -1453,20 +1475,27 @@ export class BookRepository {
     ) {
       return true;
     }
+    if (!hasLocation && this.isKoboBookmarkPercentCurrent(existingBookmark, clampedPercentage)) {
+      return true;
+    }
 
     const currentBookmark: JsonObj = {
       ...(existingBookmark ?? {}),
       LastModified: nowIso,
       ProgressPercent: clampedPercentage,
-      Location: {
-        Source: normalizedKoboLocationSource,
-        Type: normalizedKoboLocationType,
-        Value: normalizedKoboLocationValue,
-      },
+      ...(hasLocation
+        ? {
+            Location: {
+              Source: normalizedKoboLocationSource,
+              Type: normalizedKoboLocationType,
+              Value: normalizedKoboLocationValue,
+            },
+          }
+        : {}),
     };
-    if (normalizedKoboContentSourceProgressPercent !== null) {
+    if (hasLocation && normalizedKoboContentSourceProgressPercent !== null) {
       currentBookmark.ContentSourceProgressPercent = normalizedKoboContentSourceProgressPercent;
-    } else {
+    } else if (hasLocation) {
       delete currentBookmark.ContentSourceProgressPercent;
     }
     const statusInfo = {
@@ -1604,6 +1633,11 @@ export class BookRepository {
   private hasNonInternalBookmarkFields(bookmark: JsonObj | null): boolean {
     if (!bookmark) return false;
     return Object.keys(bookmark).some((key) => key !== 'LastModified' && key !== 'ProgressPercent');
+  }
+
+  private isKoboBookmarkPercentCurrent(bookmark: JsonObj | null, percentage: number): boolean {
+    const existingPercent = this.extractKoboPercent(bookmark);
+    return existingPercent !== null && Math.abs(existingPercent - percentage) < PROGRESS_EPSILON;
   }
 
   private deriveKoboStatus(percentage: number): string {

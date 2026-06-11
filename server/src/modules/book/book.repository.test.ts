@@ -810,18 +810,54 @@ describe('BookRepository', () => {
     expect(insertedBookmark).not.toHaveProperty('ContentSourceProgressPercent');
   });
 
-  it('does not overwrite Kobo reading state without an exact KoboSpan location', async () => {
+  it('advances Kobo reading state percent-only without a KoboSpan location, preserving the existing Location', async () => {
     const insertChain = makeInsertChain();
+    const existingState = {
+      entitlementId: 'ent-1',
+      createdAtKobo: '2026-06-01T00:00:00.000Z',
+      currentBookmark: { ProgressPercent: 40, Location: { Source: 'OEBPS/old.xhtml', Type: 'KoboSpan', Value: 'kobo.5.1' } },
+      statistics: null,
+      statusInfo: null,
+    };
     const db = {
-      select: vi.fn().mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub' }])),
+      select: vi
+        .fn()
+        .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub' }]))
+        .mockReturnValueOnce(makeSelectChain('limit', [existingState])),
       insert: vi.fn().mockReturnValue(insertChain),
       execute: vi.fn().mockResolvedValue(undefined),
     };
     const repo = new BookRepository(db as never);
 
-    await expect(repo.syncKoboReadingStateFromProgress(5, 9, 80, 'OEBPS/ch14.xhtml', null, null, 33.5)).resolves.toBe(false);
+    await expect(repo.syncKoboReadingStateFromProgress(5, 9, 80, 'OEBPS/ch14.xhtml', null, null, 33.5)).resolves.toBe(true);
 
-    expect(db.select).toHaveBeenCalledTimes(1);
+    expect(db.insert).toHaveBeenCalledTimes(1);
+    const inserted = insertChain.values.mock.calls[0][0] as { currentBookmark: Record<string, unknown> };
+    expect(inserted.currentBookmark.ProgressPercent).toBe(80);
+    expect(inserted.currentBookmark.Location).toEqual({ Source: 'OEBPS/old.xhtml', Type: 'KoboSpan', Value: 'kobo.5.1' });
+    expect(db.execute).toHaveBeenCalled();
+  });
+
+  it('skips the percent-only Kobo reading state write when the bookmark percent is current', async () => {
+    const existingState = {
+      entitlementId: 'ent-1',
+      createdAtKobo: '2026-06-01T00:00:00.000Z',
+      currentBookmark: { ProgressPercent: 80 },
+      statistics: null,
+      statusInfo: null,
+    };
+    const db = {
+      select: vi
+        .fn()
+        .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub' }]))
+        .mockReturnValueOnce(makeSelectChain('limit', [existingState])),
+      insert: vi.fn(),
+      execute: vi.fn(),
+    };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.syncKoboReadingStateFromProgress(5, 9, 80, null, null, null, null)).resolves.toBe(true);
+
     expect(db.insert).not.toHaveBeenCalled();
     expect(db.execute).not.toHaveBeenCalled();
   });

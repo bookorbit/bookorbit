@@ -191,6 +191,10 @@ export function cfiFromRangePoints(start: RangePoint, end: RangePoint): string {
   return buildRange(startParts, endParts);
 }
 
+export function cfiFromPoint(point: RangePoint): string {
+  return wrapCfi(partsToString(nodeToParts(point.node, point.offset)));
+}
+
 export function findElementById(root: CfiNode, id: string): CfiNode | null {
   if (isElementNode(root) && root.attribs?.id === id) return root;
   for (const child of root.children ?? []) {
