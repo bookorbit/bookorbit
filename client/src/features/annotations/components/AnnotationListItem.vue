@@ -357,7 +357,7 @@ function shouldSeparateMetadataItem(index: number): boolean {
           <Tooltip>
             <TooltipTrigger as-child>
               <RouterLink
-                :to="bookLink"
+                :to="{ name: 'book-detail', params: { bookId: annotation.bookId }, query: { tab: 'details' } }"
                 class="flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
               >
                 <Info :size="15" />
