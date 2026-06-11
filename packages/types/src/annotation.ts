@@ -100,7 +100,14 @@ export interface AnnotationListResponse {
 
 export interface AnnotationHubItem extends AnnotationItem {
   bookTitle: string | null;
+  author: string | null;
   deletedAt: string | null;
+}
+
+export interface AnnotationHubStats {
+  books: number;
+  withNotes: number;
+  originBreakdown: { origin: AnnotationItem["origin"]; count: number }[];
 }
 
 export interface AnnotationHubResponse {
@@ -108,6 +115,14 @@ export interface AnnotationHubResponse {
   total: number;
   page: number;
   pageSize: number;
+  stats: AnnotationHubStats;
+}
+
+export interface AnnotationHubBookFacet {
+  bookId: number;
+  bookTitle: string | null;
+  author: string | null;
+  count: number;
 }
 
 export type AnnotationPositionFormat = "cfi" | "xpointer" | "pdf" | "kobo_span";

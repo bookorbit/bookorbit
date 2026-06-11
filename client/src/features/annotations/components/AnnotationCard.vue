@@ -2,11 +2,19 @@
 import type { AnnotationHubItem, AnnotationItem } from '@bookorbit/types'
 import AnnotationListItem from './AnnotationListItem.vue'
 
-defineProps<{
-  annotation: AnnotationHubItem
-  selected: boolean
-  trashed: boolean
-}>()
+withDefaults(
+  defineProps<{
+    annotation: AnnotationHubItem
+    selected: boolean
+    trashed: boolean
+    showBookHeader?: boolean
+    density?: 'compact' | 'comfortable'
+  }>(),
+  {
+    showBookHeader: true,
+    density: 'comfortable',
+  },
+)
 
 const emit = defineEmits<{
   toggleSelect: [id: number]
@@ -43,7 +51,8 @@ function handlePurge(id: number) {
     :selected="selected"
     :trashed="trashed"
     mode="hub"
-    density="comfortable"
+    :density="density"
+    :show-book-header="showBookHeader"
     @toggle-select="handleToggleSelect"
     @jump="handleJump"
     @trash="handleTrash"

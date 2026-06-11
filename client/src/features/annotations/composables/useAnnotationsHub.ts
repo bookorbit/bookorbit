@@ -1,5 +1,5 @@
 import { computed, ref, watch } from 'vue'
-import type { AnnotationHubItem, AnnotationHubResponse } from '@bookorbit/types'
+import type { AnnotationHubBookFacet, AnnotationHubItem, AnnotationHubResponse, AnnotationHubStats } from '@bookorbit/types'
 import { api } from '@/lib/api'
 
 export type HubStatus = 'active' | 'trashed'
@@ -17,13 +17,18 @@ export function useAnnotationsHub() {
   const colorFilter = ref('all')
   const styleFilter = ref('all')
   const originFilter = ref('all')
+  const bookFilter = ref<number | 'all'>('all')
   const sortBy = ref<'createdAt' | 'book'>('createdAt')
   const sortDir = ref<'asc' | 'desc'>('desc')
 
+  const books = ref<AnnotationHubBookFacet[]>([])
+  const stats = ref<AnnotationHubStats | null>(null)
   const selectedIds = ref<Set<number>>(new Set())
 
   const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
   const hasSelection = computed(() => selectedIds.value.size > 0)
+  const rangeStart = computed(() => (total.value === 0 ? 0 : (page.value - 1) * pageSize.value + 1))
+  const rangeEnd = computed(() => Math.min(page.value * pageSize.value, total.value))
 
   function buildQuery(extra: Record<string, string> = {}): string {
     const params = new URLSearchParams()
@@ -36,6 +41,7 @@ export function useAnnotationsHub() {
     if (colorFilter.value !== 'all') params.set('colors', colorFilter.value)
     if (styleFilter.value !== 'all') params.set('styles', styleFilter.value)
     if (originFilter.value !== 'all') params.set('origins', originFilter.value)
+    if (bookFilter.value !== 'all') params.set('bookId', String(bookFilter.value))
     for (const [key, value] of Object.entries(extra)) params.set(key, value)
     return params.toString()
   }
@@ -52,9 +58,16 @@ export function useAnnotationsHub() {
       const body: AnnotationHubResponse = await res.json()
       items.value = body.items
       total.value = body.total
+      stats.value = body.stats
     } finally {
       loading.value = false
     }
+  }
+
+  async function loadBooks() {
+    const res = await api(`/api/v1/annotations/books?status=${status.value}`)
+    if (!res.ok) return
+    books.value = (await res.json()) as AnnotationHubBookFacet[]
   }
 
   function toggleSelected(id: number) {
@@ -84,6 +97,7 @@ export function useAnnotationsHub() {
     const body = (await res.json()) as { affected: number }
     clearSelection()
     await load()
+    void loadBooks()
     return body.affected
   }
 
@@ -110,10 +124,14 @@ export function useAnnotationsHub() {
     return `/api/v1/annotations/export?${buildQuery({ format })}`
   }
 
-  watch([status, search, colorFilter, styleFilter, originFilter, sortBy, sortDir], () => {
+  watch([status, search, colorFilter, styleFilter, originFilter, bookFilter, sortBy, sortDir], () => {
     page.value = 1
     clearSelection()
     void load()
+  })
+  watch(status, () => {
+    bookFilter.value = 'all'
+    void loadBooks()
   })
   watch(page, () => {
     clearSelection()
@@ -126,6 +144,8 @@ export function useAnnotationsHub() {
     page,
     pageSize,
     totalPages,
+    rangeStart,
+    rangeEnd,
     loading,
     error,
     status,
@@ -133,11 +153,15 @@ export function useAnnotationsHub() {
     colorFilter,
     styleFilter,
     originFilter,
+    bookFilter,
     sortBy,
     sortDir,
+    books,
+    stats,
     selectedIds,
     hasSelection,
     load,
+    loadBooks,
     toggleSelected,
     clearSelection,
     selectAllOnPage,

@@ -1,12 +1,26 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChevronLeft, ChevronRight, Download, Highlighter, Search, Trash2 } from 'lucide-vue-next'
+import {
+  ArrowDownUp,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Download,
+  Highlighter,
+  Maximize2,
+  Minimize2,
+  Search,
+  Trash2,
+} from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { ANNOTATION_COLOR_FILTER_OPTIONS, ANNOTATION_HIGHLIGHT_COLORS, type AnnotationHubItem } from '@bookorbit/types'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
 import AnnotationCard from '../components/AnnotationCard.vue'
+import AnnotationBookGroup from '../components/AnnotationBookGroup.vue'
+import { sourcePill } from '../lib/pill-styles'
 import { useAnnotationsHub } from '../composables/useAnnotationsHub'
 
 const router = useRouter()
@@ -33,9 +47,53 @@ const ORIGIN_OPTIONS = [
   { value: 'koreader', label: 'KOReader' },
 ]
 
+const density = ref<'compact' | 'comfortable'>('comfortable')
+
+const isGrouped = computed(() => hub.sortBy.value === 'book')
+
+const groupedByBook = computed(() => {
+  const groups: { bookId: number; bookTitle: string; author: string | null; items: AnnotationHubItem[] }[] = []
+  let current: (typeof groups)[number] | null = null
+  for (const item of hub.items.value) {
+    if (!current || current.bookId !== item.bookId) {
+      current = { bookId: item.bookId, bookTitle: item.bookTitle ?? 'Unknown book', author: item.author, items: [] }
+      groups.push(current)
+    }
+    current.items.push(item)
+  }
+  return groups
+})
+
+const summaryItems = computed(() => {
+  const s = hub.stats.value
+  if (!s) return []
+  const items: string[] = []
+  if (s.books > 0) items.push(`${s.books} ${s.books === 1 ? 'book' : 'books'}`)
+  if (s.withNotes > 0) items.push(`${s.withNotes} ${s.withNotes === 1 ? 'note' : 'notes'}`)
+  return items
+})
+
+const originSummary = computed(() => (hub.stats.value?.originBreakdown ?? []).map((entry) => ({ ...sourcePill(entry.origin), count: entry.count })))
+
+const HEADER_PILL_CLASS = 'inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-medium'
+
+const sortDirLabel = computed(() => {
+  if (hub.sortBy.value === 'book') return hub.sortDir.value === 'asc' ? 'A to Z' : 'Z to A'
+  return hub.sortDir.value === 'desc' ? 'Newest' : 'Oldest'
+})
+
 onMounted(() => {
   void hub.load()
+  void hub.loadBooks()
 })
+
+function toggleSortDir() {
+  hub.sortDir.value = hub.sortDir.value === 'desc' ? 'asc' : 'desc'
+}
+
+function toggleDensity() {
+  density.value = density.value === 'comfortable' ? 'compact' : 'comfortable'
+}
 
 function setActiveTab() {
   hub.status.value = 'active'
@@ -45,12 +103,20 @@ function setTrashTab() {
   hub.status.value = 'trashed'
 }
 
+function firstPage() {
+  hub.page.value = 1
+}
+
 function previousPage() {
   if (hub.page.value > 1) hub.page.value -= 1
 }
 
 function nextPage() {
   if (hub.page.value < hub.totalPages.value) hub.page.value += 1
+}
+
+function lastPage() {
+  hub.page.value = hub.totalPages.value
 }
 
 function handleJump(annotation: AnnotationHubItem) {
@@ -113,12 +179,22 @@ function handleExportJson() {
 <template>
   <div class="w-full max-w-8xl py-4 sm:py-6">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2.5">
         <Highlighter :size="22" class="text-primary" />
         <h1 class="text-xl font-semibold">Annotations</h1>
         <span class="text-sm text-muted-foreground">{{ hub.total.value }} total</span>
+        <template v-if="summaryItems.length > 0 || originSummary.length > 0">
+          <span class="hidden h-5 w-px bg-border sm:block" />
+          <div class="hidden items-center gap-2.5 text-sm text-muted-foreground sm:flex">
+            <span v-for="item in summaryItems" :key="item">{{ item }}</span>
+            <span v-if="summaryItems.length > 0 && originSummary.length > 0" class="h-4 w-px bg-border" />
+            <span v-for="origin in originSummary" :key="origin.label" :class="[HEADER_PILL_CLASS, origin.class]"
+              >{{ origin.label }} {{ origin.count }}</span
+            >
+          </div>
+        </template>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-3">
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
             <Button variant="outline" size="sm" class="gap-1.5">
@@ -165,6 +241,12 @@ function handleExportJson() {
           class="w-full h-9 pl-8 pr-3 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
         />
       </div>
+      <select v-model="hub.bookFilter.value" class="h-9 max-w-[14rem] px-2 rounded-md border border-border bg-background text-sm">
+        <option :value="'all'">All books</option>
+        <option v-for="book in hub.books.value" :key="book.bookId" :value="book.bookId">
+          {{ book.bookTitle ?? 'Unknown book' }} ({{ book.count }})
+        </option>
+      </select>
       <select v-model="hub.colorFilter.value" class="h-9 px-2 rounded-md border border-border bg-background text-sm">
         <option v-for="option in COLOR_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
       </select>
@@ -178,15 +260,44 @@ function handleExportJson() {
         <option value="createdAt">By date</option>
         <option value="book">By book</option>
       </select>
+      <button
+        type="button"
+        class="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        @click="toggleSortDir"
+      >
+        <ArrowDownUp :size="14" />
+        {{ sortDirLabel }}
+      </button>
+      <button
+        type="button"
+        class="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        @click="toggleDensity"
+      >
+        <Minimize2 v-if="density === 'comfortable'" :size="14" />
+        <Maximize2 v-else :size="14" />
+        {{ density === 'comfortable' ? 'Compact' : 'Comfortable' }}
+      </button>
     </div>
 
     <div
       v-if="hub.hasSelection.value"
       class="flex flex-wrap items-center gap-2 mb-4 px-3 py-2 rounded-md border border-primary/40 bg-primary/5 text-sm"
     >
-      <span>{{ hub.selectedIds.value.size }} selected</span>
-      <Button variant="ghost" size="sm" @click="hub.selectAllOnPage">Select page</Button>
-      <Button variant="ghost" size="sm" @click="hub.clearSelection">Clear</Button>
+      <span class="font-medium text-foreground">{{ hub.selectedIds.value.size }} selected</span>
+      <button
+        type="button"
+        class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        @click="hub.selectAllOnPage"
+      >
+        Select page
+      </button>
+      <button
+        type="button"
+        class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        @click="hub.clearSelection"
+      >
+        Clear
+      </button>
       <div class="flex-1" />
       <template v-if="hub.status.value === 'active'">
         <DropdownMenu>
@@ -208,34 +319,66 @@ function handleExportJson() {
       <Button v-else variant="outline" size="sm" @click="handleBulkRestore">Restore</Button>
     </div>
 
-    <div v-if="hub.loading.value" class="py-12 text-center text-sm text-muted-foreground">Loading annotations…</div>
+    <div v-if="hub.loading.value && hub.items.value.length === 0" class="flex flex-col gap-2">
+      <div v-for="i in 6" :key="i" class="h-24 rounded-lg bg-muted animate-shimmer" />
+    </div>
     <div v-else-if="hub.error.value" class="py-12 text-center text-sm text-destructive">{{ hub.error.value }}</div>
     <div v-else-if="hub.items.value.length === 0" class="py-12 text-center text-sm text-muted-foreground">
       {{ hub.status.value === 'trashed' ? 'Trash is empty' : 'No annotations yet. Highlights you create on the web or your e-reader appear here.' }}
     </div>
-    <div v-else class="flex flex-col gap-2">
-      <AnnotationCard
-        v-for="annotation in hub.items.value"
-        :key="annotation.id"
-        :annotation="annotation"
-        :selected="hub.selectedIds.value.has(annotation.id)"
-        :trashed="hub.status.value === 'trashed'"
-        @toggleSelect="hub.toggleSelected"
-        @jump="handleJump"
-        @trash="handleTrash"
-        @restore="handleRestore"
-        @purge="handlePurge"
-      />
+    <div v-else class="transition-opacity" :class="{ 'opacity-50 pointer-events-none': hub.loading.value }">
+      <div v-if="isGrouped" class="flex flex-col gap-4">
+        <AnnotationBookGroup
+          v-for="group in groupedByBook"
+          :key="group.bookId"
+          :book-id="group.bookId"
+          :book-title="group.bookTitle"
+          :author="group.author"
+          :items="group.items"
+          :selected-ids="hub.selectedIds.value"
+          :trashed="hub.status.value === 'trashed'"
+          :density="density"
+          @toggle-select="hub.toggleSelected"
+          @jump="handleJump"
+          @trash="handleTrash"
+          @restore="handleRestore"
+          @purge="handlePurge"
+        />
+      </div>
+      <div v-else class="flex flex-col gap-2">
+        <AnnotationCard
+          v-for="annotation in hub.items.value"
+          :key="annotation.id"
+          :annotation="annotation"
+          :selected="hub.selectedIds.value.has(annotation.id)"
+          :trashed="hub.status.value === 'trashed'"
+          :density="density"
+          @toggleSelect="hub.toggleSelected"
+          @jump="handleJump"
+          @trash="handleTrash"
+          @restore="handleRestore"
+          @purge="handlePurge"
+        />
+      </div>
     </div>
 
-    <div v-if="hub.totalPages.value > 1" class="flex items-center justify-center gap-3 mt-6">
-      <Button variant="outline" size="sm" :disabled="hub.page.value <= 1" @click="previousPage">
-        <ChevronLeft :size="14" />
-      </Button>
-      <span class="text-sm text-muted-foreground">Page {{ hub.page.value }} of {{ hub.totalPages.value }}</span>
-      <Button variant="outline" size="sm" :disabled="hub.page.value >= hub.totalPages.value" @click="nextPage">
-        <ChevronRight :size="14" />
-      </Button>
+    <div v-if="hub.total.value > 0" class="mt-6 flex items-center justify-between gap-3 text-sm text-muted-foreground">
+      <span>Showing {{ hub.rangeStart.value }}-{{ hub.rangeEnd.value }} of {{ hub.total.value }}</span>
+      <div v-if="hub.totalPages.value > 1" class="flex items-center gap-1.5">
+        <Button variant="outline" size="icon-sm" :disabled="hub.page.value <= 1" aria-label="First page" @click="firstPage">
+          <ChevronsLeft :size="14" />
+        </Button>
+        <Button variant="outline" size="icon-sm" :disabled="hub.page.value <= 1" aria-label="Previous page" @click="previousPage">
+          <ChevronLeft :size="14" />
+        </Button>
+        <span class="px-1">Page {{ hub.page.value }} of {{ hub.totalPages.value }}</span>
+        <Button variant="outline" size="icon-sm" :disabled="hub.page.value >= hub.totalPages.value" aria-label="Next page" @click="nextPage">
+          <ChevronRight :size="14" />
+        </Button>
+        <Button variant="outline" size="icon-sm" :disabled="hub.page.value >= hub.totalPages.value" aria-label="Last page" @click="lastPage">
+          <ChevronsRight :size="14" />
+        </Button>
+      </div>
     </div>
   </div>
 </template>

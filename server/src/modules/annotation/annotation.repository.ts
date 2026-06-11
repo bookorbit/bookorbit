@@ -22,7 +22,17 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { annotationPositions, annotationSyncState, annotations, bookMetadata, books, AnnotationRow, NewAnnotation } from '../../db/schema';
+import {
+  annotationPositions,
+  annotationSyncState,
+  annotations,
+  authors,
+  bookAuthors,
+  bookMetadata,
+  books,
+  AnnotationRow,
+  NewAnnotation,
+} from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -33,7 +43,7 @@ export type AnnotationWithCfi = AnnotationRow & {
   jumpFileId: number | null;
   pageno: number | null;
 };
-export type HubAnnotationRow = AnnotationWithCfi & { bookTitle: string | null };
+export type HubAnnotationRow = AnnotationWithCfi & { bookTitle: string | null; author: string | null };
 
 export interface HubFilters {
   bookId?: number;
@@ -81,6 +91,25 @@ export interface AnnotationStatsResult {
 @Injectable()
 export class AnnotationRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
+
+  private hubColumns() {
+    return {
+      ...getTableColumns(annotations),
+      cfi: annotationPositions.pos0,
+      cfiStatus: annotationPositions.status,
+      cfiExtras: annotationPositions.extras,
+      bookTitle: bookMetadata.title,
+      author: sql<
+        string | null
+      >`(select string_agg(${authors.name}, ', ' order by ${bookAuthors.displayOrder}) from ${bookAuthors} inner join ${authors} on ${authors.id} = ${bookAuthors.authorId} where ${bookAuthors.bookId} = ${annotations.bookId})`,
+      jumpFileId: sql<
+        number | null
+      >`coalesce(${annotationPositions.bookFileId}, (select ap2.book_file_id from annotation_positions ap2 where ap2.annotation_id = ${annotations.id} and ap2.format in ('xpointer', 'pdf') limit 1), ${books.primaryFileId})`,
+      pageno: sql<
+        number | null
+      >`(select (ap3.extras ->> 'pageno')::int from annotation_positions ap3 where ap3.annotation_id = ${annotations.id} and ap3.format in ('xpointer', 'pdf') limit 1)`,
+    };
+  }
 
   private selectWithCfi() {
     return this.db
@@ -290,19 +319,7 @@ export class AnnotationRepository {
 
     const [items, totalResult] = await Promise.all([
       this.db
-        .select({
-          ...getTableColumns(annotations),
-          cfi: annotationPositions.pos0,
-          cfiStatus: annotationPositions.status,
-          cfiExtras: annotationPositions.extras,
-          bookTitle: bookMetadata.title,
-          jumpFileId: sql<
-            number | null
-          >`coalesce(${annotationPositions.bookFileId}, (select ap2.book_file_id from annotation_positions ap2 where ap2.annotation_id = ${annotations.id} and ap2.format in ('xpointer', 'pdf') limit 1), ${books.primaryFileId})`,
-          pageno: sql<
-            number | null
-          >`(select (ap3.extras ->> 'pageno')::int from annotation_positions ap3 where ap3.annotation_id = ${annotations.id} and ap3.format in ('xpointer', 'pdf') limit 1)`,
-        })
+        .select(this.hubColumns())
         .from(annotations)
         .leftJoin(annotationPositions, and(eq(annotationPositions.annotationId, annotations.id), eq(annotationPositions.format, 'cfi')))
         .leftJoin(bookMetadata, eq(bookMetadata.bookId, annotations.bookId))
@@ -324,19 +341,7 @@ export class AnnotationRepository {
 
   async findHubById(userId: number, annotationId: number): Promise<HubAnnotationRow | null> {
     const [row] = await this.db
-      .select({
-        ...getTableColumns(annotations),
-        cfi: annotationPositions.pos0,
-        cfiStatus: annotationPositions.status,
-        cfiExtras: annotationPositions.extras,
-        bookTitle: bookMetadata.title,
-        jumpFileId: sql<
-          number | null
-        >`coalesce(${annotationPositions.bookFileId}, (select ap2.book_file_id from annotation_positions ap2 where ap2.annotation_id = ${annotations.id} and ap2.format in ('xpointer', 'pdf') limit 1), ${books.primaryFileId})`,
-        pageno: sql<
-          number | null
-        >`(select (ap3.extras ->> 'pageno')::int from annotation_positions ap3 where ap3.annotation_id = ${annotations.id} and ap3.format in ('xpointer', 'pdf') limit 1)`,
-      })
+      .select(this.hubColumns())
       .from(annotations)
       .leftJoin(annotationPositions, and(eq(annotationPositions.annotationId, annotations.id), eq(annotationPositions.format, 'cfi')))
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, annotations.bookId))
@@ -349,19 +354,7 @@ export class AnnotationRepository {
   async findHubAll(userId: number, filters: HubFilters, limit = 5000): Promise<HubAnnotationRow[]> {
     const conditions = this.buildHubConditions(userId, filters);
     const rows = await this.db
-      .select({
-        ...getTableColumns(annotations),
-        cfi: annotationPositions.pos0,
-        cfiStatus: annotationPositions.status,
-        cfiExtras: annotationPositions.extras,
-        bookTitle: bookMetadata.title,
-        jumpFileId: sql<
-          number | null
-        >`coalesce(${annotationPositions.bookFileId}, (select ap2.book_file_id from annotation_positions ap2 where ap2.annotation_id = ${annotations.id} and ap2.format in ('xpointer', 'pdf') limit 1), ${books.primaryFileId})`,
-        pageno: sql<
-          number | null
-        >`(select (ap3.extras ->> 'pageno')::int from annotation_positions ap3 where ap3.annotation_id = ${annotations.id} and ap3.format in ('xpointer', 'pdf') limit 1)`,
-      })
+      .select(this.hubColumns())
       .from(annotations)
       .leftJoin(annotationPositions, and(eq(annotationPositions.annotationId, annotations.id), eq(annotationPositions.format, 'cfi')))
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, annotations.bookId))
@@ -370,6 +363,38 @@ export class AnnotationRepository {
       .orderBy(asc(bookMetadata.title), asc(annotations.chapterTitle), asc(annotations.createdAt))
       .limit(limit);
     return rows as HubAnnotationRow[];
+  }
+
+  async getHubStats(userId: number, filters: HubFilters) {
+    const conditions = this.buildHubConditions(userId, filters);
+    const [row] = await this.db
+      .select({
+        books: countDistinct(annotations.bookId),
+        withNotes: sql<number>`count(*) filter (where ${annotations.note} is not null and ${annotations.note} <> '')`,
+        web: sql<number>`count(*) filter (where ${annotations.origin} = 'web')`,
+        koreader: sql<number>`count(*) filter (where ${annotations.origin} = 'koreader')`,
+        kobo: sql<number>`count(*) filter (where ${annotations.origin} = 'kobo')`,
+      })
+      .from(annotations)
+      .where(and(...conditions));
+    return row;
+  }
+
+  async findHubBookFacets(userId: number, status: 'active' | 'trashed') {
+    return this.db
+      .select({
+        bookId: annotations.bookId,
+        bookTitle: bookMetadata.title,
+        author: sql<
+          string | null
+        >`(select string_agg(${authors.name}, ', ' order by ${bookAuthors.displayOrder}) from ${bookAuthors} inner join ${authors} on ${authors.id} = ${bookAuthors.authorId} where ${bookAuthors.bookId} = ${annotations.bookId})`,
+        count: count(),
+      })
+      .from(annotations)
+      .leftJoin(bookMetadata, eq(bookMetadata.bookId, annotations.bookId))
+      .where(and(eq(annotations.userId, userId), status === 'trashed' ? isNotNull(annotations.deletedAt) : isNull(annotations.deletedAt)))
+      .groupBy(annotations.bookId, bookMetadata.title)
+      .orderBy(asc(bookMetadata.title));
   }
 
   async bulkSetDeleted(userId: number, ids: number[], deleted: boolean): Promise<number> {

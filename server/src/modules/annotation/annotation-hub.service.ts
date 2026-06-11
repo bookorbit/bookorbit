@@ -2,8 +2,10 @@ import { ConflictException, Injectable, Logger, NotFoundException } from '@nestj
 
 import type {
   AnnotationDeviceSyncInfo,
+  AnnotationHubBookFacet,
   AnnotationHubItem,
   AnnotationHubResponse,
+  AnnotationHubStats,
   AnnotationPositionFormat,
   AnnotationPositionInfo,
   AnnotationSyncDetail,
@@ -32,8 +34,28 @@ export class AnnotationHubService {
   async list(userId: number, query: AnnotationHubQueryDto): Promise<AnnotationHubResponse> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 25;
-    const { items, total } = await this.annotationRepo.findHubPaginated(userId, this.buildFilters(query), this.buildSort(query), page, pageSize);
-    return { items: items.map((row) => this.toHubItem(row)), total, page, pageSize };
+    const filters = this.buildFilters(query);
+    const [{ items, total }, statsRow] = await Promise.all([
+      this.annotationRepo.findHubPaginated(userId, filters, this.buildSort(query), page, pageSize),
+      this.annotationRepo.getHubStats(userId, filters),
+    ]);
+    const stats: AnnotationHubStats = {
+      books: Number(statsRow?.books ?? 0),
+      withNotes: Number(statsRow?.withNotes ?? 0),
+      originBreakdown: (
+        [
+          { origin: 'web', count: Number(statsRow?.web ?? 0) },
+          { origin: 'koreader', count: Number(statsRow?.koreader ?? 0) },
+          { origin: 'kobo', count: Number(statsRow?.kobo ?? 0) },
+        ] as AnnotationHubStats['originBreakdown']
+      ).filter((entry) => entry.count > 0),
+    };
+    return { items: items.map((row) => this.toHubItem(row)), total, page, pageSize, stats };
+  }
+
+  async listBooks(userId: number, status: 'active' | 'trashed'): Promise<AnnotationHubBookFacet[]> {
+    const rows = await this.annotationRepo.findHubBookFacets(userId, status);
+    return rows.map((row) => ({ bookId: row.bookId, bookTitle: row.bookTitle, author: row.author, count: Number(row.count) }));
   }
 
   async bulk(userId: number, dto: AnnotationBulkDto): Promise<{ affected: number }> {
@@ -56,7 +78,9 @@ export class AnnotationHubService {
     const restored = await this.annotationRepo.restore(annotationId, userId);
     if (!restored) throw new NotFoundException(`Annotation ${annotationId} not found in trash`);
     const row = await this.annotationRepo.findHubById(userId, annotationId);
-    return this.toHubItem(row ?? { ...restored, cfi: null, cfiStatus: null, cfiExtras: null, bookTitle: null, jumpFileId: null, pageno: null });
+    return this.toHubItem(
+      row ?? { ...restored, cfi: null, cfiStatus: null, cfiExtras: null, bookTitle: null, author: null, jumpFileId: null, pageno: null },
+    );
   }
 
   /** Hard delete; blocked until every synced device acknowledged the deletion. */
@@ -145,6 +169,7 @@ export class AnnotationHubService {
       chapterIndex: typeof chapterIndex === 'number' ? chapterIndex : null,
       createdAt: row.createdAt.toISOString(),
       bookTitle: row.bookTitle,
+      author: row.author,
       deletedAt: row.deletedAt ? row.deletedAt.toISOString() : null,
       jumpFileId: row.jumpFileId,
       pageno: row.pageno,

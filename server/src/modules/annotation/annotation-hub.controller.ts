@@ -4,7 +4,13 @@ import type { FastifyReply } from 'fastify';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { AnnotationHubService } from './annotation-hub.service';
-import { AnnotationBulkDto, AnnotationExportQueryDto, AnnotationHubQueryDto, AnnotationPositionRetryDto } from './dto/annotation-hub.dto';
+import {
+  AnnotationBulkDto,
+  AnnotationExportQueryDto,
+  AnnotationHubBooksQueryDto,
+  AnnotationHubQueryDto,
+  AnnotationPositionRetryDto,
+} from './dto/annotation-hub.dto';
 
 @Controller('annotations')
 export class AnnotationHubController {
@@ -13,6 +19,11 @@ export class AnnotationHubController {
   @Get()
   list(@CurrentUser() user: RequestUser, @Query() query: AnnotationHubQueryDto) {
     return this.hubService.list(user.id, query);
+  }
+
+  @Get('books')
+  listBooks(@CurrentUser() user: RequestUser, @Query() query: AnnotationHubBooksQueryDto) {
+    return this.hubService.listBooks(user.id, query.status ?? 'active');
   }
 
   @Post('bulk')

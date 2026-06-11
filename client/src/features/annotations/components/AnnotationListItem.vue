@@ -19,10 +19,12 @@ import {
   Waves,
   X,
 } from 'lucide-vue-next'
+import { RouterLink } from 'vue-router'
 import { ANNOTATION_HIGHLIGHT_COLORS, type AnnotationHubItem, type AnnotationItem } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { PILL_CLASS, sourcePill, statusPill } from '@/features/annotations/lib/pill-styles'
 import HighlightNoteEditor from '@/features/book/components/detail/tabs/HighlightNoteEditor.vue'
+import AnnotationBookThumb from './AnnotationBookThumb.vue'
 import AnnotationSyncDetailPanel from './AnnotationSyncDetailPanel.vue'
 
 type AnnotationListItemMode = 'book' | 'hub'
@@ -38,6 +40,7 @@ const props = withDefaults(
     mode?: AnnotationListItemMode
     density?: AnnotationListDensity
     saving?: boolean
+    showBookHeader?: boolean
   }>(),
   {
     selected: false,
@@ -46,6 +49,7 @@ const props = withDefaults(
     mode: 'hub',
     density: 'comfortable',
     saving: false,
+    showBookHeader: false,
   },
 )
 
@@ -83,6 +87,10 @@ const canJump = computed(() => props.annotation.jumpFileId != null && !props.tra
 const isLong = computed(() => props.annotation.text.length > (props.density === 'compact' ? 180 : 260))
 const isApproximate = computed(() => props.annotation.cfi == null && props.annotation.origin !== 'web')
 const hasBookTitle = computed(() => 'bookTitle' in props.annotation && props.annotation.bookTitle != null)
+const showBookHeader = computed(() => props.mode === 'hub' && props.showBookHeader)
+const bookTitleText = computed(() => (hasBookTitle.value && 'bookTitle' in props.annotation ? props.annotation.bookTitle : 'Unknown book'))
+const bookAuthor = computed(() => ('author' in props.annotation ? props.annotation.author : null))
+const bookLink = computed(() => ({ name: 'book-detail', params: { bookId: props.annotation.bookId }, query: { tab: 'highlights' } }))
 
 const styleLabel = computed(() => {
   return STYLES.find((s) => s.value === props.annotation.style)?.label ?? props.annotation.style
@@ -94,6 +102,7 @@ const styleIcon = computed(() => {
 
 const originPill = computed(() => sourcePill(props.annotation.origin))
 const positionPill = computed(() => statusPill(props.annotation.positionStatus, isApproximate.value))
+const hasMetadataBeforeSource = computed(() => showBookHeader.value || metadataItems.value.length > 0)
 
 const cardClass = computed(() => [
   props.selected ? 'ring-1 ring-primary border-primary/50' : 'hover:border-primary/30',
@@ -105,7 +114,7 @@ const noteClampClass = computed(() => (expanded.value ? '' : props.density === '
 
 const metadataItems = computed(() => {
   const items: string[] = []
-  if (hasBookTitle.value && 'bookTitle' in props.annotation) items.push(props.annotation.bookTitle ?? 'Unknown book')
+  if (props.mode !== 'hub' && hasBookTitle.value && 'bookTitle' in props.annotation) items.push(props.annotation.bookTitle ?? 'Unknown book')
   if (props.annotation.chapterTitle) items.push(props.annotation.chapterTitle)
   if (props.annotation.pageno != null) items.push(`p. ${props.annotation.pageno}`)
   if (props.annotation.chapterIndex != null) items.push(`chapter ${props.annotation.chapterIndex + 1}`)
@@ -199,6 +208,10 @@ function handleColorSelect(color: string) {
 function handleStyleSelect(style: string) {
   if (style !== props.annotation.style) emit('updateStyle', props.annotation.id, style)
 }
+
+function shouldSeparateMetadataItem(index: number): boolean {
+  return showBookHeader.value || index > 0
+}
 </script>
 
 <template>
@@ -212,7 +225,16 @@ function handleStyleSelect(style: string) {
       @change="handleToggleSelect"
     />
 
-    <Tooltip>
+    <RouterLink
+      v-if="showBookHeader"
+      :to="bookLink"
+      class="mt-0.5 block shrink-0 transition-opacity hover:opacity-90"
+      :class="density === 'compact' ? 'w-11' : 'w-14'"
+    >
+      <AnnotationBookThumb :book-id="annotation.bookId" :title="bookTitleText" class="w-full" style="aspect-ratio: 2 / 3" />
+    </RouterLink>
+
+    <Tooltip v-else>
       <TooltipTrigger as-child>
         <span
           class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded border border-border bg-muted"
@@ -288,8 +310,27 @@ function handleStyleSelect(style: string) {
       </div>
 
       <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-          <span v-for="item in metadataItems" :key="item" class="truncate max-w-[14rem]">{{ item }}</span>
+        <div class="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted-foreground">
+          <template v-if="showBookHeader">
+            <component :is="styleIcon" :size="13" class="shrink-0" :style="{ color: annotation.color }" />
+            <RouterLink
+              :to="bookLink"
+              class="truncate max-w-[16rem] text-xs font-semibold text-foreground transition-colors hover:text-primary hover:underline"
+            >
+              {{ bookTitleText }}
+            </RouterLink>
+            <span v-if="bookAuthor" aria-hidden="true" class="mx-0.5 block h-1 w-1 shrink-0 rounded-full bg-muted-foreground/70" />
+            <span v-if="bookAuthor" class="truncate max-w-[12rem]">{{ bookAuthor }}</span>
+          </template>
+          <template v-for="(item, index) in metadataItems" :key="`${item}-${index}`">
+            <span
+              v-if="shouldSeparateMetadataItem(index)"
+              aria-hidden="true"
+              class="mx-0.5 block h-1 w-1 shrink-0 rounded-full bg-muted-foreground/70"
+            />
+            <span class="truncate max-w-[14rem]">{{ item }}</span>
+          </template>
+          <span v-if="hasMetadataBeforeSource" aria-hidden="true" class="mx-0.5 block h-1 w-1 shrink-0 rounded-full bg-muted-foreground/70" />
           <span :class="[PILL_CLASS, originPill.class]">
             <Smartphone v-if="annotation.origin === 'koreader' || annotation.origin === 'kobo'" :size="10" />
             {{ originPill.label }}
@@ -316,7 +357,7 @@ function handleStyleSelect(style: string) {
             <TooltipTrigger as-child>
               <button
                 type="button"
-                class="flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:text-primary"
+                class="flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
                 @click="handleJump"
               >
                 <BookOpen :size="15" />
@@ -330,7 +371,7 @@ function handleStyleSelect(style: string) {
               <TooltipTrigger as-child>
                 <button
                   type="button"
-                  class="flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:text-primary"
+                  class="flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
                   @click="handleRestore"
                 >
                   <ArchiveRestore :size="15" />
@@ -342,7 +383,7 @@ function handleStyleSelect(style: string) {
               <TooltipTrigger as-child>
                 <button
                   type="button"
-                  class="flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:text-destructive"
+                  class="flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
                   @click="handlePurge"
                 >
                   <Trash2 :size="15" />

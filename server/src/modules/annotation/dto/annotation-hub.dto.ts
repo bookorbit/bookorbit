@@ -72,6 +72,12 @@ export class AnnotationHubQueryDto {
   sortDir?: 'asc' | 'desc';
 }
 
+export class AnnotationHubBooksQueryDto {
+  @IsOptional()
+  @IsIn(['active', 'trashed'])
+  status?: 'active' | 'trashed';
+}
+
 export class AnnotationExportQueryDto extends AnnotationHubQueryDto {
   @IsOptional()
   @IsIn(['md', 'csv', 'json'])
