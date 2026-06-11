@@ -99,6 +99,7 @@ export class KoreaderAnnotationExchangeService {
       const accessibleLibraryIds = await this.koreaderRepo.getAccessibleLibraryIds(user.id);
       const hashes = [...new Set(dto.books.map((book) => book.hash.toLowerCase()))];
       const matches = await this.koreaderRepo.resolveBookFilesByHashes(hashes, accessibleLibraryIds);
+      const deviceClockOffsetMs = this.deviceClockOffsetMs(dto.deviceTime);
 
       const results: ExchangeBookResult[] = [];
       const unmatched: string[] = [];
@@ -111,7 +112,7 @@ export class KoreaderAnnotationExchangeService {
           unmatched.push(hash);
           continue;
         }
-        const result = await this.exchangeBook(user.id, dto.deviceId, hash, match.bookId, match.bookFileId, book);
+        const result = await this.exchangeBook(user.id, dto.deviceId, hash, match.bookId, match.bookFileId, book, deviceClockOffsetMs);
         pushedTotal += result.toApply.add.length + result.toApply.edit.length + result.toApply.delete.length;
         results.push(result);
       }
@@ -180,6 +181,17 @@ export class KoreaderAnnotationExchangeService {
     }
   }
 
+  /**
+   * KOReader datetimes are device-local wall clock with no timezone; minting them
+   * from server UTC time can land in the device's future, which freezes the
+   * device-side upload watermark. The offset shifts mints into the device frame.
+   */
+  private deviceClockOffsetMs(deviceTime: string | undefined): number {
+    if (!deviceTime) return 0;
+    const parsed = Date.parse(`${deviceTime.replace(' ', 'T')}Z`);
+    return Number.isNaN(parsed) ? 0 : parsed - Date.now();
+  }
+
   private async exchangeBook(
     userId: number,
     deviceId: string,
@@ -187,6 +199,7 @@ export class KoreaderAnnotationExchangeService {
     bookId: number,
     bookFileId: number,
     book: ExchangeBookDto,
+    deviceClockOffsetMs: number,
   ): Promise<ExchangeBookResult> {
     const ingest = await this.annotationSync.ingestDeviceAnnotations({
       userId,
@@ -221,7 +234,7 @@ export class KoreaderAnnotationExchangeService {
       version: annotation.version,
       key: state.externalKey,
       datetime: annotation.deviceCreatedAt,
-      datetimeUpdated: this.mintEditDatetime(annotation),
+      datetimeUpdated: this.mintEditDatetime(annotation, deviceClockOffsetMs),
       drawer: drawerFromStyle(annotation.style),
       color: koreaderColorFromHex(annotation.color),
       text: annotation.text,
@@ -233,7 +246,7 @@ export class KoreaderAnnotationExchangeService {
     let skippedNoPosition = 0;
     const addEntries: ExchangeAddEntry[] = [];
     for (const annotation of pushDown.adds) {
-      const entry = await this.buildAddEntry(userId, bookId, bookFileId, annotation, conversionBudget > 0);
+      const entry = await this.buildAddEntry(userId, bookId, bookFileId, annotation, conversionBudget > 0, deviceClockOffsetMs);
       if (entry === 'converted') {
         conversionBudget -= 1;
         continue;
@@ -267,6 +280,7 @@ export class KoreaderAnnotationExchangeService {
     bookFileId: number,
     annotation: AnnotationRow,
     mayConvert: boolean,
+    deviceClockOffsetMs: number,
   ): Promise<ExchangeAddEntry | null | 'converted'> {
     const pdfPosition = await this.annotationSync.findDevicePositionFor(annotation.id, 'pdf');
     const xpointerPosition = pdfPosition ? null : await this.annotationSync.findDevicePositionFor(annotation.id, 'xpointer');
@@ -279,12 +293,12 @@ export class KoreaderAnnotationExchangeService {
 
     if (!usable && pdfPosition == null) {
       if (!mayConvert || !retryable) return null;
-      await this.convertCfiToXpointer(userId, bookId, bookFileId, annotation);
+      await this.convertCfiToXpointer(userId, bookId, bookFileId, annotation, deviceClockOffsetMs);
       return 'converted';
     }
     if (!usable || !position?.pos0) return null;
 
-    const datetime = await this.annotationSync.ensureDeviceCreatedAt(userId, bookId, annotation);
+    const datetime = await this.annotationSync.ensureDeviceCreatedAt(userId, bookId, annotation, deviceClockOffsetMs);
     const pageno = ((position.extras as { pageno?: number } | null)?.pageno ?? null) as number | null;
     return {
       serverId: annotation.id,
@@ -303,7 +317,13 @@ export class KoreaderAnnotationExchangeService {
     };
   }
 
-  private async convertCfiToXpointer(userId: number, bookId: number, bookFileId: number, annotation: AnnotationRow): Promise<void> {
+  private async convertCfiToXpointer(
+    userId: number,
+    bookId: number,
+    bookFileId: number,
+    annotation: AnnotationRow,
+    deviceClockOffsetMs: number,
+  ): Promise<void> {
     const cfiPosition = await this.annotationSync.findDevicePositionFor(annotation.id, 'cfi');
     if (!cfiPosition?.pos0) {
       await this.annotationSync.upsertGeneratedPosition({
@@ -339,7 +359,7 @@ export class KoreaderAnnotationExchangeService {
       return;
     }
 
-    await this.annotationSync.ensureDeviceCreatedAt(userId, bookId, annotation);
+    await this.annotationSync.ensureDeviceCreatedAt(userId, bookId, annotation, deviceClockOffsetMs);
     await this.annotationSync.upsertGeneratedPosition({
       annotationId: annotation.id,
       userId,
@@ -357,8 +377,8 @@ export class KoreaderAnnotationExchangeService {
    * datetime_updated pushed to the device must be ahead of any device edit we already
    * ingested, or the device-side dedup would treat the pushed edit as stale.
    */
-  private mintEditDatetime(annotation: AnnotationRow): string {
-    const candidate = formatDeviceDatetime(annotation.updatedAt);
+  private mintEditDatetime(annotation: AnnotationRow, deviceClockOffsetMs: number): string {
+    const candidate = formatDeviceDatetime(new Date(annotation.updatedAt.getTime() + deviceClockOffsetMs));
     if (annotation.deviceUpdatedAt && annotation.deviceUpdatedAt >= candidate) {
       const bumped = new Date(`${annotation.deviceUpdatedAt.replace(' ', 'T')}Z`);
       bumped.setUTCSeconds(bumped.getUTCSeconds() + 1);

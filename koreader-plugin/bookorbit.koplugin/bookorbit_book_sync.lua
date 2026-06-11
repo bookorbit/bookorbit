@@ -280,7 +280,7 @@ stepAnnotationsLegacy = function(ctx)
     if ctx.ann_delta == nil then
         ctx.ann_delta = {}
         ctx.ann_failed = false
-        local watermark = book.annWatermark or ""
+        local watermark = BookOrbitAnnotations.readWatermark(book, os.date("%Y-%m-%d %H:%M:%S"))
         for _, annotation in ipairs(ctx.snap.annotations) do
             local effective = annotation.datetimeUpdated or annotation.datetime
             if effective > watermark then
@@ -291,9 +291,7 @@ stepAnnotationsLegacy = function(ctx)
 
     if #ctx.ann_delta == 0 then
         if not ctx.ann_failed then
-            if ctx.snap.ann_max_datetime ~= "" and ctx.snap.ann_max_datetime > (book.annWatermark or "") then
-                book.annWatermark = ctx.snap.ann_max_datetime
-            end
+            BookOrbitAnnotations.advanceWatermark(book, ctx.snap.ann_max_datetime, os.date("%Y-%m-%d %H:%M:%S"))
             book.annCount = ctx.snap.ann_count
         end
         return step(ctx, stepState)

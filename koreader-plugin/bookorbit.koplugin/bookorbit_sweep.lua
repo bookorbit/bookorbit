@@ -414,9 +414,10 @@ end
 -- Legacy phase 5: one-way chunk upload, packing several books per request
 -- while respecting both the per-request book and annotation caps.
 buildLegacyAnnotationChunks = function(ctx)
+    local device_now = os.date("%Y-%m-%d %H:%M:%S")
     for _, entry in ipairs(ctx.ann_queue) do
         local book = ctx.state:getBook(entry.md5)
-        local ann_watermark = book and book.annWatermark or ""
+        local ann_watermark = book and BookOrbitAnnotations.readWatermark(book, device_now) or ""
         local delta = {}
         for _, annotation in ipairs(entry.annotations) do
             local effective = annotation.datetimeUpdated or annotation.datetime
@@ -576,6 +577,7 @@ end
 -- Phase 8: commit per-book sidecar watermarks for fully acked books, record
 -- the sweep server-side and store the fresh library version token.
 local function stepDone(ctx)
+    local device_now = os.date("%Y-%m-%d %H:%M:%S")
     for md5, pending in pairs(ctx.pending_books) do
         local book = ctx.state:getBook(md5)
         if book and not pending.failed then
@@ -585,9 +587,7 @@ local function stepDone(ctx)
             if ann_done and state_done and progress_done then
                 book.sidecarMtime = pending.mtime
                 book.annCount = pending.ann_count
-                if pending.ann_max_datetime ~= "" and pending.ann_max_datetime > (book.annWatermark or "") then
-                    book.annWatermark = pending.ann_max_datetime
-                end
+                BookOrbitAnnotations.advanceWatermark(book, pending.ann_max_datetime, device_now)
                 if state_done and pending.need_state then
                     book.statusSyncedModified = pending.status_modified or book.statusSyncedModified
                     book.ratingSynced = pending.rating or book.ratingSynced

@@ -31,6 +31,15 @@ export class PluginDeviceDto {
   @IsString()
   @MaxLength(20)
   pluginVersion!: string;
+
+  /**
+   * Device-local wall clock at request time. KOReader datetimes carry no timezone,
+   * so the server needs this to mint datetimes in the device's clock frame.
+   */
+  @IsOptional()
+  @IsString()
+  @Matches(DEVICE_DATETIME)
+  deviceTime?: string;
 }
 
 export class MatchCheckDto extends PluginDeviceDto {

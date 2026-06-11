@@ -36,6 +36,31 @@ function BookOrbitAnnotations.buildKey(datetime, pos0)
     return md5(datetime .. "|" .. pos0)
 end
 
+-- Returns the stored upload watermark, resetting it when it sits in the
+-- device's future: bad data there (e.g. a server that minted UTC datetimes)
+-- would swallow every new annotation. The re-upload is a server-side no-op.
+function BookOrbitAnnotations.readWatermark(book, device_now)
+    local watermark = book.annWatermark or ""
+    if watermark > device_now then
+        watermark = ""
+        book.annWatermark = ""
+    end
+    return watermark
+end
+
+-- Advances the watermark, capped at the device clock so a future-dated entry
+-- cannot freeze it; such an entry just re-uploads until time passes it.
+function BookOrbitAnnotations.advanceWatermark(book, ann_max_datetime, device_now)
+    if not ann_max_datetime or ann_max_datetime == "" then return end
+    local advance = ann_max_datetime
+    if advance > device_now then
+        advance = device_now
+    end
+    if advance > (book.annWatermark or "") then
+        book.annWatermark = advance
+    end
+end
+
 -- Key list for deletion detection, built from normalized entries so the
 -- serialized pos0 matches what the server hashed at upload time.
 function BookOrbitAnnotations.collectKeys(normalized)
@@ -312,7 +337,8 @@ function BookOrbitAnnotations.exchangeBook(opts)
     local keys_complete = #keys <= MAX_KEYS_PER_BOOK
     if not keys_complete then keys = {} end
 
-    local watermark = book.annWatermark or ""
+    local device_now = os.date("%Y-%m-%d %H:%M:%S")
+    local watermark = BookOrbitAnnotations.readWatermark(book, device_now)
     local delta = {}
     for _, annotation in ipairs(opts.annotations) do
         local effective = annotation.datetimeUpdated or annotation.datetime
@@ -359,9 +385,8 @@ function BookOrbitAnnotations.exchangeBook(opts)
         first_request = false
     until #delta == 0
 
-    if not upload_failed and opts.ann_max_datetime and opts.ann_max_datetime ~= ""
-            and opts.ann_max_datetime > (book.annWatermark or "") then
-        book.annWatermark = opts.ann_max_datetime
+    if not upload_failed then
+        BookOrbitAnnotations.advanceWatermark(book, opts.ann_max_datetime, device_now)
     end
 
     if opts.apply_mode == "skip" then

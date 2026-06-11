@@ -15,6 +15,22 @@ local util = require("util")
 
 local MAX_BODY_BYTES = 900 * 1024 -- stays under the server's 1 MiB body limit
 
+-- Plain empty Lua tables would encode as {} and fail the server's array
+-- validation; every empty table in our payloads is semantically an array.
+local ENCODE_OPTIONS = { empty_table_as_array = true }
+
+-- JSON null decodes to the rapidjson.null lightuserdata, which is truthy in
+-- Lua and would leak into sidecars and truthiness checks; treat it as absent.
+local function scrubNulls(value)
+    if value == rapidjson.null then return nil end
+    if type(value) == "table" then
+        for key, item in pairs(value) do
+            value[key] = scrubNulls(item)
+        end
+    end
+    return value
+end
+
 local BookOrbitApi = {}
 BookOrbitApi.__index = BookOrbitApi
 
@@ -62,7 +78,7 @@ function BookOrbitApi:request(method, path, body)
     }
 
     if body then
-        local body_json, encode_err = rapidjson.encode(body)
+        local body_json, encode_err = rapidjson.encode(body, ENCODE_OPTIONS)
         if not body_json then
             return nil, "encode_error: " .. tostring(encode_err)
         end
@@ -85,7 +101,7 @@ function BookOrbitApi:request(method, path, body)
 
     local decoded = nil
     if sink[1] then
-        decoded = rapidjson.decode(table.concat(sink))
+        decoded = scrubNulls(rapidjson.decode(table.concat(sink)))
     end
 
     if code < 200 or code >= 300 then
@@ -99,6 +115,9 @@ function BookOrbitApi:withDevice(body)
     body.deviceId = self.device_id
     body.deviceModel = self.device_model
     body.pluginVersion = self.plugin_version
+    -- KOReader datetimes are local wall clock with no timezone; the server
+    -- needs our clock to mint device datetimes that are not in our future.
+    body.deviceTime = os.date("%Y-%m-%d %H:%M:%S")
     return body
 end
 

@@ -379,11 +379,13 @@ export class AnnotationSyncService {
   /**
    * Returns the annotation's device identity datetime, minting a unique one per
    * (user, book) on first push (KOReader treats the datetime as identity).
+   * Device datetimes are wall-clock local with no timezone; the offset shifts the
+   * minted value into the device's clock frame so it never lands in its future.
    */
-  async ensureDeviceCreatedAt(userId: number, bookId: number, annotation: AnnotationRow): Promise<string> {
+  async ensureDeviceCreatedAt(userId: number, bookId: number, annotation: AnnotationRow, deviceClockOffsetMs = 0): Promise<string> {
     if (annotation.deviceCreatedAt) return annotation.deviceCreatedAt;
     const existing = await this.syncRepo.listDeviceCreatedAtsForBook(userId, bookId);
-    let candidate = formatDeviceDatetime(annotation.createdAt);
+    let candidate = formatDeviceDatetime(new Date(annotation.createdAt.getTime() + deviceClockOffsetMs));
     while (existing.has(candidate)) {
       candidate = addSeconds(candidate, 1);
     }
