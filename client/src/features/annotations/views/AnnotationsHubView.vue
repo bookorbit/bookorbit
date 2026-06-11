@@ -3,7 +3,7 @@ import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ChevronLeft, ChevronRight, Download, Highlighter, Search, Trash2 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
-import type { AnnotationHubItem } from '@bookorbit/types'
+import { ANNOTATION_COLOR_FILTER_OPTIONS, ANNOTATION_HIGHLIGHT_COLORS, type AnnotationHubItem } from '@bookorbit/types'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
 import AnnotationCard from '../components/AnnotationCard.vue'
@@ -14,14 +14,9 @@ const hub = useAnnotationsHub()
 
 const COLOR_OPTIONS = [
   { value: 'all', label: 'All colors' },
-  { value: '#FACC15', label: 'Yellow' },
-  { value: '#4ADE80', label: 'Green' },
-  { value: '#38BDF8', label: 'Blue' },
-  { value: '#F472B6', label: 'Pink' },
-  { value: '#FB923C', label: 'Orange' },
-  { value: '#FFFF33', label: 'Device yellow' },
-  { value: '#88FF77', label: 'Device olive' },
+  ...ANNOTATION_COLOR_FILTER_OPTIONS.map((color) => ({ value: color.hex, label: color.label })),
 ]
+const RECOLOR_OPTIONS = ANNOTATION_HIGHLIGHT_COLORS
 
 const STYLE_OPTIONS = [
   { value: 'all', label: 'All styles' },
@@ -199,12 +194,8 @@ function handleExportJson() {
             <Button variant="outline" size="sm">Recolor</Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              v-for="option in COLOR_OPTIONS.filter((o) => o.value !== 'all')"
-              :key="option.value"
-              @click="handleBulkRecolor(option.value)"
-            >
-              <span class="w-3 h-3 rounded-full mr-2" :style="{ background: option.value }" />
+            <DropdownMenuItem v-for="option in RECOLOR_OPTIONS" :key="option.hex" @click="handleBulkRecolor(option.hex)">
+              <span class="w-3 h-3 rounded-full mr-2" :style="{ background: option.hex }" />
               {{ option.label }}
             </DropdownMenuItem>
           </DropdownMenuContent>

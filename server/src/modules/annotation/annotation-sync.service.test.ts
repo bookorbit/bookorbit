@@ -33,7 +33,7 @@ function makeAnnotationRow(overrides: Record<string, unknown> = {}) {
     userId: USER_ID,
     bookId: BOOK_ID,
     text: 'highlighted text',
-    color: '#FFFF33',
+    color: '#FACC15',
     style: 'highlight',
     note: null,
     chapterTitle: 'Chapter 1',
@@ -171,7 +171,7 @@ describe('AnnotationSyncService', () => {
         bookId: BOOK_ID,
         origin: 'koreader',
         style: 'underline',
-        color: '#88FF77',
+        color: '#84CC16',
         version: 1,
         deviceCreatedAt: '2026-06-01 21:14:03',
       });

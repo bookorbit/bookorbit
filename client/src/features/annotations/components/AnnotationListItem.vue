@@ -19,7 +19,7 @@ import {
   Waves,
   X,
 } from 'lucide-vue-next'
-import type { AnnotationHubItem, AnnotationItem } from '@bookorbit/types'
+import { ANNOTATION_HIGHLIGHT_COLORS, type AnnotationHubItem, type AnnotationItem } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import HighlightNoteEditor from '@/features/book/components/detail/tabs/HighlightNoteEditor.vue'
 import AnnotationSyncDetailPanel from './AnnotationSyncDetailPanel.vue'
@@ -59,15 +59,7 @@ const emit = defineEmits<{
   updateStyle: [id: number, style: string]
 }>()
 
-const COLORS = [
-  { hex: '#FACC15', label: 'Yellow' },
-  { hex: '#4ADE80', label: 'Green' },
-  { hex: '#38BDF8', label: 'Blue' },
-  { hex: '#F472B6', label: 'Pink' },
-  { hex: '#FB923C', label: 'Orange' },
-  { hex: '#FFFF33', label: 'Device yellow' },
-  { hex: '#88FF77', label: 'Device olive' },
-]
+const COLORS = ANNOTATION_HIGHLIGHT_COLORS
 
 const STYLES = [
   { value: 'highlight', label: 'Highlight', icon: Highlighter },

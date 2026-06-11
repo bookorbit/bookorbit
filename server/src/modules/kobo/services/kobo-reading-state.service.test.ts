@@ -142,6 +142,63 @@ describe('KoboReadingStateService', () => {
     });
   });
 
+  it('does not regress envelope timestamps below a newer hub-refreshed bookmark on device re-push', async () => {
+    const db = makeDb();
+    const stateInsert = makeInsertChain();
+    db.insert.mockReturnValue(stateInsert);
+    db.query.books.findFirst.mockResolvedValue({ id: 12 });
+    db.query.koboReadingStates.findFirst
+      .mockResolvedValueOnce({
+        lastModifiedKobo: '2026-06-11T15:49:30.355Z',
+        priorityTimestamp: '2026-06-11T15:49:30.355Z',
+        currentBookmark: {
+          LastModified: '2026-06-11T15:49:30.355Z',
+          ProgressPercent: 84.94,
+          Location: { Source: 'index_split_012.html', Type: 'KoboSpan', Value: 'kobo.1.1' },
+        },
+      })
+      .mockResolvedValueOnce({
+        entitlementId: '12',
+        createdAtKobo: '2026-06-11T15:42:12.729Z',
+        lastModifiedKobo: '2026-06-11T15:49:30.355Z',
+        priorityTimestamp: '2026-06-11T15:49:30.355Z',
+        currentBookmark: { ProgressPercent: 84.94 },
+      });
+
+    await makeService(db).upsertState(
+      3,
+      12,
+      {
+        LastModified: '2026-06-11T15:49:20Z',
+        PriorityTimestamp: '2026-06-11T15:49:20Z',
+        CurrentBookmark: {
+          LastModified: '2026-06-11T15:49:20Z',
+          ProgressPercent: 21,
+          Location: { Source: 'index_split_012.html', Type: 'KoboSpan', Value: 'kobo.1.1' },
+        },
+      },
+      1,
+      99,
+      false,
+    );
+
+    expect(stateInsert.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lastModifiedKobo: '2026-06-11T15:49:30.355Z',
+        priorityTimestamp: '2026-06-11T15:49:30.355Z',
+        currentBookmark: expect.objectContaining({ ProgressPercent: 84.94, LastModified: '2026-06-11T15:49:30.355Z' }),
+      }),
+    );
+    expect(stateInsert.onConflictDoUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        set: expect.objectContaining({
+          lastModifiedKobo: '2026-06-11T15:49:30.355Z',
+          priorityTimestamp: '2026-06-11T15:49:30.355Z',
+        }),
+      }),
+    );
+  });
+
   it('calls autoUpdate with merged percent and thresholds when bookmark has ProgressPercent', async () => {
     const db = makeDb();
     const stateInsert = makeInsertChain();

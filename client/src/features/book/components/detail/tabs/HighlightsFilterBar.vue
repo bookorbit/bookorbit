@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { Search, X } from '@lucide/vue'
+import { Search, X } from 'lucide-vue-next'
+import { ANNOTATION_HIGHLIGHT_COLORS } from '@bookorbit/types'
 
 const props = defineProps<{
   activeColors: string[]
@@ -17,13 +18,7 @@ const emit = defineEmits<{
   dateRangeChange: [from: string | undefined, to: string | undefined]
 }>()
 
-const COLORS = [
-  { hex: '#FACC15', label: 'Yellow' },
-  { hex: '#4ADE80', label: 'Green' },
-  { hex: '#38BDF8', label: 'Blue' },
-  { hex: '#F472B6', label: 'Pink' },
-  { hex: '#FB923C', label: 'Orange' },
-]
+const COLORS = ANNOTATION_HIGHLIGHT_COLORS
 
 const searchInput = ref('')
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
@@ -79,7 +74,7 @@ watch(
       </button>
     </div>
 
-    <div class="flex items-center gap-1.5 shrink-0">
+    <div class="flex flex-wrap items-center gap-1.5 shrink-0">
       <button
         v-for="c in COLORS"
         :key="c.hex"

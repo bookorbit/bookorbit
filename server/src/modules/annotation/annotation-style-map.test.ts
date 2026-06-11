@@ -2,7 +2,9 @@ import {
   applyDeviceColor,
   applyDeviceStyle,
   drawerFromStyle,
+  hexFromKoboColor,
   hexFromKoreaderColor,
+  koboColorFromHex,
   koreaderColorFromHex,
   styleFromDrawer,
 } from './annotation-style-map';
@@ -37,20 +39,26 @@ describe('annotation-style-map', () => {
   });
 
   describe('hexFromKoreaderColor', () => {
-    it('maps KOReader named colors to their hex values', () => {
-      expect(hexFromKoreaderColor('yellow')).toBe('#FFFF33');
-      expect(hexFromKoreaderColor('olive')).toBe('#88FF77');
-      expect(hexFromKoreaderColor('GRAY')).toBe('#808080');
+    it('maps KOReader named colors to BookOrbit equivalents', () => {
+      expect(hexFromKoreaderColor('yellow')).toBe('#FACC15');
+      expect(hexFromKoreaderColor('olive')).toBe('#84CC16');
+      expect(hexFromKoreaderColor('cyan')).toBe('#22D3EE');
+      expect(hexFromKoreaderColor('GRAY')).toBe('#9CA3AF');
     });
 
-    it('passes through hex values, normalizing case and prefix', () => {
-      expect(hexFromKoreaderColor('#facc15')).toBe('#FACC15');
+    it('maps exact KOReader hex values to BookOrbit equivalents', () => {
+      expect(hexFromKoreaderColor('#ffff33')).toBe('#FACC15');
+      expect(hexFromKoreaderColor('88ff77')).toBe('#84CC16');
+    });
+
+    it('passes through unknown hex values, normalizing case and prefix', () => {
+      expect(hexFromKoreaderColor('#abc123')).toBe('#ABC123');
       expect(hexFromKoreaderColor('facc15')).toBe('#FACC15');
     });
 
     it('defaults to yellow for null or junk', () => {
-      expect(hexFromKoreaderColor(null)).toBe('#FFFF33');
-      expect(hexFromKoreaderColor('not-a-color')).toBe('#FFFF33');
+      expect(hexFromKoreaderColor(null)).toBe('#FACC15');
+      expect(hexFromKoreaderColor('not-a-color')).toBe('#FACC15');
     });
   });
 
@@ -63,6 +71,10 @@ describe('annotation-style-map', () => {
     it('picks the nearest named color for arbitrary hex', () => {
       expect(koreaderColorFromHex('#FACC15')).toBe('yellow');
       expect(koreaderColorFromHex('#F472B6')).toBe('purple');
+      expect(koreaderColorFromHex('#84CC16')).toBe('olive');
+      expect(koreaderColorFromHex('#22D3EE')).toBe('cyan');
+      expect(koreaderColorFromHex('#C084FC')).toBe('purple');
+      expect(koreaderColorFromHex('#9CA3AF')).toBe('gray');
       expect(koreaderColorFromHex('#111111')).toBe('gray');
     });
 
@@ -93,15 +105,40 @@ describe('annotation-style-map', () => {
     });
 
     it('applies a genuinely different named color', () => {
-      expect(applyDeviceColor('#FACC15', 'blue')).toBe('#0066FF');
+      expect(applyDeviceColor('#FACC15', 'blue')).toBe('#38BDF8');
     });
 
-    it('applies device hex colors directly', () => {
-      expect(applyDeviceColor('#FACC15', '#00AA66')).toBe('#00AA66');
+    it('applies exact device hex colors as BookOrbit equivalents', () => {
+      expect(applyDeviceColor('#FACC15', '#00AA66')).toBe('#4ADE80');
     });
 
     it('keeps the canonical color when the device sends none', () => {
       expect(applyDeviceColor('#FACC15', null)).toBe('#FACC15');
+    });
+  });
+
+  describe('Kobo color mapping', () => {
+    it('maps Kobo colors into BookOrbit equivalents', () => {
+      expect(hexFromKoboColor('#F6F3B3')).toBe('#FACC15');
+      expect(hexFromKoboColor('#E8AFCF')).toBe('#F472B6');
+    });
+
+    it('uses explicit Kobo fallbacks for BookOrbit colors', () => {
+      expect(koboColorFromHex('#F87171')).toBe('#E8AFCF');
+      expect(koboColorFromHex('#FB923C')).toBe('#F6F3B3');
+      expect(koboColorFromHex('#84CC16')).toBe('#C6E09E');
+      expect(koboColorFromHex('#22D3EE')).toBe('#B2E1E8');
+      expect(koboColorFromHex('#C084FC')).toBe('#E8AFCF');
+      expect(koboColorFromHex('#9CA3AF')).toBe('#F6F3B3');
+    });
+
+    it('uses explicit Kobo fallbacks for exact KOReader colors', () => {
+      expect(koboColorFromHex('#FF3300')).toBe('#E8AFCF');
+      expect(koboColorFromHex('#FF8800')).toBe('#F6F3B3');
+      expect(koboColorFromHex('#FFFF33')).toBe('#F6F3B3');
+      expect(koboColorFromHex('#00FFEE')).toBe('#B2E1E8');
+      expect(koboColorFromHex('#EE00FF')).toBe('#E8AFCF');
+      expect(koboColorFromHex('#808080')).toBe('#F6F3B3');
     });
   });
 });

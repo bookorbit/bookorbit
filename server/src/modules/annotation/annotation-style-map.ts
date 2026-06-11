@@ -1,3 +1,10 @@
+import {
+  ANNOTATION_HIGHLIGHT_COLORS,
+  KOBO_HIGHLIGHT_COLORS,
+  KOREADER_HIGHLIGHT_COLORS,
+  type KoboHighlightColorName,
+  type KoreaderHighlightColorName,
+} from '@bookorbit/types';
 import type { AnnotationStyle } from './annotation.constants';
 
 export const KOREADER_DRAWERS = ['lighten', 'underscore', 'strikeout', 'invert'] as const;
@@ -19,21 +26,25 @@ const STYLE_TO_DRAWER: Record<AnnotationStyle, KoreaderDrawer> = {
   invert: 'invert',
 };
 
-// Hex values mirror KOReader's BlitBuffer.HIGHLIGHT_COLORS; gray has no entry there
-// (it renders via dimming) so a neutral mid-gray represents it on the web.
-export const KOREADER_COLOR_HEX: Record<string, string> = {
-  red: '#FF3300',
-  orange: '#FF8800',
-  yellow: '#FFFF33',
-  green: '#00AA66',
-  olive: '#88FF77',
-  cyan: '#00FFEE',
-  blue: '#0066FF',
-  purple: '#EE00FF',
-  gray: '#808080',
-};
+type AnnotationHighlightColor = (typeof ANNOTATION_HIGHLIGHT_COLORS)[number];
+type KoreaderHighlightColor = (typeof KOREADER_HIGHLIGHT_COLORS)[number];
 
-export const DEFAULT_KOREADER_COLOR_HEX = KOREADER_COLOR_HEX.yellow;
+const APP_COLOR_BY_HEX = Object.fromEntries(ANNOTATION_HIGHLIGHT_COLORS.map((color) => [color.hex, color])) as Record<
+  string,
+  AnnotationHighlightColor
+>;
+const KOREADER_BY_NAME = Object.fromEntries(KOREADER_HIGHLIGHT_COLORS.map((color) => [color.name, color])) as Record<string, KoreaderHighlightColor>;
+const KOREADER_BY_HEX = Object.fromEntries(KOREADER_HIGHLIGHT_COLORS.map((color) => [color.hex, color])) as Record<string, KoreaderHighlightColor>;
+
+// Hex values mirror KOReader's BlitBuffer.HIGHLIGHT_COLORS. Gray has no entry there
+// because it renders through dimming, so a neutral mid-gray represents it here.
+export const KOREADER_COLOR_HEX = Object.fromEntries(KOREADER_HIGHLIGHT_COLORS.map((color) => [color.name, color.hex])) as Record<
+  KoreaderHighlightColorName,
+  string
+>;
+
+export const DEFAULT_KOREADER_COLOR_HEX = KOREADER_BY_NAME.yellow.hex;
+export const DEFAULT_ANNOTATION_COLOR_HEX = KOREADER_BY_NAME.yellow.appHex;
 
 export function styleFromDrawer(drawer: string | null | undefined): AnnotationStyle {
   return DRAWER_TO_STYLE[drawer as KoreaderDrawer] ?? 'highlight';
@@ -44,16 +55,23 @@ export function drawerFromStyle(style: string | null | undefined): KoreaderDrawe
 }
 
 export function hexFromKoreaderColor(color: string | null | undefined): string {
-  if (!color) return DEFAULT_KOREADER_COLOR_HEX;
-  const named = KOREADER_COLOR_HEX[color.toLowerCase()];
-  if (named) return named;
-  if (/^#[0-9a-f]{6}$/i.test(color)) return color.toUpperCase();
-  if (/^[0-9a-f]{6}$/i.test(color)) return `#${color.toUpperCase()}`;
-  return DEFAULT_KOREADER_COLOR_HEX;
+  if (!color) return DEFAULT_ANNOTATION_COLOR_HEX;
+  const named = KOREADER_BY_NAME[color.trim().toLowerCase()];
+  if (named) return named.appHex;
+  const normalized = normalizeHex(color);
+  if (!normalized) return DEFAULT_ANNOTATION_COLOR_HEX;
+  return KOREADER_BY_HEX[normalized]?.appHex ?? normalized;
 }
 
 export function koreaderColorFromHex(hex: string | null | undefined): string {
-  const rgb = parseHex(hex);
+  const normalized = normalizeHex(hex);
+  if (!normalized) return 'yellow';
+  const appColor = APP_COLOR_BY_HEX[normalized];
+  if (appColor) return appColor.koreaderFallback;
+  const exactKoreaderColor = KOREADER_BY_HEX[normalized];
+  if (exactKoreaderColor) return exactKoreaderColor.name;
+
+  const rgb = parseHex(normalized);
   if (!rgb) return 'yellow';
   // Raw RGB distance misjudges grayness in both directions (desaturated pinks land on
   // gray, near-blacks land on green), so saturation decides gray membership outright.
@@ -61,13 +79,13 @@ export function koreaderColorFromHex(hex: string | null | undefined): string {
   if (!isChromatic) return 'gray';
   let best = 'yellow';
   let bestDistance = Number.POSITIVE_INFINITY;
-  for (const [name, namedHex] of Object.entries(KOREADER_COLOR_HEX)) {
-    if (name === 'gray') continue;
-    const named = parseHex(namedHex)!;
+  for (const color of KOREADER_HIGHLIGHT_COLORS) {
+    if (color.name === 'gray') continue;
+    const named = parseHex(color.hex)!;
     const distance = (rgb.r - named.r) ** 2 + (rgb.g - named.g) ** 2 + (rgb.b - named.b) ** 2;
     if (distance < bestDistance) {
       bestDistance = distance;
-      best = name;
+      best = color.name;
     }
   }
   return best;
@@ -86,38 +104,34 @@ export function applyDeviceStyle(currentStyle: AnnotationStyle, incomingDrawer: 
 
 export function applyDeviceColor(currentHex: string, incomingColor: string | null | undefined): string {
   if (!incomingColor) return currentHex;
-  const incoming = incomingColor.toLowerCase();
-  if (KOREADER_COLOR_HEX[incoming]) {
+  const incoming = incomingColor.trim().toLowerCase();
+  const named = KOREADER_BY_NAME[incoming];
+  if (named) {
     if (koreaderColorFromHex(currentHex) === incoming) return currentHex;
-    return KOREADER_COLOR_HEX[incoming];
+    return named.appHex;
   }
   return hexFromKoreaderColor(incomingColor);
 }
 
 /** Kobo firmware's four fixed highlight colors. */
-export const KOBO_COLOR_HEX: Record<string, string> = {
-  yellow: '#F6F3B3',
-  green: '#C6E09E',
-  blue: '#B2E1E8',
-  pink: '#E8AFCF',
-};
+export const KOBO_COLOR_HEX = Object.fromEntries(KOBO_HIGHLIGHT_COLORS.map((color) => [color.name, color.hex])) as Record<
+  KoboHighlightColorName,
+  string
+>;
 
 export const DEFAULT_KOBO_COLOR_HEX = KOBO_COLOR_HEX.yellow;
 
 const KOBO_TO_APP_COLOR: Record<string, string> = {
-  '#F6F3B3': '#FACC15',
-  '#C6E09E': '#4ADE80',
-  '#B2E1E8': '#38BDF8',
-  '#E8AFCF': '#F472B6',
+  [KOBO_COLOR_HEX.yellow]: '#FACC15',
+  [KOBO_COLOR_HEX.green]: '#4ADE80',
+  [KOBO_COLOR_HEX.blue]: '#38BDF8',
+  [KOBO_COLOR_HEX.pink]: '#F472B6',
 };
 
-const APP_TO_KOBO_COLOR: Record<string, string> = {
-  '#FACC15': KOBO_COLOR_HEX.yellow,
-  '#4ADE80': KOBO_COLOR_HEX.green,
-  '#38BDF8': KOBO_COLOR_HEX.blue,
-  '#F472B6': KOBO_COLOR_HEX.pink,
-  '#FB923C': KOBO_COLOR_HEX.yellow,
-};
+const APP_TO_KOBO_COLOR = Object.fromEntries([
+  ...ANNOTATION_HIGHLIGHT_COLORS.map((color) => [color.hex, KOBO_COLOR_HEX[color.koboFallback]]),
+  ...KOREADER_HIGHLIGHT_COLORS.map((color) => [color.hex, KOBO_COLOR_HEX[color.koboFallback]]),
+]) as Record<string, string>;
 
 export function hexFromKoboColor(color: string | null | undefined): string {
   const normalized = normalizeHex(color);

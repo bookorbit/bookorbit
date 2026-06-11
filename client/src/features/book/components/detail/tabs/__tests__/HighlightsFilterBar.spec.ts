@@ -24,7 +24,19 @@ describe('HighlightsFilterBar', () => {
   it('renders color filter buttons', () => {
     const wrapper = mount(HighlightsFilterBar, { props: makeProps() })
     const colorButtons = wrapper.findAll('button[title]')
-    expect(colorButtons.length).toBe(5)
+    expect(colorButtons.length).toBe(10)
+    expect(colorButtons.map((button) => button.attributes('title'))).toEqual([
+      'Yellow',
+      'Green',
+      'Blue',
+      'Pink',
+      'Orange',
+      'Red',
+      'Olive',
+      'Cyan',
+      'Purple',
+      'Gray',
+    ])
   })
 
   it('emits toggleColor when a color button is clicked', async () => {

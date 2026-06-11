@@ -565,11 +565,11 @@ export class AnnotationSyncService {
     return candidate;
   }
 
-  async findDevicePositionFor(annotationId: number, format: 'xpointer' | 'pdf' | 'cfi') {
+  async findDevicePositionFor(annotationId: number, format: AnnotationPositionFormat) {
     return this.syncRepo.findDevicePosition(annotationId, format);
   }
 
-  async findPositions(annotationIds: number[], formats: ('xpointer' | 'pdf' | 'cfi')[]) {
+  async findPositions(annotationIds: number[], formats: AnnotationPositionFormat[]) {
     return this.syncRepo.findPositionsByAnnotationIds(annotationIds, formats);
   }
 

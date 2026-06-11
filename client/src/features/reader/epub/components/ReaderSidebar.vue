@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { Bookmark, BookOpen, Highlighter, Trash2, TriangleAlert } from 'lucide-vue-next'
+import { ANNOTATION_COLOR_FILTER_OPTIONS } from '@bookorbit/types'
 import type { TocItem } from '../composables/useToc'
 import type { Bookmark as BookmarkType } from '../composables/useBookmarks'
 import type { Annotation } from '../composables/useAnnotations'
@@ -40,27 +41,19 @@ const highlightColorFilter = ref('all')
 const highlightChapterFilter = ref('all')
 const highlightNotesOnly = ref(false)
 
-const HIGHLIGHT_COLOR_META: Record<string, { label: string; sample: string }> = {
-  '#FACC15': { label: 'Yellow', sample: '🟡' },
-  '#4ADE80': { label: 'Green', sample: '🟢' },
-  '#38BDF8': { label: 'Blue', sample: '🔵' },
-  '#F472B6': { label: 'Pink', sample: '🩷' },
-  '#FB923C': { label: 'Orange', sample: '🟠' },
-}
+const HIGHLIGHT_COLOR_META = Object.fromEntries(ANNOTATION_COLOR_FILTER_OPTIONS.map((color) => [color.hex, { label: color.label }])) as Record<
+  string,
+  { label: string }
+>
 
 function getHighlightColorLabel(color: string): string {
   const normalized = color.trim().toUpperCase()
   return HIGHLIGHT_COLOR_META[normalized]?.label ?? `Custom (${normalized})`
 }
 
-function getHighlightColorSample(color: string): string {
-  const normalized = color.trim().toUpperCase()
-  return HIGHLIGHT_COLOR_META[normalized]?.sample ?? '◉'
-}
-
 const highlightColorOptions = computed(() =>
   Array.from(new Set(props.annotations.map((ann) => ann.color)))
-    .map((hex) => ({ hex, label: getHighlightColorLabel(hex), sample: getHighlightColorSample(hex) }))
+    .map((hex) => ({ hex, label: getHighlightColorLabel(hex) }))
     .sort((a, b) => a.label.localeCompare(b.label)),
 )
 const highlightChapterOptions = computed(() =>
@@ -323,7 +316,7 @@ function deleteAnnotation(id: number) {
                   class="h-8 rounded-md border border-border bg-background px-2 text-xs text-muted-foreground outline-none focus:border-primary"
                 >
                   <option value="all">All colors</option>
-                  <option v-for="color in highlightColorOptions" :key="color.hex" :value="color.hex">{{ color.sample }} {{ color.label }}</option>
+                  <option v-for="color in highlightColorOptions" :key="color.hex" :value="color.hex">{{ color.label }}</option>
                 </select>
                 <select
                   v-model="highlightChapterFilter"

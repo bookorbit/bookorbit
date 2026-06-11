@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowUpDown, CheckSquare, Highlighter, Maximize2, Minimize2, Palette, Trash2 } from 'lucide-vue-next'
-import type { AnnotationItem, BookDetail } from '@bookorbit/types'
+import { ANNOTATION_HIGHLIGHT_COLORS, type AnnotationItem, type BookDetail } from '@bookorbit/types'
 import AnnotationListItem from '@/features/annotations/components/AnnotationListItem.vue'
 import { useBookHighlights } from '@/features/book/composables/useBookHighlights'
 import HighlightsFilterBar from './HighlightsFilterBar.vue'
@@ -42,13 +42,7 @@ const {
   setDateRange,
 } = useBookHighlights(bookIdRef)
 
-const BULK_COLORS = [
-  { hex: '#FACC15', label: 'Yellow' },
-  { hex: '#4ADE80', label: 'Green' },
-  { hex: '#38BDF8', label: 'Blue' },
-  { hex: '#F472B6', label: 'Pink' },
-  { hex: '#FB923C', label: 'Orange' },
-]
+const BULK_COLORS = ANNOTATION_HIGHLIGHT_COLORS
 
 const BULK_STYLES = [
   { value: 'highlight', label: 'Highlight' },
