@@ -123,8 +123,7 @@ export class AchievementRepository {
         value: sql<number>`coalesce(sum(${bookMetadata.pageCount} * least(greatest(coalesce(${readingSessions.progressDelta}, 0), 0), 100) / 100.0), 0)::float`,
       })
       .from(readingSessions)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-      .innerJoin(bookMetadata, eq(bookMetadata.bookId, bookFiles.bookId))
+      .innerJoin(bookMetadata, eq(bookMetadata.bookId, readingSessions.bookId))
       .where(
         and(
           eq(readingSessions.userId, userId),

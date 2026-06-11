@@ -67,7 +67,17 @@ function makeListResponse(items = []) {
       total: items.length,
       page: 1,
       pageSize: 25,
-      stats: { totalSessions: items.length, totalSeconds: 0, avgDurationSeconds: 0, firstSessionAt: null, lastSessionAt: null, dailySummary: [] },
+      stats: {
+        totalSessions: items.length,
+        totalSeconds: 0,
+        avgDurationSeconds: 0,
+        firstSessionAt: null,
+        lastSessionAt: null,
+        dailySummary: [],
+        paceProgressDelta: 0,
+        paceDurationSeconds: 0,
+        progressSummary: [],
+      },
     }),
   } as Response
 }
@@ -88,14 +98,13 @@ describe('ReadingLogTab', () => {
     expect(wrapper.text()).toContain('This year')
   })
 
-  it('sparkline is rendered but chart area is hidden when dailySummary is empty', async () => {
+  it('renders the hero and chart empty states when there is no data', async () => {
     const wrapper = mount(ReadingLogTab, { props: { book: makeBook() }, global: { plugins: [createPinia()] } })
     await flushPromises()
 
-    const sparkline = wrapper.findComponent({ name: 'ReadingLogSparkline' })
-    expect(sparkline.exists()).toBe(true)
-    const chartArea = sparkline.find('[style*="height: 120px"]')
-    expect(chartArea.exists()).toBe(false)
+    expect(wrapper.text()).toContain('Add session')
+    expect(wrapper.text()).toContain('No progress data in this window.')
+    expect(wrapper.text()).toContain('No reading activity in this window.')
   })
 
   it('calls setFilters with dateFrom when "Last 30 days" is clicked', async () => {

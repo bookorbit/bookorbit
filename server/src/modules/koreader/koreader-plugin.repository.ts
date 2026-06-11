@@ -24,11 +24,12 @@ export class KoreaderPluginRepository {
   async ingestAndDeriveForBook(params: {
     userId: number;
     bookFileId: number;
+    bookId: number;
     libraryId: number;
     deviceId: string;
     events: KoreaderPageEvent[];
   }): Promise<IngestPageStatsResult> {
-    const { userId, bookFileId, libraryId, deviceId, events } = params;
+    const { userId, bookFileId, bookId, libraryId, deviceId, events } = params;
 
     return this.db.transaction(async (tx) => {
       const inserted = await tx
@@ -133,7 +134,9 @@ export class KoreaderPluginRepository {
             upserts.map((session) => ({
               userId,
               bookFileId,
+              bookId,
               sessionId: session.sessionId,
+              source: 'koreader' as const,
               startedAt: session.startedAt,
               endedAt: session.endedAt,
               durationSeconds: session.durationSeconds,
@@ -197,8 +200,7 @@ export class KoreaderPluginRepository {
         count(*)::int as sessions_count,
         now() as updated_at
       from reading_sessions rs
-      inner join book_files bf on bf.id = rs.book_file_id
-      inner join books b on b.id = bf.book_id
+      inner join books b on b.id = rs.book_id
       where rs.user_id = ${userId}
         and b.library_id = ${libraryId}
         and date_trunc('day', rs.started_at)::date in (${dayListSql})

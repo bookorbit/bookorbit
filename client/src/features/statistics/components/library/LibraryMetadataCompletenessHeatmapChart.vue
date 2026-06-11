@@ -4,7 +4,7 @@ import VChart from 'vue-echarts'
 import { ListChecks } from '@lucide/vue'
 import { useThemeStore } from '@/stores/theme'
 
-import { buildHeatmapPalette } from '../../heatmap-palette'
+import { buildHeatmapPalette } from '@/lib/heatmap-palette'
 import { useLibraryMetadataCompleteness } from '../../composables/useLibraryMetadataCompleteness'
 import ChartCard from '../ChartCard.vue'
 

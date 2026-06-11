@@ -83,6 +83,7 @@ describe('KoreaderStatsService', () => {
     expect(pluginRepo.ingestAndDeriveForBook).toHaveBeenCalledWith({
       userId: 7,
       bookFileId: 10,
+      bookId: 20,
       libraryId: 1,
       deviceId: DEVICE_ID,
       events: dto.books[0]!.events,

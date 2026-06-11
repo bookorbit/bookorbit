@@ -32,8 +32,7 @@ async function runBackfill() {
         count(*)::int as sessions_count,
         now() as updated_at
       from reading_sessions rs
-      inner join book_files bf on bf.id = rs.book_file_id
-      inner join books b on b.id = bf.book_id
+      inner join books b on b.id = rs.book_id
       group by rs.user_id, b.library_id, date_trunc('day', rs.started_at)::date
     `);
 

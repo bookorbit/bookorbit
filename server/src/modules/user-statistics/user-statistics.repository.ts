@@ -176,8 +176,8 @@ export class UserStatisticsRepository {
         eventsCount: sql<number>`count(*)::int`,
       })
       .from(readingSessions)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
+      .innerJoin(books, eq(books.id, readingSessions.bookId))
       .where(and(eq(readingSessions.userId, userId), gte(readingSessions.startedAt, since), libraryFilter))
       .groupBy(hourExpr, formatExpr)
       .orderBy(hourExpr);
@@ -197,7 +197,7 @@ export class UserStatisticsRepository {
     return this.db
       .select({
         sessionId: readingSessions.id,
-        bookId: bookFiles.bookId,
+        bookId: readingSessions.bookId,
         bookTitle: bookMetadata.title,
         bookFormat: sql<string | null>`nullif(${bookFiles.format}, '')`,
         startedAt: readingSessions.startedAt,
@@ -205,9 +205,9 @@ export class UserStatisticsRepository {
         durationSeconds: readingSessions.durationSeconds,
       })
       .from(readingSessions)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-      .innerJoin(books, eq(books.id, bookFiles.bookId))
-      .leftJoin(bookMetadata, eq(bookMetadata.bookId, bookFiles.bookId))
+      .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
+      .innerJoin(books, eq(books.id, readingSessions.bookId))
+      .leftJoin(bookMetadata, eq(bookMetadata.bookId, readingSessions.bookId))
       .where(
         and(
           eq(readingSessions.userId, userId),
@@ -233,7 +233,7 @@ export class UserStatisticsRepository {
       .select({
         sessionId: readingSessions.id,
         libraryId: books.libraryId,
-        bookId: bookFiles.bookId,
+        bookId: readingSessions.bookId,
         bookTitle: bookMetadata.title,
         bookFormat: sql<string | null>`nullif(${bookFiles.format}, '')`,
         startedAt: readingSessions.startedAt,
@@ -241,9 +241,9 @@ export class UserStatisticsRepository {
         durationSeconds: readingSessions.durationSeconds,
       })
       .from(readingSessions)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-      .innerJoin(books, eq(books.id, bookFiles.bookId))
-      .leftJoin(bookMetadata, eq(bookMetadata.bookId, bookFiles.bookId))
+      .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
+      .innerJoin(books, eq(books.id, readingSessions.bookId))
+      .leftJoin(bookMetadata, eq(bookMetadata.bookId, readingSessions.bookId))
       .where(and(eq(readingSessions.userId, userId), eq(readingSessions.id, sessionId), libraryFilter))
       .limit(1);
 
@@ -318,8 +318,7 @@ export class UserStatisticsRepository {
             count(*)::int as sessions_count,
             now() as updated_at
           from reading_sessions rs
-          inner join book_files bf on bf.id = rs.book_file_id
-          inner join books b on b.id = bf.book_id
+          inner join books b on b.id = rs.book_id
           where rs.user_id = ${userId}
             and b.library_id = ${libraryId}
             and date_trunc('day', rs.started_at)::date in (${dayDateList})
@@ -331,7 +330,7 @@ export class UserStatisticsRepository {
         .select({
           sessionId: readingSessions.id,
           libraryId: books.libraryId,
-          bookId: bookFiles.bookId,
+          bookId: readingSessions.bookId,
           bookTitle: bookMetadata.title,
           bookFormat: sql<string | null>`nullif(${bookFiles.format}, '')`,
           startedAt: readingSessions.startedAt,
@@ -339,9 +338,9 @@ export class UserStatisticsRepository {
           durationSeconds: readingSessions.durationSeconds,
         })
         .from(readingSessions)
-        .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-        .innerJoin(books, eq(books.id, bookFiles.bookId))
-        .leftJoin(bookMetadata, eq(bookMetadata.bookId, bookFiles.bookId))
+        .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
+        .innerJoin(books, eq(books.id, readingSessions.bookId))
+        .leftJoin(bookMetadata, eq(bookMetadata.bookId, readingSessions.bookId))
         .where(and(eq(readingSessions.userId, userId), eq(readingSessions.id, sessionId)))
         .limit(1);
 
@@ -362,8 +361,7 @@ export class UserStatisticsRepository {
         eventsCount: sql<number>`count(*)::int`,
       })
       .from(readingSessions)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(books, eq(books.id, readingSessions.bookId))
       .where(and(eq(readingSessions.userId, userId), gte(readingSessions.startedAt, since), libraryFilter))
       .groupBy(dayOfWeekExpr)
       .orderBy(dayOfWeekExpr);
@@ -381,14 +379,13 @@ export class UserStatisticsRepository {
 
     const firstCompletion = this.db
       .select({
-        bookId: bookFiles.bookId,
+        bookId: readingSessions.bookId,
         firstCompletedAt: sql<Date>`min(${readingSessions.endedAt})`.as('first_completed_at'),
       })
       .from(readingSessions)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(books, eq(books.id, readingSessions.bookId))
       .where(and(eq(readingSessions.userId, userId), gte(readingSessions.endProgress, 99), libraryFilter))
-      .groupBy(bookFiles.bookId)
+      .groupBy(readingSessions.bookId)
       .as('first_completion');
 
     const yearExpr = sql<number>`extract(year from ${firstCompletion.firstCompletedAt})::int`;
@@ -425,14 +422,13 @@ export class UserStatisticsRepository {
 
     const perBookProgress = this.db
       .select({
-        bookId: bookFiles.bookId,
+        bookId: readingSessions.bookId,
         maxPercentage: sql<number>`max(${readingSessions.endProgress})`.as('max_percentage'),
       })
       .from(readingSessions)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(books, eq(books.id, readingSessions.bookId))
       .where(and(eq(readingSessions.userId, userId), timeFilter, libraryFilter, isNotNull(readingSessions.endProgress)))
-      .groupBy(bookFiles.bookId)
+      .groupBy(readingSessions.bookId)
       .as('per_book_progress');
 
     const [row] = await this.db
@@ -461,14 +457,13 @@ export class UserStatisticsRepository {
 
     const completedInWindow = this.db
       .select({
-        bookId: bookFiles.bookId,
+        bookId: readingSessions.bookId,
         completedAt: sql<Date>`min(${readingSessions.endedAt})`.as('completed_at'),
       })
       .from(readingSessions)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(books, eq(books.id, readingSessions.bookId))
       .where(and(eq(readingSessions.userId, userId), gte(readingSessions.startedAt, since), gte(readingSessions.endProgress, 99), libraryFilter))
-      .groupBy(bookFiles.bookId)
+      .groupBy(readingSessions.bookId)
       .as('completed_in_window');
 
     const startedAndCompleted = this.db
@@ -477,8 +472,7 @@ export class UserStatisticsRepository {
         startedAt: sql<Date | null>`min(${readingSessions.startedAt})`.as('started_at'),
       })
       .from(readingSessions)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-      .innerJoin(completedInWindow, eq(completedInWindow.bookId, bookFiles.bookId))
+      .innerJoin(completedInWindow, eq(completedInWindow.bookId, readingSessions.bookId))
       .where(eq(readingSessions.userId, userId))
       .groupBy(completedInWindow.bookId, completedInWindow.completedAt)
       .as('started_and_completed');
@@ -506,8 +500,7 @@ export class UserStatisticsRepository {
         readingSeconds: sql<number>`coalesce(sum(${readingSessions.durationSeconds}), 0)::int`,
       })
       .from(readingSessions)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(books, eq(books.id, readingSessions.bookId))
       .innerJoin(bookGenres, eq(bookGenres.bookId, books.id))
       .innerJoin(genres, eq(genres.id, bookGenres.genreId))
       .where(and(eq(readingSessions.userId, userId), gte(readingSessions.startedAt, since), libraryFilter))
@@ -527,8 +520,7 @@ export class UserStatisticsRepository {
         progressDelta: readingSessions.progressDelta,
       })
       .from(readingSessions)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(books, eq(books.id, readingSessions.bookId))
       .where(
         and(
           eq(readingSessions.userId, userId),
@@ -551,14 +543,13 @@ export class UserStatisticsRepository {
 
     const perBook = this.db
       .select({
-        bookId: bookFiles.bookId,
+        bookId: readingSessions.bookId,
         maxProgress: sql<number>`max(${readingSessions.endProgress})`.as('max_progress'),
       })
       .from(readingSessions)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(books, eq(books.id, readingSessions.bookId))
       .where(and(eq(readingSessions.userId, userId), gte(readingSessions.startedAt, since), isNotNull(readingSessions.endProgress), libraryFilter))
-      .groupBy(bookFiles.bookId)
+      .groupBy(readingSessions.bookId)
       .as('per_book');
 
     const rows = await this.db.select({ maxProgress: perBook.maxProgress }).from(perBook);
@@ -577,12 +568,11 @@ export class UserStatisticsRepository {
     const since = this.sinceDateForDays(days);
 
     const topBookIds = await this.db
-      .select({ bookId: bookFiles.bookId })
+      .select({ bookId: readingSessions.bookId })
       .from(readingSessions)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(books, eq(books.id, readingSessions.bookId))
       .where(and(eq(readingSessions.userId, userId), gte(readingSessions.startedAt, since), isNotNull(readingSessions.endProgress), libraryFilter))
-      .groupBy(bookFiles.bookId)
+      .groupBy(readingSessions.bookId)
       .orderBy(sql`count(*) desc`)
       .limit(limit)
       .then((rows) => rows.map((r) => r.bookId));
@@ -591,16 +581,15 @@ export class UserStatisticsRepository {
 
     return this.db
       .select({
-        bookId: bookFiles.bookId,
+        bookId: readingSessions.bookId,
         title: bookMetadata.title,
         startedAt: readingSessions.startedAt,
         endProgress: readingSessions.endProgress,
       })
       .from(readingSessions)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-      .leftJoin(bookMetadata, eq(bookMetadata.bookId, bookFiles.bookId))
-      .where(and(eq(readingSessions.userId, userId), inArray(bookFiles.bookId, topBookIds), isNotNull(readingSessions.endProgress)))
-      .orderBy(bookFiles.bookId, readingSessions.startedAt)
+      .leftJoin(bookMetadata, eq(bookMetadata.bookId, readingSessions.bookId))
+      .where(and(eq(readingSessions.userId, userId), inArray(readingSessions.bookId, topBookIds), isNotNull(readingSessions.endProgress)))
+      .orderBy(readingSessions.bookId, readingSessions.startedAt)
       .then((rows) => rows.map((r) => ({ ...r, endProgress: r.endProgress! })));
   }
 
@@ -621,8 +610,7 @@ export class UserStatisticsRepository {
     const rows = await this.db
       .select({ hour: hourExpr, durationMinutes: durationExpr, dayOfWeek: dowExpr })
       .from(readingSessions)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(books, eq(books.id, readingSessions.bookId))
       .where(and(eq(readingSessions.userId, userId), gte(readingSessions.startedAt, since), gte(readingSessions.durationSeconds, 300), libraryFilter))
       .orderBy(readingSessions.startedAt)
       .limit(2000);
@@ -653,8 +641,7 @@ export class UserStatisticsRepository {
       with top_authors as (
         select a.name, sum(rs.duration_seconds) as total
         from reading_sessions rs
-        inner join book_files bf on bf.id = rs.book_file_id
-        inner join books b on b.id = bf.book_id
+        inner join books b on b.id = rs.book_id
         inner join book_authors ba on ba.book_id = b.id
         inner join authors a on a.id = ba.author_id
         where rs.user_id = ${userId}
@@ -667,8 +654,7 @@ export class UserStatisticsRepository {
       top_genres as (
         select g.name, sum(rs.duration_seconds) as total
         from reading_sessions rs
-        inner join book_files bf on bf.id = rs.book_file_id
-        inner join books b on b.id = bf.book_id
+        inner join books b on b.id = rs.book_id
         inner join book_genres bg on bg.book_id = b.id
         inner join genres g on g.id = bg.genre_id
         where rs.user_id = ${userId}
@@ -683,8 +669,7 @@ export class UserStatisticsRepository {
         g.name as genre,
         sum(rs.duration_seconds)::int as reading_seconds
       from reading_sessions rs
-      inner join book_files bf on bf.id = rs.book_file_id
-      inner join books b on b.id = bf.book_id
+      inner join books b on b.id = rs.book_id
       inner join book_authors ba on ba.book_id = b.id
       inner join top_authors a on a.name = (
         select a2.name from book_authors ba2 inner join authors a2 on a2.id = ba2.author_id where ba2.book_id = b.id order by ba2.display_order, ba2.author_id limit 1
@@ -729,8 +714,7 @@ export class UserStatisticsRepository {
           count(*)::int as sessions_count,
           now() as updated_at
         from reading_sessions rs
-        inner join book_files bf on bf.id = rs.book_file_id
-        inner join books b on b.id = bf.book_id
+        inner join books b on b.id = rs.book_id
         where rs.started_at >= ${sinceDay}::timestamp
         group by rs.user_id, b.library_id, date_trunc('day', rs.started_at)::date
       `);

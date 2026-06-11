@@ -1,6 +1,6 @@
 {
-  "id": "139350a5-21b2-4334-b46b-6884119c7964",
-  "prevId": "1ad09390-1ed7-4667-b97c-e93645001b9b",
+  "id": "46499b98-ef74-447e-8013-4dab6d018ede",
+  "prevId": "ae965fcc-0970-44af-b1c9-2e7ea74893e5",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -5955,7 +5955,7 @@
           "name": "book_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "session_id": {
           "name": "session_id",

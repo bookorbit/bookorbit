@@ -449,8 +449,7 @@ export class DashboardWidgetRepository {
           total: sql<number>`floor(coalesce(sum(coalesce(${bookMetadata.pageCount}, 0) * least(greatest(coalesce(${readingSessions.progressDelta}, 0), 0), 100) / 100.0), 0))::int`,
         })
         .from(readingSessions)
-        .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-        .innerJoin(books, eq(books.id, bookFiles.bookId))
+        .innerJoin(books, eq(books.id, readingSessions.bookId))
         .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
         .where(
           and(
@@ -468,8 +467,7 @@ export class DashboardWidgetRepository {
           totalProgress: sql<number>`coalesce(sum(least(greatest(coalesce(${readingSessions.progressDelta}, 0), 0), 100)), 0)::float`,
         })
         .from(readingSessions)
-        .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-        .innerJoin(books, eq(books.id, bookFiles.bookId))
+        .innerJoin(books, eq(books.id, readingSessions.bookId))
         .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
         .where(
           and(
@@ -743,8 +741,7 @@ export class DashboardWidgetRepository {
           total: sql<number>`sum(${readingSessions.durationSeconds})::int`,
         })
         .from(readingSessions)
-        .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-        .innerJoin(books, eq(books.id, bookFiles.bookId))
+        .innerJoin(books, eq(books.id, readingSessions.bookId))
         .where(and(eq(readingSessions.userId, userId), libFilter, presentFilter, ...cfClauses))
         .groupBy(sql`extract(hour from ${readingSessions.startedAt})`)
         .orderBy(desc(sql`sum(${readingSessions.durationSeconds})`))
@@ -755,8 +752,7 @@ export class DashboardWidgetRepository {
           totalSeconds: sql<number>`coalesce(sum(${readingSessions.durationSeconds}), 0)::float`,
         })
         .from(readingSessions)
-        .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-        .innerJoin(books, eq(books.id, bookFiles.bookId))
+        .innerJoin(books, eq(books.id, readingSessions.bookId))
         .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
         .where(
           and(
@@ -779,8 +775,7 @@ export class DashboardWidgetRepository {
           totalSeconds: sql<number>`coalesce(sum(${readingSessions.durationSeconds}), 0)::float`,
         })
         .from(readingSessions)
-        .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-        .innerJoin(books, eq(books.id, bookFiles.bookId))
+        .innerJoin(books, eq(books.id, readingSessions.bookId))
         .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
         .where(
           and(

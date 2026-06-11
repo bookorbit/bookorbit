@@ -70,6 +70,7 @@ export class KoreaderStatsService {
         const result = await this.pluginRepo.ingestAndDeriveForBook({
           userId: user.id,
           bookFileId: match.bookFileId,
+          bookId: match.bookId,
           libraryId: match.libraryId,
           deviceId: dto.deviceId,
           events: book.events,

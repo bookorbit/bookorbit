@@ -210,6 +210,9 @@ const mockRepoExtended = {
   saveSession: vi.fn(),
   listByBook: vi.fn(),
   deleteSessionByBook: vi.fn(),
+  findBookContext: vi.fn(),
+  findLatestEndProgressBefore: vi.fn(),
+  insertManualSession: vi.fn(),
 };
 
 const mockBookServiceExtended = {
@@ -283,6 +286,154 @@ describe('ReadingSessionService - listByBook', () => {
     await svc.listByBook(10, makeUser({ id: 5 }), {});
 
     expect(mockRepoExtended.listByBook).toHaveBeenCalledWith(5, 10, 1, 25, 'startedAt', 'desc', undefined, undefined, undefined);
+  });
+});
+
+describe('ReadingSessionService - createManualSession', () => {
+  const achievementEmit = vi.fn();
+
+  function makeManualService() {
+    return new ReadingSessionService(
+      mockRepoExtended as unknown as ReadingSessionRepository,
+      mockBookServiceExtended as unknown as BookService,
+      { emit: achievementEmit } as never,
+    );
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockBookServiceExtended.verifyBookAccess.mockResolvedValue(undefined);
+    mockRepoExtended.findBookContext.mockResolvedValue({ libraryId: 3, files: [{ id: 42, format: 'epub' }] });
+    mockRepoExtended.findLatestEndProgressBefore.mockResolvedValue(null);
+    mockRepoExtended.insertManualSession.mockResolvedValue({ id: 555 });
+    vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+  });
+
+  it('verifies access and inserts a manual session with server-computed duration', async () => {
+    const svc = makeManualService();
+    const result = await svc.createManualSession(10, { startedAt: '2026-04-15T10:00:00.000Z', durationMinutes: 45 }, makeUser({ id: 5 }));
+
+    expect(mockBookServiceExtended.verifyBookAccess).toHaveBeenCalledWith(10, expect.objectContaining({ id: 5 }));
+    expect(mockRepoExtended.insertManualSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 5,
+        bookId: 10,
+        libraryId: 3,
+        bookFileId: 42,
+        startedAt: new Date('2026-04-15T10:00:00.000Z'),
+        endedAt: new Date('2026-04-15T10:45:00.000Z'),
+        durationSeconds: 2700,
+        progressDelta: null,
+        endProgress: null,
+      }),
+    );
+    const { sessionId } = mockRepoExtended.insertManualSession.mock.calls[0][0] as { sessionId: string };
+    expect(sessionId.startsWith('manual:')).toBe(true);
+    expect(result).toMatchObject({ id: 555, durationSeconds: 2700, format: 'epub', source: 'manual' });
+  });
+
+  it('computes progressDelta from the latest prior endProgress', async () => {
+    mockRepoExtended.findLatestEndProgressBefore.mockResolvedValue(40);
+
+    const svc = makeManualService();
+    const result = await svc.createManualSession(
+      10,
+      { startedAt: '2026-04-15T10:00:00.000Z', durationMinutes: 30, endProgress: 55.5 },
+      makeUser({ id: 5 }),
+    );
+
+    expect(mockRepoExtended.findLatestEndProgressBefore).toHaveBeenCalledWith(5, 10, new Date('2026-04-15T10:00:00.000Z'));
+    expect(result.progressDelta).toBe(15.5);
+    expect(result.endProgress).toBe(55.5);
+  });
+
+  it('treats missing prior progress as zero', async () => {
+    mockRepoExtended.findLatestEndProgressBefore.mockResolvedValue(null);
+
+    const svc = makeManualService();
+    const result = await svc.createManualSession(
+      10,
+      { startedAt: '2026-04-15T10:00:00.000Z', durationMinutes: 30, endProgress: 20 },
+      makeUser({ id: 5 }),
+    );
+
+    expect(result.progressDelta).toBe(20);
+  });
+
+  it('skips the prior-progress lookup when endProgress is omitted', async () => {
+    const svc = makeManualService();
+    await svc.createManualSession(10, { startedAt: '2026-04-15T10:00:00.000Z', durationMinutes: 30 }, makeUser({ id: 5 }));
+
+    expect(mockRepoExtended.findLatestEndProgressBefore).not.toHaveBeenCalled();
+  });
+
+  it('rejects a future startedAt', async () => {
+    const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    const svc = makeManualService();
+    await expect(svc.createManualSession(10, { startedAt: future, durationMinutes: 30 }, makeUser())).rejects.toThrow(BadRequestException);
+    expect(mockRepoExtended.insertManualSession).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unknown format', async () => {
+    const svc = makeManualService();
+    await expect(
+      svc.createManualSession(10, { startedAt: '2026-04-15T10:00:00.000Z', durationMinutes: 30, format: 'pdf' }, makeUser()),
+    ).rejects.toThrow(BadRequestException);
+    expect(mockRepoExtended.insertManualSession).not.toHaveBeenCalled();
+  });
+
+  it('resolves the file case-insensitively when a format is given', async () => {
+    mockRepoExtended.findBookContext.mockResolvedValue({
+      libraryId: 3,
+      files: [
+        { id: 42, format: 'epub' },
+        { id: 43, format: 'pdf' },
+      ],
+    });
+
+    const svc = makeManualService();
+    const result = await svc.createManualSession(
+      10,
+      { startedAt: '2026-04-15T10:00:00.000Z', durationMinutes: 30, format: 'PDF' },
+      makeUser({ id: 5 }),
+    );
+
+    expect(mockRepoExtended.insertManualSession).toHaveBeenCalledWith(expect.objectContaining({ bookFileId: 43 }));
+    expect(result.format).toBe('pdf');
+  });
+
+  it('leaves bookFileId null for multi-format books without a format hint', async () => {
+    mockRepoExtended.findBookContext.mockResolvedValue({
+      libraryId: 3,
+      files: [
+        { id: 42, format: 'epub' },
+        { id: 43, format: 'pdf' },
+      ],
+    });
+
+    const svc = makeManualService();
+    const result = await svc.createManualSession(10, { startedAt: '2026-04-15T10:00:00.000Z', durationMinutes: 30 }, makeUser({ id: 5 }));
+
+    expect(mockRepoExtended.insertManualSession).toHaveBeenCalledWith(expect.objectContaining({ bookFileId: null }));
+    expect(result.format).toBeNull();
+  });
+
+  it('throws NotFoundException when the book context is missing', async () => {
+    mockRepoExtended.findBookContext.mockResolvedValue(null);
+
+    const svc = makeManualService();
+    await expect(svc.createManualSession(10, { startedAt: '2026-04-15T10:00:00.000Z', durationMinutes: 30 }, makeUser())).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
+  it('does not emit achievement events for manual sessions', async () => {
+    const svc = makeManualService();
+    await svc.createManualSession(10, { startedAt: '2026-04-15T10:00:00.000Z', durationMinutes: 30 }, makeUser({ id: 5 }));
+
+    expect(achievementEmit).not.toHaveBeenCalled();
   });
 });
 

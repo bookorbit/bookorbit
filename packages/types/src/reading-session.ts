@@ -1,3 +1,6 @@
+export const READING_SESSION_SOURCES = ["web", "koreader", "manual", "kobo"] as const;
+export type ReadingSessionSource = (typeof READING_SESSION_SOURCES)[number];
+
 export interface BookReadingSession {
   id: number;
   startedAt: string;
@@ -6,6 +9,7 @@ export interface BookReadingSession {
   progressDelta: number | null;
   endProgress: number | null;
   format: string | null;
+  source: ReadingSessionSource | null;
 }
 
 export interface BookReadingSessionStats {
@@ -15,6 +19,9 @@ export interface BookReadingSessionStats {
   firstSessionAt: string | null;
   lastSessionAt: string | null;
   dailySummary: { day: string; totalMinutes: number }[];
+  paceProgressDelta: number;
+  paceDurationSeconds: number;
+  progressSummary: { day: string; endProgress: number }[];
 }
 
 export interface BookReadingSessionListResponse {

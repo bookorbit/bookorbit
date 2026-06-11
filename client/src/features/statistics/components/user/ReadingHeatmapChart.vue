@@ -4,7 +4,7 @@ import VChart from 'vue-echarts'
 import { Calendar } from '@lucide/vue'
 import { useThemeStore } from '@/stores/theme'
 
-import { buildHeatmapPalette } from '../../heatmap-palette'
+import { buildHeatmapPalette } from '@/lib/heatmap-palette'
 import { useUserReadingHeatmap } from '../../composables/useUserReadingHeatmap'
 import ChartCard from '../ChartCard.vue'
 import ChartEmptyState from '../ChartEmptyState.vue'

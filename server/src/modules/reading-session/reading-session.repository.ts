@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, gte, lte, max, min, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, isNotNull, lt, lte, max, min, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { BookReadingSession, BookReadingSessionListResponse, BookReadingSessionStats } from '@bookorbit/types';
@@ -9,6 +9,7 @@ import { bookFiles, books, readingSessions, userReadingDailyStats } from '../../
 import type { ReadingSessionSource } from '../../db/schema/reader';
 
 type Db = NodePgDatabase<typeof schema>;
+type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 const MIN_READING_SESSION_SECONDS = 10;
 
@@ -18,6 +19,19 @@ export type SaveReadingSessionResult =
       kind: 'skipped';
       reason: 'duration_below_minimum' | 'book_file_not_found' | 'duplicate_session_id';
     };
+
+export interface InsertManualSessionParams {
+  userId: number;
+  bookId: number;
+  libraryId: number;
+  bookFileId: number | null;
+  sessionId: string;
+  startedAt: Date;
+  endedAt: Date;
+  durationSeconds: number;
+  progressDelta: number | null;
+  endProgress: number | null;
+}
 
 @Injectable()
 export class ReadingSessionRepository {
@@ -39,7 +53,7 @@ export class ReadingSessionRepository {
     }
 
     const [fileRow] = await this.db
-      .select({ libraryId: books.libraryId })
+      .select({ bookId: books.id, libraryId: books.libraryId })
       .from(bookFiles)
       .innerJoin(books, eq(books.id, bookFiles.bookId))
       .where(eq(bookFiles.id, bookFileId))
@@ -49,12 +63,12 @@ export class ReadingSessionRepository {
       return { kind: 'skipped', reason: 'book_file_not_found' };
     }
 
-    const { libraryId } = fileRow;
+    const { bookId, libraryId } = fileRow;
 
     return this.db.transaction(async (tx): Promise<SaveReadingSessionResult> => {
       const inserted = await tx
         .insert(readingSessions)
-        .values({ userId, bookFileId, sessionId, startedAt, endedAt, durationSeconds, progressDelta, endProgress, source })
+        .values({ userId, bookFileId, bookId, sessionId, source, startedAt, endedAt, durationSeconds, progressDelta, endProgress })
         .onConflictDoNothing({ target: [readingSessions.userId, readingSessions.sessionId] })
         .returning({ id: readingSessions.id });
 
@@ -62,29 +76,55 @@ export class ReadingSessionRepository {
         return { kind: 'skipped', reason: 'duplicate_session_id' };
       }
 
-      await tx
-        .insert(userReadingDailyStats)
-        .values({
-          userId,
-          libraryId,
-          day: sql<string>`date_trunc('day', ${startedAt}::timestamp)::date`,
-          readingSeconds: durationSeconds,
-          progressDelta: progressDelta ?? 0,
-          sessionsCount: 1,
-          updatedAt: new Date(),
-        })
-        .onConflictDoUpdate({
-          target: [userReadingDailyStats.userId, userReadingDailyStats.libraryId, userReadingDailyStats.day],
-          set: {
-            readingSeconds: sql`${userReadingDailyStats.readingSeconds} + ${durationSeconds}`,
-            progressDelta: sql`${userReadingDailyStats.progressDelta} + ${progressDelta ?? 0}`,
-            sessionsCount: sql`${userReadingDailyStats.sessionsCount} + 1`,
-            updatedAt: new Date(),
-          },
-        });
+      await this.upsertDailyStats(tx, { userId, libraryId, startedAt, durationSeconds, progressDelta });
 
       return { kind: 'saved' };
     });
+  }
+
+  async insertManualSession(params: InsertManualSessionParams): Promise<{ id: number }> {
+    const { userId, bookId, libraryId, bookFileId, sessionId, startedAt, endedAt, durationSeconds, progressDelta, endProgress } = params;
+
+    return this.db.transaction(async (tx) => {
+      const [inserted] = await tx
+        .insert(readingSessions)
+        .values({ userId, bookId, bookFileId, sessionId, source: 'manual', startedAt, endedAt, durationSeconds, progressDelta, endProgress })
+        .returning({ id: readingSessions.id });
+
+      await this.upsertDailyStats(tx, { userId, libraryId, startedAt, durationSeconds, progressDelta });
+
+      return { id: inserted.id };
+    });
+  }
+
+  async findBookContext(bookId: number): Promise<{ libraryId: number; files: { id: number; format: string | null }[] } | null> {
+    const [bookRow] = await this.db.select({ libraryId: books.libraryId }).from(books).where(eq(books.id, bookId)).limit(1);
+    if (!bookRow) return null;
+
+    const files = await this.db
+      .select({ id: bookFiles.id, format: sql<string | null>`nullif(${bookFiles.format}, '')` })
+      .from(bookFiles)
+      .where(eq(bookFiles.bookId, bookId));
+
+    return { libraryId: bookRow.libraryId, files };
+  }
+
+  async findLatestEndProgressBefore(userId: number, bookId: number, before: Date): Promise<number | null> {
+    const [row] = await this.db
+      .select({ endProgress: readingSessions.endProgress })
+      .from(readingSessions)
+      .where(
+        and(
+          eq(readingSessions.userId, userId),
+          eq(readingSessions.bookId, bookId),
+          lt(readingSessions.startedAt, before),
+          isNotNull(readingSessions.endProgress),
+        ),
+      )
+      .orderBy(desc(readingSessions.startedAt))
+      .limit(1);
+
+    return row?.endProgress ?? null;
   }
 
   async listByBook(
@@ -98,12 +138,13 @@ export class ReadingSessionRepository {
     dateTo?: string,
     format?: string,
   ): Promise<BookReadingSessionListResponse> {
-    const conditions = [eq(books.id, bookId), eq(readingSessions.userId, userId)];
+    const conditions = [eq(readingSessions.bookId, bookId), eq(readingSessions.userId, userId)];
     if (dateFrom) conditions.push(gte(readingSessions.startedAt, new Date(dateFrom)));
     if (dateTo) conditions.push(lte(readingSessions.startedAt, new Date(dateTo)));
     if (format) conditions.push(eq(sql`upper(${bookFiles.format})`, format.toUpperCase()));
 
     const whereClause = and(...conditions);
+    const dayExpr = sql`date_trunc('day', ${readingSessions.startedAt})::date`;
 
     let orderCol;
     switch (sortBy) {
@@ -122,7 +163,7 @@ export class ReadingSessionRepository {
     const orderExpr = sortDir === 'asc' ? asc(orderCol) : desc(orderCol);
     const offset = (page - 1) * pageSize;
 
-    const [rows, countRows, statsRows, dailyRows] = await Promise.all([
+    const [rows, countRows, statsRows, dailyRows, progressRows] = await Promise.all([
       this.db
         .select({
           id: readingSessions.id,
@@ -132,21 +173,16 @@ export class ReadingSessionRepository {
           progressDelta: readingSessions.progressDelta,
           endProgress: readingSessions.endProgress,
           format: sql<string | null>`nullif(${bookFiles.format}, '')`,
+          source: readingSessions.source,
         })
         .from(readingSessions)
-        .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-        .innerJoin(books, eq(books.id, bookFiles.bookId))
+        .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
         .where(whereClause)
         .orderBy(orderExpr)
         .limit(pageSize)
         .offset(offset),
 
-      this.db
-        .select({ total: count() })
-        .from(readingSessions)
-        .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-        .innerJoin(books, eq(books.id, bookFiles.bookId))
-        .where(whereClause),
+      this.db.select({ total: count() }).from(readingSessions).leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId)).where(whereClause),
 
       this.db
         .select({
@@ -155,23 +191,33 @@ export class ReadingSessionRepository {
           avgDurationSeconds: sql<number>`coalesce(avg(${readingSessions.durationSeconds}), 0)::int`,
           firstSessionAt: min(readingSessions.startedAt),
           lastSessionAt: max(readingSessions.startedAt),
+          paceProgressDelta: sql<number>`coalesce(sum(${readingSessions.progressDelta}) filter (where ${readingSessions.progressDelta} > 0), 0)::real`,
+          paceDurationSeconds: sql<number>`coalesce(sum(${readingSessions.durationSeconds}) filter (where ${readingSessions.progressDelta} > 0), 0)::int`,
         })
         .from(readingSessions)
-        .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-        .innerJoin(books, eq(books.id, bookFiles.bookId))
+        .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
         .where(whereClause),
 
       this.db
         .select({
-          day: sql<string>`date_trunc('day', ${readingSessions.startedAt})::date::text`,
+          day: sql<string>`${dayExpr}::text`,
           totalMinutes: sql<number>`round(sum(${readingSessions.durationSeconds}) / 60.0, 1)::real`,
         })
         .from(readingSessions)
-        .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-        .innerJoin(books, eq(books.id, bookFiles.bookId))
+        .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
         .where(whereClause)
-        .groupBy(sql`date_trunc('day', ${readingSessions.startedAt})::date`)
-        .orderBy(asc(sql`date_trunc('day', ${readingSessions.startedAt})::date`)),
+        .groupBy(dayExpr)
+        .orderBy(asc(dayExpr)),
+
+      this.db
+        .selectDistinctOn([dayExpr], {
+          day: sql<string>`${dayExpr}::text`,
+          endProgress: readingSessions.endProgress,
+        })
+        .from(readingSessions)
+        .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
+        .where(and(whereClause, isNotNull(readingSessions.endProgress)))
+        .orderBy(asc(dayExpr), desc(readingSessions.startedAt)),
     ]);
 
     const total = countRows[0]?.total ?? 0;
@@ -184,6 +230,9 @@ export class ReadingSessionRepository {
       firstSessionAt: statsRow?.firstSessionAt ? (statsRow.firstSessionAt as Date).toISOString() : null,
       lastSessionAt: statsRow?.lastSessionAt ? (statsRow.lastSessionAt as Date).toISOString() : null,
       dailySummary: dailyRows.map((r) => ({ day: r.day, totalMinutes: r.totalMinutes })),
+      paceProgressDelta: statsRow?.paceProgressDelta ?? 0,
+      paceDurationSeconds: statsRow?.paceDurationSeconds ?? 0,
+      progressSummary: progressRows.map((r) => ({ day: r.day, endProgress: r.endProgress ?? 0 })),
     };
 
     const items: BookReadingSession[] = rows.map((r) => ({
@@ -194,6 +243,7 @@ export class ReadingSessionRepository {
       progressDelta: r.progressDelta ?? null,
       endProgress: r.endProgress ?? null,
       format: r.format ?? null,
+      source: r.source ?? null,
     }));
 
     return { items, total, page, pageSize, stats };
@@ -208,9 +258,8 @@ export class ReadingSessionRepository {
           libraryId: books.libraryId,
         })
         .from(readingSessions)
-        .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-        .innerJoin(books, eq(books.id, bookFiles.bookId))
-        .where(and(eq(readingSessions.id, sessionId), eq(readingSessions.userId, userId), eq(books.id, bookId)))
+        .innerJoin(books, eq(books.id, readingSessions.bookId))
+        .where(and(eq(readingSessions.id, sessionId), eq(readingSessions.userId, userId), eq(readingSessions.bookId, bookId)))
         .limit(1);
 
       if (!row) return { found: false };
@@ -238,8 +287,7 @@ export class ReadingSessionRepository {
           count(*)::int as sessions_count,
           now() as updated_at
         from reading_sessions rs
-        inner join book_files bf on bf.id = rs.book_file_id
-        inner join books b on b.id = bf.book_id
+        inner join books b on b.id = rs.book_id
         where rs.user_id = ${userId}
           and b.library_id = ${libraryId}
           and date_trunc('day', rs.started_at)::date in (${dayDateSql})
@@ -248,6 +296,34 @@ export class ReadingSessionRepository {
 
       return { found: true };
     });
+  }
+
+  private async upsertDailyStats(
+    tx: Tx,
+    params: { userId: number; libraryId: number; startedAt: Date; durationSeconds: number; progressDelta: number | null },
+  ): Promise<void> {
+    const { userId, libraryId, startedAt, durationSeconds, progressDelta } = params;
+
+    await tx
+      .insert(userReadingDailyStats)
+      .values({
+        userId,
+        libraryId,
+        day: sql<string>`date_trunc('day', ${startedAt}::timestamp)::date`,
+        readingSeconds: durationSeconds,
+        progressDelta: progressDelta ?? 0,
+        sessionsCount: 1,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [userReadingDailyStats.userId, userReadingDailyStats.libraryId, userReadingDailyStats.day],
+        set: {
+          readingSeconds: sql`${userReadingDailyStats.readingSeconds} + ${durationSeconds}`,
+          progressDelta: sql`${userReadingDailyStats.progressDelta} + ${progressDelta ?? 0}`,
+          sessionsCount: sql`${userReadingDailyStats.sessionsCount} + 1`,
+          updatedAt: new Date(),
+        },
+      });
   }
 
   private formatDayKey(date: Date): string {

@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { check, date, index, integer, jsonb, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
-import type { ReadStatus, ReadStatusSource } from '@bookorbit/types';
+import type { ReadStatus, ReadStatusSource, ReadingSessionSource } from '@bookorbit/types';
 
 import { bookFiles, books } from './books';
 import { libraries } from './libraries';
@@ -126,11 +126,15 @@ export const readingSessions = pgTable(
     userId: integer('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    bookFileId: integer('book_file_id')
+    // Nullable: manual sessions are book-level and have no file.
+    bookFileId: integer('book_file_id').references(() => bookFiles.id, { onDelete: 'cascade' }),
+    bookId: integer('book_id')
       .notNull()
-      .references(() => bookFiles.id, { onDelete: 'cascade' }),
+      .references(() => books.id, { onDelete: 'cascade' }),
     // Client-generated UUID; used for idempotent retries.
     sessionId: varchar('session_id', { length: 64 }).notNull(),
+    // 'web' (browser reader) | 'koreader' (page-stats derivation) | 'manual' (user-entered) | 'kobo' (future)
+    source: varchar('source', { length: 10 }).$type<ReadingSessionSource>(),
     startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
     endedAt: timestamp('ended_at', { withTimezone: true }).notNull(),
     // Server-computed from endedAt - startedAt; client-provided timestamps are untrusted for duration.
@@ -138,16 +142,14 @@ export const readingSessions = pgTable(
     // Nullable: CBX with no percentage tracking may omit these.
     progressDelta: real('progress_delta'),
     endProgress: real('end_progress'),
-    // Which client produced the session. Kobo analytics also writes sessions here, so this is the only
-    // way to tell a genuine web-reader session apart from a device-origin one.
-    source: varchar('source', { length: 10 }).$type<ReadingSessionSource>().notNull().default('web'),
   },
   (t) => [
     uniqueIndex('rs_user_session_id_uidx').on(t.userId, t.sessionId),
     index('rs_user_started_at_idx').on(t.userId, t.startedAt),
     index('rs_book_file_started_at_idx').on(t.bookFileId, t.startedAt),
     index('rs_user_book_file_idx').on(t.userId, t.bookFileId),
-    check('reading_sessions_source_chk', sql`${t.source} in ('web', 'kobo', 'koreader')`),
+    index('rs_user_book_started_at_idx').on(t.userId, t.bookId, t.startedAt),
+    check('reading_sessions_source_chk', sql`${t.source} in ('web', 'koreader', 'manual', 'kobo')`),
     check('reading_sessions_duration_seconds_nonnegative_chk', sql`${t.durationSeconds} >= 0`),
     check('reading_sessions_end_progress_range_chk', sql`${t.endProgress} is null or (${t.endProgress} >= 0 and ${t.endProgress} <= 100)`),
     check('reading_sessions_ended_after_started_chk', sql`${t.endedAt} >= ${t.startedAt}`),

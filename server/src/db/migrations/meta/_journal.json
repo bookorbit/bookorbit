@@ -204,6 +204,27 @@
       "when": 1781162143195,
       "tag": "0028_kobo-annotation-spoke",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1781199567205,
+      "tag": "0029_reading-session-source-book-id",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1781199578268,
+      "tag": "0030_backfill-reading-session-source-book-id",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1781199638250,
+      "tag": "0031_reading-session-book-id-not-null",
+      "breakpoints": true
     }
   ]
 }
