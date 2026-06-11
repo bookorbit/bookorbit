@@ -389,22 +389,4 @@ export class AnnotationSyncRepository {
       .from(annotationPositions)
       .where(and(inArray(annotationPositions.annotationId, annotationIds), inArray(annotationPositions.format, formats)));
   }
-
-  async listDeviceAnnotationsByBook(
-    userId: number,
-    bookId: number,
-    origin: AnnotationSyncSource,
-    formats: AnnotationPositionFormat[],
-    limit = 1000,
-  ): Promise<{ annotation: AnnotationRow; position: AnnotationPosition }[]> {
-    return this.db
-      .select({ annotation: annotations, position: annotationPositions })
-      .from(annotations)
-      .innerJoin(annotationPositions, and(eq(annotationPositions.annotationId, annotations.id), inArray(annotationPositions.format, formats)))
-      .where(
-        and(eq(annotations.userId, userId), eq(annotations.bookId, bookId), eq(annotations.origin, origin), sql`${annotations.deletedAt} is null`),
-      )
-      .orderBy(sql`(${annotationPositions.extras} ->> 'pageno')::int asc nulls last`, asc(annotations.deviceCreatedAt), asc(annotations.id))
-      .limit(limit);
-  }
 }

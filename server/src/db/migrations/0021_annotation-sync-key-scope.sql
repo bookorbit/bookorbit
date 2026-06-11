@@ -1,2 +1,0 @@
-DROP INDEX "annotation_sync_state_user_source_device_key_uidx";--> statement-breakpoint
-CREATE INDEX "annotation_sync_state_user_source_device_key_idx" ON "annotation_sync_state" USING btree ("user_id","source","device_id","external_key");

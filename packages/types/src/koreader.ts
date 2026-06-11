@@ -48,19 +48,6 @@ export interface KoreaderSyncStatus {
   pluginTotals: KoreaderPluginTotals;
 }
 
-export interface KoreaderAnnotationItem {
-  id: number;
-  drawer: "lighten" | "underscore" | "strikeout" | "invert";
-  color: string | null;
-  text: string | null;
-  note: string | null;
-  chapter: string | null;
-  pageno: number | null;
-  posFormat: "xpointer" | "pdf";
-  deviceCreatedAt: string;
-  deviceUpdatedAt: string | null;
-}
-
 export interface KoreaderBookSyncInfo {
   bookId: number;
   bookFileId: number;

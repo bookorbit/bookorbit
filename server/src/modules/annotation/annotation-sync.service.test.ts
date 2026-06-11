@@ -100,7 +100,6 @@ function makeRepo(): RepoMock {
     applyContentPatch: vi.fn().mockResolvedValue(2),
     updatePosition: vi.fn().mockResolvedValue(undefined),
     markPositionPending: vi.fn().mockResolvedValue(undefined),
-    listDeviceAnnotationsByBook: vi.fn().mockResolvedValue([]),
     findStatesForDeviceBook: vi.fn().mockResolvedValue([]),
     findAddCandidates: vi.fn().mockResolvedValue([]),
     findEditCandidates: vi.fn().mockResolvedValue([]),

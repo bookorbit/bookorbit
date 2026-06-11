@@ -23,7 +23,6 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import type { RequestUser } from '../../common/types/request-user';
 import { KoreaderAuthGuard } from './koreader-auth.guard';
 import { KoreaderPackageService } from './koreader-package.service';
-import { KoreaderPluginAnnotationService } from './koreader-plugin-annotation.service';
 import { KoreaderService } from './koreader.service';
 import { CreateKoreaderUserDto, DownloadPluginPackageDto, SaveProgressDto, TestConnectionDto, UpdateKoreaderUserDto } from './dto';
 
@@ -31,7 +30,6 @@ import { CreateKoreaderUserDto, DownloadPluginPackageDto, SaveProgressDto, TestC
 export class KoreaderController {
   constructor(
     private readonly koreaderService: KoreaderService,
-    private readonly pluginAnnotationService: KoreaderPluginAnnotationService,
     private readonly packageService: KoreaderPackageService,
   ) {}
 
@@ -110,12 +108,6 @@ export class KoreaderController {
   @Get('books/:bookId/progress')
   getBookProgress(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number) {
     return this.koreaderService.getBookProgress(user.id, bookId);
-  }
-
-  @RequirePermission(Permission.KoreaderSync)
-  @Get('books/:bookId/annotations')
-  getBookAnnotations(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number) {
-    return this.pluginAnnotationService.getBookAnnotations(user.id, bookId);
   }
 
   @RequirePermission(Permission.KoreaderSync)

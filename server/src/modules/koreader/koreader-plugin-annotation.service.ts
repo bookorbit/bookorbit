@@ -1,10 +1,8 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 
-import type { KoreaderAnnotationItem } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
-import { drawerFromStyle } from '../annotation/annotation-style-map';
-import { AnnotationSyncService, buildAnnotationKey, type IncomingDeviceAnnotation } from '../annotation/annotation-sync.service';
+import { AnnotationSyncService, type IncomingDeviceAnnotation } from '../annotation/annotation-sync.service';
 import type { AnnotationsUploadDto, KoreaderAnnotationDto } from './dto';
 import { KoreaderRepository } from './koreader.repository';
 
@@ -79,26 +77,6 @@ export class KoreaderPluginAnnotationService {
       );
       throw error;
     }
-  }
-
-  async getBookAnnotations(userId: number, bookId: number): Promise<KoreaderAnnotationItem[]> {
-    const rows = await this.annotationSync.listDeviceAnnotationsByBook(userId, bookId, 'koreader');
-    return rows.map(({ annotation, position }) => ({
-      id: annotation.id,
-      drawer: drawerFromStyle(annotation.style) as KoreaderAnnotationItem['drawer'],
-      color: annotation.color,
-      text: annotation.text || null,
-      note: annotation.note,
-      chapter: annotation.chapterTitle,
-      pageno: ((position.extras as { pageno?: number } | null)?.pageno ?? null) as number | null,
-      posFormat: position.format as KoreaderAnnotationItem['posFormat'],
-      deviceCreatedAt: annotation.deviceCreatedAt ?? '',
-      deviceUpdatedAt: annotation.deviceUpdatedAt,
-    }));
-  }
-
-  buildAnnotationKey(deviceCreatedAt: string, pos0: string): string {
-    return buildAnnotationKey(deviceCreatedAt, pos0);
   }
 
   private toIncoming(annotation: KoreaderAnnotationDto): IncomingDeviceAnnotation {

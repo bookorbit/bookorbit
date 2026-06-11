@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { ArrowUpDown, Highlighter } from 'lucide-vue-next'
-import { Permission, type BookDetail } from '@bookorbit/types'
+import type { BookDetail } from '@bookorbit/types'
 import { useBookHighlights } from '@/features/book/composables/useBookHighlights'
-import { usePermissions } from '@/features/auth/composables/usePermissions'
-import KoreaderAnnotations from '@/features/koreader/components/KoreaderAnnotations.vue'
 import HighlightsFilterBar from './HighlightsFilterBar.vue'
 import HighlightChapterGroup from './HighlightChapterGroup.vue'
 import HighlightCard from './HighlightCard.vue'
@@ -13,8 +11,6 @@ import HighlightsExportMenu from './HighlightsExportMenu.vue'
 const props = defineProps<{ book: BookDetail }>()
 
 const bookIdRef = computed(() => props.book.id)
-const { hasPermission } = usePermissions()
-const canShowKoreaderAnnotations = computed(() => hasPermission(Permission.KoreaderSync))
 const {
   items,
   total,
@@ -191,7 +187,5 @@ function handleDateRangeChange(from: string | undefined, to: string | undefined)
         </button>
       </div>
     </div>
-
-    <KoreaderAnnotations v-if="canShowKoreaderAnnotations" :book-id="book.id" />
   </div>
 </template>

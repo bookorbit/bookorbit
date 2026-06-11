@@ -3,7 +3,7 @@ import { createHash } from 'crypto';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import type { AnnotationRow, AnnotationSyncStateRow } from '../../db/schema';
-import type { AnnotationPositionFormat, AnnotationSyncSource } from './annotation.constants';
+import type { AnnotationSyncSource } from './annotation.constants';
 import { applyDeviceColor, applyDeviceStyle, hexFromKoreaderColor, styleFromDrawer } from './annotation-style-map';
 import { AnnotationSyncRepository, type DbTx } from './annotation-sync.repository';
 
@@ -76,11 +76,6 @@ export class AnnotationSyncService {
       );
       throw error;
     }
-  }
-
-  async listDeviceAnnotationsByBook(userId: number, bookId: number, source: AnnotationSyncSource) {
-    const formats: AnnotationPositionFormat[] = ['xpointer', 'pdf'];
-    return this.syncRepo.listDeviceAnnotationsByBook(userId, bookId, source, formats);
   }
 
   private dedupeByKey(annotations: IncomingDeviceAnnotation[]): IncomingDeviceAnnotation[] {

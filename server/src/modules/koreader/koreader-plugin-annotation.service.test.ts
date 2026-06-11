@@ -35,7 +35,6 @@ describe('KoreaderPluginAnnotationService', () => {
   let koreaderRepo: { getAccessibleLibraryIds: ReturnType<typeof vi.fn>; resolveBookFilesByHashes: ReturnType<typeof vi.fn> };
   let annotationSync: {
     ingestDeviceAnnotations: ReturnType<typeof vi.fn>;
-    listDeviceAnnotationsByBook: ReturnType<typeof vi.fn>;
   };
   let service: KoreaderPluginAnnotationService;
 
@@ -54,20 +53,9 @@ describe('KoreaderPluginAnnotationService', () => {
         .mockImplementation((params: { annotations: unknown[] }) =>
           Promise.resolve({ created: params.annotations.length, updated: 0, moved: 0, unchanged: 0, skippedDeleted: 0 }),
         ),
-      listDeviceAnnotationsByBook: vi.fn().mockResolvedValue([]),
     };
 
     service = new KoreaderPluginAnnotationService(koreaderRepo as unknown as KoreaderRepository, annotationSync as unknown as AnnotationSyncService);
-  });
-
-  it('builds a stable annotation key from device datetime and pos0', () => {
-    const first = service.buildAnnotationKey('2026-06-01 21:14:03', '/body/DocFragment[8]/body/p[12]/text().0');
-    const second = service.buildAnnotationKey('2026-06-01 21:14:03', '/body/DocFragment[8]/body/p[12]/text().0');
-    const different = service.buildAnnotationKey('2026-06-01 21:14:04', '/body/DocFragment[8]/body/p[12]/text().0');
-
-    expect(first).toMatch(/^[0-9a-f]{32}$/);
-    expect(second).toBe(first);
-    expect(different).not.toBe(first);
   });
 
   it('routes matched books through the sync ingest with mapped fields', async () => {
@@ -120,63 +108,5 @@ describe('KoreaderPluginAnnotationService', () => {
     );
 
     await expect(service.uploadAnnotations(makeUser(), makeDto([{ hash: HASH_A, annotations }]))).rejects.toBeInstanceOf(BadRequestException);
-  });
-
-  it('maps canonical rows to device-view annotation items', async () => {
-    annotationSync.listDeviceAnnotationsByBook.mockResolvedValue([
-      {
-        annotation: {
-          id: 1,
-          style: 'underline',
-          color: '#FF3300',
-          text: 'quote',
-          note: null,
-          chapterTitle: 'Chapter 3',
-          deviceCreatedAt: '2026-06-01 21:14:03',
-          deviceUpdatedAt: null,
-        },
-        position: { format: 'xpointer', extras: { pageno: 42 } },
-      },
-    ]);
-
-    const items = await service.getBookAnnotations(7, 20);
-
-    expect(annotationSync.listDeviceAnnotationsByBook).toHaveBeenCalledWith(7, 20, 'koreader');
-    expect(items).toEqual([
-      {
-        id: 1,
-        drawer: 'underscore',
-        color: '#FF3300',
-        text: 'quote',
-        note: null,
-        chapter: 'Chapter 3',
-        pageno: 42,
-        posFormat: 'xpointer',
-        deviceCreatedAt: '2026-06-01 21:14:03',
-        deviceUpdatedAt: null,
-      },
-    ]);
-  });
-
-  it('projects squiggly style back to underscore for the device view', async () => {
-    annotationSync.listDeviceAnnotationsByBook.mockResolvedValue([
-      {
-        annotation: {
-          id: 2,
-          style: 'squiggly',
-          color: '#FFFF33',
-          text: 'wavy',
-          note: null,
-          chapterTitle: null,
-          deviceCreatedAt: '2026-06-01 21:14:03',
-          deviceUpdatedAt: null,
-        },
-        position: { format: 'xpointer', extras: null },
-      },
-    ]);
-
-    const items = await service.getBookAnnotations(7, 20);
-
-    expect(items[0]).toMatchObject({ drawer: 'underscore', pageno: null });
   });
 });
