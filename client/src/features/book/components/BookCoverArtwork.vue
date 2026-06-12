@@ -2,6 +2,7 @@
 import type { BookCoverDisplayMode, CoverAspectRatio } from '@bookorbit/types'
 import { computed, inject, ref, watch, type ComponentPublicInstance } from 'vue'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO, coverAspectRatioValue, fittedCoverFrameStyle } from '../lib/cover-aspect-ratio'
+import { getCachedCoverRatio, rememberLoadedCover } from '../lib/cover-load-cache'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import BookCoverPlaceholder from './BookCoverPlaceholder.vue'
 
@@ -49,6 +50,12 @@ const injectedAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASP
 const loaded = ref(false)
 const failed = ref(false)
 const imageRatio = ref<number | null>(null)
+// When a pooled view is reassigned to another book (virtual scroll, resize),
+// the browser already has the cover cached; restoring from this cache skips
+// the skeleton flash and fade-in replay that otherwise make the grid flicker.
+const instant = ref(false)
+
+restoreFromCoverCache()
 
 const effectiveMode = computed(() => props.mode ?? bookCoverDisplayMode.value)
 const frameAspectRatio = computed(() => props.frameAspectRatio ?? injectedAspectRatio.value)
@@ -73,10 +80,16 @@ const spineStyle = computed(() => {
   return { inset: '0' }
 })
 
+function restoreFromCoverCache() {
+  const cached = getCachedCoverRatio(props.src)
+  instant.value = cached !== null
+  loaded.value = instant.value
+  imageRatio.value = cached?.ratio ?? null
+}
+
 function resetImageState() {
-  loaded.value = false
   failed.value = false
-  imageRatio.value = null
+  restoreFromCoverCache()
 }
 
 watch(() => [props.src, props.hasCover, props.resetKey] as const, resetImageState)
@@ -94,6 +107,7 @@ function handleImageRef(el: Element | ComponentPublicInstance | null) {
     const ratio = updateImageRatio(img)
     loaded.value = true
     failed.value = false
+    rememberLoadedCover(props.src, ratio)
     emit('load', ratio)
   }
 }
@@ -102,6 +116,7 @@ function handleImageLoad(event: Event) {
   const ratio = updateImageRatio(event.target as HTMLImageElement | null)
   loaded.value = true
   failed.value = false
+  rememberLoadedCover(props.src, ratio)
   emit('load', ratio)
 }
 
@@ -143,7 +158,8 @@ function handleImageError() {
         :loading="loading"
         :decoding="decoding"
         :class="[
-          'absolute inset-0 h-full w-full transition-opacity duration-300 ease-out',
+          'absolute inset-0 h-full w-full',
+          instant ? '' : 'transition-opacity duration-300 ease-out',
           imageFitClass,
           loaded ? 'opacity-100' : 'opacity-0',
           imageClass,

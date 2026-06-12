@@ -20,14 +20,15 @@ const SORT_FIELD_MAP: Partial<Record<SortField, AnyColumn>> = {
 @Injectable()
 export class BookSortBuilder {
   build(sort: SortSpec[], userId?: number): SQL[] {
-    if (sort.length === 0) return [sql`${bookMetadata.title} ASC NULLS LAST`];
     const result: SQL[] = [];
     for (const { field, dir } of sort) {
       const D = this.normalizeDir(dir);
       if (!D) continue;
       this.appendField(result, field, D, sort, userId);
     }
-    return result.length > 0 ? result : [sql`${bookMetadata.title} ASC NULLS LAST`];
+    if (result.length === 0) result.push(sql`${bookMetadata.title} ASC NULLS LAST`);
+    result.push(sql`${books.id} ASC`);
+    return result;
   }
 
   private normalizeDir(dir: string): 'ASC' | 'DESC' | null {
@@ -38,11 +39,7 @@ export class BookSortBuilder {
   private appendField(result: SQL[], field: SortField, D: 'ASC' | 'DESC', allSorts: SortSpec[], userId?: number): void {
     switch (field) {
       case 'author':
-        result.push(
-          sql.raw(
-            `(SELECT a.sort_name FROM book_authors ba INNER JOIN authors a ON ba.author_id = a.id WHERE ba.book_id = books.id ORDER BY ba.display_order LIMIT 1) ${D} NULLS LAST`,
-          ),
-        );
+        result.push(sql`${books.primaryAuthorSortName} ${sql.raw(D)} NULLS LAST`);
         break;
       case 'fileSize':
         result.push(sql.raw(`(SELECT bf.size_bytes FROM book_files bf WHERE bf.id = books.primary_file_id) ${D} NULLS LAST`));

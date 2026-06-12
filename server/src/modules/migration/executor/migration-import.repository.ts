@@ -3,6 +3,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db';
+import { refreshPrimaryAuthorSortNamesForAuthors, refreshPrimaryAuthorSortNamesForBooks } from '../../../db/book-author-sort-key';
 import * as schema from '../../../db/schema';
 import { SeriesIdentityService } from '../../../common/services/series-identity.service';
 import { uniqueNumbers } from './executor-utils';
@@ -93,6 +94,7 @@ export class MigrationImportRepository {
 
   async deleteBookAuthors(bookId: number): Promise<void> {
     await this.db.delete(schema.bookAuthors).where(eq(schema.bookAuthors.bookId, bookId));
+    await refreshPrimaryAuthorSortNamesForBooks(this.db, [bookId]);
   }
 
   async upsertAuthor(values: typeof schema.authors.$inferInsert): Promise<{ id: number } | null> {
@@ -101,11 +103,13 @@ export class MigrationImportRepository {
       .values(values)
       .onConflictDoUpdate({ target: schema.authors.name, set: values })
       .returning({ id: schema.authors.id });
+    if (row) await refreshPrimaryAuthorSortNamesForAuthors(this.db, [row.id]);
     return row ?? null;
   }
 
   async insertBookAuthor(bookId: number, authorId: number, displayOrder: number): Promise<void> {
     await this.db.insert(schema.bookAuthors).values({ bookId, authorId, displayOrder }).onConflictDoNothing();
+    await refreshPrimaryAuthorSortNamesForBooks(this.db, [bookId]);
   }
 
   // --- Narrators ---
@@ -313,6 +317,7 @@ export class MigrationImportRepository {
     if (bookIds.length === 0) return;
     for (const batch of chunk(bookIds, BATCH_CHUNK_SIZE)) {
       await this.db.delete(schema.bookAuthors).where(inArray(schema.bookAuthors.bookId, batch));
+      await refreshPrimaryAuthorSortNamesForBooks(this.db, batch);
     }
   }
 
@@ -326,6 +331,10 @@ export class MigrationImportRepository {
         .onConflictDoUpdate({ target: schema.authors.name, set: { sortName: sql`excluded.sort_name` } })
         .returning({ id: schema.authors.id, name: schema.authors.name });
       for (const row of rows) nameToId.set(row.name, row.id);
+      await refreshPrimaryAuthorSortNamesForAuthors(
+        this.db,
+        rows.map((row) => row.id),
+      );
     }
     return nameToId;
   }
@@ -334,6 +343,10 @@ export class MigrationImportRepository {
     if (items.length === 0) return;
     for (const batch of chunk(items, BATCH_CHUNK_SIZE)) {
       await this.db.insert(schema.bookAuthors).values(batch).onConflictDoNothing();
+      await refreshPrimaryAuthorSortNamesForBooks(
+        this.db,
+        batch.map((item) => item.bookId),
+      );
     }
   }
 

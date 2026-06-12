@@ -1,8 +1,9 @@
 import { mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { nextTick, ref } from 'vue'
 import type { BookCoverDisplayMode } from '@bookorbit/types'
 import { COVER_ASPECT_RATIO_KEY } from '@/features/book/lib/cover-aspect-ratio'
+import { clearCoverLoadCache } from '@/features/book/lib/cover-load-cache'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import BookCoverArtwork from '../BookCoverArtwork.vue'
 
@@ -54,6 +55,10 @@ async function triggerMainImageLoad(wrapper: ReturnType<typeof mountArtwork>, na
   await nextTick()
   return image
 }
+
+beforeEach(() => {
+  clearCoverLoadCache()
+})
 
 afterEach(() => {
   bookCoverDisplayMode.value = 'blurred-fit'
@@ -142,5 +147,51 @@ describe('BookCoverArtwork', () => {
     await triggerMainImageLoad(wrapper, 600, 900)
 
     expect(wrapper.find('.book-cover-spine-layer').exists()).toBe(false)
+  })
+
+  describe('cover load cache (anti-flicker)', () => {
+    it('shows the skeleton and fade-in for a cover that has never loaded', () => {
+      const wrapper = mountArtwork({ src: '/fresh-cover.jpg' })
+      const image = wrapper.find('img[alt="Dune cover"]')
+
+      expect(image.classes()).toContain('opacity-0')
+      expect(image.classes()).toContain('transition-opacity')
+      expect(wrapper.find('.animate-pulse').exists()).toBe(true)
+    })
+
+    it('skips the skeleton and fade for a cached cover after pool reassignment', async () => {
+      const first = mountArtwork({ src: '/cached-cover.jpg' })
+      await triggerMainImageLoad(first, 600, 900)
+
+      const second = mountArtwork({ src: '/cached-cover.jpg' })
+      const image = second.find('img[alt="Dune cover"]')
+
+      expect(image.classes()).toContain('opacity-100')
+      expect(image.classes()).not.toContain('transition-opacity')
+      expect(second.find('.animate-pulse').exists()).toBe(false)
+    })
+
+    it('restores instantly when src changes to an already-loaded cover', async () => {
+      const warm = mountArtwork({ src: '/warm.jpg' })
+      await triggerMainImageLoad(warm, 600, 900)
+
+      const wrapper = mountArtwork({ src: '/cold.jpg' })
+      expect(wrapper.find('img[alt="Dune cover"]').classes()).toContain('opacity-0')
+
+      await wrapper.setProps({ src: '/warm.jpg' })
+      const image = wrapper.find('img[alt="Dune cover"]')
+      expect(image.classes()).toContain('opacity-100')
+      expect(wrapper.find('.animate-pulse').exists()).toBe(false)
+    })
+
+    it('still shows the skeleton when src changes to an unseen cover', async () => {
+      const wrapper = mountArtwork({ src: '/seen.jpg' })
+      await triggerMainImageLoad(wrapper, 600, 900)
+
+      await wrapper.setProps({ src: '/never-seen.jpg' })
+      const image = wrapper.find('img[alt="Dune cover"]')
+      expect(image.classes()).toContain('opacity-0')
+      expect(wrapper.find('.animate-pulse').exists()).toBe(true)
+    })
   })
 })

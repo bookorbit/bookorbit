@@ -3,7 +3,7 @@ import { SQL, and, asc, count, eq, inArray, isNotNull, ne, or, sql } from 'drizz
 import { SUPPORTED_BOOK_FORMATS } from '../upload/upload-validator.service';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import type { ContentFilterRules, SortSpec } from '@bookorbit/types';
+import type { ContentFilterRules, JumpBucketsResponse, SortSpec } from '@bookorbit/types';
 import { isAudioFormat } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
@@ -87,6 +87,21 @@ type PatternMetadataRow = {
 };
 
 const PROGRESS_EPSILON = 0.0001;
+
+// Shared between the collapsed listing query and the collapsed jump-buckets
+// query: both must pick the exact same series representative or bucket indexes
+// drift from listing offsets. Guarded by the jump-buckets invariant e2e test.
+const COLLAPSE_GROUP_KEY_SQL = `base.library_id, COALESCE(base.series_id::text, 'book_' || base.id::text)`;
+const COLLAPSE_REPRESENTATIVE_PICK_SQL = `${COLLAPSE_GROUP_KEY_SQL},
+          base.series_index ASC NULLS LAST,
+          base.added_at ASC,
+          base.id ASC`;
+
+type JumpBucketRawRow = {
+  bucket: string;
+  item_index: number | string;
+  total: number | string;
+};
 
 @Injectable()
 export class BookRepository {
@@ -331,6 +346,7 @@ export class BookRepository {
           books.library_id,
           books.status,
           books.primary_file_id,
+          books.primary_author_sort_name,
           books.folder_path,
           books.added_at,
           books.updated_at,
@@ -429,7 +445,7 @@ export class BookRepository {
         WHERE sfu.rn = 1
       ),
       representatives AS (
-        SELECT DISTINCT ON (base.library_id, COALESCE(base.series_id::text, 'book_' || base.id::text))
+        SELECT DISTINCT ON (${sql.raw(COLLAPSE_GROUP_KEY_SQL)})
           base.id,
           base.status,
           base.primary_file_id,
@@ -450,6 +466,7 @@ export class BookRepository {
           base.subtitle,
           base.isbn13,
           base.metadata_score,
+          base.primary_author_sort_name AS author_sort_name,
           COALESCE(base.norm_series, lower(base.title)) AS sort_title,
           COALESCE(sa.latest_added_at, base.added_at) AS sort_added_at,
           sa.book_count,
@@ -475,12 +492,7 @@ export class BookRepository {
         LEFT JOIN series_first_unread sfu2
           ON sfu2.series_id = base.series_id
           AND sfu2.library_id = base.library_id
-        ORDER BY
-          base.library_id,
-          COALESCE(base.series_id::text, 'book_' || base.id::text),
-          base.series_index ASC NULLS LAST,
-          base.added_at ASC,
-          base.id ASC
+        ORDER BY ${sql.raw(COLLAPSE_REPRESENTATIVE_PICK_SQL)}
       )
       SELECT r.*,
         COUNT(*) OVER () AS total_count
@@ -526,6 +538,111 @@ export class BookRepository {
     const enrichment = await this.enrichBookIds(bookRefs, userId);
 
     return { rows: mappedRows, ...enrichment, total };
+  }
+
+  async findJumpBuckets(opts: { where: SQL | undefined; bucketExpr: SQL; orderBy: SQL[] }): Promise<JumpBucketsResponse> {
+    const visibleWhere = this.visibleWhere(opts.where);
+    const result = await this.db.execute<JumpBucketRawRow>(sql`
+      WITH ordered AS (
+        SELECT
+          ${opts.bucketExpr} AS bucket,
+          (ROW_NUMBER() OVER (ORDER BY ${sql.join(opts.orderBy, sql`, `)}) - 1) AS item_index
+        FROM ${books}
+        LEFT JOIN ${bookMetadata} ON ${bookMetadata.bookId} = ${books.id}
+        WHERE ${visibleWhere}
+      )
+      SELECT bucket, min(item_index)::int AS item_index, (SELECT count(*) FROM ordered)::int AS total
+      FROM ordered
+      WHERE bucket IS NOT NULL
+      GROUP BY bucket
+      ORDER BY min(item_index)
+    `);
+
+    return this.mapJumpBucketRows(result.rows);
+  }
+
+  // The representatives CTE mirrors findCardsCollapsed's representative
+  // selection (same group key, same pick order) but only projects the columns
+  // buildCollapseOrderBy can reference as aliases or via r.* correlated
+  // subqueries.
+  async findJumpBucketsCollapsed(opts: { where: SQL | undefined; bucketExpr: SQL; sort: SortSpec[]; userId: number }): Promise<JumpBucketsResponse> {
+    const whereFragment = this.visibleWhere(opts.where);
+    const orderBy = BookQueryBuilder.buildCollapseOrderBy(opts.sort, opts.userId);
+    const result = await this.db.execute<JumpBucketRawRow>(sql`
+      WITH base_rows AS (
+        SELECT
+          books.id,
+          books.library_id,
+          books.primary_file_id,
+          books.primary_author_sort_name,
+          books.added_at,
+          books.updated_at,
+          book_metadata.title,
+          book_metadata.series_id,
+          book_metadata.series_name,
+          book_metadata.series_index,
+          book_metadata.published_year,
+          book_metadata.publisher,
+          book_metadata.page_count,
+          NULLIF(lower(btrim(book_metadata.series_name)), '') AS norm_series
+        FROM books
+        LEFT JOIN book_metadata ON book_metadata.book_id = books.id
+        WHERE ${whereFragment}
+      ),
+      series_latest AS (
+        SELECT
+          base.series_id,
+          base.library_id,
+          MAX(base.added_at) AS latest_added_at
+        FROM base_rows base
+        WHERE base.series_id IS NOT NULL
+        GROUP BY base.series_id, base.library_id
+      ),
+      representatives AS (
+        SELECT DISTINCT ON (${sql.raw(COLLAPSE_GROUP_KEY_SQL)})
+          base.id,
+          base.primary_file_id,
+          base.updated_at,
+          base.series_index,
+          base.published_year,
+          base.publisher,
+          base.page_count,
+          ubr.rating,
+          base.primary_author_sort_name AS author_sort_name,
+          COALESCE(base.norm_series, lower(base.title)) AS sort_title,
+          COALESCE(sl.latest_added_at, base.added_at) AS sort_added_at
+        FROM base_rows base
+        LEFT JOIN user_book_ratings ubr ON ubr.book_id = base.id AND ubr.user_id = ${opts.userId}
+        LEFT JOIN series_latest sl
+          ON sl.series_id = base.series_id
+          AND sl.library_id = base.library_id
+        ORDER BY ${sql.raw(COLLAPSE_REPRESENTATIVE_PICK_SQL)}
+      ),
+      ordered AS (
+        SELECT
+          ${opts.bucketExpr} AS bucket,
+          (ROW_NUMBER() OVER (ORDER BY ${sql.raw(orderBy)}) - 1) AS item_index
+        FROM representatives r
+      )
+      SELECT bucket, min(item_index)::int AS item_index, (SELECT count(*) FROM ordered)::int AS total
+      FROM ordered
+      WHERE bucket IS NOT NULL
+      GROUP BY bucket
+      ORDER BY min(item_index)
+    `);
+
+    return this.mapJumpBucketRows(result.rows);
+  }
+
+  private mapJumpBucketRows(rows: JumpBucketRawRow[]): JumpBucketsResponse {
+    return {
+      buckets: rows.map((row) => ({
+        key: row.bucket,
+        label: row.bucket,
+        index: Number(row.item_index),
+      })),
+      total: rows.length > 0 ? Number(rows[0].total) : 0,
+    };
   }
 
   async findById(id: number) {

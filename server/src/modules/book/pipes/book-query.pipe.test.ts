@@ -144,4 +144,14 @@ describe('BookQueryPipe', () => {
       { field: 'language', dir: 'asc' },
     ]);
   });
+
+  it('accepts deep pagination window required for virtual window loading', () => {
+    const result = pipe.transform({ pagination: { page: 5000, size: 200 } });
+    expect(result.pagination.page).toBe(5000);
+    expect(result.pagination.size).toBe(200);
+  });
+
+  it('rejects a pagination window that exceeds the raised offset cap', () => {
+    expect(() => pipe.transform({ pagination: { page: 6000, size: 200 } })).toThrow(BadRequestException);
+  });
 });

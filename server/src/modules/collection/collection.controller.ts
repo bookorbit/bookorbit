@@ -166,4 +166,9 @@ export class CollectionController {
   queryBooks(@Param('id', ParseIntPipe) id: number, @Body(BookQueryPipe) query: BookQuery, @CurrentUser() user: RequestUser) {
     return this.collectionService.queryBooks(id, user, query);
   }
+
+  @Post(':id/books/jump-buckets')
+  queryJumpBuckets(@Param('id', ParseIntPipe) id: number, @Body(BookQueryPipe) query: BookQuery, @CurrentUser() user: RequestUser) {
+    return this.collectionService.queryJumpBuckets(id, user, query);
+  }
 }

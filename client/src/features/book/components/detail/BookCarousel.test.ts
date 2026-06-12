@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils'
 import { defineComponent, h } from 'vue'
 
 import BookCarousel, { type CarouselBook } from './BookCarousel.vue'
+import { clearCoverLoadCache } from '@/features/book/lib/cover-load-cache'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
 const mockRouterPush = vi.fn<() => void>()
@@ -86,6 +87,7 @@ const { bookSpineOverlay } = useDisplaySettings()
 describe('BookCarousel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    clearCoverLoadCache()
     bookSpineOverlay.value = 'off'
     mockRouterPush.mockReset()
   })

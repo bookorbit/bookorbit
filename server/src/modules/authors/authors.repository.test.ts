@@ -14,6 +14,7 @@ vi.mock('drizzle-orm', () => ({
   sql: Object.assign(
     vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', text: strings.join(''), values })),
     {
+      join: vi.fn((chunks: unknown[], separator: unknown) => ({ op: 'sql.join', chunks, separator })),
       raw: vi.fn((value: string) => ({ op: 'sql.raw', value })),
     },
   ),
@@ -84,6 +85,7 @@ function makeDb() {
       update: vi.fn().mockReturnValue(updateBuilder),
       insert: vi.fn().mockReturnValue(insertBuilder),
       delete: vi.fn().mockReturnValue(deleteBuilder),
+      execute: vi.fn().mockResolvedValue({ rowCount: 0, rows: [] }),
       transaction: vi.fn().mockResolvedValue(undefined),
     },
     selectBuilder,
@@ -350,6 +352,7 @@ describe('AuthorsRepository', () => {
       select: vi.fn().mockReturnValue(txSelectBuilder),
       insert: vi.fn().mockReturnValue(txInsertBuilder),
       delete: vi.fn().mockReturnValue(txDeleteBuilder),
+      execute: vi.fn().mockResolvedValue({ rowCount: 0, rows: [] }),
     };
     const db = {
       transaction: vi.fn(async (handler: (client: typeof tx) => Promise<void>) => handler(tx)),
@@ -377,6 +380,7 @@ describe('AuthorsRepository', () => {
       select: vi.fn().mockReturnValue(txSelectBuilder),
       insert: vi.fn(),
       delete: vi.fn().mockReturnValue(txDeleteBuilder),
+      execute: vi.fn().mockResolvedValue({ rowCount: 0, rows: [] }),
     };
     const db = {
       transaction: vi.fn(async (handler: (client: typeof tx) => Promise<void>) => handler(tx)),
@@ -390,12 +394,20 @@ describe('AuthorsRepository', () => {
   });
 
   it('deleteAuthors removes joins and authors inside one transaction', async () => {
+    const txSelectBuilder = {
+      from: vi.fn(),
+      where: vi.fn(),
+    };
+    txSelectBuilder.from.mockReturnValue(txSelectBuilder);
+    txSelectBuilder.where.mockResolvedValue([{ bookId: 10 }]);
     const txDeleteBuilder = {
       where: vi.fn(),
     };
     txDeleteBuilder.where.mockResolvedValue(undefined);
     const tx = {
+      select: vi.fn().mockReturnValue(txSelectBuilder),
       delete: vi.fn().mockReturnValue(txDeleteBuilder),
+      execute: vi.fn().mockResolvedValue({ rowCount: 0, rows: [] }),
     };
     const db = {
       transaction: vi.fn(async (handler: (client: typeof tx) => Promise<void>) => handler(tx)),
@@ -405,5 +417,6 @@ describe('AuthorsRepository', () => {
     await repo.deleteAuthors([5, 6]);
 
     expect(tx.delete).toHaveBeenCalledTimes(2);
+    expect(tx.execute).toHaveBeenCalledTimes(1);
   });
 });

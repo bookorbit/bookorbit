@@ -45,6 +45,12 @@ export class LibraryController {
     return this.bookService.queryForLibrary(user, libraryId, query);
   }
 
+  @Post(':id/books/jump-buckets')
+  @RequireLibraryAccess('viewer')
+  queryJumpBuckets(@Param('id', ParseIntPipe) libraryId: number, @Body(BookQueryPipe) query: BookQuery, @CurrentUser() user: RequestUser) {
+    return this.bookService.queryJumpBucketsForLibrary(user, libraryId, query);
+  }
+
   @Post()
   @RequirePermission(Permission.ManageLibraries)
   @Auditable({

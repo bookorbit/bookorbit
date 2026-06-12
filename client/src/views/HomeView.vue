@@ -36,7 +36,9 @@ import MetadataExportDialog from '@/features/book/components/MetadataExportDialo
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import SaveAsSmartScopeDialog from '@/features/smart-scope/components/SaveAsSmartScopeDialog.vue'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
-import { useLibraryBooks, type BookCard } from '@/features/book/composables/useLibraryBooks'
+import JumpRail from '@/features/book/components/JumpRail.vue'
+import type { BookCard } from '@bookorbit/types'
+import { useBookViewWindow } from '@/features/book/composables/useBookViewWindow'
 import { useViewSearch } from '@/features/book/composables/useViewSearch'
 import { useSeriesCollapsePreference } from '@/features/book/composables/useSeriesCollapsePreference'
 
@@ -99,20 +101,42 @@ watch(prefs, () => {
 const { searchQuery, debouncedQuery, clearSearch } = useViewSearch()
 
 const {
-  items: books,
+  booksProxy: books,
+  slots,
   total,
   loading,
   initialized: booksInitialized,
   error,
   filter,
   sort,
-  hasMore,
-  load,
-  clear,
-} = useLibraryBooks(libraryId, collapseEnabledRef, debouncedQuery)
+  reset: resetBooks,
+  updateBooks,
+  contiguousPrefix,
+  hasMorePrefix,
+  loadMorePrefix,
+  handleRange,
+  handleFirstVisibleIndex,
+  registerScroller,
+  handleJump,
+  buckets,
+  bucketKind,
+  refreshBuckets,
+  railVisible,
+  activeBucketKey,
+  letterTemplate,
+  railGutterReserved,
+  releaseRailGutter,
+} = useBookViewWindow({
+  scopeId: libraryId,
+  listEndpoint: (id) => `/api/v1/libraries/${id}/books`,
+  bucketsEndpoint: (id) => `/api/v1/libraries/${id}/books/jump-buckets`,
+  viewMode: effectiveViewMode,
+  collapseEnabled: collapseEnabledRef,
+  q: debouncedQuery,
+})
 const { onLibraryUploadCompleted } = useLibraryUploadEvents()
 const { setBookContext } = useBookNavigation()
-useBookViewContext(books, total, () => load())
+useBookViewContext(books, total, loadMorePrefix)
 
 const FILTER_STORAGE_PREFIX = 'bookorbit:filter:library:'
 function getFilterKey(id: number) {
@@ -266,7 +290,7 @@ function forgetSavedFilter() {
 }
 
 const { subscribeLibrary, getProgress, isScanning } = useScanProgress()
-const { newBookIds, start: startLiveScan, stop: stopLiveScan } = useLiveScanBooks(libraryId, books, total)
+const { newBookIds, start: startLiveScan, stop: stopLiveScan } = useLiveScanBooks(libraryId, books)
 const scanProgress = computed(() => (libraryId.value !== null ? getProgress(libraryId.value) : undefined))
 
 watch(
@@ -283,23 +307,20 @@ watch(
 )
 
 const { onBookMissing, onBookRestored, onBookMoved } = useBookEvents()
+
+function applyStatusToLoadedBooks(bookIds: number[], status: BookCard['status']) {
+  const targets = new Set(bookIds)
+  updateBooks(books.value.filter((book) => targets.has(book.id) && book.status !== status).map((book) => ({ ...book, status })))
+}
+
 onBookMissing((bookIds) => {
-  const missing = new Set(bookIds)
-  for (const book of books.value) {
-    if (missing.has(book.id)) book.status = 'missing'
-  }
+  applyStatusToLoadedBooks(bookIds, 'missing')
 })
 onBookRestored((bookIds) => {
-  const restored = new Set(bookIds)
-  for (const book of books.value) {
-    if (restored.has(book.id)) book.status = 'present'
-  }
+  applyStatusToLoadedBooks(bookIds, 'present')
 })
 onBookMoved((bookIds) => {
-  const moved = new Set(bookIds)
-  for (const book of books.value) {
-    if (moved.has(book.id)) book.status = 'present'
-  }
+  applyStatusToLoadedBooks(bookIds, 'present')
 })
 
 const filterOpen = ref(false)
@@ -337,28 +358,24 @@ function closeFilterPanel() {
 }
 
 const { sentinel } = useInfiniteScrollSentinel({
-  hasMore,
+  hasMore: hasMorePrefix,
   loading,
-  loadMore: () => load(),
+  loadMore: loadMorePrefix,
 })
 
 const stopUploadCompletedListener = onLibraryUploadCompleted((event) => {
   if (event.uploadedCount === 0) return
   if (libraryId.value === event.libraryId) {
-    load(true)
+    resetBooks()
+    refreshBuckets()
   }
 })
 
 onUnmounted(() => stopUploadCompletedListener())
 
-watch(libraryId, (newId) => {
-  if (newId === null) clear()
+watch(libraryId, () => {
   clearSearch()
 })
-
-watch(debouncedQuery, () => load(true))
-
-watch(filter, () => load(true), { deep: true })
 
 const saveAsSmartScopeOpen = ref(false)
 const querySelection = ref<QuerySelectionState | null>(null)
@@ -412,6 +429,24 @@ const {
   books,
   querySelection,
 })
+
+const bookGridRef = ref<{ scrollToIndex: (index: number) => void } | null>(null)
+
+watch(
+  [bookGridRef, tableRef, effectiveViewMode],
+  () => {
+    if (effectiveViewMode.value === 'grid' && bookGridRef.value) {
+      const grid = bookGridRef.value
+      registerScroller((index) => grid.scrollToIndex(index))
+    } else if (effectiveViewMode.value === 'table' && tableRef.value) {
+      const table = tableRef.value
+      registerScroller((index) => table.scrollToIndex(index))
+    } else {
+      registerScroller(null)
+    }
+  },
+  { immediate: true },
+)
 
 const metadataExportOpen = ref(false)
 const metadataExportDefaultScope = ref<'selected' | 'all-matching'>('all-matching')
@@ -467,7 +502,7 @@ async function handleBulkEditConfirm(fields: BulkEditFields) {
   if (result) {
     bulkEditOpen.value = false
     if (querySelection.value || hasAddOrRemoveFields(fields)) {
-      load(true)
+      resetBooks()
     }
   }
 }
@@ -480,7 +515,6 @@ async function handleToggleCollapse() {
   if (libraryId.value === null) return
   const next = !collapseEnabledRef.value
   collapseEnabledRef.value = next
-  load(true)
   await setPreference({ libraryId: libraryId.value }, next)
 }
 </script>
@@ -821,21 +855,25 @@ async function handleToggleCollapse() {
         <!-- Grid view -->
         <VirtualBookGrid
           v-if="effectiveViewMode === 'grid' && books.length > 0"
-          :books="books"
+          ref="bookGridRef"
+          :books="slots"
           :cover-size="coverSize"
           :grid-gap="gridGap"
           :selection-mode="selectionMode"
           :is-selected="isSelected"
           :new-book-ids="newBookIds"
+          :rail-gutter="railGutterReserved"
+          @range="handleRange"
+          @first-visible-index="handleFirstVisibleIndex"
           @action="handleBookAction"
           @select="handleSelect"
           @update:book="handleTableBookUpdate"
         />
 
         <!-- List view -->
-        <div v-if="effectiveViewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
+        <div v-if="effectiveViewMode === 'list' && contiguousPrefix.length > 0" class="flex flex-col divide-y divide-border">
           <BookListRow
-            v-for="book in books"
+            v-for="book in contiguousPrefix"
             :key="book.id"
             :book="book"
             :selection-mode="selectionMode"
@@ -849,10 +887,9 @@ async function handleToggleCollapse() {
         <VirtualBookTable
           v-if="effectiveViewMode === 'table'"
           ref="tableRef"
-          :books="books"
+          :books="slots"
           :in-flight="inFlight"
           :sort="sort"
-          :has-more="hasMore"
           :loading="loading"
           :total="total"
           view-type="library"
@@ -865,16 +902,29 @@ async function handleToggleCollapse() {
           @action="handleBookAction"
           @select="handleSelect"
           @update:book="handleTableBookUpdate"
-          @load-more="load"
+          @visible-range="handleRange"
+          @first-visible-index="handleFirstVisibleIndex"
           @select-all="handleSelectAllLoaded"
           @enter-selection="enterSelectionMode"
           @quick-filter="handleQuickFilter"
         />
 
-        <div v-if="effectiveViewMode !== 'table'" ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
+        <div v-if="effectiveViewMode === 'list'" ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
           <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
-          <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">All {{ total.toLocaleString() }} books loaded</span>
+          <span v-else-if="!hasMorePrefix && contiguousPrefix.length > 0" class="text-xs text-muted-foreground"
+            >All {{ total.toLocaleString() }} books loaded</span
+          >
         </div>
+
+        <JumpRail
+          :visible="railVisible"
+          :buckets="buckets"
+          :kind="bucketKind ?? 'letter'"
+          :active-key="activeBucketKey"
+          :template="bucketKind === 'letter' ? letterTemplate : undefined"
+          @jump="handleJump"
+          @after-leave="releaseRailGutter"
+        />
       </template>
     </main>
   </section>

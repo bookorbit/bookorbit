@@ -17,6 +17,7 @@ export type TableViewHandle = {
   duplicatePreset: (id: string) => void
   togglePresetFavorite: (id: string) => void
   importPresetBackup: (presets: TablePreset[]) => number
+  scrollToIndex: (index: number) => void
 }
 
 export function useTableViewControls() {

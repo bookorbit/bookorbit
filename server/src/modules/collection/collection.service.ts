@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { and } from 'drizzle-orm';
+import { and, type SQL } from 'drizzle-orm';
 
-import type { BookQuery, BooksPage } from '@bookorbit/types';
+import type { BookQuery, BooksPage, JumpBucketsResponse } from '@bookorbit/types';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import type { RequestUser } from '../../common/types/request-user';
@@ -229,17 +229,7 @@ export class CollectionService {
       `[${event}] [start] collectionId=${id} userId=${user.id} page=${query.pagination.page} size=${query.pagination.size} collapseSeries=${query.collapseSeries ?? false} hasSearch=${!!query.q?.trim()} - query collection books started`,
     );
     try {
-      await this.findCollectionForUserOrThrow(id, user);
-      const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
-      const timeZone = resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
-      const filterWhere = this.queryBuilder.buildWhere(query.filter, {
-        accessibleLibraryIds: libraryIds,
-        userId: user.id,
-        q: query.q,
-        timeZone,
-        contentFilters: user.isSuperuser ? undefined : user.contentFilters,
-      });
-      const where = and(filterWhere, this.collectionRepo.buildMembershipWhere(id));
+      const where = await this.buildBooksWhere(id, user, query);
       const page = await this.bookService.executeBooksQuery(user.id, where, query);
 
       this.logger.log(
@@ -253,5 +243,24 @@ export class CollectionService {
       );
       throw error;
     }
+  }
+
+  async queryJumpBuckets(id: number, user: RequestUser, query: BookQuery): Promise<JumpBucketsResponse> {
+    const where = await this.buildBooksWhere(id, user, query);
+    return this.bookService.executeJumpBucketsQuery(user.id, where, query);
+  }
+
+  private async buildBooksWhere(id: number, user: RequestUser, query: BookQuery): Promise<SQL | undefined> {
+    await this.findCollectionForUserOrThrow(id, user);
+    const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const timeZone = resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
+    const filterWhere = this.queryBuilder.buildWhere(query.filter, {
+      accessibleLibraryIds: libraryIds,
+      userId: user.id,
+      q: query.q,
+      timeZone,
+      contentFilters: user.isSuperuser ? undefined : user.contentFilters,
+    });
+    return and(filterWhere, this.collectionRepo.buildMembershipWhere(id));
   }
 }

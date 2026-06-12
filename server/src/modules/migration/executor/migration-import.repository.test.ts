@@ -24,15 +24,15 @@ describe('MigrationImportRepository', () => {
     const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
     const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
     const insert = vi.fn().mockReturnValue({ values });
+    const execute = vi.fn().mockResolvedValue({ rowCount: 0, rows: [] });
 
-    const repo = new MigrationImportRepository({ insert } as never);
+    const repo = new MigrationImportRepository({ insert, execute } as never);
     await repo.batchUpsertBookMetadata([
       {
         bookId: 1,
         title: 'Dune',
         openLibraryId: 'OL1W',
         itunesId: '123',
-        koboId: 'dune-kobo',
       },
       {
         bookId: 2,
@@ -49,7 +49,6 @@ describe('MigrationImportRepository', () => {
           title: expect.anything(),
           openLibraryId: expect.anything(),
           itunesId: expect.anything(),
-          koboId: expect.anything(),
           updatedAt: expect.anything(),
         }),
       }),
@@ -102,8 +101,9 @@ describe('MigrationImportRepository', () => {
     const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
     const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
     const insert = vi.fn().mockReturnValue({ values });
+    const execute = vi.fn().mockResolvedValue({ rowCount: 0, rows: [] });
 
-    const repo = new MigrationImportRepository({ insert } as never);
+    const repo = new MigrationImportRepository({ execute, insert } as never);
     const map = await repo.batchUpsertAuthors([
       { name: 'Frank Herbert', sortName: 'Herbert, Frank' },
       { name: 'Brian Herbert', sortName: 'Herbert, Brian' },
@@ -210,8 +210,9 @@ describe('MigrationImportRepository', () => {
     const onConflictDoNothing = vi.fn().mockResolvedValue(undefined);
     const values = vi.fn().mockReturnValue({ onConflictDoNothing });
     const insert = vi.fn().mockReturnValue({ values });
+    const execute = vi.fn().mockResolvedValue({ rowCount: 0, rows: [] });
 
-    const repo = new MigrationImportRepository({ delete: deleteFn, insert } as never);
+    const repo = new MigrationImportRepository({ delete: deleteFn, execute, insert } as never);
 
     await repo.deleteBookAuthors(1);
     await repo.deleteBookNarrators(1);
@@ -338,8 +339,9 @@ describe('MigrationImportRepository', () => {
     const where = vi.fn().mockResolvedValue([{ id: 7, userId: 10, name: 'Sci-fi' }]);
     const from = vi.fn().mockReturnValue({ where });
     const select = vi.fn().mockReturnValue({ from });
+    const execute = vi.fn().mockResolvedValue({ rowCount: 0, rows: [] });
 
-    const repo = new MigrationImportRepository({ insert, select } as never);
+    const repo = new MigrationImportRepository({ execute, insert, select } as never);
 
     await repo.upsertBookMetadata(1, { title: 'Dune' });
     await expect(repo.upsertAuthor({ name: 'Frank Herbert', sortName: 'Herbert, Frank' } as never)).resolves.toEqual({ id: 101 });
@@ -391,8 +393,9 @@ describe('MigrationImportRepository', () => {
     const insert = vi.fn().mockReturnValue({ values });
     const where = vi.fn().mockResolvedValue(undefined);
     const deleteFn = vi.fn().mockReturnValue({ where });
+    const execute = vi.fn().mockResolvedValue({ rowCount: 0, rows: [] });
 
-    const repo = new MigrationImportRepository({ insert, delete: deleteFn } as never);
+    const repo = new MigrationImportRepository({ execute, insert, delete: deleteFn } as never);
 
     await repo.batchUpsertBookMetadata([]);
     await repo.batchDeleteBookAuthors([]);

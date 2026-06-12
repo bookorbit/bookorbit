@@ -140,6 +140,8 @@ function makeService() {
     findAllIds: vi.fn(),
     findIdsByWhere: vi.fn(),
     findCardsCollapsed: vi.fn(),
+    findJumpBuckets: vi.fn(),
+    findJumpBucketsCollapsed: vi.fn(),
     checkBookPassesContentFilters: vi.fn().mockResolvedValue(true),
   };
   const libraryService = {
@@ -2103,6 +2105,85 @@ describe('BookService', () => {
       expect(result.total).toBe(1);
       expect(result.items[0]!.collapsedSeries).toBeDefined();
       expect(result.items[0]!.collapsedSeries!.bookCount).toBe(3);
+    });
+
+    it('queryJumpBucketsForLibrary verifies access and delegates to findJumpBuckets', async () => {
+      const { service, libraryService, queryBuilder, bookRepo } = makeService();
+      const user = makeUser({ id: 42 });
+      queryBuilder.buildWhere.mockReturnValue('WHERE' as never);
+      queryBuilder.buildOrderBy.mockReturnValue(['ORDER'] as never);
+      bookRepo.findJumpBuckets.mockResolvedValue({ buckets: [{ key: 'A', label: 'A', index: 0 }], total: 12 });
+
+      const result = await service.queryJumpBucketsForLibrary(user, 7, {
+        sort: [{ field: 'title', dir: 'asc' }],
+        pagination: { page: 0, size: 50 },
+      } as never);
+
+      expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(42, 7, false);
+      expect(queryBuilder.buildOrderBy).toHaveBeenCalledWith([{ field: 'title', dir: 'asc' }], 42);
+      expect(bookRepo.findJumpBuckets).toHaveBeenCalledWith(expect.objectContaining({ where: 'WHERE', orderBy: ['ORDER'] }));
+      expect(bookRepo.findJumpBucketsCollapsed).not.toHaveBeenCalled();
+      expect(result).toEqual({ buckets: [{ key: 'A', label: 'A', index: 0 }], total: 12 });
+    });
+
+    it('executeJumpBucketsQuery rejects ineligible sorts with BadRequestException', async () => {
+      const { service, bookRepo } = makeService();
+
+      await expect(
+        service.executeJumpBucketsQuery(1, undefined, {
+          sort: [{ field: 'addedAt', dir: 'desc' }],
+          pagination: { page: 0, size: 50 },
+        } as never),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(bookRepo.findJumpBuckets).not.toHaveBeenCalled();
+      expect(bookRepo.findJumpBucketsCollapsed).not.toHaveBeenCalled();
+    });
+
+    it('executeJumpBucketsQuery supports author and publishedYear sorts in both directions', async () => {
+      const { service, queryBuilder, bookRepo } = makeService();
+      queryBuilder.buildOrderBy.mockReturnValue(['ORDER'] as never);
+      bookRepo.findJumpBuckets.mockResolvedValue({ buckets: [], total: 0 });
+
+      for (const sort of [[{ field: 'author', dir: 'desc' }], [{ field: 'publishedYear', dir: 'asc' }], [{ field: 'title', dir: 'desc' }], []]) {
+        await service.executeJumpBucketsQuery(1, undefined, { sort, pagination: { page: 0, size: 50 } } as never);
+      }
+      expect(bookRepo.findJumpBuckets).toHaveBeenCalledTimes(4);
+    });
+
+    it('executeJumpBucketsQuery routes to the collapsed variant when collapseSeries is set', async () => {
+      const { service, bookRepo } = makeService();
+      bookRepo.findJumpBucketsCollapsed.mockResolvedValue({ buckets: [], total: 0 });
+
+      await service.executeJumpBucketsQuery(
+        9,
+        'WHERE' as never,
+        {
+          sort: [{ field: 'title', dir: 'asc' }],
+          pagination: { page: 0, size: 50 },
+          collapseSeries: true,
+        } as never,
+      );
+
+      expect(bookRepo.findJumpBucketsCollapsed).toHaveBeenCalledWith(
+        expect.objectContaining({ where: 'WHERE', sort: [{ field: 'title', dir: 'asc' }], userId: 9 }),
+      );
+      expect(bookRepo.findJumpBuckets).not.toHaveBeenCalled();
+    });
+
+    it('executeJumpBucketsQuery ignores collapseSeries when the filter targets a series', async () => {
+      const { service, queryBuilder, bookRepo } = makeService();
+      queryBuilder.buildOrderBy.mockReturnValue(['ORDER'] as never);
+      bookRepo.findJumpBuckets.mockResolvedValue({ buckets: [], total: 0 });
+
+      await service.executeJumpBucketsQuery(9, undefined, {
+        sort: [{ field: 'title', dir: 'asc' }],
+        pagination: { page: 0, size: 50 },
+        collapseSeries: true,
+        filter: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'series', operator: 'eq', value: 'Dune' }] },
+      } as never);
+
+      expect(bookRepo.findJumpBuckets).toHaveBeenCalled();
+      expect(bookRepo.findJumpBucketsCollapsed).not.toHaveBeenCalled();
     });
 
     it('queryForLibrary uses normal findCards when collapseSeries is false', async () => {

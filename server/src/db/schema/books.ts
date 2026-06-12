@@ -14,6 +14,7 @@ export const books = pgTable(
       .notNull()
       .references(() => libraryFolders.id, { onDelete: 'cascade' }),
     primaryFileId: integer('primary_file_id').references(() => bookFiles.id, { onDelete: 'set null' }),
+    primaryAuthorSortName: varchar('primary_author_sort_name', { length: 500 }),
     folderPath: varchar('folder_path', { length: 4096 }).notNull(),
     status: varchar('status', { length: 20 }).notNull().default('present'),
     addedAt: timestamp('added_at', { withTimezone: true }).defaultNow().notNull(),
@@ -28,6 +29,15 @@ export const books = pgTable(
     index('books_primary_file_id_idx').on(t.primaryFileId),
     index('books_library_status_idx').on(t.libraryId, t.status),
     index('books_library_added_at_idx').on(t.libraryId, sql`${t.addedAt} desc`),
+    index('books_library_visible_added_id_idx')
+      .on(t.libraryId, sql`${t.addedAt} desc`, t.id)
+      .where(sql`${t.status} <> 'processing'`),
+    index('books_library_author_sort_id_idx')
+      .on(t.libraryId, sql`${t.primaryAuthorSortName} asc nulls last`, t.id)
+      .where(sql`${t.status} <> 'processing'`),
+    index('books_library_author_sort_desc_id_idx')
+      .on(t.libraryId, sql`${t.primaryAuthorSortName} desc nulls last`, t.id)
+      .where(sql`${t.status} <> 'processing'`),
     foreignKey({
       columns: [t.libraryFolderId, t.libraryId],
       foreignColumns: [libraryFolders.id, libraryFolders.libraryId],

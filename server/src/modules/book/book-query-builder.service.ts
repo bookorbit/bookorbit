@@ -646,7 +646,7 @@ export class BookQueryBuilder {
   }
 
   static buildCollapseOrderBy(sort: SortSpec[], userId: number): string {
-    if (sort.length === 0) return 'sort_title ASC NULLS LAST';
+    if (sort.length === 0) return 'sort_title ASC NULLS LAST, r.id ASC';
 
     if (!Number.isSafeInteger(userId)) throw new BadRequestException('Invalid userId for collapse order');
     const safeUserId = String(Math.trunc(userId));
@@ -685,9 +685,7 @@ export class BookQueryBuilder {
           parts.push(`updated_at ${D} NULLS LAST`);
           break;
         case 'author':
-          parts.push(
-            `(SELECT a.sort_name FROM book_authors ba INNER JOIN authors a ON ba.author_id = a.id WHERE ba.book_id = r.id ORDER BY ba.display_order LIMIT 1) ${D} NULLS LAST`,
-          );
+          parts.push(`author_sort_name ${D} NULLS LAST`);
           break;
         case 'fileSize':
           parts.push(`(SELECT bf.size_bytes FROM book_files bf WHERE bf.id = r.primary_file_id) ${D} NULLS LAST`);
@@ -723,7 +721,9 @@ export class BookQueryBuilder {
           break;
       }
     }
-    return parts.length > 0 ? parts.join(', ') : 'sort_title ASC NULLS LAST';
+    if (parts.length === 0) parts.push('sort_title ASC NULLS LAST');
+    parts.push('r.id ASC');
+    return parts.join(', ');
   }
 }
 

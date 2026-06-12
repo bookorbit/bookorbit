@@ -16,6 +16,7 @@ import {
 } from '../../common/book-cover-storage';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
+import { refreshPrimaryAuthorSortNamesForBooks } from '../../db/book-author-sort-key';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
 import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
 import { ComicMetadataRepository } from './comic-metadata.repository';
@@ -37,7 +38,7 @@ import type { PdfParseWarning } from './lib/pdf-parser';
 import { MetadataEventsService, METADATA_AUTHORS_REPLACED } from './metadata-events.service';
 
 type Db = NodePgDatabase<typeof schema>;
-type RelationMutationExecutor = Pick<Db, 'delete' | 'insert' | 'select'>;
+type RelationMutationExecutor = Pick<Db, 'delete' | 'execute' | 'insert' | 'select'>;
 
 interface RelationMutationOptions {
   executor?: RelationMutationExecutor;
@@ -379,7 +380,10 @@ export class MetadataService {
   ): Promise<number[]> {
     await executor.delete(bookAuthors).where(eq(bookAuthors.bookId, bookId));
 
-    if (uniqueAuthors.length === 0) return [];
+    if (uniqueAuthors.length === 0) {
+      await refreshPrimaryAuthorSortNamesForBooks(executor, [bookId]);
+      return [];
+    }
 
     const authorByName = new Map<string, { id: number }>();
     const insertedAuthors = await executor
@@ -411,6 +415,8 @@ export class MetadataService {
     if (links.length > 0) {
       await executor.insert(bookAuthors).values(links).onConflictDoNothing();
     }
+
+    await refreshPrimaryAuthorSortNamesForBooks(executor, [bookId]);
 
     return links.map((link) => link.authorId);
   }

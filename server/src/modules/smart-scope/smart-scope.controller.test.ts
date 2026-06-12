@@ -40,6 +40,7 @@ describe('SmartScopeController', () => {
       remove: vi.fn().mockResolvedValue(undefined),
       executeSmartScope: vi.fn().mockResolvedValue({ items: [], total: 0, page: 0, size: 50 }),
       queryBooks: vi.fn().mockResolvedValue({ items: [], total: 0, page: 0, size: 50 }),
+      queryJumpBuckets: vi.fn().mockResolvedValue({ buckets: [], total: 0 }),
     };
     const controller = new SmartScopeController(smartScopeService as never);
     const user = makeUser();
@@ -53,6 +54,7 @@ describe('SmartScopeController', () => {
     await controller.executeSmartScope(1, user, 2, 25);
     const query: BookQuery = { sort: [{ field: 'title', dir: 'asc' }], pagination: { page: 0, size: 50 } };
     await controller.queryBooks(1, query, user);
+    await controller.queryJumpBuckets(1, query, user);
 
     expect(smartScopeService.findAll).toHaveBeenCalledWith(user);
     expect(smartScopeService.findOne).toHaveBeenCalledWith(1, user);
@@ -62,6 +64,7 @@ describe('SmartScopeController', () => {
     expect(smartScopeService.remove).toHaveBeenCalledWith(1, user);
     expect(smartScopeService.executeSmartScope).toHaveBeenCalledWith(1, user, 2, 25, undefined);
     expect(smartScopeService.queryBooks).toHaveBeenCalledWith(1, user, query);
+    expect(smartScopeService.queryJumpBuckets).toHaveBeenCalledWith(1, user, query);
   });
 
   it('rejects invalid page and size boundaries for legacy GET queries', async () => {

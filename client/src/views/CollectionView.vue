@@ -18,9 +18,10 @@ import MetadataExportDialog from '@/features/book/components/MetadataExportDialo
 import EditCollectionDialog from '@/features/collection/components/EditCollectionDialog.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
+import JumpRail from '@/features/book/components/JumpRail.vue'
 import { toast } from 'vue-sonner'
 import { useCollections } from '@/features/collection/composables/useCollections'
-import { useCollectionBooks } from '@/features/collection/composables/useCollectionBooks'
+import { useBookViewWindow } from '@/features/book/composables/useBookViewWindow'
 import { useSeriesCollapsePreference } from '@/features/book/composables/useSeriesCollapsePreference'
 import { useViewSearch } from '@/features/book/composables/useViewSearch'
 import { useEffectiveViewMode } from '@/composables/useEffectiveViewMode'
@@ -37,7 +38,7 @@ import { useInfiniteScrollSentinel } from '@/features/book/composables/useInfini
 import { useSavedViews, type SavedView } from '@/features/book/composables/useSavedViews'
 import { useBulkEditMetadata } from '@/features/book/composables/useBulkEditMetadata'
 import type { BulkEditFields } from '@/features/book/composables/useBulkEditMetadata'
-import type { BookCard, SortSpec } from '@bookorbit/types'
+import type { BookCard } from '@bookorbit/types'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 
 const route = useRoute()
@@ -46,8 +47,6 @@ const { viewMode, effectiveViewMode } = useEffectiveViewMode()
 const { hasPermission, isDemoRestrictedAccount } = usePermissions()
 
 const collectionId = computed(() => Number(route.params.id))
-const tableSort = ref<SortSpec[]>([{ field: 'title', dir: 'asc' }])
-const { sortModel: tableSortModel } = useViewSort(tableSort, 'collection', collectionId)
 const { tableDensity } = useDisplaySettings()
 const { allSavedViews, saveView, renameView, deleteView, duplicateView, toggleFavorite, importViews } = useSavedViews('collection', collectionId)
 const coverAspectRatio = computed(() => DEFAULT_COVER_ASPECT_RATIO)
@@ -75,18 +74,41 @@ watch(prefs, () => {
 const { searchQuery, debouncedQuery, clearSearch } = useViewSearch()
 
 const {
-  items: books,
+  booksProxy: books,
+  slots,
   total,
   loading,
   initialized: booksInitialized,
   error: booksError,
-  hasMore,
-  load,
-  clear,
-} = useCollectionBooks(collectionId, collapseEnabledRef, debouncedQuery, tableSort)
+  sort: tableSort,
+  reset: resetBooks,
+  contiguousPrefix,
+  hasMorePrefix,
+  loadMorePrefix,
+  handleRange,
+  handleFirstVisibleIndex,
+  registerScroller,
+  handleJump,
+  buckets,
+  bucketKind,
+  refreshBuckets,
+  railVisible,
+  activeBucketKey,
+  letterTemplate,
+  railGutterReserved,
+  releaseRailGutter,
+} = useBookViewWindow({
+  scopeId: collectionId,
+  listEndpoint: (id) => `/api/v1/collections/${id}/books/query`,
+  bucketsEndpoint: (id) => `/api/v1/collections/${id}/books/jump-buckets`,
+  viewMode: effectiveViewMode,
+  collapseEnabled: collapseEnabledRef,
+  q: debouncedQuery,
+})
+const { sortModel: tableSortModel } = useViewSort(tableSort, 'collection', collectionId)
 const collectionLoadError = computed(() => collectionsError.value ?? booksError.value)
 const { setBookContext } = useBookNavigation()
-useBookViewContext(books, total, () => load())
+useBookViewContext(books, total, loadMorePrefix)
 
 function handleSaveCurrentView(name: string) {
   if (!tableRef.value) return
@@ -205,7 +227,8 @@ async function handleRemoveFromCollection() {
   try {
     const ids = [...selectedIds.value]
     await removeBooksFromCollection(collectionId.value, ids)
-    load(true)
+    resetBooks()
+    refreshBuckets()
     exitSelectionMode()
     toast.success(`Removed ${ids.length} book${ids.length === 1 ? '' : 's'} from collection`)
   } catch {
@@ -266,22 +289,39 @@ async function handleBulkEditConfirm(fields: BulkEditFields) {
   const result = await submitBulkEdit(fields)
   if (result) {
     bulkEditOpen.value = false
-    load(true)
+    resetBooks()
   }
 }
 
 async function handleToggleCollapse() {
   const next = !collapseEnabledRef.value
   collapseEnabledRef.value = next
-  load(true)
   await setPreference({ collectionId: collectionId.value }, next)
 }
 
 const { sentinel } = useInfiniteScrollSentinel({
-  hasMore,
+  hasMore: hasMorePrefix,
   loading,
-  loadMore: () => load(),
+  loadMore: loadMorePrefix,
 })
+
+const bookGridRef = ref<{ scrollToIndex: (index: number) => void } | null>(null)
+
+watch(
+  [bookGridRef, tableRef, effectiveViewMode],
+  () => {
+    if (effectiveViewMode.value === 'grid' && bookGridRef.value) {
+      const grid = bookGridRef.value
+      registerScroller((index) => grid.scrollToIndex(index))
+    } else if (effectiveViewMode.value === 'table' && tableRef.value) {
+      const table = tableRef.value
+      registerScroller((index) => table.scrollToIndex(index))
+    } else {
+      registerScroller(null)
+    }
+  },
+  { immediate: true },
+)
 
 onMounted(async () => {
   await retryCollectionLoad()
@@ -289,24 +329,20 @@ onMounted(async () => {
 
 async function retryCollectionLoad() {
   collectionNotFound.value = false
-  clear()
   await fetchCollections()
   if (collectionsError.value) return
   if (!collection.value && collectionsLoaded.value) {
     collectionNotFound.value = true
     return
   }
-  if (collection.value) {
-    await load(true)
+  if (collection.value && booksError.value) {
+    resetBooks()
   }
 }
 
 watch(collectionId, async () => {
   clearSearch()
   await retryCollectionLoad()
-})
-watch(debouncedQuery, () => {
-  if (collection.value) void load(true)
 })
 </script>
 
@@ -561,18 +597,22 @@ watch(debouncedQuery, () => {
 
       <VirtualBookGrid
         v-if="effectiveViewMode === 'grid' && books.length > 0"
-        :books="books"
+        ref="bookGridRef"
+        :books="slots"
         :cover-size="coverSize"
         :grid-gap="gridGap"
         :selection-mode="selectionMode"
         :is-selected="isSelected"
+        :rail-gutter="railGutterReserved"
+        @range="handleRange"
+        @first-visible-index="handleFirstVisibleIndex"
         @action="handleBookAction"
         @select="handleSelect"
       />
 
-      <div v-if="effectiveViewMode === 'list' && books.length > 0" class="flex flex-col divide-y divide-border">
+      <div v-if="effectiveViewMode === 'list' && contiguousPrefix.length > 0" class="flex flex-col divide-y divide-border">
         <BookListRow
-          v-for="book in books"
+          v-for="book in contiguousPrefix"
           :key="book.id"
           :book="book"
           :selection-mode="selectionMode"
@@ -586,10 +626,9 @@ watch(debouncedQuery, () => {
       <VirtualBookTable
         v-if="effectiveViewMode === 'table'"
         ref="tableRef"
-        :books="books"
+        :books="slots"
         :in-flight="inFlight"
         :sort="tableSort"
-        :has-more="hasMore"
         :loading="loading"
         :total="total"
         view-type="collection"
@@ -601,15 +640,28 @@ watch(debouncedQuery, () => {
         @action="handleBookAction"
         @select="handleSelect"
         @update:book="handleTableBookUpdate"
-        @load-more="load"
+        @visible-range="handleRange"
+        @first-visible-index="handleFirstVisibleIndex"
         @select-all="handleSelectAllLoaded"
         @enter-selection="enterSelectionMode"
       />
 
-      <div v-if="effectiveViewMode !== 'table'" ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
+      <div v-if="effectiveViewMode === 'list'" ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
         <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
-        <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">All {{ total.toLocaleString() }} books loaded</span>
+        <span v-else-if="!hasMorePrefix && contiguousPrefix.length > 0" class="text-xs text-muted-foreground"
+          >All {{ total.toLocaleString() }} books loaded</span
+        >
       </div>
+
+      <JumpRail
+        :visible="railVisible"
+        :buckets="buckets"
+        :kind="bucketKind ?? 'letter'"
+        :active-key="activeBucketKey"
+        :template="bucketKind === 'letter' ? letterTemplate : undefined"
+        @jump="handleJump"
+        @after-leave="releaseRailGutter"
+      />
     </main>
   </section>
 </template>

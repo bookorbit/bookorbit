@@ -4,10 +4,18 @@ import { mount } from '@vue/test-utils'
 import type { BookCard } from '@bookorbit/types'
 import VirtualBookGrid from './VirtualBookGrid.vue'
 
+const scrollToItemMock = vi.fn<(index: number) => void>()
+
 vi.mock('vue-virtual-scroller', () => ({
   RecycleScroller: {
     name: 'RecycleScroller',
     props: ['items'],
+    emits: ['update'],
+    methods: {
+      scrollToItem(index: number) {
+        scrollToItemMock(index)
+      },
+    },
     template: '<div data-testid="recycle-scroller"><slot v-for="item in items" :key="item.id" :item="item" /></div>',
   },
 }))
@@ -193,6 +201,49 @@ describe('VirtualBookGrid', () => {
 
     expect(ebookWrapperStyle).toContain('width: 120px;')
     expect(audioWrapperStyle).toContain('width: 150px;')
+  })
+
+  describe('windowed slots', () => {
+    it('renders skeletons for placeholder slots and cards for loaded slots', () => {
+      const wrapper = mount(VirtualBookGrid, {
+        props: {
+          books: [makeBook(1), { id: -1, placeholder: true as const }, makeBook(2)],
+          coverSize: 120,
+          gridGap: 12,
+        },
+      })
+
+      expect(wrapper.findAll('[data-testid="book-cover-skeleton"]')).toHaveLength(1)
+      expect(wrapper.findAll('[data-testid="book-card"]')).toHaveLength(2)
+    })
+
+    it('re-emits the scroller update event as a range event', async () => {
+      const wrapper = mount(VirtualBookGrid, {
+        props: { books: [makeBook(1)], coverSize: 120, gridGap: 12 },
+      })
+
+      wrapper.getComponent({ name: 'RecycleScroller' }).vm.$emit('update', 10, 60, 20, 50)
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.emitted('range')).toEqual([[10, 60]])
+    })
+
+    it('exposes scrollToIndex which delegates to the scroller', () => {
+      const wrapper = mount(VirtualBookGrid, {
+        props: { books: [makeBook(1)], coverSize: 120, gridGap: 12 },
+      })
+
+      ;(wrapper.vm as unknown as { scrollToIndex: (i: number) => void }).scrollToIndex(42)
+      expect(scrollToItemMock).toHaveBeenCalledWith(42)
+    })
+
+    it('reserves a right gutter when railGutter is set', () => {
+      const wrapper = mount(VirtualBookGrid, {
+        props: { books: [makeBook(1)], coverSize: 120, gridGap: 12, railGutter: true },
+      })
+
+      expect(wrapper.classes()).toContain('pr-9')
+    })
   })
 
   describe('show-label prop forwarding', () => {

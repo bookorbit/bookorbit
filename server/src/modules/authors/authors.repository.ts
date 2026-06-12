@@ -5,6 +5,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { ContentFilterRules } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { DB } from '../../db';
+import { refreshPrimaryAuthorSortNamesForAuthors, refreshPrimaryAuthorSortNamesForBooks } from '../../db/book-author-sort-key';
 import * as schema from '../../db/schema';
 import { authors, bookAuthors, bookMetadata, books } from '../../db/schema';
 import { AuthorBookSort } from './dto/list-author-books.dto';
@@ -212,6 +213,9 @@ export class AuthorsRepository {
       hasPhoto: authors.hasPhoto,
       lastEnrichedAt: authors.lastEnrichedAt,
     });
+    if (updated && (values.name !== undefined || values.sortName !== undefined)) {
+      await refreshPrimaryAuthorSortNamesForAuthors(this.db, [authorId]);
+    }
     return updated ?? null;
   }
 
@@ -281,6 +285,10 @@ export class AuthorsRepository {
 
       await tx.delete(bookAuthors).where(inArray(bookAuthors.authorId, sourceAuthorIds));
       await tx.delete(authors).where(inArray(authors.id, sourceAuthorIds));
+      await refreshPrimaryAuthorSortNamesForBooks(
+        tx,
+        sourceRelations.map((row) => row.bookId),
+      );
     });
   }
 
@@ -288,8 +296,18 @@ export class AuthorsRepository {
     if (authorIds.length === 0) return;
 
     await this.db.transaction(async (tx) => {
+      const relations = await tx
+        .select({
+          bookId: bookAuthors.bookId,
+        })
+        .from(bookAuthors)
+        .where(inArray(bookAuthors.authorId, authorIds));
       await tx.delete(bookAuthors).where(inArray(bookAuthors.authorId, authorIds));
       await tx.delete(authors).where(inArray(authors.id, authorIds));
+      await refreshPrimaryAuthorSortNamesForBooks(
+        tx,
+        relations.map((row) => row.bookId),
+      );
     });
   }
 

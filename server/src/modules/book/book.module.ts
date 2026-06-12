@@ -17,6 +17,7 @@ import { BookSortBuilder } from './book-sort-builder.service';
 import { BookController } from './book.controller';
 import { BookRepository } from './book.repository';
 import { BookService } from './book.service';
+import { BookAuthorSortKeyBackfillService } from './book-author-sort-key-backfill.service';
 
 @Module({
   imports: [
@@ -33,7 +34,7 @@ import { BookService } from './book.service';
     AchievementModule,
   ],
   controllers: [BookController],
-  providers: [BookService, BookRepository, BookReadService, BookSortBuilder, BookQueryBuilder],
+  providers: [BookService, BookRepository, BookReadService, BookSortBuilder, BookQueryBuilder, BookAuthorSortKeyBackfillService],
   exports: [BookService, BookReadService, BookQueryBuilder],
 })
 export class BookModule {}

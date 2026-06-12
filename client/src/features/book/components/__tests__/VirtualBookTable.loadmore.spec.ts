@@ -1,5 +1,6 @@
 import { nextTick, ref, watch } from 'vue'
 import { describe, expect, it } from 'vitest'
+import { isBookPlaceholder, type BookSlot } from '@/features/book/composables/useBookWindow'
 
 describe('isLoadingMore guard', () => {
   it('prevents duplicate load-more emissions while loading is active', async () => {
@@ -77,5 +78,43 @@ describe('isLoadingMore guard', () => {
     virtualItems.value = [{ index: 19 }]
     await nextTick()
     expect(emittedCount.value).toBe(1)
+  })
+})
+
+describe('windowed table rows', () => {
+  it('emits the visible range and a scroll-derived first visible index', async () => {
+    const rowEstimate = 44
+    const scrollOffset = ref(0)
+    const virtualItems = ref<Array<{ index: number }>>([])
+    const booksLength = 500
+    const ranges: Array<[number, number]> = []
+    const firstVisible = ref(-1)
+
+    watch(virtualItems, (items) => {
+      if (!items.length) return
+      ranges.push([items[0]!.index, items[items.length - 1]!.index])
+      firstVisible.value = Math.min(booksLength - 1, Math.max(0, Math.floor(scrollOffset.value / rowEstimate)))
+    })
+
+    scrollOffset.value = 44 * 120
+    virtualItems.value = Array.from({ length: 30 }, (_, i) => ({ index: 110 + i }))
+    await nextTick()
+
+    expect(ranges).toEqual([[110, 139]])
+    expect(firstVisible.value).toBe(120)
+  })
+
+  it('distinguishes placeholder rows from loaded rows by slot shape', () => {
+    const slots: BookSlot[] = [{ id: 1 } as never, { id: -1, placeholder: true }, { id: 2 } as never]
+
+    const isPlaceholderRow = (index: number) => {
+      const slot = slots[index]
+      return slot === undefined || isBookPlaceholder(slot)
+    }
+
+    expect(isPlaceholderRow(0)).toBe(false)
+    expect(isPlaceholderRow(1)).toBe(true)
+    expect(isPlaceholderRow(2)).toBe(false)
+    expect(isPlaceholderRow(3)).toBe(true)
   })
 })

@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, ilike, inArray, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db';
+import { refreshPrimaryAuthorSortNamesForBooks } from '../../../db/book-author-sort-key';
 import * as schema from '../../../db/schema';
 import { authors, bookAuthors, books, bookMetadata } from '../../../db/schema';
 import { buildContentFilterClauses } from '../../../common/utils/content-filter-sql.utils';
@@ -274,6 +275,7 @@ export class AuthorStrategy implements EntityStrategy {
 
     if (input.mode === 'soft') {
       await this.db.delete(bookAuthors).where(eq(bookAuthors.authorId, entityId));
+      await refreshPrimaryAuthorSortNamesForBooks(this.db, affectedBookIds);
     } else {
       await this.authorsRepo.deleteAuthors([entityId]);
       await this.authorImageStorage.deleteAuthorDir(entityId);
@@ -317,6 +319,7 @@ export class AuthorStrategy implements EntityStrategy {
 
       await tx.delete(bookAuthors).where(eq(bookAuthors.authorId, input.entityId));
       await tx.delete(authors).where(eq(authors.id, input.entityId));
+      await refreshPrimaryAuthorSortNamesForBooks(tx, affectedBookIds);
     });
 
     await this.authorImageStorage.deleteAuthorDir(input.entityId);

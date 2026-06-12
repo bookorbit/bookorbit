@@ -37,6 +37,7 @@ function makeController() {
     removeBooks: vi.fn(),
     getBooks: vi.fn(),
     queryBooks: vi.fn(),
+    queryJumpBuckets: vi.fn(),
   };
   const controller = new CollectionController(service as never);
   return { controller, service };
@@ -139,6 +140,18 @@ describe('CollectionController', () => {
     await controller.queryBooks(10, query, USER);
 
     expect(service.queryBooks).toHaveBeenCalledWith(10, USER, query);
+  });
+
+  it('forwards jump bucket queries to the collection service', async () => {
+    const { controller, service } = makeController();
+    const query: BookQuery = {
+      sort: [{ field: 'title', dir: 'asc' }],
+      pagination: { page: 0, size: 50 },
+    };
+
+    await controller.queryJumpBuckets(10, query, USER);
+
+    expect(service.queryJumpBuckets).toHaveBeenCalledWith(10, USER, query);
   });
 
   describe('mutation endpoints', () => {

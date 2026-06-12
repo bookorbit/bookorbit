@@ -298,7 +298,7 @@ describe('BookQueryBuilder', () => {
 
     const result = builder.buildOrderBy([]);
 
-    expect(result).toHaveLength(1);
+    expect(result).toHaveLength(2);
   });
 
   it('adds series fallback sort when sorting by seriesIndex without explicit series sort', () => {
@@ -307,7 +307,7 @@ describe('BookQueryBuilder', () => {
 
     const result = builder.buildOrderBy([{ field: 'seriesIndex', dir: 'desc' }]);
 
-    expect(result).toHaveLength(2);
+    expect(result).toHaveLength(3);
     expect(raw).toHaveBeenCalledTimes(2);
     expect(raw).toHaveBeenNthCalledWith(1, 'DESC');
     expect(raw).toHaveBeenNthCalledWith(2, 'DESC');
@@ -319,7 +319,7 @@ describe('BookQueryBuilder', () => {
 
     const result = builder.buildOrderBy([{ field: 'title', dir: 'asc; DROP TABLE books' } as never]);
 
-    expect(result).toHaveLength(1);
+    expect(result).toHaveLength(2);
     expect(raw).not.toHaveBeenCalledWith(expect.stringContaining('DROP TABLE'));
   });
 
@@ -332,7 +332,7 @@ describe('BookQueryBuilder', () => {
       { field: 'metadataScore', dir: 'desc' },
     ]);
 
-    expect(result).toHaveLength(2);
+    expect(result).toHaveLength(3);
     expect(raw).toHaveBeenNthCalledWith(1, 'ASC');
     expect(raw).toHaveBeenNthCalledWith(2, 'DESC');
   });
@@ -342,7 +342,7 @@ describe('BookQueryBuilder', () => {
 
     const result = builder.buildOrderBy([{ field: 'readStatus', dir: 'asc' }], 1);
 
-    expect(result).toHaveLength(1);
+    expect(result).toHaveLength(2);
   });
 
   it('builds format sort with subquery', () => {
@@ -350,7 +350,7 @@ describe('BookQueryBuilder', () => {
 
     const result = builder.buildOrderBy([{ field: 'format', dir: 'desc' }]);
 
-    expect(result).toHaveLength(1);
+    expect(result).toHaveLength(2);
   });
 
   it('builds one author subquery per includesAll value and uses ilike patterns', () => {
@@ -1191,30 +1191,30 @@ describe('BookQueryBuilder.hasSeriesFilter', () => {
 
 describe('BookQueryBuilder.buildCollapseOrderBy', () => {
   it('returns default sort when sort array is empty', () => {
-    expect(BookQueryBuilder.buildCollapseOrderBy([], 1)).toBe('sort_title ASC NULLS LAST');
+    expect(BookQueryBuilder.buildCollapseOrderBy([], 1)).toBe('sort_title ASC NULLS LAST, r.id ASC');
   });
 
   it('returns default sort when all directions are invalid', () => {
     const result = BookQueryBuilder.buildCollapseOrderBy([{ field: 'title', dir: 'invalid' as never }], 1);
-    expect(result).toBe('sort_title ASC NULLS LAST');
+    expect(result).toBe('sort_title ASC NULLS LAST, r.id ASC');
   });
 
   it('generates sort_title for title field', () => {
-    expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'title', dir: 'asc' }], 1)).toBe('sort_title ASC NULLS LAST');
-    expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'title', dir: 'desc' }], 1)).toBe('sort_title DESC NULLS LAST');
+    expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'title', dir: 'asc' }], 1)).toBe('sort_title ASC NULLS LAST, r.id ASC');
+    expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'title', dir: 'desc' }], 1)).toBe('sort_title DESC NULLS LAST, r.id ASC');
   });
 
   it('generates sort_title for series field', () => {
-    expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'series', dir: 'asc' }], 1)).toBe('sort_title ASC NULLS LAST');
+    expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'series', dir: 'asc' }], 1)).toBe('sort_title ASC NULLS LAST, r.id ASC');
   });
 
   it('generates sort_added_at for addedAt field', () => {
-    expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'addedAt', dir: 'desc' }], 1)).toBe('sort_added_at DESC NULLS LAST');
+    expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'addedAt', dir: 'desc' }], 1)).toBe('sort_added_at DESC NULLS LAST, r.id ASC');
   });
 
   it('generates seriesIndex with sort_title fallback when series is not in sort', () => {
     const result = BookQueryBuilder.buildCollapseOrderBy([{ field: 'seriesIndex', dir: 'asc' }], 1);
-    expect(result).toBe('series_index ASC NULLS LAST, sort_title ASC NULLS LAST');
+    expect(result).toBe('series_index ASC NULLS LAST, sort_title ASC NULLS LAST, r.id ASC');
   });
 
   it('does not add sort_title fallback when series field is already in sort', () => {
@@ -1225,7 +1225,7 @@ describe('BookQueryBuilder.buildCollapseOrderBy', () => {
       ],
       1,
     );
-    expect(result).toBe('series_index ASC NULLS LAST, sort_title ASC NULLS LAST');
+    expect(result).toBe('series_index ASC NULLS LAST, sort_title ASC NULLS LAST, r.id ASC');
   });
 
   it('generates user-scoped subquery for readProgress', () => {
@@ -1256,18 +1256,17 @@ describe('BookQueryBuilder.buildCollapseOrderBy', () => {
     expect(result).toContain('ASC NULLS LAST');
   });
 
-  it('generates author sort using r.id to avoid column shadowing', () => {
+  it('generates author sort using the representative author sort key', () => {
     const result = BookQueryBuilder.buildCollapseOrderBy([{ field: 'author', dir: 'asc' }], 1);
-    expect(result).toContain('ba.book_id = r.id');
-    expect(result).toContain('ASC NULLS LAST');
+    expect(result).toBe('author_sort_name ASC NULLS LAST, r.id ASC');
   });
 
   it('generates publishedYear sort', () => {
-    expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'publishedYear', dir: 'asc' }], 1)).toBe('published_year ASC NULLS LAST');
+    expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'publishedYear', dir: 'asc' }], 1)).toBe('published_year ASC NULLS LAST, r.id ASC');
   });
 
   it('generates rating sort', () => {
-    expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'rating', dir: 'desc' }], 1)).toBe('rating DESC NULLS LAST');
+    expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'rating', dir: 'desc' }], 1)).toBe('rating DESC NULLS LAST, r.id ASC');
   });
 
   it('joins multiple sort parts with comma', () => {
@@ -1278,12 +1277,12 @@ describe('BookQueryBuilder.buildCollapseOrderBy', () => {
       ],
       1,
     );
-    expect(result).toBe('sort_added_at DESC NULLS LAST, sort_title ASC NULLS LAST');
+    expect(result).toBe('sort_added_at DESC NULLS LAST, sort_title ASC NULLS LAST, r.id ASC');
   });
 
   it('skips unrecognised sort fields silently', () => {
     const result = BookQueryBuilder.buildCollapseOrderBy([{ field: 'unknownField' as never, dir: 'asc' }], 1);
-    expect(result).toBe('sort_title ASC NULLS LAST');
+    expect(result).toBe('sort_title ASC NULLS LAST, r.id ASC');
   });
 
   it('generates readStatus sort using subquery', () => {

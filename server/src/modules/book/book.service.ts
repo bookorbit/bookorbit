@@ -14,7 +14,7 @@ import { access, readdir, rm, stat, rename } from 'fs/promises';
 import { inArray, type SQL } from 'drizzle-orm';
 
 import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName } from '../../common/book-cover-storage';
-import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
+import { MAX_BOOK_QUERY_OFFSET_ROWS, isBookQueryOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { isDateKey, resolveTimeZone, toDateKeyInTimeZone, toTimeZoneStartOfDay } from '../../common/utils/timezone.utils';
 import { extractEpubMetadata } from '../metadata/lib/epub';
@@ -31,6 +31,7 @@ import {
   MetadataProviderKey,
   Permission,
   isAudioFormat,
+  jumpBucketKindForSort,
   resolveUploadPath,
 } from '@bookorbit/types';
 import type {
@@ -43,6 +44,7 @@ import type {
   BookWriteAndRenameResult,
   BooksPage,
   FileRenameResult,
+  JumpBucketsResponse,
   MetadataFetchDiagnostics,
   MetadataField,
   ReadStatus,
@@ -68,6 +70,7 @@ import { UserBookStatusService } from '../user-book-status/user-book-status.serv
 import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED } from '../achievement/achievement-events.service';
 import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
 import { BookQueryBuilder } from './book-query-builder.service';
+import { collapsedJumpBucketExpr, flatJumpBucketExpr } from './jump-bucket-expr';
 import { BookRepository } from './book.repository';
 import { ComicMetadataRepository } from '../metadata/comic-metadata.repository';
 import { BookDetailDto } from './dto/book-detail.dto';
@@ -896,8 +899,8 @@ export class BookService {
   }
 
   private assertPaginationWindow(page: number, size: number): void {
-    if (!isOffsetWithinLimit(page * size)) {
-      throw new BadRequestException(`pagination window is too deep; page * size must be <= ${MAX_OFFSET_ROWS}`);
+    if (!isBookQueryOffsetWithinLimit(page * size)) {
+      throw new BadRequestException(`pagination window is too deep; page * size must be <= ${MAX_BOOK_QUERY_OFFSET_ROWS}`);
     }
   }
 
@@ -981,6 +984,47 @@ export class BookService {
       );
     }
     return result;
+  }
+
+  async queryJumpBucketsForLibrary(user: RequestUser, libraryId: number, query: BookQuery): Promise<JumpBucketsResponse> {
+    await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
+    const timeZone = this.resolveUserTimeZone(user);
+    const where = this.queryBuilder.buildWhere(query.filter, {
+      accessibleLibraryIds: [libraryId],
+      implicitLibraryId: libraryId,
+      userId: user.id,
+      q: query.q,
+      timeZone,
+      contentFilters: this.isSuperuser(user) ? undefined : user.contentFilters,
+    });
+    return this.executeJumpBucketsQuery(user.id, where, query);
+  }
+
+  async executeJumpBucketsQuery(userId: number, where: SQL | undefined, query: BookQuery): Promise<JumpBucketsResponse> {
+    const event = 'book.jump_buckets';
+    const kind = jumpBucketKindForSort(query.sort);
+    const primaryField = (query.sort[0] ?? { field: 'title', dir: 'asc' }).field;
+    const shouldCollapse = query.collapseSeries === true && !BookQueryBuilder.hasSeriesFilter(query.filter);
+    const bucketExpr = shouldCollapse ? collapsedJumpBucketExpr(primaryField) : flatJumpBucketExpr(primaryField);
+    if (!kind || !bucketExpr) throw new BadRequestException('jump buckets are not available for this sort');
+
+    const start = Date.now();
+    try {
+      const response = shouldCollapse
+        ? await this.bookRepo.findJumpBucketsCollapsed({ where, bucketExpr, sort: query.sort, userId })
+        : await this.bookRepo.findJumpBuckets({ where, bucketExpr, orderBy: this.queryBuilder.buildOrderBy(query.sort, userId) });
+      this.logger.log(
+        `[${event}] [end] userId=${userId} kind=${kind} collapse=${shouldCollapse} durationMs=${Date.now() - start} bucketCount=${response.buckets.length} total=${response.total} - jump buckets computed`,
+      );
+      return response;
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.warn(
+        `[${event}] [fail] userId=${userId} kind=${kind} collapse=${shouldCollapse} durationMs=${Date.now() - start} errorClass=${errorClass} error="${errorMessage}" - jump buckets failed`,
+      );
+      throw err;
+    }
   }
 
   async getCoverPath(id: number, user: RequestUser): Promise<string | null> {

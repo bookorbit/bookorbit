@@ -72,6 +72,7 @@ function makeService() {
 
   const bookService = {
     executeBooksQuery: vi.fn(),
+    executeJumpBucketsQuery: vi.fn(),
   };
 
   const achievementEvents = {
@@ -414,6 +415,31 @@ describe('CollectionService', () => {
 
       await expect(service.getBooks(10, makeUser(), 0, 50)).rejects.toThrow(ForbiddenException);
       expect(libraryService.findAccessibleLibraryIds).not.toHaveBeenCalled();
+    });
+
+    it('queryJumpBuckets intersects the membership filter like queryBooks', async () => {
+      const { service, collectionRepo, libraryService, queryBuilder, bookService } = makeService();
+      collectionRepo.findById.mockResolvedValue([makeCollection()]);
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([100]);
+      collectionRepo.buildMembershipWhere.mockReturnValue('membership-where');
+      queryBuilder.buildWhere.mockReturnValue('filter-where');
+      bookService.executeJumpBucketsQuery.mockResolvedValue({ buckets: [], total: 0 });
+
+      const query = { sort: [{ field: 'title', dir: 'asc' as const }], pagination: { page: 0, size: 50 } };
+      await service.queryJumpBuckets(10, makeUser(), query as never);
+
+      expect(collectionRepo.buildMembershipWhere).toHaveBeenCalledWith(10);
+      expect(bookService.executeJumpBucketsQuery).toHaveBeenCalledWith(1, expect.anything(), query);
+    });
+
+    it('queryJumpBuckets propagates ownership errors before delegating', async () => {
+      const { service, collectionRepo, bookService } = makeService();
+      collectionRepo.findById.mockResolvedValue([makeCollection({ userId: 999 })]);
+
+      await expect(service.queryJumpBuckets(10, makeUser(), { sort: [], pagination: { page: 0, size: 50 } } as never)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(bookService.executeJumpBucketsQuery).not.toHaveBeenCalled();
     });
   });
 

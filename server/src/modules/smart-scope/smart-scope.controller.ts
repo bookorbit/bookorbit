@@ -118,4 +118,9 @@ export class SmartScopeController {
   queryBooks(@Param('id', ParseIntPipe) id: number, @Body(BookQueryPipe) query: BookQuery, @CurrentUser() user: RequestUser) {
     return this.smartScopeService.queryBooks(id, user, query);
   }
+
+  @Post(':id/books/jump-buckets')
+  queryJumpBuckets(@Param('id', ParseIntPipe) id: number, @Body(BookQueryPipe) query: BookQuery, @CurrentUser() user: RequestUser) {
+    return this.smartScopeService.queryJumpBuckets(id, user, query);
+  }
 }

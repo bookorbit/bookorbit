@@ -134,6 +134,7 @@ const makeDb = () => {
     delete: vi.fn().mockReturnValue(deleteBuilder),
     select: vi.fn().mockReturnValue({ from: selectFrom }),
     insert: vi.fn().mockReturnValue({ values: insertValues }),
+    execute: vi.fn().mockResolvedValue({ rowCount: 0, rows: [] }),
   };
   const transaction = vi.fn().mockImplementation(async (callback: (tx: typeof db) => Promise<unknown>) => callback(db));
   db.transaction = transaction;

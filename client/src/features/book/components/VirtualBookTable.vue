@@ -42,13 +42,14 @@ import BookTableHeader from './table/BookTableHeader.vue'
 import BookTableHeaderContextMenu from './table/BookTableHeaderContextMenu.vue'
 import type { BookCard, Rule, SortSpec, TableLayoutState, TableViewType } from '@bookorbit/types'
 import { BOOK_METADATA_LOCK_FIELDS } from '@bookorbit/types'
+import { isBookPlaceholder, type BookSlot } from '@/features/book/composables/useBookWindow'
 import { useNarratorSearch } from '@/features/book/composables/useNarratorSearch'
 import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
 const props = withDefaults(
   defineProps<{
-    books: BookCard[]
+    books: BookSlot[]
     sort: SortSpec[]
     viewType: TableViewType
     selectionMode?: boolean
@@ -75,7 +76,20 @@ const emit = defineEmits<{
   'select-all': [checked: boolean]
   'enter-selection': []
   'quick-filter': [rule: Rule]
+  'visible-range': [startIndex: number, endIndex: number]
+  'first-visible-index': [index: number]
 }>()
+
+const loadedBooks = computed(() => props.books.filter((slot): slot is BookCard => !isBookPlaceholder(slot)))
+
+function rowBook(index: number): BookCard {
+  return props.books[index] as BookCard
+}
+
+function isPlaceholderRow(index: number): boolean {
+  const slot = props.books[index]
+  return slot === undefined || isBookPlaceholder(slot)
+}
 
 const { md } = useBreakpoints(breakpointsTailwind)
 const isReadOnly = computed(() => !md.value)
@@ -114,7 +128,7 @@ const { getCellValue, isCellLocked, isCellReadOnly, isMandatoryFieldEmpty, isBoo
 const { coverDialogBook, handleCoverClick, handleCoverDialogUpdateBook } = useTableCoverDialog(
   () => props.selectionMode ?? false,
   (updated) => emit('update:book', updated),
-  () => props.books,
+  () => loadedBooks.value,
 )
 
 function getChipsSearchFn(colId: ColumnId): (q: string) => Promise<string[]> {
@@ -203,7 +217,7 @@ async function retryMetadataRefresh(book: BookCard) {
 
 // Init lock state for books and prune stale entries
 watch(
-  () => props.books,
+  loadedBooks,
   (books) => {
     for (const book of books) {
       locks.initBook(book.id, book.lockedFields)
@@ -337,15 +351,15 @@ function closeHeaderContextMenu() {
   headerCtxPosition.value = null
 }
 
-// Checkbox selection helpers
+// Checkbox selection helpers (over loaded rows only)
 const allBooksSelected = computed(() => {
-  if (props.books.length === 0 || !props.isSelected) return false
-  return props.books.every((b) => props.isSelected!(b.id))
+  if (loadedBooks.value.length === 0 || !props.isSelected) return false
+  return loadedBooks.value.every((b) => props.isSelected!(b.id))
 })
 
 const someBooksSelected = computed(() => {
-  if (props.books.length === 0 || !props.isSelected) return false
-  const someSelected = props.books.some((b) => props.isSelected!(b.id))
+  if (loadedBooks.value.length === 0 || !props.isSelected) return false
+  const someSelected = loadedBooks.value.some((b) => props.isSelected!(b.id))
   return someSelected && !allBooksSelected.value
 })
 
@@ -373,11 +387,17 @@ const activeSorts = computed(() =>
 // Skeleton rows for initial loading
 const SKELETON_ROW_COUNT = 12
 
+const rowEstimate = computed(() => {
+  if (tableDensity.value === 'compact') return 36
+  if (tableDensity.value === 'roomy') return 52
+  return 44
+})
+
 const virtualizer = useVirtualizer(
   computed(() => ({
     count: props.books.length,
     getScrollElement: () => scrollContainerRef.value,
-    estimateSize: () => 44,
+    estimateSize: () => rowEstimate.value,
     overscan: 10,
   })),
 )
@@ -388,7 +408,12 @@ const totalSize = computed(() => virtualizer.value.getTotalSize())
 const isLoadingMore = ref(false)
 
 watch(virtualItems, (items) => {
-  if (!props.hasMore || props.loading || isLoadingMore.value || !items.length) return
+  if (!items.length) return
+  emit('visible-range', items[0]!.index, items[items.length - 1]!.index)
+  const firstVisible = Math.max(0, Math.floor((virtualizer.value.scrollOffset ?? 0) / rowEstimate.value))
+  emit('first-visible-index', Math.min(props.books.length - 1, firstVisible))
+
+  if (!props.hasMore || props.loading || isLoadingMore.value) return
   const last = items[items.length - 1]!
   if (last.index >= props.books.length - 15) {
     isLoadingMore.value = true
@@ -405,7 +430,7 @@ watch(
 
 // Keyboard navigation
 const { focusedRowIndex, focusedColIndex, isFocusedCell, handleTableKeydown } = useTableKeyboard({
-  books: () => props.books,
+  books: () => props.books as BookCard[],
   displayColumns,
   activeCellKey: editor.activeCellKey,
   selectionMode: () => props.selectionMode ?? false,
@@ -482,6 +507,7 @@ watch(
 const editableColumnIds = computed<ColumnId[]>(() => visibleColumns.value.filter((c) => c.isEditable).map((c) => c.id))
 
 function handleActivate(book: BookCard, colId: ColumnId) {
+  if (isBookPlaceholder(book as BookSlot)) return
   if (isReadOnly.value || props.selectionMode) return
   const col = displayColumns.value.find((c) => c.id === colId)
   if (!col || isCellReadOnly(book, col)) return
@@ -490,7 +516,7 @@ function handleActivate(book: BookCard, colId: ColumnId) {
 
 function handleSave(book: BookCard, colId: ColumnId, newValue: unknown) {
   editor.saveCell(book.id, colId, newValue, (patch) => {
-    const updated = mergeBookPatchWithLatest(props.books, book, patch)
+    const updated = mergeBookPatchWithLatest(loadedBooks.value, book, patch)
     emit('update:book', updated)
   })
 }
@@ -501,7 +527,7 @@ function handleCancel(bookId: number, colId: ColumnId) {
 
 function handleNavigate(book: BookCard, colId: ColumnId, direction: 'next' | 'prev' | 'rowUp' | 'rowDown') {
   if (direction === 'rowUp' || direction === 'rowDown') {
-    editor.navigateRow(direction === 'rowDown' ? 'down' : 'up', props.books, book.id, colId)
+    editor.navigateRow(direction === 'rowDown' ? 'down' : 'up', loadedBooks.value, book.id, colId)
     return
   }
   editor.navigateCell(direction, editableColumnIds.value, book, colId)
@@ -518,7 +544,7 @@ function handleRowClick(book: BookCard, e: MouseEvent) {
 }
 
 function emitLockStateUpdate(book: BookCard, nextFields: BookCard['lockedFields']) {
-  const updated = buildLockStateBookUpdate(props.books, book, nextFields)
+  const updated = buildLockStateBookUpdate(loadedBooks.value, book, nextFields)
   if (!updated) return
   emit('update:book', updated)
 }
@@ -576,6 +602,10 @@ function saveCurrentPreset(name: string): void {
   tablePresets.savePreset(name, currentLayout.value, props.sort)
 }
 
+function scrollToIndex(index: number) {
+  virtualizer.value.scrollToIndex(index, { align: 'start' })
+}
+
 defineExpose({
   allColumns,
   currentLayout,
@@ -584,6 +614,7 @@ defineExpose({
   resetLayout,
   applyPreset,
   saveCurrentPreset,
+  scrollToIndex,
   deletePreset: tablePresets.deletePreset,
   renamePreset: tablePresets.renamePreset,
   duplicatePreset: tablePresets.duplicatePreset,
@@ -694,158 +725,172 @@ defineExpose({
             <td role="gridcell" :colspan="displayColumns.length + (selectionMode ? 1 : 0)" :style="{ height: `${virtualItems[0]!.start}px` }" />
           </tr>
 
-          <tr
-            v-for="vItem in virtualItems"
-            :key="String(vItem.key)"
-            role="row"
-            :aria-label="books[vItem.index]!.title ?? undefined"
-            class="group border-b border-border/50 transition-colors"
-            :class="[
-              selectionMode && isSelected?.(books[vItem.index]!.id) ? 'bg-primary/8' : 'hover:bg-muted/40',
-              selectionMode ? 'cursor-pointer' : '',
-              isBookFileMissing(books[vItem.index]!) ? 'bg-destructive/5' : '',
-              isRowRefreshing(books[vItem.index]!.id) ? 'opacity-85' : '',
-              focusedRowIndex === vItem.index && !editor.activeCellKey.value ? 'ring-1 ring-inset ring-primary/40' : '',
-              tableZebraStriping && vItem.index % 2 === 1 && !(selectionMode && isSelected?.(books[vItem.index]!.id)) ? 'bg-muted/20' : '',
-            ]"
-            @click="handleRowClick(books[vItem.index]!, $event)"
-            @contextmenu.prevent="(event) => handleRowContextMenu(event, books[vItem.index]!)"
-          >
-            <!-- Checkbox cell -->
-            <td
-              v-if="selectionMode"
-              role="gridcell"
-              class="overflow-hidden px-2 bg-background"
-              :class="rowPaddingClass"
-              :style="{ width: '36px', minWidth: '36px', position: 'sticky', left: '0px', zIndex: 20 }"
-            >
-              <div class="flex items-center justify-center">
-                <input
-                  type="checkbox"
-                  class="accent-primary h-3.5 w-3.5 cursor-pointer"
-                  :checked="isSelected?.(books[vItem.index]!.id) ?? false"
-                  @click.stop="handleCheckboxClick(books[vItem.index]!.id, $event)"
-                />
-              </div>
-            </td>
-
-            <td
-              v-for="(col, colIdx) in displayColumns"
-              :key="col.id"
-              :data-col-id="col.id"
-              :data-row-index="vItem.index"
-              role="gridcell"
-              class="relative overflow-hidden px-2 align-middle"
+          <template v-for="vItem in virtualItems" :key="String(vItem.key)">
+            <tr v-if="isPlaceholderRow(vItem.index)" role="row" class="border-b border-border/50" :data-row-index="vItem.index">
+              <td v-if="selectionMode" role="gridcell" class="px-2" :class="rowPaddingClass" :style="{ width: '36px', minWidth: '36px' }" />
+              <td
+                v-for="col in displayColumns"
+                :key="col.id"
+                role="gridcell"
+                class="overflow-hidden px-2 align-middle"
+                :class="rowPaddingClass"
+                :style="{ width: `${col.defaultWidth}px`, minWidth: `${col.minWidth}px` }"
+              >
+                <div class="h-3.5 max-w-32 animate-pulse rounded bg-foreground/5" data-testid="book-row-skeleton" />
+              </td>
+            </tr>
+            <tr
+              v-else
+              role="row"
+              :aria-label="rowBook(vItem.index).title ?? undefined"
+              class="group border-b border-border/50 transition-colors"
               :class="[
-                rowPaddingClass,
-                col.pinned === 'right' ? 'border-l border-border/60' : '',
-                col.pinned === null ? (isMandatoryFieldEmpty(books[vItem.index]!, col.id) ? 'bg-amber-500/5' : '') : '',
-                isCellChanged(books[vItem.index]!.id, col.id) ? 'book-cell--changed' : '',
-                isFocusedCell(vItem.index, colIdx) && !editor.isActive(books[vItem.index]!.id, col.id)
-                  ? 'outline outline-2 outline-primary/50 -outline-offset-2 rounded-sm'
-                  : '',
+                selectionMode && isSelected?.(rowBook(vItem.index).id) ? 'bg-primary/8' : 'hover:bg-muted/40',
+                selectionMode ? 'cursor-pointer' : '',
+                isBookFileMissing(rowBook(vItem.index)) ? 'bg-destructive/5' : '',
+                isRowRefreshing(rowBook(vItem.index).id) ? 'opacity-85' : '',
+                focusedRowIndex === vItem.index && !editor.activeCellKey.value ? 'ring-1 ring-inset ring-primary/40' : '',
+                tableZebraStriping && vItem.index % 2 === 1 && !(selectionMode && isSelected?.(rowBook(vItem.index).id)) ? 'bg-muted/20' : '',
               ]"
-              :style="{
-                width: `${col.defaultWidth}px`,
-                minWidth: `${col.minWidth}px`,
-                ...(col.pinned === 'left' || col.id === 'lockRow'
-                  ? {
-                      position: 'sticky',
-                      left: `${(selectionMode ? 36 : 0) + (pinnedLeftOffsets.get(col.id) ?? 0)}px`,
-                      zIndex: col.id === 'lockRow' ? 20 : 2,
-                      background: getPinnedCellBackground(
-                        books[vItem.index]!,
-                        col.id,
-                        selectionMode && (isSelected?.(books[vItem.index]!.id) ?? false),
-                      ),
-                    }
-                  : {}),
-                ...(col.pinned === 'right'
-                  ? {
-                      position: 'sticky',
-                      right: '0',
-                      zIndex: 2,
-                      background: getPinnedCellBackground(
-                        books[vItem.index]!,
-                        col.id,
-                        selectionMode && (isSelected?.(books[vItem.index]!.id) ?? false),
-                      ),
-                    }
-                  : {}),
-              }"
-              @click="focusTableCell(vItem.index, colIdx, $event, books[vItem.index]!.id, col.id)"
+              @click="handleRowClick(rowBook(vItem.index), $event)"
+              @contextmenu.prevent="(event) => handleRowContextMenu(event, rowBook(vItem.index))"
             >
-              <template v-if="books[vItem.index]!.collapsedSeries">
-                <BookTableCollapsedSeriesCell :book="books[vItem.index]!" :col-id="col.id" />
-              </template>
-              <template v-else>
-                <BookTableCellDispatcher
-                  :book="books[vItem.index]!"
-                  :col-id="col.id"
-                  :cell-type="col.cellType"
-                  :has-lock-field="!!COLUMN_DEF_MAP.get(col.id)?.lockField"
-                  :is-locked="isCellLocked(books[vItem.index]!, col.id)"
-                  :is-active="editor.isActive(books[vItem.index]!.id, col.id)"
-                  :is-read-only="isCellReadOnly(books[vItem.index]!, col)"
-                  :is-fully-locked="isRowFullyLocked(books[vItem.index]!)"
-                  :locked-field-count="getRowLockedFieldCount(books[vItem.index]!)"
-                  :selection-mode="props.selectionMode ?? false"
-                  :always-show-open-link-icon="isReadOnly"
-                  :value="getCellValue(books[vItem.index]!, col.id)"
-                  :search-fn="col.cellType === 'text' ? getTextSearchFn(col.id) : col.cellType === 'chips' ? getChipsSearchFn(col.id) : undefined"
-                  :open-link="col.cellType === 'text' ? getTextCellOpenLink(books[vItem.index]!, col.id) : undefined"
-                  :open-link-label="col.cellType === 'text' ? getTextCellOpenLinkLabel(col.id) : undefined"
-                  :link-fn="col.cellType === 'chips' ? getChipsLinkFn(col.id) : undefined"
-                  :chip-action-fn="col.cellType === 'chips' ? getChipsActionFn(col.id) : undefined"
-                  :allow-decimal="col.id === 'seriesIndex'"
-                  @activate="handleActivate(books[vItem.index]!, col.id)"
-                  @save="(value) => handleSave(books[vItem.index]!, col.id, value)"
-                  @cancel="handleCancel(books[vItem.index]!.id, col.id)"
-                  @navigate="(direction) => handleNavigate(books[vItem.index]!, col.id, direction)"
-                  @cover-click="handleCoverClick(books[vItem.index]!)"
-                  @toggle-lock="handleToggleCellLock(books[vItem.index]!, col.id)"
-                  @lock-all="handleLockAllRow(books[vItem.index]!)"
-                  @unlock-all="handleUnlockAllRow(books[vItem.index]!)"
-                  @action="(type) => emit('action', books[vItem.index]!, type)"
-                  @update:book="(updated) => emit('update:book', updated)"
-                />
-
-                <div
-                  v-if="statusAnchorColumnId === col.id && getRowFeedback(books[vItem.index]!.id)"
-                  class="pointer-events-auto absolute right-1 top-1 z-30"
-                >
-                  <span
-                    v-if="getRowFeedback(books[vItem.index]!.id)?.state === 'refreshing'"
-                    class="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/12 px-1.5 py-0.5 text-[10px] font-medium text-primary"
-                  >
-                    <Loader2 :size="10" class="animate-spin" />
-                    Fetching...
-                  </span>
-                  <span
-                    v-else-if="getRowFeedback(books[vItem.index]!.id)?.state === 'success'"
-                    class="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/12 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300"
-                  >
-                    <CheckCircle2 :size="10" />
-                    Updated
-                  </span>
-                  <span
-                    v-else
-                    class="inline-flex items-center gap-1 rounded-full border border-destructive/40 bg-destructive/10 px-1 py-0.5 text-[10px] font-medium text-destructive"
-                  >
-                    <AlertTriangle :size="10" />
-                    Failed
-                    <button
-                      class="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full hover:bg-destructive/20"
-                      :title="getRowFeedbackMessage(books[vItem.index]!.id)"
-                      @click.stop="retryMetadataRefresh(books[vItem.index]!)"
-                    >
-                      <RotateCcw :size="8" />
-                    </button>
-                  </span>
+              <!-- Checkbox cell -->
+              <td
+                v-if="selectionMode"
+                role="gridcell"
+                class="overflow-hidden px-2 bg-background"
+                :class="rowPaddingClass"
+                :style="{ width: '36px', minWidth: '36px', position: 'sticky', left: '0px', zIndex: 20 }"
+              >
+                <div class="flex items-center justify-center">
+                  <input
+                    type="checkbox"
+                    class="accent-primary h-3.5 w-3.5 cursor-pointer"
+                    :checked="isSelected?.(rowBook(vItem.index).id) ?? false"
+                    @click.stop="handleCheckboxClick(rowBook(vItem.index).id, $event)"
+                  />
                 </div>
-              </template>
-            </td>
-          </tr>
+              </td>
+
+              <td
+                v-for="(col, colIdx) in displayColumns"
+                :key="col.id"
+                :data-col-id="col.id"
+                :data-row-index="vItem.index"
+                role="gridcell"
+                class="relative overflow-hidden px-2 align-middle"
+                :class="[
+                  rowPaddingClass,
+                  col.pinned === 'right' ? 'border-l border-border/60' : '',
+                  col.pinned === null ? (isMandatoryFieldEmpty(rowBook(vItem.index), col.id) ? 'bg-amber-500/5' : '') : '',
+                  isCellChanged(rowBook(vItem.index).id, col.id) ? 'book-cell--changed' : '',
+                  isFocusedCell(vItem.index, colIdx) && !editor.isActive(rowBook(vItem.index).id, col.id)
+                    ? 'outline outline-2 outline-primary/50 -outline-offset-2 rounded-sm'
+                    : '',
+                ]"
+                :style="{
+                  width: `${col.defaultWidth}px`,
+                  minWidth: `${col.minWidth}px`,
+                  ...(col.pinned === 'left' || col.id === 'lockRow'
+                    ? {
+                        position: 'sticky',
+                        left: `${(selectionMode ? 36 : 0) + (pinnedLeftOffsets.get(col.id) ?? 0)}px`,
+                        zIndex: col.id === 'lockRow' ? 20 : 2,
+                        background: getPinnedCellBackground(
+                          rowBook(vItem.index),
+                          col.id,
+                          selectionMode && (isSelected?.(rowBook(vItem.index).id) ?? false),
+                        ),
+                      }
+                    : {}),
+                  ...(col.pinned === 'right'
+                    ? {
+                        position: 'sticky',
+                        right: '0',
+                        zIndex: 2,
+                        background: getPinnedCellBackground(
+                          rowBook(vItem.index),
+                          col.id,
+                          selectionMode && (isSelected?.(rowBook(vItem.index).id) ?? false),
+                        ),
+                      }
+                    : {}),
+                }"
+                @click="focusTableCell(vItem.index, colIdx, $event, rowBook(vItem.index).id, col.id)"
+              >
+                <template v-if="rowBook(vItem.index).collapsedSeries">
+                  <BookTableCollapsedSeriesCell :book="rowBook(vItem.index)" :col-id="col.id" />
+                </template>
+                <template v-else>
+                  <BookTableCellDispatcher
+                    :book="rowBook(vItem.index)"
+                    :col-id="col.id"
+                    :cell-type="col.cellType"
+                    :has-lock-field="!!COLUMN_DEF_MAP.get(col.id)?.lockField"
+                    :is-locked="isCellLocked(rowBook(vItem.index), col.id)"
+                    :is-active="editor.isActive(rowBook(vItem.index).id, col.id)"
+                    :is-read-only="isCellReadOnly(rowBook(vItem.index), col)"
+                    :is-fully-locked="isRowFullyLocked(rowBook(vItem.index))"
+                    :locked-field-count="getRowLockedFieldCount(rowBook(vItem.index))"
+                    :selection-mode="props.selectionMode ?? false"
+                    :always-show-open-link-icon="isReadOnly"
+                    :value="getCellValue(rowBook(vItem.index), col.id)"
+                    :search-fn="col.cellType === 'text' ? getTextSearchFn(col.id) : col.cellType === 'chips' ? getChipsSearchFn(col.id) : undefined"
+                    :open-link="col.cellType === 'text' ? getTextCellOpenLink(rowBook(vItem.index), col.id) : undefined"
+                    :open-link-label="col.cellType === 'text' ? getTextCellOpenLinkLabel(col.id) : undefined"
+                    :link-fn="col.cellType === 'chips' ? getChipsLinkFn(col.id) : undefined"
+                    :chip-action-fn="col.cellType === 'chips' ? getChipsActionFn(col.id) : undefined"
+                    :allow-decimal="col.id === 'seriesIndex'"
+                    @activate="handleActivate(rowBook(vItem.index), col.id)"
+                    @save="(value) => handleSave(rowBook(vItem.index), col.id, value)"
+                    @cancel="handleCancel(rowBook(vItem.index).id, col.id)"
+                    @navigate="(direction) => handleNavigate(rowBook(vItem.index), col.id, direction)"
+                    @cover-click="handleCoverClick(rowBook(vItem.index))"
+                    @toggle-lock="handleToggleCellLock(rowBook(vItem.index), col.id)"
+                    @lock-all="handleLockAllRow(rowBook(vItem.index))"
+                    @unlock-all="handleUnlockAllRow(rowBook(vItem.index))"
+                    @action="(type) => emit('action', rowBook(vItem.index), type)"
+                    @update:book="(updated) => emit('update:book', updated)"
+                  />
+
+                  <div
+                    v-if="statusAnchorColumnId === col.id && getRowFeedback(rowBook(vItem.index).id)"
+                    class="pointer-events-auto absolute right-1 top-1 z-30"
+                  >
+                    <span
+                      v-if="getRowFeedback(rowBook(vItem.index).id)?.state === 'refreshing'"
+                      class="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/12 px-1.5 py-0.5 text-[10px] font-medium text-primary"
+                    >
+                      <Loader2 :size="10" class="animate-spin" />
+                      Fetching...
+                    </span>
+                    <span
+                      v-else-if="getRowFeedback(rowBook(vItem.index).id)?.state === 'success'"
+                      class="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/12 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300"
+                    >
+                      <CheckCircle2 :size="10" />
+                      Updated
+                    </span>
+                    <span
+                      v-else
+                      class="inline-flex items-center gap-1 rounded-full border border-destructive/40 bg-destructive/10 px-1 py-0.5 text-[10px] font-medium text-destructive"
+                    >
+                      <AlertTriangle :size="10" />
+                      Failed
+                      <button
+                        class="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full hover:bg-destructive/20"
+                        :title="getRowFeedbackMessage(rowBook(vItem.index).id)"
+                        @click.stop="retryMetadataRefresh(rowBook(vItem.index))"
+                      >
+                        <RotateCcw :size="8" />
+                      </button>
+                    </span>
+                  </div>
+                </template>
+              </td>
+            </tr>
+          </template>
 
           <tr v-if="virtualItems.length > 0" role="row">
             <td
