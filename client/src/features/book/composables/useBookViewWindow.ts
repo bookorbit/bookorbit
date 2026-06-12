@@ -14,7 +14,7 @@ function isValidScopeId(value: number | null): value is number {
 
 /**
  * One-stop wiring for the three book browsing views: the placeholder window
- * (grid + table slots, list-mode contiguous prefix) plus the jump rail
+ * (grid + table slots, list-mode contiguous prefix) plus the grid jump rail
  * (buckets, active bucket, scrubbing). Sort/filter/search changes reset the
  * window automatically through the query key; no manual reload watching.
  */
@@ -52,7 +52,7 @@ export function useBookViewWindow(options: {
   }
 
   const bucketKind = computed(() => jumpBucketKindForSort(sort.value))
-  const railModeActive = computed(() => options.viewMode.value === 'grid' || options.viewMode.value === 'table')
+  const railModeActive = computed(() => options.viewMode.value === 'grid')
   const railEligible = computed(() => bucketKind.value !== null && railModeActive.value && window.total.value >= MIN_TOTAL_FOR_RAIL)
 
   const bucketsApi = useJumpBuckets({
