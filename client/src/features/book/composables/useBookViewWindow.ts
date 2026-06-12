@@ -80,7 +80,7 @@ export function useBookViewWindow(options: {
 
   function handleJump(bucket: JumpBucket) {
     scrollToIndex?.(bucket.index)
-    window.ensureRange(bucket.index, bucket.index + BOOK_WINDOW_BLOCK_SIZE)
+    window.ensureRange(bucket.index, bucket.index + BOOK_WINDOW_BLOCK_SIZE - 1)
     firstVisibleIndex.value = bucket.index
   }
 

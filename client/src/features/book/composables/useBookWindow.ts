@@ -108,6 +108,7 @@ export function useBookWindow(options: { endpoint: Ref<string | null>; query: Re
 
   function ensureRange(startIndex: number, endIndex: number) {
     if (!options.endpoint.value) return
+    if (initialized.value && total.value === 0 && failedAt.size === 0) return
     const start = Math.max(0, startIndex)
     let end = Math.max(start, endIndex)
     if (total.value > 0) end = Math.min(end, total.value - 1)
@@ -147,8 +148,15 @@ export function useBookWindow(options: { endpoint: Ref<string | null>; query: Re
   }
 
   function retry() {
+    const failedBlocks = [...failedAt.keys()]
     failedAt.clear()
     error.value = null
+    if (failedBlocks.length > 0) {
+      for (const block of failedBlocks) {
+        if (!inFlight.has(block)) void fetchBlock(block)
+      }
+      return
+    }
     if (!initialized.value || total.value === 0) {
       reset()
       return

@@ -25,9 +25,11 @@ export function useJumpBuckets(options: {
   const cacheKey = computed(() => `${options.endpoint.value ?? ''}|${JSON.stringify(options.query.value)}`)
 
   async function fetchBuckets() {
+    const gen = ++generation
     const endpoint = options.endpoint.value
     if (!endpoint || !options.enabled.value || !kind.value) {
       buckets.value = []
+      loading.value = false
       return
     }
 
@@ -35,10 +37,10 @@ export function useJumpBuckets(options: {
     const cached = cache.get(key)
     if (cached) {
       buckets.value = cached
+      loading.value = false
       return
     }
 
-    const gen = ++generation
     loading.value = true
     try {
       const body: BookQuery = { ...options.query.value, pagination: { page: 0, size: 50 } }
