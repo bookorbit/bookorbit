@@ -194,6 +194,7 @@ export class AnnotationHubService {
       search: query.search || undefined,
       dateFrom: query.dateFrom ? new Date(query.dateFrom) : undefined,
       dateTo: query.dateTo ? new Date(query.dateTo) : undefined,
+      hasNote: query.hasNote || undefined,
       status: query.status ?? 'active',
     };
   }

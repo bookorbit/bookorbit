@@ -12,7 +12,9 @@ import {
   Maximize2,
   Minimize2,
   Search,
+  StickyNote,
   Trash2,
+  X,
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { ANNOTATION_COLOR_FILTER_OPTIONS, ANNOTATION_HIGHLIGHT_COLORS, type AnnotationHubItem } from '@bookorbit/types'
@@ -256,6 +258,39 @@ function handleExportJson() {
       <select v-model="hub.originFilter.value" class="h-9 px-2 rounded-md border border-border bg-background text-sm">
         <option v-for="option in ORIGIN_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
       </select>
+      <button
+        type="button"
+        :aria-pressed="hub.notesOnly.value"
+        class="inline-flex h-9 items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors"
+        :class="
+          hub.notesOnly.value
+            ? 'border-primary bg-primary/10 text-primary'
+            : 'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
+        "
+        @click="hub.toggleNotesOnly"
+      >
+        <StickyNote :size="14" />
+        Notes only
+      </button>
+      <div class="inline-flex items-center gap-1.5">
+        <input
+          v-model="hub.dateFrom.value"
+          type="date"
+          aria-label="From date"
+          class="h-9 px-2 rounded-md border border-border bg-background text-sm"
+        />
+        <span class="text-xs text-muted-foreground">to</span>
+        <input v-model="hub.dateTo.value" type="date" aria-label="To date" class="h-9 px-2 rounded-md border border-border bg-background text-sm" />
+        <button
+          v-if="hub.dateFrom.value || hub.dateTo.value"
+          type="button"
+          aria-label="Clear date range"
+          class="inline-flex h-9 items-center rounded-md border border-border bg-background px-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          @click="hub.clearDates"
+        >
+          <X :size="13" />
+        </button>
+      </div>
       <select v-model="hub.sortBy.value" class="h-9 px-2 rounded-md border border-border bg-background text-sm">
         <option value="createdAt">By date</option>
         <option value="book">By book</option>

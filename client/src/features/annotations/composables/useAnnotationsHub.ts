@@ -4,6 +4,17 @@ import { api } from '@/lib/api'
 
 export type HubStatus = 'active' | 'trashed'
 
+/**
+ * Turns a yyyy-mm-dd value from an `<input type="date">` into a UTC ISO instant at the
+ * start or end of that calendar day in the user's local timezone, so a "to" date includes
+ * the whole day. Returns '' for empty or unparseable input.
+ */
+function toDayBoundaryIso(date: string, edge: 'start' | 'end'): string {
+  if (!date) return ''
+  const parsed = new Date(`${date}T${edge === 'start' ? '00:00:00.000' : '23:59:59.999'}`)
+  return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString()
+}
+
 export function useAnnotationsHub() {
   const items = ref<AnnotationHubItem[]>([])
   const total = ref(0)
@@ -20,6 +31,9 @@ export function useAnnotationsHub() {
   const bookFilter = ref<number | 'all'>('all')
   const sortBy = ref<'createdAt' | 'book'>('createdAt')
   const sortDir = ref<'asc' | 'desc'>('desc')
+  const dateFrom = ref('')
+  const dateTo = ref('')
+  const notesOnly = ref(false)
 
   const books = ref<AnnotationHubBookFacet[]>([])
   const stats = ref<AnnotationHubStats | null>(null)
@@ -42,6 +56,11 @@ export function useAnnotationsHub() {
     if (styleFilter.value !== 'all') params.set('styles', styleFilter.value)
     if (originFilter.value !== 'all') params.set('origins', originFilter.value)
     if (bookFilter.value !== 'all') params.set('bookId', String(bookFilter.value))
+    const from = toDayBoundaryIso(dateFrom.value, 'start')
+    if (from) params.set('dateFrom', from)
+    const to = toDayBoundaryIso(dateTo.value, 'end')
+    if (to) params.set('dateTo', to)
+    if (notesOnly.value) params.set('hasNote', 'true')
     for (const [key, value] of Object.entries(extra)) params.set(key, value)
     return params.toString()
   }
@@ -85,6 +104,15 @@ export function useAnnotationsHub() {
     selectedIds.value = new Set(items.value.map((item) => item.id))
   }
 
+  function toggleNotesOnly() {
+    notesOnly.value = !notesOnly.value
+  }
+
+  function clearDates() {
+    dateFrom.value = ''
+    dateTo.value = ''
+  }
+
   async function bulk(action: 'trash' | 'restore' | 'restyle', patch?: { color?: string; style?: string }): Promise<number> {
     const ids = [...selectedIds.value]
     if (ids.length === 0) return 0
@@ -124,7 +152,7 @@ export function useAnnotationsHub() {
     return `/api/v1/annotations/export?${buildQuery({ format })}`
   }
 
-  watch([status, search, colorFilter, styleFilter, originFilter, bookFilter, sortBy, sortDir], () => {
+  watch([status, search, colorFilter, styleFilter, originFilter, bookFilter, sortBy, sortDir, dateFrom, dateTo, notesOnly], () => {
     page.value = 1
     clearSelection()
     void load()
@@ -156,6 +184,9 @@ export function useAnnotationsHub() {
     bookFilter,
     sortBy,
     sortDir,
+    dateFrom,
+    dateTo,
+    notesOnly,
     books,
     stats,
     selectedIds,
@@ -165,6 +196,8 @@ export function useAnnotationsHub() {
     toggleSelected,
     clearSelection,
     selectAllOnPage,
+    toggleNotesOnly,
+    clearDates,
     bulk,
     restore,
     purge,

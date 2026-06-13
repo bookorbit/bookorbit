@@ -54,6 +54,7 @@ export interface HubFilters {
   search?: string;
   dateFrom?: Date;
   dateTo?: Date;
+  hasNote?: boolean;
   status: 'active' | 'trashed';
 }
 
@@ -435,6 +436,7 @@ export class AnnotationRepository {
       const pattern = `%${filters.search}%`;
       conditions.push(or(ilike(annotations.text, pattern), ilike(annotations.note, pattern))!);
     }
+    if (filters.hasNote) conditions.push(sql`${annotations.note} is not null and ${annotations.note} <> ''`);
     if (filters.dateFrom) conditions.push(gte(annotations.createdAt, filters.dateFrom));
     if (filters.dateTo) conditions.push(lte(annotations.createdAt, filters.dateTo));
     return conditions;

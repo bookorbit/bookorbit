@@ -337,4 +337,199 @@ describe('AnnotationRepository', () => {
       expect(result).toEqual(['Chapter 1']);
     });
   });
+
+  describe('findHubPaginated', () => {
+    it('returns hub items and total while applying the notes-only and date filters', async () => {
+      const db = makeDb([makeRow({ bookTitle: 'Book', author: 'Author', jumpFileId: 1, pageno: null })], [{ count: 1 }]);
+      const repo = new AnnotationRepository(db as never);
+
+      const result = await repo.findHubPaginated(
+        10,
+        {
+          status: 'active',
+          hasNote: true,
+          dateFrom: new Date('2026-01-01T00:00:00Z'),
+          dateTo: new Date('2026-02-01T00:00:00Z'),
+          colors: ['yellow'],
+          styles: ['highlight'],
+          origins: ['web'],
+          chapter: 'Chapter 1',
+          search: 'foo',
+          bookId: 5,
+        },
+        { by: 'createdAt', dir: 'desc' },
+        1,
+        25,
+      );
+
+      expect(result.total).toBe(1);
+      expect(result.items).toHaveLength(1);
+      expect(db._queries[0].where).toHaveBeenCalled();
+    });
+
+    it('orders by book title when sort.by is book', async () => {
+      const db = makeDb([], [{ count: 0 }]);
+      const repo = new AnnotationRepository(db as never);
+
+      await repo.findHubPaginated(10, { status: 'active' }, { by: 'book', dir: 'asc' }, 1, 25);
+
+      expect(db._queries[0].orderBy).toHaveBeenCalled();
+    });
+  });
+
+  describe('getHubStats', () => {
+    it('returns the aggregate row including the notes-only filter', async () => {
+      const db = makeDb([{ books: 2, withNotes: 1, web: 1, koreader: 1, kobo: 0 }]);
+      const repo = new AnnotationRepository(db as never);
+
+      const row = await repo.getHubStats(10, { status: 'active', hasNote: true });
+
+      expect(row).toMatchObject({ books: 2, withNotes: 1 });
+    });
+  });
+
+  describe('findHubAll', () => {
+    it('returns every matching hub row for export', async () => {
+      const db = makeDb([makeRow(), makeRow({ id: 2 })]);
+      const repo = new AnnotationRepository(db as never);
+
+      const rows = await repo.findHubAll(10, { status: 'active', hasNote: true, dateTo: new Date('2026-02-01T00:00:00Z') });
+
+      expect(rows).toHaveLength(2);
+    });
+  });
+
+  describe('findHubById', () => {
+    it('returns the hub row when found', async () => {
+      const db = makeDb([makeRow({ bookTitle: 'Book' })]);
+      const repo = new AnnotationRepository(db as never);
+
+      const row = await repo.findHubById(10, 1);
+
+      expect(row).toMatchObject({ id: 1 });
+    });
+
+    it('returns null when not found', async () => {
+      const db = makeDb([]);
+      const repo = new AnnotationRepository(db as never);
+
+      expect(await repo.findHubById(10, 99)).toBeNull();
+    });
+  });
+
+  describe('findHubBookFacets', () => {
+    it('returns book facets with counts for active annotations', async () => {
+      const db = makeDb([{ bookId: 5, bookTitle: 'Book', author: 'Author', count: 3 }]);
+      const repo = new AnnotationRepository(db as never);
+
+      const rows = await repo.findHubBookFacets(10, 'active');
+
+      expect(rows).toEqual([{ bookId: 5, bookTitle: 'Book', author: 'Author', count: 3 }]);
+    });
+
+    it('queries the trashed set when status is trashed', async () => {
+      const db = makeDb([]);
+      const repo = new AnnotationRepository(db as never);
+
+      await repo.findHubBookFacets(10, 'trashed');
+
+      expect(db._queries[0].where).toHaveBeenCalled();
+    });
+  });
+
+  describe('bulkSetDeleted', () => {
+    it('returns 0 for an empty id list without querying', async () => {
+      const db = makeDb();
+      const repo = new AnnotationRepository(db as never);
+
+      expect(await repo.bulkSetDeleted(10, [], true)).toBe(0);
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
+    it('soft-deletes the given ids and returns the affected count', async () => {
+      const db = makeDb([{ id: 1 }, { id: 2 }]);
+      const repo = new AnnotationRepository(db as never);
+
+      const affected = await repo.bulkSetDeleted(10, [1, 2], true);
+
+      expect(affected).toBe(2);
+      expect(db._queries[0].set.mock.calls[0][0]).toHaveProperty('deletedAt');
+    });
+
+    it('restores when deleted is false', async () => {
+      const db = makeDb([{ id: 1 }]);
+      const repo = new AnnotationRepository(db as never);
+
+      const affected = await repo.bulkSetDeleted(10, [1], false);
+
+      expect(affected).toBe(1);
+      expect(db._queries[0].set.mock.calls[0][0]).toMatchObject({ deletedAt: null });
+    });
+  });
+
+  describe('bulkRestyle', () => {
+    it('returns 0 when there are no ids or no patch fields', async () => {
+      const db = makeDb();
+      const repo = new AnnotationRepository(db as never);
+
+      expect(await repo.bulkRestyle(10, [], { color: 'yellow' })).toBe(0);
+      expect(await repo.bulkRestyle(10, [1], {})).toBe(0);
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
+    it('applies the restyle patch and returns the affected count', async () => {
+      const db = makeDb([{ id: 1 }, { id: 2 }]);
+      const repo = new AnnotationRepository(db as never);
+
+      const affected = await repo.bulkRestyle(10, [1, 2], { color: '#38BDF8', style: 'underline' });
+
+      expect(affected).toBe(2);
+      expect(db._queries[0].set.mock.calls[0][0]).toMatchObject({ color: '#38BDF8', style: 'underline' });
+    });
+  });
+
+  describe('findTrashed', () => {
+    it('returns trashed rows filtered by book', async () => {
+      const db = makeDb([makeRow({ deletedAt: new Date('2026-01-02T00:00:00Z') })]);
+      const repo = new AnnotationRepository(db as never);
+
+      const rows = await repo.findTrashed(10, 5);
+
+      expect(rows).toHaveLength(1);
+    });
+  });
+
+  describe('findPaginated with filters', () => {
+    it('applies color, search, chapter and date filters with position sort', async () => {
+      const db = makeDb([makeRow()], [{ count: 1 }]);
+      const repo = new AnnotationRepository(db as never);
+
+      const result = await repo.findPaginated(
+        5,
+        10,
+        {
+          colors: ['yellow'],
+          search: 'foo',
+          chapter: 'Chapter 1',
+          dateFrom: new Date('2026-01-01T00:00:00Z'),
+          dateTo: new Date('2026-02-01T00:00:00Z'),
+        },
+        { by: 'position', dir: 'desc' },
+        1,
+        25,
+      );
+
+      expect(result.total).toBe(1);
+      expect(result.items).toHaveLength(1);
+    });
+
+    it('orders by createdAt when sort.by is createdAt', async () => {
+      const db = makeDb([], [{ count: 0 }]);
+      const repo = new AnnotationRepository(db as never);
+
+      await repo.findPaginated(5, 10, {}, { by: 'createdAt', dir: 'asc' }, 1, 25);
+
+      expect(db._queries[0].orderBy).toHaveBeenCalled();
+    });
+  });
 });

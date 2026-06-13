@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsISO8601, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsISO8601, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 import { ANNOTATION_POSITION_FORMATS, ANNOTATION_STYLES, type AnnotationPositionFormat } from '../annotation.constants';
 
@@ -58,6 +58,12 @@ export class AnnotationHubQueryDto {
   @IsOptional()
   @IsISO8601()
   dateTo?: string;
+
+  /** When true, only annotations that carry a note are returned. */
+  @IsOptional()
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  hasNote?: boolean;
 
   @IsOptional()
   @IsIn(['active', 'trashed'])
