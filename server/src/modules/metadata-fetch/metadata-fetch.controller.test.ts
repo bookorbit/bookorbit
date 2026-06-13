@@ -171,6 +171,7 @@ describe('MetadataFetchController', () => {
         audible: { enabled: false, domain: 'com' },
         audnexus: { enabled: false },
         kobo: { enabled: true, country: 'us', language: 'en' },
+        lubimyczytac: { enabled: false },
       }),
     );
     service.search.mockReturnValue(of({ provider: MetadataProviderKey.KOBO, providerId: 'dune-1', title: 'Dune' }));
@@ -313,5 +314,6 @@ function makeProviderConfig(overrides: Partial<ProviderConfigurations> = {}): Pr
     comicvine: { enabled: false, apiKey: '', ...overrides.comicvine },
     ranobedb: { enabled: false, ...overrides.ranobedb },
     kobo: { enabled: true, country: 'us', language: 'en', ...overrides.kobo },
+    lubimyczytac: { enabled: false, ...overrides.lubimyczytac },
   };
 }

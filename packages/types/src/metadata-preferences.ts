@@ -127,6 +127,7 @@ export interface ProviderConfigurations {
   comicvine: ComicVineProviderConfig;
   ranobedb: SimpleProviderConfig;
   kobo: KoboProviderConfig;
+  lubimyczytac: SimpleProviderConfig;
 }
 
 export interface ProviderStatus {

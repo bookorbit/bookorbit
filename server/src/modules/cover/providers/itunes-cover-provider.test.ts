@@ -15,6 +15,7 @@ const baseConfig: ProviderConfigurations = {
   comicvine: { enabled: false, apiKey: '' },
   ranobedb: { enabled: false },
   kobo: { enabled: false, country: 'us', language: 'en' },
+  lubimyczytac: { enabled: false },
 };
 
 function mockJsonResponse(body: unknown, status = 200): Response {

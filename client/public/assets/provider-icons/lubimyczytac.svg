@@ -1,0 +1,9 @@
+<svg role="img" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+  <title>LubimyCzytac</title>
+  <rect width="48" height="48" rx="10" fill="#ffffff" />
+  <g fill="#E85621">
+    <path d="M24 9 L42 16 L42 19 L24 26 L6 19 L6 16 Z" />
+    <path d="M6 22 L24 29 L42 22 L42 26 L24 33 L6 26 Z" />
+    <path d="M6 29 L24 36 L42 29 L42 33 L24 40 L6 33 Z" />
+  </g>
+</svg>

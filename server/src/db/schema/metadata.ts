@@ -68,6 +68,7 @@ export const bookMetadata = pgTable(
     audibleId: varchar('audible_id', { length: 20 }),
     comicvineId: varchar('comicvine_id', { length: 50 }),
     ranobedbId: varchar('ranobedb_id', { length: 50 }),
+    lubimyczytacId: text('lubimyczytac_id'),
     chapters: jsonb('chapters'),
     lockedFields: text('locked_fields')
       .array()

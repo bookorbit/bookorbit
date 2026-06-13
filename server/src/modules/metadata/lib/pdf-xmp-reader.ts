@@ -26,6 +26,7 @@ export interface XmpParsed {
   openLibraryId: string | null;
   ranobedbId: string | null;
   koboId: string | null;
+  lubimyczytacId: string | null;
   itunesId: string | null;
 }
 
@@ -159,6 +160,7 @@ export function parseXmp(xmpXml: string): XmpParsed | null {
     openLibraryId: str(merged[`${px}:openLibraryId`]),
     ranobedbId: str(merged[`${px}:ranobedbId`]),
     koboId: str(merged[`${px}:koboId`]),
+    lubimyczytacId: str(merged[`${px}:lubimyczytacId`]),
     itunesId: str(merged[`${px}:itunesId`]),
   };
 }

@@ -74,6 +74,7 @@ describe('ProviderConfigService', () => {
       comicvine: { enabled: false, apiKey: '' },
       ranobedb: { enabled: false },
       kobo: { enabled: false, country: 'us', language: 'en' },
+      lubimyczytac: { enabled: false },
     });
   });
 
@@ -356,6 +357,7 @@ describe('ProviderConfigService', () => {
       comicvine: { enabled: false, apiKey: '' },
       ranobedb: { enabled: false },
       kobo: { enabled: false, country: 'us', language: 'en' },
+      lubimyczytac: { enabled: false },
     });
 
     expect(statuses.map((s) => s.key)).toEqual([
@@ -370,6 +372,7 @@ describe('ProviderConfigService', () => {
       MetadataProviderKey.COMICVINE,
       MetadataProviderKey.RANOBEDB,
       MetadataProviderKey.KOBO,
+      MetadataProviderKey.LUBIMYCZYTAC,
     ]);
     expect(statuses.find((s) => s.key === MetadataProviderKey.GOOGLE)?.configured).toBe(false);
     expect(statuses.find((s) => s.key === MetadataProviderKey.GOOGLE)?.hint).toContain('API key required');
@@ -394,6 +397,7 @@ describe('ProviderConfigService', () => {
       comicvine: { enabled: false, apiKey: '' },
       ranobedb: { enabled: false },
       kobo: { enabled: false, country: 'us', language: 'en' },
+      lubimyczytac: { enabled: false },
     });
 
     expect(statuses.find((s) => s.key === MetadataProviderKey.HARDCOVER)?.configured).toBe(true);

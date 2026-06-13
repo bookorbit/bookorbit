@@ -161,6 +161,7 @@ export type BookMetadataRefreshPreviewFields = {
   koboId?: string | null;
   comicvineId?: string | null;
   ranobedbId?: string | null;
+  lubimyczytacId?: string | null;
   audioMetadata?: {
     narrators?: string[];
     durationSeconds?: number | null;

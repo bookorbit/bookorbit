@@ -578,6 +578,7 @@ export class MetadataService {
       openLibraryId: data.openLibraryId,
       ranobedbId: data.ranobedbId,
       koboId: data.koboId,
+      lubimyczytacId: data.lubimyczytacId,
       itunesId: data.itunesId,
       comicMetadata: data.comicMetadata ?? undefined,
     });
@@ -602,6 +603,7 @@ export class MetadataService {
     if (filtered.openLibraryId !== undefined) scalarFields.openLibraryId = filtered.openLibraryId;
     if (filtered.ranobedbId !== undefined) scalarFields.ranobedbId = filtered.ranobedbId;
     if (filtered.koboId !== undefined) scalarFields.koboId = filtered.koboId;
+    if (filtered.lubimyczytacId !== undefined) scalarFields.lubimyczytacId = filtered.lubimyczytacId;
     if (filtered.itunesId !== undefined) scalarFields.itunesId = filtered.itunesId;
     if (Object.keys(scalarFields).length > 0) {
       scalarFields.updatedAt = new Date();

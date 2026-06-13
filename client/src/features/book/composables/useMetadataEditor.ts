@@ -28,6 +28,7 @@ const ROOT_FIELDS = [
   'koboId',
   'comicvineId',
   'ranobedbId',
+  'lubimyczytacId',
 ] as const
 
 const COMIC_FIELDS = {
@@ -83,6 +84,7 @@ export function useMetadataEditor() {
     koboId: null as string | null,
     comicvineId: null as string | null,
     ranobedbId: null as string | null,
+    lubimyczytacId: null as string | null,
     comicIssueNumber: null as string | null,
     comicVolumeName: null as string | null,
     comicStoryArcs: [] as string[],
@@ -130,6 +132,7 @@ export function useMetadataEditor() {
     form.koboId = book.providerIds.kobo ?? null
     form.comicvineId = book.providerIds.comicvine ?? null
     form.ranobedbId = book.providerIds.ranobedb ?? null
+    form.lubimyczytacId = book.providerIds.lubimyczytac ?? null
     const cm = book.comicMetadata
     form.comicIssueNumber = cm?.issueNumber ?? null
     form.comicVolumeName = cm?.volumeName ?? null

@@ -9,6 +9,7 @@ import { DialogRoot, DialogContent, DialogPortal, DialogOverlay, DialogClose, Di
 import { formatBytes } from '@/lib/formatting'
 import { getProviderColor } from '@/lib/provider-colors'
 import { providerIconPath } from '@/features/book/lib/provider-icons'
+import { lubimyczytacBookUrl } from '@/features/book/lib/provider-links'
 import { useBookDetail } from '../composables/useBookDetail'
 import { useCoverVersions } from '../composables/useCoverVersions'
 import { getFormatColor } from '../lib/format-colors'
@@ -142,6 +143,15 @@ const providerLinks = computed<ProviderLink[]>(() => {
       url: `https://ranobedb.org/book/${ids.ranobedb}`,
       iconUrl: providerIconPath('ranobedb'),
       fallback: 'RN',
+    })
+  }
+  if (ids.lubimyczytac) {
+    out.push({
+      key: 'lubimyczytac',
+      label: 'LubimyCzytac',
+      url: lubimyczytacBookUrl(ids.lubimyczytac),
+      iconUrl: providerIconPath('lubimyczytac'),
+      fallback: 'LC',
     })
   }
   return out

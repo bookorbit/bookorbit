@@ -23,6 +23,7 @@ export interface ParsedOpf {
   openLibraryId: string | null;
   ranobedbId: string | null;
   koboId: string | null;
+  lubimyczytacId: string | null;
   itunesId: string | null;
   coverHref: string | null;
 }
@@ -208,6 +209,7 @@ export function parseOpf(xml: string): ParsedOpf {
   let schemeOpenLibraryId: string | null = null;
   let schemeRanobedbId: string | null = null;
   let schemeKoboId: string | null = null;
+  let schemeLubimyczytacId: string | null = null;
   let schemeItunesId: string | null = null;
 
   let urnGoogleBooksId: string | null = null;
@@ -217,6 +219,7 @@ export function parseOpf(xml: string): ParsedOpf {
   let urnOpenLibraryId: string | null = null;
   let urnRanobedbId: string | null = null;
   let urnKoboId: string | null = null;
+  let urnLubimyczytacId: string | null = null;
   let urnItunesId: string | null = null;
 
   for (const ident of toArray(metadata['identifier'])) {
@@ -240,6 +243,7 @@ export function parseOpf(xml: string): ParsedOpf {
     if (scheme === 'openlibrary') schemeOpenLibraryId ??= value || null;
     if (scheme === 'ranobedb') schemeRanobedbId ??= value || null;
     if (scheme === 'kobo') schemeKoboId ??= value || null;
+    if (scheme === 'lubimyczytac') schemeLubimyczytacId ??= value || null;
     if (scheme === 'itunes') schemeItunesId ??= value || null;
 
     // urn:-prefixed provider identifiers (legacy / backward-compat)
@@ -250,6 +254,7 @@ export function parseOpf(xml: string): ParsedOpf {
     if (value.startsWith('urn:openlibrary:')) urnOpenLibraryId ??= value.slice('urn:openlibrary:'.length) || null;
     if (value.startsWith('urn:ranobedb:')) urnRanobedbId ??= value.slice('urn:ranobedb:'.length) || null;
     if (value.startsWith('urn:kobo:')) urnKoboId ??= value.slice('urn:kobo:'.length) || null;
+    if (value.startsWith('urn:lubimyczytac:')) urnLubimyczytacId ??= value.slice('urn:lubimyczytac:'.length) || null;
     if (value.startsWith('urn:itunes:')) urnItunesId ??= value.slice('urn:itunes:'.length) || null;
   }
 
@@ -261,6 +266,7 @@ export function parseOpf(xml: string): ParsedOpf {
   const openLibraryId = schemeOpenLibraryId ?? urnOpenLibraryId;
   const ranobedbId = schemeRanobedbId ?? urnRanobedbId;
   const koboId = schemeKoboId ?? urnKoboId;
+  const lubimyczytacId = schemeLubimyczytacId ?? urnLubimyczytacId;
   const itunesId = schemeItunesId ?? urnItunesId;
 
   isbn10 ??= propertyMeta('bookorbit:isbn10') ?? namedMeta('bookorbit:isbn10');
@@ -381,6 +387,7 @@ export function parseOpf(xml: string): ParsedOpf {
     openLibraryId,
     ranobedbId,
     koboId,
+    lubimyczytacId,
     itunesId,
     coverHref,
   };

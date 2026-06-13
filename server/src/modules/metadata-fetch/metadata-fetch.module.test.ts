@@ -19,6 +19,7 @@ import { HardcoverProvider } from './providers/hardcover/hardcover.provider';
 import { ComicVineProvider } from './providers/comicvine/comicvine.provider';
 import { KoboProvider } from './providers/kobo/kobo.provider';
 import { RanobeDbProvider } from './providers/ranobedb/ranobedb.provider';
+import { LubimyczytacProvider } from './providers/lubimyczytac/lubimyczytac.provider';
 
 describe('MetadataFetchModule', () => {
   it('registers provider classes and factory wiring for METADATA_PROVIDERS', () => {
@@ -37,6 +38,7 @@ describe('MetadataFetchModule', () => {
         ComicVineProvider,
         RanobeDbProvider,
         KoboProvider,
+        LubimyczytacProvider,
         ProviderRegistry,
         MetadataFetchRepository,
         MetadataFetchService,
@@ -62,6 +64,7 @@ describe('MetadataFetchModule', () => {
       ComicVineProvider,
       RanobeDbProvider,
       KoboProvider,
+      LubimyczytacProvider,
     ]);
 
     const google = { key: 'google' };

@@ -23,6 +23,7 @@ import { ComicVineProvider } from './providers/comicvine/comicvine.provider';
 import { KoboProvider } from './providers/kobo/kobo.provider';
 import { RanobeDbClient } from './providers/ranobedb/ranobedb.client';
 import { RanobeDbProvider } from './providers/ranobedb/ranobedb.provider';
+import { LubimyczytacProvider } from './providers/lubimyczytac/lubimyczytac.provider';
 
 const PROVIDER_CLASSES = [
   GoogleProvider,
@@ -36,6 +37,7 @@ const PROVIDER_CLASSES = [
   ComicVineProvider,
   RanobeDbProvider,
   KoboProvider,
+  LubimyczytacProvider,
 ];
 
 @Module({

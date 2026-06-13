@@ -44,6 +44,7 @@ const DEFAULT_CONFIG: ProviderConfigurations = {
   comicvine: { enabled: false, apiKey: '' },
   ranobedb: { enabled: false },
   kobo: { enabled: false, country: 'us', language: 'en' },
+  lubimyczytac: { enabled: false },
 };
 
 function asObject(value: unknown): Record<string, unknown> {
@@ -137,6 +138,7 @@ const PROVIDER_LABELS: Record<MetadataProviderKey, string> = {
   [MetadataProviderKey.COMICVINE]: 'ComicVine',
   [MetadataProviderKey.RANOBEDB]: 'RanobeDB',
   [MetadataProviderKey.KOBO]: 'Kobo',
+  [MetadataProviderKey.LUBIMYCZYTAC]: 'LubimyCzytac',
 };
 
 type ProviderEnableRule = {
@@ -182,6 +184,7 @@ export class ProviderConfigService {
       comicvine: { ...DEFAULT_CONFIG.comicvine },
       ranobedb: { ...DEFAULT_CONFIG.ranobedb },
       kobo: { ...DEFAULT_CONFIG.kobo },
+      lubimyczytac: { ...DEFAULT_CONFIG.lubimyczytac },
     };
   }
 
@@ -199,6 +202,7 @@ export class ProviderConfigService {
       comicvine: mergeComicVineConfig(base.comicvine, next.comicvine),
       ranobedb: mergeSimpleConfig(base.ranobedb, next.ranobedb),
       kobo: mergeKoboConfig(base.kobo, next.kobo),
+      lubimyczytac: mergeSimpleConfig(base.lubimyczytac, next.lubimyczytac),
     };
   }
 
@@ -425,6 +429,13 @@ export class ProviderConfigService {
         enabled: cfg.kobo.enabled,
         configured: true,
         hint: 'Web scraping may be blocked by Kobo bot protection',
+      },
+      {
+        key: MetadataProviderKey.LUBIMYCZYTAC,
+        label: PROVIDER_LABELS[MetadataProviderKey.LUBIMYCZYTAC],
+        enabled: cfg.lubimyczytac.enabled,
+        configured: true,
+        hint: 'Polish book catalog (lubimyczytac.pl). Scrapes public pages.',
       },
     ];
   }

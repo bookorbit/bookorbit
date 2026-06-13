@@ -72,6 +72,7 @@ export class MetadataFetchService {
       [MetadataProviderKey.KOBO]: row.koboId ?? undefined,
       [MetadataProviderKey.COMICVINE]: row.comicvineId ?? undefined,
       [MetadataProviderKey.RANOBEDB]: row.ranobedbId ?? undefined,
+      [MetadataProviderKey.LUBIMYCZYTAC]: row.lubimyczytacId ?? undefined,
     };
   }
 

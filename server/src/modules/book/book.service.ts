@@ -273,6 +273,7 @@ export class BookService {
     koboId?: string | null;
     comicvineId?: string | null;
     ranobedbId?: string | null;
+    lubimyczytacId?: string | null;
   }): Partial<Record<MetadataProviderKey, string>> {
     const providerIds: Partial<Record<MetadataProviderKey, string>> = {};
     if (meta.googleBooksId) providerIds[MetadataProviderKey.GOOGLE] = meta.googleBooksId;
@@ -285,6 +286,7 @@ export class BookService {
     if (meta.koboId) providerIds[MetadataProviderKey.KOBO] = meta.koboId;
     if (meta.comicvineId) providerIds[MetadataProviderKey.COMICVINE] = meta.comicvineId;
     if (meta.ranobedbId) providerIds[MetadataProviderKey.RANOBEDB] = meta.ranobedbId;
+    if (meta.lubimyczytacId) providerIds[MetadataProviderKey.LUBIMYCZYTAC] = meta.lubimyczytacId;
     return providerIds;
   }
 
@@ -301,6 +303,7 @@ export class BookService {
       | 'koboId'
       | 'comicvineId'
       | 'ranobedbId'
+      | 'lubimyczytacId'
     >,
     providerIds: Partial<Record<MetadataProviderKey, string>>,
   ): void {
@@ -314,6 +317,7 @@ export class BookService {
     if (providerIds[MetadataProviderKey.KOBO]) dto.koboId = providerIds[MetadataProviderKey.KOBO];
     if (providerIds[MetadataProviderKey.COMICVINE]) dto.comicvineId = providerIds[MetadataProviderKey.COMICVINE];
     if (providerIds[MetadataProviderKey.RANOBEDB]) dto.ranobedbId = providerIds[MetadataProviderKey.RANOBEDB];
+    if (providerIds[MetadataProviderKey.LUBIMYCZYTAC]) dto.lubimyczytacId = providerIds[MetadataProviderKey.LUBIMYCZYTAC];
   }
 
   private buildMetadataRefreshPreview(
@@ -1430,6 +1434,7 @@ export class BookService {
     if (dto.koboId !== undefined) scalarFields.koboId = dto.koboId ?? null;
     if (dto.comicvineId !== undefined) scalarFields.comicvineId = dto.comicvineId ?? null;
     if (dto.ranobedbId !== undefined) scalarFields.ranobedbId = dto.ranobedbId ?? null;
+    if (dto.lubimyczytacId !== undefined) scalarFields.lubimyczytacId = dto.lubimyczytacId ?? null;
     if (dto.rating !== undefined) scalarFields.rating = dto.rating ?? null;
     if (dto.audioMetadata) {
       if (dto.audioMetadata.durationSeconds !== undefined) scalarFields.durationSeconds = dto.audioMetadata.durationSeconds ?? null;
@@ -2648,6 +2653,7 @@ export class BookService {
         [MetadataProviderKey.KOBO]: meta?.koboId ?? null,
         [MetadataProviderKey.COMICVINE]: meta?.comicvineId ?? null,
         [MetadataProviderKey.RANOBEDB]: meta?.ranobedbId ?? null,
+        [MetadataProviderKey.LUBIMYCZYTAC]: meta?.lubimyczytacId ?? null,
       },
       authors: authorRows,
       genres: genreRows.map((g) => g.name),
@@ -2755,6 +2761,7 @@ export class BookService {
           itunesId: parsed.itunesId,
           koboId: parsed.koboId,
           ranobedbId: parsed.ranobedbId,
+          lubimyczytacId: parsed.lubimyczytacId,
           authors: parsed.authors.length > 0 ? parsed.authors.map((a) => a.name) : undefined,
           genres: parsed.genres.length > 0 ? parsed.genres : undefined,
         };
@@ -2785,6 +2792,7 @@ export class BookService {
           itunesId: parsed.itunesId,
           koboId: parsed.koboId,
           ranobedbId: parsed.ranobedbId,
+          lubimyczytacId: parsed.lubimyczytacId,
           authors: parsed.authors.length > 0 ? parsed.authors.map((a) => a.name) : undefined,
           genres: parsed.genres.length > 0 ? parsed.genres : undefined,
         };
@@ -2833,6 +2841,7 @@ export class BookService {
           itunesId: parsed.itunesId,
           koboId: parsed.koboId,
           ranobedbId: parsed.ranobedbId,
+          lubimyczytacId: parsed.lubimyczytacId,
           authors: parsed.authors.length > 0 ? parsed.authors.map((a) => a.name) : undefined,
           genres: cbzGenres.length > 0 ? cbzGenres : undefined,
           comicMetadata: parsed.comicMetadata ?? undefined,

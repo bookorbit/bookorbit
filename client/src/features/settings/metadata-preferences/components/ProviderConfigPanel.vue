@@ -198,6 +198,12 @@ const rows: RowDef[] = [
     },
   },
   { key: 'ranobedb', label: 'RanobeDB', hint: 'Japanese light novel metadata from RanobeDB. No setup required.', fields: [] },
+  {
+    key: 'lubimyczytac',
+    label: 'LubimyCzytac',
+    hint: 'Polish book catalog (lubimyczytac.pl). Scrapes public book pages. No setup required.',
+    fields: [],
+  },
 ]
 
 const TESTABLE_PROVIDERS: MetadataProviderKey[] = [MetadataProviderKey.AMAZON, MetadataProviderKey.HARDCOVER]

@@ -24,6 +24,7 @@ export interface FileMetadata {
   koboId?: string | null
   comicvineId?: string | null
   ranobedbId?: string | null
+  lubimyczytacId?: string | null
   authors?: string[]
   genres?: string[]
   narrators?: string[]

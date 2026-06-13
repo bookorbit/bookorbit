@@ -12,6 +12,7 @@ export const MetadataProviderKey = {
   COMICVINE: "comicvine",
   RANOBEDB: "ranobedb",
   KOBO: "kobo",
+  LUBIMYCZYTAC: "lubimyczytac",
 } as const;
 
 export interface ComicMetadataFields {

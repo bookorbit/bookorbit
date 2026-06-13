@@ -73,6 +73,7 @@ const DIRECT_PATCH_FIELDS = [
   'koboId',
   'comicvineId',
   'ranobedbId',
+  'lubimyczytacId',
 ] as const
 
 const COMIC_FIELD_MAP = {
@@ -169,6 +170,7 @@ const providerIdFields = [
   { field: 'koboId' as const, label: 'Kobo' },
   { field: 'comicvineId' as const, label: 'ComicVine' },
   { field: 'ranobedbId' as const, label: 'RanobeDB' },
+  { field: 'lubimyczytacId' as const, label: 'LubimyCzytac' },
 ]
 
 function setIntField(field: 'publishedYear' | 'pageCount' | 'durationSeconds', e: Event) {
@@ -421,6 +423,7 @@ function buildPreviewPatch(preview: MetadataRefreshPreview): MetadataPatch {
     koboId: preview.koboId,
     comicvineId: preview.comicvineId,
     ranobedbId: preview.ranobedbId,
+    lubimyczytacId: preview.lubimyczytacId,
     comicMetadata: preview.comicMetadata,
     narrators: preview.audioMetadata?.narrators,
     durationSeconds: preview.audioMetadata?.durationSeconds ?? undefined,

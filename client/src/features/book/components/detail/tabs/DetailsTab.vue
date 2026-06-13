@@ -21,6 +21,7 @@ import {
 import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot } from 'reka-ui'
 import { getFormatColor } from '@/features/book/lib/format-colors'
 import { providerIconPath } from '@/features/book/lib/provider-icons'
+import { lubimyczytacBookUrl } from '@/features/book/lib/provider-links'
 import { getProviderColor } from '@/lib/provider-colors'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
@@ -599,6 +600,15 @@ const providerLinks = computed<ProviderLink[]>(() => {
       url: `https://ranobedb.org/book/${ids.ranobedb}`,
       iconUrl: providerIconPath('ranobedb'),
       fallback: 'RN',
+    })
+  }
+  if (ids.lubimyczytac) {
+    out.push({
+      key: 'lubimyczytac',
+      label: 'LubimyCzytac',
+      url: lubimyczytacBookUrl(ids.lubimyczytac),
+      iconUrl: providerIconPath('lubimyczytac'),
+      fallback: 'LC',
     })
   }
   return out

@@ -27,6 +27,7 @@ export const BOOK_METADATA_LOCK_FIELDS = [
   "koboId",
   "comicvineId",
   "ranobedbId",
+  "lubimyczytacId",
   "comicIssueNumber",
   "comicVolumeName",
   "comicStoryArcs",
@@ -75,7 +76,19 @@ export const BOOK_METADATA_LOCK_GROUPS: BookMetadataLockGroup[] = [
   {
     key: "providers",
     label: "Provider IDs",
-    fields: ["googleBooksId", "goodreadsId", "amazonId", "hardcoverId", "openLibraryId", "itunesId", "audibleId", "koboId", "comicvineId", "ranobedbId"],
+    fields: [
+      "googleBooksId",
+      "goodreadsId",
+      "amazonId",
+      "hardcoverId",
+      "openLibraryId",
+      "itunesId",
+      "audibleId",
+      "koboId",
+      "comicvineId",
+      "ranobedbId",
+      "lubimyczytacId",
+    ],
   },
   {
     key: "comic",
