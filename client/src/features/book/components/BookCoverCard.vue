@@ -254,12 +254,25 @@ function handleSecondaryLabelClick(event: MouseEvent) {
   handleLabelClick(gridCardSecondaryLabel.value, event)
 }
 
-const isPrimaryClickAvailable = computed(() => primaryFile.value != null && !isMissing.value)
-const showPrimaryOverlayAction = computed(() => primaryFile.value != null && !isMissing.value)
-const primaryOverlayActionIcon = computed(() => (isAudiobook.value ? Play : BookOpen))
-const primaryOverlayActionIconClass = computed(() => (isAudiobook.value ? 'ml-[2cqi]' : ''))
+const isPrimaryClickAvailable = computed(() => thumbnailClickAction.value === 'details' || (primaryFile.value != null && !isMissing.value))
+const showPrimaryOverlayAction = computed(() => thumbnailClickAction.value === 'details' || (primaryFile.value != null && !isMissing.value))
+const primaryOverlayActionIcon = computed(() => {
+  if (thumbnailClickAction.value === 'details') return BookText
+  return isAudiobook.value ? Play : BookOpen
+})
+const primaryOverlayActionIconClass = computed(() => (thumbnailClickAction.value !== 'details' && isAudiobook.value ? 'ml-[2cqi]' : ''))
+const showExplicitReadButton = computed(() => thumbnailClickAction.value === 'details' && primaryFile.value != null && !isMissing.value)
 
 function handlePrimaryOverlayAction() {
+  if (thumbnailClickAction.value === 'details') {
+    openBookDetails()
+    return
+  }
+
+  if (primaryFile.value && !isMissing.value) openFile(primaryFile.value)
+}
+
+function openPrimaryFileExplicit() {
   if (primaryFile.value && !isMissing.value) openFile(primaryFile.value)
 }
 
@@ -509,10 +522,17 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
               showMobileOverlay ? 'opacity-100' : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto',
             ]"
           >
-            <!-- Top row: Quick View -->
-            <div class="shrink-0 flex justify-end">
+            <!-- Top row: Quick View + explicit Read (when thumbnail click prefers details) -->
+            <div class="shrink-0 flex items-center justify-end gap-1">
               <button class="p-[3cqi] rounded-[2.5cqi] bg-black/50 hover:bg-black/30 transition-colors text-white" @click="openQuickView">
                 <PanelRight class="size-[12cqi]" />
+              </button>
+              <button
+                v-if="showExplicitReadButton"
+                class="p-[3cqi] rounded-[2.5cqi] bg-black/50 hover:bg-black/30 transition-colors text-white"
+                @click.stop="openPrimaryFileExplicit"
+              >
+                <BookOpen class="size-[12cqi]" />
               </button>
             </div>
 
