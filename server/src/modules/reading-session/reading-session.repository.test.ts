@@ -297,13 +297,21 @@ describe('ReadingSessionRepository - listByBook', () => {
     return self;
   }
 
-  function makeListDb(results: { rows?: unknown[]; count?: unknown[]; stats?: unknown[]; daily?: unknown[]; progress?: unknown[] }) {
+  function makeListDb(results: {
+    rows?: unknown[];
+    count?: unknown[];
+    stats?: unknown[];
+    daily?: unknown[];
+    progress?: unknown[];
+    bySource?: unknown[];
+  }) {
     const select = vi
       .fn()
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(results.rows ?? [])) })
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(results.count ?? [])) })
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(results.stats ?? [])) })
-      .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(results.daily ?? [])) });
+      .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(results.daily ?? [])) })
+      .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(results.bySource ?? [])) });
     const selectDistinctOn = vi.fn().mockReturnValue({ from: vi.fn().mockReturnValue(makeQueryChain(results.progress ?? [])) });
     return { db: { select, selectDistinctOn }, select, selectDistinctOn };
   }
@@ -344,13 +352,13 @@ describe('ReadingSessionRepository - listByBook', () => {
     expect(result.items[0]?.source).toBe('web');
   });
 
-  it('fires four select queries and one distinct-on query', async () => {
+  it('fires five select queries and one distinct-on query', async () => {
     const { db, select, selectDistinctOn } = makeListDb({});
     const repo = new ReadingSessionRepository(db as never);
 
     await repo.listByBook(1, 2, 2, 25, 'startedAt', 'desc');
 
-    expect(select).toHaveBeenCalledTimes(4);
+    expect(select).toHaveBeenCalledTimes(5);
     expect(selectDistinctOn).toHaveBeenCalledTimes(1);
   });
 
@@ -421,6 +429,37 @@ describe('ReadingSessionRepository - listByBook', () => {
     const repo = new ReadingSessionRepository(db as never);
 
     await expect(repo.listByBook(1, 2, 1, 25, 'startedAt', 'asc')).resolves.toBeDefined();
+  });
+
+  it('folds sessions into the 3 display buckets, ordered and excluding empty buckets', async () => {
+    const { db } = makeListDb({
+      count: [{ total: 5 }],
+      stats: [{ totalSessions: 5, totalSeconds: 380, avgDurationSeconds: 76, firstSessionAt: null, lastSessionAt: null }],
+      bySource: [
+        { source: 'web', totalSeconds: 100, totalSessions: 1 },
+        { source: 'manual', totalSeconds: 50, totalSessions: 1 },
+        { source: null, totalSeconds: 30, totalSessions: 1 },
+        { source: 'kobo', totalSeconds: 200, totalSessions: 2 },
+      ],
+    });
+    const repo = new ReadingSessionRepository(db as never);
+
+    const result = await repo.listByBook(1, 2, 1, 25, 'startedAt', 'desc');
+
+    // web + manual + null collapse into bookorbit; koreader has no rows and is omitted.
+    expect(result.stats.bySource).toEqual([
+      { bucket: 'bookorbit', totalSeconds: 180, totalSessions: 3 },
+      { bucket: 'kobo', totalSeconds: 200, totalSessions: 2 },
+    ]);
+  });
+
+  it('returns an empty bySource when there are no sessions', async () => {
+    const { db } = makeListDb({});
+    const repo = new ReadingSessionRepository(db as never);
+
+    const result = await repo.listByBook(1, 2, 1, 25, 'startedAt', 'desc');
+
+    expect(result.stats.bySource).toEqual([]);
   });
 });
 

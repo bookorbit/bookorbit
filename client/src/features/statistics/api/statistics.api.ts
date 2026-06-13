@@ -18,6 +18,7 @@ import type {
   UserReadingPacePoint,
   UserReadingSessionTimeline,
   UserReadingSessionTimelineItem,
+  UserReadingSourceDistribution,
   UserSessionArchetypePoint,
   UserStatisticsSummary,
   FormatDistributionItem,
@@ -135,6 +136,12 @@ export async function fetchUserReadingHeatmap(filters: StatisticsFilterConfig): 
   const res = await api(`/api/v1/user-statistics/reading-heatmap${buildParams(filters, { days })}`)
   if (!res.ok) throw new Error(`User reading heatmap request failed: ${res.status}`)
   return res.json() as Promise<UserDailyReadingStat[]>
+}
+
+export async function fetchUserReadingSourceDistribution(filters: StatisticsFilterConfig): Promise<UserReadingSourceDistribution> {
+  const res = await api(`/api/v1/user-statistics/reading-source-distribution${buildParams(filters, { days: '365' })}`)
+  if (!res.ok) throw new Error(`User reading source distribution request failed: ${res.status}`)
+  return res.json() as Promise<UserReadingSourceDistribution>
 }
 
 export async function fetchUserPeakReadingHours(filters: StatisticsFilterConfig): Promise<UserPeakHourStat[]> {

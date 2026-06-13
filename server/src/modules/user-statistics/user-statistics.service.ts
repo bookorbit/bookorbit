@@ -18,11 +18,12 @@ import type {
   UserReadingPacePoint,
   UserReadingSessionTimeline,
   UserReadingSessionTimelineItem,
+  UserReadingSourceDistribution,
   UserReadingSurvivalPoint,
   UserSessionArchetypePoint,
   UserStatisticsSummary,
 } from '@bookorbit/types';
-import { emptySourceBucketRecord, toReadingSessionSourceBucket } from '@bookorbit/types';
+import { READING_SESSION_SOURCE_BUCKETS, emptySourceBucketRecord, toReadingSessionSourceBucket } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { StatsCache } from '../../common/cache/stats-cache';
@@ -193,6 +194,24 @@ export class UserStatisticsService {
       }
 
       return result;
+    });
+  }
+
+  async getReadingSourceDistribution(user: RequestUser, query: UserDailyReadingQueryDto): Promise<UserReadingSourceDistribution> {
+    const days = query.days ?? BEHAVIOR_DEFAULT_DAYS;
+    const key = this.buildUserCacheKey('source-distribution', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
+    return this.cache.get(String(user.id), key, async () => {
+      const rows = await this.repo.getDailyReadingSecondsBySource(user.id, user.isSuperuser, query.libraryIds, days);
+      const totals = emptySourceBucketRecord();
+      for (const row of rows) {
+        totals[toReadingSessionSourceBucket(row.source)] += row.readingSeconds;
+      }
+      const slices = READING_SESSION_SOURCE_BUCKETS.filter((bucket) => totals[bucket] > 0).map((bucket) => ({
+        bucket,
+        readingSeconds: totals[bucket],
+      }));
+      const totalSeconds = slices.reduce((sum, slice) => sum + slice.readingSeconds, 0);
+      return { totalSeconds, slices };
     });
   }
 

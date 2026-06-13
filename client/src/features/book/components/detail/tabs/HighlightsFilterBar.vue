@@ -65,7 +65,7 @@ function handleDateToChange(e: Event) {
 }
 
 function clearAllFilters() {
-  for (const color of [...props.activeColors]) emit('toggleColor', color)
+  for (const color of props.activeColors) emit('toggleColor', color)
   emit('chapterChange', undefined)
   emit('dateRangeChange', undefined, undefined)
 }

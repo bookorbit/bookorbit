@@ -2,7 +2,14 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, count, desc, eq, gte, isNotNull, lt, lte, max, min, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import type { BookReadingSession, BookReadingSessionListResponse, BookReadingSessionStats, ReadingSessionSource } from '@bookorbit/types';
+import type {
+  BookReadingSession,
+  BookReadingSessionListResponse,
+  BookReadingSessionStats,
+  BookReadingSourceSlice,
+  ReadingSessionSource,
+} from '@bookorbit/types';
+import { READING_SESSION_SOURCE_BUCKETS, emptySourceBucketRecord, toReadingSessionSourceBucket } from '@bookorbit/types';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookFiles, books, readingSessions, userReadingDailyStats } from '../../db/schema';
@@ -162,7 +169,7 @@ export class ReadingSessionRepository {
     const orderExpr = sortDir === 'asc' ? asc(orderCol) : desc(orderCol);
     const offset = (page - 1) * pageSize;
 
-    const [rows, countRows, statsRows, dailyRows, progressRows] = await Promise.all([
+    const [rows, countRows, statsRows, dailyRows, progressRows, sourceRows] = await Promise.all([
       this.db
         .select({
           id: readingSessions.id,
@@ -217,10 +224,34 @@ export class ReadingSessionRepository {
         .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
         .where(and(whereClause, isNotNull(readingSessions.endProgress)))
         .orderBy(asc(dayExpr), desc(readingSessions.startedAt)),
+
+      this.db
+        .select({
+          source: readingSessions.source,
+          totalSeconds: sql<number>`coalesce(sum(${readingSessions.durationSeconds}), 0)::int`,
+          totalSessions: count(),
+        })
+        .from(readingSessions)
+        .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
+        .where(whereClause)
+        .groupBy(readingSessions.source),
     ]);
 
     const total = countRows[0]?.total ?? 0;
     const statsRow = statsRows[0];
+
+    const bucketSeconds = emptySourceBucketRecord();
+    const bucketSessions = emptySourceBucketRecord();
+    for (const row of sourceRows) {
+      const bucket = toReadingSessionSourceBucket(row.source);
+      bucketSeconds[bucket] += row.totalSeconds;
+      bucketSessions[bucket] += row.totalSessions;
+    }
+    const bySource: BookReadingSourceSlice[] = READING_SESSION_SOURCE_BUCKETS.filter((bucket) => bucketSessions[bucket] > 0).map((bucket) => ({
+      bucket,
+      totalSeconds: bucketSeconds[bucket],
+      totalSessions: bucketSessions[bucket],
+    }));
 
     const stats: BookReadingSessionStats = {
       totalSessions: statsRow?.totalSessions ?? 0,
@@ -232,6 +263,7 @@ export class ReadingSessionRepository {
       paceProgressDelta: statsRow?.paceProgressDelta ?? 0,
       paceDurationSeconds: statsRow?.paceDurationSeconds ?? 0,
       progressSummary: progressRows.map((r) => ({ day: r.day, endProgress: r.endProgress ?? 0 })),
+      bySource,
     };
 
     const items: BookReadingSession[] = rows.map((r) => ({

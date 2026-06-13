@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import type { BookDetail, UserBookStatus } from '@bookorbit/types'
 import { useBookReadingLog, type AddReadingSessionPayload } from '@/features/book/composables/useBookReadingLog'
 import ReadingLogHero from './ReadingLogHero.vue'
+import ReadingLogSourceSplit from './ReadingLogSourceSplit.vue'
 import ReadingLogJourneyChart from './ReadingLogJourneyChart.vue'
 import ReadingLogHeatmap from './ReadingLogHeatmap.vue'
 import ReadingLogTable from './ReadingLogTable.vue'
@@ -124,6 +125,8 @@ const quickFilters: { label: string; value: QuickFilter }[] = [
     </div>
 
     <ReadingLogHero :book="book" :stats="stats" :loading="loading" @saved="handleHeroSaved" @add-session="handleOpenAddSession" />
+
+    <ReadingLogSourceSplit :stats="stats" />
 
     <div class="flex flex-wrap items-center gap-2">
       <button

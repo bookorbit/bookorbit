@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  readCssColor: vi.fn(
+  readCssColor: vi.fn<(varName: string) => string>(
     (varName: string) =>
       (
         ({
@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
         }) as Record<string, string>
       )[varName] ?? 'oklch(0.5 0.1 0)',
   ),
-  oklchToHex: vi.fn(() => '#abcdef'),
+  oklchToHex: vi.fn<() => string>(() => '#abcdef'),
 }))
 
 vi.mock('@/lib/echarts', () => ({ readCssColor: mocks.readCssColor, oklchToHex: mocks.oklchToHex }))

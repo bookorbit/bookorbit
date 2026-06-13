@@ -56,6 +56,40 @@ describe('UserStatisticsService', () => {
     ]);
   });
 
+  it('buckets the reading-source distribution and excludes empty buckets', async () => {
+    const repo = {
+      getDailyReadingSecondsBySource: vi.fn().mockResolvedValue([
+        { day: '2026-04-06', source: 'web', readingSeconds: 100 },
+        { day: '2026-04-06', source: 'manual', readingSeconds: 50 },
+        { day: '2026-04-07', source: null, readingSeconds: 30 },
+        { day: '2026-04-06', source: 'kobo', readingSeconds: 200 },
+      ]),
+    };
+
+    const service = new UserStatisticsService(repo as any);
+    const result = await service.getReadingSourceDistribution({ id: 123, isSuperuser: false } as any, { libraryIds: [] });
+
+    expect(repo.getDailyReadingSecondsBySource).toHaveBeenCalledWith(123, false, [], 365);
+    // web + manual + null collapse into bookorbit; koreader has no activity and is omitted.
+    expect(result).toEqual({
+      totalSeconds: 380,
+      slices: [
+        { bucket: 'bookorbit', readingSeconds: 180 },
+        { bucket: 'kobo', readingSeconds: 200 },
+      ],
+    });
+  });
+
+  it('returns an empty source distribution and honours the days override', async () => {
+    const repo = { getDailyReadingSecondsBySource: vi.fn().mockResolvedValue([]) };
+    const service = new UserStatisticsService(repo as any);
+
+    const result = await service.getReadingSourceDistribution({ id: 7, isSuperuser: true } as any, { days: 30, libraryIds: [1] });
+
+    expect(repo.getDailyReadingSecondsBySource).toHaveBeenCalledWith(7, true, [1], 30);
+    expect(result).toEqual({ totalSeconds: 0, slices: [] });
+  });
+
   it('returns all 24 hour buckets for peak reading hours', async () => {
     const repo = {
       getPeakReadingHours: vi.fn().mockResolvedValue([

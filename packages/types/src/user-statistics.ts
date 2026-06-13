@@ -18,6 +18,16 @@ export interface UserDailyReadingStat {
   bySource?: Record<ReadingSessionSourceBucket, number>;
 }
 
+export interface UserReadingSourceDistributionSlice {
+  bucket: ReadingSessionSourceBucket;
+  readingSeconds: number;
+}
+
+export interface UserReadingSourceDistribution {
+  totalSeconds: number;
+  slices: UserReadingSourceDistributionSlice[];
+}
+
 export interface UserPeakHourStat {
   hour: number;
   readingSeconds: number;

@@ -28,6 +28,11 @@ export class UserStatisticsController {
     return this.userStatisticsService.getReadingHeatmap(user, query);
   }
 
+  @Get('reading-source-distribution')
+  getReadingSourceDistribution(@CurrentUser() user: RequestUser, @Query() query: UserDailyReadingQueryDto) {
+    return this.userStatisticsService.getReadingSourceDistribution(user, query);
+  }
+
   @Get('peak-hours')
   getPeakHours(@CurrentUser() user: RequestUser, @Query() query: UserDailyReadingQueryDto) {
     return this.userStatisticsService.getPeakReadingHours(user, query);
