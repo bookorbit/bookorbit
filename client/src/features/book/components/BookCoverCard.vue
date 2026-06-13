@@ -254,20 +254,12 @@ function handleSecondaryLabelClick(event: MouseEvent) {
   handleLabelClick(gridCardSecondaryLabel.value, event)
 }
 
-const isPrimaryClickAvailable = computed(() => thumbnailClickAction.value === 'details' || (primaryFile.value != null && !isMissing.value))
-const showPrimaryOverlayAction = computed(() => thumbnailClickAction.value === 'details' || (primaryFile.value != null && !isMissing.value))
-const primaryOverlayActionIcon = computed(() => {
-  if (thumbnailClickAction.value === 'details') return BookText
-  return isAudiobook.value ? Play : BookOpen
-})
-const primaryOverlayActionIconClass = computed(() => (thumbnailClickAction.value !== 'details' && isAudiobook.value ? 'ml-[2cqi]' : ''))
+const isPrimaryClickAvailable = computed(() => primaryFile.value != null && !isMissing.value)
+const showPrimaryOverlayAction = computed(() => primaryFile.value != null && !isMissing.value)
+const primaryOverlayActionIcon = computed(() => (isAudiobook.value ? Play : BookOpen))
+const primaryOverlayActionIconClass = computed(() => (isAudiobook.value ? 'ml-[2cqi]' : ''))
 
 function handlePrimaryOverlayAction() {
-  if (thumbnailClickAction.value === 'details') {
-    openBookDetails()
-    return
-  }
-
   if (primaryFile.value && !isMissing.value) openFile(primaryFile.value)
 }
 
