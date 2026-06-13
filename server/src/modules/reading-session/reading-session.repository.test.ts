@@ -142,6 +142,25 @@ describe('ReadingSessionRepository', () => {
     expect(dailyValues.mock.calls[0]?.[0]).toHaveProperty('day');
     expect(dailyConflictUpdate).toHaveBeenCalledOnce();
   });
+
+  it('persists the provided source (e.g. kobo) instead of the web default', async () => {
+    const { repo, sessionValues } = makeDbHarness({ fileRow: { bookId: 9, libraryId: 3 }, insertedIds: [{ id: 100 }] });
+
+    const result = await repo.saveSession(
+      2,
+      4,
+      'kobo-session',
+      new Date('2026-04-15T10:00:00.000Z'),
+      new Date('2026-04-15T10:01:00.000Z'),
+      60,
+      null,
+      null,
+      'kobo',
+    );
+
+    expect(result).toEqual({ kind: 'saved' });
+    expect(sessionValues).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'kobo-session', source: 'kobo' }));
+  });
 });
 
 describe('ReadingSessionRepository - insertManualSession', () => {

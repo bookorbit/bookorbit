@@ -79,7 +79,7 @@ const THEME_MODES: ProjectxThemeMode[] = ['light', 'dark']
 // Staggered hue offsets so adjacent chart series have more contrast.
 const HUE_OFFSETS = [0, 72, 144, 216, 288, 36, 108, 180, 252, 324]
 
-function oklchToHex(L: number, C: number, H: number): string {
+export function oklchToHex(L: number, C: number, H: number): string {
   const h = (H * Math.PI) / 180
   const a = C * Math.cos(h)
   const b = C * Math.sin(h)

@@ -44,6 +44,7 @@ export * from "./font";
 export * from "./dictionary";
 export * from "./achievement";
 export * from "./reading-session";
+export * from "./reading-session-source-bucket";
 export * from "./annotation";
 export * from "./hardcover";
 export * from "./path";

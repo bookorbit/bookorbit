@@ -91,6 +91,26 @@ describe('KoboAnalyticsService', () => {
     );
   });
 
+  it('tags Kobo reading sessions with the kobo source', async () => {
+    await makeService().ingest(
+      {
+        Events: [
+          {
+            Id: 'kobo-src',
+            EventType: 'LeaveContent',
+            Timestamp: '2026-06-01T00:00:20Z',
+            Metrics: { SecondsRead: 20 },
+            Attributes: { volumeid: '1', progress: '5' },
+          },
+        ],
+      },
+      user,
+      device,
+    );
+
+    expect(readingSessionService.save).toHaveBeenCalledWith(100, expect.objectContaining({ sessionId: 'kobo-src' }), user, 'kobo');
+  });
+
   it('pairs OpenContent and LeaveContent to save progress delta and active duration', async () => {
     await makeService().ingest(
       {

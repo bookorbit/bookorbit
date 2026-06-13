@@ -5,7 +5,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { BookService } from '../book/book.service';
 import { ReadingSessionRepository, type SaveReadingSessionResult } from './reading-session.repository';
 import { ReadingSessionService } from './reading-session.service';
-import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
+import { EMPTY_CONTENT_FILTER_RULES, type ReadingSessionSource } from '@bookorbit/types';
 
 function makeUser(overrides?: Partial<RequestUser>): RequestUser {
   return {
@@ -29,7 +29,9 @@ function makeUser(overrides?: Partial<RequestUser>): RequestUser {
 
 const mockRepo = {
   saveSession:
-    vi.fn<(...args: [number, number, string, Date, Date, number, number | null, number | null, string]) => Promise<SaveReadingSessionResult>>(),
+    vi.fn<
+      (...args: [number, number, string, Date, Date, number, number | null, number | null, ReadingSessionSource]) => Promise<SaveReadingSessionResult>
+    >(),
 };
 
 const mockBookService = {
@@ -107,30 +109,30 @@ describe('ReadingSessionService', () => {
     );
   });
 
-  it('threads an explicit source through to the repository', async () => {
+  it('forwards an explicit source to the repository', async () => {
     await service.save(
       42,
       {
-        sessionId: 'session-kobo',
+        sessionId: 'kobo-session',
         startedAt: '2026-04-15T10:00:00.000Z',
-        endedAt: '2026-04-15T10:02:00.000Z',
-        durationSeconds: 120,
-        progressDelta: 5,
-        endProgress: 20,
+        endedAt: '2026-04-15T10:01:00.000Z',
+        durationSeconds: 60,
+        progressDelta: null,
+        endProgress: null,
       },
-      makeUser({ id: 7 }),
+      makeUser({ id: 33 }),
       'kobo',
     );
 
     expect(mockRepo.saveSession).toHaveBeenCalledWith(
-      7,
+      33,
       42,
-      'session-kobo',
+      'kobo-session',
       new Date('2026-04-15T10:00:00.000Z'),
-      new Date('2026-04-15T10:02:00.000Z'),
-      120,
-      5,
-      20,
+      new Date('2026-04-15T10:01:00.000Z'),
+      60,
+      null,
+      null,
       'kobo',
     );
   });

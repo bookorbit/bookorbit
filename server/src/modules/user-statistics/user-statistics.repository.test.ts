@@ -84,8 +84,8 @@ describe('UserStatisticsRepository', () => {
   it('returns daily/peak/favorite aggregates and monthly completion timeline', async () => {
     const db = makeDb([
       [{ day: '2026-04-15', readingSeconds: 120, progressDelta: 1.5, eventsCount: 2 }],
-      [{ hour: 9, format: 'EPUB', readingSeconds: 500, eventsCount: 3 }],
-      [{ dayOfWeek: 2, readingSeconds: 900, eventsCount: 4 }],
+      [{ hour: 9, format: 'EPUB', source: 'koreader', readingSeconds: 500, eventsCount: 3 }],
+      [{ dayOfWeek: 2, source: 'manual', format: 'EPUB', readingSeconds: 900, eventsCount: 4 }],
       [],
       [{ year: 2026, month: 4, count: 2 }],
       [],
@@ -97,10 +97,30 @@ describe('UserStatisticsRepository', () => {
     await expect(repo.getDailyReadingStats(5, false, [2], 30)).resolves.toEqual([
       { day: '2026-04-15', readingSeconds: 120, progressDelta: 1.5, eventsCount: 2 },
     ]);
-    await expect(repo.getPeakReadingHours(5, false, [2], 30)).resolves.toEqual([{ hour: 9, format: 'EPUB', readingSeconds: 500, eventsCount: 3 }]);
-    await expect(repo.getFavoriteReadingDays(5, false, [2], 30)).resolves.toEqual([{ dayOfWeek: 2, readingSeconds: 900, eventsCount: 4 }]);
+    await expect(repo.getPeakReadingHours(5, false, [2], 30)).resolves.toEqual([
+      { hour: 9, format: 'EPUB', source: 'koreader', readingSeconds: 500, eventsCount: 3 },
+    ]);
+    await expect(repo.getFavoriteReadingDays(5, false, [2], 30)).resolves.toEqual([
+      { dayOfWeek: 2, source: 'manual', format: 'EPUB', readingSeconds: 900, eventsCount: 4 },
+    ]);
     await expect(repo.getCompletionTimeline(5, false, [2], 365)).resolves.toEqual([{ year: 2026, month: 4, count: 2 }]);
     await expect(repo.getMonthlyCompletions(5, false, [2], 365)).resolves.toEqual([{ year: 2026, month: 4, count: 2 }]);
+  });
+
+  it('returns per-source daily reading seconds for the heatmap tooltip', async () => {
+    const db = makeDb([
+      [
+        { day: '2026-04-15', source: 'web', readingSeconds: 120 },
+        { day: '2026-04-15', source: 'kobo', readingSeconds: 60 },
+      ],
+    ]);
+    const repo = new UserStatisticsRepository(db as never);
+    vi.spyOn(repo as any, 'getAccessibleLibraryIds').mockResolvedValue([2]);
+
+    await expect(repo.getDailyReadingSecondsBySource(5, false, [2], 30)).resolves.toEqual([
+      { day: '2026-04-15', source: 'web', readingSeconds: 120 },
+      { day: '2026-04-15', source: 'kobo', readingSeconds: 60 },
+    ]);
   });
 
   it('returns timeline items and timeline session by id', async () => {
@@ -109,6 +129,7 @@ describe('UserStatisticsRepository', () => {
       bookId: 4,
       bookTitle: 'Dune',
       bookFormat: 'EPUB',
+      source: 'koreader',
       startedAt: new Date('2026-04-15T10:00:00.000Z'),
       endedAt: new Date('2026-04-15T10:30:00.000Z'),
       durationSeconds: 1800,
@@ -129,6 +150,7 @@ describe('UserStatisticsRepository', () => {
         bookId: 4,
         bookTitle: 'Dune',
         bookFormat: 'EPUB',
+        source: 'koreader',
         startedAt: new Date('2026-04-15T10:00:00.000Z'),
         endedAt: new Date('2026-04-15T10:30:00.000Z'),
         durationSeconds: 1800,
@@ -210,6 +232,7 @@ describe('UserStatisticsRepository', () => {
       bookId: 4,
       bookTitle: 'Dune',
       bookFormat: 'EPUB',
+      source: 'web',
       startedAt: new Date('2026-04-15T11:00:00.000Z'),
       endedAt: new Date('2026-04-15T11:30:00.000Z'),
       durationSeconds: 1800,
@@ -280,7 +303,7 @@ describe('UserStatisticsRepository', () => {
       [],
       [],
       [{ days: '3.5' }, { days: -1 }, { days: 'not-a-number' }, { days: 7 }],
-      [{ durationSeconds: 300, progressDelta: 1.25 }],
+      [{ durationSeconds: 300, progressDelta: 1.25, source: 'kobo', format: 'PDF' }],
       [],
       [{ maxProgress: 50 }, { maxProgress: 'bad' }],
       [{ bookId: 1 }],
@@ -289,20 +312,22 @@ describe('UserStatisticsRepository', () => {
         { bookId: 1, title: 'Dune', startedAt: new Date('2026-04-02T10:00:00.000Z'), endProgress: 70 },
       ],
       [{ hour: '9.5', durationMinutes: '15', dayOfWeek: '2' }],
-      [{ genre: 'Sci-Fi', readingSeconds: 1200 }],
+      [{ genre: 'Sci-Fi', source: 'web', readingSeconds: 1200 }],
     ]);
     const repo = new UserStatisticsRepository(db as never);
     vi.spyOn(repo as any, 'getAccessibleLibraryIds').mockResolvedValue([1]);
 
     await expect(repo.getCompletionLatencyDays(5, false, [1], 365)).resolves.toEqual([3.5, 7]);
-    await expect(repo.getReadingPacePoints(5, false, [1], 365)).resolves.toEqual([{ durationSeconds: 300, progressDelta: 1.25 }]);
+    await expect(repo.getReadingPacePoints(5, false, [1], 365)).resolves.toEqual([
+      { durationSeconds: 300, progressDelta: 1.25, bucket: 'kobo', format: 'PDF' },
+    ]);
     await expect(repo.getReadingSurvivalMaxProgress(5, false, [1], 365)).resolves.toEqual([50]);
     await expect(repo.getCompletionRaceRawSessions(5, false, [1], 365, 15)).resolves.toEqual([
       { bookId: 1, title: 'Dune', startedAt: new Date('2026-04-01T10:00:00.000Z'), endProgress: 40 },
       { bookId: 1, title: 'Dune', startedAt: new Date('2026-04-02T10:00:00.000Z'), endProgress: 70 },
     ]);
     await expect(repo.getSessionArchetypePoints(5, false, [1], 365)).resolves.toEqual([{ hour: 9.5, durationMinutes: 15, dayOfWeek: 2 }]);
-    await expect(repo.getGenreReadingTime(5, false, [1], 365)).resolves.toEqual([{ genre: 'Sci-Fi', readingSeconds: 1200 }]);
+    await expect(repo.getGenreReadingTime(5, false, [1], 365)).resolves.toEqual([{ genre: 'Sci-Fi', source: 'web', readingSeconds: 1200 }]);
   });
 
   it('returns empty completion race when no top books exist', async () => {

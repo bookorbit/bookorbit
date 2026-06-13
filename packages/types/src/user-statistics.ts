@@ -1,3 +1,5 @@
+import type { ReadingSessionSourceBucket } from "./reading-session-source-bucket";
+
 export interface UserStatisticsSummary {
   trackedBooks: number;
   startedBooks: number;
@@ -11,6 +13,9 @@ export interface UserDailyReadingStat {
   readingSeconds: number;
   progressDelta: number;
   eventsCount: number;
+  // Populated only by the reading heatmap (per-source tooltip); other daily-stat
+  // consumers leave it undefined.
+  bySource?: Record<ReadingSessionSourceBucket, number>;
 }
 
 export interface UserPeakHourStat {
@@ -18,12 +23,15 @@ export interface UserPeakHourStat {
   readingSeconds: number;
   eventsCount: number;
   byFormat: Record<string, number>;
+  bySource: Record<ReadingSessionSourceBucket, number>;
 }
 
 export interface UserFavoriteDayStat {
   dayOfWeek: number;
   readingSeconds: number;
   eventsCount: number;
+  byFormat: Record<string, number>;
+  bySource: Record<ReadingSessionSourceBucket, number>;
 }
 
 export interface UserCompletionTimelinePoint {
@@ -76,6 +84,7 @@ export interface UserCompletionLatencyDistribution {
 export interface UserGenreReadingTimeItem {
   genre: string;
   readingSeconds: number;
+  bySource: Record<ReadingSessionSourceBucket, number>;
 }
 
 export interface UserReadingSessionTimelineItem {
@@ -83,6 +92,7 @@ export interface UserReadingSessionTimelineItem {
   bookId: number;
   bookTitle: string | null;
   bookFormat: string | null;
+  bookSource: ReadingSessionSourceBucket;
   startedAt: string;
   endedAt: string;
   durationSeconds: number;
@@ -99,6 +109,8 @@ export interface UserReadingSessionTimeline {
 export interface UserReadingPacePoint {
   durationSeconds: number;
   progressDelta: number;
+  bucket: ReadingSessionSourceBucket;
+  format: string;
 }
 
 export interface UserReadingSurvivalPoint {

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
-import { Calendar } from '@lucide/vue'
+import { Calendar } from 'lucide-vue-next'
+import { READING_SESSION_SOURCE_BUCKETS, READING_SESSION_SOURCE_BUCKET_LABELS } from '@bookorbit/types'
 import { useThemeStore } from '@/stores/theme'
 
 import { buildHeatmapPalette } from '@/lib/heatmap-palette'
@@ -71,7 +72,14 @@ watchEffect(() => {
         const [day, minutes, events] = params.value
         const minuteLabel = minutes === 1 ? 'minute' : 'minutes'
         const eventLabel = events === 1 ? 'event' : 'events'
-        return `${day}<br/><strong>${minutes}</strong> ${minuteLabel}<br/>${events} ${eventLabel}`
+        const bySource = byDay.get(day)?.bySource
+        const sourceRows = bySource
+          ? READING_SESSION_SOURCE_BUCKETS.filter((bucket) => (bySource[bucket] ?? 0) > 0)
+              .map((bucket) => `${READING_SESSION_SOURCE_BUCKET_LABELS[bucket]}: ${Math.round((bySource[bucket] ?? 0) / 60)}m`)
+              .join('<br/>')
+          : ''
+        const base = `${day}<br/><strong>${minutes}</strong> ${minuteLabel}<br/>${events} ${eventLabel}`
+        return sourceRows ? `${base}<br/>${sourceRows}` : base
       },
     },
     visualMap: {

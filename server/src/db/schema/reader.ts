@@ -6,8 +6,6 @@ import { bookFiles, books } from './books';
 import { libraries } from './libraries';
 import { users } from './auth';
 
-export type ReadingSessionSource = 'web' | 'kobo' | 'koreader';
-
 export const userBookStatus = pgTable(
   'user_book_status',
   {
