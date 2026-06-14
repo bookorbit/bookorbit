@@ -42,17 +42,48 @@ function BookOrbitSweep.isRunning()
     return BookOrbitSweep.running
 end
 
-function BookOrbitSweep.lastSweepAt()
+function BookOrbitSweep.syncStatus()
     local state = BookOrbitState.open()
-    return state.global.lastSweepAt or 0
+    local matched, unmatched = 0, 0
+    for _ in pairs(state.books) do matched = matched + 1 end
+    for _ in pairs(state.unmatched) do unmatched = unmatched + 1 end
+    return {
+        lastSweepAt = state.global.lastSweepAt or 0,
+        matched = matched,
+        unmatched = unmatched,
+    }
 end
 
 local function isAuthError(err)
     return err == 401 or err == 403
 end
 
+local PROGRESS_THROTTLE = 2
+
+-- Interactive-only progress toast for the sweep, reused across phases. Identical
+-- text never redraws, and changing text redraws at most every PROGRESS_THROTTLE
+-- seconds, so a long first run stays legible without flooding the e-ink screen.
+local function setProgress(ctx, text, force)
+    if not ctx.interactive then return end
+    if not force then
+        if text == ctx.progress_shown_text then return end
+        if ctx.progress_msg and os.time() - (ctx.progress_shown_at or 0) < PROGRESS_THROTTLE then
+            return
+        end
+    end
+    ctx.progress_shown_text = text
+    ctx.progress_shown_at = os.time()
+    if ctx.progress_msg then UIManager:close(ctx.progress_msg) end
+    ctx.progress_msg = InfoMessage:new{ text = text }
+    UIManager:show(ctx.progress_msg)
+end
+
 local function finish(ctx, err)
     BookOrbitSweep.running = false
+    if ctx.progress_msg then
+        UIManager:close(ctx.progress_msg)
+        ctx.progress_msg = nil
+    end
     ctx.state:flush()
 
     if err == "auth" then
@@ -194,10 +225,12 @@ local function stepMatchNext(ctx)
                 table.insert(ctx.stats_queue, { md5 = md5, ids = cand.stat_ids })
             end
         end
+        ctx.stats_total = #ctx.stats_queue
         step(ctx, ctx.steps.statsNext)
         return
     end
 
+    setProgress(ctx, _("BookOrbit sync: matching books..."))
     local body, err = ctx.client:matchCheck(batch)
     if not body then
         if isAuthError(err) then return finish(ctx, "auth") end
@@ -229,6 +262,11 @@ local function stepStatsNext(ctx)
     if not item then
         step(ctx, ctx.steps.sidecars)
         return
+    end
+
+    if ctx.stats_total and ctx.stats_total > 0 then
+        setProgress(ctx, T(_("BookOrbit sync: uploading reading data (%1/%2)"),
+            ctx.stats_total - #ctx.stats_queue, ctx.stats_total))
     end
 
     local book = ctx.state:getBook(item.md5)
@@ -344,6 +382,7 @@ local function stepSidecars(ctx)
         end
     end
 
+    ctx.ann_total = #ctx.ann_queue
     step(ctx, ctx.steps.annotationsNext)
 end
 
@@ -368,6 +407,11 @@ local function stepAnnotationsNext(ctx)
     if not entry then
         step(ctx, ctx.steps.statesNext)
         return
+    end
+
+    if ctx.ann_total and ctx.ann_total > 0 then
+        setProgress(ctx, T(_("BookOrbit sync: syncing highlights (%1/%2)"),
+            ctx.ann_total - #ctx.ann_queue, ctx.ann_total))
     end
 
     local pending = ctx.pending_books[entry.md5]
@@ -675,9 +719,7 @@ function BookOrbitSweep.run(opts)
         done = stepDone,
     }
 
-    if ctx.interactive then
-        UIManager:show(InfoMessage:new{ text = _("Syncing to BookOrbit. This may take a while on first run."), timeout = 2 })
-    end
+    setProgress(ctx, _("Syncing to BookOrbit. This may take a while on first run."), true)
     logger.info("BookOrbit: sweep started, interactive:", ctx.interactive)
 
     step(ctx, ctx.steps.enumerate)

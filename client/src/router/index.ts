@@ -132,13 +132,13 @@ export const routes: RouteRecordRaw[] = [
             path: 'kobo',
             name: 'settings-kobo',
             component: () => import('@/features/settings/KoboSettings.vue'),
-            meta: { maxWidth: 'max-w-3xl', title: 'Kobo Sync' },
+            meta: { maxWidth: 'max-w-4xl', title: 'Kobo Sync' },
           },
           {
             path: 'koreader',
             name: 'settings-koreader',
             component: () => import('@/features/settings/KoreaderSettings.vue'),
-            meta: { maxWidth: 'max-w-3xl', title: 'KOReader Sync' },
+            meta: { maxWidth: 'max-w-4xl', title: 'KOReader Sync' },
           },
           {
             path: 'hardcover',

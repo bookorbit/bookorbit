@@ -258,9 +258,9 @@ local function getNameStrategy(strategy)
     if strategy == SYNC_STRATEGY.PROMPT then
         return _("Prompt")
     elseif strategy == SYNC_STRATEGY.SILENT then
-        return _("Auto")
+        return _("Silently")
     else
-        return _("Disable")
+        return _("Never")
     end
 end
 
@@ -403,11 +403,15 @@ If set to 0, updating progress based on page turns will be disabled.]]),
             },
             {
                 text_func = function()
-                    local last = BookOrbitSweep.lastSweepAt()
-                    if last == 0 then
-                        return _("Last full sync: never")
+                    local status = BookOrbitSweep.syncStatus()
+                    local when = (status.lastSweepAt == 0) and _("never")
+                        or os.date("%Y-%m-%d %H:%M", status.lastSweepAt)
+                    if status.unmatched > 0 then
+                        return T(_("Last sync: %1 (%2 linked, %3 unmatched)"), when, status.matched, status.unmatched)
+                    elseif status.matched > 0 then
+                        return T(_("Last sync: %1 (%2 linked)"), when, status.matched)
                     end
-                    return T(_("Last full sync: %1"), os.date("%Y-%m-%d %H:%M", last))
+                    return T(_("Last sync: %1"), when)
                 end,
                 enabled = false,
             },
