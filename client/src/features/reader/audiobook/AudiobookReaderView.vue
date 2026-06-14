@@ -587,7 +587,15 @@ const absolutePositionSeconds = computed(() => {
 
 const absolutePositionMs = computed(() => absolutePositionSeconds.value * 1000)
 
-const totalBookDuration = computed(() => audioFiles.value.reduce((sum, f) => sum + (f.durationSeconds ?? 0), 0))
+const totalBookDuration = computed(() => {
+  const durationFromFiles = audioFiles.value.reduce((sum, f) => sum + (f.durationSeconds ?? 0), 0)
+
+  if (durationFromFiles === 0) {
+    return detail.value?.audioMetadata?.durationSeconds ?? 0
+  }
+
+  return durationFromFiles
+})
 
 const progressPct = computed(() => {
   const total = totalBookDuration.value
