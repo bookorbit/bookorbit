@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const apiMock = vi.hoisted(() => vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>())
 
@@ -23,10 +23,20 @@ function paramsFromUrl(url: string): URLSearchParams {
 
 describe('useAnnotationsHub', () => {
   beforeEach(() => {
+    // Fake only the timer functions so the search-debounce setTimeout can never
+    // leak a real timer into a later test (which would call the mock mid-reset).
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     vi.resetModules()
     apiMock.mockReset()
     // Safe default so any watcher-triggered reload resolves cleanly.
     apiMock.mockResolvedValue(makeResponse(emptyHub))
+  })
+
+  afterEach(() => {
+    if (vi.isFakeTimers()) {
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    }
   })
 
   describe('query building', () => {
