@@ -1,23 +1,19 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import type { AnnotationHubBookFacet, AnnotationHubItem, AnnotationHubResponse, AnnotationHubStats } from '@bookorbit/types'
 import { api } from '@/lib/api'
-import { colorLabel, originLabel, styleLabel, type SortKey } from '../lib/filter-options'
+import { type SortKey } from '../lib/filter-options'
+import { buildFilterChips } from '../lib/filter-chips'
+import { useAnnotationSelection } from './useAnnotationSelection'
+import { useAnnotationMutations } from './useAnnotationMutations'
 
 export type HubStatus = 'active' | 'trashed'
-
-export type PopoverFilterKey = 'color' | 'style' | 'origin' | 'date'
-
-export interface ActiveFilterChip {
-  key: PopoverFilterKey
-  label: string
-}
 
 /** The slice of hub state that can be restored from the URL on load. */
 export interface AnnotationsHubState {
   status: HubStatus
   search: string
   bookFilter: number | 'all'
-  colorFilter: string
+  colors: string[]
   styleFilter: string
   originFilter: string
   notesOnly: boolean
@@ -25,12 +21,6 @@ export interface AnnotationsHubState {
   dateTo: string
   sortKey: SortKey
   page: number
-}
-
-function dateRangeLabel(from: string, to: string): string {
-  if (from && to) return `${from} to ${to}`
-  if (from) return `From ${from}`
-  return `Until ${to}`
 }
 
 const SEARCH_RELOAD_DEBOUNCE_MS = 300
@@ -56,7 +46,7 @@ export function useAnnotationsHub() {
 
   const status = ref<HubStatus>('active')
   const search = ref('')
-  const colorFilter = ref('all')
+  const colors = ref<string[]>([])
   const styleFilter = ref('all')
   const originFilter = ref('all')
   const bookFilter = ref<number | 'all'>('all')
@@ -69,11 +59,11 @@ export function useAnnotationsHub() {
 
   const selectedBookLabel = ref<string | null>(null)
   const stats = ref<AnnotationHubStats | null>(null)
-  const selectedIds = ref<Set<number>>(new Set())
-  const savingIds = ref<Set<number>>(new Set())
+
+  const selection = useAnnotationSelection(items)
+  const mutations = useAnnotationMutations(items, (id) => items.value.find((item) => item.id === id)?.bookId ?? null)
 
   const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
-  const hasSelection = computed(() => selectedIds.value.size > 0)
   const rangeStart = computed(() => (total.value === 0 ? 0 : (page.value - 1) * pageSize.value + 1))
   const rangeEnd = computed(() => Math.min(page.value * pageSize.value, total.value))
 
@@ -104,14 +94,15 @@ export function useAnnotationsHub() {
     },
   })
 
-  const activeFilterChips = computed<ActiveFilterChip[]>(() => {
-    const chips: ActiveFilterChip[] = []
-    if (colorFilter.value !== 'all') chips.push({ key: 'color', label: `Color: ${colorLabel(colorFilter.value)}` })
-    if (styleFilter.value !== 'all') chips.push({ key: 'style', label: `Style: ${styleLabel(styleFilter.value)}` })
-    if (originFilter.value !== 'all') chips.push({ key: 'origin', label: `Source: ${originLabel(originFilter.value)}` })
-    if (dateFrom.value || dateTo.value) chips.push({ key: 'date', label: `Date: ${dateRangeLabel(dateFrom.value, dateTo.value)}` })
-    return chips
-  })
+  const activeFilterChips = computed(() =>
+    buildFilterChips({
+      colors: colors.value,
+      styleFilter: styleFilter.value,
+      originFilter: originFilter.value,
+      dateFrom: dateFrom.value,
+      dateTo: dateTo.value,
+    }),
+  )
 
   const popoverFilterCount = computed(() => activeFilterChips.value.length)
 
@@ -120,7 +111,7 @@ export function useAnnotationsHub() {
       search.value.trim() !== '' ||
       bookFilter.value !== 'all' ||
       notesOnly.value ||
-      colorFilter.value !== 'all' ||
+      colors.value.length > 0 ||
       styleFilter.value !== 'all' ||
       originFilter.value !== 'all' ||
       dateFrom.value !== '' ||
@@ -135,7 +126,7 @@ export function useAnnotationsHub() {
     params.set('sortBy', sortBy.value)
     params.set('sortDir', sortDir.value)
     if (search.value.trim()) params.set('search', search.value.trim())
-    if (colorFilter.value !== 'all') params.set('colors', colorFilter.value)
+    if (colors.value.length > 0) params.set('colors', colors.value.join(','))
     if (styleFilter.value !== 'all') params.set('styles', styleFilter.value)
     if (originFilter.value !== 'all') params.set('origins', originFilter.value)
     if (bookFilter.value !== 'all') params.set('bookId', String(bookFilter.value))
@@ -148,21 +139,25 @@ export function useAnnotationsHub() {
     return params.toString()
   }
 
+  let loadSeq = 0
   async function load() {
+    const seq = ++loadSeq
     loading.value = true
     error.value = null
     try {
       const res = await api(`/api/v1/annotations?${buildQuery()}`)
+      if (seq !== loadSeq) return
       if (!res.ok) {
         error.value = 'Failed to load annotations'
         return
       }
       const body: AnnotationHubResponse = await res.json()
+      if (seq !== loadSeq) return
       items.value = body.items
       total.value = body.total
       stats.value = body.stats
     } finally {
-      loading.value = false
+      if (seq === loadSeq) loading.value = false
     }
   }
 
@@ -188,21 +183,6 @@ export function useAnnotationsHub() {
     if (match) selectedBookLabel.value = match.bookTitle ?? 'Unknown book'
   }
 
-  function toggleSelected(id: number) {
-    const next = new Set(selectedIds.value)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    selectedIds.value = next
-  }
-
-  function clearSelection() {
-    selectedIds.value = new Set()
-  }
-
-  function selectAllOnPage() {
-    selectedIds.value = new Set(items.value.map((item) => item.id))
-  }
-
   function toggleNotesOnly() {
     notesOnly.value = !notesOnly.value
   }
@@ -213,7 +193,7 @@ export function useAnnotationsHub() {
   }
 
   function clearPopoverFilters() {
-    colorFilter.value = 'all'
+    colors.value = []
     styleFilter.value = 'all'
     originFilter.value = 'all'
     clearDates()
@@ -227,21 +207,15 @@ export function useAnnotationsHub() {
     clearPopoverFilters()
   }
 
-  function removeFilterChip(key: PopoverFilterKey) {
-    switch (key) {
-      case 'color':
-        colorFilter.value = 'all'
-        break
-      case 'style':
-        styleFilter.value = 'all'
-        break
-      case 'origin':
-        originFilter.value = 'all'
-        break
-      case 'date':
-        clearDates()
-        break
+  function removeFilterChip(id: string) {
+    if (id.startsWith('color:')) {
+      const hex = id.slice('color:'.length)
+      colors.value = colors.value.filter((value) => value !== hex)
+      return
     }
+    if (id === 'style') styleFilter.value = 'all'
+    else if (id === 'origin') originFilter.value = 'all'
+    else if (id === 'date') clearDates()
   }
 
   function hydrate(state: Partial<AnnotationsHubState>) {
@@ -249,7 +223,7 @@ export function useAnnotationsHub() {
     if (state.status !== undefined) status.value = state.status
     if (state.search !== undefined) search.value = state.search
     if (state.bookFilter !== undefined) bookFilter.value = state.bookFilter
-    if (state.colorFilter !== undefined) colorFilter.value = state.colorFilter
+    if (state.colors !== undefined) colors.value = state.colors
     if (state.styleFilter !== undefined) styleFilter.value = state.styleFilter
     if (state.originFilter !== undefined) originFilter.value = state.originFilter
     if (state.notesOnly !== undefined) notesOnly.value = state.notesOnly
@@ -262,33 +236,8 @@ export function useAnnotationsHub() {
     })
   }
 
-  function setSaving(id: number, saving: boolean) {
-    const next = new Set(savingIds.value)
-    if (saving) next.add(id)
-    else next.delete(id)
-    savingIds.value = next
-  }
-
-  async function updateAnnotation(bookId: number, id: number, patch: { note?: string | null; color?: string; style?: string }) {
-    const previous = items.value
-    items.value = items.value.map((item) => (item.id === id ? { ...item, ...patch } : item))
-    setSaving(id, true)
-    try {
-      const res = await api(`/api/v1/books/${bookId}/annotations/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
-      })
-      if (!res.ok) items.value = previous
-    } catch {
-      items.value = previous
-    } finally {
-      setSaving(id, false)
-    }
-  }
-
   async function bulk(action: 'trash' | 'restore' | 'restyle', patch?: { color?: string; style?: string }): Promise<number> {
-    const ids = [...selectedIds.value]
+    const ids = [...selection.selectedIds.value]
     if (ids.length === 0) return 0
     const res = await api('/api/v1/annotations/bulk', {
       method: 'POST',
@@ -297,7 +246,7 @@ export function useAnnotationsHub() {
     })
     if (!res.ok) return 0
     const body = (await res.json()) as { affected: number }
-    clearSelection()
+    selection.clearSelection()
     await load()
     return body.affected
   }
@@ -326,12 +275,12 @@ export function useAnnotationsHub() {
   }
 
   function reloadFromFilterChange() {
-    page.value = 1
-    clearSelection()
-    void load()
+    selection.clearSelection()
+    if (page.value === 1) void load()
+    else page.value = 1
   }
 
-  watch([status, colorFilter, styleFilter, originFilter, bookFilter, sortBy, sortDir, dateFrom, dateTo, notesOnly], () => {
+  watch([status, colors, styleFilter, originFilter, bookFilter, sortBy, sortDir, dateFrom, dateTo, notesOnly], () => {
     if (hydrating.value) return
     reloadFromFilterChange()
   })
@@ -348,7 +297,7 @@ export function useAnnotationsHub() {
   })
   watch(page, () => {
     if (hydrating.value) return
-    clearSelection()
+    selection.clearSelection()
     void load()
   })
 
@@ -364,7 +313,7 @@ export function useAnnotationsHub() {
     error,
     status,
     search,
-    colorFilter,
+    colors,
     styleFilter,
     originFilter,
     bookFilter,
@@ -380,21 +329,24 @@ export function useAnnotationsHub() {
     hasActiveFilters,
     selectedBookLabel,
     stats,
-    selectedIds,
-    savingIds,
-    hasSelection,
+    selectedIds: selection.selectedIds,
+    savingIds: mutations.savingIds,
+    hasSelection: selection.hasSelection,
+    allVisibleSelected: selection.allVisibleSelected,
     load,
     searchBooks,
     resolveSelectedBook,
-    toggleSelected,
-    clearSelection,
-    selectAllOnPage,
+    toggleSelected: selection.toggleSelected,
+    clearSelection: selection.clearSelection,
+    selectAllOnPage: selection.selectAllOnPage,
     toggleNotesOnly,
     clearDates,
     clearPopoverFilters,
     resetAllFilters,
     removeFilterChip,
-    updateAnnotation,
+    updateNote: mutations.updateNote,
+    updateColor: mutations.updateColor,
+    updateStyle: mutations.updateStyle,
     hydrate,
     bulk,
     restore,

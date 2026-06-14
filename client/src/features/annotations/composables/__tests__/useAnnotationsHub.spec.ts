@@ -62,14 +62,14 @@ describe('useAnnotationsHub', () => {
 
       hub.search.value = '  needle  '
       hub.bookFilter.value = 5
-      hub.colorFilter.value = '#FACC15'
+      hub.colors.value = ['#FACC15', '#4ADE80']
       hub.styleFilter.value = 'underline'
       hub.originFilter.value = 'koreader'
 
       const params = paramsFromUrl(hub.exportUrl('csv'))
       expect(params.get('search')).toBe('needle')
       expect(params.get('bookId')).toBe('5')
-      expect(params.get('colors')).toBe('#FACC15')
+      expect(params.get('colors')).toBe('#FACC15,#4ADE80')
       expect(params.get('styles')).toBe('underline')
       expect(params.get('origins')).toBe('koreader')
     })
@@ -329,23 +329,23 @@ describe('useAnnotationsHub', () => {
       expect(hub.popoverFilterCount.value).toBe(0)
       expect(hub.activeFilterChips.value).toEqual([])
 
-      hub.colorFilter.value = '#FACC15'
+      hub.colors.value = ['#FACC15']
       hub.styleFilter.value = 'underline'
       hub.originFilter.value = 'koreader'
       hub.dateFrom.value = '2026-01-10'
 
       expect(hub.popoverFilterCount.value).toBe(4)
-      expect(hub.activeFilterChips.value.map((chip) => chip.key)).toEqual(['color', 'style', 'origin', 'date'])
+      expect(hub.activeFilterChips.value.map((chip) => chip.id)).toEqual(['color:#FACC15', 'style', 'origin', 'date'])
       expect(hub.activeFilterChips.value[0].label).toBe('Color: Yellow')
       expect(hub.activeFilterChips.value[3].label).toBe('Date: From 2026-01-10')
 
-      hub.removeFilterChip('style')
-      expect(hub.styleFilter.value).toBe('all')
+      hub.removeFilterChip('color:#FACC15')
+      expect(hub.colors.value).toEqual([])
       expect(hub.popoverFilterCount.value).toBe(3)
 
       hub.clearPopoverFilters()
       expect(hub.popoverFilterCount.value).toBe(0)
-      expect(hub.colorFilter.value).toBe('all')
+      expect(hub.styleFilter.value).toBe('all')
       expect(hub.originFilter.value).toBe('all')
       expect(hub.dateFrom.value).toBe('')
     })
@@ -368,9 +368,9 @@ describe('useAnnotationsHub', () => {
       const { useAnnotationsHub } = await import('../useAnnotationsHub')
       const hub = useAnnotationsHub()
 
-      hub.hydrate({ colorFilter: '#FACC15', notesOnly: true, sortKey: 'oldest', page: 3 })
+      hub.hydrate({ colors: ['#FACC15'], notesOnly: true, sortKey: 'oldest', page: 3 })
 
-      expect(hub.colorFilter.value).toBe('#FACC15')
+      expect(hub.colors.value).toEqual(['#FACC15'])
       expect(hub.notesOnly.value).toBe(true)
       expect(hub.sortBy.value).toBe('createdAt')
       expect(hub.sortDir.value).toBe('asc')
@@ -411,7 +411,7 @@ describe('useAnnotationsHub', () => {
 
       expect(hub.hasActiveFilters.value).toBe(false)
 
-      hub.colorFilter.value = '#FACC15'
+      hub.colors.value = ['#FACC15']
       hub.bookFilter.value = 5
       hub.selectedBookLabel.value = 'Dune'
       hub.notesOnly.value = true
@@ -423,7 +423,7 @@ describe('useAnnotationsHub', () => {
       expect(hub.bookFilter.value).toBe('all')
       expect(hub.selectedBookLabel.value).toBeNull()
       expect(hub.notesOnly.value).toBe(false)
-      expect(hub.colorFilter.value).toBe('all')
+      expect(hub.colors.value).toEqual([])
       expect(hub.dateFrom.value).toBe('')
     })
   })
@@ -436,7 +436,7 @@ describe('useAnnotationsHub', () => {
       const hub = useAnnotationsHub()
       hub.items.value = [{ id: 1, bookId: 5, note: 'old', color: '#FACC15' }] as never
 
-      await hub.updateAnnotation(5, 1, { note: 'new' })
+      await hub.updateNote(1, 'new')
 
       const [url, req] = apiMock.mock.calls[0] as [string, RequestInit]
       expect(url).toBe('/api/v1/books/5/annotations/1')
@@ -453,10 +453,54 @@ describe('useAnnotationsHub', () => {
       const hub = useAnnotationsHub()
       hub.items.value = [{ id: 1, bookId: 5, note: 'old' }] as never
 
-      await hub.updateAnnotation(5, 1, { note: 'new' })
+      await hub.updateNote(1, 'new')
 
       expect(hub.items.value[0]!.note).toBe('old')
       expect(hub.savingIds.value.has(1)).toBe(false)
+    })
+  })
+
+  describe('load sequencing', () => {
+    it('reloads exactly once when a filter changes while on a later page', async () => {
+      const { nextTick } = await import('vue')
+      const { useAnnotationsHub } = await import('../useAnnotationsHub')
+      const hub = useAnnotationsHub()
+
+      hub.page.value = 3
+      await nextTick()
+      apiMock.mockClear()
+
+      hub.colors.value = ['#FACC15']
+      await nextTick()
+
+      expect(hub.page.value).toBe(1)
+      expect(apiMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('discards a stale load when a newer load has superseded it', async () => {
+      apiMock.mockReset()
+      let resolveStale!: (res: Response) => void
+      const stalePending = new Promise<Response>((resolve) => {
+        resolveStale = resolve
+      })
+      const freshBody = { items: [{ id: 2 }], total: 2, page: 1, pageSize: 25, stats: emptyHub.stats }
+      apiMock.mockReturnValueOnce(stalePending).mockResolvedValueOnce(makeResponse(freshBody))
+
+      const { useAnnotationsHub } = await import('../useAnnotationsHub')
+      const hub = useAnnotationsHub()
+
+      const stale = hub.load()
+      const fresh = hub.load()
+      await fresh
+
+      expect(hub.total.value).toBe(2)
+      expect(hub.loading.value).toBe(false)
+
+      resolveStale(makeResponse({ items: [{ id: 1 }], total: 1, page: 1, pageSize: 25, stats: emptyHub.stats }))
+      await stale
+
+      expect(hub.total.value).toBe(2)
+      expect(hub.loading.value).toBe(false)
     })
   })
 })

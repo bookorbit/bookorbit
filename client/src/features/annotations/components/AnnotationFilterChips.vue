@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { X } from 'lucide-vue-next'
-import type { ActiveFilterChip, PopoverFilterKey } from '../composables/useAnnotationsHub'
+import type { ActiveFilterChip } from '../lib/filter-chips'
 
 defineProps<{ chips: ActiveFilterChip[] }>()
-const emit = defineEmits<{ remove: [key: PopoverFilterKey]; clearAll: [] }>()
+const emit = defineEmits<{ remove: [id: string]; clearAll: [] }>()
 
-function handleRemove(key: PopoverFilterKey) {
-  emit('remove', key)
+function handleRemove(id: string) {
+  emit('remove', id)
 }
 
 function handleClearAll() {
@@ -19,11 +19,11 @@ function handleClearAll() {
     <span class="text-xs text-muted-foreground">Active:</span>
     <button
       v-for="chip in chips"
-      :key="chip.key"
+      :key="chip.id"
       type="button"
       class="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2.5 py-1 text-xs text-foreground transition-colors hover:bg-muted/70"
       :aria-label="`Remove filter ${chip.label}`"
-      @click="handleRemove(chip.key)"
+      @click="handleRemove(chip.id)"
     >
       {{ chip.label }}
       <X :size="12" class="text-muted-foreground" />

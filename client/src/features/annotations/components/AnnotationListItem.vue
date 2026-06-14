@@ -247,7 +247,7 @@ function shouldSeparateMetadataItem(index: number): boolean {
       <TooltipContent>{{ styleLabel }}</TooltipContent>
     </Tooltip>
 
-    <div class="flex-1 min-w-0">
+    <div class="flex flex-1 min-w-0 flex-col self-stretch">
       <p class="text-sm leading-relaxed text-foreground" :class="quoteClampClass">
         {{ annotation.text }}
       </p>
@@ -310,7 +310,7 @@ function shouldSeparateMetadataItem(index: number): boolean {
         </div>
       </div>
 
-      <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div class="mt-auto flex flex-col gap-2 pt-2 sm:flex-row sm:items-center sm:justify-between">
         <div class="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted-foreground">
           <template v-if="showBookHeader">
             <component :is="styleIcon" :size="13" class="shrink-0" :style="{ color: annotation.color }" />

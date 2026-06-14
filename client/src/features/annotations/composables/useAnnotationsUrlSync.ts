@@ -31,8 +31,11 @@ export function annotationsStateFromQuery(query: LocationQuery): Partial<Annotat
     if (Number.isInteger(parsed) && parsed > 0) state.bookFilter = parsed
   }
 
-  const color = firstString(query.color)
-  if (color) state.colorFilter = color
+  const colorsParam = firstString(query.colors)
+  if (colorsParam) {
+    const list = colorsParam.split(',').filter(Boolean)
+    if (list.length > 0) state.colors = list
+  }
 
   const style = firstString(query.style)
   if (style) state.styleFilter = style
@@ -67,7 +70,7 @@ export function annotationsQueryFromState(state: AnnotationsHubState): LocationQ
   const search = state.search.trim()
   if (search) query.search = search
   if (state.bookFilter !== 'all') query.bookId = String(state.bookFilter)
-  if (state.colorFilter !== 'all') query.color = state.colorFilter
+  if (state.colors.length > 0) query.colors = state.colors.join(',')
   if (state.styleFilter !== 'all') query.style = state.styleFilter
   if (state.originFilter !== 'all') query.origin = state.originFilter
   if (state.notesOnly) query.notes = '1'
@@ -101,7 +104,7 @@ export function useAnnotationsUrlSync(hub: Hub) {
       status: hub.status.value,
       search: hub.search.value,
       bookFilter: hub.bookFilter.value,
-      colorFilter: hub.colorFilter.value,
+      colors: hub.colors.value,
       styleFilter: hub.styleFilter.value,
       originFilter: hub.originFilter.value,
       notesOnly: hub.notesOnly.value,
@@ -126,7 +129,7 @@ export function useAnnotationsUrlSync(hub: Hub) {
   })
 
   watch(
-    [hub.status, hub.bookFilter, hub.colorFilter, hub.styleFilter, hub.originFilter, hub.notesOnly, hub.dateFrom, hub.dateTo, hub.sortKey, hub.page],
+    [hub.status, hub.bookFilter, hub.colors, hub.styleFilter, hub.originFilter, hub.notesOnly, hub.dateFrom, hub.dateTo, hub.sortKey, hub.page],
     write,
   )
 }

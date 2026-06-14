@@ -1,25 +1,18 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import {
-  ArrowUpDown,
-  CheckSquare,
-  Contrast,
-  Highlighter,
-  Maximize2,
-  Minimize2,
-  Palette,
-  Strikethrough,
-  Trash2,
-  Underline,
-  Waves,
-} from 'lucide-vue-next'
-import { ANNOTATION_HIGHLIGHT_COLORS, type AnnotationItem, type BookDetail } from '@bookorbit/types'
+import { Highlighter, RotateCcw, Trash2 } from 'lucide-vue-next'
+import type { AnnotationItem, BookDetail } from '@bookorbit/types'
+import { Button } from '@/components/ui/button'
 import AnnotationListItem from '@/features/annotations/components/AnnotationListItem.vue'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { PILL_CLASS, sourcePill } from '@/features/annotations/lib/pill-styles'
+import AnnotationToolbar from '@/features/annotations/components/AnnotationToolbar.vue'
+import AnnotationFiltersPanel from '@/features/annotations/components/AnnotationFiltersPanel.vue'
+import AnnotationSummaryBar from '@/features/annotations/components/AnnotationSummaryBar.vue'
+import AnnotationBulkBar from '@/features/annotations/components/AnnotationBulkBar.vue'
+import AnnotationPagination from '@/features/annotations/components/AnnotationPagination.vue'
+import { sourcePill } from '@/features/annotations/lib/pill-styles'
 import { useBookHighlights } from '@/features/book/composables/useBookHighlights'
-import HighlightsFilterBar from './HighlightsFilterBar.vue'
+import { useDensity } from '@/features/annotations/composables/useDensity'
 import HighlightChapterGroup from './HighlightChapterGroup.vue'
 import HighlightsExportMenu from './HighlightsExportMenu.vue'
 
@@ -27,52 +20,18 @@ const props = defineProps<{ book: BookDetail }>()
 
 const router = useRouter()
 const bookIdRef = computed(() => props.book.id)
-const {
-  items,
-  total,
-  stats,
-  loading,
-  error,
-  page,
-  pageSize,
-  sortBy,
-  sortDir,
-  colors: activeColors,
-  chapter: selectedChapter,
-  dateFrom,
-  dateTo,
-  chapters,
-  updateNote,
-  updateColor,
-  updateStyle,
-  deleteHighlight,
-  bulkTrash,
-  bulkRestyle,
-  setPage,
-  setSort,
-  toggleColor,
-  setSearch,
-  setChapter,
-  setDateRange,
-} = useBookHighlights(bookIdRef)
+const hl = useBookHighlights(bookIdRef)
+const { density } = useDensity()
 
-const BULK_COLORS = ANNOTATION_HIGHLIGHT_COLORS
-
-const BULK_STYLES = [
-  { value: 'highlight', label: 'Highlight', icon: Highlighter },
-  { value: 'underline', label: 'Underline', icon: Underline },
-  { value: 'strikethrough', label: 'Strike', icon: Strikethrough },
-  { value: 'squiggly', label: 'Squiggle', icon: Waves },
-  { value: 'invert', label: 'Invert', icon: Contrast },
+const SORT_OPTIONS = [
+  { value: 'position', label: 'Position' },
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
 ]
-
-const density = ref<'compact' | 'comfortable'>('comfortable')
-const selectedIds = ref<Set<number>>(new Set())
-const savingIds = ref<Set<number>>(new Set())
 
 const groupedHighlights = computed(() => {
   const groups = new Map<string, AnnotationItem[]>()
-  for (const item of items.value) {
+  for (const item of hl.items.value) {
     const key = item.chapterTitle ?? ''
     if (!groups.has(key)) groups.set(key, [])
     groups.get(key)!.push(item)
@@ -86,79 +45,20 @@ const hasChapterGroups = computed(() => {
   return true
 })
 
-const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
-const startItem = computed(() => Math.min((page.value - 1) * pageSize.value + 1, total.value))
-const endItem = computed(() => Math.min(page.value * pageSize.value, total.value))
-const visibleIds = computed(() => items.value.map((item) => item.id))
-const selectedItems = computed(() => items.value.filter((item) => selectedIds.value.has(item.id)))
-const hasSelection = computed(() => selectedIds.value.size > 0)
-const allVisibleSelected = computed(() => visibleIds.value.length > 0 && visibleIds.value.every((id) => selectedIds.value.has(id)))
-
-const sortLabel = computed(() => {
-  if (sortBy.value === 'position') return 'Position'
-  return sortDir.value === 'desc' ? 'Newest' : 'Oldest'
-})
-
-const originSummary = computed(() => {
-  return (stats.value?.originBreakdown ?? []).filter((entry) => entry.count > 0).map((entry) => ({ ...sourcePill(entry.origin), count: entry.count }))
-})
-
-const summaryItems = computed(() => {
-  const result = [`${total.value} highlights`]
-  if (stats.value) {
-    result.push(`${stats.value.highlightsWithNotes} notes`)
-    result.push(`${stats.value.chaptersWithHighlights} chapters`)
+const summaryTexts = computed(() => {
+  const texts = [`${hl.total.value} ${hl.total.value === 1 ? 'highlight' : 'highlights'}`]
+  if (hl.stats.value) {
+    texts.push(`${hl.stats.value.highlightsWithNotes} notes`)
+    texts.push(`${hl.stats.value.chaptersWithHighlights} chapters`)
   }
-  return result
+  return texts
 })
 
-watch(items, (nextItems) => {
-  const currentIds = new Set(nextItems.map((item) => item.id))
-  selectedIds.value = new Set([...selectedIds.value].filter((id) => currentIds.has(id)))
-  savingIds.value = new Set([...savingIds.value].filter((id) => currentIds.has(id)))
-})
-
-function handleToggleSort() {
-  if (sortBy.value === 'position') {
-    setSort('createdAt', 'desc')
-  } else if (sortDir.value === 'desc') {
-    setSort('createdAt', 'asc')
-  } else {
-    setSort('position', 'asc')
-  }
-}
-
-function toggleDensity() {
-  density.value = density.value === 'compact' ? 'comfortable' : 'compact'
-}
-
-function toggleSelected(id: number) {
-  const next = new Set(selectedIds.value)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  selectedIds.value = next
-}
-
-function selectAllOnPage() {
-  const next = new Set(selectedIds.value)
-  for (const id of visibleIds.value) next.add(id)
-  selectedIds.value = next
-}
-
-function clearSelection() {
-  selectedIds.value = new Set()
-}
-
-function setSaving(id: number, saving: boolean) {
-  const next = new Set(savingIds.value)
-  if (saving) next.add(id)
-  else next.delete(id)
-  savingIds.value = next
-}
-
-function selectedIdsArray(): number[] {
-  return [...selectedIds.value]
-}
+const originSummary = computed(() =>
+  (hl.stats.value?.originBreakdown ?? [])
+    .filter((entry) => entry.count > 0)
+    .map((entry) => ({ origin: entry.origin, ...sourcePill(entry.origin), count: entry.count })),
+)
 
 function handleJump(annotation: AnnotationItem) {
   if (!annotation.jumpFileId) return
@@ -170,187 +70,111 @@ function handleJump(annotation: AnnotationItem) {
   void router.push({ name: 'reader', params: { bookId: annotation.bookId, fileId: annotation.jumpFileId }, query })
 }
 
-async function handleUpdateNote(id: number, note: string | null) {
-  setSaving(id, true)
-  try {
-    await updateNote(id, note)
-  } finally {
-    setSaving(id, false)
-  }
-}
-
-async function handleUpdateColor(id: number, color: string) {
-  setSaving(id, true)
-  try {
-    await updateColor(id, color)
-  } finally {
-    setSaving(id, false)
-  }
-}
-
-async function handleUpdateStyle(id: number, style: string) {
-  setSaving(id, true)
-  try {
-    await updateStyle(id, style)
-  } finally {
-    setSaving(id, false)
-  }
+function handleSetPage(page: number) {
+  hl.page.value = page
 }
 
 async function handleDelete(id: number) {
-  await deleteHighlight(id)
-  const next = new Set(selectedIds.value)
-  next.delete(id)
-  selectedIds.value = next
-}
-
-async function handleBulkTrash() {
-  const affected = await bulkTrash(selectedIdsArray())
-  if (affected > 0) clearSelection()
+  await hl.deleteHighlight(id)
 }
 
 async function handleBulkColor(color: string) {
-  const affected = await bulkRestyle(selectedIdsArray(), { color })
-  if (affected > 0) clearSelection()
+  const affected = await hl.bulkRestyle([...hl.selectedIds.value], { color })
+  if (affected > 0) hl.clearSelection()
 }
 
 async function handleBulkStyle(style: string) {
-  const affected = await bulkRestyle(selectedIdsArray(), { style })
-  if (affected > 0) clearSelection()
+  const affected = await hl.bulkRestyle([...hl.selectedIds.value], { style })
+  if (affected > 0) hl.clearSelection()
 }
 
-function handlePrevPage() {
-  setPage(page.value - 1)
-}
-
-function handleNextPage() {
-  setPage(page.value + 1)
-}
-
-function handleSearchChange(query: string) {
-  setSearch(query)
-}
-
-function handleChapterChange(ch: string | undefined) {
-  setChapter(ch)
-}
-
-function handleDateRangeChange(from: string | undefined, to: string | undefined) {
-  setDateRange(from, to)
+async function handleBulkTrash() {
+  const affected = await hl.bulkTrash([...hl.selectedIds.value])
+  if (affected > 0) hl.clearSelection()
 }
 </script>
 
 <template>
   <div class="space-y-3">
-    <div v-if="error" class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive">
-      {{ error }}
+    <div v-if="hl.error.value" class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive">
+      {{ hl.error.value }}
     </div>
 
-    <HighlightsFilterBar
-      :active-colors="activeColors"
-      :chapters="chapters"
-      :selected-chapter="selectedChapter"
-      :date-from="dateFrom"
-      :date-to="dateTo"
-      @toggle-color="toggleColor"
-      @search="handleSearchChange"
-      @chapter-change="handleChapterChange"
-      @date-range-change="handleDateRangeChange"
+    <AnnotationToolbar
+      v-model:search="hl.search.value"
+      v-model:sort-key="hl.sortKey.value"
+      v-model:density="density"
+      :sort-options="SORT_OPTIONS"
+      :filter-count="hl.popoverFilterCount.value"
+      :chips="hl.activeFilterChips.value"
+      @remove-chip="hl.removeFilterChip"
+      @clear-filters="hl.clearPopoverFilters"
     >
-      <div class="flex items-center gap-2">
-        <button
-          type="button"
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          @click="handleToggleSort"
+      <template #inline-filters>
+        <select
+          v-if="hl.chapters.value.length > 0"
+          v-model="hl.chapter.value"
+          aria-label="Filter by chapter"
+          class="h-9 max-w-[14rem] px-2 rounded-md border border-border bg-background text-sm"
         >
-          <ArrowUpDown :size="14" />
-          {{ sortLabel }}
-        </button>
-        <button
-          type="button"
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          @click="toggleDensity"
-        >
-          <Minimize2 v-if="density === 'comfortable'" :size="14" />
-          <Maximize2 v-else :size="14" />
-          {{ density === 'comfortable' ? 'Compact' : 'Comfortable' }}
-        </button>
-        <HighlightsExportMenu :items="items" :book-title="book.title ?? 'Untitled'" label="Export page" />
-      </div>
-    </HighlightsFilterBar>
-
-    <div
-      v-if="total > 0"
-      class="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground"
-    >
-      <span v-for="item in summaryItems" :key="item" class="font-medium text-foreground">{{ item }}</span>
-      <span v-if="originSummary.length > 0" class="h-3 w-px bg-border" />
-      <span v-for="origin in originSummary" :key="origin.label" :class="[PILL_CLASS, origin.class]"> {{ origin.label }} {{ origin.count }} </span>
-    </div>
-
-    <div v-if="hasSelection" class="flex flex-wrap items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
-      <span class="font-medium text-foreground">{{ selectedIds.size }} selected</span>
-      <button
-        type="button"
-        class="inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-        @click="selectAllOnPage"
-      >
-        <CheckSquare :size="13" />
-        {{ allVisibleSelected ? 'Page selected' : 'Select page' }}
-      </button>
-      <button type="button" class="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground" @click="clearSelection">
-        Clear
-      </button>
-
-      <div class="h-5 w-px bg-border" />
-
-      <div class="flex items-center gap-1">
-        <Palette :size="13" class="text-muted-foreground" />
-        <button
-          v-for="color in BULK_COLORS"
-          :key="color.hex"
-          type="button"
-          class="h-6 w-6 rounded-full border border-border transition-transform hover:scale-110"
-          :style="{ background: color.hex }"
-          :title="color.label"
-          @click="handleBulkColor(color.hex)"
+          <option value="">All chapters</option>
+          <option v-for="ch in hl.chapters.value" :key="ch" :value="ch">{{ ch }}</option>
+        </select>
+      </template>
+      <template #filters>
+        <AnnotationFiltersPanel
+          v-model:colors="hl.colors.value"
+          v-model:date-from="hl.dateFrom.value"
+          v-model:date-to="hl.dateTo.value"
+          @clear-all="hl.clearPopoverFilters"
         />
-      </div>
+      </template>
+    </AnnotationToolbar>
 
-      <div class="flex flex-wrap items-center gap-1">
-        <Tooltip v-for="style in BULK_STYLES" :key="style.value">
-          <TooltipTrigger as-child>
-            <button
-              type="button"
-              class="flex h-7 w-7 items-center justify-center rounded border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              @click="handleBulkStyle(style.value)"
-            >
-              <component :is="style.icon" :size="14" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{{ style.label }}</TooltipContent>
-        </Tooltip>
-      </div>
-
-      <div class="flex-1" />
-      <HighlightsExportMenu :items="selectedItems" :book-title="book.title ?? 'Untitled'" label="Export selected" />
-      <button
-        type="button"
-        class="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-sm text-destructive-foreground transition-colors hover:bg-destructive/90"
-        @click="handleBulkTrash"
-      >
-        <Trash2 :size="14" />
-        Trash
-      </button>
+    <div v-if="hl.total.value > 0" class="flex flex-wrap items-center justify-between gap-2">
+      <AnnotationSummaryBar :texts="summaryTexts" :origins="originSummary" />
+      <HighlightsExportMenu :items="hl.items.value" :book-title="book.title ?? 'Untitled'" label="Export page" />
     </div>
 
-    <div class="transition-opacity" :class="{ 'opacity-50 pointer-events-none': loading && items.length > 0 }">
-      <div v-if="items.length === 0 && !loading" class="flex flex-col items-center justify-center py-16 gap-3">
+    <AnnotationBulkBar
+      v-if="hl.hasSelection.value"
+      :count="hl.selectedIds.value.size"
+      :all-visible-selected="hl.allVisibleSelected.value"
+      show-restyle
+      @select-page="hl.selectAllOnPage"
+      @clear="hl.clearSelection"
+      @recolor="handleBulkColor"
+      @restyle="handleBulkStyle"
+    >
+      <template #trailing>
+        <HighlightsExportMenu :items="hl.selectedItems.value" :book-title="book.title ?? 'Untitled'" label="Export selected" />
+        <Button variant="destructive" size="sm" class="gap-1.5" @click="handleBulkTrash">
+          <Trash2 :size="14" />
+          Trash
+        </Button>
+      </template>
+    </AnnotationBulkBar>
+
+    <div class="transition-opacity" :class="{ 'opacity-50 pointer-events-none': hl.loading.value && hl.items.value.length > 0 }">
+      <div v-if="hl.items.value.length === 0 && !hl.loading.value" class="flex flex-col items-center justify-center py-16 gap-3">
         <div class="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
           <Highlighter :size="20" class="text-muted-foreground/60" />
         </div>
-        <p class="text-sm text-muted-foreground">No highlights yet</p>
-        <p class="text-xs text-muted-foreground/70">Select text while reading to create highlights</p>
+        <template v-if="hl.hasActiveFilters.value">
+          <p class="text-sm text-muted-foreground">No highlights match your filters.</p>
+          <button
+            type="button"
+            class="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
+            @click="hl.resetAllFilters"
+          >
+            <RotateCcw :size="14" />
+            Reset filters
+          </button>
+        </template>
+        <template v-else>
+          <p class="text-sm text-muted-foreground">No highlights yet</p>
+          <p class="text-xs text-muted-foreground/70">Select text while reading to create highlights</p>
+        </template>
       </div>
 
       <div v-else class="space-y-4">
@@ -360,56 +184,46 @@ function handleDateRangeChange(from: string | undefined, to: string | undefined)
             :key="chapterTitle"
             :chapter-title="chapterTitle || 'Uncategorized'"
             :highlights="highlights"
-            :selected-ids="selectedIds"
+            :selected-ids="hl.selectedIds.value"
             :density="density"
-            :saving-ids="savingIds"
-            @toggle-select="toggleSelected"
+            :saving-ids="hl.savingIds.value"
+            @toggle-select="hl.toggleSelected"
             @jump="handleJump"
-            @update-note="handleUpdateNote"
-            @update-color="handleUpdateColor"
-            @update-style="handleUpdateStyle"
+            @update-note="hl.updateNote"
+            @update-color="hl.updateColor"
+            @update-style="hl.updateStyle"
             @trash="handleDelete"
           />
         </template>
         <template v-else>
           <AnnotationListItem
-            v-for="h in items"
+            v-for="h in hl.items.value"
             :key="h.id"
             :annotation="h"
-            :selected="selectedIds.has(h.id)"
+            :selected="hl.selectedIds.value.has(h.id)"
             :density="density"
-            :saving="savingIds.has(h.id)"
+            :saving="hl.savingIds.value.has(h.id)"
             mode="book"
-            @toggle-select="toggleSelected"
+            @toggle-select="hl.toggleSelected"
             @jump="handleJump"
-            @update-note="handleUpdateNote"
-            @update-color="handleUpdateColor"
-            @update-style="handleUpdateStyle"
+            @update-note="hl.updateNote"
+            @update-color="hl.updateColor"
+            @update-style="hl.updateStyle"
             @trash="handleDelete"
           />
         </template>
       </div>
     </div>
 
-    <div v-if="total > 0" class="flex items-center justify-between text-sm text-muted-foreground">
-      <span>Showing {{ startItem }}-{{ endItem }} of {{ total }} highlights</span>
-      <div class="flex items-center gap-2">
-        <button
-          class="px-3 py-1.5 rounded border border-border bg-card hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed text-foreground text-sm"
-          :disabled="page <= 1"
-          @click="handlePrevPage"
-        >
-          Prev
-        </button>
-        <span class="text-xs">{{ page }} / {{ totalPages }}</span>
-        <button
-          class="px-3 py-1.5 rounded border border-border bg-card hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed text-foreground text-sm"
-          :disabled="page >= totalPages"
-          @click="handleNextPage"
-        >
-          Next
-        </button>
-      </div>
-    </div>
+    <AnnotationPagination
+      v-if="hl.total.value > 0"
+      :page="hl.page.value"
+      :total-pages="hl.totalPages.value"
+      :range-start="hl.rangeStart.value"
+      :range-end="hl.rangeEnd.value"
+      :total="hl.total.value"
+      unit="highlights"
+      @update:page="handleSetPage"
+    />
   </div>
 </template>

@@ -25,7 +25,7 @@ function makeResponse(data: unknown, options: { ok?: boolean; status?: number } 
 }
 
 function stubMatchMedia(matches: boolean) {
-  window.matchMedia = vi.fn<(...args: unknown[]) => unknown>().mockImplementation((query: string) => ({
+  window.matchMedia = vi.fn<(query: string) => unknown>().mockImplementation((query: string) => ({
     matches,
     media: query,
     onchange: null,
