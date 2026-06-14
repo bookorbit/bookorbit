@@ -82,6 +82,27 @@ export class AnnotationHubBooksQueryDto {
   @IsOptional()
   @IsIn(['active', 'trashed'])
   status?: 'active' | 'trashed';
+
+  /** Typeahead term matched against book title and author name. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  q?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+
+  /** A book id whose facet is always included in the response, even outside the limit/search. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  selectedId?: number;
 }
 
 export class AnnotationExportQueryDto extends AnnotationHubQueryDto {

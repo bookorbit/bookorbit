@@ -83,7 +83,7 @@ const confirmTrash = ref(false)
 const copied = ref(false)
 const pendingNote = ref<string | null | undefined>(undefined)
 
-const canEdit = computed(() => props.mode === 'book' && !props.trashed)
+const canEdit = computed(() => !props.trashed)
 const canJump = computed(() => props.annotation.jumpFileId != null && !props.trashed)
 const isLong = computed(() => props.annotation.text.length > (props.density === 'compact' ? 180 : 260))
 const isApproximate = computed(() => props.annotation.cfi == null && props.annotation.origin !== 'web')

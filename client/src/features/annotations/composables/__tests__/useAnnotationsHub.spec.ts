@@ -171,16 +171,43 @@ describe('useAnnotationsHub', () => {
       expect(hub.error.value).toBe('Failed to load annotations')
     })
 
-    it('loadBooks populates the book facets', async () => {
+    it('searchBooks queries the books facet endpoint with the trimmed term', async () => {
       apiMock.mockResolvedValueOnce(makeResponse([{ bookId: 5, bookTitle: 'B', author: 'A', count: 3 }]))
 
       const { useAnnotationsHub } = await import('../useAnnotationsHub')
       const hub = useAnnotationsHub()
 
-      await hub.loadBooks()
+      const facets = await hub.searchBooks('  dune  ')
 
-      expect(apiMock).toHaveBeenCalledWith('/api/v1/annotations/books?status=active')
-      expect(hub.books.value).toEqual([{ bookId: 5, bookTitle: 'B', author: 'A', count: 3 }])
+      const url = String(apiMock.mock.calls[0][0])
+      expect(url).toContain('/api/v1/annotations/books?')
+      expect(url).toContain('status=active')
+      expect(url).toContain('q=dune')
+      expect(facets).toEqual([{ bookId: 5, bookTitle: 'B', author: 'A', count: 3 }])
+    })
+
+    it('resolveSelectedBook fills the label for the selected book id', async () => {
+      apiMock.mockResolvedValueOnce(makeResponse([{ bookId: 7, bookTitle: 'Dune', author: 'FH', count: 9 }]))
+
+      const { useAnnotationsHub } = await import('../useAnnotationsHub')
+      const hub = useAnnotationsHub()
+      hub.hydrate({ bookFilter: 7 })
+
+      await hub.resolveSelectedBook()
+
+      const url = String(apiMock.mock.calls[0][0])
+      expect(url).toContain('selectedId=7')
+      expect(hub.selectedBookLabel.value).toBe('Dune')
+    })
+
+    it('resolveSelectedBook clears the label when no book is selected', async () => {
+      const { useAnnotationsHub } = await import('../useAnnotationsHub')
+      const hub = useAnnotationsHub()
+
+      await hub.resolveSelectedBook()
+
+      expect(apiMock).not.toHaveBeenCalled()
+      expect(hub.selectedBookLabel.value).toBeNull()
     })
 
     it('bulk returns 0 and skips the request when nothing is selected', async () => {
@@ -270,6 +297,166 @@ describe('useAnnotationsHub', () => {
       hub.page.value = 2
       await nextTick()
       expect(apiMock).toHaveBeenCalled()
+    })
+  })
+
+  describe('sort key', () => {
+    it('maps the merged sort key to sortBy/sortDir and back', async () => {
+      const { useAnnotationsHub } = await import('../useAnnotationsHub')
+      const hub = useAnnotationsHub()
+
+      expect(hub.sortKey.value).toBe('newest')
+
+      hub.sortKey.value = 'oldest'
+      expect(hub.sortBy.value).toBe('createdAt')
+      expect(hub.sortDir.value).toBe('asc')
+
+      hub.sortKey.value = 'book-asc'
+      expect(hub.sortBy.value).toBe('book')
+      expect(hub.sortDir.value).toBe('asc')
+
+      hub.sortBy.value = 'book'
+      hub.sortDir.value = 'desc'
+      expect(hub.sortKey.value).toBe('book-desc')
+    })
+  })
+
+  describe('popover filters', () => {
+    it('builds chips, counts them, and clears individually or all at once', async () => {
+      const { useAnnotationsHub } = await import('../useAnnotationsHub')
+      const hub = useAnnotationsHub()
+
+      expect(hub.popoverFilterCount.value).toBe(0)
+      expect(hub.activeFilterChips.value).toEqual([])
+
+      hub.colorFilter.value = '#FACC15'
+      hub.styleFilter.value = 'underline'
+      hub.originFilter.value = 'koreader'
+      hub.dateFrom.value = '2026-01-10'
+
+      expect(hub.popoverFilterCount.value).toBe(4)
+      expect(hub.activeFilterChips.value.map((chip) => chip.key)).toEqual(['color', 'style', 'origin', 'date'])
+      expect(hub.activeFilterChips.value[0].label).toBe('Color: Yellow')
+      expect(hub.activeFilterChips.value[3].label).toBe('Date: From 2026-01-10')
+
+      hub.removeFilterChip('style')
+      expect(hub.styleFilter.value).toBe('all')
+      expect(hub.popoverFilterCount.value).toBe(3)
+
+      hub.clearPopoverFilters()
+      expect(hub.popoverFilterCount.value).toBe(0)
+      expect(hub.colorFilter.value).toBe('all')
+      expect(hub.originFilter.value).toBe('all')
+      expect(hub.dateFrom.value).toBe('')
+    })
+
+    it('does not chip the book or notes-only filters', async () => {
+      const { useAnnotationsHub } = await import('../useAnnotationsHub')
+      const hub = useAnnotationsHub()
+
+      hub.bookFilter.value = 5
+      hub.notesOnly.value = true
+
+      expect(hub.activeFilterChips.value).toEqual([])
+      expect(hub.popoverFilterCount.value).toBe(0)
+    })
+  })
+
+  describe('hydrate', () => {
+    it('restores state and keeps the hydrated page despite the filter watcher', async () => {
+      const { nextTick } = await import('vue')
+      const { useAnnotationsHub } = await import('../useAnnotationsHub')
+      const hub = useAnnotationsHub()
+
+      hub.hydrate({ colorFilter: '#FACC15', notesOnly: true, sortKey: 'oldest', page: 3 })
+
+      expect(hub.colorFilter.value).toBe('#FACC15')
+      expect(hub.notesOnly.value).toBe(true)
+      expect(hub.sortBy.value).toBe('createdAt')
+      expect(hub.sortDir.value).toBe('asc')
+      expect(hub.page.value).toBe(3)
+
+      await nextTick()
+      expect(hub.page.value).toBe(3)
+      expect(hub.hydrating.value).toBe(false)
+    })
+  })
+
+  describe('search debounce', () => {
+    it('defers the search-triggered reload until the debounce elapses', async () => {
+      vi.useFakeTimers()
+      try {
+        const { nextTick } = await import('vue')
+        const { useAnnotationsHub } = await import('../useAnnotationsHub')
+        const hub = useAnnotationsHub()
+        apiMock.mockClear()
+
+        hub.search.value = 'dune'
+        await nextTick()
+        expect(apiMock).not.toHaveBeenCalled()
+
+        vi.advanceTimersByTime(300)
+        expect(apiMock).toHaveBeenCalledTimes(1)
+        expect(String(apiMock.mock.calls[0][0])).toContain('search=dune')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  })
+
+  describe('filter reset', () => {
+    it('hasActiveFilters reflects active filters and resetAllFilters clears them', async () => {
+      const { useAnnotationsHub } = await import('../useAnnotationsHub')
+      const hub = useAnnotationsHub()
+
+      expect(hub.hasActiveFilters.value).toBe(false)
+
+      hub.colorFilter.value = '#FACC15'
+      hub.bookFilter.value = 5
+      hub.selectedBookLabel.value = 'Dune'
+      hub.notesOnly.value = true
+      hub.dateFrom.value = '2026-01-01'
+      expect(hub.hasActiveFilters.value).toBe(true)
+
+      hub.resetAllFilters()
+      expect(hub.hasActiveFilters.value).toBe(false)
+      expect(hub.bookFilter.value).toBe('all')
+      expect(hub.selectedBookLabel.value).toBeNull()
+      expect(hub.notesOnly.value).toBe(false)
+      expect(hub.colorFilter.value).toBe('all')
+      expect(hub.dateFrom.value).toBe('')
+    })
+  })
+
+  describe('updateAnnotation', () => {
+    it('optimistically patches the item and PATCHes the book-scoped endpoint', async () => {
+      apiMock.mockResolvedValueOnce(makeResponse({}))
+
+      const { useAnnotationsHub } = await import('../useAnnotationsHub')
+      const hub = useAnnotationsHub()
+      hub.items.value = [{ id: 1, bookId: 5, note: 'old', color: '#FACC15' }] as never
+
+      await hub.updateAnnotation(5, 1, { note: 'new' })
+
+      const [url, req] = apiMock.mock.calls[0] as [string, RequestInit]
+      expect(url).toBe('/api/v1/books/5/annotations/1')
+      expect(req.method).toBe('PATCH')
+      expect(JSON.parse(String(req.body))).toEqual({ note: 'new' })
+      expect(hub.items.value[0]!.note).toBe('new')
+      expect(hub.savingIds.value.has(1)).toBe(false)
+    })
+
+    it('reverts the optimistic change when the request fails', async () => {
+      apiMock.mockResolvedValueOnce(makeResponse({}, { ok: false, status: 500 }))
+
+      const { useAnnotationsHub } = await import('../useAnnotationsHub')
+      const hub = useAnnotationsHub()
+      hub.items.value = [{ id: 1, bookId: 5, note: 'old' }] as never
+
+      await hub.updateAnnotation(5, 1, { note: 'new' })
+
+      expect(hub.items.value[0]!.note).toBe('old')
+      expect(hub.savingIds.value.has(1)).toBe(false)
     })
   })
 })

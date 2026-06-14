@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  ArrowDownUp,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -11,45 +10,44 @@ import {
   Highlighter,
   Maximize2,
   Minimize2,
+  RotateCcw,
   Search,
+  SlidersHorizontal,
   StickyNote,
   Trash2,
-  X,
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
-import { ANNOTATION_COLOR_FILTER_OPTIONS, ANNOTATION_HIGHLIGHT_COLORS, type AnnotationHubItem } from '@bookorbit/types'
+import { ANNOTATION_HIGHLIGHT_COLORS, type AnnotationHubItem } from '@bookorbit/types'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import AnnotationCard from '../components/AnnotationCard.vue'
 import AnnotationBookGroup from '../components/AnnotationBookGroup.vue'
+import AnnotationBookCombobox from '../components/AnnotationBookCombobox.vue'
+import AnnotationFiltersPanel from '../components/AnnotationFiltersPanel.vue'
+import AnnotationFilterChips from '../components/AnnotationFilterChips.vue'
+import { SORT_OPTIONS } from '../lib/filter-options'
 import { sourcePill } from '../lib/pill-styles'
 import { useAnnotationsHub } from '../composables/useAnnotationsHub'
+import { useAnnotationsUrlSync } from '../composables/useAnnotationsUrlSync'
 
 const router = useRouter()
 const hub = useAnnotationsHub()
+useAnnotationsUrlSync(hub)
 
-const COLOR_OPTIONS = [
-  { value: 'all', label: 'All colors' },
-  ...ANNOTATION_COLOR_FILTER_OPTIONS.map((color) => ({ value: color.hex, label: color.label })),
-]
 const RECOLOR_OPTIONS = ANNOTATION_HIGHLIGHT_COLORS
 
-const STYLE_OPTIONS = [
-  { value: 'all', label: 'All styles' },
-  { value: 'highlight', label: 'Highlight' },
-  { value: 'underline', label: 'Underline' },
-  { value: 'strikethrough', label: 'Strikethrough' },
-  { value: 'squiggly', label: 'Squiggly' },
-  { value: 'invert', label: 'Invert' },
-]
+const DENSITY_STORAGE_KEY = 'annotations:density'
 
-const ORIGIN_OPTIONS = [
-  { value: 'all', label: 'All sources' },
-  { value: 'web', label: 'Web' },
-  { value: 'koreader', label: 'KOReader' },
-]
+function readStoredDensity(): 'compact' | 'comfortable' {
+  const stored = localStorage.getItem(DENSITY_STORAGE_KEY)
+  return stored === 'compact' || stored === 'comfortable' ? stored : 'comfortable'
+}
 
-const density = ref<'compact' | 'comfortable'>('comfortable')
+const density = ref<'compact' | 'comfortable'>(readStoredDensity())
+watch(density, (value) => localStorage.setItem(DENSITY_STORAGE_KEY, value))
 
 const isGrouped = computed(() => hub.sortBy.value === 'book')
 
@@ -66,35 +64,48 @@ const groupedByBook = computed(() => {
   return groups
 })
 
-const summaryItems = computed(() => {
-  const s = hub.stats.value
-  if (!s) return []
-  const items: string[] = []
-  if (s.books > 0) items.push(`${s.books} ${s.books === 1 ? 'book' : 'books'}`)
-  if (s.withNotes > 0) items.push(`${s.withNotes} ${s.withNotes === 1 ? 'note' : 'notes'}`)
-  return items
+const bookCountText = computed(() => {
+  const books = hub.stats.value?.books ?? 0
+  return books > 0 ? `${books} ${books === 1 ? 'book' : 'books'}` : null
 })
 
-const originSummary = computed(() => (hub.stats.value?.originBreakdown ?? []).map((entry) => ({ ...sourcePill(entry.origin), count: entry.count })))
+const notesCount = computed(() => hub.stats.value?.withNotes ?? 0)
 
-const HEADER_PILL_CLASS = 'inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-medium'
+const originSummary = computed(() =>
+  (hub.stats.value?.originBreakdown ?? []).map((entry) => ({ origin: entry.origin, ...sourcePill(entry.origin), count: entry.count })),
+)
 
-const sortDirLabel = computed(() => {
-  if (hub.sortBy.value === 'book') return hub.sortDir.value === 'asc' ? 'A to Z' : 'Z to A'
-  return hub.sortDir.value === 'desc' ? 'Newest' : 'Oldest'
-})
+const HEADER_PILL_CLASS = 'inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-medium transition-colors'
 
 onMounted(() => {
   void hub.load()
-  void hub.loadBooks()
 })
-
-function toggleSortDir() {
-  hub.sortDir.value = hub.sortDir.value === 'desc' ? 'asc' : 'desc'
-}
 
 function toggleDensity() {
   density.value = density.value === 'comfortable' ? 'compact' : 'comfortable'
+}
+
+function toggleOriginFilter(origin: string) {
+  hub.originFilter.value = hub.originFilter.value === origin ? 'all' : origin
+}
+
+function bookIdForAnnotation(id: number): number | null {
+  return hub.items.value.find((item) => item.id === id)?.bookId ?? null
+}
+
+function handleUpdateNote(id: number, note: string | null) {
+  const bookId = bookIdForAnnotation(id)
+  if (bookId != null) void hub.updateAnnotation(bookId, id, { note })
+}
+
+function handleUpdateColor(id: number, color: string) {
+  const bookId = bookIdForAnnotation(id)
+  if (bookId != null) void hub.updateAnnotation(bookId, id, { color })
+}
+
+function handleUpdateStyle(id: number, style: string) {
+  const bookId = bookIdForAnnotation(id)
+  if (bookId != null) void hub.updateAnnotation(bookId, id, { style })
 }
 
 function setActiveTab() {
@@ -185,14 +196,35 @@ function handleExportJson() {
         <Highlighter :size="22" class="text-primary" />
         <h1 class="text-xl font-semibold">Annotations</h1>
         <span class="text-sm text-muted-foreground">{{ hub.total.value }} total</span>
-        <template v-if="summaryItems.length > 0 || originSummary.length > 0">
+        <template v-if="bookCountText || notesCount > 0 || originSummary.length > 0">
           <span class="hidden h-5 w-px bg-border sm:block" />
-          <div class="hidden items-center gap-2.5 text-sm text-muted-foreground sm:flex">
-            <span v-for="item in summaryItems" :key="item">{{ item }}</span>
-            <span v-if="summaryItems.length > 0 && originSummary.length > 0" class="h-4 w-px bg-border" />
-            <span v-for="origin in originSummary" :key="origin.label" :class="[HEADER_PILL_CLASS, origin.class]"
-              >{{ origin.label }} {{ origin.count }}</span
+          <div class="hidden items-center gap-2 text-sm text-muted-foreground sm:flex">
+            <span v-if="bookCountText">{{ bookCountText }}</span>
+            <button
+              v-if="notesCount > 0"
+              type="button"
+              :aria-pressed="hub.notesOnly.value"
+              :class="[
+                HEADER_PILL_CLASS,
+                hub.notesOnly.value
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
+              ]"
+              @click="hub.toggleNotesOnly"
             >
+              {{ notesCount }} {{ notesCount === 1 ? 'note' : 'notes' }}
+            </button>
+            <span v-if="(bookCountText || notesCount > 0) && originSummary.length > 0" class="h-4 w-px bg-border" />
+            <button
+              v-for="origin in originSummary"
+              :key="origin.origin"
+              type="button"
+              :aria-pressed="hub.originFilter.value === origin.origin"
+              :class="[HEADER_PILL_CLASS, origin.class, hub.originFilter.value === origin.origin ? 'ring-1 ring-primary' : 'hover:opacity-80']"
+              @click="toggleOriginFilter(origin.origin)"
+            >
+              {{ origin.label }} {{ origin.count }}
+            </button>
           </div>
         </template>
       </div>
@@ -233,85 +265,107 @@ function handleExportJson() {
       </button>
     </div>
 
-    <div class="flex flex-wrap items-center gap-2 mb-4">
-      <div class="relative flex-1 min-w-[12rem]">
-        <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <input
-          v-model="hub.search.value"
-          type="search"
-          placeholder="Search text and notes"
-          class="w-full h-9 pl-8 pr-3 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-        />
-      </div>
-      <select v-model="hub.bookFilter.value" class="h-9 max-w-[14rem] px-2 rounded-md border border-border bg-background text-sm">
-        <option :value="'all'">All books</option>
-        <option v-for="book in hub.books.value" :key="book.bookId" :value="book.bookId">
-          {{ book.bookTitle ?? 'Unknown book' }} ({{ book.count }})
-        </option>
-      </select>
-      <select v-model="hub.colorFilter.value" class="h-9 px-2 rounded-md border border-border bg-background text-sm">
-        <option v-for="option in COLOR_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
-      </select>
-      <select v-model="hub.styleFilter.value" class="h-9 px-2 rounded-md border border-border bg-background text-sm">
-        <option v-for="option in STYLE_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
-      </select>
-      <select v-model="hub.originFilter.value" class="h-9 px-2 rounded-md border border-border bg-background text-sm">
-        <option v-for="option in ORIGIN_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
-      </select>
-      <button
-        type="button"
-        :aria-pressed="hub.notesOnly.value"
-        class="inline-flex h-9 items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors"
-        :class="
-          hub.notesOnly.value
-            ? 'border-primary bg-primary/10 text-primary'
-            : 'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
-        "
-        @click="hub.toggleNotesOnly"
-      >
-        <StickyNote :size="14" />
-        Notes only
-      </button>
-      <div class="inline-flex items-center gap-1.5">
-        <input
-          v-model="hub.dateFrom.value"
-          type="date"
-          aria-label="From date"
-          class="h-9 px-2 rounded-md border border-border bg-background text-sm"
-        />
-        <span class="text-xs text-muted-foreground">to</span>
-        <input v-model="hub.dateTo.value" type="date" aria-label="To date" class="h-9 px-2 rounded-md border border-border bg-background text-sm" />
+    <div class="flex flex-col gap-3 mb-4">
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="relative w-full sm:w-auto sm:flex-1 sm:min-w-[14rem]">
+          <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            v-model="hub.search.value"
+            type="search"
+            placeholder="Search text and notes"
+            class="w-full h-9 pl-8 pr-3 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+        <AnnotationBookCombobox v-model="hub.bookFilter.value" v-model:selected-label="hub.selectedBookLabel.value" :search-fn="hub.searchBooks" />
         <button
-          v-if="hub.dateFrom.value || hub.dateTo.value"
           type="button"
-          aria-label="Clear date range"
-          class="inline-flex h-9 items-center rounded-md border border-border bg-background px-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          @click="hub.clearDates"
+          :aria-pressed="hub.notesOnly.value"
+          class="inline-flex h-9 items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors"
+          :class="
+            hub.notesOnly.value
+              ? 'border-primary bg-primary/10 text-primary'
+              : 'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
+          "
+          @click="hub.toggleNotesOnly"
         >
-          <X :size="13" />
+          <StickyNote :size="14" />
+          Notes only
+        </button>
+
+        <div class="hidden sm:block">
+          <Popover>
+            <PopoverTrigger as-child>
+              <Button variant="outline" size="sm" class="gap-1.5">
+                <SlidersHorizontal :size="14" />
+                Filters
+                <Badge v-if="hub.popoverFilterCount.value > 0" variant="secondary" class="ml-0.5 h-5 min-w-5 justify-center px-1">
+                  {{ hub.popoverFilterCount.value }}
+                </Badge>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" class="w-80">
+              <AnnotationFiltersPanel
+                v-model:color="hub.colorFilter.value"
+                v-model:highlight-style="hub.styleFilter.value"
+                v-model:origin="hub.originFilter.value"
+                v-model:date-from="hub.dateFrom.value"
+                v-model:date-to="hub.dateTo.value"
+                @clear-all="hub.clearPopoverFilters"
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <div class="sm:hidden">
+          <Sheet>
+            <SheetTrigger as-child>
+              <Button variant="outline" size="sm" class="gap-1.5">
+                <SlidersHorizontal :size="14" />
+                Filters
+                <Badge v-if="hub.popoverFilterCount.value > 0" variant="secondary" class="ml-0.5 h-5 min-w-5 justify-center px-1">
+                  {{ hub.popoverFilterCount.value }}
+                </Badge>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="bottom" class="max-h-[85vh] overflow-y-auto">
+              <SheetHeader>
+                <SheetTitle>Filters</SheetTitle>
+              </SheetHeader>
+              <div class="px-4 pb-6">
+                <AnnotationFiltersPanel
+                  v-model:color="hub.colorFilter.value"
+                  v-model:highlight-style="hub.styleFilter.value"
+                  v-model:origin="hub.originFilter.value"
+                  v-model:date-from="hub.dateFrom.value"
+                  v-model:date-to="hub.dateTo.value"
+                  @clear-all="hub.clearPopoverFilters"
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+
+        <select v-model="hub.sortKey.value" aria-label="Sort order" class="h-9 px-2 rounded-md border border-border bg-background text-sm">
+          <option v-for="option in SORT_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
+        </select>
+        <button
+          type="button"
+          :aria-label="density === 'comfortable' ? 'Switch to compact view' : 'Switch to comfortable view'"
+          :title="density === 'comfortable' ? 'Compact view' : 'Comfortable view'"
+          class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          @click="toggleDensity"
+        >
+          <Minimize2 v-if="density === 'comfortable'" :size="14" />
+          <Maximize2 v-else :size="14" />
         </button>
       </div>
-      <select v-model="hub.sortBy.value" class="h-9 px-2 rounded-md border border-border bg-background text-sm">
-        <option value="createdAt">By date</option>
-        <option value="book">By book</option>
-      </select>
-      <button
-        type="button"
-        class="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        @click="toggleSortDir"
-      >
-        <ArrowDownUp :size="14" />
-        {{ sortDirLabel }}
-      </button>
-      <button
-        type="button"
-        class="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        @click="toggleDensity"
-      >
-        <Minimize2 v-if="density === 'comfortable'" :size="14" />
-        <Maximize2 v-else :size="14" />
-        {{ density === 'comfortable' ? 'Compact' : 'Comfortable' }}
-      </button>
+
+      <AnnotationFilterChips
+        v-if="hub.activeFilterChips.value.length > 0"
+        :chips="hub.activeFilterChips.value"
+        @remove="hub.removeFilterChip"
+        @clear-all="hub.clearPopoverFilters"
+      />
     </div>
 
     <div
@@ -358,8 +412,21 @@ function handleExportJson() {
       <div v-for="i in 6" :key="i" class="h-24 rounded-lg bg-muted animate-shimmer" />
     </div>
     <div v-else-if="hub.error.value" class="py-12 text-center text-sm text-destructive">{{ hub.error.value }}</div>
-    <div v-else-if="hub.items.value.length === 0" class="py-12 text-center text-sm text-muted-foreground">
-      {{ hub.status.value === 'trashed' ? 'Trash is empty' : 'No annotations yet. Highlights you create on the web or your e-reader appear here.' }}
+    <div v-else-if="hub.items.value.length === 0" class="py-12 text-center">
+      <template v-if="hub.hasActiveFilters.value">
+        <p class="text-sm text-muted-foreground">No highlights match your filters.</p>
+        <button
+          type="button"
+          class="mt-3 inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
+          @click="hub.resetAllFilters"
+        >
+          <RotateCcw :size="14" />
+          Reset filters
+        </button>
+      </template>
+      <p v-else class="text-sm text-muted-foreground">
+        {{ hub.status.value === 'trashed' ? 'Trash is empty' : 'No annotations yet. Highlights you create on the web or your e-reader appear here.' }}
+      </p>
     </div>
     <div v-else class="transition-opacity" :class="{ 'opacity-50 pointer-events-none': hub.loading.value }">
       <div v-if="isGrouped" class="flex flex-col gap-4">
@@ -371,6 +438,7 @@ function handleExportJson() {
           :author="group.author"
           :items="group.items"
           :selected-ids="hub.selectedIds.value"
+          :saving-ids="hub.savingIds.value"
           :trashed="hub.status.value === 'trashed'"
           :density="density"
           @toggle-select="hub.toggleSelected"
@@ -378,6 +446,9 @@ function handleExportJson() {
           @trash="handleTrash"
           @restore="handleRestore"
           @purge="handlePurge"
+          @update-note="handleUpdateNote"
+          @update-color="handleUpdateColor"
+          @update-style="handleUpdateStyle"
         />
       </div>
       <div v-else class="flex flex-col gap-2">
@@ -386,6 +457,7 @@ function handleExportJson() {
           :key="annotation.id"
           :annotation="annotation"
           :selected="hub.selectedIds.value.has(annotation.id)"
+          :saving="hub.savingIds.value.has(annotation.id)"
           :trashed="hub.status.value === 'trashed'"
           :density="density"
           @toggleSelect="hub.toggleSelected"
@@ -393,6 +465,9 @@ function handleExportJson() {
           @trash="handleTrash"
           @restore="handleRestore"
           @purge="handlePurge"
+          @update-note="handleUpdateNote"
+          @update-color="handleUpdateColor"
+          @update-style="handleUpdateStyle"
         />
       </div>
     </div>

@@ -9,10 +9,12 @@ withDefaults(
     trashed: boolean
     showBookHeader?: boolean
     density?: 'compact' | 'comfortable'
+    saving?: boolean
   }>(),
   {
     showBookHeader: true,
     density: 'comfortable',
+    saving: false,
   },
 )
 
@@ -22,6 +24,9 @@ const emit = defineEmits<{
   trash: [id: number]
   restore: [id: number]
   purge: [id: number]
+  updateNote: [id: number, note: string | null]
+  updateColor: [id: number, color: string]
+  updateStyle: [id: number, style: string]
 }>()
 
 function handleToggleSelect(id: number) {
@@ -43,6 +48,18 @@ function handleRestore(id: number) {
 function handlePurge(id: number) {
   emit('purge', id)
 }
+
+function handleUpdateNote(id: number, note: string | null) {
+  emit('updateNote', id, note)
+}
+
+function handleUpdateColor(id: number, color: string) {
+  emit('updateColor', id, color)
+}
+
+function handleUpdateStyle(id: number, style: string) {
+  emit('updateStyle', id, style)
+}
 </script>
 
 <template>
@@ -53,10 +70,14 @@ function handlePurge(id: number) {
     mode="hub"
     :density="density"
     :show-book-header="showBookHeader"
+    :saving="saving"
     @toggle-select="handleToggleSelect"
     @jump="handleJump"
     @trash="handleTrash"
     @restore="handleRestore"
     @purge="handlePurge"
+    @update-note="handleUpdateNote"
+    @update-color="handleUpdateColor"
+    @update-style="handleUpdateStyle"
   />
 </template>

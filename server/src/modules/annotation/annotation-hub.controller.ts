@@ -23,7 +23,12 @@ export class AnnotationHubController {
 
   @Get('books')
   listBooks(@CurrentUser() user: RequestUser, @Query() query: AnnotationHubBooksQueryDto) {
-    return this.hubService.listBooks(user.id, query.status ?? 'active');
+    return this.hubService.listBooks(user.id, {
+      status: query.status ?? 'active',
+      q: query.q,
+      limit: query.limit,
+      selectedId: query.selectedId,
+    });
   }
 
   @Post('bulk')

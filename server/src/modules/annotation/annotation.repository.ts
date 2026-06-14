@@ -14,6 +14,7 @@ import {
   isNull,
   lte,
   inArray,
+  max,
   notExists,
   or,
   sql,
@@ -381,21 +382,62 @@ export class AnnotationRepository {
     return row;
   }
 
-  async findHubBookFacets(userId: number, status: 'active' | 'trashed') {
+  private bookFacetAuthorSql() {
+    return sql<
+      string | null
+    >`(select string_agg(${authors.name}, ', ' order by ${bookAuthors.displayOrder}) from ${bookAuthors} inner join ${authors} on ${authors.id} = ${bookAuthors.authorId} where ${bookAuthors.bookId} = ${annotations.bookId})`;
+  }
+
+  async findHubBookFacets(userId: number, params: { status: 'active' | 'trashed'; q?: string; limit: number }) {
+    const conditions: SQL[] = [
+      eq(annotations.userId, userId),
+      params.status === 'trashed' ? isNotNull(annotations.deletedAt) : isNull(annotations.deletedAt),
+    ];
+    const term = params.q?.trim();
+    if (term) {
+      const pattern = `%${term}%`;
+      conditions.push(
+        or(
+          ilike(bookMetadata.title, pattern),
+          sql`exists (select 1 from ${bookAuthors} inner join ${authors} on ${authors.id} = ${bookAuthors.authorId} where ${bookAuthors.bookId} = ${annotations.bookId} and ${authors.name} ilike ${pattern})`,
+        )!,
+      );
+    }
     return this.db
       .select({
         bookId: annotations.bookId,
         bookTitle: bookMetadata.title,
-        author: sql<
-          string | null
-        >`(select string_agg(${authors.name}, ', ' order by ${bookAuthors.displayOrder}) from ${bookAuthors} inner join ${authors} on ${authors.id} = ${bookAuthors.authorId} where ${bookAuthors.bookId} = ${annotations.bookId})`,
+        author: this.bookFacetAuthorSql(),
         count: count(),
       })
       .from(annotations)
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, annotations.bookId))
-      .where(and(eq(annotations.userId, userId), status === 'trashed' ? isNotNull(annotations.deletedAt) : isNull(annotations.deletedAt)))
+      .where(and(...conditions))
       .groupBy(annotations.bookId, bookMetadata.title)
-      .orderBy(asc(bookMetadata.title));
+      .orderBy(desc(max(annotations.createdAt)), asc(bookMetadata.title))
+      .limit(params.limit);
+  }
+
+  async findHubBookFacet(userId: number, status: 'active' | 'trashed', bookId: number) {
+    const rows = await this.db
+      .select({
+        bookId: annotations.bookId,
+        bookTitle: bookMetadata.title,
+        author: this.bookFacetAuthorSql(),
+        count: count(),
+      })
+      .from(annotations)
+      .leftJoin(bookMetadata, eq(bookMetadata.bookId, annotations.bookId))
+      .where(
+        and(
+          eq(annotations.userId, userId),
+          eq(annotations.bookId, bookId),
+          status === 'trashed' ? isNotNull(annotations.deletedAt) : isNull(annotations.deletedAt),
+        ),
+      )
+      .groupBy(annotations.bookId, bookMetadata.title)
+      .limit(1);
+    return rows[0] ?? null;
   }
 
   async bulkSetDeleted(userId: number, ids: number[], deleted: boolean): Promise<number> {

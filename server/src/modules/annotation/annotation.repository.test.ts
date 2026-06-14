@@ -418,22 +418,50 @@ describe('AnnotationRepository', () => {
   });
 
   describe('findHubBookFacets', () => {
-    it('returns book facets with counts for active annotations', async () => {
+    it('returns book facets with counts for active annotations and applies the limit', async () => {
       const db = makeDb([{ bookId: 5, bookTitle: 'Book', author: 'Author', count: 3 }]);
       const repo = new AnnotationRepository(db as never);
 
-      const rows = await repo.findHubBookFacets(10, 'active');
+      const rows = await repo.findHubBookFacets(10, { status: 'active', limit: 20 });
 
       expect(rows).toEqual([{ bookId: 5, bookTitle: 'Book', author: 'Author', count: 3 }]);
+      expect(db._queries[0].orderBy).toHaveBeenCalled();
+      expect(db._queries[0].limit).toHaveBeenCalledWith(20);
     });
 
     it('queries the trashed set when status is trashed', async () => {
       const db = makeDb([]);
       const repo = new AnnotationRepository(db as never);
 
-      await repo.findHubBookFacets(10, 'trashed');
+      await repo.findHubBookFacets(10, { status: 'trashed', limit: 20 });
 
       expect(db._queries[0].where).toHaveBeenCalled();
+    });
+
+    it('adds a search filter and forwards a custom limit when a term is provided', async () => {
+      const db = makeDb([]);
+      const repo = new AnnotationRepository(db as never);
+
+      await repo.findHubBookFacets(10, { status: 'active', q: 'dune', limit: 10 });
+
+      expect(db._queries[0].where).toHaveBeenCalled();
+      expect(db._queries[0].limit).toHaveBeenCalledWith(10);
+    });
+  });
+
+  describe('findHubBookFacet', () => {
+    it('returns the single pinned facet row', async () => {
+      const db = makeDb([{ bookId: 99, bookTitle: 'Pinned', author: null, count: 7 }]);
+      const repo = new AnnotationRepository(db as never);
+
+      expect(await repo.findHubBookFacet(10, 'active', 99)).toEqual({ bookId: 99, bookTitle: 'Pinned', author: null, count: 7 });
+    });
+
+    it('returns null when the book has no annotations for the status', async () => {
+      const db = makeDb([]);
+      const repo = new AnnotationRepository(db as never);
+
+      expect(await repo.findHubBookFacet(10, 'active', 99)).toBeNull();
     });
   });
 

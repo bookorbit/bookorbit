@@ -35,6 +35,7 @@ function makeService() {
     getHubStats: vi.fn().mockResolvedValue({ books: 1, withNotes: 1, web: 1, koreader: 0, kobo: 0 }),
     findHubAll: vi.fn().mockResolvedValue([makeHubRow()]),
     findHubBookFacets: vi.fn().mockResolvedValue([{ bookId: 5, bookTitle: 'A Book', author: 'An Author', count: 3 }]),
+    findHubBookFacet: vi.fn().mockResolvedValue(null),
     bulkSetDeleted: vi.fn().mockResolvedValue(2),
     bulkRestyle: vi.fn().mockResolvedValue(2),
     restore: vi.fn().mockResolvedValue(makeHubRow({ deletedAt: null })),
@@ -165,13 +166,41 @@ describe('AnnotationHubService', () => {
   });
 
   describe('listBooks', () => {
-    it('maps book facets, defaulting status to active', async () => {
+    it('maps book facets and forwards the default limit', async () => {
       const { service, annotationRepo } = makeService();
 
-      const facets = await service.listBooks(10, 'active');
+      const facets = await service.listBooks(10, { status: 'active' });
 
-      expect(annotationRepo.findHubBookFacets).toHaveBeenCalledWith(10, 'active');
+      expect(annotationRepo.findHubBookFacets).toHaveBeenCalledWith(10, { status: 'active', q: undefined, limit: 20 });
       expect(facets).toEqual([{ bookId: 5, bookTitle: 'A Book', author: 'An Author', count: 3 }]);
+    });
+
+    it('forwards the search term and a custom limit', async () => {
+      const { service, annotationRepo } = makeService();
+
+      await service.listBooks(10, { status: 'trashed', q: 'dune', limit: 5 });
+
+      expect(annotationRepo.findHubBookFacets).toHaveBeenCalledWith(10, { status: 'trashed', q: 'dune', limit: 5 });
+    });
+
+    it('pins the selected book at the top when it is outside the returned facets', async () => {
+      const { service, annotationRepo } = makeService();
+      annotationRepo.findHubBookFacet.mockResolvedValue({ bookId: 99, bookTitle: 'Pinned', author: null, count: 7 });
+
+      const facets = await service.listBooks(10, { status: 'active', selectedId: 99 });
+
+      expect(annotationRepo.findHubBookFacet).toHaveBeenCalledWith(10, 'active', 99);
+      expect(facets[0]).toEqual({ bookId: 99, bookTitle: 'Pinned', author: null, count: 7 });
+      expect(facets).toHaveLength(2);
+    });
+
+    it('does not re-fetch or duplicate the selected book when it is already present', async () => {
+      const { service, annotationRepo } = makeService();
+
+      const facets = await service.listBooks(10, { status: 'active', selectedId: 5 });
+
+      expect(annotationRepo.findHubBookFacet).not.toHaveBeenCalled();
+      expect(facets).toHaveLength(1);
     });
   });
 

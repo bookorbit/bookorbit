@@ -12,6 +12,7 @@ const props = defineProps<{
   author: string | null
   items: AnnotationHubItem[]
   selectedIds: Set<number>
+  savingIds: Set<number>
   trashed: boolean
   density: 'compact' | 'comfortable'
 }>()
@@ -22,6 +23,9 @@ const emit = defineEmits<{
   trash: [id: number]
   restore: [id: number]
   purge: [id: number]
+  updateNote: [id: number, note: string | null]
+  updateColor: [id: number, color: string]
+  updateStyle: [id: number, style: string]
 }>()
 
 const expanded = ref(true)
@@ -51,6 +55,18 @@ function handleRestore(id: number) {
 function handlePurge(id: number) {
   emit('purge', id)
 }
+
+function handleUpdateNote(id: number, note: string | null) {
+  emit('updateNote', id, note)
+}
+
+function handleUpdateColor(id: number, color: string) {
+  emit('updateColor', id, color)
+}
+
+function handleUpdateStyle(id: number, style: string) {
+  emit('updateStyle', id, style)
+}
 </script>
 
 <template>
@@ -79,11 +95,15 @@ function handlePurge(id: number) {
         :trashed="trashed"
         :density="density"
         :show-book-header="false"
+        :saving="savingIds.has(annotation.id)"
         @toggle-select="handleToggleSelect"
         @jump="handleJump"
         @trash="handleTrash"
         @restore="handleRestore"
         @purge="handlePurge"
+        @update-note="handleUpdateNote"
+        @update-color="handleUpdateColor"
+        @update-style="handleUpdateStyle"
       />
     </div>
   </div>

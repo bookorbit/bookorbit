@@ -19,6 +19,11 @@ import type { AnnotationBulkDto, AnnotationExportQueryDto, AnnotationHubQueryDto
 
 const BULK_EVENT = 'annotation.bulk';
 const RETRY_EVENT = 'annotation.position_retry';
+const DEFAULT_BOOK_FACET_LIMIT = 20;
+
+function toBookFacet(row: { bookId: number; bookTitle: string | null; author: string | null; count: number }): AnnotationHubBookFacet {
+  return { bookId: row.bookId, bookTitle: row.bookTitle, author: row.author, count: Number(row.count) };
+}
 
 @Injectable()
 export class AnnotationHubService {
@@ -53,9 +58,18 @@ export class AnnotationHubService {
     return { items: items.map((row) => this.toHubItem(row)), total, page, pageSize, stats };
   }
 
-  async listBooks(userId: number, status: 'active' | 'trashed'): Promise<AnnotationHubBookFacet[]> {
-    const rows = await this.annotationRepo.findHubBookFacets(userId, status);
-    return rows.map((row) => ({ bookId: row.bookId, bookTitle: row.bookTitle, author: row.author, count: Number(row.count) }));
+  async listBooks(
+    userId: number,
+    params: { status: 'active' | 'trashed'; q?: string; limit?: number; selectedId?: number },
+  ): Promise<AnnotationHubBookFacet[]> {
+    const limit = params.limit ?? DEFAULT_BOOK_FACET_LIMIT;
+    const rows = await this.annotationRepo.findHubBookFacets(userId, { status: params.status, q: params.q, limit });
+    const facets = rows.map(toBookFacet);
+    if (params.selectedId && !facets.some((facet) => facet.bookId === params.selectedId)) {
+      const selected = await this.annotationRepo.findHubBookFacet(userId, params.status, params.selectedId);
+      if (selected) facets.unshift(toBookFacet(selected));
+    }
+    return facets;
   }
 
   async bulk(userId: number, dto: AnnotationBulkDto): Promise<{ affected: number }> {
