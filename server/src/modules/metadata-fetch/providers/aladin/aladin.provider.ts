@@ -18,7 +18,7 @@ const API_VERSION = '20131101';
 @Injectable()
 export class AladinProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.ALADIN;
-  readonly label = '알라딘';
+  readonly label = 'Aladin';
   readonly identifiable = true as const;
 
   private readonly logger = new Logger(AladinProvider.name);

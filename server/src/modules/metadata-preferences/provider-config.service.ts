@@ -134,8 +134,6 @@ function mergeAladinConfig(base: ProviderConfigurations['aladin'], value: unknow
     ttbKey: asString(next.ttbKey, base.ttbKey),
   };
 }
-  };
-}
 
 const PROVIDER_LABELS: Record<MetadataProviderKey, string> = {
   [MetadataProviderKey.GOOGLE]: 'Google Books',
@@ -177,7 +175,7 @@ const PROVIDER_ENABLE_RULES = {
   },
   aladin: {
     canEnable: (config) => !!config.aladin.ttbKey.trim(),
-    blockedMessage: '알라딘 requires a TTB Key before it can be enabled',
+      blockedMessage: 'Aladin requires a TTB Key before it can be enabled',
     setupHint: 'TTB Key required',
   },
 } satisfies Partial<Record<keyof ProviderConfigurations, ProviderEnableRule>>;
@@ -295,7 +293,6 @@ export class ProviderConfigService {
       aladin: {
         ...config.aladin,
         ttbKey: config.aladin.ttbKey.trim(),
-      },
       },
     };
 
@@ -468,7 +465,6 @@ export class ProviderConfigService {
         configured: !!this.getEnableRule('aladin')?.canEnable(cfg),
         hint: !this.getEnableRule('aladin')?.canEnable(cfg) ? this.getEnableRule('aladin')?.setupHint : undefined,
       },
-      },
     ];
   }
 
@@ -623,7 +619,7 @@ export class ProviderConfigService {
         key: MetadataProviderKey.ALADIN,
         ok: false,
         status: 'fail',
-        message: '알라딘 TTB Key is required.',
+        message: 'Aladin TTB Key is required.',
       };
     }
 
@@ -637,7 +633,7 @@ export class ProviderConfigService {
           key: MetadataProviderKey.ALADIN,
           ok: false,
           status: 'fail',
-          message: `알라딘 request failed with HTTP ${response.status}.`,
+          message: `Aladin request failed with HTTP ${response.status}.`,
         };
       }
 
@@ -648,7 +644,7 @@ export class ProviderConfigService {
           key: MetadataProviderKey.ALADIN,
           ok: false,
           status: 'fail',
-          message: `알라딘 API error: ${body.errorMessage ?? body.errorCode}`,
+          message: `Aladin API error: ${body.errorMessage ?? body.errorCode}`,
         };
       }
 
@@ -656,7 +652,7 @@ export class ProviderConfigService {
         key: MetadataProviderKey.ALADIN,
         ok: true,
         status: 'success',
-        message: '알라딘 API connection successful.',
+        message: 'Aladin API connection successful.',
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -664,7 +660,7 @@ export class ProviderConfigService {
         key: MetadataProviderKey.ALADIN,
         ok: false,
         status: 'fail',
-        message: `알라딘 connection test failed: ${message}`,
+        message: `Aladin connection test failed: ${message}`,
       };
     }
   }

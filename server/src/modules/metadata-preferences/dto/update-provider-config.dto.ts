@@ -47,7 +47,6 @@ export class AladinProviderConfigDto {
   @IsOptional() @IsBoolean() enabled?: boolean;
   @IsOptional() @IsString() ttbKey?: string;
 }
-}
 
 export class UpdateProviderConfigDto {
   @IsOptional() @ValidateNested() @Type(() => GoogleProviderConfigDto) google?: GoogleProviderConfigDto;

@@ -119,7 +119,6 @@ export interface AladinProviderConfig {
   enabled: boolean;
   ttbKey: string;
 }
-}
 
 export interface ProviderConfigurations {
   google: GoogleProviderConfig;
