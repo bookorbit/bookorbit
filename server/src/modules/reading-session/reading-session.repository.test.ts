@@ -96,7 +96,7 @@ describe('ReadingSessionRepository', () => {
     expect(dailyValues).not.toHaveBeenCalled();
   });
 
-  it('persists session with bookId and web source, then upserts daily stats', async () => {
+  it('persists session with bookId and explicit source, then upserts daily stats', async () => {
     const { repo, sessionValues, sessionConflict, dailyValues, dailyConflictUpdate } = makeDbHarness({
       fileRow: { bookId: 9, libraryId: 3 },
       insertedIds: [{ id: 99 }],
@@ -121,7 +121,6 @@ describe('ReadingSessionRepository', () => {
         bookFileId: 4,
         bookId: 9,
         sessionId: 'new-session',
-        source: 'web',
         durationSeconds: 60,
         progressDelta: null,
         endProgress: 42.5,
