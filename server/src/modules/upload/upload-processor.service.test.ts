@@ -13,6 +13,7 @@ const mockComputeFileHash = computeFileHash as MockedFunction<typeof computeFile
 describe('UploadProcessorService', () => {
   const metadataService = {
     extractAndSave: vi.fn(),
+    extractAndAggregateAudioDuration: vi.fn(),
   };
   const orchestrator = {
     scheduleIfEligible: vi.fn(),
@@ -231,6 +232,61 @@ describe('UploadProcessorService', () => {
 
     expect(metadataService.extractAndSave).toHaveBeenCalledWith(9, '/tmp/a.epub', 'epub');
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('upstream failed'));
+  });
+
+  it('extractMetadataAsync extracts per-file duration after saving metadata for audio formats', async () => {
+    metadataService.extractAndSave.mockResolvedValue(undefined);
+    metadataService.extractAndAggregateAudioDuration.mockResolvedValue(undefined);
+
+    service.extractMetadataAsync(7, '/tmp/book.m4b', 'm4b');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(metadataService.extractAndSave).toHaveBeenCalledWith(7, '/tmp/book.m4b', 'm4b');
+    expect(metadataService.extractAndAggregateAudioDuration).toHaveBeenCalledWith(7, '/tmp/book.m4b');
+  });
+
+  it('extractMetadataAsync skips duration extraction for non-audio formats', async () => {
+    metadataService.extractAndSave.mockResolvedValue(undefined);
+
+    service.extractMetadataAsync(7, '/tmp/book.epub', 'epub');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(metadataService.extractAndSave).toHaveBeenCalledWith(7, '/tmp/book.epub', 'epub');
+    expect(metadataService.extractAndAggregateAudioDuration).not.toHaveBeenCalled();
+  });
+
+  it('extractMetadataAsync does not extract duration when metadata save fails for an audio file', async () => {
+    vi.spyOn((service as unknown as { logger: { warn: (m: string) => void } }).logger, 'warn').mockImplementation();
+    metadataService.extractAndSave.mockRejectedValue(new Error('probe failed'));
+
+    service.extractMetadataAsync(7, '/tmp/book.m4b', 'm4b');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(metadataService.extractAndAggregateAudioDuration).not.toHaveBeenCalled();
+  });
+
+  it('extractAudioDurationAsync ignores non-audio formats', () => {
+    service.extractAudioDurationAsync(7, '/tmp/book.epub', 'epub');
+    expect(metadataService.extractAndAggregateAudioDuration).not.toHaveBeenCalled();
+  });
+
+  it('extractAudioDurationAsync extracts and aggregates duration for audio formats', async () => {
+    metadataService.extractAndAggregateAudioDuration.mockResolvedValue(undefined);
+
+    service.extractAudioDurationAsync(7, '/tmp/chapter-01.mp3', 'mp3');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(metadataService.extractAndAggregateAudioDuration).toHaveBeenCalledWith(7, '/tmp/chapter-01.mp3');
+  });
+
+  it('extractAudioDurationAsync logs and suppresses extraction errors', async () => {
+    const warn = vi.spyOn((service as unknown as { logger: { warn: (m: string) => void } }).logger, 'warn').mockImplementation();
+    metadataService.extractAndAggregateAudioDuration.mockRejectedValue(new Error('aggregate failed'));
+
+    service.extractAudioDurationAsync(7, '/tmp/chapter-01.mp3', 'mp3');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('aggregate failed'));
   });
 
   describe('with undefined orchestrator', () => {

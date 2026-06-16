@@ -3,7 +3,7 @@ import { eq, inArray, ne, and, isNotNull, sql, asc, desc } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { ContentFilterRules } from '@bookorbit/types';
-import { isAudioFormat } from '@bookorbit/types';
+import { isAudioFormat, isComicFormat } from '@bookorbit/types';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { authors, bookAuthors, bookFiles, bookGenres, bookMetadata, bookTags, books, genres, tags } from '../../db/schema';
@@ -21,6 +21,7 @@ export interface SeriesBookRow {
   coverSource: string | null;
   authorNames: string[];
   isAudiobook: boolean;
+  isComic: boolean;
 }
 
 export interface AuthorBookRow {
@@ -29,6 +30,7 @@ export interface AuthorBookRow {
   coverSource: string | null;
   authorNames: string[];
   isAudiobook: boolean;
+  isComic: boolean;
 }
 
 export interface AnnCandidate {
@@ -196,6 +198,7 @@ export class RecommendationRepository {
       coverSource: r.coverSource,
       authorNames: authorsByBook.get(r.bookId) ?? [],
       isAudiobook: r.primaryFormat != null ? isAudioFormat(r.primaryFormat) : false,
+      isComic: r.primaryFormat != null ? isComicFormat(r.primaryFormat) : false,
     }));
   }
 
@@ -240,6 +243,7 @@ export class RecommendationRepository {
       coverSource: r.coverSource,
       authorNames: authorsByBook.get(r.bookId) ?? [],
       isAudiobook: r.primaryFormat != null ? isAudioFormat(r.primaryFormat) : false,
+      isComic: r.primaryFormat != null ? isComicFormat(r.primaryFormat) : false,
     }));
   }
 

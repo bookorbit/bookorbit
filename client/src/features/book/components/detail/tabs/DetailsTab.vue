@@ -286,6 +286,7 @@ const detailCoverAspectRatio = computed(() => {
 })
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
 const isPrimaryAudio = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
+const isPrimaryComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'cbx')
 const readableFiles = computed(() => props.book.files.filter((f) => f.format && READER_OPENABLE_FORMATS.has(f.format)))
 
 // For multi-file audiobooks, collapse all tracks into one representative entry.
@@ -970,6 +971,7 @@ watch(
         <BookCoverSurface
           class="book-cover-surface--spine-fitted relative w-full rounded-sm overflow-hidden"
           :disable-spine="isPrimaryAudio"
+          :is-comic="isPrimaryComic"
           :class="hasCover && coverLoaded && !coverFailed ? 'cursor-zoom-in' : ''"
           :style="{ aspectRatio: detailCoverAspectRatio }"
           @click="handleCoverClick"
@@ -986,6 +988,7 @@ watch(
             loading="eager"
             backdrop-class="blur-lg brightness-50"
             :spine="!isPrimaryAudio"
+            :is-comic="isPrimaryComic"
             @load="handleCoverLoad"
             @error="handleCoverError"
           />
@@ -1200,6 +1203,7 @@ watch(
         <BookCoverSurface
           class="book-cover-surface--spine-fitted group relative w-full rounded-sm overflow-hidden"
           :disable-spine="isPrimaryAudio"
+          :is-comic="isPrimaryComic"
           :class="hasCover && coverLoaded && !coverFailed ? 'cursor-zoom-in' : ''"
           :style="{ aspectRatio: detailCoverAspectRatio }"
           @click="handleCoverClick"
@@ -1227,6 +1231,7 @@ watch(
             loading="eager"
             backdrop-class="blur-lg brightness-50"
             :spine="!isPrimaryAudio"
+            :is-comic="isPrimaryComic"
             @load="handleCoverLoad"
             @error="handleCoverError"
           />

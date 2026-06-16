@@ -18,6 +18,7 @@ function validDisplayPreferences(overrides: Partial<DisplayPreferences> = {}): D
     tableZebraStriping: false,
     tableDensity: 'comfortable',
     bookSpineOverlay: 'subtle',
+    showSpineOnComics: false,
     bookShadowStrength: 'strong',
     bookCoverDisplayMode: 'blurred-fit',
     cardInfoMode: 'hover-overlay',

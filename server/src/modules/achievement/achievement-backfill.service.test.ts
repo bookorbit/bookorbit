@@ -14,6 +14,15 @@ function makeRepo(overrides: Record<string, unknown> = {}) {
 function makeAchievementService() {
   return {
     handleEvent: vi.fn().mockResolvedValue(undefined),
+    ensureCatalogueSeeded: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+function makeAppSettings(overrides: Record<string, unknown> = {}) {
+  return {
+    getValue: vi.fn().mockResolvedValue(null),
+    setValue: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
   };
 }
 
@@ -29,12 +38,14 @@ describe('AchievementBackfillService', () => {
   let service: AchievementBackfillService;
   let repo: ReturnType<typeof makeRepo>;
   let achievementService: ReturnType<typeof makeAchievementService>;
+  let appSettings: ReturnType<typeof makeAppSettings>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     repo = makeRepo();
     achievementService = makeAchievementService();
-    service = new AchievementBackfillService(repo as never, achievementService as never);
+    appSettings = makeAppSettings();
+    service = new AchievementBackfillService(repo as never, achievementService as never, appSettings as never);
   });
 
   it('throws ForbiddenException for non-superuser callers', async () => {
@@ -61,13 +72,14 @@ describe('AchievementBackfillService', () => {
   });
   it('correctly counts awards granted based on earned key delta', async () => {
     repo.findAllUserIds.mockResolvedValue([1, 2]);
-    // With Promise.allSettled, both processUser calls start in parallel:
-    // call order: user1-before, user2-before, user1-after, user2-after
-    repo.findUserEarnedKeys
-      .mockResolvedValueOnce(new Set(['books_finished_1'])) // user 1 before (size 1)
-      .mockResolvedValueOnce(new Set()) // user 2 before (size 0)
-      .mockResolvedValueOnce(new Set(['books_finished_1', 'marathoner'])) // user 1 after (size 2)
-      .mockResolvedValueOnce(new Set(['bookmarked'])); // user 2 after (size 1)
+    // Keyed by user (not global call order) so the assertion does not depend on batch interleaving.
+    // user 1: 1 key before -> 2 after (delta 1); user 2: 0 before -> 1 after (delta 1); total 2.
+    const earnedByUser: Record<number, Set<string>[]> = {
+      1: [new Set(['books_finished_1']), new Set(['books_finished_1', 'marathoner'])],
+      2: [new Set(), new Set(['bookmarked'])],
+    };
+    const callCounts: Record<number, number> = { 1: 0, 2: 0 };
+    repo.findUserEarnedKeys.mockImplementation((userId: number) => Promise.resolve(earnedByUser[userId][callCounts[userId]++]));
 
     const result = await service.runBackfill(makeSuperuser());
 
@@ -95,5 +107,64 @@ describe('AchievementBackfillService', () => {
 
     expect(result.usersProcessed).toBe(2);
     expect(achievementService.handleEvent).toHaveBeenCalledTimes(3);
+  });
+
+  describe('onModuleInit auto-backfill', () => {
+    const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+    it('backfills all users and stores the seed signature when none is stored', async () => {
+      repo.findAllUserIds.mockResolvedValue([1, 2]);
+
+      service.onModuleInit();
+      await flush();
+
+      expect(achievementService.handleEvent).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_BACKFILL, { userId: 1 });
+      expect(achievementService.handleEvent).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_BACKFILL, { userId: 2 });
+      expect(appSettings.setValue).toHaveBeenCalledWith('achievements_backfill_signature', expect.any(String));
+    });
+
+    it('waits for the catalogue seed before awarding, so badge FKs resolve', async () => {
+      repo.findAllUserIds.mockResolvedValue([1]);
+      const order: string[] = [];
+      achievementService.ensureCatalogueSeeded.mockImplementation(() => {
+        order.push('seed');
+        return Promise.resolve();
+      });
+      achievementService.handleEvent.mockImplementation(() => {
+        order.push('handle');
+        return Promise.resolve();
+      });
+
+      service.onModuleInit();
+      await flush();
+
+      expect(order).toEqual(['seed', 'handle']);
+    });
+
+    it('skips the backfill when the stored signature already matches the current seed', async () => {
+      appSettings.setValue.mockResolvedValue(undefined);
+      // First run computes and stores the current signature, which we then feed back as the stored value.
+      service.onModuleInit();
+      await flush();
+      const storedSignature = appSettings.setValue.mock.calls[0]?.[1];
+      vi.clearAllMocks();
+      appSettings.getValue.mockResolvedValue(storedSignature);
+
+      service.onModuleInit();
+      await flush();
+
+      expect(repo.findAllUserIds).not.toHaveBeenCalled();
+      expect(achievementService.handleEvent).not.toHaveBeenCalled();
+      expect(appSettings.setValue).not.toHaveBeenCalled();
+    });
+
+    it('does not store the signature when backfill fails, so it retries on the next start', async () => {
+      repo.findAllUserIds.mockRejectedValue(new Error('DB down'));
+
+      service.onModuleInit();
+      await flush();
+
+      expect(appSettings.setValue).not.toHaveBeenCalled();
+    });
   });
 });

@@ -17,6 +17,7 @@ const bookCount = computed(() => collapsed.value.bookCount)
 const coverIds = computed(() => collapsed.value.coverBookIds.filter((id) => id > 0).slice(0, 4))
 const primaryFile = computed(() => props.book.files.find((file) => file.role === 'primary') ?? props.book.files[0] ?? null)
 const isAudiobook = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
+const isComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'cbx')
 
 function thumbnailUrl(bookId: number): string {
   return `/api/v1/books/${bookId}/thumbnail`
@@ -48,6 +49,7 @@ function thumbnailUrl(bookId: number): string {
         :key="coverId"
         size="mini"
         :disable-spine="isAudiobook"
+        :is-comic="isComic"
         class="h-8 w-6 rounded-sm overflow-hidden"
       >
         <img :src="thumbnailUrl(coverId)" class="h-full w-full object-cover" loading="lazy" alt="" />
@@ -56,6 +58,7 @@ function thumbnailUrl(bookId: number): string {
         v-if="coverIds.length === 0"
         size="mini"
         :disable-spine="isAudiobook"
+        :is-comic="isComic"
         class="h-8 w-6 rounded-sm bg-muted flex items-center justify-center"
       >
         <span class="text-[8px] text-muted-foreground">?</span>

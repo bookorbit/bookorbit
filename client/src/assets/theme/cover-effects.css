@@ -35,6 +35,11 @@
 .book-cover-surface[data-cover-fit='natural-bottom']:has(.book-cover-artwork-placeholder-natural) {
   background-color: transparent;
   box-shadow: none;
+  /* The cover shadow moves to the inner artwork frame (which is anchored flush
+     to this surface's edges). The surface's own overflow:hidden would clip that
+     shadow, so let it render. The frame keeps its own overflow:hidden, so the
+     image stays clipped to its rounded rect. */
+  overflow: visible;
 }
 
 .book-cover-surface--interactive {

@@ -250,6 +250,70 @@ describe('mapBookWithEditions', () => {
     expect(mapBookWithEditions(book)[0].seriesIndex).toBeUndefined();
   });
 
+  it('emits no page count for audiobook editions (reading_format_id = 2)', () => {
+    const book: HardcoverBookWithEditions = {
+      ...baseBook,
+      pages: 662,
+      editions: [{ ...baseBook.editions![0], reading_format_id: 2, pages: undefined }],
+    };
+    expect(mapBookWithEditions(book)[0].pageCount).toBeUndefined();
+  });
+
+  it('emits no page count for audiobook editions (audio_seconds > 0)', () => {
+    const book: HardcoverBookWithEditions = {
+      ...baseBook,
+      pages: 662,
+      editions: [{ ...baseBook.editions![0], audio_seconds: 36000, pages: undefined }],
+    };
+    expect(mapBookWithEditions(book)[0].pageCount).toBeUndefined();
+  });
+
+  it('does not let audiobooks inherit the book page count even if Hardcover provides one', () => {
+    const book: HardcoverBookWithEditions = {
+      ...baseBook,
+      pages: 662,
+      editions: [{ ...baseBook.editions![0], reading_format_id: 2, pages: 999 }],
+    };
+    expect(mapBookWithEditions(book)[0].pageCount).toBeUndefined();
+  });
+
+  it('keeps the book page-count fallback for non-audiobook editions without pages', () => {
+    const book: HardcoverBookWithEditions = {
+      ...baseBook,
+      pages: 662,
+      editions: [{ ...baseBook.editions![0], reading_format_id: 4, pages: undefined }],
+    };
+    expect(mapBookWithEditions(book)[0].pageCount).toBe(662);
+  });
+
+  it('ranks physical/ebook editions ahead of audiobooks', () => {
+    const book: HardcoverBookWithEditions = {
+      ...baseBook,
+      editions: [
+        { ...baseBook.editions![0], id: 1, isbn_13: 'AUDIO', reading_format_id: 2, pages: undefined },
+        { ...baseBook.editions![0], id: 2, isbn_13: 'PRINT', reading_format_id: 1, pages: 700 },
+      ],
+    };
+    const results = mapBookWithEditions(book);
+    expect(results[0].isbn13).toBe('PRINT');
+    expect(results[0].pageCount).toBe(700);
+    expect(results[1].isbn13).toBe('AUDIO');
+    expect(results[1].pageCount).toBeUndefined();
+  });
+
+  it('ranks editions with a page count ahead of those without when format is equal', () => {
+    const book: HardcoverBookWithEditions = {
+      ...baseBook,
+      editions: [
+        { ...baseBook.editions![0], id: 1, isbn_13: 'NOPAGES', reading_format_id: 1, pages: undefined },
+        { ...baseBook.editions![0], id: 2, isbn_13: 'HASPAGES', reading_format_id: 1, pages: 500 },
+      ],
+    };
+    const results = mapBookWithEditions(book);
+    expect(results[0].isbn13).toBe('HASPAGES');
+    expect(results[1].isbn13).toBe('NOPAGES');
+  });
+
   it('filters out contributors with no author name', () => {
     const book: HardcoverBookWithEditions = {
       ...baseBook,

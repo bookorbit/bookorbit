@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, countDistinct, desc, eq, gt, gte, isNotNull, lt, ne, notInArray, sql, sum } from 'drizzle-orm';
+import { and, count, countDistinct, desc, eq, gt, gte, isNotNull, lt, lte, ne, notInArray, sql, sum } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -8,6 +8,7 @@ import {
   achievements,
   userAchievements,
   userBookStatus,
+  userBookRatings,
   readingSessions,
   annotations,
   collections,
@@ -19,6 +20,8 @@ import {
   bookAuthors,
   userReadingDailyStats,
   userLibraryAccess,
+  koreaderDeviceProgress,
+  koboReadingStates,
   users,
 } from '../../db/schema';
 import type { AchievementRow, NewAchievement, UserAchievementRow } from '../../db/schema';
@@ -886,6 +889,213 @@ export class AchievementRepository {
           ne(bookMetadata.seriesName, ''),
         ),
       )
+      .limit(1);
+    return !!row;
+  }
+
+  // ── Ratings ──
+
+  async countRatings(userId: number): Promise<number> {
+    const [{ value }] = await this.db.select({ value: count() }).from(userBookRatings).where(eq(userBookRatings.userId, userId));
+    return value;
+  }
+
+  async countRatingsAtMost(userId: number, max: number): Promise<number> {
+    const [{ value }] = await this.db
+      .select({ value: count() })
+      .from(userBookRatings)
+      .where(and(eq(userBookRatings.userId, userId), lte(userBookRatings.rating, max)));
+    return value;
+  }
+
+  async countDistinctRatingValues(userId: number): Promise<number> {
+    const [{ value }] = await this.db
+      .select({ value: countDistinct(userBookRatings.rating) })
+      .from(userBookRatings)
+      .where(eq(userBookRatings.userId, userId));
+    return value;
+  }
+
+  async existsRatingValue(userId: number, value: number): Promise<boolean> {
+    const [row] = await this.db
+      .select({ bookId: userBookRatings.bookId })
+      .from(userBookRatings)
+      .where(and(eq(userBookRatings.userId, userId), eq(userBookRatings.rating, value)))
+      .limit(1);
+    return !!row;
+  }
+
+  // ── Reading velocity (pages) ──
+
+  async getPageCountByBookFile(bookFileId: number): Promise<number | null> {
+    const [row] = await this.db
+      .select({ pageCount: bookMetadata.pageCount })
+      .from(bookFiles)
+      .innerJoin(bookMetadata, eq(bookMetadata.bookId, bookFiles.bookId))
+      .where(eq(bookFiles.id, bookFileId))
+      .limit(1);
+    return row?.pageCount ?? null;
+  }
+
+  async getMaxSessionPages(userId: number): Promise<number> {
+    const [result] = await this.db
+      .select({
+        value: sql<number>`coalesce(max(${bookMetadata.pageCount} * least(greatest(${readingSessions.progressDelta}, 0), 100) / 100.0), 0)::float`,
+      })
+      .from(readingSessions)
+      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
+      .innerJoin(bookMetadata, eq(bookMetadata.bookId, bookFiles.bookId))
+      .where(
+        and(
+          eq(readingSessions.userId, userId),
+          isNotNull(bookMetadata.pageCount),
+          gt(bookMetadata.pageCount, 0),
+          isNotNull(readingSessions.progressDelta),
+          gt(readingSessions.progressDelta, 0),
+          sql`${readingSessions.progressDelta} <= 100`,
+          gt(readingSessions.durationSeconds, 0),
+        ),
+      );
+    return Math.floor(Number(result?.value ?? 0));
+  }
+
+  async getPagesOnDay(userId: number, day: Date): Promise<number> {
+    const dayStart = new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate()));
+    const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+    const [result] = await this.db
+      .select({
+        value: sql<number>`coalesce(sum(${bookMetadata.pageCount} * least(greatest(${readingSessions.progressDelta}, 0), 100) / 100.0), 0)::float`,
+      })
+      .from(readingSessions)
+      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
+      .innerJoin(bookMetadata, eq(bookMetadata.bookId, bookFiles.bookId))
+      .where(
+        and(
+          eq(readingSessions.userId, userId),
+          gte(readingSessions.startedAt, dayStart),
+          lt(readingSessions.startedAt, dayEnd),
+          isNotNull(bookMetadata.pageCount),
+          gt(bookMetadata.pageCount, 0),
+          isNotNull(readingSessions.progressDelta),
+          gt(readingSessions.progressDelta, 0),
+          sql`${readingSessions.progressDelta} <= 100`,
+          gt(readingSessions.durationSeconds, 0),
+        ),
+      );
+    return Math.floor(Number(result?.value ?? 0));
+  }
+
+  async getMaxPagesInADay(userId: number): Promise<number> {
+    const result = await this.db.execute<{ max_pages: number }>(sql`
+      SELECT COALESCE(MAX(day_pages), 0)::float AS max_pages FROM (
+        SELECT SUM(bm.page_count * LEAST(GREATEST(rs.progress_delta, 0), 100) / 100.0) AS day_pages
+        FROM reading_sessions rs
+        JOIN book_files bf ON bf.id = rs.book_file_id
+        JOIN book_metadata bm ON bm.book_id = bf.book_id
+        WHERE rs.user_id = ${userId}
+          AND bm.page_count IS NOT NULL AND bm.page_count > 0
+          AND rs.progress_delta IS NOT NULL AND rs.progress_delta > 0 AND rs.progress_delta <= 100
+          AND rs.duration_seconds > 0
+        GROUP BY DATE_TRUNC('day', rs.started_at AT TIME ZONE 'UTC')
+      ) daily
+    `);
+    const rows = (result as unknown as { rows: Array<{ max_pages: number }> }).rows;
+    return Math.floor(Number(rows[0]?.max_pages ?? 0));
+  }
+
+  // ── Annotation enrichment ──
+
+  async getAnnotationNoteLength(annotationId: number, userId: number): Promise<number | null> {
+    const [row] = await this.db
+      .select({ note: annotations.note })
+      .from(annotations)
+      .where(and(eq(annotations.id, annotationId), eq(annotations.userId, userId)))
+      .limit(1);
+    if (!row || row.note === null) return null;
+    return row.note.length;
+  }
+
+  async getMaxNoteLength(userId: number): Promise<number> {
+    const [result] = await this.db
+      .select({ value: sql<number>`coalesce(max(char_length(${annotations.note})), 0)::int` })
+      .from(annotations)
+      .where(and(eq(annotations.userId, userId), isNotNull(annotations.note)));
+    return Number(result?.value ?? 0);
+  }
+
+  async countDistinctColors(userId: number): Promise<number> {
+    const [{ value }] = await this.db
+      .select({ value: countDistinct(annotations.color) })
+      .from(annotations)
+      .where(eq(annotations.userId, userId));
+    return value;
+  }
+
+  // ── Devices / reading sources ──
+
+  async hasWebSession(userId: number): Promise<boolean> {
+    // Kobo analytics also writes reading sessions, so a genuine web-reader session must filter on source.
+    const [row] = await this.db
+      .select({ id: readingSessions.id })
+      .from(readingSessions)
+      .where(and(eq(readingSessions.userId, userId), eq(readingSessions.source, 'web')))
+      .limit(1);
+    return !!row;
+  }
+
+  async hasKoreaderSync(userId: number): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: koreaderDeviceProgress.id })
+      .from(koreaderDeviceProgress)
+      .where(and(eq(koreaderDeviceProgress.userId, userId), eq(koreaderDeviceProgress.orphaned, false)))
+      .limit(1);
+    return !!row;
+  }
+
+  async hasKoboSync(userId: number): Promise<boolean> {
+    const [row] = await this.db.select({ id: koboReadingStates.id }).from(koboReadingStates).where(eq(koboReadingStates.userId, userId)).limit(1);
+    return !!row;
+  }
+
+  async hasAnyExternalDevice(userId: number): Promise<boolean> {
+    const [koreader, kobo] = await Promise.all([this.hasKoreaderSync(userId), this.hasKoboSync(userId)]);
+    return koreader || kobo;
+  }
+
+  async countDistinctSources(userId: number): Promise<number> {
+    const [web, koreader, kobo] = await Promise.all([this.hasWebSession(userId), this.hasKoreaderSync(userId), this.hasKoboSync(userId)]);
+    return (web ? 1 : 0) + (koreader ? 1 : 0) + (kobo ? 1 : 0);
+  }
+
+  async maxSourcesOnSingleBook(userId: number): Promise<number> {
+    const result = await this.db.execute<{ max_sources: number }>(sql`
+      SELECT COALESCE(MAX(src_count), 0)::int AS max_sources FROM (
+        SELECT book_id, COUNT(DISTINCT src) AS src_count FROM (
+          SELECT bf.book_id, 'web' AS src
+          FROM reading_sessions rs JOIN book_files bf ON bf.id = rs.book_file_id
+          WHERE rs.user_id = ${userId} AND rs.source = 'web'
+          UNION
+          SELECT bf.book_id, 'koreader' AS src
+          FROM koreader_device_progress kdp JOIN book_files bf ON bf.id = kdp.book_file_id
+          WHERE kdp.user_id = ${userId} AND kdp.orphaned = false AND kdp.book_file_id IS NOT NULL
+          UNION
+          SELECT krs.book_id, 'kobo' AS src
+          FROM kobo_reading_states krs WHERE krs.user_id = ${userId}
+        ) sources
+        GROUP BY book_id
+      ) per_book
+    `);
+    const rows = (result as unknown as { rows: Array<{ max_sources: number }> }).rows;
+    return Number(rows[0]?.max_sources ?? 0);
+  }
+
+  // ── Status ──
+
+  async hasAbandonedBook(userId: number): Promise<boolean> {
+    const [row] = await this.db
+      .select({ bookId: userBookStatus.bookId })
+      .from(userBookStatus)
+      .where(and(eq(userBookStatus.userId, userId), eq(userBookStatus.status, 'abandoned')))
       .limit(1);
     return !!row;
   }

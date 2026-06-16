@@ -1,4 +1,4 @@
-export type AchievementCategory = "reading" | "library" | "exploration" | "dedication";
+export type AchievementCategory = "reading" | "library" | "exploration" | "dedication" | "devices";
 
 export type AchievementRarity = "common" | "rare" | "epic" | "legendary";
 
@@ -7,6 +7,7 @@ export const ACHIEVEMENT_CATEGORY_LABELS: Record<AchievementCategory, string> = 
   library: "Library",
   exploration: "Exploration",
   dedication: "Dedication",
+  devices: "Devices",
 };
 
 export interface AchievementItem {

@@ -28,7 +28,8 @@ function makeUser(overrides?: Partial<RequestUser>): RequestUser {
 }
 
 const mockRepo = {
-  saveSession: vi.fn<(...args: [number, number, string, Date, Date, number, number | null, number | null]) => Promise<SaveReadingSessionResult>>(),
+  saveSession:
+    vi.fn<(...args: [number, number, string, Date, Date, number, number | null, number | null, string]) => Promise<SaveReadingSessionResult>>(),
 };
 
 const mockBookService = {
@@ -75,6 +76,7 @@ describe('ReadingSessionService', () => {
       120,
       2.5,
       10,
+      'web',
     );
   });
 
@@ -101,6 +103,35 @@ describe('ReadingSessionService', () => {
       30,
       null,
       null,
+      'web',
+    );
+  });
+
+  it('threads an explicit source through to the repository', async () => {
+    await service.save(
+      42,
+      {
+        sessionId: 'session-kobo',
+        startedAt: '2026-04-15T10:00:00.000Z',
+        endedAt: '2026-04-15T10:02:00.000Z',
+        durationSeconds: 120,
+        progressDelta: 5,
+        endProgress: 20,
+      },
+      makeUser({ id: 7 }),
+      'kobo',
+    );
+
+    expect(mockRepo.saveSession).toHaveBeenCalledWith(
+      7,
+      42,
+      'session-kobo',
+      new Date('2026-04-15T10:00:00.000Z'),
+      new Date('2026-04-15T10:02:00.000Z'),
+      120,
+      5,
+      20,
+      'kobo',
     );
   });
 

@@ -1,4 +1,5 @@
 import { KoboReadingStateService } from './kobo-reading-state.service';
+import { ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED } from '../../achievement/achievement-events.service';
 
 function makeInsertChain() {
   const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
@@ -37,9 +38,16 @@ describe('KoboReadingStateService', () => {
   const bookAccessService = { assertBookAccessible: vi.fn() };
   const userBookStatusService = { autoUpdate: vi.fn() };
   const bookIdentityService = { ensureForBook: vi.fn() };
+  const achievementEvents = { emit: vi.fn() };
 
   function makeService(db: ReturnType<typeof makeDb>) {
-    return new KoboReadingStateService(db as never, bookAccessService as never, userBookStatusService as never, bookIdentityService as never);
+    return new KoboReadingStateService(
+      db as never,
+      bookAccessService as never,
+      userBookStatusService as never,
+      bookIdentityService as never,
+      achievementEvents as never,
+    );
   }
 
   beforeEach(() => {
@@ -210,6 +218,10 @@ describe('KoboReadingStateService', () => {
     expect(userBookStatusService.autoUpdate).toHaveBeenCalledWith(1, 5, 42.5, 1, 99);
     expect(db.select).not.toHaveBeenCalled();
     expect(db.execute).not.toHaveBeenCalled();
+    expect(achievementEvents.emit).toHaveBeenCalledWith(
+      ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED,
+      expect.objectContaining({ userId: 1, bookId: 5, progress: 42.5, source: 'kobo' }),
+    );
   });
 
   it('does not replace newer internal CFI progress with stale Kobo percent', async () => {

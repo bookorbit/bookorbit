@@ -6,6 +6,7 @@ import type { BookReadingSession, BookReadingSessionListResponse, BookReadingSes
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookFiles, books, readingSessions, userReadingDailyStats } from '../../db/schema';
+import type { ReadingSessionSource } from '../../db/schema/reader';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -31,6 +32,7 @@ export class ReadingSessionRepository {
     durationSeconds: number,
     progressDelta: number | null,
     endProgress: number | null,
+    source: ReadingSessionSource,
   ): Promise<SaveReadingSessionResult> {
     if (durationSeconds < MIN_READING_SESSION_SECONDS) {
       return { kind: 'skipped', reason: 'duration_below_minimum' };
@@ -52,7 +54,7 @@ export class ReadingSessionRepository {
     return this.db.transaction(async (tx): Promise<SaveReadingSessionResult> => {
       const inserted = await tx
         .insert(readingSessions)
-        .values({ userId, bookFileId, sessionId, startedAt, endedAt, durationSeconds, progressDelta, endProgress })
+        .values({ userId, bookFileId, sessionId, startedAt, endedAt, durationSeconds, progressDelta, endProgress, source })
         .onConflictDoNothing({ target: [readingSessions.userId, readingSessions.sessionId] })
         .returning({ id: readingSessions.id });
 

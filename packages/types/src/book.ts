@@ -12,6 +12,11 @@ export function isAudioFormat(format: string): boolean {
   return AUDIO_FORMATS.has(format.toLowerCase());
 }
 
+const COMIC_FORMATS = new Set<string>(["cbz", "cbr", "cb7", "cbx"]);
+export function isComicFormat(format: string): boolean {
+  return COMIC_FORMATS.has(format.toLowerCase());
+}
+
 export const READ_STATUSES = ["unread", "want_to_read", "reading", "on_hold", "rereading", "read", "skimmed", "abandoned"] as const;
 export type ReadStatus = (typeof READ_STATUSES)[number];
 export type ReadStatusSource = "auto" | "manual";
@@ -217,6 +222,7 @@ export type BookRecommendation = {
   hasCover: boolean;
   authors: string[];
   isAudiobook?: boolean;
+  isComic?: boolean;
 };
 
 export type SeriesBookRecommendation = {
@@ -226,6 +232,7 @@ export type SeriesBookRecommendation = {
   hasCover: boolean;
   authors: string[];
   isAudiobook?: boolean;
+  isComic?: boolean;
 };
 
 export type CoverSearchResult = {

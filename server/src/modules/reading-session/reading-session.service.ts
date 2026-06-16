@@ -5,6 +5,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { BookService } from '../book/book.service';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_READING_SESSION_SAVED } from '../achievement/achievement-events.service';
+import type { ReadingSessionSource } from '../../db/schema/reader';
 import type { ListBookReadingSessionsDto } from './dto/list-book-reading-sessions.dto';
 import type { SaveReadingSessionDto } from './dto/save-reading-session.dto';
 import { ReadingSessionRepository } from './reading-session.repository';
@@ -19,7 +20,7 @@ export class ReadingSessionService {
     private readonly achievementEvents: AchievementEventsService,
   ) {}
 
-  async save(fileId: number, dto: SaveReadingSessionDto, user: RequestUser): Promise<void> {
+  async save(fileId: number, dto: SaveReadingSessionDto, user: RequestUser, source: ReadingSessionSource = 'web'): Promise<void> {
     const event = 'reading_session.save';
     const startedAtMs = Date.now();
     this.logger.log(
@@ -53,6 +54,7 @@ export class ReadingSessionService {
         durationSeconds,
         dto.progressDelta ?? null,
         dto.endProgress ?? null,
+        source,
       );
 
       this.logger.log(

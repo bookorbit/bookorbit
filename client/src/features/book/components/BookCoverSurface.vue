@@ -9,6 +9,7 @@ const props = withDefaults(
     interactive?: boolean
     tag?: string
     disableSpine?: boolean
+    isComic?: boolean
     displayMode?: BookCoverDisplayMode
   }>(),
   {
@@ -16,14 +17,16 @@ const props = withDefaults(
     interactive: false,
     tag: 'div',
     disableSpine: false,
+    isComic: false,
     displayMode: undefined,
   },
 )
 
-const { bookSpineOverlay, bookShadowStrength, bookCoverDisplayMode } = useDisplaySettings()
+const { bookSpineOverlay, bookShadowStrength, bookCoverDisplayMode, showSpineOnComics } = useDisplaySettings()
 
 const spineOverlayMode = computed(() => {
   if (props.disableSpine) return 'off'
+  if (props.isComic && !showSpineOnComics.value) return 'off'
   return bookSpineOverlay?.value ?? 'off'
 })
 

@@ -71,6 +71,13 @@ describe('AppSettingsService', () => {
     });
   });
 
+  describe('setValue', () => {
+    it('upserts the key/value pair', async () => {
+      await service.setValue('achievements_backfill_signature', 'abc123');
+      expect(repo.upsert).toHaveBeenCalledWith('achievements_backfill_signature', 'abc123');
+    });
+  });
+
   describe('update', () => {
     it('returns updated setting', async () => {
       const setting = { key: 'allow_registration', value: 'true' };

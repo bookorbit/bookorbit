@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { Folder, FolderOpen, ChevronRight, ChevronUp, Search, X, Check, Loader2, HardDrive } from 'lucide-vue-next'
+import { ref, computed, watch, nextTick } from 'vue'
+import { Folder, FolderOpen, FolderPlus, ChevronRight, ChevronUp, Search, X, Check, Loader2, HardDrive } from 'lucide-vue-next'
+import type { CreateFolderResult } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -74,6 +75,69 @@ watch(currentPath, (p) => loadEntries(p), { immediate: true })
 function selectCurrent() {
   emit('select', currentPath.value)
 }
+
+const creatingFolder = ref(false)
+const newFolderName = ref('')
+const createError = ref<string | null>(null)
+const createLoading = ref(false)
+const newFolderInput = ref<HTMLInputElement | null>(null)
+
+function toggleNewFolder() {
+  creatingFolder.value = !creatingFolder.value
+  newFolderName.value = ''
+  createError.value = null
+  if (creatingFolder.value) {
+    nextTick(() => newFolderInput.value?.focus())
+  }
+}
+
+function cancelNewFolder() {
+  creatingFolder.value = false
+  newFolderName.value = ''
+  createError.value = null
+}
+
+async function submitNewFolder() {
+  const name = newFolderName.value.trim()
+  if (!name || createLoading.value) return
+  if (name.includes('/') || name.includes('\\') || name === '.' || name === '..' || name.startsWith('.')) {
+    createError.value = 'Enter a single folder name without slashes or leading dots'
+    return
+  }
+  createLoading.value = true
+  createError.value = null
+  try {
+    const res = await api('/api/v1/path', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ parentPath: currentPath.value, name }),
+    })
+    if (res.ok) {
+      const created: CreateFolderResult = await res.json()
+      creatingFolder.value = false
+      newFolderName.value = ''
+      navigate(created.path)
+    } else {
+      const body = await res.json().catch(() => ({}))
+      const message = Array.isArray(body?.message) ? body.message[0] : body?.message
+      createError.value = message ?? 'Could not create folder'
+    }
+  } catch {
+    createError.value = 'Could not connect'
+  } finally {
+    createLoading.value = false
+  }
+}
+
+function onNewFolderKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    submitNewFolder()
+  } else if (e.key === 'Escape') {
+    e.preventDefault()
+    cancelNewFolder()
+  }
+}
 </script>
 
 <template>
@@ -91,12 +155,21 @@ function selectCurrent() {
             <HardDrive :size="15" class="text-primary" />
             <span class="text-sm font-semibold text-foreground">Browse folders</span>
           </div>
-          <button
-            class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            @click="emit('close')"
-          >
-            <X :size="14" />
-          </button>
+          <div class="flex items-center gap-1">
+            <button
+              class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              @click="toggleNewFolder"
+            >
+              <FolderPlus :size="13" />
+              New folder
+            </button>
+            <button
+              class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              @click="emit('close')"
+            >
+              <X :size="14" />
+            </button>
+          </div>
         </div>
 
         <!-- Breadcrumb -->
@@ -137,6 +210,36 @@ function selectCurrent() {
           <button v-if="search" class="text-muted-foreground hover:text-foreground" @click="search = ''">
             <X :size="12" />
           </button>
+        </div>
+
+        <!-- New folder -->
+        <div v-if="creatingFolder" class="px-3 py-2 border-b border-border bg-muted/20 shrink-0">
+          <div class="flex items-center gap-2">
+            <FolderPlus :size="13" class="text-primary shrink-0" />
+            <input
+              ref="newFolderInput"
+              v-model="newFolderName"
+              type="text"
+              placeholder="New folder name"
+              class="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
+              @keydown="onNewFolderKeydown"
+            />
+            <button
+              class="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity shrink-0 disabled:opacity-50"
+              :disabled="!newFolderName.trim() || createLoading"
+              @click="submitNewFolder"
+            >
+              <Loader2 v-if="createLoading" :size="12" class="animate-spin" />
+              Create
+            </button>
+            <button
+              class="px-2.5 py-1 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+              @click="cancelNewFolder"
+            >
+              Cancel
+            </button>
+          </div>
+          <p v-if="createError" class="mt-1.5 pl-5 text-xs text-destructive">{{ createError }}</p>
         </div>
 
         <!-- Directory list -->

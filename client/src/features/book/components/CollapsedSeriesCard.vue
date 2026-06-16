@@ -83,6 +83,7 @@ watch(
 )
 const primaryFile = computed(() => props.book.files.find((file) => file.role === 'primary') ?? props.book.files[0] ?? null)
 const isAudiobook = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
+const isComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'cbx')
 
 function handleCoverLoad(bookId: number) {
   loadedCovers.value = new Set([...loadedCovers.value, bookId])
@@ -194,6 +195,7 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
         :class="isStack ? 'book-cover-surface--spine-fitted' : ''"
         interactive
         :disable-spine="isAudiobook"
+        :is-comic="isComic"
         :style="{ aspectRatio: coverAspectRatio, ...(isStack ? { backgroundColor: 'transparent', boxShadow: 'none' } : {}) }"
       >
         <div v-if="isStack" class="absolute inset-0 isolate overflow-hidden" data-testid="series-cover-stack">
@@ -215,6 +217,7 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
               loading="lazy"
               decoding="async"
               :spine="!isAudiobook"
+              :is-comic="isComic"
               @error="() => handleCoverError(bookId)"
             />
 

@@ -221,6 +221,8 @@ export class UploadService {
         if (needsStatusUpdate) finalStatus = 'present';
       }
 
+      this.processor.extractAudioDurationAsync(bookId, destination, format);
+
       this.logger.log(
         `[${event}] [end] bookId=${bookId} userId=${user.id} fileId=${inserted.id} format=${format} sizeBytes=${sizeBytes} durationMs=${Date.now() - startedAt} - add file to book completed`,
       );

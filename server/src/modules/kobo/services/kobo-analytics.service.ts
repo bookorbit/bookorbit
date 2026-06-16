@@ -182,6 +182,7 @@ export class KoboAnalyticsService {
         endProgress: parseKoboProgress(ev.Attributes?.progress),
       },
       user,
+      'kobo',
     );
   }
 

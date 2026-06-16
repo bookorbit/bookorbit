@@ -26,6 +26,10 @@ function makeRepo(overrides: Record<string, unknown> = {}) {
     hasMonthWithBooksFinished: vi.fn().mockResolvedValue(false),
     hasSessionWithProgressDeltaAtLeast: vi.fn().mockResolvedValue(false),
     countBooksFinishedInMonth: vi.fn().mockResolvedValue(0),
+    getPageCountByBookFile: vi.fn().mockResolvedValue(null),
+    getMaxSessionPages: vi.fn().mockResolvedValue(0),
+    getPagesOnDay: vi.fn().mockResolvedValue(0),
+    getMaxPagesInADay: vi.fn().mockResolvedValue(0),
     ...overrides,
   };
 }
@@ -642,6 +646,76 @@ describe('ReadingEvaluator', () => {
       expect(repo.hasAnySlowBurnBook).not.toHaveBeenCalled();
       expect(repo.hasSessionWithProgressDeltaAtLeast).not.toHaveBeenCalled();
       expect(repo.hasMonthWithBooksFinished).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('power_hour', () => {
+    it('awards power_hour for 75+ pages in a session', async () => {
+      repo.getPageCountByBookFile.mockResolvedValue(300);
+      const awards = await evaluator.evaluate(
+        { userId: 1, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload({ progressDelta: 30 }) as never },
+        new Set(),
+      );
+      expect(awards).toContainEqual(expect.objectContaining({ key: 'power_hour' }));
+    });
+
+    it('does not award power_hour below 75 pages', async () => {
+      repo.getPageCountByBookFile.mockResolvedValue(300);
+      const awards = await evaluator.evaluate(
+        { userId: 1, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload({ progressDelta: 10 }) as never },
+        new Set(),
+      );
+      expect(awards.find((a) => a.key === 'power_hour')).toBeUndefined();
+    });
+
+    it('does not award power_hour when progressDelta is null', async () => {
+      repo.getPageCountByBookFile.mockResolvedValue(1000);
+      const awards = await evaluator.evaluate(
+        { userId: 1, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload({ progressDelta: null }) as never },
+        new Set(),
+      );
+      expect(awards.find((a) => a.key === 'power_hour')).toBeUndefined();
+    });
+
+    it('does not award power_hour when page count is unknown', async () => {
+      repo.getPageCountByBookFile.mockResolvedValue(null);
+      const awards = await evaluator.evaluate(
+        { userId: 1, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload({ progressDelta: 50 }) as never },
+        new Set(),
+      );
+      expect(awards.find((a) => a.key === 'power_hour')).toBeUndefined();
+    });
+
+    it('awards power_hour via backfill', async () => {
+      repo.getMaxSessionPages.mockResolvedValue(80);
+      const awards = await evaluator.evaluate(backfillCtx, new Set());
+      expect(awards).toContainEqual(expect.objectContaining({ key: 'power_hour' }));
+    });
+  });
+
+  describe('speed_reader', () => {
+    it('awards speed_reader for 100+ pages in a day', async () => {
+      repo.getPagesOnDay.mockResolvedValue(120);
+      const awards = await evaluator.evaluate(
+        { userId: 1, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload() as never },
+        new Set(),
+      );
+      expect(awards).toContainEqual(expect.objectContaining({ key: 'speed_reader' }));
+    });
+
+    it('does not award speed_reader below 100 pages', async () => {
+      repo.getPagesOnDay.mockResolvedValue(99);
+      const awards = await evaluator.evaluate(
+        { userId: 1, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload() as never },
+        new Set(),
+      );
+      expect(awards.find((a) => a.key === 'speed_reader')).toBeUndefined();
+    });
+
+    it('awards speed_reader via backfill', async () => {
+      repo.getMaxPagesInADay.mockResolvedValue(150);
+      const awards = await evaluator.evaluate(backfillCtx, new Set());
+      expect(awards).toContainEqual(expect.objectContaining({ key: 'speed_reader' }));
     });
   });
 });

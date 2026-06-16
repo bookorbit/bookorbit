@@ -296,6 +296,11 @@ export class MetadataService {
     }
   }
 
+  async extractAndAggregateAudioDuration(bookId: number, absolutePath: string): Promise<void> {
+    await this.extractAudioFileDuration(bookId, absolutePath);
+    await this.aggregateAudioDuration(bookId);
+  }
+
   // ── Authors ──────────────────────────────────────────────────────────────────
 
   async replaceAuthors(

@@ -23,6 +23,7 @@ const props = withDefaults(
     imageClass?: string
     resetKey?: string | number | null
     spine?: boolean
+    isComic?: boolean
   }>(),
   {
     authorLine: null,
@@ -36,6 +37,7 @@ const props = withDefaults(
     imageClass: '',
     resetKey: null,
     spine: true,
+    isComic: false,
   },
 )
 
@@ -44,7 +46,7 @@ const emit = defineEmits<{
   error: []
 }>()
 
-const { bookCoverDisplayMode, bookSpineOverlay } = useDisplaySettings()
+const { bookCoverDisplayMode, bookSpineOverlay, showSpineOnComics } = useDisplaySettings()
 const injectedAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 
 const loaded = ref(false)
@@ -63,7 +65,11 @@ const slotRatio = computed(() => coverAspectRatioValue(String(frameAspectRatio.v
 const canRenderImage = computed(() => props.hasCover && props.src !== null && props.src !== '' && !failed.value)
 const showBlurredBackdrop = computed(() => effectiveMode.value === 'blurred-fit' && canRenderImage.value && loaded.value)
 const useNaturalFrame = computed(() => effectiveMode.value === 'natural-bottom' && canRenderImage.value && loaded.value)
-const spineMode = computed(() => (props.spine ? (bookSpineOverlay?.value ?? 'off') : 'off'))
+const spineMode = computed(() => {
+  if (!props.spine) return 'off'
+  if (props.isComic && !showSpineOnComics.value) return 'off'
+  return bookSpineOverlay?.value ?? 'off'
+})
 // In blurred-fit the image is letterboxed inside the full slot, so the spine
 // layer must be fitted to the image rectangle. Until the ratio is known that
 // fit can't be computed, so hold the layer back rather than let it span the

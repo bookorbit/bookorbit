@@ -15,6 +15,7 @@ export interface CarouselBook {
   hasCover: boolean
   authors: string[]
   isAudiobook?: boolean
+  isComic?: boolean
 }
 
 const props = withDefaults(
@@ -53,6 +54,10 @@ function formatSeriesIndex(index: number | null | undefined): string {
 
 function isAudiobook(book: CarouselBook): boolean {
   return book.isAudiobook ?? false
+}
+
+function isComic(book: CarouselBook): boolean {
+  return book.isComic ?? false
 }
 
 function cardAspectRatio(book: CarouselBook): string {
@@ -121,6 +126,7 @@ defineExpose({ scroll })
           class="book-cover-surface--spine-fitted relative w-full rounded-sm overflow-hidden transition-transform duration-150 group-hover:scale-[1.02]"
           :interactive="true"
           :disable-spine="isAudiobook(book)"
+          :is-comic="isComic(book)"
           :display-mode="isAudiobook(book) ? 'fill-crop' : undefined"
           :style="{ aspectRatio: cardAspectRatio(book) }"
         >
@@ -136,6 +142,7 @@ defineExpose({ scroll })
             :mode="isAudiobook(book) ? 'fill-crop' : undefined"
             :reset-key="`${coverResetVersion}:${book.id}`"
             :spine="!isAudiobook(book)"
+            :is-comic="isComic(book)"
           />
           <span
             v-if="showSeriesIndex && book.seriesIndex != null"

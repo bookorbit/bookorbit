@@ -4,7 +4,7 @@ import { SUPPORTED_BOOK_FORMATS } from '../upload/upload-validator.service';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { ContentFilterRules, JumpBucketsResponse, SortSpec } from '@bookorbit/types';
-import { isAudioFormat } from '@bookorbit/types';
+import { isAudioFormat, isComicFormat } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
 import { BookQueryBuilder } from './book-query-builder.service';
@@ -949,7 +949,7 @@ export class BookRepository {
 
   async findRecommendationTitlesByBookIds(
     bookIds: number[],
-  ): Promise<{ id: number; title: string | null; hasCover: boolean; authors: string[]; isAudiobook: boolean }[]> {
+  ): Promise<{ id: number; title: string | null; hasCover: boolean; authors: string[]; isAudiobook: boolean; isComic: boolean }[]> {
     if (bookIds.length === 0) return [];
 
     const [rows, authorRows] = await Promise.all([
@@ -979,6 +979,7 @@ export class BookRepository {
       hasCover: r.coverSource !== null,
       authors: authorsByBook.get(r.id) ?? [],
       isAudiobook: r.primaryFormat != null ? isAudioFormat(r.primaryFormat) : false,
+      isComic: r.primaryFormat != null ? isComicFormat(r.primaryFormat) : false,
     }));
   }
 

@@ -14,6 +14,9 @@ import {
   ACHIEVEMENT_EVENT_COLLECTION_CREATED,
   ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED,
   ACHIEVEMENT_EVENT_ACHIEVEMENT_AWARDED,
+  ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED,
+  ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED,
+  ACHIEVEMENT_EVENT_BACKFILL,
 } from './achievement-events.service';
 import { EvaluatorRegistry } from './evaluators/evaluator-registry';
 import { ACHIEVEMENT_SEED } from './seed/achievement-seed';
@@ -23,6 +26,7 @@ import type { AchievementRow, UserAchievementRow } from '../../db/schema';
 export class AchievementService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AchievementService.name);
   private readonly eventHandlers = new Map<string, (payload: Record<string, unknown>) => void>();
+  private seedPromise: Promise<void> | null = null;
 
   constructor(
     private readonly repo: AchievementRepository,
@@ -32,8 +36,17 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    await this.seedCatalogue();
+    await this.ensureCatalogueSeeded();
     this.registerEventListeners();
+  }
+
+  // Memoized so the catalogue is seeded exactly once, and so a concurrent onModuleInit hook
+  // (the auto-backfill) can await it before awarding achievements whose keys are FK'd to the catalogue.
+  ensureCatalogueSeeded(): Promise<void> {
+    if (!this.seedPromise) {
+      this.seedPromise = this.seedCatalogue();
+    }
+    return this.seedPromise;
   }
 
   async getCatalogue(user: RequestUser): Promise<AchievementCatalogueResponse> {
@@ -47,7 +60,7 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
 
     const progressMap = await this.computeProgress(userId, user.isSuperuser, allAchievements, earnedMap);
 
-    const categoryOrder: AchievementCategory[] = ['reading', 'library', 'exploration', 'dedication'];
+    const categoryOrder: AchievementCategory[] = ['reading', 'library', 'exploration', 'dedication', 'devices'];
     const grouped = new Map<AchievementCategory, AchievementItem[]>();
 
     for (const cat of categoryOrder) {
@@ -111,6 +124,8 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
     try {
       const [earnedKeys, isSuperuser] = await Promise.all([this.repo.findUserEarnedKeys(userId), this.repo.findUserIsSuperuser(userId)]);
       const awards = await this.registry.evaluate({ userId, isSuperuser, eventName, payload }, earnedKeys);
+      // Backfill is a retroactive catch-up, so it awards silently instead of flooding the user with notifications.
+      const notify = eventName !== ACHIEVEMENT_EVENT_BACKFILL;
 
       let awarded = 0;
       for (const award of awards) {
@@ -119,12 +134,12 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
         if (row) {
           awarded++;
           earnedKeys.add(award.key);
-          await this.sendNotification(userId, award.key);
+          if (notify) await this.sendNotification(userId, award.key);
         }
       }
 
       if (awarded > 0) {
-        await this.evaluateMetaBadges(userId, isSuperuser, earnedKeys);
+        await this.evaluateMetaBadges(userId, isSuperuser, earnedKeys, notify);
       }
 
       if (awarded > 0) {
@@ -165,6 +180,8 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
       ACHIEVEMENT_EVENT_ANNOTATION_CREATED,
       ACHIEVEMENT_EVENT_COLLECTION_CREATED,
       ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED,
+      ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED,
+      ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED,
     ];
 
     for (const eventName of events) {
@@ -190,7 +207,7 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private async evaluateMetaBadges(userId: number, isSuperuser: boolean, earnedKeys: Set<string>): Promise<void> {
+  private async evaluateMetaBadges(userId: number, isSuperuser: boolean, earnedKeys: Set<string>, notify: boolean): Promise<void> {
     const metaAwards = await this.registry.evaluate(
       { userId, isSuperuser, eventName: ACHIEVEMENT_EVENT_ACHIEVEMENT_AWARDED, payload: { userId } },
       earnedKeys,
@@ -200,7 +217,7 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
       const row = await this.repo.award(userId, award.key, award.context);
       if (row) {
         earnedKeys.add(award.key);
-        await this.sendNotification(userId, award.key);
+        if (notify) await this.sendNotification(userId, award.key);
       }
     }
   }
@@ -297,6 +314,20 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
         const currentYear = new Date().getFullYear();
         return this.repo.countDistinctSeasonsWithReading(userId, currentYear);
       }
+      case 'across_the_board':
+        return this.repo.countDistinctRatingValues(userId);
+      case 'power_hour':
+        return this.repo.getMaxSessionPages(userId);
+      case 'speed_reader':
+        return this.repo.getMaxPagesInADay(userId);
+      case 'wordsmith':
+        return this.repo.getMaxNoteLength(userId);
+      case 'box_of_crayons':
+        return this.repo.countDistinctColors(userId);
+      case 'full_orbit':
+        return this.repo.countDistinctSources(userId);
+      case 'two_worlds':
+        return this.repo.maxSourcesOnSingleBook(userId);
       default:
         return null;
     }
@@ -322,6 +353,8 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
         return this.repo.getCurrentStreak(userId);
       case 'long_book':
         return this.repo.getMaxFinishedBookPageCount(userId);
+      case 'critic':
+        return this.repo.countRatings(userId);
       default:
         return null;
     }

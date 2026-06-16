@@ -28,6 +28,7 @@ const validDisplayPreferences: DisplayPreferences = {
   tableZebraStriping: false,
   tableDensity: 'comfortable',
   bookSpineOverlay: 'subtle',
+  showSpineOnComics: false,
   bookShadowStrength: 'strong',
   bookCoverDisplayMode: 'natural-bottom',
   seriesCardCoverMode: 'stack',
@@ -193,6 +194,31 @@ describe('UserPreferencesService', () => {
     await expect(service.upsertDisplayPreferences(11, withoutMode as unknown as Record<string, unknown>)).resolves.toBeUndefined();
 
     expect(repo.upsert).toHaveBeenCalledWith(11, 'display', expect.objectContaining({ seriesCardCoverMode: 'stack' }));
+  });
+
+  it('upsertDisplayPreferences accepts both showSpineOnComics values', async () => {
+    for (const value of [true, false]) {
+      await expect(
+        service.upsertDisplayPreferences(11, { ...validDisplayPreferences, showSpineOnComics: value } as unknown as Record<string, unknown>),
+      ).resolves.toBeUndefined();
+      expect(repo.upsert).toHaveBeenCalledWith(11, 'display', expect.objectContaining({ showSpineOnComics: value }));
+    }
+  });
+
+  it('upsertDisplayPreferences defaults showSpineOnComics to false when omitted', async () => {
+    const { showSpineOnComics, ...withoutFlag } = validDisplayPreferences;
+    void showSpineOnComics;
+
+    await expect(service.upsertDisplayPreferences(11, withoutFlag as unknown as Record<string, unknown>)).resolves.toBeUndefined();
+
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'display', expect.objectContaining({ showSpineOnComics: false }));
+  });
+
+  it('upsertDisplayPreferences rejects non-boolean showSpineOnComics', async () => {
+    await expect(
+      service.upsertDisplayPreferences(11, { ...validDisplayPreferences, showSpineOnComics: 'yes' } as unknown as Record<string, unknown>),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.upsert).not.toHaveBeenCalled();
   });
 
   it('upsertDisplayPreferences rejects invalid cover display modes', async () => {

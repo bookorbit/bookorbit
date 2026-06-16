@@ -75,6 +75,7 @@ const authorQuery = computed(() => props.book.authors[0] ?? null)
 const readableFiles = computed(() => props.book.files.filter((f) => f.format && READER_OPENABLE_FORMATS.has(f.format)))
 const primaryFile = computed(() => readableFiles.value.find((f) => f.role === 'primary') ?? readableFiles.value[0] ?? null)
 const isAudiobook = computed(() => readableFiles.value.some((f) => FORMAT_TO_GROUP[f.format!] === 'audio'))
+const isComic = computed(() => readableFiles.value.some((f) => FORMAT_TO_GROUP[f.format!] === 'cbx'))
 
 // For multi-file audiobooks, collapse all tracks into one representative entry.
 // The audio reader loads the full track queue from the book, so opening any track is equivalent.
@@ -396,6 +397,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
         :class="isMissing || selectionMode ? '' : 'group-hover:scale-[1.02]'"
         :interactive="!isMissing && !selectionMode"
         :disable-spine="isAudiobook"
+        :is-comic="isComic"
         :style="{ aspectRatio: effectiveCoverAspectRatio }"
       >
         <!-- Missing border overlay: mirror selected overlay pattern so border is never clipped/hidden -->
@@ -412,6 +414,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
           :frame-aspect-ratio="effectiveCoverAspectRatio"
           :image-class="isMissing ? 'brightness-50' : ''"
           :spine="!isAudiobook"
+          :is-comic="isComic"
           @load="handleArtworkLoad"
           @error="handleArtworkError"
         />

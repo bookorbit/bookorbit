@@ -50,6 +50,7 @@ const DISPLAY_PREFERENCES_SCHEMA = z
     tableZebraStriping: z.boolean(),
     tableDensity: z.enum(TABLE_DENSITIES),
     bookSpineOverlay: z.enum(BOOK_SPINE_OVERLAYS),
+    showSpineOnComics: z.boolean().default(false),
     bookShadowStrength: z.enum(BOOK_SHADOW_STRENGTHS),
     bookCoverDisplayMode: z.enum(BOOK_COVER_DISPLAY_MODES),
     seriesCardCoverMode: z.enum(SERIES_CARD_COVER_MODES).default('stack'),

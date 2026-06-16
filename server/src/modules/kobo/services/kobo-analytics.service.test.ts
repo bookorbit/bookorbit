@@ -66,6 +66,7 @@ describe('KoboAnalyticsService', () => {
         endProgress: 4,
       },
       user,
+      'kobo',
     );
     expect(readingSessionService.save).toHaveBeenNthCalledWith(
       2,
@@ -76,6 +77,7 @@ describe('KoboAnalyticsService', () => {
         endProgress: 6,
       }),
       user,
+      'kobo',
     );
     expect(readingSessionService.save).toHaveBeenNthCalledWith(
       3,
@@ -85,6 +87,7 @@ describe('KoboAnalyticsService', () => {
         durationSeconds: 4,
       }),
       user,
+      'kobo',
     );
   });
 
@@ -139,6 +142,7 @@ describe('KoboAnalyticsService', () => {
         endProgress: 12,
       },
       user,
+      'kobo',
     );
     expect(readingSessionService.save).toHaveBeenNthCalledWith(
       2,
@@ -152,6 +156,7 @@ describe('KoboAnalyticsService', () => {
         endProgress: 10,
       },
       user,
+      'kobo',
     );
   });
 
@@ -191,8 +196,20 @@ describe('KoboAnalyticsService', () => {
       device,
     );
 
-    expect(readingSessionService.save).toHaveBeenNthCalledWith(1, 100, expect.objectContaining({ sessionId: 'leave-one', progressDelta: 2 }), user);
-    expect(readingSessionService.save).toHaveBeenNthCalledWith(2, 100, expect.objectContaining({ sessionId: 'leave-two', progressDelta: 5 }), user);
+    expect(readingSessionService.save).toHaveBeenNthCalledWith(
+      1,
+      100,
+      expect.objectContaining({ sessionId: 'leave-one', progressDelta: 2 }),
+      user,
+      'kobo',
+    );
+    expect(readingSessionService.save).toHaveBeenNthCalledWith(
+      2,
+      100,
+      expect.objectContaining({ sessionId: 'leave-two', progressDelta: 5 }),
+      user,
+      'kobo',
+    );
   });
 
   it('falls back to null progressDelta when the paired open progress is invalid', async () => {
@@ -222,6 +239,7 @@ describe('KoboAnalyticsService', () => {
       100,
       expect.objectContaining({ sessionId: 'leave-after-bad-progress', progressDelta: null, endProgress: 20 }),
       user,
+      'kobo',
     );
   });
 
@@ -250,6 +268,7 @@ describe('KoboAnalyticsService', () => {
         durationSeconds: 20,
       }),
       user,
+      'kobo',
     );
   });
 
@@ -277,8 +296,8 @@ describe('KoboAnalyticsService', () => {
       device,
     );
 
-    expect(readingSessionService.save).toHaveBeenNthCalledWith(1, 100, expect.objectContaining({ endProgress: null }), user);
-    expect(readingSessionService.save).toHaveBeenNthCalledWith(2, 100, expect.objectContaining({ endProgress: null }), user);
+    expect(readingSessionService.save).toHaveBeenNthCalledWith(1, 100, expect.objectContaining({ endProgress: null }), user, 'kobo');
+    expect(readingSessionService.save).toHaveBeenNthCalledWith(2, 100, expect.objectContaining({ endProgress: null }), user, 'kobo');
   });
 
   it('still processes later events when an earlier save throws', async () => {
@@ -358,7 +377,7 @@ describe('KoboAnalyticsService', () => {
 
     expect(bookIdentityService.resolveBookIdByEntitlementId).toHaveBeenCalledWith(7, entitlementId);
     expect(resolver.resolveBookFileId).toHaveBeenCalledWith(7, 9);
-    expect(readingSessionService.save).toHaveBeenCalledWith(100, expect.objectContaining({ sessionId: 'uuid-volume', endProgress: 8 }), user);
+    expect(readingSessionService.save).toHaveBeenCalledWith(100, expect.objectContaining({ sessionId: 'uuid-volume', endProgress: 8 }), user, 'kobo');
   });
 
   it('skips LeaveContent without volumeid or SecondsRead', async () => {

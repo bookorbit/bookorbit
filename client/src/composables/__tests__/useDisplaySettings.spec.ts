@@ -18,6 +18,7 @@ function resetDisplaySettings() {
   settings.tableZebraStriping.value = false
   settings.tableDensity.value = 'comfortable'
   settings.bookSpineOverlay.value = 'off'
+  settings.showSpineOnComics.value = false
   settings.bookShadowStrength.value = 'default'
   settings.bookCoverDisplayMode.value = 'blurred-fit'
   settings.seriesCardCoverMode.value = 'stack'
@@ -165,6 +166,27 @@ describe('useDisplaySettings preferences helpers', () => {
     applyDisplayPreferences({ gridCardPrimaryLabel: 'series-title', gridCardSecondaryLabel: 'author' })
     expect(settings.gridCardPrimaryLabel.value).toBe('series-title')
     expect(settings.gridCardSecondaryLabel.value).toBe('author')
+  })
+
+  it('includes showSpineOnComics in snapshot', () => {
+    settings.showSpineOnComics.value = true
+    expect(getDisplayPreferencesSnapshot().showSpineOnComics).toBe(true)
+  })
+
+  it('defaults showSpineOnComics to false', () => {
+    resetDisplaySettings()
+    expect(settings.showSpineOnComics.value).toBe(false)
+  })
+
+  it('sanitizes boolean showSpineOnComics and drops non-boolean values', () => {
+    expect(sanitizeDisplayPreferences({ showSpineOnComics: true })).toEqual({ showSpineOnComics: true })
+    expect(sanitizeDisplayPreferences({ showSpineOnComics: false })).toEqual({ showSpineOnComics: false })
+    expect(sanitizeDisplayPreferences({ showSpineOnComics: 'yes' })).toEqual({})
+  })
+
+  it('applies showSpineOnComics from preferences', () => {
+    applyDisplayPreferences({ showSpineOnComics: true })
+    expect(settings.showSpineOnComics.value).toBe(true)
   })
 
   it('includes thumbnailClickAction in snapshot', () => {

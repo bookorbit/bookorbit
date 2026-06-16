@@ -146,6 +146,7 @@ const authorCoverShape = ref<AuthorCoverShape>(normalizeAuthorCoverShape(storage
 const tableZebraStriping = ref(storage.get<boolean>('tableZebraStriping', false) === true)
 const tableDensity = ref<TableDensity>(normalizeTableDensity(storage.get('tableDensity', 'comfortable')))
 const bookSpineOverlay = ref<BookSpineOverlay>(normalizeBookSpineOverlay(storage.get('bookSpineOverlay', DEFAULT_BOOK_SPINE_OVERLAY)))
+const showSpineOnComics = ref(storage.get<boolean>('showSpineOnComics', false) === true)
 const bookShadowStrength = ref<BookShadowStrength>(normalizeBookShadowStrength(storage.get('bookShadowStrength', DEFAULT_BOOK_SHADOW_STRENGTH)))
 const bookCoverDisplayMode = ref<BookCoverDisplayMode>(
   normalizeBookCoverDisplayMode(storage.get('bookCoverDisplayMode', DEFAULT_BOOK_COVER_DISPLAY_MODE)),
@@ -172,6 +173,7 @@ watch(authorCoverShape, (v) => storage.set('authorCoverShape', normalizeAuthorCo
 watch(tableZebraStriping, (v) => storage.set('tableZebraStriping', v))
 watch(tableDensity, (v) => storage.set('tableDensity', normalizeTableDensity(v)))
 watch(bookSpineOverlay, (value) => storage.set('bookSpineOverlay', normalizeBookSpineOverlay(value)))
+watch(showSpineOnComics, (v) => storage.set('showSpineOnComics', v))
 watch(bookShadowStrength, (value) => storage.set('bookShadowStrength', normalizeBookShadowStrength(value)))
 watch(bookCoverDisplayMode, (value) => storage.set('bookCoverDisplayMode', normalizeBookCoverDisplayMode(value)))
 watch(seriesCardCoverMode, (value) => storage.set('seriesCardCoverMode', normalizeSeriesCardCoverMode(value)))
@@ -196,6 +198,7 @@ export function getDisplayPreferencesSnapshot(): DisplayPreferences {
     tableZebraStriping: tableZebraStriping.value === true,
     tableDensity: normalizeTableDensity(tableDensity.value),
     bookSpineOverlay: normalizeBookSpineOverlay(bookSpineOverlay.value),
+    showSpineOnComics: showSpineOnComics.value === true,
     bookShadowStrength: normalizeBookShadowStrength(bookShadowStrength.value),
     bookCoverDisplayMode: normalizeBookCoverDisplayMode(bookCoverDisplayMode.value),
     seriesCardCoverMode: normalizeSeriesCardCoverMode(seriesCardCoverMode.value),
@@ -227,6 +230,7 @@ export function sanitizeDisplayPreferences(raw: unknown): Partial<DisplayPrefere
   if (typeof obj.tableZebraStriping === 'boolean') out.tableZebraStriping = obj.tableZebraStriping
   if (TABLE_DENSITIES.includes(obj.tableDensity as TableDensity)) out.tableDensity = obj.tableDensity as TableDensity
   if (BOOK_SPINE_OVERLAYS.includes(obj.bookSpineOverlay as BookSpineOverlay)) out.bookSpineOverlay = obj.bookSpineOverlay as BookSpineOverlay
+  if (typeof obj.showSpineOnComics === 'boolean') out.showSpineOnComics = obj.showSpineOnComics
   if (BOOK_SHADOW_STRENGTHS.includes(obj.bookShadowStrength as BookShadowStrength))
     out.bookShadowStrength = obj.bookShadowStrength as BookShadowStrength
   if (BOOK_COVER_DISPLAY_MODES.includes(obj.bookCoverDisplayMode as BookCoverDisplayMode)) {
@@ -267,6 +271,7 @@ export function applyDisplayPreferences(raw: unknown): void {
   if (prefs.tableZebraStriping !== undefined) tableZebraStriping.value = prefs.tableZebraStriping
   if (prefs.tableDensity !== undefined) tableDensity.value = prefs.tableDensity
   if (prefs.bookSpineOverlay !== undefined) bookSpineOverlay.value = prefs.bookSpineOverlay
+  if (prefs.showSpineOnComics !== undefined) showSpineOnComics.value = prefs.showSpineOnComics
   if (prefs.bookShadowStrength !== undefined) bookShadowStrength.value = prefs.bookShadowStrength
   if (prefs.bookCoverDisplayMode !== undefined) bookCoverDisplayMode.value = prefs.bookCoverDisplayMode
   if (prefs.seriesCardCoverMode !== undefined) seriesCardCoverMode.value = prefs.seriesCardCoverMode
@@ -292,6 +297,7 @@ export function useDisplaySettings() {
     tableZebraStriping,
     tableDensity,
     bookSpineOverlay,
+    showSpineOnComics,
     bookShadowStrength,
     bookCoverDisplayMode,
     seriesCardCoverMode,

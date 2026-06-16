@@ -54,9 +54,10 @@ export interface BookRatingChangedPayload {
 export interface BookProgressChangedPayload {
   userId: number;
   bookId: number;
-  bookFileId: number;
+  // Optional: Kobo syncs progress at the book level and has no single relevant file id.
+  bookFileId?: number;
   progress: number;
-  source: 'koreader' | 'web_reader';
+  source: 'koreader' | 'kobo' | 'web_reader';
 }
 
 export type AchievementEventPayload =

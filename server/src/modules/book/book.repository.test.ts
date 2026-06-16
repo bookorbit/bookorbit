@@ -303,8 +303,8 @@ describe('BookRepository', () => {
     const result = await repo.findRecommendationTitlesByBookIds([10, 11]);
 
     expect(result).toEqual([
-      { id: 10, title: 'Dune', hasCover: true, authors: ['Frank Herbert'], isAudiobook: true },
-      { id: 11, title: 'Foundation', hasCover: false, authors: ['Isaac Asimov', 'Robert Heinlein'], isAudiobook: false },
+      { id: 10, title: 'Dune', hasCover: true, authors: ['Frank Herbert'], isAudiobook: true, isComic: false },
+      { id: 11, title: 'Foundation', hasCover: false, authors: ['Isaac Asimov', 'Robert Heinlein'], isAudiobook: false, isComic: false },
     ]);
   });
 
@@ -317,7 +317,7 @@ describe('BookRepository', () => {
 
     const result = await repo.findRecommendationTitlesByBookIds([5]);
 
-    expect(result).toEqual([{ id: 5, title: 'No Cover', hasCover: false, authors: [], isAudiobook: false }]);
+    expect(result).toEqual([{ id: 5, title: 'No Cover', hasCover: false, authors: [], isAudiobook: false, isComic: false }]);
   });
 
   it('treats primary format checks as case-insensitive in recommendation rows', async () => {
@@ -329,7 +329,19 @@ describe('BookRepository', () => {
 
     const result = await repo.findRecommendationTitlesByBookIds([6]);
 
-    expect(result).toEqual([{ id: 6, title: 'Audio Case', hasCover: true, authors: [], isAudiobook: true }]);
+    expect(result).toEqual([{ id: 6, title: 'Audio Case', hasCover: true, authors: [], isAudiobook: true, isComic: false }]);
+  });
+
+  it('flags comic primary formats as isComic in recommendation rows', async () => {
+    const bookRows = [{ id: 8, title: 'Comic Case', coverSource: 'custom', primaryFormat: 'CBR' }];
+    const db = {
+      select: vi.fn().mockReturnValueOnce(makeSelectChain('where', bookRows)).mockReturnValueOnce(makeSelectChain('where', [])),
+    };
+    const repo = new BookRepository(db as never);
+
+    const result = await repo.findRecommendationTitlesByBookIds([8]);
+
+    expect(result).toEqual([{ id: 8, title: 'Comic Case', hasCover: true, authors: [], isAudiobook: false, isComic: true }]);
   });
 
   it('maps id-list helper rows and primary-file lookups', async () => {
@@ -360,7 +372,7 @@ describe('BookRepository', () => {
 
     await expect(repo.findLibraryIdsByBookIds([1])).resolves.toEqual(libraryRows);
     await expect(repo.findRecommendationTitlesByBookIds([1])).resolves.toEqual([
-      { id: 1, title: 'Dune', hasCover: true, authors: ['Frank Herbert'], isAudiobook: true },
+      { id: 1, title: 'Dune', hasCover: true, authors: ['Frank Herbert'], isAudiobook: true, isComic: false },
     ]);
     await expect(repo.findPrimaryFilesByBookIds([1])).resolves.toEqual(primaryFilesByIds);
     await expect(repo.findAllFilesByBookIds([1])).resolves.toEqual(allFilesByIds);

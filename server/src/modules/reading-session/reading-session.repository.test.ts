@@ -108,6 +108,7 @@ describe('ReadingSessionRepository', () => {
       60,
       null,
       42.5,
+      'kobo',
     );
 
     expect(result).toEqual({ kind: 'saved' });
@@ -119,6 +120,7 @@ describe('ReadingSessionRepository', () => {
         durationSeconds: 60,
         progressDelta: null,
         endProgress: 42.5,
+        source: 'kobo',
       }),
     );
     expect(sessionConflict).toHaveBeenCalledWith({ target: [readingSessions.userId, readingSessions.sessionId] });

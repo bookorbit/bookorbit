@@ -63,6 +63,24 @@ function getRuleSql(where: Record<string, unknown>): Record<string, unknown> {
   return outer.clauses[1].clauses[0] as Record<string, unknown>;
 }
 
+/**
+ * Recursively gathers the static SQL text fragments from a (possibly deeply nested)
+ * mocked clause tree so tests can assert on keywords composed across nested sql`` templates.
+ */
+function collectSqlText(node: unknown, acc: string[] = []): string[] {
+  if (!node || typeof node !== 'object') return acc;
+  const n = node as Record<string, unknown>;
+  if (n.type === 'sql' && typeof n.text === 'string') acc.push(n.text);
+  for (const key of ['values', 'clauses'] as const) {
+    const arr = n[key];
+    if (Array.isArray(arr)) arr.forEach((child) => collectSqlText(child, acc));
+  }
+  for (const key of ['value', 'left', 'right'] as const) {
+    if (n[key]) collectSqlText(n[key], acc);
+  }
+  return acc;
+}
+
 const BASE_CTX = { accessibleLibraryIds: [1] as number[] };
 const USER_CTX = { accessibleLibraryIds: [1] as number[], userId: 10 };
 
@@ -86,6 +104,9 @@ function buildValueFor(operator: RuleOperator, field: RuleField): { value?: unkn
     case 'isUnread':
     case 'isInProgress':
     case 'isFinished':
+    case 'isLocked':
+    case 'isUnlocked':
+    case 'isUpNext':
       return {};
     case 'contains':
     case 'notContains':
@@ -1137,6 +1158,65 @@ describe('coverRuleToSql', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'cover', operator: 'isPresent' }) as never, BASE_CTX) as any;
     expect(getRuleSql(where)).toMatchObject({ type: 'isNotNull' });
+  });
+});
+
+describe('lockStatusRuleToSql', () => {
+  it('isLocked produces cardinality(lockedFields) > 0', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'lockStatus', operator: 'isLocked' }) as never, BASE_CTX) as any;
+    const clause = getRuleSql(where);
+    expect(clause).toMatchObject({ type: 'sql' });
+    expect(clause.text).toContain('cardinality');
+    expect(clause.text).toContain('> 0');
+  });
+
+  it('isUnlocked produces cardinality(lockedFields) = 0', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'lockStatus', operator: 'isUnlocked' }) as never, BASE_CTX) as any;
+    const clause = getRuleSql(where);
+    expect(clause).toMatchObject({ type: 'sql' });
+    expect(clause.text).toContain('cardinality');
+    expect(clause.text).toContain('= 0');
+  });
+
+  it('rejects an invalid operator for lockStatus', () => {
+    const { builder } = makeBuilder();
+    expect(() => builder.buildWhere(wrapRule({ type: 'rule', field: 'lockStatus', operator: 'isPresent' }) as never, BASE_CTX)).toThrow(
+      BadRequestException,
+    );
+  });
+});
+
+describe('seriesStatusRuleToSql', () => {
+  it('isUpNext builds set membership against the shelf window-function pipeline', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'seriesStatus', operator: 'isUpNext' }) as never, USER_CTX) as any;
+    const clause = getRuleSql(where);
+    expect(clause).toMatchObject({ type: 'sql' });
+
+    const text = collectSqlText(clause).join(' ').toLowerCase();
+    expect(text).toContain(' in (');
+    expect(text).toContain('distinct on');
+    expect(text).toContain('lag(');
+    expect(text).toContain('partition by');
+    expect(text).toContain('previous_is_completed');
+    expect(text).toContain("'read'");
+    expect(text).toContain("'skimmed'");
+  });
+
+  it('requires an authenticated user', () => {
+    const { builder } = makeBuilder();
+    expect(() => builder.buildWhere(wrapRule({ type: 'rule', field: 'seriesStatus', operator: 'isUpNext' }) as never, BASE_CTX)).toThrow(
+      'Series status filter requires an authenticated user',
+    );
+  });
+
+  it('rejects an invalid operator for seriesStatus', () => {
+    const { builder } = makeBuilder();
+    expect(() => builder.buildWhere(wrapRule({ type: 'rule', field: 'seriesStatus', operator: 'isFinished' }) as never, USER_CTX)).toThrow(
+      BadRequestException,
+    );
   });
 });
 

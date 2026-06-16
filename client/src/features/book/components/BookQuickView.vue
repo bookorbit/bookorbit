@@ -186,6 +186,7 @@ const quickViewCoverAspectRatio = computed(() => {
 
 const primaryFile = computed(() => detail.value?.files.find((f) => f.role === 'primary') ?? detail.value?.files[0] ?? null)
 const isPrimaryAudio = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
+const isPrimaryComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'cbx')
 const knownFormats = computed(() => [
   ...new Set((detail.value?.files ?? []).filter((f) => f.format && FORMAT_TO_GROUP[f.format]).map((f) => f.format!)),
 ])
@@ -292,6 +293,7 @@ function handleDelete() {
                 size="mini"
                 class="book-cover-surface--spine-fitted w-24 shrink-0 rounded overflow-hidden relative"
                 :disable-spine="isPrimaryAudio"
+                :is-comic="isPrimaryComic"
                 :class="detail.coverSource && !coverFailed ? 'cursor-zoom-in' : ''"
                 :style="{ aspectRatio: quickViewCoverAspectRatio }"
                 @click="handleCoverClick"
@@ -307,6 +309,7 @@ function handleDelete() {
                   :frame-aspect-ratio="quickViewCoverAspectRatio"
                   loading="eager"
                   :spine="!isPrimaryAudio"
+                  :is-comic="isPrimaryComic"
                   @load="handleCoverLoad"
                   @error="handleCoverError"
                 />

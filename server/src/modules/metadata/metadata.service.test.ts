@@ -950,6 +950,27 @@ describe('MetadataService', () => {
     expect(updateSet).toHaveBeenCalledWith({ durationSeconds: 4321 });
   });
 
+  it('extractAndAggregateAudioDuration writes the per-file duration before re-aggregating the total', async () => {
+    const { db } = makeDb();
+    const service = makeService(db);
+
+    const callOrder: string[] = [];
+    const extractSpy = vi.spyOn(service, 'extractAudioFileDuration').mockImplementation(() => {
+      callOrder.push('extract');
+      return Promise.resolve();
+    });
+    const aggregateSpy = vi.spyOn(service, 'aggregateAudioDuration').mockImplementation(() => {
+      callOrder.push('aggregate');
+      return Promise.resolve();
+    });
+
+    await service.extractAndAggregateAudioDuration(55, '/tmp/book.m4b');
+
+    expect(extractSpy).toHaveBeenCalledWith(55, '/tmp/book.m4b');
+    expect(aggregateSpy).toHaveBeenCalledWith(55);
+    expect(callOrder).toEqual(['extract', 'aggregate']);
+  });
+
   it('replaceNarrators and upsertComicMetadata delegate to collaborators', async () => {
     const { db } = makeDb();
     const narratorService = {

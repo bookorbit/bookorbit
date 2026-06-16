@@ -95,7 +95,7 @@ describe('AchievementService', () => {
 
       const result = await service.getCatalogue({ id: 1, isSuperuser: false } as never);
 
-      expect(result.categories).toHaveLength(4);
+      expect(result.categories).toHaveLength(5);
       expect(result.totalAvailable).toBe(1);
       expect(result.totalEarned).toBe(0);
       const readingCategory = result.categories.find((c) => c.key === 'reading');
@@ -578,7 +578,7 @@ describe('AchievementService', () => {
       await service.onModuleInit();
       const removeListenerSpy = vi.spyOn(events, 'removeListener');
       service.onModuleDestroy();
-      expect(removeListenerSpy).toHaveBeenCalledTimes(5);
+      expect(removeListenerSpy).toHaveBeenCalledTimes(7);
     });
   });
 });

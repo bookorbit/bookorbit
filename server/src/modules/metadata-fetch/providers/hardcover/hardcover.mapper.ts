@@ -25,6 +25,19 @@ function pickIsbn(isbns: string[] | undefined): { isbn10?: string; isbn13?: stri
   };
 }
 
+// Hardcover reading_format_id: 1 = physical, 2 = audiobook, 4 = ebook.
+const AUDIOBOOK_READING_FORMAT_ID = 2;
+
+function isAudiobookEdition(edition: HardcoverEdition): boolean {
+  return edition.reading_format_id === AUDIOBOOK_READING_FORMAT_ID || (edition.audio_seconds ?? 0) > 0;
+}
+
+// Lower rank sorts first: physical/ebook before audiobooks, and editions with a
+// real page count before those without.
+function editionRank(edition: HardcoverEdition): number {
+  return (isAudiobookEdition(edition) ? 2 : 0) + (edition.pages == null ? 1 : 0);
+}
+
 export function mapSearchDocument(doc: HardcoverSearchDocument): MetadataCandidate {
   const { isbn10, isbn13 } = pickIsbn(doc.isbns);
 
@@ -49,7 +62,7 @@ export function mapSearchDocument(doc: HardcoverSearchDocument): MetadataCandida
 
 export function mapBookWithEditions(book: HardcoverBookWithEditions): MetadataCandidate[] {
   if (!book.editions || book.editions.length === 0) return [];
-  return book.editions.map((edition) => mapEdition(edition, book));
+  return [...book.editions].sort((a, b) => editionRank(a) - editionRank(b)).map((edition) => mapEdition(edition, book));
 }
 
 function mapEdition(edition: HardcoverEdition, book: HardcoverBookWithEditions): MetadataCandidate {
@@ -65,7 +78,7 @@ function mapEdition(edition: HardcoverEdition, book: HardcoverBookWithEditions):
     authors,
     publisher: edition.publisher?.name,
     language: edition.language?.code2,
-    pageCount: edition.pages ?? book.pages,
+    pageCount: isAudiobookEdition(edition) ? undefined : (edition.pages ?? book.pages),
     publishedYear: parseYear(edition.release_year ?? book.release_year, edition.release_date ?? book.release_date),
     isbn10: edition.isbn_10,
     isbn13: edition.isbn_13,

@@ -9,7 +9,7 @@ import {
   type CardOverlayKey,
 } from '@/composables/useDisplaySettings'
 
-const { cardOverlays, bookSpineOverlay, bookShadowStrength, bookCoverDisplayMode } = useDisplaySettings()
+const { cardOverlays, bookSpineOverlay, showSpineOnComics, bookShadowStrength, bookCoverDisplayMode } = useDisplaySettings()
 
 const OVERLAY_OPTIONS: { key: CardOverlayKey; label: string; hint: string }[] = [
   { key: 'progress-bar', label: 'Progress bar', hint: 'Thin colored line along the bottom edge' },
@@ -106,6 +106,15 @@ function setBookCoverDisplayMode(mode: BookCoverDisplayMode) {
             <p class="mt-0.5 text-[11px] leading-snug opacity-80">{{ opt.hint }}</p>
           </button>
         </div>
+      </div>
+      <div class="flex items-center justify-between gap-3 px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="min-w-0">
+          <p class="settings-label">Show spine on comics</p>
+          <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:whitespace-normal md:overflow-visible">
+            Apply the spine and gloss effect to comic covers (cbz, cbr, cb7)
+          </p>
+        </div>
+        <ToggleSwitch v-model="showSpineOnComics" />
       </div>
       <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
         <div>

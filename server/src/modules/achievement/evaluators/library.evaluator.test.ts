@@ -17,6 +17,9 @@ function makeRepo(overrides: Record<string, unknown> = {}) {
     countAnnotationsWithNotes: vi.fn().mockResolvedValue(0),
     countAnnotationsOnDay: vi.fn().mockResolvedValue(0),
     hasAnyDayWithAnnotationCount: vi.fn().mockResolvedValue(false),
+    getAnnotationNoteLength: vi.fn().mockResolvedValue(null),
+    getMaxNoteLength: vi.fn().mockResolvedValue(0),
+    countDistinctColors: vi.fn().mockResolvedValue(0),
     ...overrides,
   };
 }
@@ -225,6 +228,73 @@ describe('LibraryEvaluator', () => {
         new Set(),
       );
       expect(awards.find((a) => a.key === 'deep_dive_session')).toBeUndefined();
+    });
+  });
+
+  describe('wordsmith', () => {
+    it('awards wordsmith for a note longer than 280 chars', async () => {
+      repo.getAnnotationNoteLength.mockResolvedValue(300);
+      const awards = await evaluator.evaluate(
+        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_ANNOTATION_CREATED, payload: { userId: 1, bookId: 1, annotationId: 9 } },
+        new Set(),
+      );
+      expect(awards).toContainEqual(expect.objectContaining({ key: 'wordsmith' }));
+    });
+
+    it('does not award wordsmith for a note of exactly 280 chars', async () => {
+      repo.getAnnotationNoteLength.mockResolvedValue(280);
+      const awards = await evaluator.evaluate(
+        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_ANNOTATION_CREATED, payload: { userId: 1, bookId: 1, annotationId: 9 } },
+        new Set(),
+      );
+      expect(awards.find((a) => a.key === 'wordsmith')).toBeUndefined();
+    });
+
+    it('does not award wordsmith when the annotation has no note', async () => {
+      repo.getAnnotationNoteLength.mockResolvedValue(null);
+      const awards = await evaluator.evaluate(
+        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_ANNOTATION_CREATED, payload: { userId: 1, bookId: 1, annotationId: 9 } },
+        new Set(),
+      );
+      expect(awards.find((a) => a.key === 'wordsmith')).toBeUndefined();
+    });
+
+    it('awards wordsmith via backfill', async () => {
+      repo.getMaxNoteLength.mockResolvedValue(500);
+      const awards = await evaluator.evaluate(
+        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
+        new Set(),
+      );
+      expect(awards).toContainEqual(expect.objectContaining({ key: 'wordsmith' }));
+    });
+  });
+
+  describe('box_of_crayons', () => {
+    it('awards box_of_crayons when all 5 colors are used', async () => {
+      repo.countDistinctColors.mockResolvedValue(5);
+      const awards = await evaluator.evaluate(
+        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_ANNOTATION_CREATED, payload: { userId: 1, bookId: 1, annotationId: 9 } },
+        new Set(),
+      );
+      expect(awards).toContainEqual(expect.objectContaining({ key: 'box_of_crayons' }));
+    });
+
+    it('does not award box_of_crayons with only 4 colors', async () => {
+      repo.countDistinctColors.mockResolvedValue(4);
+      const awards = await evaluator.evaluate(
+        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_ANNOTATION_CREATED, payload: { userId: 1, bookId: 1, annotationId: 9 } },
+        new Set(),
+      );
+      expect(awards.find((a) => a.key === 'box_of_crayons')).toBeUndefined();
+    });
+
+    it('awards box_of_crayons via backfill', async () => {
+      repo.countDistinctColors.mockResolvedValue(5);
+      const awards = await evaluator.evaluate(
+        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
+        new Set(),
+      );
+      expect(awards).toContainEqual(expect.objectContaining({ key: 'box_of_crayons' }));
     });
   });
 });

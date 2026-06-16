@@ -9,6 +9,7 @@ import { buildContentFilterClauses } from '../../common/utils/content-filter-sql
 import * as schema from '../../db/schema';
 import { BookSortBuilder } from './book-sort-builder.service';
 import {
+  audiobookProgress,
   authors,
   bookAuthors,
   bookFiles,
@@ -167,6 +168,10 @@ export class BookQueryBuilder {
         return this.numericRuleToSql(bookMetadata.metadataScore, operator, value as number, valueTo as number | undefined);
       case 'cover':
         return this.coverRuleToSql(operator);
+      case 'lockStatus':
+        return this.lockStatusRuleToSql(operator);
+      case 'seriesStatus':
+        return this.seriesStatusRuleToSql(operator, userId);
       default:
         throw new BadRequestException(`Unknown filter field: ${String(field)}`);
     }
@@ -487,6 +492,88 @@ export class BookQueryBuilder {
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for cover field`);
     }
+  }
+
+  private lockStatusRuleToSql(operator: string): SQL {
+    switch (operator) {
+      case 'isLocked':
+        return sql`coalesce(cardinality(${bookMetadata.lockedFields}), 0) > 0`;
+      case 'isUnlocked':
+        return sql`coalesce(cardinality(${bookMetadata.lockedFields}), 0) = 0`;
+      default:
+        throw new BadRequestException(`Invalid operator '${operator}' for lockStatus field`);
+    }
+  }
+
+  private seriesStatusRuleToSql(operator: string, userId?: number): SQL {
+    if (userId === undefined) throw new BadRequestException('Series status filter requires an authenticated user');
+    switch (operator) {
+      case 'isUpNext':
+        return this.upNextInSeriesSql(userId);
+      default:
+        throw new BadRequestException(`Invalid operator '${operator}' for seriesStatus field`);
+    }
+  }
+
+  /**
+   * Set membership against the same window-function pipeline as the "Up Next in Series" shelf
+   * (DashboardRepository.findUpNextInSeriesBookIds): per (library, series), the next unstarted book
+   * whose immediately preceding entry is finished. Implemented as a subquery (not a per-row predicate)
+   * so results match the shelf exactly. Keep the merged-progress / completion definitions in sync with
+   * that repository. Library scoping is omitted here because the window partitions by library already;
+   * the surrounding query restricts to the user's accessible libraries.
+   */
+  private upNextInSeriesSql(userId: number): SQL {
+    const mergedProgress = sql`coalesce(
+      case
+        when rp.updated_at is null then ab.percentage
+        when ab.updated_at is null then rp.percentage
+        when rp.updated_at >= ab.updated_at then rp.percentage
+        else ab.percentage
+      end,
+      rp.percentage,
+      ab.percentage,
+      0
+    )`;
+    const isCompleted = sql`(ubs.status in ('read', 'skimmed') or ${mergedProgress} >= 100)`;
+    return sql`${books.id} in (
+      with scoped as (
+        select
+          b.id as id,
+          b.library_id as library_id,
+          m.series_id as series_id,
+          m.series_index as series_index,
+          b.added_at as added_at,
+          ${mergedProgress} as current_progress,
+          case when ${isCompleted} then true else false end as is_completed
+        from ${books} b
+        inner join ${bookMetadata} m on m.book_id = b.id
+        left join ${bookFiles} bf on bf.id = b.primary_file_id
+        left join ${readingProgress} rp on rp.book_file_id = bf.id and rp.user_id = ${userId}
+        left join ${audiobookProgress} ab on ab.book_id = b.id and ab.user_id = ${userId}
+        left join ${userBookStatus} ubs on ubs.book_id = b.id and ubs.user_id = ${userId}
+        where b.status = 'present' and m.series_id is not null and m.series_index is not null
+      ),
+      ordered as (
+        select
+          s.id,
+          s.library_id,
+          s.series_id,
+          s.series_index,
+          s.added_at,
+          s.is_completed,
+          s.current_progress,
+          lag(s.is_completed) over (
+            partition by s.library_id, s.series_id
+            order by s.series_index asc, s.added_at asc, s.id asc
+          ) as previous_is_completed
+        from scoped s
+      )
+      select distinct on (o.library_id, o.series_id) o.id
+      from ordered o
+      where o.previous_is_completed = true and o.is_completed = false and o.current_progress = 0
+      order by o.library_id, o.series_id, o.series_index asc, o.added_at asc, o.id asc
+    )`;
   }
 
   private readProgressRuleToSql(operator: string, userId?: number): SQL {

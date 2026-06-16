@@ -36,6 +36,10 @@ export class MilestonesEvaluator implements IAchievementEvaluator {
       const payload = ctx.payload as unknown as BookStatusChangedPayload;
       if (payload.newStatus === 'read') {
         await this.evaluateFirstSeries(ctx.userId, payload.bookId, earnedKeys, awards);
+        this.evaluateOldFriend(payload, earnedKeys, awards);
+      }
+      if (payload.newStatus === 'abandoned') {
+        this.evaluateDnfSelfAware(payload, earnedKeys, awards);
       }
     }
 
@@ -56,6 +60,7 @@ export class MilestonesEvaluator implements IAchievementEvaluator {
       await this.evaluateBookmarkedBackfill(ctx.userId, earnedKeys, awards);
       await this.evaluateNewYearReaderBackfill(ctx.userId, earnedKeys, awards);
       await this.evaluateFirstSeriesBackfill(ctx.userId, earnedKeys, awards);
+      await this.evaluateDnfSelfAwareBackfill(ctx.userId, earnedKeys, awards);
       await this.evaluateCategorySweeper(ctx.userId, earnedKeys, awards);
     }
 
@@ -113,6 +118,28 @@ export class MilestonesEvaluator implements IAchievementEvaluator {
     const hasSeriesBook = await this.repo.hasFinishedBookInSeries(userId);
     if (hasSeriesBook) {
       awards.push({ key: 'first_series', context: {} });
+    }
+  }
+
+  // Awarded when a book that was being re-read is finished again. Re-read history is not stored,
+  // so this is live-only (no backfill branch) and only accrues going forward.
+  private evaluateOldFriend(payload: BookStatusChangedPayload, earnedKeys: Set<string>, awards: AchievementAward[]): void {
+    if (earnedKeys.has('old_friend')) return;
+    if (payload.previousStatus === 'rereading') {
+      awards.push({ key: 'old_friend', context: { bookId: payload.bookId } });
+    }
+  }
+
+  private evaluateDnfSelfAware(payload: BookStatusChangedPayload, earnedKeys: Set<string>, awards: AchievementAward[]): void {
+    if (earnedKeys.has('dnf_self_aware')) return;
+    awards.push({ key: 'dnf_self_aware', context: { bookId: payload.bookId } });
+  }
+
+  private async evaluateDnfSelfAwareBackfill(userId: number, earnedKeys: Set<string>, awards: AchievementAward[]): Promise<void> {
+    if (earnedKeys.has('dnf_self_aware')) return;
+    const hasAbandoned = await this.repo.hasAbandonedBook(userId);
+    if (hasAbandoned) {
+      awards.push({ key: 'dnf_self_aware', context: null });
     }
   }
 }

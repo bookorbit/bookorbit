@@ -21,7 +21,7 @@ export const achievements = pgTable(
   (t) => [
     index('achievements_category_sort_idx').on(t.category, t.sortOrder),
     index('achievements_group_key_idx').on(t.groupKey),
-    check('achievements_category_chk', sql`${t.category} in ('reading', 'library', 'exploration', 'dedication')`),
+    check('achievements_category_chk', sql`${t.category} in ('reading', 'library', 'exploration', 'dedication', 'devices')`),
     check('achievements_rarity_chk', sql`${t.rarity} in ('common', 'rare', 'epic', 'legendary')`),
     check('achievements_tier_chk', sql`${t.tier} is null or (${t.tier} >= 1 and ${t.tier} <= 4)`),
   ],

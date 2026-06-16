@@ -74,6 +74,7 @@ const lockStateClass = computed(() => {
 
 const primaryFile = computed(() => props.book.files.find((file) => file.role === 'primary') ?? props.book.files[0] ?? null)
 const isAudiobook = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
+const isComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'cbx')
 </script>
 
 <template>
@@ -95,6 +96,7 @@ const isAudiobook = computed(() => primaryFile.value?.format != null && FORMAT_T
     :title="book.title"
     :has-cover="book.hasCover"
     :is-audio="isAudiobook"
+    :is-comic="isComic"
     @cover-click="emit('coverClick')"
   />
 

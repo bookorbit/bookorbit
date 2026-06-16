@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import type { BookCard } from '@bookorbit/types'
+import type { CellType, ColumnId } from '@/features/book/composables/tableColumnSchema'
 import BookTableCellDispatcher from '../BookTableCellDispatcher.vue'
 
 function makeBook(overrides: Partial<BookCard> = {}): BookCard {
@@ -36,8 +37,8 @@ function makeBook(overrides: Partial<BookCard> = {}): BookCard {
 
 const baseProps = {
   book: makeBook(),
-  colId: 'lockRow' as const,
-  cellType: 'lockRow' as const,
+  colId: 'lockRow' as ColumnId,
+  cellType: 'lockRow' as CellType,
   hasLockField: false,
   isLocked: false,
   isActive: false,
@@ -49,6 +50,12 @@ const baseProps = {
   value: null,
 }
 
+const CoverCellStub = {
+  name: 'BookTableCoverCell',
+  props: ['isComic', 'isAudio'],
+  template: '<div data-testid="cover-cell" :data-comic="isComic" />',
+}
+
 function mountDispatcher(overrides: Partial<typeof baseProps> = {}) {
   return mount(BookTableCellDispatcher, {
     props: { ...baseProps, ...overrides },
@@ -56,6 +63,7 @@ function mountDispatcher(overrides: Partial<typeof baseProps> = {}) {
       stubs: {
         Lock: { template: '<svg data-test="lock-icon" />' },
         LockOpen: { template: '<svg data-test="lock-open-icon" />' },
+        BookTableCoverCell: CoverCellStub,
       },
     },
   })
@@ -84,6 +92,20 @@ describe('BookTableCellDispatcher lock row', () => {
     await button.trigger('click')
     expect(wrapper.emitted('lockAll')).toBeTruthy()
     expect(wrapper.emitted('unlockAll')).toBeFalsy()
+  })
+
+  it('passes the comic flag to the cover cell for comic primary files', () => {
+    const book = makeBook({ files: [{ id: 1, format: 'cbz', role: 'primary', sizeBytes: null }] })
+    const wrapper = mountDispatcher({ book, colId: 'cover' as const, cellType: 'cover' as const })
+
+    expect(wrapper.find('[data-testid="cover-cell"]').attributes('data-comic')).toBe('true')
+  })
+
+  it('does not flag non-comic primary files as comics in the cover cell', () => {
+    const book = makeBook({ files: [{ id: 1, format: 'epub', role: 'primary', sizeBytes: null }] })
+    const wrapper = mountDispatcher({ book, colId: 'cover' as const, cellType: 'cover' as const })
+
+    expect(wrapper.find('[data-testid="cover-cell"]').attributes('data-comic')).toBe('false')
   })
 
   it('renders fully locked state and emits unlock-all', async () => {

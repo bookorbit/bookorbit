@@ -22,7 +22,18 @@ const emit = defineEmits<{
 const MAX_DEPTH = 5
 const NUMERIC_FIELDS: RuleField[] = ['seriesIndex', 'publishedYear', 'pageCount', 'rating', 'metadataScore']
 const DATE_FIELDS: RuleField[] = ['addedAt', 'startedAt', 'finishedAt']
-const NO_VALUE_OPERATORS: RuleOperator[] = ['isEmpty', 'isNotEmpty', 'isMissing', 'isPresent', 'isUnread', 'isInProgress', 'isFinished']
+const NO_VALUE_OPERATORS: RuleOperator[] = [
+  'isEmpty',
+  'isNotEmpty',
+  'isMissing',
+  'isPresent',
+  'isUnread',
+  'isInProgress',
+  'isFinished',
+  'isLocked',
+  'isUnlocked',
+  'isUpNext',
+]
 const BETWEEN_OPERATORS: RuleOperator[] = ['between']
 const COLLECTION_OPERATORS: RuleOperator[] = ['includesAny', 'includesAll', 'excludesAll']
 

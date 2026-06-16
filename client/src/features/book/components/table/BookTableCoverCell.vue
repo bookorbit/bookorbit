@@ -12,6 +12,7 @@ const props = defineProps<{
   title: string | null
   hasCover: boolean
   isAudio: boolean
+  isComic: boolean
 }>()
 
 const emit = defineEmits<{ 'cover-click': [] }>()
@@ -76,6 +77,7 @@ const adjustedTop = computed(() => {
     <BookCoverSurface
       size="mini"
       :disable-spine="isAudio"
+      :is-comic="isComic"
       tabindex="0"
       role="button"
       aria-label="View cover"
@@ -93,6 +95,7 @@ const adjustedTop = computed(() => {
         :alt="title ?? ''"
         frame-aspect-ratio="1/1"
         :spine="!isAudio"
+        :is-comic="isComic"
       />
       <div v-if="isRefreshingBook" class="absolute inset-0 flex items-center justify-center bg-black/50">
         <Loader2 :size="12" class="animate-spin text-white" />

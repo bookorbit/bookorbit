@@ -3,12 +3,13 @@ import { afterEach, describe, expect, it } from 'vitest'
 import BookCoverSurface from '../BookCoverSurface.vue'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
-const { bookSpineOverlay, bookShadowStrength, bookCoverDisplayMode } = useDisplaySettings()
+const { bookSpineOverlay, bookShadowStrength, bookCoverDisplayMode, showSpineOnComics } = useDisplaySettings()
 
 afterEach(() => {
   bookSpineOverlay.value = 'off'
   bookShadowStrength.value = 'default'
   bookCoverDisplayMode.value = 'blurred-fit'
+  showSpineOnComics.value = false
 })
 
 describe('BookCoverSurface', () => {
@@ -71,5 +72,35 @@ describe('BookCoverSurface', () => {
     })
 
     expect(wrapper.attributes('data-cover-spine')).toBe('off')
+  })
+
+  it('forces spine overlay off for comics when showSpineOnComics is disabled', () => {
+    bookSpineOverlay.value = 'strong'
+    showSpineOnComics.value = false
+    const wrapper = mount(BookCoverSurface, {
+      props: { isComic: true },
+    })
+
+    expect(wrapper.attributes('data-cover-spine')).toBe('off')
+  })
+
+  it('keeps the spine overlay for comics when showSpineOnComics is enabled', () => {
+    bookSpineOverlay.value = 'strong'
+    showSpineOnComics.value = true
+    const wrapper = mount(BookCoverSurface, {
+      props: { isComic: true },
+    })
+
+    expect(wrapper.attributes('data-cover-spine')).toBe('strong')
+  })
+
+  it('does not affect non-comic covers when showSpineOnComics is disabled', () => {
+    bookSpineOverlay.value = 'subtle'
+    showSpineOnComics.value = false
+    const wrapper = mount(BookCoverSurface, {
+      props: { isComic: false },
+    })
+
+    expect(wrapper.attributes('data-cover-spine')).toBe('subtle')
   })
 })

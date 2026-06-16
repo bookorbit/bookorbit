@@ -49,6 +49,7 @@ export interface DisplayPreferences {
   tableZebraStriping: boolean;
   tableDensity: TableDensity;
   bookSpineOverlay: BookSpineOverlay;
+  showSpineOnComics: boolean;
   bookShadowStrength: BookShadowStrength;
   bookCoverDisplayMode: BookCoverDisplayMode;
   seriesCardCoverMode: SeriesCardCoverMode;

@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Clock, Play } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
+import { FORMAT_TO_GROUP } from '@bookorbit/types'
 
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
@@ -10,6 +12,11 @@ import { useLongWaitWidget } from '../../composables/useLongWaitWidget'
 const { data, loading, error } = useLongWaitWidget()
 const router = useRouter()
 const { coverUrl } = useCoverVersions()
+
+const isComic = computed(() => {
+  const format = data.value?.fileFormat
+  return format != null && FORMAT_TO_GROUP[format] === 'cbx'
+})
 
 function goToBook() {
   if (!data.value) return
@@ -62,6 +69,7 @@ function startReading() {
           type="button"
           size="mini"
           class="book-cover-surface--spine-fitted h-24 w-18 shrink-0 cursor-pointer overflow-hidden rounded transition-opacity hover:opacity-80"
+          :is-comic="isComic"
           @click="goToBook"
         >
           <BookCoverArtwork
@@ -73,6 +81,7 @@ function startReading() {
             :seed="data.title ?? String(data.bookId)"
             :alt="data.title ?? 'Cover'"
             frame-aspect-ratio="3/4"
+            :is-comic="isComic"
           />
         </BookCoverSurface>
 

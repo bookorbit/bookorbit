@@ -51,6 +51,10 @@ export class AppSettingsService {
     return row?.value ?? null;
   }
 
+  async setValue(key: string, value: string): Promise<void> {
+    await this.repo.upsert(key, value);
+  }
+
   async update(key: string, value: string) {
     const setting = await this.repo.updateByKey(key, value);
     if (!setting) throw new NotFoundException(`Setting '${key}' not found`);

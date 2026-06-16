@@ -70,6 +70,7 @@ describe('UploadService', () => {
   const processor = {
     createBookRecord: vi.fn(),
     extractMetadataAsync: vi.fn(),
+    extractAudioDurationAsync: vi.fn(),
   };
 
   const user = { id: 7, isSuperuser: false, permissions: [] } as any;
@@ -737,6 +738,24 @@ describe('UploadService', () => {
       expect(result.format).toBe('epub');
       expect(result.bookStatus).toBe('present');
       expect(result.role).toBe('content');
+    });
+
+    it('kicks off per-file audio duration extraction for an added audio file', async () => {
+      validator.sanitizeFilename.mockReturnValue('chapter-02.mp3');
+      validator.validateFormat.mockReturnValue('mp3');
+      db.select.mockReturnValueOnce(selectJoinChain([makeBookRow()])).mockReturnValueOnce(noHashConflict());
+
+      await service.addFileToBook(10, 'chapter-02.mp3', {} as any, user);
+
+      expect(processor.extractAudioDurationAsync).toHaveBeenCalledWith(10, '/library/Book Title/chapter-02.mp3', 'mp3');
+    });
+
+    it('delegates duration extraction to the processor regardless of format (processor gates on audio)', async () => {
+      db.select.mockReturnValueOnce(selectJoinChain([makeBookRow()])).mockReturnValueOnce(noHashConflict());
+
+      await service.addFileToBook(10, 'book.epub', {} as any, user);
+
+      expect(processor.extractAudioDurationAsync).toHaveBeenCalledWith(10, '/library/Book Title/book.epub', 'epub');
     });
 
     it('promotes new file to primary when book has no primary file', async () => {

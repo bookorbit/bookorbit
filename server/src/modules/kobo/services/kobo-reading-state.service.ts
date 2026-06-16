@@ -5,6 +5,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DB } from '../../../db';
 import * as schema from '../../../db/schema';
 import { UserBookStatusService } from '../../user-book-status/user-book-status.service';
+import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED } from '../../achievement/achievement-events.service';
 import { KoboBookAccessService } from './kobo-book-access.service';
 import { KoboBookIdentityService } from './kobo-book-identity.service';
 
@@ -28,6 +29,7 @@ export class KoboReadingStateService {
     private readonly bookAccessService: KoboBookAccessService,
     private readonly userBookStatusService: UserBookStatusService,
     private readonly bookIdentityService: KoboBookIdentityService,
+    private readonly achievementEvents: AchievementEventsService,
   ) {}
 
   async upsertState(
@@ -122,6 +124,12 @@ export class KoboReadingStateService {
         await this.markSnapshotBookUnsynced(userId, bookId);
       }
       void this.userBookStatusService.autoUpdate(userId, bookId, percent, readingThreshold, finishedThreshold);
+      this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, {
+        userId,
+        bookId,
+        progress: percent,
+        source: 'kobo',
+      });
     }
 
     return this.getRawState(userId, bookId);

@@ -47,6 +47,8 @@ const ALL_NIGHTER_START_HOUR = 1;
 const ALL_NIGHTER_END_HOUR = 4;
 const EARLY_BIRD_START_HOUR = 5;
 const EARLY_BIRD_END_HOUR = 7;
+const POWER_HOUR_PAGES = 75;
+const SPEED_READER_PAGES = 100;
 
 @Injectable()
 export class ReadingEvaluator implements IAchievementEvaluator {
@@ -84,6 +86,8 @@ export class ReadingEvaluator implements IAchievementEvaluator {
       this.evaluateAllNighter(payload, earnedKeys, awards);
       this.evaluateEarlyBird(payload, earnedKeys, awards);
       this.evaluateOneSitting(payload, earnedKeys, awards);
+      await this.evaluatePowerHour(payload, earnedKeys, awards);
+      await this.evaluateSpeedReader(ctx.userId, payload, earnedKeys, awards);
     }
 
     if (ctx.eventName === ACHIEVEMENT_EVENT_BACKFILL) {
@@ -99,6 +103,8 @@ export class ReadingEvaluator implements IAchievementEvaluator {
       await this.evaluateSlowBurnBackfill(ctx.userId, earnedKeys, awards);
       await this.evaluateMonthlyReader2Backfill(ctx.userId, earnedKeys, awards);
       await this.evaluateOneSittingBackfill(ctx.userId, earnedKeys, awards);
+      await this.evaluatePowerHourBackfill(ctx.userId, earnedKeys, awards);
+      await this.evaluateSpeedReaderBackfill(ctx.userId, earnedKeys, awards);
     }
 
     return awards;
@@ -316,6 +322,46 @@ export class ReadingEvaluator implements IAchievementEvaluator {
     const hasSession = await this.repo.hasSessionWithProgressDeltaAtLeast(userId, ONE_SITTING_THRESHOLD);
     if (hasSession) {
       awards.push({ key: 'one_sitting', context: {} });
+    }
+  }
+
+  private async evaluatePowerHour(payload: ReadingSessionSavedPayload, earnedKeys: Set<string>, awards: AchievementAward[]): Promise<void> {
+    if (earnedKeys.has('power_hour')) return;
+    if (payload.progressDelta === null || payload.progressDelta <= 0) return;
+    const pageCount = await this.repo.getPageCountByBookFile(payload.bookFileId);
+    if (pageCount === null || pageCount <= 0) return;
+    const pages = (Math.min(Math.max(payload.progressDelta, 0), 100) / 100) * pageCount;
+    if (pages >= POWER_HOUR_PAGES) {
+      awards.push({ key: 'power_hour', context: { pages: Math.floor(pages) } });
+    }
+  }
+
+  private async evaluateSpeedReader(
+    userId: number,
+    payload: ReadingSessionSavedPayload,
+    earnedKeys: Set<string>,
+    awards: AchievementAward[],
+  ): Promise<void> {
+    if (earnedKeys.has('speed_reader')) return;
+    const pages = await this.repo.getPagesOnDay(userId, payload.startedAt);
+    if (pages >= SPEED_READER_PAGES) {
+      awards.push({ key: 'speed_reader', context: { pages } });
+    }
+  }
+
+  private async evaluatePowerHourBackfill(userId: number, earnedKeys: Set<string>, awards: AchievementAward[]): Promise<void> {
+    if (earnedKeys.has('power_hour')) return;
+    const maxPages = await this.repo.getMaxSessionPages(userId);
+    if (maxPages >= POWER_HOUR_PAGES) {
+      awards.push({ key: 'power_hour', context: { pages: maxPages } });
+    }
+  }
+
+  private async evaluateSpeedReaderBackfill(userId: number, earnedKeys: Set<string>, awards: AchievementAward[]): Promise<void> {
+    if (earnedKeys.has('speed_reader')) return;
+    const maxDayPages = await this.repo.getMaxPagesInADay(userId);
+    if (maxDayPages >= SPEED_READER_PAGES) {
+      awards.push({ key: 'speed_reader', context: { pages: maxDayPages } });
     }
   }
 }

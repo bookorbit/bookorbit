@@ -78,6 +78,8 @@ export interface HardcoverEdition {
   isbn_10?: string;
   isbn_13?: string;
   language?: { code2: string };
+  reading_format_id?: number;
+  audio_seconds?: number;
 }
 
 export interface HardcoverCachedContributor {

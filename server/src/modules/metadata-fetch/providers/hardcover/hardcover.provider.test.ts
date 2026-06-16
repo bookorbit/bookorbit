@@ -113,6 +113,26 @@ describe('HardcoverProvider', () => {
       expect(results[0].isbn13).toBe('9780756404079');
     });
 
+    it('orders physical editions before audiobooks in ISBN search results', async () => {
+      vi.spyOn(client, 'searchByIsbn').mockResolvedValue([
+        {
+          ...mockBook,
+          pages: 600,
+          editions: [
+            { id: 1, isbn_13: 'AUDIO', reading_format_id: 2 },
+            { id: 2, isbn_13: 'PRINT', reading_format_id: 1, pages: 600 },
+          ],
+        },
+      ]);
+
+      const results = await provider.search({ isbn: '9780756404079' });
+
+      expect(results[0].isbn13).toBe('PRINT');
+      expect(results[0].pageCount).toBe(600);
+      expect(results[1].isbn13).toBe('AUDIO');
+      expect(results[1].pageCount).toBeUndefined();
+    });
+
     it('falls through to title search when ISBN returns no results', async () => {
       vi.spyOn(client, 'searchByIsbn').mockResolvedValue([]);
       vi.spyOn(client, 'searchBooks').mockResolvedValue([mockDocument]);
@@ -190,6 +210,22 @@ describe('HardcoverProvider', () => {
       expect(result).not.toBeNull();
       expect(result?.providerId).toBe('the-name-of-the-wind');
       expect(result?.isbn13).toBe('9780756404079');
+    });
+
+    it('returns the physical edition even when an audiobook is listed first', async () => {
+      vi.spyOn(client, 'lookupBySlug').mockResolvedValue({
+        ...mockBook,
+        pages: 662,
+        editions: [
+          { id: 1, isbn_13: 'AUDIO', reading_format_id: 2 },
+          { id: 2, isbn_13: 'PRINT', reading_format_id: 1, pages: 662 },
+        ],
+      });
+
+      const result = await provider.lookupById('the-name-of-the-wind');
+
+      expect(result?.isbn13).toBe('PRINT');
+      expect(result?.pageCount).toBe(662);
     });
 
     it('returns null when the slug is not found', async () => {

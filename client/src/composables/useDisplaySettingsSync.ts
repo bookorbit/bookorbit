@@ -115,6 +115,7 @@ export function initDisplaySettingsSync(): void {
         settings.tableZebraStriping.value,
         settings.tableDensity.value,
         settings.bookSpineOverlay.value,
+        settings.showSpineOnComics.value,
         settings.bookShadowStrength.value,
         settings.bookCoverDisplayMode.value,
         settings.seriesCardCoverMode.value,

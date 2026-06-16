@@ -28,6 +28,8 @@ const ANNOTATOR_TIERS = [
 
 const NOTE_KEEPER_THRESHOLD = 25;
 const DEEP_DIVE_SESSION_THRESHOLD = 10;
+const WORDSMITH_MIN_LENGTH = 280;
+const BOX_OF_CRAYONS_COLORS = 5;
 
 @Injectable()
 export class LibraryEvaluator implements IAchievementEvaluator {
@@ -51,6 +53,8 @@ export class LibraryEvaluator implements IAchievementEvaluator {
       await this.evaluateAnnotatorTiers(ctx.userId, earnedKeys, awards);
       await this.evaluateNoteKeeper(ctx.userId, earnedKeys, awards);
       await this.evaluateDeepDiveSession(ctx.userId, payload, earnedKeys, awards);
+      await this.evaluateWordsmith(ctx.userId, payload, earnedKeys, awards);
+      await this.evaluateBoxOfCrayons(ctx.userId, earnedKeys, awards);
     }
 
     if (ctx.eventName === ACHIEVEMENT_EVENT_COLLECTION_CREATED) {
@@ -77,6 +81,8 @@ export class LibraryEvaluator implements IAchievementEvaluator {
       await this.evaluateMultiFormat(ctx.userId, ctx.isSuperuser, earnedKeys, awards);
       await this.evaluateNoteKeeper(ctx.userId, earnedKeys, awards);
       await this.evaluateDeepDiveSessionBackfill(ctx.userId, earnedKeys, awards);
+      await this.evaluateWordsmithBackfill(ctx.userId, earnedKeys, awards);
+      await this.evaluateBoxOfCrayons(ctx.userId, earnedKeys, awards);
     }
 
     return awards;
@@ -156,6 +162,35 @@ export class LibraryEvaluator implements IAchievementEvaluator {
     const hasDay = await this.repo.hasAnyDayWithAnnotationCount(userId, DEEP_DIVE_SESSION_THRESHOLD);
     if (hasDay) {
       awards.push({ key: 'deep_dive_session', context: {} });
+    }
+  }
+
+  private async evaluateWordsmith(
+    userId: number,
+    payload: AnnotationCreatedPayload,
+    earnedKeys: Set<string>,
+    awards: AchievementAward[],
+  ): Promise<void> {
+    if (earnedKeys.has('wordsmith')) return;
+    const length = await this.repo.getAnnotationNoteLength(payload.annotationId, userId);
+    if (length !== null && length > WORDSMITH_MIN_LENGTH) {
+      awards.push({ key: 'wordsmith', context: { length, bookId: payload.bookId } });
+    }
+  }
+
+  private async evaluateWordsmithBackfill(userId: number, earnedKeys: Set<string>, awards: AchievementAward[]): Promise<void> {
+    if (earnedKeys.has('wordsmith')) return;
+    const maxLength = await this.repo.getMaxNoteLength(userId);
+    if (maxLength > WORDSMITH_MIN_LENGTH) {
+      awards.push({ key: 'wordsmith', context: { length: maxLength } });
+    }
+  }
+
+  private async evaluateBoxOfCrayons(userId: number, earnedKeys: Set<string>, awards: AchievementAward[]): Promise<void> {
+    if (earnedKeys.has('box_of_crayons')) return;
+    const colors = await this.repo.countDistinctColors(userId);
+    if (colors >= BOX_OF_CRAYONS_COLORS) {
+      awards.push({ key: 'box_of_crayons', context: { colors } });
     }
   }
 }

@@ -7,7 +7,7 @@ import { clearCoverLoadCache } from '@/features/book/lib/cover-load-cache'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import BookCoverArtwork from '../BookCoverArtwork.vue'
 
-const { bookCoverDisplayMode, bookSpineOverlay } = useDisplaySettings()
+const { bookCoverDisplayMode, bookSpineOverlay, showSpineOnComics } = useDisplaySettings()
 
 function mountArtwork(
   options: {
@@ -16,6 +16,7 @@ function mountArtwork(
     src?: string | null
     frameAspectRatio?: string
     spine?: boolean
+    isComic?: boolean
   } = {},
 ) {
   return mount(BookCoverArtwork, {
@@ -30,6 +31,7 @@ function mountArtwork(
       mode: options.mode,
       frameAspectRatio: options.frameAspectRatio,
       spine: options.spine,
+      isComic: options.isComic,
     },
     global: {
       provide: {
@@ -59,11 +61,13 @@ async function triggerMainImageLoad(wrapper: ReturnType<typeof mountArtwork>, na
 beforeEach(() => {
   clearCoverLoadCache()
   bookSpineOverlay.value = 'off'
+  showSpineOnComics.value = false
 })
 
 afterEach(() => {
   bookCoverDisplayMode.value = 'blurred-fit'
   bookSpineOverlay.value = 'off'
+  showSpineOnComics.value = false
 })
 
 describe('BookCoverArtwork', () => {
@@ -170,6 +174,26 @@ describe('BookCoverArtwork', () => {
     await triggerMainImageLoad(wrapper, 600, 900)
 
     expect(wrapper.find('.book-cover-spine-layer').exists()).toBe(false)
+  })
+
+  it('suppresses the spine layer for comics when showSpineOnComics is disabled', async () => {
+    bookSpineOverlay.value = 'strong'
+    showSpineOnComics.value = false
+    const wrapper = mountArtwork({ mode: 'fill-crop', isComic: true })
+
+    await triggerMainImageLoad(wrapper, 600, 900)
+
+    expect(wrapper.find('.book-cover-spine-layer').exists()).toBe(false)
+  })
+
+  it('renders the spine layer for comics when showSpineOnComics is enabled', async () => {
+    bookSpineOverlay.value = 'strong'
+    showSpineOnComics.value = true
+    const wrapper = mountArtwork({ mode: 'fill-crop', isComic: true })
+
+    await triggerMainImageLoad(wrapper, 600, 900)
+
+    expect(wrapper.find('.book-cover-spine-layer').attributes('data-cover-spine')).toBe('strong')
   })
 
   it('tags the spine layer with the active overlay mode so it works without a surface ancestor', async () => {

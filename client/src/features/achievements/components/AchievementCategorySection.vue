@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue'
-import { BookOpen, Compass, Flame, Library } from 'lucide-vue-next'
+import { BookOpen, Compass, Flame, Library, TabletSmartphone } from 'lucide-vue-next'
 import type { AchievementCategory, AchievementCategoryGroup } from '@bookorbit/types'
 import { groupAchievements } from '../composables/useGroupedAchievements'
 import type { DisplayItem, FilterState } from '../types'
@@ -18,6 +18,7 @@ const CATEGORY_ICONS: Record<AchievementCategory, Component> = {
   library: Library,
   exploration: Compass,
   dedication: Flame,
+  devices: TabletSmartphone,
 }
 
 const CATEGORY_ACCENT: Record<AchievementCategory, string> = {
@@ -25,6 +26,7 @@ const CATEGORY_ACCENT: Record<AchievementCategory, string> = {
   library: 'bg-emerald-500',
   exploration: 'bg-orange-500',
   dedication: 'bg-red-500',
+  devices: 'bg-violet-500',
 }
 
 const CATEGORY_ICON_COLOR: Record<AchievementCategory, string> = {
@@ -32,6 +34,7 @@ const CATEGORY_ICON_COLOR: Record<AchievementCategory, string> = {
   library: 'text-emerald-400',
   exploration: 'text-orange-400',
   dedication: 'text-red-400',
+  devices: 'text-violet-400',
 }
 
 const CategoryIcon = computed<Component>(() => CATEGORY_ICONS[props.group.key])

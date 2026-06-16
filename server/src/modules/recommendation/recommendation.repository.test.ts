@@ -243,8 +243,8 @@ describe('RecommendationRepository', () => {
     const result = await repo.findSeriesBooks(88, [3, 4]);
 
     expect(result).toEqual([
-      { bookId: 1, title: 'Book 1', seriesIndex: 1, coverSource: 'extracted', authorNames: ['Frank Herbert'], isAudiobook: true },
-      { bookId: 2, title: 'Book 2', seriesIndex: 2, coverSource: null, authorNames: [], isAudiobook: false },
+      { bookId: 1, title: 'Book 1', seriesIndex: 1, coverSource: 'extracted', authorNames: ['Frank Herbert'], isAudiobook: true, isComic: false },
+      { bookId: 2, title: 'Book 2', seriesIndex: 2, coverSource: null, authorNames: [], isAudiobook: false, isComic: false },
     ]);
     expect(select).toHaveBeenCalledTimes(2);
     expect(chains[0].from).toHaveBeenCalledTimes(1);
@@ -264,7 +264,9 @@ describe('RecommendationRepository', () => {
 
     const result = await repo.findSeriesBooks(88, [1]);
 
-    expect(result).toEqual([{ bookId: 5, title: 'Solo Book', seriesIndex: null, coverSource: null, authorNames: [], isAudiobook: false }]);
+    expect(result).toEqual([
+      { bookId: 5, title: 'Solo Book', seriesIndex: null, coverSource: null, authorNames: [], isAudiobook: false, isComic: false },
+    ]);
   });
 
   it('returns empty author books when libraryIds is empty', async () => {
@@ -289,7 +291,9 @@ describe('RecommendationRepository', () => {
 
     const result = await repo.findAuthorBooks(1, [3]);
 
-    expect(result).toEqual([{ bookId: 10, title: 'Other Book', coverSource: 'extracted', authorNames: ['Terry Pratchett'], isAudiobook: true }]);
+    expect(result).toEqual([
+      { bookId: 10, title: 'Other Book', coverSource: 'extracted', authorNames: ['Terry Pratchett'], isAudiobook: true, isComic: false },
+    ]);
     expect(select).toHaveBeenCalledTimes(3);
     expect(chains[1].innerJoin).toHaveBeenCalledTimes(1);
     expect(chains[1].leftJoin).toHaveBeenCalledTimes(2);
@@ -307,6 +311,21 @@ describe('RecommendationRepository', () => {
 
     const result = await repo.findAuthorBooks(1, [1]);
 
-    expect(result).toEqual([{ bookId: 7, title: 'Anonymous Work', coverSource: null, authorNames: [], isAudiobook: false }]);
+    expect(result).toEqual([{ bookId: 7, title: 'Anonymous Work', coverSource: null, authorNames: [], isAudiobook: false, isComic: false }]);
+  });
+
+  it('flags comic primary formats as isComic for series books', async () => {
+    const rows = [{ bookId: 9, title: 'Comic Issue', seriesIndex: 3, coverSource: 'extracted', primaryFormat: 'CBZ' }];
+    const { db } = makeDb([
+      { terminal: 'limit', result: rows },
+      { terminal: 'where', result: [] },
+    ]);
+    const repo = new RecommendationRepository(db);
+
+    const result = await repo.findSeriesBooks(88, [1]);
+
+    expect(result).toEqual([
+      { bookId: 9, title: 'Comic Issue', seriesIndex: 3, coverSource: 'extracted', authorNames: [], isAudiobook: false, isComic: true },
+    ]);
   });
 });

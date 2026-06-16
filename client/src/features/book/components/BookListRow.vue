@@ -62,6 +62,7 @@ const seriesLine = computed(() => {
 const isMissing = computed(() => props.book.status === 'missing')
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
 const isAudiobook = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
+const isComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'cbx')
 const secondaryFiles = computed(() => props.book.files.filter((f) => f !== primaryFile.value))
 
 const uniqueSecondaryFiles = computed(() => {
@@ -175,6 +176,7 @@ function handleRowClick(event: MouseEvent) {
       size="mini"
       class="book-cover-surface--spine-fitted w-16 rounded shrink-0 overflow-hidden relative"
       :disable-spine="isAudiobook"
+      :is-comic="isComic"
       :class="isMissing ? 'opacity-50 grayscale' : ''"
       :style="{ aspectRatio: coverAspectRatio }"
     >
@@ -188,6 +190,7 @@ function handleRowClick(event: MouseEvent) {
         :alt="book.title ?? ''"
         backdrop-class="blur-md brightness-50"
         :spine="!isAudiobook"
+        :is-comic="isComic"
       />
     </BookCoverSurface>
 

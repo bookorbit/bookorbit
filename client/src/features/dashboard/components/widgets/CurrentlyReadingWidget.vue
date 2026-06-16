@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { BookOpen, Play } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
+import { FORMAT_TO_GROUP } from '@bookorbit/types'
 
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
@@ -13,6 +14,10 @@ const { coverUrl } = useCoverVersions()
 
 function goToBook(bookId: number) {
   void router.push({ name: 'book-detail', params: { bookId } })
+}
+
+function isComic(fileFormat: string | null): boolean {
+  return fileFormat != null && FORMAT_TO_GROUP[fileFormat] === 'cbx'
 }
 
 function continueReading(bookId: number, fileId: number | null, fileFormat: string | null) {
@@ -64,7 +69,11 @@ function continueReading(bookId: number, fileId: number | null, fileFormat: stri
           @click="goToBook(book.bookId)"
         >
           <!-- Cover thumbnail -->
-          <BookCoverSurface size="mini" class="book-cover-surface--spine-fitted h-14 w-9 shrink-0 overflow-hidden rounded">
+          <BookCoverSurface
+            size="mini"
+            class="book-cover-surface--spine-fitted h-14 w-9 shrink-0 overflow-hidden rounded"
+            :is-comic="isComic(book.fileFormat)"
+          >
             <BookCoverArtwork
               :src="coverUrl(book.bookId)"
               :has-cover="book.hasCover"
@@ -74,6 +83,7 @@ function continueReading(bookId: number, fileId: number | null, fileFormat: stri
               :seed="book.title ?? String(book.bookId)"
               :alt="book.title ?? 'Book cover'"
               frame-aspect-ratio="9/14"
+              :is-comic="isComic(book.fileFormat)"
             />
           </BookCoverSurface>
 

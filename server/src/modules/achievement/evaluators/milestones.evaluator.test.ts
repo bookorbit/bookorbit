@@ -20,6 +20,7 @@ function makeRepo(overrides: Record<string, unknown> = {}) {
     countBooksFinishedInYear: vi.fn().mockResolvedValue(0),
     countDistinctEarnedCategories: vi.fn().mockResolvedValue(0),
     hasFinishedBookInSeries: vi.fn().mockResolvedValue(false),
+    hasAbandonedBook: vi.fn().mockResolvedValue(false),
     ...overrides,
   };
 }
@@ -268,6 +269,79 @@ describe('MilestonesEvaluator', () => {
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'new_year_reader' }));
+    });
+  });
+
+  describe('old_friend', () => {
+    it('awards old_friend when a re-read is finished (previousStatus rereading)', async () => {
+      const awards = await evaluator.evaluate(
+        {
+          userId: 1,
+          eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED,
+          payload: { userId: 1, bookId: 5, newStatus: 'read', previousStatus: 'rereading' } as never,
+        },
+        new Set(),
+      );
+      expect(awards).toContainEqual(expect.objectContaining({ key: 'old_friend' }));
+    });
+
+    it('does not award old_friend for a first-time finish', async () => {
+      const awards = await evaluator.evaluate(
+        {
+          userId: 1,
+          eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED,
+          payload: { userId: 1, bookId: 5, newStatus: 'read', previousStatus: 'reading' } as never,
+        },
+        new Set(),
+      );
+      expect(awards.find((a) => a.key === 'old_friend')).toBeUndefined();
+    });
+
+    it('does not award old_friend when already earned', async () => {
+      const awards = await evaluator.evaluate(
+        {
+          userId: 1,
+          eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED,
+          payload: { userId: 1, bookId: 5, newStatus: 'read', previousStatus: 'rereading' } as never,
+        },
+        new Set(['old_friend']),
+      );
+      expect(awards.find((a) => a.key === 'old_friend')).toBeUndefined();
+    });
+  });
+
+  describe('dnf_self_aware', () => {
+    it('awards dnf_self_aware when a book is abandoned', async () => {
+      const awards = await evaluator.evaluate(
+        {
+          userId: 1,
+          eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED,
+          payload: { userId: 1, bookId: 5, newStatus: 'abandoned', previousStatus: 'reading' } as never,
+        },
+        new Set(),
+      );
+      expect(awards).toContainEqual(expect.objectContaining({ key: 'dnf_self_aware' }));
+    });
+
+    it('does not award dnf_self_aware for a non-abandoned status', async () => {
+      const awards = await evaluator.evaluate(
+        {
+          userId: 1,
+          eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED,
+          payload: { userId: 1, bookId: 5, newStatus: 'reading', previousStatus: 'unread' } as never,
+        },
+        new Set(),
+      );
+      expect(awards.find((a) => a.key === 'dnf_self_aware')).toBeUndefined();
+    });
+
+    it('awards dnf_self_aware via backfill when an abandoned book exists', async () => {
+      repo.hasAbandonedBook.mockResolvedValue(true);
+      const awards = await evaluator.evaluate(
+        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
+        new Set(),
+      );
+      expect(awards).toContainEqual(expect.objectContaining({ key: 'dnf_self_aware' }));
     });
   });
 });
