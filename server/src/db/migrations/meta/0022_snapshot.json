@@ -1,6 +1,6 @@
 {
-  "id": "ae965fcc-0970-44af-b1c9-2e7ea74893e5",
-  "prevId": "d20a77d2-02c8-4790-973c-50845a9eab26",
+  "id": "3351c184-8a15-4777-9aaa-1ca260fc20b0",
+  "prevId": "36797d38-e911-42b4-9a27-9e0fd5746e8e",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2678,6 +2678,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "primary_author_sort_name": {
+          "name": "primary_author_sort_name",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "folder_path": {
           "name": "folder_path",
           "type": "varchar(4096)",
@@ -2781,6 +2787,90 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "books_library_visible_added_id_idx": {
+          "name": "books_library_visible_added_id_idx",
+          "columns": [
+            {
+              "expression": "library_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "\"added_at\" desc",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"books\".\"status\" <> 'processing'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "books_library_author_sort_id_idx": {
+          "name": "books_library_author_sort_id_idx",
+          "columns": [
+            {
+              "expression": "library_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "\"primary_author_sort_name\" asc nulls last",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"books\".\"status\" <> 'processing'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "books_library_author_sort_desc_id_idx": {
+          "name": "books_library_author_sort_desc_id_idx",
+          "columns": [
+            {
+              "expression": "library_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "\"primary_author_sort_name\" desc nulls last",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"books\".\"status\" <> 'processing'",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -3229,6 +3319,157 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.book_series_memberships": {
+      "name": "book_series_memberships",
+      "schema": "",
+      "columns": {
+        "book_id": {
+          "name": "book_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "series_id": {
+          "name": "series_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "series_index": {
+          "name": "series_index",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "display_order": {
+          "name": "display_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "book_series_memberships_book_display_uidx": {
+          "name": "book_series_memberships_book_display_uidx",
+          "columns": [
+            {
+              "expression": "book_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "display_order",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "book_series_memberships_series_index_book_idx": {
+          "name": "book_series_memberships_series_index_book_idx",
+          "columns": [
+            {
+              "expression": "series_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "series_index",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "book_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "book_series_memberships_book_display_idx": {
+          "name": "book_series_memberships_book_display_idx",
+          "columns": [
+            {
+              "expression": "book_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "display_order",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "book_series_memberships_book_id_books_id_fk": {
+          "name": "book_series_memberships_book_id_books_id_fk",
+          "tableFrom": "book_series_memberships",
+          "tableTo": "books",
+          "columnsFrom": ["book_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "book_series_memberships_series_id_book_series_id_fk": {
+          "name": "book_series_memberships_series_id_book_series_id_fk",
+          "tableFrom": "book_series_memberships",
+          "tableTo": "book_series",
+          "columnsFrom": ["series_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "book_series_memberships_book_id_series_id_pk": {
+          "name": "book_series_memberships_book_id_series_id_pk",
+          "columns": ["book_id", "series_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "book_series_memberships_display_order_nonnegative_chk": {
+          "name": "book_series_memberships_display_order_nonnegative_chk",
+          "value": "\"book_series_memberships\".\"display_order\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.author_enrichment_queue": {
       "name": "author_enrichment_queue",
       "schema": "",
@@ -3514,6 +3755,33 @@
             },
             {
               "expression": "display_order",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "book_authors_book_display_author_idx": {
+          "name": "book_authors_book_display_author_idx",
+          "columns": [
+            {
+              "expression": "book_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "display_order",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "author_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -3812,6 +4080,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "lubimyczytac_id": {
+          "name": "lubimyczytac_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "aladin_id": {
+          "name": "aladin_id",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "chapters": {
           "name": "chapters",
           "type": "jsonb",
@@ -3831,12 +4111,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "lubimyczytac_id": {
-          "name": "lubimyczytac_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -3871,6 +4145,27 @@
           "method": "btree",
           "with": {}
         },
+        "bm_title_book_id_idx": {
+          "name": "bm_title_book_id_idx",
+          "columns": [
+            {
+              "expression": "title",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "book_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "bm_series_trgm_idx": {
           "name": "bm_series_trgm_idx",
           "columns": [
@@ -3892,6 +4187,33 @@
           "columns": [
             {
               "expression": "series_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "bm_series_id_index_book_id_idx": {
+          "name": "bm_series_id_index_book_id_idx",
+          "columns": [
+            {
+              "expression": "series_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "series_index",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "book_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -4755,396 +5077,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.annotation_positions": {
-      "name": "annotation_positions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "annotation_id": {
-          "name": "annotation_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "book_file_id": {
-          "name": "book_file_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "format": {
-          "name": "format",
-          "type": "varchar(12)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "pos0": {
-          "name": "pos0",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "pos1": {
-          "name": "pos1",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "varchar(10)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'exact'"
-        },
-        "converter_version": {
-          "name": "converter_version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "extras": {
-          "name": "extras",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "annotation_positions_annotation_format_uidx": {
-          "name": "annotation_positions_annotation_format_uidx",
-          "columns": [
-            {
-              "expression": "annotation_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "format",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "annotation_positions_user_idx": {
-          "name": "annotation_positions_user_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "annotation_positions_format_status_idx": {
-          "name": "annotation_positions_format_status_idx",
-          "columns": [
-            {
-              "expression": "format",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "annotation_positions_annotation_id_annotations_id_fk": {
-          "name": "annotation_positions_annotation_id_annotations_id_fk",
-          "tableFrom": "annotation_positions",
-          "tableTo": "annotations",
-          "columnsFrom": ["annotation_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "annotation_positions_user_id_users_id_fk": {
-          "name": "annotation_positions_user_id_users_id_fk",
-          "tableFrom": "annotation_positions",
-          "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "annotation_positions_book_file_id_book_files_id_fk": {
-          "name": "annotation_positions_book_file_id_book_files_id_fk",
-          "tableFrom": "annotation_positions",
-          "tableTo": "book_files",
-          "columnsFrom": ["book_file_id"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "annotation_positions_format_chk": {
-          "name": "annotation_positions_format_chk",
-          "value": "\"annotation_positions\".\"format\" in ('cfi', 'xpointer', 'pdf', 'kobo_span')"
-        },
-        "annotation_positions_status_chk": {
-          "name": "annotation_positions_status_chk",
-          "value": "\"annotation_positions\".\"status\" in ('exact', 'repaired', 'failed', 'pending')"
-        },
-        "annotation_positions_pos0_chk": {
-          "name": "annotation_positions_pos0_chk",
-          "value": "\"annotation_positions\".\"status\" in ('failed', 'pending') or \"annotation_positions\".\"pos0\" is not null"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.annotation_sync_state": {
-      "name": "annotation_sync_state",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "annotation_id": {
-          "name": "annotation_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source": {
-          "name": "source",
-          "type": "varchar(10)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "device_id": {
-          "name": "device_id",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "external_key": {
-          "name": "external_key",
-          "type": "varchar(64)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "external_created_at": {
-          "name": "external_created_at",
-          "type": "varchar(19)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_applied_version": {
-          "name": "last_applied_version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "delete_acked_at": {
-          "name": "delete_acked_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "first_synced_at": {
-          "name": "first_synced_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "last_synced_at": {
-          "name": "last_synced_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "annotation_sync_state_annotation_source_device_uidx": {
-          "name": "annotation_sync_state_annotation_source_device_uidx",
-          "columns": [
-            {
-              "expression": "annotation_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "source",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "device_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "annotation_sync_state_user_source_device_key_idx": {
-          "name": "annotation_sync_state_user_source_device_key_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "source",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "device_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "external_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "annotation_sync_state_user_key_idx": {
-          "name": "annotation_sync_state_user_key_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "external_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "annotation_sync_state_annotation_id_idx": {
-          "name": "annotation_sync_state_annotation_id_idx",
-          "columns": [
-            {
-              "expression": "annotation_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "annotation_sync_state_annotation_id_annotations_id_fk": {
-          "name": "annotation_sync_state_annotation_id_annotations_id_fk",
-          "tableFrom": "annotation_sync_state",
-          "tableTo": "annotations",
-          "columnsFrom": ["annotation_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "annotation_sync_state_user_id_users_id_fk": {
-          "name": "annotation_sync_state_user_id_users_id_fk",
-          "tableFrom": "annotation_sync_state",
-          "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "annotation_sync_state_source_chk": {
-          "name": "annotation_sync_state_source_chk",
-          "value": "\"annotation_sync_state\".\"source\" in ('koreader', 'kobo')"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.annotations": {
       "name": "annotations",
       "schema": "",
@@ -5164,6 +5096,12 @@
         "book_id": {
           "name": "book_id",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cfi": {
+          "name": "cfi",
+          "type": "varchar(2000)",
           "primaryKey": false,
           "notNull": true
         },
@@ -5196,38 +5134,6 @@
         "chapter_title": {
           "name": "chapter_title",
           "type": "varchar(500)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "origin": {
-          "name": "origin",
-          "type": "varchar(10)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'web'"
-        },
-        "version": {
-          "name": "version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 1
-        },
-        "deleted_at": {
-          "name": "deleted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "device_created_at": {
-          "name": "device_created_at",
-          "type": "varchar(19)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "device_updated_at": {
-          "name": "device_updated_at",
-          "type": "varchar(19)",
           "primaryKey": false,
           "notNull": false
         },
@@ -5282,28 +5188,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "annotations_user_book_active_idx": {
-          "name": "annotations_user_book_active_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "book_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"annotations\".\"deleted_at\" is null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -5332,11 +5216,7 @@
       "checkConstraints": {
         "annotations_style_chk": {
           "name": "annotations_style_chk",
-          "value": "\"annotations\".\"style\" in ('highlight', 'underline', 'strikethrough', 'squiggly', 'invert')"
-        },
-        "annotations_origin_chk": {
-          "name": "annotations_origin_chk",
-          "value": "\"annotations\".\"origin\" in ('web', 'koreader', 'kobo')"
+          "value": "\"annotations\".\"style\" in ('highlight', 'underline', 'strikethrough', 'squiggly')"
         }
       },
       "isRLSEnabled": false
@@ -5992,6 +5872,13 @@
           "type": "real",
           "primaryKey": false,
           "notNull": false
+        },
+        "source": {
+          "name": "source",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'web'"
         }
       },
       "indexes": {
@@ -6104,6 +5991,10 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
+        "reading_sessions_source_chk": {
+          "name": "reading_sessions_source_chk",
+          "value": "\"reading_sessions\".\"source\" in ('web', 'kobo', 'koreader')"
+        },
         "reading_sessions_duration_seconds_nonnegative_chk": {
           "name": "reading_sessions_duration_seconds_nonnegative_chk",
           "value": "\"reading_sessions\".\"duration_seconds\" >= 0"
@@ -7459,12 +7350,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "client_device_id": {
-          "name": "client_device_id",
-          "type": "varchar(128)",
-          "primaryKey": false,
-          "notNull": false
-        },
         "last_seen_at": {
           "name": "last_seen_at",
           "type": "timestamp with time zone",
@@ -7513,11 +7398,6 @@
           "name": "kobo_devices_token_unique",
           "nullsNotDistinct": false,
           "columns": ["token"]
-        },
-        "kobo_devices_client_device_id_unique": {
-          "name": "kobo_devices_client_device_id_unique",
-          "nullsNotDistinct": false,
-          "columns": ["client_device_id"]
         }
       },
       "policies": {},
@@ -7860,13 +7740,6 @@
         },
         "two_way_progress_sync": {
           "name": "two_way_progress_sync",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "sync_bookorbit_annotations_to_kobo": {
-          "name": "sync_bookorbit_annotations_to_kobo",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
@@ -10344,301 +10217,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.koreader_device_sweeps": {
-      "name": "koreader_device_sweeps",
-      "schema": "",
-      "columns": {
-        "user_id": {
-          "name": "user_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "device_id": {
-          "name": "device_id",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "device_model": {
-          "name": "device_model",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'KOReader'"
-        },
-        "plugin_version": {
-          "name": "plugin_version",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_sweep_at": {
-          "name": "last_sweep_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "last_sweep_books_matched": {
-          "name": "last_sweep_books_matched",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "last_sweep_page_stats": {
-          "name": "last_sweep_page_stats",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "last_sweep_annotations": {
-          "name": "last_sweep_annotations",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "kds_user_id_idx": {
-          "name": "kds_user_id_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "koreader_device_sweeps_user_id_users_id_fk": {
-          "name": "koreader_device_sweeps_user_id_users_id_fk",
-          "tableFrom": "koreader_device_sweeps",
-          "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "koreader_device_sweeps_user_id_device_id_pk": {
-          "name": "koreader_device_sweeps_user_id_device_id_pk",
-          "columns": ["user_id", "device_id"]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.koreader_page_stats": {
-      "name": "koreader_page_stats",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "book_file_id": {
-          "name": "book_file_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "device_id": {
-          "name": "device_id",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "page": {
-          "name": "page",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "start_time": {
-          "name": "start_time",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "duration_seconds": {
-          "name": "duration_seconds",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "total_pages": {
-          "name": "total_pages",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "kps_user_file_device_page_start_uidx": {
-          "name": "kps_user_file_device_page_start_uidx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "book_file_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "device_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "page",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "start_time",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "kps_user_file_device_start_idx": {
-          "name": "kps_user_file_device_start_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "book_file_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "device_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "start_time",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "kps_user_id_idx": {
-          "name": "kps_user_id_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "koreader_page_stats_user_id_users_id_fk": {
-          "name": "koreader_page_stats_user_id_users_id_fk",
-          "tableFrom": "koreader_page_stats",
-          "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "koreader_page_stats_book_file_id_book_files_id_fk": {
-          "name": "koreader_page_stats_book_file_id_book_files_id_fk",
-          "tableFrom": "koreader_page_stats",
-          "tableTo": "book_files",
-          "columnsFrom": ["book_file_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "koreader_page_stats_duration_nonnegative_chk": {
-          "name": "koreader_page_stats_duration_nonnegative_chk",
-          "value": "\"koreader_page_stats\".\"duration_seconds\" >= 0"
-        },
-        "koreader_page_stats_page_nonnegative_chk": {
-          "name": "koreader_page_stats_page_nonnegative_chk",
-          "value": "\"koreader_page_stats\".\"page\" >= 0"
-        },
-        "koreader_page_stats_total_pages_positive_chk": {
-          "name": "koreader_page_stats_total_pages_positive_chk",
-          "value": "\"koreader_page_stats\".\"total_pages\" > 0"
-        },
-        "koreader_page_stats_start_time_positive_chk": {
-          "name": "koreader_page_stats_start_time_positive_chk",
-          "value": "\"koreader_page_stats\".\"start_time\" > 0"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.koreader_users": {
       "name": "koreader_users",
       "schema": "",
@@ -10861,7 +10439,7 @@
       "checkConstraints": {
         "achievements_category_chk": {
           "name": "achievements_category_chk",
-          "value": "\"achievements\".\"category\" in ('reading', 'library', 'exploration', 'dedication')"
+          "value": "\"achievements\".\"category\" in ('reading', 'library', 'exploration', 'dedication', 'devices')"
         },
         "achievements_rarity_chk": {
           "name": "achievements_rarity_chk",
