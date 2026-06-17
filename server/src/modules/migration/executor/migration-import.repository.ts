@@ -6,6 +6,7 @@ import { DB } from '../../../db';
 import { refreshPrimaryAuthorSortNamesForAuthors, refreshPrimaryAuthorSortNamesForBooks } from '../../../db/book-author-sort-key';
 import * as schema from '../../../db/schema';
 import { SeriesIdentityService } from '../../../common/services/series-identity.service';
+import { SeriesMembershipService } from '../../../common/services/series-membership.service';
 import { uniqueNumbers } from './executor-utils';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -74,20 +75,28 @@ export class MigrationImportRepository {
   constructor(
     @Inject(DB) private readonly db: Db,
     @Optional() private readonly seriesIdentity?: SeriesIdentityService,
+    @Optional() private readonly seriesMemberships?: SeriesMembershipService,
   ) {}
 
   async withTransaction<T>(handler: (repo: MigrationImportRepository) => Promise<T>): Promise<T> {
-    return this.db.transaction(async (tx) => handler(new MigrationImportRepository(tx as unknown as Db, this.seriesIdentity)));
+    return this.db.transaction(async (tx) =>
+      handler(new MigrationImportRepository(tx as unknown as Db, this.seriesIdentity, this.seriesMemberships)),
+    );
   }
 
   // --- Metadata ---
 
   async upsertBookMetadata(bookId: number, values: Partial<typeof schema.bookMetadata.$inferInsert>): Promise<void> {
+    const shouldSyncSeries =
+      Object.prototype.hasOwnProperty.call(values, 'seriesName') || Object.prototype.hasOwnProperty.call(values, 'seriesIndex');
     const patch = (await this.seriesIdentity?.resolveMetadataPatch(values, this.db)) ?? values;
     await this.db
       .insert(schema.bookMetadata)
       .values({ bookId, ...patch })
       .onConflictDoUpdate({ target: schema.bookMetadata.bookId, set: patch });
+    if (shouldSyncSeries) {
+      await this.seriesMemberships?.syncPrimaryFromMetadata(bookId, this.db);
+    }
   }
 
   // --- Authors ---
@@ -303,12 +312,17 @@ export class MigrationImportRepository {
     if (items.length === 0) return;
     for (const batch of chunk(items, BATCH_CHUNK_SIZE)) {
       for (const item of batch) {
+        const shouldSyncSeries =
+          Object.prototype.hasOwnProperty.call(item, 'seriesName') || Object.prototype.hasOwnProperty.call(item, 'seriesIndex');
         const patch = (await this.seriesIdentity?.resolveMetadataPatch(item, this.db)) ?? item;
         const set = bookMetadataConflictSet(patch);
         await this.db.insert(schema.bookMetadata).values(patch).onConflictDoUpdate({
           target: schema.bookMetadata.bookId,
           set,
         });
+        if (shouldSyncSeries) {
+          await this.seriesMemberships?.syncPrimaryFromMetadata(item.bookId, this.db);
+        }
       }
     }
   }

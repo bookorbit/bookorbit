@@ -148,6 +148,13 @@
       "when": 1781495568135,
       "tag": "0020_achievements_devices_and_session_source",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1781675709588,
+      "tag": "0021_add_book_series_memberships",
+      "breakpoints": true
     }
   ]
 }

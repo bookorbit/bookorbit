@@ -16,6 +16,8 @@ import {
   bookGenres,
   bookMetadata,
   bookNarrators,
+  bookSeries,
+  bookSeriesMemberships,
   books,
   bookTags,
   collectionBooks,
@@ -96,7 +98,16 @@ export class BookQueryBuilder {
       return sql`exists (${sq})`;
     })();
 
-    return or(ilike(bookMetadata.title, pattern), existsAuthor, ilike(bookMetadata.seriesName, pattern), existsNarrator)!;
+    const existsSeries = (() => {
+      const sq = this.db
+        .select({ one: sql`1` })
+        .from(bookSeriesMemberships)
+        .innerJoin(bookSeries, eq(bookSeries.id, bookSeriesMemberships.seriesId))
+        .where(and(eq(bookSeriesMemberships.bookId, books.id), ilike(bookSeries.name, pattern))!);
+      return sql`exists (${sq})`;
+    })();
+
+    return or(ilike(bookMetadata.title, pattern), existsAuthor, ilike(bookMetadata.seriesName, pattern), existsSeries, existsNarrator)!;
   }
 
   buildOrderBy(sort: SortSpec[], userId?: number): SQL[] {
@@ -125,13 +136,11 @@ export class BookQueryBuilder {
           ? this.textSetRuleToSql(bookMetadata.language, operator, value as string[])
           : this.textRuleToSql(bookMetadata.language, operator, value as string);
       case 'series':
-        return Array.isArray(value)
-          ? this.textSetRuleToSql(bookMetadata.seriesName, operator, value as string[])
-          : this.textRuleToSql(bookMetadata.seriesName, operator, value as string);
+        return this.seriesRuleToSql(operator, value as string | string[] | undefined);
       case 'publishedYear':
         return this.numericRuleToSql(bookMetadata.publishedYear, operator, value as number, valueTo as number | undefined);
       case 'seriesIndex':
-        return this.numericRuleToSql(bookMetadata.seriesIndex, operator, value as number, valueTo as number | undefined);
+        return this.seriesIndexRuleToSql(operator, value as number, valueTo as number | undefined);
       case 'pageCount':
         return this.numericRuleToSql(bookMetadata.pageCount, operator, value as number, valueTo as number | undefined);
       case 'rating':
@@ -245,6 +254,101 @@ export class BookQueryBuilder {
         return isNull(col);
       case 'isNotEmpty':
         return isNotNull(col);
+      default:
+        throw new BadRequestException(`Invalid operator '${operator}' for numeric field`);
+    }
+  }
+
+  private seriesRuleToSql(operator: string, value?: string | string[]): SQL {
+    const existsSeries = (whereClause?: SQL) => {
+      const predicates: SQL[] = [eq(bookSeriesMemberships.bookId, books.id)];
+      if (whereClause) predicates.push(whereClause);
+      const sq = this.db
+        .select({ one: sql`1` })
+        .from(bookSeriesMemberships)
+        .innerJoin(bookSeries, eq(bookSeries.id, bookSeriesMemberships.seriesId))
+        .where(and(...predicates)!);
+      return sql`exists (${sq})`;
+    };
+
+    if (Array.isArray(value)) {
+      switch (operator) {
+        case 'includesAny':
+          if (!value.length) return sql`1 = 0`;
+          return existsSeries(inArray(bookSeries.name, value));
+        case 'excludesAll':
+          if (!value.length) return sql`1 = 1`;
+          return not(existsSeries(inArray(bookSeries.name, value)));
+        default:
+          throw new BadRequestException(`Invalid operator '${operator}' for series field`);
+      }
+    }
+
+    const VALUE_REQUIRED = ['contains', 'notContains', 'startsWith', 'endsWith', 'eq', 'notEq'];
+    if (VALUE_REQUIRED.includes(operator) && !value) {
+      throw new BadRequestException(`Operator '${operator}' requires a non-empty value`);
+    }
+
+    switch (operator) {
+      case 'contains':
+        return existsSeries(ilike(bookSeries.name, `%${escapeLikePattern(value!)}%`));
+      case 'notContains':
+        return not(existsSeries(ilike(bookSeries.name, `%${escapeLikePattern(value!)}%`)));
+      case 'startsWith':
+        return existsSeries(ilike(bookSeries.name, `${escapeLikePattern(value!)}%`));
+      case 'endsWith':
+        return existsSeries(ilike(bookSeries.name, `%${escapeLikePattern(value!)}`));
+      case 'eq':
+        return existsSeries(ilike(bookSeries.name, escapeLikePattern(value!)));
+      case 'notEq':
+        return not(existsSeries(ilike(bookSeries.name, escapeLikePattern(value!))));
+      case 'isEmpty':
+        return not(existsSeries());
+      case 'isNotEmpty':
+        return existsSeries();
+      default:
+        throw new BadRequestException(`Invalid operator '${operator}' for series field`);
+    }
+  }
+
+  private seriesIndexRuleToSql(operator: string, value?: number, valueTo?: number): SQL {
+    const existsSeriesIndex = (whereClause?: SQL) => {
+      const predicates: SQL[] = [eq(bookSeriesMemberships.bookId, books.id)];
+      if (whereClause) predicates.push(whereClause);
+      const sq = this.db
+        .select({ one: sql`1` })
+        .from(bookSeriesMemberships)
+        .where(and(...predicates)!);
+      return sql`exists (${sq})`;
+    };
+
+    switch (operator) {
+      case 'eq':
+        this.assertNumber(value, operator, 'value');
+        return existsSeriesIndex(eq(bookSeriesMemberships.seriesIndex, value!));
+      case 'notEq':
+        this.assertNumber(value, operator, 'value');
+        return existsSeriesIndex(ne(bookSeriesMemberships.seriesIndex, value!));
+      case 'gt':
+        this.assertNumber(value, operator, 'value');
+        return existsSeriesIndex(gt(bookSeriesMemberships.seriesIndex, value!));
+      case 'gte':
+        this.assertNumber(value, operator, 'value');
+        return existsSeriesIndex(gte(bookSeriesMemberships.seriesIndex, value!));
+      case 'lt':
+        this.assertNumber(value, operator, 'value');
+        return existsSeriesIndex(lt(bookSeriesMemberships.seriesIndex, value!));
+      case 'lte':
+        this.assertNumber(value, operator, 'value');
+        return existsSeriesIndex(lte(bookSeriesMemberships.seriesIndex, value!));
+      case 'between':
+        this.assertNumber(value, operator, 'value');
+        this.assertNumber(valueTo, operator, 'valueTo');
+        return existsSeriesIndex(and(gte(bookSeriesMemberships.seriesIndex, value!), lte(bookSeriesMemberships.seriesIndex, valueTo!))!);
+      case 'isEmpty':
+        return not(existsSeriesIndex(isNotNull(bookSeriesMemberships.seriesIndex)));
+      case 'isNotEmpty':
+        return existsSeriesIndex(isNotNull(bookSeriesMemberships.seriesIndex));
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for numeric field`);
     }

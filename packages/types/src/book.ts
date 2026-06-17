@@ -36,6 +36,13 @@ export type BookFileRef = {
   sizeBytes: number | null;
 };
 
+export type BookSeriesMembership = {
+  seriesId: number;
+  seriesName: string;
+  seriesIndex: number | null;
+  displayOrder: number;
+};
+
 export type BookCard = {
   id: number;
   status: string;
@@ -44,6 +51,7 @@ export type BookCard = {
   seriesId?: number | null;
   seriesName: string | null;
   seriesIndex: number | null;
+  seriesMemberships?: BookSeriesMembership[];
   files: BookFileRef[];
   publishedYear: number | null;
   language: string | null;
@@ -119,6 +127,7 @@ export type BookDetail = {
   seriesId?: number | null;
   seriesName: string | null;
   seriesIndex: number | null;
+  seriesMemberships?: BookSeriesMembership[];
   rating: number | null;
   coverSource: "extracted" | "custom" | null;
   providerIds: ProviderIds;
@@ -155,6 +164,7 @@ export type BookMetadataRefreshPreviewFields = {
   pageCount?: number | null;
   seriesName?: string | null;
   seriesIndex?: number | null;
+  seriesMemberships?: { seriesName: string; seriesIndex?: number | null }[] | null;
   coverUrl?: string;
   googleBooksId?: string | null;
   goodreadsId?: string | null;

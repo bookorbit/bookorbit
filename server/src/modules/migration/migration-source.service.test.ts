@@ -46,6 +46,7 @@ function createService(overrides: Partial<Record<string, unknown>> = {}) {
     listSources: vi.fn(() => Promise.resolve([buildSource()])),
     updateSource: vi.fn((id: number, values: Record<string, unknown>) => Promise.resolve({ ...buildSource(), ...values, id })),
     createSource: vi.fn((values: Record<string, unknown>) => Promise.resolve({ ...buildSource({ id: 5 }), ...values })),
+    deleteSource: vi.fn((id: number) => Promise.resolve(buildSource({ id }))),
     updateSourceValidation: vi.fn(() => Promise.resolve(buildSource())),
     purgeRunState: vi.fn(() => Promise.resolve()),
     ...overrides,
@@ -124,6 +125,46 @@ describe('MigrationSourceService', () => {
     });
 
     await expect(service.validateSourceById(999)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('resetSource deletes saved setup when no migration run exists', async () => {
+    const { service, repo } = createService({
+      listRuns: vi.fn(() => Promise.resolve([])),
+    });
+
+    await expect(service.resetSource(1)).resolves.toBeUndefined();
+
+    expect(repo.findSourceById).toHaveBeenCalledWith(1);
+    expect(repo.listRuns).toHaveBeenCalledWith(1);
+    expect(repo.deleteSource).toHaveBeenCalledWith(1);
+  });
+
+  it('resetSource throws NotFoundException when source is missing', async () => {
+    const { service, repo } = createService({
+      findSourceById: vi.fn(() => Promise.resolve(null)),
+    });
+
+    await expect(service.resetSource(999)).rejects.toBeInstanceOf(NotFoundException);
+    expect(repo.deleteSource).not.toHaveBeenCalled();
+  });
+
+  it('resetSource rejects setup reset after a migration run exists', async () => {
+    const { service, repo } = createService({
+      listRuns: vi.fn(() => Promise.resolve([{ id: 10, state: 'failed' }])),
+    });
+
+    await expect(service.resetSource(1)).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.deleteSource).not.toHaveBeenCalled();
+  });
+
+  it('resetSource blocks when a migration run is already active', async () => {
+    const { service, repo } = createService({
+      listRuns: vi.fn(() => Promise.resolve([{ id: 99, state: 'running' }])),
+    });
+
+    await expect(service.resetSource(1)).rejects.toBeInstanceOf(ConflictException);
+    expect(repo.findSourceById).not.toHaveBeenCalled();
+    expect(repo.deleteSource).not.toHaveBeenCalled();
   });
 
   it('createSource updates existing source and preserves sentinel password', async () => {

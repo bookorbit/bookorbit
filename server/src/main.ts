@@ -6,13 +6,19 @@ import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { join } from 'path';
-import { Readable } from 'stream';
 import fastifyCookie from '@fastify/cookie';
 import fastifyMultipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import fastifyHelmet from '@fastify/helmet';
 import fastifyCompress from '@fastify/compress';
-import { parseBooleanEnv, parseTrustProxy, buildCspDirectives } from './common/utils/bootstrap.utils';
+import {
+  parseBooleanEnv,
+  parseTrustProxy,
+  buildCspDirectives,
+  buildEmptyJsonBodyStream,
+  registerEmptyBodyContentTypeParser,
+  shouldInjectEmptyJsonBody,
+} from './common/utils/bootstrap.utils';
 
 const MAX_COVER_BYTES = 20 * 1024 * 1024;
 
@@ -25,25 +31,16 @@ async function bootstrap() {
 
   const fastify = adapter.getInstance();
 
-  // Kobo devices send Content-Type: application/json with empty bodies on GET/DELETE.
   // Fastify's default JSON parser rejects empty bodies, so we inject '{}' before parsing.
   fastify.addHook('preParsing', (request, _reply, payload, done) => {
-    const ct = request.headers['content-type'] ?? '';
-    const isJson = ct.startsWith('application/json');
-    const isEmpty = request.headers['content-length'] === '0' || request.headers['content-length'] === undefined;
-    if (isJson && isEmpty) {
-      // Kobo sends Content-Length: 0 with application/json on DELETE; align header with injected body.
-      if (request.method === 'DELETE' && request.headers['content-length'] === '0') {
-        request.headers['content-length'] = '2';
-      }
-      const fake = new Readable();
-      fake.push('{}');
-      fake.push(null);
-      done(null, fake);
+    if (shouldInjectEmptyJsonBody(request.method, request.headers)) {
+      done(null, buildEmptyJsonBodyStream(request.headers));
       return;
     }
     done(null, payload);
   });
+  // Reverse proxies can forward empty mutating requests with chunked transfer or an unsupported content type.
+  registerEmptyBodyContentTypeParser(fastify);
 
   // Echo pino-http's request ID so clients can correlate errors with server logs.
   fastify.addHook('onSend', (_request, reply, _payload, done) => {

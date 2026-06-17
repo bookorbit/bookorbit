@@ -211,6 +211,23 @@ describe('MigrationRepository', () => {
     await expect(repo.findRunById(400)).resolves.toEqual({ id: 400 });
   });
 
+  it('deletes migration sources and returns null when no row is deleted', async () => {
+    const returning = vi
+      .fn()
+      .mockResolvedValueOnce([{ id: 7 }])
+      .mockResolvedValueOnce([]);
+    const where = vi.fn().mockReturnValue({ returning });
+    const deleteFn = vi.fn().mockReturnValue({ where });
+
+    const repo = new MigrationRepository({ delete: deleteFn } as never);
+
+    await expect(repo.deleteSource(7)).resolves.toEqual({ id: 7 });
+    await expect(repo.deleteSource(8)).resolves.toBeNull();
+
+    expect(deleteFn).toHaveBeenCalledWith(schema.migrationSources);
+    expect(where).toHaveBeenCalledTimes(2);
+  });
+
   it('lists sources/profiles/plans/runs and run metrics via select query chains', async () => {
     const orderBy = vi.fn().mockResolvedValue([{ id: 1 }]);
     const where = vi.fn().mockReturnValue({ orderBy });

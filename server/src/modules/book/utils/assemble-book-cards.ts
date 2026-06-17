@@ -46,6 +46,7 @@ type CollapsedBookRow = BookRow & {
 type NameRow = { bookId: number; name: string };
 type NarratorRow = { bookId: number; name: string };
 type FileRow = { bookId: number; id: number; format: string | null; role: string; sizeBytes: number | null };
+type SeriesMembershipRow = { bookId: number; seriesId: number; seriesName: string; seriesIndex: number | null; displayOrder: number };
 type ProgressRow = { bookFileId: number; percentage: number | null };
 type StatusRow = {
   bookId: number;
@@ -65,6 +66,7 @@ export function assembleBookCards(
   statusRows: StatusRow[] = [],
   narratorRows: NarratorRow[] = [],
   tagRows: NameRow[] = [],
+  seriesMembershipRows: SeriesMembershipRow[] = [],
 ): BookCard[] {
   const authorsByBook = new Map<number, string[]>();
   for (const row of authorRows) {
@@ -117,6 +119,13 @@ export function assembleBookCards(
     tagsByBook.set(row.bookId, list);
   }
 
+  const seriesMembershipsByBook = new Map<number, SeriesMembershipRow[]>();
+  for (const row of seriesMembershipRows) {
+    const list = seriesMembershipsByBook.get(row.bookId) ?? [];
+    list.push(row);
+    seriesMembershipsByBook.set(row.bookId, list);
+  }
+
   return rows.map((row) => {
     const rawFiles = filesByBook.get(row.id) ?? [];
     const primaryFile =
@@ -140,6 +149,15 @@ export function assembleBookCards(
       seriesId: row.seriesId ?? null,
       seriesName: row.seriesName ?? null,
       seriesIndex: row.seriesIndex ?? null,
+      seriesMemberships: (seriesMembershipsByBook.get(row.id) ?? [])
+        .slice()
+        .sort((a, b) => a.displayOrder - b.displayOrder || a.seriesId - b.seriesId)
+        .map((membership) => ({
+          seriesId: membership.seriesId,
+          seriesName: membership.seriesName,
+          seriesIndex: membership.seriesIndex,
+          displayOrder: membership.displayOrder,
+        })),
       authors: authorsByBook.get(row.id) ?? [],
       files,
       publishedYear: row.publishedYear ?? null,
@@ -173,8 +191,9 @@ export function assembleCollapsedBookCards(
   statusRows: StatusRow[] = [],
   narratorRows: NarratorRow[] = [],
   tagRows: NameRow[] = [],
+  seriesMembershipRows: SeriesMembershipRow[] = [],
 ): BookCard[] {
-  const base = assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows, narratorRows, tagRows);
+  const base = assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows, narratorRows, tagRows, seriesMembershipRows);
 
   for (let i = 0; i < base.length; i++) {
     const row = rows[i];

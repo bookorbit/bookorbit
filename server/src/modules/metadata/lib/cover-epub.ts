@@ -1,38 +1,9 @@
 import * as unzipper from 'unzipper';
 import { XMLParser } from 'fast-xml-parser';
 
+import { attr, findInZip, resolvePath, toRecordArray } from './epub-zip-utils';
+
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', removeNSPrefix: true });
-
-function attr(obj: Record<string, unknown>, key: string): string {
-  const v = obj[key];
-  return typeof v === 'string' ? v : '';
-}
-
-function toRecordArray(val: unknown): Record<string, unknown>[] {
-  if (Array.isArray(val)) return val as Record<string, unknown>[];
-  if (val != null && typeof val === 'object') return [val as Record<string, unknown>];
-  return [];
-}
-
-function resolvePath(base: string, rel: string): string {
-  const parts = (base + rel).split('/');
-  const resolved: string[] = [];
-  for (const part of parts) {
-    if (part === '..') resolved.pop();
-    else if (part !== '.') resolved.push(part);
-  }
-  return resolved.join('/');
-}
-
-function findInZip(zip: unzipper.CentralDirectory, rawHref: string, opfDir: string) {
-  const decoded = decodeURIComponent(rawHref);
-  const candidates = [resolvePath(opfDir, decoded), resolvePath(opfDir, rawHref), decoded, rawHref];
-  const lower = candidates.map((c) => c.toLowerCase());
-  return zip.files.find((f) => {
-    const p = f.path.startsWith('/') ? f.path.slice(1) : f.path;
-    return candidates.includes(p) || lower.includes(p.toLowerCase());
-  });
-}
 
 /** Extract the first <img src> from an HTML cover page and resolve it to a zip entry. */
 async function imageFromHtmlCoverPage(zip: unzipper.CentralDirectory, htmlItem: Record<string, unknown>, opfDir: string): Promise<Buffer | null> {

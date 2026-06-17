@@ -1,6 +1,7 @@
 import type {
   AudiobookChapter,
   BookFileWriteStatus,
+  BookSeriesMembership,
   BookMetadataLockField,
   ComicMetadataFields,
   NarratorRef,
@@ -45,6 +46,7 @@ export class BookDetailDto {
   seriesId: number | null;
   seriesName: string | null;
   seriesIndex: number | null;
+  seriesMemberships: BookSeriesMembership[];
   rating: number | null;
   coverSource: 'extracted' | 'custom' | null;
   providerIds: ProviderIds;

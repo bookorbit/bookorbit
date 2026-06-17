@@ -50,6 +50,11 @@ export class MigrationRepository {
     return this.db.query.migrationSources.findFirst({ where: eq(schema.migrationSources.id, id) });
   }
 
+  async deleteSource(id: number) {
+    const [row] = await this.db.delete(schema.migrationSources).where(eq(schema.migrationSources.id, id)).returning();
+    return row ?? null;
+  }
+
   listTargetUsersForMapping() {
     return this.db
       .select({

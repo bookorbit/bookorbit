@@ -1,3 +1,7 @@
+import { formatSeriesIndex } from '../../common/utils/series-index-format.utils';
+
+export { formatSeriesIndex };
+
 export interface RenameMetadata {
   title: string | null;
   subtitle: string | null;
@@ -25,12 +29,4 @@ export function buildTokens(metadata: RenameMetadata, authors: string[], origina
   if (authors.length > 0) tokens['authors'] = authors.join(', ');
 
   return tokens;
-}
-
-export function formatSeriesIndex(value: number | null): string | null {
-  if (value == null) return null;
-  const whole = Math.floor(value);
-  const fraction = value - whole;
-  const padded = String(whole).padStart(2, '0');
-  return fraction > 0 ? `${padded}.${String(fraction).split('.')[1]}` : padded;
 }

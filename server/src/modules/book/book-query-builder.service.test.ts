@@ -498,17 +498,18 @@ describe('field coverage smoke tests', () => {
 });
 
 describe('buildQuickSearch', () => {
-  it('produces an OR of title/series ilike and author/narrator exists subqueries', () => {
+  it('produces an OR of title/series ilike and author/series/narrator exists subqueries', () => {
     const { builder } = makeBuilder();
 
     const result = builder.buildQuickSearch('tolkien') as any;
 
     expect(result).toMatchObject({ type: 'or' });
-    expect(result.clauses).toHaveLength(4);
+    expect(result.clauses).toHaveLength(5);
     expect(result.clauses[0]).toMatchObject({ type: 'ilike', pattern: '%tolkien%' });
     expect(result.clauses[1]).toMatchObject({ type: 'sql' });
     expect(result.clauses[2]).toMatchObject({ type: 'ilike', pattern: '%tolkien%' });
     expect(result.clauses[3]).toMatchObject({ type: 'sql' });
+    expect(result.clauses[4]).toMatchObject({ type: 'sql' });
   });
 
   it('escapes LIKE special characters in q', () => {
@@ -528,12 +529,12 @@ describe('buildQuickSearch', () => {
     expect(result.clauses[0]).toMatchObject({ type: 'ilike', pattern: '%book\\_one%' });
   });
 
-  it('calls db.select twice (once for authors, once for narrators)', () => {
+  it('calls db.select three times for author, series membership, and narrator exists subqueries', () => {
     const { builder, db } = makeBuilder();
 
     builder.buildQuickSearch('dune');
 
-    expect(db.select).toHaveBeenCalledTimes(2);
+    expect(db.select).toHaveBeenCalledTimes(3);
   });
 });
 

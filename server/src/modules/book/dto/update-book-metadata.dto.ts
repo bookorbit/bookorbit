@@ -28,6 +28,11 @@ export class ComicMetadataDto {
   @IsOptional() @IsArray() @IsString({ each: true }) storyArcs?: string[];
 }
 
+export class BookSeriesMembershipDto {
+  @IsString() @MaxLength(500) seriesName!: string;
+  @IsOptional() @IsNumber() seriesIndex?: number | null;
+}
+
 export class UpdateBookMetadataDto {
   @IsOptional() @IsString() @MaxLength(1000) title?: string | null;
   @IsOptional() @IsString() @MaxLength(1000) subtitle?: string | null;
@@ -39,6 +44,7 @@ export class UpdateBookMetadataDto {
   @IsOptional() @Transform(({ value }) => (value === 0 ? null : value)) @IsInt() @Min(1) pageCount?: number | null;
   @IsOptional() @IsString() @MaxLength(500) seriesName?: string | null;
   @IsOptional() @IsNumber() seriesIndex?: number | null;
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => BookSeriesMembershipDto) seriesMemberships?: BookSeriesMembershipDto[] | null;
   @IsOptional() @IsString() @MaxLength(10) isbn10?: string | null;
   @IsOptional() @IsString() @MaxLength(13) isbn13?: string | null;
   @IsOptional() @IsInt() @Min(1) @Max(5) rating?: number | null;

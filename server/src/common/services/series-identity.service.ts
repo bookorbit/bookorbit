@@ -4,7 +4,7 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { bookMetadata, bookSeries } from '../../db/schema';
+import { bookMetadata, bookSeries, bookSeriesMemberships } from '../../db/schema';
 import { sanitizeLogValue } from '../utils/log-sanitize.utils';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -22,8 +22,9 @@ export class SeriesIdentityService implements OnModuleInit {
       await this.db.transaction(async (tx) => {
         await tx.execute(sql`SET LOCAL statement_timeout = 0`);
         await this.backfillMissingSeriesIds(tx);
+        await this.backfillMissingSeriesMemberships(tx);
       });
-      this.logger.log(`[series.backfill] [end] durationMs=${Date.now() - start} - series id backfill completed`);
+      this.logger.log(`[series.backfill] [end] durationMs=${Date.now() - start} - series id and membership backfill completed`);
     } catch (err) {
       const e = err as Error & { cause?: unknown };
       const cause = e.cause instanceof Error ? e.cause.message : e.message;
@@ -97,6 +98,21 @@ export class SeriesIdentityService implements OnModuleInit {
       SET series_id = NULL
       WHERE (${bookMetadata.seriesName} IS NULL OR btrim(${bookMetadata.seriesName}) = '')
         AND ${bookMetadata.seriesId} IS NOT NULL
+    `);
+  }
+
+  async backfillMissingSeriesMemberships(executor: Pick<Db, 'execute'> = this.db): Promise<void> {
+    await executor.execute(sql`
+      INSERT INTO ${bookSeriesMemberships} (book_id, series_id, series_index, display_order)
+      SELECT ${bookMetadata.bookId}, ${bookMetadata.seriesId}, ${bookMetadata.seriesIndex}, 0
+      FROM ${bookMetadata}
+      WHERE ${bookMetadata.seriesId} IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1
+          FROM ${bookSeriesMemberships}
+          WHERE ${bookSeriesMemberships.bookId} = ${bookMetadata.bookId}
+        )
+      ON CONFLICT DO NOTHING
     `);
   }
 

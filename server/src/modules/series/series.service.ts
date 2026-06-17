@@ -126,9 +126,24 @@ export class SeriesService {
         cardData.genreRows,
         cardData.progressRows,
         cardData.statusRows,
+        cardData.narratorRows,
+        cardData.tagRows,
+        cardData.seriesMembershipRows,
       );
       const orderMap = new Map(bookPage.bookIds.map((id, i) => [id, i]));
-      items = cards.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
+      items = cards
+        .map((card) => {
+          const contextualSeries = (card.seriesMemberships ?? []).find((membership) => membership.seriesId === seriesId);
+          return contextualSeries
+            ? {
+                ...card,
+                seriesId: contextualSeries.seriesId,
+                seriesName: contextualSeries.seriesName,
+                seriesIndex: contextualSeries.seriesIndex,
+              }
+            : card;
+        })
+        .sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
     }
 
     const seriesInfo: SeriesDetail = {

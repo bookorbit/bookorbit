@@ -14,6 +14,8 @@ import type {
 import { NotificationType, resolveUploadPath } from '@bookorbit/types';
 import { NotificationService } from '../notification/notification.service';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
+import { SeriesMembershipService } from '../../common/services/series-membership.service';
+import { formatSeriesIndex } from '../../common/utils/series-index-format.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { authors, bookAuthors, bookMetadata, books, libraries, libraryFolders } from '../../db/schema';
@@ -71,6 +73,7 @@ export class BookDockFinalizeService implements OnModuleInit {
     private readonly gateway: BookDockGateway,
     private readonly notificationService: NotificationService,
     @Optional() private readonly seriesIdentity?: SeriesIdentityService,
+    @Optional() private readonly seriesMemberships?: SeriesMembershipService,
   ) {}
 
   onModuleInit() {
@@ -542,12 +545,8 @@ export class BookDockFinalizeService implements OnModuleInit {
     if (meta.isbn13) tokens['isbn'] = meta.isbn13;
     if (meta.publishedYear) tokens['year'] = String(meta.publishedYear);
     if (meta.seriesName) tokens['series'] = meta.seriesName;
-    if (meta.seriesIndex != null) {
-      const whole = Math.floor(meta.seriesIndex);
-      const fraction = meta.seriesIndex - whole;
-      const padded = String(whole).padStart(2, '0');
-      tokens['seriesIndex'] = fraction > 0 ? `${padded}.${String(fraction).split('.')[1]}` : padded;
-    }
+    const seriesIndex = formatSeriesIndex(meta.seriesIndex ?? null);
+    if (seriesIndex) tokens['seriesIndex'] = seriesIndex;
     if (meta.authors && meta.authors.length > 0) {
       tokens['authors'] = meta.authors.join(', ');
     }
@@ -594,6 +593,7 @@ export class BookDockFinalizeService implements OnModuleInit {
       .update(bookMetadata)
       .set({ ...patch, ...buildAudioMetadataPatch(audio) })
       .where(eq(bookMetadata.bookId, bookId));
+    await this.seriesMemberships?.syncPrimaryFromMetadata(bookId);
 
     if (meta.authors.length > 0) {
       await this.metadataService.replaceAuthors(

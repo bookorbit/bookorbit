@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { parseBooleanEnv, parseTrustProxy, buildCspDirectives } from './bootstrap.utils';
+import Fastify, { type FastifyInstance } from 'fastify';
+import {
+  parseBooleanEnv,
+  parseTrustProxy,
+  buildCspDirectives,
+  buildEmptyJsonBodyStream,
+  registerEmptyBodyContentTypeParser,
+  shouldInjectEmptyJsonBody,
+} from './bootstrap.utils';
 
 describe('parseBooleanEnv', () => {
   it('returns fallback when value is undefined', () => {
@@ -228,3 +236,124 @@ describe('buildCspDirectives', () => {
     });
   });
 });
+
+describe('empty request body bootstrap handling', () => {
+  it('identifies empty JSON body requests that need parser-safe replacement', () => {
+    expect(shouldInjectEmptyJsonBody('POST', { 'content-type': 'application/json', 'content-length': '0' })).toBe(true);
+    expect(shouldInjectEmptyJsonBody('DELETE', { 'content-type': 'application/json' })).toBe(true);
+    expect(shouldInjectEmptyJsonBody('PATCH', { 'content-type': 'application/json; charset=utf-8', 'content-length': '0' })).toBe(true);
+    expect(shouldInjectEmptyJsonBody('POST', { 'content-type': 'Application/JSON', 'content-length': ' 0 ' })).toBe(true);
+
+    expect(shouldInjectEmptyJsonBody('GET', { 'content-type': 'application/json', 'content-length': '0' })).toBe(false);
+    expect(shouldInjectEmptyJsonBody('POST', { 'content-type': 'text/plain', 'content-length': '0' })).toBe(false);
+    expect(shouldInjectEmptyJsonBody('POST', { 'content-type': 'application/json', 'content-length': '9' })).toBe(false);
+  });
+
+  it('builds a parser-safe empty JSON stream with a matching content length', async () => {
+    const headers = { 'content-length': '0' };
+    const stream = buildEmptyJsonBodyStream(headers);
+    const chunks: Buffer[] = [];
+
+    for await (const chunk of stream) {
+      chunks.push(Buffer.from(chunk));
+    }
+
+    expect(headers['content-length']).toBe('2');
+    expect(Buffer.concat(chunks).toString('utf8')).toBe('{}');
+  });
+
+  it('accepts empty unsupported content types as an empty object', async () => {
+    await withParserApp(async (app) => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/body',
+        headers: {
+          'content-type': 'application/octet-stream',
+          'content-length': '0',
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ body: {} });
+    });
+  });
+
+  it('accepts empty chunked requests without a content type as an empty object', async () => {
+    await withParserApp(async (app) => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/body',
+        headers: {
+          'transfer-encoding': 'chunked',
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ body: {} });
+    });
+  });
+
+  it('still rejects non-empty unsupported content types', async () => {
+    await withParserApp(async (app) => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/body',
+        headers: {
+          'content-type': 'application/octet-stream',
+        },
+        payload: 'not json',
+      });
+
+      expect(response.statusCode).toBe(415);
+      expect(response.json()).toMatchObject({
+        message: 'Unsupported Media Type',
+        statusCode: 415,
+      });
+    });
+  });
+
+  it('still rejects non-empty bodies without a content type', async () => {
+    await withParserApp(async (app) => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/body',
+        payload: 'not json',
+      });
+
+      expect(response.statusCode).toBe(415);
+      expect(response.json()).toMatchObject({
+        message: 'Unsupported Media Type',
+        statusCode: 415,
+      });
+    });
+  });
+
+  it('does not interfere with Fastify JSON parsing', async () => {
+    await withParserApp(async (app) => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/body',
+        headers: {
+          'content-type': 'application/json',
+        },
+        payload: JSON.stringify({ ok: true }),
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ body: { ok: true } });
+    });
+  });
+});
+
+async function withParserApp(run: (app: FastifyInstance) => Promise<void>): Promise<void> {
+  const app = Fastify({ logger: false });
+  registerEmptyBodyContentTypeParser(app);
+  app.post('/body', (request) => ({ body: request.body ?? null }));
+
+  try {
+    await app.ready();
+    await run(app);
+  } finally {
+    await app.close();
+  }
+}

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { Eye, EyeOff, Loader2, X, ChevronLeft, ChevronRight, Check, AlertCircle } from 'lucide-vue-next'
+import { Eye, EyeOff, Loader2, X, ChevronLeft, ChevronRight, Check, AlertCircle, RotateCcw } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import SearchableUserSelect from './SearchableUserSelect.vue'
 import { api } from '@/lib/api'
@@ -36,6 +36,7 @@ import {
 } from '@/features/migration/lib/migration-api'
 import { useMigrationPolling } from '@/features/migration/composables/useMigrationPolling'
 import { useMigrationProgress } from '@/features/migration/composables/useMigrationProgress'
+import { useMigrationSetupReset } from '@/features/migration/composables/useMigrationSetupReset'
 
 interface StepDefinition {
   label: string
@@ -88,7 +89,7 @@ const suggestionsLoadedAt = ref<string | null>(null)
 const userMappings = ref<UserMappingDraft[]>([])
 const pathMappings = ref<PathMappingDraft[]>([{ sourcePrefix: '', targetPrefix: '' }])
 
-const sourceDraft = reactive({
+const DEFAULT_SOURCE_DRAFT = {
   type: 'booklore',
   name: 'Booklore',
   host: '',
@@ -98,7 +99,9 @@ const sourceDraft = reactive({
   database: '',
   ssl: false,
   mediaRootPath: '',
-})
+}
+
+const sourceDraft = reactive({ ...DEFAULT_SOURCE_DRAFT })
 
 const busy = reactive({
   testingSource: false,
@@ -125,6 +128,8 @@ const profile = computed<MigrationProfile | null>(() => active.value?.profile ??
 const plan = computed<MigrationPlanArtifact | null>(() => active.value?.plan ?? null)
 const run = computed<MigrationRun | null>(() => active.value?.run ?? null)
 const hasActiveRun = computed(() => workflowState.value?.hasActiveRun === true)
+const sourceIdForReset = computed(() => source.value?.id ?? null)
+const canResetSetup = computed(() => source.value != null && run.value == null && !hasActiveRun.value)
 const sourceCapabilities = computed<MigrationSourceCapabilities | null>(() => source.value?.capabilities ?? null)
 const sourceValidationWarnings = computed(() => sourceCapabilities.value?.warnings ?? [])
 const sourceRowCounts = computed(() => Object.entries(sourceCapabilities.value?.counts ?? {}).sort(([left], [right]) => left.localeCompare(right)))
@@ -146,6 +151,16 @@ const mediaRootPathHint = computed(() => {
     className: 'text-muted-foreground',
     text: 'Cover import path configured. Use Test Connection to verify access and Booklore images folder structure.',
   }
+})
+
+const { resettingSource, resetSetup: onResetSetup } = useMigrationSetupReset({
+  sourceId: sourceIdForReset,
+  canResetSetup,
+  resetLocalState: resetLocalMigrationState,
+  refreshWorkflowState,
+  notifySuccess: toast.success,
+  notifyError: toast.error,
+  getErrorMessage,
 })
 
 const preflight = computed(() => {
@@ -631,7 +646,10 @@ async function refreshWorkflowState() {
 
 function hydrateSourceDraft() {
   const currentSource = source.value
-  if (!currentSource) return
+  if (!currentSource) {
+    resetSourceDraft()
+    return
+  }
   sourceDraft.type = currentSource.type || sourceDraft.type
   sourceDraft.name = currentSource.name || sourceDraft.name
   const cfg = asRecord(currentSource.connectionConfig)
@@ -642,6 +660,15 @@ function hydrateSourceDraft() {
   sourceDraft.database = asString(cfg.database) ?? sourceDraft.database
   sourceDraft.ssl = asBoolean(cfg.ssl) ?? sourceDraft.ssl
   sourceDraft.mediaRootPath = asString(cfg.mediaRootPath) ?? ''
+}
+
+function resetSourceDraft() {
+  Object.assign(sourceDraft, {
+    ...DEFAULT_SOURCE_DRAFT,
+    type: supportedTypes.value[0] ?? DEFAULT_SOURCE_DRAFT.type,
+  })
+  mediaPathTestState.value = 'idle'
+  mediaPathTestMessage.value = null
 }
 
 function hydratePathMappings() {
@@ -821,6 +848,17 @@ async function onSaveAndValidate() {
   } finally {
     busy.savingSource = false
   }
+}
+
+function resetLocalMigrationState() {
+  pathValidation.value = null
+  suggestionsLoadedAt.value = null
+  sourcePathPrefixes.value = []
+  runProgress.value = null
+  runReport.value = null
+  duplicateResolutions.value = new Map()
+  duplicateTargetBookLabels.value = new Map()
+  currentStep.value = 0
 }
 
 async function autoLoadPathPrefixes() {
@@ -1942,14 +1980,26 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => S
             <!-- Footer -->
             <div class="shrink-0 border-t border-border px-5 md:px-6 py-4">
               <div class="flex items-center justify-between">
-                <button
-                  class="flex items-center gap-1.5 px-4 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  @click="onBackOrCancel"
-                >
-                  <X v-if="currentStep === 0" :size="14" />
-                  <ChevronLeft v-else :size="14" />
-                  {{ currentStep === 0 ? 'Cancel' : 'Back' }}
-                </button>
+                <div class="flex items-center gap-2">
+                  <button
+                    class="flex items-center gap-1.5 px-4 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    @click="onBackOrCancel"
+                  >
+                    <X v-if="currentStep === 0" :size="14" />
+                    <ChevronLeft v-else :size="14" />
+                    {{ currentStep === 0 ? 'Cancel' : 'Back' }}
+                  </button>
+                  <button
+                    v-if="canResetSetup"
+                    class="flex items-center gap-1.5 px-4 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                    :disabled="resettingSource"
+                    @click="onResetSetup"
+                  >
+                    <Loader2 v-if="resettingSource" class="size-3.5 animate-spin" />
+                    <RotateCcw v-else :size="14" />
+                    Reset Setup
+                  </button>
+                </div>
 
                 <span class="text-xs text-muted-foreground hidden md:block">Step {{ currentStep + 1 }} of 5</span>
 

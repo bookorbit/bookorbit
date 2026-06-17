@@ -2,6 +2,11 @@ import { computed, reactive, ref } from 'vue'
 import { api } from '@/lib/api'
 import { FORMAT_TO_GROUP, type BookDetail, type BookMetadataLockField, type BookMetadataSaveResult } from '@bookorbit/types'
 
+export type EditableSeriesMembership = {
+  seriesName: string
+  seriesIndex: number | null
+}
+
 const ROOT_FIELDS = [
   'title',
   'subtitle',
@@ -10,8 +15,6 @@ const ROOT_FIELDS = [
   'publishedYear',
   'language',
   'pageCount',
-  'seriesName',
-  'seriesIndex',
   'isbn10',
   'isbn13',
   'rating',
@@ -56,6 +59,28 @@ function normalizePageCount(value: number | null): number | null {
   return typeof value === 'number' && value > 0 ? value : null
 }
 
+export function normalizeSeriesMemberships(values: readonly EditableSeriesMembership[]): EditableSeriesMembership[] {
+  const seen = new Set<string>()
+  const out: EditableSeriesMembership[] = []
+  for (const value of values) {
+    const seriesName = value.seriesName.trim()
+    if (!seriesName) continue
+    const key = seriesName.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ seriesName, seriesIndex: value.seriesIndex ?? null })
+  }
+  return out
+}
+
+function seriesMembershipsFromBook(book: BookDetail): EditableSeriesMembership[] {
+  const memberships = book.seriesMemberships ?? []
+  if (memberships.length > 0) {
+    return normalizeSeriesMemberships(memberships.map((membership) => ({ seriesName: membership.seriesName, seriesIndex: membership.seriesIndex })))
+  }
+  return book.seriesName ? [{ seriesName: book.seriesName, seriesIndex: book.seriesIndex }] : []
+}
+
 export function useMetadataEditor() {
   const saving = ref(false)
   const error = ref<string | null>(null)
@@ -70,6 +95,7 @@ export function useMetadataEditor() {
     pageCount: null as number | null,
     seriesName: null as string | null,
     seriesIndex: null as number | null,
+    seriesMemberships: [] as EditableSeriesMembership[],
     isbn10: null as string | null,
     isbn13: null as string | null,
     rating: null as number | null,
@@ -119,6 +145,7 @@ export function useMetadataEditor() {
     form.pageCount = book.pageCount
     form.seriesName = book.seriesName
     form.seriesIndex = book.seriesIndex
+    form.seriesMemberships = seriesMembershipsFromBook(book)
     form.isbn10 = book.isbn10
     form.isbn13 = book.isbn13
     form.rating = book.rating ?? null
@@ -172,6 +199,12 @@ export function useMetadataEditor() {
       if (JSON.stringify(current) !== JSON.stringify(previous[field])) {
         payload[field] = current
       }
+    }
+
+    const currentSeriesMemberships = normalizeSeriesMemberships(form.seriesMemberships)
+    const previousSeriesMemberships = normalizeSeriesMemberships(previous.seriesMemberships)
+    if (JSON.stringify(currentSeriesMemberships) !== JSON.stringify(previousSeriesMemberships)) {
+      payload.seriesMemberships = currentSeriesMemberships
     }
 
     const comicMetadata: Record<string, unknown> = {}

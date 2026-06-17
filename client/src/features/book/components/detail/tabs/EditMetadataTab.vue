@@ -23,9 +23,10 @@ import ChipInput from '@/components/ui/ChipInput.vue'
 import CoverEditorPanel from './CoverEditorPanel.vue'
 import MetadataSearchDrawer from './MetadataSearchDrawer.vue'
 import MetadataFieldLabel from './MetadataFieldLabel.vue'
+import SeriesMembershipEditor from './SeriesMembershipEditor.vue'
 import WriteAndRenameResultPanel from '../WriteAndRenameResultPanel.vue'
 import type { MetadataPatch } from '../../../composables/useMetadataDiff'
-import { useMetadataEditor } from '../../../composables/useMetadataEditor'
+import { type EditableSeriesMembership, useMetadataEditor } from '../../../composables/useMetadataEditor'
 import { type MetadataRefreshPreview, useRefreshMetadata } from '../../../composables/useRefreshMetadata'
 import { type FileMetadata, useFileMetadata } from '../../../composables/useFileMetadata'
 import { useWriteAndRename } from '../../../composables/useWriteAndRename'
@@ -143,6 +144,7 @@ const {
   markPersisted: markLocksPersisted,
   isLocked,
   isUpdating: isUpdatingLock,
+  replace: replaceLocks,
   toggle,
   lockAll,
   unlockAll,
@@ -185,16 +187,6 @@ function setIntField(field: 'publishedYear' | 'pageCount' | 'durationSeconds', e
   form[field] = isNaN(n) ? null : n
 }
 
-function setFloatField(field: 'seriesIndex', e: Event) {
-  const val = (e.target as HTMLInputElement).value
-  if (val === '') {
-    form[field] = null
-    return
-  }
-  const n = parseFloat(val)
-  form[field] = isNaN(n) ? null : n
-}
-
 watch(
   () => props.book,
   (book) => {
@@ -207,6 +199,7 @@ watch(
 const combinedError = computed(() => lockError.value ?? error.value)
 const hasLockedFields = computed(() => lockedFields.value.length > 0)
 const hasPendingChanges = computed(() => isDirty.value || locksDirty.value)
+const isSeriesLocked = computed(() => isLocked('seriesName') || isLocked('seriesIndex'))
 
 async function submit() {
   if (coverPanel.value?.hasPending) {
@@ -256,8 +249,54 @@ function trackLockedField(field: BookMetadataLockField, skippedFields: BookMetad
   }
 }
 
+function normalizeSeriesIndex(value: unknown): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number.parseFloat(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
+}
+
+function setSeriesMemberships(memberships: EditableSeriesMembership[]) {
+  form.seriesMemberships = memberships
+  const primary = memberships.find((membership) => membership.seriesName.trim())
+  form.seriesName = primary?.seriesName.trim() || null
+  form.seriesIndex = primary?.seriesIndex ?? null
+}
+
+function handleSeriesMembershipsUpdate(memberships: EditableSeriesMembership[]) {
+  setSeriesMemberships(memberships)
+}
+
+function applyPrimarySeriesPatch(field: 'seriesName' | 'seriesIndex', value: unknown, skippedFields: BookMetadataLockField[]): boolean {
+  if (isSeriesLocked.value) {
+    if (isLocked('seriesName')) trackLockedField('seriesName', skippedFields)
+    if (isLocked('seriesIndex')) trackLockedField('seriesIndex', skippedFields)
+    return false
+  }
+
+  const next = [...form.seriesMemberships]
+  const primary = next[0] ?? { seriesName: form.seriesName ?? '', seriesIndex: form.seriesIndex ?? null }
+  const patched =
+    field === 'seriesName'
+      ? { ...primary, seriesName: typeof value === 'string' ? value : value == null ? '' : String(value) }
+      : { ...primary, seriesIndex: normalizeSeriesIndex(value) }
+
+  if (next.length > 0) {
+    next[0] = patched
+  } else {
+    next.push(patched)
+  }
+  setSeriesMemberships(next)
+  return true
+}
+
 function applyDirectPatchField(field: (typeof DIRECT_PATCH_FIELDS)[number], value: unknown, skippedFields: BookMetadataLockField[]): boolean {
   if (value === undefined) return false
+  if (field === 'seriesName' || field === 'seriesIndex') {
+    return applyPrimarySeriesPatch(field, value, skippedFields)
+  }
   if (isLocked(field)) {
     trackLockedField(field, skippedFields)
     return false
@@ -492,6 +531,14 @@ onBeforeUnmount(() => {
 
 async function handleLockToggle(field: BookMetadataLockField) {
   await toggle(props.book.id, field)
+}
+
+async function handleSeriesLockToggle() {
+  const seriesFields: BookMetadataLockField[] = ['seriesName', 'seriesIndex']
+  const next = isSeriesLocked.value
+    ? lockedFields.value.filter((field) => !seriesFields.includes(field))
+    : [...new Set([...lockedFields.value, ...seriesFields])]
+  await replaceLocks(props.book.id, next, 'seriesName')
 }
 
 function handleCoverLockToggle() {
@@ -834,43 +881,25 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         </MetadataFieldLabel>
       </div>
 
-      <!-- Series | Index | Publisher -->
-      <div class="grid grid-cols-[1fr_7rem] sm:flex sm:flex-wrap gap-3">
+      <!-- Series | Publisher -->
+      <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)] gap-3">
         <MetadataFieldLabel
-          class="min-w-0 sm:flex-1 sm:min-w-35"
           label="Series"
           field="seriesName"
-          :locked="isLocked('seriesName')"
+          :locked="isSeriesLocked"
           :is-updating="isUpdatingLock"
-          @toggle="handleLockToggle"
+          multiline
+          @toggle="handleSeriesLockToggle"
         >
-          <InputWithSuggestions
-            v-model="form.seriesName"
+          <SeriesMembershipEditor
+            class="pr-10"
+            :model-value="form.seriesMemberships"
             :search-fn="searchSeriesName"
-            :disabled="isLocked('seriesName')"
-            :class="'w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed'"
+            :disabled="isSeriesLocked"
+            @update:model-value="handleSeriesMembershipsUpdate"
           />
         </MetadataFieldLabel>
         <MetadataFieldLabel
-          class="sm:w-28 sm:shrink-0"
-          label="Index"
-          field="seriesIndex"
-          :locked="isLocked('seriesIndex')"
-          :is-updating="isUpdatingLock"
-          @toggle="handleLockToggle"
-        >
-          <input
-            :value="form.seriesIndex ?? ''"
-            type="number"
-            step="0.1"
-            min="0"
-            class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
-            :disabled="isLocked('seriesIndex')"
-            @input="setFloatField('seriesIndex', $event)"
-          />
-        </MetadataFieldLabel>
-        <MetadataFieldLabel
-          class="col-span-2 sm:flex-1 sm:min-w-30"
           label="Publisher"
           field="publisher"
           :locked="isLocked('publisher')"

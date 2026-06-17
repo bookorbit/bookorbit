@@ -1,7 +1,11 @@
+import { Logger } from '@nestjs/common';
 import * as unzipper from 'unzipper';
 import { XMLParser } from 'fast-xml-parser';
 
+import { scanEpubSpineForIsbn } from './epub-isbn-scan';
 import { ParsedOpf, parseOpf } from './opf-parser';
+
+const logger = new Logger('EpubMetadata');
 
 const containerParser = new XMLParser({
   ignoreAttributes: false,
@@ -40,7 +44,18 @@ export async function extractEpubMetadata(absolutePath: string): Promise<ParsedO
     const zip = await unzipper.Open.file(absolutePath);
     const opfPath = await findOpfPath(zip);
     const opfXml = await readFileFromZip(zip, opfPath);
-    return parseOpf(opfXml);
+    const opf = parseOpf(opfXml);
+
+    if (opf.isbn10 == null && opf.isbn13 == null) {
+      const found = await scanEpubSpineForIsbn(zip, opfXml, opfPath);
+      if (found.isbn10 || found.isbn13) {
+        opf.isbn10 = found.isbn10;
+        opf.isbn13 = found.isbn13;
+        logger.debug(`[epub.isbn_fallback] isbn13=${found.isbn13 ?? ''} isbn10=${found.isbn10 ?? ''} - recovered isbn from content`);
+      }
+    }
+
+    return opf;
   } catch {
     return null;
   }

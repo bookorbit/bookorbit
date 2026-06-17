@@ -14,6 +14,7 @@ import {
   createSource,
   testSource,
   validateSourceById,
+  resetSource,
   suggestUserMappings,
   validatePathMappings,
   createProfile,
@@ -179,6 +180,19 @@ describe('validateSourceById', () => {
     const result = await validateSourceById(5)
     expect(result).toEqual({ ok: true, warnings: [] })
     expect(mockApi).toHaveBeenCalledWith('/api/v1/migration/sources/5/validate', expect.objectContaining({ method: 'POST' }))
+  })
+})
+
+describe('resetSource', () => {
+  it('deletes a saved source setup', async () => {
+    mockApi.mockResolvedValue(okResponse(null))
+    await expect(resetSource(5)).resolves.toBeUndefined()
+    expect(mockApi).toHaveBeenCalledWith('/api/v1/migration/sources/5', expect.objectContaining({ method: 'DELETE' }))
+  })
+
+  it('throws the backend message when reset fails', async () => {
+    mockApi.mockResolvedValue(errorResponse(400, { message: 'Cannot reset migration setup after a migration run has been created' }))
+    await expect(resetSource(5)).rejects.toThrow('Cannot reset migration setup after a migration run has been created')
   })
 })
 

@@ -1,6 +1,7 @@
 import { IsArray, IsIn, IsInt, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { BulkSelectionDto } from './bulk-selection.dto';
+import { BookSeriesMembershipDto } from './update-book-metadata.dto';
 
 const ARRAY_MODES = ['add', 'remove', 'replace'] as const;
 export type BulkArrayMode = (typeof ARRAY_MODES)[number];
@@ -26,7 +27,17 @@ export class BulkScalarNumberFieldDto {
   value!: number | null;
 }
 
-const ALLOWED_FIELD_KEYS = new Set<string>(['authors', 'seriesName', 'genres', 'tags', 'publisher', 'language', 'publishedYear', 'narrators']);
+const ALLOWED_FIELD_KEYS = new Set<string>([
+  'authors',
+  'seriesName',
+  'seriesMemberships',
+  'genres',
+  'tags',
+  'publisher',
+  'language',
+  'publishedYear',
+  'narrators',
+]);
 
 export class BulkEditFieldsDto {
   @IsOptional()
@@ -38,6 +49,12 @@ export class BulkEditFieldsDto {
   @ValidateNested()
   @Type(() => BulkScalarStringFieldDto)
   seriesName?: BulkScalarStringFieldDto;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BookSeriesMembershipDto)
+  seriesMemberships?: BookSeriesMembershipDto[];
 
   @IsOptional()
   @ValidateNested()

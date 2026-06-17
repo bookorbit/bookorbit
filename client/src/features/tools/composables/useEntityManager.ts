@@ -56,6 +56,8 @@ export function useEntityManager() {
   // Selection state
   const selectedIds = ref<Set<number | string>>(new Set())
   const selectedItemsMap = ref<Map<number | string, BrowseEntityItem>>(new Map())
+  const selectionAnchorId = ref<number | string | null>(null)
+  const selectionAnchorSelected = ref(false)
 
   // Operation state
   const operationLoading = ref(false)
@@ -146,7 +148,7 @@ export function useEntityManager() {
     browseItems.value = []
     browseTotal.value = 0
     browsePage.value = 1
-    selectedIds.value = new Set()
+    resetSelection()
   }
 
   watch(entityType, () => {
@@ -159,7 +161,7 @@ export function useEntityManager() {
   })
 
   watch(mode, () => {
-    selectedIds.value = new Set()
+    resetSelection()
   })
 
   async function scan(): Promise<void> {
@@ -336,19 +338,60 @@ export function useEntityManager() {
     }
   }
 
+  function syncSelectedItem(id: number | string, selected: boolean): void {
+    if (!selected) {
+      selectedItemsMap.value.delete(id)
+      return
+    }
+
+    const item = browseItems.value.find((i) => i.id === id)
+    if (item) {
+      selectedItemsMap.value.set(id, item)
+    }
+  }
+
+  function setItemSelected(next: Set<number | string>, id: number | string, selected: boolean): void {
+    if (selected) {
+      next.add(id)
+    } else {
+      next.delete(id)
+    }
+    syncSelectedItem(id, selected)
+  }
+
   function toggleSelection(id: number | string): void {
     const newSet = new Set(selectedIds.value)
-    if (newSet.has(id)) {
-      newSet.delete(id)
-      selectedItemsMap.value.delete(id)
-    } else {
-      newSet.add(id)
-      // Add to map if we have it in current page
-      const item = browseItems.value.find((i) => i.id === id)
+    const shouldSelect = !newSet.has(id)
+    setItemSelected(newSet, id, shouldSelect)
+    selectedIds.value = newSet
+    selectionAnchorId.value = id
+    selectionAnchorSelected.value = shouldSelect
+  }
+
+  function rangeSelectTo(targetId: number | string): void {
+    if (selectionAnchorId.value === null) {
+      toggleSelection(targetId)
+      return
+    }
+
+    const anchorIdx = browseItems.value.findIndex((item) => item.id === selectionAnchorId.value)
+    const targetIdx = browseItems.value.findIndex((item) => item.id === targetId)
+    if (anchorIdx === -1 || targetIdx === -1) {
+      toggleSelection(targetId)
+      return
+    }
+
+    const start = Math.min(anchorIdx, targetIdx)
+    const end = Math.max(anchorIdx, targetIdx)
+    const newSet = new Set(selectedIds.value)
+
+    for (let i = start; i <= end; i += 1) {
+      const item = browseItems.value[i]
       if (item) {
-        selectedItemsMap.value.set(id, item)
+        setItemSelected(newSet, item.id, selectionAnchorSelected.value)
       }
     }
+
     selectedIds.value = newSet
   }
 
@@ -358,11 +401,21 @@ export function useEntityManager() {
     newSet.delete(id)
     selectedItemsMap.value.delete(id)
     selectedIds.value = newSet
+    if (selectionAnchorId.value === id) {
+      selectionAnchorId.value = null
+      selectionAnchorSelected.value = false
+    }
+  }
+
+  function resetSelection(): void {
+    selectedIds.value = new Set()
+    selectedItemsMap.value.clear()
+    selectionAnchorId.value = null
+    selectionAnchorSelected.value = false
   }
 
   function clearSelection(): void {
-    selectedIds.value = new Set()
-    selectedItemsMap.value.clear()
+    resetSelection()
   }
 
   const browseTotalPages = computed(() => Math.ceil(browseTotal.value / browsePageSize.value))
@@ -406,6 +459,7 @@ export function useEntityManager() {
     selectedIds,
     selectedItemsMap,
     toggleSelection,
+    rangeSelectTo,
     removeFromSelection,
     clearSelection,
 

@@ -47,10 +47,12 @@ function makeUpdateTx() {
   const where = vi.fn().mockResolvedValue(undefined);
   const set = vi.fn().mockReturnValue({ where });
   const update = vi.fn().mockReturnValue({ set });
+  const deleteWhere = vi.fn().mockResolvedValue(undefined);
+  const deleteFrom = vi.fn().mockReturnValue({ where: deleteWhere });
   const execute = vi.fn().mockResolvedValue({ rows: [] });
-  const tx = { update, execute };
+  const tx = { update, execute, delete: deleteFrom };
   const transaction = vi.fn().mockImplementation(async (callback: (txArg: typeof tx) => Promise<unknown>) => callback(tx));
-  return { transaction, tx, update, set, where, execute };
+  return { transaction, tx, update, set, where, deleteFrom, deleteWhere, execute };
 }
 
 describe('SeriesStrategy', () => {
@@ -159,8 +161,8 @@ describe('SeriesStrategy', () => {
     expect(select).not.toHaveBeenCalled();
   });
 
-  it('merges source series into a target for scoped books only', async () => {
-    const { transaction, set, where } = makeUpdateTx();
+  it('merges source series memberships into a target for scoped books only', async () => {
+    const { transaction, execute } = makeUpdateTx();
     const strategy = makeStrategy({ transaction });
     vi.spyOn(strategy, 'findEntityById').mockResolvedValue({ id: 1, name: 'Target' });
     vi.spyOn(strategy as never, 'findAffectedBookIdsInLibraries').mockResolvedValue([10, 20]);
@@ -170,8 +172,9 @@ describe('SeriesStrategy', () => {
       affectedBookIds: [10, 20],
     });
 
-    expect(set).toHaveBeenCalledWith(expect.objectContaining({ seriesId: 1, seriesName: 'Target', updatedAt: expect.any(Date) }));
-    expect(where).toHaveBeenCalledTimes(1);
+    const statements = execute.mock.calls.map((call) => flattenSql(call[0]).replace(/\s+/g, ' '));
+    expect(statements.some((statement) => statement.includes('UPDATE book_series_memberships'))).toBe(true);
+    expect(statements.some((statement) => statement.includes('UPDATE book_metadata bm'))).toBe(true);
   });
 
   it('does not merge when target or source ids are invalid', async () => {
@@ -189,7 +192,7 @@ describe('SeriesStrategy', () => {
   });
 
   it('renames a series and reports implicit merges', async () => {
-    const { transaction, set } = makeUpdateTx();
+    const { transaction, execute } = makeUpdateTx();
     const strategy = makeStrategy({ transaction });
     vi.spyOn(strategy, 'findEntityById').mockResolvedValue({ id: 2, name: 'Old' });
     vi.spyOn(strategy as never, 'upsertSeries').mockResolvedValue({ id: 5, name: 'New' });
@@ -199,7 +202,9 @@ describe('SeriesStrategy', () => {
     const result = await strategy.rename({ entityId: 2, newName: ' New ', userId: 9, libraryIds: [1] });
 
     expect(result).toEqual({ oldName: 'Old', affectedBookIds: [10], wasImplicitMerge: true, mergedEntityId: 5 });
-    expect(set).toHaveBeenCalledWith(expect.objectContaining({ seriesId: 5, seriesName: 'New', updatedAt: expect.any(Date) }));
+    const statements = execute.mock.calls.map((call) => flattenSql(call[0]).replace(/\s+/g, ' '));
+    expect(statements.some((statement) => statement.includes('UPDATE book_series_memberships'))).toBe(true);
+    expect(statements.some((statement) => statement.includes('UPDATE book_metadata bm'))).toBe(true);
   });
 
   it('renames a series without reporting a merge when the identity is unchanged', async () => {
@@ -239,8 +244,8 @@ describe('SeriesStrategy', () => {
     await expect(strategy.rename({ entityId: 2, newName: '   ', userId: 9, libraryIds: [1] })).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('deletes a series by clearing metadata for scoped books', async () => {
-    const { transaction, set } = makeUpdateTx();
+  it('deletes a series by removing scoped memberships and syncing primary metadata', async () => {
+    const { transaction, deleteFrom, deleteWhere, execute } = makeUpdateTx();
     const strategy = makeStrategy({ transaction });
     vi.spyOn(strategy, 'findEntityById').mockResolvedValue({ id: 2, name: 'Old' });
     vi.spyOn(strategy as never, 'findAffectedBookIdsInLibraries').mockResolvedValue([10, 11]);
@@ -249,7 +254,10 @@ describe('SeriesStrategy', () => {
     const result = await strategy.deleteEntity({ entityId: 2, mode: 'hard', libraryIds: [1] });
 
     expect(result).toEqual({ name: 'Old', affectedBookIds: [10, 11] });
-    expect(set).toHaveBeenCalledWith(expect.objectContaining({ seriesId: null, seriesName: null, updatedAt: expect.any(Date) }));
+    expect(deleteFrom).toHaveBeenCalledTimes(1);
+    expect(deleteWhere).toHaveBeenCalledTimes(1);
+    const statements = execute.mock.calls.map((call) => flattenSql(call[0]).replace(/\s+/g, ' '));
+    expect(statements.some((statement) => statement.includes('UPDATE book_metadata bm'))).toBe(true);
   });
 
   it('does not start a delete transaction when no scoped books are affected', async () => {
@@ -326,7 +334,8 @@ describe('SeriesStrategy', () => {
     const limit = vi.fn().mockResolvedValue([{ title: 'A' }, { title: 'B' }]);
     const orderBy = vi.fn().mockReturnValue({ limit });
     const where = vi.fn().mockReturnValue({ orderBy });
-    const from = vi.fn().mockReturnValue({ where });
+    const innerJoin = vi.fn().mockReturnValue({ where });
+    const from = vi.fn().mockReturnValue({ innerJoin });
     const select = vi.fn().mockReturnValue({ from });
     const strategy = makeStrategy({ select });
 
