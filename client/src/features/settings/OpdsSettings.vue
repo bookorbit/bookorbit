@@ -8,6 +8,7 @@ import { api } from '@/lib/api'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import type { OpdsUser, OpdsSortOrder } from '@bookorbit/types'
 import { useMediaQuery } from '@vueuse/core'
+import { copyToClipboard } from '@/lib/clipboard'
 
 const { hasPermission } = usePermissions()
 const canManageSettings = computed(() => hasPermission('manage_app_settings'))
@@ -82,8 +83,12 @@ async function toggleOpds() {
 }
 
 async function copyUrl() {
-  await secureCopy(opdsUrl.value)
-  toast.success('OPDS URL copied to clipboard')
+  const copied = await copyToClipboard(opdsUrl.value)
+  if (copied) {
+    toast.success('OPDS URL copied to clipboard')
+  } else {
+    toast.error('Failed to copy OPDS URL')
+  }
 }
 
 async function createUser() {
@@ -176,39 +181,11 @@ function userDetailsOpen(id: number) {
 }
 
 async function copyValue(value: string, label: string) {
-  await secureCopy(value)
-  toast.success(`${label} copied`)
-}
-
-async function secureCopy(text: string): Promise<boolean> {
-  if (navigator.clipboard && window.isSecureContext) {
-    try {
-      await navigator.clipboard.writeText(text)
-      return true
-    } catch {
-      return false
-    }
-  }
-
-  const textArea = document.createElement('textarea')
-  textArea.value = text
-  textArea.style.position = 'fixed'
-  textArea.style.top = '-9999px'
-  textArea.style.left = '-9999px'
-  textArea.style.opacity = '0'
-  textArea.setAttribute('readonly', '')
-
-  document.body.appendChild(textArea)
-  textArea.focus()
-  textArea.select()
-
-  try {
-    const successful = document.execCommand('copy')
-    document.body.removeChild(textArea)
-    return successful
-  } catch {
-    document.body.removeChild(textArea)
-    return false
+  const copied = await copyToClipboard(value)
+  if (copied) {
+    toast.success(`${label} copied`)
+  } else {
+    toast.error(`Failed to copy ${label.toLowerCase()}`)
   }
 }
 
