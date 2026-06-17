@@ -175,8 +175,8 @@ watchEffect(() => {
       </span>
       <span v-if="subtitle" class="text-xs text-muted-foreground">{{ subtitle }}</span>
     </div>
-    <div v-if="hasData" class="min-h-0 flex-1 transition-opacity" :class="{ 'opacity-50': loading }" style="min-height: 220px">
-      <VChart :option autoresize class="h-full w-full" />
+    <div v-if="hasData" class="relative min-h-0 flex-1 transition-opacity" :class="{ 'opacity-50': loading }" style="min-height: 220px">
+      <VChart :option autoresize class="absolute inset-0" />
     </div>
     <div v-else class="flex flex-1 items-center justify-center py-12 text-sm text-muted-foreground" style="min-height: 220px">
       No reading activity in this window.
