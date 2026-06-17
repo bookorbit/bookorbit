@@ -16,6 +16,7 @@ import {
 } from '../../common/book-cover-storage';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
+import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { refreshPrimaryAuthorSortNamesForBooks } from '../../db/book-author-sort-key';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
 import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
@@ -75,6 +76,7 @@ export class MetadataService {
     @Optional() private readonly embedder: BookEmbedderService,
     @Optional() private readonly metadataEvents?: MetadataEventsService,
     @Optional() private readonly seriesIdentity?: SeriesIdentityService,
+    @Optional() private readonly seriesMemberships?: SeriesMembershipService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
     const audio = new AudioFormatExtractor();
@@ -540,9 +542,14 @@ export class MetadataService {
     if (filtered.audioMetadata?.durationSeconds !== undefined) scalarFields.durationSeconds = filtered.audioMetadata.durationSeconds;
     if (filtered.audioMetadata?.chapters !== undefined) scalarFields.chapters = filtered.audioMetadata.chapters;
     if (Object.keys(scalarFields).length > 0) {
+      const shouldSyncSeries =
+        Object.prototype.hasOwnProperty.call(scalarFields, 'seriesName') || Object.prototype.hasOwnProperty.call(scalarFields, 'seriesIndex');
       scalarFields.updatedAt = new Date();
       const patch = (await this.seriesIdentity?.resolveMetadataPatch(scalarFields)) ?? scalarFields;
       await this.db.update(bookMetadata).set(patch).where(eq(bookMetadata.bookId, bookId));
+      if (shouldSyncSeries) {
+        await this.seriesMemberships?.syncPrimaryFromMetadata(bookId);
+      }
     }
 
     if (filtered.authors !== undefined) {
@@ -584,6 +591,7 @@ export class MetadataService {
       ranobedbId: data.ranobedbId,
       koboId: data.koboId,
       lubimyczytacId: data.lubimyczytacId,
+      aladinId: data.aladinId,
       itunesId: data.itunesId,
       comicMetadata: data.comicMetadata ?? undefined,
     });
@@ -609,11 +617,17 @@ export class MetadataService {
     if (filtered.ranobedbId !== undefined) scalarFields.ranobedbId = filtered.ranobedbId;
     if (filtered.koboId !== undefined) scalarFields.koboId = filtered.koboId;
     if (filtered.lubimyczytacId !== undefined) scalarFields.lubimyczytacId = filtered.lubimyczytacId;
+    if (filtered.aladinId !== undefined) scalarFields.aladinId = filtered.aladinId;
     if (filtered.itunesId !== undefined) scalarFields.itunesId = filtered.itunesId;
     if (Object.keys(scalarFields).length > 0) {
+      const shouldSyncSeries =
+        Object.prototype.hasOwnProperty.call(scalarFields, 'seriesName') || Object.prototype.hasOwnProperty.call(scalarFields, 'seriesIndex');
       scalarFields.updatedAt = new Date();
       const patch = (await this.seriesIdentity?.resolveMetadataPatch(scalarFields)) ?? scalarFields;
       await this.db.update(bookMetadata).set(patch).where(eq(bookMetadata.bookId, bookId));
+      if (shouldSyncSeries) {
+        await this.seriesMemberships?.syncPrimaryFromMetadata(bookId);
+      }
     }
 
     if (filtered.authors !== undefined) {

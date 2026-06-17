@@ -11,6 +11,7 @@ const PROVIDER_ICON_PATHS = {
   kobo: `${PROVIDER_ICON_BASE_PATH}/kobo.svg`,
   ranobedb: `${PROVIDER_ICON_BASE_PATH}/ranobedb.svg`,
   lubimyczytac: `${PROVIDER_ICON_BASE_PATH}/lubimyczytac.svg`,
+  aladin: `${PROVIDER_ICON_BASE_PATH}/aladin.svg`,
 } as const
 
 type ProviderIconKey = keyof typeof PROVIDER_ICON_PATHS

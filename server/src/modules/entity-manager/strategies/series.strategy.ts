@@ -1,11 +1,11 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { SQL, and, asc, count, desc, eq, ilike, inArray, isNotNull, sql } from 'drizzle-orm';
+import { SQL, and, asc, count, desc, eq, ilike, inArray, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { buildContentFilterClauses } from '../../../common/utils/content-filter-sql.utils';
 import { DB } from '../../../db';
 import * as schema from '../../../db/schema';
-import { bookMetadata, books, bookSeries } from '../../../db/schema';
+import { bookMetadata, books, bookSeries, bookSeriesMemberships } from '../../../db/schema';
 import type {
   BrowseParams,
   BrowseResult,
@@ -67,14 +67,14 @@ export class SeriesStrategy implements EntityStrategy {
         JOIN book_series s2 ON s1.id < s2.id AND s1.name % s2.name
         WHERE similarity(s1.name, s2.name) >= ${similarityThreshold}
           AND EXISTS (
-            SELECT 1 FROM book_metadata bm
-            JOIN books b ON b.id = bm.book_id
-            WHERE bm.series_id = s1.id AND b.library_id IN (${libraryIdList})
+            SELECT 1 FROM book_series_memberships bsm
+            JOIN books b ON b.id = bsm.book_id
+            WHERE bsm.series_id = s1.id AND b.library_id IN (${libraryIdList})
           )
           AND EXISTS (
-            SELECT 1 FROM book_metadata bm
-            JOIN books b ON b.id = bm.book_id
-            WHERE bm.series_id = s2.id AND b.library_id IN (${libraryIdList})
+            SELECT 1 FROM book_series_memberships bsm
+            JOIN books b ON b.id = bsm.book_id
+            WHERE bsm.series_id = s2.id AND b.library_id IN (${libraryIdList})
           )
         ORDER BY similarity(s1.name, s2.name) DESC
       `);
@@ -116,26 +116,26 @@ export class SeriesStrategy implements EntityStrategy {
     if (params.libraryIds.length === 0) return { items: [], total: 0 };
 
     const filterClauses = params.contentFilters ? buildContentFilterClauses(params.contentFilters, this.db) : [];
-    const conditions = [inArray(books.libraryId, params.libraryIds), isNotNull(bookMetadata.seriesId), ...filterClauses];
+    const conditions = [inArray(books.libraryId, params.libraryIds), ...filterClauses];
     if (params.search) {
       conditions.push(ilike(bookSeries.name, `%${escapeLike(params.search)}%`) as never);
     }
 
     const where = and(...conditions)!;
-    const bookCountExpr = sql<number>`count(distinct ${bookMetadata.bookId})::int`;
+    const bookCountExpr = sql<number>`count(distinct ${bookSeriesMemberships.bookId})::int`;
 
     const [countResult, itemRows] = await Promise.all([
       this.db
         .select({ total: sql<number>`count(distinct ${bookSeries.id})::int` })
         .from(bookSeries)
-        .innerJoin(bookMetadata, eq(bookMetadata.seriesId, bookSeries.id))
-        .innerJoin(books, eq(books.id, bookMetadata.bookId))
+        .innerJoin(bookSeriesMemberships, eq(bookSeriesMemberships.seriesId, bookSeries.id))
+        .innerJoin(books, eq(books.id, bookSeriesMemberships.bookId))
         .where(where),
       this.db
         .select({ id: bookSeries.id, name: bookSeries.name, bookCount: bookCountExpr })
         .from(bookSeries)
-        .innerJoin(bookMetadata, eq(bookMetadata.seriesId, bookSeries.id))
-        .innerJoin(books, eq(books.id, bookMetadata.bookId))
+        .innerJoin(bookSeriesMemberships, eq(bookSeriesMemberships.seriesId, bookSeries.id))
+        .innerJoin(books, eq(books.id, bookSeriesMemberships.bookId))
         .where(where)
         .groupBy(bookSeries.id, bookSeries.name)
         .orderBy(
@@ -169,10 +169,8 @@ export class SeriesStrategy implements EntityStrategy {
     if (affectedBookIds.length === 0) return { affectedBookIds };
 
     await this.db.transaction(async (tx) => {
-      await tx
-        .update(bookMetadata)
-        .set({ seriesId: targetId, seriesName: target.name, updatedAt: new Date() })
-        .where(and(inArray(bookMetadata.bookId, affectedBookIds), inArray(bookMetadata.seriesId, sourceIds)));
+      await this.mergeMemberships(sourceIds, targetId, affectedBookIds, tx as unknown as Db);
+      await this.syncPrimaryMetadataForBooks(affectedBookIds, tx as unknown as Db);
       await this.deleteUnusedSeriesRows(sourceIds, tx as unknown as Db);
     });
 
@@ -200,10 +198,10 @@ export class SeriesStrategy implements EntityStrategy {
     const wasImplicitMerge = target.id !== entityId;
 
     await this.db.transaction(async (tx) => {
-      await tx
-        .update(bookMetadata)
-        .set({ seriesId: target.id, seriesName: target.name, updatedAt: new Date() })
-        .where(and(inArray(bookMetadata.bookId, affectedBookIds), eq(bookMetadata.seriesId, entityId)));
+      if (wasImplicitMerge) {
+        await this.mergeMemberships([entityId], target.id, affectedBookIds, tx as unknown as Db);
+      }
+      await this.syncPrimaryMetadataForBooks(affectedBookIds, tx as unknown as Db);
       await this.deleteUnusedSeriesRows([entityId], tx as unknown as Db);
     });
 
@@ -224,9 +222,9 @@ export class SeriesStrategy implements EntityStrategy {
     if (affectedBookIds.length > 0) {
       await this.db.transaction(async (tx) => {
         await tx
-          .update(bookMetadata)
-          .set({ seriesId: null, seriesName: null, updatedAt: new Date() })
-          .where(and(inArray(bookMetadata.bookId, affectedBookIds), eq(bookMetadata.seriesId, entityId)));
+          .delete(bookSeriesMemberships)
+          .where(and(inArray(bookSeriesMemberships.bookId, affectedBookIds), eq(bookSeriesMemberships.seriesId, entityId)));
+        await this.syncPrimaryMetadataForBooks(affectedBookIds, tx as unknown as Db);
         await this.deleteUnusedSeriesRows([entityId], tx as unknown as Db);
       });
     }
@@ -241,23 +239,27 @@ export class SeriesStrategy implements EntityStrategy {
   async findAffectedBookIds(ids: (number | string)[]): Promise<number[]> {
     const seriesIds = numericIds(ids);
     if (seriesIds.length === 0) return [];
-    const rows = await this.db.select({ bookId: bookMetadata.bookId }).from(bookMetadata).where(inArray(bookMetadata.seriesId, seriesIds));
-    return rows.map((row) => row.bookId);
+    const rows = await this.db
+      .select({ bookId: bookSeriesMemberships.bookId })
+      .from(bookSeriesMemberships)
+      .where(inArray(bookSeriesMemberships.seriesId, seriesIds));
+    return [...new Set(rows.map((row) => row.bookId))];
   }
 
   async getBookCount(id: number | string): Promise<number> {
     const [row] = await this.db
       .select({ count: count() })
-      .from(bookMetadata)
-      .where(eq(bookMetadata.seriesId, Number(id)));
+      .from(bookSeriesMemberships)
+      .where(eq(bookSeriesMemberships.seriesId, Number(id)));
     return row?.count ?? 0;
   }
 
   async getBookTitles(id: number | string, limit: number): Promise<string[]> {
     const rows = await this.db
       .select({ title: sql<string>`COALESCE(${bookMetadata.title}, 'Untitled')` })
-      .from(bookMetadata)
-      .where(eq(bookMetadata.seriesId, Number(id)))
+      .from(bookSeriesMemberships)
+      .innerJoin(bookMetadata, eq(bookMetadata.bookId, bookSeriesMemberships.bookId))
+      .where(eq(bookSeriesMemberships.seriesId, Number(id)))
       .orderBy(asc(bookMetadata.title))
       .limit(limit);
     return rows.map((row) => row.title);
@@ -289,11 +291,110 @@ export class SeriesStrategy implements EntityStrategy {
   private async findAffectedBookIdsInLibraries(seriesIds: number[], libraryIds: number[] | undefined): Promise<number[]> {
     if (seriesIds.length === 0 || !libraryIds || libraryIds.length === 0) return [];
     const rows = await this.db
-      .select({ bookId: bookMetadata.bookId })
-      .from(bookMetadata)
-      .innerJoin(books, eq(books.id, bookMetadata.bookId))
-      .where(and(inArray(bookMetadata.seriesId, seriesIds), inArray(books.libraryId, libraryIds)));
-    return rows.map((row) => row.bookId);
+      .select({ bookId: bookSeriesMemberships.bookId })
+      .from(bookSeriesMemberships)
+      .innerJoin(books, eq(books.id, bookSeriesMemberships.bookId))
+      .where(and(inArray(bookSeriesMemberships.seriesId, seriesIds), inArray(books.libraryId, libraryIds)));
+    return [...new Set(rows.map((row) => row.bookId))];
+  }
+
+  private async mergeMemberships(sourceIds: number[], targetId: number, affectedBookIds: number[], db: Db): Promise<void> {
+    const sourceSeriesIds = numericIds(sourceIds);
+    const bookIds = numericIds(affectedBookIds);
+    if (sourceSeriesIds.length === 0 || bookIds.length === 0) return;
+    const sourceIdList = sqlNumberList(sourceSeriesIds);
+    const bookIdList = sqlNumberList(bookIds);
+
+    await db.execute(sql`
+      UPDATE book_series_memberships bsm
+      SET series_id = ${targetId}, updated_at = now()
+      WHERE bsm.book_id IN (${bookIdList})
+        AND bsm.series_id IN (${sourceIdList})
+        AND NOT EXISTS (
+          SELECT 1
+          FROM book_series_memberships existing
+          WHERE existing.book_id = bsm.book_id
+            AND existing.series_id = ${targetId}
+        )
+    `);
+
+    await db.execute(sql`
+      DELETE FROM book_series_memberships
+      WHERE book_id IN (${bookIdList})
+        AND series_id IN (${sourceIdList})
+    `);
+
+    await this.renumberMemberships(bookIds, db);
+  }
+
+  private async renumberMemberships(bookIds: number[], db: Db): Promise<void> {
+    const scopedBookIds = numericIds(bookIds);
+    if (scopedBookIds.length === 0) return;
+    const bookIdList = sqlNumberList(scopedBookIds);
+
+    await db.execute(sql`
+      UPDATE book_series_memberships
+      SET display_order = display_order + 100000
+      WHERE book_id IN (${bookIdList})
+    `);
+
+    await db.execute(sql`
+      WITH ranked AS (
+        SELECT
+          book_id,
+          series_id,
+          row_number() OVER (PARTITION BY book_id ORDER BY display_order ASC, series_id ASC) - 1 AS next_display_order
+        FROM book_series_memberships
+        WHERE book_id IN (${bookIdList})
+      )
+      UPDATE book_series_memberships bsm
+      SET display_order = ranked.next_display_order,
+          updated_at = now()
+      FROM ranked
+      WHERE bsm.book_id = ranked.book_id
+        AND bsm.series_id = ranked.series_id
+    `);
+  }
+
+  private async syncPrimaryMetadataForBooks(bookIds: number[], db: Db): Promise<void> {
+    const scopedBookIds = numericIds(bookIds);
+    if (scopedBookIds.length === 0) return;
+    const bookIdList = sqlNumberList(scopedBookIds);
+
+    await this.renumberMemberships(scopedBookIds, db);
+
+    await db.execute(sql`
+      UPDATE book_metadata bm
+      SET series_id = bsm.series_id,
+          series_name = bs.name,
+          series_index = bsm.series_index,
+          updated_at = now()
+      FROM book_series_memberships bsm
+      JOIN book_series bs ON bs.id = bsm.series_id
+      WHERE bm.book_id = bsm.book_id
+        AND bsm.display_order = 0
+        AND bm.book_id IN (${bookIdList})
+    `);
+
+    await db.execute(sql`
+      UPDATE book_metadata bm
+      SET series_id = NULL,
+          series_name = NULL,
+          series_index = NULL,
+          updated_at = now()
+      WHERE bm.book_id IN (${bookIdList})
+        AND NOT EXISTS (
+          SELECT 1
+          FROM book_series_memberships bsm
+          WHERE bsm.book_id = bm.book_id
+        )
+    `);
+
+    await db.execute(sql`
+      UPDATE books
+      SET updated_at = now()
+      WHERE id IN (${bookIdList})
+    `);
   }
 
   private async deleteUnusedSeriesRows(seriesIds: number[], db: Db): Promise<void> {
@@ -304,8 +405,8 @@ export class SeriesStrategy implements EntityStrategy {
       DELETE FROM book_series s
       WHERE s.id IN (${seriesIdList})
         AND NOT EXISTS (
-          SELECT 1 FROM book_metadata bm
-          WHERE bm.series_id = s.id
+          SELECT 1 FROM book_series_memberships bsm
+          WHERE bsm.series_id = s.id
         )
     `);
   }

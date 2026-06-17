@@ -3,6 +3,7 @@ import { api } from '@/lib/api'
 import { toast } from 'vue-sonner'
 import type { Ref } from 'vue'
 import type { BookCard, SortSpec, GroupRule } from '@bookorbit/types'
+import type { EditableSeriesMembership } from './useMetadataEditor'
 
 export type ArrayMode = 'add' | 'remove' | 'replace'
 
@@ -25,6 +26,7 @@ export type BulkEditFields = {
   tags?: BulkEditArrayField
   narrators?: BulkEditArrayField
   seriesName?: BulkEditScalarStringField
+  seriesMemberships?: EditableSeriesMembership[]
   publisher?: BulkEditScalarStringField
   language?: BulkEditScalarStringField
   publishedYear?: BulkEditScalarNumberField
@@ -129,6 +131,12 @@ function applyOptimisticUpdates(fields: BulkEditFields, ids: number[], books: Re
 
     if (fields.seriesName !== undefined) {
       updated.seriesName = fields.seriesName.value
+      updated.seriesIndex = null
+    }
+    if (fields.seriesMemberships !== undefined) {
+      const primary = fields.seriesMemberships[0]
+      updated.seriesName = primary?.seriesName ?? null
+      updated.seriesIndex = primary?.seriesIndex ?? null
     }
     if (fields.publisher !== undefined) {
       updated.publisher = fields.publisher.value

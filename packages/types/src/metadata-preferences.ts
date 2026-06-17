@@ -115,6 +115,11 @@ export interface KoboProviderConfig {
   language: string;
 }
 
+export interface AladinProviderConfig {
+  enabled: boolean;
+  ttbKey: string;
+}
+
 export interface ProviderConfigurations {
   google: GoogleProviderConfig;
   amazon: AmazonProviderConfig;
@@ -128,6 +133,7 @@ export interface ProviderConfigurations {
   ranobedb: SimpleProviderConfig;
   kobo: KoboProviderConfig;
   lubimyczytac: SimpleProviderConfig;
+  aladin: AladinProviderConfig;
 }
 
 export interface ProviderStatus {

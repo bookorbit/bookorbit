@@ -101,6 +101,21 @@ export class MigrationSourceService {
     });
   }
 
+  async resetSource(sourceId: number): Promise<void> {
+    await this.assertNoGlobalActiveRun();
+
+    const source = await this.repo.findSourceById(sourceId);
+    if (!source) throw new NotFoundException(`Migration source not found: ${sourceId}`);
+
+    const runs = await this.repo.listRuns(sourceId);
+    if (runs.length > 0) {
+      throw new BadRequestException('Cannot reset migration setup after a migration run has been created');
+    }
+
+    const deleted = await this.repo.deleteSource(sourceId);
+    if (!deleted) throw new InternalServerErrorException('Failed to reset migration setup');
+  }
+
   async getSourcePathPrefixes(sourceId: number): Promise<{ prefixes: string[] }> {
     const source = await this.repo.findSourceById(sourceId);
     if (!source) throw new NotFoundException(`Migration source not found: ${sourceId}`);

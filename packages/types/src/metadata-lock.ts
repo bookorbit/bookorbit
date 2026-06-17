@@ -28,6 +28,7 @@ export const BOOK_METADATA_LOCK_FIELDS = [
   "comicvineId",
   "ranobedbId",
   "lubimyczytacId",
+  "aladinId",
   "comicIssueNumber",
   "comicVolumeName",
   "comicStoryArcs",
@@ -88,6 +89,7 @@ export const BOOK_METADATA_LOCK_GROUPS: BookMetadataLockGroup[] = [
       "comicvineId",
       "ranobedbId",
       "lubimyczytacId",
+      "aladinId",
     ],
   },
   {

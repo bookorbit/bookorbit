@@ -6,7 +6,7 @@ import type { ContentFilterRules } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookAuthors, bookMetadata, books, bookSeries, userBookStatus } from '../../db/schema';
+import { authors, bookAuthors, bookMetadata, books, bookSeries, bookSeriesMemberships, userBookStatus } from '../../db/schema';
 import type { SeriesListSort, SortDirection } from './dto/list-series.dto';
 import type { SeriesBookSort } from './dto/list-series-books.dto';
 
@@ -66,7 +66,7 @@ export class SeriesRepository {
     const libraryFilter = this.buildLibraryFilter(params.libraryIds);
     const filterClauses = params.contentFilters ? buildContentFilterClauses(params.contentFilters, this.db) : [];
 
-    const conditions: SQL[] = [isNotNull(bookMetadata.seriesId), libraryFilter, ...filterClauses];
+    const conditions: SQL[] = [libraryFilter, ...filterClauses];
 
     if (params.q) {
       const qPattern = `%${this.escapeLikePattern(params.q)}%`;
@@ -103,7 +103,8 @@ export class SeriesRepository {
       })
       .from(books)
       .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-      .innerJoin(bookSeries, eq(bookSeries.id, bookMetadata.seriesId))
+      .innerJoin(bookSeriesMemberships, eq(bookSeriesMemberships.bookId, books.id))
+      .innerJoin(bookSeries, eq(bookSeries.id, bookSeriesMemberships.seriesId))
       .leftJoin(userBookStatus, and(eq(userBookStatus.bookId, books.id), eq(userBookStatus.userId, params.userId)))
       .where(baseWhere)
       .groupBy(bookSeries.id, bookSeries.name);
@@ -122,7 +123,8 @@ export class SeriesRepository {
       })
       .from(books)
       .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-      .innerJoin(bookSeries, eq(bookSeries.id, bookMetadata.seriesId))
+      .innerJoin(bookSeriesMemberships, eq(bookSeriesMemberships.bookId, books.id))
+      .innerJoin(bookSeries, eq(bookSeries.id, bookSeriesMemberships.seriesId))
       .leftJoin(userBookStatus, and(eq(userBookStatus.bookId, books.id), eq(userBookStatus.userId, params.userId)))
       .where(baseWhere)
       .groupBy(bookSeries.id, bookSeries.name)
@@ -180,7 +182,8 @@ export class SeriesRepository {
       })
       .from(books)
       .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-      .innerJoin(bookSeries, eq(bookSeries.id, bookMetadata.seriesId))
+      .innerJoin(bookSeriesMemberships, eq(bookSeriesMemberships.bookId, books.id))
+      .innerJoin(bookSeries, eq(bookSeries.id, bookSeriesMemberships.seriesId))
       .leftJoin(userBookStatus, and(eq(userBookStatus.bookId, books.id), eq(userBookStatus.userId, params.userId)))
       .where(and(eq(bookSeries.id, params.seriesId), libraryFilter, ...filterClauses))
       .groupBy(bookSeries.id, bookSeries.name);
@@ -192,10 +195,12 @@ export class SeriesRepository {
     const [authorsMap, indicesRows] = await Promise.all([
       this.fetchAuthorsForSeries([params.seriesId], params.libraryIds, params.contentFilters),
       this.db
-        .select({ idx: bookMetadata.seriesIndex })
+        .select({ idx: bookSeriesMemberships.seriesIndex })
         .from(books)
-        .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-        .where(and(eq(bookMetadata.seriesId, params.seriesId), libraryFilter, ...filterClauses, isNotNull(bookMetadata.seriesIndex))),
+        .innerJoin(bookSeriesMemberships, eq(bookSeriesMemberships.bookId, books.id))
+        .where(
+          and(eq(bookSeriesMemberships.seriesId, params.seriesId), libraryFilter, ...filterClauses, isNotNull(bookSeriesMemberships.seriesIndex)),
+        ),
     ]);
 
     const indices = indicesRows.map((r) => r.idx!);
@@ -221,7 +226,7 @@ export class SeriesRepository {
   }): Promise<{ bookIds: number[]; total: number }> {
     const libraryFilter = this.buildLibraryFilter(params.libraryIds);
     const filterClauses = params.contentFilters ? buildContentFilterClauses(params.contentFilters, this.db) : [];
-    const where = and(eq(bookMetadata.seriesId, params.seriesId), libraryFilter, ...filterClauses)!;
+    const where = and(eq(bookSeriesMemberships.seriesId, params.seriesId), libraryFilter, ...filterClauses)!;
 
     const orderBy = this.buildBookSortExpression(params.sort, params.order);
 
@@ -229,12 +234,18 @@ export class SeriesRepository {
       this.db
         .select({ id: books.id })
         .from(books)
+        .innerJoin(bookSeriesMemberships, eq(bookSeriesMemberships.bookId, books.id))
         .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
         .where(where)
         .orderBy(...orderBy)
         .limit(params.size)
         .offset(params.page * params.size),
-      this.db.select({ total: count() }).from(books).innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id)).where(where),
+      this.db
+        .select({ total: count() })
+        .from(books)
+        .innerJoin(bookSeriesMemberships, eq(bookSeriesMemberships.bookId, books.id))
+        .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+        .where(where),
     ]);
 
     return { bookIds: dataRows.map((r) => r.id), total: Number(total) };
@@ -250,15 +261,15 @@ export class SeriesRepository {
     const filterClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
     const rows = await this.db
       .select({
-        seriesId: bookMetadata.seriesId,
+        seriesId: bookSeriesMemberships.seriesId,
         authorName: authors.name,
       })
       .from(books)
-      .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .innerJoin(bookSeriesMemberships, eq(bookSeriesMemberships.bookId, books.id))
       .innerJoin(bookAuthors, eq(bookAuthors.bookId, books.id))
       .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
-      .where(and(inArray(bookMetadata.seriesId, seriesIds), this.buildLibraryFilter(libraryIds), ...filterClauses))
-      .groupBy(bookMetadata.seriesId, authors.name);
+      .where(and(inArray(bookSeriesMemberships.seriesId, seriesIds), this.buildLibraryFilter(libraryIds), ...filterClauses))
+      .groupBy(bookSeriesMemberships.seriesId, authors.name);
 
     const result = new Map<number, string[]>();
     for (const row of rows) {
@@ -276,16 +287,22 @@ export class SeriesRepository {
     const filterClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
     const rows = await this.db
       .select({
-        seriesId: bookMetadata.seriesId,
+        seriesId: bookSeriesMemberships.seriesId,
         bookId: books.id,
-        seriesIndex: bookMetadata.seriesIndex,
+        seriesIndex: bookSeriesMemberships.seriesIndex,
       })
       .from(books)
+      .innerJoin(bookSeriesMemberships, eq(bookSeriesMemberships.bookId, books.id))
       .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .where(
-        and(inArray(bookMetadata.seriesId, seriesIds), this.buildLibraryFilter(libraryIds), ...filterClauses, isNotNull(bookMetadata.coverSource)),
+        and(
+          inArray(bookSeriesMemberships.seriesId, seriesIds),
+          this.buildLibraryFilter(libraryIds),
+          ...filterClauses,
+          isNotNull(bookMetadata.coverSource),
+        ),
       )
-      .orderBy(bookMetadata.seriesId, asc(bookMetadata.seriesIndex), asc(books.addedAt));
+      .orderBy(bookSeriesMemberships.seriesId, asc(bookSeriesMemberships.seriesIndex), asc(books.addedAt));
 
     const result = new Map<number, number[]>();
     for (const row of rows) {
@@ -348,7 +365,10 @@ export class SeriesRepository {
         return [dir(books.addedAt), asc(books.id)];
       case 'seriesIndex':
       default:
-        return [order === 'asc' ? sql`${bookMetadata.seriesIndex} ASC NULLS LAST` : sql`${bookMetadata.seriesIndex} DESC NULLS LAST`, asc(books.id)];
+        return [
+          order === 'asc' ? sql`${bookSeriesMemberships.seriesIndex} ASC NULLS LAST` : sql`${bookSeriesMemberships.seriesIndex} DESC NULLS LAST`,
+          asc(books.id),
+        ];
     }
   }
 }

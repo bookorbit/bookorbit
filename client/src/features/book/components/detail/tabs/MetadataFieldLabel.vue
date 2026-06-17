@@ -28,7 +28,7 @@ function handleToggle() {
       <button
         type="button"
         class="absolute right-2 z-10 inline-flex size-6 cursor-pointer items-center justify-center rounded-md border border-input bg-background/95 text-muted-foreground shadow-sm transition-[colors,opacity] hover:text-foreground hover:bg-muted disabled:cursor-not-allowed"
-        :class="[multiline ? 'top-2.5' : 'top-1/2 -translate-y-1/2', loading ? 'opacity-60' : 'opacity-100']"
+        :class="[multiline ? 'top-1' : 'top-1/2 -translate-y-1/2', loading ? 'opacity-60' : 'opacity-100']"
         :aria-label="locked ? `Unlock ${label}` : `Lock ${label}`"
         :title="locked ? `Unlock ${label}` : `Lock ${label}`"
         :disabled="loading"

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Post, Query, Res } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 import { Permission } from '@bookorbit/types';
 
@@ -54,6 +54,12 @@ export class MigrationController {
   @HttpCode(HttpStatus.OK)
   validateSourceById(@Param('id', ParseIntPipe) sourceId: number) {
     return this.sourceService.validateSourceById(sourceId);
+  }
+
+  @Delete('sources/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  resetSource(@Param('id', ParseIntPipe) sourceId: number) {
+    return this.sourceService.resetSource(sourceId);
   }
 
   @Get('sources/:id/path-prefixes')

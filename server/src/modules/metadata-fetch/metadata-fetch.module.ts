@@ -24,6 +24,7 @@ import { KoboProvider } from './providers/kobo/kobo.provider';
 import { RanobeDbClient } from './providers/ranobedb/ranobedb.client';
 import { RanobeDbProvider } from './providers/ranobedb/ranobedb.provider';
 import { LubimyczytacProvider } from './providers/lubimyczytac/lubimyczytac.provider';
+import { AladinProvider } from './providers/aladin/aladin.provider';
 
 const PROVIDER_CLASSES = [
   GoogleProvider,
@@ -38,6 +39,7 @@ const PROVIDER_CLASSES = [
   RanobeDbProvider,
   KoboProvider,
   LubimyczytacProvider,
+  AladinProvider,
 ];
 
 @Module({

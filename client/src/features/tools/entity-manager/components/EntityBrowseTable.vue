@@ -20,7 +20,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:page': [value: number]
   'update:search': [value: string]
-  select: [id: number | string]
+  select: [id: number | string, event: MouseEvent]
   rename: [item: BrowseEntityItem]
   delete: [item: BrowseEntityItem]
   bulkDelete: []
@@ -42,8 +42,8 @@ function handleNextPage(): void {
   emit('update:page', props.page + 1)
 }
 
-function handleSelectItem(id: number | string): void {
-  emit('select', id)
+function handleSelectItem(id: number | string, event: MouseEvent): void {
+  emit('select', id, event)
 }
 
 function handleRename(item: BrowseEntityItem): void {
@@ -123,7 +123,12 @@ const canMerge = computed(() => props.selectedIds.size >= 2)
 
       <template v-else>
         <div v-for="item in items" :key="String(item.id)" class="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors">
-          <input type="checkbox" :checked="selectedIds.has(item.id)" class="rounded accent-primary shrink-0" @change="handleSelectItem(item.id)" />
+          <input
+            type="checkbox"
+            :checked="selectedIds.has(item.id)"
+            class="rounded accent-primary shrink-0"
+            @click="handleSelectItem(item.id, $event)"
+          />
           <div class="flex-1 min-w-0">
             <span class="text-sm font-medium truncate block">{{ item.name }}</span>
             <div v-if="item.sortName" class="text-xs text-muted-foreground">sort: {{ item.sortName }}</div>

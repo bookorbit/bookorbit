@@ -31,7 +31,16 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
 }))
 
 vi.mock('@/features/admin/UsersPage.vue', () => ({ default: { template: '<div data-testid="users-page" />' } }))
-vi.mock('../MagicLinksSettings.vue', () => ({ default: { template: '<div data-testid="magic-links-settings" />' } }))
+vi.mock('../MagicLinksSettings.vue', () => ({
+  default: {
+    name: 'MagicLinksSettings',
+    props: {
+      withHeader: Boolean,
+      withEmbeddedCreateAction: Boolean,
+    },
+    template: '<div data-testid="magic-links-settings" />',
+  },
+}))
 vi.mock('../OidcSettings.vue', () => ({ default: { template: '<div data-testid="oidc-settings" />' } }))
 vi.mock('../SettingsPageHeader.vue', () => ({ default: { template: '<div />' } }))
 
@@ -78,6 +87,14 @@ describe('AdminAllSettings', () => {
       expect(wrapper.find('[data-testid="magic-links-settings"]').exists()).toBe(true)
       expect(wrapper.find('[data-testid="users-page"]').exists()).toBe(false)
       expect(wrapper.find('[data-testid="oidc-settings"]').exists()).toBe(false)
+    })
+
+    it('enables MagicLinksSettings embedded create action in the admin tab', () => {
+      const wrapper = mountComponent('magic-links', { su: true })
+      const magicLinksSettings = wrapper.findComponent({ name: 'MagicLinksSettings' })
+
+      expect(magicLinksSettings.props('withHeader')).toBe(false)
+      expect(magicLinksSettings.props('withEmbeddedCreateAction')).toBe(true)
     })
   })
 

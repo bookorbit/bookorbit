@@ -4,14 +4,14 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookMetadata, collections, genres, narrators, tags } from '../../db/schema';
+import { authors, bookMetadata, bookSeries, collections, genres, narrators, tags } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 type SearchResult = { name: string };
 type SearchResultWithId = { id: number; name: string };
-type NamedTable = typeof authors | typeof genres | typeof tags | typeof narrators;
+type NamedTable = typeof authors | typeof genres | typeof tags | typeof narrators | typeof bookSeries;
 type NamedTableWithId = typeof genres | typeof tags;
-type MetadataTextColumn = typeof bookMetadata.publisher | typeof bookMetadata.seriesName | typeof bookMetadata.language;
+type MetadataTextColumn = typeof bookMetadata.publisher | typeof bookMetadata.language;
 
 const DEFAULT_SEARCH_LIMIT = 15;
 const COLLECTION_SEARCH_LIMIT = 20;
@@ -42,7 +42,7 @@ export class CatalogService {
   }
 
   searchSeries(q: string): Promise<SearchResult[]> {
-    return this.searchDistinctMetadataField(q, bookMetadata.seriesName);
+    return this.searchByName(q, bookSeries);
   }
 
   searchLanguages(q: string): Promise<SearchResult[]> {

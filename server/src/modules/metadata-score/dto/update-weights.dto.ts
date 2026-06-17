@@ -24,4 +24,5 @@ export class UpdateWeightsDto {
   @IsInt() @Min(0) openLibraryId!: number;
   @IsInt() @Min(0) itunesId!: number;
   @IsInt() @Min(0) koboId!: number;
+  @IsInt() @Min(0) aladinId!: number;
 }

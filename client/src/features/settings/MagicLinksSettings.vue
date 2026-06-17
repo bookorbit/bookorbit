@@ -6,7 +6,10 @@ import { useMagicLinks } from '@/features/settings/composables/useMagicLinks'
 import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
-const props = withDefaults(defineProps<{ withHeader?: boolean }>(), { withHeader: true })
+const props = withDefaults(defineProps<{ withHeader?: boolean; withEmbeddedCreateAction?: boolean }>(), {
+  withHeader: true,
+  withEmbeddedCreateAction: false,
+})
 
 defineExpose({ openCreateForm })
 
@@ -146,6 +149,12 @@ function isExpired(expiresAt: string | null | undefined): boolean {
       </button>
     </div>
   </template>
+  <div v-else-if="props.withEmbeddedCreateAction" class="mb-4 flex items-center justify-end md:mb-5">
+    <button class="settings-btn-primary w-full justify-center md:w-auto" :disabled="sharedUsers.length === 0" @click="openCreateForm">
+      <Plus :size="14" />
+      Create link
+    </button>
+  </div>
 
   <p v-if="sharedUsers.length === 0 && !loading" class="text-sm text-muted-foreground mb-4">
     No shared accounts found. Create a shared account from the Users page first.

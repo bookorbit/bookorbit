@@ -32,6 +32,7 @@ describe('getProviderColor', () => {
       'comicvine',
       'ranobedb',
       'kobo',
+      'aladin',
       'auto',
     ]
     for (const provider of providers) {
@@ -46,7 +47,20 @@ describe('PROVIDER_SHORT_LABELS', () => {
   })
 
   it('has labels for all providers', () => {
-    const providers = ['google', 'amazon', 'goodreads', 'hardcover', 'openLibrary', 'itunes', 'audible', 'audnexus', 'comicvine', 'ranobedb', 'kobo']
+    const providers = [
+      'google',
+      'amazon',
+      'goodreads',
+      'hardcover',
+      'openLibrary',
+      'itunes',
+      'audible',
+      'audnexus',
+      'comicvine',
+      'ranobedb',
+      'kobo',
+      'aladin',
+    ]
     for (const provider of providers) {
       expect(PROVIDER_SHORT_LABELS[provider]).toBeTruthy()
     }

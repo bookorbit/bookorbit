@@ -30,6 +30,7 @@ export interface PdfParsed {
   ranobedbId: string | null;
   koboId: string | null;
   lubimyczytacId: string | null;
+  aladinId: string | null;
   itunesId: string | null;
   coverBuffer: Buffer | null;
 }
@@ -142,6 +143,7 @@ export async function parsePdfFile(absolutePath: string, options: PdfParseOption
       ranobedbId: xmp?.ranobedbId ?? null,
       koboId: xmp?.koboId ?? null,
       lubimyczytacId: xmp?.lubimyczytacId ?? null,
+      aladinId: xmp?.aladinId ?? null,
       itunesId: xmp?.itunesId ?? null,
       coverBuffer,
     };

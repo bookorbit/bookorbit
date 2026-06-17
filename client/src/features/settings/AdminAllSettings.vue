@@ -82,7 +82,7 @@ function selectTab(tab: Tab) {
 
   <div :class="tabWidths[activeTab]">
     <UsersPage v-if="activeTab === 'users'" embedded />
-    <MagicLinksSettings v-else-if="activeTab === 'magic-links'" :with-header="false" />
+    <MagicLinksSettings v-else-if="activeTab === 'magic-links'" :with-header="false" with-embedded-create-action />
     <OidcSettings v-else-if="activeTab === 'oidc'" embedded />
   </div>
 </template>

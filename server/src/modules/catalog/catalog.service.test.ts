@@ -8,7 +8,7 @@ vi.mock('drizzle-orm', () => ({
 
 import { and, eq, ilike, isNotNull } from 'drizzle-orm';
 
-import { authors, bookMetadata, collections, narrators } from '../../db/schema';
+import { authors, bookMetadata, bookSeries, collections, narrators } from '../../db/schema';
 import { CatalogService } from './catalog.service';
 
 interface QueryChain<T> {
@@ -122,13 +122,14 @@ describe('CatalogService', () => {
   });
 
   it('queries the expected metadata column for series search', async () => {
-    const { service, setSelectDistinctRows } = makeService();
-    setSelectDistinctRows([{ name: 'The Expanse' }]);
+    const { service, setSelectRows, selectChains } = makeService();
+    setSelectRows([{ name: 'The Expanse' }]);
 
     await service.searchSeries('Expanse');
 
-    expect(isNotNull).toHaveBeenCalledWith(bookMetadata.seriesName);
-    expect(ilike).toHaveBeenCalledWith(bookMetadata.seriesName, '%Expanse%');
+    expect(ilike).toHaveBeenCalledWith(bookSeries.name, '%Expanse%');
+    expect(selectChains[0]?.from).toHaveBeenCalledWith(bookSeries);
+    expect(selectChains[0]?.orderBy).toHaveBeenCalledWith(bookSeries.name);
   });
 
   it('queries the expected metadata column for language search', async () => {

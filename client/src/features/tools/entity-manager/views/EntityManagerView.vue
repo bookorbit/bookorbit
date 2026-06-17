@@ -131,7 +131,11 @@ function handleToggleDismissed(): void {
   em.showDismissed.value = !em.showDismissed.value
 }
 
-function handleSelectItem(id: number | string): void {
+function handleSelectItem(id: number | string, event: MouseEvent): void {
+  if (event.shiftKey) {
+    em.rangeSelectTo(id)
+    return
+  }
   em.toggleSelection(id)
 }
 

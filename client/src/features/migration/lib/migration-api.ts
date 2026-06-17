@@ -193,6 +193,17 @@ export function validateSourceById(sourceId: number) {
   )
 }
 
+export async function resetSource(sourceId: number) {
+  const res = await api(`/api/v1/migration/sources/${sourceId}`, { method: 'DELETE' })
+  if (res.ok) return
+  const payload = await res.json().catch(() => ({}))
+  const message =
+    payload && typeof payload === 'object' && 'message' in payload && typeof payload.message === 'string'
+      ? payload.message
+      : 'Failed to reset migration setup'
+  throw new Error(message)
+}
+
 export function suggestUserMappings(sourceId: number) {
   return api(`/api/v1/migration/sources/${sourceId}/user-mapping-suggestions`).then((res) =>
     expectJson<{ sourceId: number; generatedAt: string; suggestions: MappingSuggestion[] }>(res, 'Failed to load user mapping suggestions'),

@@ -43,6 +43,11 @@ export class KoboProviderConfigDto {
   @IsOptional() @IsString() language?: string;
 }
 
+export class AladinProviderConfigDto {
+  @IsOptional() @IsBoolean() enabled?: boolean;
+  @IsOptional() @IsString() ttbKey?: string;
+}
+
 export class UpdateProviderConfigDto {
   @IsOptional() @ValidateNested() @Type(() => GoogleProviderConfigDto) google?: GoogleProviderConfigDto;
   @IsOptional() @ValidateNested() @Type(() => AmazonProviderConfigDto) amazon?: AmazonProviderConfigDto;
@@ -56,4 +61,5 @@ export class UpdateProviderConfigDto {
   @IsOptional() @ValidateNested() @Type(() => SimpleProviderConfigDto) ranobedb?: SimpleProviderConfigDto;
   @IsOptional() @ValidateNested() @Type(() => KoboProviderConfigDto) kobo?: KoboProviderConfigDto;
   @IsOptional() @ValidateNested() @Type(() => SimpleProviderConfigDto) lubimyczytac?: SimpleProviderConfigDto;
+  @IsOptional() @ValidateNested() @Type(() => AladinProviderConfigDto) aladin?: AladinProviderConfigDto;
 }

@@ -6,6 +6,7 @@ import { Readable } from 'stream';
 import { and, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { formatSeriesIndex } from '../../common/utils/series-index-format.utils';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -388,12 +389,8 @@ export class UploadService {
       if (parsed.isbn13) base['isbn'] = parsed.isbn13;
       if (parsed.publishedYear) base['year'] = String(parsed.publishedYear);
       if (parsed.seriesName) base['series'] = parsed.seriesName;
-      if (parsed.seriesIndex != null) {
-        const whole = Math.floor(parsed.seriesIndex);
-        const fraction = parsed.seriesIndex - whole;
-        const padded = String(whole).padStart(2, '0');
-        base['seriesIndex'] = fraction > 0 ? `${padded}.${String(fraction).split('.')[1]}` : padded;
-      }
+      const seriesIndex = formatSeriesIndex(parsed.seriesIndex ?? null);
+      if (seriesIndex) base['seriesIndex'] = seriesIndex;
       if (parsed.authors.length > 0) {
         base['authors'] = parsed.authors.map((a) => a.name).join(', ');
       }

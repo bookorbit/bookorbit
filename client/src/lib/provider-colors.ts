@@ -13,6 +13,7 @@ const PROVIDER_HEX: Record<string, string> = {
   ranobedb: '#a78cff',
   kobo: '#e23434',
   lubimyczytac: '#f47373',
+  aladin: '#3E7FFF',
   auto: '#8B5CF6',
 }
 
@@ -31,6 +32,7 @@ export const PROVIDER_SHORT_LABELS: Record<string, string> = {
   ranobedb: 'RanobeDB',
   kobo: 'Kobo',
   lubimyczytac: 'LubimyCzytac',
+  aladin: 'Aladin',
   auto: 'Fetched',
 }
 

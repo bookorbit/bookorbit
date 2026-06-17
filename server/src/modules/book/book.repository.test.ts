@@ -64,6 +64,7 @@ describe('BookRepository', () => {
     const fileProgressRows = [{ bookFileId: 1001, percentage: 45, updatedAt: new Date('2026-01-01T00:00:00.000Z') }];
     const statusRows = [{ bookId: 10, status: 'reading', source: 'manual', startedAt: null, finishedAt: null, updatedAt: null }];
     const narratorRows = [{ bookId: 10, name: 'Scott Brick' }];
+    const seriesMembershipRows = [{ bookId: 10, seriesId: 20, seriesName: 'Dune', seriesIndex: 1, displayOrder: 0 }];
     const progressRows = [{ bookFileId: 1001, percentage: 45 }];
 
     const db = {
@@ -75,6 +76,7 @@ describe('BookRepository', () => {
         .mockReturnValueOnce(makeSelectChain('where', genreRows))
         .mockReturnValueOnce(makeSelectChain('where', tagRows))
         .mockReturnValueOnce(makeSelectChain('orderBy', narratorRows))
+        .mockReturnValueOnce(makeSelectChain('orderBy', seriesMembershipRows))
         .mockReturnValueOnce(makeSelectChain('where', statusRows))
         .mockReturnValueOnce(makeSelectChain('where', fileProgressRows))
         .mockReturnValueOnce(makeSelectChain('where', [])),
@@ -92,6 +94,7 @@ describe('BookRepository', () => {
       progressRows,
       statusRows,
       narratorRows,
+      seriesMembershipRows,
       total: 1,
     });
   });
@@ -109,6 +112,7 @@ describe('BookRepository', () => {
         .mockReturnValueOnce(makeSelectChain('where', []))
         .mockReturnValueOnce(makeSelectChain('where', []))
         .mockReturnValueOnce(makeSelectChain('where', []))
+        .mockReturnValueOnce(makeSelectChain('orderBy', []))
         .mockReturnValueOnce(makeSelectChain('orderBy', []))
         .mockReturnValueOnce(makeSelectChain('where', []))
         .mockReturnValueOnce(makeSelectChain('where', readingProgressRows))
@@ -134,6 +138,7 @@ describe('BookRepository', () => {
       progressRows: [],
       statusRows: [],
       narratorRows: [],
+      seriesMembershipRows: [],
       total: 0,
     });
     expect(db.select).not.toHaveBeenCalled();
@@ -172,6 +177,7 @@ describe('BookRepository', () => {
       { id: 99, format: 'epub', role: 'primary', sizeBytes: 1, absolutePath: '/books/dune.epub', createdAt: new Date(), durationSeconds: null },
     ];
     const narratorRows = [{ id: 4, name: 'Narrator', sortName: null, displayOrder: 0 }];
+    const seriesMembershipRows = [{ seriesId: 20, seriesName: 'Dune', seriesIndex: 1, displayOrder: 0 }];
     const db = {
       select: vi
         .fn()
@@ -180,7 +186,8 @@ describe('BookRepository', () => {
         .mockReturnValueOnce(makeSelectChain('where', genreRows))
         .mockReturnValueOnce(makeSelectChain('where', tagRows))
         .mockReturnValueOnce(makeSelectChain('orderBy', fileRows))
-        .mockReturnValueOnce(makeSelectChain('orderBy', narratorRows)),
+        .mockReturnValueOnce(makeSelectChain('orderBy', narratorRows))
+        .mockReturnValueOnce(makeSelectChain('orderBy', seriesMembershipRows)),
     };
     const repo = new BookRepository(db as never);
 
@@ -193,6 +200,7 @@ describe('BookRepository', () => {
       tagRows,
       fileRows,
       narratorRows,
+      seriesMembershipRows,
     });
   });
 

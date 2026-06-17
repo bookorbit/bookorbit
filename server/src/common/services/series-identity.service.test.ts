@@ -117,12 +117,15 @@ describe('SeriesIdentityService', () => {
     const transaction = vi.fn().mockImplementation(async (cb: (tx: typeof tx) => Promise<void>) => cb(tx));
     const service = new SeriesIdentityService({ transaction } as never);
     const backfill = vi.spyOn(service, 'backfillMissingSeriesIds').mockResolvedValue(undefined);
+    const backfillMemberships = vi.spyOn(service, 'backfillMissingSeriesMemberships').mockResolvedValue(undefined);
 
     await service.onModuleInit();
 
     expect(transaction).toHaveBeenCalledTimes(1);
     expect(backfill).toHaveBeenCalledTimes(1);
     expect(backfill).toHaveBeenCalledWith(tx);
+    expect(backfillMemberships).toHaveBeenCalledTimes(1);
+    expect(backfillMemberships).toHaveBeenCalledWith(tx);
   });
 
   it('disables statement timeout before running backfill', async () => {
@@ -131,6 +134,7 @@ describe('SeriesIdentityService', () => {
     const transaction = vi.fn().mockImplementation(async (cb: (tx: typeof tx) => Promise<void>) => cb(tx));
     const service = new SeriesIdentityService({ transaction } as never);
     vi.spyOn(service, 'backfillMissingSeriesIds').mockResolvedValue(undefined);
+    vi.spyOn(service, 'backfillMissingSeriesMemberships').mockResolvedValue(undefined);
 
     await service.onModuleInit();
 

@@ -17,6 +17,7 @@ describe('UpdateProviderConfigDto', () => {
       amazon: { cookie: 'session-cookie' },
       hardcover: { apiKey: 'hardcover-key' },
       itunes: { coverResolution: 'standard' },
+      aladin: { ttbKey: 'ttb-test-key' },
     });
 
     expect(errors).toHaveLength(0);
@@ -35,6 +36,7 @@ describe('UpdateProviderConfigDto', () => {
       hardcover: { apiKey: false },
       openLibrary: { enabled: 'true' },
       itunes: { coverResolution: 'ultra' },
+      aladin: { ttbKey: 123 },
     });
 
     expect(errors).toEqual(
@@ -44,6 +46,7 @@ describe('UpdateProviderConfigDto', () => {
         expect.objectContaining({ property: 'hardcover' }),
         expect.objectContaining({ property: 'openLibrary' }),
         expect.objectContaining({ property: 'itunes' }),
+        expect.objectContaining({ property: 'aladin' }),
       ]),
     );
   });

@@ -612,6 +612,15 @@ const providerLinks = computed<ProviderLink[]>(() => {
       fallback: 'LC',
     })
   }
+  if (ids.aladin) {
+    out.push({
+      key: 'aladin',
+      label: 'Aladin',
+      url: `https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=${ids.aladin}`,
+      iconUrl: providerIconPath('aladin'),
+      fallback: '알',
+    })
+  }
   return out
 })
 
