@@ -8,6 +8,7 @@ import { api } from '@/lib/api'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import type { OpdsUser, OpdsSortOrder } from '@bookorbit/types'
 import { useMediaQuery } from '@vueuse/core'
+import { copyToClipboard } from '@/lib/clipboard'
 
 const { hasPermission } = usePermissions()
 const canManageSettings = computed(() => hasPermission('manage_app_settings'))
@@ -82,8 +83,12 @@ async function toggleOpds() {
 }
 
 async function copyUrl() {
-  await navigator.clipboard.writeText(opdsUrl.value)
-  toast.success('OPDS URL copied to clipboard')
+  const copied = await copyToClipboard(opdsUrl.value)
+  if (copied) {
+    toast.success('OPDS URL copied to clipboard')
+  } else {
+    toast.error('Failed to copy OPDS URL')
+  }
 }
 
 async function createUser() {
@@ -176,8 +181,12 @@ function userDetailsOpen(id: number) {
 }
 
 async function copyValue(value: string, label: string) {
-  await navigator.clipboard.writeText(value)
-  toast.success(`${label} copied`)
+  const copied = await copyToClipboard(value)
+  if (copied) {
+    toast.success(`${label} copied`)
+  } else {
+    toast.error(`Failed to copy ${label.toLowerCase()}`)
+  }
 }
 
 watch(
