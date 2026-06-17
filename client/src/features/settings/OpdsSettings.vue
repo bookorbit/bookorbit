@@ -82,7 +82,7 @@ async function toggleOpds() {
 }
 
 async function copyUrl() {
-  await navigator.clipboard.writeText(opdsUrl.value)
+  await secureCopy(opdsUrl.value)
   toast.success('OPDS URL copied to clipboard')
 }
 
@@ -176,8 +176,40 @@ function userDetailsOpen(id: number) {
 }
 
 async function copyValue(value: string, label: string) {
-  await navigator.clipboard.writeText(value)
+  await secureCopy(value)
   toast.success(`${label} copied`)
+}
+
+async function secureCopy(text: string): Promise<boolean> {
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  const textArea = document.createElement('textarea')
+  textArea.value = text
+  textArea.style.position = 'fixed'
+  textArea.style.top = '-9999px'
+  textArea.style.left = '-9999px'
+  textArea.style.opacity = '0'
+  textArea.setAttribute('readonly', '')
+
+  document.body.appendChild(textArea)
+  textArea.focus()
+  textArea.select()
+
+  try {
+    const successful = document.execCommand('copy')
+    document.body.removeChild(textArea)
+    return successful
+  } catch {
+    document.body.removeChild(textArea)
+    return false
+  }
 }
 
 watch(
