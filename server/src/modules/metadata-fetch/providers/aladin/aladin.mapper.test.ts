@@ -27,7 +27,7 @@ describe('AladinMapper', () => {
     const result = mapAladinItem(baseItem);
 
     expect(result.provider).toBe(MetadataProviderKey.ALADIN);
-    expect(result.providerId).toBe('9788912345678');
+    expect(result.providerId).toBe('12345');
     expect(result.title).toBe('테스트 도서');
     expect(result.authors).toEqual(['테스트 저자']);
     expect(result.publisher).toBe('테스트 출판사');
@@ -95,11 +95,11 @@ describe('AladinMapper', () => {
     expect(result.genres).toBeUndefined();
   });
 
-  it('should parse series info', () => {
+  it('should parse series name without fabricating an index', () => {
     const item = { ...baseItem, seriesInfo: { seriesId: 1, seriesName: '테스트 시리즈', seriesLink: 'https://aladin.co.kr/series/1' } };
     const result = mapAladinItem(item);
     expect(result.seriesName).toBe('테스트 시리즈');
-    expect(result.seriesIndex).toBe(1);
+    expect(result.seriesIndex).toBeUndefined();
   });
 
   it('should handle missing series info', () => {
@@ -110,14 +110,16 @@ describe('AladinMapper', () => {
     expect(result.seriesIndex).toBeUndefined();
   });
 
-  it('should prefer isbn13 for providerId', () => {
+  it('should use the Aladin ItemId from the link for providerId', () => {
     const result = mapAladinItem(baseItem);
-    expect(result.providerId).toBe('9788912345678');
+    expect(result.providerId).toBe('12345');
   });
 
-  it('should fall back to isbn if isbn13 missing', () => {
-    const item = { ...baseItem, isbn13: '' };
+  it('should leave providerId empty when the link has no ItemId (ISBNs still mapped to their own fields)', () => {
+    const item = { ...baseItem, link: 'https://www.aladin.co.kr/shop/wproduct.aspx' };
     const result = mapAladinItem(item);
-    expect(result.providerId).toBe('8912345678');
+    expect(result.providerId).toBe('');
+    expect(result.isbn10).toBe('8912345678');
+    expect(result.isbn13).toBe('9788912345678');
   });
 });

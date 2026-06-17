@@ -12,7 +12,7 @@ import { buildRequestSignal } from '../provider-utils';
 import { mapAladinItem } from './aladin.mapper';
 import { AladinLookupResponse, AladinSearchResponse } from './aladin.types';
 
-const BASE_URL = 'http://www.aladin.co.kr/ttb/api';
+const BASE_URL = 'https://www.aladin.co.kr/ttb/api';
 const API_VERSION = '20131101';
 
 @Injectable()
@@ -53,29 +53,31 @@ export class AladinProvider implements IdentifiableProvider {
     const url = this.buildSearchUrl(query, ttbKey);
     const startedAt = Date.now();
     const safeQuery = sanitizeLogValue(query);
-    this.logger.log(`[aladin] [start] op=search query="${safeQuery}"`);
+    this.logger.log(`[aladin.search] [start] query="${safeQuery}"`);
 
     try {
       const res = await fetchWithThrottle(url, { signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.DEFAULT, signal) });
       if (!res.ok) {
         this.logger.warn(
-          `[aladin] [fail] op=search query="${safeQuery}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+          `[aladin.search] [fail] query="${safeQuery}" status=${res.status} durationMs=${Date.now() - startedAt} errorClass=HttpError error="non-ok response"`,
         );
         return [];
       }
       const body = (await res.json()) as AladinSearchResponse;
       const items = (body.item ?? []).map(mapAladinItem);
       this.logger.log(
-        `[aladin] [end] op=search query="${safeQuery}" status=${res.status} resultCount=${items.length} durationMs=${Date.now() - startedAt}`,
+        `[aladin.search] [end] query="${safeQuery}" status=${res.status} resultCount=${items.length} durationMs=${Date.now() - startedAt}`,
       );
       return items;
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
-        this.logger.warn(`[aladin] [fail] op=search query="${safeQuery}" durationMs=${Date.now() - startedAt} message="throttled"`);
+        this.logger.warn(
+          `[aladin.search] [fail] query="${safeQuery}" durationMs=${Date.now() - startedAt} errorClass=ProviderThrottleError error="throttled"`,
+        );
         throw err;
       }
       this.logger.warn(
-        `[aladin] [fail] op=search query="${safeQuery}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+        `[aladin.search] [fail] query="${safeQuery}" durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'UnknownError'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}"`,
       );
       throw err;
     }
@@ -84,32 +86,35 @@ export class AladinProvider implements IdentifiableProvider {
   private async lookupItem(providerId: string, ttbKey: string, signal?: AbortSignal): Promise<MetadataCandidate | null> {
     const url = this.buildLookupUrl(providerId, ttbKey);
     const startedAt = Date.now();
-    this.logger.log(`[aladin] [start] op=lookup providerId="${providerId}"`);
+    const safeId = sanitizeLogValue(providerId);
+    this.logger.log(`[aladin.lookup] [start] providerId="${safeId}"`);
 
     try {
       const res = await fetchWithThrottle(url, { signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.DEFAULT, signal) });
       if (!res.ok) {
         this.logger.warn(
-          `[aladin] [fail] op=lookup providerId="${providerId}" status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+          `[aladin.lookup] [fail] providerId="${safeId}" status=${res.status} durationMs=${Date.now() - startedAt} errorClass=HttpError error="non-ok response"`,
         );
         return null;
       }
       const body = (await res.json()) as AladinLookupResponse;
       const item = body.item?.[0];
       if (!item) {
-        this.logger.log(`[aladin] [end] op=lookup providerId="${providerId}" status=${res.status} found=false durationMs=${Date.now() - startedAt}`);
+        this.logger.log(`[aladin.lookup] [end] providerId="${safeId}" status=${res.status} found=false durationMs=${Date.now() - startedAt}`);
         return null;
       }
       const mapped = mapAladinItem(item);
-      this.logger.log(`[aladin] [end] op=lookup providerId="${providerId}" status=${res.status} found=true durationMs=${Date.now() - startedAt}`);
+      this.logger.log(`[aladin.lookup] [end] providerId="${safeId}" status=${res.status} found=true durationMs=${Date.now() - startedAt}`);
       return mapped;
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
-        this.logger.warn(`[aladin] [fail] op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="throttled"`);
+        this.logger.warn(
+          `[aladin.lookup] [fail] providerId="${safeId}" durationMs=${Date.now() - startedAt} errorClass=ProviderThrottleError error="throttled"`,
+        );
         throw err;
       }
       this.logger.warn(
-        `[aladin] [fail] op=lookup providerId="${providerId}" durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+        `[aladin.lookup] [fail] providerId="${safeId}" durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'UnknownError'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}"`,
       );
       throw err;
     }
@@ -132,11 +137,10 @@ export class AladinProvider implements IdentifiableProvider {
   }
 
   private buildLookupUrl(providerId: string, ttbKey: string): string {
-    const isIsbn13 = providerId.length === 13;
     const params = new URLSearchParams({
       TTBKey: ttbKey,
       ItemId: providerId,
-      ItemIdType: isIsbn13 ? 'ISBN13' : 'ISBN',
+      ItemIdType: 'ItemId',
       output: 'JS',
       Version: API_VERSION,
       Cover: 'Big',

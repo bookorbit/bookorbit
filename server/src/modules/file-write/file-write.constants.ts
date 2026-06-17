@@ -39,6 +39,7 @@ export const COMIC_INFO_MANAGED_NOTES_KEYS = [
   'ranobedbId',
   'koboId',
   'lubimyczytacId',
+  'aladinId',
 ] as const satisfies readonly BookWritePayloadKey[];
 
 type ComicInfoProviderKey = (typeof COMIC_INFO_PROVIDER_ID_KEYS)[number];
@@ -61,5 +62,6 @@ export const EPUB_PROVIDER_IDENTIFIER_SCHEMES = {
   ranobedbId: 'RANOBEDB',
   koboId: 'KOBO',
   lubimyczytacId: 'LUBIMYCZYTAC',
+  aladinId: 'ALADIN',
   itunesId: 'ITUNES',
 } as const satisfies Partial<Record<BookWritePayloadKey, string>>;

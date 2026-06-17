@@ -31,24 +31,25 @@ function parseGenres(categoryIdList?: AladinItem['categoryIdList']): string[] | 
   return categoryIdList.map((c) => c.categoryName).filter((c) => c.length > 0);
 }
 
-function parseSeries(seriesInfo?: AladinItem['seriesInfo']): { name: string; index: number } | undefined {
-  if (!seriesInfo?.seriesName) return undefined;
-  return {
-    name: seriesInfo.seriesName,
-    index: 1,
-  };
+function parseSeriesName(seriesInfo?: AladinItem['seriesInfo']): string | undefined {
+  return seriesInfo?.seriesName || undefined;
+}
+
+function parseItemId(link: string): string | undefined {
+  const match = link.match(/ItemId=(\d+)/i);
+  return match ? match[1] : undefined;
 }
 
 export function mapAladinItem(item: AladinItem): MetadataCandidate {
   const authors = parseAuthors(item.author);
-  const series = parseSeries(item.seriesInfo);
   const genres = parseGenres(item.categoryIdList);
   const publishedYear = parseYear(item.pubDate);
   const pageCount = parsePageCount(item.subInfo);
+  const itemId = parseItemId(item.link);
 
   return {
     provider: MetadataProviderKey.ALADIN,
-    providerId: item.isbn13 || item.isbn,
+    providerId: itemId ?? '',
     title: item.title,
     subtitle: undefined,
     authors: authors.length > 0 ? authors : undefined,
@@ -59,8 +60,7 @@ export function mapAladinItem(item: AladinItem): MetadataCandidate {
     pageCount,
     isbn10: item.isbn || undefined,
     isbn13: item.isbn13 || undefined,
-    seriesName: series?.name,
-    seriesIndex: series?.index,
+    seriesName: parseSeriesName(item.seriesInfo),
     genres,
     coverUrl: item.cover || undefined,
     sourceUrl: item.link || undefined,

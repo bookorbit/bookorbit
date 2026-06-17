@@ -24,6 +24,7 @@ export interface BookWritePayload {
   ranobedbId?: string | null;
   koboId?: string | null;
   lubimyczytacId?: string | null;
+  aladinId?: string | null;
   comicIssueNumber?: string | null;
   comicVolumeName?: string | null;
   comicPencillers?: string[];

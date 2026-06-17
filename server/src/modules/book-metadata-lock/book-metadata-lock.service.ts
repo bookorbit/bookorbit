@@ -20,6 +20,7 @@ const PROVIDER_ID_LOCK_FIELDS_BY_PROVIDER: Partial<Record<MetadataProviderKey, B
   [MetadataProviderKey.COMICVINE]: 'comicvineId',
   [MetadataProviderKey.RANOBEDB]: 'ranobedbId',
   [MetadataProviderKey.LUBIMYCZYTAC]: 'lubimyczytacId',
+  [MetadataProviderKey.ALADIN]: 'aladinId',
 };
 
 const COMIC_METADATA_LOCK_FIELDS: Record<keyof ComicMetadataFields, BookMetadataLockField> = {
@@ -248,6 +249,7 @@ export class BookMetadataLockService {
     this.copyUpdateField(filteredDto, dto, 'comicvineId', 'comicvineId', lockedSet, skippedFields);
     this.copyUpdateField(filteredDto, dto, 'ranobedbId', 'ranobedbId', lockedSet, skippedFields);
     this.copyUpdateField(filteredDto, dto, 'lubimyczytacId', 'lubimyczytacId', lockedSet, skippedFields);
+    this.copyUpdateField(filteredDto, dto, 'aladinId', 'aladinId', lockedSet, skippedFields);
 
     if (dto.audioMetadata) {
       const filteredAudioMetadata: NonNullable<UpdateBookMetadataDto['audioMetadata']> = {};
@@ -378,6 +380,7 @@ export class BookMetadataLockService {
     this.addFieldIfPresent(fields, dto, 'comicvineId', 'comicvineId');
     this.addFieldIfPresent(fields, dto, 'ranobedbId', 'ranobedbId');
     this.addFieldIfPresent(fields, dto, 'lubimyczytacId', 'lubimyczytacId');
+    this.addFieldIfPresent(fields, dto, 'aladinId', 'aladinId');
 
     if (dto.audioMetadata) {
       this.addFieldIfPresent(fields, dto.audioMetadata, 'narrators', 'narrators');

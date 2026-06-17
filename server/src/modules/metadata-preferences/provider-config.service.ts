@@ -175,7 +175,7 @@ const PROVIDER_ENABLE_RULES = {
   },
   aladin: {
     canEnable: (config) => !!config.aladin.ttbKey.trim(),
-      blockedMessage: 'Aladin requires a TTB Key before it can be enabled',
+    blockedMessage: 'Aladin requires a TTB Key before it can be enabled',
     setupHint: 'TTB Key required',
   },
 } satisfies Partial<Record<keyof ProviderConfigurations, ProviderEnableRule>>;
@@ -623,7 +623,7 @@ export class ProviderConfigService {
       };
     }
 
-    const testUrl = `http://www.aladin.co.kr/ttb/api/ItemSearch.aspx?TTBKey=${encodeURIComponent(key)}&Query=%ED%8C%8C%EC%9D%B4%EC%8D%AC&QueryType=Keyword&MaxResults=1&start=1&SearchTarget=Book&output=JS&Version=20131101`;
+    const testUrl = `https://www.aladin.co.kr/ttb/api/ItemSearch.aspx?TTBKey=${encodeURIComponent(key)}&Query=%ED%8C%8C%EC%9D%B4%EC%8D%AC&QueryType=Keyword&MaxResults=1&start=1&SearchTarget=Book&output=JS&Version=20131101`;
 
     try {
       const response = await fetch(testUrl, { method: 'GET', signal: AbortSignal.timeout(PROVIDER_TEST_TIMEOUT_MS) });

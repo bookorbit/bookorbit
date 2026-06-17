@@ -126,12 +126,12 @@ describe('AladinProvider', () => {
 
       const result = await provider.search({ title: '테스트 도서' });
 
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('http://www.aladin.co.kr/ttb/api/ItemSearch.aspx'), expect.any(Object));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('https://www.aladin.co.kr/ttb/api/ItemSearch.aspx'), expect.any(Object));
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('TTBKey=test-ttb-key'), expect.any(Object));
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('Query=%ED%85%8C%EC%8A%A4%ED%8A%B8+%EB%8F%84%EC%84%9C'), expect.any(Object));
       expect(result).toHaveLength(1);
       expect(result[0].title).toBe('테스트 도서');
-      expect(result[0].providerId).toBe('9788912345678');
+      expect(result[0].providerId).toBe('12345');
       expect(result[0].provider).toBe('aladin');
       expect(result[0].authors).toEqual(['테스트 저자']);
       expect(result[0].publisher).toBe('테스트 출판사');
@@ -183,7 +183,23 @@ describe('AladinProvider', () => {
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it('should fetch item by ISBN13 and return mapped item', async () => {
+    it('should look up by Aladin ItemId and return the mapped item', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(mockAladinLookupResponse),
+      });
+
+      const result = await provider.lookupById('12345');
+
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('https://www.aladin.co.kr/ttb/api/ItemLookUp.aspx'), expect.any(Object));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('ItemIdType=ItemId'), expect.any(Object));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('ItemId=12345'), expect.any(Object));
+      expect(result).not.toBeNull();
+      expect(result?.title).toBe('테스트 도서');
+      expect(result?.providerId).toBe('12345');
+    });
+
+    it('should pass the providerId through unchanged as the ItemId', async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: vi.fn().mockResolvedValue(mockAladinLookupResponse),
@@ -191,24 +207,8 @@ describe('AladinProvider', () => {
 
       const result = await provider.lookupById('9788912345678');
 
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('http://www.aladin.co.kr/ttb/api/ItemLookUp.aspx'), expect.any(Object));
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('ItemIdType=ISBN13'), expect.any(Object));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('ItemIdType=ItemId'), expect.any(Object));
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('ItemId=9788912345678'), expect.any(Object));
-      expect(result).not.toBeNull();
-      expect(result?.title).toBe('테스트 도서');
-      expect(result?.providerId).toBe('9788912345678');
-    });
-
-    it('should fetch item by ISBN10 and return mapped item', async () => {
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue(mockAladinLookupResponse),
-      });
-
-      const result = await provider.lookupById('8912345678');
-
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('ItemIdType=ISBN'), expect.any(Object));
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('ItemId=8912345678'), expect.any(Object));
       expect(result).not.toBeNull();
     });
 

@@ -177,6 +177,7 @@ export type BookMetadataRefreshPreviewFields = {
   comicvineId?: string | null;
   ranobedbId?: string | null;
   lubimyczytacId?: string | null;
+  aladinId?: string | null;
   audioMetadata?: {
     narrators?: string[];
     durationSeconds?: number | null;
