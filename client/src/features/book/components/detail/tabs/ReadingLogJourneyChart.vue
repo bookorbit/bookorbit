@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
-import { TrendingUp } from 'lucide-vue-next'
+import { TrendingUp } from '@lucide/vue'
 import type { BookReadingSessionStats } from '@bookorbit/types'
 import { useThemeStore } from '@/stores/theme'
 import { getBookorbitThemeName, initChartThemes } from '@/lib/echarts'

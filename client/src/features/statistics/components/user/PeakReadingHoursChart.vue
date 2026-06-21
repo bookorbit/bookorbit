@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
-import { Clock3 } from 'lucide-vue-next'
+import { Clock3 } from '@lucide/vue'
 import type { ReadingSessionSourceBucket } from '@bookorbit/types'
 
 import { useThemeStore } from '@/stores/theme'

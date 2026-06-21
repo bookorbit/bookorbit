@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { promisify } from 'util';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { KepubifyBinaryService } from '../kobo/services/kepubify-binary.service';
@@ -59,7 +59,7 @@ const CH2 = `<?xml version="1.0" encoding="utf-8"?>
 const PNG_1X1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
 async function buildEpub(path: string): Promise<void> {
-  const archive = archiver('zip', { zlib: { level: 0 } });
+  const archive = new ZipArchive({ zlib: { level: 0 } });
   const chunks: Buffer[] = [];
   archive.on('data', (chunk: Buffer) => chunks.push(chunk));
   const done = new Promise<void>((resolve, reject) => {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Download, Highlighter, RotateCcw, StickyNote, Trash2 } from 'lucide-vue-next'
+import { Download, Highlighter, RotateCcw, StickyNote, Trash2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import type { AnnotationHubItem } from '@bookorbit/types'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'

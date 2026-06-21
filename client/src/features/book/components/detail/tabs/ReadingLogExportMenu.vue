@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Download, FileJson, FileSpreadsheet, Loader2 } from 'lucide-vue-next'
+import { Download, FileJson, FileSpreadsheet, Loader2 } from '@lucide/vue'
 import type { BookReadingSession } from '@bookorbit/types'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 

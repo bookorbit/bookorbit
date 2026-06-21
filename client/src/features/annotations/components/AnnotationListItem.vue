@@ -19,7 +19,7 @@ import {
   Underline,
   Waves,
   X,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import { RouterLink } from 'vue-router'
 import { ANNOTATION_HIGHLIGHT_COLORS, type AnnotationHubItem, type AnnotationItem } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'

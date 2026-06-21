@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Contrast, Highlighter, Palette, Strikethrough, Underline, Waves } from 'lucide-vue-next'
+import { Contrast, Highlighter, Palette, Strikethrough, Underline, Waves } from '@lucide/vue'
 import { ANNOTATION_HIGHLIGHT_COLORS } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 

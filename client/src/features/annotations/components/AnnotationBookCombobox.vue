@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref } from 'vue'
-import { ChevronsUpDown, X } from 'lucide-vue-next'
+import { ChevronsUpDown, X } from '@lucide/vue'
 import type { AnnotationHubBookFacet } from '@bookorbit/types'
 
 const props = defineProps<{

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
-import { CalendarDays } from 'lucide-vue-next'
+import { CalendarDays } from '@lucide/vue'
 import type { BookReadingSessionStats } from '@bookorbit/types'
 import { useThemeStore } from '@/stores/theme'
 import { buildHeatmapPalette } from '@/lib/heatmap-palette'

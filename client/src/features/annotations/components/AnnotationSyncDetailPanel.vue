@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import { Globe, Loader2, MonitorSmartphone, RefreshCw, Tablet } from 'lucide-vue-next'
+import { Globe, Loader2, MonitorSmartphone, RefreshCw, Tablet } from '@lucide/vue'
 import type { AnnotationPositionFormat } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAnnotationSyncDetail } from '../composables/useAnnotationSyncDetail'

@@ -1,7 +1,7 @@
 import { mkdtemp, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { KepubDomService } from './kepub-dom.service';
@@ -30,7 +30,7 @@ const CH2 = `<?xml version="1.0" encoding="utf-8"?>
 <body><div id="book-columns"><div id="book-inner"><p><span class="koboSpan" id="kobo.1.1">Second chapter text.</span></p></div></div></body></html>`;
 
 async function buildKepub(path: string): Promise<void> {
-  const archive = archiver('zip', { zlib: { level: 0 } });
+  const archive = new ZipArchive({ zlib: { level: 0 } });
   const chunks: Buffer[] = [];
   archive.on('data', (chunk: Buffer) => chunks.push(chunk));
   const done = new Promise<void>((resolve, reject) => {

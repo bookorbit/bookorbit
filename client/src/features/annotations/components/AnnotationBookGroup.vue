@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { ChevronDown, ChevronRight } from 'lucide-vue-next'
+import { ChevronDown, ChevronRight } from '@lucide/vue'
 import { RouterLink } from 'vue-router'
 import type { AnnotationHubItem } from '@bookorbit/types'
 import AnnotationBookThumb from './AnnotationBookThumb.vue'

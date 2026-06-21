@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, X } from 'lucide-vue-next'
+import { Check, X } from '@lucide/vue'
 import { ANNOTATION_COLOR_FILTER_OPTIONS } from '@bookorbit/types'
 
 const colors = defineModel<string[]>('colors', { required: true })

@@ -5,13 +5,18 @@
  *
  * Usage: cd server && npx tsx src/scripts/annotation-conversion-smoke.ts
  */
-import 'dotenv/config';
+import { existsSync } from 'fs';
+import { loadEnvFile } from 'node:process';
 import { Client } from 'pg';
 import * as unzipper from 'unzipper';
 
 import { loadChapterFromZip, readEpubSpine } from '../modules/position-converter/epub-dom.service';
 import { cfiRangeToXPointer, xpointerRangeToCfi } from '../modules/position-converter/position-converter.core';
 import { parseXPointer } from '../modules/position-converter/xpointer.utils';
+
+if (existsSync('.env')) {
+  loadEnvFile('.env');
+}
 
 async function main() {
   const client = new Client({ connectionString: process.env.DATABASE_URL });

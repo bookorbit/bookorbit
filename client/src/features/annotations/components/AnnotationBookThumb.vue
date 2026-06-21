@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { BookOpen } from 'lucide-vue-next'
+import { BookOpen } from '@lucide/vue'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 
 const props = defineProps<{ bookId: number; title?: string | null }>()

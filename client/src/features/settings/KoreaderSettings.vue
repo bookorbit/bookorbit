@@ -16,7 +16,7 @@ import {
   Smartphone,
   Trash2,
   User,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
-import { Calendar } from 'lucide-vue-next'
+import { Calendar } from '@lucide/vue'
 import { READING_SESSION_SOURCE_BUCKETS, READING_SESSION_SOURCE_BUCKET_LABELS } from '@bookorbit/types'
 import { useThemeStore } from '@/stores/theme'
 

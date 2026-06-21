@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { Check, ChevronDown, Clock, Minus, Plus, TrendingDown, TrendingUp } from 'lucide-vue-next'
+import { Check, ChevronDown, Clock, Minus, Plus, TrendingDown, TrendingUp } from '@lucide/vue'
 import type { BookDetail, BookReadingSessionStats, ReadStatus, UserBookStatus } from '@bookorbit/types'
 import { isAudioFormat } from '@bookorbit/types'
 import { api } from '@/lib/api'

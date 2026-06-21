@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Highlighter, RotateCcw, Trash2 } from 'lucide-vue-next'
+import { Highlighter, RotateCcw, Trash2 } from '@lucide/vue'
 import type { AnnotationItem, BookDetail } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
 import AnnotationListItem from '@/features/annotations/components/AnnotationListItem.vue'

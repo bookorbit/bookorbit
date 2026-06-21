@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import { existsSync } from 'fs';
 import { join, resolve } from 'path';
 
@@ -88,7 +88,7 @@ export class KoreaderPackageService {
 
   private zipPlugin(pluginDir: string, provisionContent: string): Promise<Buffer> {
     return new Promise((resolveZip, reject) => {
-      const archive = archiver('zip', { zlib: { level: 9 } });
+      const archive = new ZipArchive({ zlib: { level: 9 } });
       const chunks: Buffer[] = [];
       archive.on('data', (chunk: Buffer) => chunks.push(chunk));
       archive.on('warning', reject);

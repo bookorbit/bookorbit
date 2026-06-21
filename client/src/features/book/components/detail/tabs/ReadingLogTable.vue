@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { ChevronDown, ChevronUp, ChevronsUpDown, Loader2, Trash2, X } from 'lucide-vue-next'
+import { ChevronDown, ChevronUp, ChevronsUpDown, Loader2, Trash2, X } from '@lucide/vue'
 import type { BookReadingSession, ReadingSessionSource } from '@bookorbit/types'
 
 const props = defineProps<{

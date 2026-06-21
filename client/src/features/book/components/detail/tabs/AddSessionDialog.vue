@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { X } from 'lucide-vue-next'
+import { X } from '@lucide/vue'
 
 const props = defineProps<{
   open: boolean

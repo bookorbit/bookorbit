@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { MonitorSmartphone } from 'lucide-vue-next'
+import { MonitorSmartphone } from '@lucide/vue'
 import type { BookReadingSessionStats, ReadingSessionSourceBucket } from '@bookorbit/types'
 import { READING_SESSION_SOURCE_BUCKET_LABELS } from '@bookorbit/types'
 
