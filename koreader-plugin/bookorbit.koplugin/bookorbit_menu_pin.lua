@@ -6,7 +6,8 @@ KOReader merges <settings_dir>/<prefix>_menu_order.lua over the bundled order
 tables per top-level key, so the generated files must carry the complete tools
 list. Files created here start with a marker comment and are regenerated from
 the bundled order on every startup, so KOReader updates never drift. A
-hand-maintained file only ever gets the single bookorbit_sync id inserted.
+hand-maintained file only ever gets old BookOrbit ids replaced by the current
+one.
 ]]
 
 local DataStorage = require("datastorage")
@@ -15,8 +16,15 @@ local lfs = require("libs/libkoreader-lfs")
 local logger = require("logger")
 local util = require("util")
 
-local MARKER = "-- bookorbit-sync-pin v1 (generated; delete this file to reset menu order)"
-local MENU_ID = "bookorbit_sync"
+local MARKER = "-- bookorbit-menu-pin v2 (generated; delete this file to reset menu order)"
+local OLD_MARKERS = {
+    "-- bookorbit-sync-pin v1 (generated; delete this file to reset menu order)",
+}
+local MENU_ID = "bookorbit"
+local OLD_MENU_IDS = {
+    "bookorbit_browse",
+    "bookorbit_sync",
+}
 
 local PREFIXES = {
     { prefix = "reader", order_module = "ui/elements/reader_menu_order" },
@@ -27,14 +35,38 @@ local BookOrbitMenuPin = {
     done = false,
 }
 
-local function insertAfterCalibre(tools)
-    for i, id in ipairs(tools) do
-        if id == "calibre" then
-            table.insert(tools, i + 1, MENU_ID)
-            return
+local function removeId(tools, menu_id)
+    local removed = false
+    for i = #tools, 1, -1 do
+        if tools[i] == menu_id then
+            table.remove(tools, i)
+            removed = true
         end
     end
-    table.insert(tools, MENU_ID)
+    return removed
+end
+
+local function removeOldIds(tools)
+    local removed = false
+    for _, menu_id in ipairs(OLD_MENU_IDS) do
+        removed = removeId(tools, menu_id) or removed
+    end
+    return removed
+end
+
+local function normalizeBookOrbitIds(tools)
+    removeOldIds(tools)
+    removeId(tools, MENU_ID)
+
+    local insert_at = #tools
+    for i, id in ipairs(tools) do
+        if id == "calibre" then
+            insert_at = i
+            break
+        end
+    end
+
+    table.insert(tools, insert_at + 1, MENU_ID)
 end
 
 local function desiredTools(order_module)
@@ -46,7 +78,7 @@ local function desiredTools(order_module)
     for _, id in ipairs(bundled.tools) do
         table.insert(tools, id)
     end
-    insertAfterCalibre(tools)
+    normalizeBookOrbitIds(tools)
     return tools
 end
 
@@ -54,9 +86,14 @@ local function serializeOurs(tools)
     return MARKER .. "\nreturn " .. dump({ tools = tools }, nil, true) .. "\n"
 end
 
-local function containsId(tools)
-    for _, id in ipairs(tools) do
-        if id == MENU_ID then return true end
+local function isGeneratedByUs(existing)
+    if existing:sub(1, #MARKER) == MARKER then
+        return true
+    end
+    for _, marker in ipairs(OLD_MARKERS) do
+        if existing:sub(1, #marker) == marker then
+            return true
+        end
     end
     return false
 end
@@ -81,7 +118,7 @@ local function ensureOne(prefix, order_module)
         return
     end
 
-    if existing:sub(1, #MARKER) == MARKER then
+    if isGeneratedByUs(existing) then
         local content = serializeOurs(tools)
         if content ~= existing then
             local ok, err = util.writeToFile(content, path, true)
@@ -92,15 +129,14 @@ local function ensureOne(prefix, order_module)
         return
     end
 
-    -- Hand-maintained file: only ever insert our id, never restructure.
+    -- Hand-maintained file: replace stale BookOrbit ids without touching other entries.
     local parsed, user = pcall(dofile, path)
     if not parsed or type(user) ~= "table" then
         logger.warn("BookOrbit: cannot parse user menu order file, leaving it alone:", path)
         return
     end
     if type(user.tools) == "table" then
-        if containsId(user.tools) then return end
-        insertAfterCalibre(user.tools)
+        normalizeBookOrbitIds(user.tools)
     else
         user.tools = tools
     end

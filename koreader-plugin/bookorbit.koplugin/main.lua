@@ -281,18 +281,8 @@ function BookOrbit:strategyMenu(getter, setter)
 end
 
 function BookOrbit:addToMainMenu(menu_items)
-    menu_items.bookorbit_browse = {
-        text = _("Browse BookOrbit"),
-        sorting_hint = "tools",
-        enabled_func = function()
-            return self:isLoggedIn()
-        end,
-        callback = function()
-            self:browseCatalog()
-        end,
-    }
-    menu_items.bookorbit_sync = {
-        text = _("BookOrbit sync"),
+    menu_items.bookorbit = {
+        text = _("BookOrbit"),
         -- Fallback placement only: BookOrbitMenuPin normally pins this entry
         -- right below calibre on the first page of the Tools menu.
         sorting_hint = "tools",
@@ -322,6 +312,16 @@ function BookOrbit:addToMainMenu(menu_items)
                             self:login(menu)
                         end
                     end
+                end,
+                separator = true,
+            },
+            {
+                text = _("Browse library"),
+                enabled_func = function()
+                    return self:isLoggedIn()
+                end,
+                callback = function()
+                    self:browseCatalog()
                 end,
                 separator = true,
             },
