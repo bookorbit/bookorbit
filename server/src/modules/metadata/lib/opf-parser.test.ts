@@ -418,8 +418,56 @@ describe('parseOpf', () => {
       expect(r.ranobedbId).toBe('ranobe-legacy');
     });
 
+    it('normalizes urn-prefixed provider IDs when opf:scheme is present', () => {
+      const xml = epub2Opf(`
+        <dc:identifier opf:scheme="GOOGLE">urn:google:RPyFDwAAQBAJ</dc:identifier>
+        <dc:identifier opf:scheme="AMAZON">urn:amazon:0345415000</dc:identifier>
+        <dc:identifier opf:scheme="GOODREADS">urn:goodreads:42129393</dc:identifier>
+        <dc:identifier opf:scheme="HARDCOVER">urn:hardcover:new-orleans-rush</dc:identifier>
+        <dc:identifier opf:scheme="OPENLIBRARY">urn:openlibrary:OL20652610W</dc:identifier>
+        <dc:identifier opf:scheme="RANOBEDB">urn:ranobedb:ranobe-legacy</dc:identifier>
+        <dc:identifier opf:scheme="KOBO">urn:kobo:kobo-123</dc:identifier>
+        <dc:identifier opf:scheme="LUBIMYCZYTAC">urn:lubimyczytac:lub-99999</dc:identifier>
+        <dc:identifier opf:scheme="ALADIN">urn:aladin:9791190090018</dc:identifier>
+        <dc:identifier opf:scheme="ITUNES">urn:itunes:123456789</dc:identifier>
+      `);
+      const r = parseOpf(xml);
+      expect(r.googleBooksId).toBe('RPyFDwAAQBAJ');
+      expect(r.amazonId).toBe('0345415000');
+      expect(r.goodreadsId).toBe('42129393');
+      expect(r.hardcoverId).toBe('new-orleans-rush');
+      expect(r.openLibraryId).toBe('OL20652610W');
+      expect(r.ranobedbId).toBe('ranobe-legacy');
+      expect(r.koboId).toBe('kobo-123');
+      expect(r.lubimyczytacId).toBe('lub-99999');
+      expect(r.aladinId).toBe('9791190090018');
+      expect(r.itunesId).toBe('123456789');
+    });
+
+    it('normalizes the real-world Amazon URN value that exceeds the amazon_id column when untrimmed', () => {
+      const r = parseOpf(epub2Opf(`<dc:identifier opf:scheme="AMAZON">urn:amazon:0345415000</dc:identifier>`));
+      expect(r.amazonId).toBe('0345415000');
+      expect(r.amazonId).toHaveLength(10);
+    });
+
+    it('normalizes provider URN prefixes case-insensitively', () => {
+      const xml = epub2Opf(`
+        <dc:identifier>URN:GOOGLE:CaseSensitiveGoogleId</dc:identifier>
+        <dc:identifier>URN:AMAZON:B0G3YRNY6Y</dc:identifier>
+      `);
+      const r = parseOpf(xml);
+      expect(r.googleBooksId).toBe('CaseSensitiveGoogleId');
+      expect(r.amazonId).toBe('B0G3YRNY6Y');
+    });
+
+    it('normalizes Amazon alias prefixes when opf:scheme is present', () => {
+      expect(parseOpf(epub2Opf(`<dc:identifier opf:scheme="AMAZON">amazon:B0G3YRNY6Y</dc:identifier>`)).amazonId).toBe('B0G3YRNY6Y');
+      expect(parseOpf(epub2Opf(`<dc:identifier opf:scheme="AMAZON">asin:B0G3YRNY6Y</dc:identifier>`)).amazonId).toBe('B0G3YRNY6Y');
+      expect(parseOpf(epub2Opf(`<dc:identifier opf:scheme="AMAZON">mobi-asin:B0ABCDEFGH</dc:identifier>`)).amazonId).toBe('B0ABCDEFGH');
+    });
+
     it('opf:scheme format wins over urn: when both are present for the same provider', () => {
-      // urn: appears first in document order — scheme should still win
+      // urn: appears first in document order; scheme should still win.
       const xml = epub2Opf(`
         <dc:identifier>urn:google:OLD_URN_VALUE</dc:identifier>
         <dc:identifier opf:scheme="GOOGLE">SCHEME_VALUE</dc:identifier>

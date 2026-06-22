@@ -177,8 +177,11 @@ async function onCopy() {
                 class="w-6 h-6 rounded-full border-2 transition-all hover:scale-110"
                 :class="selectedColor === c.hex ? 'border-foreground scale-110' : 'border-transparent'"
                 :style="{ background: c.hex }"
+                :title="c.label"
                 @click="selectedColor = c.hex"
-              />
+              >
+                <span class="sr-only">{{ c.label }}</span>
+              </button>
             </div>
             <div class="flex gap-1 px-0.5">
               <button
