@@ -67,6 +67,11 @@ BookOrbit.default_settings = {
     pages_before_update = 10,
     sync_forward = SYNC_STRATEGY.PROMPT,
     sync_backward = SYNC_STRATEGY.DISABLE,
+    catalog_view_mode = "mosaic",
+    catalog_sort = "recently_added",
+    catalog_grid_cols = 3,
+    catalog_grid_rows = 3,
+    catalog_recent_searches = {},
 }
 
 function BookOrbit:init()
@@ -440,6 +445,10 @@ function BookOrbit:browseCatalog()
         self.catalog_browser = BookOrbitCatalog:new{
             title = _("BookOrbit"),
             api = self:apiOpts(),
+            settings = self.settings,
+            save_settings = function()
+                G_reader_settings:flush()
+            end,
             _manager = self,
             close_callback = function()
                 UIManager:close(self.catalog_browser)

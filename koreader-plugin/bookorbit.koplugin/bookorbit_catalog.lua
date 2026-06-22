@@ -42,11 +42,11 @@ local _ = require("gettext")
 local BookOrbitApi = require("bookorbit_api")
 local BookOrbitState = require("bookorbit_state")
 
-local PAGE_SIZE = 9
-local GRID_COLUMNS = 3
-local GRID_ROWS = 3
-local GRID_ITEMS = GRID_COLUMNS * GRID_ROWS
+local DEFAULT_GRID_COLUMNS = 3
+local DEFAULT_GRID_ROWS = 3
 local THUMBNAIL_BATCH_SIZE = 2
+local MAX_RECENT_SEARCHES = 8
+local ON_DEVICE_MAX_IDS = 200
 local Screen = Device.screen
 
 local SORTS = {
@@ -54,7 +54,64 @@ local SORTS = {
     { id = "author", text = _("Author") },
     { id = "recently_added", text = _("Recently added") },
     { id = "recently_updated", text = _("Recently updated") },
+    { id = "recently_read", text = _("Recently read") },
     { id = "series", text = _("Series order") },
+}
+
+local SORT_LABELS = {
+    title = _("Title"),
+    author = _("Author"),
+    recently_added = _("Recently added"),
+    recently_updated = _("Recently updated"),
+    recently_read = _("Recently read"),
+    series = _("Series order"),
+}
+
+local NATURAL_ORDER = {
+    title = "asc",
+    author = "asc",
+    series = "asc",
+    recently_added = "desc",
+    recently_updated = "desc",
+    recently_read = "desc",
+}
+
+local SORT_KIND = {
+    title = "alpha",
+    author = "alpha",
+    series = "alpha",
+    recently_added = "time",
+    recently_updated = "time",
+    recently_read = "time",
+}
+
+local DIRECTION_LABELS = {
+    alpha = { asc = _("A-Z"), desc = _("Z-A") },
+    time = { asc = _("oldest first"), desc = _("newest first") },
+}
+
+local READ_STATUS_FILTERS = {
+    { id = nil, text = _("All") },
+    { id = "unread", text = _("Unread") },
+    { id = "reading", text = _("Reading") },
+    { id = "finished", text = _("Finished") },
+}
+
+local READ_STATUS_LABELS = {
+    unread = _("Unread"),
+    want_to_read = _("To read"),
+    reading = _("Reading"),
+    on_hold = _("On hold"),
+    rereading = _("Rereading"),
+    read = _("Read"),
+    skimmed = _("Skimmed"),
+    abandoned = _("Abandoned"),
+}
+
+local COMMON_FORMATS = { "epub", "pdf", "cbz", "cbr", "mobi", "azw3", "fb2", "djvu", "txt" }
+
+local GRID_PRESETS = {
+    { 2, 2 }, { 2, 3 }, { 3, 3 }, { 3, 4 }, { 4, 4 }, { 4, 5 },
 }
 
 local BookOrbitCatalog = Menu:extend{
@@ -265,21 +322,6 @@ local function coverLabel(book)
     return table.concat(lines, "\n")
 end
 
-local function bookCellLabel(book)
-    local parts = { shortText(book.title or _("Untitled"), 30) }
-    local author = firstAuthor(book)
-    if author then
-        table.insert(parts, shortText(author, 24))
-    end
-    local progress = formatProgress(book.progressPercentage)
-    if progress then
-        table.insert(parts, progress)
-    elseif book.formats and book.formats[1] then
-        table.insert(parts, table.concat(book.formats, ", "))
-    end
-    return table.concat(parts, "\n")
-end
-
 local function buildFakeCover(book, width, height, footer)
     local inner_w = math.max(1, width - 2 * Size.padding.default - 2 * Size.border.thin)
     local inner_h = math.max(1, height - 2 * Size.padding.default - 2 * Size.border.thin)
@@ -393,7 +435,7 @@ function BookOrbitMosaicItem:init()
     table.insert(content, buildCoverWidget(book, cover_w, cover_h, path, state))
     table.insert(content, VerticalSpan:new{ width = Size.span.vertical_default })
     table.insert(content, TextBoxWidget:new{
-        text = bookCellLabel(book),
+        text = self.menu:cellLabel(book),
         width = self.dimen.w - 2 * Size.padding.tiny,
         height = label_h,
         alignment = "center",
@@ -417,18 +459,201 @@ function BookOrbitMosaicItem:onHoldSelect()
     return true
 end
 
+local BookOrbitListItem = InputContainer:extend{
+    entry = nil,
+    dimen = nil,
+    menu = nil,
+}
+
+function BookOrbitListItem:init()
+    self.ges_events = {
+        TapSelect = {
+            GestureRange:new{
+                ges = "tap",
+                range = self.dimen,
+            },
+        },
+        HoldSelect = {
+            GestureRange:new{
+                ges = "hold",
+                range = self.dimen,
+            },
+        },
+    }
+
+    local book = self.entry.book
+    local pad = Size.padding.default
+    local inner_h = math.max(1, self.dimen.h - 2 * Size.border.thin)
+    local cover_h = math.max(Screen:scaleBySize(40), inner_h - 2 * Size.padding.small)
+    local cover_w = math.floor(cover_h * 0.68)
+    local text_w = math.max(1, self.dimen.w - cover_w - 3 * pad)
+
+    local path = self.menu:cachedThumbnailPath(book)
+    local state = self.menu:thumbnailState(book)
+
+    local row = HorizontalGroup:new{ align = "center" }
+    table.insert(row, HorizontalSpan:new{ width = pad })
+    table.insert(row, buildCoverWidget(book, cover_w, cover_h, path, state))
+    table.insert(row, HorizontalSpan:new{ width = pad })
+    table.insert(row, TextBoxWidget:new{
+        text = self.menu:listText(book),
+        width = text_w,
+        height = math.max(1, inner_h - 2 * Size.padding.small),
+        alignment = "left",
+        face = Font:getFace("smallinfofont"),
+        height_overflow_show_ellipsis = true,
+    })
+
+    self[1] = FrameContainer:new{
+        width = self.dimen.w,
+        height = self.dimen.h,
+        margin = 0,
+        padding = 0,
+        bordersize = Size.border.thin,
+        background = Blitbuffer.COLOR_WHITE,
+        row,
+    }
+end
+
+function BookOrbitListItem:onTapSelect()
+    self.menu:onMenuSelect(self.entry)
+    return true
+end
+
+function BookOrbitListItem:onHoldSelect()
+    self.menu:onMenuSelect(self.entry)
+    return true
+end
+
 function BookOrbitCatalog:init()
     self.client = BookOrbitApi.new(self.api)
     self.stack = {}
     self.thumbnail_cache_dir = DataStorage:getDataDir() .. "/cache/bookorbit"
     self.thumbnail_generation = 0
     self.thumbnail_failures = {}
+    self.settings = self.settings or {}
+    self.view_mode = self.settings.catalog_view_mode == "list" and "list" or "mosaic"
+    self.grid_cols = self:sanitizeGridValue(self.settings.catalog_grid_cols, DEFAULT_GRID_COLUMNS)
+    self.grid_rows = self:sanitizeGridValue(self.settings.catalog_grid_rows, DEFAULT_GRID_ROWS)
+    self.default_sort = self.settings.catalog_sort or "recently_added"
+    self.list_rows = self:computeListRows()
+    self.on_device = {}
+    self.on_device_files = {}
+    self:refreshOnDevice()
     self.current_context = { kind = "root", title = self.title }
     self.item_table = self:rootItems()
     self.is_borderless = true
     self.title_bar_fm_style = true
     Menu.init(self)
     self.paths = self.stack
+end
+
+function BookOrbitCatalog:sanitizeGridValue(value, fallback)
+    value = tonumber(value)
+    if not value then return fallback end
+    value = math.floor(value)
+    if value < 1 then return 1 end
+    if value > 6 then return 6 end
+    return value
+end
+
+function BookOrbitCatalog:computeListRows()
+    local row_h = Screen:scaleBySize(64)
+    local usable = Screen:getHeight() * 0.82
+    return math.max(5, math.floor(usable / row_h))
+end
+
+function BookOrbitCatalog:itemsPerPage()
+    if self.view_mode == "list" then
+        return self.list_rows or 8
+    end
+    return self.grid_cols * self.grid_rows
+end
+
+function BookOrbitCatalog:persistSetting(key, value)
+    self.settings[key] = value
+    if self.save_settings then
+        self.save_settings()
+    end
+end
+
+function BookOrbitCatalog:refreshOnDevice()
+    local ok, state = pcall(function()
+        return BookOrbitState.open()
+    end)
+    if ok and state then
+        self.on_device = state:matchedByBookId()
+        self.on_device_files = state:matchedByBookFileId()
+    else
+        self.on_device = {}
+        self.on_device_files = {}
+    end
+end
+
+function BookOrbitCatalog:isOnDevice(book)
+    return book ~= nil and book.id ~= nil and self.on_device[book.id] ~= nil
+end
+
+function BookOrbitCatalog:onDeviceFilePath(file)
+    return file ~= nil and file.id ~= nil and self.on_device_files and self.on_device_files[file.id] or nil
+end
+
+function BookOrbitCatalog:detailReadPath(detail)
+    local fallback
+    for _, file in ipairs(self:supportedFiles(detail)) do
+        local path = self:onDeviceFilePath(file)
+        if path then
+            if string.lower(file.format or "") == "epub" then
+                return path
+            end
+            fallback = fallback or path
+        end
+    end
+    if fallback then return fallback end
+    return detail ~= nil and detail.id ~= nil and self.on_device[detail.id] or nil
+end
+
+function BookOrbitCatalog:readStatusLabel(book)
+    return book and book.readStatus and READ_STATUS_LABELS[book.readStatus] or nil
+end
+
+function BookOrbitCatalog:bookMetaLine(book)
+    local meta = {}
+    local progress = formatProgress(book.progressPercentage)
+    if progress then table.insert(meta, progress) end
+    local status = self:readStatusLabel(book)
+    if status then table.insert(meta, status) end
+    if self:isOnDevice(book) then table.insert(meta, _("On device")) end
+    if #meta == 0 and book.formats and book.formats[1] then
+        table.insert(meta, table.concat(book.formats, ", "))
+    end
+    return #meta > 0 and table.concat(meta, " - ") or nil
+end
+
+function BookOrbitCatalog:cellLabel(book)
+    local parts = { shortText(book.title or _("Untitled"), 30) }
+    local author = firstAuthor(book)
+    if author then
+        table.insert(parts, shortText(author, 24))
+    end
+    local meta = self:bookMetaLine(book)
+    if meta then table.insert(parts, meta) end
+    return table.concat(parts, "\n")
+end
+
+function BookOrbitCatalog:listText(book)
+    local lines = { shortText(book.title or _("Untitled"), 48) }
+    local author = firstAuthor(book)
+    if author then
+        table.insert(lines, shortText(author, 44))
+    end
+    local series = formatSeries(book)
+    if series then
+        table.insert(lines, shortText(series, 44))
+    end
+    local meta = self:bookMetaLine(book)
+    if meta then table.insert(lines, meta) end
+    return table.concat(lines, "\n")
 end
 
 function BookOrbitCatalog:rootItems()
@@ -452,6 +677,12 @@ function BookOrbitCatalog:rootItems()
                 kind = "books",
                 params = { sort = "recently_added" },
             })
+        elseif section.section == "continue-reading" then
+            table.insert(items, {
+                text = section.title,
+                kind = "books",
+                params = { sort = "recently_read", readStatus = "reading" },
+            })
         elseif section.section == "all-books" then
             table.insert(items, {
                 text = section.title,
@@ -466,6 +697,17 @@ function BookOrbitCatalog:rootItems()
             })
         end
     end
+
+    local on_device_count = 0
+    for _ in pairs(self.on_device or {}) do
+        on_device_count = on_device_count + 1
+    end
+    table.insert(items, {
+        text = _("On device"),
+        mandatory = on_device_count > 0 and tostring(on_device_count) or nil,
+        kind = "on-device",
+    })
+
     return items
 end
 
@@ -497,11 +739,60 @@ function BookOrbitCatalog:switchTo(title, item_table, context, push)
     end
 end
 
+function BookOrbitCatalog:withLoading(text, fn)
+    local info = InfoMessage:new{ text = text or _("Loading...") }
+    UIManager:show(info)
+    UIManager:forceRePaint()
+    fn()
+    UIManager:close(info)
+end
+
+function BookOrbitCatalog:errorText(err)
+    if isAuthError(err) then
+        return _("BookOrbit login failed. Check your KOReader credentials.")
+    elseif type(err) == "number" then
+        return T(_("BookOrbit server error (%1)."), err)
+    end
+    return _("Could not reach the BookOrbit server. Check your connection.")
+end
+
+function BookOrbitCatalog:showRetry(err, retry_fn)
+    local dialog
+    dialog = ButtonDialog:new{
+        title = self:errorText(err),
+        buttons = {
+            {
+                {
+                    text = _("Retry"),
+                    callback = function()
+                        UIManager:close(dialog)
+                        retry_fn()
+                    end,
+                },
+            },
+            {
+                {
+                    text = _("Cancel"),
+                    callback = function()
+                        UIManager:close(dialog)
+                    end,
+                },
+            },
+        },
+    }
+    UIManager:show(dialog)
+end
+
 function BookOrbitCatalog:loadSection(section)
     NetworkMgr:runWhenConnected(function()
-        local body, err = self.client:catalogSection(section)
+        local body, err
+        self:withLoading(_("Loading..."), function()
+            body, err = self.client:catalogSection(section)
+        end)
         if not body then
-            showError(err)
+            self:showRetry(err, function()
+                self:loadSection(section)
+            end)
             return
         end
 
@@ -554,17 +845,41 @@ function BookOrbitCatalog:loadBooks(params, title, push)
     NetworkMgr:runWhenConnected(function()
         local query = cloneParams(params)
         query.page = query.page or 1
-        query.size = query.size or PAGE_SIZE
-        query.sort = query.sort or "recently_added"
+        query.size = self:itemsPerPage()
+        query.sort = query.sort or self.default_sort or "recently_added"
+        query.order = self:effectiveOrder(query)
 
-        local body, err = self.client:catalogBooks(query)
+        local body, err
+        self:withLoading(_("Loading books..."), function()
+            body, err = self.client:catalogBooks(query)
+        end)
         if not body then
-            showError(err)
+            self:showRetry(err, function()
+                self:loadBooks(params, title, push)
+            end)
             return
         end
 
         self:showBookPage(body, query, title or _("Books"), push ~= false)
     end)
+end
+
+function BookOrbitCatalog:loadOnDevice()
+    self:refreshOnDevice()
+    local ids = {}
+    for book_id in pairs(self.on_device) do
+        table.insert(ids, book_id)
+    end
+    if #ids == 0 then
+        UIManager:show(InfoMessage:new{ text = _("No downloaded books are linked on this device yet."), timeout = 3 })
+        return
+    end
+    table.sort(ids)
+    local capped = {}
+    for i = 1, math.min(#ids, ON_DEVICE_MAX_IDS) do
+        capped[i] = ids[i]
+    end
+    self:loadBooks({ ids = table.concat(capped, ","), sort = "title" }, _("On device"), true)
 end
 
 function BookOrbitCatalog:scopeParams(query)
@@ -575,7 +890,56 @@ function BookOrbitCatalog:scopeParams(query)
     return params
 end
 
+function BookOrbitCatalog:recordRecentSearch(q)
+    local recents = self.settings.catalog_recent_searches or {}
+    local next_list = { q }
+    for _, prev in ipairs(recents) do
+        if prev ~= q and #next_list < MAX_RECENT_SEARCHES then
+            table.insert(next_list, prev)
+        end
+    end
+    self:persistSetting("catalog_recent_searches", next_list)
+end
+
+function BookOrbitCatalog:runSearch(params, q)
+    q = util.trim(q or "")
+    if q == "" then return end
+    self:recordRecentSearch(q)
+    local query = cloneParams(params)
+    query.q = q
+    query.page = 1
+    query.sort = query.sort or "title"
+    self:loadBooks(query, T(_("Search: %1"), q), true)
+end
+
+function BookOrbitCatalog:showRecentSearches(params)
+    local recents = self.settings.catalog_recent_searches or {}
+    if #recents == 0 then
+        UIManager:show(InfoMessage:new{ text = _("No recent searches yet."), timeout = 2 })
+        return
+    end
+    local dialog
+    local buttons = {}
+    for _, q in ipairs(recents) do
+        table.insert(buttons, {
+            {
+                text = q,
+                callback = function()
+                    UIManager:close(dialog)
+                    self:runSearch(params, q)
+                end,
+            },
+        })
+    end
+    dialog = ButtonDialog:new{
+        title = _("Recent searches"),
+        buttons = buttons,
+    }
+    UIManager:show(dialog)
+end
+
 function BookOrbitCatalog:promptSearch(params)
+    local has_recents = #(self.settings.catalog_recent_searches or {}) > 0
     local dialog
     dialog = InputDialog:new{
         title = _("Search BookOrbit"),
@@ -590,17 +954,21 @@ function BookOrbitCatalog:promptSearch(params)
                     end,
                 },
                 {
+                    text = _("Recent"),
+                    enabled = has_recents,
+                    callback = function()
+                        UIManager:close(dialog)
+                        self:showRecentSearches(params)
+                    end,
+                },
+                {
                     text = _("Search"),
                     is_enter_default = true,
                     callback = function()
                         local q = util.trim(dialog:getInputText() or "")
                         if q == "" then return end
                         UIManager:close(dialog)
-                        local query = cloneParams(params)
-                        query.q = q
-                        query.page = 1
-                        query.sort = query.sort or "title"
-                        self:loadBooks(query, T(_("Search: %1"), q), true)
+                        self:runSearch(params, q)
                     end,
                 },
             },
@@ -610,15 +978,39 @@ function BookOrbitCatalog:promptSearch(params)
     dialog:onShowKeyboard()
 end
 
+function BookOrbitCatalog:filterSummary(query)
+    local parts = {}
+    if query.readStatus then
+        for _, f in ipairs(READ_STATUS_FILTERS) do
+            if f.id == query.readStatus then
+                table.insert(parts, f.text)
+                break
+            end
+        end
+    end
+    if query.format then
+        table.insert(parts, string.upper(query.format))
+    end
+    return #parts > 0 and table.concat(parts, ", ") or nil
+end
+
 function BookOrbitCatalog:showBookPage(body, query, title, push)
     local items = body.items or {}
     local page = body.page or query.page or 1
-    local size = body.size or query.size or PAGE_SIZE
+    local size = body.size or query.size or self:itemsPerPage()
     local total = body.total or 0
     local page_count = math.max(1, math.ceil(total / size))
-    local subtitle = total > 0
-        and T(_("%1 books - Sort: %2"), total, self:sortLabel(query.sort))
-        or T(_("Sort: %1"), self:sortLabel(query.sort))
+    local filters = self:filterSummary(query)
+    local sort_label = T(_("%1 (%2)"), self:sortLabel(query.sort), self:directionLabel(query))
+    local subtitle
+    if total > 0 then
+        subtitle = T(_("%1 books - Sort: %2"), total, sort_label)
+    else
+        subtitle = T(_("Sort: %1"), sort_label)
+    end
+    if filters then
+        subtitle = subtitle .. T(_(" - Filter: %1"), filters)
+    end
     local item_table = {}
 
     for _, book in ipairs(items) do
@@ -714,7 +1106,10 @@ function BookOrbitCatalog:showSortDialog(item)
                     UIManager:close(dialog)
                     local params = cloneParams(item.params)
                     params.sort = sort.id
+                    params.order = nil
                     params.page = 1
+                    self.default_sort = sort.id
+                    self:persistSetting("catalog_sort", sort.id)
                     self:loadBooks(params, item.title or _("Books"), false)
                 end,
             },
@@ -727,16 +1122,156 @@ function BookOrbitCatalog:showSortDialog(item)
     UIManager:show(dialog)
 end
 
+function BookOrbitCatalog:reverseOrder()
+    self:applyToCurrentBooks(function(params)
+        local current = self:effectiveOrder(params)
+        params.order = current == "asc" and "desc" or "asc"
+    end)
+end
+
 function BookOrbitCatalog:sortLabel(sort_id)
-    for _, sort in ipairs(SORTS) do
-        if sort.id == sort_id then return sort.text end
+    return SORT_LABELS[sort_id] or _("Recently added")
+end
+
+function BookOrbitCatalog:effectiveOrder(query)
+    local sort = query.sort or "recently_added"
+    return query.order or NATURAL_ORDER[sort] or "asc"
+end
+
+function BookOrbitCatalog:directionLabel(query)
+    local sort = query.sort or "recently_added"
+    local kind = SORT_KIND[sort] or "alpha"
+    local order = self:effectiveOrder(query)
+    return DIRECTION_LABELS[kind][order]
+end
+
+function BookOrbitCatalog:applyToCurrentBooks(mutator)
+    local context = self.current_context or {}
+    if context.kind ~= "books" then return false end
+    local params = cloneParams(context.params or {})
+    if mutator then mutator(params) end
+    params.page = 1
+    self:loadBooks(params, context.title or _("Books"), false)
+    return true
+end
+
+function BookOrbitCatalog:reloadCurrentBooks()
+    return self:applyToCurrentBooks(nil)
+end
+
+function BookOrbitCatalog:setViewMode(mode)
+    if mode ~= "list" and mode ~= "mosaic" then return end
+    if self.view_mode == mode then return end
+    self.view_mode = mode
+    self:persistSetting("catalog_view_mode", mode)
+    if self:bookMode() then
+        self:reloadCurrentBooks()
     end
-    return _("Recently added")
+end
+
+function BookOrbitCatalog:setGrid(cols, rows)
+    self.grid_cols = self:sanitizeGridValue(cols, DEFAULT_GRID_COLUMNS)
+    self.grid_rows = self:sanitizeGridValue(rows, DEFAULT_GRID_ROWS)
+    self:persistSetting("catalog_grid_cols", self.grid_cols)
+    self:persistSetting("catalog_grid_rows", self.grid_rows)
+    if self:bookMode() and self.view_mode == "mosaic" then
+        self:reloadCurrentBooks()
+    end
+end
+
+function BookOrbitCatalog:showGridDialog()
+    local dialog
+    local grid_label = _("%1 x %2")
+    local buttons = {}
+    for _, preset in ipairs(GRID_PRESETS) do
+        local cols, rows = preset[1], preset[2]
+        local is_current = cols == self.grid_cols and rows == self.grid_rows
+        table.insert(buttons, {
+            {
+                text = T(grid_label, cols, rows) .. (is_current and " *" or ""),
+                callback = function()
+                    UIManager:close(dialog)
+                    self:setGrid(cols, rows)
+                end,
+            },
+        })
+    end
+    dialog = ButtonDialog:new{
+        title = _("Grid (columns x rows)"),
+        buttons = buttons,
+    }
+    UIManager:show(dialog)
+end
+
+function BookOrbitCatalog:showReadStatusDialog()
+    local context = self.current_context or {}
+    local current = (context.params or {}).readStatus
+    local dialog
+    local buttons = {}
+    for _, filter in ipairs(READ_STATUS_FILTERS) do
+        table.insert(buttons, {
+            {
+                text = filter.text .. (current == filter.id and " *" or ""),
+                callback = function()
+                    UIManager:close(dialog)
+                    self:applyToCurrentBooks(function(params)
+                        params.readStatus = filter.id
+                    end)
+                end,
+            },
+        })
+    end
+    dialog = ButtonDialog:new{
+        title = _("Read status"),
+        buttons = buttons,
+    }
+    UIManager:show(dialog)
+end
+
+function BookOrbitCatalog:showFormatDialog()
+    local context = self.current_context or {}
+    local current = (context.params or {}).format
+    local dialog
+    local buttons = {
+        {
+            {
+                text = _("All") .. (current == nil and " *" or ""),
+                callback = function()
+                    UIManager:close(dialog)
+                    self:applyToCurrentBooks(function(params)
+                        params.format = nil
+                    end)
+                end,
+            },
+        },
+    }
+    for _, fmt in ipairs(COMMON_FORMATS) do
+        if isSupportedFormat(fmt) then
+            table.insert(buttons, {
+                {
+                    text = string.upper(fmt) .. (current == fmt and " *" or ""),
+                    callback = function()
+                        UIManager:close(dialog)
+                        self:applyToCurrentBooks(function(params)
+                            params.format = fmt
+                        end)
+                    end,
+                },
+            })
+        end
+    end
+    dialog = ButtonDialog:new{
+        title = _("Format"),
+        buttons = buttons,
+    }
+    UIManager:show(dialog)
 end
 
 function BookOrbitCatalog:showBookActions()
     local context = self.current_context or {}
-    local params = context.kind == "books" and self:scopeParams(context.params or {}) or {}
+    local in_books = context.kind == "books"
+    local params = in_books and self:scopeParams(context.params or {}) or {}
+    local view_label = self.view_mode == "list" and _("View: List") or _("View: Mosaic")
     local dialog
     dialog = ButtonDialog:new{
         title = _("BookOrbit"),
@@ -752,10 +1287,10 @@ function BookOrbitCatalog:showBookActions()
             },
             {
                 {
-                    text = context.kind == "books"
-                        and T(_("Sort: %1"), self:sortLabel((context.params or {}).sort))
+                    text = in_books
+                        and T(_("Sort: %1 (%2)"), self:sortLabel((context.params or {}).sort), self:directionLabel(context.params or {}))
                         or _("Sort books"),
-                    enabled = context.kind == "books",
+                    enabled = in_books,
                     callback = function()
                         UIManager:close(dialog)
                         self:showSortDialog({
@@ -763,6 +1298,49 @@ function BookOrbitCatalog:showBookActions()
                             current_sort = (context.params or {}).sort,
                             title = context.title,
                         })
+                    end,
+                },
+                {
+                    text = _("Reverse"),
+                    enabled = in_books,
+                    callback = function()
+                        UIManager:close(dialog)
+                        self:reverseOrder()
+                    end,
+                },
+            },
+            {
+                {
+                    text = _("Read status"),
+                    enabled = in_books,
+                    callback = function()
+                        UIManager:close(dialog)
+                        self:showReadStatusDialog()
+                    end,
+                },
+                {
+                    text = _("Format"),
+                    enabled = in_books,
+                    callback = function()
+                        UIManager:close(dialog)
+                        self:showFormatDialog()
+                    end,
+                },
+            },
+            {
+                {
+                    text = view_label,
+                    callback = function()
+                        UIManager:close(dialog)
+                        self:setViewMode(self.view_mode == "list" and "mosaic" or "list")
+                    end,
+                },
+                {
+                    text = _("Grid size"),
+                    enabled = self.view_mode == "mosaic",
+                    callback = function()
+                        UIManager:close(dialog)
+                        self:showGridDialog()
                     end,
                 },
             },
@@ -778,9 +1356,14 @@ end
 
 function BookOrbitCatalog:loadBookDetail(book_id)
     NetworkMgr:runWhenConnected(function()
-        local detail, err = self.client:catalogBook(book_id)
+        local detail, err
+        self:withLoading(_("Loading book..."), function()
+            detail, err = self.client:catalogBook(book_id)
+        end)
         if not detail then
-            showError(err)
+            self:showRetry(err, function()
+                self:loadBookDetail(book_id)
+            end)
             return
         end
         self:showBookDetail(detail)
@@ -864,6 +1447,7 @@ function BookOrbitCatalog:detailOverviewLines(detail)
 end
 
 function BookOrbitCatalog:showBookDetail(detail)
+    self:refreshOnDevice()
     local supported_files = self:supportedFiles(detail)
     self:switchTo(detail.title or _("Book details"), {
         {
@@ -888,19 +1472,32 @@ function BookOrbitCatalog:showFileChoices(detail)
         return
     end
     if #files == 1 then
-        self:showDownloadDialog(detail, files[1])
+        local path = self:onDeviceFilePath(files[1])
+        if path then
+            self:openDownloadedFile(path)
+        else
+            self:showDownloadDialog(detail, files[1])
+        end
         return
     end
 
     local dialog
     local buttons = {}
+    local open_tpl = _("Open - %1")
+    local download_tpl = _("Download - %1")
     for _, file in ipairs(files) do
+        local path = self:onDeviceFilePath(file)
+        local label = self:fileLabel(file, false)
         table.insert(buttons, {
             {
-                text = self:fileLabel(file, false),
+                text = path and T(open_tpl, label) or T(download_tpl, label),
                 callback = function()
                     UIManager:close(dialog)
-                    self:showDownloadDialog(detail, file)
+                    if path then
+                        self:openDownloadedFile(path)
+                    else
+                        self:showDownloadDialog(detail, file)
+                    end
                 end,
             },
         })
@@ -1004,8 +1601,7 @@ end
 
 function BookOrbitCatalog:checkDownloadFile(local_path, detail, file)
     local function download()
-        UIManager:show(InfoMessage:new{ text = _("Downloading..."), timeout = 1 })
-        UIManager:scheduleIn(1, function()
+        UIManager:nextTick(function()
             self:downloadFile(local_path, detail, file)
         end)
     end
@@ -1022,13 +1618,44 @@ function BookOrbitCatalog:checkDownloadFile(local_path, detail, file)
 end
 
 function BookOrbitCatalog:downloadFile(local_path, detail, file)
-    local ok, err = self.client:downloadCatalogFile(file.id, local_path)
+    local total = file.sizeBytes
+    local info = InfoMessage:new{ text = _("Downloading...") }
+    UIManager:show(info)
+    UIManager:forceRePaint()
+
+    local last_bucket = -1
+    local function on_progress(received)
+        local text, bucket
+        if total and total > 0 then
+            local pct = math.min(100, math.floor(received / total * 100))
+            bucket = math.floor(pct / 5)
+            if bucket == last_bucket then return end
+            text = T(_("Downloading... %1"), pct .. "%")
+        else
+            bucket = math.floor(received / (256 * 1024))
+            if bucket == last_bucket then return end
+            text = T(_("Downloading... %1"), formatBytes(received))
+        end
+        last_bucket = bucket
+        UIManager:close(info)
+        info = InfoMessage:new{ text = text }
+        UIManager:show(info)
+        UIManager:forceRePaint()
+    end
+
+    local ok, err = self.client:downloadCatalogFile(file.id, local_path, on_progress)
+    UIManager:close(info)
     if not ok then
-        showError(err)
+        self:showRetry(err, function()
+            self:downloadFile(local_path, detail, file)
+        end)
         return
     end
 
     local linked = self:linkDownloadedFile(local_path)
+    if linked then
+        self:refreshOnDevice()
+    end
     self:showDownloadedDialog(local_path, linked)
 end
 
@@ -1101,6 +1728,9 @@ end
 
 function BookOrbitCatalog:_recalculateDimen(no_recalculate_dimen)
     if self:bookMode() then
+        if self.view_mode == "list" then
+            return self:recalculateListDimen()
+        end
         return self:recalculateMosaicDimen()
     elseif self:detailMode() then
         return self:recalculateDetailDimen()
@@ -1122,14 +1752,14 @@ function BookOrbitCatalog:menuChromeHeight()
 end
 
 function BookOrbitCatalog:recalculateMosaicDimen()
-    self.perpage = GRID_ITEMS
+    self.perpage = self.grid_cols * self.grid_rows
     self.page = self.current_context.page or 1
     self.page_num = self.current_context.page_count or 1
     local top_height, bottom_height = self:menuChromeHeight()
     self.available_height = self.inner_dimen.h - top_height - bottom_height
     self.item_margin = Screen:scaleBySize(10)
-    self.item_height = math.floor((self.available_height - (GRID_ROWS + 1) * self.item_margin) / GRID_ROWS)
-    self.item_width = math.floor((self.inner_dimen.w - (GRID_COLUMNS + 1) * self.item_margin) / GRID_COLUMNS)
+    self.item_height = math.floor((self.available_height - (self.grid_rows + 1) * self.item_margin) / self.grid_rows)
+    self.item_width = math.floor((self.inner_dimen.w - (self.grid_cols + 1) * self.item_margin) / self.grid_cols)
     self.item_dimen = Geom:new{
         x = 0,
         y = 0,
@@ -1154,6 +1784,9 @@ end
 
 function BookOrbitCatalog:updateItems(select_number, no_recalculate_dimen)
     if self:bookMode() then
+        if self.view_mode == "list" then
+            return self:updateListItems(select_number, no_recalculate_dimen)
+        end
         return self:updateMosaicItems(select_number, no_recalculate_dimen)
     elseif self:detailMode() then
         return self:updateDetailItems(select_number, no_recalculate_dimen)
@@ -1201,13 +1834,13 @@ function BookOrbitCatalog:updateMosaicItems(select_number, no_recalculate_dimen)
         return
     end
 
-    for row = 1, GRID_ROWS do
+    for row = 1, self.grid_rows do
         local line_layout = {}
         table.insert(self.item_group, VerticalSpan:new{ width = self.item_margin })
         local row_group = HorizontalGroup:new{}
         table.insert(row_group, HorizontalSpan:new{ width = self.item_margin })
-        for col = 1, GRID_COLUMNS do
-            local slot = (row - 1) * GRID_COLUMNS + col
+        for col = 1, self.grid_cols do
+            local slot = (row - 1) * self.grid_cols + col
             local entry = items[slot]
             if entry then
                 entry.idx = slot
@@ -1236,6 +1869,72 @@ function BookOrbitCatalog:updateMosaicItems(select_number, no_recalculate_dimen)
         })
         if #line_layout > 0 then
             table.insert(self.layout, line_layout)
+        end
+    end
+    table.insert(self.item_group, VerticalSpan:new{ width = self.item_margin })
+    self:finishCustomUpdate(old_dimen, selected_number)
+end
+
+function BookOrbitCatalog:recalculateListDimen()
+    self.perpage = self.list_rows
+    self.page = self.current_context.page or 1
+    self.page_num = self.current_context.page_count or 1
+    local top_height, bottom_height = self:menuChromeHeight()
+    self.available_height = self.inner_dimen.h - top_height - bottom_height
+    self.item_margin = Screen:scaleBySize(4)
+    self.item_height = math.floor((self.available_height - (self.list_rows + 1) * self.item_margin) / self.list_rows)
+    self.item_width = self.inner_dimen.w - 2 * self.item_margin
+    self.item_dimen = Geom:new{
+        x = 0,
+        y = 0,
+        w = self.item_width,
+        h = self.item_height,
+    }
+end
+
+function BookOrbitCatalog:updateListItems(select_number, no_recalculate_dimen)
+    local old_dimen = self:prepareCustomUpdate(no_recalculate_dimen)
+    local items = self.item_table or {}
+    local selected_number = select_number
+
+    if #items == 0 then
+        table.insert(self.item_group, VerticalSpan:new{ width = math.floor(self.available_height * 0.38) })
+        table.insert(self.item_group, CenterContainer:new{
+            dimen = Geom:new{ w = self.inner_dimen.w, h = Screen:scaleBySize(80) },
+            TextBoxWidget:new{
+                text = _("No books"),
+                width = self.inner_dimen.w - 2 * Size.padding.large,
+                alignment = "center",
+                face = Font:getFace("infofont"),
+            },
+        })
+        self:finishCustomUpdate(old_dimen, selected_number)
+        return
+    end
+
+    for idx = 1, self.list_rows do
+        local entry = items[idx]
+        table.insert(self.item_group, VerticalSpan:new{ width = self.item_margin })
+        if entry then
+            entry.idx = idx
+            local item = BookOrbitListItem:new{
+                entry = entry,
+                dimen = self.item_dimen:copy(),
+                menu = self,
+            }
+            if entry.idx == self.itemnumber then
+                selected_number = idx
+            end
+            table.insert(self.item_group, CenterContainer:new{
+                dimen = Geom:new{ w = self.inner_dimen.w, h = self.item_height },
+                item,
+            })
+            table.insert(self.layout, { item })
+        else
+            table.insert(self.item_group, CenterContainer:new{
+                dimen = Geom:new{ w = self.inner_dimen.w, h = self.item_height },
+                HorizontalSpan:new{ width = 0 },
+            })
         end
     end
     table.insert(self.item_group, VerticalSpan:new{ width = self.item_margin })
@@ -1271,16 +1970,50 @@ function BookOrbitCatalog:buildDetailHeader(detail, width, height)
     local path = self:cachedThumbnailPath(detail)
     local state = self:thumbnailState(detail)
 
-    self.detail_download_button = Button:new{
-        text = _("Download"),
-        width = button_w,
-        height = button_h,
-        enabled = #supported_files > 0,
-        text_font_size = 16,
-        callback = function()
-            self:showFileChoices(detail)
-        end,
-    }
+    local read_path = self:detailReadPath(detail)
+    local undownloaded = 0
+    for _, file in ipairs(supported_files) do
+        if not self:onDeviceFilePath(file) then
+            undownloaded = undownloaded + 1
+        end
+    end
+    local show_read = read_path ~= nil
+    local show_download = (not show_read) or undownloaded > 0
+    local both = show_read and show_download
+    local half_w = math.floor((button_w - gap) / 2)
+
+    self.detail_read_button = nil
+    self.detail_download_button = nil
+    local buttons_row = HorizontalGroup:new{}
+
+    if show_read then
+        self.detail_read_button = Button:new{
+            text = _("Read"),
+            width = both and half_w or button_w,
+            height = button_h,
+            text_font_size = 16,
+            callback = function()
+                self:openDownloadedFile(read_path)
+            end,
+        }
+        table.insert(buttons_row, self.detail_read_button)
+    end
+    if both then
+        table.insert(buttons_row, HorizontalSpan:new{ width = gap })
+    end
+    if show_download then
+        self.detail_download_button = Button:new{
+            text = _("Download"),
+            width = both and (button_w - half_w - gap) or button_w,
+            height = button_h,
+            enabled = #supported_files > 0,
+            text_font_size = 16,
+            callback = function()
+                self:showFileChoices(detail)
+            end,
+        }
+        table.insert(buttons_row, self.detail_download_button)
+    end
 
     local facts = self:detailFactLines(detail)
     local author = joinNames(detail.authors) or _("Unknown author")
@@ -1302,9 +2035,7 @@ function BookOrbitCatalog:buildDetailHeader(detail, width, height)
         height_overflow_show_ellipsis = true,
     })
     table.insert(right, VerticalSpan:new{ width = row_gap })
-    table.insert(right, HorizontalGroup:new{
-        self.detail_download_button,
-    })
+    table.insert(right, buttons_row)
 
     return FrameContainer:new{
         width = width,
@@ -1342,9 +2073,10 @@ function BookOrbitCatalog:updateDetailItems(select_number, no_recalculate_dimen)
             height_overflow_show_ellipsis = true,
         },
     })
-    self.layout = {
-        { self.detail_download_button },
-    }
+    local focus_row = {}
+    if self.detail_read_button then table.insert(focus_row, self.detail_read_button) end
+    if self.detail_download_button then table.insert(focus_row, self.detail_download_button) end
+    self.layout = { focus_row }
     self:finishCustomUpdate(old_dimen, select_number)
 end
 
@@ -1411,6 +2143,8 @@ end
 function BookOrbitCatalog:onMenuSelect(item)
     if item.kind == "section" then
         self:loadSection(item.section)
+    elseif item.kind == "on-device" then
+        self:loadOnDevice()
     elseif item.kind == "books" then
         self:loadBooks(item.params or {}, item.list_title or item.text)
     elseif item.kind == "book" then

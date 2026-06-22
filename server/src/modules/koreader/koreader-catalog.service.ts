@@ -15,6 +15,7 @@ import type {
   KoreaderCatalogProgress,
   KoreaderCatalogSection,
   KoreaderCatalogSort,
+  KoreaderCatalogSortOrder,
 } from '@bookorbit/types';
 import { bookThumbnailPath } from '../../common/book-cover-storage';
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
@@ -34,6 +35,15 @@ type BookProgressRow = Awaited<ReturnType<BookReadService['findProgressByBook']>
 type ProgressCandidate = BookProgressRow & { percentage: number; updatedAt: Date };
 
 const CATALOG_BASE = '/api/v1/koreader/plugin/catalog';
+
+const NATURAL_SORT_ORDER: Record<KoreaderCatalogSort, KoreaderCatalogSortOrder> = {
+  title: 'asc',
+  author: 'asc',
+  series: 'asc',
+  recently_added: 'desc',
+  recently_updated: 'desc',
+  recently_read: 'desc',
+};
 
 const ROOT_SECTIONS: KoreaderCatalogEntry[] = [
   {
@@ -77,6 +87,12 @@ const ROOT_SECTIONS: KoreaderCatalogEntry[] = [
     title: 'Recent',
     section: 'recent',
     booksHref: `${CATALOG_BASE}/books?sort=recently_added`,
+  },
+  {
+    id: 'continue-reading',
+    title: 'Continue reading',
+    section: 'continue-reading',
+    booksHref: `${CATALOG_BASE}/books?sort=recently_read&readStatus=reading`,
   },
   {
     id: 'all-books',
@@ -123,7 +139,7 @@ export class KoreaderCatalogService {
     this.assertPaginationWindow(page, size);
 
     const filters = this.buildBookFilters(query);
-    const sort = this.mapSort(query.sort ?? 'recently_added');
+    const sort = this.mapSort(query.sort ?? 'recently_added', query.order);
     const { entries, total } = await this.opdsBookService.getBooksPage(user.id, sort, page, size, filters, user.isSuperuser, user.contentFilters);
 
     const items = await Promise.all(entries.map((entry) => this.mapBookListItem(user, entry)));
@@ -349,6 +365,9 @@ export class KoreaderCatalogService {
     author?: string;
     series?: string;
     q?: string;
+    readStatus?: 'unread' | 'reading' | 'finished';
+    format?: string;
+    ids?: number[];
   } {
     return {
       ...(query.libraryId !== undefined ? { libraryId: query.libraryId } : {}),
@@ -357,22 +376,29 @@ export class KoreaderCatalogService {
       ...(query.author ? { author: query.author } : {}),
       ...(query.series ? { series: query.series } : {}),
       ...(query.q?.trim() ? { q: query.q.trim() } : {}),
+      ...(query.readStatus ? { readStatus: query.readStatus } : {}),
+      ...(query.format?.trim() ? { format: query.format.trim().toLowerCase() } : {}),
+      ...(query.ids ? { ids: query.ids } : {}),
     };
   }
 
-  private mapSort(sort: KoreaderCatalogSort): OpdsSortOrder {
+  private mapSort(sort: KoreaderCatalogSort, order?: KoreaderCatalogSortOrder): OpdsSortOrder {
+    const direction = order ?? NATURAL_SORT_ORDER[sort];
+    const descending = direction === 'desc';
     switch (sort) {
       case 'title':
-        return 'title_asc';
+        return descending ? 'title_desc' : 'title_asc';
       case 'author':
-        return 'author_asc';
+        return descending ? 'author_desc' : 'author_asc';
       case 'recently_updated':
-        return 'updated';
+        return descending ? 'updated' : 'updated_asc';
+      case 'recently_read':
+        return descending ? 'recently_read' : 'recently_read_asc';
       case 'series':
-        return 'series_asc';
+        return descending ? 'series_desc' : 'series_asc';
       case 'recently_added':
       default:
-        return 'recent';
+        return descending ? 'recent' : 'recent_asc';
     }
   }
 
@@ -397,11 +423,25 @@ export class KoreaderCatalogService {
 
   private booksHref(params: Partial<KoreaderCatalogBooksQueryDto>): string {
     const search = new URLSearchParams();
-    const orderedKeys = ['page', 'size', 'sort', 'q', 'libraryId', 'collectionId', 'smartScopeId', 'author', 'series'] as const;
+    const orderedKeys = [
+      'page',
+      'size',
+      'sort',
+      'order',
+      'q',
+      'readStatus',
+      'format',
+      'ids',
+      'libraryId',
+      'collectionId',
+      'smartScopeId',
+      'author',
+      'series',
+    ] as const;
     for (const key of orderedKeys) {
       const value = params[key];
       if (value !== undefined && value !== null && value !== '') {
-        search.set(key, String(value));
+        search.set(key, Array.isArray(value) ? value.join(',') : String(value));
       }
     }
     const suffix = search.toString();

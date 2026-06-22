@@ -150,8 +150,72 @@ describe('KoreaderCatalogService', () => {
       'series',
       'search',
       'recent',
+      'continue-reading',
       'all-books',
     ]);
+  });
+
+  it('exposes the continue-reading shortcut as a recently_read reading scope', () => {
+    const { service } = makeService();
+
+    const entry = service.getRoot().sections.find((section) => section.id === 'continue-reading');
+
+    expect(entry).toEqual(
+      expect.objectContaining({
+        section: 'continue-reading',
+        booksHref: '/api/v1/koreader/plugin/catalog/books?sort=recently_read&readStatus=reading',
+      }),
+    );
+  });
+
+  it('forwards read-status, format, and id filters to the books query', async () => {
+    const { service, opdsBookService } = makeService();
+    const user = makeUser({ id: 4 });
+
+    const query = Object.assign(new KoreaderCatalogBooksQueryDto(), {
+      page: 1,
+      size: 20,
+      sort: 'recently_read',
+      readStatus: 'reading',
+      format: 'EPUB',
+      ids: [3, 1, 2],
+    });
+    await service.getBooksPage(user, query);
+
+    expect(opdsBookService.getBooksPage).toHaveBeenCalledWith(
+      4,
+      'recently_read',
+      1,
+      20,
+      { readStatus: 'reading', format: 'epub', ids: [3, 1, 2] },
+      false,
+      user.contentFilters,
+    );
+  });
+
+  it('maps explicit sort order to ascending/descending variants', async () => {
+    const { service, opdsBookService } = makeService();
+    const user = makeUser({ id: 11 });
+
+    await service.getBooksPage(user, Object.assign(new KoreaderCatalogBooksQueryDto(), { sort: 'title', order: 'desc' }));
+    expect(opdsBookService.getBooksPage).toHaveBeenLastCalledWith(11, 'title_desc', 1, 20, {}, false, user.contentFilters);
+
+    await service.getBooksPage(user, Object.assign(new KoreaderCatalogBooksQueryDto(), { sort: 'recently_added', order: 'asc' }));
+    expect(opdsBookService.getBooksPage).toHaveBeenLastCalledWith(11, 'recent_asc', 1, 20, {}, false, user.contentFilters);
+
+    await service.getBooksPage(user, Object.assign(new KoreaderCatalogBooksQueryDto(), { sort: 'recently_read', order: 'asc' }));
+    expect(opdsBookService.getBooksPage).toHaveBeenLastCalledWith(11, 'recently_read_asc', 1, 20, {}, false, user.contentFilters);
+  });
+
+  it('falls back to the natural direction when no order is given', async () => {
+    const { service, opdsBookService } = makeService();
+    const user = makeUser({ id: 12 });
+
+    await service.getBooksPage(user, Object.assign(new KoreaderCatalogBooksQueryDto(), { sort: 'title' }));
+    expect(opdsBookService.getBooksPage).toHaveBeenLastCalledWith(12, 'title_asc', 1, 20, {}, false, user.contentFilters);
+
+    await service.getBooksPage(user, Object.assign(new KoreaderCatalogBooksQueryDto(), { sort: 'recently_updated' }));
+    expect(opdsBookService.getBooksPage).toHaveBeenLastCalledWith(12, 'updated', 1, 20, {}, false, user.contentFilters);
   });
 
   it('maps section entries to scoped book links and content-filtered counts', async () => {

@@ -77,9 +77,22 @@ export interface TestKoreaderConnectionResult {
   serverUrl: string;
 }
 
-export type KoreaderCatalogSection = "libraries" | "collections" | "smart-scopes" | "authors" | "series" | "search" | "recent" | "all-books";
+export type KoreaderCatalogSection =
+  | "libraries"
+  | "collections"
+  | "smart-scopes"
+  | "authors"
+  | "series"
+  | "search"
+  | "recent"
+  | "all-books"
+  | "continue-reading";
 
-export type KoreaderCatalogSort = "title" | "author" | "recently_added" | "recently_updated" | "series";
+export type KoreaderCatalogSort = "title" | "author" | "recently_added" | "recently_updated" | "recently_read" | "series";
+
+export type KoreaderCatalogSortOrder = "asc" | "desc";
+
+export type KoreaderCatalogReadStatusFilter = "unread" | "reading" | "finished";
 
 export interface KoreaderCatalogEntry {
   id: string;

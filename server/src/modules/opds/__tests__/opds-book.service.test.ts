@@ -227,12 +227,66 @@ describe('OpdsBookService', () => {
     expect(fetchSpy).toHaveBeenCalledWith([3, 1]);
   });
 
+  it('builds read-status, format, and id filters and forwards the user id to pagination', async () => {
+    const { service } = makeService();
+    const accessSpy = vi.spyOn(service, 'getAccessibleLibraryIds');
+    const paginatedSpy = vi.spyOn(service as never, 'paginatedBookQuery').mockResolvedValue({ entries: [{ id: 1 }], total: 1 });
+
+    accessSpy.mockResolvedValueOnce([1, 2]);
+    await expect(service.getBooksPage(7, 'recently_read', 1, 20, { readStatus: 'reading', format: 'EPUB', ids: [3, 1] })).resolves.toEqual({
+      entries: [{ id: 1 }],
+      total: 1,
+    });
+
+    expect(paginatedSpy).toHaveBeenCalledTimes(1);
+    const [where, sortOrder, page, size, userId] = paginatedSpy.mock.calls[0] as unknown[];
+    expect(sortOrder).toBe('recently_read');
+    expect(page).toBe(1);
+    expect(size).toBe(20);
+    expect(userId).toBe(7);
+
+    const values = collectValues(where);
+    expect(values).toContain('reading');
+    expect(values).toContain('epub');
+    expect(values).toContain(3);
+    expect(values).toContain(1);
+  });
+
+  it('short-circuits when an empty id filter is supplied', async () => {
+    const { service } = makeService();
+    vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValueOnce([1]);
+    await expect(service.getBooksPage(7, 'recent', 1, 20, { ids: [] })).resolves.toEqual({ entries: [], total: 0 });
+  });
+
+  it('builds unread read-status as a negated active-status subquery', () => {
+    const { service } = makeService();
+
+    const readingClause = (service as never).buildReadStatusClause(7, 'reading');
+    const unreadClause = (service as never).buildReadStatusClause(7, 'unread');
+
+    expect(collectValues(readingClause)).toEqual(expect.arrayContaining([7, 'reading', 'rereading', 'on_hold']));
+    expect(collectValues(unreadClause)).toEqual(expect.arrayContaining([7, 'read', 'skimmed', 'abandoned']));
+  });
+
   it('every sort order includes a books.id tiebreaker as its final ORDER BY clause', async () => {
-    const sortOrders = ['recent', 'updated', 'title_asc', 'title_desc', 'author_asc', 'author_desc', 'series_asc', 'series_desc'] as const;
+    const sortOrders = [
+      'recent',
+      'recent_asc',
+      'updated',
+      'updated_asc',
+      'recently_read',
+      'recently_read_asc',
+      'title_asc',
+      'title_desc',
+      'author_asc',
+      'author_desc',
+      'series_asc',
+      'series_desc',
+    ] as const;
 
     for (const sortOrder of sortOrders) {
       const { service, db } = makeService([[], [{ total: 0 }]]);
-      await (service as never).paginatedBookQuery({ kind: 'where' }, sortOrder, 1, 25);
+      await (service as never).paginatedBookQuery({ kind: 'where' }, sortOrder, 1, 25, 7);
 
       const chains = (db.select as ReturnType<typeof vi.fn>).mock.results.map((r: { value: Record<string, unknown> }) => r.value);
       const orderByArgs = chains.flatMap((chain: Record<string, unknown>) => {

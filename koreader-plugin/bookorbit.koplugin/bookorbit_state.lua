@@ -8,6 +8,7 @@ thousands of unmatched books stay cheap. statistics.sqlite3 is never written.
 
 local DataStorage = require("datastorage")
 local LuaSettings = require("luasettings")
+local lfs = require("libs/libkoreader-lfs")
 
 local STATE_FILE = "bookorbit_sync_state.lua"
 
@@ -27,6 +28,28 @@ end
 
 function BookOrbitState:getBook(md5)
     return self.books[md5]
+end
+
+-- Maps BookOrbit bookId -> local file path for every matched book whose file is
+-- still present on disk. Powers the catalog "on device" badges and shortcut.
+function BookOrbitState:matchedByBookId()
+    local result = {}
+    for _, book in pairs(self.books) do
+        if book.bookId and book.file and lfs.attributes(book.file, "mode") == "file" then
+            result[book.bookId] = book.file
+        end
+    end
+    return result
+end
+
+function BookOrbitState:matchedByBookFileId()
+    local result = {}
+    for _, book in pairs(self.books) do
+        if book.fileId and book.file and lfs.attributes(book.file, "mode") == "file" then
+            result[book.fileId] = book.file
+        end
+    end
+    return result
 end
 
 function BookOrbitState:setMatched(md5, book_file_id, book_id, file)

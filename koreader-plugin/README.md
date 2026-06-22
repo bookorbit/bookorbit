@@ -2,7 +2,7 @@
 
 Syncs your KOReader reading life into BookOrbit:
 
-- Native BookOrbit catalog browsing from KOReader: libraries, collections, SmartScopes, authors, series, recent books, all books and scoped search. Downloads are linked to BookOrbit sync after the file is saved.
+- Native BookOrbit catalog browsing from KOReader: libraries, collections, SmartScopes, authors, series, recent books, all books, "Continue reading", "On device" and scoped or global search. Browse as a cover mosaic or a detailed list, with read-status, reading-progress and on-device indicators, read-status and format filters, a configurable grid, persisted view/sort/grid, recent-search history, loading feedback, download progress and inline retry on failures. Downloads are linked to BookOrbit sync after the file is saved, and books already on the device offer a "Read" action that opens the local file.
 - Live reading progress of the open book (pull on open with conflict prompt, optional periodic push every N page turns, push on close and suspend), compatible with the kosync flow BookOrbit already speaks.
 - Reading statistics: the raw per-page time events from KOReader's statistics database. BookOrbit turns them into reading sessions and daily stats, so they show up in the existing dashboards.
 - Highlights and notes, two ways: device highlights appear in the BookOrbit web reader as native highlights, and highlights, note edits and deletions made in BookOrbit come back to the device.
@@ -75,8 +75,13 @@ Years of statistics upload in batches of 500 events. Roughly 200k events means a
 ## Hand-test checklist
 
 - Menu placement: "BookOrbit sync" appears on the Tools first page directly below Calibre, in both the file manager and the reader; `settings/reader_menu_order.lua` and `settings/filemanager_menu_order.lua` exist with the bookorbit marker line; a restart does not rewrite them.
-- Catalog browser: "Browse BookOrbit" appears in the Tools menu after login. Libraries, collections, SmartScopes, authors, series, recent and all books load through the BookOrbit JSON API, with page navigation, scoped search and sorting.
-- Catalog download: open a book detail, choose a file format, change folder/name if needed, confirm overwrite, download, then accept "Open now". The downloaded file is matched by partial MD5 and linked in `bookorbit_sync_state.lua`.
+- Catalog browser: "Browse BookOrbit" appears in the Tools menu after login. Libraries, collections, SmartScopes, authors, series, recent and all books, "Continue reading" and "On device" load through the BookOrbit JSON API, with page navigation, scoped/global search and sorting.
+- Catalog view and filters (actions menu, title-bar left button on a book page): toggle mosaic/list view, change the mosaic grid size, filter by read status (all/unread/reading/finished) and by format, sort, and reverse the sort direction (asc/desc). View mode, sort and grid size persist across sessions; the active sort, direction and filters show in the page subtitle.
+- Catalog indicators: each card/row shows reading progress, read status and an "On device" badge when a matching file already exists locally. "On device" lists those matched books via a single `?ids=` lookup.
+- Catalog search history: the search dialog offers a "Recent" button to re-run one of the last searches (stored locally).
+- Catalog feedback: section/page/detail fetches show a loading message; failures show an inline "Retry" dialog; downloads show throttled byte/percent progress.
+- Catalog download: open a book detail, choose a file format, change folder/name if needed, confirm overwrite, watch the download progress, then accept "Open now". The downloaded file is matched by partial MD5 and linked in `bookorbit_sync_state.lua`; the "On device" badge refreshes after a successful link.
+- Catalog read vs download: when a book is already on the device, the detail page shows a primary "Read" button that opens the local file. "Download" is shown next to it only when there are formats not yet on the device, and is hidden once every supported format is downloaded. The file chooser marks already-downloaded formats as "Open" instead of "Download". On-device state is refreshed when the detail opens.
 - Custom menu order: remove the marker line and shuffle the tools list; on restart only the `bookorbit_sync` id is re-inserted, the rest is preserved. A syntactically broken file is left untouched (warning in the log).
 - Login: wrong password shows a login error; server URL with and without trailing `/` and with `/api/v1` already appended all work.
 - Preconfigured install: download the zip from web settings, install, restart; the "set up for ... as ..." message appears once, the server URL and login are filled in, `bookorbit_provision.lua` is gone from the plugin folder, and a second restart shows no message.

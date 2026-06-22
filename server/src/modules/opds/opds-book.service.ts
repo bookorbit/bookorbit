@@ -14,6 +14,7 @@ import {
   collectionBooks,
   smartScopes,
   libraries,
+  userBookStatus,
   userLibraryAccess,
 } from '../../db/schema';
 import { BookQueryBuilder } from '../book/book-query-builder.service';
@@ -22,11 +23,27 @@ import { buildContentFilterClauses } from '../../common/utils/content-filter-sql
 
 type Db = NodePgDatabase<typeof schema>;
 
-type OpdsSortOrder = 'recent' | 'updated' | 'title_asc' | 'title_desc' | 'author_asc' | 'author_desc' | 'series_asc' | 'series_desc';
+type OpdsSortOrder =
+  | 'recent'
+  | 'recent_asc'
+  | 'updated'
+  | 'updated_asc'
+  | 'recently_read'
+  | 'recently_read_asc'
+  | 'title_asc'
+  | 'title_desc'
+  | 'author_asc'
+  | 'author_desc'
+  | 'series_asc'
+  | 'series_desc';
 
 const OPDS_SORT_MAP: Record<OpdsSortOrder, SQL[]> = {
   recent: [sql`${books.addedAt} DESC`, sql`${books.id} ASC`],
+  recent_asc: [sql`${books.addedAt} ASC`, sql`${books.id} ASC`],
   updated: [sql`${books.updatedAt} DESC`, sql`${books.id} ASC`],
+  updated_asc: [sql`${books.updatedAt} ASC`, sql`${books.id} ASC`],
+  recently_read: [sql`${userBookStatus.updatedAt} DESC NULLS LAST`, sql`${books.id} ASC`],
+  recently_read_asc: [sql`${userBookStatus.updatedAt} ASC NULLS LAST`, sql`${books.id} ASC`],
   title_asc: [sql`${bookMetadata.title} ASC NULLS LAST`, sql`${books.id} ASC`],
   title_desc: [sql`${bookMetadata.title} DESC NULLS LAST`, sql`${books.id} ASC`],
   author_asc: [sql`min(${authors.sortName}) ASC NULLS LAST`, sql`${bookMetadata.title} ASC NULLS LAST`, sql`${books.id} ASC`],
@@ -34,6 +51,13 @@ const OPDS_SORT_MAP: Record<OpdsSortOrder, SQL[]> = {
   series_asc: [sql`${bookMetadata.seriesName} ASC NULLS LAST`, sql`${bookMetadata.seriesIndex} ASC NULLS LAST`, sql`${books.id} ASC`],
   series_desc: [sql`${bookMetadata.seriesName} DESC NULLS LAST`, sql`${bookMetadata.seriesIndex} DESC NULLS LAST`, sql`${books.id} ASC`],
 };
+
+const READ_STATUS_BUCKETS = {
+  reading: ['reading', 'rereading', 'on_hold'],
+  finished: ['read', 'skimmed', 'abandoned'],
+} as const;
+
+const ACTIVE_READ_STATUSES = [...READ_STATUS_BUCKETS.reading, ...READ_STATUS_BUCKETS.finished];
 
 const LIKE_SPECIAL_CHARS = /[%_\\]/g;
 
@@ -101,12 +125,24 @@ export class OpdsBookService {
     sortOrder: OpdsSortOrder,
     page: number,
     size: number,
-    filters?: { libraryId?: number; collectionId?: number; smartScopeId?: number; author?: string; series?: string; q?: string },
+    filters?: {
+      libraryId?: number;
+      collectionId?: number;
+      smartScopeId?: number;
+      author?: string;
+      series?: string;
+      q?: string;
+      readStatus?: 'unread' | 'reading' | 'finished';
+      format?: string;
+      ids?: number[];
+    },
     isSuperuser = false,
     contentFilters?: ContentFilterRules,
   ): Promise<{ entries: OpdsBookEntry[]; total: number }> {
     const accessibleIds = await this.getAccessibleLibraryIds(userId, isSuperuser);
     if (accessibleIds.length === 0) return { entries: [], total: 0 };
+
+    if (filters?.ids && filters.ids.length === 0) return { entries: [], total: 0 };
 
     if (filters?.libraryId && !accessibleIds.includes(filters.libraryId)) {
       throw new ForbiddenException('No access to this library');
@@ -131,6 +167,8 @@ export class OpdsBookService {
 
     if (filters?.libraryId) clauses.push(eq(books.libraryId, filters.libraryId));
 
+    if (filters?.ids) clauses.push(inArray(books.id, filters.ids));
+
     if (filters?.collectionId) {
       clauses.push(
         sql`${books.id} IN (SELECT ${collectionBooks.bookId} FROM ${collectionBooks} WHERE ${collectionBooks.collectionId} = ${filters.collectionId})`,
@@ -147,6 +185,19 @@ export class OpdsBookService {
       clauses.push(eq(bookMetadata.seriesName, filters.series));
     }
 
+    if (filters?.format) {
+      const format = filters.format.trim().toLowerCase();
+      if (format) {
+        clauses.push(
+          sql`${books.id} IN (SELECT ${bookFiles.bookId} FROM ${bookFiles} WHERE ${bookFiles.role} = 'content' AND lower(${bookFiles.format}) = ${format})`,
+        );
+      }
+    }
+
+    if (filters?.readStatus) {
+      clauses.push(this.buildReadStatusClause(userId, filters.readStatus));
+    }
+
     if (filters?.q) {
       const searchClause = this.buildCatalogSearchClause(filters.q);
       if (searchClause) clauses.push(searchClause);
@@ -156,7 +207,15 @@ export class OpdsBookService {
       clauses.push(...buildContentFilterClauses(contentFilters, this.db));
     }
 
-    return this.paginatedBookQuery(and(...clauses)!, sortOrder, page, size);
+    return this.paginatedBookQuery(and(...clauses)!, sortOrder, page, size, userId);
+  }
+
+  private buildReadStatusClause(userId: number, readStatus: 'unread' | 'reading' | 'finished'): SQL {
+    if (readStatus === 'unread') {
+      return sql`${books.id} NOT IN (SELECT ${userBookStatus.bookId} FROM ${userBookStatus} WHERE ${userBookStatus.userId} = ${userId} AND ${userBookStatus.status} IN ${ACTIVE_READ_STATUSES})`;
+    }
+    const statuses = READ_STATUS_BUCKETS[readStatus];
+    return sql`${books.id} IN (SELECT ${userBookStatus.bookId} FROM ${userBookStatus} WHERE ${userBookStatus.userId} = ${userId} AND ${userBookStatus.status} IN ${statuses})`;
   }
 
   private buildCatalogSearchClause(q: string): SQL | undefined {
@@ -383,7 +442,7 @@ export class OpdsBookService {
     });
     const statusClause = eq(books.status, 'present');
     const combinedWhere = where ? and(where, statusClause) : statusClause;
-    return this.paginatedBookQuery(combinedWhere!, sortOrder, page, size);
+    return this.paginatedBookQuery(combinedWhere!, sortOrder, page, size, userId);
   }
 
   private async paginatedBookQuery(
@@ -391,32 +450,50 @@ export class OpdsBookService {
     sortOrder: OpdsSortOrder,
     page: number,
     size: number,
+    userId?: number,
   ): Promise<{ entries: OpdsBookEntry[]; total: number }> {
     const offset = (page - 1) * size;
     const needsAuthorJoin = sortOrder === 'author_asc' || sortOrder === 'author_desc';
+    const needsStatusJoin = (sortOrder === 'recently_read' || sortOrder === 'recently_read_asc') && userId !== undefined;
     const orderClauses = OPDS_SORT_MAP[sortOrder];
 
+    const buildIdQuery = () => {
+      if (needsAuthorJoin) {
+        return this.db
+          .select({ id: books.id })
+          .from(books)
+          .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+          .leftJoin(bookAuthors, eq(bookAuthors.bookId, books.id))
+          .leftJoin(authors, eq(authors.id, bookAuthors.authorId))
+          .where(where)
+          .groupBy(books.id, bookMetadata.title, bookMetadata.seriesName, bookMetadata.seriesIndex)
+          .orderBy(...orderClauses)
+          .limit(size)
+          .offset(offset);
+      }
+      if (needsStatusJoin) {
+        return this.db
+          .select({ id: books.id })
+          .from(books)
+          .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+          .leftJoin(userBookStatus, and(eq(userBookStatus.bookId, books.id), eq(userBookStatus.userId, userId!)))
+          .where(where)
+          .orderBy(...orderClauses)
+          .limit(size)
+          .offset(offset);
+      }
+      return this.db
+        .select({ id: books.id })
+        .from(books)
+        .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+        .where(where)
+        .orderBy(...orderClauses)
+        .limit(size)
+        .offset(offset);
+    };
+
     const [idRows, [{ total }]] = await Promise.all([
-      needsAuthorJoin
-        ? this.db
-            .select({ id: books.id })
-            .from(books)
-            .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-            .leftJoin(bookAuthors, eq(bookAuthors.bookId, books.id))
-            .leftJoin(authors, eq(authors.id, bookAuthors.authorId))
-            .where(where)
-            .groupBy(books.id, bookMetadata.title, bookMetadata.seriesName, bookMetadata.seriesIndex)
-            .orderBy(...orderClauses)
-            .limit(size)
-            .offset(offset)
-        : this.db
-            .select({ id: books.id })
-            .from(books)
-            .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-            .where(where)
-            .orderBy(...orderClauses)
-            .limit(size)
-            .offset(offset),
+      buildIdQuery(),
       this.db.select({ total: count() }).from(books).leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id)).where(where),
     ]);
 

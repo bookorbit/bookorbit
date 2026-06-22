@@ -130,16 +130,29 @@ function BookOrbitApi:query(path, params)
     return path .. "?" .. table.concat(parts, "&")
 end
 
-function BookOrbitApi:download(path, local_path, accept)
+function BookOrbitApi:download(path, local_path, accept, progress_cb)
     local out, open_err = io.open(local_path, "w")
     if not out then
         return nil, tostring(open_err or "open_error")
     end
 
+    local file_sink = ltn12.sink.file(out)
+    local sink = file_sink
+    if progress_cb then
+        local received = 0
+        sink = function(chunk, err)
+            if chunk and chunk ~= "" then
+                received = received + #chunk
+                progress_cb(received)
+            end
+            return file_sink(chunk, err)
+        end
+    end
+
     local request = {
         url = self.server_url .. path,
         method = "GET",
-        sink = ltn12.sink.file(out),
+        sink = sink,
         headers = {
             ["accept"] = accept or "application/octet-stream",
             ["Accept-Encoding"] = "identity",
@@ -251,8 +264,8 @@ function BookOrbitApi:catalogBook(book_id)
     return self:request("GET", "/koreader/plugin/catalog/books/" .. tostring(book_id))
 end
 
-function BookOrbitApi:downloadCatalogFile(file_id, local_path)
-    return self:download("/koreader/plugin/catalog/files/" .. tostring(file_id) .. "/download", local_path)
+function BookOrbitApi:downloadCatalogFile(file_id, local_path, progress_cb)
+    return self:download("/koreader/plugin/catalog/files/" .. tostring(file_id) .. "/download", local_path, nil, progress_cb)
 end
 
 function BookOrbitApi:downloadCatalogThumbnail(book_id, local_path)
