@@ -94,6 +94,15 @@ export type KoreaderCatalogSortOrder = "asc" | "desc";
 
 export type KoreaderCatalogReadStatusFilter = "unread" | "reading" | "finished";
 
+// Read statuses the catalog detail page can set on a book. A subset of the
+// full ReadStatus enum, chosen for reading-device ergonomics.
+export type KoreaderCatalogSettableReadStatus = "want_to_read" | "reading" | "on_hold" | "read" | "abandoned";
+
+export interface KoreaderCatalogSeriesSummary {
+  total: number;
+  finished: number;
+}
+
 export interface KoreaderCatalogEntry {
   id: string;
   title: string;
@@ -165,4 +174,27 @@ export interface KoreaderCatalogPage<T> {
   hasPrevious: boolean;
   nextUrl: string | null;
   previousUrl: string | null;
+  // Present when the page is scoped to a single series, summarising
+  // read-through progress across the whole series.
+  seriesSummary?: KoreaderCatalogSeriesSummary | null;
+}
+
+export interface KoreaderCatalogSectionResponse {
+  section: KoreaderCatalogSection;
+  items: KoreaderCatalogEntry[];
+  // Pagination is only emitted for large sections (authors, series).
+  page?: number;
+  hasNext?: boolean;
+  hasPrevious?: boolean;
+  nextUrl?: string | null;
+  previousUrl?: string | null;
+  query?: string | null;
+}
+
+export interface KoreaderCatalogReadStatusResult {
+  readStatus: KoreaderCatalogSettableReadStatus;
+}
+
+export interface KoreaderCatalogRatingResult {
+  rating: number | null;
 }

@@ -915,6 +915,21 @@ export class BookRepository {
       .orderBy(asc(bookFiles.sortOrder), asc(bookFiles.id));
   }
 
+  async findProgressByBooks(userId: number, bookIds: number[]) {
+    if (bookIds.length === 0) return [];
+    return this.db
+      .select({
+        bookId: bookFiles.bookId,
+        fileId: bookFiles.id,
+        percentage: readingProgress.percentage,
+        koreaderProgress: readingProgress.koreaderProgress,
+        updatedAt: readingProgress.updatedAt,
+      })
+      .from(bookFiles)
+      .innerJoin(readingProgress, and(eq(readingProgress.bookFileId, bookFiles.id), eq(readingProgress.userId, userId)))
+      .where(inArray(bookFiles.bookId, bookIds));
+  }
+
   async findKoboReadingState(userId: number, bookId: number) {
     const [row] = await this.db
       .select({

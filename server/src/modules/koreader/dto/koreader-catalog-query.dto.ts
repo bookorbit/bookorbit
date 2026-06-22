@@ -1,7 +1,12 @@
 import { Transform, Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
-import type { KoreaderCatalogReadStatusFilter, KoreaderCatalogSort, KoreaderCatalogSortOrder } from '@bookorbit/types';
+import type {
+  KoreaderCatalogReadStatusFilter,
+  KoreaderCatalogSettableReadStatus,
+  KoreaderCatalogSort,
+  KoreaderCatalogSortOrder,
+} from '@bookorbit/types';
 
 export const KOREADER_CATALOG_SORTS = [
   'title',
@@ -15,6 +20,14 @@ export const KOREADER_CATALOG_SORTS = [
 export const KOREADER_CATALOG_SORT_ORDERS = ['asc', 'desc'] as const satisfies readonly KoreaderCatalogSortOrder[];
 
 export const KOREADER_CATALOG_READ_STATUS_FILTERS = ['unread', 'reading', 'finished'] as const satisfies readonly KoreaderCatalogReadStatusFilter[];
+
+export const KOREADER_CATALOG_SETTABLE_READ_STATUSES = [
+  'want_to_read',
+  'reading',
+  'on_hold',
+  'read',
+  'abandoned',
+] as const satisfies readonly KoreaderCatalogSettableReadStatus[];
 
 function parseIdList(value: unknown): number[] | undefined {
   if (value === undefined || value === null || value === '') return undefined;
@@ -100,4 +113,30 @@ export class KoreaderCatalogBooksQueryDto {
   @IsOptional()
   @IsString()
   series?: string;
+}
+
+export class KoreaderCatalogSectionQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  q?: string;
+}
+
+export class KoreaderCatalogSetReadStatusDto {
+  @IsIn(KOREADER_CATALOG_SETTABLE_READ_STATUSES)
+  status!: KoreaderCatalogSettableReadStatus;
+}
+
+export class KoreaderCatalogSetRatingDto {
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(5)
+  rating?: number | null;
 }

@@ -13,7 +13,12 @@ import type {
   KoreaderCatalogFile,
   KoreaderCatalogPage,
   KoreaderCatalogProgress,
+  KoreaderCatalogRatingResult,
+  KoreaderCatalogReadStatusResult,
   KoreaderCatalogSection,
+  KoreaderCatalogSectionResponse,
+  KoreaderCatalogSeriesSummary,
+  KoreaderCatalogSettableReadStatus,
   KoreaderCatalogSort,
   KoreaderCatalogSortOrder,
 } from '@bookorbit/types';
@@ -33,8 +38,11 @@ import { KoreaderCatalogBooksQueryDto } from './dto/koreader-catalog-query.dto';
 type OpdsSortOrder = Parameters<OpdsBookService['getBooksPage']>[1];
 type BookProgressRow = Awaited<ReturnType<BookReadService['findProgressByBook']>>[number];
 type ProgressCandidate = BookProgressRow & { percentage: number; updatedAt: Date };
+type BatchProgressRow = Awaited<ReturnType<BookReadService['findProgressByBooks']>>[number];
+type BatchProgressCandidate = BatchProgressRow & { percentage: number; updatedAt: Date };
 
 const CATALOG_BASE = '/api/v1/koreader/plugin/catalog';
+const AUTHOR_SERIES_PAGE_SIZE = 60;
 
 const NATURAL_SORT_ORDER: Record<KoreaderCatalogSort, KoreaderCatalogSortOrder> = {
   title: 'asc',
@@ -110,7 +118,7 @@ export class KoreaderCatalogService {
     return { sections: ROOT_SECTIONS.map((section) => ({ ...section })) };
   }
 
-  async getSectionEntries(user: RequestUser, section: string): Promise<{ section: KoreaderCatalogSection; items: KoreaderCatalogEntry[] }> {
+  async getSectionEntries(user: RequestUser, section: string, query: { page?: number; q?: string } = {}): Promise<KoreaderCatalogSectionResponse> {
     switch (section) {
       case 'libraries':
         return { section, items: await this.getLibraryEntries(user) };
@@ -119,9 +127,9 @@ export class KoreaderCatalogService {
       case 'smart-scopes':
         return { section, items: await this.getSmartScopeEntries(user) };
       case 'authors':
-        return { section, items: await this.getAuthorEntries(user) };
+        return this.getAuthorsSection(user, query);
       case 'series':
-        return { section, items: await this.getSeriesEntries(user) };
+        return this.getSeriesSection(user, query);
       default:
         throw new BadRequestException('Unknown catalog section');
     }
@@ -136,8 +144,27 @@ export class KoreaderCatalogService {
     const sort = this.mapSort(query.sort ?? 'recently_added', query.order);
     const { entries, total } = await this.opdsBookService.getBooksPage(user.id, sort, page, size, filters, user.isSuperuser, user.contentFilters);
 
-    const items = await Promise.all(entries.map((entry) => this.mapBookListItem(user, entry)));
-    return this.paginate(items, total, page, size, query);
+    const bookIds = entries.map((entry) => entry.id);
+    const [progressMap, statusMap, seriesSummary] = await Promise.all([
+      this.findBestProgressMap(user.id, bookIds),
+      this.userBookStatusService.findByBookIds(user.id, bookIds),
+      query.series ? this.computeSeriesSummary(user, query.series) : Promise.resolve(null),
+    ]);
+
+    const items = entries.map((entry) => this.mapBookListItem(entry, progressMap.get(entry.id) ?? null, statusMap.get(entry.id)?.status ?? null));
+    return this.paginate(items, total, page, size, query, seriesSummary);
+  }
+
+  async setReadStatus(user: RequestUser, bookId: number, status: KoreaderCatalogSettableReadStatus): Promise<KoreaderCatalogReadStatusResult> {
+    await this.bookService.verifyBookAccess(bookId, user);
+    await this.userBookStatusService.setManual(user.id, bookId, status);
+    return { readStatus: status };
+  }
+
+  async setRating(user: RequestUser, bookId: number, rating: number | null): Promise<KoreaderCatalogRatingResult> {
+    const normalized = rating ?? null;
+    await this.bookService.bulkSetRating([bookId], normalized, user);
+    return { rating: normalized };
   }
 
   async getBookDetail(user: RequestUser, bookId: number): Promise<KoreaderCatalogBookDetail> {
@@ -230,41 +257,86 @@ export class KoreaderCatalogService {
     }));
   }
 
-  private async getAuthorEntries(user: RequestUser): Promise<KoreaderCatalogEntry[]> {
-    const rows = await this.opdsBookService.getDistinctAuthors(user.id, user.isSuperuser, user.contentFilters);
-    return rows.map((row) => ({
+  private async getAuthorsSection(user: RequestUser, query: { page?: number; q?: string }): Promise<KoreaderCatalogSectionResponse> {
+    const page = query.page ?? 1;
+    const offset = (page - 1) * AUTHOR_SERIES_PAGE_SIZE;
+    const { items, hasNext } = await this.opdsBookService.getDistinctAuthorsPage(
+      user.id,
+      { q: query.q, limit: AUTHOR_SERIES_PAGE_SIZE, offset },
+      user.isSuperuser,
+      user.contentFilters,
+    );
+    const entries: KoreaderCatalogEntry[] = items.map((row) => ({
       id: row.name,
       title: row.name,
       section: 'authors',
       count: row.bookCount,
       booksHref: this.booksHref({ author: row.name, sort: 'title' }),
     }));
+    return this.buildSectionPage('authors', entries, page, hasNext, query.q);
   }
 
-  private async getSeriesEntries(user: RequestUser): Promise<KoreaderCatalogEntry[]> {
-    const rows = await this.opdsBookService.getDistinctSeries(user.id, user.isSuperuser, user.contentFilters);
-    return rows
-      .filter((row): row is { name: string; bookCount: number } => row.name !== null)
-      .map((row) => ({
-        id: row.name,
-        title: row.name,
-        section: 'series',
-        count: row.bookCount,
-        booksHref: this.booksHref({ series: row.name, sort: 'series' }),
-      }));
+  private async getSeriesSection(user: RequestUser, query: { page?: number; q?: string }): Promise<KoreaderCatalogSectionResponse> {
+    const page = query.page ?? 1;
+    const offset = (page - 1) * AUTHOR_SERIES_PAGE_SIZE;
+    const { items, hasNext } = await this.opdsBookService.getDistinctSeriesPage(
+      user.id,
+      { q: query.q, limit: AUTHOR_SERIES_PAGE_SIZE, offset },
+      user.isSuperuser,
+      user.contentFilters,
+    );
+    const entries: KoreaderCatalogEntry[] = items.map((row) => ({
+      id: row.name,
+      title: row.name,
+      section: 'series',
+      count: row.bookCount,
+      booksHref: this.booksHref({ series: row.name, sort: 'series' }),
+    }));
+    return this.buildSectionPage('series', entries, page, hasNext, query.q);
   }
 
-  private async countBooks(user: RequestUser, filters: { libraryId?: number; collectionId?: number }): Promise<number> {
+  private buildSectionPage(
+    section: KoreaderCatalogSection,
+    items: KoreaderCatalogEntry[],
+    page: number,
+    hasNext: boolean,
+    q?: string,
+  ): KoreaderCatalogSectionResponse {
+    const hasPrevious = page > 1;
+    return {
+      section,
+      items,
+      page,
+      hasNext,
+      hasPrevious,
+      nextUrl: hasNext ? this.sectionHref(section, page + 1, q) : null,
+      previousUrl: hasPrevious ? this.sectionHref(section, page - 1, q) : null,
+      query: q?.trim() ? q.trim() : null,
+    };
+  }
+
+  private sectionHref(section: KoreaderCatalogSection, page: number, q?: string): string {
+    const search = new URLSearchParams();
+    if (page > 1) search.set('page', String(page));
+    if (q?.trim()) search.set('q', q.trim());
+    const suffix = search.toString();
+    return suffix ? `${CATALOG_BASE}/sections/${section}?${suffix}` : `${CATALOG_BASE}/sections/${section}`;
+  }
+
+  private async countBooks(
+    user: RequestUser,
+    filters: { libraryId?: number; collectionId?: number; series?: string; readStatus?: 'unread' | 'reading' | 'finished' },
+  ): Promise<number> {
     const result = await this.opdsBookService.getBooksPage(user.id, 'title_asc', 1, 1, filters, user.isSuperuser, user.contentFilters);
     return result.total;
   }
 
-  private async mapBookListItem(user: RequestUser, entry: OpdsBookEntry): Promise<KoreaderCatalogBookListItem> {
-    const [progress, readStatus] = await Promise.all([
-      this.findBestProgress(user.id, entry.id),
-      this.userBookStatusService.findOne(user.id, entry.id),
-    ]);
+  private async computeSeriesSummary(user: RequestUser, series: string): Promise<KoreaderCatalogSeriesSummary> {
+    const [total, finished] = await Promise.all([this.countBooks(user, { series }), this.countBooks(user, { series, readStatus: 'finished' })]);
+    return { total, finished };
+  }
 
+  private mapBookListItem(entry: OpdsBookEntry, progress: KoreaderCatalogProgress | null, readStatus: string | null): KoreaderCatalogBookListItem {
     const formats = this.uniqueFormats(entry.files.map((file) => file.format));
     return {
       id: entry.id,
@@ -273,7 +345,7 @@ export class KoreaderCatalogService {
       seriesName: entry.seriesName,
       seriesIndex: entry.seriesIndex,
       progressPercentage: progress?.percentage ?? null,
-      readStatus: readStatus?.status ?? null,
+      readStatus,
       formats,
       hasCover: entry.hasCover,
       thumbnailUrl: entry.hasCover ? `${CATALOG_BASE}/books/${entry.id}/thumbnail` : null,
@@ -343,6 +415,32 @@ export class KoreaderCatalogService {
     return best ? this.mapProgress(best) : null;
   }
 
+  private async findBestProgressMap(userId: number, bookIds: number[]): Promise<Map<number, KoreaderCatalogProgress>> {
+    const map = new Map<number, KoreaderCatalogProgress>();
+    if (bookIds.length === 0) return map;
+
+    const rows = await this.bookReadService.findProgressByBooks(userId, bookIds);
+    const best = new Map<number, BatchProgressCandidate>();
+    for (const row of rows) {
+      if (row.percentage == null || row.updatedAt == null) continue;
+      const candidate = row as BatchProgressCandidate;
+      const current = best.get(row.bookId);
+      if (!current || candidate.updatedAt > current.updatedAt) {
+        best.set(row.bookId, candidate);
+      }
+    }
+
+    for (const [bookId, candidate] of best) {
+      map.set(bookId, {
+        fileId: candidate.fileId,
+        percentage: candidate.percentage,
+        koreaderProgress: candidate.koreaderProgress ?? null,
+        updatedAt: candidate.updatedAt.toISOString(),
+      });
+    }
+    return map;
+  }
+
   private mapProgress(row: ProgressCandidate): KoreaderCatalogProgress {
     return {
       fileId: row.fileId,
@@ -396,7 +494,14 @@ export class KoreaderCatalogService {
     }
   }
 
-  private paginate<T>(items: T[], total: number, page: number, size: number, query: KoreaderCatalogBooksQueryDto): KoreaderCatalogPage<T> {
+  private paginate<T>(
+    items: T[],
+    total: number,
+    page: number,
+    size: number,
+    query: KoreaderCatalogBooksQueryDto,
+    seriesSummary: KoreaderCatalogSeriesSummary | null = null,
+  ): KoreaderCatalogPage<T> {
     const hasNext = page * size < total;
     const hasPrevious = page > 1;
     return {
@@ -408,6 +513,7 @@ export class KoreaderCatalogService {
       hasPrevious,
       nextUrl: hasNext ? this.pageHref(query, page + 1, size) : null,
       previousUrl: hasPrevious ? this.pageHref(query, page - 1, size) : null,
+      seriesSummary,
     };
   }
 

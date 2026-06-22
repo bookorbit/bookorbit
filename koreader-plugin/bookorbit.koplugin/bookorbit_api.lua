@@ -252,8 +252,17 @@ function BookOrbitApi:catalogRoot()
     return self:request("GET", "/koreader/plugin/catalog/root")
 end
 
-function BookOrbitApi:catalogSection(section)
-    return self:request("GET", "/koreader/plugin/catalog/sections/" .. util.urlEncode(section))
+function BookOrbitApi:catalogSection(section, params)
+    return self:request("GET", self:query("/koreader/plugin/catalog/sections/" .. util.urlEncode(section), params))
+end
+
+function BookOrbitApi:catalogSetReadStatus(book_id, status)
+    return self:request("PUT", "/koreader/plugin/catalog/books/" .. tostring(book_id) .. "/read-status", { status = status })
+end
+
+function BookOrbitApi:catalogSetRating(book_id, rating)
+    if rating == nil then rating = rapidjson.null end
+    return self:request("PUT", "/koreader/plugin/catalog/books/" .. tostring(book_id) .. "/rating", { rating = rating })
 end
 
 function BookOrbitApi:catalogBooks(params)

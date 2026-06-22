@@ -89,16 +89,14 @@ function makeService() {
     getAccessibleLibraries: vi.fn().mockResolvedValue([{ id: 1, name: 'Main', bookCount: 99 }]),
     getUserCollections: vi.fn().mockResolvedValue([{ id: 2, name: 'Favorites', bookCount: 99 }]),
     getUserSmartScopes: vi.fn().mockResolvedValue([{ id: 3, name: 'Unread', icon: 'book-open' }]),
-    getDistinctAuthors: vi.fn().mockResolvedValue([{ name: 'Frank Herbert', bookCount: 2 }]),
-    getDistinctSeries: vi.fn().mockResolvedValue([
-      { name: null, bookCount: 1 },
-      { name: 'Dune', bookCount: 6 },
-    ]),
+    getDistinctAuthorsPage: vi.fn().mockResolvedValue({ items: [{ name: 'Frank Herbert', bookCount: 2 }], hasNext: false }),
+    getDistinctSeriesPage: vi.fn().mockResolvedValue({ items: [{ name: 'Dune', bookCount: 6 }], hasNext: false }),
     getBooksPage: vi.fn().mockResolvedValue({ entries: [], total: 0 }),
   };
   const bookService = {
     getDetail: vi.fn().mockResolvedValue(makeDetail()),
     verifyBookAccess: vi.fn().mockResolvedValue(undefined),
+    bulkSetRating: vi.fn().mockResolvedValue(undefined),
     verifyFileAccess: vi.fn().mockResolvedValue({
       id: 100,
       role: 'content',
@@ -117,9 +115,20 @@ function makeService() {
         updatedAt: new Date('2026-03-01T00:00:00.000Z'),
       },
     ]),
+    findProgressByBooks: vi.fn().mockResolvedValue([
+      {
+        bookId: 10,
+        fileId: 100,
+        percentage: 47.4,
+        koreaderProgress: '/body/DocFragment[2]/body/p[1]',
+        updatedAt: new Date('2026-03-01T00:00:00.000Z'),
+      },
+    ]),
   };
   const userBookStatusService = {
     findOne: vi.fn().mockResolvedValue({ status: 'reading' }),
+    findByBookIds: vi.fn().mockResolvedValue(new Map([[10, { status: 'reading' }]])),
+    setManual: vi.fn().mockResolvedValue(undefined),
   };
 
   const service = new KoreaderCatalogService(
@@ -368,5 +377,63 @@ describe('KoreaderCatalogService', () => {
 
     mockStat.mockRejectedValueOnce(new Error('missing'));
     await expect(service.streamThumbnail(makeUser(), 10, makeReply() as never)).rejects.toThrow(NotFoundException);
+  });
+
+  it('paginates author sections with a filter and navigation links', async () => {
+    const { service, opdsBookService } = makeService();
+    opdsBookService.getDistinctAuthorsPage.mockResolvedValueOnce({ items: [{ name: 'Frank Herbert', bookCount: 2 }], hasNext: true });
+    const user = makeUser({ id: 7 });
+
+    const res = await service.getSectionEntries(user, 'authors', { page: 2, q: 'her' });
+
+    expect(opdsBookService.getDistinctAuthorsPage).toHaveBeenCalledWith(7, { q: 'her', limit: 60, offset: 60 }, false, user.contentFilters);
+    expect(res.page).toBe(2);
+    expect(res.hasNext).toBe(true);
+    expect(res.nextUrl).toContain('sections/authors?page=3&q=her');
+    expect(res.previousUrl).toContain('sections/authors?q=her');
+    expect(res.query).toBe('her');
+  });
+
+  it('includes a series read-through summary on series-scoped pages', async () => {
+    const { service, opdsBookService } = makeService();
+    opdsBookService.getBooksPage
+      .mockResolvedValueOnce({ entries: [], total: 6 })
+      .mockResolvedValueOnce({ entries: [], total: 6 })
+      .mockResolvedValueOnce({ entries: [], total: 2 });
+    const user = makeUser({ id: 7 });
+
+    const result = await service.getBooksPage(user, Object.assign(new KoreaderCatalogBooksQueryDto(), { series: 'Dune', sort: 'series' }));
+
+    expect(result.seriesSummary).toEqual({ total: 6, finished: 2 });
+  });
+
+  it('omits the series summary for non-series listings', async () => {
+    const { service } = makeService();
+    const result = await service.getBooksPage(makeUser({ id: 7 }), Object.assign(new KoreaderCatalogBooksQueryDto(), { sort: 'title' }));
+    expect(result.seriesSummary).toBeNull();
+  });
+
+  it('sets read status through ownership-checked services', async () => {
+    const { service, bookService, userBookStatusService } = makeService();
+    const user = makeUser({ id: 7 });
+
+    const res = await service.setReadStatus(user, 10, 'reading');
+
+    expect(bookService.verifyBookAccess).toHaveBeenCalledWith(10, user);
+    expect(userBookStatusService.setManual).toHaveBeenCalledWith(7, 10, 'reading');
+    expect(res).toEqual({ readStatus: 'reading' });
+  });
+
+  it('sets and clears rating through the book service', async () => {
+    const { service, bookService } = makeService();
+    const user = makeUser({ id: 7 });
+
+    const res = await service.setRating(user, 10, 4);
+    expect(bookService.bulkSetRating).toHaveBeenCalledWith([10], 4, user);
+    expect(res).toEqual({ rating: 4 });
+
+    const cleared = await service.setRating(user, 10, null);
+    expect(bookService.bulkSetRating).toHaveBeenLastCalledWith([10], null, user);
+    expect(cleared).toEqual({ rating: null });
   });
 });

@@ -345,6 +345,73 @@ export class OpdsBookService {
       .orderBy(sql`${bookMetadata.seriesName} ASC`);
   }
 
+  async getDistinctAuthorsPage(
+    userId: number,
+    opts: { q?: string; limit: number; offset: number },
+    isSuperuser = false,
+    contentFilters?: ContentFilterRules,
+  ): Promise<{ items: { name: string; bookCount: number }[]; hasNext: boolean }> {
+    const accessibleIds = await this.getAccessibleLibraryIds(userId, isSuperuser);
+    if (accessibleIds.length === 0) return { items: [], hasNext: false };
+
+    const filterClauses = !isSuperuser && contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
+    const where: SQL[] = [inArray(books.libraryId, accessibleIds)];
+    const term = opts.q?.trim();
+    if (term) {
+      where.push(ilike(authors.name, `%${term.replace(LIKE_SPECIAL_CHARS, '\\$&')}%`));
+    }
+
+    const rows = await this.db
+      .select({
+        name: authors.name,
+        bookCount: sql<number>`count(DISTINCT ${bookAuthors.bookId})::int`,
+      })
+      .from(authors)
+      .innerJoin(bookAuthors, eq(bookAuthors.authorId, authors.id))
+      .innerJoin(books, and(eq(books.id, bookAuthors.bookId), eq(books.status, 'present'), ...filterClauses))
+      .where(and(...where))
+      .groupBy(authors.name, authors.sortName)
+      .orderBy(sql`${authors.sortName} ASC NULLS LAST`)
+      .limit(opts.limit + 1)
+      .offset(opts.offset);
+
+    const hasNext = rows.length > opts.limit;
+    return { items: hasNext ? rows.slice(0, opts.limit) : rows, hasNext };
+  }
+
+  async getDistinctSeriesPage(
+    userId: number,
+    opts: { q?: string; limit: number; offset: number },
+    isSuperuser = false,
+    contentFilters?: ContentFilterRules,
+  ): Promise<{ items: { name: string; bookCount: number }[]; hasNext: boolean }> {
+    const accessibleIds = await this.getAccessibleLibraryIds(userId, isSuperuser);
+    if (accessibleIds.length === 0) return { items: [], hasNext: false };
+
+    const filterClauses = !isSuperuser && contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
+    const where: SQL[] = [inArray(books.libraryId, accessibleIds), sql`${bookMetadata.seriesName} IS NOT NULL`];
+    const term = opts.q?.trim();
+    if (term) {
+      where.push(ilike(bookMetadata.seriesName, `%${term.replace(LIKE_SPECIAL_CHARS, '\\$&')}%`));
+    }
+
+    const rows = await this.db
+      .select({
+        name: sql<string>`${bookMetadata.seriesName}`,
+        bookCount: sql<number>`count(DISTINCT ${books.id})::int`,
+      })
+      .from(bookMetadata)
+      .innerJoin(books, and(eq(books.id, bookMetadata.bookId), eq(books.status, 'present'), ...filterClauses))
+      .where(and(...where))
+      .groupBy(bookMetadata.seriesName)
+      .orderBy(sql`${bookMetadata.seriesName} ASC`)
+      .limit(opts.limit + 1)
+      .offset(opts.offset);
+
+    const hasNext = rows.length > opts.limit;
+    return { items: hasNext ? rows.slice(0, opts.limit) : rows, hasNext };
+  }
+
   async getUserCollections(userId: number) {
     return this.db
       .select({
