@@ -246,7 +246,7 @@ const {
 
 function handleTextSelected(detail: SelectionDetail) {
   const selCfi = detail.cfi
-  const match = selCfi ? (annotations.annotations.value.find((a) => cfiRangesOverlap(selCfi, a.cfi)) ?? null) : null
+  const match = selCfi ? (annotations.annotations.value.find((a) => a.cfi != null && cfiRangesOverlap(selCfi, a.cfi)) ?? null) : null
   selection.show(detail, match?.id ?? null)
 }
 
