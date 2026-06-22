@@ -143,14 +143,13 @@ describe('KoreaderCatalogService', () => {
     const { service } = makeService();
 
     expect(service.getRoot().sections.map((section) => section.id)).toEqual([
+      'continue-reading',
+      'recent',
       'libraries',
       'collections',
       'smart-scopes',
       'authors',
       'series',
-      'search',
-      'recent',
-      'continue-reading',
       'all-books',
     ]);
   });

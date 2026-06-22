@@ -545,6 +545,7 @@ function BookOrbitCatalog:init()
     self.is_borderless = true
     self.title_bar_fm_style = true
     Menu.init(self)
+    self:updateLeftIcon()
     self.paths = self.stack
 end
 
@@ -666,11 +667,7 @@ function BookOrbitCatalog:rootItems()
     local items = {}
     for _, section in ipairs(body.sections or {}) do
         if section.section == "search" then
-            table.insert(items, {
-                text = section.title,
-                kind = "search",
-                params = {},
-            })
+            -- Search is exposed through the title-bar magnifier on the root, not a list row.
         elseif section.section == "recent" then
             table.insert(items, {
                 text = section.title,
@@ -732,6 +729,7 @@ function BookOrbitCatalog:switchTo(title, item_table, context, push)
     self:updateReturnPath()
     self.current_context = context
     self:switchItemTable(title, item_table, nil, nil, context.subtitle or "")
+    self:updateLeftIcon()
     if context.kind == "books" then
         self:scheduleThumbnailDownloads(context.books or {})
     elseif context.kind == "detail" then
@@ -1349,8 +1347,22 @@ function BookOrbitCatalog:showBookActions()
     UIManager:show(dialog)
 end
 
+function BookOrbitCatalog:contextUsesActions()
+    local kind = self.current_context and self.current_context.kind
+    return kind == "books" or kind == "detail"
+end
+
+function BookOrbitCatalog:updateLeftIcon()
+    if not self.title_bar then return end
+    self.title_bar:setLeftIcon(self:contextUsesActions() and "appbar.menu" or "appbar.search")
+end
+
 function BookOrbitCatalog:onLeftButtonTap()
-    self:showBookActions()
+    if self:contextUsesActions() then
+        self:showBookActions()
+    else
+        self:promptSearch({})
+    end
     return true
 end
 
@@ -2149,8 +2161,6 @@ function BookOrbitCatalog:onMenuSelect(item)
         self:loadBooks(item.params or {}, item.list_title or item.text)
     elseif item.kind == "book" then
         self:loadBookDetail(item.book_id)
-    elseif item.kind == "search" then
-        self:promptSearch(item.params or {})
     elseif item.kind == "sort" then
         self:showSortDialog(item)
     end
@@ -2175,6 +2185,7 @@ function BookOrbitCatalog:onReturn()
         self:updateReturnPath()
         self:switchItemTable(self.title, self.item_table, nil, nil, "")
     end
+    self:updateLeftIcon()
     return true
 end
 
@@ -2185,6 +2196,7 @@ function BookOrbitCatalog:onHoldReturn()
     self.item_table = self:rootItems()
     self.current_context = { kind = "root", title = self.title }
     self:switchItemTable(self.title, self.item_table, nil, nil, "")
+    self:updateLeftIcon()
     return true
 end
 

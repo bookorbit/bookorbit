@@ -47,6 +47,18 @@ const NATURAL_SORT_ORDER: Record<KoreaderCatalogSort, KoreaderCatalogSortOrder> 
 
 const ROOT_SECTIONS: KoreaderCatalogEntry[] = [
   {
+    id: 'continue-reading',
+    title: 'Continue reading',
+    section: 'continue-reading',
+    booksHref: `${CATALOG_BASE}/books?sort=recently_read&readStatus=reading`,
+  },
+  {
+    id: 'recent',
+    title: 'Recently added',
+    section: 'recent',
+    booksHref: `${CATALOG_BASE}/books?sort=recently_added`,
+  },
+  {
     id: 'libraries',
     title: 'Libraries',
     section: 'libraries',
@@ -75,24 +87,6 @@ const ROOT_SECTIONS: KoreaderCatalogEntry[] = [
     title: 'Series',
     section: 'series',
     href: `${CATALOG_BASE}/sections/series`,
-  },
-  {
-    id: 'search',
-    title: 'Search',
-    section: 'search',
-    booksHref: `${CATALOG_BASE}/books?q=`,
-  },
-  {
-    id: 'recent',
-    title: 'Recent',
-    section: 'recent',
-    booksHref: `${CATALOG_BASE}/books?sort=recently_added`,
-  },
-  {
-    id: 'continue-reading',
-    title: 'Continue reading',
-    section: 'continue-reading',
-    booksHref: `${CATALOG_BASE}/books?sort=recently_read&readStatus=reading`,
   },
   {
     id: 'all-books',
