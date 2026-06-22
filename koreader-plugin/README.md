@@ -2,6 +2,7 @@
 
 Syncs your KOReader reading life into BookOrbit:
 
+- Native BookOrbit catalog browsing from KOReader: libraries, collections, SmartScopes, authors, series, recent books, all books and scoped search. Downloads are linked to BookOrbit sync after the file is saved.
 - Live reading progress of the open book (pull on open with conflict prompt, optional periodic push every N page turns, push on close and suspend), compatible with the kosync flow BookOrbit already speaks.
 - Reading statistics: the raw per-page time events from KOReader's statistics database. BookOrbit turns them into reading sessions and daily stats, so they show up in the existing dashboards.
 - Highlights and notes, two ways: device highlights appear in the BookOrbit web reader as native highlights, and highlights, note edits and deletions made in BookOrbit come back to the device.
@@ -28,6 +29,7 @@ Re-downloading later (for example after changing the sync password or server add
 4. On the device, open the main menu, Tools tab: "BookOrbit sync" sits directly below "Calibre" on the first page.
    - Set the BookOrbit server address (e.g. `https://bookorbit.example.com`; the `/api/v1` suffix is added automatically).
    - Login with the credentials from step 3.
+   - Use "Browse BookOrbit" to browse and download books from the same account.
 
 ## Setup
 
@@ -73,6 +75,8 @@ Years of statistics upload in batches of 500 events. Roughly 200k events means a
 ## Hand-test checklist
 
 - Menu placement: "BookOrbit sync" appears on the Tools first page directly below Calibre, in both the file manager and the reader; `settings/reader_menu_order.lua` and `settings/filemanager_menu_order.lua` exist with the bookorbit marker line; a restart does not rewrite them.
+- Catalog browser: "Browse BookOrbit" appears in the Tools menu after login. Libraries, collections, SmartScopes, authors, series, recent and all books load through the BookOrbit JSON API, with page navigation, scoped search and sorting.
+- Catalog download: open a book detail, choose a file format, change folder/name if needed, confirm overwrite, download, then accept "Open now". The downloaded file is matched by partial MD5 and linked in `bookorbit_sync_state.lua`.
 - Custom menu order: remove the marker line and shuffle the tools list; on restart only the `bookorbit_sync` id is re-inserted, the rest is preserved. A syntactically broken file is left untouched (warning in the log).
 - Login: wrong password shows a login error; server URL with and without trailing `/` and with `/api/v1` already appended all work.
 - Preconfigured install: download the zip from web settings, install, restart; the "set up for ... as ..." message appears once, the server URL and login are filled in, `bookorbit_provision.lua` is gone from the plugin folder, and a second restart shows no message.

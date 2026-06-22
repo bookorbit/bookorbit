@@ -16,5 +16,6 @@ import { OpdsUserService } from './opds-user.service';
   imports: [AppSettingsModule, BookModule, UserModule, CommonModule],
   controllers: [OpdsController, OpdsUserController],
   providers: [OpdsService, OpdsBookService, OpdsUserService, OpdsAuthGuard, OpdsEnabledGuard],
+  exports: [OpdsBookService],
 })
 export class OpdsModule {}

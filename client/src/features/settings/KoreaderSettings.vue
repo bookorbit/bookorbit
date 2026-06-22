@@ -218,14 +218,14 @@ async function handleDownloadPlugin() {
     v-if="!props.embedded"
     class="hidden md:flex"
     title="KOReader Sync"
-    subtitle="Sync KOReader progress, reading activity, highlights, and annotation changes with BookOrbit."
+    subtitle="Browse your BookOrbit catalog in KOReader and sync progress, reading activity, highlights, and annotation changes."
   />
   <div v-if="!props.embedded" class="md:hidden px-1">
     <h1 class="text-xl font-semibold tracking-tight text-foreground">KOReader Sync</h1>
     <p
       class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
     >
-      Sync KOReader progress, reading activity, highlights, and annotation changes with BookOrbit.
+      Browse your BookOrbit catalog in KOReader and sync progress, reading activity, highlights, and annotation changes.
     </p>
   </div>
 
@@ -241,7 +241,8 @@ async function handleDownloadPlugin() {
         </div>
         <p class="text-sm font-medium text-foreground">KOReader sync is not configured</p>
         <p class="text-xs text-muted-foreground mt-1 mb-4 max-w-sm mx-auto">
-          Create one set of sync credentials, then use them with the BookOrbit KOReader plugin for progress, reading events, highlights, and deletes.
+          Create one set of sync credentials, then use them with the BookOrbit KOReader plugin for browsing, downloads, progress, reading events,
+          highlights, and deletes.
         </p>
         <button class="settings-btn-primary mx-auto min-h-10 justify-center" @click="handleShowSetupForm">
           <User :size="13" />
@@ -359,7 +360,8 @@ async function handleDownloadPlugin() {
             <div class="min-w-0">
               <p class="settings-label">Preconfigured BookOrbit plugin</p>
               <p class="settings-hint">
-                Download a zip with the server URL and your sync login already configured. Copy the plugin folder to
+                Download a zip with the server URL and your sync login already configured. The plugin includes catalog browsing and sync. Copy the
+                folder to
                 <span class="font-mono text-foreground/70">koreader/plugins/</span> and restart KOReader.
               </p>
             </div>
@@ -480,7 +482,8 @@ async function handleDownloadPlugin() {
             <div class="flex-1 min-w-0">
               <p class="settings-label">KOReader setup steps</p>
               <p class="settings-hint">
-                Use the BookOrbit plugin for progress, reading events, and highlights. Use the stock plugin for progress only.
+                Use the BookOrbit plugin for catalog browsing, downloads, progress, reading events, and highlights. Use the stock plugin for progress
+                only.
               </p>
             </div>
             <ChevronUp v-if="helpOpen" :size="14" class="text-muted-foreground shrink-0" />
@@ -496,6 +499,7 @@ async function handleDownloadPlugin() {
                   <span class="font-mono text-foreground/70">koreader/plugins/</span> on your device.
                 </li>
                 <li>Restart KOReader. The server and login are configured automatically.</li>
+                <li>Open <span class="font-mono text-foreground/70">Browse BookOrbit</span> to search, download, and link books to sync.</li>
               </ol>
             </div>
             <div>

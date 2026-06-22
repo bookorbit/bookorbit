@@ -31,6 +31,7 @@ local _ = require("gettext")
 local BookOrbitAnnotations = require("bookorbit_annotations")
 local BookOrbitApi = require("bookorbit_api")
 local BookOrbitBookSync = require("bookorbit_book_sync")
+local BookOrbitCatalog = require("bookorbit_catalog")
 local BookOrbitState = require("bookorbit_state")
 local BookOrbitMenuPin = require("bookorbit_menu_pin")
 local BookOrbitSweep = require("bookorbit_sweep")
@@ -280,6 +281,16 @@ function BookOrbit:strategyMenu(getter, setter)
 end
 
 function BookOrbit:addToMainMenu(menu_items)
+    menu_items.bookorbit_browse = {
+        text = _("Browse BookOrbit"),
+        sorting_hint = "tools",
+        enabled_func = function()
+            return self:isLoggedIn()
+        end,
+        callback = function()
+            self:browseCatalog()
+        end,
+    }
     menu_items.bookorbit_sync = {
         text = _("BookOrbit sync"),
         -- Fallback placement only: BookOrbitMenuPin normally pins this entry
@@ -417,6 +428,26 @@ If set to 0, updating progress based on page turns will be disabled.]]),
             },
         },
     }
+end
+
+function BookOrbit:browseCatalog()
+    if not self:isLoggedIn() then
+        promptLogin()
+        return
+    end
+
+    NetworkMgr:runWhenConnected(function()
+        self.catalog_browser = BookOrbitCatalog:new{
+            title = _("BookOrbit"),
+            api = self:apiOpts(),
+            _manager = self,
+            close_callback = function()
+                UIManager:close(self.catalog_browser)
+                self.catalog_browser = nil
+            end,
+        }
+        UIManager:show(self.catalog_browser)
+    end)
 end
 
 function BookOrbit:setServerAddress()

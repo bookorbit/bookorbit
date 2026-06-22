@@ -47,6 +47,10 @@ export class BookReadService {
     return this.bookRepo.findById(id);
   }
 
+  findProgressByBook(userId: number, bookId: number) {
+    return this.bookRepo.findProgressByBook(userId, bookId);
+  }
+
   checkBookPassesContentFilters(bookId: number, contentFilters: import('@bookorbit/types').ContentFilterRules) {
     return this.bookRepo.checkBookPassesContentFilters(bookId, contentFilters);
   }

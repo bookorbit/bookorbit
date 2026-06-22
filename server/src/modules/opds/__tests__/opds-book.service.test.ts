@@ -228,7 +228,7 @@ describe('OpdsBookService', () => {
   });
 
   it('every sort order includes a books.id tiebreaker as its final ORDER BY clause', async () => {
-    const sortOrders = ['recent', 'title_asc', 'title_desc', 'author_asc', 'author_desc', 'series_asc', 'series_desc'] as const;
+    const sortOrders = ['recent', 'updated', 'title_asc', 'title_desc', 'author_asc', 'author_desc', 'series_asc', 'series_desc'] as const;
 
     for (const sortOrder of sortOrders) {
       const { service, db } = makeService([[], [{ total: 0 }]]);

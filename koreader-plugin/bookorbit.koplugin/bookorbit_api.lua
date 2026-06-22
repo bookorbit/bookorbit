@@ -111,6 +111,58 @@ function BookOrbitApi:request(method, path, body)
     return decoded or {}
 end
 
+function BookOrbitApi:query(path, params)
+    if not params then return path end
+
+    local keys = {}
+    for key, value in pairs(params) do
+        if value ~= nil and value ~= "" then
+            table.insert(keys, key)
+        end
+    end
+    table.sort(keys)
+    if #keys == 0 then return path end
+
+    local parts = {}
+    for _, key in ipairs(keys) do
+        table.insert(parts, util.urlEncode(key) .. "=" .. util.urlEncode(tostring(params[key])))
+    end
+    return path .. "?" .. table.concat(parts, "&")
+end
+
+function BookOrbitApi:download(path, local_path, accept)
+    local out, open_err = io.open(local_path, "w")
+    if not out then
+        return nil, tostring(open_err or "open_error")
+    end
+
+    local request = {
+        url = self.server_url .. path,
+        method = "GET",
+        sink = ltn12.sink.file(out),
+        headers = {
+            ["accept"] = accept or "application/octet-stream",
+            ["Accept-Encoding"] = "identity",
+            ["x-auth-user"] = self.username,
+            ["x-auth-key"] = self.userkey,
+        },
+    }
+
+    socketutil:set_timeout(socketutil.FILE_BLOCK_TIMEOUT, socketutil.FILE_TOTAL_TIMEOUT)
+    local code, _, status = socket.skip(1, http.request(request))
+    socketutil:reset_timeout()
+
+    if code == 200 then
+        return true
+    end
+
+    util.removeFile(local_path)
+    if type(code) ~= "number" then
+        return nil, tostring(status or code or "network_error")
+    end
+    return nil, code
+end
+
 function BookOrbitApi:withDevice(body)
     body.deviceId = self.device_id
     body.deviceModel = self.device_model
@@ -179,6 +231,32 @@ function BookOrbitApi:sweepComplete(counts)
         pageStatsUploaded = counts.page_stats or 0,
         annotationsUpserted = counts.annotations or 0,
     }))
+end
+
+-- BookOrbit catalog endpoints
+
+function BookOrbitApi:catalogRoot()
+    return self:request("GET", "/koreader/plugin/catalog/root")
+end
+
+function BookOrbitApi:catalogSection(section)
+    return self:request("GET", "/koreader/plugin/catalog/sections/" .. util.urlEncode(section))
+end
+
+function BookOrbitApi:catalogBooks(params)
+    return self:request("GET", self:query("/koreader/plugin/catalog/books", params))
+end
+
+function BookOrbitApi:catalogBook(book_id)
+    return self:request("GET", "/koreader/plugin/catalog/books/" .. tostring(book_id))
+end
+
+function BookOrbitApi:downloadCatalogFile(file_id, local_path)
+    return self:download("/koreader/plugin/catalog/files/" .. tostring(file_id) .. "/download", local_path)
+end
+
+function BookOrbitApi:downloadCatalogThumbnail(book_id, local_path)
+    return self:download("/koreader/plugin/catalog/books/" .. tostring(book_id) .. "/thumbnail", local_path, "image/jpeg,image/*")
 end
 
 return BookOrbitApi

@@ -22,10 +22,11 @@ import { buildContentFilterClauses } from '../../common/utils/content-filter-sql
 
 type Db = NodePgDatabase<typeof schema>;
 
-type OpdsSortOrder = 'recent' | 'title_asc' | 'title_desc' | 'author_asc' | 'author_desc' | 'series_asc' | 'series_desc';
+type OpdsSortOrder = 'recent' | 'updated' | 'title_asc' | 'title_desc' | 'author_asc' | 'author_desc' | 'series_asc' | 'series_desc';
 
 const OPDS_SORT_MAP: Record<OpdsSortOrder, SQL[]> = {
   recent: [sql`${books.addedAt} DESC`, sql`${books.id} ASC`],
+  updated: [sql`${books.updatedAt} DESC`, sql`${books.id} ASC`],
   title_asc: [sql`${bookMetadata.title} ASC NULLS LAST`, sql`${books.id} ASC`],
   title_desc: [sql`${bookMetadata.title} DESC NULLS LAST`, sql`${books.id} ASC`],
   author_asc: [sql`min(${authors.sortName}) ASC NULLS LAST`, sql`${bookMetadata.title} ASC NULLS LAST`, sql`${books.id} ASC`],

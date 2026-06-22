@@ -76,3 +76,80 @@ export interface TestKoreaderConnectionResult {
   username: string;
   serverUrl: string;
 }
+
+export type KoreaderCatalogSection = "libraries" | "collections" | "smart-scopes" | "authors" | "series" | "search" | "recent" | "all-books";
+
+export type KoreaderCatalogSort = "title" | "author" | "recently_added" | "recently_updated" | "series";
+
+export interface KoreaderCatalogEntry {
+  id: string;
+  title: string;
+  section: KoreaderCatalogSection;
+  subtitle?: string | null;
+  count?: number;
+  icon?: string | null;
+  href?: string;
+  booksHref?: string;
+}
+
+export interface KoreaderCatalogFile {
+  id: number;
+  format: string;
+  role: string;
+  sizeBytes: number | null;
+  durationSeconds: number | null;
+  downloadUrl: string;
+}
+
+export interface KoreaderCatalogProgress {
+  fileId: number;
+  percentage: number;
+  koreaderProgress: string | null;
+  updatedAt: string;
+}
+
+export interface KoreaderCatalogBookListItem {
+  id: number;
+  title: string;
+  authors: string[];
+  seriesName: string | null;
+  seriesIndex: number | null;
+  progressPercentage: number | null;
+  readStatus: string | null;
+  formats: string[];
+  hasCover: boolean;
+  thumbnailUrl: string | null;
+  detailUrl: string;
+  addedAt: string;
+  updatedAt: string;
+}
+
+export interface KoreaderCatalogBookDetail extends KoreaderCatalogBookListItem {
+  subtitle: string | null;
+  description: string | null;
+  publisher: string | null;
+  publishedYear: number | null;
+  language: string | null;
+  isbn10: string | null;
+  isbn13: string | null;
+  libraryId: number;
+  libraryName: string;
+  rating: number | null;
+  pageCount: number | null;
+  collections: { id: number; name: string }[];
+  genres: string[];
+  tags: string[];
+  progress: KoreaderCatalogProgress | null;
+  files: KoreaderCatalogFile[];
+}
+
+export interface KoreaderCatalogPage<T> {
+  items: T[];
+  total: number;
+  page: number;
+  size: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+  nextUrl: string | null;
+  previousUrl: string | null;
+}
