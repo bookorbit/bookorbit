@@ -1,4 +1,5 @@
 import { BadRequestException, Controller, Get, Param, ParseIntPipe, Query, Res } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import type { FastifyReply } from 'fastify';
 
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
@@ -14,6 +15,7 @@ export class EpubController {
     return this.epubService.getBookInfo(bookId, this.parseFileId(fileId), user);
   }
 
+  @SkipThrottle()
   @Get(':bookId/file/*')
   async getFile(
     @Param('bookId', ParseIntPipe) bookId: number,
