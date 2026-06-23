@@ -112,6 +112,7 @@ function CatalogDownload.install(Catalog)
                     {
                         text = _("Choose folder"),
                         callback = function()
+                            UIManager:close(dialog)
                             require("ui/downloadmgr"):new{
                                 onConfirm = function(path)
                                     logger.dbg("BookOrbit: download folder set to", path)
@@ -119,7 +120,9 @@ function CatalogDownload.install(Catalog)
                                         self._manager.ui.folder_shortcuts:updateShortcut("download_dir", path)
                                     end
                                     G_reader_settings:saveSetting("download_dir", path)
-                                    dialog:setTitle(createTitle(path, filename))
+                                    UIManager:nextTick(function()
+                                        self:showDownloadDialog(detail, file)
+                                    end)
                                 end,
                             }:chooseDir(self:getCurrentDownloadDir())
                         end,
