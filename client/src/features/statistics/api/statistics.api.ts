@@ -162,8 +162,8 @@ export async function fetchUserCompletionTimeline(filters: StatisticsFilterConfi
   return res.json() as Promise<UserCompletionTimelinePoint[]>
 }
 
-export async function fetchUserGoalTrajectory(filters: StatisticsFilterConfig): Promise<UserGoalTrajectory> {
-  const res = await api(`/api/v1/user-statistics/goal-trajectory${buildParams(filters, { days: '365', goalBooks: '12' })}`)
+export async function fetchUserGoalTrajectory(filters: StatisticsFilterConfig, goalBooks = 12): Promise<UserGoalTrajectory> {
+  const res = await api(`/api/v1/user-statistics/goal-trajectory${buildParams(filters, { days: '365', goalBooks: String(goalBooks) })}`)
   if (!res.ok) throw new Error(`User goal trajectory request failed: ${res.status}`)
   return res.json() as Promise<UserGoalTrajectory>
 }

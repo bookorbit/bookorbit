@@ -7,9 +7,10 @@ interface UseStatisticsQueryOptions<T> {
   initialData: T
   fetcher: (filters: StatisticsFilterConfig) => Promise<T>
   watchFilterFields?: Array<(filters: StatisticsFilterConfig) => string | number>
+  extraWatchSources?: Array<() => string | number | null>
 }
 
-export function useStatisticsQuery<T>({ initialData, fetcher, watchFilterFields = [] }: UseStatisticsQueryOptions<T>) {
+export function useStatisticsQuery<T>({ initialData, fetcher, watchFilterFields = [], extraWatchSources = [] }: UseStatisticsQueryOptions<T>) {
   const data = ref<T>(initialData)
   const loading = ref(true)
   const error = ref(false)
@@ -35,9 +36,10 @@ export function useStatisticsQuery<T>({ initialData, fetcher, watchFilterFields 
     }
   }
 
-  const watchSources: Array<() => string | number> = [
+  const watchSources: Array<() => string | number | null> = [
     () => filters.value.libraryIds.join(','),
     ...watchFilterFields.map((selector) => () => selector(filters.value)),
+    ...extraWatchSources,
   ]
 
   watch(watchSources, load)

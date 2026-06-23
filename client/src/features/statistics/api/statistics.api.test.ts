@@ -437,6 +437,16 @@ describe('fetchUserGoalTrajectory', () => {
     expect(result).toEqual(data)
   })
 
+  it('passes a custom goalBooks value when specified', async () => {
+    mockedApi.mockResolvedValue(mockOkResponse({ goalBooks: 24, points: [] }))
+
+    await fetchUserGoalTrajectory(filters, 24)
+
+    const url = mockedApi.mock.calls[0][0] as string
+    expect(url).toContain('goalBooks=24')
+    expect(url).not.toContain('goalBooks=12')
+  })
+
   it('throws on non-ok response', async () => {
     mockedApi.mockResolvedValue(mockErrorResponse(503))
 

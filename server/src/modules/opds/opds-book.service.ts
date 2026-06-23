@@ -160,7 +160,7 @@ export class OpdsBookService {
     }
 
     if (filters?.smartScopeId) {
-      return this.getBooksBySmartScope(userId, filters.smartScopeId, accessibleIds, sortOrder, page, size, contentFilters);
+      return this.getBooksBySmartScope(userId, filters.smartScopeId, accessibleIds, sortOrder, page, size, contentFilters, filters.q);
     }
 
     const clauses: SQL[] = [inArray(books.libraryId, accessibleIds), eq(books.status, 'present')];
@@ -497,6 +497,7 @@ export class OpdsBookService {
     page: number,
     size: number,
     contentFilters?: ContentFilterRules,
+    q?: string,
   ): Promise<{ entries: OpdsBookEntry[]; total: number }> {
     const [smartScope] = await this.db.select().from(smartScopes).where(eq(smartScopes.id, smartScopeId)).limit(1);
     if (!smartScope) return { entries: [], total: 0 };
@@ -508,7 +509,8 @@ export class OpdsBookService {
       contentFilters,
     });
     const statusClause = eq(books.status, 'present');
-    const combinedWhere = where ? and(where, statusClause) : statusClause;
+    const searchClause = q?.trim() ? this.buildCatalogSearchClause(q) : undefined;
+    const combinedWhere = and(...([where, statusClause, searchClause].filter(Boolean) as SQL[]));
     return this.paginatedBookQuery(combinedWhere!, sortOrder, page, size, userId);
   }
 

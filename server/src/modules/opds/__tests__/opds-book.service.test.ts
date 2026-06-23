@@ -79,7 +79,12 @@ describe('OpdsBookService', () => {
     accessSpy.mockResolvedValueOnce([1, 2]);
     smartScopeSpy.mockResolvedValueOnce({ entries: [{ id: 5 }], total: 1 });
     await expect(service.getBooksPage(7, 'recent', 3, 25, { smartScopeId: 4 })).resolves.toEqual({ entries: [{ id: 5 }], total: 1 });
-    expect(smartScopeSpy).toHaveBeenCalledWith(7, 4, [1, 2], 'recent', 3, 25, undefined);
+    expect(smartScopeSpy).toHaveBeenCalledWith(7, 4, [1, 2], 'recent', 3, 25, undefined, undefined);
+
+    accessSpy.mockResolvedValueOnce([1, 2]);
+    smartScopeSpy.mockResolvedValueOnce({ entries: [{ id: 6 }], total: 1 });
+    await expect(service.getBooksPage(7, 'recent', 1, 20, { smartScopeId: 4, q: 'dune' })).resolves.toEqual({ entries: [{ id: 6 }], total: 1 });
+    expect(smartScopeSpy).toHaveBeenCalledWith(7, 4, [1, 2], 'recent', 1, 20, undefined, 'dune');
 
     accessSpy.mockResolvedValueOnce([1, 2]);
     paginatedSpy.mockResolvedValueOnce({ entries: [{ id: 9 }], total: 1 });
@@ -193,6 +198,30 @@ describe('OpdsBookService', () => {
       title: 'book-7',
       authorName: '',
     });
+  });
+
+  it('applies text search inside smartScope when q is provided', async () => {
+    const { service } = makeService([[{ id: 3, userId: 7, isPublic: false, filter: null }]]);
+    const paginatedSpy = vi.spyOn(service as never, 'paginatedBookQuery').mockResolvedValue({ entries: [], total: 0 });
+    const searchSpy = vi.spyOn(service as never, 'buildCatalogSearchClause');
+
+    await (service as never).getBooksBySmartScope(7, 3, [1], 'title_asc', 1, 20, undefined, 'dune');
+
+    expect(searchSpy).toHaveBeenCalledWith('dune');
+    expect(paginatedSpy).toHaveBeenCalledTimes(1);
+    const [where] = paginatedSpy.mock.calls[0] as unknown[];
+    expect(collectValues(where)).toContain('%dune%');
+  });
+
+  it('omits text search clause inside smartScope when q is absent', async () => {
+    const { service } = makeService([[{ id: 3, userId: 7, isPublic: false, filter: null }]]);
+    const paginatedSpy = vi.spyOn(service as never, 'paginatedBookQuery').mockResolvedValue({ entries: [], total: 0 });
+    const searchSpy = vi.spyOn(service as never, 'buildCatalogSearchClause');
+
+    await (service as never).getBooksBySmartScope(7, 3, [1], 'title_asc', 1, 20);
+
+    expect(searchSpy).not.toHaveBeenCalled();
+    expect(paginatedSpy).toHaveBeenCalledTimes(1);
   });
 
   it('returns no smartScope books when smartScope is missing or private to another user', async () => {

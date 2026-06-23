@@ -158,7 +158,7 @@ const quickFilters: { label: string; value: QuickFilter }[] = [
       </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-4 lg:grid-cols-5">
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-5 lg:items-start">
       <div class="lg:col-span-3">
         <ReadingLogJourneyChart :stats="stats" :loading="loading" />
       </div>

@@ -59,6 +59,7 @@ local BookOrbit = WidgetContainer:extend{
 }
 
 BookOrbit.default_settings = {
+    settings_version = 1,
     server_url = nil,
     username = nil,
     userkey = nil,
@@ -93,6 +94,28 @@ function BookOrbit:init()
 
     self.settings = G_reader_settings:readSetting("bookorbit", self.default_settings)
     self.device_id = G_reader_settings:readSetting("device_id")
+
+    -- Detect settings from the old bookorbit-koplugin, which used the same
+    -- "bookorbit" key but a different structure. Reset behavior keys to
+    -- defaults while preserving any existing credentials so users aren't
+    -- logged out.
+    if not self.settings.settings_version then
+        local server_url = self.settings.server_url
+        local username = self.settings.username
+        local userkey = self.settings.userkey
+        local provision_fingerprint = self.settings.provision_fingerprint
+        self.settings = {}
+        for k, v in pairs(self.default_settings) do
+            self.settings[k] = type(v) == "table" and {} or v
+        end
+        self.settings.server_url = server_url
+        self.settings.username = username
+        self.settings.userkey = userkey
+        self.settings.provision_fingerprint = provision_fingerprint
+        G_reader_settings:saveSetting("bookorbit", self.settings)
+        G_reader_settings:flush()
+        logger.info("BookOrbit: migrated settings from previous schema")
+    end
 
     -- v1 settings cleanup: full sweeps are manual-only since 0.2.0.
     self.settings.sweep_on_close = nil
