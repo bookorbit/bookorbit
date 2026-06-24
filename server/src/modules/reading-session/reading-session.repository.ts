@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, gte, isNotNull, lt, lte, max, min, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, lt, lte, max, min, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type {
@@ -10,6 +10,14 @@ import type {
   ReadingSessionSource,
 } from '@bookorbit/types';
 import { READING_SESSION_SOURCE_BUCKETS, emptySourceBucketRecord, toReadingSessionSourceBucket } from '@bookorbit/types';
+import {
+  aggregateReadingSessionDailyStats,
+  getDayRangeForDateKeys,
+  getReadingSessionDayKeys,
+  splitReadingSessionByDay,
+  type ReadingDailyStatsSegment,
+} from '../../common/utils/reading-daily-stats.utils';
+import { toDateKeyInTimeZone } from '../../common/utils/timezone.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookFiles, books, readingSessions, userReadingDailyStats } from '../../db/schema';
@@ -37,6 +45,7 @@ export interface InsertManualSessionParams {
   durationSeconds: number;
   progressDelta: number | null;
   endProgress: number | null;
+  timeZone: string;
 }
 
 @Injectable()
@@ -53,6 +62,7 @@ export class ReadingSessionRepository {
     progressDelta: number | null,
     endProgress: number | null,
     source: ReadingSessionSource = 'web',
+    timeZone = 'UTC',
   ): Promise<SaveReadingSessionResult> {
     if (durationSeconds < MIN_READING_SESSION_SECONDS) {
       return { kind: 'skipped', reason: 'duration_below_minimum' };
@@ -82,14 +92,14 @@ export class ReadingSessionRepository {
         return { kind: 'skipped', reason: 'duplicate_session_id' };
       }
 
-      await this.upsertDailyStats(tx, { userId, libraryId, startedAt, durationSeconds, progressDelta });
+      await this.upsertDailyStats(tx, { userId, libraryId, startedAt, endedAt, durationSeconds, progressDelta, timeZone });
 
       return { kind: 'saved' };
     });
   }
 
   async insertManualSession(params: InsertManualSessionParams): Promise<{ id: number }> {
-    const { userId, bookId, libraryId, bookFileId, sessionId, startedAt, endedAt, durationSeconds, progressDelta, endProgress } = params;
+    const { userId, bookId, libraryId, bookFileId, sessionId, startedAt, endedAt, durationSeconds, progressDelta, endProgress, timeZone } = params;
 
     return this.db.transaction(async (tx) => {
       const [inserted] = await tx
@@ -97,7 +107,7 @@ export class ReadingSessionRepository {
         .values({ userId, bookId, bookFileId, sessionId, source: 'manual', startedAt, endedAt, durationSeconds, progressDelta, endProgress })
         .returning({ id: readingSessions.id });
 
-      await this.upsertDailyStats(tx, { userId, libraryId, startedAt, durationSeconds, progressDelta });
+      await this.upsertDailyStats(tx, { userId, libraryId, startedAt, endedAt, durationSeconds, progressDelta, timeZone });
 
       return { id: inserted.id };
     });
@@ -143,6 +153,7 @@ export class ReadingSessionRepository {
     dateFrom?: string,
     dateTo?: string,
     format?: string,
+    timeZone = 'UTC',
   ): Promise<BookReadingSessionListResponse> {
     const conditions = [eq(readingSessions.bookId, bookId), eq(readingSessions.userId, userId)];
     if (dateFrom) conditions.push(gte(readingSessions.startedAt, new Date(dateFrom)));
@@ -150,7 +161,6 @@ export class ReadingSessionRepository {
     if (format) conditions.push(eq(sql`upper(${bookFiles.format})`, format.toUpperCase()));
 
     const whereClause = and(...conditions);
-    const dayExpr = sql`date_trunc('day', ${readingSessions.startedAt})::date`;
 
     let orderCol;
     switch (sortBy) {
@@ -169,7 +179,7 @@ export class ReadingSessionRepository {
     const orderExpr = sortDir === 'asc' ? asc(orderCol) : desc(orderCol);
     const offset = (page - 1) * pageSize;
 
-    const [rows, countRows, statsRows, dailyRows, progressRows, sourceRows] = await Promise.all([
+    const [rows, countRows, statsRows, summaryRows, sourceRows] = await Promise.all([
       this.db
         .select({
           id: readingSessions.id,
@@ -206,24 +216,16 @@ export class ReadingSessionRepository {
 
       this.db
         .select({
-          day: sql<string>`${dayExpr}::text`,
-          totalMinutes: sql<number>`round(sum(${readingSessions.durationSeconds}) / 60.0, 1)::real`,
-        })
-        .from(readingSessions)
-        .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-        .where(whereClause)
-        .groupBy(dayExpr)
-        .orderBy(asc(dayExpr)),
-
-      this.db
-        .selectDistinctOn([dayExpr], {
-          day: sql<string>`${dayExpr}::text`,
+          startedAt: readingSessions.startedAt,
+          endedAt: readingSessions.endedAt,
+          durationSeconds: readingSessions.durationSeconds,
+          progressDelta: readingSessions.progressDelta,
           endProgress: readingSessions.endProgress,
         })
         .from(readingSessions)
         .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-        .where(and(whereClause, isNotNull(readingSessions.endProgress)))
-        .orderBy(asc(dayExpr), desc(readingSessions.startedAt)),
+        .where(whereClause)
+        .orderBy(asc(readingSessions.startedAt)),
 
       this.db
         .select({
@@ -253,16 +255,43 @@ export class ReadingSessionRepository {
       totalSessions: bucketSessions[bucket],
     }));
 
+    const dailySummary = aggregateReadingSessionDailyStats(
+      summaryRows.map((row) => ({
+        startedAt: row.startedAt,
+        endedAt: row.endedAt,
+        durationSeconds: row.durationSeconds,
+        progressDelta: row.progressDelta ?? null,
+      })),
+      timeZone,
+    ).map((segment) => ({
+      day: segment.day,
+      totalMinutes: Math.round((segment.readingSeconds / 60) * 10) / 10,
+    }));
+
+    const progressByDay = new Map<string, { day: string; endProgress: number; endedAtMs: number }>();
+    for (const row of summaryRows) {
+      if (row.endProgress == null) continue;
+      const day = toDateKeyInTimeZone(row.endedAt, timeZone);
+      const endedAtMs = row.endedAt.getTime();
+      const existing = progressByDay.get(day);
+      if (!existing || endedAtMs > existing.endedAtMs) {
+        progressByDay.set(day, { day, endProgress: row.endProgress, endedAtMs });
+      }
+    }
+    const progressSummary = [...progressByDay.values()]
+      .sort((a, b) => a.day.localeCompare(b.day))
+      .map(({ day, endProgress }) => ({ day, endProgress }));
+
     const stats: BookReadingSessionStats = {
       totalSessions: statsRow?.totalSessions ?? 0,
       totalSeconds: statsRow?.totalSeconds ?? 0,
       avgDurationSeconds: statsRow?.avgDurationSeconds ?? 0,
       firstSessionAt: statsRow?.firstSessionAt ? (statsRow.firstSessionAt as Date).toISOString() : null,
       lastSessionAt: statsRow?.lastSessionAt ? (statsRow.lastSessionAt as Date).toISOString() : null,
-      dailySummary: dailyRows.map((r) => ({ day: r.day, totalMinutes: r.totalMinutes })),
+      dailySummary,
       paceProgressDelta: statsRow?.paceProgressDelta ?? 0,
       paceDurationSeconds: statsRow?.paceDurationSeconds ?? 0,
-      progressSummary: progressRows.map((r) => ({ day: r.day, endProgress: r.endProgress ?? 0 })),
+      progressSummary,
       bySource,
     };
 
@@ -280,12 +309,15 @@ export class ReadingSessionRepository {
     return { items, total, page, pageSize, stats };
   }
 
-  async deleteSessionByBook(userId: number, bookId: number, sessionId: number): Promise<{ found: boolean }> {
+  async deleteSessionByBook(userId: number, bookId: number, sessionId: number, timeZone = 'UTC'): Promise<{ found: boolean }> {
     return this.db.transaction(async (tx) => {
       const [row] = await tx
         .select({
           id: readingSessions.id,
           startedAt: readingSessions.startedAt,
+          endedAt: readingSessions.endedAt,
+          durationSeconds: readingSessions.durationSeconds,
+          progressDelta: readingSessions.progressDelta,
           libraryId: books.libraryId,
         })
         .from(readingSessions)
@@ -295,35 +327,12 @@ export class ReadingSessionRepository {
 
       if (!row) return { found: false };
 
-      const { startedAt, libraryId } = row;
+      const { startedAt, endedAt, durationSeconds, progressDelta, libraryId } = row;
+      const affectedDays = getReadingSessionDayKeys({ startedAt, endedAt, durationSeconds, progressDelta: progressDelta ?? null }, timeZone);
 
       await tx.delete(readingSessions).where(eq(readingSessions.id, sessionId));
 
-      const dayKey = this.formatDayKey(startedAt as Date);
-
-      await tx
-        .delete(userReadingDailyStats)
-        .where(and(eq(userReadingDailyStats.userId, userId), eq(userReadingDailyStats.libraryId, libraryId), eq(userReadingDailyStats.day, dayKey)));
-
-      const dayDateSql = sql`${dayKey}::date`;
-
-      await tx.execute(sql`
-        insert into user_reading_daily_stats (user_id, library_id, day, reading_seconds, progress_delta, sessions_count, updated_at)
-        select
-          rs.user_id,
-          b.library_id,
-          date_trunc('day', rs.started_at)::date as day,
-          coalesce(sum(rs.duration_seconds), 0)::int as reading_seconds,
-          coalesce(sum(rs.progress_delta), 0)::real as progress_delta,
-          count(*)::int as sessions_count,
-          now() as updated_at
-        from reading_sessions rs
-        inner join books b on b.id = rs.book_id
-        where rs.user_id = ${userId}
-          and b.library_id = ${libraryId}
-          and date_trunc('day', rs.started_at)::date in (${dayDateSql})
-        group by rs.user_id, b.library_id, date_trunc('day', rs.started_at)::date
-      `);
+      await this.recomputeDailyStats(tx, userId, libraryId, affectedDays, timeZone);
 
       return { found: true };
     });
@@ -331,33 +340,115 @@ export class ReadingSessionRepository {
 
   private async upsertDailyStats(
     tx: Tx,
-    params: { userId: number; libraryId: number; startedAt: Date; durationSeconds: number; progressDelta: number | null },
+    params: {
+      userId: number;
+      libraryId: number;
+      startedAt: Date;
+      endedAt: Date;
+      durationSeconds: number;
+      progressDelta: number | null;
+      timeZone: string;
+    },
   ): Promise<void> {
-    const { userId, libraryId, startedAt, durationSeconds, progressDelta } = params;
-
-    await tx
-      .insert(userReadingDailyStats)
-      .values({
-        userId,
-        libraryId,
-        day: sql<string>`date_trunc('day', ${startedAt}::timestamp)::date`,
-        readingSeconds: durationSeconds,
-        progressDelta: progressDelta ?? 0,
-        sessionsCount: 1,
-        updatedAt: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: [userReadingDailyStats.userId, userReadingDailyStats.libraryId, userReadingDailyStats.day],
-        set: {
-          readingSeconds: sql`${userReadingDailyStats.readingSeconds} + ${durationSeconds}`,
-          progressDelta: sql`${userReadingDailyStats.progressDelta} + ${progressDelta ?? 0}`,
-          sessionsCount: sql`${userReadingDailyStats.sessionsCount} + 1`,
-          updatedAt: new Date(),
-        },
-      });
+    const { userId, libraryId, startedAt, endedAt, durationSeconds, progressDelta, timeZone } = params;
+    await this.lockDailyStats(tx, userId, libraryId);
+    const segments = splitReadingSessionByDay({ startedAt, endedAt, durationSeconds, progressDelta }, timeZone);
+    await this.insertDailyStatsSegments(tx, userId, libraryId, segments, 'increment');
   }
 
-  private formatDayKey(date: Date): string {
-    return date.toISOString().slice(0, 10);
+  private async recomputeDailyStats(tx: Tx, userId: number, libraryId: number, days: string[], timeZone: string): Promise<void> {
+    const affectedDays = [...new Set(days)].sort();
+    if (affectedDays.length === 0) return;
+
+    await this.lockDailyStats(tx, userId, libraryId);
+
+    await tx
+      .delete(userReadingDailyStats)
+      .where(
+        and(
+          eq(userReadingDailyStats.userId, userId),
+          eq(userReadingDailyStats.libraryId, libraryId),
+          inArray(userReadingDailyStats.day, affectedDays),
+        ),
+      );
+
+    const range = getDayRangeForDateKeys(affectedDays, timeZone);
+    if (!range) return;
+
+    const rows = await tx
+      .select({
+        startedAt: readingSessions.startedAt,
+        endedAt: readingSessions.endedAt,
+        durationSeconds: readingSessions.durationSeconds,
+        progressDelta: readingSessions.progressDelta,
+      })
+      .from(readingSessions)
+      .innerJoin(books, eq(books.id, readingSessions.bookId))
+      .where(
+        and(
+          eq(readingSessions.userId, userId),
+          eq(books.libraryId, libraryId),
+          lt(readingSessions.startedAt, range.end),
+          gt(readingSessions.endedAt, range.start),
+        ),
+      );
+
+    const segments = aggregateReadingSessionDailyStats(
+      rows.map((row) => ({
+        startedAt: row.startedAt,
+        endedAt: row.endedAt,
+        durationSeconds: row.durationSeconds,
+        progressDelta: row.progressDelta ?? null,
+      })),
+      timeZone,
+      new Set(affectedDays),
+    );
+    await this.insertDailyStatsSegments(tx, userId, libraryId, segments, 'replace');
+  }
+
+  private async lockDailyStats(tx: Tx, userId: number, libraryId: number): Promise<void> {
+    await tx.execute(sql`select pg_advisory_xact_lock(${userId}::int, ${libraryId}::int)`);
+  }
+
+  private async insertDailyStatsSegments(
+    tx: Tx,
+    userId: number,
+    libraryId: number,
+    segments: ReadingDailyStatsSegment[],
+    mode: 'increment' | 'replace',
+  ): Promise<void> {
+    if (segments.length === 0) return;
+
+    const now = new Date();
+    await tx
+      .insert(userReadingDailyStats)
+      .values(
+        segments.map((segment) => ({
+          userId,
+          libraryId,
+          day: segment.day,
+          readingSeconds: segment.readingSeconds,
+          progressDelta: segment.progressDelta,
+          sessionsCount: segment.sessionsCount,
+          updatedAt: now,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [userReadingDailyStats.userId, userReadingDailyStats.libraryId, userReadingDailyStats.day],
+        set:
+          mode === 'increment'
+            ? {
+                readingSeconds: sql`${userReadingDailyStats.readingSeconds} + excluded.reading_seconds`,
+                progressDelta: sql`${userReadingDailyStats.progressDelta} + excluded.progress_delta`,
+                sessionsCount: sql`${userReadingDailyStats.sessionsCount} + excluded.sessions_count`,
+                updatedAt: now,
+              }
+            : {
+                readingSeconds: sql`excluded.reading_seconds`,
+                progressDelta: sql`excluded.progress_delta`,
+                sessionsCount: sql`excluded.sessions_count`,
+                updatedAt: now,
+              },
+      });
   }
 }

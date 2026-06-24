@@ -21,6 +21,7 @@ function makeDbHarness(options?: { fileRow?: { bookId: number; libraryId: number
   const dailyValues = vi.fn().mockReturnValue({ onConflictDoUpdate: dailyConflictUpdate });
 
   const tx = {
+    execute: vi.fn().mockResolvedValue(undefined),
     insert: vi.fn((table: unknown) => {
       if (table === readingSessions) return { values: sessionValues };
       if (table === userReadingDailyStats) return { values: dailyValues };
@@ -42,6 +43,7 @@ function makeDbHarness(options?: { fileRow?: { bookId: number; libraryId: number
     sessionReturning,
     dailyValues,
     dailyConflictUpdate,
+    tx,
   };
 }
 
@@ -97,7 +99,7 @@ describe('ReadingSessionRepository', () => {
   });
 
   it('persists session with bookId and explicit source, then upserts daily stats', async () => {
-    const { repo, sessionValues, sessionConflict, dailyValues, dailyConflictUpdate } = makeDbHarness({
+    const { repo, sessionValues, sessionConflict, dailyValues, dailyConflictUpdate, tx } = makeDbHarness({
       fileRow: { bookId: 9, libraryId: 3 },
       insertedIds: [{ id: 99 }],
     });
@@ -128,17 +130,18 @@ describe('ReadingSessionRepository', () => {
       }),
     );
     expect(sessionConflict).toHaveBeenCalledWith({ target: [readingSessions.userId, readingSessions.sessionId] });
-    expect(dailyValues).toHaveBeenCalledWith(
+    expect(tx.execute).toHaveBeenCalledOnce();
+    expect(dailyValues).toHaveBeenCalledWith([
       expect.objectContaining({
         userId: 2,
         libraryId: 3,
+        day: '2026-04-15',
         readingSeconds: 60,
         progressDelta: 0,
         sessionsCount: 1,
         updatedAt: expect.any(Date),
       }),
-    );
-    expect(dailyValues.mock.calls[0]?.[0]).toHaveProperty('day');
+    ]);
     expect(dailyConflictUpdate).toHaveBeenCalledOnce();
   });
 
@@ -175,6 +178,7 @@ describe('ReadingSessionRepository - insertManualSession', () => {
     const dailyValues = vi.fn().mockReturnValue({ onConflictDoUpdate: dailyConflictUpdate });
 
     const tx = {
+      execute: vi.fn().mockResolvedValue(undefined),
       insert: vi.fn((table: unknown) => {
         if (table === readingSessions) return { values: sessionValues };
         if (table === userReadingDailyStats) return { values: dailyValues };
@@ -186,11 +190,11 @@ describe('ReadingSessionRepository - insertManualSession', () => {
     const db = { transaction };
     const repo = new ReadingSessionRepository(db as never);
 
-    return { repo, sessionValues, dailyValues, dailyConflictUpdate };
+    return { repo, sessionValues, dailyValues, dailyConflictUpdate, tx };
   }
 
   it('inserts with manual source and upserts daily stats in one transaction', async () => {
-    const { repo, sessionValues, dailyValues, dailyConflictUpdate } = makeManualHarness();
+    const { repo, sessionValues, dailyValues, dailyConflictUpdate, tx } = makeManualHarness();
 
     const result = await repo.insertManualSession({
       userId: 5,
@@ -203,6 +207,7 @@ describe('ReadingSessionRepository - insertManualSession', () => {
       durationSeconds: 1800,
       progressDelta: 12.5,
       endProgress: 60,
+      timeZone: 'UTC',
     });
 
     expect(result).toEqual({ id: 321 });
@@ -218,9 +223,10 @@ describe('ReadingSessionRepository - insertManualSession', () => {
         endProgress: 60,
       }),
     );
-    expect(dailyValues).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: 5, libraryId: 3, readingSeconds: 1800, progressDelta: 12.5, sessionsCount: 1 }),
-    );
+    expect(dailyValues).toHaveBeenCalledWith([
+      expect.objectContaining({ userId: 5, libraryId: 3, day: '2026-04-15', readingSeconds: 1800, progressDelta: 12.5, sessionsCount: 1 }),
+    ]);
+    expect(tx.execute).toHaveBeenCalledOnce();
     expect(dailyConflictUpdate).toHaveBeenCalledOnce();
   });
 });
@@ -296,23 +302,15 @@ describe('ReadingSessionRepository - listByBook', () => {
     return self;
   }
 
-  function makeListDb(results: {
-    rows?: unknown[];
-    count?: unknown[];
-    stats?: unknown[];
-    daily?: unknown[];
-    progress?: unknown[];
-    bySource?: unknown[];
-  }) {
+  function makeListDb(results: { rows?: unknown[]; count?: unknown[]; stats?: unknown[]; summary?: unknown[]; bySource?: unknown[] }) {
     const select = vi
       .fn()
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(results.rows ?? [])) })
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(results.count ?? [])) })
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(results.stats ?? [])) })
-      .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(results.daily ?? [])) })
+      .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(results.summary ?? [])) })
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(results.bySource ?? [])) });
-    const selectDistinctOn = vi.fn().mockReturnValue({ from: vi.fn().mockReturnValue(makeQueryChain(results.progress ?? [])) });
-    return { db: { select, selectDistinctOn }, select, selectDistinctOn };
+    return { db: { select }, select };
   }
 
   it('returns items, total, and stats with correct structure', async () => {
@@ -333,8 +331,7 @@ describe('ReadingSessionRepository - listByBook', () => {
           paceDurationSeconds: 1800,
         },
       ],
-      daily: [{ day: '2026-04-15', totalMinutes: 30 }],
-      progress: [{ day: '2026-04-15', endProgress: 50 }],
+      summary: [{ startedAt: now, endedAt: later, durationSeconds: 1800, progressDelta: 5, endProgress: 50 }],
     });
     const repo = new ReadingSessionRepository(db as never);
 
@@ -351,14 +348,32 @@ describe('ReadingSessionRepository - listByBook', () => {
     expect(result.items[0]?.source).toBe('web');
   });
 
-  it('fires five select queries and one distinct-on query', async () => {
-    const { db, select, selectDistinctOn } = makeListDb({});
+  it('fires five select queries', async () => {
+    const { db, select } = makeListDb({});
     const repo = new ReadingSessionRepository(db as never);
 
     await repo.listByBook(1, 2, 2, 25, 'startedAt', 'desc');
 
     expect(select).toHaveBeenCalledTimes(5);
-    expect(selectDistinctOn).toHaveBeenCalledTimes(1);
+  });
+
+  it('splits per-book daily summaries across local midnight', async () => {
+    const startedAt = new Date('2026-04-16T03:00:00.000Z');
+    const endedAt = new Date('2026-04-16T04:30:00.000Z');
+    const { db } = makeListDb({
+      count: [{ total: 1 }],
+      stats: [{ totalSessions: 1, totalSeconds: 5400, avgDurationSeconds: 5400, firstSessionAt: startedAt, lastSessionAt: startedAt }],
+      summary: [{ startedAt, endedAt, durationSeconds: 5400, progressDelta: 9, endProgress: 12 }],
+    });
+    const repo = new ReadingSessionRepository(db as never);
+
+    const result = await repo.listByBook(1, 2, 1, 25, 'startedAt', 'desc', undefined, undefined, undefined, 'America/New_York');
+
+    expect(result.stats.dailySummary).toEqual([
+      { day: '2026-04-15', totalMinutes: 60 },
+      { day: '2026-04-16', totalMinutes: 30 },
+    ]);
+    expect(result.stats.progressSummary).toEqual([{ day: '2026-04-16', endProgress: 12 }]);
   });
 
   it('returns empty items and zero stats when no data', async () => {
@@ -467,23 +482,35 @@ describe('ReadingSessionRepository - deleteSessionByBook', () => {
     vi.clearAllMocks();
   });
 
-  function makeDeleteHarness(sessionRow: { id: number; startedAt: Date; libraryId: number } | null) {
+  function makeDeleteHarness(
+    sessionRow: { id: number; startedAt: Date; endedAt: Date; durationSeconds: number; progressDelta: number | null; libraryId: number } | null,
+    recomputeRows: Array<{ startedAt: Date; endedAt: Date; durationSeconds: number; progressDelta: number | null }> = [],
+  ) {
     const limit = vi.fn().mockResolvedValue(sessionRow ? [sessionRow] : []);
-    const where = vi.fn().mockReturnValue({ limit });
-    const innerJoin = vi.fn().mockReturnValue({ where });
-    const from = vi.fn().mockReturnValue({ innerJoin });
-    const select = vi.fn().mockReturnValue({ from });
+    const lookupWhere = vi.fn().mockReturnValue({ limit });
+    const lookupInnerJoin = vi.fn().mockReturnValue({ where: lookupWhere });
+    const lookupFrom = vi.fn().mockReturnValue({ innerJoin: lookupInnerJoin });
+
+    const recomputeWhere = vi.fn().mockResolvedValue(recomputeRows);
+    const recomputeInnerJoin = vi.fn().mockReturnValue({ where: recomputeWhere });
+    const recomputeFrom = vi.fn().mockReturnValue({ innerJoin: recomputeInnerJoin });
+    const select = vi.fn().mockReturnValueOnce({ from: lookupFrom }).mockReturnValue({ from: recomputeFrom });
 
     const deleteWhere = vi.fn().mockResolvedValue(undefined);
     const deleteFn = vi.fn().mockReturnValue({ where: deleteWhere });
-    const execute = vi.fn().mockResolvedValue(undefined);
+    const dailyConflictUpdate = vi.fn().mockResolvedValue(undefined);
+    const dailyValues = vi.fn().mockReturnValue({ onConflictDoUpdate: dailyConflictUpdate });
+    const insert = vi.fn((table: unknown) => {
+      if (table === userReadingDailyStats) return { values: dailyValues };
+      throw new Error('Unexpected table in insert');
+    });
 
-    const tx = { select, delete: deleteFn, execute };
+    const tx = { execute: vi.fn().mockResolvedValue(undefined), select, delete: deleteFn, insert };
     const transaction = vi.fn(async (cb: (trx: typeof tx) => Promise<unknown>) => cb(tx));
     const db = { transaction };
     const repo = new ReadingSessionRepository(db as never);
 
-    return { repo, innerJoin, deleteFn, execute, transaction };
+    return { repo, innerJoin: lookupInnerJoin, deleteFn, dailyValues, transaction, tx };
   }
 
   it('returns { found: false } when session not found', async () => {
@@ -503,24 +530,58 @@ describe('ReadingSessionRepository - deleteSessionByBook', () => {
   });
 
   it('returns { found: true } and deletes when session found', async () => {
-    const { repo, deleteFn } = makeDeleteHarness({ id: 5, startedAt: new Date('2026-04-15T10:00:00.000Z'), libraryId: 3 });
+    const { repo, deleteFn, tx } = makeDeleteHarness({
+      id: 5,
+      startedAt: new Date('2026-04-15T10:00:00.000Z'),
+      endedAt: new Date('2026-04-15T10:30:00.000Z'),
+      durationSeconds: 1800,
+      progressDelta: null,
+      libraryId: 3,
+    });
 
     const result = await repo.deleteSessionByBook(1, 2, 5);
 
     expect(result).toEqual({ found: true });
     expect(deleteFn).toHaveBeenCalledWith(readingSessions);
+    expect(tx.execute).toHaveBeenCalledOnce();
   });
 
-  it('calls execute to re-aggregate daily stats after deletion', async () => {
-    const { repo, execute } = makeDeleteHarness({ id: 5, startedAt: new Date('2026-04-15T10:00:00.000Z'), libraryId: 3 });
+  it('re-inserts re-aggregated daily stats after deletion when other sessions remain', async () => {
+    const { repo, dailyValues } = makeDeleteHarness(
+      {
+        id: 5,
+        startedAt: new Date('2026-04-15T10:00:00.000Z'),
+        endedAt: new Date('2026-04-15T10:30:00.000Z'),
+        durationSeconds: 1800,
+        progressDelta: null,
+        libraryId: 3,
+      },
+      [
+        {
+          startedAt: new Date('2026-04-15T11:00:00.000Z'),
+          endedAt: new Date('2026-04-15T11:20:00.000Z'),
+          durationSeconds: 1200,
+          progressDelta: 2,
+        },
+      ],
+    );
 
     await repo.deleteSessionByBook(1, 2, 5);
 
-    expect(execute).toHaveBeenCalledOnce();
+    expect(dailyValues).toHaveBeenCalledWith([
+      expect.objectContaining({ day: '2026-04-15', readingSeconds: 1200, progressDelta: 2, sessionsCount: 1 }),
+    ]);
   });
 
   it('deletes the userReadingDailyStats row for the session day', async () => {
-    const { repo, deleteFn } = makeDeleteHarness({ id: 5, startedAt: new Date('2026-04-15T10:00:00.000Z'), libraryId: 3 });
+    const { repo, deleteFn } = makeDeleteHarness({
+      id: 5,
+      startedAt: new Date('2026-04-15T10:00:00.000Z'),
+      endedAt: new Date('2026-04-15T10:30:00.000Z'),
+      durationSeconds: 1800,
+      progressDelta: null,
+      libraryId: 3,
+    });
 
     await repo.deleteSessionByBook(1, 2, 5);
 

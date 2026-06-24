@@ -30,7 +30,9 @@ function makeUser(overrides?: Partial<RequestUser>): RequestUser {
 const mockRepo = {
   saveSession:
     vi.fn<
-      (...args: [number, number, string, Date, Date, number, number | null, number | null, ReadingSessionSource]) => Promise<SaveReadingSessionResult>
+      (
+        ...args: [number, number, string, Date, Date, number, number | null, number | null, ReadingSessionSource, string]
+      ) => Promise<SaveReadingSessionResult>
     >(),
 };
 
@@ -79,6 +81,7 @@ describe('ReadingSessionService', () => {
       2.5,
       10,
       'web',
+      'UTC',
     );
   });
 
@@ -106,6 +109,7 @@ describe('ReadingSessionService', () => {
       null,
       null,
       'web',
+      'UTC',
     );
   });
 
@@ -134,6 +138,7 @@ describe('ReadingSessionService', () => {
       null,
       null,
       'kobo',
+      'UTC',
     );
   });
 
@@ -267,7 +272,7 @@ describe('ReadingSessionService - listByBook', () => {
     mockRepoExtended.listByBook.mockResolvedValue({ items: [], total: 0, page: 2, pageSize: 10, stats: emptyStats });
 
     const svc = makeServiceExtended();
-    await svc.listByBook(10, makeUser({ id: 5 }), {
+    await svc.listByBook(10, makeUser({ id: 5, settings: { timezone: 'Asia/Kolkata' } }), {
       page: 2,
       pageSize: 10,
       sortBy: 'durationSeconds',
@@ -277,7 +282,18 @@ describe('ReadingSessionService - listByBook', () => {
       format: 'EPUB',
     });
 
-    expect(mockRepoExtended.listByBook).toHaveBeenCalledWith(5, 10, 2, 10, 'durationSeconds', 'asc', '2026-01-01', '2026-12-31', 'EPUB');
+    expect(mockRepoExtended.listByBook).toHaveBeenCalledWith(
+      5,
+      10,
+      2,
+      10,
+      'durationSeconds',
+      'asc',
+      '2026-01-01',
+      '2026-12-31',
+      'EPUB',
+      'Asia/Kolkata',
+    );
   });
 
   it('uses defaults when optional params are missing', async () => {
@@ -287,7 +303,7 @@ describe('ReadingSessionService - listByBook', () => {
     const svc = makeServiceExtended();
     await svc.listByBook(10, makeUser({ id: 5 }), {});
 
-    expect(mockRepoExtended.listByBook).toHaveBeenCalledWith(5, 10, 1, 25, 'startedAt', 'desc', undefined, undefined, undefined);
+    expect(mockRepoExtended.listByBook).toHaveBeenCalledWith(5, 10, 1, 25, 'startedAt', 'desc', undefined, undefined, undefined, 'UTC');
   });
 });
 

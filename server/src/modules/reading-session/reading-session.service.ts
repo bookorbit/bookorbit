@@ -5,6 +5,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import type { BookReadingSession, BookReadingSessionListResponse, ReadingSessionSource, UserSettings } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import { BookService } from '../book/book.service';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_READING_SESSION_SAVED } from '../achievement/achievement-events.service';
 import type { CreateManualReadingSessionDto } from './dto/create-manual-reading-session.dto';
@@ -21,6 +22,10 @@ export class ReadingSessionService {
     private readonly bookService: BookService,
     private readonly achievementEvents: AchievementEventsService,
   ) {}
+
+  private resolveUserTimeZone(user: RequestUser): string {
+    return resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
+  }
 
   async save(fileId: number, dto: SaveReadingSessionDto, user: RequestUser, source: ReadingSessionSource = 'web'): Promise<void> {
     const event = 'reading_session.save';
@@ -57,6 +62,7 @@ export class ReadingSessionService {
         dto.progressDelta ?? null,
         dto.endProgress ?? null,
         source,
+        this.resolveUserTimeZone(user),
       );
 
       this.logger.log(
@@ -140,6 +146,7 @@ export class ReadingSessionService {
         durationSeconds,
         progressDelta,
         endProgress,
+        timeZone: this.resolveUserTimeZone(user),
       });
 
       // No achievement event: the payload requires a non-null bookFileId, and retroactive
@@ -186,6 +193,7 @@ export class ReadingSessionService {
         query.dateFrom,
         query.dateTo,
         query.format,
+        this.resolveUserTimeZone(user),
       );
       this.logger.log(
         `[${event}] [end] bookId=${bookId} userId=${user.id} durationMs=${Date.now() - startedAtMs} total=${result.total} - list reading sessions completed`,
@@ -206,7 +214,7 @@ export class ReadingSessionService {
     this.logger.log(`[${event}] [start] bookId=${bookId} sessionId=${sessionId} userId=${user.id} - delete reading session started`);
     try {
       await this.bookService.verifyBookAccess(bookId, user);
-      const result = await this.repo.deleteSessionByBook(user.id, bookId, sessionId);
+      const result = await this.repo.deleteSessionByBook(user.id, bookId, sessionId, this.resolveUserTimeZone(user));
       if (!result.found) throw new NotFoundException('Reading session not found');
       this.logger.log(
         `[${event}] [end] bookId=${bookId} sessionId=${sessionId} userId=${user.id} durationMs=${Date.now() - startedAtMs} - delete reading session completed`,

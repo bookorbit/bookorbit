@@ -177,6 +177,7 @@ describe('UserStatisticsRepository', () => {
       10,
       3,
       new Date('2026-04-15T09:00:00.000Z'),
+      new Date('2026-04-15T09:30:00.000Z'),
       new Date('2026-04-15T10:20:00.000Z'),
       new Date('2026-04-15T10:50:00.000Z'),
       1800,
@@ -216,6 +217,7 @@ describe('UserStatisticsRepository', () => {
       10,
       3,
       new Date('2026-04-15T09:00:00.000Z'),
+      new Date('2026-04-15T09:30:00.000Z'),
       new Date('2026-04-15T10:00:00.000Z'),
       new Date('2026-04-15T10:30:00.000Z'),
       1800,
@@ -237,9 +239,14 @@ describe('UserStatisticsRepository', () => {
       endedAt: new Date('2026-04-15T11:30:00.000Z'),
       durationSeconds: 1800,
     };
-    const txSelectQueue = [[], [updatedRow]];
+    const txSelectQueue = [
+      [],
+      [{ startedAt: new Date('2026-04-15T11:00:00.000Z'), endedAt: new Date('2026-04-15T11:30:00.000Z'), durationSeconds: 1800, progressDelta: 3 }],
+      [updatedRow],
+    ];
     const returning = vi.fn().mockResolvedValue([{ id: 10 }]);
     const deleteWhere = vi.fn().mockResolvedValue(undefined);
+    const dailyValues = vi.fn().mockReturnValue({ onConflictDoUpdate: vi.fn().mockResolvedValue(undefined) });
     const tx = {
       execute: vi.fn().mockResolvedValue(undefined),
       select: vi.fn((fields?: Record<string, unknown>) => makeChain(txSelectQueue.shift() ?? [], fields)),
@@ -253,6 +260,9 @@ describe('UserStatisticsRepository', () => {
       delete: vi.fn().mockReturnValue({
         where: deleteWhere,
       }),
+      insert: vi.fn().mockReturnValue({
+        values: dailyValues,
+      }),
     };
     const db = {
       transaction: vi.fn(async (callback: (trx: typeof tx) => Promise<unknown>) => callback(tx)),
@@ -264,6 +274,7 @@ describe('UserStatisticsRepository', () => {
       10,
       3,
       new Date('2026-04-14T09:00:00.000Z'),
+      new Date('2026-04-14T09:30:00.000Z'),
       new Date('2026-04-15T11:00:00.000Z'),
       new Date('2026-04-15T11:30:00.000Z'),
       1800,
@@ -271,7 +282,9 @@ describe('UserStatisticsRepository', () => {
 
     expect(result).toEqual({ updated: updatedRow, conflict: null });
     expect(deleteWhere).toHaveBeenCalledOnce();
-    expect(tx.execute).toHaveBeenCalledTimes(2);
+    expect(dailyValues).toHaveBeenCalledWith([
+      expect.objectContaining({ day: '2026-04-15', readingSeconds: 1800, progressDelta: 3, sessionsCount: 1 }),
+    ]);
   });
 
   it('returns progress funnel values and defaults when aggregate row is missing', async () => {
@@ -353,20 +366,45 @@ describe('UserStatisticsRepository', () => {
     });
   });
 
-  it('recomputes recent daily stats inside a transaction and returns row counts', async () => {
+  it('recomputes recent daily stats with timezone-aware day segments inside a transaction', async () => {
+    const dailyValues = vi.fn().mockReturnValue({ onConflictDoUpdate: vi.fn().mockResolvedValue(undefined) });
+    const txSelectQueue = [
+      [],
+      [{ userId: 5, libraryId: 3, settings: { timezone: 'Asia/Kolkata' } }],
+      [
+        {
+          startedAt: new Date('2026-04-13T19:00:00.000Z'),
+          endedAt: new Date('2026-04-13T20:00:00.000Z'),
+          durationSeconds: 3600,
+          progressDelta: 2,
+        },
+      ],
+    ];
+    const tx = {
+      execute: vi.fn().mockResolvedValueOnce({ rowCount: 0 }).mockResolvedValueOnce({ rowCount: 4 }),
+      select: vi.fn((fields?: Record<string, unknown>) => makeChain(txSelectQueue.shift() ?? [], fields)),
+      insert: vi.fn().mockReturnValue({ values: dailyValues }),
+    };
     const db = {
-      transaction: vi.fn(async (callback: (tx: { execute: ReturnType<typeof vi.fn> }) => Promise<unknown>) =>
-        callback({
-          execute: vi.fn().mockResolvedValueOnce({ rowCount: 4 }).mockResolvedValueOnce({ rowCount: 7 }),
-        }),
-      ),
+      transaction: vi.fn(async (callback: (trx: typeof tx) => Promise<unknown>) => callback(tx)),
     };
     const repo = new UserStatisticsRepository(db as never);
 
     await expect(repo.recomputeRecentDailyStats(2)).resolves.toEqual({
       deleted: 4,
-      inserted: 7,
+      inserted: 1,
       since: '2026-04-14',
     });
+    expect(tx.execute).toHaveBeenCalledTimes(2);
+    expect(dailyValues).toHaveBeenCalledWith([
+      expect.objectContaining({
+        userId: 5,
+        libraryId: 3,
+        day: '2026-04-14',
+        readingSeconds: 3600,
+        progressDelta: 2,
+        sessionsCount: 1,
+      }),
+    ]);
   });
 });

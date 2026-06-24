@@ -87,6 +87,7 @@ describe('KoreaderStatsService', () => {
       libraryId: 1,
       deviceId: DEVICE_ID,
       events: dto.books[0]!.events,
+      timeZone: 'Asia/Kolkata',
     });
   });
 

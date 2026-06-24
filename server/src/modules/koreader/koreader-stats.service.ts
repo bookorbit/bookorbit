@@ -3,6 +3,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import type { UserSettings } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import {
   ACHIEVEMENT_EVENT_BACKFILL,
   ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
@@ -51,6 +52,7 @@ export class KoreaderStatsService {
       }
 
       const accessibleLibraryIds = await this.koreaderRepo.getAccessibleLibraryIds(user.id);
+      const timeZone = resolveTimeZone((user.settings as unknown as UserSettings | undefined)?.timezone, 'UTC');
       const hashes = [...new Set(dto.books.map((book) => book.hash.toLowerCase()))];
       const matches = await this.koreaderRepo.resolveBookFilesByHashes(hashes, accessibleLibraryIds);
 
@@ -74,6 +76,7 @@ export class KoreaderStatsService {
           libraryId: match.libraryId,
           deviceId: dto.deviceId,
           events: book.events,
+          timeZone,
         });
 
         acceptedTotal += result.accepted;
@@ -111,7 +114,7 @@ export class KoreaderStatsService {
       return;
     }
 
-    const timezone = (user.settings as unknown as UserSettings)?.timezone ?? 'UTC';
+    const timezone = resolveTimeZone((user.settings as unknown as UserSettings | undefined)?.timezone, 'UTC');
     for (const { session, bookFileId } of inserted) {
       this.achievementEvents.emit(ACHIEVEMENT_EVENT_READING_SESSION_SAVED, {
         userId: user.id,

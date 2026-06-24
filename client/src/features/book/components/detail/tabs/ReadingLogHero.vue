@@ -72,6 +72,17 @@ function formatRelative(iso: string | null): string {
   return `${yr} year${yr === 1 ? '' : 's'} ago`
 }
 
+function formatSessionDate(iso: string | null): string {
+  if (!iso) return 'No sessions'
+  return new Date(iso).toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 const todayDateInput = computed(() => dateToDateKey(new Date()))
 
 const localReadStatus = ref<ReadStatus | null>(props.book.readStatus?.status ?? null)
@@ -288,6 +299,8 @@ const statCells = computed(() => [
 ])
 
 const currentStatusOption = computed(() => STATUS_OPTIONS.find((o) => o.value === (localReadStatus.value ?? 'unread')))
+const firstReadLabel = computed(() => formatSessionDate(props.stats?.firstSessionAt ?? null))
+const lastReadLabel = computed(() => formatSessionDate(props.stats?.lastSessionAt ?? null))
 
 function handleAddSession() {
   emit('addSession')
@@ -325,7 +338,18 @@ function handleAddSession() {
 
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span class="flex items-center gap-1">
-              Started
+              First Read
+              <span class="font-medium text-foreground">{{ firstReadLabel }}</span>
+            </span>
+            <span class="flex items-center gap-1">
+              Last Read
+              <span class="font-medium text-foreground">{{ lastReadLabel }}</span>
+            </span>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span class="flex items-center gap-1">
+              Date Started
               <input
                 v-if="activeDateField === 'startedAt'"
                 v-model="draftDates.startedAt"
@@ -343,7 +367,7 @@ function handleAddSession() {
               </button>
             </span>
             <span class="flex items-center gap-1">
-              Finished
+              Date Finished
               <input
                 v-if="activeDateField === 'finishedAt'"
                 v-model="draftDates.finishedAt"

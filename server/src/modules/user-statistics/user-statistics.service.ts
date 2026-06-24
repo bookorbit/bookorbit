@@ -27,6 +27,7 @@ import { READING_SESSION_SOURCE_BUCKETS, emptySourceBucketRecord, toReadingSessi
 
 import type { RequestUser } from '../../common/types/request-user';
 import { StatsCache } from '../../common/cache/stats-cache';
+import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import type { UserDailyReadingQueryDto } from './dto/user-daily-reading-query.dto';
 import type { UserGoalTrajectoryQueryDto } from './dto/user-goal-trajectory-query.dto';
 import type { UserSessionTimelineQueryDto } from './dto/user-session-timeline-query.dto';
@@ -375,9 +376,11 @@ export class UserStatisticsService {
       sessionId,
       existing.libraryId,
       existing.startedAt,
+      existing.endedAt,
       startedAt,
       endedAt,
       proposedDuration,
+      resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC'),
     );
     if (moveResult.conflict) {
       const conflictStart = moveResult.conflict.startedAt.toISOString();

@@ -1,9 +1,15 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, inArray, like, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, like, lt, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
+import {
+  aggregateReadingSessionDailyStats,
+  getDayRangeForDateKeys,
+  getReadingSessionDayKeys,
+  type ReadingDailyStatsSegment,
+} from '../../common/utils/reading-daily-stats.utils';
 import { buildSessionIdPrefix, deriveKoreaderSessions, type DerivedKoreaderSession, type KoreaderPageEvent } from './koreader-stats.util';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -28,8 +34,9 @@ export class KoreaderPluginRepository {
     libraryId: number;
     deviceId: string;
     events: KoreaderPageEvent[];
+    timeZone: string;
   }): Promise<IngestPageStatsResult> {
-    const { userId, bookFileId, bookId, libraryId, deviceId, events } = params;
+    const { userId, bookFileId, bookId, libraryId, deviceId, events, timeZone } = params;
 
     return this.db.transaction(async (tx) => {
       const inserted = await tx
@@ -156,11 +163,27 @@ export class KoreaderPluginRepository {
       }
 
       const affectedDays = new Set<string>();
-      for (const session of toDelete) affectedDays.add(formatDayKey(session.startedAt));
-      for (const session of upserts) affectedDays.add(formatDayKey(session.startedAt));
+      for (const session of toDelete) {
+        for (const day of getReadingSessionDayKeys(
+          {
+            startedAt: session.startedAt,
+            endedAt: session.endedAt,
+            durationSeconds: session.durationSeconds,
+            progressDelta: session.progressDelta ?? null,
+          },
+          timeZone,
+        )) {
+          affectedDays.add(day);
+        }
+      }
+      for (const session of upserts) {
+        for (const day of getReadingSessionDayKeys(session, timeZone)) {
+          affectedDays.add(day);
+        }
+      }
 
       if (affectedDays.size > 0) {
-        await this.recomputeDailyStats(tx, userId, libraryId, [...affectedDays]);
+        await this.recomputeDailyStats(tx, userId, libraryId, [...affectedDays], timeZone);
       }
 
       return {
@@ -173,39 +196,86 @@ export class KoreaderPluginRepository {
     });
   }
 
-  private async recomputeDailyStats(tx: Tx, userId: number, libraryId: number, days: string[]) {
+  private async recomputeDailyStats(tx: Tx, userId: number, libraryId: number, days: string[], timeZone: string) {
+    const affectedDays = [...new Set(days)].sort();
+    if (affectedDays.length === 0) return;
+
+    await this.lockDailyStats(tx, userId, libraryId);
+
     await tx
       .delete(schema.userReadingDailyStats)
       .where(
         and(
           eq(schema.userReadingDailyStats.userId, userId),
           eq(schema.userReadingDailyStats.libraryId, libraryId),
-          inArray(schema.userReadingDailyStats.day, days),
+          inArray(schema.userReadingDailyStats.day, affectedDays),
         ),
       );
 
-    const dayListSql = sql.join(
-      days.map((day) => sql`${day}::date`),
-      sql`, `,
-    );
+    const range = getDayRangeForDateKeys(affectedDays, timeZone);
+    if (!range) return;
 
-    await tx.execute(sql`
-      insert into user_reading_daily_stats (user_id, library_id, day, reading_seconds, progress_delta, sessions_count, updated_at)
-      select
-        rs.user_id,
-        b.library_id,
-        date_trunc('day', rs.started_at)::date as day,
-        coalesce(sum(rs.duration_seconds), 0)::int as reading_seconds,
-        coalesce(sum(rs.progress_delta), 0)::real as progress_delta,
-        count(*)::int as sessions_count,
-        now() as updated_at
-      from reading_sessions rs
-      inner join books b on b.id = rs.book_id
-      where rs.user_id = ${userId}
-        and b.library_id = ${libraryId}
-        and date_trunc('day', rs.started_at)::date in (${dayListSql})
-      group by rs.user_id, b.library_id, date_trunc('day', rs.started_at)::date
-    `);
+    const rows = await tx
+      .select({
+        startedAt: schema.readingSessions.startedAt,
+        endedAt: schema.readingSessions.endedAt,
+        durationSeconds: schema.readingSessions.durationSeconds,
+        progressDelta: schema.readingSessions.progressDelta,
+      })
+      .from(schema.readingSessions)
+      .innerJoin(schema.books, eq(schema.books.id, schema.readingSessions.bookId))
+      .where(
+        and(
+          eq(schema.readingSessions.userId, userId),
+          eq(schema.books.libraryId, libraryId),
+          lt(schema.readingSessions.startedAt, range.end),
+          gt(schema.readingSessions.endedAt, range.start),
+        ),
+      );
+
+    const segments = aggregateReadingSessionDailyStats(
+      rows.map((row) => ({
+        startedAt: row.startedAt,
+        endedAt: row.endedAt,
+        durationSeconds: row.durationSeconds,
+        progressDelta: row.progressDelta ?? null,
+      })),
+      timeZone,
+      new Set(affectedDays),
+    );
+    await this.insertDailyStatsSegments(tx, userId, libraryId, segments);
+  }
+
+  private async lockDailyStats(tx: Tx, userId: number, libraryId: number): Promise<void> {
+    await tx.execute(sql`select pg_advisory_xact_lock(${userId}::int, ${libraryId}::int)`);
+  }
+
+  private async insertDailyStatsSegments(tx: Tx, userId: number, libraryId: number, segments: ReadingDailyStatsSegment[]): Promise<void> {
+    if (segments.length === 0) return;
+
+    const now = new Date();
+    await tx
+      .insert(schema.userReadingDailyStats)
+      .values(
+        segments.map((segment) => ({
+          userId,
+          libraryId,
+          day: segment.day,
+          readingSeconds: segment.readingSeconds,
+          progressDelta: segment.progressDelta,
+          sessionsCount: segment.sessionsCount,
+          updatedAt: now,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [schema.userReadingDailyStats.userId, schema.userReadingDailyStats.libraryId, schema.userReadingDailyStats.day],
+        set: {
+          readingSeconds: sql`excluded.reading_seconds`,
+          progressDelta: sql`excluded.progress_delta`,
+          sessionsCount: sql`excluded.sessions_count`,
+          updatedAt: now,
+        },
+      });
   }
 
   async getRating(userId: number, bookId: number): Promise<{ rating: number; updatedAt: Date } | null> {
@@ -328,8 +398,4 @@ export class KoreaderPluginRepository {
 
     return row?.maxTs ? new Date(row.maxTs) : null;
   }
-}
-
-function formatDayKey(date: Date): string {
-  return date.toISOString().slice(0, 10);
 }

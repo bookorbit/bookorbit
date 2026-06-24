@@ -377,9 +377,11 @@ describe('UserStatisticsService', () => {
       101,
       4,
       new Date('2026-04-07T08:00:00.000Z'),
+      new Date('2026-04-07T08:30:00.000Z'),
       new Date('2026-04-08T09:00:00.000Z'),
       new Date('2026-04-08T09:30:00.000Z'),
       1800,
+      'UTC',
     );
     expect(result.startedAt).toBe('2026-04-08T09:00:00.000Z');
     expect(result.endedAt).toBe('2026-04-08T09:30:00.000Z');
