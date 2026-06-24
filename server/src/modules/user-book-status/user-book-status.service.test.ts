@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { UserBookStatusRow } from '../../db/schema';
 import { UserBookStatusRepository } from './user-book-status.repository';
+import type { SessionBoundaries } from './user-book-status.repository';
 import { UserBookStatusService } from './user-book-status.service';
 
 function makeRow(overrides: Partial<UserBookStatusRow> = {}): UserBookStatusRow {
@@ -29,6 +30,7 @@ const mockRepo = {
         ...args: [number, number, { status: ReadStatus; source: ReadStatusSource; startedAt: Date | null; finishedAt: Date | null; updatedAt: Date }]
       ) => Promise<void>
     >(),
+  findSessionBoundariesForBook: vi.fn<(...args: [number, number]) => Promise<SessionBoundaries>>(),
 };
 const mockAchievementEvents = {
   emit: vi.fn(),
@@ -42,6 +44,7 @@ beforeEach(() => {
   mockRepo.findByBookIds.mockResolvedValue([]);
   mockRepo.upsert.mockResolvedValue(undefined);
   mockRepo.upsertState.mockResolvedValue(undefined);
+  mockRepo.findSessionBoundariesForBook.mockResolvedValue({ firstStartedAt: null, lastEndedAt: null });
   service = new UserBookStatusService(mockRepo as unknown as UserBookStatusRepository, mockAchievementEvents as never);
 });
 
@@ -66,6 +69,49 @@ describe('setManual', () => {
     expect(state.updatedAt).toBeInstanceOf(Date);
     expect(mockRepo.upsert).not.toHaveBeenCalled();
     expect(mockAchievementEvents.emit).not.toHaveBeenCalled();
+  });
+
+  it('seeds startedAt from sessions when no existing row has a date', async () => {
+    const firstSession = new Date('2024-06-01T10:00:00.000Z');
+    mockRepo.findOne.mockResolvedValue(null);
+    mockRepo.findSessionBoundariesForBook.mockResolvedValue({ firstStartedAt: firstSession, lastEndedAt: new Date('2024-12-01T22:00:00.000Z') });
+
+    await service.setManual(1, 10, 'reading');
+
+    expect(mockRepo.findSessionBoundariesForBook).toHaveBeenCalledOnce();
+    expect(mockRepo.upsertState).toHaveBeenCalledOnce();
+    expect(mockRepo.upsertState.mock.calls[0]?.[2]).toMatchObject({
+      status: 'reading',
+      source: 'manual',
+      startedAt: firstSession,
+      finishedAt: null,
+    });
+  });
+
+  it('seeds startedAt and finishedAt from sessions when status is read and existing has null dates', async () => {
+    const firstSession = new Date('2024-06-01T10:00:00.000Z');
+    const lastSession = new Date('2024-12-01T22:00:00.000Z');
+    mockRepo.findOne.mockResolvedValue(makeRow({ startedAt: null, finishedAt: null, status: 'reading', source: 'auto' }));
+    mockRepo.findSessionBoundariesForBook.mockResolvedValue({ firstStartedAt: firstSession, lastEndedAt: lastSession });
+
+    await service.setManual(1, 10, 'read');
+
+    expect(mockRepo.findSessionBoundariesForBook).toHaveBeenCalledOnce();
+    expect(mockRepo.upsertState.mock.calls[0]?.[2]).toMatchObject({
+      status: 'read',
+      source: 'manual',
+      startedAt: firstSession,
+      finishedAt: lastSession,
+    });
+  });
+
+  it('does not fetch session boundaries when existing row already has startedAt', async () => {
+    const started = new Date('2026-04-01T00:00:00.000Z');
+    mockRepo.findOne.mockResolvedValue(makeRow({ startedAt: started, finishedAt: null, status: 'reading', source: 'auto' }));
+
+    await service.setManual(1, 10, 'reading');
+
+    expect(mockRepo.findSessionBoundariesForBook).not.toHaveBeenCalled();
   });
 });
 
@@ -133,6 +179,95 @@ describe('updateManual', () => {
 
     await service.updateManual(1, 10, { startedAt: new Date('2026-04-01T00:00:00.000Z') });
     expect(mockAchievementEvents.emit).not.toHaveBeenCalled();
+  });
+
+  it('does not seed dates or fetch boundaries for unread and want_to_read statuses', async () => {
+    mockRepo.findSessionBoundariesForBook.mockResolvedValue({
+      firstStartedAt: new Date('2024-06-01T10:00:00.000Z'),
+      lastEndedAt: new Date('2024-12-01T22:00:00.000Z'),
+    });
+
+    for (const status of ['unread', 'want_to_read'] as const) {
+      vi.clearAllMocks();
+      mockRepo.findOne.mockResolvedValue(makeRow({ startedAt: null, finishedAt: null, status: 'reading', source: 'auto' }));
+      mockRepo.upsertState.mockResolvedValue(undefined);
+      mockRepo.findSessionBoundariesForBook.mockResolvedValue({
+        firstStartedAt: new Date('2024-06-01T10:00:00.000Z'),
+        lastEndedAt: new Date('2024-12-01T22:00:00.000Z'),
+      });
+
+      const result = await service.updateManual(1, 10, { status });
+
+      expect(mockRepo.findSessionBoundariesForBook).not.toHaveBeenCalled();
+      expect(result.startedAt).toBeNull();
+      expect(result.finishedAt).toBeNull();
+    }
+  });
+
+  it('does not seed finishedAt when the last session ended before the explicit startedAt', async () => {
+    mockRepo.findOne.mockResolvedValue(null);
+    mockRepo.findSessionBoundariesForBook.mockResolvedValue({
+      firstStartedAt: new Date('2024-06-01T10:00:00.000Z'),
+      lastEndedAt: new Date('2024-12-01T22:00:00.000Z'),
+    });
+
+    const explicitStartedAt = new Date('2025-06-01T00:00:00.000Z');
+    const result = await service.updateManual(1, 10, { status: 'read', startedAt: explicitStartedAt });
+
+    expect(result.startedAt).toBe(explicitStartedAt.toISOString());
+    expect(result.finishedAt).toBeNull();
+  });
+
+  it('seeds finishedAt when the last session ended after the seeded startedAt', async () => {
+    const firstSession = new Date('2024-06-01T10:00:00.000Z');
+    const lastSession = new Date('2024-12-01T22:00:00.000Z');
+    mockRepo.findOne.mockResolvedValue(makeRow({ status: 'reading', source: 'auto', startedAt: null, finishedAt: null }));
+    mockRepo.findSessionBoundariesForBook.mockResolvedValue({ firstStartedAt: firstSession, lastEndedAt: lastSession });
+
+    const result = await service.updateManual(1, 10, { status: 'read' });
+
+    expect(result.startedAt).toBe(firstSession.toISOString());
+    expect(result.finishedAt).toBe(lastSession.toISOString());
+  });
+
+  it('does not fetch session boundaries when explicit null is provided for startedAt', async () => {
+    mockRepo.findOne.mockResolvedValue(makeRow({ status: 'reading', source: 'manual', startedAt: null, finishedAt: null }));
+
+    const result = await service.updateManual(1, 10, { startedAt: null });
+
+    expect(mockRepo.findSessionBoundariesForBook).not.toHaveBeenCalled();
+    expect(result.startedAt).toBeNull();
+  });
+
+  it('does not fetch session boundaries when startedAt is already set on existing row', async () => {
+    const existing = new Date('2026-01-01T00:00:00.000Z');
+    mockRepo.findOne.mockResolvedValue(makeRow({ status: 'unread', source: 'auto', startedAt: existing, finishedAt: null }));
+
+    await service.updateManual(1, 10, { status: 'reading' });
+
+    expect(mockRepo.findSessionBoundariesForBook).not.toHaveBeenCalled();
+    const state = mockRepo.upsertState.mock.calls[0]?.[2];
+    expect(state?.startedAt).toEqual(existing);
+  });
+
+  it('does not seed finishedAt for non-read statuses even when session boundaries exist', async () => {
+    const lastSession = new Date('2024-12-01T22:00:00.000Z');
+    mockRepo.findOne.mockResolvedValue(makeRow({ status: 'unread', source: 'auto', startedAt: null, finishedAt: null }));
+    mockRepo.findSessionBoundariesForBook.mockResolvedValue({ firstStartedAt: new Date('2024-06-01T10:00:00.000Z'), lastEndedAt: lastSession });
+
+    const result = await service.updateManual(1, 10, { status: 'reading' });
+
+    expect(result.finishedAt).toBeNull();
+  });
+
+  it('leaves finishedAt null when sessions have no data and status is read', async () => {
+    mockRepo.findOne.mockResolvedValue(makeRow({ status: 'reading', source: 'auto', startedAt: null, finishedAt: null }));
+    mockRepo.findSessionBoundariesForBook.mockResolvedValue({ firstStartedAt: null, lastEndedAt: null });
+
+    const result = await service.updateManual(1, 10, { status: 'read' });
+
+    expect(result.startedAt).toBeNull();
+    expect(result.finishedAt).toBeNull();
   });
 });
 
