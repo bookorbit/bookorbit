@@ -1,10 +1,12 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Res, UseGuards } from '@nestjs/common';
+import type { FastifyReply } from 'fastify';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { KoreaderAuthGuard } from './koreader-auth.guard';
 import { KoreaderAnnotationExchangeService } from './koreader-annotation-exchange.service';
+import { KoreaderPackageService } from './koreader-package.service';
 import { KoreaderPluginAnnotationService } from './koreader-plugin-annotation.service';
 import { KoreaderPluginService } from './koreader-plugin.service';
 import { KoreaderStatsService } from './koreader-stats.service';
@@ -28,6 +30,7 @@ export class KoreaderPluginController {
     private readonly statsService: KoreaderStatsService,
     private readonly annotationService: KoreaderPluginAnnotationService,
     private readonly annotationExchangeService: KoreaderAnnotationExchangeService,
+    private readonly packageService: KoreaderPackageService,
   ) {}
 
   @Post('match-check')
@@ -69,5 +72,20 @@ export class KoreaderPluginController {
   @Post('sweeps')
   sweepComplete(@CurrentUser() user: RequestUser, @Body() dto: SweepCompleteDto) {
     return this.pluginService.sweepComplete(user, dto);
+  }
+
+  @Get('version')
+  getVersion() {
+    return this.packageService.getVersionInfo();
+  }
+
+  @Get('package')
+  async downloadUpdatePackage(@CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
+    const zip = await this.packageService.buildRawPluginPackage(user.id);
+    reply
+      .header('Content-Type', 'application/zip')
+      .header('Content-Disposition', 'attachment; filename="bookorbit.koplugin.zip"')
+      .header('Cache-Control', 'no-store')
+      .send(zip);
   }
 }

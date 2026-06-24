@@ -2,6 +2,7 @@ import { BadRequestException, Inject, Injectable, Logger, NotFoundException, Ser
 import type { ConfigType } from '@nestjs/config';
 import { ZipArchive } from 'archiver';
 import { existsSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { join, resolve } from 'path';
 
 import { appConfig } from '../../config/config';
@@ -48,6 +49,45 @@ export class KoreaderPackageService {
     }
   }
 
+  async buildRawPluginPackage(userId: number): Promise<Buffer> {
+    const startedAt = Date.now();
+    this.logger.log(`[${PACKAGE_EVENT}] [start] userId=${userId} - building raw plugin update package`);
+
+    try {
+      const pluginDir = this.resolvePluginSourceDir();
+      const zip = await this.zipPlugin(pluginDir);
+
+      this.logger.log(
+        `[${PACKAGE_EVENT}] [end] userId=${userId} durationMs=${Date.now() - startedAt} bytes=${zip.length} - raw plugin update package built`,
+      );
+      return zip;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.warn(
+        `[${PACKAGE_EVENT}] [fail] userId=${userId} durationMs=${Date.now() - startedAt} errorClass=${error.constructor.name} error="${sanitizeLogValue(error.message)}" - raw plugin update package failed`,
+      );
+      throw err;
+    }
+  }
+
+  async getVersionInfo(): Promise<{ pluginVersion: string; serverVersion: string }> {
+    return {
+      pluginVersion: await this.readPluginVersion(),
+      serverVersion: this.config.version,
+    };
+  }
+
+  private async readPluginVersion(): Promise<string> {
+    try {
+      const pluginDir = this.resolvePluginSourceDir();
+      const content = await readFile(join(pluginDir, 'main.lua'), 'utf8');
+      const match = content.match(/^local PLUGIN_VERSION = "(.+)"$/m);
+      return match?.[1] ?? 'unknown';
+    } catch {
+      return 'unknown';
+    }
+  }
+
   private normalizeOrigin(rawOrigin: string): string {
     let parsed: URL;
     try {
@@ -86,7 +126,7 @@ export class KoreaderPackageService {
     ].join('\n');
   }
 
-  private zipPlugin(pluginDir: string, provisionContent: string): Promise<Buffer> {
+  private zipPlugin(pluginDir: string, provisionContent?: string): Promise<Buffer> {
     return new Promise((resolveZip, reject) => {
       const archive = new ZipArchive({ zlib: { level: 9 } });
       const chunks: Buffer[] = [];
@@ -95,7 +135,9 @@ export class KoreaderPackageService {
       archive.on('error', reject);
       archive.on('end', () => resolveZip(Buffer.concat(chunks)));
       archive.directory(pluginDir, PLUGIN_FOLDER, (entry) => (isHiddenPath(entry.name) ? false : entry));
-      archive.append(provisionContent, { name: `${PLUGIN_FOLDER}/${PROVISION_FILE}` });
+      if (provisionContent !== undefined) {
+        archive.append(provisionContent, { name: `${PLUGIN_FOLDER}/${PROVISION_FILE}` });
+      }
       void archive.finalize();
     });
   }

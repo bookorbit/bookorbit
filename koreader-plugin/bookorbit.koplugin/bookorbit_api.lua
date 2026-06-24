@@ -281,4 +281,14 @@ function BookOrbitApi:downloadCatalogThumbnail(book_id, local_path)
     return self:download("/koreader/plugin/catalog/books/" .. tostring(book_id) .. "/thumbnail", local_path, "image/jpeg,image/*")
 end
 
+-- Plugin self-update endpoints
+
+function BookOrbitApi:getPluginVersion()
+    return self:request("GET", "/koreader/plugin/version")
+end
+
+function BookOrbitApi:downloadPluginUpdate(local_path, progress_cb)
+    return self:download("/koreader/plugin/package", local_path, "application/zip", progress_cb)
+end
+
 return BookOrbitApi

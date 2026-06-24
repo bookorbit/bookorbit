@@ -35,8 +35,9 @@ local BookOrbitCatalog = require("bookorbit_catalog")
 local BookOrbitState = require("bookorbit_state")
 local BookOrbitMenuPin = require("bookorbit_menu_pin")
 local BookOrbitSweep = require("bookorbit_sweep")
+local BookOrbitUpdater = require("bookorbit_updater")
 
-local PLUGIN_VERSION = "0.4.0"
+local PLUGIN_VERSION = "0.5.0"
 
 local SYNC_STRATEGY = {
     PROMPT = 1,
@@ -453,6 +454,29 @@ If set to 0, updating progress based on page turns will be disabled.]]),
                     return T(_("Last sync: %1"), when)
                 end,
                 enabled = false,
+                separator = true,
+            },
+            {
+                text_func = function()
+                    return T(_("Plugin: v%1"), PLUGIN_VERSION)
+                end,
+                enabled = false,
+            },
+            {
+                text_func = function()
+                    if self:isLoggedIn() then
+                        return _("Check for update")
+                    end
+                    return _("Check for update (login required)")
+                end,
+                enabled_func = function()
+                    return self:isLoggedIn()
+                        and not BookOrbitSweep.isRunning()
+                        and not BookOrbitBookSync.isRunning()
+                end,
+                callback = function()
+                    self:checkForUpdate()
+                end,
             },
         },
     }
@@ -1000,6 +1024,109 @@ function BookOrbit:onCloseWidget()
         UIManager:unschedule(self.periodic_push_task)
         self.periodic_push_task = nil
     end
+end
+
+function BookOrbit:checkForUpdate()
+    if not self:isLoggedIn() then
+        promptLogin()
+        return
+    end
+    NetworkMgr:runWhenConnected(function()
+        self:doCheckForUpdate()
+    end)
+end
+
+function BookOrbit:doCheckForUpdate()
+    local checking = InfoMessage:new{ text = _("Checking for update...") }
+    UIManager:show(checking)
+
+    local body, err = self:newClient():getPluginVersion()
+    UIManager:close(checking)
+
+    if not body then
+        UIManager:show(InfoMessage:new{
+            text = T(_("Could not check for update: %1"), tostring(err or "network error")),
+            timeout = 4,
+        })
+        return
+    end
+
+    local server_ver = body.serverVersion or "unknown"
+    local plugin_latest = body.pluginVersion
+
+    if type(plugin_latest) ~= "string" or plugin_latest == "unknown" then
+        UIManager:show(InfoMessage:new{
+            text = _("Could not determine the latest plugin version from the server."),
+            timeout = 4,
+        })
+        return
+    end
+
+    if not BookOrbitUpdater.isNewer(plugin_latest, PLUGIN_VERSION) then
+        UIManager:show(InfoMessage:new{
+            text = T(_("Plugin is up to date (v%1).\nServer: v%2"), PLUGIN_VERSION, server_ver),
+            timeout = 4,
+        })
+        return
+    end
+
+    UIManager:show(ConfirmBox:new{
+        text = T(_("Update available: v%1 -> v%2\nServer: v%3\n\nDownload and apply the update now?"),
+            PLUGIN_VERSION, plugin_latest, server_ver),
+        ok_text = _("Update"),
+        ok_callback = function()
+            self:applyUpdate(plugin_latest)
+        end,
+    })
+end
+
+function BookOrbit:applyUpdate(new_version)
+    if self._updating then
+        UIManager:show(InfoMessage:new{ text = _("An update is already in progress."), timeout = 3 })
+        return
+    end
+    self._updating = true
+    self:_doApplyUpdate(new_version)
+    self._updating = false
+end
+
+function BookOrbit:_doApplyUpdate(new_version)
+    if not self.path then
+        UIManager:show(InfoMessage:new{
+            text = _("Cannot determine plugin path. Update aborted."),
+            timeout = 3,
+        })
+        return
+    end
+
+    local progress = InfoMessage:new{ text = T(_("Downloading BookOrbit v%1..."), new_version) }
+    UIManager:show(progress)
+    UIManager:forceRePaint()
+
+    local ok, err = BookOrbitUpdater.apply(self:newClient(), self.path)
+    UIManager:close(progress)
+
+    if not ok then
+        local msg
+        if type(err) == "number" and err == 503 then
+            msg = _("Update failed: the server does not have the plugin package available.")
+        else
+            msg = T(_("Update failed: %1"), tostring(err or "unknown error"))
+        end
+        UIManager:show(InfoMessage:new{ text = msg, timeout = 6 })
+        return
+    end
+
+    UIManager:show(ConfirmBox:new{
+        text = T(_("BookOrbit v%1 installed. KOReader needs to restart to apply the update."), new_version),
+        ok_text = _("Restart now"),
+        ok_callback = function()
+            -- Exit code 85 triggers an app restart on Kobo and most e-ink platforms.
+            -- On other platforms KOReader exits cleanly; reopen it to apply the update.
+            UIManager:quit(UIManager.RETURN_CODE_REBOOT or 85)
+        end,
+        cancel_text = _("Later"),
+    })
 end
 
 return BookOrbit
