@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import KoreaderSettings from '../KoreaderSettings.vue'
 import type { KoreaderCredentials, KoreaderSyncStatus } from '@bookorbit/types'
+import { copyToClipboard } from '@/lib/clipboard'
 
 const koreaderMock = vi.hoisted(() => ({
   credentials: { __v_isRef: true, value: null as KoreaderCredentials | null },
@@ -21,6 +22,10 @@ vi.mock('@/features/koreader/composables/useKoreaderSync', () => ({
 
 vi.mock('vue-sonner', () => ({
   toast: { success: vi.fn<() => void>(), error: vi.fn<() => void>() },
+}))
+
+vi.mock('@/lib/clipboard', () => ({
+  copyToClipboard: vi.fn<(text: string) => Promise<boolean>>().mockResolvedValue(true),
 }))
 
 vi.mock('../SettingsPageHeader.vue', () => ({
@@ -85,10 +90,6 @@ describe('KoreaderSettings', () => {
     koreaderMock.deleteCredentials.mockResolvedValue(undefined)
     koreaderMock.getSyncUrl.mockReturnValue('https://bookorbit.example/api/v1/koreader')
     koreaderMock.downloadPluginPackage.mockResolvedValue(undefined)
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: { writeText: vi.fn<() => Promise<void>>().mockResolvedValue(undefined) },
-    })
   })
 
   it('shows loading state', () => {
@@ -187,7 +188,7 @@ describe('KoreaderSettings', () => {
 
     expect(koreaderMock.fetchSyncStatus).toHaveBeenCalledTimes(2)
     expect(koreaderMock.updateCredentials).toHaveBeenCalledWith({ syncEnabled: false })
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('https://bookorbit.example/api/v1/koreader')
+    expect(vi.mocked(copyToClipboard)).toHaveBeenCalledWith('https://bookorbit.example/api/v1/koreader')
     expect(koreaderMock.downloadPluginPackage).toHaveBeenCalledTimes(1)
     expect(wrapper.text()).toContain('Delete KOReader credentials?')
 

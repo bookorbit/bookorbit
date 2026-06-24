@@ -27,6 +27,7 @@ import { PILL_CLASS, sourcePill, statusPill } from '@/features/annotations/lib/p
 import HighlightNoteEditor from '@/features/book/components/detail/tabs/HighlightNoteEditor.vue'
 import AnnotationBookThumb from './AnnotationBookThumb.vue'
 import AnnotationSyncDetailPanel from './AnnotationSyncDetailPanel.vue'
+import { copyToClipboard } from '@/lib/clipboard'
 
 type AnnotationListItemMode = 'book' | 'hub'
 type AnnotationListDensity = 'compact' | 'comfortable'
@@ -149,7 +150,7 @@ function handleJump() {
 }
 
 function handleCopy() {
-  navigator.clipboard?.writeText(props.annotation.text).catch(() => {})
+  void copyToClipboard(props.annotation.text)
   copied.value = true
   setTimeout(() => {
     copied.value = false
