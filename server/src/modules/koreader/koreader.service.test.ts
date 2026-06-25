@@ -150,6 +150,7 @@ describe('KoreaderService', () => {
     mockRepo.upsertDeviceProgress.mockResolvedValue(undefined);
     mockRepo.upsertReadingProgress.mockResolvedValue(undefined);
     mockRepo.getAccessibleLibraryIds.mockResolvedValue([1, 2]);
+    mockRepo.getChapters.mockResolvedValue([]);
     mockChapterService.parseChapterIndexFromProgress.mockReturnValue(null);
     mockChapterExtractor.extractAndStoreChapters.mockResolvedValue([]);
     mockUserBookStatusService.autoUpdate.mockResolvedValue(undefined);
@@ -473,7 +474,7 @@ describe('KoreaderService', () => {
       await expect(service.getProgress(7, 'doc-hash')).resolves.toEqual({
         document: 'doc-hash',
         percentage: 0.7321,
-        progress: null,
+        progress: '',
         device: 'web',
         device_id: 'bookorbit-web',
         timestamp: Math.floor(readerTime.getTime() / 1000),
@@ -537,7 +538,35 @@ describe('KoreaderService', () => {
       mockChapterService.parseChapterIndexFromCfi.mockReturnValue(null);
 
       const result = await service.getProgress(7, 'doc-hash');
-      expect(result?.progress).toBeNull();
+      expect(result?.progress).toBe('');
+    });
+
+    it('resolves progress using chapters fallback when koreaderProgress and cfi are null', async () => {
+      const readerTime = new Date('2026-02-01T11:00:00.000Z');
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20 });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
+      mockRepo.getReadingProgress.mockResolvedValue({
+        percentage: 50,
+        cfi: null,
+        koboLocationSource: 'OEBPS/text/ch3.xhtml',
+        updatedAt: readerTime,
+      });
+
+      mockRepo.getChapters.mockResolvedValue([
+        { chapterIndex: 0, href: 'OEBPS/text/ch1.xhtml' },
+        { chapterIndex: 1, href: 'OEBPS/text/ch2.xhtml' },
+        { chapterIndex: 2, href: 'OEBPS/text/ch3.xhtml' },
+      ]);
+
+      await expect(service.getProgress(7, 'doc-hash')).resolves.toEqual({
+        document: 'doc-hash',
+        percentage: 0.5,
+        progress: '/body/DocFragment[3]/body',
+        device: 'web',
+        device_id: 'bookorbit-web',
+        timestamp: Math.floor(readerTime.getTime() / 1000),
+      });
+      expect(mockRepo.getChapters).toHaveBeenCalledWith(10);
     });
 
     it('returns null when neither device nor web reader progress exists', async () => {

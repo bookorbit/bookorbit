@@ -195,8 +195,29 @@ export class KoreaderService {
 
     if (readingProg) {
       let xpointer = readingProg.koreaderProgress ?? null;
-      if (!xpointer && readingProg.cfi) {
-        const chapterIndex = this.chapterService.parseChapterIndexFromCfi(readingProg.cfi);
+      if (!xpointer) {
+        let chapterIndex: number | null = null;
+        if (readingProg.cfi) {
+          chapterIndex = this.chapterService.parseChapterIndexFromCfi(readingProg.cfi);
+        }
+
+        if (chapterIndex === null) {
+          const chapters = await this.repo.getChapters(bookFile.id);
+          if (chapters.length > 0) {
+            if (readingProg.koboLocationSource) {
+              const cleanSource = readingProg.koboLocationSource.split('#')[0].split('?')[0];
+              const chapter = chapters.find((c) => c.href && c.href.split('#')[0].split('?')[0] === cleanSource);
+              if (chapter) {
+                chapterIndex = chapter.chapterIndex;
+              }
+            }
+            if (chapterIndex === null) {
+              const pct = Math.max(0, Math.min(100, readingProg.percentage));
+              chapterIndex = Math.min(chapters.length - 1, Math.floor((pct / 100) * chapters.length));
+            }
+          }
+        }
+
         if (chapterIndex !== null && chapterIndex >= 0) {
           xpointer = `/body/DocFragment[${chapterIndex + 1}]/body`;
         }
@@ -205,7 +226,7 @@ export class KoreaderService {
       return {
         document: documentHash,
         percentage: toKoreaderPercentage(readingProg.percentage),
-        progress: xpointer,
+        progress: xpointer ?? '',
         device: 'web',
         device_id: 'bookorbit-web',
         timestamp: Math.floor(readerTime / 1000),
