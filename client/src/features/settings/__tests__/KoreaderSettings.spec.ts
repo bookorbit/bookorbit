@@ -54,11 +54,15 @@ function makeSyncStatus(overrides: Partial<KoreaderSyncStatus> = {}): KoreaderSy
     ],
     totalSyncedBooks: 14,
     lastSyncAt: '2026-01-02T00:00:00.000Z',
+    latestPluginVersion: '0.5.0',
+    pluginUpdateAvailable: true,
     sweeps: [
       {
         deviceId: 'device-1',
         deviceModel: 'Kobo Libra 2',
         pluginVersion: '0.3.0',
+        latestPluginVersion: '0.5.0',
+        updateAvailable: true,
         lastSweepAt: '2026-01-02T00:00:00.000Z',
         lastSweepBooksMatched: 12,
         lastSweepPageStats: 30,
@@ -150,6 +154,9 @@ describe('KoreaderSettings', () => {
     expect(syncUrlInput.value).toBe('https://bookorbit.example/api/v1/koreader')
     expect(wrapper.text()).toContain('Kobo Libra 2')
     expect(wrapper.text()).toContain('Project Hail Mary')
+    expect(wrapper.text()).toContain('Latest plugin: v0.5.0')
+    expect(wrapper.text()).toContain('Update available')
+    expect(wrapper.text()).toContain('latest plugin v0.5.0')
     expect(wrapper.text()).toContain('Matched books')
     expect(wrapper.text()).toContain('2 deleted highlights awaiting KOReader plugin acknowledgement.')
     expect(wrapper.text()).toContain('3 highlight positions need attention.')
@@ -169,6 +176,63 @@ describe('KoreaderSettings', () => {
     await buttonByText(wrapper, 'KOReader setup steps')!.trigger('click')
 
     expect(wrapper.text()).toContain('Download the preconfigured plugin above.')
+  })
+
+  it('shows current plugin state without an update warning when reported devices are current', async () => {
+    const status = makeSyncStatus({
+      pluginUpdateAvailable: false,
+      sweeps: [
+        {
+          deviceId: 'device-1',
+          deviceModel: 'Kobo Libra 2',
+          pluginVersion: '0.5.0',
+          latestPluginVersion: '0.5.0',
+          updateAvailable: false,
+          lastSweepAt: '2026-01-02T00:00:00.000Z',
+          lastSweepBooksMatched: 12,
+          lastSweepPageStats: 30,
+          lastSweepAnnotations: 8,
+        },
+      ],
+    })
+    koreaderMock.credentials.value = status.credentials
+    koreaderMock.syncStatus.value = status
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Latest plugin: v0.5.0')
+    expect(wrapper.text()).toContain('Up to date')
+    expect(wrapper.text()).not.toContain('latest plugin v0.5.0')
+  })
+
+  it('keeps plugin update state explicit when the server cannot report the latest version', async () => {
+    const status = makeSyncStatus({
+      latestPluginVersion: null,
+      pluginUpdateAvailable: false,
+      sweeps: [
+        {
+          deviceId: 'device-1',
+          deviceModel: 'Kobo Libra 2',
+          pluginVersion: '0.5.0',
+          latestPluginVersion: null,
+          updateAvailable: null,
+          lastSweepAt: '2026-01-02T00:00:00.000Z',
+          lastSweepBooksMatched: 12,
+          lastSweepPageStats: 30,
+          lastSweepAnnotations: 8,
+        },
+      ],
+    })
+    koreaderMock.credentials.value = status.credentials
+    koreaderMock.syncStatus.value = status
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Latest plugin unavailable')
+    expect(wrapper.text()).toContain('Version unknown')
+    expect(wrapper.text()).not.toContain('Update available')
   })
 
   it('calls existing action methods from the refreshed controls', async () => {

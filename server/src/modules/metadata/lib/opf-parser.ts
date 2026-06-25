@@ -127,6 +127,7 @@ const PROVIDER_PREFIXES: Record<ProviderKey, readonly string[]> = {
   google: ['urn:google:', 'google:'],
   goodreads: ['urn:goodreads:', 'goodreads:'],
   hardcover: ['urn:hardcover:', 'hardcover:'],
+  hardcoverEdition: ['urn:hardcover_edition:', 'hardcover_edition:', 'hardcover-edition:', 'hardcoveredition:'],
   openlibrary: ['urn:openlibrary:', 'openlibrary:'],
   ranobedb: ['urn:ranobedb:', 'ranobedb:'],
   kobo: ['urn:kobo:', 'kobo:'],

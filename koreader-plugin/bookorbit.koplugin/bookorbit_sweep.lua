@@ -85,6 +85,9 @@ local function finish(ctx, err)
         ctx.progress_msg = nil
     end
     ctx.state:flush()
+    if ctx.on_finish then
+        pcall(ctx.on_finish, err)
+    end
 
     if err == "auth" then
         if ctx.interactive then
@@ -703,6 +706,7 @@ function BookOrbitSweep.run(opts)
         interactive = opts.interactive or false,
         annotation_sync = opts.annotation_sync ~= false,
         full_recheck = opts.interactive or state.global.needsFullRecheck or false,
+        on_finish = opts.on_finish,
         counts = { books_matched = 0, page_stats = 0, annotations = 0, ann_applied = 0 },
         had_errors = false,
     }

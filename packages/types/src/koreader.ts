@@ -24,6 +24,8 @@ export interface KoreaderDeviceSweepInfo {
   deviceId: string;
   deviceModel: string;
   pluginVersion: string | null;
+  latestPluginVersion: string | null;
+  updateAvailable: boolean | null;
   lastSweepAt: string;
   lastSweepBooksMatched: number;
   lastSweepPageStats: number;
@@ -44,6 +46,8 @@ export interface KoreaderSyncStatus {
   devices: KoreaderDeviceInfo[];
   totalSyncedBooks: number;
   lastSyncAt: string | null;
+  latestPluginVersion: string | null;
+  pluginUpdateAvailable: boolean;
   sweeps: KoreaderDeviceSweepInfo[];
   pluginTotals: KoreaderPluginTotals;
 }

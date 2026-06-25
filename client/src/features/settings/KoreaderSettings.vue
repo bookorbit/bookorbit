@@ -69,6 +69,9 @@ const pluginTotals = computed(
       failedPositions: 0,
     },
 )
+const latestPluginVersion = computed(() => syncStatus.value?.latestPluginVersion ?? null)
+const pluginUpdateAvailable = computed(() => syncStatus.value?.pluginUpdateAvailable ?? false)
+const latestPluginLabel = computed(() => (latestPluginVersion.value ? `Latest plugin: v${latestPluginVersion.value}` : 'Latest plugin unavailable'))
 const pendingDeletes = computed(() => pluginTotals.value.pendingDeletes)
 const failedPositions = computed(() => pluginTotals.value.failedPositions)
 const hasPluginActivity = computed(
@@ -104,6 +107,18 @@ function formatDate(dateStr: string | null | undefined): string {
 
 function formatCount(value: number, singular: string, plural = `${singular}s`): string {
   return `${value} ${value === 1 ? singular : plural}`
+}
+
+function pluginUpdateText(updateAvailable: boolean | null): string {
+  if (updateAvailable === true) return 'Update available'
+  if (updateAvailable === false) return 'Up to date'
+  return 'Version unknown'
+}
+
+function pluginUpdateClass(updateAvailable: boolean | null): string {
+  if (updateAvailable === true) return 'border-primary/40 bg-primary/10 text-primary'
+  if (updateAvailable === false) return 'border-border bg-muted text-muted-foreground'
+  return 'border-border bg-background text-muted-foreground'
 }
 
 onMounted(async () => {
@@ -358,12 +373,21 @@ async function handleDownloadPlugin() {
           </div>
           <div class="flex flex-col gap-3 px-4 py-4 bg-card md:flex-row md:items-center md:justify-between md:px-5">
             <div class="min-w-0">
-              <p class="settings-label">Preconfigured BookOrbit plugin</p>
+              <div class="flex flex-wrap items-center gap-2">
+                <p class="settings-label">Preconfigured BookOrbit plugin</p>
+                <span
+                  v-if="pluginUpdateAvailable"
+                  class="rounded-md border border-primary/40 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary"
+                >
+                  Update available
+                </span>
+              </div>
               <p class="settings-hint">
                 Download a zip with the server URL and your sync login already configured. The plugin includes catalog browsing and sync. Copy the
                 folder to
                 <span class="font-mono text-foreground/70">koreader/plugins/</span> and restart KOReader.
               </p>
+              <p class="settings-hint mt-1">{{ latestPluginLabel }}. Device updates run from the BookOrbit menu in KOReader.</p>
             </div>
             <button class="settings-btn-primary self-start md:self-auto" :disabled="downloadingPlugin" @click="handleDownloadPlugin">
               <Download :size="12" />
@@ -418,11 +442,19 @@ async function handleDownloadPlugin() {
                 <Smartphone :size="16" />
               </div>
               <div class="flex-1 min-w-0">
-                <p class="settings-label truncate">
-                  {{ sweep.deviceModel }}
-                  <span v-if="sweep.pluginVersion" class="font-normal text-muted-foreground"> v{{ sweep.pluginVersion }}</span>
+                <div class="flex flex-wrap items-center gap-2">
+                  <p class="settings-label truncate">
+                    {{ sweep.deviceModel }}
+                    <span v-if="sweep.pluginVersion" class="font-normal text-muted-foreground"> v{{ sweep.pluginVersion }}</span>
+                  </p>
+                  <span class="rounded-md border px-2 py-0.5 text-[11px] font-medium" :class="pluginUpdateClass(sweep.updateAvailable)">
+                    {{ pluginUpdateText(sweep.updateAvailable) }}
+                  </span>
+                </div>
+                <p class="settings-hint mt-1">
+                  Last full sync: {{ formatLastSync(sweep.lastSweepAt) }}
+                  <span v-if="sweep.updateAvailable === true && sweep.latestPluginVersion"> - latest plugin v{{ sweep.latestPluginVersion }}</span>
                 </p>
-                <p class="settings-hint mt-1">Last full sync: {{ formatLastSync(sweep.lastSweepAt) }}</p>
               </div>
             </div>
             <div class="mt-4 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">

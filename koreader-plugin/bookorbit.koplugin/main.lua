@@ -37,7 +37,7 @@ local BookOrbitMenuPin = require("bookorbit_menu_pin")
 local BookOrbitSweep = require("bookorbit_sweep")
 local BookOrbitUpdater = require("bookorbit_updater")
 
-local PLUGIN_VERSION = "0.5.0"
+local PLUGIN_VERSION = "0.1.0"
 
 local SYNC_STRATEGY = {
     PROMPT = 1,
@@ -46,6 +46,7 @@ local SYNC_STRATEGY = {
 }
 
 local API_CALL_DEBOUNCE_DELAY = time.s(25)
+local UPDATE_CHECK_INTERVAL = 24 * 60 * 60
 
 local BookOrbit = WidgetContainer:extend{
     name = "bookorbit",
@@ -74,6 +75,7 @@ BookOrbit.default_settings = {
     catalog_grid_cols = 3,
     catalog_grid_rows = 3,
     catalog_recent_searches = {},
+    update_check_last_at = 0,
 }
 
 function BookOrbit:init()
@@ -127,6 +129,9 @@ function BookOrbit:init()
     if self.settings.annotation_sync == nil then
         self.settings.annotation_sync = true
     end
+    if self.settings.update_check_last_at == nil then
+        self.settings.update_check_last_at = 0
+    end
 
     self:applyProvision()
 
@@ -138,6 +143,9 @@ function BookOrbit:init()
     pcall(BookOrbitMenuPin.ensure)
     self:onDispatcherRegisterActions()
     self.ui.menu:registerToMainMenu(self)
+    UIManager:scheduleIn(5, function()
+        self:maybeCheckForUpdate(false)
+    end)
 end
 
 local PROVISION_FILE = "bookorbit_provision.lua"
@@ -309,6 +317,20 @@ function BookOrbit:strategyMenu(getter, setter)
     }
 end
 
+function BookOrbit:hasKnownUpdate()
+    return BookOrbitUpdater.isNewer(self.settings.update_latest_version, PLUGIN_VERSION) == true
+end
+
+function BookOrbit:updateCheckMenuText()
+    if self:hasKnownUpdate() then
+        return T(_("Plugin update available: v%1 -> v%2"), PLUGIN_VERSION, self.settings.update_latest_version)
+    end
+    if self:isLoggedIn() then
+        return T(_("Installed plugin: v%1 (Check for update)"), PLUGIN_VERSION)
+    end
+    return T(_("Installed plugin: v%1 (Login required)"), PLUGIN_VERSION)
+end
+
 function BookOrbit:addToMainMenu(menu_items)
     menu_items.bookorbit = {
         text = _("BookOrbit"),
@@ -396,7 +418,6 @@ If set to 0, updating progress based on page turns will be disabled.]]),
                     }
                     UIManager:show(items)
                 end,
-                separator = true,
             },
             {
                 text = _("Sync behavior"),
@@ -420,7 +441,6 @@ If set to 0, updating progress based on page turns will be disabled.]]),
                         ),
                     },
                 },
-                separator = true,
             },
             {
                 text = _("Sync this book now"),
@@ -440,6 +460,22 @@ If set to 0, updating progress based on page turns will be disabled.]]),
                 callback = function()
                     self:startSweep()
                 end,
+                separator = true,
+            },
+            {
+                text_func = function()
+                    return self:updateCheckMenuText()
+                end,
+                enabled_func = function()
+                    return self:isLoggedIn()
+                        and not BookOrbitSweep.isRunning()
+                        and not BookOrbitBookSync.isRunning()
+                end,
+                keep_menu_open = true,
+                callback = function()
+                    self:checkForUpdate()
+                end,
+                separator = true,
             },
             {
                 text_func = function()
@@ -455,28 +491,6 @@ If set to 0, updating progress based on page turns will be disabled.]]),
                 end,
                 enabled = false,
                 separator = true,
-            },
-            {
-                text_func = function()
-                    return T(_("Plugin: v%1"), PLUGIN_VERSION)
-                end,
-                enabled = false,
-            },
-            {
-                text_func = function()
-                    if self:isLoggedIn() then
-                        return _("Check for update")
-                    end
-                    return _("Check for update (login required)")
-                end,
-                enabled_func = function()
-                    return self:isLoggedIn()
-                        and not BookOrbitSweep.isRunning()
-                        and not BookOrbitBookSync.isRunning()
-                end,
-                callback = function()
-                    self:checkForUpdate()
-                end,
             },
         },
     }
@@ -611,6 +625,9 @@ function BookOrbit:doLogin(username, password, menu)
         self.settings.userkey = userkey
         if menu then menu:updateItems() end
         UIManager:show(InfoMessage:new{ text = _("Logged in to BookOrbit.") })
+        UIManager:scheduleIn(1, function()
+            self:maybeCheckForUpdate(false)
+        end)
     elseif err == 401 or err == 403 then
         UIManager:show(InfoMessage:new{
             text = _("Login failed. Create or check your KOReader credentials in BookOrbit web settings."),
@@ -713,11 +730,14 @@ function BookOrbit:updateProgress(ensure_networking, interactive, on_suspend)
     if interactive then
         if body then
             UIManager:show(InfoMessage:new{ text = _("Progress has been pushed to BookOrbit."), timeout = 3 })
+            if not on_suspend then self:maybeCheckForUpdate(false) end
         else
             showSyncError()
         end
     elseif not body then
         logger.dbg("BookOrbit: push failed:", err)
+    elseif not on_suspend then
+        self:maybeCheckForUpdate(false)
     end
 
     if on_suspend and Device:hasWifiManager() then
@@ -756,6 +776,7 @@ function BookOrbit:getProgress(ensure_networking, interactive)
         logger.dbg("BookOrbit: pull failed:", err)
         return
     end
+    self:maybeCheckForUpdate(false)
 
     if not body.percentage then
         if interactive then
@@ -823,11 +844,18 @@ function BookOrbit:startSweep()
         return
     end
 
-    local api_opts = self:apiOpts()
-    if NetworkMgr:willRerunWhenOnline(function() BookOrbitSweep.run{ api = api_opts, interactive = true, annotation_sync = self.settings.annotation_sync } end) then
+    local sweep_opts = {
+        api = self:apiOpts(),
+        interactive = true,
+        annotation_sync = self.settings.annotation_sync,
+        on_finish = function(err)
+            if not err then self:maybeCheckForUpdate(false) end
+        end,
+    }
+    if NetworkMgr:willRerunWhenOnline(function() BookOrbitSweep.run(sweep_opts) end) then
         return
     end
-    BookOrbitSweep.run{ api = api_opts, interactive = true, annotation_sync = self.settings.annotation_sync }
+    BookOrbitSweep.run(sweep_opts)
 end
 
 function BookOrbit:onBookOrbitSyncBook()
@@ -949,6 +977,7 @@ function BookOrbit:_onNetworkConnected()
     logger.dbg("BookOrbit: onNetworkConnected")
     UIManager:scheduleIn(0.5, function()
         self:getProgress(false, false)
+        self:maybeCheckForUpdate(false)
     end)
 end
 
@@ -1036,6 +1065,34 @@ function BookOrbit:checkForUpdate()
     end)
 end
 
+function BookOrbit:maybeCheckForUpdate(interactive)
+    if not self:isLoggedIn() or self._checking_update or self._updating then return end
+    if BookOrbitSweep.isRunning() or BookOrbitBookSync.isRunning() then return end
+
+    local now = os.time()
+    if not interactive and now - (self.settings.update_check_last_at or 0) < UPDATE_CHECK_INTERVAL then
+        return
+    end
+
+    self._checking_update = true
+    local body, err = self:newClient():getPluginVersion()
+    self._checking_update = false
+
+    if not body then
+        if interactive then
+            UIManager:show(InfoMessage:new{
+                text = T(_("Could not check for update: %1"), tostring(err or "network error")),
+                timeout = 4,
+            })
+        else
+            logger.dbg("BookOrbit: plugin update check failed:", err)
+        end
+        return
+    end
+
+    self:handleUpdateVersionResponse(body, interactive, interactive or self.catalog_browser == nil)
+end
+
 function BookOrbit:doCheckForUpdate()
     local checking = InfoMessage:new{ text = _("Checking for update...") }
     UIManager:show(checking)
@@ -1051,23 +1108,48 @@ function BookOrbit:doCheckForUpdate()
         return
     end
 
+    self:handleUpdateVersionResponse(body, true, true)
+end
+
+function BookOrbit:handleUpdateVersionResponse(body, interactive, prompt_allowed)
     local server_ver = body.serverVersion or "unknown"
     local plugin_latest = body.pluginVersion
+    self.settings.update_check_last_at = os.time()
 
     if type(plugin_latest) ~= "string" or plugin_latest == "unknown" then
-        UIManager:show(InfoMessage:new{
-            text = _("Could not determine the latest plugin version from the server."),
-            timeout = 4,
-        })
+        G_reader_settings:flush()
+        if interactive then
+            UIManager:show(InfoMessage:new{
+                text = _("Could not determine the latest plugin version from the server."),
+                timeout = 4,
+            })
+        end
         return
     end
 
-    if not BookOrbitUpdater.isNewer(plugin_latest, PLUGIN_VERSION) then
-        UIManager:show(InfoMessage:new{
-            text = T(_("Plugin is up to date (v%1).\nServer: v%2"), PLUGIN_VERSION, server_ver),
-            timeout = 4,
-        })
+    self.settings.update_latest_version = plugin_latest
+    G_reader_settings:flush()
+
+    if BookOrbitUpdater.isNewer(plugin_latest, PLUGIN_VERSION) ~= true then
+        if interactive then
+            UIManager:show(InfoMessage:new{
+                text = T(_("Plugin is up to date (v%1).\nServer: v%2"), PLUGIN_VERSION, server_ver),
+                timeout = 4,
+            })
+        end
         return
+    end
+
+    if not prompt_allowed then
+        return
+    end
+
+    if not interactive and self.settings.update_dismissed_version == plugin_latest then
+        return
+    end
+    if not interactive then
+        self.settings.update_dismissed_version = plugin_latest
+        G_reader_settings:flush()
     end
 
     UIManager:show(ConfirmBox:new{

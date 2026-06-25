@@ -3,9 +3,11 @@ import { hash as bcryptHash } from 'bcryptjs';
 import { createHash } from 'crypto';
 
 import type { KoreaderBookSyncInfo, KoreaderDeviceInfo, KoreaderSyncStatus } from '@bookorbit/types';
+import { isSemverNewer } from '../../common/utils/semver.utils';
 import { KoreaderRepository } from './koreader.repository';
 import { KoreaderChapterService } from './koreader-chapter.service';
 import { KoreaderChapterExtractorService } from './koreader-chapter-extractor.service';
+import { KoreaderPackageService } from './koreader-package.service';
 import { KoreaderPluginRepository } from './koreader-plugin.repository';
 import { BookService } from '../book/book.service';
 import { PositionConverterService } from '../position-converter/position-converter.service';
@@ -30,6 +32,7 @@ export class KoreaderService {
     private readonly achievementEvents: AchievementEventsService,
     private readonly positionConverter: PositionConverterService,
     private readonly bookService: BookService,
+    private readonly packageService: KoreaderPackageService,
   ) {}
 
   async createCredentials(userId: number, username: string, password: string) {
@@ -236,25 +239,30 @@ export class KoreaderService {
   }
 
   async getSyncStatus(userId: number): Promise<KoreaderSyncStatus> {
-    const [credentials, devices, totalSyncedBooks, sweepRows, pluginTotals] = await Promise.all([
+    const [credentials, devices, totalSyncedBooks, sweepRows, pluginTotals, versionInfo] = await Promise.all([
       this.getCredentials(userId),
       this.getDevices(userId),
       this.repo.getTotalSyncedBooks(userId),
       this.pluginRepo.listSweeps(userId),
       this.pluginRepo.getPluginTotals(userId),
+      this.packageService.getVersionInfo(),
     ]);
     const lastSyncAt = devices.length > 0 ? devices[0]!.lastSyncAt : null;
+    const latestPluginVersion = versionInfo.pluginVersion === 'unknown' ? null : versionInfo.pluginVersion;
     const sweeps = sweepRows.map((row) => ({
       deviceId: row.deviceId,
       deviceModel: row.deviceModel,
       pluginVersion: row.pluginVersion,
+      latestPluginVersion,
+      updateAvailable: isSemverNewer(latestPluginVersion, row.pluginVersion),
       lastSweepAt: row.lastSweepAt.toISOString(),
       lastSweepBooksMatched: row.lastSweepBooksMatched,
       lastSweepPageStats: row.lastSweepPageStats,
       lastSweepAnnotations: row.lastSweepAnnotations,
     }));
+    const pluginUpdateAvailable = sweeps.some((sweep) => sweep.updateAvailable === true);
 
-    return { credentials, devices, totalSyncedBooks, lastSyncAt, sweeps, pluginTotals };
+    return { credentials, devices, totalSyncedBooks, lastSyncAt, latestPluginVersion, pluginUpdateAvailable, sweeps, pluginTotals };
   }
 
   async getDevices(userId: number): Promise<KoreaderDeviceInfo[]> {
