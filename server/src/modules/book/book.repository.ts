@@ -1,5 +1,5 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
-import { SQL, and, asc, count, eq, inArray, isNotNull, ne, or, sql } from 'drizzle-orm';
+import { SQL, and, asc, desc, count, eq, inArray, isNotNull, ne, or, sql } from 'drizzle-orm';
 import { SUPPORTED_BOOK_FORMATS } from '../upload/upload-validator.service';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -1395,36 +1395,77 @@ export class BookRepository {
 
     if (!resolvedSource || resolvedType !== 'KoboSpan' || !resolvedValue) {
       // Try to resolve from chapters
-      const chapters = await this.db
+      let chapters = await this.db
         .select()
         .from(schema.bookFileChapters)
         .where(eq(schema.bookFileChapters.bookFileId, fileId))
         .orderBy(schema.bookFileChapters.chapterIndex);
 
+      if (chapters.length === 0) {
+        const otherFiles = await this.db
+          .select({ id: bookFiles.id })
+          .from(bookFiles)
+          .where(eq(bookFiles.bookId, file.bookId));
+        for (const otherFile of otherFiles) {
+          if (otherFile.id !== fileId) {
+            const fallbackChapters = await this.db
+              .select()
+              .from(schema.bookFileChapters)
+              .where(eq(schema.bookFileChapters.bookFileId, otherFile.id))
+              .orderBy(schema.bookFileChapters.chapterIndex);
+            if (fallbackChapters.length > 0) {
+              chapters = fallbackChapters;
+              break;
+            }
+          }
+        }
+      }
+
       if (chapters.length > 0) {
-        const [progress] = await this.db
+        let chapterIndex: number | null = null;
+        const [deviceProgress] = await this.db
           .select({
-            cfi: readingProgress.cfi,
-            koreaderProgress: readingProgress.koreaderProgress,
+            chapterIndex: schema.koreaderDeviceProgress.chapterIndex,
           })
-          .from(readingProgress)
-          .where(and(eq(readingProgress.userId, userId), eq(readingProgress.bookFileId, fileId)))
+          .from(schema.koreaderDeviceProgress)
+          .where(
+            and(
+              eq(schema.koreaderDeviceProgress.userId, userId),
+              eq(schema.koreaderDeviceProgress.bookFileId, fileId),
+            ),
+          )
+          .orderBy(desc(schema.koreaderDeviceProgress.updatedAt))
           .limit(1);
 
-        let chapterIndex: number | null = null;
-        if (progress?.koreaderProgress) {
-          const match = progress.koreaderProgress.match(/DocFragment\[(\d+)\]/);
-          if (match) {
-            chapterIndex = parseInt(match[1]!, 10) - 1;
+        if (deviceProgress && deviceProgress.chapterIndex !== null) {
+          chapterIndex = deviceProgress.chapterIndex;
+        }
+
+        if (chapterIndex === null) {
+          const [progress] = await this.db
+            .select({
+              cfi: readingProgress.cfi,
+              koreaderProgress: readingProgress.koreaderProgress,
+            })
+            .from(readingProgress)
+            .where(and(eq(readingProgress.userId, userId), eq(readingProgress.bookFileId, fileId)))
+            .limit(1);
+
+          if (progress?.koreaderProgress) {
+            const match = progress.koreaderProgress.match(/DocFragment\[(\d+)\]/);
+            if (match) {
+              chapterIndex = parseInt(match[1]!, 10) - 1;
+            }
+          }
+          if (chapterIndex === null && progress?.cfi) {
+            const match = progress.cfi.match(/epubcfi\(\/6\/(\d+)/);
+            if (match) {
+              const spinePos = parseInt(match[1]!, 10);
+              chapterIndex = Math.floor(spinePos / 2) - 1;
+            }
           }
         }
-        if (chapterIndex === null && progress?.cfi) {
-          const match = progress.cfi.match(/epubcfi\(\/6\/(\d+)/);
-          if (match) {
-            const spinePos = parseInt(match[1]!, 10);
-            chapterIndex = Math.floor(spinePos / 2) - 1;
-          }
-        }
+
         if (chapterIndex === null) {
           const pct = Math.max(0, Math.min(100, percentage));
           chapterIndex = Math.min(chapters.length - 1, Math.floor((pct / 100) * chapters.length));
@@ -1432,7 +1473,7 @@ export class BookRepository {
 
         const chapter = chapters.find((c) => c.chapterIndex === chapterIndex) ?? chapters[0];
         if (chapter?.href) {
-          resolvedSource = chapter.href.split('#')[0].split('?')[0];
+          resolvedSource = chapter.href.split('#')[0]!.split('?')[0]!;
           resolvedType = 'KoboSpan';
           resolvedValue = 'kobo.0.0';
         }
