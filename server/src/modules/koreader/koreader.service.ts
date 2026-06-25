@@ -120,12 +120,13 @@ export class KoreaderService {
       throw new NotFoundException('Book not found for the given document hash');
     }
 
+    const targetFileId = bookFile.primaryFileId || bookFile.id;
     const chapterIndex = this.chapterService.parseChapterIndexFromProgress(data.progress ?? null);
 
-    this.chapterExtractor.extractAndStoreChapters(bookFile.id).catch(() => {});
+    this.chapterExtractor.extractAndStoreChapters(targetFileId).catch(() => {});
 
     await this.repo.upsertDeviceProgress({
-      bookFileId: bookFile.id,
+      bookFileId: targetFileId,
       userId,
       device,
       deviceId,
@@ -136,12 +137,12 @@ export class KoreaderService {
     });
 
     const bookorbitPercentage = toBookorbitPercentage(data.percentage);
-    await this.repo.upsertReadingProgress(bookFile.id, userId, bookorbitPercentage);
+    await this.repo.upsertReadingProgress(targetFileId, userId, bookorbitPercentage);
     await this.userBookStatusService.autoUpdate(userId, bookFile.bookId, bookorbitPercentage);
     this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, {
       userId,
       bookId: bookFile.bookId,
-      bookFileId: bookFile.id,
+      bookFileId: targetFileId,
       progress: bookorbitPercentage,
       source: 'koreader',
     });
@@ -150,7 +151,7 @@ export class KoreaderService {
       try {
         await this.bookService.syncKoboReadingStateFromProgress(
           userId,
-          bookFile.id,
+          targetFileId,
           bookorbitPercentage,
         );
       } catch (err: any) {
@@ -159,7 +160,7 @@ export class KoreaderService {
     }
 
     this.logger.debug(
-      `[${SYNC_EVENT}] [end] userId=${userId} bookFileId=${bookFile.id} device=${device} durationMs=${Date.now() - startedAt} percentage=${data.percentage} - save progress completed`,
+      `[${SYNC_EVENT}] [end] userId=${userId} bookFileId=${targetFileId} device=${device} durationMs=${Date.now() - startedAt} percentage=${data.percentage} - save progress completed`,
     );
 
     return { document: data.document, timestamp: data.timestamp ?? Math.floor(Date.now() / 1000) };
@@ -171,15 +172,16 @@ export class KoreaderService {
 
     if (!bookFile) return null;
 
-    const latestDevice = await this.repo.getLatestDeviceProgress(bookFile.id, userId);
-    const readingProg = await this.repo.getReadingProgress(bookFile.id, userId);
+    const targetFileId = bookFile.primaryFileId || bookFile.id;
+
+    const latestDevice = await this.repo.getLatestDeviceProgress(targetFileId, userId);
+    const readingProg = await this.repo.getReadingProgress(targetFileId, userId);
 
     if (!latestDevice && !readingProg) return null;
 
-    // Compare server timestamps to find the most recent source.
-    // reading_progress.updatedAt is only set by the web reader (KOReader sync deliberately
-    // preserves the existing value), so this comparison is accurate.
-    const deviceTime = latestDevice?.updatedAt?.getTime() ?? 0;
+    const deviceTime = latestDevice?.syncTimestamp
+      ? latestDevice.syncTimestamp * 1000
+      : (latestDevice?.updatedAt?.getTime() ?? 0);
     const readerTime = readingProg?.updatedAt?.getTime() ?? 0;
 
     if (latestDevice && deviceTime >= readerTime) {
@@ -202,7 +204,7 @@ export class KoreaderService {
         }
 
         if (chapterIndex === null) {
-          const chapters = await this.repo.getChapters(bookFile.id);
+          const chapters = await this.repo.getChapters(targetFileId);
           if (chapters.length > 0) {
             if (readingProg.koboLocationSource) {
               const cleanSource = readingProg.koboLocationSource.split('#')[0].split('?')[0];
@@ -264,7 +266,9 @@ export class KoreaderService {
 
     const chapters = await this.repo.getChapters(bookFileId);
     const latestDevice = deviceProgress[0];
-    const deviceTime = latestDevice?.updatedAt?.getTime() ?? 0;
+    const deviceTime = latestDevice?.syncTimestamp
+      ? latestDevice.syncTimestamp * 1000
+      : (latestDevice?.updatedAt?.getTime() ?? 0);
     const readerTime = readingProgress?.updatedAt?.getTime() ?? 0;
 
     const isKoreaderLatest = latestDevice && deviceTime >= readerTime;

@@ -582,6 +582,49 @@ describe('KoreaderService', () => {
 
       await expect(service.getProgress(7, 'doc-hash')).resolves.toBeNull();
     });
+
+    it('uses primaryFileId if available when resolving progress', async () => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20, primaryFileId: 15 });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
+      mockRepo.getReadingProgress.mockResolvedValue({
+        percentage: 50,
+        cfi: null,
+        koreaderProgress: '/body/DocFragment[3]/body',
+        updatedAt: new Date('2026-02-01T11:00:00.000Z'),
+      });
+
+      await service.getProgress(7, 'doc-hash');
+
+      expect(mockRepo.getLatestDeviceProgress).toHaveBeenCalledWith(15, 7);
+      expect(mockRepo.getReadingProgress).toHaveBeenCalledWith(15, 7);
+    });
+
+    it('compares syncTimestamp instead of updatedAt for latest device check', async () => {
+      const readerTime = new Date('2026-02-01T11:00:00.000Z');
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20, primaryFileId: null });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue({
+        percentage: 0.66,
+        progress: '/body/DocFragment[8]/body',
+        device: 'Kobo Libra',
+        deviceId: 'device-1',
+        syncTimestamp: 1700000000, // 2023-11-14 (older than 2026 readerTime)
+        updatedAt: new Date('2026-02-01T12:00:00.000Z'), // updatedAt is newer, but syncTimestamp is older
+      });
+      mockRepo.getReadingProgress.mockResolvedValue({
+        percentage: 80,
+        koreaderProgress: '/body/DocFragment[5]/body',
+        updatedAt: readerTime,
+      });
+
+      await expect(service.getProgress(7, 'doc-hash')).resolves.toEqual({
+        document: 'doc-hash',
+        percentage: 0.8,
+        progress: '/body/DocFragment[5]/body',
+        device: 'web',
+        device_id: 'bookorbit-web',
+        timestamp: Math.floor(readerTime.getTime() / 1000),
+      });
+    });
   });
 
   describe('getSyncStatus', () => {
