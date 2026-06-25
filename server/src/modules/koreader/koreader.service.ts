@@ -123,7 +123,7 @@ export class KoreaderService {
     const targetFileId = bookFile.primaryFileId || bookFile.id;
     const chapterIndex = this.chapterService.parseChapterIndexFromProgress(data.progress ?? null);
 
-    this.chapterExtractor.extractAndStoreChapters(targetFileId).catch(() => {});
+    this.chapterExtractor.extractAndStoreChapters(bookFile.id).catch(() => {});
 
     await this.repo.upsertDeviceProgress({
       bookFileId: targetFileId,
@@ -204,7 +204,7 @@ export class KoreaderService {
         }
 
         if (chapterIndex === null) {
-          const chapters = await this.repo.getChapters(targetFileId);
+          const chapters = await this.repo.getChapters(bookFile.id);
           if (chapters.length > 0) {
             if (readingProg.koboLocationSource) {
               const cleanSource = readingProg.koboLocationSource.split('#')[0].split('?')[0];

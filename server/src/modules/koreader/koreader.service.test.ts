@@ -625,6 +625,28 @@ describe('KoreaderService', () => {
         timestamp: Math.floor(readerTime.getTime() / 1000),
       });
     });
+
+    it('resolves chapters fallback using requested bookFile.id instead of targetFileId', async () => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20, primaryFileId: 15 });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
+      mockRepo.getReadingProgress.mockResolvedValue({
+        percentage: 50,
+        cfi: null,
+        koreaderProgress: null,
+        koboLocationSource: 'OEBPS/text/ch3.xhtml',
+        updatedAt: new Date('2026-02-01T11:00:00.000Z'),
+      });
+
+      mockRepo.getChapters.mockResolvedValue([
+        { chapterIndex: 0, href: 'OEBPS/text/ch1.xhtml' },
+        { chapterIndex: 1, href: 'OEBPS/text/ch2.xhtml' },
+        { chapterIndex: 2, href: 'OEBPS/text/ch3.xhtml' },
+      ]);
+
+      await service.getProgress(7, 'doc-hash');
+
+      expect(mockRepo.getChapters).toHaveBeenCalledWith(10); // NOT 15
+    });
   });
 
   describe('getSyncStatus', () => {
