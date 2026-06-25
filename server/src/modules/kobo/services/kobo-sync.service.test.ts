@@ -694,6 +694,13 @@ describe('KoboSyncService', () => {
         kepubConversionLimitMb: 1,
       }).format,
     ).toBe('PDF');
+
+    const nativeKepub = (service as any).getDeliveryInfo('kepub', 1024, {
+      convertToKepub: false,
+      forceEnableHyphenation: false,
+      kepubConversionLimitMb: 1,
+    });
+    expect(nativeKepub.format).toBe('KEPUB');
   });
 
   it('fetchEligibleSnapshotRows and fetchEligibleBooksByIds map DB rows into sync payload objects', async () => {
