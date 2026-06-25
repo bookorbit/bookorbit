@@ -1384,14 +1384,62 @@ export class BookRepository {
       .where(eq(bookFiles.id, fileId))
       .limit(1);
 
-    if (!file || file.primaryFileId !== fileId || file.format !== 'epub') return false;
+    if (!file || file.primaryFileId !== fileId || (file.format !== 'epub' && file.format !== 'kepub')) return false;
 
     const clampedPercentage = this.clampProgressPercentage(percentage);
-    const normalizedKoboLocationSource = this.normalizeKoboLocationPart(koboLocationSource);
-    const normalizedKoboLocationType = this.normalizeKoboLocationPart(koboLocationType);
-    const normalizedKoboLocationValue = this.normalizeKoboLocationPart(koboLocationValue);
     const normalizedKoboContentSourceProgressPercent = this.clampNullableProgressPercentage(koboContentSourceProgressPercent);
-    if (!normalizedKoboLocationSource || normalizedKoboLocationType !== 'KoboSpan' || !normalizedKoboLocationValue) return false;
+
+    let resolvedSource = this.normalizeKoboLocationPart(koboLocationSource);
+    let resolvedType = this.normalizeKoboLocationPart(koboLocationType);
+    let resolvedValue = this.normalizeKoboLocationPart(koboLocationValue);
+
+    if (!resolvedSource || resolvedType !== 'KoboSpan' || !resolvedValue) {
+      // Try to resolve from chapters
+      const chapters = await this.db
+        .select()
+        .from(schema.bookFileChapters)
+        .where(eq(schema.bookFileChapters.bookFileId, fileId))
+        .orderBy(schema.bookFileChapters.chapterIndex);
+
+      if (chapters.length > 0) {
+        const [progress] = await this.db
+          .select({
+            cfi: readingProgress.cfi,
+            koreaderProgress: readingProgress.koreaderProgress,
+          })
+          .from(readingProgress)
+          .where(and(eq(readingProgress.userId, userId), eq(readingProgress.bookFileId, fileId)))
+          .limit(1);
+
+        let chapterIndex: number | null = null;
+        if (progress?.koreaderProgress) {
+          const match = progress.koreaderProgress.match(/DocFragment\[(\d+)\]/);
+          if (match) {
+            chapterIndex = parseInt(match[1]!, 10) - 1;
+          }
+        }
+        if (chapterIndex === null && progress?.cfi) {
+          const match = progress.cfi.match(/epubcfi\(\/6\/(\d+)/);
+          if (match) {
+            const spinePos = parseInt(match[1]!, 10);
+            chapterIndex = Math.floor(spinePos / 2) - 1;
+          }
+        }
+        if (chapterIndex === null) {
+          const pct = Math.max(0, Math.min(100, percentage));
+          chapterIndex = Math.min(chapters.length - 1, Math.floor((pct / 100) * chapters.length));
+        }
+
+        const chapter = chapters.find((c) => c.chapterIndex === chapterIndex) ?? chapters[0];
+        if (chapter?.href) {
+          resolvedSource = chapter.href.split('#')[0].split('?')[0];
+          resolvedType = 'KoboSpan';
+          resolvedValue = 'kobo.0.0';
+        }
+      }
+    }
+
+    if (!resolvedSource || resolvedType !== 'KoboSpan' || !resolvedValue) return false;
 
     const now = new Date();
     const nowIso = now.toISOString();
@@ -1413,9 +1461,9 @@ export class BookRepository {
       this.isKoboBookmarkCurrent(
         existingBookmark,
         clampedPercentage,
-        normalizedKoboLocationSource,
-        normalizedKoboLocationType,
-        normalizedKoboLocationValue,
+        resolvedSource,
+        resolvedType,
+        resolvedValue,
         normalizedKoboContentSourceProgressPercent,
       )
     ) {
@@ -1427,9 +1475,9 @@ export class BookRepository {
       LastModified: nowIso,
       ProgressPercent: clampedPercentage,
       Location: {
-        Source: normalizedKoboLocationSource,
-        Type: normalizedKoboLocationType,
-        Value: normalizedKoboLocationValue,
+        Source: resolvedSource,
+        Type: resolvedType,
+        Value: resolvedValue,
       },
     };
     if (normalizedKoboContentSourceProgressPercent !== null) {

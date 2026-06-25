@@ -22,6 +22,7 @@ import { KoreaderChapterExtractorService } from './koreader-chapter-extractor.se
 import { KoreaderChapterService } from './koreader-chapter.service';
 import { KoreaderRepository } from './koreader.repository';
 import { KoreaderService } from './koreader.service';
+import { BookService } from '../book/book.service';
 
 function md5Hex(value: string): string {
   return `md5:${value}:hex:0123456789abcdef0123456789abcdef`;
@@ -76,6 +77,10 @@ describe('KoreaderService', () => {
   };
   let mockAchievementEvents: {
     emit: ReturnType<typeof vi.fn>;
+  };
+  let mockBookService: {
+    isKoboTwoWayProgressSyncEnabled: ReturnType<typeof vi.fn>;
+    syncKoboReadingStateFromProgress: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -133,6 +138,13 @@ describe('KoreaderService', () => {
       emit: vi.fn(),
     };
 
+    mockBookService = {
+      isKoboTwoWayProgressSyncEnabled: vi.fn(),
+      syncKoboReadingStateFromProgress: vi.fn(),
+    };
+    mockBookService.isKoboTwoWayProgressSyncEnabled.mockResolvedValue(false);
+    mockBookService.syncKoboReadingStateFromProgress.mockResolvedValue(true);
+
     mockRepo.deleteKoreaderUser.mockResolvedValue(undefined);
     mockRepo.updateKoreaderUser.mockResolvedValue(undefined);
     mockRepo.upsertDeviceProgress.mockResolvedValue(undefined);
@@ -152,6 +164,7 @@ describe('KoreaderService', () => {
       mockChapterExtractor as unknown as KoreaderChapterExtractorService,
       mockUserBookStatusService as unknown as UserBookStatusService,
       mockAchievementEvents as unknown as AchievementEventsService,
+      mockBookService as unknown as BookService,
     );
   });
 
@@ -343,6 +356,23 @@ describe('KoreaderService', () => {
         document: 'abcdef1234567890fedcba',
         timestamp: 1700000000,
       });
+    });
+
+    it('triggers Kobo sync if twoWayProgressSync is enabled', async () => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 44, bookId: 55 });
+      mockBookService.isKoboTwoWayProgressSyncEnabled.mockResolvedValue(true);
+
+      await service.saveProgress(12, {
+        document: 'abcdef1234567890fedcba',
+        percentage: 0.5,
+        progress: '/body/DocFragment[7]',
+        device: 'Kobo Sage',
+        device_id: 'device-12',
+        timestamp: 1700000000,
+      });
+
+      expect(mockBookService.isKoboTwoWayProgressSyncEnabled).toHaveBeenCalledWith(12);
+      expect(mockBookService.syncKoboReadingStateFromProgress).toHaveBeenCalledWith(12, 44, 50);
     });
 
     it('throws when the book file cannot be resolved', async () => {

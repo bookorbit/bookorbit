@@ -763,7 +763,10 @@ describe('BookRepository', () => {
   it('does not overwrite Kobo reading state without an exact KoboSpan location', async () => {
     const insertChain = makeInsertChain();
     const db = {
-      select: vi.fn().mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub' }])),
+      select: vi
+        .fn()
+        .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub' }]))
+        .mockReturnValue(makeSelectChain('limit', [])),
       insert: vi.fn().mockReturnValue(insertChain),
       execute: vi.fn().mockResolvedValue(undefined),
     };
@@ -771,7 +774,7 @@ describe('BookRepository', () => {
 
     await expect(repo.syncKoboReadingStateFromProgress(5, 9, 80, 'OEBPS/ch14.xhtml', null, null, 33.5)).resolves.toBe(false);
 
-    expect(db.select).toHaveBeenCalledTimes(1);
+    expect(db.select).toHaveBeenCalledTimes(2);
     expect(db.insert).not.toHaveBeenCalled();
     expect(db.execute).not.toHaveBeenCalled();
   });

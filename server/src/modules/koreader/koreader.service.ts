@@ -8,6 +8,7 @@ import { KoreaderChapterService } from './koreader-chapter.service';
 import { KoreaderChapterExtractorService } from './koreader-chapter-extractor.service';
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED } from '../achievement/achievement-events.service';
+import { BookService } from '../book/book.service';
 
 const BCRYPT_ROUNDS = 12;
 const SYNC_EVENT = 'koreader.sync';
@@ -24,6 +25,7 @@ export class KoreaderService {
     private readonly chapterExtractor: KoreaderChapterExtractorService,
     private readonly userBookStatusService: UserBookStatusService,
     private readonly achievementEvents: AchievementEventsService,
+    private readonly bookService: BookService,
   ) {}
 
   async createCredentials(userId: number, username: string, password: string) {
@@ -143,6 +145,18 @@ export class KoreaderService {
       progress: bookorbitPercentage,
       source: 'koreader',
     });
+
+    if (await this.bookService.isKoboTwoWayProgressSyncEnabled(userId)) {
+      try {
+        await this.bookService.syncKoboReadingStateFromProgress(
+          userId,
+          bookFile.id,
+          bookorbitPercentage,
+        );
+      } catch (err: any) {
+        this.logger.warn(`Failed to sync Kobo reading state from KOReader progress: ${err.message}`);
+      }
+    }
 
     this.logger.debug(
       `[${SYNC_EVENT}] [end] userId=${userId} bookFileId=${bookFile.id} device=${device} durationMs=${Date.now() - startedAt} percentage=${data.percentage} - save progress completed`,
