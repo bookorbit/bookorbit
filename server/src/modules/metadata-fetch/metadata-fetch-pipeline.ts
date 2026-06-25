@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   AudiobookChapter,
+  BookCommunityRating,
   ComicMetadataFields,
   FieldPreference,
   MetadataCandidate,
@@ -28,6 +29,7 @@ export type ResolvedMetadataFields = Partial<Record<MetadataField, string | stri
   seriesMemberships?: MetadataSeriesMembership[];
   chapters?: AudiobookChapter[];
   comicMetadata?: ComicMetadataFields;
+  communityRatings?: BookCommunityRating[];
 };
 type ResolvedProviderIds = Partial<Record<MetadataProviderKey, string>>;
 
@@ -251,6 +253,18 @@ export class MetadataFetchPipeline {
         continue;
       }
 
+      if (field === 'communityRating') {
+        const existingValue = existing[field];
+        if (fieldPreference.mergeStrategy === 'fillMissing' && !this.isMissing(existingValue)) continue;
+
+        const communityRatings = this.collectCommunityRatings(fieldPreference.providers as MetadataProviderKey[], byProvider);
+        if (communityRatings.length > 0) {
+          result.communityRatings = communityRatings;
+          sources.communityRating = communityRatings.map((rating) => rating.provider).join('|');
+        }
+        continue;
+      }
+
       for (const providerKey of fieldPreference.providers) {
         const candidate = byProvider.get(providerKey);
         if (!candidate) continue;
@@ -340,6 +354,40 @@ export class MetadataFetchPipeline {
     };
     const key = map[field];
     return key ? candidate[key] : undefined;
+  }
+
+  private collectCommunityRatings(providerKeys: MetadataProviderKey[], byProvider: Map<string, MetadataCandidate>): BookCommunityRating[] {
+    const updatedAt = new Date().toISOString();
+    const ratings: BookCommunityRating[] = [];
+    const seen = new Set<MetadataProviderKey>();
+
+    for (const providerKey of providerKeys) {
+      if (seen.has(providerKey)) continue;
+      seen.add(providerKey);
+
+      const candidate = byProvider.get(providerKey);
+      if (!candidate) continue;
+
+      const rating = this.normalizeCommunityRating(candidate.communityRating);
+      if (rating === undefined) continue;
+
+      ratings.push({
+        provider: providerKey,
+        rating,
+        ratingCount: this.normalizeCommunityRatingCount(candidate.communityRatingCount) ?? null,
+        updatedAt,
+      });
+    }
+
+    return ratings;
+  }
+
+  private normalizeCommunityRating(value: unknown): number | undefined {
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 5 ? value : undefined;
+  }
+
+  private normalizeCommunityRatingCount(value: unknown): number | undefined {
+    return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : undefined;
   }
 
   private resolveSeriesMemberships(

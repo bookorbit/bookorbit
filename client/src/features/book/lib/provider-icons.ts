@@ -19,3 +19,7 @@ type ProviderIconKey = keyof typeof PROVIDER_ICON_PATHS
 export function providerIconPath(provider: ProviderIconKey): string {
   return PROVIDER_ICON_PATHS[provider]
 }
+
+export function providerIconPathSafe(provider: string): string | null {
+  return Object.prototype.hasOwnProperty.call(PROVIDER_ICON_PATHS, provider) ? PROVIDER_ICON_PATHS[provider as ProviderIconKey] : null
+}

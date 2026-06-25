@@ -48,6 +48,7 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     seriesName: null,
     seriesIndex: null,
     rating: null,
+    communityRatings: [],
     coverSource: 'extracted',
     hardcoverEditionId: null,
     providerIds: {},
@@ -260,6 +261,28 @@ describe('DetailsTab cover surface', () => {
       { name: 'author-detail', params: { id: 42 } },
     ])
     expect(wrapper.text()).toContain('Author One, Author Two')
+  })
+
+  it('renders community rating badges with score and tooltip per provider', async () => {
+    const wrapper = mountDetails(
+      makeBook({
+        communityRatings: [
+          { provider: 'amazon', rating: 4.8, ratingCount: 104451, updatedAt: '2026-06-25T00:00:00.000Z' },
+          { provider: 'hardcover', rating: 4.25, ratingCount: 12345, updatedAt: '2026-06-24T00:00:00.000Z' },
+        ],
+      }),
+    )
+    await flushPromises()
+
+    // Scores are visible as text in the badges
+    expect(wrapper.text()).toContain('4.8')
+    expect(wrapper.text()).toContain('4.3')
+
+    // Full detail is in the title tooltip (not in visible text)
+    const titledEls = wrapper.findAll('[title]')
+    const tooltips = titledEls.map((el) => el.attributes('title') ?? '')
+    expect(tooltips.some((t) => t.includes('4.8 / 5') && t.includes('104,451'))).toBe(true)
+    expect(tooltips.some((t) => t.includes('4.3 / 5') && t.includes('12,345'))).toBe(true)
   })
 
   it('places the Hardcover sync grid item with the current book id', async () => {

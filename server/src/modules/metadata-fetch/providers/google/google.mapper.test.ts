@@ -19,6 +19,8 @@ describe('GoogleMapper', () => {
           { type: 'ISBN_13', identifier: '1234567890123' },
         ],
         pageCount: 180,
+        averageRating: 4.1,
+        ratingsCount: 2345,
         categories: ['Fiction'],
         imageLinks: {
           thumbnail: 'http://books.google.com/thumbnail?id=vol123&zoom=1&edge=curl',
@@ -40,6 +42,8 @@ describe('GoogleMapper', () => {
       publishedYear: 1925,
       language: 'en',
       pageCount: 180,
+      communityRating: 4.1,
+      communityRatingCount: 2345,
       isbn10: '1234567890',
       isbn13: '1234567890123',
       genres: ['Fiction'],

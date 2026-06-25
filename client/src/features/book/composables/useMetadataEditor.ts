@@ -2,6 +2,7 @@ import { computed, reactive, ref } from 'vue'
 import { api } from '@/lib/api'
 import {
   FORMAT_TO_GROUP,
+  type BookCommunityRating,
   type BookDetail,
   type BookMetadataLockField,
   type BookMetadataSaveResult,
@@ -111,6 +112,7 @@ export function useMetadataEditor() {
     publishedYear: null as number | null,
     language: null as string | null,
     pageCount: null as number | null,
+    communityRatings: [] as BookCommunityRating[],
     seriesName: null as string | null,
     seriesIndex: null as number | null,
     seriesMemberships: [] as EditableSeriesMembership[],
@@ -163,6 +165,7 @@ export function useMetadataEditor() {
     form.publishedYear = book.publishedYear
     form.language = book.language
     form.pageCount = book.pageCount
+    form.communityRatings = [...book.communityRatings]
     form.seriesName = book.seriesName
     form.seriesIndex = book.seriesIndex
     form.seriesMemberships = seriesMembershipsFromBook(book)
@@ -227,6 +230,12 @@ export function useMetadataEditor() {
     const previousSeriesMemberships = normalizeSeriesMemberships(previous.seriesMemberships)
     if (JSON.stringify(currentSeriesMemberships) !== JSON.stringify(previousSeriesMemberships)) {
       payload.seriesMemberships = currentSeriesMemberships
+    }
+
+    const currentCommunityRatings = form.communityRatings.map(({ provider, rating, ratingCount }) => ({ provider, rating, ratingCount }))
+    const previousCommunityRatings = previous.communityRatings.map(({ provider, rating, ratingCount }) => ({ provider, rating, ratingCount }))
+    if (JSON.stringify(currentCommunityRatings) !== JSON.stringify(previousCommunityRatings)) {
+      payload.communityRatings = currentCommunityRatings
     }
 
     const comicMetadata: Record<string, unknown> = {}

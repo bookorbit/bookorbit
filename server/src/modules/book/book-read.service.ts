@@ -50,4 +50,8 @@ export class BookReadService {
   updateMetadataFields(bookId: number, fields: Parameters<BookRepository['updateMetadataFields']>[1]) {
     return this.bookRepo.updateMetadataFields(bookId, fields);
   }
+
+  replaceCommunityRatings(bookId: number, ratings: Parameters<BookRepository['replaceCommunityRatings']>[1]) {
+    return this.bookRepo.replaceCommunityRatings(bookId, ratings);
+  }
 }

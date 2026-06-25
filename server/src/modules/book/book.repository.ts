@@ -14,6 +14,7 @@ import * as schema from '../../db/schema';
 import {
   authors,
   bookAuthors,
+  bookCommunityRatings,
   bookFiles,
   bookGenres,
   bookMetadata,
@@ -746,7 +747,7 @@ export class BookRepository {
 
     if (!book) return null;
 
-    const [authorRows, genreRows, tagRows, fileRows, narratorRows, seriesMembershipRows] = await Promise.all([
+    const [authorRows, genreRows, tagRows, fileRows, narratorRows, seriesMembershipRows, communityRatingRows] = await Promise.all([
       this.db
         .select({ id: authors.id, name: authors.name, sortName: authors.sortName })
         .from(bookAuthors)
@@ -785,9 +786,19 @@ export class BookRepository {
         .innerJoin(bookSeries, eq(bookSeries.id, bookSeriesMemberships.seriesId))
         .where(eq(bookSeriesMemberships.bookId, id))
         .orderBy(asc(bookSeriesMemberships.displayOrder), asc(bookSeriesMemberships.seriesId)),
+      this.db
+        .select({
+          provider: bookCommunityRatings.provider,
+          rating: bookCommunityRatings.rating,
+          ratingCount: bookCommunityRatings.ratingCount,
+          updatedAt: bookCommunityRatings.updatedAt,
+        })
+        .from(bookCommunityRatings)
+        .where(eq(bookCommunityRatings.bookId, id))
+        .orderBy(asc(bookCommunityRatings.provider)),
     ]);
 
-    return { book, authorRows, genreRows, tagRows, fileRows, narratorRows, seriesMembershipRows };
+    return { book, authorRows, genreRows, tagRows, fileRows, narratorRows, seriesMembershipRows, communityRatingRows };
   }
 
   async findRatingByBookAndUser(bookId: number, userId: number): Promise<number | null> {
@@ -1294,6 +1305,27 @@ export class BookRepository {
       await this.seriesMemberships?.syncPrimaryFromMetadata(bookId, executor);
     }
     await executor.update(books).set({ updatedAt: new Date() }).where(eq(books.id, bookId));
+  }
+
+  async replaceCommunityRatings(
+    bookId: number,
+    ratings: Array<{ provider: string; rating: number; ratingCount: number | null }>,
+    executor: MetadataUpdateExecutor = this.db,
+  ): Promise<void> {
+    const now = new Date();
+    await executor.delete(bookCommunityRatings).where(eq(bookCommunityRatings.bookId, bookId));
+    if (ratings.length > 0) {
+      await executor.insert(bookCommunityRatings).values(
+        ratings.map((rating) => ({
+          bookId,
+          provider: rating.provider,
+          rating: rating.rating,
+          ratingCount: rating.ratingCount,
+          updatedAt: now,
+        })),
+      );
+    }
+    await executor.update(books).set({ updatedAt: now }).where(eq(books.id, bookId));
   }
 
   async bulkUpdateMetadataFields(

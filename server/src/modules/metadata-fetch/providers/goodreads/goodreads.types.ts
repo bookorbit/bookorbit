@@ -17,12 +17,13 @@ export interface GoodreadsAutocompleteItem {
   bookTitleBare?: string;
   author?: string | { name?: string };
   numPages?: string | number;
+  avgRating?: string | number;
   ratingsCount?: string | number;
   imageUrl?: string;
   description?: { html?: string; truncated?: boolean } | string;
 }
 
-// Inline nested objects — NOT __ref pointers
+// Inline nested objects, not __ref pointers.
 export interface GoodreadsApolloBook {
   legacyId?: string | number;
   title?: string;
@@ -35,6 +36,7 @@ export interface GoodreadsApolloBook {
     series?: { __ref?: string; title?: string };
   }>;
   primaryContributorEdge?: { node?: { __ref?: string }; role?: string };
+  work?: { __ref?: string };
 }
 
 export interface GoodreadsApolloDetails {
@@ -53,4 +55,11 @@ export interface GoodreadsApolloContributor {
 
 export interface GoodreadsApolloSeries {
   title?: string;
+}
+
+export interface GoodreadsApolloWork {
+  stats?: {
+    averageRating?: string | number;
+    ratingsCount?: string | number;
+  };
 }

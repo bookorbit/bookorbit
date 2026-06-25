@@ -179,6 +179,7 @@ describe('BookRepository', () => {
     ];
     const narratorRows = [{ id: 4, name: 'Narrator', sortName: null, displayOrder: 0 }];
     const seriesMembershipRows = [{ seriesId: 20, seriesName: 'Dune', seriesIndex: 1, displayOrder: 0 }];
+    const communityRatingRows = [{ provider: 'amazon', rating: 4.8, ratingCount: 104451, updatedAt: new Date() }];
     const db = {
       select: vi
         .fn()
@@ -188,7 +189,8 @@ describe('BookRepository', () => {
         .mockReturnValueOnce(makeSelectChain('where', tagRows))
         .mockReturnValueOnce(makeSelectChain('orderBy', fileRows))
         .mockReturnValueOnce(makeSelectChain('orderBy', narratorRows))
-        .mockReturnValueOnce(makeSelectChain('orderBy', seriesMembershipRows)),
+        .mockReturnValueOnce(makeSelectChain('orderBy', seriesMembershipRows))
+        .mockReturnValueOnce(makeSelectChain('orderBy', communityRatingRows)),
     };
     const repo = new BookRepository(db as never);
 
@@ -202,6 +204,7 @@ describe('BookRepository', () => {
       fileRows,
       narratorRows,
       seriesMembershipRows,
+      communityRatingRows,
     });
   });
 
@@ -433,6 +436,53 @@ describe('BookRepository', () => {
     expect(updateBuilder.set).toHaveBeenNthCalledWith(2, expect.objectContaining({ updatedAt: expect.any(Date) }));
     expect(updateWhere).toHaveBeenCalledTimes(2);
     expect(db.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it('replaces all community rating rows: deletes old then inserts new', async () => {
+    const deleteWhere = vi.fn().mockResolvedValue(undefined);
+    const deleteBuilder = { where: vi.fn().mockReturnValue(deleteWhere) };
+    const values = vi.fn().mockResolvedValue(undefined);
+    const insertBuilder = { values };
+    const updateWhere = vi.fn().mockResolvedValue(undefined);
+    const updateBuilder = { set: vi.fn().mockReturnValue({ where: updateWhere }) };
+    const db = {
+      delete: vi.fn().mockReturnValue(deleteBuilder),
+      insert: vi.fn().mockReturnValue(insertBuilder),
+      update: vi.fn().mockReturnValue(updateBuilder),
+    };
+    const repo = new BookRepository(db as never);
+
+    await repo.replaceCommunityRatings(10, [
+      { provider: 'amazon', rating: 4.8, ratingCount: 104451 },
+      { provider: 'hardcover', rating: 4.25, ratingCount: 12345 },
+    ]);
+
+    expect(db.delete).toHaveBeenCalledTimes(1);
+    expect(deleteBuilder.where).toHaveBeenCalledTimes(1);
+    expect(values).toHaveBeenCalledWith([
+      expect.objectContaining({ bookId: 10, provider: 'amazon', rating: 4.8, ratingCount: 104451, updatedAt: expect.any(Date) }),
+      expect.objectContaining({ bookId: 10, provider: 'hardcover', rating: 4.25, ratingCount: 12345, updatedAt: expect.any(Date) }),
+    ]);
+    expect(updateBuilder.set).toHaveBeenCalledWith({ updatedAt: expect.any(Date) });
+  });
+
+  it('replaceCommunityRatings with empty array deletes all rows without inserting', async () => {
+    const deleteWhere = vi.fn().mockResolvedValue(undefined);
+    const deleteBuilder = { where: vi.fn().mockReturnValue(deleteWhere) };
+    const updateWhere = vi.fn().mockResolvedValue(undefined);
+    const updateBuilder = { set: vi.fn().mockReturnValue({ where: updateWhere }) };
+    const db = {
+      delete: vi.fn().mockReturnValue(deleteBuilder),
+      insert: vi.fn(),
+      update: vi.fn().mockReturnValue(updateBuilder),
+    };
+    const repo = new BookRepository(db as never);
+
+    await repo.replaceCommunityRatings(10, []);
+
+    expect(db.delete).toHaveBeenCalledTimes(1);
+    expect(db.insert).not.toHaveBeenCalled();
+    expect(updateBuilder.set).toHaveBeenCalledWith({ updatedAt: expect.any(Date) });
   });
 
   it('returns empty pattern metadata without hitting DB when no book ids are provided', async () => {

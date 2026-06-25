@@ -42,6 +42,16 @@ describe('MetadataPreferenceResolver', () => {
       MetadataProviderKey.ITUNES,
       MetadataProviderKey.KOBO,
     ]);
+    expect(defaults.fields.communityRating.providers).toEqual([
+      MetadataProviderKey.HARDCOVER,
+      MetadataProviderKey.GOODREADS,
+      MetadataProviderKey.GOOGLE,
+      MetadataProviderKey.OPEN_LIBRARY,
+      MetadataProviderKey.ITUNES,
+      MetadataProviderKey.RANOBEDB,
+      MetadataProviderKey.AMAZON,
+      MetadataProviderKey.AUDIBLE,
+    ]);
 
     const fieldsWithoutItunes: (keyof typeof defaults.fields)[] = [
       'publisher',

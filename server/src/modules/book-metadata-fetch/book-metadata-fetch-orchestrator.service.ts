@@ -176,7 +176,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         return;
       }
 
-      const { book, authorRows, genreRows, narratorRows } = found;
+      const { book, authorRows, genreRows, narratorRows, communityRatingRows } = found;
       const meta = book.book_metadata;
       const libraryId = book.books.libraryId;
 
@@ -198,6 +198,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         publishedYear: meta?.publishedYear,
         language: meta?.language,
         pageCount: meta?.pageCount,
+        communityRating: communityRatingRows,
         seriesName: meta?.seriesName,
         seriesIndex: meta?.seriesIndex,
         genres: genreRows.map((g) => g.name),
@@ -304,6 +305,17 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     scalarFields.updatedAt = new Date();
     await this.bookReadService.updateMetadataFields(bookId, scalarFields);
 
+    if (filteredResolved.communityRatings !== undefined) {
+      await this.bookReadService.replaceCommunityRatings(
+        bookId,
+        filteredResolved.communityRatings.map((rating) => ({
+          provider: rating.provider,
+          rating: rating.rating,
+          ratingCount: rating.ratingCount,
+        })),
+      );
+    }
+
     const resolvedAuthors = this.asStringArray(filteredResolved.authors);
     if (resolvedAuthors !== undefined) {
       const names = resolvedAuthors;
@@ -346,7 +358,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
   private async loadEligibilityData(bookId: number) {
     const found = await this.bookReadService.findById(bookId);
     if (!found) return null;
-    const { book, authorRows, genreRows, narratorRows } = found;
+    const { book, authorRows, genreRows, narratorRows, communityRatingRows } = found;
     const meta = book.book_metadata;
     return {
       metadataScore: meta?.metadataScore ?? null,
@@ -358,6 +370,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
       publishedYear: meta?.publishedYear ?? null,
       language: meta?.language ?? null,
       pageCount: meta?.pageCount ?? null,
+      communityRating: communityRatingRows,
       seriesName: meta?.seriesName ?? null,
       seriesIndex: meta?.seriesIndex ?? null,
       coverSource: meta?.coverSource ?? null,

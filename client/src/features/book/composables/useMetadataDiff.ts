@@ -1,5 +1,6 @@
 import { computed, reactive, toValue, type MaybeRefOrGetter } from 'vue'
 import type {
+  BookCommunityRating,
   BookMetadataLockField,
   ComicMetadataFields,
   MetadataCandidate,
@@ -11,6 +12,7 @@ import type {
   CustomMetadataBookValueInput,
 } from '@bookorbit/types'
 import { getProviderLabel, toDisplayCoverUrl } from '../lib/metadata-fetch'
+import { formatCommunityRatingLine, formatCommunityRatingValue } from '../lib/community-rating'
 
 type ComicDiffFieldKey =
   | 'comicIssueNumber'
@@ -34,6 +36,7 @@ export type DiffFieldKey =
   | 'publishedYear'
   | 'language'
   | 'pageCount'
+  | 'communityRating'
   | 'seriesName'
   | 'seriesIndex'
   | 'isbn13'
@@ -80,6 +83,7 @@ export interface MetadataPatch {
   publishedYear?: number | null
   language?: string | null
   pageCount?: number | null
+  communityRatings?: Array<Pick<BookCommunityRating, 'provider' | 'rating' | 'ratingCount'>>
   seriesName?: string | null
   seriesIndex?: number | null
   seriesMemberships?: MetadataSeriesMembership[] | null
@@ -117,6 +121,7 @@ export const FIELD_DEFS: { key: DiffFieldKey; label: string }[] = [
   { key: 'publishedYear', label: 'Published Year' },
   { key: 'language', label: 'Language' },
   { key: 'pageCount', label: 'Page Count' },
+  { key: 'communityRating', label: 'Community Rating' },
   { key: 'seriesName', label: 'Series' },
   { key: 'seriesIndex', label: 'Series Index' },
   { key: 'isbn13', label: 'ISBN-13' },
@@ -219,6 +224,7 @@ export function getCandidateValueFrom(candidate: MetadataCandidate, key: DiffFie
   if (key === 'authors') return (candidate.authors ?? []).join(', ')
   if (key === 'genres') return (candidate.genres ?? []).join(', ')
   if (key === 'narrators') return (candidate.narrators ?? []).join(', ')
+  if (key === 'communityRating') return formatCommunityRatingValue(candidate.communityRating, candidate.communityRatingCount)
   const val = candidate[key as keyof MetadataCandidate]
   return val != null ? String(val) : ''
 }
@@ -252,6 +258,7 @@ export function useMetadataDiff(
   lockedFields?: MaybeRefOrGetter<readonly BookMetadataLockField[] | undefined>,
 ) {
   const pickedSources = reactive(new Map<DiffFieldKey, MetadataProviderKey>())
+  const pickedCommunityRatingProviders = reactive(new Set<MetadataProviderKey>())
   const lockedFieldSet = computed(() => new Set(toValue(lockedFields) ?? []))
 
   function resolveLockField(key: DiffFieldKey): BookMetadataLockField | null {
@@ -266,6 +273,11 @@ export function useMetadataDiff(
     if (key === 'genres') return current.genres.join(', ')
     if (key === 'narrators') return current.narrators?.join(', ') ?? ''
     if (key === 'coverUrl') return currentCoverUrl ?? ''
+    if (key === 'communityRating') {
+      const ap = toValue(activeProvider)
+      const existing = current.communityRatings?.find((r) => r.provider === ap)
+      return existing ? formatCommunityRatingValue(existing.rating, existing.ratingCount) : ''
+    }
     const val = current[key as keyof MetadataSource]
     return val != null ? String(val) : ''
   }
@@ -285,7 +297,7 @@ export function useMetadataDiff(
         provider: c.provider,
         label: getProviderLabel(c.provider, infos),
         display,
-        isPicked: pickedSources.get(key) === c.provider,
+        isPicked: key === 'communityRating' ? pickedCommunityRatingProviders.has(c.provider) : pickedSources.get(key) === c.provider,
       })
     }
 
@@ -305,11 +317,34 @@ export function useMetadataDiff(
       if (!candidateVal) return null
     }
 
-    const pickedProvider = pickedSources.get(key) ?? null
+    const pickedProvider =
+      key === 'communityRating'
+        ? pickedCommunityRatingProviders.has(ap)
+          ? ap
+          : (pickedCommunityRatingProviders.values().next().value ?? null)
+        : (pickedSources.get(key) ?? null)
     const isPicked = pickedProvider !== null
-    const pickedFromActive = isPicked && pickedProvider === ap
-    const pickedCandidate = isPicked ? allCandidates.find((c) => c.provider === pickedProvider) : null
-    const pickedDisplay = pickedCandidate ? getCandidateValueFrom(pickedCandidate, key) : ''
+    const pickedFromActive = key === 'communityRating' ? pickedCommunityRatingProviders.has(ap) : isPicked && pickedProvider === ap
+    const pickedDisplay =
+      key === 'communityRating'
+        ? allCandidates
+            .filter((c) => pickedCommunityRatingProviders.has(c.provider) && c.communityRating !== undefined)
+            .map((c) =>
+              formatCommunityRatingLine(
+                {
+                  provider: c.provider,
+                  rating: c.communityRating!,
+                  ratingCount: c.communityRatingCount ?? null,
+                  updatedAt: null,
+                },
+                toValue(providerInfos),
+              ),
+            )
+            .join(', ')
+        : (() => {
+            const pickedCandidate = isPicked ? allCandidates.find((c) => c.provider === pickedProvider) : null
+            return pickedCandidate ? getCandidateValueFrom(pickedCandidate, key) : ''
+          })()
     const lockField = resolveLockField(key)
 
     return {
@@ -403,6 +438,11 @@ export function useMetadataDiff(
     const lockField = resolveLockField(key)
     if (lockField && lockedFieldSet.value.has(lockField)) return
     const ap = toValue(activeProvider)
+    if (key === 'communityRating') {
+      if (pickedCommunityRatingProviders.has(ap)) pickedCommunityRatingProviders.delete(ap)
+      else pickedCommunityRatingProviders.add(ap)
+      return
+    }
     if (pickedSources.get(key) === ap) {
       pickedSources.delete(key)
     } else {
@@ -413,6 +453,11 @@ export function useMetadataDiff(
   function pickFieldFromProvider(key: DiffFieldKey, provider: MetadataProviderKey) {
     const lockField = resolveLockField(key)
     if (lockField && lockedFieldSet.value.has(lockField)) return
+    if (key === 'communityRating') {
+      if (pickedCommunityRatingProviders.has(provider)) pickedCommunityRatingProviders.delete(provider)
+      else pickedCommunityRatingProviders.add(provider)
+      return
+    }
     if (pickedSources.get(key) === provider) {
       pickedSources.delete(key)
     } else {
@@ -423,14 +468,18 @@ export function useMetadataDiff(
   function copyAll() {
     const ap = toValue(activeProvider)
     for (const f of fields.value) {
-      if (f.isCopyable && !f.isLocked) pickedSources.set(f.key, ap)
+      if (!f.isCopyable || f.isLocked) continue
+      if (f.key === 'communityRating') pickedCommunityRatingProviders.add(ap)
+      else pickedSources.set(f.key, ap)
     }
   }
 
   function copyMissing() {
     const ap = toValue(activeProvider)
     for (const f of fields.value) {
-      if (f.isCopyable && !f.isLocked && !f.bookValue && !f.isPicked) pickedSources.set(f.key, ap)
+      if (!f.isCopyable || f.isLocked || f.bookValue || f.isPicked) continue
+      if (f.key === 'communityRating') pickedCommunityRatingProviders.add(ap)
+      else pickedSources.set(f.key, ap)
     }
   }
 
@@ -487,6 +536,9 @@ export function useMetadataDiff(
         formPatch.pageCount = candidate.pageCount ?? null
         continue
       }
+      if (key === 'communityRating') {
+        continue
+      }
       if (key === 'seriesIndex') {
         formPatch.seriesIndex = candidate.seriesIndex ?? null
         continue
@@ -498,6 +550,17 @@ export function useMetadataDiff(
       if (key === 'sourceUrl') continue
       const val = candidate[key as keyof MetadataCandidate]
       ;(formPatch as Record<string, unknown>)[key] = val != null ? String(val) : null
+    }
+
+    for (const providerKey of pickedCommunityRatingProviders) {
+      const candidate = allCandidates.find((c) => c.provider === providerKey)
+      if (candidate?.communityRating === undefined) continue
+      formPatch.communityRatings ??= []
+      formPatch.communityRatings.push({
+        provider: candidate.provider,
+        rating: candidate.communityRating,
+        ratingCount: candidate.communityRatingCount ?? null,
+      })
     }
 
     if (pickedSeriesNameProvider && pickedSeriesIndexProvider === pickedSeriesNameProvider) {
@@ -512,6 +575,9 @@ export function useMetadataDiff(
 
     // Auto-include provider IDs for every provider that contributed at least one picked field
     const pickedProviders = new Set(pickedSources.values())
+    for (const provider of pickedCommunityRatingProviders) {
+      pickedProviders.add(provider)
+    }
     for (const provider of pickedProviders) {
       const candidate = allCandidates.find((c) => c.provider === provider)
       if (!candidate?.providerId) continue
@@ -548,6 +614,9 @@ export function useMetadataDiff(
     for (const provKey of pickedSources.values()) {
       counts.set(provKey, (counts.get(provKey) ?? 0) + 1)
     }
+    for (const provKey of pickedCommunityRatingProviders) {
+      counts.set(provKey, (counts.get(provKey) ?? 0) + 1)
+    }
     return counts
   })
 
@@ -555,9 +624,10 @@ export function useMetadataDiff(
     for (const [key, p] of pickedSources) {
       if (p === provider) pickedSources.delete(key)
     }
+    pickedCommunityRatingProviders.delete(provider)
   }
 
-  const hasCopied = computed(() => pickedSources.size > 0)
+  const hasCopied = computed(() => pickedSources.size > 0 || pickedCommunityRatingProviders.size > 0)
 
   return {
     fields,

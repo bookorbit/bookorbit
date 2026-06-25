@@ -138,6 +138,8 @@ describe('mapRanobeDbBook', () => {
       isbn13: '9780316371247',
       seriesName: 'Sword Art Online',
       seriesIndex: 1,
+      communityRating: 4.25,
+      communityRatingCount: 1200,
       coverUrl: 'https://images.ranobedb.org/covers/sao.jpg',
       sourceUrl: 'https://ranobedb.org/book/1287',
     });

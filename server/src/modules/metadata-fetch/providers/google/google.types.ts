@@ -16,6 +16,8 @@ export interface GoogleVolumeInfo {
   publisher?: string;
   publishedDate?: string;
   pageCount?: number;
+  averageRating?: number;
+  ratingsCount?: number;
   language?: string;
   categories?: string[];
   industryIdentifiers?: GoogleIndustryIdentifier[];

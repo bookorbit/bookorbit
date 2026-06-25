@@ -2,7 +2,14 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Check, ChevronDown, FileCheck, HardDriveDownload, HardDriveUpload, Loader2, Lock, LockOpen, RefreshCw, Sparkles, Star, X } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import type { BookDetail, BookMetadataLockField, CustomMetadataPrimitiveValue, MetadataProviderInfo, WriteResult } from '@bookorbit/types'
+import type {
+  BookCommunityRating,
+  BookDetail,
+  BookMetadataLockField,
+  CustomMetadataPrimitiveValue,
+  MetadataProviderInfo,
+  WriteResult,
+} from '@bookorbit/types'
 import { BOOK_FILE_WRITE_FIELD_LABELS, FORMAT_TO_GROUP } from '@bookorbit/types'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -28,6 +35,7 @@ import { RATING_STARS, getRatingStarClass } from '@/features/book/lib/rating-sta
 import { buildFileMetadataPatch } from '@/features/book/lib/file-metadata-patch'
 import { metadataRefreshEmptyMessage } from '@/features/book/lib/metadata-refresh-feedback'
 import { filterProviderIdFields, isProviderIdFieldAvailable, isProviderIdFormField } from '@/features/book/lib/provider-id-fields'
+import { formatCommunityRatingLine } from '@/features/book/lib/community-rating'
 
 const AUTO_FILL_EMPTY_TOAST_DURATION_MS = 10_000
 
@@ -231,6 +239,9 @@ const combinedError = computed(() => lockError.value ?? error.value)
 const hasLockedFields = computed(() => lockedFields.value.length > 0)
 const hasPendingChanges = computed(() => isDirty.value || locksDirty.value)
 const isSeriesLocked = computed(() => isLocked('seriesName') || isLocked('seriesIndex'))
+const communityRatingLines = computed(() =>
+  form.communityRatings.map((rating) => formatCommunityRatingLine(rating, availableMetadataProviders.value ?? [])),
+)
 
 async function submit() {
   if (coverPanel.value?.hasPending) {
@@ -342,6 +353,37 @@ function applySeriesMembershipPatch(formPatch: MetadataPatch, skippedFields: Boo
   return 1
 }
 
+function normalizeCommunityRatingPatchItem(rating: NonNullable<MetadataPatch['communityRatings']>[number]): BookCommunityRating | null {
+  if (!Number.isFinite(rating.rating) || rating.rating < 0 || rating.rating > 5) return null
+  const ratingCount =
+    typeof rating.ratingCount === 'number' && Number.isInteger(rating.ratingCount) && rating.ratingCount >= 0 ? rating.ratingCount : null
+  return {
+    provider: rating.provider,
+    rating: rating.rating,
+    ratingCount,
+    updatedAt: null,
+  }
+}
+
+function applyCommunityRatingPatch(formPatch: MetadataPatch, skippedFields: BookMetadataLockField[]): number {
+  if (formPatch.communityRatings === undefined) return 0
+  if (isLocked('communityRating')) {
+    trackLockedField('communityRating', skippedFields)
+    return 0
+  }
+
+  const byProvider = new Map(form.communityRatings.map((rating) => [rating.provider, rating]))
+  let updated = 0
+  for (const patchRating of formPatch.communityRatings) {
+    const normalized = normalizeCommunityRatingPatchItem(patchRating)
+    if (!normalized) continue
+    byProvider.set(normalized.provider, normalized)
+    updated++
+  }
+  form.communityRatings = [...byProvider.values()]
+  return updated > 0 ? 1 : 0
+}
+
 function applyDirectPatchField(field: (typeof DIRECT_PATCH_FIELDS)[number], value: unknown, skippedFields: BookMetadataLockField[]): boolean {
   if (value === undefined) return false
   if (isProviderIdFormField(field) && !isProviderIdFieldAvailable(field, availableMetadataProviders.value)) return false
@@ -421,6 +463,7 @@ function applyPatchToForm(formPatch: MetadataPatch, coverUrl: string | undefined
   let updatedCount = 0
   const hasSeriesMembershipPatch = formPatch.seriesMemberships !== undefined
   updatedCount += applySeriesMembershipPatch(formPatch, skippedFields)
+  updatedCount += applyCommunityRatingPatch(formPatch, skippedFields)
   for (const field of DIRECT_PATCH_FIELDS) {
     if (hasSeriesMembershipPatch && (field === 'seriesName' || field === 'seriesIndex')) continue
     if (applyDirectPatchField(field, formPatch[field], skippedFields)) updatedCount++
@@ -519,6 +562,7 @@ function buildPreviewPatch(preview: MetadataRefreshPreview): MetadataPatch {
     publishedYear: preview.publishedYear,
     language: preview.language,
     pageCount: preview.pageCount,
+    communityRatings: preview.communityRatings,
     seriesName: preview.seriesName,
     seriesIndex: preview.seriesIndex,
     seriesMemberships: preview.seriesMemberships,
@@ -949,6 +993,29 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           </div>
         </MetadataFieldLabel>
       </div>
+
+      <MetadataFieldLabel
+        label="Community Ratings"
+        field="communityRating"
+        :locked="isLocked('communityRating')"
+        :is-updating="isUpdatingLock"
+        multiline
+        @toggle="handleLockToggle"
+      >
+        <div class="min-h-10 rounded-lg border border-input bg-background px-3 py-2 pr-12 text-sm">
+          <div v-if="communityRatingLines.length" class="flex flex-wrap gap-1.5">
+            <span
+              v-for="line in communityRatingLines"
+              :key="line"
+              class="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-xs text-foreground"
+            >
+              <Star class="size-3 text-primary" />
+              {{ line }}
+            </span>
+          </div>
+          <span v-else class="text-sm text-muted-foreground">No provider ratings</span>
+        </div>
+      </MetadataFieldLabel>
 
       <!-- Series | Publisher -->
       <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)] gap-3">

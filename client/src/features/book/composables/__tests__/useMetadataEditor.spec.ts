@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { BookDetail } from '@bookorbit/types'
+import { MetadataProviderKey, type BookDetail } from '@bookorbit/types'
 import { useMetadataEditor } from '../useMetadataEditor'
 
 const apiMock = vi.hoisted(() => vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<unknown>>())
@@ -29,6 +29,7 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     seriesName: null,
     seriesIndex: null,
     rating: null,
+    communityRatings: [],
     coverSource: null,
     hardcoverEditionId: null,
     providerIds: {},
@@ -151,6 +152,30 @@ describe('useMetadataEditor', () => {
     expect(JSON.parse(String(req.body))).toEqual({
       metadata: {
         customMetadata: [{ fieldId: 7, value: 'Le Comte de Monte-Cristo' }],
+      },
+      lockedFields: [],
+    })
+  })
+
+  it('sends changed community rating rows in the metadata payload', async () => {
+    const book = makeBook()
+    apiMock.mockResolvedValue({ ok: true, json: async () => book })
+
+    const { form, load, save } = useMetadataEditor()
+    load(book)
+    form.communityRatings = [
+      { provider: MetadataProviderKey.HARDCOVER, rating: 4.2, ratingCount: 6, updatedAt: null },
+      { provider: MetadataProviderKey.AMAZON, rating: 4.8, ratingCount: 104451, updatedAt: null },
+    ]
+    await save(book.id, [])
+
+    const [, req] = apiMock.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(String(req.body))).toEqual({
+      metadata: {
+        communityRatings: [
+          { provider: MetadataProviderKey.HARDCOVER, rating: 4.2, ratingCount: 6 },
+          { provider: MetadataProviderKey.AMAZON, rating: 4.8, ratingCount: 104451 },
+        ],
       },
       lockedFields: [],
     })

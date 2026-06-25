@@ -23,12 +23,19 @@ describe('GoodreadsMapper', () => {
           isbn13: '1234567890123',
         },
         bookSeries: [{ userPosition: '1' }],
+        work: { __ref: 'Work:kca:999' },
       },
       'Contributor:kca:456': {
         name: 'F. Scott Fitzgerald',
       },
       'Series:kca:789': {
         title: 'Great American Novels',
+      },
+      'Work:kca:999': {
+        stats: {
+          averageRating: 4.02,
+          ratingsCount: 5_123_456,
+        },
       },
     };
 
@@ -52,7 +59,53 @@ describe('GoodreadsMapper', () => {
       sourceUrl: `https://www.goodreads.com/book/show/${bookId}`,
       seriesName: 'Great American Novels',
       seriesIndex: 1,
+      communityRating: 4.02,
+      communityRatingCount: 5_123_456,
     });
+  });
+
+  it('maps Goodreads community rating from Apollo Work stats', () => {
+    const mockState = {
+      'Book:kca://book/actual': {
+        legacyId: 199635056,
+        title: 'My Salty Mary',
+        work: { __ref: 'Work:kca://work/actual' },
+      },
+      'Work:kca://work/actual': {
+        stats: {
+          averageRating: 3.92,
+          ratingsCount: 2505,
+        },
+      },
+    };
+
+    const result = mapGoodreadsApolloState(mockState, '199635056');
+
+    expect(result).toMatchObject({
+      title: 'My Salty Mary',
+      communityRating: 3.92,
+      communityRatingCount: 2505,
+    });
+  });
+
+  it('ignores invalid Goodreads community rating values from Apollo Work stats', () => {
+    const mockState = {
+      'Book:kca:1': {
+        title: 'Invalid Stats',
+        work: { __ref: 'Work:kca:1' },
+      },
+      'Work:kca:1': {
+        stats: {
+          averageRating: 8,
+          ratingsCount: -1,
+        },
+      },
+    };
+
+    const result = mapGoodreadsApolloState(mockState, '1');
+
+    expect(result?.communityRating).toBeUndefined();
+    expect(result?.communityRatingCount).toBeUndefined();
   });
 
   it('uses only the first Goodreads Apollo bookSeries entry', () => {
@@ -198,6 +251,8 @@ describe('GoodreadsMapper', () => {
           bookTitleBare: 'Mistborn: The Final Empire',
           author: { name: 'Brandon Sanderson' },
           numPages: 541,
+          avgRating: '4.42',
+          ratingsCount: 987_654,
           imageUrl: 'https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1617768316i/68428._SY75_.jpg',
           description: { html: 'For a thousand years the ash fell &amp; no flowers bloomed.<br/><br/>Once, a hero rose…', truncated: true },
         },
@@ -216,6 +271,8 @@ describe('GoodreadsMapper', () => {
         sourceUrl: 'https://www.goodreads.com/book/show/68428',
         seriesName: 'Mistborn',
         seriesIndex: 1,
+        communityRating: 4.42,
+        communityRatingCount: 987_654,
       });
     });
 
@@ -229,6 +286,40 @@ describe('GoodreadsMapper', () => {
       expect(result?.subtitle).toBeUndefined();
       expect(result?.seriesName).toBeUndefined();
       expect(result?.seriesIndex).toBeUndefined();
+    });
+
+    it('maps Goodreads community rating from autocomplete fallback items', () => {
+      const result = mapGoodreadsAutocompleteItem(
+        {
+          bookId: '7488244',
+          title: 'Unearthly (Unearthly, #1)',
+          bookTitleBare: 'Unearthly',
+          avgRating: '4.01',
+          ratingsCount: '129,924',
+        },
+        '7488244',
+      );
+
+      expect(result).toMatchObject({
+        title: 'Unearthly',
+        communityRating: 4.01,
+        communityRatingCount: 129_924,
+      });
+    });
+
+    it('ignores invalid Goodreads community rating values from autocomplete items', () => {
+      const result = mapGoodreadsAutocompleteItem(
+        {
+          bookId: '1',
+          bookTitleBare: 'Invalid Fallback Stats',
+          avgRating: '6.3',
+          ratingsCount: '-10',
+        },
+        '1',
+      );
+
+      expect(result?.communityRating).toBeUndefined();
+      expect(result?.communityRatingCount).toBeUndefined();
     });
 
     it('returns null when the item has no usable title', () => {
@@ -265,5 +356,65 @@ describe('GoodreadsMapper', () => {
     expect(result?.title).toBe('To Kill a Mockingbird');
     expect(result?.description).toBe('A novel about Scout Finch.');
     expect(result?.pageCount).toBe(323);
+  });
+
+  it('does not attach community rating from an unrelated Work when book has no work ref', () => {
+    const mockState = {
+      'Book:kca:42': {
+        title: 'Some Book',
+        // no work ref
+      },
+      'Work:kca:unrelated': {
+        stats: {
+          averageRating: 4.9,
+          ratingsCount: 999_000,
+        },
+      },
+    };
+
+    const result = mapGoodreadsApolloState(mockState, '42');
+
+    expect(result?.communityRating).toBeUndefined();
+    expect(result?.communityRatingCount).toBeUndefined();
+  });
+
+  it('treats blank and whitespace-only ratingsCount strings as missing', () => {
+    const mockState = {
+      'Book:kca:1': {
+        title: 'Blank Count Book',
+        work: { __ref: 'Work:kca:1' },
+      },
+      'Work:kca:1': {
+        stats: {
+          averageRating: 4.0,
+          ratingsCount: '   ',
+        },
+      },
+    };
+
+    const result = mapGoodreadsApolloState(mockState, '1');
+
+    expect(result?.communityRating).toBe(4.0);
+    expect(result?.communityRatingCount).toBeUndefined();
+  });
+
+  it('treats empty string ratingsCount as missing', () => {
+    const mockState = {
+      'Book:kca:2': {
+        title: 'Empty Count Book',
+        work: { __ref: 'Work:kca:2' },
+      },
+      'Work:kca:2': {
+        stats: {
+          averageRating: 3.5,
+          ratingsCount: '',
+        },
+      },
+    };
+
+    const result = mapGoodreadsApolloState(mockState, '2');
+
+    expect(result?.communityRating).toBe(3.5);
+    expect(result?.communityRatingCount).toBeUndefined();
   });
 });

@@ -24,10 +24,20 @@ function coverUrl(coverId: number | undefined): string | undefined {
   return `https://covers.openlibrary.org/b/id/${coverId}-L.jpg`;
 }
 
+function normalizeCommunityRating(value: number | undefined): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 5 ? value : undefined;
+}
+
+function normalizeCommunityRatingCount(value: number | undefined): number | undefined {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : undefined;
+}
+
 export function mapOpenLibraryDoc(raw: OpenLibraryDoc): MetadataCandidate {
   const isbn10 = raw.isbn?.find((i) => i.length === 10);
   const isbn13 = raw.isbn?.find((i) => i.length === 13);
   const providerId = stripWorkPrefix(raw.key);
+  const communityRating = normalizeCommunityRating(raw.ratings_average);
+  const communityRatingCount = normalizeCommunityRatingCount(raw.ratings_count);
 
   return {
     provider: MetadataProviderKey.OPEN_LIBRARY,
@@ -43,6 +53,8 @@ export function mapOpenLibraryDoc(raw: OpenLibraryDoc): MetadataCandidate {
     genres: raw.subject?.slice(0, 10),
     coverUrl: coverUrl(raw.cover_i),
     sourceUrl: `https://openlibrary.org${raw.key}`,
+    ...(communityRating !== undefined ? { communityRating } : {}),
+    ...(communityRatingCount !== undefined ? { communityRatingCount } : {}),
   };
 }
 

@@ -311,6 +311,44 @@ describe('MetadataFetchPipeline', () => {
     expect(sources.description).toBe(MetadataProviderKey.OPEN_LIBRARY);
   });
 
+  it('resolves community ratings from every configured provider', async () => {
+    const prefs = createPreferences((fields) => {
+      for (const field of ALL_METADATA_FIELDS) {
+        fields[field] = {
+          enabled: false,
+          providers: [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY],
+          mergeStrategy: 'overwriteIfProvided',
+        };
+      }
+      fields.communityRating = {
+        enabled: true,
+        providers: [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+    });
+
+    preferencesService.getGlobal.mockResolvedValue(prefs);
+    resolver.resolve.mockReturnValue(prefs);
+    resolver.withForwardCompatibility.mockReturnValue(prefs);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
+    fetchService.search.mockReturnValue(
+      of(
+        candidate(MetadataProviderKey.GOOGLE, 'g1', { communityRating: 4.1 }),
+        candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { communityRating: 4.2, communityRatingCount: 999 }),
+      ),
+    );
+
+    const { resolved, sources } = await pipeline.runWithSources({ title: 'Query' }, {});
+
+    expect(resolved).toMatchObject({
+      communityRatings: [
+        { provider: MetadataProviderKey.GOOGLE, rating: 4.1, ratingCount: null, updatedAt: expect.any(String) },
+        { provider: MetadataProviderKey.OPEN_LIBRARY, rating: 4.2, ratingCount: 999, updatedAt: expect.any(String) },
+      ],
+    });
+    expect(sources.communityRating).toBe(`${MetadataProviderKey.GOOGLE}|${MetadataProviderKey.OPEN_LIBRARY}`);
+  });
+
   it('maps cover field to coverUrl output and source key', async () => {
     const prefs = createPreferences((fields) => {
       fields.cover = {

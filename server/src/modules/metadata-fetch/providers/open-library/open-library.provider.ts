@@ -12,7 +12,8 @@ import { mapOpenLibraryDoc, mapOpenLibraryWork } from './open-library.mapper';
 import { OpenLibraryDoc, OpenLibrarySearchResponse, OpenLibraryWork } from './open-library.types';
 
 const BASE_URL = 'https://openlibrary.org';
-const SEARCH_FIELDS = 'key,title,author_name,first_publish_year,isbn,cover_i,publisher,language,number_of_pages_median,subject';
+const SEARCH_FIELDS =
+  'key,title,author_name,first_publish_year,isbn,cover_i,publisher,language,number_of_pages_median,subject,ratings_average,ratings_count';
 
 @Injectable()
 export class OpenLibraryProvider implements IdentifiableProvider {

@@ -1,5 +1,6 @@
-import { IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+import { MetadataProviderKey } from '@bookorbit/types';
 import { CustomMetadataValueDto } from '../../custom-metadata/dto/custom-metadata-value.dto';
 
 export class AudiobookChapterDto {
@@ -34,6 +35,12 @@ export class BookSeriesMembershipDto {
   @IsOptional() @IsNumber() seriesIndex?: number | null;
 }
 
+export class CommunityRatingDto {
+  @IsIn(Object.values(MetadataProviderKey)) provider!: MetadataProviderKey;
+  @IsNumber() @Min(0) @Max(5) rating!: number;
+  @IsOptional() @IsInt() @Min(0) ratingCount?: number | null;
+}
+
 export class UpdateBookMetadataDto {
   @IsOptional() @IsString() @MaxLength(1000) title?: string | null;
   @IsOptional() @IsString() @MaxLength(1000) subtitle?: string | null;
@@ -49,6 +56,7 @@ export class UpdateBookMetadataDto {
   @IsOptional() @IsString() @MaxLength(10) isbn10?: string | null;
   @IsOptional() @IsString() @MaxLength(13) isbn13?: string | null;
   @IsOptional() @IsInt() @Min(1) @Max(5) rating?: number | null;
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => CommunityRatingDto) communityRatings?: CommunityRatingDto[] | null;
   @IsOptional() @IsArray() @IsString({ each: true }) authors?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) genres?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];

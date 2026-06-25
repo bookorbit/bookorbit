@@ -183,6 +183,13 @@
       "when": 1782412211738,
       "tag": "0025_add_hardcover_edition_id",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1782421105729,
+      "tag": "0026_add_book_community_ratings",
+      "breakpoints": true
     }
   ]
 }

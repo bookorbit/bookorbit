@@ -35,6 +35,17 @@ const PROVIDERS_WITH_ITUNES: MetadataProviderKey[] = [
   MetadataProviderKey.OPEN_LIBRARY,
 ];
 
+const COMMUNITY_RATING_PROVIDERS: MetadataProviderKey[] = [
+  MetadataProviderKey.HARDCOVER,
+  MetadataProviderKey.GOODREADS,
+  MetadataProviderKey.GOOGLE,
+  MetadataProviderKey.OPEN_LIBRARY,
+  MetadataProviderKey.ITUNES,
+  MetadataProviderKey.RANOBEDB,
+  MetadataProviderKey.AMAZON,
+  MetadataProviderKey.AUDIBLE,
+];
+
 const FIELD_DEFAULTS: Partial<Record<MetadataField, Partial<FieldPreference>>> = {
   title: { mergeStrategy: 'fillMissing', providers: PROVIDERS_WITH_ITUNES },
   subtitle: { providers: PROVIDERS_WITH_ITUNES },
@@ -51,6 +62,7 @@ const FIELD_DEFAULTS: Partial<Record<MetadataField, Partial<FieldPreference>>> =
   },
   authors: { providers: PROVIDERS_WITH_ITUNES },
   genres: { providers: [MetadataProviderKey.GOODREADS, MetadataProviderKey.GOOGLE, MetadataProviderKey.ITUNES, MetadataProviderKey.KOBO] },
+  communityRating: { providers: COMMUNITY_RATING_PROVIDERS },
 };
 
 @Injectable()

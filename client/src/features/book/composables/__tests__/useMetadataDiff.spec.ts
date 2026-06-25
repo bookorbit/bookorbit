@@ -22,6 +22,7 @@ describe('useMetadataDiff', () => {
     durationSeconds: null,
     abridged: null,
     hardcoverEditionId: null,
+    communityRatings: [],
   }
 
   const mockCandidate1: MetadataCandidate = {
@@ -46,7 +47,11 @@ describe('useMetadataDiff', () => {
     { key: 'goodreads' as MetadataProviderKey, label: 'Goodreads', identifiable: true },
   ]
 
-  const hardcoverProviders = [{ key: 'hardcover' as MetadataProviderKey, label: 'Hardcover', identifiable: true }]
+  const communityRatingProviders = [
+    { key: 'hardcover' as MetadataProviderKey, label: 'Hardcover', identifiable: true },
+    { key: 'amazon' as MetadataProviderKey, label: 'Amazon', identifiable: true },
+  ]
+  const hardcoverProviders = [communityRatingProviders[0]]
 
   it('initializes with fields from active provider', () => {
     const candidates = ref([mockCandidate1, mockCandidate2])
@@ -106,6 +111,51 @@ describe('useMetadataDiff', () => {
     // Should auto-include provider IDs
     expect(formPatch.googleBooksId).toBe('g1')
     expect(formPatch.goodreadsId).toBe('gr1')
+  })
+
+  it('builds a provider-specific community ratings patch', () => {
+    const hardcoverCandidate: MetadataCandidate = {
+      provider: 'hardcover',
+      providerId: 'hardcover-book',
+      title: 'Hardcover Title',
+      communityRating: 4.25,
+      communityRatingCount: 12345,
+    }
+    const amazonCandidate: MetadataCandidate = {
+      provider: 'amazon',
+      providerId: 'B00X47ZVXM',
+      title: 'Amazon Title',
+      communityRating: 4.8,
+      communityRatingCount: 104451,
+    }
+    const candidates = ref([hardcoverCandidate, amazonCandidate])
+    const activeProvider = ref<MetadataProviderKey>('hardcover')
+    const { fields, toggleField, pickFieldFromProvider, buildPatch } = useMetadataDiff(
+      mockCurrent,
+      candidates,
+      activeProvider,
+      communityRatingProviders,
+    )
+
+    const ratingField = fields.value.find((f) => f.key === 'communityRating')
+    expect(ratingField).toEqual(
+      expect.objectContaining({
+        bookValue: '',
+        candidateDisplay: '4.3 / 5 (12,345 ratings)',
+      }),
+    )
+
+    toggleField('communityRating')
+    pickFieldFromProvider('communityRating', 'amazon')
+
+    expect(buildPatch().formPatch).toMatchObject({
+      communityRatings: [
+        { provider: 'hardcover', rating: 4.25, ratingCount: 12345 },
+        { provider: 'amazon', rating: 4.8, ratingCount: 104451 },
+      ],
+      hardcoverId: 'hardcover-book',
+      amazonId: 'B00X47ZVXM',
+    })
   })
 
   it('shows and applies Hardcover edition IDs as lockable metadata fields', () => {

@@ -11,6 +11,7 @@ export interface BookEligibilityData {
   publishedYear: number | null;
   language: string | null;
   pageCount: number | null;
+  communityRating: readonly unknown[];
   seriesName: string | null;
   seriesIndex: number | null;
   coverSource: string | null;
@@ -74,6 +75,8 @@ export class BookMetadataFetchEligibilityService {
         return book.language === null || book.language === '';
       case 'pageCount':
         return book.pageCount === null;
+      case 'communityRating':
+        return book.communityRating.length === 0;
       case 'seriesName':
         return book.seriesName === null || book.seriesName === '';
       case 'seriesIndex':

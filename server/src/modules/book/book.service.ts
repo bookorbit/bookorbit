@@ -38,6 +38,7 @@ import {
 } from '@bookorbit/types';
 import type {
   AudiobookChapter,
+  BookCommunityRating,
   BookKoboState,
   BookMetadataRefreshPreviewFields,
   BookMetadataRefreshPreviewResponse,
@@ -99,6 +100,8 @@ const METADATA_UPDATE_FAILPOINTS = [
   'afterTagsReplace',
   'beforeTransactionCommit',
 ] as const;
+
+const METADATA_PROVIDER_KEY_SET = new Set<string>(Object.values(MetadataProviderKey));
 
 export type MetadataUpdateFailpoint = (typeof METADATA_UPDATE_FAILPOINTS)[number];
 export type ExportScope = 'primary' | 'all' | 'audio';
@@ -352,6 +355,7 @@ export class BookService {
     if (r.publishedYear !== undefined) preview.publishedYear = r.publishedYear as number | null;
     if (r.language !== undefined) preview.language = r.language as string | null;
     if (r.pageCount !== undefined) preview.pageCount = r.pageCount as number | null;
+    if (r.communityRatings !== undefined) preview.communityRatings = r.communityRatings as BookCommunityRating[];
     if (r.seriesName !== undefined) preview.seriesName = r.seriesName as string | null;
     if (r.seriesIndex !== undefined) preview.seriesIndex = r.seriesIndex as number | null;
     if (r.seriesMemberships !== undefined) preview.seriesMemberships = r.seriesMemberships as BookMetadataRefreshPreviewFields['seriesMemberships'];
@@ -396,6 +400,40 @@ export class BookService {
       candidateCount: 0,
       resolvedFieldCount: 0,
     };
+  }
+
+  private normalizeCommunityRatingInputs(
+    ratings: UpdateBookMetadataDto['communityRatings'],
+  ): Array<{ provider: MetadataProviderKey; rating: number; ratingCount: number | null }> | undefined {
+    if (ratings === undefined) return undefined;
+    if (!ratings?.length) return [];
+
+    const byProvider = new Map<MetadataProviderKey, { provider: MetadataProviderKey; rating: number; ratingCount: number | null }>();
+    for (const item of ratings) {
+      if (!METADATA_PROVIDER_KEY_SET.has(item.provider)) continue;
+      if (!Number.isFinite(item.rating) || item.rating < 0 || item.rating > 5) continue;
+
+      const ratingCount =
+        typeof item.ratingCount === 'number' && Number.isInteger(item.ratingCount) && item.ratingCount >= 0 ? item.ratingCount : null;
+      byProvider.set(item.provider, { provider: item.provider, rating: item.rating, ratingCount });
+    }
+
+    return [...byProvider.values()];
+  }
+
+  private mapCommunityRatingRows(
+    rows: readonly { provider: string; rating: number; ratingCount: number | null; updatedAt: Date | null }[],
+  ): BookCommunityRating[] {
+    return rows
+      .filter((row): row is { provider: MetadataProviderKey; rating: number; ratingCount: number | null; updatedAt: Date | null } =>
+        METADATA_PROVIDER_KEY_SET.has(row.provider),
+      )
+      .map((row) => ({
+        provider: row.provider,
+        rating: row.rating,
+        ratingCount: row.ratingCount,
+        updatedAt: row.updatedAt?.toISOString() ?? null,
+      }));
   }
 
   async verifyBookAccess(bookId: number, user: RequestUser): Promise<void> {
@@ -1481,6 +1519,7 @@ export class BookService {
       if (dto.audioMetadata.chapters !== undefined) scalarFields.chapters = dto.audioMetadata.chapters ?? null;
     }
 
+    const communityRatings = this.normalizeCommunityRatingInputs(dto.communityRatings);
     const scalarFieldCount = Object.keys(scalarFields).length;
     const hasMetadataUpdate = Object.keys(dto).length > 0;
     const customMetadataLibraryId = dto.customMetadata !== undefined ? await this.bookRepo.findLibraryIdByBookId(id) : null;
@@ -1496,6 +1535,10 @@ export class BookService {
         await this.bookRepo.updateMetadataFields(id, scalarFields, tx);
       }
       this.throwIfMetadataUpdateFailpoint('afterScalarUpdate');
+
+      if (communityRatings !== undefined) {
+        await this.bookRepo.replaceCommunityRatings(id, communityRatings, tx);
+      }
 
       if (dto.seriesMemberships !== undefined) {
         await this.seriesMemberships?.replaceForBook(id, dto.seriesMemberships, tx);
@@ -2319,7 +2362,7 @@ export class BookService {
       const found = await this.bookRepo.findById(id);
       if (!found) throw new NotFoundException(`Book ${id} not found`);
 
-      const { book, authorRows, genreRows } = found;
+      const { book, authorRows, genreRows, communityRatingRows } = found;
       await this.libraryService.verifyUserAccess(user.id, book.books.libraryId, this.isSuperuser(user));
       const meta = book.book_metadata;
 
@@ -2343,6 +2386,7 @@ export class BookService {
         publishedYear: meta?.publishedYear,
         language: meta?.language,
         pageCount: meta?.pageCount,
+        communityRating: communityRatingRows,
         seriesName: meta?.seriesName,
         seriesIndex: meta?.seriesIndex,
         genres: genreRows.map((g) => g.name),
@@ -2383,6 +2427,7 @@ export class BookService {
       if (r.publishedYear !== undefined) dto.publishedYear = r.publishedYear as number | null;
       if (r.language !== undefined) dto.language = r.language as string | null;
       if (r.pageCount !== undefined) dto.pageCount = r.pageCount as number | null;
+      if (r.communityRatings !== undefined) dto.communityRatings = r.communityRatings as UpdateBookMetadataDto['communityRatings'];
       if (r.seriesName !== undefined) dto.seriesName = r.seriesName as string | null;
       if (r.seriesIndex !== undefined) dto.seriesIndex = r.seriesIndex as number | null;
       if (r.seriesMemberships !== undefined) dto.seriesMemberships = r.seriesMemberships as UpdateBookMetadataDto['seriesMemberships'];
@@ -2671,7 +2716,7 @@ export class BookService {
     ]);
     if (!result) throw new NotFoundException(`Book ${id} not found`);
 
-    const { book, authorRows, genreRows, tagRows, fileRows, narratorRows, seriesMembershipRows } = result;
+    const { book, authorRows, genreRows, tagRows, fileRows, narratorRows, seriesMembershipRows, communityRatingRows } = result;
     const meta = book.book_metadata;
     const customMetadata = await this.customMetadataService.getBookValues(id, book.books.libraryId);
     const hasAudioFiles = fileRows.some((f) => f.format && isAudioFormat(f.format));
@@ -2711,6 +2756,7 @@ export class BookService {
       seriesIndex: meta?.seriesIndex ?? null,
       seriesMemberships: seriesMembershipRows,
       rating: personalRating,
+      communityRatings: this.mapCommunityRatingRows(communityRatingRows),
       coverSource: (meta?.coverSource as 'extracted' | 'custom' | null) ?? null,
       hardcoverEditionId: meta?.hardcoverEditionId ?? null,
       lockedFields: this.bookMetadataLockService.normalizeLockedFields(meta?.lockedFields),

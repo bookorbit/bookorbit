@@ -125,6 +125,57 @@ describe('BookMetadataLockService', () => {
     });
   });
 
+  it('filters community rating rows as one lockable provider bundle', async () => {
+    const unlocked = makeService();
+    const communityRatings = [{ provider: MetadataProviderKey.HARDCOVER, rating: 4.25, ratingCount: 12345, updatedAt: '2026-06-25T00:00:00.000Z' }];
+
+    await expect(
+      unlocked.service.filterResolvedMetadata(
+        1,
+        {
+          communityRatings,
+        },
+        {},
+      ),
+    ).resolves.toEqual({
+      resolved: {
+        communityRatings,
+      },
+      providerIds: {},
+      skippedFields: [],
+    });
+
+    const locked = makeService(['communityRating']);
+
+    await expect(
+      locked.service.filterResolvedMetadata(
+        1,
+        {
+          communityRatings,
+        },
+        {},
+      ),
+    ).resolves.toEqual({
+      resolved: {},
+      providerIds: {},
+      skippedFields: ['communityRating'],
+    });
+  });
+
+  it('filters automated community rating dto updates as one lockable provider bundle', async () => {
+    const { service } = makeService(['communityRating']);
+
+    const result = await service.filterAutomatedBookUpdate(12, {
+      title: 'Allowed',
+      communityRatings: [{ provider: MetadataProviderKey.HARDCOVER, rating: 4.25, ratingCount: 12345 }],
+    });
+
+    expect(result).toEqual({
+      dto: { title: 'Allowed' },
+      skippedFields: ['communityRating'],
+    });
+  });
+
   it('propagates repository errors', async () => {
     const lockRepo = {
       findLockedFields: vi.fn().mockRejectedValue(new Error('db failure')),

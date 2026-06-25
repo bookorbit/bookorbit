@@ -16,6 +16,8 @@ describe('itunes.mapper', () => {
       trackViewUrl: 'https://books.apple.com/us/book/the-hobbit/id12345',
       sellerName: 'HarperCollins',
       languageCodesISO2A: ['EN'],
+      averageUserRating: 4.6,
+      userRatingCount: 789,
     };
 
     const mapped = mapITunesResult(result);
@@ -29,6 +31,8 @@ describe('itunes.mapper', () => {
     expect(mapped.publishedYear).toBe(1937);
     expect(mapped.language).toBe('EN');
     expect(mapped.genres).toEqual(['Fantasy', 'Adventure']);
+    expect(mapped.communityRating).toBe(4.6);
+    expect(mapped.communityRatingCount).toBe(789);
     expect(mapped.coverUrl).toBe('https://is1-ssl.mzstatic.com/image/thumb/Publication/v4/8a/d8/61/8ad861cd/9780547951973.jpg/10000x10000bb.jpg');
     expect(mapped.sourceUrl).toBe('https://books.apple.com/us/book/the-hobbit/id12345');
   });

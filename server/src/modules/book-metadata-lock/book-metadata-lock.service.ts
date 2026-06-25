@@ -163,6 +163,7 @@ export class BookMetadataLockService {
     this.copyResolvedField(filteredResolved, resolved, 'narrators', 'narrators', lockedSet, skippedFields);
     this.copyResolvedField(filteredResolved, resolved, 'duration', 'durationSeconds', lockedSet, skippedFields);
     this.copyResolvedField(filteredResolved, resolved, 'abridged', 'abridged', lockedSet, skippedFields);
+    this.copyResolvedCommunityRating(filteredResolved, resolved, lockedSet, skippedFields);
     this.copyResolvedField(filteredResolved, resolved, 'hardcoverEditionId', 'hardcoverEditionId', lockedSet, skippedFields);
 
     if (resolved.chapters !== undefined) {
@@ -240,6 +241,7 @@ export class BookMetadataLockService {
     this.copyUpdateField(filteredDto, dto, 'isbn10', 'isbn10', lockedSet, skippedFields);
     this.copyUpdateField(filteredDto, dto, 'isbn13', 'isbn13', lockedSet, skippedFields);
     this.copyUpdateField(filteredDto, dto, 'rating', 'rating', lockedSet, skippedFields);
+    this.copyUpdateCommunityRating(filteredDto, dto, lockedSet, skippedFields);
     this.copyUpdateField(filteredDto, dto, 'authors', 'authors', lockedSet, skippedFields);
     this.copyUpdateField(filteredDto, dto, 'genres', 'genres', lockedSet, skippedFields);
     this.copyUpdateField(filteredDto, dto, 'tags', 'tags', lockedSet, skippedFields);
@@ -353,6 +355,38 @@ export class BookMetadataLockService {
     target[key] = source[key] as never;
   }
 
+  private copyResolvedCommunityRating(
+    target: ResolvedMetadataFields,
+    source: ResolvedMetadataFields,
+    lockedSet: ReadonlySet<BookMetadataLockField>,
+    skippedFields: Set<BookMetadataLockField>,
+  ): void {
+    if (source.communityRatings === undefined) return;
+
+    if (lockedSet.has('communityRating')) {
+      skippedFields.add('communityRating');
+      return;
+    }
+
+    target.communityRatings = source.communityRatings;
+  }
+
+  private copyUpdateCommunityRating(
+    target: UpdateBookMetadataDto,
+    source: UpdateBookMetadataDto,
+    lockedSet: ReadonlySet<BookMetadataLockField>,
+    skippedFields: Set<BookMetadataLockField>,
+  ): void {
+    if (source.communityRatings === undefined) return;
+
+    if (lockedSet.has('communityRating')) {
+      skippedFields.add('communityRating');
+      return;
+    }
+
+    target.communityRatings = source.communityRatings;
+  }
+
   private getFieldsTargetedByBookUpdate(dto: UpdateBookMetadataDto): BookMetadataLockField[] {
     const fields = new Set<BookMetadataLockField>();
 
@@ -372,6 +406,9 @@ export class BookMetadataLockService {
     this.addFieldIfPresent(fields, dto, 'isbn10', 'isbn10');
     this.addFieldIfPresent(fields, dto, 'isbn13', 'isbn13');
     this.addFieldIfPresent(fields, dto, 'rating', 'rating');
+    if (dto.communityRatings !== undefined) {
+      fields.add('communityRating');
+    }
     this.addFieldIfPresent(fields, dto, 'authors', 'authors');
     this.addFieldIfPresent(fields, dto, 'genres', 'genres');
     this.addFieldIfPresent(fields, dto, 'tags', 'tags');
