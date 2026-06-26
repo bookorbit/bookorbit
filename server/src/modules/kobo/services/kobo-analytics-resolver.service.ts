@@ -45,7 +45,9 @@ export class KoboAnalyticsResolverService {
       const byHash = await this.db
         .select({ id: schema.bookFiles.id })
         .from(schema.bookFiles)
-        .where(and(eq(schema.bookFiles.bookId, bookId), eq(schema.bookFiles.fileHash, snapHash), inArray(schema.bookFiles.format, ['epub', 'kepub'])));
+        .where(
+          and(eq(schema.bookFiles.bookId, bookId), eq(schema.bookFiles.fileHash, snapHash), inArray(schema.bookFiles.format, ['epub', 'kepub'])),
+        );
 
       if (byHash.length === 1) {
         return { kind: 'resolved', bookFileId: byHash[0].id };

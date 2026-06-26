@@ -701,6 +701,7 @@ describe('KoboSyncService', () => {
       kepubConversionLimitMb: 1,
     });
     expect(nativeKepub.format).toBe('KEPUB');
+    expect(nativeKepub.hash).toBe(kepub.hash);
   });
 
   it('fetchEligibleSnapshotRows and fetchEligibleBooksByIds map DB rows into sync payload objects', async () => {

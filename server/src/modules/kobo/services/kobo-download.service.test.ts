@@ -89,6 +89,27 @@ describe('KoboDownloadService', () => {
     expect(streamFileSpy).toHaveBeenCalledWith('/books/file.pdf', 22, 'pdf', expect.anything());
   });
 
+  it('streams native kepub files without conversion', async () => {
+    const deps = makeDeps();
+    deps.db.query.books.findFirst.mockResolvedValue({ id: 11, primaryFileId: 22 });
+    deps.db.query.bookFiles.findFirst.mockResolvedValue({
+      id: 22,
+      format: 'kepub',
+      absolutePath: '/books/file.kepub.epub',
+      fileHash: 'h1',
+      sizeBytes: 5 * 1024 * 1024,
+    });
+    deps.bookAccessService.assertBookAccessible.mockResolvedValue(undefined);
+    const service = makeService(deps);
+    const streamFileSpy = vi.spyOn(service as any, 'streamFile').mockResolvedValue(undefined);
+
+    await service.streamBook(7, 11, makeReply() as never);
+
+    expect(streamFileSpy).toHaveBeenCalledWith('/books/file.kepub.epub', 22, 'kepub.epub', expect.anything());
+    expect(deps.settingsService.getSettings).not.toHaveBeenCalled();
+    expect(deps.kepubConversionService.getKepubPath).not.toHaveBeenCalled();
+  });
+
   it('converts epub to kepub when enabled and within conversion size limit', async () => {
     const deps = makeDeps();
     deps.db.query.books.findFirst.mockResolvedValue({ id: 11, primaryFileId: 22 });
