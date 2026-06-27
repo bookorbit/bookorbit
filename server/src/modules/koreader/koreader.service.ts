@@ -179,7 +179,7 @@ export class KoreaderService {
 
     if (!latestDevice && !readingProg) return null;
 
-    const deviceTime = latestDevice?.syncTimestamp
+    const deviceTime = latestDevice?.syncTimestamp != null
       ? latestDevice.syncTimestamp * 1000
       : (latestDevice?.updatedAt?.getTime() ?? 0);
     const readerTime = readingProg?.updatedAt?.getTime() ?? 0;
@@ -266,7 +266,7 @@ export class KoreaderService {
 
     const chapters = await this.repo.getChapters(bookFileId);
     const latestDevice = deviceProgress[0];
-    const deviceTime = latestDevice?.syncTimestamp
+    const deviceTime = latestDevice?.syncTimestamp != null
       ? latestDevice.syncTimestamp * 1000
       : (latestDevice?.updatedAt?.getTime() ?? 0);
     const readerTime = readingProgress?.updatedAt?.getTime() ?? 0;

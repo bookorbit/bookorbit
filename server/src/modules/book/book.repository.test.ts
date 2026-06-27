@@ -766,7 +766,8 @@ describe('BookRepository', () => {
       select: vi
         .fn()
         .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub' }]))
-        .mockReturnValue(makeSelectChain('limit', [])),
+        .mockReturnValueOnce(makeSelectChain('orderBy', []))
+        .mockReturnValueOnce(makeSelectChain('where', [])),
       insert: vi.fn().mockReturnValue(insertChain),
       execute: vi.fn().mockResolvedValue(undefined),
     };
@@ -774,7 +775,7 @@ describe('BookRepository', () => {
 
     await expect(repo.syncKoboReadingStateFromProgress(5, 9, 80, 'OEBPS/ch14.xhtml', null, null, 33.5)).resolves.toBe(false);
 
-    expect(db.select).toHaveBeenCalledTimes(2);
+    expect(db.select).toHaveBeenCalledTimes(3);
     expect(db.insert).not.toHaveBeenCalled();
     expect(db.execute).not.toHaveBeenCalled();
   });

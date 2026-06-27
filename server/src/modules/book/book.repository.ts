@@ -1471,7 +1471,11 @@ export class BookRepository {
           chapterIndex = Math.min(chapters.length - 1, Math.floor((pct / 100) * chapters.length));
         }
 
-        const chapter = chapters.find((c) => c.chapterIndex === chapterIndex) ?? chapters[0];
+        const boundedIndex = Math.max(0, Math.min(chapters.length - 1, chapterIndex));
+        const chapter =
+          chapters.find((c) => c.chapterIndex === boundedIndex) ??
+          chapters[boundedIndex] ??
+          chapters[0];
         if (chapter?.href) {
           resolvedSource = chapter.href.split('#')[0]!.split('?')[0]!;
           resolvedType = 'KoboSpan';

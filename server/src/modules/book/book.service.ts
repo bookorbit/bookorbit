@@ -1808,7 +1808,7 @@ export class BookService {
       dto.koboContentSourceProgressPercent ?? null,
       dto.koreaderProgress ?? null,
     );
-    if (['epub', 'kepub'].includes(file.format) && this.hasPermission(user, Permission.KoboSync) && (await this.bookRepo.isKoboTwoWayProgressSyncEnabled(userId))) {
+    if (file.format && ['epub', 'kepub'].includes(file.format) && this.hasPermission(user, Permission.KoboSync) && (await this.bookRepo.isKoboTwoWayProgressSyncEnabled(userId))) {
       await this.bookRepo.syncKoboReadingStateFromProgress(
         userId,
         fileId,
