@@ -18,6 +18,7 @@ import type {
   UserReadingPacePoint,
   UserReadingSessionTimeline,
   UserReadingSessionTimelineItem,
+  UserReadingSourceDistribution,
   UserSessionArchetypePoint,
   UserStatisticsSummary,
   FormatDistributionItem,
@@ -137,6 +138,12 @@ export async function fetchUserReadingHeatmap(filters: StatisticsFilterConfig): 
   return res.json() as Promise<UserDailyReadingStat[]>
 }
 
+export async function fetchUserReadingSourceDistribution(filters: StatisticsFilterConfig): Promise<UserReadingSourceDistribution> {
+  const res = await api(`/api/v1/user-statistics/reading-source-distribution${buildParams(filters, { days: '365' })}`)
+  if (!res.ok) throw new Error(`User reading source distribution request failed: ${res.status}`)
+  return res.json() as Promise<UserReadingSourceDistribution>
+}
+
 export async function fetchUserPeakReadingHours(filters: StatisticsFilterConfig): Promise<UserPeakHourStat[]> {
   const res = await api(`/api/v1/user-statistics/peak-hours${buildParams(filters, { days: '365' })}`)
   if (!res.ok) throw new Error(`User peak hours request failed: ${res.status}`)
@@ -155,8 +162,8 @@ export async function fetchUserCompletionTimeline(filters: StatisticsFilterConfi
   return res.json() as Promise<UserCompletionTimelinePoint[]>
 }
 
-export async function fetchUserGoalTrajectory(filters: StatisticsFilterConfig): Promise<UserGoalTrajectory> {
-  const res = await api(`/api/v1/user-statistics/goal-trajectory${buildParams(filters, { days: '365', goalBooks: '12' })}`)
+export async function fetchUserGoalTrajectory(filters: StatisticsFilterConfig, goalBooks = 12): Promise<UserGoalTrajectory> {
+  const res = await api(`/api/v1/user-statistics/goal-trajectory${buildParams(filters, { days: '365', goalBooks: String(goalBooks) })}`)
   if (!res.ok) throw new Error(`User goal trajectory request failed: ${res.status}`)
   return res.json() as Promise<UserGoalTrajectory>
 }

@@ -12,6 +12,7 @@ const baseBook = (): BookEligibilityData => ({
   publishedYear: 2020,
   language: 'en',
   pageCount: 320,
+  communityRating: [{ provider: 'hardcover', rating: 4.25 }],
   seriesName: 'Series',
   seriesIndex: 1,
   coverSource: 'cover.jpg',
@@ -91,6 +92,15 @@ describe('BookMetadataFetchEligibilityService', () => {
     const missingAbridged = { ...baseBook(), abridged: null };
     config.conditions.missingFields.fields = ['abridged'];
     expect(service.isEligible(missingAbridged, config)).toBe(true);
+  });
+
+  it('treats a missing community rating as eligible', () => {
+    const book = { ...baseBook(), communityRating: [] };
+    const config = baseConfig();
+    config.conditions.missingFields.enabled = true;
+    config.conditions.missingFields.fields = ['communityRating'];
+
+    expect(service.isEligible(book, config)).toBe(true);
   });
 
   it('treats empty strings as missing for scalar text fields', () => {

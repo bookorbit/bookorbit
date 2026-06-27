@@ -10,6 +10,7 @@ export type MetadataField =
   | "publishedYear"
   | "language"
   | "pageCount"
+  | "communityRating"
   | "seriesName"
   | "seriesIndex"
   | "genres"
@@ -27,6 +28,7 @@ export const ALL_METADATA_FIELDS: MetadataField[] = [
   "publishedYear",
   "language",
   "pageCount",
+  "communityRating",
   "seriesName",
   "seriesIndex",
   "genres",

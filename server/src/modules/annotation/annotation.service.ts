@@ -5,6 +5,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { BookService } from '../book/book.service';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_ANNOTATION_CREATED } from '../achievement/achievement-events.service';
 import { DEFAULT_ANNOTATION_COLOR, DEFAULT_ANNOTATION_STYLE } from './annotation.constants';
+import { AnnotationConversionService } from './annotation-conversion.service';
 import { AnnotationRepository, type AnnotationFilters, type AnnotationSort } from './annotation.repository';
 import { AnnotationResponseDto } from './dto/annotation-response.dto';
 import { CreateAnnotationDto } from './dto/create-annotation.dto';
@@ -17,10 +18,12 @@ export class AnnotationService {
     private readonly annotationRepo: AnnotationRepository,
     private readonly bookService: BookService,
     private readonly achievementEvents: AchievementEventsService,
+    private readonly conversionService: AnnotationConversionService,
   ) {}
 
   async getAnnotations(bookId: number, user: RequestUser): Promise<AnnotationResponseDto[]> {
     await this.bookService.verifyBookAccess(bookId, user);
+    await this.conversionService.ensureCfiPositionsForBook(user.id, bookId);
     const rows = await this.annotationRepo.findByBookId(bookId, user.id);
     return rows.map((row) => AnnotationResponseDto.from(row));
   }
@@ -46,11 +49,16 @@ export class AnnotationService {
           id: dto.id,
           bookId: dto.bookId,
           cfi: dto.cfi,
+          jumpFileId: dto.jumpFileId,
+          pageno: dto.pageno,
           text: dto.text,
           color: dto.color,
           style: dto.style,
           note: dto.note,
           chapterTitle: dto.chapterTitle,
+          origin: dto.origin as 'web' | 'koreader' | 'kobo',
+          positionStatus: dto.positionStatus as AnnotationListResponse['items'][number]['positionStatus'],
+          chapterIndex: dto.chapterIndex,
           createdAt: dto.createdAt instanceof Date ? dto.createdAt.toISOString() : String(dto.createdAt),
         };
       }),
@@ -70,6 +78,7 @@ export class AnnotationService {
       userId: user.id,
       bookId,
       cfi: dto.cfi,
+      bookFileId: dto.bookFileId ?? null,
       text: dto.text,
       color: dto.color ?? DEFAULT_ANNOTATION_COLOR,
       style: dto.style ?? DEFAULT_ANNOTATION_STYLE,
@@ -97,7 +106,7 @@ export class AnnotationService {
 
   async deleteAnnotation(bookId: number, annotationId: number, user: RequestUser): Promise<void> {
     await this.bookService.verifyBookAccess(bookId, user);
-    const deleted = await this.annotationRepo.delete(bookId, annotationId, user.id);
+    const deleted = await this.annotationRepo.softDelete(bookId, annotationId, user.id);
     if (!deleted) throw new NotFoundException(this.notFoundMessage(bookId, annotationId));
   }
 

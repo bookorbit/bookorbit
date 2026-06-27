@@ -15,6 +15,7 @@ const FIELD_LABELS: Record<MetadataField, string> = {
   publishedYear: 'Published year',
   language: 'Language',
   pageCount: 'Page count',
+  communityRating: 'Community rating',
   seriesName: 'Series name',
   seriesIndex: 'Series index',
   genres: 'Genres',

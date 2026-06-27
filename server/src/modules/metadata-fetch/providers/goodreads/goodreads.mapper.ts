@@ -1,6 +1,12 @@
 import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
-import { GoodreadsApolloBook, GoodreadsApolloContributor, GoodreadsApolloSeries, GoodreadsAutocompleteItem } from './goodreads.types';
+import {
+  GoodreadsApolloBook,
+  GoodreadsApolloContributor,
+  GoodreadsApolloSeries,
+  GoodreadsApolloWork,
+  GoodreadsAutocompleteItem,
+} from './goodreads.types';
 
 export function mapGoodreadsApolloState(state: Record<string, unknown>, bookId: string): MetadataCandidate | null {
   const book = findBook(state, bookId);
@@ -15,6 +21,7 @@ export function mapGoodreadsApolloState(state: Record<string, unknown>, bookId: 
   const authorName = contributor?.name;
 
   const details = book.details;
+  const work = findWork(state, book.work?.__ref);
 
   const genres = (book.bookGenres ?? []).map((g) => g.genre?.name).filter((n): n is string => !!n);
 
@@ -23,6 +30,8 @@ export function mapGoodreadsApolloState(state: Record<string, unknown>, bookId: 
   const publishedYear = parseEpochYear(details?.publicationTime);
   const pageCount = parsePositiveInt(details?.numPages);
   const seriesIndex = parseSeriesIndex(firstSeries?.userPosition);
+  const communityRating = normalizeCommunityRating(work?.stats?.averageRating);
+  const communityRatingCount = normalizeCommunityRatingCount(work?.stats?.ratingsCount);
 
   return {
     provider: MetadataProviderKey.GOODREADS,
@@ -42,6 +51,8 @@ export function mapGoodreadsApolloState(state: Record<string, unknown>, bookId: 
     sourceUrl: `https://www.goodreads.com/book/show/${bookId}`,
     seriesName: normalize(series?.title),
     seriesIndex,
+    ...(communityRating !== undefined ? { communityRating } : {}),
+    ...(communityRatingCount !== undefined ? { communityRatingCount } : {}),
   };
 }
 
@@ -52,6 +63,8 @@ export function mapGoodreadsAutocompleteItem(item: GoodreadsAutocompleteItem, bo
   const { title, subtitle } = splitTitle(rawTitle);
   const authorName = normalize(typeof item.author === 'string' ? item.author : item.author?.name);
   const { seriesName, seriesIndex } = parseSeriesFromTitle(item.title);
+  const communityRating = normalizeCommunityRating(item.avgRating);
+  const communityRatingCount = normalizeCommunityRatingCount(item.ratingsCount);
 
   return {
     provider: MetadataProviderKey.GOODREADS,
@@ -65,6 +78,8 @@ export function mapGoodreadsAutocompleteItem(item: GoodreadsAutocompleteItem, bo
     sourceUrl: `https://www.goodreads.com/book/show/${bookId}`,
     seriesName,
     seriesIndex,
+    ...(communityRating !== undefined ? { communityRating } : {}),
+    ...(communityRatingCount !== undefined ? { communityRatingCount } : {}),
   };
 }
 
@@ -153,6 +168,11 @@ function findSeries(state: Record<string, unknown>, ref: string | undefined): Go
   return findByKeyPrefix<GoodreadsApolloSeries>(state, 'Series:kca');
 }
 
+function findWork(state: Record<string, unknown>, ref: string | undefined): GoodreadsApolloWork | undefined {
+  if (!ref) return undefined;
+  return state[ref] as GoodreadsApolloWork | undefined;
+}
+
 function splitTitle(fullTitle: string): { title: string; subtitle?: string } {
   const colon = fullTitle.indexOf(':');
   if (colon > 0) {
@@ -180,6 +200,20 @@ function parsePositiveInt(value: string | number | undefined): number | undefine
   if (value == null) return undefined;
   const n = typeof value === 'string' ? parseInt(value, 10) : Math.round(value);
   return n > 0 && !Number.isNaN(n) ? n : undefined;
+}
+
+function normalizeCommunityRating(value: string | number | undefined): number | undefined {
+  if (value == null) return undefined;
+  const n = typeof value === 'string' ? parseFloat(value) : value;
+  return Number.isFinite(n) && n >= 0 && n <= 5 ? n : undefined;
+}
+
+function normalizeCommunityRatingCount(value: string | number | undefined): number | undefined {
+  if (value == null) return undefined;
+  if (typeof value === 'string' && value.trim() === '') return undefined;
+  const normalized = typeof value === 'string' ? value.replace(/,/g, '') : value;
+  const n = typeof normalized === 'string' ? Number(normalized) : normalized;
+  return Number.isInteger(n) && n >= 0 ? n : undefined;
 }
 
 function parseSeriesIndex(value: string | undefined): number | undefined {

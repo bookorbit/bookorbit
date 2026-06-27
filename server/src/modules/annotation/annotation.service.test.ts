@@ -35,11 +35,20 @@ function makeAnnotationRow(overrides?: Record<string, unknown>) {
     userId: 1,
     bookId: 5,
     cfi: 'epubcfi(/6/4!/4/2/1:0)',
+    cfiStatus: 'exact',
+    cfiExtras: null,
+    jumpFileId: 50,
+    pageno: null,
     text: 'selected text',
     color: 'yellow',
     style: 'highlight',
     note: null,
     chapterTitle: null,
+    origin: 'web',
+    version: 1,
+    deletedAt: null,
+    deviceCreatedAt: null,
+    deviceUpdatedAt: null,
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
     ...overrides,
@@ -54,7 +63,7 @@ function makeService() {
     getDistinctChapters: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
-    delete: vi.fn(),
+    softDelete: vi.fn(),
   };
   const bookService = {
     verifyBookAccess: vi.fn().mockResolvedValue(undefined),
@@ -62,8 +71,9 @@ function makeService() {
   const achievementEvents = {
     emit: vi.fn(),
   };
-  const service = new AnnotationService(annotationRepo as never, bookService as never, achievementEvents as never);
-  return { service, annotationRepo, bookService };
+  const conversionService = { ensureCfiPositionsForBook: vi.fn().mockResolvedValue(0) };
+  const service = new AnnotationService(annotationRepo as never, bookService as never, achievementEvents as never, conversionService as never);
+  return { service, annotationRepo, bookService, conversionService };
 }
 
 describe('AnnotationService', () => {
@@ -291,29 +301,29 @@ describe('AnnotationService', () => {
   describe('deleteAnnotation', () => {
     it('deletes annotation successfully', async () => {
       const { service, annotationRepo } = makeService();
-      annotationRepo.delete.mockResolvedValue(true);
+      annotationRepo.softDelete.mockResolvedValue(true);
 
       await expect(service.deleteAnnotation(5, 10, makeUser())).resolves.toBeUndefined();
-      expect(annotationRepo.delete).toHaveBeenCalledWith(5, 10, 1);
+      expect(annotationRepo.softDelete).toHaveBeenCalledWith(5, 10, 1);
     });
 
     it('throws NotFoundException when annotation is not found', async () => {
       const { service, annotationRepo } = makeService();
-      annotationRepo.delete.mockResolvedValue(false);
+      annotationRepo.softDelete.mockResolvedValue(false);
 
       await expect(service.deleteAnnotation(5, 99, makeUser())).rejects.toThrow(NotFoundException);
     });
 
     it('NotFoundException message includes bookId and annotationId', async () => {
       const { service, annotationRepo } = makeService();
-      annotationRepo.delete.mockResolvedValue(false);
+      annotationRepo.softDelete.mockResolvedValue(false);
 
       await expect(service.deleteAnnotation(5, 99, makeUser())).rejects.toThrow('Annotation 99 not found for book 5');
     });
 
     it('verifies book access before deleting', async () => {
       const { service, annotationRepo, bookService } = makeService();
-      annotationRepo.delete.mockResolvedValue(true);
+      annotationRepo.softDelete.mockResolvedValue(true);
 
       await service.deleteAnnotation(5, 10, makeUser());
 
@@ -325,7 +335,7 @@ describe('AnnotationService', () => {
       bookService.verifyBookAccess.mockRejectedValue(new ForbiddenException());
 
       await expect(service.deleteAnnotation(5, 10, makeUser())).rejects.toThrow(ForbiddenException);
-      expect(annotationRepo.delete).not.toHaveBeenCalled();
+      expect(annotationRepo.softDelete).not.toHaveBeenCalled();
     });
 
     it('propagates NotFoundException when book does not exist', async () => {
@@ -384,6 +394,7 @@ describe('AnnotationService', () => {
           { color: 'yellow', count: 2 },
           { color: '#4ADE80', count: 1 },
         ],
+        originBreakdown: [{ origin: 'web', count: 3 }],
         chaptersWithHighlights: 2,
         highlightsWithNotes: 1,
         ...overrides,

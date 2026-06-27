@@ -27,6 +27,8 @@ export interface HardcoverSearchDocument {
   release_date?: string;
   release_year?: number;
   genres?: string[];
+  rating?: number;
+  ratings_count?: number;
   featured_series?: {
     series?: {
       name?: string;

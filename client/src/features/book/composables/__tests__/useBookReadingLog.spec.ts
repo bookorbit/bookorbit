@@ -19,13 +19,39 @@ function makeResponse(data: unknown, status = 200): Response {
   } as Response
 }
 
-function makeListResponse(items = [], total?: number) {
+const emptyStats = {
+  totalSessions: 0,
+  totalSeconds: 0,
+  avgDurationSeconds: 0,
+  firstSessionAt: null,
+  lastSessionAt: null,
+  dailySummary: [],
+  paceProgressDelta: 0,
+  paceDurationSeconds: 0,
+  progressSummary: [],
+}
+
+function makeSession(id: number, overrides?: Record<string, unknown>) {
+  return {
+    id,
+    startedAt: '2026-04-15T10:00:00.000Z',
+    endedAt: '2026-04-15T10:30:00.000Z',
+    durationSeconds: 1800,
+    progressDelta: null,
+    endProgress: null,
+    format: null,
+    source: 'web',
+    ...overrides,
+  }
+}
+
+function makeListResponse(items: unknown[] = [], total?: number) {
   return makeResponse({
     items,
     total: total ?? items.length,
     page: 1,
     pageSize: 25,
-    stats: { totalSessions: 0, totalSeconds: 0, avgDurationSeconds: 0, firstSessionAt: null, lastSessionAt: null, dailySummary: [] },
+    stats: emptyStats,
   })
 }
 
@@ -44,29 +70,14 @@ describe('useBookReadingLog', () => {
   })
 
   it('updates sessions and stats after fetch', async () => {
-    const session = {
-      id: 1,
-      startedAt: '2026-04-15T10:00:00.000Z',
-      endedAt: '2026-04-15T10:30:00.000Z',
-      durationSeconds: 1800,
-      progressDelta: null,
-      endProgress: null,
-      format: 'epub',
-    }
+    const session = makeSession(1, { format: 'epub' })
     mocks.api.mockResolvedValue(
       makeResponse({
         items: [session],
         total: 1,
         page: 1,
         pageSize: 25,
-        stats: {
-          totalSessions: 1,
-          totalSeconds: 1800,
-          avgDurationSeconds: 1800,
-          firstSessionAt: session.startedAt,
-          lastSessionAt: session.startedAt,
-          dailySummary: [],
-        },
+        stats: { ...emptyStats, totalSessions: 1, totalSeconds: 1800, avgDurationSeconds: 1800 },
       }),
     )
 
@@ -107,60 +118,30 @@ describe('useBookReadingLog', () => {
     expect(error.value).toContain('network error')
   })
 
-  it('deleteSession removes item optimistically then refetches', async () => {
-    const session = {
-      id: 1,
-      startedAt: '2026-04-15T10:00:00.000Z',
-      endedAt: '2026-04-15T10:30:00.000Z',
-      durationSeconds: 1800,
-      progressDelta: null,
-      endProgress: null,
-      format: null,
-    }
+  it('deleteSession removes item optimistically then refreshes stats only', async () => {
     mocks.api
-      .mockResolvedValueOnce(
-        makeResponse({
-          items: [session],
-          total: 1,
-          page: 1,
-          pageSize: 25,
-          stats: { totalSessions: 1, totalSeconds: 1800, avgDurationSeconds: 1800, firstSessionAt: null, lastSessionAt: null, dailySummary: [] },
-        }),
-      )
+      .mockResolvedValueOnce(makeListResponse([makeSession(1), makeSession(2)], 2))
       .mockResolvedValueOnce({ ok: true, status: 204, json: async () => null } as Response)
-      .mockResolvedValueOnce(makeListResponse())
+      .mockResolvedValueOnce(makeListResponse([makeSession(2)], 1))
 
     const bookId = ref(10)
-    const { sessions, deleteSession } = useBookReadingLog(bookId)
+    const { sessions, total, deleteSession } = useBookReadingLog(bookId)
     await nextTick()
     await nextTick()
 
     await deleteSession(1)
     await nextTick()
 
-    expect(sessions.value).toHaveLength(0)
+    expect(sessions.value.map((s) => s.id)).toEqual([2])
+    expect(total.value).toBe(1)
+    const statsUrl = mocks.api.mock.calls[2]?.[0] as string
+    expect(statsUrl).toContain('page=1')
+    expect(statsUrl).toContain('pageSize=1')
   })
 
   it('deleteSession rolls back sessions and total on error', async () => {
-    const session = {
-      id: 1,
-      startedAt: '2026-04-15T10:00:00.000Z',
-      endedAt: '2026-04-15T10:30:00.000Z',
-      durationSeconds: 1800,
-      progressDelta: null,
-      endProgress: null,
-      format: null,
-    }
     mocks.api
-      .mockResolvedValueOnce(
-        makeResponse({
-          items: [session],
-          total: 5,
-          page: 1,
-          pageSize: 25,
-          stats: { totalSessions: 5, totalSeconds: 0, avgDurationSeconds: 0, firstSessionAt: null, lastSessionAt: null, dailySummary: [] },
-        }),
-      )
+      .mockResolvedValueOnce(makeListResponse([makeSession(1)], 5))
       .mockResolvedValueOnce({ ok: false, status: 404, json: async () => null } as Response)
 
     const bookId = ref(10)
@@ -217,24 +198,103 @@ describe('useBookReadingLog', () => {
     expect(url).toContain('sortDir=asc')
   })
 
-  it('setPage changes page and fetches', async () => {
-    mocks.api.mockResolvedValue(makeListResponse())
+  it('loadMore appends the next page without duplicates', async () => {
+    const firstPage = Array.from({ length: 25 }, (_, i) => makeSession(i + 1))
+    mocks.api.mockResolvedValueOnce(makeListResponse(firstPage, 30))
 
     const bookId = ref(10)
-    const { setPage, page } = useBookReadingLog(bookId)
+    const { sessions, hasMore, loadMore } = useBookReadingLog(bookId)
+    await nextTick()
+    await nextTick()
+
+    expect(sessions.value).toHaveLength(25)
+    expect(hasMore.value).toBe(true)
+
+    mocks.api.mockClear()
+    const secondPage = [makeSession(25), ...Array.from({ length: 5 }, (_, i) => makeSession(i + 26))]
+    mocks.api.mockResolvedValueOnce(makeListResponse(secondPage, 30))
+
+    await loadMore()
+
+    const url = mocks.api.mock.calls[0]?.[0] as string
+    expect(url).toContain('page=2')
+    expect(sessions.value).toHaveLength(30)
+    expect(hasMore.value).toBe(false)
+  })
+
+  it('loadMore is a no-op when everything is loaded', async () => {
+    mocks.api.mockResolvedValueOnce(makeListResponse([makeSession(1)], 1))
+
+    const bookId = ref(10)
+    const { loadMore } = useBookReadingLog(bookId)
     await nextTick()
     await nextTick()
 
     mocks.api.mockClear()
-    mocks.api.mockResolvedValue(makeListResponse())
+    await loadMore()
 
-    setPage(3)
+    expect(mocks.api).not.toHaveBeenCalled()
+  })
+
+  it('addSession posts the payload and refetches from page 1', async () => {
+    mocks.api.mockResolvedValueOnce(makeListResponse())
+
+    const bookId = ref(10)
+    const { addSession } = useBookReadingLog(bookId)
     await nextTick()
     await nextTick()
 
-    expect(page.value).toBe(3)
-    const url = mocks.api.mock.calls[0]?.[0] as string
-    expect(url).toContain('page=3')
+    mocks.api.mockClear()
+    mocks.api
+      .mockResolvedValueOnce(makeResponse({ id: 9, source: 'manual' }, 201))
+      .mockResolvedValueOnce(makeListResponse([makeSession(9, { source: 'manual' })], 1))
+
+    await addSession({ startedAt: '2026-04-15T10:00:00.000Z', durationMinutes: 30, endProgress: 50 })
+
+    const [postUrl, postInit] = mocks.api.mock.calls[0] as [string, RequestInit]
+    expect(postUrl).toBe('/api/v1/books/10/sessions')
+    expect(postInit.method).toBe('POST')
+    expect(JSON.parse(postInit.body as string)).toMatchObject({ durationMinutes: 30, endProgress: 50 })
+    const refetchUrl = mocks.api.mock.calls[1]?.[0] as string
+    expect(refetchUrl).toContain('page=1')
+  })
+
+  it('addSession throws with the server message on failure', async () => {
+    mocks.api.mockResolvedValueOnce(makeListResponse())
+
+    const bookId = ref(10)
+    const { addSession } = useBookReadingLog(bookId)
+    await nextTick()
+    await nextTick()
+
+    mocks.api.mockClear()
+    mocks.api.mockResolvedValueOnce(makeResponse({ message: 'startedAt cannot be in the future' }, 400))
+
+    await expect(addSession({ startedAt: '2099-01-01T00:00:00.000Z', durationMinutes: 30 })).rejects.toThrow('startedAt cannot be in the future')
+  })
+
+  it('exportAll pages through the full list at pageSize 100', async () => {
+    mocks.api.mockResolvedValueOnce(makeListResponse())
+
+    const bookId = ref(10)
+    const { exportAll } = useBookReadingLog(bookId)
+    await nextTick()
+    await nextTick()
+
+    mocks.api.mockClear()
+    const pageOne = Array.from({ length: 100 }, (_, i) => makeSession(i + 1))
+    const pageTwo = Array.from({ length: 20 }, (_, i) => makeSession(i + 101))
+    mocks.api.mockResolvedValueOnce(makeListResponse(pageOne, 120)).mockResolvedValueOnce(makeListResponse(pageTwo, 120))
+
+    const items = await exportAll()
+
+    expect(items).toHaveLength(120)
+    expect(mocks.api).toHaveBeenCalledTimes(2)
+    const firstUrl = mocks.api.mock.calls[0]?.[0] as string
+    expect(firstUrl).toContain('pageSize=100')
+    expect(firstUrl).toContain('page=1')
+    const secondUrl = mocks.api.mock.calls[1]?.[0] as string
+    expect(secondUrl).toContain('page=2')
   })
 
   it('loading is true while fetching and false after', async () => {

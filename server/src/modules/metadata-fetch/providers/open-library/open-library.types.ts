@@ -14,6 +14,8 @@ export interface OpenLibraryDoc {
   language?: string[];
   number_of_pages_median?: number;
   subject?: string[];
+  ratings_average?: number;
+  ratings_count?: number;
   series?: string[];
 }
 

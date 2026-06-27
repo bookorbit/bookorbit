@@ -246,7 +246,7 @@ const {
 
 function handleTextSelected(detail: SelectionDetail) {
   const selCfi = detail.cfi
-  const match = selCfi ? (annotations.annotations.value.find((a) => cfiRangesOverlap(selCfi, a.cfi)) ?? null) : null
+  const match = selCfi ? (annotations.annotations.value.find((a) => a.cfi != null && cfiRangesOverlap(selCfi, a.cfi)) ?? null) : null
   selection.show(detail, match?.id ?? null)
 }
 
@@ -295,10 +295,20 @@ onMounted(async () => {
   sectionFractions.value = getSectionFractions()
   await bookmarks.load(bookId)
   await annotations.load(bookId)
-  if (annotations.annotations.value.length > 0) {
-    addAnnotations(annotations.annotations.value.map((a) => ({ cfi: a.cfi, color: a.color, style: a.style })))
+  const drawableAnnotations = annotations.annotations.value.filter((a): a is typeof a & { cfi: string } => a.cfi != null)
+  if (drawableAnnotations.length > 0) {
+    addAnnotations(drawableAnnotations.map((a) => ({ cfi: a.cfi, color: a.color, style: a.style })))
   }
   void hydrateSidebarLocationMeta()
+
+  const deepLinkCfi = typeof route.query.cfi === 'string' ? route.query.cfi : null
+  if (deepLinkCfi) {
+    try {
+      await goTo(deepLinkCfi)
+    } catch {
+      toast.error('Could not open the linked highlight position')
+    }
+  }
 
   if (hadProgress) {
     const pct = Math.round(progress.percentage.value)
@@ -381,13 +391,14 @@ async function handleHighlight(color: string, style: string, note?: string) {
   if (!selection.text.value || !annotationCfi) return
   const created = await annotations.create(bookId, {
     cfi: annotationCfi,
+    bookFileId: fileId,
     text: selection.text.value,
     color,
     style,
     note: note ?? null,
     chapterTitle: chapterTitle.value || null,
   })
-  if (created) {
+  if (created?.cfi) {
     addAnnotation(created.cfi, created.color, created.style)
   }
   selection.dismiss()
@@ -402,7 +413,7 @@ async function handleSaveNote(note: string) {
 function handleDeleteAnnotation(id: number) {
   const ann = annotations.annotations.value.find((a) => a.id === id)
   if (ann) {
-    deleteAnnotation(ann.cfi)
+    if (ann.cfi) deleteAnnotation(ann.cfi)
     annotations.remove(bookId, id)
   }
   selection.dismiss()
@@ -411,7 +422,7 @@ function handleDeleteAnnotation(id: number) {
 function handleSidebarDeleteAnnotation(id: number) {
   const ann = annotations.annotations.value.find((a) => a.id === id)
   if (ann) {
-    deleteAnnotation(ann.cfi)
+    if (ann.cfi) deleteAnnotation(ann.cfi)
     annotations.remove(bookId, id)
   }
 }
@@ -502,6 +513,16 @@ async function navigateFromSidebar(cfiTarget: string) {
     .catch(() => false)
   if (!navigated) return
   showSidebar.value = false
+}
+
+function navigateAnnotationChapterFromSidebar(chapterIndex: number) {
+  const goToPromise = goToSection(chapterIndex)
+  if (!goToPromise) return
+  void Promise.resolve(goToPromise)
+    .then(() => {
+      showSidebar.value = false
+    })
+    .catch(() => undefined)
 }
 
 function navigateChapterFromSidebar(href: string) {
@@ -617,6 +638,7 @@ watch(
       @navigateChapter="navigateChapterFromSidebar"
       @navigateBookmark="navigateFromSidebar"
       @navigateAnnotation="navigateFromSidebar"
+      @navigateAnnotationChapter="navigateAnnotationChapterFromSidebar"
       @deleteBookmark="handleSidebarDeleteBookmark"
       @deleteAnnotation="handleSidebarDeleteAnnotation"
       @toggleExpand="toggleExpand"

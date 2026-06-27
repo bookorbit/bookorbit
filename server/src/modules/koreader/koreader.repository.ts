@@ -63,6 +63,59 @@ export class KoreaderRepository {
     return null;
   }
 
+  async resolveBookFilesByHashes(
+    hashes: string[],
+    accessibleLibraryIds: number[] | null,
+  ): Promise<Map<string, { bookFileId: number; bookId: number; libraryId: number; primaryFileId: number | null }>> {
+    const result = new Map<string, { bookFileId: number; bookId: number; libraryId: number; primaryFileId: number | null }>();
+    if (hashes.length === 0) return result;
+    if (accessibleLibraryIds !== null && accessibleLibraryIds.length === 0) return result;
+
+    const libraryFilter = accessibleLibraryIds ? inArray(schema.books.libraryId, accessibleLibraryIds) : undefined;
+
+    const direct = await this.db
+      .select({
+        hash: schema.bookFiles.fileHash,
+        bookFileId: schema.bookFiles.id,
+        bookId: schema.bookFiles.bookId,
+        libraryId: schema.books.libraryId,
+        primaryFileId: schema.books.primaryFileId,
+      })
+      .from(schema.bookFiles)
+      .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
+      .where(and(inArray(schema.bookFiles.fileHash, hashes), libraryFilter));
+
+    for (const row of direct) {
+      if (row.hash && !result.has(row.hash)) {
+        result.set(row.hash, { bookFileId: row.bookFileId, bookId: row.bookId, libraryId: row.libraryId, primaryFileId: row.primaryFileId });
+      }
+    }
+
+    const missing = hashes.filter((hash) => !result.has(hash));
+    if (missing.length === 0) return result;
+
+    const history = await this.db
+      .select({
+        hash: schema.bookFileHashHistory.fileHash,
+        bookFileId: schema.bookFiles.id,
+        bookId: schema.bookFiles.bookId,
+        libraryId: schema.books.libraryId,
+        primaryFileId: schema.books.primaryFileId,
+      })
+      .from(schema.bookFileHashHistory)
+      .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.bookFileHashHistory.bookFileId))
+      .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
+      .where(and(inArray(schema.bookFileHashHistory.fileHash, missing), libraryFilter));
+
+    for (const row of history) {
+      if (!result.has(row.hash)) {
+        result.set(row.hash, { bookFileId: row.bookFileId, bookId: row.bookId, libraryId: row.libraryId, primaryFileId: row.primaryFileId });
+      }
+    }
+
+    return result;
+  }
+
   async getAccessibleLibraryIds(userId: number): Promise<number[] | null> {
     const user = await this.db.query.users.findFirst({
       where: eq(schema.users.id, userId),
@@ -144,19 +197,31 @@ export class KoreaderRepository {
     return row ?? null;
   }
 
-  async upsertReadingProgress(bookFileId: number, userId: number, percentage: number) {
+  async upsertReadingProgress(bookFileId: number, userId: number, percentage: number, cfi: string | null = null, xpointer: string | null = null) {
     await this.db
       .insert(schema.readingProgress)
-      .values({ bookFileId, userId, percentage })
+      .values({ bookFileId, userId, percentage, cfi, koreaderProgress: xpointer })
       .onConflictDoUpdate({
         target: [schema.readingProgress.bookFileId, schema.readingProgress.userId],
         // Deliberately do NOT update updatedAt here. reading_progress.updatedAt must only
         // change when the web reader writes it, so getProgress can use it as an accurate
         // "last web-reader sync time" for comparison against koreader_device_progress.updatedAt.
-        // KOReader sends percentage + XPointer, while the web reader stores CFI and its own
-        // KOReader-compatible XPointer. If we keep stale web locator fields, clients may resume
-        // at an older location even when KOReader synced newer percentage.
-        set: { percentage, cfi: null, pageNumber: null, koreaderProgress: null, updatedAt: sql`"reading_progress"."updated_at"` },
+        // The cfi stored here is the server-side conversion of KOReader's XPointer (null when
+        // conversion fails) so the web reader resumes at the same paragraph; stale web locator
+        // fields are never kept, or clients may resume at an older location. Kobo location
+        // fields clear because the position no longer matches the device's bookmark; the Kobo
+        // pull path recomputes a precise Location from the cfi.
+        set: {
+          percentage,
+          cfi,
+          pageNumber: null,
+          koreaderProgress: xpointer,
+          koboLocationSource: null,
+          koboLocationType: null,
+          koboLocationValue: null,
+          koboContentSourceProgressPercent: null,
+          updatedAt: sql`"reading_progress"."updated_at"`,
+        },
       });
   }
 

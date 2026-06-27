@@ -12,6 +12,7 @@ export type StatisticsChartId =
   | "format-share-over-time"
   | "page-count-distribution"
   | "reading-heatmap"
+  | "reading-source-distribution"
   | "peak-reading-hours"
   | "favorite-reading-days"
   | "completion-timeline"
@@ -78,6 +79,7 @@ export const DEFAULT_LIBRARY_CHART_ORDER: StatisticsChartId[] = [
 
 export const DEFAULT_USER_CHART_ORDER: StatisticsChartId[] = [
   "reading-heatmap",
+  "reading-source-distribution",
   "peak-reading-hours",
   "favorite-reading-days",
   "completion-timeline",

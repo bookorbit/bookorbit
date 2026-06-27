@@ -16,6 +16,8 @@ export interface AmazonBookData {
   seriesIndex?: number;
   coverUrl?: string;
   tags?: string[];
+  communityRating?: number;
+  communityRatingCount?: number;
 }
 
 const SKIP_TITLE_PATTERNS = /box\s*set|collection\s*set|books\s*set|omnibus|summary\s*&\s*study|streamer|display\s*kit|bookstore\s*kit|shelf\s*kit/i;
@@ -38,6 +40,8 @@ export function parseBookPage(html: string): AmazonBookData {
     seriesIndex: extractSeriesIndex($),
     coverUrl: extractCoverUrl($),
     tags: extractCategories($),
+    communityRating: extractCommunityRating($),
+    communityRatingCount: extractCommunityRatingCount($),
   };
 }
 
@@ -229,6 +233,32 @@ function extractCoverUrl($: CheerioAPI): string | undefined {
   return src ? src.replace(/\._[A-Z0-9_,]+_\./i, '.') : undefined;
 }
 
+function extractCommunityRating($: CheerioAPI): number | undefined {
+  const candidates = [
+    $('#averageCustomerReviews_feature_div #acrPopover').attr('title'),
+    $('#acrPopover').attr('title'),
+    $('#averageCustomerReviews_feature_div .a-icon-alt').first().text(),
+    $('#acrPopover .a-icon-alt').first().text(),
+    $('#acrPopover .a-size-base.a-color-base').first().text(),
+    $('#acrPopover .a-size-small.a-color-base').first().text(),
+  ];
+
+  for (const raw of candidates) {
+    const parsed = parseRating(raw);
+    if (parsed !== undefined) return parsed;
+  }
+  return undefined;
+}
+
+function extractCommunityRatingCount($: CheerioAPI): number | undefined {
+  const candidates = [$('#acrCustomerReviewText').attr('aria-label'), $('#acrCustomerReviewText').first().text()];
+  for (const raw of candidates) {
+    const parsed = parseRatingCount(raw);
+    if (parsed !== undefined) return parsed;
+  }
+  return undefined;
+}
+
 function extractCategories($: CheerioAPI): string[] {
   const seen = new Set<string>();
   const cats: string[] = [];
@@ -271,4 +301,20 @@ function detailBulletValue($: CheerioAPI, labelPattern: RegExp): string {
 function parseYearFromText(text: string): number | undefined {
   const match = text.match(/\b(1[0-9]{3}|2[0-9]{3})\b/);
   return match ? parseInt(match[1], 10) : undefined;
+}
+
+function parseRating(text: string | undefined): number | undefined {
+  if (!text) return undefined;
+  const match = text.match(/(-?[0-9]+(?:[.,][0-9]+)?)\s*(?:out of\s*)?5/i) ?? text.trim().match(/^(-?[0-9]+(?:[.,][0-9]+)?)$/);
+  if (!match) return undefined;
+  const value = parseFloat(match[1].replace(',', '.'));
+  return Number.isFinite(value) && value >= 0 && value <= 5 ? value : undefined;
+}
+
+function parseRatingCount(text: string | undefined): number | undefined {
+  if (!text) return undefined;
+  const match = text.match(/(-?[0-9][0-9,.\s]*)/);
+  if (!match) return undefined;
+  const value = parseInt(match[1].replace(/[,\s]/g, ''), 10);
+  return Number.isInteger(value) && value >= 0 ? value : undefined;
 }

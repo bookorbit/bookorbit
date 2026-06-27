@@ -2,7 +2,6 @@ import { createRouter, createWebHistory, type RouteLocationNormalizedLoaded, typ
 import { EMAIL_TAB_LABELS, normalizeEmailTab } from '@/features/email/lib/email-tabs'
 import { METADATA_TAB_INFO, normalizeMetadataTab } from '@/features/settings/lib/metadata-tabs'
 import { READER_TAB_TITLE_LABELS, normalizeReaderTab } from '@/features/settings/lib/reader-tabs'
-import { INTEGRATIONS_TAB_INFO, normalizeIntegrationsTab } from '@/features/settings/lib/integrations-tabs'
 import { ADMIN_TAB_INFO, normalizeAdminTab } from '@/features/settings/lib/admin-tabs'
 import { SYSTEM_TAB_INFO, normalizeSystemTab } from '@/features/settings/lib/system-tabs'
 import { ACCOUNT_TAB_INFO, normalizeAccountTab } from '@/features/settings/lib/account-tabs'
@@ -48,11 +47,6 @@ function resolveMetadataTitle(to: RouteLocationNormalizedLoaded): string {
   return METADATA_TAB_INFO[tab].titleLabel
 }
 
-function resolveIntegrationsTitle(to: RouteLocationNormalizedLoaded): string {
-  const tab = normalizeIntegrationsTab(to.query.tab)
-  return INTEGRATIONS_TAB_INFO[tab].titleLabel
-}
-
 function resolveAdminTitle(to: RouteLocationNormalizedLoaded): string {
   const tab = normalizeAdminTab(to.query.tab)
   return ADMIN_TAB_INFO[tab].titleLabel
@@ -70,6 +64,18 @@ function resolveAccountTitle(to: RouteLocationNormalizedLoaded): string {
 
 function resolveStatisticsTitle(): string {
   return 'Statistics'
+}
+
+function resolveLegacyIntegrationsRoute(tab: unknown): string {
+  switch (firstText(tab)) {
+    case 'koreader':
+      return 'settings-koreader'
+    case 'hardcover':
+      return 'settings-hardcover'
+    case 'kobo':
+    default:
+      return 'settings-kobo'
+  }
 }
 
 export const routes: RouteRecordRaw[] = [
@@ -120,23 +126,25 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'integrations',
             name: 'settings-integrations',
-            component: () => import('@/features/settings/IntegrationsAllSettings.vue'),
-            meta: { maxWidth: 'max-w-3xl', title: resolveIntegrationsTitle },
+            redirect: (to) => ({ name: resolveLegacyIntegrationsRoute(to.query.tab) }),
           },
           {
             path: 'kobo',
             name: 'settings-kobo',
-            redirect: () => ({ name: 'settings-integrations', query: { tab: 'kobo' } }),
+            component: () => import('@/features/settings/KoboSettings.vue'),
+            meta: { maxWidth: 'max-w-4xl', title: 'Kobo Sync' },
           },
           {
             path: 'koreader',
             name: 'settings-koreader',
-            redirect: () => ({ name: 'settings-integrations', query: { tab: 'koreader' } }),
+            component: () => import('@/features/settings/KoreaderSettings.vue'),
+            meta: { maxWidth: 'max-w-4xl', title: 'KOReader Sync' },
           },
           {
             path: 'hardcover',
             name: 'settings-hardcover',
-            redirect: () => ({ name: 'settings-integrations', query: { tab: 'hardcover' } }),
+            component: () => import('@/features/hardcover/components/HardcoverSettings.vue'),
+            meta: { maxWidth: 'max-w-3xl', title: 'Hardcover' },
           },
           {
             path: 'email',
@@ -237,6 +245,12 @@ export const routes: RouteRecordRaw[] = [
         name: 'whats-new',
         component: () => import('@/features/whats-new/WhatsNewView.vue'),
         meta: { title: "What's New" },
+      },
+      {
+        path: '/annotations',
+        name: 'annotations',
+        component: () => import('@/features/annotations/views/AnnotationsHubView.vue'),
+        meta: { title: 'Annotations' },
       },
       {
         path: '/statistics',

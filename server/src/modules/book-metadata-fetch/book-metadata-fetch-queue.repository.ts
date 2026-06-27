@@ -12,7 +12,16 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { bookAuthors, bookGenres, bookMetadata, bookMetadataFetchQueue, bookNarrators, books, libraries } from '../../db/schema';
+import {
+  bookAuthors,
+  bookCommunityRatings,
+  bookGenres,
+  bookMetadata,
+  bookMetadataFetchQueue,
+  bookNarrators,
+  books,
+  libraries,
+} from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -324,6 +333,8 @@ export class BookMetadataFetchQueueRepository {
         return sql`(${bookMetadata.language} IS NULL OR ${bookMetadata.language} = '')`;
       case 'pageCount':
         return sql`${bookMetadata.pageCount} IS NULL`;
+      case 'communityRating':
+        return sql`NOT EXISTS (SELECT 1 FROM ${bookCommunityRatings} WHERE ${bookCommunityRatings.bookId} = ${bookMetadata.bookId})`;
       case 'seriesName':
         return sql`(${bookMetadata.seriesName} IS NULL OR ${bookMetadata.seriesName} = '')`;
       case 'seriesIndex':

@@ -4,7 +4,7 @@ export { getProviderColor, providerBadgeStyle, providerActivePillStyle } from '@
 
 const COVER_PROXY_PATH = '/api/v1/books/cover/proxy'
 
-export function getProviderLabel(provider: MetadataProviderKey, providers: MetadataProviderInfo[]): string {
+export function getProviderLabel(provider: MetadataProviderKey, providers: readonly MetadataProviderInfo[]): string {
   return providers.find((p) => p.key === provider)?.label ?? provider
 }
 

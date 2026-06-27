@@ -105,6 +105,28 @@ export const bookMetadata = pgTable(
   ],
 );
 
+export const bookCommunityRatings = pgTable(
+  'book_community_ratings',
+  {
+    bookId: integer('book_id')
+      .notNull()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    provider: varchar('provider', { length: 50 }).notNull(),
+    rating: real('rating').notNull(),
+    ratingCount: integer('rating_count'),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [
+    primaryKey({ columns: [t.bookId, t.provider] }),
+    index('book_community_ratings_provider_idx').on(t.provider),
+    check('book_community_ratings_rating_range_chk', sql`${t.rating} >= 0 and ${t.rating} <= 5`),
+    check('book_community_ratings_count_nonnegative_chk', sql`${t.ratingCount} is null or ${t.ratingCount} >= 0`),
+  ],
+);
+
 export const authors = pgTable(
   'authors',
   {
@@ -218,6 +240,8 @@ export const bookTags = pgTable(
 
 export type BookMetadata = typeof bookMetadata.$inferSelect;
 export type NewBookMetadata = typeof bookMetadata.$inferInsert;
+export type BookCommunityRating = typeof bookCommunityRatings.$inferSelect;
+export type NewBookCommunityRating = typeof bookCommunityRatings.$inferInsert;
 
 export type Author = typeof authors.$inferSelect;
 export type NewAuthor = typeof authors.$inferInsert;

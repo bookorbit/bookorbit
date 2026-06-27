@@ -1,5 +1,19 @@
 import { sql } from 'drizzle-orm';
-import { bigint, boolean, check, index, integer, pgTable, real, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  boolean,
+  check,
+  index,
+  integer,
+  pgTable,
+  primaryKey,
+  real,
+  serial,
+  text,
+  timestamp,
+  uniqueIndex,
+  varchar,
+} from 'drizzle-orm/pg-core';
 
 import { bookFiles } from './books';
 import { users } from './auth';
@@ -108,3 +122,56 @@ export const bookFileChapters = pgTable(
 
 export type BookFileChapter = typeof bookFileChapters.$inferSelect;
 export type NewBookFileChapter = typeof bookFileChapters.$inferInsert;
+
+export const koreaderPageStats = pgTable(
+  'koreader_page_stats',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bookFileId: integer('book_file_id')
+      .notNull()
+      .references(() => bookFiles.id, { onDelete: 'cascade' }),
+    deviceId: varchar('device_id', { length: 100 }).notNull(),
+    page: integer('page').notNull(),
+    // Device-reported unix seconds; part of the dedup key, stored verbatim (device clock accepted as-is).
+    startTime: bigint('start_time', { mode: 'number' }).notNull(),
+    durationSeconds: integer('duration_seconds').notNull(),
+    totalPages: integer('total_pages').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex('kps_user_file_device_page_start_uidx').on(t.userId, t.bookFileId, t.deviceId, t.page, t.startTime),
+    index('kps_user_file_device_start_idx').on(t.userId, t.bookFileId, t.deviceId, t.startTime),
+    index('kps_user_id_idx').on(t.userId),
+    check('koreader_page_stats_duration_nonnegative_chk', sql`${t.durationSeconds} >= 0`),
+    check('koreader_page_stats_page_nonnegative_chk', sql`${t.page} >= 0`),
+    check('koreader_page_stats_total_pages_positive_chk', sql`${t.totalPages} > 0`),
+    check('koreader_page_stats_start_time_positive_chk', sql`${t.startTime} > 0`),
+  ],
+);
+
+export type KoreaderPageStat = typeof koreaderPageStats.$inferSelect;
+export type NewKoreaderPageStat = typeof koreaderPageStats.$inferInsert;
+
+export const koreaderDeviceSweeps = pgTable(
+  'koreader_device_sweeps',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    deviceId: varchar('device_id', { length: 100 }).notNull(),
+    deviceModel: varchar('device_model', { length: 100 }).notNull().default('KOReader'),
+    pluginVersion: varchar('plugin_version', { length: 20 }),
+    lastSweepAt: timestamp('last_sweep_at', { withTimezone: true }).notNull(),
+    lastSweepBooksMatched: integer('last_sweep_books_matched').notNull().default(0),
+    lastSweepPageStats: integer('last_sweep_page_stats').notNull().default(0),
+    lastSweepAnnotations: integer('last_sweep_annotations').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.deviceId] }), index('kds_user_id_idx').on(t.userId)],
+);
+
+export type KoreaderDeviceSweep = typeof koreaderDeviceSweeps.$inferSelect;
+export type NewKoreaderDeviceSweep = typeof koreaderDeviceSweeps.$inferInsert;

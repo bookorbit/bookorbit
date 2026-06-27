@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { Bookmark, BookOpen, Highlighter, Trash2 } from '@lucide/vue'
+import { Bookmark, BookOpen, Highlighter, Trash2, TriangleAlert } from '@lucide/vue'
+import { ANNOTATION_COLOR_FILTER_OPTIONS } from '@bookorbit/types'
 import type { TocItem } from '../composables/useToc'
 import type { Bookmark as BookmarkType } from '../composables/useBookmarks'
 import type { Annotation } from '../composables/useAnnotations'
@@ -22,6 +23,7 @@ const emit = defineEmits<{
   navigateChapter: [href: string]
   navigateBookmark: [cfi: string]
   navigateAnnotation: [cfi: string]
+  navigateAnnotationChapter: [chapterIndex: number]
   deleteBookmark: [id: number]
   deleteAnnotation: [id: number]
   toggleExpand: [href: string]
@@ -39,27 +41,19 @@ const highlightColorFilter = ref('all')
 const highlightChapterFilter = ref('all')
 const highlightNotesOnly = ref(false)
 
-const HIGHLIGHT_COLOR_META: Record<string, { label: string; sample: string }> = {
-  '#FACC15': { label: 'Yellow', sample: '🟡' },
-  '#4ADE80': { label: 'Green', sample: '🟢' },
-  '#38BDF8': { label: 'Blue', sample: '🔵' },
-  '#F472B6': { label: 'Pink', sample: '🩷' },
-  '#FB923C': { label: 'Orange', sample: '🟠' },
-}
+const HIGHLIGHT_COLOR_META = Object.fromEntries(ANNOTATION_COLOR_FILTER_OPTIONS.map((color) => [color.hex, { label: color.label }])) as Record<
+  string,
+  { label: string }
+>
 
 function getHighlightColorLabel(color: string): string {
   const normalized = color.trim().toUpperCase()
   return HIGHLIGHT_COLOR_META[normalized]?.label ?? `Custom (${normalized})`
 }
 
-function getHighlightColorSample(color: string): string {
-  const normalized = color.trim().toUpperCase()
-  return HIGHLIGHT_COLOR_META[normalized]?.sample ?? '◉'
-}
-
 const highlightColorOptions = computed(() =>
   Array.from(new Set(props.annotations.map((ann) => ann.color)))
-    .map((hex) => ({ hex, label: getHighlightColorLabel(hex), sample: getHighlightColorSample(hex) }))
+    .map((hex) => ({ hex, label: getHighlightColorLabel(hex) }))
     .sort((a, b) => a.label.localeCompare(b.label)),
 )
 const highlightChapterOptions = computed(() =>
@@ -182,9 +176,18 @@ function navigateBookmark(cfi: string | null | undefined) {
   emit('navigateBookmark', cfi)
 }
 
-function navigateAnnotation(cfi: string | null | undefined) {
-  if (!cfi) return
-  emit('navigateAnnotation', cfi)
+function navigateAnnotation(ann: Annotation) {
+  if (ann.cfi) {
+    emit('navigateAnnotation', ann.cfi)
+    return
+  }
+  if (ann.chapterIndex != null) {
+    emit('navigateAnnotationChapter', ann.chapterIndex)
+  }
+}
+
+function isApproximateAnnotation(ann: Annotation): boolean {
+  return ann.cfi == null
 }
 
 function deleteBookmark(id: number) {
@@ -313,7 +316,7 @@ function deleteAnnotation(id: number) {
                   class="h-8 rounded-md border border-border bg-background px-2 text-xs text-muted-foreground outline-none focus:border-primary"
                 >
                   <option value="all">All colors</option>
-                  <option v-for="color in highlightColorOptions" :key="color.hex" :value="color.hex">{{ color.sample }} {{ color.label }}</option>
+                  <option v-for="color in highlightColorOptions" :key="color.hex" :value="color.hex">{{ color.label }}</option>
                 </select>
                 <select
                   v-model="highlightChapterFilter"
@@ -339,11 +342,19 @@ function deleteAnnotation(id: number) {
                 :data-reader-active-row="ann.id === activeAnnotationId ? 'highlight' : undefined"
               >
                 <div class="flex items-start gap-2">
-                  <button type="button" class="flex flex-1 min-w-0 items-start gap-2 text-left cursor-pointer" @click="navigateAnnotation(ann.cfi)">
+                  <button type="button" class="flex flex-1 min-w-0 items-start gap-2 text-left cursor-pointer" @click="navigateAnnotation(ann)">
                     <span class="mt-1.5 w-2.5 h-2.5 rounded-full shrink-0" :style="{ background: ann.color }" />
                     <div class="flex-1 min-w-0">
                       <p class="text-[13px] leading-relaxed line-clamp-3">{{ ann.text }}</p>
-                      <p class="text-[11px] text-muted-foreground mt-1">{{ getHighlightContextLine(ann) }}</p>
+                      <p class="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+                        <Tooltip v-if="isApproximateAnnotation(ann)">
+                          <TooltipTrigger as-child>
+                            <TriangleAlert :size="11" class="shrink-0 text-amber-500" />
+                          </TooltipTrigger>
+                          <TooltipContent>Synced from device; exact position unavailable, jumps to the chapter</TooltipContent>
+                        </Tooltip>
+                        <span>{{ getHighlightContextLine(ann) }}</span>
+                      </p>
                       <p class="text-[11px] text-muted-foreground mt-0.5">{{ formatDate(ann.createdAt) }}</p>
                       <p v-if="ann.note" class="text-[11px] text-muted-foreground mt-1 italic">{{ ann.note }}</p>
                     </div>

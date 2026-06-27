@@ -91,10 +91,22 @@ function resolvePublishedYear(book: RanobeDbBook, release: RanobeDbRelease | und
   return parseDateInt(book.c_release_date);
 }
 
+function normalizeCommunityRating(book: RanobeDbBook): { communityRating?: number; communityRatingCount?: number } {
+  const score = book.rating?.score;
+  const count = book.rating?.count;
+  const communityRating = typeof score === 'number' && Number.isFinite(score) && score >= 0 && score <= 10 ? score / 2 : undefined;
+  const communityRatingCount = typeof count === 'number' && Number.isInteger(count) && count >= 0 ? count : undefined;
+  return {
+    ...(communityRating !== undefined ? { communityRating } : {}),
+    ...(communityRatingCount !== undefined ? { communityRatingCount } : {}),
+  };
+}
+
 export function mapRanobeDbBook(book: RanobeDbBook): MetadataCandidate | null {
   if (!book?.id) return null;
 
   const selectedRelease = selectEnglishRelease(book.releases);
+  const communityRating = normalizeCommunityRating(book);
 
   return {
     provider: MetadataProviderKey.RANOBEDB,
@@ -113,5 +125,6 @@ export function mapRanobeDbBook(book: RanobeDbBook): MetadataCandidate | null {
     genres: resolveGenres(book),
     coverUrl: book.image ? `${IMAGE_BASE_URL}/${book.image.filename}` : undefined,
     sourceUrl: `${RANOBEDB_BASE_URL}/book/${book.id}`,
+    ...communityRating,
   };
 }

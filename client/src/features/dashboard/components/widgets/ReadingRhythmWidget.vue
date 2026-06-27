@@ -24,6 +24,12 @@ function getDayLabel(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00Z')
   return ['S', 'M', 'T', 'W', 'T', 'F', 'S'][d.getUTCDay()]!
 }
+
+const consistencyLabel = computed(() => {
+  if (!data.value) return ''
+  const dayWord = data.value.activeDays === 1 ? 'day' : 'days'
+  return `${data.value.activeDays} active ${dayWord} · ${data.value.consistencyPercent}% consistency`
+})
 </script>
 
 <template>
@@ -33,16 +39,13 @@ function getDayLabel(dateStr: string): string {
       <span class="text-[15px] font-semibold text-foreground">Reading Rhythm</span>
     </div>
 
-    <!-- Loading -->
     <div v-if="loading" class="flex flex-1 flex-col gap-2">
       <div class="flex-1 animate-pulse rounded bg-muted" />
       <div class="h-3 w-20 animate-pulse rounded bg-muted" />
     </div>
 
-    <!-- Error -->
     <div v-else-if="error" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">Failed to load</div>
 
-    <!-- Empty -->
     <div v-else-if="!data || data.activeDays === 0" class="flex flex-1 flex-col items-center justify-center gap-2">
       <div class="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
         <HeartPulse :size="16" class="text-muted-foreground/60" />
@@ -50,9 +53,7 @@ function getDayLabel(dateStr: string): string {
       <p class="text-center text-xs text-muted-foreground">Start reading to see your rhythm take shape</p>
     </div>
 
-    <!-- Rhythm chart -->
     <div v-else class="flex flex-1 flex-col">
-      <!-- Bars area — columns stretch to full height via default align-items:stretch -->
       <div class="flex flex-1 gap-[3px]">
         <div v-for="day in data.days" :key="day.date" class="flex flex-1 flex-col-reverse">
           <div
@@ -63,16 +64,14 @@ function getDayLabel(dateStr: string): string {
         </div>
       </div>
 
-      <!-- Day labels row -->
       <div class="flex gap-[3px] pb-1 pt-0.5">
         <div v-for="day in data.days" :key="day.date + '-lbl'" class="flex flex-1 justify-center">
           <span class="text-[8.5px] text-muted-foreground/70">{{ getDayLabel(day.date) }}</span>
         </div>
       </div>
 
-      <!-- Stats footer -->
-      <div class="flex items-center justify-between border-t border-border/30 pt-1.5">
-        <span class="text-[11px] text-muted-foreground"> {{ data.consistencyPercent }}% consistent </span>
+      <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-border/30 pt-1.5">
+        <span class="text-[11px] text-muted-foreground"> {{ consistencyLabel }} </span>
         <span class="text-[11px] text-muted-foreground"> avg {{ formatTime(data.avgSecondsPerDay) }}/day </span>
       </div>
     </div>

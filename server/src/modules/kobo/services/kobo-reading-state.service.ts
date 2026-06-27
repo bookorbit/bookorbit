@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db';
@@ -8,6 +8,8 @@ import { UserBookStatusService } from '../../user-book-status/user-book-status.s
 import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED } from '../../achievement/achievement-events.service';
 import { KoboBookAccessService } from './kobo-book-access.service';
 import { KoboBookIdentityService } from './kobo-book-identity.service';
+import { KoboProgressBridgeService } from './kobo-progress-bridge.service';
+import { KoboSettingsService } from './kobo-settings.service';
 
 type Db = NodePgDatabase<typeof schema>;
 type JsonObj = Record<string, unknown>;
@@ -22,6 +24,26 @@ function mergeSubObject(incoming: JsonObj | null | undefined, existing: JsonObj 
   return a >= b ? incoming : existing;
 }
 
+/**
+ * Returns the chronologically latest of the given timestamps, preserving the original
+ * string. The Kobo device resolves reading-state conflicts on the envelope LastModified/
+ * PriorityTimestamp, so these must never regress below the bookmark they wrap: a device
+ * re-push of its older state must not lower an envelope that already carries a newer
+ * hub-refreshed bookmark, or the device keeps rejecting the hub progress forever.
+ */
+function maxIsoTimestamp(...values: (string | null | undefined)[]): string | null {
+  let best: string | null = null;
+  let bestMs = Number.NEGATIVE_INFINITY;
+  for (const value of values) {
+    if (!value) continue;
+    const ms = new Date(value).getTime();
+    if (Number.isNaN(ms) || ms <= bestMs) continue;
+    bestMs = ms;
+    best = value;
+  }
+  return best;
+}
+
 @Injectable()
 export class KoboReadingStateService {
   constructor(
@@ -29,6 +51,8 @@ export class KoboReadingStateService {
     private readonly bookAccessService: KoboBookAccessService,
     private readonly userBookStatusService: UserBookStatusService,
     private readonly bookIdentityService: KoboBookIdentityService,
+    private readonly progressBridge: KoboProgressBridgeService,
+    private readonly settingsService: KoboSettingsService,
     private readonly achievementEvents: AchievementEventsService,
   ) {}
 
@@ -82,6 +106,10 @@ export class KoboReadingStateService {
     const mergedStats = mergeSubObject(incomingStats, existing?.statistics as JsonObj | null);
     const mergedStatus = mergeSubObject(incomingStatus, existing?.statusInfo as JsonObj | null);
 
+    const bookmarkModified = typeof mergedBookmark?.LastModified === 'string' ? mergedBookmark.LastModified : undefined;
+    const effectiveLastModified = maxIsoTimestamp(lastModified, existing?.lastModifiedKobo, bookmarkModified) ?? lastModified;
+    const effectivePriority = maxIsoTimestamp(priorityTimestamp, existing?.priorityTimestamp, bookmarkModified) ?? priorityTimestamp;
+
     await this.db
       .insert(schema.koboReadingStates)
       .values({
@@ -89,8 +117,8 @@ export class KoboReadingStateService {
         bookId,
         entitlementId,
         createdAtKobo: created,
-        lastModifiedKobo: lastModified,
-        priorityTimestamp,
+        lastModifiedKobo: effectiveLastModified,
+        priorityTimestamp: effectivePriority,
         currentBookmark: mergedBookmark,
         statistics: mergedStats,
         statusInfo: mergedStatus,
@@ -99,8 +127,8 @@ export class KoboReadingStateService {
       .onConflictDoUpdate({
         target: [schema.koboReadingStates.userId, schema.koboReadingStates.bookId],
         set: {
-          lastModifiedKobo: lastModified,
-          priorityTimestamp,
+          lastModifiedKobo: effectiveLastModified,
+          priorityTimestamp: effectivePriority,
           currentBookmark: sql`excluded.current_bookmark`,
           statistics: sql`excluded.statistics`,
           statusInfo: sql`excluded.status_info`,
@@ -111,15 +139,27 @@ export class KoboReadingStateService {
     const percent = this.extractPercent(mergedBookmark);
     if (percent !== null) {
       if (twoWayProgressSync) {
+        const locationSource = this.extractKoboLocationSource(mergedBookmark);
+        const locationType = this.extractKoboLocationType(mergedBookmark);
+        const locationValue = this.extractKoboLocationValue(mergedBookmark);
+
+        // KoboSpan bookmarks convert to precise canonical points; web and KOReader
+        // resume at the same paragraph instead of a percent approximation.
+        const precise =
+          locationType === 'KoboSpan' && locationSource && locationValue
+            ? await this.progressBridge.koboBookmarkToCanonical(userId, bookId, locationSource, locationValue)
+            : null;
+
         await this.syncPercentToInternalProgress(
           userId,
           bookId,
           percent,
           this.extractProgressModifiedAt(mergedBookmark, lastModified),
-          this.extractKoboLocationSource(mergedBookmark),
-          this.extractKoboLocationType(mergedBookmark),
-          this.extractKoboLocationValue(mergedBookmark),
+          locationSource,
+          locationType,
+          locationValue,
           this.extractContentSourceProgressPercent(mergedBookmark),
+          precise,
         );
         await this.markSnapshotBookUnsynced(userId, bookId);
       }
@@ -150,15 +190,103 @@ export class KoboReadingStateService {
 
     if (!row) return null;
 
+    const refreshed = await this.refreshBookmarkFromHub(userId, bookId, this.asJsonObj(row.currentBookmark)).catch(() => null);
+
     return {
       EntitlementId: (await this.bookIdentityService.ensureForBook(userId, bookId, await this.hasLibrarySnapshot(userId))).entitlementId,
       Created: row.createdAtKobo,
-      LastModified: row.lastModifiedKobo,
-      PriorityTimestamp: row.priorityTimestamp,
-      CurrentBookmark: row.currentBookmark,
+      LastModified: refreshed?.lastModifiedKobo ?? row.lastModifiedKobo,
+      PriorityTimestamp: refreshed?.lastModifiedKobo ?? row.priorityTimestamp,
+      CurrentBookmark: refreshed?.bookmark ?? row.currentBookmark,
       Statistics: row.statistics,
       StatusInfo: row.statusInfo,
     };
+  }
+
+  /**
+   * Computes a precise KoboSpan Location for the bookmark when the hub position moved
+   * since the device last reported. readingProgress.koboLocationValue is set only by
+   * device-originated progress (or a previous refresh), so a present cfi with a null
+   * value means the web reader or KOReader owns the current position.
+   */
+  private async refreshBookmarkFromHub(
+    userId: number,
+    bookId: number,
+    bookmark: JsonObj | null,
+  ): Promise<{ bookmark: JsonObj; lastModifiedKobo: string } | null> {
+    const settings = await this.settingsService.getSettings(userId);
+    if (!settings.twoWayProgressSync) return null;
+
+    const [primaryFile] = await this.db
+      .select({ fileId: schema.bookFiles.id })
+      .from(schema.books)
+      .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.books.primaryFileId))
+      .where(and(eq(schema.books.id, bookId), eq(schema.bookFiles.format, 'epub')))
+      .limit(1);
+    if (!primaryFile) return null;
+
+    const [progress] = await this.db
+      .select({
+        cfi: schema.readingProgress.cfi,
+        percentage: schema.readingProgress.percentage,
+        koboLocationValue: schema.readingProgress.koboLocationValue,
+      })
+      .from(schema.readingProgress)
+      .where(and(eq(schema.readingProgress.userId, userId), eq(schema.readingProgress.bookFileId, primaryFile.fileId)))
+      .limit(1);
+    if (!progress?.cfi || progress.koboLocationValue) return null;
+
+    const point = await this.progressBridge.cfiToKoboBookmark(userId, bookId, progress.cfi);
+    if (!point) return null;
+
+    const existingLocation = this.asJsonObj(bookmark?.Location ?? null);
+    const sameLocation = existingLocation?.Value === point.value && existingLocation?.Source === point.source;
+    const samePercent = typeof bookmark?.ProgressPercent === 'number' && Math.abs(bookmark.ProgressPercent - progress.percentage) < PROGRESS_EPSILON;
+    if (sameLocation && samePercent) {
+      await this.stampProgressLocation(userId, primaryFile.fileId, point);
+      return null;
+    }
+
+    const nowIso = new Date().toISOString();
+    const merged: JsonObj = {
+      ...(bookmark ?? {}),
+      LastModified: nowIso,
+      ProgressPercent: progress.percentage,
+      Location: { Source: point.source, Type: 'KoboSpan', Value: point.value },
+    };
+    if (point.contentSourceProgressPercent != null) merged.ContentSourceProgressPercent = point.contentSourceProgressPercent;
+    else delete merged.ContentSourceProgressPercent;
+
+    await this.db
+      .update(schema.koboReadingStates)
+      .set({ currentBookmark: merged, lastModifiedKobo: nowIso, priorityTimestamp: nowIso, updatedAt: new Date() })
+      .where(and(eq(schema.koboReadingStates.userId, userId), eq(schema.koboReadingStates.bookId, bookId)));
+    await this.stampProgressLocation(userId, primaryFile.fileId, point);
+
+    return { bookmark: merged, lastModifiedKobo: nowIso };
+  }
+
+  /** Records which Location the bookmark reflects; deliberately keeps updatedAt untouched. */
+  private async stampProgressLocation(
+    userId: number,
+    fileId: number,
+    point: { source: string; value: string; contentSourceProgressPercent: number | null },
+  ): Promise<void> {
+    await this.db
+      .update(schema.readingProgress)
+      .set({
+        koboLocationSource: point.source,
+        koboLocationType: 'KoboSpan',
+        koboLocationValue: point.value,
+        koboContentSourceProgressPercent: point.contentSourceProgressPercent,
+        updatedAt: sql`"reading_progress"."updated_at"`,
+      })
+      .where(and(eq(schema.readingProgress.userId, userId), eq(schema.readingProgress.bookFileId, fileId)));
+  }
+
+  private asJsonObj(value: unknown): JsonObj | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    return value as JsonObj;
   }
 
   private extractPercent(bookmark: JsonObj | null): number | null {
@@ -216,12 +344,13 @@ export class KoboReadingStateService {
     koboLocationType: string | null,
     koboLocationValue: string | null,
     koboContentSourceProgressPercent: number | null,
+    precise: { cfi: string; xpointer: string } | null,
   ): Promise<void> {
     const [primaryFile] = await this.db
       .select({ fileId: schema.bookFiles.id })
       .from(schema.books)
       .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.books.primaryFileId))
-      .where(and(eq(schema.books.id, bookId), eq(schema.bookFiles.format, 'epub')))
+      .where(and(eq(schema.books.id, bookId), inArray(schema.bookFiles.format, ['epub', 'kepub'])))
       .limit(1);
 
     if (!primaryFile) return;
@@ -252,7 +381,8 @@ export class KoboReadingStateService {
     ) {
       return;
     }
-    const nextCfi = samePercent ? (existing?.cfi ?? null) : null;
+    const nextCfi = precise?.cfi ?? (samePercent ? (existing?.cfi ?? null) : null);
+    const nextXpointer = precise?.xpointer ?? null;
 
     await this.db
       .insert(schema.readingProgress)
@@ -267,6 +397,7 @@ export class KoboReadingStateService {
         koboLocationType,
         koboLocationValue,
         koboContentSourceProgressPercent,
+        koreaderProgress: nextXpointer,
         updatedAt: sourceUpdatedAt,
       })
       .onConflictDoUpdate({
@@ -280,6 +411,7 @@ export class KoboReadingStateService {
           koboLocationType,
           koboLocationValue,
           koboContentSourceProgressPercent,
+          ...(nextXpointer != null ? { koreaderProgress: nextXpointer } : {}),
           updatedAt: sourceUpdatedAt,
         },
       });

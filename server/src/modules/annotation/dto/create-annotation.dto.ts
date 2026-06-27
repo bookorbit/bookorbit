@@ -1,4 +1,5 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 import { ANNOTATION_STYLES } from '../annotation.constants';
 
@@ -7,6 +8,12 @@ export class CreateAnnotationDto {
   @IsNotEmpty()
   @MaxLength(2000)
   cfi!: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  bookFileId?: number;
 
   @IsString()
   @IsNotEmpty()

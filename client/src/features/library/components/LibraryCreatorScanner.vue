@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Plus, X } from '@lucide/vue'
+import { Lock, Plus, X } from '@lucide/vue'
 import type { OrganizationMode } from '@bookorbit/types'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { FORMAT_LABELS } from '../composables/useLibraryCreator'
 
 const props = defineProps<{
   organizationMode: OrganizationMode
+  organizationModeLocked?: boolean
   allowedFormats: string[]
   excludePatterns: string[]
 }>()
@@ -18,8 +20,20 @@ const emit = defineEmits<{
 
 // ── Scan mode ─────────────────────────────────────────────────────────────────
 
+const ORGANIZATION_MODE_LOCK_TOOLTIP =
+  'Organization mode is fixed after library creation because changing it can create duplicate or missing book entries. To use a different mode, create a new library and rescan.'
+
 function handleSelectMode(mode: OrganizationMode) {
+  if (props.organizationModeLocked) return
   emit('update:organizationMode', mode)
+}
+
+function handleSelectFolderMode() {
+  handleSelectMode('book_per_folder')
+}
+
+function handleSelectFileMode() {
+  handleSelectMode('book_per_file')
 }
 
 // ── Allowed formats ──────────────────────────────────────────────────────────
@@ -70,16 +84,34 @@ function onPatternKeydown(e: KeyboardEvent) {
   <div class="px-6 py-6 space-y-8">
     <!-- Scan mode -->
     <div>
-      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-3">Scan mode</p>
+      <div class="flex items-center gap-2 mb-3">
+        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">Scan mode</p>
+        <Tooltip v-if="organizationModeLocked">
+          <TooltipTrigger as-child>
+            <span
+              class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border text-muted-foreground cursor-help"
+              aria-label="Organization mode is locked"
+            >
+              <Lock :size="11" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent class="max-w-72 text-xs leading-relaxed">
+            {{ ORGANIZATION_MODE_LOCK_TOOLTIP }}
+          </TooltipContent>
+        </Tooltip>
+      </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <button
+          type="button"
           class="text-left rounded-lg border p-4 transition-colors"
-          :class="
+          :class="[
             organizationMode === 'book_per_folder'
               ? 'border-primary bg-primary/5 ring-1 ring-primary'
-              : 'border-border bg-card hover:border-primary/40'
-          "
-          @click="handleSelectMode('book_per_folder')"
+              : 'border-border bg-card hover:border-primary/40',
+            organizationModeLocked ? 'cursor-not-allowed opacity-75' : '',
+          ]"
+          :disabled="organizationModeLocked"
+          @click="handleSelectFolderMode"
         >
           <div class="flex items-center gap-2 mb-1.5">
             <span
@@ -97,11 +129,16 @@ function onPatternKeydown(e: KeyboardEvent) {
         </button>
 
         <button
+          type="button"
           class="text-left rounded-lg border p-4 transition-colors"
-          :class="
-            organizationMode === 'book_per_file' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border bg-card hover:border-primary/40'
-          "
-          @click="handleSelectMode('book_per_file')"
+          :class="[
+            organizationMode === 'book_per_file'
+              ? 'border-primary bg-primary/5 ring-1 ring-primary'
+              : 'border-border bg-card hover:border-primary/40',
+            organizationModeLocked ? 'cursor-not-allowed opacity-75' : '',
+          ]"
+          :disabled="organizationModeLocked"
+          @click="handleSelectFileMode"
         >
           <div class="flex items-center gap-2 mb-1.5">
             <span

@@ -18,6 +18,7 @@ import {
   Star,
   ExternalLink,
   Sparkles,
+  Highlighter,
 } from '@lucide/vue'
 import { useRouter, useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -74,6 +75,7 @@ const githubStarPopoverOpen = ref(false)
 const isBookDockActive = computed(() => route.name === 'book-dock')
 const isAchievementsActive = computed(() => route.name === 'achievements')
 const isStatisticsActive = computed(() => route.name === 'statistics')
+const isAnnotationsActive = computed(() => route.name === 'annotations')
 
 const iconRadiusClass = computed(() => (themeStore.radius === 'sharp' ? 'rounded-none' : 'rounded-full'))
 const canChangePassword = computed(
@@ -87,6 +89,10 @@ function navigateToBookDock() {
 
 function navigateToStatistics() {
   router.push({ name: 'statistics', query: { tab: 'library' } })
+}
+
+function navigateToAnnotations() {
+  router.push({ name: 'annotations' })
 }
 
 function navigateToAchievements() {
@@ -606,6 +612,27 @@ function formatBadgeStyle(fmt: string) {
 
           <!-- Notifications button -->
           <NotificationSheet v-if="canAccessNotifications" :icon-radius-class="iconRadiusClass" />
+
+          <!-- Annotations button -->
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-8 w-8 border transition-colors"
+                :class="[
+                  isAnnotationsActive
+                    ? 'border-primary/80 bg-primary/8 text-primary'
+                    : 'border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground',
+                  iconRadiusClass,
+                ]"
+                @click="navigateToAnnotations"
+              >
+                <Highlighter :size="15" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Annotations</TooltipContent>
+          </Tooltip>
 
           <!-- Statistics button -->
           <Tooltip>

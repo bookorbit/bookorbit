@@ -172,7 +172,7 @@ watch(
                 v-for="pv in field.providerValues"
                 :key="pv.provider"
                 class="flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors hover:bg-muted w-full"
-                :class="field.pickedProvider === pv.provider ? 'bg-primary/8 ring-1 ring-inset ring-primary/20' : ''"
+                :class="pv.isPicked ? 'bg-primary/8 ring-1 ring-inset ring-primary/20' : ''"
                 @click="handlePickFromProvider(pv.provider)"
               >
                 <span class="relative shrink-0 w-8 rounded overflow-hidden bg-muted" :style="{ aspectRatio: coverAspectRatio }">
@@ -303,7 +303,7 @@ watch(
                 v-for="pv in field.providerValues"
                 :key="pv.provider"
                 class="flex items-start gap-2 px-2 py-1.5 rounded-md text-left transition-colors hover:bg-muted w-full"
-                :class="field.pickedProvider === pv.provider ? 'bg-primary/8 ring-1 ring-inset ring-primary/20' : ''"
+                :class="pv.isPicked ? 'bg-primary/8 ring-1 ring-inset ring-primary/20' : ''"
                 @click="handlePickFromProvider(pv.provider)"
               >
                 <span

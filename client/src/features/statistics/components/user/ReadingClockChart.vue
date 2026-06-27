@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, shallowRef, watchEffect } from 'vue'
+import { computed, ref, shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
 import { Clock } from '@lucide/vue'
+import type { ReadingSessionSourceBucket } from '@bookorbit/types'
 
 import { useThemeStore } from '@/stores/theme'
-import { getThemePalette } from '@/lib/echarts'
+import { getBreakdownSeries, type BreakdownDimension } from '../../lib/breakdown'
 import { useUserPeakReadingHours } from '../../composables/useUserPeakReadingHours'
+import BreakdownSelect from '../BreakdownSelect.vue'
 import ChartCard from '../ChartCard.vue'
 import ChartEmptyState from '../ChartEmptyState.vue'
 
@@ -26,6 +28,7 @@ const option = shallowRef({})
 const totalEvents = computed(() => data.value.reduce((s, d) => s + d.eventsCount, 0))
 const isEmpty = computed(() => totalEvents.value === 0)
 const lowConfidence = computed(() => totalEvents.value > 0 && totalEvents.value < MIN_EVENTS)
+const dimension = ref<BreakdownDimension>('source')
 
 function formatDuration(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds))
@@ -46,22 +49,23 @@ watchEffect(() => {
   option.value = {}
   if (isEmpty.value || lowConfidence.value || !data.value.length) return
 
-  const palette = getThemePalette(themeStore.theme, themeStore.accent)
+  const formatKeys = [...new Set(data.value.flatMap((d) => Object.keys(d.byFormat)))].sort()
+  const seriesMeta = getBreakdownSeries(dimension.value, `${themeStore.theme}:${themeStore.accent}`, formatKeys)
 
-  const formats = [...new Set(data.value.flatMap((d) => Object.keys(d.byFormat)))].sort()
-
-  const series = formats.map((fmt, i) => ({
+  const series = seriesMeta.map((meta) => ({
     type: 'bar',
-    name: fmt,
-    data: data.value.map((d) => (d.byFormat[fmt] ?? 0) / 60),
+    name: meta.label,
+    data: data.value.map(
+      (d) => ((dimension.value === 'source' ? d.bySource?.[meta.key as ReadingSessionSourceBucket] : d.byFormat?.[meta.key]) ?? 0) / 60,
+    ),
     coordinateSystem: 'polar',
     stack: 'clock',
-    itemStyle: { color: palette[i % palette.length] },
-    emphasis: { focus: 'series' },
+    itemStyle: { color: meta.color },
   }))
 
   option.value = {
-    polar: { radius: ['20%', '80%'] },
+    legend: { bottom: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 11 } },
+    polar: { radius: ['18%', '74%'], center: ['50%', '46%'] },
     angleAxis: {
       type: 'category',
       data: HOUR_LABELS,
@@ -91,15 +95,15 @@ watchEffect(() => {
         const eventLabel = events === 1 ? 'session' : 'sessions'
         const active = params.filter((p) => p.data > 0)
         const formatRows =
-          active.length > 1
+          active.length > 0
             ? `<div style="border-top:1px solid rgba(128,128,128,0.2);margin-top:5px;padding-top:5px">${active
                 .map((p) => {
-                  const formatSeconds = data.value[idx]?.byFormat[p.seriesName] ?? 0
+                  const sourceSeconds = (p.data ?? 0) * 60
                   return (
                     `<div style="display:flex;align-items:center;gap:6px;margin-top:2px">` +
                     `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};flex-shrink:0"></span>` +
                     `<span style="color:rgba(180,180,180,0.9)">${p.seriesName}</span>` +
-                    `<span style="margin-left:auto;padding-left:12px">${formatDuration(formatSeconds)}</span>` +
+                    `<span style="margin-left:auto;padding-left:12px">${formatDuration(sourceSeconds)}</span>` +
                     `</div>`
                   )
                 })
@@ -120,6 +124,9 @@ watchEffect(() => {
 
 <template>
   <ChartCard title="Reading Clock" :icon="Clock" :color-index="5" :loading :error :empty="isEmpty">
+    <template #controls>
+      <BreakdownSelect v-model="dimension" />
+    </template>
     <ChartEmptyState
       v-if="lowConfidence"
       :icon="Clock"

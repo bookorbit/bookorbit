@@ -38,7 +38,7 @@ const parser = new XMLParser({
   isArray: (name) => ['creator', 'identifier', 'subject', 'title', 'meta', 'item', 'reference'].includes(name),
   textNodeName: '#text',
   allowBooleanAttributes: true,
-  parseTagValue: false, // keep all values as strings — prevents leading-zero loss on ISBNs and numeric year conversion
+  parseTagValue: false, // keep all values as strings to preserve ISBNs with leading zeroes
 });
 
 function toArray<T>(val: T | T[] | undefined): T[] {
@@ -121,6 +121,34 @@ const PREFIX_TO_PROVIDER: Record<string, ProviderKey> = {
   ranobedb: 'ranobedb',
   aladin: 'aladin',
 };
+
+const PROVIDER_PREFIXES: Record<ProviderKey, readonly string[]> = {
+  amazon: ['urn:amazon:', 'amazon:', 'asin:', 'mobi-asin:'],
+  google: ['urn:google:', 'google:'],
+  goodreads: ['urn:goodreads:', 'goodreads:'],
+  hardcover: ['urn:hardcover:', 'hardcover:'],
+  hardcoverEdition: ['urn:hardcover_edition:', 'hardcover_edition:', 'hardcover-edition:', 'hardcoveredition:'],
+  openlibrary: ['urn:openlibrary:', 'openlibrary:'],
+  ranobedb: ['urn:ranobedb:', 'ranobedb:'],
+  kobo: ['urn:kobo:', 'kobo:'],
+  lubimyczytac: ['urn:lubimyczytac:', 'lubimyczytac:'],
+  aladin: ['urn:aladin:', 'aladin:'],
+  itunes: ['urn:itunes:', 'itunes:'],
+};
+
+function normalizeProviderId(provider: ProviderKey, raw: string): string | null {
+  const value = raw.trim();
+  if (!value) return null;
+
+  const lower = value.toLowerCase();
+  for (const prefix of PROVIDER_PREFIXES[provider]) {
+    if (lower.startsWith(prefix)) {
+      return value.slice(prefix.length).trim() || null;
+    }
+  }
+
+  return value;
+}
 
 // Calibre stores custom-column values in a `calibre:user_metadata` JSON blob keyed by column name,
 // each value carrying the actual value under `#value#`. Used only to fill page count / subtitle when null.
@@ -296,7 +324,7 @@ export function parseOpf(xml: string): ParsedOpf {
   let urnAladinId: string | null = null;
   let urnItunesId: string | null = null;
 
-  // Calibre prefix:value identifiers — lowest priority, resolved after scheme and urn.
+  // Calibre prefix:value identifiers have the lowest priority, after scheme and urn.
   const prefixIds: Partial<Record<ProviderKey, string>> = {};
 
   for (const ident of toArray(metadata['identifier'])) {
@@ -304,57 +332,58 @@ export function parseOpf(xml: string): ParsedOpf {
     const scheme = ((mo['@_opf:scheme'] ?? mo['@_scheme'] ?? '') as string).toLowerCase().trim();
     const value = getText(ident);
     if (!value) continue;
+    const lowerValue = value.toLowerCase();
 
     const looksLikeBareIsbn = scheme === '' && /^[\d\s-]{9,17}$/.test(value) && /^\d{9}[\dX]$|^\d{13}$/.test(value.replace(/[\s-]/g, ''));
-    if (scheme === 'isbn' || value.toLowerCase().includes('isbn') || looksLikeBareIsbn) {
+    if (scheme === 'isbn' || lowerValue.includes('isbn') || looksLikeBareIsbn) {
       const parsed = parseIsbn(value);
       isbn10 ??= parsed.isbn10;
       isbn13 ??= parsed.isbn13;
     }
 
     // opf:scheme-based provider identifiers (preferred format)
-    if (scheme === 'google') schemeGoogleBooksId ??= value || null;
-    if (scheme === 'amazon') schemeAmazonId ??= value || null;
-    if (scheme === 'goodreads') schemeGoodreadsId ??= value || null;
-    if (scheme === 'hardcover') schemeHardcoverId ??= value || null;
+    if (scheme === 'google') schemeGoogleBooksId ??= normalizeProviderId('google', value);
+    if (scheme === 'amazon') schemeAmazonId ??= normalizeProviderId('amazon', value);
+    if (scheme === 'goodreads') schemeGoodreadsId ??= normalizeProviderId('goodreads', value);
+    if (scheme === 'hardcover') schemeHardcoverId ??= normalizeProviderId('hardcover', value);
     if (scheme === 'hardcover_edition' || scheme === 'hardcover-edition' || scheme === 'hardcoveredition') {
-      schemeHardcoverEditionId ??= value || null;
+      schemeHardcoverEditionId ??= normalizeProviderId('hardcoverEdition', value);
     }
-    if (scheme === 'openlibrary') schemeOpenLibraryId ??= value || null;
-    if (scheme === 'ranobedb') schemeRanobedbId ??= value || null;
-    if (scheme === 'kobo') schemeKoboId ??= value || null;
-    if (scheme === 'lubimyczytac') schemeLubimyczytacId ??= value || null;
-    if (scheme === 'aladin') schemeAladinId ??= value || null;
-    if (scheme === 'itunes') schemeItunesId ??= value || null;
+    if (scheme === 'openlibrary') schemeOpenLibraryId ??= normalizeProviderId('openlibrary', value);
+    if (scheme === 'ranobedb') schemeRanobedbId ??= normalizeProviderId('ranobedb', value);
+    if (scheme === 'kobo') schemeKoboId ??= normalizeProviderId('kobo', value);
+    if (scheme === 'lubimyczytac') schemeLubimyczytacId ??= normalizeProviderId('lubimyczytac', value);
+    if (scheme === 'aladin') schemeAladinId ??= normalizeProviderId('aladin', value);
+    if (scheme === 'itunes') schemeItunesId ??= normalizeProviderId('itunes', value);
 
     // urn:-prefixed provider identifiers (legacy / backward-compat)
-    if (value.startsWith('urn:goodreads:')) urnGoodreadsId ??= value.slice('urn:goodreads:'.length) || null;
-    if (value.startsWith('urn:amazon:')) urnAmazonId ??= value.slice('urn:amazon:'.length) || null;
-    if (value.startsWith('urn:hardcover:')) urnHardcoverId ??= value.slice('urn:hardcover:'.length) || null;
-    if (value.startsWith('urn:hardcover_edition:')) urnHardcoverEditionId ??= value.slice('urn:hardcover_edition:'.length) || null;
-    if (value.startsWith('urn:hardcover-edition:')) urnHardcoverEditionId ??= value.slice('urn:hardcover-edition:'.length) || null;
-    if (value.startsWith('urn:google:')) urnGoogleBooksId ??= value.slice('urn:google:'.length) || null;
-    if (value.startsWith('urn:openlibrary:')) urnOpenLibraryId ??= value.slice('urn:openlibrary:'.length) || null;
-    if (value.startsWith('urn:ranobedb:')) urnRanobedbId ??= value.slice('urn:ranobedb:'.length) || null;
-    if (value.startsWith('urn:kobo:')) urnKoboId ??= value.slice('urn:kobo:'.length) || null;
-    if (value.startsWith('urn:lubimyczytac:')) urnLubimyczytacId ??= value.slice('urn:lubimyczytac:'.length) || null;
-    if (value.startsWith('urn:aladin:')) urnAladinId ??= value.slice('urn:aladin:'.length) || null;
-    if (value.startsWith('urn:itunes:')) urnItunesId ??= value.slice('urn:itunes:'.length) || null;
+    if (lowerValue.startsWith('urn:goodreads:')) urnGoodreadsId ??= normalizeProviderId('goodreads', value);
+    if (lowerValue.startsWith('urn:amazon:')) urnAmazonId ??= normalizeProviderId('amazon', value);
+    if (lowerValue.startsWith('urn:hardcover:')) urnHardcoverId ??= normalizeProviderId('hardcover', value);
+    if (lowerValue.startsWith('urn:hardcover_edition:')) urnHardcoverEditionId ??= normalizeProviderId('hardcoverEdition', value);
+    if (lowerValue.startsWith('urn:hardcover-edition:')) urnHardcoverEditionId ??= normalizeProviderId('hardcoverEdition', value);
+    if (lowerValue.startsWith('urn:google:')) urnGoogleBooksId ??= normalizeProviderId('google', value);
+    if (lowerValue.startsWith('urn:openlibrary:')) urnOpenLibraryId ??= normalizeProviderId('openlibrary', value);
+    if (lowerValue.startsWith('urn:ranobedb:')) urnRanobedbId ??= normalizeProviderId('ranobedb', value);
+    if (lowerValue.startsWith('urn:kobo:')) urnKoboId ??= normalizeProviderId('kobo', value);
+    if (lowerValue.startsWith('urn:lubimyczytac:')) urnLubimyczytacId ??= normalizeProviderId('lubimyczytac', value);
+    if (lowerValue.startsWith('urn:aladin:')) urnAladinId ??= normalizeProviderId('aladin', value);
+    if (lowerValue.startsWith('urn:itunes:')) urnItunesId ??= normalizeProviderId('itunes', value);
 
-    // Calibre prefix:value — only when there is no opf:scheme attribute and the value is not a urn:
-    if (scheme === '' && !value.startsWith('urn:')) {
+    // Calibre prefix:value only applies when there is no opf:scheme attribute and the value is not a urn.
+    if (scheme === '' && !lowerValue.startsWith('urn:')) {
       const colon = value.indexOf(':');
       if (colon > 0) {
         const provider = PREFIX_TO_PROVIDER[value.slice(0, colon).toLowerCase()];
         if (provider) {
-          const id = value.slice(colon + 1).trim();
+          const id = normalizeProviderId(provider, value);
           if (id) prefixIds[provider] ??= id;
         }
       }
     }
   }
 
-  // Priority: opf:scheme → urn: → Calibre prefix:value
+  // Priority: opf:scheme, then urn:, then Calibre prefix:value.
   const googleBooksId = schemeGoogleBooksId ?? urnGoogleBooksId ?? prefixIds.google ?? null;
   const goodreadsId = schemeGoodreadsId ?? urnGoodreadsId ?? prefixIds.goodreads ?? null;
   const amazonId = schemeAmazonId ?? urnAmazonId ?? prefixIds.amazon ?? null;

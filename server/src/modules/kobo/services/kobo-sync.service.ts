@@ -593,6 +593,10 @@ export class KoboSyncService {
       return { format: 'PDF', hash: this.buildDeliveryHash('PDF', false) };
     }
 
+    if (normalizedFormat === 'kepub') {
+      return { format: 'KEPUB', hash: this.buildDeliveryHash('KEPUB', false) };
+    }
+
     if (normalizedFormat === 'epub') {
       const limitBytes = settings.kepubConversionLimitMb * 1024 * 1024;
       const withinLimit = !fileSizeBytes || fileSizeBytes <= limitBytes;
@@ -650,7 +654,7 @@ export class KoboSyncService {
 
     return and(
       eq(schema.books.status, 'present'),
-      eq(schema.bookFiles.format, 'epub'),
+      inArray(schema.bookFiles.format, ['epub', 'kepub']),
       libraryAccessFilter,
       collectionMembershipFilter,
       ...contentFilterClauses,

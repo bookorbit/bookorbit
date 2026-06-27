@@ -69,6 +69,28 @@ describe('SelectionPopup', () => {
     expect(wrapper.emitted('highlight')?.[1]).toEqual(['#FACC15', 'highlight'])
   })
 
+  it('shows KOReader-equivalent highlight colors in the picker', async () => {
+    const wrapper = mount(SelectionPopup, {
+      props: {
+        visible: true,
+        position: { x: 100, y: 200 },
+        showBelow: false,
+        selectedText: 'Text',
+        overlappingAnnotationId: null,
+      },
+      global: globalStubs,
+    })
+
+    const highlightButton = wrapper.findAll('button')[1]!
+    await highlightButton.trigger('click')
+
+    expect(wrapper.text()).toContain('Red')
+    expect(wrapper.text()).toContain('Olive')
+    expect(wrapper.text()).toContain('Cyan')
+    expect(wrapper.text()).toContain('Purple')
+    expect(wrapper.text()).toContain('Gray')
+  })
+
   it('shows delete action only when overlapping annotation exists', async () => {
     const withDelete = mount(SelectionPopup, {
       props: {

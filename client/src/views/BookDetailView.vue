@@ -99,7 +99,7 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
           @cover-changed="onCoverChanged"
         />
         <FilesTab v-else-if="tab === 'files'" :book="detail" @refetch="fetch(detail.id)" />
-        <ReadingLogTab v-else-if="tab === 'reading-log'" :book="detail" />
+        <ReadingLogTab v-else-if="tab === 'reading-log'" :book="detail" @saved="onMetadataSaved" />
         <HighlightsTab v-else-if="tab === 'highlights'" :book="detail" />
       </div>
 
@@ -133,13 +133,14 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
           <div v-for="i in 3" :key="i" class="h-16 rounded-md bg-muted animate-shimmer" />
         </div>
         <div v-else-if="tab === 'reading-log'" class="space-y-4">
+          <div class="h-32 rounded-lg bg-muted animate-shimmer" />
           <div class="flex gap-2">
             <div v-for="i in 4" :key="i" class="h-8 w-24 rounded-md bg-muted animate-shimmer" />
           </div>
-          <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <div v-for="i in 5" :key="i" class="h-16 rounded-lg bg-muted animate-shimmer" />
+          <div class="grid grid-cols-1 gap-4 lg:grid-cols-5">
+            <div class="h-64 rounded-lg bg-muted animate-shimmer lg:col-span-3" />
+            <div class="h-64 rounded-lg bg-muted animate-shimmer lg:col-span-2" />
           </div>
-          <div class="h-16 rounded-md bg-muted animate-shimmer" />
           <div class="space-y-2">
             <div v-for="i in 5" :key="i" class="h-12 rounded-md bg-muted animate-shimmer" />
           </div>

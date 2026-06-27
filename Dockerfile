@@ -43,6 +43,7 @@ WORKDIR /app
 ARG APP_VERSION=dev
 ENV APP_VERSION=${APP_VERSION}
 ENV KOBO_CLOUDSCRAPER_PYTHON=/opt/bookorbit-python/bin/python
+ENV KOREADER_PLUGIN_PATH=/app/koreader-plugin/bookorbit.koplugin
 
 COPY server/requirements/kobo-cloudscraper.txt /tmp/kobo-cloudscraper-requirements.txt
 
@@ -60,6 +61,7 @@ COPY --from=server-builder --chown=node:node /deploy ./
 COPY --from=client-builder --chown=node:node /app/client/dist ./public
 COPY --from=server-builder --chown=node:node /app/server/entrypoint.sh ./entrypoint.sh
 COPY --chown=node:node server/bin/kepubify/ ./bin/kepubify/
+COPY --chown=node:node koreader-plugin/bookorbit.koplugin/ ./koreader-plugin/bookorbit.koplugin/
 
 RUN chmod +x /app/entrypoint.sh /app/bin/kepubify/* && mkdir -p /books /data/covers /data/book-bucket /tmp && chown -R node:node /data /tmp
 

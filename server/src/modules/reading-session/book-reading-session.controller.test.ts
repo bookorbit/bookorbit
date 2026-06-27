@@ -16,6 +16,19 @@ describe('BookReadingSessionController', () => {
     expect(result).toBe(mockResult);
   });
 
+  it('delegates createSession to service.createManualSession', async () => {
+    const created = { id: 1, source: 'manual' };
+    const service = { createManualSession: vi.fn().mockResolvedValue(created) };
+    const controller = new BookReadingSessionController(service as never);
+    const user = { id: 7 } as never;
+    const dto = { startedAt: '2026-04-15T10:00:00.000Z', durationMinutes: 30 };
+
+    const result = await controller.createSession(10, dto, user);
+
+    expect(service.createManualSession).toHaveBeenCalledWith(10, dto, user);
+    expect(result).toBe(created);
+  });
+
   it('delegates deleteSession to service.deleteSessionByBook', async () => {
     const service = { deleteSessionByBook: vi.fn().mockResolvedValue(undefined) };
     const controller = new BookReadingSessionController(service as never);

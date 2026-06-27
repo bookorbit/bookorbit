@@ -8,11 +8,16 @@ function makeHighlight(overrides: Partial<AnnotationItem> = {}): AnnotationItem 
     id: 1,
     bookId: 5,
     cfi: 'epubcfi(/6/4)',
+    jumpFileId: 10,
+    pageno: null,
     text: 'highlighted text',
     color: '#FACC15',
     style: 'highlight',
     note: null,
     chapterTitle: 'Chapter 1',
+    origin: 'web',
+    positionStatus: 'exact',
+    chapterIndex: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
   }
@@ -40,10 +45,16 @@ function setupDownloadMocks() {
   return { createObjectURL, revokeObjectURL, clickMock }
 }
 
+const stubs = {
+  Popover: { name: 'Popover', props: ['open'], template: '<div><slot /></div>' },
+  PopoverTrigger: { template: '<div><slot /></div>' },
+  PopoverContent: { template: '<div><slot /></div>' },
+}
+
 function mountMenu(items: AnnotationItem[], bookTitle = 'Test Book') {
   return mount(HighlightsExportMenu, {
     props: { items, bookTitle },
-    global: { stubs: { teleport: true } },
+    global: { stubs },
   })
 }
 
@@ -63,9 +74,8 @@ describe('HighlightsExportMenu', () => {
     expect(btn.attributes('disabled')).toBeDefined()
   })
 
-  it('opens menu on click', async () => {
+  it('shows export options', () => {
     const wrapper = mountMenu([makeHighlight()])
-    await wrapper.find('button').trigger('click')
     expect(wrapper.text()).toContain('Markdown')
     expect(wrapper.text()).toContain('Plain Text')
     expect(wrapper.text()).toContain('JSON')
@@ -76,7 +86,6 @@ describe('HighlightsExportMenu', () => {
 
     const wrapper = mountMenu([makeHighlight({ text: 'my highlight', note: 'my note', chapterTitle: 'Ch 1' })], 'Test Book')
 
-    await wrapper.find('button').trigger('click')
     const mdBtn = wrapper.findAll('button').find((b) => b.text().includes('Markdown'))!
     await mdBtn.trigger('click')
 
@@ -90,7 +99,6 @@ describe('HighlightsExportMenu', () => {
 
     const wrapper = mountMenu([makeHighlight()])
 
-    await wrapper.find('button').trigger('click')
     const jsonBtn = wrapper.findAll('button').find((b) => b.text().includes('JSON'))!
     await jsonBtn.trigger('click')
 
@@ -103,7 +111,6 @@ describe('HighlightsExportMenu', () => {
 
     const wrapper = mountMenu([makeHighlight()])
 
-    await wrapper.find('button').trigger('click')
     const txtBtn = wrapper.findAll('button').find((b) => b.text().includes('Plain Text'))!
     await txtBtn.trigger('click')
 
@@ -115,12 +122,10 @@ describe('HighlightsExportMenu', () => {
     setupDownloadMocks()
 
     const wrapper = mountMenu([makeHighlight()])
-    await wrapper.find('button').trigger('click')
-    expect(wrapper.text()).toContain('Markdown')
 
     const mdBtn = wrapper.findAll('button').find((b) => b.text().includes('Markdown'))!
     await mdBtn.trigger('click')
 
-    expect(wrapper.text()).not.toContain('Plain Text')
+    expect(wrapper.findComponent({ name: 'Popover' }).props('open')).toBe(false)
   })
 })

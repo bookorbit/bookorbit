@@ -11,6 +11,7 @@ function makeSession(overrides = {}) {
     progressDelta: 5.5,
     endProgress: 42.0,
     format: 'epub',
+    source: null,
     ...overrides,
   }
 }
@@ -20,11 +21,11 @@ function mountTable(props = {}) {
     props: {
       sessions: [makeSession()],
       total: 1,
-      page: 1,
-      pageSize: 25,
       sortBy: 'startedAt',
       sortDir: 'desc' as const,
       loading: false,
+      loadingMore: false,
+      hasMore: false,
       hasMultipleFormats: false,
       ...props,
     },
@@ -40,16 +41,6 @@ describe('ReadingLogTable', () => {
   it('shows empty state when sessions is empty and not loading', () => {
     const wrapper = mountTable({ sessions: [], total: 0 })
     expect(wrapper.text()).toContain('No reading sessions recorded yet')
-  })
-
-  it('does not show edit inputs (edit mode removed)', () => {
-    const wrapper = mountTable()
-    expect(wrapper.find('input[type="datetime-local"]').exists()).toBe(false)
-  })
-
-  it('does not show edit pencil button (edit mode removed)', () => {
-    const wrapper = mountTable()
-    expect(wrapper.find('button[title="Edit"]').exists()).toBe(false)
   })
 
   it('first delete click enters confirm state', async () => {
@@ -116,6 +107,78 @@ describe('ReadingLogTable', () => {
     expect(wrapper.find('tbody').text()).toContain('-')
   })
 
+  it('shows pace per hour derived from delta and duration', () => {
+    const wrapper = mountTable({ sessions: [makeSession({ progressDelta: 5, durationSeconds: 1800 })] })
+    expect(wrapper.text()).toContain('10.0%/hr')
+  })
+
+  it('shows "-" pace when progressDelta is null', () => {
+    const wrapper = mountTable({ sessions: [makeSession({ progressDelta: null })] })
+    const paceCells = wrapper.findAll('td.hidden')
+    expect(paceCells.some((cell) => cell.text() === '-')).toBe(true)
+  })
+
+  it('shows "-" pace when progressDelta is negative', () => {
+    const wrapper = mountTable({ sessions: [makeSession({ progressDelta: -70.2, durationSeconds: 26 })] })
+    const paceCells = wrapper.findAll('td.hidden')
+    expect(paceCells.some((cell) => cell.text() === '-')).toBe(true)
+    expect(wrapper.text()).not.toContain('-9715.3%/hr')
+  })
+
+  it('groups sessions under day headers with subtotals when sorted by date', () => {
+    // Local-time constructors keep the grouping assertions timezone-agnostic.
+    const day1Morning = new Date(2026, 3, 15, 10, 0).toISOString()
+    const day1Evening = new Date(2026, 3, 15, 20, 0).toISOString()
+    const day2Morning = new Date(2026, 3, 14, 9, 0).toISOString()
+    const wrapper = mountTable({
+      sessions: [
+        makeSession({ id: 1, startedAt: day1Morning, durationSeconds: 1800, progressDelta: 3 }),
+        makeSession({ id: 2, startedAt: day1Evening, durationSeconds: 1800, progressDelta: 2 }),
+        makeSession({ id: 3, startedAt: day2Morning, durationSeconds: 600, progressDelta: null }),
+      ],
+      total: 3,
+    })
+
+    const headerRows = wrapper.findAll('tbody tr.bg-muted\\/40')
+    expect(headerRows.length).toBe(2)
+    expect(headerRows[0]!.text()).toContain('1h 0m')
+    expect(headerRows[0]!.text()).toContain('+5.0%')
+    expect(headerRows[1]!.text()).toContain('10m')
+    expect(headerRows[1]!.text()).not.toContain('%')
+  })
+
+  it('renders flat rows without day headers when sorted by another column', () => {
+    const wrapper = mountTable({
+      sessions: [
+        makeSession({ id: 1, startedAt: new Date(2026, 3, 15, 10, 0).toISOString() }),
+        makeSession({ id: 2, startedAt: new Date(2026, 3, 14, 9, 0).toISOString() }),
+      ],
+      total: 2,
+      sortBy: 'durationSeconds',
+    })
+
+    expect(wrapper.findAll('tbody tr.bg-muted\\/40').length).toBe(0)
+    expect(wrapper.find('tbody').findAll('tr').length).toBe(2)
+  })
+
+  it('shows source pills when sessions carry a source', () => {
+    const wrapper = mountTable({
+      sessions: [makeSession({ id: 1, source: 'koreader' }), makeSession({ id: 2, source: 'manual' })],
+      total: 2,
+    })
+
+    expect(wrapper.text()).toContain('KOReader')
+    expect(wrapper.text()).toContain('Manual')
+    const headers = wrapper.findAll('th')
+    expect(headers.some((h) => h.text() === 'Source')).toBe(true)
+  })
+
+  it('hides the source column when no session has a source', () => {
+    const wrapper = mountTable({ sessions: [makeSession({ source: null })] })
+    const headers = wrapper.findAll('th')
+    expect(headers.some((h) => h.text() === 'Source')).toBe(false)
+  })
+
   it('does not show format column when hasMultipleFormats is false', () => {
     const wrapper = mountTable({ hasMultipleFormats: false })
     const headers = wrapper.findAll('th')
@@ -157,36 +220,29 @@ describe('ReadingLogTable', () => {
     expect(wrapper.emitted('sortChange')?.[0]).toEqual(['startedAt', 'asc'])
   })
 
-  it('prev button emits pageChange with page-1', async () => {
-    const wrapper = mountTable({ total: 30, page: 2, pageSize: 25 })
-    const prevBtn = wrapper.findAll('button').find((b) => b.text() === 'Prev')
-    expect(prevBtn).toBeDefined()
-    await prevBtn!.trigger('click')
-    expect(wrapper.emitted('pageChange')?.[0]).toEqual([1])
+  it('shows a Load more button when hasMore is true and emits loadMore', async () => {
+    const wrapper = mountTable({ total: 30, hasMore: true })
+    const loadMoreBtn = wrapper.findAll('button').find((b) => b.text().includes('Load more'))
+    expect(loadMoreBtn).toBeDefined()
+    await loadMoreBtn!.trigger('click')
+    expect(wrapper.emitted('loadMore')).toBeTruthy()
   })
 
-  it('next button emits pageChange with page+1', async () => {
-    const wrapper = mountTable({ total: 30, page: 1, pageSize: 25 })
-    const nextBtn = wrapper.findAll('button').find((b) => b.text() === 'Next')
-    await nextBtn!.trigger('click')
-    expect(wrapper.emitted('pageChange')?.[0]).toEqual([2])
+  it('hides the Load more button when everything is loaded', () => {
+    const wrapper = mountTable({ total: 1, hasMore: false })
+    const loadMoreBtn = wrapper.findAll('button').find((b) => b.text().includes('Load more'))
+    expect(loadMoreBtn).toBeUndefined()
   })
 
-  it('prev button is disabled on first page', () => {
-    const wrapper = mountTable({ page: 1 })
-    const prevBtn = wrapper.findAll('button').find((b) => b.text() === 'Prev')
-    expect(prevBtn?.attributes('disabled')).toBeDefined()
+  it('disables the Load more button while loading more', () => {
+    const wrapper = mountTable({ total: 30, hasMore: true, loadingMore: true })
+    const loadMoreBtn = wrapper.findAll('button').find((b) => b.text().includes('Load more'))
+    expect(loadMoreBtn?.attributes('disabled')).toBeDefined()
   })
 
-  it('next button is disabled on last page', () => {
-    const wrapper = mountTable({ total: 1, page: 1, pageSize: 25 })
-    const nextBtn = wrapper.findAll('button').find((b) => b.text() === 'Next')
-    expect(nextBtn?.attributes('disabled')).toBeDefined()
-  })
-
-  it('shows pagination range correctly', () => {
-    const wrapper = mountTable({ total: 50, page: 2, pageSize: 25 })
-    expect(wrapper.text()).toContain('26-50 of 50')
+  it('shows the accumulated count', () => {
+    const wrapper = mountTable({ sessions: [makeSession({ id: 1 }), makeSession({ id: 2 })], total: 50 })
+    expect(wrapper.text()).toContain('Showing 2 of 50 sessions')
   })
 
   it('clears confirm state when sessions prop changes', async () => {
@@ -206,16 +262,6 @@ describe('ReadingLogTable', () => {
     expect(wrapper.find('button[title="Click again to confirm delete"]').exists()).toBe(true)
     const sortBtn = wrapper.find('thead button')
     await sortBtn.trigger('click')
-    expect(wrapper.find('button[title="Click again to confirm delete"]').exists()).toBe(false)
-  })
-
-  it('clears confirm state when navigating to next page', async () => {
-    const wrapper = mountTable({ total: 30, page: 1, pageSize: 25 })
-    const deleteBtn = wrapper.find('button[title="Delete"]')
-    await deleteBtn.trigger('click')
-    expect(wrapper.find('button[title="Click again to confirm delete"]').exists()).toBe(true)
-    const nextBtn = wrapper.findAll('button').find((b) => b.text() === 'Next')
-    await nextBtn!.trigger('click')
     expect(wrapper.find('button[title="Click again to confirm delete"]').exists()).toBe(false)
   })
 

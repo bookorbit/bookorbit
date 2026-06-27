@@ -50,6 +50,10 @@ export class KoboDownloadService {
       return this.streamFile(file.absolutePath, file.id, format, reply);
     }
 
+    if (format === 'kepub') {
+      return this.streamFile(file.absolutePath, file.id, 'kepub.epub', reply);
+    }
+
     if (format === 'epub') {
       const settings = await this.settingsService.getSettings(userId);
       const limitBytes = settings.kepubConversionLimitMb * 1024 * 1024;

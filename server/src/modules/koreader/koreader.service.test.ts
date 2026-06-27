@@ -20,6 +20,8 @@ import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED } fro
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import { KoreaderChapterExtractorService } from './koreader-chapter-extractor.service';
 import { KoreaderChapterService } from './koreader-chapter.service';
+import type { KoreaderPackageService } from './koreader-package.service';
+import { KoreaderPluginRepository } from './koreader-plugin.repository';
 import { KoreaderRepository } from './koreader.repository';
 import { KoreaderService } from './koreader.service';
 import { BookService } from '../book/book.service';
@@ -78,9 +80,18 @@ describe('KoreaderService', () => {
   let mockAchievementEvents: {
     emit: ReturnType<typeof vi.fn>;
   };
+  let mockPluginRepo: {
+    listSweeps: ReturnType<typeof vi.fn>;
+    getPluginTotals: ReturnType<typeof vi.fn>;
+  };
+  let mockPositionConverter: {
+    xpointerPointToCfi: ReturnType<typeof vi.fn>;
+  };
   let mockBookService: {
-    isKoboTwoWayProgressSyncEnabled: ReturnType<typeof vi.fn>;
-    syncKoboReadingStateFromProgress: ReturnType<typeof vi.fn>;
+    syncKoboReadingStateForExternalProgress: ReturnType<typeof vi.fn>;
+  };
+  let mockPackageService: {
+    getVersionInfo: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -138,12 +149,28 @@ describe('KoreaderService', () => {
       emit: vi.fn(),
     };
 
-    mockBookService = {
-      isKoboTwoWayProgressSyncEnabled: vi.fn(),
-      syncKoboReadingStateFromProgress: vi.fn(),
+    mockPositionConverter = {
+      xpointerPointToCfi: vi.fn().mockResolvedValue({ status: 'failed', reason: 'chapter_unavailable' }),
     };
-    mockBookService.isKoboTwoWayProgressSyncEnabled.mockResolvedValue(false);
-    mockBookService.syncKoboReadingStateFromProgress.mockResolvedValue(true);
+
+    mockBookService = {
+      syncKoboReadingStateForExternalProgress: vi.fn().mockResolvedValue(undefined),
+    };
+    mockPackageService = {
+      getVersionInfo: vi.fn().mockResolvedValue({ pluginVersion: 'unknown', serverVersion: '1.0.0' }),
+    };
+
+    mockPluginRepo = {
+      listSweeps: vi.fn().mockResolvedValue([]),
+      getPluginTotals: vi.fn().mockResolvedValue({
+        matchedBooks: 0,
+        trashedAnnotations: 0,
+        pendingDeletes: 0,
+        failedPositions: 0,
+        pageStatEvents: 0,
+        annotations: 0,
+      }),
+    };
 
     mockRepo.deleteKoreaderUser.mockResolvedValue(undefined);
     mockRepo.updateKoreaderUser.mockResolvedValue(undefined);
@@ -161,11 +188,14 @@ describe('KoreaderService', () => {
 
     service = new KoreaderService(
       mockRepo as unknown as KoreaderRepository,
+      mockPluginRepo as unknown as KoreaderPluginRepository,
       mockChapterService as unknown as KoreaderChapterService,
       mockChapterExtractor as unknown as KoreaderChapterExtractorService,
       mockUserBookStatusService as unknown as UserBookStatusService,
       mockAchievementEvents as unknown as AchievementEventsService,
-      mockBookService as unknown as BookService,
+      mockPositionConverter as never,
+      mockBookService as never,
+      mockPackageService as unknown as KoreaderPackageService,
     );
   });
 
@@ -341,7 +371,8 @@ describe('KoreaderService', () => {
         chapterIndex: 6,
         syncTimestamp: 1700000000,
       });
-      expect(mockRepo.upsertReadingProgress).toHaveBeenCalledWith(44, 12, 50);
+      expect(mockRepo.upsertReadingProgress).toHaveBeenCalledWith(44, 12, 50, null, '/body/DocFragment[7]');
+      expect(mockBookService.syncKoboReadingStateForExternalProgress).toHaveBeenCalledWith(12, 44, 50);
       expect(mockUserBookStatusService.autoUpdate).toHaveBeenCalledWith(12, 55, 50);
       expect(mockAchievementEvents.emit).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, {
         userId: 12,
@@ -357,23 +388,6 @@ describe('KoreaderService', () => {
         document: 'abcdef1234567890fedcba',
         timestamp: 1700000000,
       });
-    });
-
-    it('triggers Kobo sync if twoWayProgressSync is enabled', async () => {
-      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 44, bookId: 55 });
-      mockBookService.isKoboTwoWayProgressSyncEnabled.mockResolvedValue(true);
-
-      await service.saveProgress(12, {
-        document: 'abcdef1234567890fedcba',
-        percentage: 0.5,
-        progress: '/body/DocFragment[7]',
-        device: 'Kobo Sage',
-        device_id: 'device-12',
-        timestamp: 1700000000,
-      });
-
-      expect(mockBookService.isKoboTwoWayProgressSyncEnabled).toHaveBeenCalledWith(12);
-      expect(mockBookService.syncKoboReadingStateFromProgress).toHaveBeenCalledWith(12, 44, 50);
     });
 
     it('throws when the book file cannot be resolved', async () => {
@@ -673,11 +687,105 @@ describe('KoreaderService', () => {
         devices,
         totalSyncedBooks: 14,
         lastSyncAt: '2026-02-01T10:00:00.000Z',
+        latestPluginVersion: null,
+        pluginUpdateAvailable: false,
+        sweeps: [],
+        pluginTotals: { matchedBooks: 0, trashedAnnotations: 0, pendingDeletes: 0, failedPositions: 0, pageStatEvents: 0, annotations: 0 },
       });
 
       expect(getCredentialsSpy).toHaveBeenCalledWith(7);
       expect(getDevicesSpy).toHaveBeenCalledWith(7);
       expect(mockRepo.getTotalSyncedBooks).toHaveBeenCalledWith(7);
+      expect(mockPluginRepo.listSweeps).toHaveBeenCalledWith(7);
+      expect(mockPluginRepo.getPluginTotals).toHaveBeenCalledWith(7);
+      expect(mockPackageService.getVersionInfo).toHaveBeenCalledTimes(1);
+    });
+
+    it('marks only devices with older comparable plugin versions as updateable', async () => {
+      vi.spyOn(service, 'getCredentials').mockResolvedValue(null);
+      vi.spyOn(service, 'getDevices').mockResolvedValue([]);
+      mockRepo.getTotalSyncedBooks.mockResolvedValue(0);
+      mockPackageService.getVersionInfo.mockResolvedValue({ pluginVersion: '0.5.0', serverVersion: '1.0.0' });
+      mockPluginRepo.listSweeps.mockResolvedValue([
+        {
+          deviceId: 'old-device',
+          deviceModel: 'Kobo Libra 2',
+          pluginVersion: '0.4.0',
+          lastSweepAt: new Date('2026-02-01T10:00:00.000Z'),
+          lastSweepBooksMatched: 12,
+          lastSweepPageStats: 30,
+          lastSweepAnnotations: 8,
+        },
+        {
+          deviceId: 'current-device',
+          deviceModel: 'Kobo Clara',
+          pluginVersion: '0.5.0',
+          lastSweepAt: new Date('2026-02-01T11:00:00.000Z'),
+          lastSweepBooksMatched: 3,
+          lastSweepPageStats: 4,
+          lastSweepAnnotations: 5,
+        },
+        {
+          deviceId: 'unknown-device',
+          deviceModel: 'Kobo Sage',
+          pluginVersion: null,
+          lastSweepAt: new Date('2026-02-01T12:00:00.000Z'),
+          lastSweepBooksMatched: 0,
+          lastSweepPageStats: 0,
+          lastSweepAnnotations: 0,
+        },
+      ]);
+
+      const result = await service.getSyncStatus(7);
+
+      expect(result.latestPluginVersion).toBe('0.5.0');
+      expect(result.pluginUpdateAvailable).toBe(true);
+      expect(result.sweeps).toEqual([
+        expect.objectContaining({
+          deviceId: 'old-device',
+          latestPluginVersion: '0.5.0',
+          updateAvailable: true,
+        }),
+        expect.objectContaining({
+          deviceId: 'current-device',
+          latestPluginVersion: '0.5.0',
+          updateAvailable: false,
+        }),
+        expect.objectContaining({
+          deviceId: 'unknown-device',
+          latestPluginVersion: '0.5.0',
+          updateAvailable: null,
+        }),
+      ]);
+    });
+
+    it('keeps plugin update state unknown when the server cannot report a plugin version', async () => {
+      vi.spyOn(service, 'getCredentials').mockResolvedValue(null);
+      vi.spyOn(service, 'getDevices').mockResolvedValue([]);
+      mockRepo.getTotalSyncedBooks.mockResolvedValue(0);
+      mockPackageService.getVersionInfo.mockResolvedValue({ pluginVersion: 'unknown', serverVersion: '1.0.0' });
+      mockPluginRepo.listSweeps.mockResolvedValue([
+        {
+          deviceId: 'device-1',
+          deviceModel: 'Kobo Libra 2',
+          pluginVersion: '0.4.0',
+          lastSweepAt: new Date('2026-02-01T10:00:00.000Z'),
+          lastSweepBooksMatched: 12,
+          lastSweepPageStats: 30,
+          lastSweepAnnotations: 8,
+        },
+      ]);
+
+      const result = await service.getSyncStatus(7);
+
+      expect(result.latestPluginVersion).toBeNull();
+      expect(result.pluginUpdateAvailable).toBe(false);
+      expect(result.sweeps[0]).toEqual(
+        expect.objectContaining({
+          latestPluginVersion: null,
+          updateAvailable: null,
+        }),
+      );
     });
   });
 

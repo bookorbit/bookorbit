@@ -1,16 +1,39 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { BookDetail } from '@bookorbit/types'
-import { useBookReadingLog } from '@/features/book/composables/useBookReadingLog'
-import ReadingLogStatsStrip from './ReadingLogStatsStrip.vue'
-import ReadingLogSparkline from './ReadingLogSparkline.vue'
+import type { BookDetail, UserBookStatus } from '@bookorbit/types'
+import { useBookReadingLog, type AddReadingSessionPayload } from '@/features/book/composables/useBookReadingLog'
+import ReadingLogHero from './ReadingLogHero.vue'
+import ReadingLogSourceSplit from './ReadingLogSourceSplit.vue'
+import ReadingLogJourneyChart from './ReadingLogJourneyChart.vue'
+import ReadingLogHeatmap from './ReadingLogHeatmap.vue'
 import ReadingLogTable from './ReadingLogTable.vue'
+import ReadingLogExportMenu from './ReadingLogExportMenu.vue'
+import AddSessionDialog from './AddSessionDialog.vue'
 
 const props = defineProps<{ book: BookDetail }>()
 
+const emit = defineEmits<{
+  saved: [book: BookDetail]
+}>()
+
 const bookIdRef = computed(() => props.book.id)
-const { sessions, total, stats, loading, error, page, pageSize, sortBy, sortDir, deleteSession, setPage, setSort, setFilters } =
-  useBookReadingLog(bookIdRef)
+const {
+  sessions,
+  total,
+  stats,
+  loading,
+  loadingMore,
+  error,
+  sortBy,
+  sortDir,
+  hasMore,
+  deleteSession,
+  addSession,
+  exportAll,
+  loadMore,
+  setSort,
+  setFilters,
+} = useBookReadingLog(bookIdRef)
 
 type QuickFilter = 'all' | 'last30' | 'last90' | 'thisYear'
 const activeQuick = ref<QuickFilter>('all')
@@ -22,6 +45,8 @@ const uniqueFormats = computed(() => {
 })
 
 const hasMultipleFormats = computed(() => uniqueFormats.value.length >= 2)
+
+const bookTitle = computed(() => props.book.title ?? 'Untitled')
 
 function buildDateFrom(q: QuickFilter): string | undefined {
   const now = new Date()
@@ -46,12 +71,43 @@ function handleSortChange(by: string, dir: 'asc' | 'desc') {
   setSort(by as 'startedAt' | 'durationSeconds' | 'progressDelta' | 'endProgress', dir)
 }
 
-function handlePageChange(p: number) {
-  setPage(p)
+function handleLoadMore() {
+  void loadMore()
 }
 
 async function handleDeleteSession(sessionId: number) {
   await deleteSession(sessionId)
+}
+
+function handleHeroSaved(readStatus: UserBookStatus) {
+  emit('saved', { ...props.book, readStatus })
+}
+
+const addDialogOpen = ref(false)
+const addSaving = ref(false)
+const addError = ref<string | null>(null)
+
+function handleOpenAddSession() {
+  addError.value = null
+  addDialogOpen.value = true
+}
+
+function handleCloseAddSession() {
+  if (addSaving.value) return
+  addDialogOpen.value = false
+}
+
+async function handleAddSessionSubmit(payload: AddReadingSessionPayload) {
+  addSaving.value = true
+  addError.value = null
+  try {
+    await addSession(payload)
+    addDialogOpen.value = false
+  } catch (e) {
+    addError.value = e instanceof Error ? e.message : 'Failed to add session'
+  } finally {
+    addSaving.value = false
+  }
 }
 
 const quickFilters: { label: string; value: QuickFilter }[] = [
@@ -68,6 +124,10 @@ const quickFilters: { label: string; value: QuickFilter }[] = [
       {{ error }}
     </div>
 
+    <ReadingLogHero :book="book" :stats="stats" :loading="loading" @saved="handleHeroSaved" @add-session="handleOpenAddSession" />
+
+    <ReadingLogSourceSplit :stats="stats" />
+
     <div class="flex flex-wrap items-center gap-2">
       <button
         v-for="qf in quickFilters"
@@ -83,33 +143,51 @@ const quickFilters: { label: string; value: QuickFilter }[] = [
         {{ qf.label }}
       </button>
 
-      <select
-        v-if="hasMultipleFormats"
-        class="ml-auto px-3 py-1.5 rounded-md text-sm border border-border bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-        :value="selectedFormat ?? ''"
-        @change="handleFormatChange"
-      >
-        <option value="">All formats</option>
-        <option v-for="fmt in uniqueFormats" :key="fmt" :value="fmt">{{ fmt.toUpperCase() }}</option>
-      </select>
+      <div class="ml-auto flex items-center gap-2">
+        <select
+          v-if="hasMultipleFormats"
+          class="px-3 py-1.5 rounded-md text-sm border border-border bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          :value="selectedFormat ?? ''"
+          @change="handleFormatChange"
+        >
+          <option value="">All formats</option>
+          <option v-for="fmt in uniqueFormats" :key="fmt" :value="fmt">{{ fmt.toUpperCase() }}</option>
+        </select>
+
+        <ReadingLogExportMenu :book-title="bookTitle" :total="total" :export-all="exportAll" />
+      </div>
     </div>
 
-    <ReadingLogSparkline :stats="stats" :loading="loading" />
-
-    <ReadingLogStatsStrip :stats="stats" :loading="loading" :quick-filter="activeQuick" />
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-5 lg:items-start">
+      <div class="lg:col-span-3">
+        <ReadingLogJourneyChart :stats="stats" :loading="loading" />
+      </div>
+      <div class="lg:col-span-2">
+        <ReadingLogHeatmap :stats="stats" :loading="loading" :quick-filter="activeQuick" />
+      </div>
+    </div>
 
     <ReadingLogTable
       :sessions="sessions"
       :total="total"
-      :page="page"
-      :page-size="pageSize"
       :sort-by="sortBy"
       :sort-dir="sortDir"
       :loading="loading"
+      :loading-more="loadingMore"
+      :has-more="hasMore"
       :has-multiple-formats="hasMultipleFormats"
       @sort-change="handleSortChange"
-      @page-change="handlePageChange"
+      @load-more="handleLoadMore"
       @delete-session="handleDeleteSession"
+    />
+
+    <AddSessionDialog
+      :open="addDialogOpen"
+      :formats="uniqueFormats"
+      :saving="addSaving"
+      :error="addError"
+      @close="handleCloseAddSession"
+      @submit="handleAddSessionSubmit"
     />
   </div>
 </template>

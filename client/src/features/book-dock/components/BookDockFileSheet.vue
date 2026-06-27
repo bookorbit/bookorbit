@@ -208,6 +208,7 @@ const currentSource = computed<MetadataSource>(() => ({
   durationSeconds: null,
   abridged: null,
   hardcoverEditionId: null,
+  communityRatings: [],
 }))
 
 function openSearch() {

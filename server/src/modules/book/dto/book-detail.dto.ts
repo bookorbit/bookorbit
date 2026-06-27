@@ -3,6 +3,7 @@ import type {
   BookFileWriteStatus,
   BookSeriesMembership,
   BookMetadataLockField,
+  BookCommunityRating,
   CustomMetadataBookValue,
   ComicMetadataFields,
   NarratorRef,
@@ -50,6 +51,7 @@ export class BookDetailDto {
   seriesIndex: number | null;
   seriesMemberships: BookSeriesMembership[];
   rating: number | null;
+  communityRatings: BookCommunityRating[];
   coverSource: 'extracted' | 'custom' | null;
   hardcoverEditionId: string | null;
   providerIds: ProviderIds;

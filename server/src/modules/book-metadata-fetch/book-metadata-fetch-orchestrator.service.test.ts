@@ -42,6 +42,7 @@ function makeService(withGateway = true) {
   const bookReadService = {
     findById: vi.fn(),
     updateMetadataFields: vi.fn().mockResolvedValue(undefined),
+    replaceCommunityRatings: vi.fn().mockResolvedValue(undefined),
   };
   const pipeline = {
     runWithSources: vi.fn().mockResolvedValue({ resolved: {}, providerIds: {} }),
@@ -186,6 +187,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
           publishedYear: null,
           language: null,
           pageCount: null,
+          communityRating: null,
           seriesName: null,
           seriesIndex: null,
           coverSource: null,
@@ -196,6 +198,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
       authorRows: [],
       genreRows: [],
       narratorRows: [],
+      communityRatingRows: [],
     });
     eligibilityService.isEligible.mockReturnValue(true);
     queueRepo.upsertSchedule = vi.fn().mockResolvedValue(1);
@@ -251,6 +254,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
         publishedYear: 2020,
         language: 'en',
         pageCount: 200,
+        communityRatings: [{ provider: MetadataProviderKey.HARDCOVER, rating: 4.25, ratingCount: 12345, updatedAt: '2026-06-25T00:00:00.000Z' }],
         seriesName: 'Series',
         seriesIndex: 2,
         duration: 3600,
@@ -289,6 +293,9 @@ describe('BookMetadataFetchOrchestratorService', () => {
         koboId: 'kobo-1',
       }),
     );
+    expect(bookReadService.replaceCommunityRatings).toHaveBeenCalledWith(88, [
+      { provider: MetadataProviderKey.HARDCOVER, rating: 4.25, ratingCount: 12345 },
+    ]);
     expect(metadataService.replaceAuthors).toHaveBeenCalledWith(88, [{ name: 'Author A', sortName: null }]);
     expect(metadataService.replaceGenres).toHaveBeenCalledWith(88, ['Genre A']);
     expect(metadataService.replaceNarrators).toHaveBeenCalledWith(88, [{ name: 'Narrator A', sortName: null }]);
@@ -311,6 +318,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
           publishedYear: null,
           language: null,
           pageCount: null,
+          communityRating: null,
           seriesName: null,
           seriesIndex: null,
           coverSource: null,
@@ -321,6 +329,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
       authorRows: [],
       genreRows: [],
       narratorRows: [],
+      communityRatingRows: [],
     });
     pipeline.runWithSources.mockRejectedValue(Object.assign(new Error('provider down'), { status: 503 }));
 
@@ -409,6 +418,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
       authorRows: [{ name: 'Author' }],
       genreRows: [{ name: 'Genre' }],
       narratorRows: [],
+      communityRatingRows: [],
     });
     pipeline.runWithSources.mockResolvedValue({ resolved: {}, providerIds: {} });
     vi.spyOn(service as any, 'persistResolved').mockResolvedValue(undefined);
@@ -495,6 +505,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
           publishedYear: null,
           language: null,
           pageCount: null,
+          communityRating: null,
           seriesName: null,
           seriesIndex: null,
           coverSource: null,
@@ -505,6 +516,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
       authorRows: [],
       genreRows: [],
       narratorRows: [],
+      communityRatingRows: [],
     });
     eligibilityService.isEligible.mockReturnValue(false);
     await service.scheduleIfEligible(1, 2, 'import' as never);
@@ -551,6 +563,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
           publishedYear: null,
           language: null,
           pageCount: null,
+          communityRating: null,
           seriesName: null,
           seriesIndex: null,
           coverSource: null,
@@ -573,6 +586,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
       authorRows: [],
       genreRows: [],
       narratorRows: [],
+      communityRatingRows: [],
     });
 
     await (service as any).processOne(91, 'Book');
@@ -618,6 +632,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
           publishedYear: null,
           language: null,
           pageCount: null,
+          communityRating: null,
           seriesName: null,
           seriesIndex: null,
           coverSource: null,
@@ -628,6 +643,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
       authorRows: [],
       genreRows: [],
       narratorRows: [],
+      communityRatingRows: [],
     });
     pipeline.runWithSources.mockRejectedValue('provider down');
 

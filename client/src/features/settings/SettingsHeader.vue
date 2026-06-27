@@ -34,16 +34,24 @@ const sections = computed<Section[]>(() => {
     result.push({ label: 'Metadata', routeName: 'settings-admin-metadata' })
   }
 
-  if (su || perms.includes(Permission.KoboSync) || perms.includes(Permission.KoreaderSync) || perms.includes(Permission.HardcoverSync)) {
-    result.push({ label: 'Integrations', routeName: 'settings-integrations' })
-  }
-
   if (su || perms.includes('email_send') || perms.includes('manage_email')) {
     result.push({ label: 'Email', routeName: 'settings-email' })
   }
 
   if (su || perms.includes('opds_access')) {
     result.push({ label: 'OPDS', routeName: 'settings-opds' })
+  }
+
+  if (su || perms.includes(Permission.KoboSync)) {
+    result.push({ label: 'Kobo', routeName: 'settings-kobo' })
+  }
+
+  if (su || perms.includes(Permission.KoreaderSync)) {
+    result.push({ label: 'KOReader', routeName: 'settings-koreader' })
+  }
+
+  if (su || perms.includes(Permission.HardcoverSync)) {
+    result.push({ label: 'Hardcover', routeName: 'settings-hardcover' })
   }
 
   if (su || perms.includes('manage_users') || perms.includes('manage_app_settings')) {

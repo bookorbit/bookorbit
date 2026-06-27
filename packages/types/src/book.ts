@@ -1,4 +1,4 @@
-import type { MetadataFetchDiagnostics, MetadataProviderKey, MetadataSeriesMembership } from "./metadata-fetch";
+import type { BookCommunityRating, MetadataFetchDiagnostics, MetadataProviderKey, MetadataSeriesMembership } from "./metadata-fetch";
 import type { BookMetadataLockField } from "./metadata-lock";
 import type { AudiobookChapter, NarratorRef } from "./audiobook";
 import type { ComicMetadataFields } from "./metadata-fetch";
@@ -133,6 +133,7 @@ export type BookDetail = {
   seriesIndex: number | null;
   seriesMemberships?: BookSeriesMembership[];
   rating: number | null;
+  communityRatings: BookCommunityRating[];
   coverSource: "extracted" | "custom" | null;
   hardcoverEditionId: string | null;
   providerIds: ProviderIds;
@@ -171,6 +172,7 @@ export type BookMetadataRefreshPreviewFields = {
   seriesName?: string | null;
   seriesIndex?: number | null;
   seriesMemberships?: MetadataSeriesMembership[] | null;
+  communityRatings?: BookCommunityRating[];
   coverUrl?: string;
   googleBooksId?: string | null;
   goodreadsId?: string | null;

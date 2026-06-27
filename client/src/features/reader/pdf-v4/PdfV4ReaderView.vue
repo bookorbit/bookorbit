@@ -128,7 +128,9 @@ async function setupProgressTracking(registry: PluginRegistry) {
 
   unsubLayoutReady = scroll.onLayoutReady(({ isInitial, totalPages }) => {
     if (!isInitial) return
-    const initialPage = progress.pageNumber.value ?? 1
+    const deepLinkQuery = route?.query?.page
+    const deepLinkPage = typeof deepLinkQuery === 'string' ? Number.parseInt(deepLinkQuery, 10) : NaN
+    const initialPage = Number.isFinite(deepLinkPage) && deepLinkPage >= 1 ? deepLinkPage : (progress.pageNumber.value ?? 1)
     currentPageNumber.value = initialPage
     totalPageCount.value = totalPages
     if (initialPage > 1 && initialPage <= totalPages) {

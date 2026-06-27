@@ -1,17 +1,8 @@
 import { ref } from 'vue'
+import type { AnnotationItem } from '@bookorbit/types'
 import { api } from '@/lib/api'
 
-export interface Annotation {
-  id: number
-  bookId: number
-  cfi: string
-  text: string
-  color: string
-  style: string
-  note: string | null
-  chapterTitle: string | null
-  createdAt: string
-}
+export type Annotation = AnnotationItem
 
 export function useAnnotations() {
   const annotations = ref<Annotation[]>([])
@@ -29,7 +20,7 @@ export function useAnnotations() {
 
   async function create(
     bookId: number,
-    data: { cfi: string; text: string; color: string; style: string; note?: string | null; chapterTitle?: string | null },
+    data: { cfi: string; bookFileId?: number; text: string; color: string; style: string; note?: string | null; chapterTitle?: string | null },
   ): Promise<Annotation | null> {
     const res = await api(`/api/v1/books/${bookId}/annotations`, {
       method: 'POST',

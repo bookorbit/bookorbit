@@ -298,6 +298,39 @@ describe('LibraryService', () => {
     expect(scannerService.startScanAsync).toHaveBeenCalledWith(10);
   });
 
+  it('update rejects organization mode changes after creation', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 10, name: 'Current', icon: 'BookOpen', watch: false, organizationMode: 'book_per_folder' }]);
+
+    await expect(service.update(10, { organizationMode: 'book_per_file' } as any)).rejects.toThrow(BadRequestException);
+
+    expect(libraryRepo.update).not.toHaveBeenCalled();
+    expect(scannerService.startScanAsync).not.toHaveBeenCalled();
+  });
+
+  it('update accepts the same organization mode without triggering a scan', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 10, name: 'Current', icon: 'BookOpen', watch: false, organizationMode: 'book_per_file' }]);
+    libraryRepo.update.mockResolvedValue([{ id: 10, name: 'Current', icon: 'BookOpen', watch: false, organizationMode: 'book_per_file' }]);
+    libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 1, path: '/books' }]);
+
+    const result = await service.update(10, { organizationMode: 'book_per_file' } as any);
+
+    expect(libraryRepo.update).toHaveBeenCalledWith(10, { organizationMode: 'book_per_file' });
+    expect(scannerService.startScanAsync).not.toHaveBeenCalled();
+    expect(result.organizationMode).toBe('book_per_file');
+  });
+
+  it('update accepts the default organization mode for legacy rows without triggering a scan', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 10, name: 'Current', icon: 'BookOpen', watch: false, organizationMode: null }]);
+    libraryRepo.update.mockResolvedValue([{ id: 10, name: 'Current', icon: 'BookOpen', watch: false, organizationMode: null }]);
+    libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 1, path: '/books' }]);
+
+    const result = await service.update(10, { organizationMode: 'book_per_folder' } as any);
+
+    expect(libraryRepo.update).toHaveBeenCalledWith(10, { organizationMode: 'book_per_folder' });
+    expect(scannerService.startScanAsync).not.toHaveBeenCalled();
+    expect(result.organizationMode).toBe('book_per_folder');
+  });
+
   it('update rejects changes that would leave a library without an icon', async () => {
     libraryRepo.findById.mockResolvedValue([{ id: 10, name: 'Current', icon: null, watch: false }]);
 

@@ -40,6 +40,21 @@ export function useFoliateAnnotations() {
           }
           return g
         }
+      case 'invert':
+        return (rects: DOMRectList, { color = '#FFFFFF' }: { color?: string } = {}) => {
+          const g = createSVG('g')
+          g.setAttribute('fill', color)
+          ;(g as SVGElement).style.mixBlendMode = 'difference'
+          for (const { left, top, height, width } of Array.from(rects)) {
+            const el = createSVG('rect')
+            el.setAttribute('x', String(left))
+            el.setAttribute('y', String(top))
+            el.setAttribute('height', String(height))
+            el.setAttribute('width', String(width))
+            g.append(el)
+          }
+          return g
+        }
       case 'squiggly':
         return (rects: DOMRectList, { color = 'red' }: { color?: string } = {}) => {
           const g = createSVG('g')

@@ -67,6 +67,17 @@ export function useKoreaderSync() {
     return `${window.location.origin}/api/v1/koreader`
   }
 
+  async function downloadPluginPackage(): Promise<void> {
+    const origin = encodeURIComponent(window.location.origin)
+    const res = await api(`/api/v1/koreader/plugin-package?origin=${origin}`)
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body.message || 'Failed to download the plugin')
+    }
+    const blob = await res.blob()
+    triggerBlobDownload(blob, 'bookorbit.koplugin.zip')
+  }
+
   return {
     credentials,
     syncStatus,
@@ -77,5 +88,18 @@ export function useKoreaderSync() {
     deleteCredentials,
     testConnection,
     getSyncUrl,
+    downloadPluginPackage,
   }
+}
+
+function triggerBlobDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.rel = 'noopener'
+  document.body.append(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
 }

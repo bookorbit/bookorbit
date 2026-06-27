@@ -14,6 +14,7 @@ export interface KoboSettings {
   forceEnableHyphenation: boolean;
   kepubConversionLimitMb: number;
   twoWayProgressSync: boolean;
+  syncBookOrbitAnnotationsToKobo: boolean;
 }
 
 @Injectable()
@@ -31,7 +32,7 @@ export class KoboSettingsService {
     }
 
     if (!row) throw new InternalServerErrorException('Failed to create kobo settings row');
-    if (row.twoWayProgressSync && !row.convertToKepub) {
+    if ((row.twoWayProgressSync || row.syncBookOrbitAnnotationsToKobo) && !row.convertToKepub) {
       const [updated] = await this.db
         .update(schema.koboSyncSettings)
         .set({ convertToKepub: true, updatedAt: sql`now()` })
@@ -48,6 +49,7 @@ export class KoboSettingsService {
       forceEnableHyphenation: row.forceEnableHyphenation,
       kepubConversionLimitMb: row.kepubConversionLimitMb,
       twoWayProgressSync: row.twoWayProgressSync,
+      syncBookOrbitAnnotationsToKobo: row.syncBookOrbitAnnotationsToKobo,
     };
   }
 
@@ -57,7 +59,8 @@ export class KoboSettingsService {
     const newReading = patch.readingThreshold ?? current.readingThreshold;
     const newFinished = patch.finishedThreshold ?? current.finishedThreshold;
     const newTwoWayProgressSync = patch.twoWayProgressSync ?? current.twoWayProgressSync;
-    const newConvertToKepub = newTwoWayProgressSync ? true : (patch.convertToKepub ?? current.convertToKepub);
+    const newAnnotationSync = patch.syncBookOrbitAnnotationsToKobo ?? current.syncBookOrbitAnnotationsToKobo;
+    const newConvertToKepub = newTwoWayProgressSync || newAnnotationSync ? true : (patch.convertToKepub ?? current.convertToKepub);
 
     if (newReading >= newFinished) {
       throw new BadRequestException('Reading threshold must be less than finished threshold');
@@ -72,6 +75,7 @@ export class KoboSettingsService {
         forceEnableHyphenation: patch.forceEnableHyphenation ?? current.forceEnableHyphenation,
         kepubConversionLimitMb: patch.kepubConversionLimitMb ?? current.kepubConversionLimitMb,
         twoWayProgressSync: newTwoWayProgressSync,
+        syncBookOrbitAnnotationsToKobo: newAnnotationSync,
         updatedAt: sql`now()`,
       })
       .where(eq(schema.koboSyncSettings.userId, userId))
@@ -92,6 +96,7 @@ export class KoboSettingsService {
       forceEnableHyphenation: updated.forceEnableHyphenation,
       kepubConversionLimitMb: updated.kepubConversionLimitMb,
       twoWayProgressSync: updated.twoWayProgressSync,
+      syncBookOrbitAnnotationsToKobo: updated.syncBookOrbitAnnotationsToKobo,
     };
   }
 

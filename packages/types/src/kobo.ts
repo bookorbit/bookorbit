@@ -16,6 +16,7 @@ export interface KoboSyncSettings {
   forceEnableHyphenation: boolean;
   kepubConversionLimitMb: number;
   twoWayProgressSync: boolean;
+  syncBookOrbitAnnotationsToKobo: boolean;
 }
 
 export interface CreateKoboDeviceRequest {
@@ -33,4 +34,5 @@ export interface UpdateKoboSyncSettingsRequest {
   forceEnableHyphenation?: boolean;
   kepubConversionLimitMb?: number;
   twoWayProgressSync?: boolean;
+  syncBookOrbitAnnotationsToKobo?: boolean;
 }

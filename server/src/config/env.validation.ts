@@ -71,6 +71,10 @@ const envSchema = z.object({
     .string()
     .transform((val) => val.trim())
     .optional(),
+  KOREADER_PLUGIN_PATH: z
+    .string()
+    .transform((val) => val.trim())
+    .optional(),
 });
 
 export function validateEnv(config: Record<string, unknown>) {

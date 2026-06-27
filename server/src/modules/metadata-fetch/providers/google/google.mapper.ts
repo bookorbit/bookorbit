@@ -9,6 +9,14 @@ function parseYear(dateString: string | undefined): number | undefined {
   return year;
 }
 
+function normalizeCommunityRating(value: number | undefined): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 5 ? value : undefined;
+}
+
+function normalizeCommunityRatingCount(value: number | undefined): number | undefined {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : undefined;
+}
+
 export function mapGoogleVolume(raw: GoogleVolumeItem): MetadataCandidate {
   const info = raw.volumeInfo;
   const identifiers = info.industryIdentifiers ?? [];
@@ -21,6 +29,8 @@ export function mapGoogleVolume(raw: GoogleVolumeItem): MetadataCandidate {
   const coverUrl = info.imageLinks?.thumbnail
     ? info.imageLinks.thumbnail.replace('http://', 'https://').replace('&edge=curl', '').replace('zoom=1', 'zoom=0')
     : undefined;
+  const communityRating = normalizeCommunityRating(info.averageRating);
+  const communityRatingCount = normalizeCommunityRatingCount(info.ratingsCount);
 
   return {
     provider: MetadataProviderKey.GOOGLE,
@@ -38,5 +48,7 @@ export function mapGoogleVolume(raw: GoogleVolumeItem): MetadataCandidate {
     genres: info.categories,
     coverUrl,
     sourceUrl: `https://books.google.com/books?id=${raw.id}`,
+    ...(communityRating !== undefined ? { communityRating } : {}),
+    ...(communityRatingCount !== undefined ? { communityRatingCount } : {}),
   };
 }

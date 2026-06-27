@@ -15,6 +15,8 @@ const baseDocument: HardcoverSearchDocument = {
   release_year: 2007,
   release_date: '2007-03-27',
   genres: ['Fantasy', 'Fiction'],
+  rating: 4.42,
+  ratings_count: 12345,
   featured_series: { series: { name: 'The Kingkiller Chronicle' }, position: 1 },
   image: { url: 'https://assets.hardcover.app/cover.jpg' },
 };
@@ -27,6 +29,8 @@ const baseBook: HardcoverBookWithEditions = {
   description: 'A story about a wizard.',
   cached_contributors: [{ author: { id: 1, name: 'Patrick Rothfuss' }, contribution: null }],
   featured_book_series: { series: { name: 'The Kingkiller Chronicle', books_count: 3 }, position: 1 },
+  rating: 4.42,
+  ratings_count: 12345,
   pages: 662,
   release_year: 2007,
   release_date: '2007-03-27',
@@ -69,6 +73,8 @@ describe('mapSearchDocument', () => {
       seriesIndex: 1,
       coverUrl: 'https://assets.hardcover.app/cover.jpg',
       sourceUrl: 'https://hardcover.app/books/the-name-of-the-wind',
+      communityRating: 4.42,
+      communityRatingCount: 12345,
     });
     expect(result.hardcoverEditionId).toBeUndefined();
   });
@@ -158,6 +164,8 @@ describe('mapBookWithEditions', () => {
       isbn13: '9780756404079',
       seriesName: 'The Kingkiller Chronicle',
       seriesIndex: 1,
+      communityRating: 4.42,
+      communityRatingCount: 12345,
       coverUrl: 'https://assets.hardcover.app/edition-cover.jpg',
       sourceUrl: 'https://hardcover.app/books/the-name-of-the-wind',
     });

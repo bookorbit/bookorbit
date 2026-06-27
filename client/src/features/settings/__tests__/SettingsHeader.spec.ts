@@ -57,48 +57,47 @@ describe('SettingsHeader', () => {
       expect(labels).toContain('Account')
     })
 
-    it('hides Integrations tab when user has no integration permissions', () => {
+    it('hides integration tabs when user has no integration permissions', () => {
       const labels = getTabLabels(mountHeader())
+      expect(labels).not.toContain('Integrations')
+      expect(labels).not.toContain('Kobo')
+      expect(labels).not.toContain('KOReader')
+      expect(labels).not.toContain('Hardcover')
+    })
+
+    it('shows Kobo tab for users with kobo_sync', () => {
+      const labels = getTabLabels(mountHeader({ perms: ['kobo_sync'] }))
+      expect(labels).toContain('Kobo')
       expect(labels).not.toContain('Integrations')
     })
 
-    it('shows Integrations tab for users with kobo_sync', () => {
-      const labels = getTabLabels(mountHeader({ perms: ['kobo_sync'] }))
-      expect(labels).toContain('Integrations')
-    })
-
-    it('shows Integrations tab for users with koreader_sync', () => {
+    it('shows KOReader tab for users with koreader_sync', () => {
       const labels = getTabLabels(mountHeader({ perms: ['koreader_sync'] }))
-      expect(labels).toContain('Integrations')
+      expect(labels).toContain('KOReader')
+      expect(labels).not.toContain('Integrations')
     })
 
-    it('shows Integrations tab for users with hardcover_sync', () => {
+    it('shows Hardcover tab for users with hardcover_sync', () => {
       const labels = getTabLabels(mountHeader({ perms: ['hardcover_sync'] }))
-      expect(labels).toContain('Integrations')
+      expect(labels).toContain('Hardcover')
+      expect(labels).not.toContain('Integrations')
     })
 
-    it('shows Integrations tab for superusers', () => {
+    it('shows integration tabs for superusers', () => {
       const labels = getTabLabels(mountHeader({ su: true }))
-      expect(labels).toContain('Integrations')
+      expect(labels).toContain('Kobo')
+      expect(labels).toContain('KOReader')
+      expect(labels).toContain('Hardcover')
+      expect(labels).not.toContain('Integrations')
+    })
+
+    it('places integration tabs after OPDS', () => {
+      const labels = getTabLabels(mountHeader({ su: true }))
+      expect(labels.slice(labels.indexOf('OPDS'), labels.indexOf('Admin'))).toEqual(['OPDS', 'Kobo', 'KOReader', 'Hardcover'])
     })
   })
 
   describe('tabs removed from top-level navigation', () => {
-    it('does not show a standalone Kobo tab', () => {
-      const labels = getTabLabels(mountHeader({ su: true }))
-      expect(labels).not.toContain('Kobo')
-    })
-
-    it('does not show a standalone KOReader tab', () => {
-      const labels = getTabLabels(mountHeader({ su: true }))
-      expect(labels).not.toContain('KOReader')
-    })
-
-    it('does not show a standalone Hardcover tab', () => {
-      const labels = getTabLabels(mountHeader({ su: true }))
-      expect(labels).not.toContain('Hardcover')
-    })
-
     it('does not show a standalone Users tab', () => {
       const labels = getTabLabels(mountHeader({ su: true }))
       expect(labels).not.toContain('Users')
@@ -229,9 +228,21 @@ describe('SettingsHeader', () => {
       expect(readerBtn?.classes()).toContain('border-transparent')
     })
 
-    it('integrations tab is active when route is settings-integrations', () => {
-      const wrapper = mountHeader({ routeName: 'settings-integrations', perms: ['kobo_sync'] })
-      const btn = wrapper.findAll('button').find((b) => b.text() === 'Integrations')
+    it('kobo tab is active when route is settings-kobo', () => {
+      const wrapper = mountHeader({ routeName: 'settings-kobo', perms: ['kobo_sync'] })
+      const btn = wrapper.findAll('button').find((b) => b.text() === 'Kobo')
+      expect(btn?.classes()).toContain('border-primary')
+    })
+
+    it('KOReader tab is active when route is settings-koreader', () => {
+      const wrapper = mountHeader({ routeName: 'settings-koreader', perms: ['koreader_sync'] })
+      const btn = wrapper.findAll('button').find((b) => b.text() === 'KOReader')
+      expect(btn?.classes()).toContain('border-primary')
+    })
+
+    it('Hardcover tab is active when route is settings-hardcover', () => {
+      const wrapper = mountHeader({ routeName: 'settings-hardcover', perms: ['hardcover_sync'] })
+      const btn = wrapper.findAll('button').find((b) => b.text() === 'Hardcover')
       expect(btn?.classes()).toContain('border-primary')
     })
 

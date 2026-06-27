@@ -158,6 +158,13 @@ export class LibraryService {
     const [existing] = await this.libraryRepo.findById(id);
     if (!existing) throw new NotFoundException('Library not found');
 
+    const existingOrganizationMode = normalizeOrganizationMode(existing.organizationMode);
+    if (dto.organizationMode !== undefined && dto.organizationMode !== existingOrganizationMode) {
+      throw new BadRequestException(
+        'Library organization mode cannot be changed after creation. Create a new library to use a different organization mode.',
+      );
+    }
+
     if (dto.name && dto.name !== existing.name) {
       await this.assertNameAvailable(dto.name, id);
     }
@@ -206,11 +213,7 @@ export class LibraryService {
     }
 
     const shouldRescan =
-      dto.formatPriority !== undefined ||
-      dto.allowedFormats !== undefined ||
-      dto.excludePatterns !== undefined ||
-      dto.organizationMode !== undefined ||
-      folderPaths !== undefined;
+      dto.formatPriority !== undefined || dto.allowedFormats !== undefined || dto.excludePatterns !== undefined || folderPaths !== undefined;
     if (shouldRescan) this.scannerService.startScanAsync(id);
 
     return { ...normalizeLibraryOrganizationMode(updated), folders };

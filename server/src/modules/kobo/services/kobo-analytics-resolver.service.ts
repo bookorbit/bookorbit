@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db/db.module';
@@ -45,7 +45,9 @@ export class KoboAnalyticsResolverService {
       const byHash = await this.db
         .select({ id: schema.bookFiles.id })
         .from(schema.bookFiles)
-        .where(and(eq(schema.bookFiles.bookId, bookId), eq(schema.bookFiles.fileHash, snapHash), eq(schema.bookFiles.format, 'epub')));
+        .where(
+          and(eq(schema.bookFiles.bookId, bookId), eq(schema.bookFiles.fileHash, snapHash), inArray(schema.bookFiles.format, ['epub', 'kepub'])),
+        );
 
       if (byHash.length === 1) {
         return { kind: 'resolved', bookFileId: byHash[0].id };
@@ -59,7 +61,7 @@ export class KoboAnalyticsResolverService {
     if (book.primaryFileId == null) return { kind: 'skipped', reason: 'no_epub_file' };
 
     const primary = await this.db.query.bookFiles.findFirst({
-      where: and(eq(schema.bookFiles.id, book.primaryFileId), eq(schema.bookFiles.format, 'epub')),
+      where: and(eq(schema.bookFiles.id, book.primaryFileId), inArray(schema.bookFiles.format, ['epub', 'kepub'])),
       columns: { id: true },
     });
     if (!primary) return { kind: 'skipped', reason: 'no_epub_file' };

@@ -2,6 +2,7 @@
 import { computed, shallowRef, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
 import { Tag } from '@lucide/vue'
+import { READING_SESSION_SOURCE_BUCKETS, READING_SESSION_SOURCE_BUCKET_LABELS } from '@bookorbit/types'
 
 import { useThemeStore } from '@/stores/theme'
 import { getThemePalette, readCssColor } from '@/lib/echarts'
@@ -26,6 +27,7 @@ watchEffect(() => {
 
   const palette = getThemePalette(themeStore.theme, themeStore.accent, 0.8, 0.8)
   const background = readCssColor('--background')
+  const bySourceByGenre = new Map(data.value.map((item) => [item.genre, item.bySource]))
 
   option.value = {
     tooltip: {
@@ -34,7 +36,14 @@ watchEffect(() => {
       formatter: (params: { name: string; value: number }) => {
         const hours = (params.value / 3600).toFixed(1)
         const pct = totalSeconds.value > 0 ? ((params.value / totalSeconds.value) * 100).toFixed(1) : '0'
-        return `<strong>${params.name}</strong><br/>${hours}h reading time<br/>${pct}% of total`
+        const bySource = bySourceByGenre.get(params.name)
+        const sourceRows = bySource
+          ? READING_SESSION_SOURCE_BUCKETS.filter((bucket) => (bySource[bucket] ?? 0) > 0)
+              .map((bucket) => `${READING_SESSION_SOURCE_BUCKET_LABELS[bucket]}: ${((bySource[bucket] ?? 0) / 3600).toFixed(1)}h`)
+              .join('<br/>')
+          : ''
+        const base = `<strong>${params.name}</strong><br/>${hours}h reading time<br/>${pct}% of total`
+        return sourceRows ? `${base}<br/>${sourceRows}` : base
       },
     },
     series: [

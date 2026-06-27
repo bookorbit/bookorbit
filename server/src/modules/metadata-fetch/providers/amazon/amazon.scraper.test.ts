@@ -59,6 +59,12 @@ describe('AmazonScraper', () => {
         <div id="rpi-attribute-book_details-publication_date"><span class="rpi-attribute-value"><span>April 10, 1925</span></span></div>
         <div id="rpi-attribute-language"><span class="rpi-attribute-value"><span>English</span></span></div>
         <div id="rpi-attribute-book_details-fiona_pages"><span class="rpi-attribute-value"><span>180 pages</span></span></div>
+        <div id="averageCustomerReviews_feature_div">
+          <span id="acrPopover" title="4.8 out of 5 stars">
+            <span class="a-icon-alt">4.8 out of 5 stars</span>
+          </span>
+          <span id="acrCustomerReviewText" aria-label="104,451 Reviews">104,451 ratings</span>
+        </div>
         <img id="landingImage" data-a-dynamic-image='{"https://m.media-amazon.com/images/I/123._SY342_.jpg": [225, 342]}'>
       `;
 
@@ -76,6 +82,8 @@ describe('AmazonScraper', () => {
         language: 'English',
         pageCount: 180,
         coverUrl: 'https://m.media-amazon.com/images/I/123.jpg',
+        communityRating: 4.8,
+        communityRatingCount: 104451,
       });
     });
 
@@ -93,6 +101,35 @@ describe('AmazonScraper', () => {
       expect(result.publishedYear).toBe(2020);
       expect(result.isbn13).toBe('9780987654321');
       expect(result.pageCount).toBe(1234);
+    });
+
+    it('rejects a negative rating value', () => {
+      const html = `
+        <span id="productTitle">Bad Rating Book</span>
+        <div id="averageCustomerReviews_feature_div">
+          <span id="acrPopover" title="-1 out of 5 stars">
+            <span class="a-icon-alt">-1 out of 5 stars</span>
+          </span>
+          <span id="acrCustomerReviewText">500 ratings</span>
+        </div>
+      `;
+      const result = parseBookPage(html);
+      expect(result.communityRating).toBeUndefined();
+    });
+
+    it('rejects a negative rating count', () => {
+      const html = `
+        <span id="productTitle">Bad Count Book</span>
+        <div id="averageCustomerReviews_feature_div">
+          <span id="acrPopover" title="4.0 out of 5 stars">
+            <span class="a-icon-alt">4.0 out of 5 stars</span>
+          </span>
+          <span id="acrCustomerReviewText">-10 ratings</span>
+        </div>
+      `;
+      const result = parseBookPage(html);
+      expect(result.communityRating).toBe(4.0);
+      expect(result.communityRatingCount).toBeUndefined();
     });
   });
 });

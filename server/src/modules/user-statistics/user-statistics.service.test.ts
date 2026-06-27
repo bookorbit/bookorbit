@@ -38,24 +38,64 @@ describe('UserStatisticsService', () => {
   it('returns a contiguous daily heatmap window with zero-filled days', async () => {
     const repo = {
       getDailyReadingStats: vi.fn().mockResolvedValue([{ day: '2026-04-06', readingSeconds: 120, progressDelta: 1.23456, eventsCount: 2 }]),
+      getDailyReadingSecondsBySource: vi.fn().mockResolvedValue([
+        { day: '2026-04-06', source: 'web', readingSeconds: 90 },
+        { day: '2026-04-06', source: 'kobo', readingSeconds: 30 },
+      ]),
     };
 
     const service = new UserStatisticsService(repo as any);
     const result = await service.getReadingHeatmap({ id: 123, isSuperuser: false } as any, { days: 3, libraryIds: [] });
 
     expect(repo.getDailyReadingStats).toHaveBeenCalledWith(123, false, [], 3);
+    expect(repo.getDailyReadingSecondsBySource).toHaveBeenCalledWith(123, false, [], 3);
     expect(result).toEqual([
-      { day: '2026-04-06', readingSeconds: 120, progressDelta: 1.2346, eventsCount: 2 },
-      { day: '2026-04-07', readingSeconds: 0, progressDelta: 0, eventsCount: 0 },
-      { day: '2026-04-08', readingSeconds: 0, progressDelta: 0, eventsCount: 0 },
+      { day: '2026-04-06', readingSeconds: 120, progressDelta: 1.2346, eventsCount: 2, bySource: { bookorbit: 90, koreader: 0, kobo: 30 } },
+      { day: '2026-04-07', readingSeconds: 0, progressDelta: 0, eventsCount: 0, bySource: { bookorbit: 0, koreader: 0, kobo: 0 } },
+      { day: '2026-04-08', readingSeconds: 0, progressDelta: 0, eventsCount: 0, bySource: { bookorbit: 0, koreader: 0, kobo: 0 } },
     ]);
+  });
+
+  it('buckets the reading-source distribution and excludes empty buckets', async () => {
+    const repo = {
+      getDailyReadingSecondsBySource: vi.fn().mockResolvedValue([
+        { day: '2026-04-06', source: 'web', readingSeconds: 100 },
+        { day: '2026-04-06', source: 'manual', readingSeconds: 50 },
+        { day: '2026-04-07', source: null, readingSeconds: 30 },
+        { day: '2026-04-06', source: 'kobo', readingSeconds: 200 },
+      ]),
+    };
+
+    const service = new UserStatisticsService(repo as any);
+    const result = await service.getReadingSourceDistribution({ id: 123, isSuperuser: false } as any, { libraryIds: [] });
+
+    expect(repo.getDailyReadingSecondsBySource).toHaveBeenCalledWith(123, false, [], 365);
+    // web + manual + null collapse into bookorbit; koreader has no activity and is omitted.
+    expect(result).toEqual({
+      totalSeconds: 380,
+      slices: [
+        { bucket: 'bookorbit', readingSeconds: 180 },
+        { bucket: 'kobo', readingSeconds: 200 },
+      ],
+    });
+  });
+
+  it('returns an empty source distribution and honours the days override', async () => {
+    const repo = { getDailyReadingSecondsBySource: vi.fn().mockResolvedValue([]) };
+    const service = new UserStatisticsService(repo as any);
+
+    const result = await service.getReadingSourceDistribution({ id: 7, isSuperuser: true } as any, { days: 30, libraryIds: [1] });
+
+    expect(repo.getDailyReadingSecondsBySource).toHaveBeenCalledWith(7, true, [1], 30);
+    expect(result).toEqual({ totalSeconds: 0, slices: [] });
   });
 
   it('returns all 24 hour buckets for peak reading hours', async () => {
     const repo = {
       getPeakReadingHours: vi.fn().mockResolvedValue([
-        { hour: 8, readingSeconds: 600, eventsCount: 3 },
-        { hour: 21, readingSeconds: 900, eventsCount: 4 },
+        { hour: 8, format: 'EPUB', source: 'web', readingSeconds: 400, eventsCount: 2 },
+        { hour: 8, format: 'EPUB', source: 'kobo', readingSeconds: 200, eventsCount: 1 },
+        { hour: 21, format: 'EPUB', source: 'koreader', readingSeconds: 900, eventsCount: 4 },
       ]),
     };
 
@@ -64,14 +104,23 @@ describe('UserStatisticsService', () => {
 
     expect(repo.getPeakReadingHours).toHaveBeenCalledWith(123, false, [], 365);
     expect(result).toHaveLength(24);
-    expect(result[8]).toEqual(expect.objectContaining({ hour: 8, readingSeconds: 600, eventsCount: 3 }));
-    expect(result[21]).toEqual(expect.objectContaining({ hour: 21, readingSeconds: 900, eventsCount: 4 }));
-    expect(result[0]).toEqual(expect.objectContaining({ hour: 0, readingSeconds: 0, eventsCount: 0 }));
+    expect(result[8]).toEqual(
+      expect.objectContaining({ hour: 8, readingSeconds: 600, eventsCount: 3, bySource: { bookorbit: 400, koreader: 0, kobo: 200 } }),
+    );
+    expect(result[21]).toEqual(
+      expect.objectContaining({ hour: 21, readingSeconds: 900, eventsCount: 4, bySource: { bookorbit: 0, koreader: 900, kobo: 0 } }),
+    );
+    expect(result[0]).toEqual(
+      expect.objectContaining({ hour: 0, readingSeconds: 0, eventsCount: 0, bySource: { bookorbit: 0, koreader: 0, kobo: 0 } }),
+    );
   });
 
   it('returns all weekday buckets for favorite reading days', async () => {
     const repo = {
-      getFavoriteReadingDays: vi.fn().mockResolvedValue([{ dayOfWeek: 1, readingSeconds: 1800, eventsCount: 6 }]),
+      getFavoriteReadingDays: vi.fn().mockResolvedValue([
+        { dayOfWeek: 1, source: 'koreader', format: 'EPUB', readingSeconds: 1200, eventsCount: 4 },
+        { dayOfWeek: 1, source: 'web', format: 'PDF', readingSeconds: 600, eventsCount: 2 },
+      ]),
     };
 
     const service = new UserStatisticsService(repo as any);
@@ -79,8 +128,20 @@ describe('UserStatisticsService', () => {
 
     expect(repo.getFavoriteReadingDays).toHaveBeenCalledWith(123, false, [], 365);
     expect(result).toHaveLength(7);
-    expect(result[1]).toEqual({ dayOfWeek: 1, readingSeconds: 1800, eventsCount: 6 });
-    expect(result[0]).toEqual({ dayOfWeek: 0, readingSeconds: 0, eventsCount: 0 });
+    expect(result[1]).toEqual({
+      dayOfWeek: 1,
+      readingSeconds: 1800,
+      eventsCount: 6,
+      byFormat: { EPUB: 1200, PDF: 600 },
+      bySource: { bookorbit: 600, koreader: 1200, kobo: 0 },
+    });
+    expect(result[0]).toEqual({
+      dayOfWeek: 0,
+      readingSeconds: 0,
+      eventsCount: 0,
+      byFormat: {},
+      bySource: { bookorbit: 0, koreader: 0, kobo: 0 },
+    });
   });
 
   it('returns a contiguous monthly completion timeline', async () => {
@@ -242,6 +303,7 @@ describe('UserStatisticsService', () => {
           bookId: 55,
           bookTitle: 'Deep Work',
           bookFormat: 'EPUB',
+          source: 'kobo',
           startedAt: new Date('2026-04-07T02:30:00.000Z'),
           endedAt: new Date('2026-04-07T03:00:00.000Z'),
           durationSeconds: 1800,
@@ -261,6 +323,7 @@ describe('UserStatisticsService', () => {
       bookId: 55,
       bookTitle: 'Deep Work',
       bookFormat: 'EPUB',
+      bookSource: 'kobo',
       startedAt: '2026-04-07T02:30:00.000Z',
       endedAt: '2026-04-07T03:00:00.000Z',
       durationSeconds: 1800,
@@ -314,9 +377,11 @@ describe('UserStatisticsService', () => {
       101,
       4,
       new Date('2026-04-07T08:00:00.000Z'),
+      new Date('2026-04-07T08:30:00.000Z'),
       new Date('2026-04-08T09:00:00.000Z'),
       new Date('2026-04-08T09:30:00.000Z'),
       1800,
+      'UTC',
     );
     expect(result.startedAt).toBe('2026-04-08T09:00:00.000Z');
     expect(result.endedAt).toBe('2026-04-08T09:30:00.000Z');
@@ -531,16 +596,23 @@ describe('UserStatisticsService', () => {
   it('delegates and caches archetype/genre/pace/chord queries', async () => {
     const repo = {
       getSessionArchetypePoints: vi.fn().mockResolvedValue([{ hour: 9, durationMinutes: 20, dayOfWeek: 2 }]),
-      getGenreReadingTime: vi.fn().mockResolvedValue([{ genre: 'Sci-Fi', readingSeconds: 300 }]),
-      getReadingPacePoints: vi.fn().mockResolvedValue([{ durationSeconds: 240, progressDelta: 1.4 }]),
+      getGenreReadingTime: vi.fn().mockResolvedValue([
+        { genre: 'Sci-Fi', source: 'web', readingSeconds: 200 },
+        { genre: 'Sci-Fi', source: 'kobo', readingSeconds: 100 },
+      ]),
+      getReadingPacePoints: vi.fn().mockResolvedValue([{ durationSeconds: 240, progressDelta: 1.4, bucket: 'bookorbit', format: 'EPUB' }]),
       getAuthorGenreChord: vi.fn().mockResolvedValue({ nodes: [{ name: 'A' }, { name: 'G' }], links: [{ source: 'A', target: 'G', value: 10 }] }),
     };
     const service = new UserStatisticsService(repo as any);
     const user = { id: 9, isSuperuser: false } as any;
 
     await expect(service.getSessionArchetypes(user, { libraryIds: [1] })).resolves.toEqual([{ hour: 9, durationMinutes: 20, dayOfWeek: 2 }]);
-    await expect(service.getGenreReadingTime(user, { libraryIds: [1] })).resolves.toEqual([{ genre: 'Sci-Fi', readingSeconds: 300 }]);
-    await expect(service.getReadingPace(user, { libraryIds: [1] })).resolves.toEqual([{ durationSeconds: 240, progressDelta: 1.4 }]);
+    await expect(service.getGenreReadingTime(user, { libraryIds: [1] })).resolves.toEqual([
+      { genre: 'Sci-Fi', readingSeconds: 300, bySource: { bookorbit: 200, koreader: 0, kobo: 100 } },
+    ]);
+    await expect(service.getReadingPace(user, { libraryIds: [1] })).resolves.toEqual([
+      { durationSeconds: 240, progressDelta: 1.4, bucket: 'bookorbit', format: 'EPUB' },
+    ]);
     await expect(service.getAuthorGenreChord(user, { libraryIds: [1] })).resolves.toEqual({
       nodes: [{ name: 'A' }, { name: 'G' }],
       links: [{ source: 'A', target: 'G', value: 10 }],

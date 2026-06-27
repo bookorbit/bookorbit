@@ -26,6 +26,10 @@ export class UpdateSettingsDto {
   twoWayProgressSync?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  syncBookOrbitAnnotationsToKobo?: boolean;
+
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(500)

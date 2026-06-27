@@ -1,10 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, max, min } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { userBookStatus } from '../../db/schema';
+import { readingSessions, userBookStatus } from '../../db/schema';
 import type { ReadStatus, ReadStatusSource } from '@bookorbit/types';
 import type { UserBookStatusRow } from '../../db/schema';
 
@@ -13,7 +13,17 @@ type Db = NodePgDatabase<typeof schema>;
 export type UserBookStatusLifecycle = Pick<UserBookStatusRow, 'startedAt' | 'finishedAt'>;
 export type UserBookStatusState = Pick<UserBookStatusRow, 'status' | 'source' | 'startedAt' | 'finishedAt' | 'updatedAt'>;
 
-export function deriveLifecycle(status: ReadStatus, now: Date, existing: UserBookStatusRow | null): UserBookStatusLifecycle {
+export interface SessionBoundaries {
+  firstStartedAt: Date | null;
+  lastEndedAt: Date | null;
+}
+
+export function deriveLifecycle(
+  status: ReadStatus,
+  now: Date,
+  existing: UserBookStatusRow | null,
+  sessionBoundaries?: SessionBoundaries,
+): UserBookStatusLifecycle {
   switch (status) {
     case 'unread':
     case 'want_to_read':
@@ -23,9 +33,9 @@ export function deriveLifecycle(status: ReadStatus, now: Date, existing: UserBoo
     case 'rereading':
     case 'skimmed':
     case 'abandoned':
-      return { startedAt: existing?.startedAt ?? now, finishedAt: null };
+      return { startedAt: existing?.startedAt ?? sessionBoundaries?.firstStartedAt ?? now, finishedAt: null };
     case 'read':
-      return { startedAt: existing?.startedAt ?? now, finishedAt: now };
+      return { startedAt: existing?.startedAt ?? sessionBoundaries?.firstStartedAt ?? now, finishedAt: now };
   }
 }
 
@@ -50,6 +60,21 @@ export class UserBookStatusRepository {
       .where(and(eq(userBookStatus.userId, userId), inArray(userBookStatus.bookId, bookIds)));
   }
 
+  async findSessionBoundariesForBook(userId: number, bookId: number): Promise<SessionBoundaries> {
+    const [row] = await this.db
+      .select({
+        firstStartedAt: min(readingSessions.startedAt),
+        lastEndedAt: max(readingSessions.endedAt),
+      })
+      .from(readingSessions)
+      .where(and(eq(readingSessions.userId, userId), eq(readingSessions.bookId, bookId)));
+
+    return {
+      firstStartedAt: (row?.firstStartedAt as Date | null | undefined) ?? null,
+      lastEndedAt: (row?.lastEndedAt as Date | null | undefined) ?? null,
+    };
+  }
+
   async upsert(
     userId: number,
     bookId: number,
@@ -59,7 +84,11 @@ export class UserBookStatusRepository {
     existing?: Awaited<ReturnType<typeof this.findOne>>,
   ): Promise<void> {
     const row = existing !== undefined ? existing : await this.findOne(userId, bookId);
-    const { startedAt, finishedAt } = deriveLifecycle(status, now, row);
+
+    const needsSessionBoundaries = status !== 'unread' && status !== 'want_to_read' && row?.startedAt == null;
+    const sessionBoundaries = needsSessionBoundaries ? await this.findSessionBoundariesForBook(userId, bookId) : undefined;
+
+    const { startedAt, finishedAt } = deriveLifecycle(status, now, row, sessionBoundaries);
 
     await this.db
       .insert(userBookStatus)

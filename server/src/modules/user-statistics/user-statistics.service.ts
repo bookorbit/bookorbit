@@ -2,6 +2,8 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 
 import type {
   ChordDiagramData,
+  ReadingSessionSource,
+  ReadingSessionSourceBucket,
   UserCompletionLatencyDistribution,
   UserCompletionRaceBook,
   UserCompletionTimelinePoint,
@@ -16,13 +18,16 @@ import type {
   UserReadingPacePoint,
   UserReadingSessionTimeline,
   UserReadingSessionTimelineItem,
+  UserReadingSourceDistribution,
   UserReadingSurvivalPoint,
   UserSessionArchetypePoint,
   UserStatisticsSummary,
 } from '@bookorbit/types';
+import { READING_SESSION_SOURCE_BUCKETS, emptySourceBucketRecord, toReadingSessionSourceBucket } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { StatsCache } from '../../common/cache/stats-cache';
+import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import type { UserDailyReadingQueryDto } from './dto/user-daily-reading-query.dto';
 import type { UserGoalTrajectoryQueryDto } from './dto/user-goal-trajectory-query.dto';
 import type { UserSessionTimelineQueryDto } from './dto/user-session-timeline-query.dto';
@@ -162,7 +167,17 @@ export class UserStatisticsService {
     const key = this.buildUserCacheKey('reading-heatmap', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
     return this.cache.get(String(user.id), key, async () => {
       const items = await this.repo.getDailyReadingStats(user.id, user.isSuperuser, query.libraryIds, days);
+      const bySourceRows = await this.repo.getDailyReadingSecondsBySource(user.id, user.isSuperuser, query.libraryIds, days);
       const byDay = new Map(items.map((item) => [item.day, item]));
+      const bySourceByDay = new Map<string, Record<ReadingSessionSourceBucket, number>>();
+      for (const row of bySourceRows) {
+        let record = bySourceByDay.get(row.day);
+        if (!record) {
+          record = emptySourceBucketRecord();
+          bySourceByDay.set(row.day, record);
+        }
+        record[toReadingSessionSourceBucket(row.source)] += row.readingSeconds;
+      }
       const start = this.sinceDateForDays(days);
       const end = this.startOfUtcDay(new Date());
       const result: UserDailyReadingStat[] = [];
@@ -175,10 +190,29 @@ export class UserStatisticsService {
           readingSeconds: value?.readingSeconds ?? 0,
           progressDelta: this.roundProgressDelta(value?.progressDelta ?? 0),
           eventsCount: value?.eventsCount ?? 0,
+          bySource: bySourceByDay.get(day) ?? emptySourceBucketRecord(),
         });
       }
 
       return result;
+    });
+  }
+
+  async getReadingSourceDistribution(user: RequestUser, query: UserDailyReadingQueryDto): Promise<UserReadingSourceDistribution> {
+    const days = query.days ?? BEHAVIOR_DEFAULT_DAYS;
+    const key = this.buildUserCacheKey('source-distribution', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
+    return this.cache.get(String(user.id), key, async () => {
+      const rows = await this.repo.getDailyReadingSecondsBySource(user.id, user.isSuperuser, query.libraryIds, days);
+      const totals = emptySourceBucketRecord();
+      for (const row of rows) {
+        totals[toReadingSessionSourceBucket(row.source)] += row.readingSeconds;
+      }
+      const slices = READING_SESSION_SOURCE_BUCKETS.filter((bucket) => totals[bucket] > 0).map((bucket) => ({
+        bucket,
+        readingSeconds: totals[bucket],
+      }));
+      const totalSeconds = slices.reduce((sum, slice) => sum + slice.readingSeconds, 0);
+      return { totalSeconds, slices };
     });
   }
 
@@ -188,15 +222,20 @@ export class UserStatisticsService {
     return this.cache.get(String(user.id), key, async () => {
       const rows = await this.repo.getPeakReadingHours(user.id, user.isSuperuser, query.libraryIds, days);
 
-      const byHour = new Map<number, { readingSeconds: number; eventsCount: number; byFormat: Record<string, number> }>();
+      const byHour = new Map<
+        number,
+        { readingSeconds: number; eventsCount: number; byFormat: Record<string, number>; bySource: Record<ReadingSessionSourceBucket, number> }
+      >();
       for (const row of rows) {
         if (!byHour.has(row.hour)) {
-          byHour.set(row.hour, { readingSeconds: 0, eventsCount: 0, byFormat: {} });
+          byHour.set(row.hour, { readingSeconds: 0, eventsCount: 0, byFormat: {}, bySource: emptySourceBucketRecord() });
         }
         const entry = byHour.get(row.hour)!;
         entry.readingSeconds += row.readingSeconds;
         entry.eventsCount += row.eventsCount;
-        entry.byFormat[row.format] = row.readingSeconds;
+        // Grouping now splits each hour by (format, source), so accumulate rather than assign.
+        entry.byFormat[row.format] = (entry.byFormat[row.format] ?? 0) + row.readingSeconds;
+        entry.bySource[toReadingSessionSourceBucket(row.source)] += row.readingSeconds;
       }
 
       return Array.from({ length: 24 }, (_, hour) => {
@@ -206,6 +245,7 @@ export class UserStatisticsService {
           readingSeconds: entry?.readingSeconds ?? 0,
           eventsCount: entry?.eventsCount ?? 0,
           byFormat: entry?.byFormat ?? {},
+          bySource: entry?.bySource ?? emptySourceBucketRecord(),
         };
       });
     });
@@ -216,14 +256,30 @@ export class UserStatisticsService {
     const key = this.buildUserCacheKey('favorite-days', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
     return this.cache.get(String(user.id), key, async () => {
       const rows = await this.repo.getFavoriteReadingDays(user.id, user.isSuperuser, query.libraryIds, days);
-      const byDay = new Map(rows.map((row) => [row.dayOfWeek, row]));
+      const byDay = new Map<
+        number,
+        { readingSeconds: number; eventsCount: number; byFormat: Record<string, number>; bySource: Record<ReadingSessionSourceBucket, number> }
+      >();
+      for (const row of rows) {
+        let entry = byDay.get(row.dayOfWeek);
+        if (!entry) {
+          entry = { readingSeconds: 0, eventsCount: 0, byFormat: {}, bySource: emptySourceBucketRecord() };
+          byDay.set(row.dayOfWeek, entry);
+        }
+        entry.readingSeconds += row.readingSeconds;
+        entry.eventsCount += row.eventsCount;
+        entry.byFormat[row.format] = (entry.byFormat[row.format] ?? 0) + row.readingSeconds;
+        entry.bySource[toReadingSessionSourceBucket(row.source)] += row.readingSeconds;
+      }
 
       return Array.from({ length: 7 }, (_, dayOfWeek) => {
-        const row = byDay.get(dayOfWeek);
+        const entry = byDay.get(dayOfWeek);
         return {
           dayOfWeek,
-          readingSeconds: row?.readingSeconds ?? 0,
-          eventsCount: row?.eventsCount ?? 0,
+          readingSeconds: entry?.readingSeconds ?? 0,
+          eventsCount: entry?.eventsCount ?? 0,
+          byFormat: entry?.byFormat ?? {},
+          bySource: entry?.bySource ?? emptySourceBucketRecord(),
         };
       });
     });
@@ -234,6 +290,7 @@ export class UserStatisticsService {
     bookId: number;
     bookTitle: string | null;
     bookFormat: string | null;
+    source: ReadingSessionSource | null;
     startedAt: Date;
     endedAt: Date;
     durationSeconds: number;
@@ -243,6 +300,7 @@ export class UserStatisticsService {
       bookId: row.bookId,
       bookTitle: row.bookTitle,
       bookFormat: row.bookFormat,
+      bookSource: toReadingSessionSourceBucket(row.source),
       startedAt: row.startedAt.toISOString(),
       endedAt: row.endedAt.toISOString(),
       durationSeconds: row.durationSeconds,
@@ -318,9 +376,11 @@ export class UserStatisticsService {
       sessionId,
       existing.libraryId,
       existing.startedAt,
+      existing.endedAt,
       startedAt,
       endedAt,
       proposedDuration,
+      resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC'),
     );
     if (moveResult.conflict) {
       const conflictStart = moveResult.conflict.startedAt.toISOString();
@@ -521,7 +581,23 @@ export class UserStatisticsService {
   async getGenreReadingTime(user: RequestUser, query: UserDailyReadingQueryDto): Promise<UserGenreReadingTimeItem[]> {
     const days = query.days ?? GENRE_READING_TIME_DEFAULT_DAYS;
     const key = this.buildUserCacheKey('genre-reading-time', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
-    return this.cache.get(String(user.id), key, () => this.repo.getGenreReadingTime(user.id, user.isSuperuser, query.libraryIds, days));
+    return this.cache.get(String(user.id), key, async () => {
+      const rows = await this.repo.getGenreReadingTime(user.id, user.isSuperuser, query.libraryIds, days);
+      const byGenre = new Map<string, { readingSeconds: number; bySource: Record<ReadingSessionSourceBucket, number> }>();
+      for (const row of rows) {
+        let entry = byGenre.get(row.genre);
+        if (!entry) {
+          entry = { readingSeconds: 0, bySource: emptySourceBucketRecord() };
+          byGenre.set(row.genre, entry);
+        }
+        entry.readingSeconds += row.readingSeconds;
+        entry.bySource[toReadingSessionSourceBucket(row.source)] += row.readingSeconds;
+      }
+
+      return Array.from(byGenre, ([genre, entry]) => ({ genre, readingSeconds: entry.readingSeconds, bySource: entry.bySource }))
+        .sort((a, b) => b.readingSeconds - a.readingSeconds)
+        .slice(0, 30);
+    });
   }
 
   async getReadingPace(user: RequestUser, query: UserDailyReadingQueryDto): Promise<UserReadingPacePoint[]> {

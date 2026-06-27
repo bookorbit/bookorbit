@@ -90,6 +90,22 @@ describe('mapAudibleProduct — basic fields', () => {
     const result = mapAudibleProduct(makeProduct({ language: 'english' }));
     expect(result.language).toBe('english');
   });
+
+  it('maps overall community rating and rating count', () => {
+    const result = mapAudibleProduct(
+      makeProduct({
+        rating: {
+          overall_distribution: {
+            average_rating: 4.936869108034913,
+            num_ratings: 125913,
+          },
+        },
+      }),
+    );
+
+    expect(result.communityRating).toBe(4.936869108034913);
+    expect(result.communityRatingCount).toBe(125913);
+  });
 });
 
 // ── COVER URL ────────────────────────────────────────────────────────────────

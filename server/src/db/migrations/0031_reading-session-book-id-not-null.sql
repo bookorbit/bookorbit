@@ -1,0 +1,1 @@
+ALTER TABLE "reading_sessions" ALTER COLUMN "book_id" SET NOT NULL;

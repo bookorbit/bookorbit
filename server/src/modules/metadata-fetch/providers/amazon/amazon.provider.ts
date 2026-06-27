@@ -89,6 +89,8 @@ export class AmazonProvider implements IdentifiableProvider {
       coverUrl: data.coverUrl,
       genres: data.tags?.length ? data.tags : undefined,
       sourceUrl: `https://www.${domain}/dp/${asin}`,
+      ...(data.communityRating !== undefined ? { communityRating: data.communityRating } : {}),
+      ...(data.communityRatingCount !== undefined ? { communityRatingCount: data.communityRatingCount } : {}),
     };
   }
 

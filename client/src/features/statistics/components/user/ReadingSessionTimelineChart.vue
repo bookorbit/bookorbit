@@ -3,12 +3,15 @@ import { computed, ref, shallowRef, watch } from 'vue'
 import VChart from 'vue-echarts'
 import { CalendarRange } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import type { UserReadingSessionTimeline, UserReadingSessionTimelineItem } from '@bookorbit/types'
+import type { UserReadingSessionTimeline, UserReadingSessionTimelineItem, ReadingSessionSourceBucket } from '@bookorbit/types'
+import { READING_SESSION_SOURCE_BUCKET_LABELS } from '@bookorbit/types'
 
+import { useThemeStore } from '@/stores/theme'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
-import { getFormatColor } from '@/features/book/lib/format-colors'
+import { getBreakdownColor, getBreakdownSeries, type BreakdownDimension, type BreakdownSeries } from '../../lib/breakdown'
 import { fetchUserReadingSessionTimeline, updateUserReadingSessionTimelineSession } from '../../api/statistics.api'
 import { useStatisticsConfig } from '../../composables/useStatisticsConfig'
+import BreakdownSelect from '../BreakdownSelect.vue'
 import ChartCard from '../ChartCard.vue'
 import ChartEmptyState from '../ChartEmptyState.vue'
 
@@ -22,6 +25,7 @@ interface SessionSegment {
   bookId: number
   bookTitle: string | null
   bookFormat: string | null
+  bookSource: ReadingSessionSourceBucket
   dayIndex: number
   startMinute: number
   endMinute: number
@@ -54,6 +58,9 @@ interface PointerOffset {
 
 const { filters } = useStatisticsConfig()
 const { coverUrl } = useCoverVersions()
+const themeStore = useThemeStore()
+const themeKey = computed(() => `${themeStore.theme}:${themeStore.accent}`)
+const dimension = ref<BreakdownDimension>('source')
 
 const now = new Date()
 const selectedYear = ref(getIsoWeekYear(now))
@@ -77,6 +84,11 @@ const timeline = ref<UserReadingSessionTimeline>({
 })
 
 const isEmpty = computed(() => timeline.value.items.length === 0)
+
+const legendItems = computed<BreakdownSeries[]>(() => {
+  const formatKeys = [...new Set(timeline.value.items.map((item) => (item.bookFormat ?? 'UNKNOWN').toUpperCase()))].sort()
+  return getBreakdownSeries(dimension.value, themeKey.value, formatKeys)
+})
 
 const weekStartDate = computed(() => parseYmdLocal(timeline.value.weekStart) ?? getIsoWeekStart(selectedYear.value, selectedWeek.value))
 const weekEndExclusive = computed(() => addDays(weekStartDate.value, 7))
@@ -127,9 +139,9 @@ watch(dragEnabled, (enabled) => {
 })
 
 watch(
-  [segments, dragPreview, dragEnabled],
+  [segments, dragPreview, dragEnabled, dimension, themeKey],
   () => {
-    option.value = makeOption(segments.value, dragPreview.value)
+    option.value = makeOption(segments.value, dragPreview.value, dimension.value, themeKey.value)
   },
   { immediate: true },
 )
@@ -154,16 +166,17 @@ async function loadTimeline() {
   }
 }
 
-function makeOption(data: SessionSegment[], preview: DragPreview | null) {
+function makeOption(data: SessionSegment[], preview: DragPreview | null, dim: BreakdownDimension, themeKeyValue: string) {
   const seriesData = data.map((segment) => ({
     value: [segment.dayIndex, segment.startMinute, segment.endMinute, segment.track, segment.totalTracks, segment.durationMinutes],
     sessionId: segment.sessionId,
     bookId: segment.bookId,
     bookTitle: segment.bookTitle,
     bookFormat: segment.bookFormat,
+    bookSource: segment.bookSource,
     durationMinutes: segment.durationMinutes,
     itemStyle: {
-      color: getFormatColor(segment.bookFormat),
+      color: getBreakdownColor(dim, dim === 'source' ? segment.bookSource : (segment.bookFormat ?? 'UNKNOWN').toUpperCase(), themeKeyValue),
       opacity: 0.9,
     },
   }))
@@ -206,7 +219,14 @@ function makeOption(data: SessionSegment[], preview: DragPreview | null) {
     tooltip: {
       trigger: 'item',
       formatter: (params: {
-        data: { bookId?: number; bookTitle?: string | null; bookFormat?: string | null; durationMinutes?: number; value: number[] }
+        data: {
+          bookId?: number
+          bookTitle?: string | null
+          bookFormat?: string | null
+          bookSource?: ReadingSessionSourceBucket
+          durationMinutes?: number
+          value: number[]
+        }
       }) => {
         const d = params.data
         if (!d || !d.value) return ''
@@ -215,6 +235,7 @@ function makeOption(data: SessionSegment[], preview: DragPreview | null) {
         const duration = formatDuration(Math.max(0, d.durationMinutes ?? 0))
         const title = escapeHtml(d.bookTitle ?? 'Reading session')
         const format = escapeHtml(d.bookFormat ?? 'Unknown')
+        const source = d.bookSource ? READING_SESSION_SOURCE_BUCKET_LABELS[d.bookSource] : ''
         const cover = d.bookId
           ? `<img src="${coverUrl(d.bookId)}" alt="Cover" style="width:32px;height:48px;object-fit:cover;border-radius:4px;" />`
           : ''
@@ -226,7 +247,7 @@ function makeOption(data: SessionSegment[], preview: DragPreview | null) {
           `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`,
           `<div style="opacity:0.85;">${start} - ${end}</div>`,
           `<div style="opacity:0.85;">${duration}</div>`,
-          `<div style="opacity:0.72;">${format}</div>`,
+          `<div style="opacity:0.72;">${format}${source ? ` · ${source}` : ''}</div>`,
           '</div>',
           '</div>',
         ].join('')
@@ -489,6 +510,7 @@ function buildSegments(items: UserReadingSessionTimelineItem[], weekStart: Date,
         bookId: item.bookId,
         bookTitle: item.bookTitle,
         bookFormat: item.bookFormat,
+        bookSource: item.bookSource,
         dayIndex,
         startMinute,
         endMinute: Math.max(startMinute + 0.5, endMinute),
@@ -664,6 +686,7 @@ function getIsoWeekStart(year: number, week: number): Date {
 <template>
   <ChartCard title="Reading Session Timeline" :icon="CalendarRange" :color-index="11" :loading="loading" :error="error" :empty="false">
     <template #controls>
+      <BreakdownSelect v-model="dimension" />
       <button
         type="button"
         :disabled="persistLoading"
@@ -716,7 +739,15 @@ function getIsoWeekStart(year: number, week: number): Date {
           </select>
         </div>
 
-        <p class="text-muted-foreground text-xs">{{ weekRangeLabel }}</p>
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2">
+            <span v-for="entry in legendItems" :key="entry.key" class="text-muted-foreground flex items-center gap-1 text-xs">
+              <span class="inline-block h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: entry.color }" />
+              {{ entry.label }}
+            </span>
+          </div>
+          <p class="text-muted-foreground text-xs">{{ weekRangeLabel }}</p>
+        </div>
       </div>
 
       <p v-if="dragEnabled" class="text-muted-foreground border-border/60 bg-muted/20 rounded-md border px-2 py-1 text-xs">

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { BookA, Check, Copy, FileText, Highlighter, Languages, Search, Trash2 } from '@lucide/vue'
+import { ANNOTATION_HIGHLIGHT_COLORS } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { copyToClipboard } from '@/lib/clipboard'
 
@@ -26,13 +27,7 @@ const emit = defineEmits<{
 const showColorPicker = ref(false)
 const copied = ref(false)
 
-const colors = [
-  { hex: '#FACC15', label: 'Yellow' },
-  { hex: '#4ADE80', label: 'Green' },
-  { hex: '#38BDF8', label: 'Blue' },
-  { hex: '#F472B6', label: 'Pink' },
-  { hex: '#FB923C', label: 'Orange' },
-]
+const colors = ANNOTATION_HIGHLIGHT_COLORS
 
 const styles = [
   { id: 'highlight', label: 'H' },
@@ -182,8 +177,11 @@ async function onCopy() {
                 class="w-6 h-6 rounded-full border-2 transition-all hover:scale-110"
                 :class="selectedColor === c.hex ? 'border-foreground scale-110' : 'border-transparent'"
                 :style="{ background: c.hex }"
+                :title="c.label"
                 @click="selectedColor = c.hex"
-              />
+              >
+                <span class="sr-only">{{ c.label }}</span>
+              </button>
             </div>
             <div class="flex gap-1 px-0.5">
               <button

@@ -35,8 +35,25 @@ export class UserBookStatusService {
     const hasFinishedAt = Object.prototype.hasOwnProperty.call(patch, 'finishedAt');
 
     const nextStatus = patch.status ?? existing?.status ?? 'unread';
-    const nextStartedAt = hasStartedAt ? (patch.startedAt ?? null) : (existing?.startedAt ?? null);
-    const nextFinishedAt = hasFinishedAt ? (patch.finishedAt ?? null) : (existing?.finishedAt ?? null);
+    let nextStartedAt = hasStartedAt ? (patch.startedAt ?? null) : (existing?.startedAt ?? null);
+    let nextFinishedAt = hasFinishedAt ? (patch.finishedAt ?? null) : (existing?.finishedAt ?? null);
+
+    // When dates were not explicitly provided and would be null, seed from session history.
+    // Explicit null patches (user clearing a date) are preserved as-is.
+    // Mirror the same status guard used in repo.upsert(): unread/want_to_read always have null dates.
+    const needsStartedAt = !hasStartedAt && nextStartedAt === null && nextStatus !== 'unread' && nextStatus !== 'want_to_read';
+    const needsFinishedAt = !hasFinishedAt && nextFinishedAt === null && nextStatus === 'read';
+    if (needsStartedAt || needsFinishedAt) {
+      const boundaries = await this.repo.findSessionBoundariesForBook(userId, bookId);
+      if (needsStartedAt) nextStartedAt = boundaries.firstStartedAt;
+      if (needsFinishedAt) {
+        const seeded = boundaries.lastEndedAt;
+        // Only apply if the seeded end is not before the current startedAt.
+        if (seeded !== null && (nextStartedAt === null || seeded >= nextStartedAt)) {
+          nextFinishedAt = seeded;
+        }
+      }
+    }
 
     const shouldPersist = existing !== null || hasStatus || nextStartedAt !== null || nextFinishedAt !== null;
     if (shouldPersist) {

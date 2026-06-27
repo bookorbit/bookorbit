@@ -42,8 +42,18 @@ function resolveEditionPublishedYear(edition: HardcoverEdition, book: HardcoverB
   return parseYear(edition.release_year, edition.release_date) ?? parseYear(book.release_year, book.release_date);
 }
 
+function normalizeCommunityRating(value: number | undefined): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 5 ? value : undefined;
+}
+
+function normalizeCommunityRatingCount(value: number | undefined): number | undefined {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : undefined;
+}
+
 export function mapSearchDocument(doc: HardcoverSearchDocument): MetadataCandidate {
   const { isbn10, isbn13 } = pickIsbn(doc.isbns);
+  const communityRating = normalizeCommunityRating(doc.rating);
+  const communityRatingCount = normalizeCommunityRatingCount(doc.ratings_count);
 
   return {
     provider: MetadataProviderKey.HARDCOVER,
@@ -61,6 +71,8 @@ export function mapSearchDocument(doc: HardcoverSearchDocument): MetadataCandida
     seriesIndex: doc.featured_series?.position ?? undefined,
     coverUrl: doc.image?.url,
     sourceUrl: `https://hardcover.app/books/${doc.slug}`,
+    ...(communityRating !== undefined ? { communityRating } : {}),
+    ...(communityRatingCount !== undefined ? { communityRatingCount } : {}),
   };
 }
 
@@ -72,6 +84,8 @@ export function mapBookWithEditions(book: HardcoverBookWithEditions): MetadataCa
 function mapEdition(edition: HardcoverEdition, book: HardcoverBookWithEditions): MetadataCandidate {
   const editionAuthors = extractAuthorsFromContributors(edition.cached_contributors);
   const authors = editionAuthors.length > 0 ? editionAuthors : extractAuthorsFromContributors(book.cached_contributors);
+  const communityRating = normalizeCommunityRating(book.rating);
+  const communityRatingCount = normalizeCommunityRatingCount(book.ratings_count);
 
   return {
     provider: MetadataProviderKey.HARDCOVER,
@@ -91,5 +105,7 @@ function mapEdition(edition: HardcoverEdition, book: HardcoverBookWithEditions):
     seriesIndex: book.featured_book_series?.position ?? undefined,
     coverUrl: edition.image?.url ?? book.image?.url,
     sourceUrl: `https://hardcover.app/books/${book.slug}`,
+    ...(communityRating !== undefined ? { communityRating } : {}),
+    ...(communityRatingCount !== undefined ? { communityRatingCount } : {}),
   };
 }

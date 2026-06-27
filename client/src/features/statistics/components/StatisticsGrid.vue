@@ -29,6 +29,7 @@ const CHART_COMPONENTS: Record<StatisticsChartId, Component> = {
   'top-series': defineAsyncComponent(() => import('./library/TopSeriesChart.vue')),
   'publication-year-timeline': defineAsyncComponent(() => import('./library/PublicationYearTimelineChart.vue')),
   'reading-heatmap': defineAsyncComponent(() => import('./user/ReadingHeatmapChart.vue')),
+  'reading-source-distribution': defineAsyncComponent(() => import('./user/SourceDistributionChart.vue')),
   'peak-reading-hours': defineAsyncComponent(() => import('./user/PeakReadingHoursChart.vue')),
   'favorite-reading-days': defineAsyncComponent(() => import('./user/FavoriteReadingDaysChart.vue')),
   'completion-timeline': defineAsyncComponent(() => import('./user/CompletionTimelineChart.vue')),

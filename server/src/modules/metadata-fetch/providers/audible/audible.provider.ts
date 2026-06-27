@@ -34,7 +34,7 @@ export class AudibleProvider implements IdentifiableProvider {
     const url = new URL(`https://api.audible.${normalizedDomain}/1.0/catalog/products`);
     url.searchParams.set('num_results', '10');
     url.searchParams.set('keywords', query);
-    url.searchParams.set('response_groups', 'product_desc,media,product_attrs,series,product_plan_details,category_ladders');
+    url.searchParams.set('response_groups', 'product_desc,media,product_attrs,series,product_plan_details,category_ladders,rating');
     const requestUrl = url.toString();
     const startedAt = Date.now();
     const safeQuery = sanitizeLogValue(query);
@@ -72,7 +72,7 @@ export class AudibleProvider implements IdentifiableProvider {
     const normalizedDomain = normalizeAudibleDomain(domain);
 
     const url = new URL(`https://api.audible.${normalizedDomain}/1.0/catalog/products/${providerId}`);
-    url.searchParams.set('response_groups', 'product_desc,media,product_attrs,series,product_plan_details,category_ladders');
+    url.searchParams.set('response_groups', 'product_desc,media,product_attrs,series,product_plan_details,category_ladders,rating');
     const requestUrl = url.toString();
     const startedAt = Date.now();
     this.logger.log(`[audible] [start] op=lookup providerId="${providerId}"`);

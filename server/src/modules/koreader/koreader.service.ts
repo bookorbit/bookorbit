@@ -3,12 +3,16 @@ import { hash as bcryptHash } from 'bcryptjs';
 import { createHash } from 'crypto';
 
 import type { KoreaderBookSyncInfo, KoreaderDeviceInfo, KoreaderSyncStatus } from '@bookorbit/types';
+import { isSemverNewer } from '../../common/utils/semver.utils';
 import { KoreaderRepository } from './koreader.repository';
 import { KoreaderChapterService } from './koreader-chapter.service';
 import { KoreaderChapterExtractorService } from './koreader-chapter-extractor.service';
+import { KoreaderPackageService } from './koreader-package.service';
+import { KoreaderPluginRepository } from './koreader-plugin.repository';
+import { BookService } from '../book/book.service';
+import { PositionConverterService } from '../position-converter/position-converter.service';
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED } from '../achievement/achievement-events.service';
-import { BookService } from '../book/book.service';
 
 const BCRYPT_ROUNDS = 12;
 const SYNC_EVENT = 'koreader.sync';
@@ -21,11 +25,14 @@ export class KoreaderService {
 
   constructor(
     private readonly repo: KoreaderRepository,
+    private readonly pluginRepo: KoreaderPluginRepository,
     private readonly chapterService: KoreaderChapterService,
     private readonly chapterExtractor: KoreaderChapterExtractorService,
     private readonly userBookStatusService: UserBookStatusService,
     private readonly achievementEvents: AchievementEventsService,
+    private readonly positionConverter: PositionConverterService,
     private readonly bookService: BookService,
+    private readonly packageService: KoreaderPackageService,
   ) {}
 
   async createCredentials(userId: number, username: string, password: string) {
@@ -120,6 +127,28 @@ export class KoreaderService {
       throw new NotFoundException('Book not found for the given document hash');
     }
 
+    await this.applyProgressForResolvedFile(userId, bookFile, {
+      percentage: data.percentage,
+      progress: data.progress,
+      device,
+      deviceId,
+      timestamp: data.timestamp,
+    });
+
+    const targetFileId = bookFile.primaryFileId || bookFile.id;
+    this.logger.log(
+      `[${SYNC_EVENT}] [end] userId=${userId} bookFileId=${targetFileId} device=${device} durationMs=${Date.now() - startedAt} percentage=${data.percentage} - save progress completed`,
+    );
+
+    return { document: data.document, timestamp: data.timestamp ?? Math.floor(Date.now() / 1000) };
+  }
+
+  async applyProgressForResolvedFile(
+    userId: number,
+    bookFile: { id: number; bookId: number; primaryFileId?: number | null },
+    data: { percentage: number; progress?: string; device: string; deviceId: string; timestamp?: number },
+    options?: { skipSharedProgress?: boolean },
+  ) {
     const targetFileId = bookFile.primaryFileId || bookFile.id;
     const chapterIndex = this.chapterService.parseChapterIndexFromProgress(data.progress ?? null);
 
@@ -128,16 +157,21 @@ export class KoreaderService {
     await this.repo.upsertDeviceProgress({
       bookFileId: targetFileId,
       userId,
-      device,
-      deviceId,
+      device: data.device,
+      deviceId: data.deviceId,
       percentage: data.percentage,
       progress: data.progress ?? null,
       chapterIndex,
       syncTimestamp: data.timestamp ?? null,
     });
 
+    if (options?.skipSharedProgress) return;
+
     const bookorbitPercentage = toBookorbitPercentage(data.percentage);
-    await this.repo.upsertReadingProgress(targetFileId, userId, bookorbitPercentage);
+    const cfi = data.progress ? await this.convertProgressToCfi(targetFileId, data.progress) : null;
+    await this.repo.upsertReadingProgress(targetFileId, userId, bookorbitPercentage, cfi, data.progress ?? null);
+    await this.bookService.syncKoboReadingStateForExternalProgress(userId, targetFileId, bookorbitPercentage).catch(() => undefined);
+
     await this.userBookStatusService.autoUpdate(userId, bookFile.bookId, bookorbitPercentage);
     this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, {
       userId,
@@ -146,24 +180,15 @@ export class KoreaderService {
       progress: bookorbitPercentage,
       source: 'koreader',
     });
+  }
 
-    if (await this.bookService.isKoboTwoWayProgressSyncEnabled(userId)) {
-      try {
-        await this.bookService.syncKoboReadingStateFromProgress(
-          userId,
-          targetFileId,
-          bookorbitPercentage,
-        );
-      } catch (err: any) {
-        this.logger.warn(`Failed to sync Kobo reading state from KOReader progress: ${err.message}`);
-      }
+  private async convertProgressToCfi(bookFileId: number, xpointer: string): Promise<string | null> {
+    try {
+      const outcome = await this.positionConverter.xpointerPointToCfi({ bookFileId, pos: xpointer });
+      return outcome.status === 'failed' ? null : (outcome.cfi ?? null);
+    } catch {
+      return null;
     }
-
-    this.logger.debug(
-      `[${SYNC_EVENT}] [end] userId=${userId} bookFileId=${targetFileId} device=${device} durationMs=${Date.now() - startedAt} percentage=${data.percentage} - save progress completed`,
-    );
-
-    return { document: data.document, timestamp: data.timestamp ?? Math.floor(Date.now() / 1000) };
   }
 
   async getProgress(userId: number, documentHash: string) {
@@ -239,12 +264,30 @@ export class KoreaderService {
   }
 
   async getSyncStatus(userId: number): Promise<KoreaderSyncStatus> {
-    const credentials = await this.getCredentials(userId);
-    const devices = await this.getDevices(userId);
-    const totalSyncedBooks = await this.repo.getTotalSyncedBooks(userId);
+    const [credentials, devices, totalSyncedBooks, sweepRows, pluginTotals, versionInfo] = await Promise.all([
+      this.getCredentials(userId),
+      this.getDevices(userId),
+      this.repo.getTotalSyncedBooks(userId),
+      this.pluginRepo.listSweeps(userId),
+      this.pluginRepo.getPluginTotals(userId),
+      this.packageService.getVersionInfo(),
+    ]);
     const lastSyncAt = devices.length > 0 ? devices[0]!.lastSyncAt : null;
+    const latestPluginVersion = versionInfo.pluginVersion === 'unknown' ? null : versionInfo.pluginVersion;
+    const sweeps = sweepRows.map((row) => ({
+      deviceId: row.deviceId,
+      deviceModel: row.deviceModel,
+      pluginVersion: row.pluginVersion,
+      latestPluginVersion,
+      updateAvailable: isSemverNewer(latestPluginVersion, row.pluginVersion),
+      lastSweepAt: row.lastSweepAt.toISOString(),
+      lastSweepBooksMatched: row.lastSweepBooksMatched,
+      lastSweepPageStats: row.lastSweepPageStats,
+      lastSweepAnnotations: row.lastSweepAnnotations,
+    }));
+    const pluginUpdateAvailable = sweeps.some((sweep) => sweep.updateAvailable === true);
 
-    return { credentials, devices, totalSyncedBooks, lastSyncAt };
+    return { credentials, devices, totalSyncedBooks, lastSyncAt, latestPluginVersion, pluginUpdateAvailable, sweeps, pluginTotals };
   }
 
   async getDevices(userId: number): Promise<KoreaderDeviceInfo[]> {

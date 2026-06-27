@@ -48,6 +48,17 @@ function extractSeriesMemberships(product: AudibleProduct): MetadataSeriesMember
   return memberships.length ? memberships : undefined;
 }
 
+function normalizeCommunityRating(product: AudibleProduct): { communityRating?: number; communityRatingCount?: number } {
+  const score = product.rating?.overall_distribution?.average_rating;
+  const count = product.rating?.overall_distribution?.num_ratings;
+  const communityRating = typeof score === 'number' && Number.isFinite(score) && score >= 0 && score <= 5 ? score : undefined;
+  const communityRatingCount = typeof count === 'number' && Number.isInteger(count) && count >= 0 ? count : undefined;
+  return {
+    ...(communityRating !== undefined ? { communityRating } : {}),
+    ...(communityRatingCount !== undefined ? { communityRatingCount } : {}),
+  };
+}
+
 export function mapAudibleProduct(product: AudibleProduct): MetadataCandidate {
   const coverUrl = product.product_images?.[1024] ?? product.product_images?.[500];
 
@@ -66,6 +77,7 @@ export function mapAudibleProduct(product: AudibleProduct): MetadataCandidate {
 
   const seriesMemberships = extractSeriesMemberships(product);
   const primarySeries = seriesMemberships?.[0];
+  const communityRating = normalizeCommunityRating(product);
 
   return {
     provider: MetadataProviderKey.AUDIBLE,
@@ -86,5 +98,6 @@ export function mapAudibleProduct(product: AudibleProduct): MetadataCandidate {
     seriesIndex: primarySeries?.seriesIndex ?? undefined,
     seriesMemberships,
     genres: extractGenres(product),
+    ...communityRating,
   };
 }

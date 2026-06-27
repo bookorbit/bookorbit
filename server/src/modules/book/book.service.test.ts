@@ -136,6 +136,7 @@ function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
     bulkSetRating: vi.fn(),
     bulkUpdateMetadataFields: vi.fn(),
     updateMetadataFields: vi.fn(),
+    replaceCommunityRatings: vi.fn(),
     withTransaction: vi.fn(),
     deleteByIds: vi.fn(),
     findAllIds: vi.fn(),
@@ -852,6 +853,7 @@ describe('BookService', () => {
         },
         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
         genreRows: [],
+        communityRatingRows: [],
       });
       pipeline.runWithSources.mockResolvedValue({
         resolved: { title: 'New Title' },
@@ -889,6 +891,7 @@ describe('BookService', () => {
           publishedYear: null,
           language: null,
           pageCount: null,
+          communityRating: [],
           seriesName: null,
           seriesIndex: null,
           genres: [],
@@ -964,6 +967,37 @@ describe('BookService', () => {
           openLibraryId: 'ol-id',
         },
         diagnostics: makeMetadataFetchDiagnostics({ resolvedFieldCount: 3 }),
+      });
+    });
+
+    it('refreshMetadata preview includes community rating as an atomic provider bundle', async () => {
+      const { service, bookRepo, pipeline } = makeService();
+      const user = makeUser();
+      bookRepo.findById.mockResolvedValue({
+        book: {
+          books: { id: 1, libraryId: 7 },
+          book_metadata: { title: 'Old', isbn13: null, isbn10: null },
+        },
+        authorRows: [{ id: 1, name: 'Author One', sortName: null }],
+        genreRows: [],
+        communityRatingRows: [],
+      });
+      pipeline.runWithSources.mockResolvedValue({
+        resolved: {
+          communityRatings: [{ provider: MetadataProviderKey.HARDCOVER, rating: 4.25, ratingCount: 12345, updatedAt: '2026-06-25T00:00:00.000Z' }],
+        },
+        sources: { communityRating: MetadataProviderKey.HARDCOVER },
+        providerIds: {},
+        diagnostics: makeMetadataFetchDiagnostics({ resolvedFieldCount: 1 }),
+      });
+
+      const result = await service.refreshMetadata(1, true, user);
+
+      expect(result).toEqual({
+        metadata: {
+          communityRatings: [{ provider: MetadataProviderKey.HARDCOVER, rating: 4.25, ratingCount: 12345, updatedAt: '2026-06-25T00:00:00.000Z' }],
+        },
+        diagnostics: makeMetadataFetchDiagnostics({ resolvedFieldCount: 1 }),
       });
     });
 
@@ -1085,6 +1119,44 @@ describe('BookService', () => {
           title: 'Resolved',
           googleBooksId: 'g-id',
           openLibraryId: 'ol-id',
+        },
+        user,
+        { postSaveMode: 'schedule' },
+      );
+    });
+
+    it('refreshMetadata persists provider-specific community rating rows', async () => {
+      const { service, bookRepo, pipeline } = makeService();
+      const user = makeUser();
+      bookRepo.findById.mockResolvedValue({
+        book: {
+          books: { id: 1, libraryId: 7 },
+          book_metadata: { title: 'Old', isbn13: null, isbn10: null },
+        },
+        authorRows: [{ id: 1, name: 'Author One', sortName: null }],
+        genreRows: [],
+        communityRatingRows: [],
+      });
+      pipeline.runWithSources.mockResolvedValue({
+        resolved: {
+          communityRatings: [{ provider: MetadataProviderKey.HARDCOVER, rating: 4.25, ratingCount: 12345, updatedAt: null }],
+        },
+        sources: { communityRating: MetadataProviderKey.HARDCOVER },
+        providerIds: {},
+      });
+
+      const updateSpy = vi.spyOn(service, 'updateMetadata').mockResolvedValue({
+        book: { id: 1 },
+        write: null,
+        libraryAutoWriteEnabled: false,
+      } as never);
+
+      await service.refreshMetadata(1, false, user);
+
+      expect(updateSpy).toHaveBeenCalledWith(
+        1,
+        {
+          communityRatings: [{ provider: MetadataProviderKey.HARDCOVER, rating: 4.25, ratingCount: 12345, updatedAt: null }],
         },
         user,
         { postSaveMode: 'schedule' },
@@ -1325,6 +1397,55 @@ describe('BookService', () => {
         write: { status: 'success', fieldsWritten: ['title'], durationMs: 12 },
         libraryAutoWriteEnabled: true,
       });
+    });
+
+    it('updateMetadata replaces community rating rows', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 5 } as never);
+
+      await service.updateMetadata(
+        5,
+        {
+          communityRatings: [
+            { provider: MetadataProviderKey.HARDCOVER, rating: 4.25, ratingCount: 12345 },
+            { provider: MetadataProviderKey.AMAZON, rating: 4.8, ratingCount: 104451 },
+          ],
+        },
+        user,
+      );
+
+      expect(bookRepo.replaceCommunityRatings).toHaveBeenCalledWith(
+        5,
+        [
+          { provider: MetadataProviderKey.HARDCOVER, rating: 4.25, ratingCount: 12345 },
+          { provider: MetadataProviderKey.AMAZON, rating: 4.8, ratingCount: 104451 },
+        ],
+        expect.anything(),
+      );
+    });
+
+    it('updateMetadata with empty communityRatings clears all existing ratings', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 5 } as never);
+
+      await service.updateMetadata(5, { communityRatings: [] }, user);
+
+      expect(bookRepo.replaceCommunityRatings).toHaveBeenCalledWith(5, [], expect.anything());
+    });
+
+    it('updateMetadata without communityRatings does not touch community rating rows', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 5 } as never);
+
+      await service.updateMetadata(5, { title: 'Some Title' }, user);
+
+      expect(bookRepo.replaceCommunityRatings).not.toHaveBeenCalled();
     });
 
     it('updateMetadata keeps the saved metadata response when sync file write settings lookup fails', async () => {
@@ -3285,6 +3406,10 @@ describe('BookService', () => {
           },
         ],
         narratorRows: [{ id: 4, name: 'Narrator Name', sortName: null, displayOrder: 0 }],
+        communityRatingRows: [
+          { provider: MetadataProviderKey.AMAZON, rating: 4.8, ratingCount: 104451, updatedAt: new Date('2026-06-25T00:00:00.000Z') },
+          { provider: MetadataProviderKey.HARDCOVER, rating: 4.25, ratingCount: 12345, updatedAt: new Date('2026-06-24T00:00:00.000Z') },
+        ],
       });
       userBookStatusService.findOne.mockResolvedValue({
         status: 'reading',
@@ -3306,6 +3431,10 @@ describe('BookService', () => {
       const result = await service.getDetail(9, user);
 
       expect(result.id).toBe(9);
+      expect(result.communityRatings).toEqual([
+        { provider: MetadataProviderKey.AMAZON, rating: 4.8, ratingCount: 104451, updatedAt: '2026-06-25T00:00:00.000Z' },
+        { provider: MetadataProviderKey.HARDCOVER, rating: 4.25, ratingCount: 12345, updatedAt: '2026-06-24T00:00:00.000Z' },
+      ]);
       expect(result.audioMetadata?.chapters).toEqual([
         { title: '01-intro', startMs: 0 },
         { title: '02-main', startMs: 30_000 },
@@ -3400,6 +3529,7 @@ describe('BookService', () => {
           },
         ],
         narratorRows: [],
+        communityRatingRows: [],
       });
       userBookStatusService.findOne.mockResolvedValue(null);
       comicMetadataService.findByBookId.mockResolvedValue(null);
@@ -3410,6 +3540,7 @@ describe('BookService', () => {
 
       expect(result.readStatus).toBeNull();
       expect(result.rating).toBeNull();
+      expect(result.communityRatings).toEqual([]);
       expect(result.audioMetadata).toBeNull();
       expect(result.collections).toEqual([]);
       expect(result.comicMetadata).toBeNull();

@@ -17,6 +17,8 @@ describe('OpenLibraryMapper', () => {
         language: ['eng'],
         number_of_pages_median: 180,
         subject: ['Fiction', 'Classic'],
+        ratings_average: 4.2,
+        ratings_count: 3456,
       };
 
       const result = mapOpenLibraryDoc(mockDoc);
@@ -33,6 +35,8 @@ describe('OpenLibraryMapper', () => {
         language: 'eng',
         pageCount: 180,
         genres: ['Fiction', 'Classic'],
+        communityRating: 4.2,
+        communityRatingCount: 3456,
         coverUrl: 'https://covers.openlibrary.org/b/id/12345-L.jpg',
         sourceUrl: 'https://openlibrary.org/works/OL12345W',
       });

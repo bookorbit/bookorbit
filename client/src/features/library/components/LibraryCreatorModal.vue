@@ -128,6 +128,7 @@ const sectionProps = computed(() => ({
   folders: { folders: form.folders, prescanResult: prescanResult.value, prescanLoading: prescanLoading.value },
   scanner: {
     organizationMode: form.organizationMode,
+    organizationModeLocked: mode.value === 'edit',
     allowedFormats: form.allowedFormats,
     excludePatterns: form.excludePatterns,
   },

@@ -20,7 +20,7 @@ const emit = defineEmits<{
 const GROUPS: { label: string; fields: MetadataField[] }[] = [
   { label: 'Core', fields: ['title', 'subtitle', 'description', 'cover'] },
   { label: 'Contributors', fields: ['authors'] },
-  { label: 'Publication', fields: ['publisher', 'publishedYear', 'language', 'pageCount'] },
+  { label: 'Publication', fields: ['publisher', 'publishedYear', 'language', 'pageCount', 'communityRating'] },
   { label: 'Series', fields: ['seriesName', 'seriesIndex'] },
   { label: 'Classification', fields: ['genres'] },
   { label: 'Audiobook', fields: ['narrators', 'duration', 'abridged'] },

@@ -18,6 +18,12 @@ export interface AudibleProduct {
   merchandising_summary?: string;
   series?: Array<{ asin?: string; title: string; sequence?: string; url?: string }>;
   category_ladders?: AudibleCategoryLadder[];
+  rating?: {
+    overall_distribution?: {
+      average_rating?: number;
+      num_ratings?: number;
+    };
+  };
 }
 
 export interface AudibleSearchResponse {
