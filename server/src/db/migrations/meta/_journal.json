@@ -225,6 +225,13 @@
       "when": 1782421105734,
       "tag": "0031_reading-session-book-id-not-null",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1782592228459,
+      "tag": "0032_custom-icons",
+      "breakpoints": true
     }
   ]
 }

@@ -25,7 +25,7 @@ services:
       CLIENT_URL: ${CLIENT_URL:-${APP_URL?required}}
       PUID: ${PUID:-1000}
       PGID: ${PGID:-1000}
-      NODE_MAX_OLD_SPACE_SIZE: ${NODE_MAX_OLD_SPACE_SIZE:-2048}
+      NODE_MAX_OLD_SPACE_SIZE: ${NODE_MAX_OLD_SPACE_SIZE:-auto}
       BOOK_DOCK_PATH: ${BOOK_DOCK_PATH:-}
     depends_on:
       postgres:

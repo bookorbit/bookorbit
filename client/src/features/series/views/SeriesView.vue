@@ -264,6 +264,7 @@ defineOptions({ name: 'SeriesView' })
     <ViewHeader
       title="Series"
       icon="Library"
+      fallback-icon="Library"
       :total="total"
       :view-mode="viewMode"
       :show-selection="false"

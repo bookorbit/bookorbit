@@ -16,13 +16,13 @@ import {
   Query,
   Res,
 } from '@nestjs/common';
-import { SkipThrottle } from '@nestjs/throttler';
 import { ZipArchive } from 'archiver';
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 import type { FastifyReply } from 'fastify';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { contentDispositionHeader } from '../../common/utils/content-disposition.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import { ForbidPermission } from '../../common/decorators/forbid-permission.decorator';
@@ -52,36 +52,8 @@ import { Permission, AuditAction, AuditResource } from '@bookorbit/types';
 import type { BookQuery } from '@bookorbit/types';
 import { UpdateBookMetadataLocksDto } from '../book-metadata-lock/dto/update-book-metadata-locks.dto';
 
-function stripLoneSurrogates(value: string): string {
-  let out = '';
-  for (let i = 0; i < value.length; i++) {
-    const code = value.charCodeAt(i);
-    if (code >= 0xd800 && code <= 0xdbff) {
-      const next = value.charCodeAt(i + 1);
-      if (next >= 0xdc00 && next <= 0xdfff) {
-        out += value[i] + value[i + 1];
-        i += 1;
-      }
-      continue;
-    }
-    if (code >= 0xdc00 && code <= 0xdfff) continue;
-    out += value[i];
-  }
-  return out;
-}
-
 function shouldSyncFileWrite(value: string | undefined): boolean {
   return value === 'true';
-}
-
-function encodeFilenameStar(value: string): string | null {
-  try {
-    const cleaned = stripLoneSurrogates(value);
-    if (!cleaned) return null;
-    return encodeURIComponent(cleaned).replace(/[!'()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
-  } catch {
-    return null;
-  }
 }
 
 const AUDIO_MIME_TYPES: Record<string, string> = {
@@ -263,12 +235,9 @@ export class BookController {
     const releaseExportSlot = this.bookService.acquireExportSlot(user.id);
     try {
       const exported = await this.bookService.buildMetadataExport(dto, user);
-      const asciiFilename = exported.fileName.replace(/[^\x20-\x7E]|["\\]/g, '_') || 'book-metadata-export';
-      const encodedFilename = encodeFilenameStar(exported.fileName);
-      const disposition = `attachment; filename="${asciiFilename}"`;
 
       reply.raw.setHeader('Content-Type', exported.contentType);
-      reply.raw.setHeader('Content-Disposition', encodedFilename ? `${disposition}; filename*=UTF-8''${encodedFilename}` : disposition);
+      reply.raw.setHeader('Content-Disposition', contentDispositionHeader('attachment', exported.fileName, 'book-metadata-export'));
       reply.send(exported.content);
 
       this.logger.log(
@@ -344,7 +313,6 @@ export class BookController {
     }
   }
 
-  @SkipThrottle()
   @Get(':id/cover')
   async getCover(
     @Param('id', ParseIntPipe) id: number,
@@ -372,7 +340,6 @@ export class BookController {
     reply.send(createReadStream(coverPath));
   }
 
-  @SkipThrottle()
   @Get(':id/thumbnail')
   async getThumbnail(
     @Param('id', ParseIntPipe) id: number,
@@ -412,12 +379,9 @@ export class BookController {
     const { path, size, format, originalFilename } = await this.bookService.getFileInfo(fileId, user);
     const mimeType = resolveBookMimeType(format);
     const filename = originalFilename;
-    const asciiFilename = filename.replace(/[^\x20-\x7E]|["\\]/g, '_') || 'download';
-    const encodedFilename = encodeFilenameStar(filename);
 
     reply.header('Accept-Ranges', 'bytes');
-    const disposition = `inline; filename="${asciiFilename}"`;
-    reply.header('Content-Disposition', encodedFilename ? `${disposition}; filename*=UTF-8''${encodedFilename}` : disposition);
+    reply.header('Content-Disposition', contentDispositionHeader('inline', filename, 'download'));
     reply.type(mimeType);
 
     if (rangeHeader) {
@@ -453,12 +417,9 @@ export class BookController {
       const { path, size, format, bookId } = await this.bookService.getFileInfo(fileId, user);
       const mimeType = resolveBookMimeType(format);
       const filename = await this.bookService.resolveDownloadFilename({ bookId, absolutePath: path, format: format === 'unknown' ? null : format });
-      const asciiFilename = filename.replace(/[^\x20-\x7E]|["\\]/g, '_') || 'download';
-      const encodedFilename = encodeFilenameStar(filename);
 
       reply.header('Accept-Ranges', 'bytes');
-      const disposition = `attachment; filename="${asciiFilename}"`;
-      reply.header('Content-Disposition', encodedFilename ? `${disposition}; filename*=UTF-8''${encodedFilename}` : disposition);
+      reply.header('Content-Disposition', contentDispositionHeader('attachment', filename, 'download'));
       reply.type(mimeType);
       reply.header('Content-Length', size);
       reply.send(createReadStream(path));

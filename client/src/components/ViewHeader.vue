@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { CheckSquare, LayoutGrid, List, SlidersHorizontal, Square, Table2 } from '@lucide/vue'
-import * as LucideIcons from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -10,11 +9,13 @@ import ViewHeaderDesktopSearch from '@/components/view-header/ViewHeaderDesktopS
 import ViewHeaderDisplayControls from '@/components/view-header/ViewHeaderDisplayControls.vue'
 import ViewHeaderMobileMenu from '@/components/view-header/ViewHeaderMobileMenu.vue'
 import ViewHeaderMobileSearchSheet from '@/components/view-header/ViewHeaderMobileSearchSheet.vue'
+import AppIcon from '@/components/AppIcon.vue'
 
 withDefaults(
   defineProps<{
     title: string
     icon?: string
+    fallbackIcon?: string
     total: number
     coverSize: number
     gridGap: number
@@ -61,16 +62,12 @@ const emit = defineEmits<{
 
 const mobileDisplayOpen = ref(false)
 const mobileSearchOpen = ref(false)
-
-function getIconComponent(name: string) {
-  return (LucideIcons as Record<string, unknown>)[name] ?? null
-}
 </script>
 
 <template>
   <div class="sticky top-0 z-20 mb-2 mt-2 flex h-10 shrink-0 items-center gap-2 bg-background/80 p-2 backdrop-blur-md transition-all duration-300">
     <div class="flex min-w-0 flex-1 items-center gap-2">
-      <component v-if="icon" :is="getIconComponent(icon)" :size="16" class="shrink-0 text-muted-foreground" />
+      <AppIcon v-if="icon" :icon="icon" :fallback="fallbackIcon" :size="16" class="shrink-0 text-muted-foreground" />
       <span class="truncate text-[16px] font-bold tracking-tight text-foreground/90">{{ title }}</span>
       <span class="shrink-0 tabular-nums text-[12px] font-semibold text-primary/70">({{ total.toLocaleString() }})</span>
     </div>

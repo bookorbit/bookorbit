@@ -460,7 +460,31 @@ describe('KoreaderCatalogService', () => {
     await service.streamFile(makeUser({ permissions: [] }), 100, reply as never);
 
     expect(bookService.verifyFileAccess).toHaveBeenCalledWith(100, expect.objectContaining({ permissions: [] }));
-    expect(reply.header).toHaveBeenCalledWith('Content-Disposition', 'attachment; filename="Dune - Frank Herbert.epub"');
+    expect(reply.header).toHaveBeenCalledWith(
+      'Content-Disposition',
+      `attachment; filename="Dune - Frank Herbert.epub"; filename*=UTF-8''Dune%20-%20Frank%20Herbert.epub`,
+    );
+    expect(reply.header).toHaveBeenCalledWith('Content-Length', 1234);
+    expect(reply.type).toHaveBeenCalledWith('application/epub+zip');
+    expect(mockCreateReadStream).toHaveBeenCalledWith('/books/dune.epub');
+  });
+
+  it('encodes non-ASCII content file download filenames for Content-Disposition', async () => {
+    const { service, bookService } = makeService();
+    const reply = makeReply();
+    bookService.getDetail.mockResolvedValueOnce(
+      makeDetail({
+        title: 'Dune’s Café',
+        authors: [{ id: 1, name: 'Frank Herbert', sortName: 'Herbert, Frank' }],
+      }),
+    );
+
+    await service.streamFile(makeUser({ permissions: [] }), 100, reply as never);
+
+    expect(reply.header).toHaveBeenCalledWith(
+      'Content-Disposition',
+      `attachment; filename="Dune_s Caf_ - Frank Herbert.epub"; filename*=UTF-8''Dune%E2%80%99s%20Caf%C3%A9%20-%20Frank%20Herbert.epub`,
+    );
     expect(reply.header).toHaveBeenCalledWith('Content-Length', 1234);
     expect(reply.type).toHaveBeenCalledWith('application/epub+zip');
     expect(mockCreateReadStream).toHaveBeenCalledWith('/books/dune.epub');

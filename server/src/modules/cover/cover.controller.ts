@@ -1,7 +1,6 @@
 import { Permission } from '@bookorbit/types';
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Post, Query, Req, Res } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
-import { SkipThrottle } from '@nestjs/throttler';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { MultipartRequest } from '../../common/types/multipart-request';
@@ -27,7 +26,6 @@ export class CoverController {
   }
 
   @Get('cover/proxy')
-  @SkipThrottle()
   @RequirePermission(Permission.LibraryEditMetadata)
   async proxyImage(@Query() query: ProxyCoverQueryDto, @Res() res: FastifyReply) {
     const { buffer, contentType } = await this.coverService.proxyImage(query.url);

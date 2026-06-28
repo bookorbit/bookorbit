@@ -95,14 +95,15 @@ describe('BookDockRepository', () => {
       { status: 'ready', cnt: '5' },
       { status: 'error', cnt: '2' },
       { status: 'extracting', cnt: '1' },
+      { status: 'fetching', cnt: '4' },
     ]);
     const repo = new BookDockRepository(db as never);
 
     await expect(repo.countsByStatus()).resolves.toEqual({
-      pending: 3,
+      pending: 8,
       ready: 5,
       error: 2,
-      total: 11,
+      total: 15,
     });
   });
 
@@ -164,6 +165,24 @@ describe('BookDockRepository', () => {
       items: [{ id: 1 }, { id: 2 }],
       total: 7,
     });
+  });
+
+  it('findAll adds id as a deterministic tie-breaker for pagination order', async () => {
+    const { db, selectBuilder } = makeDb();
+    selectBuilder.where.mockReturnValueOnce(selectBuilder).mockResolvedValueOnce([{ total: 2 }]);
+    selectBuilder.offset.mockResolvedValueOnce([{ id: 2 }, { id: 1 }]);
+    const repo = new BookDockRepository(db as never);
+
+    await repo.findAll({
+      page: 1,
+      limit: 20,
+      sort: 'createdAt',
+      order: 'desc',
+      userId: 1,
+      isSuperuser: true,
+    });
+
+    expect(selectBuilder.orderBy).toHaveBeenCalledWith(expect.objectContaining({ op: 'desc' }), expect.objectContaining({ op: 'desc' }));
   });
 
   it('findById and findByAbsolutePath return the first selected row', async () => {

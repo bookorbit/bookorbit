@@ -427,6 +427,7 @@ defineOptions({ name: 'CollectionView' })
       <ViewHeader
         :title="collection?.name ?? 'Collection'"
         :icon="collection?.icon || 'FolderOpen'"
+        fallback-icon="FolderOpen"
         :total="total"
         v-model:coverSize="coverSize"
         v-model:gridGap="gridGap"

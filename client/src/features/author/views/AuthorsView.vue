@@ -436,6 +436,7 @@ defineOptions({ name: 'AuthorsView' })
       <ViewHeader
         title="Authors"
         icon="Users"
+        fallback-icon="Users"
         :total="total"
         v-model:coverSize="authorCoverSize"
         v-model:gridGap="gridGap"

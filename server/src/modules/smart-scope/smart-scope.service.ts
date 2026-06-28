@@ -3,6 +3,7 @@ import type { SQL } from 'drizzle-orm';
 
 import type { BookQuery, BooksPage, GroupRule, JumpBucketsResponse, SortSpec } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
+import { normalizeIconValue } from '../../common/utils/icon-value.utils';
 import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import type { SmartScope } from '../../db/schema/smart-scopes';
 import { BookService } from '../book/book.service';
@@ -14,12 +15,6 @@ import { CreateSmartScopeDto } from './dto/create-smart-scope.dto';
 import { ReorderSmartScopesDto } from './dto/reorder-smart-scopes.dto';
 import { UpdateSmartScopeDto } from './dto/update-smart-scope.dto';
 import { SmartScopeRepository } from './smart-scope.repository';
-
-function normalizeIcon(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const icon = value.trim();
-  return icon.length > 0 ? icon : null;
-}
 
 /**
  * SmartScopes: server-backed, rule-based dynamic datasets.
@@ -94,7 +89,7 @@ export class SmartScopeService {
 
   async create(dto: CreateSmartScopeDto, user: RequestUser) {
     const filter = validateGroupRule(dto.filter);
-    const icon = normalizeIcon(dto.icon);
+    const icon = normalizeIconValue(dto.icon);
     if (!icon) {
       throw new BadRequestException('Icon is required');
     }
@@ -115,7 +110,7 @@ export class SmartScopeService {
 
     const hasFilterField = Object.prototype.hasOwnProperty.call(dto, 'filter');
     const filter = hasFilterField ? validateGroupRule(dto.filter) : undefined;
-    const icon = dto.icon !== undefined ? normalizeIcon(dto.icon) : normalizeIcon(smartScope.icon);
+    const icon = dto.icon !== undefined ? normalizeIconValue(dto.icon) : normalizeIconValue(smartScope.icon);
     if (!icon) {
       throw new BadRequestException('Icon is required');
     }

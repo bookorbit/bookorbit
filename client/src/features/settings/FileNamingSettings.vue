@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { Check, ChevronDown, ChevronUp, ClipboardCopy, FolderOpen, Info, Loader2, RotateCcw, Save } from '@lucide/vue'
-import * as LucideIcons from '@lucide/vue'
+import { Check, ChevronDown, ChevronUp, ClipboardCopy, Info, Loader2, RotateCcw, Save } from '@lucide/vue'
 import {
   DEFAULT_DOWNLOAD_PATTERN,
   DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE,
@@ -16,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import { copyToClipboard } from '@/lib/clipboard'
+import AppIcon from '@/components/AppIcon.vue'
 
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
@@ -161,11 +161,6 @@ const EXAMPLES = [
     ],
   },
 ]
-
-function getLibraryIconComponent(name: string | null | undefined) {
-  if (!name) return FolderOpen
-  return (LucideIcons as Record<string, unknown>)[name] ?? FolderOpen
-}
 
 async function copyToken(token: string) {
   const value = `{${token}}`
@@ -469,7 +464,7 @@ onUnmounted(() => {
           <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div class="flex items-center gap-3 min-w-0">
               <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-muted shrink-0 text-muted-foreground">
-                <component :is="getLibraryIconComponent(lib.icon)" :size="16" />
+                <AppIcon :icon="lib.icon || 'FolderOpen'" fallback="FolderOpen" :size="16" />
               </div>
               <div class="min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">

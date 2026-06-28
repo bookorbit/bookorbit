@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
 import { SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
+import AppIcon from '@/components/AppIcon.vue'
 
 withDefaults(
   defineProps<{
     isActive: boolean
     tooltip: string
-    icon: Component
+    icon: Component | string
+    fallbackIcon?: Component | string
     iconSize?: number
     iconClass?: string
     label: string
@@ -38,7 +40,16 @@ const buttonClass = [
     <SidebarMenuButton :is-active="isActive" :tooltip="tooltip" :class="buttonClass" @click="emit('click')">
       <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors">
         <component
+          v-if="typeof icon !== 'string'"
           :is="icon"
+          :size="iconSize"
+          class="text-sidebar-foreground/70 transition-colors group-hover/item:text-sidebar-foreground group-data-[active=true]/item:text-primary"
+          :class="iconClass"
+        />
+        <AppIcon
+          v-else
+          :icon="icon"
+          :fallback="fallbackIcon"
           :size="iconSize"
           class="text-sidebar-foreground/70 transition-colors group-hover/item:text-sidebar-foreground group-data-[active=true]/item:text-primary"
           :class="iconClass"

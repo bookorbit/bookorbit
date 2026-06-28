@@ -28,6 +28,7 @@ import { bookThumbnailPath } from '../../common/book-cover-storage';
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { RequestUser } from '../../common/types/request-user';
+import { contentDispositionHeader } from '../../common/utils/content-disposition.utils';
 import { storageConfig } from '../../config/config';
 import { BookReadService } from '../book/book-read.service';
 import { BookService } from '../book/book.service';
@@ -254,7 +255,7 @@ export class KoreaderCatalogService {
 
     try {
       const { size } = await stat(file.absolutePath);
-      reply.header('Content-Disposition', `attachment; filename="${filename}"`);
+      reply.header('Content-Disposition', contentDispositionHeader('attachment', filename, 'download'));
       reply.header('Content-Length', size);
       reply.type(fileMimeType(format));
       reply.send(createReadStream(file.absolutePath));

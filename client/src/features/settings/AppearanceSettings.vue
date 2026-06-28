@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ACCENT_PASTEL, ACCENT_VIVID, BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import AppearanceBehaviorSettings from './AppearanceBehaviorSettings.vue'
 import AppearanceBookCoverSettings from './AppearanceBookCoverSettings.vue'
+import AppearanceIconsSettings from './AppearanceIconsSettings.vue'
 import AppearanceLayoutSettings from './AppearanceLayoutSettings.vue'
 import AppearanceThemeSettings from './AppearanceThemeSettings.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
@@ -71,6 +72,7 @@ function selectTab(tab: Tab) {
 
   <AppearanceThemeSettings v-if="activeTab === 'theme'" />
   <AppearanceBookCoverSettings v-else-if="activeTab === 'book-covers'" />
+  <AppearanceIconsSettings v-else-if="activeTab === 'icons'" />
   <AppearanceLayoutSettings v-else-if="activeTab === 'layout'" />
   <AppearanceBehaviorSettings v-else-if="activeTab === 'behavior'" />
 </template>

@@ -22,7 +22,33 @@ export function useFoliateInput(
   let longHoldTimeout: ReturnType<typeof setTimeout> | null = null
 
   function getViewEl() {
-    return getView() as { prev?: () => void; next?: () => void; getBoundingClientRect?: () => DOMRect } | null
+    return getView() as {
+      prev?: () => void
+      next?: () => void
+      goLeft?: () => void
+      goRight?: () => void
+      getBoundingClientRect?: () => DOMRect
+    } | null
+  }
+
+  function navigateLeft() {
+    const view = getViewEl()
+    if (view?.goLeft) view.goLeft()
+    else view?.prev?.()
+  }
+
+  function navigateRight() {
+    const view = getViewEl()
+    if (view?.goRight) view.goRight()
+    else view?.next?.()
+  }
+
+  function navigatePrev() {
+    getViewEl()?.prev?.()
+  }
+
+  function navigateNext() {
+    getViewEl()?.next?.()
   }
 
   function handleTouchStart(e: TouchEvent) {
@@ -74,8 +100,8 @@ export function useFoliateInput(
       if (Math.abs(deltaX) >= SWIPE_THRESHOLD && Math.abs(deltaX) > deltaY) {
         if (isNavigating) return
         isNavigating = true
-        if (deltaX < 0) getViewEl()?.next?.()
-        else getViewEl()?.prev?.()
+        if (deltaX < 0) navigateRight()
+        else navigateLeft()
         setTimeout(() => (isNavigating = false), 300)
         return
       }
@@ -195,11 +221,11 @@ export function useFoliateInput(
 
       if (currentZone === 'left' && !isMobile) {
         isNavigating = true
-        getViewEl()?.prev?.()
+        navigateLeft()
         setTimeout(() => (isNavigating = false), 300)
       } else if (currentZone === 'right' && !isMobile) {
         isNavigating = true
-        getViewEl()?.next?.()
+        navigateRight()
         setTimeout(() => (isNavigating = false), 300)
       } else {
         onMiddleTap?.()
@@ -212,17 +238,23 @@ export function useFoliateInput(
     if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) return
     const view = getViewEl()
     if (!view) return
-    if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-      view.prev?.()
+    if (e.key === 'ArrowLeft') {
+      navigateLeft()
       e.preventDefault()
-    } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
-      view.next?.()
+    } else if (e.key === 'ArrowRight') {
+      navigateRight()
+      e.preventDefault()
+    } else if (e.key === 'PageUp') {
+      navigatePrev()
+      e.preventDefault()
+    } else if (e.key === 'PageDown') {
+      navigateNext()
       e.preventDefault()
     } else if (e.key === ' ' && e.shiftKey) {
-      view.prev?.()
+      navigatePrev()
       e.preventDefault()
     } else if (e.key === ' ') {
-      view.next?.()
+      navigateNext()
       e.preventDefault()
     }
   }

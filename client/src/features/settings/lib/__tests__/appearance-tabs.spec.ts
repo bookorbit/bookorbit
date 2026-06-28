@@ -3,7 +3,7 @@ import { APPEARANCE_TAB_LABELS, APPEARANCE_TAB_TITLE_LABELS, APPEARANCE_TABS, no
 
 describe('appearance-tabs', () => {
   it('keeps the public tab order stable', () => {
-    expect(APPEARANCE_TABS).toEqual(['theme', 'book-covers', 'layout', 'behavior'])
+    expect(APPEARANCE_TABS).toEqual(['theme', 'book-covers', 'icons', 'layout', 'behavior'])
   })
 
   it('has nav and title labels for every tab', () => {

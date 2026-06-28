@@ -63,7 +63,7 @@ function resolveLoginError(err: unknown): string {
   if (!(err instanceof Error)) return 'Invalid username or password'
 
   const normalizedMessage = err.message.trim().toLowerCase()
-  if (normalizedMessage.includes('too many requests') || normalizedMessage.includes('throttler')) {
+  if (normalizedMessage.includes('too many requests')) {
     return 'Too many login attempts. Please wait a minute and try again.'
   }
   if (normalizedMessage.includes('invalid credentials')) {

@@ -344,13 +344,13 @@ export const makeBook = async (file) => {
  * @param {number} bookId - Book ID for API requests
  * @param {string} baseUrl - API base URL for EPUB endpoints
  * @param {Object} bookInfo - Pre-fetched metadata from /api/v1/epub/{bookId}/info
- * @param {string} [authToken] - Optional authentication token
+ * @param {Function} [fetchFile] - Fetch implementation for EPUB file requests
  * @param {string} [bookType] - Optional book type for alternative format (e.g., 'EPUB')
  * @param {number|null} [fileId] - Optional specific file ID (for books with multiple epub files)
  * @returns {Promise<EPUB>} Initialized EPUB book object
  */
-export const makeStreamingBook = async (bookId, baseUrl, bookInfo, authToken = null, bookType = null, fileId = null) => {
-  const loader = makeStreamingLoader(bookId, baseUrl, bookInfo, authToken, bookType, fileId)
+export const makeStreamingBook = async (bookId, baseUrl, bookInfo, fetchFile = fetch, bookType = null, fileId = null) => {
+  const loader = makeStreamingLoader(bookId, baseUrl, bookInfo, fetchFile, bookType, fileId)
   const { EPUB } = await import('./epub.js')
   return new EPUB(loader).init()
 }
@@ -845,12 +845,16 @@ export class View extends HTMLElement {
     await this.renderer.next(distance)
   }
 
+  #isRTL() {
+    return this.book?.dir === 'rtl' || this.renderer?.getAttribute?.('dir') === 'rtl'
+  }
+
   goLeft() {
-    return this.book.dir === 'rtl' ? this.next() : this.prev()
+    return this.#isRTL() ? this.next() : this.prev()
   }
 
   goRight() {
-    return this.book.dir === 'rtl' ? this.prev() : this.next()
+    return this.#isRTL() ? this.prev() : this.next()
   }
 
   async *#searchSection(matcher, query, index) {

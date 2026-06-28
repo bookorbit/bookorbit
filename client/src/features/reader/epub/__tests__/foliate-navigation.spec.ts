@@ -29,16 +29,22 @@ function installBrowserGlobals() {
 
 describe('Foliate navigation', () => {
   let View: new () => {
-    book: { sections: unknown[]; resolveHref: (href: string) => { index: number } }
+    book: { sections?: unknown[]; resolveHref?: (href: string) => { index: number }; dir?: string | null }
     renderer: {
-      goTo: (resolved: { index: number }) => Promise<void>
-      getContents: () => { index: number; text?: string }[]
+      goTo?: (resolved: { index: number }) => Promise<void>
+      getContents?: () => { index: number; text?: string }[]
+      prev?: () => void
+      next?: () => void
+      getAttribute?: (name: string) => string | null
     }
     goTo: (target: string) => Promise<{ index: number } | undefined>
+    goLeft: () => Promise<void>
+    goRight: () => Promise<void>
   }
   let getKoreaderProgress: (index: number, range: Range | null) => string | null
   let getKoreaderDocFragmentIndex: (sections: { id: string }[], index: number) => number | null
   let getKoboSpanValue: (range: Range | null) => string | null
+  let getPageProgressionRtl: (bookDir: string | null | undefined, contentRtl: boolean) => boolean
   let Paginator: new () => {
     sections: { load: () => Promise<string | null> }[]
     goTo: (target: { index: number }) => Promise<void>
@@ -55,7 +61,10 @@ describe('Foliate navigation', () => {
       getKoreaderDocFragmentIndex: typeof getKoreaderDocFragmentIndex
       getKoboSpanValue: typeof getKoboSpanValue
     })
-    ;({ Paginator } = (await import(paginatorModulePath)) as { Paginator: typeof Paginator })
+    ;({ Paginator, getPageProgressionRtl } = (await import(paginatorModulePath)) as {
+      Paginator: typeof Paginator
+      getPageProgressionRtl: typeof getPageProgressionRtl
+    })
   })
 
   it('does not treat stale rendered contents as successful navigation', async () => {
@@ -78,7 +87,7 @@ describe('Foliate navigation', () => {
     await expect(view.goTo('chapter-1')).resolves.toEqual({ index: 2 })
 
     expect(goToCalls).toEqual([{ index: 1 }, { index: 2 }])
-    expect(view.renderer.getContents()).toEqual([{ index: 2, text: 'chapter 2' }])
+    expect(view.renderer!.getContents!()).toEqual([{ index: 2, text: 'chapter 2' }])
   })
 
   it('keeps the requested target when the rendered contents match', async () => {
@@ -98,7 +107,7 @@ describe('Foliate navigation', () => {
 
     await expect(view.goTo('chapter-1')).resolves.toEqual({ index: 1 })
 
-    expect(view.renderer.getContents()).toEqual([{ index: 1 }])
+    expect(view.renderer!.getContents!()).toEqual([{ index: 1 }])
   })
 
   it('rejects paginator navigation when a section load does not produce a source', async () => {
@@ -106,6 +115,47 @@ describe('Foliate navigation', () => {
     paginator.sections = [{ load: vi.fn<() => Promise<string | null>>().mockResolvedValue(null) }]
 
     await expect(paginator.goTo({ index: 0 })).rejects.toThrow('Failed to load section 0')
+  })
+
+  it('uses explicit OPF page progression before content direction', () => {
+    expect(getPageProgressionRtl('rtl', false)).toBe(true)
+    expect(getPageProgressionRtl('ltr', true)).toBe(false)
+    expect(getPageProgressionRtl('default', true)).toBe(true)
+    expect(getPageProgressionRtl(undefined, false)).toBe(false)
+  })
+
+  it('maps physical left and right navigation using OPF RTL page progression', async () => {
+    const view = new View()
+    const prev = vi.fn<() => void>()
+    const next = vi.fn<() => void>()
+
+    view.book = { dir: 'rtl' }
+    view.renderer = { prev, next, getAttribute: () => null }
+
+    await view.goLeft()
+    await view.goRight()
+
+    expect(next).toHaveBeenCalledTimes(1)
+    expect(prev).toHaveBeenCalledTimes(1)
+  })
+
+  it('maps physical left and right navigation using renderer-resolved RTL direction', async () => {
+    const view = new View()
+    const prev = vi.fn<() => void>()
+    const next = vi.fn<() => void>()
+
+    view.book = { dir: null }
+    view.renderer = {
+      prev,
+      next,
+      getAttribute: (name: string) => (name === 'dir' ? 'rtl' : null),
+    }
+
+    await view.goLeft()
+    await view.goRight()
+
+    expect(next).toHaveBeenCalledTimes(1)
+    expect(prev).toHaveBeenCalledTimes(1)
   })
 
   it('preserves real inline elements for KOReader XPointer progress', () => {

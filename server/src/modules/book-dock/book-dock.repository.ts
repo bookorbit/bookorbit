@@ -55,7 +55,7 @@ export class BookDockRepository {
         .select()
         .from(bookDockFiles)
         .where(where)
-        .orderBy(orderFn(sortCol))
+        .orderBy(orderFn(sortCol), orderFn(bookDockFiles.id))
         .limit(opts.limit)
         .offset((opts.page - 1) * opts.limit),
       this.db.select({ total: count() }).from(bookDockFiles).where(where),
@@ -142,7 +142,7 @@ export class BookDockRepository {
     const result = { pending: 0, ready: 0, error: 0, total: 0 };
     for (const row of rows) {
       const n = Number(row.cnt);
-      if (row.status === 'pending') result.pending = n;
+      if (row.status === 'pending' || row.status === 'extracting' || row.status === 'fetching') result.pending += n;
       else if (row.status === 'ready') result.ready = n;
       else if (row.status === 'error') result.error = n;
       result.total += n;

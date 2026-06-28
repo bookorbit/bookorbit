@@ -3,7 +3,11 @@ import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import * as LucideIcons from '@lucide/vue'
 import { ChevronDown, Search, X } from '@lucide/vue'
 import { RecycleScroller } from 'vue-virtual-scroller'
+import type { CustomIcon } from '@bookorbit/types'
+import { customIconSlugFromValue, customIconValue } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import AppIcon from '@/components/AppIcon.vue'
+import { useCustomIcons } from '@/features/custom-icons/composables/useCustomIcons'
 
 const props = defineProps<{
   modelValue: string
@@ -26,7 +30,21 @@ function getIconComponent(name: string) {
   return (LucideIcons as Record<string, unknown>)[name]
 }
 
-const selectedIconComponent = computed(() => (props.modelValue ? ((LucideIcons as Record<string, unknown>)[props.modelValue] ?? null) : null))
+const {
+  icons: customIcons,
+  loading: customIconsLoading,
+  catalogTruncated,
+  ensureCustomIconsLoaded,
+  findCustomIconByValue,
+  fetchIconPage,
+} = useCustomIcons()
+
+const selectedCustomIcon = computed(() => findCustomIconByValue(props.modelValue))
+const selectedLabel = computed(() => {
+  const slug = customIconSlugFromValue(props.modelValue)
+  if (slug) return selectedCustomIcon.value?.name ?? slug
+  return props.modelValue
+})
 
 // ── Virtual grid ──────────────────────────────────────────────────────────
 
@@ -36,20 +54,60 @@ const VIEWPORT_MARGIN = 8
 const PANEL_OFFSET = 4
 const PANEL_MIN_WIDTH = 440
 const PANEL_MAX_HEIGHT = 400
-const PANEL_SEARCH_ROW_HEIGHT = 44
+const PANEL_SEARCH_ROW_HEIGHT = 86
 const PANEL_DEFAULT_GRID_HEIGHT = 320
 const PANEL_MIN_GRID_HEIGHT = 140
 
 const query = ref('')
+const activeSource = ref<'lucide' | 'custom'>('lucide')
+
+// Server-side search results used when the catalog is truncated and the user types a query.
+const serverSearchResults = ref<CustomIcon[]>([])
+const serverSearchLoading = ref(false)
+let serverSearchTimer: ReturnType<typeof setTimeout> | null = null
 
 const filteredIcons = computed(() => {
   const q = query.value.trim().toLowerCase()
   return q ? ALL_ICONS.filter((n) => n.toLowerCase().includes(q)) : ALL_ICONS
 })
 
+const filteredCustomIcons = computed(() => {
+  const q = query.value.trim().toLowerCase()
+  if (activeSource.value !== 'custom') return []
+  if (catalogTruncated.value && q) return serverSearchResults.value
+  if (!q) return customIcons.value
+  return customIcons.value.filter((icon) => icon.name.toLowerCase().includes(q) || icon.slug.toLowerCase().includes(q))
+})
+
+watch([query, activeSource], ([newQuery, newSource]) => {
+  if (newSource !== 'custom' || !catalogTruncated.value) return
+  if (serverSearchTimer) clearTimeout(serverSearchTimer)
+  const term = newQuery.trim()
+  if (!term) {
+    serverSearchResults.value = []
+    return
+  }
+  serverSearchTimer = setTimeout(async () => {
+    serverSearchLoading.value = true
+    try {
+      const result = await fetchIconPage({ q: term, sort: 'name', page: 0, size: 200 })
+      serverSearchResults.value = result.items
+    } catch {
+      serverSearchResults.value = []
+    } finally {
+      serverSearchLoading.value = false
+    }
+  }, 300)
+})
+
 interface IconRow {
   id: number
   icons: string[]
+}
+
+interface CustomIconRow {
+  id: number
+  icons: CustomIcon[]
 }
 
 const rows = computed<IconRow[]>(() => {
@@ -60,6 +118,23 @@ const rows = computed<IconRow[]>(() => {
   }
   return result
 })
+
+const customRows = computed<CustomIconRow[]>(() => {
+  const result: CustomIconRow[] = []
+  const list = filteredCustomIcons.value
+  for (let i = 0; i < list.length; i += COLS) {
+    result.push({ id: i, icons: list.slice(i, i + COLS) })
+  }
+  return result
+})
+
+const activeCount = computed(() => (activeSource.value === 'lucide' ? filteredIcons.value.length : filteredCustomIcons.value.length))
+const searchPlaceholder = computed(() => (activeSource.value === 'lucide' ? 'Search Lucide icons...' : 'Search custom icons...'))
+const customIconsSearching = computed(
+  () =>
+    serverSearchLoading.value ||
+    (activeSource.value === 'custom' && catalogTruncated.value && !!query.value.trim() && serverSearchResults.value.length === 0),
+)
 
 // ── Picker state ──────────────────────────────────────────────────────────
 
@@ -109,7 +184,10 @@ function handleViewportChange() {
 }
 
 function toggle() {
-  if (!open.value) positionPanel()
+  if (!open.value) {
+    activeSource.value = customIconSlugFromValue(props.modelValue) ? 'custom' : 'lucide'
+    positionPanel()
+  }
   open.value = !open.value
 }
 
@@ -125,6 +203,7 @@ watch(open, (isOpen) => {
       searchRef.value?.focus()
       window.addEventListener('resize', handleViewportChange)
       window.visualViewport?.addEventListener('resize', handleViewportChange)
+      void ensureCustomIconsLoaded().catch(() => undefined)
     })
   }
 })
@@ -134,8 +213,29 @@ function select(name: string) {
   open.value = false
 }
 
+function selectCustom(icon: CustomIcon) {
+  const value = customIconValue(icon.slug)
+  emit('update:modelValue', value === props.modelValue ? '' : value)
+  open.value = false
+}
+
 function clearValue() {
   emit('update:modelValue', '')
+}
+
+function clearQuery() {
+  query.value = ''
+}
+
+function selectLucideTab() {
+  activeSource.value = 'lucide'
+  query.value = ''
+}
+
+function selectCustomTab() {
+  activeSource.value = 'custom'
+  query.value = ''
+  void ensureCustomIconsLoaded().catch(() => undefined)
 }
 
 // ── Click outside ─────────────────────────────────────────────────────────
@@ -151,9 +251,12 @@ watch(open, (isOpen) => {
   else document.removeEventListener('mousedown', handleOutsideClick)
 })
 
-onUnmounted(() => document.removeEventListener('mousedown', handleOutsideClick))
-onUnmounted(() => window.removeEventListener('resize', handleViewportChange))
-onUnmounted(() => window.visualViewport?.removeEventListener('resize', handleViewportChange))
+onUnmounted(() => {
+  document.removeEventListener('mousedown', handleOutsideClick)
+  window.removeEventListener('resize', handleViewportChange)
+  window.visualViewport?.removeEventListener('resize', handleViewportChange)
+  if (serverSearchTimer) clearTimeout(serverSearchTimer)
+})
 </script>
 
 <template>
@@ -165,7 +268,7 @@ onUnmounted(() => window.visualViewport?.removeEventListener('resize', handleVie
     class="h-9 flex items-center justify-center gap-2 rounded-md border border-input bg-background shadow-xs text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
     :class="[!hideText ? 'w-full px-3' : '', hideText && modelValue ? 'w-9 px-0' : '', hideText && !modelValue ? 'px-3 whitespace-nowrap' : '']"
   >
-    <component v-if="selectedIconComponent" :is="selectedIconComponent" :size="16" class="shrink-0" />
+    <AppIcon v-if="modelValue" :icon="modelValue" :size="16" class="shrink-0" />
 
     <template v-if="!modelValue">
       <span v-if="!hideText" class="text-muted-foreground flex-1 text-left font-normal truncate">
@@ -184,7 +287,7 @@ onUnmounted(() => window.visualViewport?.removeEventListener('resize', handleVie
     </template>
 
     <template v-else-if="!hideText">
-      <span class="flex-1 text-left text-foreground truncate">{{ modelValue }}</span>
+      <span class="flex-1 text-left text-foreground truncate">{{ selectedLabel }}</span>
       <button
         type="button"
         @click.stop="clearValue"
@@ -208,32 +311,55 @@ onUnmounted(() => window.visualViewport?.removeEventListener('resize', handleVie
         @focusin.stop
         @focusout.stop
       >
-        <!-- Search bar -->
-        <div class="flex items-center gap-2 px-3 py-2.5 border-b border-border shrink-0">
-          <Search :size="13" class="text-muted-foreground shrink-0" />
-          <input
-            ref="searchRef"
-            v-model="query"
-            type="text"
-            placeholder="Search icons..."
-            class="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
-          />
-          <div class="flex items-center gap-2 shrink-0">
-            <span class="text-[11px] text-muted-foreground/80">{{ filteredIcons.length.toLocaleString() }}</span>
-            <button v-if="query" type="button" @click="query = ''" class="text-muted-foreground hover:text-foreground transition-colors">
-              <X :size="13" />
+        <div class="border-b border-border shrink-0">
+          <div class="grid grid-cols-2 gap-1 px-2.5 pt-2">
+            <button
+              type="button"
+              class="h-8 rounded-md text-xs font-medium transition-colors"
+              :class="activeSource === 'lucide' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
+              @click="selectLucideTab"
+            >
+              Lucide
             </button>
+            <button
+              type="button"
+              class="h-8 rounded-md text-xs font-medium transition-colors"
+              :class="activeSource === 'custom' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
+              @click="selectCustomTab"
+            >
+              Custom
+            </button>
+          </div>
+          <div class="flex items-center gap-2 px-3 py-2 border-border shrink-0">
+            <Search :size="13" class="text-muted-foreground shrink-0" />
+            <input
+              ref="searchRef"
+              v-model="query"
+              type="text"
+              :placeholder="searchPlaceholder"
+              class="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
+            />
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="text-[11px] text-muted-foreground/80">{{ activeCount.toLocaleString() }}</span>
+              <button v-if="query" type="button" class="text-muted-foreground hover:text-foreground transition-colors" @click="clearQuery">
+                <X :size="13" />
+              </button>
+            </div>
           </div>
         </div>
 
         <!-- No results -->
-        <div v-if="filteredIcons.length === 0" class="flex items-center justify-center py-12 text-xs text-muted-foreground">
-          No icons match "{{ query }}"
+        <div v-if="activeCount === 0" class="flex items-center justify-center py-12 text-xs text-muted-foreground">
+          <span v-if="activeSource === 'custom' && (customIconsLoading || customIconsSearching)">Searching...</span>
+          <span v-else-if="query">No icons match "{{ query }}"</span>
+          <span v-else-if="activeSource === 'custom' && catalogTruncated">Type to search all icons</span>
+          <span v-else-if="activeSource === 'custom'">No custom icons uploaded</span>
+          <span v-else>No icons available</span>
         </div>
 
         <!-- Virtual icon grid -->
         <RecycleScroller
-          v-else
+          v-else-if="activeSource === 'lucide'"
           class="overflow-y-auto px-2 py-1.5"
           :style="{ height: `${gridHeight}px` }"
           :items="rows"
@@ -255,6 +381,38 @@ onUnmounted(() => window.visualViewport?.removeEventListener('resize', handleVie
                   </button>
                 </TooltipTrigger>
                 <TooltipContent class="z-300">{{ name }}</TooltipContent>
+              </Tooltip>
+            </div>
+          </template>
+        </RecycleScroller>
+
+        <RecycleScroller
+          v-else
+          class="overflow-y-auto px-2 py-1.5"
+          :style="{ height: `${gridHeight}px` }"
+          :items="customRows"
+          :item-size="ROW_HEIGHT"
+          key-field="id"
+        >
+          <template #default="{ item }">
+            <div class="flex gap-0.5">
+              <Tooltip v-for="icon in item.icons" :key="icon.slug">
+                <TooltipTrigger as-child>
+                  <button
+                    type="button"
+                    :style="{ width: `calc(100% / ${COLS})`, aspectRatio: '1' }"
+                    class="flex items-center justify-center rounded-md transition-colors"
+                    :class="
+                      modelValue === customIconValue(icon.slug)
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    "
+                    @click="selectCustom(icon)"
+                  >
+                    <AppIcon :icon="customIconValue(icon.slug)" :size="16" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent class="z-300">{{ icon.name }}</TooltipContent>
               </Tooltip>
             </div>
           </template>

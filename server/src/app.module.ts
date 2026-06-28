@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 
 import { appConfig, authConfig, dbConfig, emailConfig, fileWriteConfig, migrationConfig, oidcRuntimeConfig, storageConfig } from './config/config';
@@ -14,6 +14,7 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { LibraryAccessGuard } from './common/guards/library-access.guard';
 import { PermissionGuard } from './common/guards/permission.guard';
+import { SensitiveEndpointThrottlerGuard } from './common/guards/sensitive-endpoint-throttler.guard';
 import { DbModule } from './db/db.module';
 import { AnnotationModule } from './modules/annotation/annotation.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
@@ -64,6 +65,7 @@ import { ReleaseNotesModule } from './modules/release-notes/release-notes.module
 import { AchievementModule } from './modules/achievement/achievement.module';
 import { HardcoverModule } from './modules/hardcover/hardcover.module';
 import { CustomMetadataModule } from './modules/custom-metadata/custom-metadata.module';
+import { CustomIconModule } from './modules/custom-icon/custom-icon.module';
 
 @Module({
   imports: [
@@ -107,6 +109,7 @@ import { CustomMetadataModule } from './modules/custom-metadata/custom-metadata.
     MetadataFetchModule,
     MetadataPreferencesModule,
     CustomMetadataModule,
+    CustomIconModule,
     RecommendationModule,
     KoboModule,
     OpdsModule,
@@ -138,8 +141,8 @@ import { CustomMetadataModule } from './modules/custom-metadata/custom-metadata.
     HardcoverModule,
   ],
   providers: [
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
+    { provide: APP_GUARD, useClass: SensitiveEndpointThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionGuard },
     { provide: APP_GUARD, useClass: LibraryAccessGuard },

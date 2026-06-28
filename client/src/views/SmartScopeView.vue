@@ -439,6 +439,7 @@ defineOptions({ name: 'SmartScopeView' })
       <ViewHeader
         :title="smartScope?.name ?? 'SmartScope'"
         :icon="smartScope?.icon ?? undefined"
+        fallback-icon="Aperture"
         :total="total"
         v-model:coverSize="coverSize"
         v-model:gridGap="gridGap"

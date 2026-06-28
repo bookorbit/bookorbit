@@ -556,6 +556,7 @@ defineOptions({ name: 'HomeView' })
       <ViewHeader
         :title="title"
         :icon="libraryIcon"
+        fallback-icon="BookOpen"
         :total="total"
         v-model:coverSize="coverSize"
         v-model:gridGap="gridGap"

@@ -195,6 +195,12 @@ const getBackground = (doc) => {
     : bodyStyle.background
 }
 
+export const getPageProgressionRtl = (bookDir, contentRtl) => {
+  if (bookDir === 'rtl') return true
+  if (bookDir === 'ltr') return false
+  return contentRtl
+}
+
 const makeMarginals = (length, part) =>
   Array.from({ length }, () => {
     const div = document.createElement('div')
@@ -682,7 +688,8 @@ export class Paginator extends HTMLElement {
   }
   #beforeRender({ vertical, rtl, background }) {
     this.#vertical = vertical
-    this.#rtl = rtl
+    const pageProgressionRtl = getPageProgressionRtl(this.bookDir, rtl)
+    this.#rtl = pageProgressionRtl
     this.#top.classList.toggle('vertical', vertical)
 
     // set background to `doc` background
@@ -735,13 +742,13 @@ export class Paginator extends HTMLElement {
 
     const divisor = Math.min(maxColumnCount, Math.ceil(size / maxInlineSize))
     const columnWidth = size / divisor - gap
-    this.setAttribute('dir', rtl ? 'rtl' : 'ltr')
+    this.setAttribute('dir', pageProgressionRtl ? 'rtl' : 'ltr')
 
     const marginalDivisor = vertical ? Math.min(2, Math.ceil(width / maxInlineSize)) : divisor
     const marginalStyle = {
       gridTemplateColumns: `repeat(${marginalDivisor}, 1fr)`,
       gap: `${gap}px`,
-      direction: this.bookDir === 'rtl' ? 'rtl' : 'ltr',
+      direction: pageProgressionRtl ? 'rtl' : 'ltr',
     }
     Object.assign(this.#header.style, marginalStyle)
     Object.assign(this.#footer.style, marginalStyle)
