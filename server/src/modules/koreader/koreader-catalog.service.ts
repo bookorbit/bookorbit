@@ -38,6 +38,34 @@ import { OpdsBookEntry, OpdsBookService } from '../opds/opds-book.service';
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import { KoreaderCatalogBooksQueryDto } from './dto/koreader-catalog-query.dto';
 
+function stripLoneSurrogates(value: string): string {
+  let out = '';
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        out += value[i] + value[i + 1];
+        i += 1;
+      }
+      continue;
+    }
+    if (code >= 0xdc00 && code <= 0xdfff) continue;
+    out += value[i];
+  }
+  return out;
+}
+
+function encodeFilenameStar(value: string): string | null {
+  try {
+    const cleaned = stripLoneSurrogates(value);
+    if (!cleaned) return null;
+    return encodeURIComponent(cleaned).replace(/[!'()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+  } catch {
+    return null;
+  }
+}
+
 type OpdsSortOrder = Parameters<OpdsBookService['getBooksPage']>[1];
 type BookProgressRow = Awaited<ReturnType<BookReadService['findProgressByBook']>>[number];
 type ProgressCandidate = BookProgressRow & { percentage: number; updatedAt: Date };
@@ -251,10 +279,13 @@ export class KoreaderCatalogService {
     const detail = await this.bookService.getDetail(file.bookId, user);
     const format = this.normalizeFormat(file.format);
     const filename = this.downloadFilename(detail, fileId, format);
+    const asciiFilename = filename.replace(/[^\x20-\x7E]|["\\]/g, '_') || 'download';
+    const encodedFilename = encodeFilenameStar(filename);
 
     try {
       const { size } = await stat(file.absolutePath);
-      reply.header('Content-Disposition', `attachment; filename*=utf-8''${encodeURIComponent(filename)}`);
+      const disposition = `attachment; filename="${asciiFilename}"`;
+      reply.header('Content-Disposition', encodedFilename ? `${disposition}; filename*=utf-8''${encodedFilename}` : disposition);
       reply.header('Content-Length', size);
       reply.type(fileMimeType(format));
       reply.send(createReadStream(file.absolutePath));
