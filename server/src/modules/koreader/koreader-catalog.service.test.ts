@@ -92,6 +92,7 @@ function makeService() {
     getDistinctAuthorsPage: vi.fn().mockResolvedValue({ items: [{ name: 'Frank Herbert', bookCount: 2 }], hasNext: false }),
     getDistinctSeriesPage: vi.fn().mockResolvedValue({ items: [{ name: 'Dune', bookCount: 6 }], hasNext: false }),
     getBooksPage: vi.fn().mockResolvedValue({ entries: [], total: 0 }),
+    getRandomBooks: vi.fn().mockResolvedValue([]),
   };
   const bookService = {
     getDetail: vi.fn().mockResolvedValue(makeDetail()),
@@ -130,16 +131,30 @@ function makeService() {
     findByBookIds: vi.fn().mockResolvedValue(new Map([[10, { status: 'reading' }]])),
     setManual: vi.fn().mockResolvedValue(undefined),
   };
+  const dashboardWidgetService = {
+    getReadingGoal: vi.fn().mockResolvedValue({ goalBooks: 24, completedBooks: 6, year: 2026 }),
+    getReadingStreak: vi.fn().mockResolvedValue({ currentStreak: 4, longestStreak: 9, lastSevenDays: [true, false, true, true, true, false, true] }),
+    getHighlightOfTheDay: vi.fn().mockResolvedValue({
+      text: 'Fear is the mind-killer.',
+      note: null,
+      bookTitle: 'Dune',
+      bookId: 10,
+      hasCover: true,
+      chapterTitle: 'Chapter 1',
+      createdAt: '2026-03-01T00:00:00.000Z',
+    }),
+  };
 
   const service = new KoreaderCatalogService(
     opdsBookService as never,
     bookService as never,
     bookReadService as never,
     userBookStatusService as never,
+    dashboardWidgetService as never,
     { appDataPath: '/data', bookDockPath: '/data/book-dock' },
   );
 
-  return { service, opdsBookService, bookService, bookReadService, userBookStatusService };
+  return { service, opdsBookService, bookService, bookReadService, userBookStatusService, dashboardWidgetService };
 }
 
 describe('KoreaderCatalogService', () => {
@@ -174,6 +189,95 @@ describe('KoreaderCatalogService', () => {
         booksHref: '/api/v1/koreader/plugin/catalog/books?sort=recently_read&readStatus=reading',
       }),
     );
+  });
+
+  it('builds a capped dashboard payload from catalog and widget data', async () => {
+    const { service, opdsBookService, dashboardWidgetService } = makeService();
+    const user = makeUser({ id: 7 });
+    opdsBookService.getBooksPage.mockResolvedValueOnce({
+      total: 1,
+      entries: [
+        {
+          id: 10,
+          title: 'Dune',
+          folderPath: '/books/dune',
+          addedAt: new Date('2026-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2026-02-01T00:00:00.000Z'),
+          description: null,
+          seriesName: 'Dune',
+          seriesIndex: 1,
+          language: 'en',
+          publisher: 'Ace',
+          isbn13: null,
+          hasCover: true,
+          authors: ['Frank Herbert'],
+          files: [{ id: 100, format: 'epub' }],
+        },
+      ],
+    });
+
+    opdsBookService.getRandomBooks.mockResolvedValueOnce([
+      {
+        id: 22,
+        title: 'Neuromancer',
+        folderPath: '/books/neuromancer',
+        addedAt: new Date('2026-01-05T00:00:00.000Z'),
+        updatedAt: new Date('2026-02-05T00:00:00.000Z'),
+        description: null,
+        seriesName: null,
+        seriesIndex: null,
+        language: 'en',
+        publisher: 'Ace',
+        isbn13: null,
+        hasCover: true,
+        authors: ['William Gibson'],
+        files: [{ id: 200, format: 'epub' }],
+      },
+    ]);
+
+    const dashboard = await service.getDashboard(user);
+
+    expect(opdsBookService.getBooksPage).toHaveBeenCalledWith(7, 'recently_read', 1, 5, { readStatus: 'reading' }, false, user.contentFilters);
+    expect(opdsBookService.getRandomBooks).toHaveBeenCalledWith(7, 8, false, user.contentFilters);
+    expect(dashboard.sections.map((section) => section.id)).toContain('all-books');
+    expect(dashboard.continueReading[0]).toEqual(expect.objectContaining({ id: 10, progressPercentage: 47.4, readStatus: 'reading' }));
+    expect(dashboard.discover[0]).toEqual(expect.objectContaining({ id: 22, title: 'Neuromancer' }));
+    expect(dashboard.readingGoal).toEqual({ goalBooks: 24, completedBooks: 6, year: 2026 });
+    expect(dashboard.readingStreak.currentStreak).toBe(4);
+    expect(dashboard.highlightOfTheDay?.bookId).toBe(10);
+    expect(dashboard.generatedAt).toEqual(expect.any(String));
+    expect(dashboardWidgetService.getReadingGoal).toHaveBeenCalledWith(user);
+    expect(dashboardWidgetService.getReadingStreak).toHaveBeenCalledWith(user);
+    expect(dashboardWidgetService.getHighlightOfTheDay).toHaveBeenCalledWith(user);
+  });
+
+  it('rerolls discover books via getDiscover', async () => {
+    const { service, opdsBookService } = makeService();
+    const user = makeUser({ id: 7 });
+    opdsBookService.getRandomBooks.mockResolvedValueOnce([
+      {
+        id: 33,
+        title: 'Frankenstein',
+        folderPath: '/books/frankenstein',
+        addedAt: new Date('2026-01-09T00:00:00.000Z'),
+        updatedAt: new Date('2026-02-09T00:00:00.000Z'),
+        description: null,
+        seriesName: null,
+        seriesIndex: null,
+        language: 'en',
+        publisher: 'Lackington',
+        isbn13: null,
+        hasCover: true,
+        authors: ['Mary Shelley'],
+        files: [{ id: 300, format: 'epub' }],
+      },
+    ]);
+
+    const result = await service.getDiscover(user);
+
+    expect(opdsBookService.getRandomBooks).toHaveBeenCalledWith(7, 8, false, user.contentFilters);
+    expect(result.discover).toHaveLength(1);
+    expect(result.discover[0]).toEqual(expect.objectContaining({ id: 33, title: 'Frankenstein' }));
   });
 
   it('forwards read-status, format, and id filters to the books query', async () => {

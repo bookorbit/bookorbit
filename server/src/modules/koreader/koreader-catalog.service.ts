@@ -9,6 +9,8 @@ import type { FastifyReply } from 'fastify';
 import type {
   KoreaderCatalogBookDetail,
   KoreaderCatalogBookListItem,
+  KoreaderCatalogDashboardResponse,
+  KoreaderCatalogDiscoverResponse,
   KoreaderCatalogEntry,
   KoreaderCatalogFile,
   KoreaderCatalogPage,
@@ -30,6 +32,7 @@ import { storageConfig } from '../../config/config';
 import { BookReadService } from '../book/book-read.service';
 import { BookService } from '../book/book.service';
 import type { BookDetailDto } from '../book/dto/book-detail.dto';
+import { DashboardWidgetService } from '../dashboard/dashboard-widget.service';
 import { fileMimeType } from '../opds/opds-xml.helpers';
 import { OpdsBookEntry, OpdsBookService } from '../opds/opds-book.service';
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
@@ -43,6 +46,8 @@ type BatchProgressCandidate = BatchProgressRow & { percentage: number; updatedAt
 
 const CATALOG_BASE = '/api/v1/koreader/plugin/catalog';
 const AUTHOR_SERIES_PAGE_SIZE = 60;
+const DASHBOARD_CONTINUE_READING_LIMIT = 5;
+const DASHBOARD_DISCOVER_LIMIT = 8;
 
 const NATURAL_SORT_ORDER: Record<KoreaderCatalogSort, KoreaderCatalogSortOrder> = {
   title: 'asc',
@@ -111,11 +116,55 @@ export class KoreaderCatalogService {
     private readonly bookService: BookService,
     private readonly bookReadService: BookReadService,
     private readonly userBookStatusService: UserBookStatusService,
+    private readonly dashboardWidgetService: DashboardWidgetService,
     @Inject(storageConfig.KEY) private readonly storage: ConfigType<typeof storageConfig>,
   ) {}
 
   getRoot(): { sections: KoreaderCatalogEntry[] } {
     return { sections: ROOT_SECTIONS.map((section) => ({ ...section })) };
+  }
+
+  async getDashboard(user: RequestUser): Promise<KoreaderCatalogDashboardResponse> {
+    const continueReadingQuery = Object.assign(new KoreaderCatalogBooksQueryDto(), {
+      page: 1,
+      size: DASHBOARD_CONTINUE_READING_LIMIT,
+      sort: 'recently_read' as const,
+      readStatus: 'reading' as const,
+    });
+
+    const [continueReading, discover, readingGoal, readingStreak, highlightOfTheDay] = await Promise.all([
+      this.getBooksPage(user, continueReadingQuery),
+      this.buildDiscover(user),
+      this.dashboardWidgetService.getReadingGoal(user),
+      this.dashboardWidgetService.getReadingStreak(user),
+      this.dashboardWidgetService.getHighlightOfTheDay(user),
+    ]);
+
+    return {
+      generatedAt: new Date().toISOString(),
+      sections: ROOT_SECTIONS.map((section) => ({ ...section })),
+      continueReading: continueReading.items,
+      discover,
+      readingGoal,
+      readingStreak,
+      highlightOfTheDay,
+    };
+  }
+
+  async getDiscover(user: RequestUser): Promise<KoreaderCatalogDiscoverResponse> {
+    return { discover: await this.buildDiscover(user) };
+  }
+
+  private async buildDiscover(user: RequestUser): Promise<KoreaderCatalogBookListItem[]> {
+    const entries = await this.opdsBookService.getRandomBooks(user.id, DASHBOARD_DISCOVER_LIMIT, user.isSuperuser, user.contentFilters);
+    if (entries.length === 0) return [];
+
+    const bookIds = entries.map((entry) => entry.id);
+    const [progressMap, statusMap] = await Promise.all([
+      this.findBestProgressMap(user.id, bookIds),
+      this.userBookStatusService.findByBookIds(user.id, bookIds),
+    ]);
+    return entries.map((entry) => this.mapBookListItem(entry, progressMap.get(entry.id) ?? null, statusMap.get(entry.id)?.status ?? null));
   }
 
   async getSectionEntries(user: RequestUser, section: string, query: { page?: number; q?: string } = {}): Promise<KoreaderCatalogSectionResponse> {

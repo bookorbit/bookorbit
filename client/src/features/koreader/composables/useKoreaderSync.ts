@@ -64,7 +64,7 @@ export function useKoreaderSync() {
   }
 
   function getSyncUrl(): string {
-    return `${window.location.origin}/api/v1/koreader`
+    return window.location.origin
   }
 
   async function downloadPluginPackage(): Promise<void> {

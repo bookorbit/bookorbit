@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -10,6 +10,7 @@ import { KoboBookAccessService } from './kobo-book-access.service';
 import { KoboBookIdentityService } from './kobo-book-identity.service';
 import { KoboProgressBridgeService } from './kobo-progress-bridge.service';
 import { KoboSettingsService } from './kobo-settings.service';
+import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 
 type Db = NodePgDatabase<typeof schema>;
 type JsonObj = Record<string, unknown>;
@@ -46,6 +47,8 @@ function maxIsoTimestamp(...values: (string | null | undefined)[]): string | nul
 
 @Injectable()
 export class KoboReadingStateService {
+  private readonly logger = new Logger(KoboReadingStateService.name);
+
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly bookAccessService: KoboBookAccessService,
@@ -163,7 +166,7 @@ export class KoboReadingStateService {
         );
         await this.markSnapshotBookUnsynced(userId, bookId);
       }
-      void this.userBookStatusService.autoUpdate(userId, bookId, percent, readingThreshold, finishedThreshold);
+      await this.autoUpdateReadStatus(userId, bookId, percent, readingThreshold, finishedThreshold);
       this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, {
         userId,
         bookId,
@@ -173,6 +176,24 @@ export class KoboReadingStateService {
     }
 
     return this.getRawState(userId, bookId);
+  }
+
+  private async autoUpdateReadStatus(
+    userId: number,
+    bookId: number,
+    percent: number,
+    readingThreshold: number,
+    finishedThreshold: number,
+  ): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      await this.userBookStatusService.autoUpdate(userId, bookId, percent, readingThreshold, finishedThreshold);
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.logger.warn(
+        `[kobo.reading_state_status_update] [fail] userId=${userId} bookId=${bookId} durationMs=${Date.now() - startedAt} errorClass=${err.constructor.name} error="${sanitizeLogValue(err.message)}" - auto status update failed`,
+      );
+    }
   }
 
   async getRawState(userId: number, bookId: number): Promise<unknown> {

@@ -6,6 +6,7 @@ the plugin zip from the BookOrbit server and atomically replaces the current
 plugin directory. KOReader must be restarted for the new files to load.
 ]]
 
+local Device = require("device")
 local lfs = require("libs/libkoreader-lfs")
 
 local BookOrbitUpdater = {}
@@ -63,21 +64,28 @@ function BookOrbitUpdater.apply(api, plugin_dir, progress_cb)
         return nil, tostring(err or "download failed")
     end
 
-    -- Extract into a staging directory so a partial unzip never touches the
-    -- live plugin directory.
-    local ret = os.execute("unzip -o " .. sq(tmp_zip) .. " -d " .. sq(staging))
-    os.remove(tmp_zip)
-
-    if ret ~= 0 then
-        os.execute("rm -rf " .. sq(staging))
-        return nil, "unzip failed with exit code " .. tostring(ret)
+    if not lfs.mkdir(staging) and lfs.attributes(staging, "mode") ~= "directory" then
+        os.remove(tmp_zip)
+        return nil, "could not create update staging directory"
     end
 
-    -- The zip must contain exactly the plugin folder as its top-level entry.
-    local extracted = staging .. "/" .. plugin_name
-    if lfs.attributes(extracted, "mode") ~= "directory" then
+    -- Extract into a staging directory so a partial unpack never touches the
+    -- live plugin directory. Use KOReader's archive helper instead of the
+    -- platform unzip command: unzip warning exit codes vary by platform.
+    local ok_unpack, unpack_err = Device:unpackArchive(tmp_zip, staging, true)
+    os.remove(tmp_zip)
+
+    if not ok_unpack then
         os.execute("rm -rf " .. sq(staging))
-        return nil, "update zip does not contain expected directory: " .. plugin_name
+        return nil, tostring(unpack_err or "archive extraction failed")
+    end
+
+    -- The zip must contain the plugin folder as its top-level entry. We strip
+    -- that root during extraction, so the staging directory should now look
+    -- like the plugin directory itself.
+    if lfs.attributes(staging .. "/main.lua", "mode") ~= "file" then
+        os.execute("rm -rf " .. sq(staging))
+        return nil, "update zip does not contain expected plugin files: " .. plugin_name
     end
 
     -- Atomic-ish swap (all paths share the same filesystem):
@@ -89,7 +97,7 @@ function BookOrbitUpdater.apply(api, plugin_dir, progress_cb)
         os.execute("rm -rf " .. sq(staging))
         return nil, "could not create plugin backup"
     end
-    if not os.rename(extracted, dir) then
+    if not os.rename(staging, dir) then
         -- Restore backup so the plugin remains usable.
         os.rename(backup, dir)
         os.execute("rm -rf " .. sq(staging))

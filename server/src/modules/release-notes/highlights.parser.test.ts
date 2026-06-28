@@ -159,9 +159,29 @@ describe('parseHighlights', () => {
     expect(parseHighlights(body)).toEqual([]);
   });
 
-  it('stops at the next heading or horizontal rule', () => {
-    const body = ['## Highlights', '- **One** - first.', '', '---', '**Docker**', '- not a highlight'].join('\n');
-    expect(parseHighlights(body)).toEqual([{ icon: null, title: 'One', body: 'first.', media: [] }]);
+  it('stops at the next heading but NOT at a horizontal rule', () => {
+    const body = ['## Highlights', '- **One** - first.', '', '---', '', '- **Two** - second.', '', '### Features', '- not a highlight'].join('\n');
+    expect(parseHighlights(body).map((h) => h.title)).toEqual(['One', 'Two']);
+  });
+
+  it('parses multiple highlights separated by horizontal rules (v2.0.0 format)', () => {
+    const body = [
+      '## Highlights',
+      '- **A** - first. <!-- icon: Zap -->',
+      '',
+      '---',
+      '',
+      '- **B** - second. <!-- icon: Star -->',
+      '',
+      '---',
+      '',
+      '### Features',
+      '- a feature',
+    ].join('\n');
+    const result = parseHighlights(body);
+    expect(result.map((h) => h.title)).toEqual(['A', 'B']);
+    expect(result[0].icon).toBe('Zap');
+    expect(result[1].icon).toBe('Star');
   });
 
   it('parses CRLF bodies (GitHub web-editor line endings)', () => {
@@ -182,6 +202,11 @@ describe('parseHighlights', () => {
 describe('stripHighlightsSection', () => {
   it('removes the Highlights block but keeps the changelog', () => {
     const body = ['## Highlights', '- **A** - one.', '', '### Features', '- a feature'].join('\n');
+    expect(stripHighlightsSection(body)).toBe('### Features\n- a feature');
+  });
+
+  it('strips the full Highlights block when bullets are separated by horizontal rules', () => {
+    const body = ['## Highlights', '- **A** - one.', '', '---', '', '- **B** - two.', '', '### Features', '- a feature'].join('\n');
     expect(stripHighlightsSection(body)).toBe('### Features\n- a feature');
   });
 

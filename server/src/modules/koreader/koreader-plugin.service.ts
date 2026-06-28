@@ -154,7 +154,7 @@ export class KoreaderPluginService {
         const stale = await this.isStaleProgress(user.id, match.bookFileId, item.timestamp);
         await this.koreaderService.applyProgressForResolvedFile(
           user.id,
-          { id: match.bookFileId, bookId: match.bookId, primaryFileId: match.primaryFileId },
+          { id: match.bookFileId, bookId: match.bookId, libraryId: match.libraryId, primaryFileId: match.primaryFileId },
           {
             percentage: item.percentage,
             progress: item.progress,

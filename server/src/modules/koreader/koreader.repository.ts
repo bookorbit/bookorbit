@@ -6,6 +6,7 @@ import { DB } from '../../db';
 import * as schema from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
+type ResolvedBookFileByHash = { id: number; bookId: number; libraryId: number; primaryFileId: number | null };
 
 @Injectable()
 export class KoreaderRepository {
@@ -36,13 +37,18 @@ export class KoreaderRepository {
     await this.db.delete(schema.koreaderUsers).where(eq(schema.koreaderUsers.userId, userId));
   }
 
-  async resolveBookFileByHash(hash: string, accessibleLibraryIds: number[] | null): Promise<{ id: number; bookId: number; primaryFileId: number | null } | null> {
+  async resolveBookFileByHash(hash: string, accessibleLibraryIds: number[] | null): Promise<ResolvedBookFileByHash | null> {
     if (accessibleLibraryIds !== null && accessibleLibraryIds.length === 0) return null;
 
     const libraryFilter = accessibleLibraryIds ? inArray(schema.books.libraryId, accessibleLibraryIds) : undefined;
 
     const [byFileHash] = await this.db
-      .select({ id: schema.bookFiles.id, bookId: schema.bookFiles.bookId, primaryFileId: schema.books.primaryFileId })
+      .select({
+        id: schema.bookFiles.id,
+        bookId: schema.bookFiles.bookId,
+        libraryId: schema.books.libraryId,
+        primaryFileId: schema.books.primaryFileId,
+      })
       .from(schema.bookFiles)
       .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
       .where(and(eq(schema.bookFiles.fileHash, hash), libraryFilter))
@@ -51,7 +57,12 @@ export class KoreaderRepository {
     if (byFileHash) return byFileHash;
 
     const [byFileHashHistory] = await this.db
-      .select({ id: schema.bookFiles.id, bookId: schema.bookFiles.bookId, primaryFileId: schema.books.primaryFileId })
+      .select({
+        id: schema.bookFiles.id,
+        bookId: schema.bookFiles.bookId,
+        libraryId: schema.books.libraryId,
+        primaryFileId: schema.books.primaryFileId,
+      })
       .from(schema.bookFileHashHistory)
       .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.bookFileHashHistory.bookFileId))
       .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))

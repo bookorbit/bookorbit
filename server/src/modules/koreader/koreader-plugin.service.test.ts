@@ -183,7 +183,7 @@ describe('KoreaderPluginService', () => {
 
       expect(koreaderService.applyProgressForResolvedFile).toHaveBeenCalledWith(
         7,
-        { id: 10, bookId: 20 },
+        { id: 10, bookId: 20, libraryId: 1 },
         {
           percentage: 0.5,
           progress: '/body/DocFragment[3]/body',
@@ -201,7 +201,7 @@ describe('KoreaderPluginService', () => {
 
       await service.bulkProgress(makeUser(), progressDto([{ hash: HASH_A, percentage: 0.2, timestamp: 1700000000 }]));
 
-      expect(koreaderService.applyProgressForResolvedFile).toHaveBeenCalledWith(7, { id: 10, bookId: 20 }, expect.any(Object), {
+      expect(koreaderService.applyProgressForResolvedFile).toHaveBeenCalledWith(7, { id: 10, bookId: 20, libraryId: 1 }, expect.any(Object), {
         skipSharedProgress: true,
       });
     });
@@ -211,7 +211,7 @@ describe('KoreaderPluginService', () => {
 
       await service.bulkProgress(makeUser(), progressDto([{ hash: HASH_A, percentage: 0.2 }]));
 
-      expect(koreaderService.applyProgressForResolvedFile).toHaveBeenCalledWith(7, { id: 10, bookId: 20 }, expect.any(Object), {
+      expect(koreaderService.applyProgressForResolvedFile).toHaveBeenCalledWith(7, { id: 10, bookId: 20, libraryId: 1 }, expect.any(Object), {
         skipSharedProgress: false,
       });
     });

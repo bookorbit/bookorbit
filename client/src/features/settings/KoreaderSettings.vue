@@ -360,7 +360,7 @@ async function handleDownloadPlugin() {
           <div class="px-4 py-4 bg-card md:px-5">
             <div class="mb-2 flex items-center gap-2">
               <BookOpen :size="14" class="text-muted-foreground shrink-0" />
-              <p class="settings-label">Sync server URL</p>
+              <p class="settings-label">Plugin server URL</p>
             </div>
             <div class="flex flex-col gap-2 md:flex-row md:items-center">
               <input :value="syncUrl" readonly class="input-field flex-1 min-w-0 font-mono text-xs md:text-sm" />

@@ -11,7 +11,6 @@ import { KoreaderPackageService } from './koreader-package.service';
 import { KoreaderPluginRepository } from './koreader-plugin.repository';
 import { BookService } from '../book/book.service';
 import { PositionConverterService } from '../position-converter/position-converter.service';
-import { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED } from '../achievement/achievement-events.service';
 
 const BCRYPT_ROUNDS = 12;
@@ -28,7 +27,6 @@ export class KoreaderService {
     private readonly pluginRepo: KoreaderPluginRepository,
     private readonly chapterService: KoreaderChapterService,
     private readonly chapterExtractor: KoreaderChapterExtractorService,
-    private readonly userBookStatusService: UserBookStatusService,
     private readonly achievementEvents: AchievementEventsService,
     private readonly positionConverter: PositionConverterService,
     private readonly bookService: BookService,
@@ -145,7 +143,7 @@ export class KoreaderService {
 
   async applyProgressForResolvedFile(
     userId: number,
-    bookFile: { id: number; bookId: number; primaryFileId?: number | null },
+    bookFile: { id: number; bookId: number; libraryId: number; primaryFileId?: number | null },
     data: { percentage: number; progress?: string; device: string; deviceId: string; timestamp?: number },
     options?: { skipSharedProgress?: boolean },
   ) {
@@ -171,8 +169,7 @@ export class KoreaderService {
     const cfi = data.progress ? await this.convertProgressToCfi(targetFileId, data.progress) : null;
     await this.repo.upsertReadingProgress(targetFileId, userId, bookorbitPercentage, cfi, data.progress ?? null);
     await this.bookService.syncKoboReadingStateForExternalProgress(userId, targetFileId, bookorbitPercentage).catch(() => undefined);
-
-    await this.userBookStatusService.autoUpdate(userId, bookFile.bookId, bookorbitPercentage);
+    await this.bookService.autoUpdateReadStatusForProgress(userId, bookFile, bookorbitPercentage);
     this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, {
       userId,
       bookId: bookFile.bookId,

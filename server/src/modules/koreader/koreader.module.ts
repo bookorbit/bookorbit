@@ -4,6 +4,7 @@ import { CommonModule } from '../../common/common.module';
 import { AchievementModule } from '../achievement/achievement.module';
 import { AnnotationModule } from '../annotation/annotation.module';
 import { BookModule } from '../book/book.module';
+import { DashboardModule } from '../dashboard/dashboard.module';
 import { OpdsModule } from '../opds/opds.module';
 import { PositionConverterModule } from '../position-converter/position-converter.module';
 import { UserModule } from '../user/user.module';
@@ -25,7 +26,17 @@ import { KoreaderService } from './koreader.service';
 import { KoreaderStatsService } from './koreader-stats.service';
 
 @Module({
-  imports: [CommonModule, UserModule, UserBookStatusModule, AchievementModule, AnnotationModule, BookModule, OpdsModule, PositionConverterModule],
+  imports: [
+    CommonModule,
+    UserModule,
+    UserBookStatusModule,
+    AchievementModule,
+    AnnotationModule,
+    BookModule,
+    DashboardModule,
+    OpdsModule,
+    PositionConverterModule,
+  ],
   controllers: [KoreaderController, KoreaderPluginController, KoreaderCatalogController],
   providers: [
     KoreaderService,
