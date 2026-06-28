@@ -254,7 +254,7 @@ export class KoreaderCatalogService {
 
     try {
       const { size } = await stat(file.absolutePath);
-      reply.header('Content-Disposition', `attachment; filename="${filename}"`);
+      reply.header('Content-Disposition', `attachment; filename*=utf-8''${encodeURIComponent(filename)}`);
       reply.header('Content-Length', size);
       reply.type(fileMimeType(format));
       reply.send(createReadStream(file.absolutePath));

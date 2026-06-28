@@ -460,10 +460,56 @@ describe('KoreaderCatalogService', () => {
     await service.streamFile(makeUser({ permissions: [] }), 100, reply as never);
 
     expect(bookService.verifyFileAccess).toHaveBeenCalledWith(100, expect.objectContaining({ permissions: [] }));
-    expect(reply.header).toHaveBeenCalledWith('Content-Disposition', 'attachment; filename="Dune - Frank Herbert.epub"');
+    expect(reply.header).toHaveBeenCalledWith('Content-Disposition', "attachment; filename*=utf-8''Dune%20-%20Frank%20Herbert.epub");
     expect(reply.header).toHaveBeenCalledWith('Content-Length', 1234);
     expect(reply.type).toHaveBeenCalledWith('application/epub+zip');
     expect(mockCreateReadStream).toHaveBeenCalledWith('/books/dune.epub');
+  });
+
+  it('streams content files with non-ascii filenames', async () => {
+    const { service, bookService } = makeService();
+    const reply = makeReply();
+
+    bookService.verifyFileAccess.mockResolvedValueOnce({
+      id: 300,
+      role: 'content',
+      bookId: 33,
+      libraryId: 1,
+      absolutePath: '/books/人間失格.epub',
+      format: 'epub',
+    });
+
+    bookService.getDetail.mockResolvedValueOnce(
+      makeDetail({
+        id: 33,
+        title: '人間失格',
+        publisher: '筑摩書房',
+        authors: [{ id: 2, name: '太宰治', sortName: '太宰治' }],
+        files: [
+          {
+            id: 300,
+            format: 'epub',
+            role: 'primary',
+            sizeBytes: 1234,
+            absolutePath: '/books/人間失格.epub',
+            createdAt: new Date('2026-01-01T00:00:00.000Z'),
+            filename: '人間失格.epub',
+            durationSeconds: null,
+          },
+        ],
+      }),
+    );
+
+    await service.streamFile(makeUser({ permissions: [] }), 300, reply as never);
+
+    expect(bookService.verifyFileAccess).toHaveBeenCalledWith(300, expect.objectContaining({ permissions: [] }));
+    expect(reply.header).toHaveBeenCalledWith(
+      'Content-Disposition',
+      "attachment; filename*=utf-8''%E4%BA%BA%E9%96%93%E5%A4%B1%E6%A0%BC%20-%20%E5%A4%AA%E5%AE%B0%E6%B2%BB.epub",
+    );
+    expect(reply.header).toHaveBeenCalledWith('Content-Length', 1234);
+    expect(reply.type).toHaveBeenCalledWith('application/epub+zip');
+    expect(mockCreateReadStream).toHaveBeenCalledWith('/books/人間失格.epub');
   });
 
   it('rejects non-content file downloads and missing thumbnails', async () => {
