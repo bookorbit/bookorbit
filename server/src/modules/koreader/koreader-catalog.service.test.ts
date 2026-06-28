@@ -460,7 +460,10 @@ describe('KoreaderCatalogService', () => {
     await service.streamFile(makeUser({ permissions: [] }), 100, reply as never);
 
     expect(bookService.verifyFileAccess).toHaveBeenCalledWith(100, expect.objectContaining({ permissions: [] }));
-    expect(reply.header).toHaveBeenCalledWith('Content-Disposition', "attachment; filename*=utf-8''Dune%20-%20Frank%20Herbert.epub");
+    expect(reply.header).toHaveBeenCalledWith(
+      'Content-Disposition',
+      `attachment; filename="Dune - Frank Herbert.epub"; filename*=utf-8''Dune%20-%20Frank%20Herbert.epub`,
+    );
     expect(reply.header).toHaveBeenCalledWith('Content-Length', 1234);
     expect(reply.type).toHaveBeenCalledWith('application/epub+zip');
     expect(mockCreateReadStream).toHaveBeenCalledWith('/books/dune.epub');
@@ -505,7 +508,7 @@ describe('KoreaderCatalogService', () => {
     expect(bookService.verifyFileAccess).toHaveBeenCalledWith(300, expect.objectContaining({ permissions: [] }));
     expect(reply.header).toHaveBeenCalledWith(
       'Content-Disposition',
-      "attachment; filename*=utf-8''%E4%BA%BA%E9%96%93%E5%A4%B1%E6%A0%BC%20-%20%E5%A4%AA%E5%AE%B0%E6%B2%BB.epub",
+      `attachment; filename="____ - ___.epub"; filename*=utf-8''%E4%BA%BA%E9%96%93%E5%A4%B1%E6%A0%BC%20-%20%E5%A4%AA%E5%AE%B0%E6%B2%BB.epub`,
     );
     expect(reply.header).toHaveBeenCalledWith('Content-Length', 1234);
     expect(reply.type).toHaveBeenCalledWith('application/epub+zip');
