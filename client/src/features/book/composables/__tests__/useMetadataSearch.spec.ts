@@ -14,8 +14,8 @@ describe('useMetadataSearch', () => {
     apiMock.mockReset()
   })
 
-  function provider(key: MetadataProviderKey): MetadataProviderInfo {
-    return { key, label: key, identifiable: true }
+  function provider(key: MetadataProviderKey, selectedByFieldRules?: boolean): MetadataProviderInfo {
+    return { key, label: key, identifiable: true, ...(selectedByFieldRules !== undefined ? { selectedByFieldRules } : {}) }
   }
 
   function candidate(providerKey: MetadataProviderKey, providerId: string): MetadataCandidate {
@@ -62,6 +62,7 @@ describe('useMetadataSearch', () => {
 
     expect(apiMock).toHaveBeenCalledWith('/api/v1/metadata-fetch/providers')
     expect(state.providers.value).toEqual([provider(MetadataProviderKey.GOOGLE)])
+    expect(state.selectedProviders.value).toEqual([MetadataProviderKey.GOOGLE])
   })
 
   it('loads providers scoped to the current book', async () => {
@@ -73,6 +74,32 @@ describe('useMetadataSearch', () => {
     scope.stop()
 
     expect(apiMock).toHaveBeenCalledWith('/api/v1/metadata-fetch/providers?bookId=42')
+  })
+
+  it('selects all loaded providers by default and can switch to field rule providers', async () => {
+    apiMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [provider(MetadataProviderKey.GOOGLE, true), provider(MetadataProviderKey.LUBIMYCZYTAC, false)],
+      })
+      .mockResolvedValueOnce({ ok: false })
+
+    const scope = effectScope()
+    const state = scope.run(() => useMetadataSearch())!
+    await state.loadProviders(42)
+
+    expect(state.selectedProviders.value).toEqual([MetadataProviderKey.GOOGLE, MetadataProviderKey.LUBIMYCZYTAC])
+
+    state.selectFieldRuleProviders()
+    expect(state.selectedProviders.value).toEqual([MetadataProviderKey.GOOGLE])
+
+    state.selectAllProviders()
+    await state.search({ title: 'Dune', bookId: 42, isAudiobook: false })
+    scope.stop()
+
+    expect(apiMock).toHaveBeenLastCalledWith('/api/v1/metadata-fetch/stream?title=Dune&bookId=42&isAudiobook=false&providers=google%2Clubimyczytac', {
+      signal: expect.any(AbortSignal),
+    })
   })
 
   it('includes bookId in metadata stream searches', async () => {

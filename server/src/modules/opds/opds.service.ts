@@ -71,14 +71,14 @@ export class OpdsService {
     return this.wrapFeed('Authors', 'urn:bookorbit:authors', now, [xmlLink('self', `${BASE}/authors`, OPDS_MIME_NAV)], entries);
   }
 
-  generateSeriesNavigation(items: { name: string; bookCount: number }[]): string {
+  generateSeriesNavigation(items: { id?: number; name: string; bookCount: number }[]): string {
     const now = new Date().toISOString();
     const entries = items.map((s) =>
       this.navEntry(
-        `urn:bookorbit:series:${encodeURIComponent(s.name)}`,
+        `urn:bookorbit:series:${s.id ?? encodeURIComponent(s.name)}`,
         s.name,
         `${s.bookCount} books`,
-        `${BASE}/catalog?series=${encodeURIComponent(s.name)}`,
+        s.id != null ? `${BASE}/catalog?seriesId=${s.id}` : `${BASE}/catalog?series=${encodeURIComponent(s.name)}`,
         now,
       ),
     );
@@ -154,8 +154,10 @@ export class OpdsService {
     }
 
     if (book.seriesName) {
+      const seriesHref =
+        book.seriesId != null ? `${BASE}/catalog?seriesId=${book.seriesId}` : `${BASE}/catalog?series=${encodeURIComponent(book.seriesName)}`;
       lines.push(
-        `  <link rel="http://opds-spec.org/sort/series" href="${esc(BASE)}/catalog?series=${encodeURIComponent(book.seriesName)}" title="${esc(book.seriesName)}${book.seriesIndex != null ? ` #${book.seriesIndex}` : ''}"/>`,
+        `  <link rel="http://opds-spec.org/sort/series" href="${esc(seriesHref)}" title="${esc(book.seriesName)}${book.seriesIndex != null ? ` #${book.seriesIndex}` : ''}"/>`,
       );
     }
 

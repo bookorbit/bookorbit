@@ -107,8 +107,9 @@ describe('MetadataFetchController', () => {
     expect(service.getAccessibleBookLibraryId).toHaveBeenCalledWith(12, user);
     expect(pipeline.getEffectiveProviderKeys).toHaveBeenCalledWith(9);
     expect(result).toEqual([
-      { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true },
-      { key: MetadataProviderKey.KOBO, label: 'Kobo', identifiable: true },
+      { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true, selectedByFieldRules: true },
+      { key: MetadataProviderKey.OPEN_LIBRARY, label: 'OpenLibrary', identifiable: false, selectedByFieldRules: false },
+      { key: MetadataProviderKey.KOBO, label: 'Kobo', identifiable: true, selectedByFieldRules: true },
     ]);
   });
 
@@ -134,7 +135,7 @@ describe('MetadataFetchController', () => {
     const events = await firstValueFrom(stream.pipe(toArray()));
 
     expect(service.getStoredProviderContext).toHaveBeenCalledWith(12, user);
-    expect(pipeline.getEffectiveProviderKeys).toHaveBeenCalledWith(5);
+    expect(pipeline.getEffectiveProviderKeys).not.toHaveBeenCalled();
     expect(service.search).toHaveBeenCalledWith(
       {
         title: 'Dune',
@@ -149,6 +150,18 @@ describe('MetadataFetchController', () => {
       { data: { provider: MetadataProviderKey.GOOGLE, providerId: 'vol-1', title: 'First' } },
       { data: { provider: MetadataProviderKey.OPEN_LIBRARY, providerId: 'ol-1', title: 'Second' } },
     ]);
+  });
+
+  it('allows explicit book searches to use enabled providers outside field rules', async () => {
+    service.getStoredProviderContext.mockResolvedValue({ libraryId: 5, providerIds: {} });
+    pipeline.getEffectiveProviderKeys.mockResolvedValue([MetadataProviderKey.GOOGLE]);
+    service.search.mockReturnValue(of({ provider: MetadataProviderKey.KOBO, providerId: 'kobo-1', title: 'Kobo Result' }));
+
+    const stream = await controller.stream({ bookId: 12, title: 'Dune', providers: [MetadataProviderKey.KOBO] }, user);
+    await firstValueFrom(stream.pipe(toArray()));
+
+    expect(pipeline.getEffectiveProviderKeys).not.toHaveBeenCalled();
+    expect(service.search).toHaveBeenCalledWith(expect.objectContaining({ title: 'Dune' }), [MetadataProviderKey.KOBO]);
   });
 
   it('filters blocklisted genres from streamed metadata candidates', async () => {

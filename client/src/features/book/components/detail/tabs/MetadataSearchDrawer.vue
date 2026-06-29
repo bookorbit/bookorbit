@@ -54,12 +54,12 @@ const {
   loadProviders,
   search,
   toggleProvider,
+  selectFieldRuleProviders,
   clearProviderFilter,
 } = useMetadataSearch()
 
 const view = ref<'search' | 'diff'>('search')
 const selectedCandidate = ref<MetadataCandidate | null>(null)
-const lastSearchParams = ref<{ title: string; author: string; isbn: string } | null>(null)
 const drawerTitle = computed(() => (view.value === 'search' ? 'Search Metadata' : 'Compare Metadata'))
 const drawerSubtitle = computed(() =>
   view.value === 'search' ? 'Find the best provider match for this book.' : 'Review differences and apply only what you want.',
@@ -79,26 +79,21 @@ function runMetadataSearch(params: { title: string; author: string; isbn: string
 }
 
 function handleSearch(params: { title: string; author: string; isbn: string }) {
-  lastSearchParams.value = params
   selectedCandidate.value = null
   view.value = 'search'
   runMetadataSearch(params)
 }
 
-function rerunLastSearch() {
-  selectedCandidate.value = null
-  view.value = 'search'
-  if (lastSearchParams.value) runMetadataSearch(lastSearchParams.value)
-}
-
 function handleToggleProvider(provider: MetadataProviderKey) {
   toggleProvider(provider)
-  if (hasSearched.value) rerunLastSearch()
 }
 
 function handleClearProviderFilter() {
   clearProviderFilter()
-  if (hasSearched.value) rerunLastSearch()
+}
+
+function handleSelectFieldRules() {
+  selectFieldRuleProviders()
 }
 
 function handleSelect(candidate: MetadataCandidate) {
@@ -123,7 +118,7 @@ function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string }) {
       <div class="hidden sm:block flex-1 bg-black/50 backdrop-blur-sm" @click="handleClose" />
 
       <!-- Drawer panel -->
-      <div class="relative flex flex-col w-full sm:w-3/4 sm:max-w-4xl h-full bg-background sm:border-l border-border shadow-2xl overflow-hidden">
+      <div class="relative flex flex-col w-full sm:w-3/4 sm:max-w-5xl h-full bg-background sm:border-l border-border shadow-2xl overflow-hidden">
         <!-- Gradient accent strip -->
         <div class="h-px w-full bg-linear-to-r from-transparent via-primary to-transparent shrink-0 opacity-60" />
 
@@ -169,6 +164,7 @@ function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string }) {
             @search="handleSearch"
             @toggle-provider="handleToggleProvider"
             @clear-filter="handleClearProviderFilter"
+            @select-field-rules="handleSelectFieldRules"
             @select="handleSelect"
           />
 

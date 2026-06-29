@@ -171,6 +171,7 @@ const {
   loadProviders,
   search,
   toggleProvider,
+  selectFieldRuleProviders,
   clearProviderFilter,
 } = useMetadataSearch()
 
@@ -573,6 +574,7 @@ onMounted(() => {
             @search="handleSearchSubmit"
             @toggle-provider="toggleProvider"
             @clear-filter="clearProviderFilter"
+            @select-field-rules="selectFieldRuleProviders"
             @select="selectCandidate"
           />
         </div>

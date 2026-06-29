@@ -20,6 +20,7 @@ const emit = defineEmits<{
   search: [{ title: string; author: string; isbn: string }]
   toggleProvider: [MetadataProviderKey]
   clearFilter: []
+  selectFieldRules: []
   select: [MetadataCandidate]
 }>()
 
@@ -37,6 +38,19 @@ const searchSummary = computed(() => {
   const parts = [form.title.trim(), form.author.trim(), form.isbn.trim()].filter(Boolean)
   return parts.length ? parts.join(' - ') : 'Untitled query'
 })
+const hasFieldRuleScope = computed(() => props.providers.some((provider) => provider.selectedByFieldRules !== undefined))
+const allProviderKeys = computed(() => props.providers.map((provider) => provider.key))
+const fieldRuleProviderKeys = computed(() => props.providers.filter((provider) => provider.selectedByFieldRules).map((provider) => provider.key))
+const providersOutsideFieldRules = computed(() => props.providers.filter((provider) => provider.selectedByFieldRules === false))
+const providersOutsideFieldRuleText = computed(() => providersOutsideFieldRules.value.map((provider) => provider.label).join(', '))
+const allProvidersSelected = computed(() => sameProviderSelection(allProviderKeys.value))
+const fieldRuleProvidersSelected = computed(() => sameProviderSelection(fieldRuleProviderKeys.value))
+const hasFieldRuleScopeOption = computed(
+  () => hasFieldRuleScope.value && providersOutsideFieldRules.value.length > 0 && fieldRuleProviderKeys.value.length > 0,
+)
+const customProviderSelection = computed(
+  () => props.providers.length > 0 && !allProvidersSelected.value && !(hasFieldRuleScopeOption.value && fieldRuleProvidersSelected.value),
+)
 
 watch(
   () => props.hasSearched,
@@ -66,6 +80,10 @@ function handleClearFilter() {
   emit('clearFilter')
 }
 
+function handleSelectFieldRules() {
+  emit('selectFieldRules')
+}
+
 function handleToggleProvider(provider: MetadataProviderKey) {
   emit('toggleProvider', provider)
 }
@@ -73,15 +91,21 @@ function handleToggleProvider(provider: MetadataProviderKey) {
 function handleSelectCandidate(candidate: MetadataCandidate) {
   emit('select', candidate)
 }
+
+function sameProviderSelection(keys: MetadataProviderKey[]) {
+  if (!keys.length) return false
+  const selected = new Set(props.selectedProviders)
+  return selected.size === keys.length && keys.every((key) => selected.has(key))
+}
 </script>
 
 <template>
   <div class="flex flex-col h-full">
     <!-- Search form card -->
     <div v-if="!isFormCollapsed" class="px-4 pt-4 pb-3 shrink-0">
-      <div class="rounded-lg border border-border bg-card p-3 space-y-2 shadow-sm">
-        <div class="flex gap-2">
-          <div class="relative flex-1">
+      <div class="rounded-lg border border-border bg-card p-3 shadow-sm">
+        <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_11rem_auto]">
+          <div class="relative col-span-2 min-w-0 md:col-span-1">
             <BookOpen class="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
             <input
               v-model="form.title"
@@ -92,20 +116,18 @@ function handleSelectCandidate(candidate: MetadataCandidate) {
           </div>
           <input
             v-model="form.author"
-            class="flex-1 h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow"
+            class="col-span-2 h-8 min-w-0 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow md:col-span-1"
             placeholder="Author"
             @keydown.enter="runSearch"
           />
-        </div>
-        <div class="flex gap-2">
           <input
             v-model="form.isbn"
-            class="flex-1 h-8 rounded-lg border border-input bg-background px-3 text-sm font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow"
+            class="h-8 min-w-0 rounded-lg border border-input bg-background px-3 text-sm font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow"
             placeholder="ISBN"
             @keydown.enter="runSearch"
           />
           <button
-            class="relative flex items-center gap-1.5 h-8 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium transition-all disabled:opacity-40 hover:opacity-90 active:scale-95 overflow-hidden group"
+            class="relative flex items-center justify-center gap-1.5 h-8 w-28 rounded-lg bg-primary text-primary-foreground text-sm font-medium transition-all disabled:opacity-40 hover:opacity-90 active:scale-95 overflow-hidden group"
             :disabled="!canSearch || isStreaming"
             @click="runSearch"
           >
@@ -137,28 +159,41 @@ function handleSelectCandidate(candidate: MetadataCandidate) {
     </div>
 
     <!-- Provider filter pills -->
-    <div v-if="providers.length" class="flex items-center gap-1.5 px-4 pb-3 flex-wrap shrink-0">
-      <button
-        class="h-6 px-2.5 rounded-full text-xs font-medium transition-all active:scale-95"
-        :class="
-          !selectedProviders.length
-            ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
-            : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
-        "
-        @click="handleClearFilter"
-      >
-        All
-      </button>
+    <div v-if="providers.length" class="flex items-center gap-1.5 px-4 pb-2 flex-wrap shrink-0">
+      <div class="inline-flex h-6 items-stretch overflow-hidden rounded-full border border-border bg-background shadow-xs" aria-label="Search scope">
+        <button
+          class="h-full px-2.5 text-[11px] font-medium transition-colors"
+          :class="
+            allProvidersSelected ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+          "
+          @click="handleClearFilter"
+        >
+          {{ hasFieldRuleScope ? 'All enabled' : 'All' }}
+        </button>
+        <button
+          v-if="hasFieldRuleScopeOption"
+          class="h-full px-2.5 text-[11px] font-medium transition-colors"
+          :class="
+            fieldRuleProvidersSelected ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+          "
+          @click="handleSelectFieldRules"
+        >
+          Field Rules
+        </button>
+        <span
+          v-if="customProviderSelection"
+          class="h-full px-2.5 bg-primary text-primary-foreground text-[11px] font-medium shadow-sm flex items-center"
+        >
+          Custom
+        </span>
+      </div>
       <button
         v-for="p in providers"
         :key="p.key"
         class="h-6 px-2.5 rounded-full text-xs font-medium transition-all flex items-center gap-1 active:scale-95"
-        :class="
-          selectedProviders.includes(p.key) || !selectedProviders.length
-            ? ''
-            : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
-        "
-        :style="selectedProviders.includes(p.key) || !selectedProviders.length ? providerActivePillStyle(p.key) : {}"
+        :title="p.selectedByFieldRules === false ? `${p.label} is enabled but not in Field Rules` : p.label"
+        :class="selectedProviders.includes(p.key) ? '' : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'"
+        :style="selectedProviders.includes(p.key) ? providerActivePillStyle(p.key) : {}"
         @click="handleToggleProvider(p.key)"
       >
         {{ p.label }}
@@ -170,6 +205,13 @@ function handleSelectCandidate(candidate: MetadataCandidate) {
         </span>
         <span v-else-if="isStreaming" class="size-1.5 rounded-full bg-current animate-pulse" />
       </button>
+    </div>
+    <div
+      v-if="providersOutsideFieldRules.length"
+      class="mx-4 mb-3 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs leading-relaxed text-muted-foreground shrink-0"
+    >
+      <span class="font-medium text-foreground">Not in Field Rules:</span>
+      {{ providersOutsideFieldRuleText }}. Included in manual search with All enabled, but not used by automatic metadata fetch.
     </div>
 
     <!-- Results (scrollable) -->

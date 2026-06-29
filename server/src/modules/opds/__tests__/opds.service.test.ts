@@ -17,6 +17,7 @@ function sampleBook(overrides?: Partial<OpdsBookEntry>): OpdsBookEntry {
     addedAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-02'),
     description: 'A fantasy novel by Brandon Sanderson',
+    seriesId: 1,
     seriesName: 'Mistborn',
     seriesIndex: 1,
     language: 'en',
@@ -119,6 +120,15 @@ describe('OpdsService', () => {
 
       expect(xml).toContain(encodeURIComponent('The Lord of the Rings'));
     });
+
+    it('uses stable series ids when available', () => {
+      const service = makeService();
+      const xml = service.generateSeriesNavigation([{ id: 42, name: 'The Lord of the Rings', bookCount: 3 }]);
+
+      expect(xml).toContain('urn:bookorbit:series:42');
+      expect(xml).toContain(`${BASE}/catalog?seriesId=42`);
+      expect(xml).not.toContain('catalog?series=The%20Lord%20of%20the%20Rings');
+    });
   });
 
   describe('generateAcquisitionFeed', () => {
@@ -197,11 +207,12 @@ describe('OpdsService', () => {
       );
 
       expect(xml).toContain('Mistborn #1');
+      expect(xml).toContain(`${BASE}/catalog?seriesId=1`);
     });
 
     it('omits series link when seriesName is null', () => {
       const service = makeService();
-      const book = sampleBook({ seriesName: null, seriesIndex: null });
+      const book = sampleBook({ seriesId: null, seriesName: null, seriesIndex: null });
       const xml = service.generateAcquisitionFeed(
         'Catalog',
         'urn:bookorbit:catalog',

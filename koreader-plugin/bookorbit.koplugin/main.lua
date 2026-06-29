@@ -38,7 +38,7 @@ local BookOrbitMenuPin = require("bookorbit_menu_pin")
 local BookOrbitSweep = require("bookorbit_sweep")
 local BookOrbitUpdater = require("bookorbit_updater")
 
-local PLUGIN_VERSION = "1.0.0"
+local PLUGIN_VERSION = "1.0.1"
 
 local SYNC_STRATEGY = {
     PROMPT = 1,
@@ -265,7 +265,9 @@ function BookOrbit:onDispatcherRegisterActions()
     Dispatcher:registerAction("bookorbit_push_progress",
         { category = "none", event = "BookOrbitPushProgress", title = _("BookOrbit: push progress"), reader = true })
     Dispatcher:registerAction("bookorbit_pull_progress",
-        { category = "none", event = "BookOrbitPullProgress", title = _("BookOrbit: pull progress"), reader = true, separator = true })
+        { category = "none", event = "BookOrbitPullProgress", title = _("BookOrbit: pull progress"), reader = true })
+    Dispatcher:registerAction("bookorbit_open_dashboard",
+        { category = "none", event = "BookOrbitOpenDashboard", title = _("BookOrbit: open dashboard"), general = true, separator = true })
 end
 
 function BookOrbit:onReaderReady()
@@ -1126,6 +1128,10 @@ end
 
 function BookOrbit:onBookOrbitSyncNow()
     self:startSweep()
+end
+
+function BookOrbit:onBookOrbitOpenDashboard()
+    self:browseCatalog(false)
 end
 
 function BookOrbit:onBookOrbitToggleAutoSync(toggle, from_menu)

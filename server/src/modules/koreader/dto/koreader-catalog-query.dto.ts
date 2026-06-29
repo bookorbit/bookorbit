@@ -113,6 +113,12 @@ export class KoreaderCatalogBooksQueryDto {
   @IsOptional()
   @IsString()
   series?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  seriesId?: number;
 }
 
 export class KoreaderCatalogSectionQueryDto {

@@ -872,7 +872,11 @@ function BookOrbitCatalog:paramsForEntry(section, entry)
     elseif section == "authors" then
         params.author = entry.id
     elseif section == "series" then
-        params.series = entry.id
+        if entry.seriesId then
+            params.seriesId = tonumber(entry.seriesId)
+        else
+            params.series = entry.id
+        end
         params.sort = "series"
     end
     return params

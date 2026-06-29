@@ -78,6 +78,7 @@ export interface MetadataProviderInfo {
   key: MetadataProviderKey;
   label: string;
   identifiable: boolean;
+  selectedByFieldRules?: boolean;
 }
 
 export type MetadataFetchEmptyReason = "no_active_providers" | "providers_throttled" | "no_candidates" | "no_resolved_fields";

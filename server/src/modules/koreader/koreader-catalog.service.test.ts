@@ -90,7 +90,7 @@ function makeService() {
     getUserCollections: vi.fn().mockResolvedValue([{ id: 2, name: 'Favorites', bookCount: 99 }]),
     getUserSmartScopes: vi.fn().mockResolvedValue([{ id: 3, name: 'Unread', icon: 'book-open' }]),
     getDistinctAuthorsPage: vi.fn().mockResolvedValue({ items: [{ name: 'Frank Herbert', bookCount: 2 }], hasNext: false }),
-    getDistinctSeriesPage: vi.fn().mockResolvedValue({ items: [{ name: 'Dune', bookCount: 6 }], hasNext: false }),
+    getDistinctSeriesPage: vi.fn().mockResolvedValue({ items: [{ id: 42, name: 'Dune', bookCount: 6 }], hasNext: false }),
     getBooksPage: vi.fn().mockResolvedValue({ entries: [], total: 0 }),
     getRandomBooks: vi.fn().mockResolvedValue([]),
   };
@@ -204,6 +204,7 @@ describe('KoreaderCatalogService', () => {
           addedAt: new Date('2026-01-01T00:00:00.000Z'),
           updatedAt: new Date('2026-02-01T00:00:00.000Z'),
           description: null,
+          seriesId: 42,
           seriesName: 'Dune',
           seriesIndex: 1,
           language: 'en',
@@ -224,6 +225,7 @@ describe('KoreaderCatalogService', () => {
         addedAt: new Date('2026-01-05T00:00:00.000Z'),
         updatedAt: new Date('2026-02-05T00:00:00.000Z'),
         description: null,
+        seriesId: null,
         seriesName: null,
         seriesIndex: null,
         language: 'en',
@@ -350,7 +352,16 @@ describe('KoreaderCatalogService', () => {
     );
     expect(opdsBookService.getBooksPage).toHaveBeenCalledWith(7, 'title_asc', 1, 1, { libraryId: 1 }, false, user.contentFilters);
     expect(authors.items[0]!.booksHref).toContain('author=Frank+Herbert');
-    expect(series.items.map((item) => item.title)).toEqual(['Dune']);
+    expect(series.items[0]).toEqual(
+      expect.objectContaining({
+        id: 'series:42',
+        title: 'Dune',
+        section: 'series',
+        seriesId: 42,
+        count: 6,
+        booksHref: '/api/v1/koreader/plugin/catalog/books?sort=series&seriesId=42',
+      }),
+    );
   });
 
   it('rejects unknown section names', async () => {
@@ -371,6 +382,7 @@ describe('KoreaderCatalogService', () => {
           addedAt: new Date('2026-01-01T00:00:00.000Z'),
           updatedAt: new Date('2026-02-01T00:00:00.000Z'),
           description: null,
+          seriesId: 42,
           seriesName: 'Dune',
           seriesIndex: 1,
           language: 'en',
@@ -530,9 +542,21 @@ describe('KoreaderCatalogService', () => {
       .mockResolvedValueOnce({ entries: [], total: 2 });
     const user = makeUser({ id: 7 });
 
-    const result = await service.getBooksPage(user, Object.assign(new KoreaderCatalogBooksQueryDto(), { series: 'Dune', sort: 'series' }));
+    const result = await service.getBooksPage(user, Object.assign(new KoreaderCatalogBooksQueryDto(), { seriesId: 42, sort: 'series' }));
 
     expect(result.seriesSummary).toEqual({ total: 6, finished: 2 });
+    expect(opdsBookService.getBooksPage).toHaveBeenNthCalledWith(1, 7, 'series_asc', 1, 20, { seriesId: 42 }, false, user.contentFilters);
+    expect(opdsBookService.getBooksPage).toHaveBeenNthCalledWith(2, 7, 'title_asc', 1, 1, { seriesId: 42 }, false, user.contentFilters);
+    expect(opdsBookService.getBooksPage).toHaveBeenNthCalledWith(
+      3,
+      7,
+      'title_asc',
+      1,
+      1,
+      { seriesId: 42, readStatus: 'finished' },
+      false,
+      user.contentFilters,
+    );
   });
 
   it('omits the series summary for non-series listings', async () => {

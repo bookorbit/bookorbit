@@ -9,6 +9,8 @@ import {
   bookAuthors,
   bookFiles,
   bookMetadata,
+  bookSeries,
+  bookSeriesMemberships,
   books,
   collections,
   collectionBooks,
@@ -22,6 +24,32 @@ import type { ContentFilterRules, GroupRule } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 
 type Db = NodePgDatabase<typeof schema>;
+
+type OpdsBookFilters = {
+  libraryId?: number;
+  collectionId?: number;
+  smartScopeId?: number;
+  author?: string;
+  series?: string;
+  seriesId?: number;
+  q?: string;
+  readStatus?: 'unread' | 'reading' | 'finished';
+  format?: string;
+  ids?: number[];
+};
+
+type SeriesFilter = { seriesId: number } | { normalizedName: string };
+
+type FetchBookEntriesOptions = {
+  contextSeries?: SeriesFilter;
+};
+
+type ContextSeriesRow = {
+  bookId: number;
+  seriesId: number;
+  seriesName: string;
+  seriesIndex: number | null;
+};
 
 type OpdsSortOrder =
   | 'recent'
@@ -68,6 +96,7 @@ export interface OpdsBookEntry {
   addedAt: Date;
   updatedAt: Date;
   description: string | null;
+  seriesId: number | null;
   seriesName: string | null;
   seriesIndex: number | null;
   language: string | null;
@@ -125,17 +154,7 @@ export class OpdsBookService {
     sortOrder: OpdsSortOrder,
     page: number,
     size: number,
-    filters?: {
-      libraryId?: number;
-      collectionId?: number;
-      smartScopeId?: number;
-      author?: string;
-      series?: string;
-      q?: string;
-      readStatus?: 'unread' | 'reading' | 'finished';
-      format?: string;
-      ids?: number[];
-    },
+    filters?: OpdsBookFilters,
     isSuperuser = false,
     contentFilters?: ContentFilterRules,
   ): Promise<{ entries: OpdsBookEntry[]; total: number }> {
@@ -181,9 +200,8 @@ export class OpdsBookService {
       );
     }
 
-    if (filters?.series) {
-      clauses.push(eq(bookMetadata.seriesName, filters.series));
-    }
+    const seriesFilter = this.resolveSeriesFilter(filters);
+    if (seriesFilter) clauses.push(this.buildSeriesMembershipClause(seriesFilter));
 
     if (filters?.format) {
       const format = filters.format.trim().toLowerCase();
@@ -207,7 +225,7 @@ export class OpdsBookService {
       clauses.push(...buildContentFilterClauses(contentFilters, this.db));
     }
 
-    return this.paginatedBookQuery(and(...clauses)!, sortOrder, page, size, userId);
+    return this.paginatedBookQuery(and(...clauses)!, sortOrder, page, size, userId, { contextSeries: seriesFilter });
   }
 
   private buildReadStatusClause(userId: number, readStatus: 'unread' | 'reading' | 'finished'): SQL {
@@ -232,7 +250,15 @@ export class OpdsBookService {
       return sql`exists (${sq})`;
     })();
 
-    const clauses: SQL[] = [ilike(bookMetadata.title, pattern), existsAuthor, ilike(bookMetadata.seriesName, pattern)];
+    const existsSeries = sql`exists (
+      SELECT 1
+      FROM ${bookSeriesMemberships}
+      INNER JOIN ${bookSeries} ON ${bookSeries.id} = ${bookSeriesMemberships.seriesId}
+      WHERE ${bookSeriesMemberships.bookId} = ${books.id}
+        AND ${ilike(bookSeries.name, pattern)}
+    )`;
+
+    const clauses: SQL[] = [ilike(bookMetadata.title, pattern), existsAuthor, existsSeries, ilike(bookMetadata.seriesName, pattern)];
     const normalizedIsbn = normalizeIsbnSearchTerm(term);
     if (normalizedIsbn) {
       clauses.push(or(eq(bookMetadata.isbn13, normalizedIsbn), eq(bookMetadata.isbn10, normalizedIsbn))!);
@@ -327,7 +353,7 @@ export class OpdsBookService {
     userId: number,
     isSuperuser = false,
     contentFilters?: ContentFilterRules,
-  ): Promise<{ name: string | null; bookCount: number }[]> {
+  ): Promise<{ id: number; name: string; bookCount: number }[]> {
     const accessibleIds = await this.getAccessibleLibraryIds(userId, isSuperuser);
     if (accessibleIds.length === 0) return [];
 
@@ -335,14 +361,16 @@ export class OpdsBookService {
 
     return this.db
       .select({
-        name: bookMetadata.seriesName,
+        id: bookSeries.id,
+        name: bookSeries.name,
         bookCount: sql<number>`count(DISTINCT ${books.id})::int`,
       })
-      .from(bookMetadata)
-      .innerJoin(books, and(eq(books.id, bookMetadata.bookId), eq(books.status, 'present'), ...filterClauses))
-      .where(and(inArray(books.libraryId, accessibleIds), sql`${bookMetadata.seriesName} IS NOT NULL`))
-      .groupBy(bookMetadata.seriesName)
-      .orderBy(sql`${bookMetadata.seriesName} ASC`);
+      .from(bookSeries)
+      .innerJoin(bookSeriesMemberships, eq(bookSeriesMemberships.seriesId, bookSeries.id))
+      .innerJoin(books, and(eq(books.id, bookSeriesMemberships.bookId), eq(books.status, 'present'), ...filterClauses))
+      .where(inArray(books.libraryId, accessibleIds))
+      .groupBy(bookSeries.id, bookSeries.name)
+      .orderBy(sql`${bookSeries.name} ASC`);
   }
 
   async getDistinctAuthorsPage(
@@ -384,27 +412,29 @@ export class OpdsBookService {
     opts: { q?: string; limit: number; offset: number },
     isSuperuser = false,
     contentFilters?: ContentFilterRules,
-  ): Promise<{ items: { name: string; bookCount: number }[]; hasNext: boolean }> {
+  ): Promise<{ items: { id: number; name: string; bookCount: number }[]; hasNext: boolean }> {
     const accessibleIds = await this.getAccessibleLibraryIds(userId, isSuperuser);
     if (accessibleIds.length === 0) return { items: [], hasNext: false };
 
     const filterClauses = !isSuperuser && contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
-    const where: SQL[] = [inArray(books.libraryId, accessibleIds), sql`${bookMetadata.seriesName} IS NOT NULL`];
+    const where: SQL[] = [inArray(books.libraryId, accessibleIds)];
     const term = opts.q?.trim();
     if (term) {
-      where.push(ilike(bookMetadata.seriesName, `%${term.replace(LIKE_SPECIAL_CHARS, '\\$&')}%`));
+      where.push(ilike(bookSeries.name, `%${term.replace(LIKE_SPECIAL_CHARS, '\\$&')}%`));
     }
 
     const rows = await this.db
       .select({
-        name: sql<string>`${bookMetadata.seriesName}`,
+        id: bookSeries.id,
+        name: bookSeries.name,
         bookCount: sql<number>`count(DISTINCT ${books.id})::int`,
       })
-      .from(bookMetadata)
-      .innerJoin(books, and(eq(books.id, bookMetadata.bookId), eq(books.status, 'present'), ...filterClauses))
+      .from(bookSeries)
+      .innerJoin(bookSeriesMemberships, eq(bookSeriesMemberships.seriesId, bookSeries.id))
+      .innerJoin(books, and(eq(books.id, bookSeriesMemberships.bookId), eq(books.status, 'present'), ...filterClauses))
       .where(and(...where))
-      .groupBy(bookMetadata.seriesName)
-      .orderBy(sql`${bookMetadata.seriesName} ASC`)
+      .groupBy(bookSeries.id, bookSeries.name)
+      .orderBy(sql`${bookSeries.name} ASC`)
       .limit(opts.limit + 1)
       .offset(opts.offset);
 
@@ -520,13 +550,40 @@ export class OpdsBookService {
     page: number,
     size: number,
     userId?: number,
+    options: FetchBookEntriesOptions = {},
   ): Promise<{ entries: OpdsBookEntry[]; total: number }> {
     const offset = (page - 1) * size;
     const needsAuthorJoin = sortOrder === 'author_asc' || sortOrder === 'author_desc';
     const needsStatusJoin = (sortOrder === 'recently_read' || sortOrder === 'recently_read_asc') && userId !== undefined;
-    const orderClauses = OPDS_SORT_MAP[sortOrder];
+    const needsContextSeriesJoin = options.contextSeries !== undefined && (sortOrder === 'series_asc' || sortOrder === 'series_desc');
+    const orderClauses = needsContextSeriesJoin ? this.buildContextSeriesOrder(sortOrder) : OPDS_SORT_MAP[sortOrder];
 
     const buildIdQuery = () => {
+      if (needsContextSeriesJoin) {
+        const query = this.db
+          .select({ id: books.id })
+          .from(books)
+          .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+          .innerJoin(bookSeriesMemberships, this.buildContextSeriesMembershipJoin(options.contextSeries!));
+
+        if ('normalizedName' in options.contextSeries!) {
+          return query
+            .innerJoin(
+              bookSeries,
+              and(eq(bookSeries.id, bookSeriesMemberships.seriesId), eq(bookSeries.normalizedName, options.contextSeries.normalizedName))!,
+            )
+            .where(where)
+            .orderBy(...orderClauses)
+            .limit(size)
+            .offset(offset);
+        }
+
+        return query
+          .where(where)
+          .orderBy(...orderClauses)
+          .limit(size)
+          .offset(offset);
+      }
       if (needsAuthorJoin) {
         return this.db
           .select({ id: books.id })
@@ -568,14 +625,17 @@ export class OpdsBookService {
 
     if (idRows.length === 0) return { entries: [], total: Number(total) };
 
-    const entries = await this.fetchBookEntries(idRows.map((r) => r.id));
+    const entries = await this.fetchBookEntries(
+      idRows.map((r) => r.id),
+      options,
+    );
     return { entries, total: Number(total) };
   }
 
-  private async fetchBookEntries(bookIds: number[]): Promise<OpdsBookEntry[]> {
+  private async fetchBookEntries(bookIds: number[], options: FetchBookEntriesOptions = {}): Promise<OpdsBookEntry[]> {
     if (bookIds.length === 0) return [];
 
-    const [metaRows, authorRows, fileRows] = await Promise.all([
+    const [metaRows, authorRows, fileRows, contextSeriesRows] = await Promise.all([
       this.db
         .select({
           id: books.id,
@@ -584,6 +644,7 @@ export class OpdsBookService {
           bookUpdatedAt: books.updatedAt,
           title: bookMetadata.title,
           description: bookMetadata.description,
+          seriesId: bookMetadata.seriesId,
           seriesName: bookMetadata.seriesName,
           seriesIndex: bookMetadata.seriesIndex,
           language: bookMetadata.language,
@@ -606,6 +667,7 @@ export class OpdsBookService {
         .innerJoin(books, eq(books.id, bookFiles.bookId))
         .where(and(inArray(bookFiles.bookId, bookIds), eq(bookFiles.role, 'content')))
         .orderBy(sql`case when ${bookFiles.id} = ${books.primaryFileId} then 0 else 1 end`, bookFiles.sortOrder, bookFiles.id),
+      options.contextSeries ? this.fetchContextSeriesRows(bookIds, options.contextSeries) : Promise.resolve<ContextSeriesRow[]>([]),
     ]);
 
     const authorsByBook = new Map<number, string[]>();
@@ -624,28 +686,110 @@ export class OpdsBookService {
     }
 
     const idOrder = new Map(bookIds.map((id, i) => [id, i]));
+    const contextSeriesByBook = new Map(contextSeriesRows.map((row) => [row.bookId, row]));
 
     return metaRows
-      .map((row) => ({
-        id: row.id,
-        title: row.title ?? row.folderPath.split('/').pop() ?? 'Untitled',
-        folderPath: row.folderPath,
-        addedAt: row.addedAt,
-        updatedAt: row.bookUpdatedAt,
-        description: row.description,
-        seriesName: row.seriesName,
-        seriesIndex: row.seriesIndex,
-        language: row.language,
-        publisher: row.publisher,
-        isbn13: row.isbn13,
-        hasCover: row.coverSource !== null,
-        authors: authorsByBook.get(row.id) ?? [],
-        files: filesByBook.get(row.id) ?? [],
-      }))
+      .map((row) => {
+        const contextSeries = contextSeriesByBook.get(row.id);
+        return {
+          id: row.id,
+          title: row.title ?? row.folderPath.split('/').pop() ?? 'Untitled',
+          folderPath: row.folderPath,
+          addedAt: row.addedAt,
+          updatedAt: row.bookUpdatedAt,
+          description: row.description,
+          seriesId: contextSeries?.seriesId ?? row.seriesId,
+          seriesName: contextSeries?.seriesName ?? row.seriesName,
+          seriesIndex: contextSeries?.seriesIndex ?? row.seriesIndex,
+          language: row.language,
+          publisher: row.publisher,
+          isbn13: row.isbn13,
+          hasCover: row.coverSource !== null,
+          authors: authorsByBook.get(row.id) ?? [],
+          files: filesByBook.get(row.id) ?? [],
+        };
+      })
       .sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
+  }
+
+  private resolveSeriesFilter(filters?: OpdsBookFilters): SeriesFilter | undefined {
+    if (filters?.seriesId !== undefined) return { seriesId: filters.seriesId };
+
+    const catalogSeriesId = parseCatalogSeriesId(filters?.series);
+    if (catalogSeriesId !== undefined) return { seriesId: catalogSeriesId };
+
+    const normalizedName = normalizeSeriesNameFilter(filters?.series);
+    return normalizedName ? { normalizedName } : undefined;
+  }
+
+  private buildSeriesMembershipClause(filter: SeriesFilter): SQL {
+    if ('seriesId' in filter) {
+      return sql`${books.id} IN (
+        SELECT ${bookSeriesMemberships.bookId}
+        FROM ${bookSeriesMemberships}
+        WHERE ${bookSeriesMemberships.seriesId} = ${filter.seriesId}
+      )`;
+    }
+
+    return sql`${books.id} IN (
+      SELECT ${bookSeriesMemberships.bookId}
+      FROM ${bookSeriesMemberships}
+      INNER JOIN ${bookSeries} ON ${bookSeries.id} = ${bookSeriesMemberships.seriesId}
+      WHERE ${bookSeries.normalizedName} = ${filter.normalizedName}
+    )`;
+  }
+
+  private buildContextSeriesMembershipJoin(filter: SeriesFilter): SQL {
+    if ('seriesId' in filter) {
+      return and(eq(bookSeriesMemberships.bookId, books.id), eq(bookSeriesMemberships.seriesId, filter.seriesId))!;
+    }
+
+    return eq(bookSeriesMemberships.bookId, books.id);
+  }
+
+  private buildContextSeriesOrder(sortOrder: OpdsSortOrder): SQL[] {
+    const direction = sortOrder === 'series_desc' ? 'DESC' : 'ASC';
+    return [
+      sql`${bookSeriesMemberships.seriesIndex} ${sql.raw(direction)} NULLS LAST`,
+      sql`${bookMetadata.title} ASC NULLS LAST`,
+      sql`${books.id} ASC`,
+    ];
+  }
+
+  private fetchContextSeriesRows(bookIds: number[], filter: SeriesFilter): Promise<ContextSeriesRow[]> {
+    const conditions: SQL[] = [inArray(bookSeriesMemberships.bookId, bookIds)];
+    if ('seriesId' in filter) {
+      conditions.push(eq(bookSeriesMemberships.seriesId, filter.seriesId));
+    } else {
+      conditions.push(eq(bookSeries.normalizedName, filter.normalizedName));
+    }
+
+    return this.db
+      .select({
+        bookId: bookSeriesMemberships.bookId,
+        seriesId: bookSeriesMemberships.seriesId,
+        seriesName: bookSeries.name,
+        seriesIndex: bookSeriesMemberships.seriesIndex,
+      })
+      .from(bookSeriesMemberships)
+      .innerJoin(bookSeries, eq(bookSeries.id, bookSeriesMemberships.seriesId))
+      .where(and(...conditions))
+      .orderBy(bookSeriesMemberships.displayOrder, bookSeriesMemberships.seriesId);
   }
 }
 
 function normalizeIsbnSearchTerm(value: string): string {
   return value.replace(/[^0-9Xx]/g, '').toUpperCase();
+}
+
+function parseCatalogSeriesId(value: string | null | undefined): number | undefined {
+  const match = /^series:(\d+)$/.exec(value?.trim() ?? '');
+  if (!match) return undefined;
+  const id = Number.parseInt(match[1]!, 10);
+  return Number.isSafeInteger(id) && id > 0 ? id : undefined;
+}
+
+function normalizeSeriesNameFilter(value: string | null | undefined): string | undefined {
+  const normalized = value?.trim().toLowerCase();
+  return normalized || undefined;
 }

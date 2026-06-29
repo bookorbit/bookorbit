@@ -23,7 +23,10 @@ export function useMetadataSearch() {
   async function loadProviders(bookId?: number) {
     const query = bookId != null ? `?bookId=${bookId}` : ''
     const res = await api(`/api/v1/metadata-fetch/providers${query}`)
-    if (res.ok) providers.value = (await res.json()) as MetadataProviderInfo[]
+    if (res.ok) {
+      providers.value = (await res.json()) as MetadataProviderInfo[]
+      selectAllProviders()
+    }
   }
 
   function cancel() {
@@ -132,11 +135,23 @@ export function useMetadataSearch() {
   function toggleProvider(key: MetadataProviderKey) {
     const idx = selectedProviders.value.indexOf(key)
     if (idx === -1) selectedProviders.value.push(key)
-    else selectedProviders.value.splice(idx, 1)
+    else {
+      selectedProviders.value.splice(idx, 1)
+      if (selectedProviders.value.length === 0) selectAllProviders()
+    }
+  }
+
+  function selectAllProviders() {
+    selectedProviders.value = providers.value.map((provider) => provider.key)
+  }
+
+  function selectFieldRuleProviders() {
+    const fieldRuleProviders = providers.value.filter((provider) => provider.selectedByFieldRules).map((provider) => provider.key)
+    selectedProviders.value = fieldRuleProviders.length ? fieldRuleProviders : providers.value.map((provider) => provider.key)
   }
 
   function clearProviderFilter() {
-    selectedProviders.value = []
+    selectAllProviders()
   }
 
   return {
@@ -149,6 +164,8 @@ export function useMetadataSearch() {
     loadProviders,
     search,
     toggleProvider,
+    selectAllProviders,
+    selectFieldRuleProviders,
     clearProviderFilter,
   }
 }

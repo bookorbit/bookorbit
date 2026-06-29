@@ -40,8 +40,16 @@ export class MetadataFetchController {
 
   @Get('providers')
   async listProviders(@Query() dto: ListMetadataProvidersDto, @CurrentUser() user: RequestUser): Promise<MetadataProviderInfo[]> {
-    const libraryId = dto.bookId ? await this.metadataFetchService.getAccessibleBookLibraryId(dto.bookId, user) : undefined;
-    const providerKeys = await this.resolveEnabledProviderKeys(undefined, libraryId);
+    if (dto.bookId) {
+      const libraryId = await this.metadataFetchService.getAccessibleBookLibraryId(dto.bookId, user);
+      const [enabledProviderKeys, fieldRuleProviderKeys] = await Promise.all([
+        this.resolveEnabledProviderKeys(),
+        this.resolveFieldRuleProviderKeys(undefined, libraryId),
+      ]);
+      return this.providerInfosForKeys(enabledProviderKeys, new Set(fieldRuleProviderKeys));
+    }
+
+    const providerKeys = await this.resolveEnabledProviderKeys();
     return this.providerInfosForKeys(providerKeys);
   }
 
@@ -61,7 +69,7 @@ export class MetadataFetchController {
     const existingProviderIds = storedContext?.providerIds ?? {};
     const [preferences, providerKeys] = await Promise.all([
       this.metadataPreferences.getGlobal(),
-      this.resolveEnabledProviderKeys(dto.providers, storedContext?.libraryId),
+      this.resolveSearchProviderKeys(dto.providers, storedContext?.libraryId),
     ]);
     const requestedAudiobookProvider = (dto.providers ?? []).some(isAudiobookProvider);
     const onlyAudiobookProviders = providerKeys.length > 0 && providerKeys.every(isAudiobookProvider);
@@ -97,17 +105,7 @@ export class MetadataFetchController {
     return filterCandidateGenresAgainstBlocklist(candidate, blockedGenreTokens);
   }
 
-  private async resolveEnabledProviderKeys(
-    requestedProviders: MetadataProviderKey[] | undefined,
-    libraryId?: number,
-  ): Promise<MetadataProviderKey[]> {
-    if (libraryId !== undefined) {
-      const effectiveProviderKeys = await this.pipeline.getEffectiveProviderKeys(libraryId);
-      if (requestedProviders === undefined) return effectiveProviderKeys;
-      const requested = new Set(requestedProviders);
-      return effectiveProviderKeys.filter((providerKey) => requested.has(providerKey));
-    }
-
+  private async resolveEnabledProviderKeys(requestedProviders?: MetadataProviderKey[]): Promise<MetadataProviderKey[]> {
     const config = await this.providerConfig.getConfig();
     const registeredProviders = this.registry.all();
     const enabledProviders = new Set(
@@ -117,7 +115,25 @@ export class MetadataFetchController {
     return providerKeys.filter((providerKey) => enabledProviders.has(providerKey));
   }
 
-  private providerInfosForKeys(providerKeys: MetadataProviderKey[]): MetadataProviderInfo[] {
+  private async resolveFieldRuleProviderKeys(
+    requestedProviders: MetadataProviderKey[] | undefined,
+    libraryId: number,
+  ): Promise<MetadataProviderKey[]> {
+    const effectiveProviderKeys = await this.pipeline.getEffectiveProviderKeys(libraryId);
+    if (requestedProviders === undefined) return effectiveProviderKeys;
+    const requested = new Set(requestedProviders);
+    return effectiveProviderKeys.filter((providerKey) => requested.has(providerKey));
+  }
+
+  private async resolveSearchProviderKeys(requestedProviders: MetadataProviderKey[] | undefined, libraryId?: number): Promise<MetadataProviderKey[]> {
+    if (requestedProviders !== undefined || libraryId === undefined) {
+      return this.resolveEnabledProviderKeys(requestedProviders);
+    }
+
+    return this.resolveFieldRuleProviderKeys(undefined, libraryId);
+  }
+
+  private providerInfosForKeys(providerKeys: MetadataProviderKey[], fieldRuleProviderKeys?: Set<MetadataProviderKey>): MetadataProviderInfo[] {
     const keySet = new Set(providerKeys);
     return this.registry
       .all()
@@ -126,6 +142,7 @@ export class MetadataFetchController {
         key: p.key,
         label: p.label,
         identifiable: p.identifiable,
+        ...(fieldRuleProviderKeys ? { selectedByFieldRules: fieldRuleProviderKeys.has(p.key) } : {}),
       }));
   }
 }

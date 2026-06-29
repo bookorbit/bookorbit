@@ -86,7 +86,7 @@ export class OpdsController {
   @Get('series')
   async series(@OpdsUser() user: OpdsRequestUser, @Res() reply: FastifyReply) {
     const items = await this.opdsBookService.getDistinctSeries(user.userId, user.isSuperuser, user.contentFilters);
-    const xml = this.opdsService.generateSeriesNavigation(items.filter((s): s is { name: string; bookCount: number } => s.name !== null));
+    const xml = this.opdsService.generateSeriesNavigation(items.filter((s): s is { id: number; name: string; bookCount: number } => s.name !== null));
     this.sendXml(reply, xml, OPDS_MIME_NAV);
   }
 
@@ -102,6 +102,7 @@ export class OpdsController {
     @Query('series') series?: string,
     @Query('q') q?: string,
     @Res() reply?: FastifyReply,
+    @Query('seriesId') seriesIdStr?: string,
   ) {
     const clampedSize = Math.min(Math.max(size, 1), 100);
     const clampedPage = Math.max(page, 1);
@@ -111,10 +112,12 @@ export class OpdsController {
     const libraryId = this.parseOptionalPositiveInt('libraryId', libraryIdStr);
     const collectionId = this.parseOptionalPositiveInt('collectionId', collectionIdStr);
     const smartScopeId = this.parseOptionalPositiveInt('smartScopeId', smartScopeIdStr);
+    const seriesId = this.parseOptionalPositiveInt('seriesId', seriesIdStr);
 
     if (libraryId !== undefined) filters.libraryId = libraryId;
     if (collectionId !== undefined) filters.collectionId = collectionId;
     if (smartScopeId !== undefined) filters.smartScopeId = smartScopeId;
+    if (seriesId !== undefined) filters.seriesId = seriesId;
     if (author) filters.author = author;
     if (series) filters.series = series;
     if (q) filters.q = q;

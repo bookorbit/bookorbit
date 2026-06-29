@@ -198,7 +198,7 @@ export class KoreaderCatalogService {
     const [progressMap, statusMap, seriesSummary] = await Promise.all([
       this.findBestProgressMap(user.id, bookIds),
       this.userBookStatusService.findByBookIds(user.id, bookIds),
-      query.series ? this.computeSeriesSummary(user, query.series) : Promise.resolve(null),
+      filters.seriesId !== undefined || filters.series ? this.computeSeriesSummary(user, filters) : Promise.resolve(null),
     ]);
 
     const items = entries.map((entry) => this.mapBookListItem(entry, progressMap.get(entry.id) ?? null, statusMap.get(entry.id)?.status ?? null));
@@ -336,13 +336,18 @@ export class KoreaderCatalogService {
       user.contentFilters,
     );
     const entries: KoreaderCatalogEntry[] = items.map((row) => ({
-      id: row.name,
+      id: this.seriesEntryId(row.id),
       title: row.name,
       section: 'series',
       count: row.bookCount,
-      booksHref: this.booksHref({ series: row.name, sort: 'series' }),
+      seriesId: row.id,
+      booksHref: this.booksHref({ seriesId: row.id, sort: 'series' }),
     }));
     return this.buildSectionPage('series', entries, page, hasNext, query.q);
+  }
+
+  private seriesEntryId(seriesId: number): string {
+    return `series:${seriesId}`;
   }
 
   private buildSectionPage(
@@ -375,14 +380,20 @@ export class KoreaderCatalogService {
 
   private async countBooks(
     user: RequestUser,
-    filters: { libraryId?: number; collectionId?: number; series?: string; readStatus?: 'unread' | 'reading' | 'finished' },
+    filters: {
+      libraryId?: number;
+      collectionId?: number;
+      series?: string;
+      seriesId?: number;
+      readStatus?: 'unread' | 'reading' | 'finished';
+    },
   ): Promise<number> {
     const result = await this.opdsBookService.getBooksPage(user.id, 'title_asc', 1, 1, filters, user.isSuperuser, user.contentFilters);
     return result.total;
   }
 
-  private async computeSeriesSummary(user: RequestUser, series: string): Promise<KoreaderCatalogSeriesSummary> {
-    const [total, finished] = await Promise.all([this.countBooks(user, { series }), this.countBooks(user, { series, readStatus: 'finished' })]);
+  private async computeSeriesSummary(user: RequestUser, filters: { series?: string; seriesId?: number }): Promise<KoreaderCatalogSeriesSummary> {
+    const [total, finished] = await Promise.all([this.countBooks(user, filters), this.countBooks(user, { ...filters, readStatus: 'finished' })]);
     return { total, finished };
   }
 
@@ -392,6 +403,7 @@ export class KoreaderCatalogService {
       id: entry.id,
       title: entry.title,
       authors: entry.authors,
+      seriesId: entry.seriesId ?? null,
       seriesName: entry.seriesName,
       seriesIndex: entry.seriesIndex,
       progressPercentage: progress?.percentage ?? null,
@@ -422,6 +434,7 @@ export class KoreaderCatalogService {
       id: detail.id,
       title,
       authors: detail.authors.map((author) => author.name),
+      seriesId: detail.seriesId,
       seriesName: detail.seriesName,
       seriesIndex: detail.seriesIndex,
       progressPercentage: progress?.percentage ?? null,
@@ -506,6 +519,7 @@ export class KoreaderCatalogService {
     smartScopeId?: number;
     author?: string;
     series?: string;
+    seriesId?: number;
     q?: string;
     readStatus?: 'unread' | 'reading' | 'finished';
     format?: string;
@@ -516,6 +530,7 @@ export class KoreaderCatalogService {
       ...(query.collectionId !== undefined ? { collectionId: query.collectionId } : {}),
       ...(query.smartScopeId !== undefined ? { smartScopeId: query.smartScopeId } : {}),
       ...(query.author ? { author: query.author } : {}),
+      ...(query.seriesId !== undefined ? { seriesId: query.seriesId } : {}),
       ...(query.series ? { series: query.series } : {}),
       ...(query.q?.trim() ? { q: query.q.trim() } : {}),
       ...(query.readStatus ? { readStatus: query.readStatus } : {}),
@@ -586,6 +601,7 @@ export class KoreaderCatalogService {
       'collectionId',
       'smartScopeId',
       'author',
+      'seriesId',
       'series',
     ] as const;
     for (const key of orderedKeys) {

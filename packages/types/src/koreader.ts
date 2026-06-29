@@ -116,6 +116,7 @@ export interface KoreaderCatalogEntry {
   subtitle?: string | null;
   count?: number;
   icon?: string | null;
+  seriesId?: number;
   href?: string;
   booksHref?: string;
 }
@@ -140,6 +141,7 @@ export interface KoreaderCatalogBookListItem {
   id: number;
   title: string;
   authors: string[];
+  seriesId: number | null;
   seriesName: string | null;
   seriesIndex: number | null;
   progressPercentage: number | null;
