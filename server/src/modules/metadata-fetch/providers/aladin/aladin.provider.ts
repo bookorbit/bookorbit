@@ -15,6 +15,17 @@ import { AladinLookupResponse, AladinSearchResponse } from './aladin.types';
 const BASE_URL = 'https://www.aladin.co.kr/ttb/api';
 const API_VERSION = '20131101';
 
+function normalizeIsbn(isbn: string): string {
+  return isbn.replace(/[-\s]/g, '');
+}
+
+function getIsbnItemIdType(isbn: string): 'ISBN13' | 'ISBN' | null {
+  const normalized = normalizeIsbn(isbn);
+  if (/^\d{13}$/.test(normalized)) return 'ISBN13';
+  if (/^\d{9}[\dX]$/.test(normalized)) return 'ISBN';
+  return null;
+}
+
 @Injectable()
 export class AladinProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.ALADIN;
@@ -28,6 +39,9 @@ export class AladinProvider implements IdentifiableProvider {
   async search(params: MetadataSearchParams): Promise<MetadataCandidate[]> {
     const { enabled, ttbKey } = await this.providerConfig.getConfig().then((c) => c.aladin);
     if (!enabled || !ttbKey.trim()) return [];
+    if (params.isbn) {
+      return this.searchByIsbn(params.isbn, ttbKey, params.signal);
+    }
     const query = this.buildQuery(params);
     if (!query) return [];
     return this.searchItems(query, ttbKey, params.signal);
@@ -40,9 +54,6 @@ export class AladinProvider implements IdentifiableProvider {
   }
 
   private buildQuery(params: MetadataSearchParams): string | null {
-    if (params.isbn) {
-      return params.isbn;
-    }
     const parts: string[] = [];
     if (params.title) parts.push(params.title);
     if (params.author) parts.push(params.author);
@@ -78,6 +89,45 @@ export class AladinProvider implements IdentifiableProvider {
       }
       this.logger.warn(
         `[aladin.search] [fail] query="${safeQuery}" durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'UnknownError'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}"`,
+      );
+      throw err;
+    }
+  }
+
+  private async searchByIsbn(isbn: string, ttbKey: string, signal?: AbortSignal): Promise<MetadataCandidate[]> {
+    const itemIdType = getIsbnItemIdType(isbn);
+    if (!itemIdType) {
+      return this.searchItems(isbn, ttbKey, signal);
+    }
+    const normalizedIsbn = normalizeIsbn(isbn);
+    const url = this.buildLookupUrl(normalizedIsbn, ttbKey, itemIdType);
+    const startedAt = Date.now();
+    const safeIsbn = sanitizeLogValue(normalizedIsbn);
+    this.logger.log(`[aladin.search] [start] isbn="${safeIsbn}" itemIdType=${itemIdType}`);
+
+    try {
+      const res = await fetchWithThrottle(url, { signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.DEFAULT, signal) });
+      if (!res.ok) {
+        this.logger.warn(
+          `[aladin.search] [fail] isbn="${safeIsbn}" status=${res.status} durationMs=${Date.now() - startedAt} errorClass=HttpError error="non-ok response"`,
+        );
+        return [];
+      }
+      const body = (await res.json()) as AladinLookupResponse;
+      const items = (body.item ?? []).map(mapAladinItem);
+      this.logger.log(
+        `[aladin.search] [end] isbn="${safeIsbn}" status=${res.status} resultCount=${items.length} durationMs=${Date.now() - startedAt}`,
+      );
+      return items;
+    } catch (err) {
+      if (err instanceof ProviderThrottleError) {
+        this.logger.warn(
+          `[aladin.search] [fail] isbn="${safeIsbn}" durationMs=${Date.now() - startedAt} errorClass=ProviderThrottleError error="throttled"`,
+        );
+        throw err;
+      }
+      this.logger.warn(
+        `[aladin.search] [fail] isbn="${safeIsbn}" durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'UnknownError'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}"`,
       );
       throw err;
     }
@@ -136,11 +186,11 @@ export class AladinProvider implements IdentifiableProvider {
     return `${BASE_URL}/ItemSearch.aspx?${params.toString()}`;
   }
 
-  private buildLookupUrl(providerId: string, ttbKey: string): string {
+  private buildLookupUrl(itemId: string, ttbKey: string, itemIdType: string = 'ItemId'): string {
     const params = new URLSearchParams({
       TTBKey: ttbKey,
-      ItemId: providerId,
-      ItemIdType: 'ItemId',
+      ItemId: itemId,
+      ItemIdType: itemIdType,
       output: 'JS',
       Version: API_VERSION,
       Cover: 'Big',

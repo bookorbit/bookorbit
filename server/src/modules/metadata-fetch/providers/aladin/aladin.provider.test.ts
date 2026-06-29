@@ -141,15 +141,44 @@ describe('AladinProvider', () => {
       expect(result[0].genres).toEqual(['소설/시/희곡']);
     });
 
-    it('should handle search with ISBN', async () => {
+    it('should search by ISBN using ItemLookUp with ISBN13 for 13-digit ISBNs', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(mockAladinLookupResponse),
+      });
+
+      const result = await provider.search({ isbn: '9788912345678' });
+
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('ItemLookUp.aspx'), expect.any(Object));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('ItemId=9788912345678'), expect.any(Object));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('ItemIdType=ISBN13'), expect.any(Object));
+      expect(result).toHaveLength(1);
+      expect(result[0].title).toBe('테스트 도서');
+    });
+
+    it('should search by ISBN using ItemLookUp with ISBN for 10-digit ISBNs', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(mockAladinLookupResponse),
+      });
+
+      await provider.search({ isbn: '8912345678' });
+
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('ItemLookUp.aspx'), expect.any(Object));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('ItemId=8912345678'), expect.any(Object));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('ItemIdType=ISBN'), expect.any(Object));
+    });
+
+    it('should fall back to keyword search for invalid ISBN format', async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: vi.fn().mockResolvedValue({ item: [] }),
       });
 
-      await provider.search({ isbn: '9788912345678' });
+      await provider.search({ isbn: 'not-an-isbn' });
 
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('Query=9788912345678'), expect.any(Object));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('ItemSearch.aspx'), expect.any(Object));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('Query=not-an-isbn'), expect.any(Object));
     });
 
     it('should return empty array on fetch error', async () => {
