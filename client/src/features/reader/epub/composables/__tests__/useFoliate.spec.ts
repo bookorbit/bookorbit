@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/api', () => ({
   api: vi.fn<() => Promise<Response>>(),
-  getAccessToken: vi.fn<() => string | null>(() => 'test-token'),
 }))
 
 vi.mock('../useFoliateAnnotations', () => ({
@@ -74,7 +73,9 @@ describe('useFoliate.open', () => {
       ok: true,
       json: vi.fn<() => Promise<unknown>>().mockResolvedValue({}),
     } as unknown as Response)
-    ;(window as { makeStreamingBook?: unknown }).makeStreamingBook = vi.fn<() => Promise<unknown>>().mockResolvedValue({ type: 'book' })
+    ;(window as { makeStreamingBook?: unknown }).makeStreamingBook = vi
+      .fn<(...args: unknown[]) => Promise<unknown>>()
+      .mockResolvedValue({ type: 'book' })
   })
 
   afterEach(() => {
@@ -90,6 +91,15 @@ describe('useFoliate.open', () => {
 
     expect(mockGoTo).toHaveBeenCalledWith('epubcfi(/6/2!)')
     expect(mockGoToFraction).not.toHaveBeenCalled()
+  })
+
+  it('passes the authenticated api fetcher to the streaming book loader', async () => {
+    const foliate = useFoliate(() => container)
+
+    await foliate.open(1, 2, 'epub', null, undefined)
+
+    const makeStreamingBook = (window as unknown as { makeStreamingBook: ReturnType<typeof vi.fn> }).makeStreamingBook
+    expect(makeStreamingBook).toHaveBeenCalledWith(1, '/api/v1/epub', {}, api, null, 2)
   })
 
   it('navigates to fallback fraction when cfi is null and fraction > 0', async () => {

@@ -18,7 +18,6 @@ import {
   CalendarClock,
 } from '@lucide/vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
-import * as LucideIcons from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
 import type { Library as LibraryType, LibraryStats } from '@bookorbit/types'
@@ -31,6 +30,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { parseCronToHuman } from '@/features/library/utils/cron'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import AppIcon from '@/components/AppIcon.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -55,11 +55,6 @@ const fileSyncingMap = ref<Record<number, boolean>>({})
 const confirmSyncLibrary = ref<LibraryType | null>(null)
 
 const { syncAll: syncAllFiles } = useLibraryFileSync()
-
-function getIconComponent(name: string | null | undefined) {
-  if (!name) return FolderOpen
-  return (LucideIcons as Record<string, unknown>)[name] ?? FolderOpen
-}
 
 function promptSyncFiles(lib: LibraryType) {
   confirmSyncLibrary.value = lib
@@ -304,7 +299,7 @@ function coverRefreshLabel(libraryId: number): string {
               :to="{ name: 'library', params: { id: lib.id } }"
               class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 hover:bg-primary/15 transition-colors"
             >
-              <component :is="getIconComponent(lib.icon)" :size="16" class="text-primary" />
+              <AppIcon :icon="lib.icon || 'FolderOpen'" fallback="FolderOpen" :size="16" class="text-primary" />
             </RouterLink>
 
             <!-- Name + stats -->

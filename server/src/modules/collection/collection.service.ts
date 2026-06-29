@@ -5,6 +5,7 @@ import type { BookQuery, BooksPage, JumpBucketsResponse } from '@bookorbit/types
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import type { RequestUser } from '../../common/types/request-user';
+import { normalizeIconValue } from '../../common/utils/icon-value.utils';
 import { BookService } from '../book/book.service';
 import { BookQueryBuilder } from '../book/book-query-builder.service';
 import { LibraryService } from '../library/library.service';
@@ -27,12 +28,6 @@ function isUniqueViolation(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const causeCode = (error.cause as { code?: unknown } | undefined)?.code;
   return causeCode === '23505';
-}
-
-function normalizeIcon(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const icon = value.trim();
-  return icon.length > 0 ? icon : null;
 }
 
 @Injectable()
@@ -96,7 +91,7 @@ export class CollectionService {
   }
 
   async create(dto: CreateCollectionDto, user: RequestUser) {
-    const icon = normalizeIcon(dto.icon);
+    const icon = normalizeIconValue(dto.icon);
     if (!icon) {
       throw new BadRequestException('Icon is required');
     }
@@ -124,7 +119,7 @@ export class CollectionService {
 
   async update(id: number, dto: UpdateCollectionDto, user: RequestUser) {
     const existing = await this.findCollectionForUserOrThrow(id, user);
-    const icon = dto.icon !== undefined ? normalizeIcon(dto.icon) : normalizeIcon(existing.icon);
+    const icon = dto.icon !== undefined ? normalizeIconValue(dto.icon) : normalizeIconValue(existing.icon);
     if (!icon) {
       throw new BadRequestException('Icon is required');
     }

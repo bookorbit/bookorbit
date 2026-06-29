@@ -4,7 +4,6 @@ import { MAX_HIGHLIGHTS_PER_RELEASE, MAX_MEDIA_PER_HIGHLIGHT } from './release-n
 
 const HEADING_RE = /^#{1,6}\s+/;
 const HEADING_TEXT_RE = /^#{1,6}\s+(.+?)\s*$/;
-const HR_RE = /^\s*([-*_])\1{2,}\s*$/;
 const BULLET_RE = /^\s*[-*]\s+(.+)$/;
 // Primary icon carrier: an HTML comment GitHub renders as nothing, e.g. `<!-- icon: BookHeart -->`.
 const ICON_COMMENT_RE = /<!--\s*icon:\s*([A-Za-z][A-Za-z0-9]*)\s*-->/i;
@@ -87,7 +86,7 @@ export function extractHighlightsBlock(body: string): string[] | null {
   const block: string[] = [];
   for (let i = start + 1; i < lines.length; i++) {
     const line = lines[i];
-    if (HEADING_RE.test(line) || HR_RE.test(line)) break;
+    if (HEADING_RE.test(line)) break;
     block.push(line);
   }
   return block;
@@ -173,7 +172,7 @@ export function stripHighlightsSection(body: string | null | undefined): string 
   for (let i = 0; i < lines.length; i++) {
     if (!removed && isHighlightsHeading(lines[i])) {
       i++;
-      while (i < lines.length && !HEADING_RE.test(lines[i]) && !HR_RE.test(lines[i])) i++;
+      while (i < lines.length && !HEADING_RE.test(lines[i])) i++;
       i--;
       removed = true;
       continue;

@@ -1,5 +1,4 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { SkipThrottle } from '@nestjs/throttler';
 
 import { AuditAction, type EntityType, INLINE_ENTITY_TYPES, Permission } from '@bookorbit/types';
 import { Auditable } from '../../common/decorators/auditable.decorator';
@@ -36,7 +35,6 @@ export class EntityManagerController {
   }
 
   @Get(':entityType/duplicates/scan')
-  @SkipThrottle()
   @RequirePermission(Permission.LibraryEditMetadata)
   scanDuplicates(@Param('entityType', EntityTypePipe) entityType: EntityType, @Query() dto: ScanDuplicatesDto, @CurrentUser() user: RequestUser) {
     return this.service.scanDuplicates(entityType, user, dto.libraryId, dto.minSimilarity, dto.page, dto.pageSize);

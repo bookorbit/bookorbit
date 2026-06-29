@@ -29,6 +29,7 @@ local/
 # Build artifacts
 coverage/
 *.tsbuildinfo
+server/src/metadata.ts
 
 # Test results (generated artifacts - uploaded to CI, not committed)
 test-results/

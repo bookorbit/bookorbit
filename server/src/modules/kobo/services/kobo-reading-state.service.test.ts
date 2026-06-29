@@ -1,3 +1,5 @@
+import { Logger } from '@nestjs/common';
+
 import { KoboReadingStateService } from './kobo-reading-state.service';
 import { ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED } from '../../achievement/achievement-events.service';
 
@@ -286,6 +288,31 @@ describe('KoboReadingStateService', () => {
       ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED,
       expect.objectContaining({ userId: 1, bookId: 5, progress: 42.5, source: 'kobo' }),
     );
+    expect(achievementEvents.emit.mock.invocationCallOrder[0]!).toBeGreaterThan(userBookStatusService.autoUpdate.mock.invocationCallOrder[0]!);
+  });
+
+  it('does not fail the Kobo progress update when auto status update fails', async () => {
+    const db = makeDb();
+    const stateInsert = makeInsertChain();
+    const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    db.insert.mockReturnValue(stateInsert);
+    db.query.books.findFirst.mockResolvedValue({ id: 5 });
+    db.query.koboReadingStates.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ entitlementId: '5', currentBookmark: { ProgressPercent: 42.5 } });
+    userBookStatusService.autoUpdate.mockRejectedValueOnce(new Error('status update failed'));
+
+    await expect(
+      makeService(db).upsertState(1, 5, { CurrentBookmark: { LastModified: '2026-01-01T00:00:00Z', ProgressPercent: 42.5 } }, 1, 99, false),
+    ).resolves.toEqual(expect.objectContaining({ EntitlementId: 'entitlement-5' }));
+
+    expect(userBookStatusService.autoUpdate).toHaveBeenCalledWith(1, 5, 42.5, 1, 99);
+    expect(achievementEvents.emit).toHaveBeenCalledWith(
+      ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED,
+      expect.objectContaining({ userId: 1, bookId: 5, progress: 42.5, source: 'kobo' }),
+    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[kobo.reading_state_status_update] [fail] userId=1 bookId=5'));
+    warnSpy.mockRestore();
   });
 
   it('does not replace newer internal CFI progress with stale Kobo percent', async () => {

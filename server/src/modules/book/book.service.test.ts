@@ -149,6 +149,7 @@ function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
   const libraryService = {
     verifyUserAccess: vi.fn().mockResolvedValue(undefined),
     findAll: vi.fn().mockResolvedValue([]),
+    findOne: vi.fn().mockResolvedValue({ readingThreshold: 1, markAsFinishedPercentComplete: 99 }),
   };
   const queryBuilder = {
     buildWhere: vi.fn(),
@@ -2040,7 +2041,7 @@ describe('BookService', () => {
       bookRepo.findFileById.mockResolvedValue({ id: 7, bookId: 10, libraryId: 1, absolutePath: '/books/a.m4b', format: 'm4b' });
       bookRepo.upsertProgress.mockResolvedValue(undefined);
       libraryService.verifyUserAccess.mockResolvedValue(undefined);
-      libraryService.findOne = vi.fn().mockResolvedValue(null);
+      libraryService.findOne = vi.fn().mockResolvedValue({ readingThreshold: 1, markAsFinishedPercentComplete: 99 });
 
       await service.saveProgress(user.id, 7, { percentage: 25, positionSeconds: 900 } as never, user);
 
@@ -2048,21 +2049,42 @@ describe('BookService', () => {
     });
 
     it('passes null positionSeconds when not provided in DTO', async () => {
-      const { service, bookRepo, libraryService } = makeService();
+      const { service, bookRepo, libraryService, userBookStatusService } = makeService();
       const user = makeUser();
 
       bookRepo.findFileById.mockResolvedValue({ id: 8, bookId: 11, libraryId: 2, absolutePath: '/books/b.epub', format: 'epub' });
       bookRepo.upsertProgress.mockResolvedValue(undefined);
       libraryService.verifyUserAccess.mockResolvedValue(undefined);
-      libraryService.findOne = vi.fn().mockResolvedValue(null);
+      libraryService.findOne = vi.fn().mockResolvedValue({ readingThreshold: 3, markAsFinishedPercentComplete: 97 });
 
       await service.saveProgress(user.id, 8, { percentage: 50 } as never, user);
 
       expect(bookRepo.upsertProgress).toHaveBeenCalledWith(user.id, 8, null, null, 50, null, null, null, null, null, null);
+      expect(libraryService.findOne).toHaveBeenCalledWith(2);
+      expect(userBookStatusService.autoUpdate).toHaveBeenCalledWith(user.id, 11, 50, 3, 97);
+    });
+
+    it('does not fail progress save when auto status update fails', async () => {
+      const { service, bookRepo, libraryService, userBookStatusService } = makeService();
+      const user = makeUser();
+      const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+
+      bookRepo.findFileById.mockResolvedValue({ id: 8, bookId: 11, libraryId: 2, absolutePath: '/books/b.epub', format: 'epub' });
+      bookRepo.upsertProgress.mockResolvedValue(undefined);
+      libraryService.verifyUserAccess.mockResolvedValue(undefined);
+      libraryService.findOne = vi.fn().mockResolvedValue({ readingThreshold: 3, markAsFinishedPercentComplete: 97 });
+      userBookStatusService.autoUpdate.mockRejectedValueOnce(new Error('status update failed'));
+
+      await expect(service.saveProgress(user.id, 8, { percentage: 50 } as never, user)).resolves.toBeUndefined();
+
+      expect(bookRepo.upsertProgress).toHaveBeenCalledWith(user.id, 8, null, null, 50, null, null, null, null, null, null);
+      expect(userBookStatusService.autoUpdate).toHaveBeenCalledWith(user.id, 11, 50, 3, 97);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[book.progress_status_update] [fail] userId=1 bookId=11 libraryId=2'));
+      warnSpy.mockRestore();
     });
 
     it('mirrors EPUB percentage to Kobo state for users with Kobo sync permission', async () => {
-      const { service, bookRepo, libraryService } = makeService();
+      const { service, bookRepo, libraryService, userBookStatusService } = makeService();
       const user = makeUser({ permissions: [Permission.KoboSync] });
 
       bookRepo.findFileById.mockResolvedValue({ id: 8, bookId: 11, libraryId: 2, absolutePath: '/books/b.epub', format: 'epub' });
@@ -2070,7 +2092,7 @@ describe('BookService', () => {
       bookRepo.isKoboTwoWayProgressSyncEnabled.mockResolvedValue(true);
       bookRepo.syncKoboReadingStateFromProgress.mockResolvedValue(true);
       libraryService.verifyUserAccess.mockResolvedValue(undefined);
-      libraryService.findOne = vi.fn().mockResolvedValue({ readingThreshold: 1, markAsFinishedPercentComplete: 99 });
+      libraryService.findOne = vi.fn().mockResolvedValue({ readingThreshold: 4, markAsFinishedPercentComplete: 90 });
 
       await service.saveProgress(
         user.id,
@@ -2087,6 +2109,7 @@ describe('BookService', () => {
       );
 
       expect(bookRepo.syncKoboReadingStateFromProgress).toHaveBeenCalledWith(user.id, 8, 50, 'OEBPS/ch1.xhtml', 'KoboSpan', 'kobo.25.1', 25);
+      expect(userBookStatusService.autoUpdate).toHaveBeenCalledWith(user.id, 11, 50, 4, 90);
     });
 
     it('does not mirror EPUB percentage to Kobo state when two-way sync is disabled', async () => {
@@ -2097,7 +2120,7 @@ describe('BookService', () => {
       bookRepo.upsertProgress.mockResolvedValue(undefined);
       bookRepo.isKoboTwoWayProgressSyncEnabled.mockResolvedValue(false);
       libraryService.verifyUserAccess.mockResolvedValue(undefined);
-      libraryService.findOne = vi.fn().mockResolvedValue({ readingThreshold: 1, markAsFinishedPercentComplete: 99 });
+      libraryService.findOne = vi.fn().mockResolvedValue({ readingThreshold: 4, markAsFinishedPercentComplete: 90 });
 
       await service.saveProgress(user.id, 8, { percentage: 50 } as never, user);
 
@@ -2142,7 +2165,7 @@ describe('BookService', () => {
 
   describe('saveAudioProgress', () => {
     it('writes audio progress when current file belongs to the target book', async () => {
-      const { service, bookRepo, libraryService } = makeService();
+      const { service, bookRepo, libraryService, userBookStatusService } = makeService();
       const user = makeUser({ id: 21 });
 
       bookRepo.findLibraryIdByBookId.mockResolvedValue(1);
@@ -2154,7 +2177,7 @@ describe('BookService', () => {
         libraryId: 1,
       });
       libraryService.verifyUserAccess.mockResolvedValue(undefined);
-      libraryService.findOne = vi.fn().mockResolvedValue(null);
+      libraryService.findOne = vi.fn().mockResolvedValue({ readingThreshold: 4, markAsFinishedPercentComplete: 90 });
 
       await service.saveAudioProgress(
         user.id,
@@ -2168,6 +2191,8 @@ describe('BookService', () => {
       );
 
       expect(bookRepo.upsertAudioProgress).toHaveBeenCalledWith(user.id, 10, 7, 120, 33);
+      expect(libraryService.findOne).toHaveBeenCalledWith(1);
+      expect(userBookStatusService.autoUpdate).toHaveBeenCalledWith(user.id, 10, 33, 4, 90);
     });
 
     it('throws BadRequestException when current file belongs to a different book', async () => {

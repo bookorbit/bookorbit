@@ -183,6 +183,21 @@ This starts the server, client, and types watcher concurrently with hot reload.
 
 If PostgreSQL is not running, start it first with `pnpm run db:up`.
 
+### API Docs
+
+Generated OpenAPI docs are disabled by default. To enable them for local development, set `SWAGGER_ENABLED=true` in `server/.env` or prefix the dev command:
+
+```bash
+SWAGGER_ENABLED=true pnpm dev
+```
+
+When enabled, open:
+
+| Docs         | URL                                 |
+| ------------ | ----------------------------------- |
+| Swagger UI   | http://localhost:3000/api/docs      |
+| OpenAPI JSON | http://localhost:3000/api/docs-json |
+
 <details>
 <summary>Running workspaces separately</summary>
 
@@ -209,14 +224,15 @@ pnpm --filter @bookorbit/types dev
 
 These are the variables you are most likely to need during development. See `server/.env.example` for the full list with comments.
 
-| Variable        | Purpose                            | Default (dev)                                             |
-| --------------- | ---------------------------------- | --------------------------------------------------------- |
-| `DATABASE_URL`  | PostgreSQL connection string       | `postgres://bookorbit:bookorbit@localhost:5432/bookorbit` |
-| `PORT`          | Server listen port                 | `3000`                                                    |
-| `NODE_ENV`      | Runtime mode                       | `development`                                             |
-| `JWT_SECRET`    | Signing key for auth tokens        | `change-me-in-production`                                 |
-| `APP_DATA_PATH` | Storage for covers, avatars, cache | `../local/data`                                           |
-| `APP_URL`       | Base URL for email links           | `http://localhost:5173`                                   |
+| Variable          | Purpose                            | Default (dev)                                             |
+| ----------------- | ---------------------------------- | --------------------------------------------------------- |
+| `DATABASE_URL`    | PostgreSQL connection string       | `postgres://bookorbit:bookorbit@localhost:5432/bookorbit` |
+| `PORT`            | Server listen port                 | `3000`                                                    |
+| `NODE_ENV`        | Runtime mode                       | `development`                                             |
+| `JWT_SECRET`      | Signing key for auth tokens        | `change-me-in-production`                                 |
+| `APP_DATA_PATH`   | Storage for covers, avatars, cache | `../local/data`                                           |
+| `APP_URL`         | Base URL for email links           | `http://localhost:5173`                                   |
+| `SWAGGER_ENABLED` | Serve Swagger UI and OpenAPI JSON  | `false`                                                   |
 
 ---
 

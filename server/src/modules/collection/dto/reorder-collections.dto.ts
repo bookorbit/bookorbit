@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import { ArrayMinSize, IsArray, IsInt, Min, ValidateNested } from 'class-validator';
 
-class CollectionOrderItem {
+export class CollectionOrderItem {
   @IsInt()
   @Min(1)
   id: number;

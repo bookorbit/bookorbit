@@ -4,6 +4,16 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "deleteOutDir": true,
-    "builder": "swc"
+    "builder": "swc",
+    "typeCheck": true,
+    "plugins": [
+      {
+        "name": "@nestjs/swagger",
+        "options": {
+          "classValidatorShim": true,
+          "dtoFileNameSuffix": [".dto.ts"]
+        }
+      }
+    ]
   }
 }

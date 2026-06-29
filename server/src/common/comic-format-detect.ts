@@ -2,8 +2,23 @@ import { open } from 'fs/promises';
 
 export type ComicContainerFormat = 'cbz' | 'cbr' | 'cb7';
 
+const RAR_SIGNATURES = [
+  [0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x00],
+  [0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x01, 0x00],
+] as const;
+
+const ZIP_SIGNATURES = [
+  [0x50, 0x4b, 0x03, 0x04],
+  [0x50, 0x4b, 0x05, 0x06],
+  [0x50, 0x4b, 0x07, 0x08],
+] as const;
+
+function startsWithSignature(buf: Buffer, bytesRead: number, signature: readonly number[]): boolean {
+  return bytesRead >= signature.length && signature.every((byte, index) => buf[index] === byte);
+}
+
 /**
- * Reads 4 magic bytes from the file to determine the actual container format.
+ * Reads magic bytes from the file to determine the actual container format.
  *
  * Some archives are mislabelled: a RAR archive saved as .cbz, or a ZIP saved
  * as .cbr. Extension-based classification routes them to the wrong reader;
@@ -22,14 +37,10 @@ export async function detectComicContainerFormat(absolutePath: string, storedFmt
   let fh: Awaited<ReturnType<typeof open>> | undefined;
   try {
     fh = await open(absolutePath, 'r');
-    const buf = Buffer.allocUnsafe(4);
-    const { bytesRead } = await fh.read(buf, 0, 4, 0);
-    if (bytesRead >= 4) {
-      // RAR: Rar!
-      if (buf[0] === 0x52 && buf[1] === 0x61 && buf[2] === 0x72 && buf[3] === 0x21) return 'cbr';
-      // ZIP: PK
-      if (buf[0] === 0x50 && buf[1] === 0x4b) return 'cbz';
-    }
+    const buf = Buffer.allocUnsafe(8);
+    const { bytesRead } = await fh.read(buf, 0, buf.length, 0);
+    if (RAR_SIGNATURES.some((signature) => startsWithSignature(buf, bytesRead, signature))) return 'cbr';
+    if (ZIP_SIGNATURES.some((signature) => startsWithSignature(buf, bytesRead, signature))) return 'cbz';
   } catch {
     return storedFmt;
   } finally {

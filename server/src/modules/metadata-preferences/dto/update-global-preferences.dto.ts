@@ -30,7 +30,7 @@ export class FieldPreferenceDto {
   mergeStrategy!: MergeStrategy;
 }
 
-class GenreOptionsDto {
+export class GenreOptionsDto {
   @IsIn(GENRE_MERGE_MODES)
   mode!: GenreMergeMode;
 

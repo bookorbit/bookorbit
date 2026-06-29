@@ -1,4 +1,4 @@
-import { defineComponent, ref } from 'vue'
+import { defineComponent, nextTick, ref } from 'vue'
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BookCard } from '@bookorbit/types'
@@ -110,6 +110,49 @@ describe('useBookViewContext', () => {
 
     expect(await nextPromise).toBe(101)
     expect(loadMore).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not let a deactivated kept-alive source passively clobber the active navigation context', async () => {
+    const nav = useBookNavigation()
+    const showSource = ref(true)
+    const slots = ref<BookSlot[]>([makeBook(1), makeBook(2), makeBook(3)])
+    const total = ref(3)
+    const loadMore = vi.fn<() => Promise<void>>(async () => {})
+
+    const Source = defineComponent({
+      setup() {
+        useBookViewContext(slots, total, loadMore)
+        return {}
+      },
+      template: '<div />',
+    })
+
+    const Harness = defineComponent({
+      components: { Source },
+      setup() {
+        return { showSource }
+      },
+      template: '<KeepAlive><Source v-if="showSource" /></KeepAlive>',
+    })
+
+    const wrapper = mount(Harness)
+    await nextTick()
+
+    nav.setBookContext([10, 20], 2)
+    expect(nav.currentIndex(20)).toBe(1)
+
+    showSource.value = false
+    await nextTick()
+
+    slots.value = []
+    total.value = 0
+    await nextTick()
+
+    expect(nav.bookIds.value).toEqual([10, 20])
+    expect(nav.currentIndex(20)).toBe(1)
+    expect(nav.total.value).toBe(2)
+
+    wrapper.unmount()
   })
 
   it('reports the absolute slot index after a jump rail loads a far block', async () => {

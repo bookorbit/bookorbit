@@ -2,6 +2,7 @@ export * from './audit';
 export * from './auth';
 export * from './comic-metadata';
 export * from './custom-metadata';
+export * from './custom-icons';
 export * from './migration';
 export * from './libraries';
 export * from './books';

@@ -215,6 +215,11 @@ type LibraryWriteSettingsLookupResult = {
 
 type PostMetadataSaveMode = 'sync' | 'schedule';
 
+export type ProgressStatusFileContext = {
+  bookId: number;
+  libraryId: number;
+};
+
 @Injectable()
 export class BookService {
   private readonly logger = new Logger(BookService.name);
@@ -1830,10 +1835,20 @@ export class BookService {
       throw new BadRequestException(`currentFileId ${dto.currentFileId} does not belong to book ${bookId}`);
     }
     await this.bookRepo.upsertAudioProgress(userId, bookId, dto.currentFileId, dto.positionSeconds, dto.percentage);
-    this.libraryService
-      .findOne(libraryId)
-      .then((lib) => this.userBookStatusService.autoUpdate(userId, bookId, dto.percentage, lib.readingThreshold, lib.markAsFinishedPercentComplete))
-      .catch((err: Error) => this.logger.warn(`Auto status update failed for book ${bookId}: ${err.message}`));
+    await this.autoUpdateReadStatusForProgress(userId, { bookId, libraryId }, dto.percentage);
+  }
+
+  async autoUpdateReadStatusForProgress(userId: number, file: ProgressStatusFileContext, percentage: number): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      const library = await this.libraryService.findOne(file.libraryId);
+      await this.userBookStatusService.autoUpdate(userId, file.bookId, percentage, library.readingThreshold, library.markAsFinishedPercentComplete);
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.logger.warn(
+        `[book.progress_status_update] [fail] userId=${userId} bookId=${file.bookId} libraryId=${file.libraryId} durationMs=${Date.now() - startedAt} errorClass=${err.constructor.name} error="${sanitizeLogValue(err.message)}" - auto status update failed`,
+      );
+    }
   }
 
   /**
@@ -1872,12 +1887,7 @@ export class BookService {
         dto.koboContentSourceProgressPercent ?? null,
       );
     }
-    this.libraryService
-      .findOne(file.libraryId)
-      .then((lib) =>
-        this.userBookStatusService.autoUpdate(userId, file.bookId, dto.percentage, lib.readingThreshold, lib.markAsFinishedPercentComplete),
-      )
-      .catch((err: Error) => this.logger.warn(`Auto status update failed for book ${file.bookId}: ${err.message}`));
+    await this.autoUpdateReadStatusForProgress(userId, file, dto.percentage);
   }
 
   async clearFileProgress(userId: number, fileId: number, user: RequestUser): Promise<void> {

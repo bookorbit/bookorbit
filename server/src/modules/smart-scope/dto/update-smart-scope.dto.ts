@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import type { GroupRule } from '@bookorbit/types';
+import { ICON_VALUE_MAX_LENGTH, type GroupRule } from '@bookorbit/types';
 import { IsArray, IsBoolean, IsNotEmpty, IsObject, IsOptional, IsString, MaxLength, ValidateIf, ValidateNested } from 'class-validator';
 import { SortSpecDto } from './create-smart-scope.dto';
 
@@ -17,7 +17,7 @@ export class UpdateSmartScopeDto {
   @Transform(({ value }) => trimString(value))
   @IsString()
   @IsNotEmpty()
-  @MaxLength(64)
+  @MaxLength(ICON_VALUE_MAX_LENGTH)
   icon?: string;
 
   @IsOptional()

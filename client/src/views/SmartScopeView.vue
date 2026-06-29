@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   AlertTriangle,
@@ -57,7 +57,7 @@ const { viewMode, effectiveViewMode } = useEffectiveViewMode()
 const { hasPermission, isDemoRestrictedAccount } = usePermissions()
 const { smartScopeFilterExpanded } = useDisplaySettings()
 
-const smartScopeId = computed(() => Number(route.params.id))
+const smartScopeId = shallowRef(Number(route.params.id))
 const coverAspectRatio = computed(() => DEFAULT_COVER_ASPECT_RATIO)
 const { coverSize, gridGap } = useViewDisplaySettings('smartScope', smartScopeId, coverAspectRatio)
 const { tableDensity } = useDisplaySettings()
@@ -439,6 +439,7 @@ defineOptions({ name: 'SmartScopeView' })
       <ViewHeader
         :title="smartScope?.name ?? 'SmartScope'"
         :icon="smartScope?.icon ?? undefined"
+        fallback-icon="Aperture"
         :total="total"
         v-model:coverSize="coverSize"
         v-model:gridGap="gridGap"

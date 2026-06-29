@@ -20,6 +20,7 @@ export enum Permission {
   // Administration
   ManageLibraries = "manage_libraries",
   ManageMetadataConfig = "manage_metadata_config",
+  ManageIcons = "manage_icons",
   ManageAppSettings = "manage_app_settings",
   ManageUsers = "manage_users",
   ViewAuditLog = "view_audit_log",
@@ -43,6 +44,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   [Permission.ManageEmail]: "Manage email",
   [Permission.ManageLibraries]: "Manage libraries",
   [Permission.ManageMetadataConfig]: "Metadata config",
+  [Permission.ManageIcons]: "Manage icons",
   [Permission.ManageAppSettings]: "App settings",
   [Permission.ManageUsers]: "Manage users",
   [Permission.ViewAuditLog]: "View audit log",

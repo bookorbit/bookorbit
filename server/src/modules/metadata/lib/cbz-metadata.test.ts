@@ -2,10 +2,11 @@ vi.mock('fs/promises');
 vi.mock('node-unrar-js');
 vi.mock('../../../common/sevenzip');
 
-import { readFile } from 'fs/promises';
+import { open, readFile } from 'fs/promises';
 import { getSevenZip } from '../../../common/sevenzip';
 import { extractCb7Metadata, extractCbzMetadata } from './cbz-metadata';
 
+const mockOpen = open as MockedFunction<typeof open>;
 const mockReadFile = readFile as MockedFunction<typeof readFile>;
 const mockGetSevenZip = getSevenZip as MockedFunction<typeof getSevenZip>;
 
@@ -81,21 +82,46 @@ function buildZipCommentOnly(comment: string): Buffer {
   return buildZip([], Buffer.from(comment, 'utf-8'));
 }
 
+function mockZipFile(buf: Buffer): void {
+  mockOpen.mockImplementation(() => {
+    const handle = {
+      stat: vi.fn().mockResolvedValue({ size: buf.length }),
+      close: vi.fn().mockResolvedValue(undefined),
+      read: vi.fn((target: Buffer, targetOffset: number, length: number, position: number) => {
+        if (position >= buf.length) return Promise.resolve({ bytesRead: 0, buffer: target });
+        const bytesRead = buf.copy(target, targetOffset, position, Math.min(position + length, buf.length));
+        return Promise.resolve({ bytesRead, buffer: target });
+      }),
+    };
+    return Promise.resolve(handle as unknown as Awaited<ReturnType<typeof open>>);
+  });
+}
+
 beforeEach(() => vi.resetAllMocks());
 
 describe('extractCbzMetadata', () => {
   describe('ComicInfo.xml parsing', () => {
     it('extracts title from ComicInfo.xml', async () => {
       const xml = `<ComicInfo><Title>My Comic</Title></ComicInfo>`;
-      mockReadFile.mockResolvedValue(buildZipWithComicInfo(xml) as unknown as Buffer);
+      mockZipFile(buildZipWithComicInfo(xml));
 
       const r = await extractCbzMetadata('/book.cbz');
       expect(r?.title).toBe('My Comic');
     });
 
+    it('does not read the entire CBZ file into memory', async () => {
+      const xml = `<ComicInfo><Title>Streamed Comic</Title></ComicInfo>`;
+      mockZipFile(buildZipWithComicInfo(xml));
+
+      const r = await extractCbzMetadata('/book.cbz');
+
+      expect(r?.title).toBe('Streamed Comic');
+      expect(mockReadFile).not.toHaveBeenCalled();
+    });
+
     it('extracts series name and issue number', async () => {
       const xml = `<ComicInfo><Series>Amazing Series</Series><Number>5</Number></ComicInfo>`;
-      mockReadFile.mockResolvedValue(buildZipWithComicInfo(xml) as unknown as Buffer);
+      mockZipFile(buildZipWithComicInfo(xml));
 
       const r = await extractCbzMetadata('/book.cbz');
       expect(r?.seriesName).toBe('Amazing Series');
@@ -104,7 +130,7 @@ describe('extractCbzMetadata', () => {
 
     it('extracts authors from Writer field', async () => {
       const xml = `<ComicInfo><Writer>Alan Moore</Writer></ComicInfo>`;
-      mockReadFile.mockResolvedValue(buildZipWithComicInfo(xml) as unknown as Buffer);
+      mockZipFile(buildZipWithComicInfo(xml));
 
       const r = await extractCbzMetadata('/book.cbz');
       expect(r?.authors).toHaveLength(1);
@@ -114,7 +140,7 @@ describe('extractCbzMetadata', () => {
 
     it('splits comma-separated writers into multiple authors', async () => {
       const xml = `<ComicInfo><Writer>Writer One, Writer Two</Writer></ComicInfo>`;
-      mockReadFile.mockResolvedValue(buildZipWithComicInfo(xml) as unknown as Buffer);
+      mockZipFile(buildZipWithComicInfo(xml));
 
       const r = await extractCbzMetadata('/book.cbz');
       expect(r?.authors).toHaveLength(2);
@@ -123,7 +149,7 @@ describe('extractCbzMetadata', () => {
 
     it('extracts Genre and Tags into separate deduplicated lists', async () => {
       const xml = `<ComicInfo><Genre>Superhero,Fantasy</Genre><Tags>Fantasy,Horror</Tags></ComicInfo>`;
-      mockReadFile.mockResolvedValue(buildZipWithComicInfo(xml) as unknown as Buffer);
+      mockZipFile(buildZipWithComicInfo(xml));
 
       const r = await extractCbzMetadata('/book.cbz');
       expect(r?.genres).toContain('Superhero');
@@ -142,7 +168,7 @@ describe('extractCbzMetadata', () => {
         <LanguageISO>en</LanguageISO>
         <Summary>Watchmen summary.</Summary>
       </ComicInfo>`;
-      mockReadFile.mockResolvedValue(buildZipWithComicInfo(xml) as unknown as Buffer);
+      mockZipFile(buildZipWithComicInfo(xml));
 
       const r = await extractCbzMetadata('/book.cbz');
       expect(r?.publisher).toBe('DC Comics');
@@ -153,7 +179,7 @@ describe('extractCbzMetadata', () => {
 
     it('maps CommunityRating from 0-5 scale into 0-10 scale', async () => {
       const xml = `<ComicInfo><CommunityRating>4.5</CommunityRating></ComicInfo>`;
-      mockReadFile.mockResolvedValue(buildZipWithComicInfo(xml) as unknown as Buffer);
+      mockZipFile(buildZipWithComicInfo(xml));
 
       const r = await extractCbzMetadata('/book.cbz');
       expect(r?.rating).toBe(9);
@@ -161,7 +187,7 @@ describe('extractCbzMetadata', () => {
 
     it('clamps CommunityRating to a maximum of 10 after scaling', async () => {
       const xml = `<ComicInfo><CommunityRating>8</CommunityRating></ComicInfo>`;
-      mockReadFile.mockResolvedValue(buildZipWithComicInfo(xml) as unknown as Buffer);
+      mockZipFile(buildZipWithComicInfo(xml));
 
       const r = await extractCbzMetadata('/book.cbz');
       expect(r?.rating).toBe(10);
@@ -169,7 +195,7 @@ describe('extractCbzMetadata', () => {
 
     it('truncates fractional year to integer', async () => {
       const xml = `<ComicInfo><Year>1986.5</Year></ComicInfo>`;
-      mockReadFile.mockResolvedValue(buildZipWithComicInfo(xml) as unknown as Buffer);
+      mockZipFile(buildZipWithComicInfo(xml));
 
       const r = await extractCbzMetadata('/book.cbz');
       expect(r?.publishedYear).toBe(1986);
@@ -177,7 +203,7 @@ describe('extractCbzMetadata', () => {
 
     it('returns null for missing optional fields', async () => {
       const xml = `<ComicInfo><Title>Minimal</Title></ComicInfo>`;
-      mockReadFile.mockResolvedValue(buildZipWithComicInfo(xml) as unknown as Buffer);
+      mockZipFile(buildZipWithComicInfo(xml));
 
       const r = await extractCbzMetadata('/book.cbz');
       expect(r?.publisher).toBeNull();
@@ -187,7 +213,7 @@ describe('extractCbzMetadata', () => {
 
     it('extracts ComicInfo.xml when local header size is zero (data descriptor mode)', async () => {
       const xml = `<ComicInfo><Title>Descriptor Comic</Title></ComicInfo>`;
-      mockReadFile.mockResolvedValue(buildZipWithComicInfo(xml, undefined, { dataDescriptor: true }) as unknown as Buffer);
+      mockZipFile(buildZipWithComicInfo(xml, undefined, { dataDescriptor: true }));
 
       const r = await extractCbzMetadata('/book.cbz');
       expect(r?.title).toBe('Descriptor Comic');
@@ -202,7 +228,7 @@ describe('extractCbzMetadata', () => {
           [bookorbit:hardcoverEditionId] 8941973
         </Notes>
       </ComicInfo>`;
-      mockReadFile.mockResolvedValue(buildZipWithComicInfo(xml) as unknown as Buffer);
+      mockZipFile(buildZipWithComicInfo(xml));
 
       const r = await extractCbzMetadata('/book.cbz');
       expect(r?.ranobedbId).toBe('ranobe-1');
@@ -224,7 +250,7 @@ describe('extractCbzMetadata', () => {
           tags: [],
         },
       });
-      mockReadFile.mockResolvedValue(buildZipCommentOnly(comment) as unknown as Buffer);
+      mockZipFile(buildZipCommentOnly(comment));
 
       const r = await extractCbzMetadata('/book.cbz');
       expect(r?.title).toBe('JSON Comic');
@@ -244,7 +270,7 @@ describe('extractCbzMetadata', () => {
           tags: [],
         },
       });
-      mockReadFile.mockResolvedValue(buildZipCommentOnly(comment) as unknown as Buffer);
+      mockZipFile(buildZipCommentOnly(comment));
 
       const r = await extractCbzMetadata('/book.cbz');
       expect(r?.authors).toHaveLength(1);
@@ -255,7 +281,7 @@ describe('extractCbzMetadata', () => {
       const comment = JSON.stringify({
         'ComicBookInfo/1.0': { tags: ['superhero', 'action'], credits: [] },
       });
-      mockReadFile.mockResolvedValue(buildZipCommentOnly(comment) as unknown as Buffer);
+      mockZipFile(buildZipCommentOnly(comment));
 
       const r = await extractCbzMetadata('/book.cbz');
       expect(r?.tags).toEqual(['superhero', 'action']);
@@ -265,7 +291,7 @@ describe('extractCbzMetadata', () => {
       const comment = JSON.stringify({
         'ComicBookInfo/1.0': { issue: 0, credits: [], tags: [] },
       });
-      mockReadFile.mockResolvedValue(buildZipCommentOnly(comment) as unknown as Buffer);
+      mockZipFile(buildZipCommentOnly(comment));
 
       const r = await extractCbzMetadata('/book.cbz');
       expect(r?.seriesIndex).toBe(0);
@@ -273,20 +299,20 @@ describe('extractCbzMetadata', () => {
   });
 
   describe('error handling', () => {
-    it('returns null when file read fails', async () => {
-      mockReadFile.mockRejectedValue(new Error('ENOENT'));
+    it('returns null when file open fails', async () => {
+      mockOpen.mockRejectedValue(new Error('ENOENT'));
       expect(await extractCbzMetadata('/missing.cbz')).toBeNull();
     });
 
     it('returns null when ZIP has no ComicInfo.xml and no valid JSON comment', async () => {
       const emptyZip = Buffer.from([0x50, 0x4b, 0x05, 0x06, ...new Array(18).fill(0)]);
-      mockReadFile.mockResolvedValue(emptyZip as unknown as Buffer);
+      mockZipFile(emptyZip);
       expect(await extractCbzMetadata('/empty.cbz')).toBeNull();
     });
 
     it('returns null when ComicInfo.xml has no ComicInfo root element', async () => {
       const xml = `<SomeOtherRoot><Title>Test</Title></SomeOtherRoot>`;
-      mockReadFile.mockResolvedValue(buildZipWithComicInfo(xml) as unknown as Buffer);
+      mockZipFile(buildZipWithComicInfo(xml));
       expect(await extractCbzMetadata('/bad.cbz')).toBeNull();
     });
   });

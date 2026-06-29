@@ -14,6 +14,7 @@ import { join } from 'path';
 import { DEFAULT_FORMAT_PRIORITY } from '@bookorbit/types';
 import type { AccessLevel, LibraryFileSyncProgressEvent, OrganizationMode, WriteResult } from '@bookorbit/types';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { normalizeIconValue } from '../../common/utils/icon-value.utils';
 import type { RequestUser } from '../../common/types/request-user';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED } from '../achievement/achievement-events.service';
 import { FileWriteService } from '../file-write/file-write.service';
@@ -31,12 +32,6 @@ import { LibraryRepository } from './library.repository';
 interface LibraryMetadataWriteStreamOptions {
   onProgress?: (event: LibraryFileSyncProgressEvent) => void;
   isCancelled?: () => boolean;
-}
-
-function normalizeIcon(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const icon = value.trim();
-  return icon.length > 0 ? icon : null;
 }
 
 interface LibraryMetadataWriteSummary {
@@ -107,7 +102,7 @@ export class LibraryService {
 
   async create(dto: CreateLibraryDto) {
     await this.assertNameAvailable(dto.name);
-    const icon = normalizeIcon(dto.icon);
+    const icon = normalizeIconValue(dto.icon);
     if (!icon) {
       throw new BadRequestException('Icon is required');
     }
@@ -170,7 +165,7 @@ export class LibraryService {
     }
 
     const { folders: folderPaths, ...fields } = dto;
-    const icon = fields.icon !== undefined ? normalizeIcon(fields.icon) : normalizeIcon(existing.icon);
+    const icon = fields.icon !== undefined ? normalizeIconValue(fields.icon) : normalizeIconValue(existing.icon);
     if (!icon) {
       throw new BadRequestException('Icon is required');
     }

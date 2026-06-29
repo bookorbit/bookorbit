@@ -85,7 +85,7 @@ export function useBookTableShell({ books, querySelection }: BookTableShellOptio
     const orderedIds = books.value.filter((book) => selection.selectedIds.value.has(book.id)).map((book) => book.id)
     if (orderedIds.length === 0) return
     setBookContext(orderedIds, orderedIds.length)
-    router.push({ name: 'book-detail', params: { bookId: orderedIds[0] }, query: { tab: 'details' } })
+    router.push({ name: 'book-detail', params: { bookId: orderedIds[0] }, query: { tab: 'edit' } })
     selection.exitSelectionMode()
   }
 

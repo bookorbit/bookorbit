@@ -79,6 +79,26 @@ describe('validateEnv', () => {
     ).toThrow('OIDC_ALLOW_LOCAL_ISSUERS must be one of true/false/1/0/yes/no/on/off');
   });
 
+  it('accepts boolean-like values for SWAGGER_ENABLED', () => {
+    for (const SWAGGER_ENABLED of ['true', 'false', '1', '0', 'yes', 'no', 'on', 'off']) {
+      expect(() =>
+        validateEnv({
+          ...BASE_ENV,
+          SWAGGER_ENABLED,
+        }),
+      ).not.toThrow();
+    }
+  });
+
+  it('rejects invalid SWAGGER_ENABLED values', () => {
+    expect(() =>
+      validateEnv({
+        ...BASE_ENV,
+        SWAGGER_ENABLED: 'maybe',
+      }),
+    ).toThrow('SWAGGER_ENABLED must be one of true/false/1/0/yes/no/on/off');
+  });
+
   it('accepts a custom Book Dock container path', () => {
     expect(() =>
       validateEnv({

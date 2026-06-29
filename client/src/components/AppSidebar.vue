@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, type Component } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as Icons from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
@@ -33,11 +33,6 @@ import { useThemeStore } from '@/stores/theme'
 import { useAppInfo } from '@/features/settings/composables/useAppInfo'
 import { buildSidebarVersionUi } from '@/components/sidebar/versionUi'
 import { useWhatsNew } from '@/features/whats-new/composables/useWhatsNew'
-
-function resolveIcon(name: string | null | undefined, fallback: Component): Component {
-  if (name && name in Icons) return (Icons as Record<string, unknown>)[name] as Component
-  return fallback
-}
 
 function useSidebarSection(key: string) {
   const isOpen = ref(localStorage.getItem(`bookorbit:sidebar:${key}`) !== 'false')
@@ -266,7 +261,8 @@ onUnmounted(() => stopLibraryUploadListener())
                   :key="lib.id"
                   :is-active="activeLibraryId === lib.id"
                   :tooltip="getProgress(lib.id)?.status === 'running' ? `${lib.name} - Scanning ${scanPct(lib.id)}%` : lib.name"
-                  :icon="resolveIcon(lib.icon, Icons.BookCopy)"
+                  :icon="lib.icon || 'BookCopy'"
+                  fallback-icon="BookCopy"
                   :icon-class="''"
                   :label="lib.name"
                   @click="navigateFromSidebar({ name: 'library', params: { id: lib.id } })"
@@ -350,7 +346,8 @@ onUnmounted(() => stopLibraryUploadListener())
                   :key="smartScope.id"
                   :is-active="activeSmartScopeId === smartScope.id"
                   :tooltip="smartScope.name"
-                  :icon="resolveIcon(smartScope.icon, Icons.Aperture)"
+                  :icon="smartScope.icon || 'Aperture'"
+                  fallback-icon="Aperture"
                   :label="smartScope.name"
                   @click="navigateFromSidebar({ name: 'smartScope', params: { id: smartScope.id } })"
                 >
@@ -412,7 +409,8 @@ onUnmounted(() => stopLibraryUploadListener())
                   :key="collection.id"
                   :is-active="activeCollectionId === collection.id"
                   :tooltip="collection.name"
-                  :icon="resolveIcon(collection.icon, Icons.FolderOpen)"
+                  :icon="collection.icon || 'FolderOpen'"
+                  fallback-icon="FolderOpen"
                   :label="collection.name"
                   @click="navigateFromSidebar({ name: 'collection', params: { id: collection.id } })"
                 >

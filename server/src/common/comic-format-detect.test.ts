@@ -32,9 +32,19 @@ describe('detectComicContainerFormat', () => {
     await expect(detectComicContainerFormat('/a.cbr', 'cbr')).resolves.toBe('cbz');
   });
 
-  it('detects a RAR file as "cbr" regardless of stored format', async () => {
-    mockOpen.mockResolvedValue(makeHandle([0x52, 0x61, 0x72, 0x21]));
+  it('detects a RAR 4 file as "cbr" regardless of stored format', async () => {
+    mockOpen.mockResolvedValue(makeHandle([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x00]));
     await expect(detectComicContainerFormat('/a.cbz', 'cbz')).resolves.toBe('cbr');
+  });
+
+  it('detects a RAR 5 file as "cbr" regardless of stored format', async () => {
+    mockOpen.mockResolvedValue(makeHandle([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x01, 0x00]));
+    await expect(detectComicContainerFormat('/a.cbz', 'cbz')).resolves.toBe('cbr');
+  });
+
+  it('does not classify a Rar! prefix without the full RAR signature as "cbr"', async () => {
+    mockOpen.mockResolvedValue(makeHandle([0x52, 0x61, 0x72, 0x21, 0x00, 0x00, 0x00, 0x00]));
+    await expect(detectComicContainerFormat('/a.cbz', 'cbz')).resolves.toBe('cbz');
   });
 
   it('returns stored format when bytes match neither ZIP nor RAR', async () => {

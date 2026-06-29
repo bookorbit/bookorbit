@@ -3,6 +3,7 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import { ValidationPipe } from '@nestjs/common';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { Logger } from 'nestjs-pino';
+import type { ConfigType } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { join } from 'path';
@@ -11,6 +12,8 @@ import fastifyMultipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import fastifyHelmet from '@fastify/helmet';
 import fastifyCompress from '@fastify/compress';
+import { appConfig } from './config/config';
+import { setupSwaggerDocs } from './swagger';
 import {
   parseBooleanEnv,
   parseTrustProxy,
@@ -66,6 +69,11 @@ async function bootstrap() {
   );
 
   app.useGlobalFilters(new GlobalExceptionFilter());
+
+  const appConfiguration = app.get<ConfigType<typeof appConfig>>(appConfig.KEY);
+  if (appConfiguration.swaggerEnabled) {
+    await setupSwaggerDocs(app, appConfiguration);
+  }
 
   await app.register(fastifyHelmet as never, {
     crossOriginOpenerPolicy: false,

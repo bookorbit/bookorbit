@@ -1469,7 +1469,7 @@ describe('BookDockFinalizeService', () => {
     const handler = events.on.mock.calls[0]?.[1] as ((fileId: number) => void) | undefined;
     expect(handler).toBeDefined();
     handler?.(77);
-    await Promise.resolve();
+    await (service as any).autoFinalizeQueue.waitForIdle();
 
     expect(triggerSpy).toHaveBeenCalledWith(77);
   });

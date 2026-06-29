@@ -10,7 +10,7 @@ import type {
 
 import { ALL_METADATA_FIELDS } from '@bookorbit/types';
 
-class ScoreConditionDto {
+export class ScoreConditionDto {
   @IsDefined()
   @IsBoolean()
   enabled: boolean;
@@ -22,7 +22,7 @@ class ScoreConditionDto {
   threshold: number;
 }
 
-class MissingFieldsConditionDto {
+export class MissingFieldsConditionDto {
   @IsDefined()
   @IsBoolean()
   enabled: boolean;
@@ -33,13 +33,13 @@ class MissingFieldsConditionDto {
   fields: MetadataField[];
 }
 
-class NeverFetchedConditionDto {
+export class NeverFetchedConditionDto {
   @IsDefined()
   @IsBoolean()
   enabled: boolean;
 }
 
-class ConditionsDto implements BookMetadataFetchConditions {
+export class ConditionsDto implements BookMetadataFetchConditions {
   @IsDefined()
   @IsObject()
   @ValidateNested()
@@ -59,7 +59,7 @@ class ConditionsDto implements BookMetadataFetchConditions {
   neverFetched: NeverFetchedConditionDto;
 }
 
-class ScoreConditionOverrideDto implements Partial<ScoreConditionDto> {
+export class ScoreConditionOverrideDto implements Partial<ScoreConditionDto> {
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
@@ -71,7 +71,7 @@ class ScoreConditionOverrideDto implements Partial<ScoreConditionDto> {
   threshold?: number;
 }
 
-class MissingFieldsConditionOverrideDto implements Partial<MissingFieldsConditionDto> {
+export class MissingFieldsConditionOverrideDto implements Partial<MissingFieldsConditionDto> {
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
@@ -82,13 +82,13 @@ class MissingFieldsConditionOverrideDto implements Partial<MissingFieldsConditio
   fields?: MetadataField[];
 }
 
-class NeverFetchedConditionOverrideDto implements Partial<NeverFetchedConditionDto> {
+export class NeverFetchedConditionOverrideDto implements Partial<NeverFetchedConditionDto> {
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
 }
 
-class ConditionsOverrideDto implements BookMetadataFetchConditionsOverride {
+export class ConditionsOverrideDto implements BookMetadataFetchConditionsOverride {
   @IsOptional()
   @IsObject()
   @ValidateNested()

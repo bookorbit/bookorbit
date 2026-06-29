@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import { ArrayMinSize, ArrayUnique, IsArray, IsInt, Min, ValidateNested } from 'class-validator';
 
-class SmartScopeOrderItem {
+export class SmartScopeOrderItem {
   @IsInt()
   @Min(1)
   id: number;

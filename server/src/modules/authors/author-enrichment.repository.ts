@@ -11,6 +11,8 @@ import { AuthorEnrichmentReason } from './author-enrichment-reasons';
 
 type Db = NodePgDatabase<typeof schema>;
 
+const DEFAULT_SCHEDULE_BATCH_SIZE = 1000;
+
 export const AUTHOR_ENRICHMENT_ACTIVE_STATUSES = ['queued', 'rate_limited'] as const;
 
 export type AuthorEnrichmentQueueRow = typeof authorEnrichmentQueue.$inferSelect;
@@ -19,15 +21,28 @@ export type AuthorEnrichmentQueueRow = typeof authorEnrichmentQueue.$inferSelect
 export class AuthorEnrichmentRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  async upsertSchedule(authorIds: number[], reason: AuthorEnrichmentReason): Promise<number> {
+  async upsertSchedule(authorIds: number[], reason: AuthorEnrichmentReason, batchSize = DEFAULT_SCHEDULE_BATCH_SIZE): Promise<number> {
     const uniqueAuthorIds = [...new Set(authorIds)].filter((id) => Number.isInteger(id) && id > 0);
     if (uniqueAuthorIds.length === 0) return 0;
 
+    const resolvedBatchSize = resolveBatchSize(batchSize);
+    if (!resolvedBatchSize) return 0;
+
     const now = new Date();
+    let totalTouched = 0;
+    for (let offset = 0; offset < uniqueAuthorIds.length; offset += resolvedBatchSize) {
+      const batch = uniqueAuthorIds.slice(offset, offset + resolvedBatchSize);
+      totalTouched += await this.upsertScheduleBatch(batch, reason, now);
+    }
+
+    return totalTouched;
+  }
+
+  private async upsertScheduleBatch(authorIds: number[], reason: AuthorEnrichmentReason, now: Date): Promise<number> {
     const touched = await this.db
       .insert(authorEnrichmentQueue)
       .values(
-        uniqueAuthorIds.map((authorId) => ({
+        authorIds.map((authorId) => ({
           authorId,
           status: 'queued',
           reason,
@@ -51,36 +66,95 @@ export class AuthorEnrichmentRepository {
     return touched.length;
   }
 
-  async enqueueAllLinkedAuthors(reason: AuthorEnrichmentReason): Promise<number> {
-    const rows = await this.db.selectDistinct({ authorId: bookAuthors.authorId }).from(bookAuthors);
-    const authorIds = rows.map((row) => row.authorId);
-    return this.upsertSchedule(authorIds, reason);
+  async enqueueAllLinkedAuthors(reason: AuthorEnrichmentReason, batchSize = DEFAULT_SCHEDULE_BATCH_SIZE): Promise<number> {
+    const resolvedBatchSize = resolveBatchSize(batchSize);
+    if (!resolvedBatchSize) return 0;
+
+    let cursorAuthorId = 0;
+    let totalQueued = 0;
+
+    for (;;) {
+      const rows = await this.db
+        .selectDistinct({ authorId: bookAuthors.authorId })
+        .from(bookAuthors)
+        .where(sql`${bookAuthors.authorId} > ${cursorAuthorId}`)
+        .orderBy(asc(bookAuthors.authorId))
+        .limit(resolvedBatchSize);
+
+      if (rows.length === 0) break;
+
+      totalQueued += await this.upsertSchedule(
+        rows.map((row) => row.authorId),
+        reason,
+        resolvedBatchSize,
+      );
+      cursorAuthorId = rows[rows.length - 1]!.authorId;
+    }
+
+    return totalQueued;
   }
 
-  async filterEligibleAuthorIds(authorIds: number[], conditions: AuthorEnrichmentConditions): Promise<number[]> {
+  async filterEligibleAuthorIds(
+    authorIds: number[],
+    conditions: AuthorEnrichmentConditions,
+    batchSize = DEFAULT_SCHEDULE_BATCH_SIZE,
+  ): Promise<number[]> {
     if (authorIds.length === 0) return [];
 
     const eligibility = this.buildEligibilityPredicate(conditions);
     if (!eligibility) return [];
 
-    const rows = await this.db
-      .select({ id: authors.id })
-      .from(authors)
-      .where(and(inArray(authors.id, authorIds), eligibility));
+    const resolvedBatchSize = resolveBatchSize(batchSize);
+    if (!resolvedBatchSize) return [];
 
-    return rows.map((r) => r.id);
+    const eligibleIds: number[] = [];
+    const uniqueAuthorIds = [...new Set(authorIds)].filter((id) => Number.isInteger(id) && id > 0);
+    for (let offset = 0; offset < uniqueAuthorIds.length; offset += resolvedBatchSize) {
+      const batch = uniqueAuthorIds.slice(offset, offset + resolvedBatchSize);
+      const rows = await this.db
+        .select({ id: authors.id })
+        .from(authors)
+        .where(and(inArray(authors.id, batch), eligibility));
+      eligibleIds.push(...rows.map((r) => r.id));
+    }
+
+    return eligibleIds;
   }
 
-  async enqueueEligibleLinkedAuthors(reason: AuthorEnrichmentReason, conditions: AuthorEnrichmentConditions): Promise<number> {
+  async enqueueEligibleLinkedAuthors(
+    reason: AuthorEnrichmentReason,
+    conditions: AuthorEnrichmentConditions,
+    batchSize = DEFAULT_SCHEDULE_BATCH_SIZE,
+  ): Promise<number> {
     const eligibility = this.buildEligibilityPredicate(conditions);
     if (!eligibility) return 0;
-    const rows = await this.db
-      .selectDistinct({ authorId: bookAuthors.authorId })
-      .from(bookAuthors)
-      .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
-      .where(eligibility);
-    const eligibleIds = rows.map((row) => row.authorId);
-    return this.upsertSchedule(eligibleIds, reason);
+
+    const resolvedBatchSize = resolveBatchSize(batchSize);
+    if (!resolvedBatchSize) return 0;
+
+    let cursorAuthorId = 0;
+    let totalQueued = 0;
+
+    for (;;) {
+      const rows = await this.db
+        .selectDistinct({ authorId: bookAuthors.authorId })
+        .from(bookAuthors)
+        .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
+        .where(and(eligibility, sql`${bookAuthors.authorId} > ${cursorAuthorId}`))
+        .orderBy(asc(bookAuthors.authorId))
+        .limit(resolvedBatchSize);
+
+      if (rows.length === 0) break;
+
+      totalQueued += await this.upsertSchedule(
+        rows.map((row) => row.authorId),
+        reason,
+        resolvedBatchSize,
+      );
+      cursorAuthorId = rows[rows.length - 1]!.authorId;
+    }
+
+    return totalQueued;
   }
 
   async countEligibleLinkedAuthors(conditions: AuthorEnrichmentConditions): Promise<number> {
@@ -286,4 +360,10 @@ function isUniqueViolation(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   const code = Reflect.get(error, 'code');
   return code === '23505';
+}
+
+function resolveBatchSize(batchSize: number): number | null {
+  const resolved = Math.floor(batchSize);
+  if (!Number.isFinite(resolved) || resolved <= 0) return null;
+  return resolved;
 }

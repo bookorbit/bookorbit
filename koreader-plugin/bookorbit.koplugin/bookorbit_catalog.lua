@@ -22,12 +22,15 @@ local FrameContainer = require("ui/widget/container/framecontainer")
 local Geom = require("ui/geometry")
 local HorizontalGroup = require("ui/widget/horizontalgroup")
 local HorizontalSpan = require("ui/widget/horizontalspan")
+local IconButton = require("ui/widget/iconbutton")
 local InfoMessage = require("ui/widget/infomessage")
 local InputDialog = require("ui/widget/inputdialog")
 local Menu = require("ui/widget/menu")
 local NetworkMgr = require("ui/network/manager")
+local OverlapGroup = require("ui/widget/overlapgroup")
 local Size = require("ui/size")
 local TextBoxWidget = require("ui/widget/textboxwidget")
+local TitleBar = require("ui/widget/titlebar")
 local TextViewer = require("ui/widget/textviewer")
 local Trapper = require("ui/trapper")
 local UIManager = require("ui/uimanager")
@@ -46,6 +49,7 @@ local CatalogWidgets = require("bookorbit_catalog_widgets")
 local CatalogDownload = require("bookorbit_catalog_download")
 
 local Screen = Device.screen
+local DGENERIC_ICON_SIZE = G_defaults:readSetting("DGENERIC_ICON_SIZE")
 
 local DEFAULT_GRID_COLUMNS = CatalogUtil.DEFAULT_GRID_COLUMNS
 local DEFAULT_GRID_ROWS = CatalogUtil.DEFAULT_GRID_ROWS
@@ -80,6 +84,9 @@ local coverLabel = CatalogUtil.coverLabel
 local buildCoverWidget = CatalogWidgets.buildCoverWidget
 local BookOrbitMosaicItem = CatalogWidgets.MosaicItem
 local BookOrbitListItem = CatalogWidgets.ListItem
+local BookOrbitDashboardCoverCard = CatalogWidgets.DashboardCoverCard
+local BookOrbitDashboardBrowseTile = CatalogWidgets.DashboardBrowseTile
+local BookOrbitDashboardIconButton = CatalogWidgets.DashboardIconButton
 
 -- Max genres/tags shown inline on the detail page before a "+N more" expander.
 local DETAIL_TAGS_INLINE = 6
@@ -97,6 +104,91 @@ local function showError(err)
         text = _("Could not reach the BookOrbit server.")
     end
     UIManager:show(InfoMessage:new{ text = text, timeout = 4 })
+end
+
+local function isDashboardUnsupported(err)
+    return err == 404 or err == 405
+end
+
+local BookOrbitTitleBar = TitleBar:extend{
+    search_icon = nil,
+    search_icon_tap_callback = nil,
+    search_icon_hold_callback = nil,
+    search_icon_allow_flash = true,
+    refresh_icon = nil,
+    refresh_icon_tap_callback = nil,
+    refresh_icon_hold_callback = nil,
+    refresh_icon_allow_flash = true,
+}
+
+function BookOrbitTitleBar:init()
+    TitleBar.init(self)
+    if self._bookorbit_extra_buttons then return end
+    self._bookorbit_extra_buttons = true
+
+    local icon_size = Screen:scaleBySize(DGENERIC_ICON_SIZE * (self.left_icon_size_ratio or 0.6))
+    local button_padding = self.button_padding or 0
+    if self.left_button then
+        self.left_button.padding_right = button_padding
+        self.left_button:update()
+    end
+    if self.right_button then
+        self.right_button.padding_left = button_padding
+        self.right_button:update()
+    end
+
+    if self.search_icon then
+        self.search_button = IconButton:new{
+            icon = self.search_icon,
+            width = icon_size,
+            height = icon_size,
+            padding = button_padding,
+            padding_bottom = icon_size,
+            overlap_offset = { self.left_button and self.left_button:getSize().w or 0, 0 },
+            callback = self.search_icon_tap_callback,
+            hold_callback = self.search_icon_hold_callback,
+            allow_flash = self.search_icon_allow_flash,
+            show_parent = self.show_parent,
+        }
+        table.insert(self, self.search_button)
+    end
+    if self.refresh_icon then
+        local right_width = self.right_button and self.right_button:getSize().w or 0
+        local refresh_width = icon_size + button_padding * 2
+        self.refresh_button = IconButton:new{
+            icon = self.refresh_icon,
+            width = icon_size,
+            height = icon_size,
+            padding = button_padding,
+            padding_bottom = icon_size,
+            overlap_offset = { self.width - right_width - refresh_width, 0 },
+            callback = self.refresh_icon_tap_callback,
+            hold_callback = self.refresh_icon_hold_callback,
+            allow_flash = self.refresh_icon_allow_flash,
+            show_parent = self.show_parent,
+        }
+        table.insert(self, self.refresh_button)
+    end
+    self._size = nil
+    OverlapGroup.init(self)
+end
+
+function BookOrbitTitleBar:generateHorizontalLayout()
+    local row = {}
+    if self.left_button then table.insert(row, self.left_button) end
+    if self.search_button then table.insert(row, self.search_button) end
+    if self.refresh_button then table.insert(row, self.refresh_button) end
+    if self.right_button then table.insert(row, self.right_button) end
+    return #row > 0 and { row } or {}
+end
+
+function BookOrbitTitleBar:generateVerticalLayout()
+    local layout = {}
+    if self.left_button then table.insert(layout, { self.left_button }) end
+    if self.search_button then table.insert(layout, { self.search_button }) end
+    if self.refresh_button then table.insert(layout, { self.refresh_button }) end
+    if self.right_button then table.insert(layout, { self.right_button }) end
+    return layout
 end
 
 local BookOrbitCatalog = Menu:extend{
@@ -130,12 +222,16 @@ function BookOrbitCatalog:init()
     self.on_device = {}
     self.on_device_files = {}
     self:refreshOnDevice()
-    self.current_context = { kind = "root", title = self.title }
-    self.item_table = self:rootItems()
+    self.item_table, self.current_context = self:dashboardRoot()
+    self.subtitle = self.current_context.subtitle
     self.is_borderless = true
     self.title_bar_fm_style = true
+    self.custom_title_bar = self:buildTitleBar(self.current_context.title or self.title, self.current_context.subtitle or "")
     Menu.init(self)
     self:updateLeftIcon()
+    if self:dashboardMode() then
+        self:scheduleThumbnailDownloads(self:dashboardBooks(self.current_context.dashboard))
+    end
     self.paths = self.stack
     UIManager:nextTick(function()
         self:cleanLegacyThumbnails()
@@ -155,6 +251,44 @@ function BookOrbitCatalog:cleanLegacyThumbnails()
     end
 end
 
+function BookOrbitCatalog:buildTitleBar(title, subtitle)
+    return BookOrbitTitleBar:new{
+        width = Screen:getWidth(),
+        fullscreen = "true",
+        align = "center",
+        title = title or self.title,
+        title_face = self.title_face,
+        title_multilines = self.title_multilines,
+        title_shrink_font_to_fit = self.title_shrink_font_to_fit,
+        subtitle = subtitle or "",
+        subtitle_truncate_left = self.show_path,
+        subtitle_fullwidth = self.show_path,
+        title_top_padding = Screen:scaleBySize(6),
+        button_padding = Screen:scaleBySize(5),
+        left_icon = self.title_bar_left_icon,
+        left_icon_size_ratio = 1,
+        left_icon_tap_callback = function() self:onLeftButtonTap() end,
+        left_icon_hold_callback = function() self:onLeftButtonHold() end,
+        right_icon_size_ratio = 1,
+        close_callback = function() self:onClose() end,
+        search_icon = "appbar.search",
+        search_icon_tap_callback = function() self:onSearchButtonTap() end,
+        refresh_icon = "cre.render.reload",
+        refresh_icon_tap_callback = function() self:onRefreshButtonTap() end,
+        show_parent = self.show_parent or self,
+    }
+end
+
+function BookOrbitCatalog:resetTitleBar(title, subtitle)
+    self.custom_title_bar = self:buildTitleBar(title, subtitle)
+    self.title_bar = self.custom_title_bar
+    if self.content_group then
+        self.content_group[1] = self.title_bar
+        self.content_group:resetLayout()
+    end
+    self:updateLeftIcon()
+end
+
 function BookOrbitCatalog:refreshCurrent()
     self.thumbnail_failures = {}
     local context = self.current_context or {}
@@ -163,6 +297,9 @@ function BookOrbitCatalog:refreshCurrent()
         local params = cloneParams(context.params or {})
         params.page = context.page or 1
         self:loadBooks(params, context.title or _("Books"), false)
+    elseif context.kind == "dashboard" then
+        self:evictCachedCovers(self:dashboardBooks(context.dashboard))
+        self:loadDashboardRoot(true)
     elseif context.kind == "section" then
         self:loadSection(context.section, { page = context.page, q = context.q, replace = true })
     elseif context.kind == "detail" and context.detail then
@@ -183,6 +320,31 @@ function BookOrbitCatalog:refreshCurrent()
             self:scheduleThumbnailDownloads({ detail })
         end)
     end
+end
+
+function BookOrbitCatalog:markStackDirty()
+    for _, entry in ipairs(self.stack or {}) do
+        if entry.context and (entry.context.kind == "books" or entry.context.kind == "dashboard" or entry.context.kind == "section") then
+            entry.context.dirty = true
+        end
+    end
+end
+
+function BookOrbitCatalog:goDashboard()
+    self.stack = {}
+    self:updateReturnPath()
+    self:loadDashboardRoot(true)
+end
+
+function BookOrbitCatalog:sectionSubtitle(page, q, has_next)
+    local parts = {}
+    if q and q ~= "" then
+        table.insert(parts, T(_("Filter: %1"), q))
+    end
+    if page and (page > 1 or has_next) then
+        table.insert(parts, T(_("Results page %1"), page))
+    end
+    return #parts > 0 and table.concat(parts, " - ") or ""
 end
 
 -- Deletes cached covers for the given books so a refresh re-downloads them,
@@ -302,6 +464,123 @@ function BookOrbitCatalog:listText(book)
     return table.concat(lines, "\n")
 end
 
+function BookOrbitCatalog:listSubtitleLine(book)
+    local parts = {}
+    local author = firstAuthor(book)
+    if author then table.insert(parts, author) end
+    local series = formatSeries(book)
+    if series then table.insert(parts, series) end
+    return #parts > 0 and shortText(table.concat(parts, " - "), 72) or nil
+end
+
+function BookOrbitCatalog:listSideMetaText(book)
+    local lines = {}
+    if book and book.formats and book.formats[1] then
+        table.insert(lines, shortText(table.concat(book.formats, ", "), 20))
+    end
+    local meta = {}
+    local progress = book and formatProgress(book.progressPercentage) or nil
+    if progress then table.insert(meta, progress) end
+    local status = self:readStatusLabel(book)
+    if status then table.insert(meta, status) end
+    if self:isOnDevice(book) then table.insert(meta, _("On device")) end
+    if #meta > 0 then
+        table.insert(lines, shortText(table.concat(meta, " - "), 28))
+    end
+    return table.concat(lines, "\n")
+end
+
+function BookOrbitCatalog:onDeviceCount()
+    local count = 0
+    for _ in pairs(self.on_device or {}) do
+        count = count + 1
+    end
+    return count
+end
+
+function BookOrbitCatalog:dashboardCache()
+    local cache = self.settings.catalog_dashboard_cache
+    return type(cache) == "table" and cache or nil
+end
+
+function BookOrbitCatalog:cacheDashboard(body)
+    if type(body) ~= "table" then return end
+    self:persistSetting("catalog_dashboard_cache", body)
+end
+
+function BookOrbitCatalog:dashboardItems()
+    return {
+        {
+            text = _("Dashboard"),
+            kind = "dashboard",
+        },
+    }
+end
+
+function BookOrbitCatalog:dashboardRoot()
+    local cached = self:dashboardCache()
+    if self.prefer_cached_dashboard and cached and not NetworkMgr:isConnected() then
+        return self:dashboardItems(), {
+            kind = "dashboard",
+            title = self.title,
+            subtitle = _("Dashboard"),
+            dashboard = cached,
+            stale = true,
+        }
+    end
+
+    local body, err = self:fetch(_("Loading dashboard..."), function()
+        return self.client:catalogDashboard()
+    end)
+    if body and body.continueReading then
+        self:cacheDashboard(body)
+        return self:dashboardItems(), {
+            kind = "dashboard",
+            title = self.title,
+            subtitle = _("Dashboard"),
+            dashboard = body,
+            stale = false,
+        }
+    end
+
+    if isDashboardUnsupported(err) then
+        UIManager:show(InfoMessage:new{
+            text = _("BookOrbit dashboard needs a newer server. Showing the catalog instead."),
+            timeout = 4,
+        })
+        return self:rootItems(), { kind = "root", title = self.title }
+    end
+
+    if cached then
+        return self:dashboardItems(), {
+            kind = "dashboard",
+            title = self.title,
+            subtitle = _("Dashboard"),
+            dashboard = cached,
+            stale = true,
+        }
+    end
+
+    if err ~= "cancelled" then
+        showError(err)
+    end
+    return self:dashboardItems(), {
+        kind = "dashboard",
+        title = self.title,
+        subtitle = _("Dashboard"),
+        dashboard = nil,
+        stale = true,
+        unavailable = true,
+    }
+end
+
+function BookOrbitCatalog:loadDashboardRoot(replace)
+    self:runConnected(function()
+        local items, context = self:dashboardRoot()
+        self:switchTo(context.title or self.title, items, context, not replace)
+    end)
+end
+
 function BookOrbitCatalog:rootItems()
     local body, err = self:fetch(_("Loading..."), function()
         return self.client:catalogRoot()
@@ -316,7 +595,7 @@ function BookOrbitCatalog:rootItems()
     local items = {}
     for _, section in ipairs(body.sections or {}) do
         if section.section == "search" then
-            -- Search is exposed through the title-bar magnifier on the root, not a list row.
+            -- Search is exposed through the catalog action menu, not a list row.
         elseif section.section == "recent" then
             table.insert(items, {
                 text = section.title,
@@ -377,12 +656,14 @@ function BookOrbitCatalog:switchTo(title, item_table, context, push)
     end
     self:updateReturnPath()
     self.current_context = context
+    self:resetTitleBar(title, context.subtitle or "")
     self:switchItemTable(title, item_table, nil, nil, context.subtitle or "")
-    self:updateLeftIcon()
     if context.kind == "books" then
         self:scheduleThumbnailDownloads(context.books or {})
     elseif context.kind == "detail" then
         self:scheduleThumbnailDownloads({ context.detail })
+    elseif context.kind == "dashboard" then
+        self:scheduleThumbnailDownloads(self:dashboardBooks(context.dashboard))
     end
 end
 
@@ -504,33 +785,6 @@ function BookOrbitCatalog:loadSection(section, opts)
         local q = body.query or opts.q
         local item_table = {}
 
-        if paged then
-            table.insert(item_table, {
-                text = q and T(_("Filter: %1"), q) or _("Filter..."),
-                kind = "section-filter",
-                section = section,
-                q = q,
-            })
-            if page > 1 then
-                table.insert(item_table, {
-                    text = T(_("< Previous page (%1)"), page - 1),
-                    kind = "section-page",
-                    section = section,
-                    section_page = page - 1,
-                    q = q,
-                })
-            end
-            if body.hasNext then
-                table.insert(item_table, {
-                    text = T(_("Next page (%1) >"), page + 1),
-                    kind = "section-page",
-                    section = section,
-                    section_page = page + 1,
-                    q = q,
-                })
-            end
-        end
-
         for _, entry in ipairs(body.items or {}) do
             local entry_params = self:paramsForEntry(section, entry)
             table.insert(item_table, {
@@ -546,7 +800,17 @@ function BookOrbitCatalog:loadSection(section, opts)
         end
         local title = self:titleForSection(section)
         local push = not opts.replace
-        self:switchTo(title, item_table, { kind = "section", title = title, section = section, page = page, q = q }, push)
+        self:switchTo(title, item_table, {
+            kind = "section",
+            title = title,
+            subtitle = paged and self:sectionSubtitle(page, q, body.hasNext) or "",
+            section = section,
+            page = page,
+            q = q,
+            paged = paged,
+            has_next = body.hasNext == true,
+            has_previous = page > 1,
+        }, push)
     end)
 end
 
@@ -675,7 +939,7 @@ function BookOrbitCatalog:recordRecentSearch(q)
     self:persistSetting("catalog_recent_searches", next_list)
 end
 
-function BookOrbitCatalog:runSearch(params, q)
+function BookOrbitCatalog:runSearch(params, q, scope_title)
     q = util.trim(q or "")
     if q == "" then return end
     self:recordRecentSearch(q)
@@ -683,10 +947,11 @@ function BookOrbitCatalog:runSearch(params, q)
     query.q = q
     query.page = 1
     query.sort = query.sort or "title"
-    self:loadBooks(query, T(_("Search: %1"), q), true)
+    local title = scope_title and scope_title ~= "" and T(_("%1 search: %2"), scope_title, q) or T(_("Search: %1"), q)
+    self:loadBooks(query, title, true)
 end
 
-function BookOrbitCatalog:showRecentSearches(params)
+function BookOrbitCatalog:showRecentSearches(params, scope_title)
     local recents = self.settings.catalog_recent_searches or {}
     if #recents == 0 then
         UIManager:show(InfoMessage:new{ text = _("No recent searches yet."), timeout = 2 })
@@ -700,7 +965,7 @@ function BookOrbitCatalog:showRecentSearches(params)
                 text = q,
                 callback = function()
                     UIManager:close(dialog)
-                    self:runSearch(params, q)
+                    self:runSearch(params, q, scope_title)
                 end,
             },
         })
@@ -712,7 +977,7 @@ function BookOrbitCatalog:showRecentSearches(params)
     UIManager:show(dialog)
 end
 
-function BookOrbitCatalog:promptSearch(params)
+function BookOrbitCatalog:promptSearch(params, scope_title)
     local has_recents = #(self.settings.catalog_recent_searches or {}) > 0
     local dialog
     dialog = InputDialog:new{
@@ -732,7 +997,7 @@ function BookOrbitCatalog:promptSearch(params)
                     enabled = has_recents,
                     callback = function()
                         UIManager:close(dialog)
-                        self:showRecentSearches(params)
+                        self:showRecentSearches(params, scope_title)
                     end,
                 },
                 {
@@ -742,7 +1007,7 @@ function BookOrbitCatalog:promptSearch(params)
                         local q = util.trim(dialog:getInputText() or "")
                         if q == "" then return end
                         UIManager:close(dialog)
-                        self:runSearch(params, q)
+                        self:runSearch(params, q, scope_title)
                     end,
                 },
             },
@@ -755,17 +1020,29 @@ end
 function BookOrbitCatalog:filterSummary(query)
     local parts = {}
     if query.readStatus then
-        for _, f in ipairs(READ_STATUS_FILTERS) do
-            if f.id == query.readStatus then
-                table.insert(parts, f.text)
-                break
-            end
-        end
+        table.insert(parts, self:readStatusFilterLabel(query.readStatus))
     end
     if query.format then
         table.insert(parts, string.upper(query.format))
     end
     return #parts > 0 and table.concat(parts, ", ") or nil
+end
+
+function BookOrbitCatalog:readStatusFilterLabel(read_status)
+    for _, f in ipairs(READ_STATUS_FILTERS) do
+        if f.id == read_status then
+            return f.text
+        end
+    end
+    return _("All")
+end
+
+function BookOrbitCatalog:formatFilterLabel(format)
+    return format and string.upper(format) or _("All")
+end
+
+function BookOrbitCatalog:orderActionLabel(query)
+    return T(_("Order: %1"), self:directionLabel(query or {}))
 end
 
 function BookOrbitCatalog:showBookPage(body, query, title, push)
@@ -1141,97 +1418,126 @@ end
 function BookOrbitCatalog:showBookActions()
     local context = self.current_context or {}
     local in_books = context.kind == "books"
+    local in_section = context.kind == "section"
     local params = in_books and self:scopeParams(context.params or {}) or {}
+    local query = context.params or {}
     local view_label = self.view_mode == "list" and _("View: List") or _("View: Mosaic")
+    local grid_label = T(_("%1 x %2"), self.grid_cols, self.grid_rows)
     local dialog
-    dialog = ButtonDialog:new{
-        title = _("BookOrbit"),
-        buttons = {
+    local buttons = {
+        {
             {
-                {
-                    text = _("Search in this scope"),
-                    callback = function()
-                        UIManager:close(dialog)
-                        self:promptSearch(params)
-                    end,
-                },
-                {
-                    text = _("Refresh"),
-                    callback = function()
-                        UIManager:close(dialog)
-                        self:refreshCurrent()
-                    end,
-                },
-            },
-            {
-                {
-                    text = in_books
-                        and T(_("Sort: %1 (%2)"), self:sortLabel((context.params or {}).sort), self:directionLabel(context.params or {}))
-                        or _("Sort books"),
-                    enabled = in_books,
-                    callback = function()
-                        UIManager:close(dialog)
-                        self:showSortDialog({
-                            params = params,
-                            current_sort = (context.params or {}).sort,
-                            title = context.title,
-                        })
-                    end,
-                },
-                {
-                    text = _("Reverse"),
-                    enabled = in_books,
-                    callback = function()
-                        UIManager:close(dialog)
-                        self:reverseOrder()
-                    end,
-                },
-            },
-            {
-                {
-                    text = _("Read status"),
-                    enabled = in_books,
-                    callback = function()
-                        UIManager:close(dialog)
-                        self:showReadStatusDialog()
-                    end,
-                },
-                {
-                    text = _("Format"),
-                    enabled = in_books,
-                    callback = function()
-                        UIManager:close(dialog)
-                        self:showFormatDialog()
-                    end,
-                },
-            },
-            {
-                {
-                    text = view_label,
-                    callback = function()
-                        UIManager:close(dialog)
-                        self:setViewMode(self.view_mode == "list" and "mosaic" or "list")
-                    end,
-                },
-                {
-                    text = _("Grid size"),
-                    enabled = self.view_mode == "mosaic",
-                    callback = function()
-                        UIManager:close(dialog)
-                        self:showGridDialog()
-                    end,
-                },
+                text = _("Refresh"),
+                callback = function()
+                    UIManager:close(dialog)
+                    self:refreshCurrent()
+                end,
             },
         },
+    }
+
+    if in_section and context.paged then
+        table.insert(buttons, {
+            {
+                text = context.q and T(_("Filter: %1"), context.q) or _("Filter..."),
+                callback = function()
+                    UIManager:close(dialog)
+                    self:promptSectionFilter(context.section, context.q)
+                end,
+            },
+            {
+                text = _("Clear filter"),
+                enabled = context.q ~= nil,
+                callback = function()
+                    UIManager:close(dialog)
+                    self:loadSection(context.section, { page = 1, q = nil, replace = true })
+                end,
+            },
+        })
+    end
+
+    if in_books then
+        table.insert(buttons, {
+            {
+                text = T(_("Sort: %1"), self:sortLabel(query.sort)),
+                callback = function()
+                    UIManager:close(dialog)
+                    self:showSortDialog({
+                        params = params,
+                        current_sort = query.sort,
+                        title = context.title,
+                    })
+                end,
+            },
+            {
+                text = self:orderActionLabel(query),
+                callback = function()
+                    UIManager:close(dialog)
+                    self:reverseOrder()
+                end,
+            },
+        })
+        table.insert(buttons, {
+            {
+                text = T(_("Status: %1"), self:readStatusFilterLabel(query.readStatus)),
+                callback = function()
+                    UIManager:close(dialog)
+                    self:showReadStatusDialog()
+                end,
+            },
+            {
+                text = T(_("Format: %1"), self:formatFilterLabel(query.format)),
+                callback = function()
+                    UIManager:close(dialog)
+                    self:showFormatDialog()
+                end,
+            },
+        })
+        table.insert(buttons, {
+            {
+                text = view_label,
+                callback = function()
+                    UIManager:close(dialog)
+                    self:setViewMode(self.view_mode == "list" and "mosaic" or "list")
+                end,
+            },
+            {
+                text = T(_("Grid: %1"), grid_label),
+                enabled = self.view_mode == "mosaic",
+                callback = function()
+                    UIManager:close(dialog)
+                    self:showGridDialog()
+                end,
+            },
+        })
+    end
+
+    if not self:dashboardMode() then
+        table.insert(buttons, {
+            {
+                text = _("Dashboard"),
+                callback = function()
+                    UIManager:close(dialog)
+                    self:goDashboard()
+                end,
+            },
+        })
+    end
+
+    dialog = ButtonDialog:new{
+        title = _("BookOrbit"),
+        buttons = buttons,
     }
     UIManager:show(dialog)
 end
 
 function BookOrbitCatalog:showDetailActions()
-    local detail = (self.current_context or {}).detail
+    local context = self.current_context or {}
+    local detail = context.detail
     if not detail then return end
     local has_genres = detail.genres and #detail.genres > 0
     local has_tags = detail.tags and #detail.tags > 0
+    local supported_files = context.supported_files or self:supportedFiles(detail)
     local dialog
     dialog = ButtonDialog:new{
         title = detail.title or _("Book"),
@@ -1254,7 +1560,15 @@ function BookOrbitCatalog:showDetailActions()
             },
             {
                 {
-                    text = _("Full description"),
+                    text = _("Download options"),
+                    enabled = #supported_files > 0,
+                    callback = function()
+                        UIManager:close(dialog)
+                        self:showDownloadOptions(detail)
+                    end,
+                },
+                {
+                    text = _("Description"),
                     enabled = cleanDescriptionText(detail.description) ~= nil,
                     callback = function()
                         UIManager:close(dialog)
@@ -1264,7 +1578,7 @@ function BookOrbitCatalog:showDetailActions()
             },
             {
                 {
-                    text = _("All genres"),
+                    text = _("Genres"),
                     enabled = has_genres,
                     callback = function()
                         UIManager:close(dialog)
@@ -1272,7 +1586,7 @@ function BookOrbitCatalog:showDetailActions()
                     end,
                 },
                 {
-                    text = _("All tags"),
+                    text = _("Tags"),
                     enabled = has_tags,
                     callback = function()
                         UIManager:close(dialog)
@@ -1286,6 +1600,13 @@ function BookOrbitCatalog:showDetailActions()
                     callback = function()
                         UIManager:close(dialog)
                         self:refreshCurrent()
+                    end,
+                },
+                {
+                    text = _("Dashboard"),
+                    callback = function()
+                        UIManager:close(dialog)
+                        self:goDashboard()
                     end,
                 },
             },
@@ -1368,6 +1689,7 @@ function BookOrbitCatalog:applyReadStatus(detail, status)
             return
         end
         detail.readStatus = body.readStatus or status
+        self:markStackDirty()
         self:refreshDetailView()
         UIManager:show(InfoMessage:new{ text = _("Read status updated"), timeout = 1 })
     end)
@@ -1383,29 +1705,44 @@ function BookOrbitCatalog:applyRating(detail, rating)
             return
         end
         detail.rating = body.rating
+        self:markStackDirty()
         self:refreshDetailView()
         UIManager:show(InfoMessage:new{ text = _("Rating updated"), timeout = 1 })
     end)
 end
 
 function BookOrbitCatalog:contextUsesActions()
-    local kind = self.current_context and self.current_context.kind
-    return kind == "books" or kind == "detail"
+    return true
 end
 
 function BookOrbitCatalog:updateLeftIcon()
     if not self.title_bar then return end
-    self.title_bar:setLeftIcon(self:contextUsesActions() and "appbar.menu" or "appbar.search")
+    self.title_bar:setLeftIcon("appbar.menu")
 end
 
 function BookOrbitCatalog:onLeftButtonTap()
-    if self:detailMode() then
+    if self:dashboardMode() and self.show_dashboard_menu then
+        self.show_dashboard_menu(self)
+    elseif self:detailMode() then
         self:showDetailActions()
-    elseif self:contextUsesActions() then
-        self:showBookActions()
     else
-        self:promptSearch({})
+        self:showBookActions()
     end
+    return true
+end
+
+function BookOrbitCatalog:onSearchButtonTap()
+    local context = self.current_context or {}
+    if context.kind == "books" then
+        self:promptSearch(self:scopeParams(context.params or {}), context.title)
+    else
+        self:promptSearch({}, nil)
+    end
+    return true
+end
+
+function BookOrbitCatalog:onRefreshButtonTap()
+    self:refreshCurrent()
     return true
 end
 
@@ -1558,6 +1895,10 @@ function BookOrbitCatalog:showBookDetail(detail)
     }, true)
 end
 
+function BookOrbitCatalog:dashboardMode()
+    return self.current_context and self.current_context.kind == "dashboard"
+end
+
 function BookOrbitCatalog:bookMode()
     return self.current_context and self.current_context.kind == "books"
 end
@@ -1566,8 +1907,348 @@ function BookOrbitCatalog:detailMode()
     return self.current_context and self.current_context.kind == "detail"
 end
 
+function BookOrbitCatalog:pagedSectionMode()
+    return self.current_context and self.current_context.kind == "section" and self.current_context.paged
+end
+
+function BookOrbitCatalog:dashboardStatusText()
+    local context = self.current_context or {}
+    local dashboard = context.dashboard or {}
+    local generated = dashboard.generatedAt and tostring(dashboard.generatedAt):sub(1, 10) or nil
+    if context.unavailable then
+        return _("Dashboard unavailable")
+    end
+    if context.stale then
+        return generated and T(_("Offline cache from %1"), generated) or _("Offline cache")
+    end
+    return generated and T(_("Updated %1"), generated) or _("Updated")
+end
+
+-- All books rendered on the dashboard (continue reading + discover), used for
+-- thumbnail prefetching and cover-cache eviction.
+function BookOrbitCatalog:dashboardBooks(dashboard)
+    dashboard = dashboard or {}
+    local books = {}
+    for _, book in ipairs(dashboard.continueReading or {}) do
+        table.insert(books, book)
+    end
+    for _, book in ipairs(dashboard.discover or {}) do
+        table.insert(books, book)
+    end
+    return books
+end
+
+function BookOrbitCatalog:dashboardActionEntries()
+    return {
+        {
+            text = _("In progress"),
+            icon = "dogear.reading",
+            kind = "books",
+            params = { sort = "recently_read", readStatus = "reading" },
+        },
+        {
+            text = _("On device"),
+            icon = "appbar.filebrowser",
+            mandatory = tostring(self:onDeviceCount()),
+            kind = "on-device",
+        },
+        {
+            text = _("Libraries"),
+            icon = "column.two",
+            kind = "section",
+            section = "libraries",
+        },
+        {
+            text = _("All Books"),
+            icon = "appbar.pageview",
+            kind = "books",
+            params = { sort = "title" },
+        },
+        {
+            text = _("Authors"),
+            icon = "bookmark",
+            kind = "section",
+            section = "authors",
+        },
+        {
+            text = _("Series"),
+            icon = "book.opened",
+            kind = "section",
+            section = "series",
+        },
+        {
+            text = _("Collections"),
+            icon = "texture-box",
+            kind = "section",
+            section = "collections",
+        },
+        {
+            text = _("SmartScopes"),
+            icon = "cre.render.working",
+            kind = "section",
+            section = "smart-scopes",
+        },
+    }
+end
+
+function BookOrbitCatalog:addDashboardSpacer(height)
+    if not height or height <= 0 then return end
+    table.insert(self.item_group, VerticalSpan:new{ width = height })
+end
+
+-- Insert a widget (built at self.content_w) flush within the dashboard's
+-- horizontal margins. Tappable widgets are also registered for focus nav.
+function BookOrbitCatalog:addDashboardInset(widget, tappable)
+    table.insert(self.item_group, HorizontalGroup:new{
+        align = "center",
+        HorizontalSpan:new{ width = self.content_inset },
+        widget,
+        HorizontalSpan:new{ width = self.content_inset },
+    })
+    if tappable then
+        table.insert(self.layout, { widget })
+    end
+end
+
+function BookOrbitCatalog:addDashboardHeader(text, height, status, reroll)
+    local has_status = status and status ~= ""
+    if not has_status and not reroll then
+        self:addDashboardInset(CatalogWidgets.buildSectionHeader(text, self.content_w, height))
+        return
+    end
+    local gap = Size.span.horizontal_default
+    local reroll_w = reroll and height or 0
+    local status_w = has_status and math.floor(self.content_w * 0.40) or 0
+    local extra = (reroll_w > 0 and (reroll_w + gap) or 0) + (status_w > 0 and (status_w + gap) or 0)
+    local title_w = math.max(1, self.content_w - extra)
+
+    local row = HorizontalGroup:new{ align = "center" }
+    table.insert(row, CatalogWidgets.buildSectionHeader(text, title_w, height))
+    if status_w > 0 then
+        table.insert(row, HorizontalSpan:new{ width = gap })
+        table.insert(row, CatalogWidgets.buildStatusLabel(status, status_w, height, "right"))
+    end
+    if reroll then
+        table.insert(row, HorizontalSpan:new{ width = gap })
+        local button = BookOrbitDashboardIconButton:new{
+            entry = { kind = "dashboard-reroll", icon = "cre.render.reload" },
+            dimen = Geom:new{ x = 0, y = 0, w = reroll_w, h = height },
+            menu = self,
+        }
+        table.insert(row, button)
+        table.insert(self.layout, { button })
+    end
+    self:addDashboardInset(row)
+end
+
+function BookOrbitCatalog:addDashboardDivider()
+    self:addDashboardInset(CatalogWidgets.buildDivider(self.content_w))
+end
+
+function BookOrbitCatalog:addDashboardSectionBreak()
+    self:addDashboardSpacer(self.dash_section_gap)
+    self:addDashboardDivider()
+    self:addDashboardSpacer(self.dash_section_gap)
+end
+
+function BookOrbitCatalog:addDashboardCoverCards(books, height, count, with_progress)
+    count = math.max(1, count or 1)
+    local card_w = CatalogWidgets.coverCardWidth(height, with_progress)
+    while count > 1 and card_w * count > self.content_w do
+        count = count - 1
+    end
+    -- Center the cover-hugging cards across the content width with even gaps.
+    local leftover = math.max(0, self.content_w - count * card_w)
+    local gap = math.floor(leftover / (count + 1))
+    local side = self.content_inset + gap
+    local row = HorizontalGroup:new{ align = "center" }
+    table.insert(row, HorizontalSpan:new{ width = side })
+    for index = 1, count do
+        if index > 1 then
+            table.insert(row, HorizontalSpan:new{ width = gap })
+        end
+        local book = books[index]
+        if book then
+            local card = BookOrbitDashboardCoverCard:new{
+                entry = { kind = "dashboard-book", book_id = book.id, book = book },
+                dimen = Geom:new{ x = 0, y = 0, w = card_w, h = height },
+                menu = self,
+            }
+            table.insert(row, card)
+            table.insert(self.layout, { card })
+        else
+            table.insert(row, HorizontalSpan:new{ width = card_w })
+        end
+    end
+    table.insert(row, HorizontalSpan:new{ width = side })
+    table.insert(self.item_group, row)
+end
+
+function BookOrbitCatalog:addDashboardEmptyBooks(height)
+    self:addDashboardInset(CatalogWidgets.buildStatusLabel(_("No books in progress."), self.content_w, height))
+end
+
+function BookOrbitCatalog:addDashboardBrowseGrid(entries, tile_h, gap, cols)
+    cols = math.max(1, cols or 1)
+    local tile_w = math.floor((self.content_w - (cols - 1) * gap) / cols)
+    local index = 1
+    while index <= #entries do
+        local row = HorizontalGroup:new{ align = "center" }
+        table.insert(row, HorizontalSpan:new{ width = self.content_inset })
+        for col = 0, cols - 1 do
+            local entry = entries[index + col]
+            if col > 0 then
+                table.insert(row, HorizontalSpan:new{ width = gap })
+            end
+            if entry then
+                local tile = BookOrbitDashboardBrowseTile:new{
+                    entry = entry,
+                    dimen = Geom:new{ x = 0, y = 0, w = tile_w, h = tile_h },
+                    menu = self,
+                }
+                table.insert(row, tile)
+                table.insert(self.layout, { tile })
+            else
+                table.insert(row, HorizontalSpan:new{ width = tile_w })
+            end
+        end
+        table.insert(row, HorizontalSpan:new{ width = self.content_inset })
+        table.insert(self.item_group, row)
+        if index + cols <= #entries then
+            self:addDashboardSpacer(gap)
+        end
+        index = index + cols
+    end
+end
+
+function BookOrbitCatalog:dashboardBrowseColumns(entry_count, gap)
+    entry_count = math.max(1, entry_count or 1)
+    gap = gap or 0
+    local max_cols = math.min(4, entry_count)
+    local min_tile_w = Screen:scaleBySize(120)
+    for cols = max_cols, 1, -1 do
+        local tile_w = math.floor((self.content_w - (cols - 1) * gap) / cols)
+        if cols == 1 or tile_w >= min_tile_w then
+            return cols
+        end
+    end
+    return 1
+end
+
+function BookOrbitCatalog:dashboardMaxCardHeight(count, with_progress, height_limit)
+    count = math.max(1, count or 1)
+    height_limit = math.max(1, math.floor(height_limit or Screen:scaleBySize(340)))
+    local target_w = math.max(1, math.floor((self.content_w or self.inner_dimen.w) / count))
+    local low, high, best = 1, height_limit, 1
+    while low <= high do
+        local mid = math.floor((low + high) / 2)
+        if CatalogWidgets.coverCardWidth(mid, with_progress) <= target_w then
+            best = mid
+            low = mid + 1
+        else
+            high = mid - 1
+        end
+    end
+    return best
+end
+
+function BookOrbitCatalog:dashboardCardLayout(height_limit)
+    local min_card_h = math.min(height_limit or 1, Screen:scaleBySize(180))
+    for count = 4, 1, -1 do
+        local height = self:dashboardMaxCardHeight(count, false, height_limit)
+        local fits = CatalogWidgets.coverCardWidth(height, false) * count <= self.content_w
+        if fits and (count == 1 or height >= min_card_h) then
+            return count, height
+        end
+    end
+    return 1, self:dashboardMaxCardHeight(1, false, height_limit)
+end
+
+function BookOrbitCatalog:recalculateDashboardDimen()
+    self.perpage = 1
+    self.page = 1
+    self.page_num = 1
+    local top_height, bottom_height = self:menuChromeHeight()
+    self.available_height = self.inner_dimen.h - top_height - bottom_height
+    self.content_inset = Size.padding.large
+    self.content_w = math.max(1, self.inner_dimen.w - 2 * self.content_inset)
+    self.item_dimen = Geom:new{
+        x = 0,
+        y = 0,
+        w = self.inner_dimen.w,
+        h = self.available_height,
+    }
+end
+
+function BookOrbitCatalog:updateDashboardItems(select_number, no_recalculate_dimen)
+    local old_dimen = self:prepareCustomUpdate(no_recalculate_dimen)
+    self:refreshOnDevice()
+    local dashboard = (self.current_context or {}).dashboard
+    local continue_books = dashboard and dashboard.continueReading or {}
+    local discover_books = dashboard and dashboard.discover or {}
+    local action_entries = self:dashboardActionEntries()
+
+    local function px(n) return Screen:scaleBySize(n) end
+    local avail = self.available_height
+    local inner_gap = px(6)
+    local section_gap = px(14)
+    self.dash_inner_gap = inner_gap
+    self.dash_section_gap = section_gap
+    local header_h = px(24)
+
+    local card_count
+    local browse_cols = self:dashboardBrowseColumns(#action_entries, inner_gap)
+    local browse_rows = math.ceil(#action_entries / browse_cols)
+    local browse_tile_h = browse_cols >= 4 and px(72) or px(64)
+    local empty_h = px(40)
+
+    local card_rows = {
+        {
+            header = _("Continue reading"),
+            status = self:dashboardStatusText(),
+            books = continue_books,
+            allow_empty = true,
+            with_progress = true,
+        },
+    }
+    if #discover_books > 0 then
+        table.insert(card_rows, { header = _("Discover"), books = discover_books, reroll = true })
+    end
+
+    local browse_block = browse_rows * browse_tile_h + (browse_rows - 1) * inner_gap
+    local consumed = #card_rows * (header_h + inner_gap)
+        + math.max(0, #card_rows - 1) * section_gap
+        + (header_h + inner_gap)
+        + section_gap * 2
+        + browse_block
+    local card_total = avail - consumed
+    local card_row_h = math.max(px(72), math.min(px(340), math.floor(card_total / #card_rows)))
+    card_count, card_row_h = self:dashboardCardLayout(card_row_h)
+
+    for index, section in ipairs(card_rows) do
+        if index > 1 then
+            self:addDashboardSpacer(section_gap)
+        end
+        self:addDashboardHeader(section.header, header_h, section.status, section.reroll)
+        self:addDashboardSpacer(inner_gap)
+        if #section.books > 0 then
+            self:addDashboardCoverCards(section.books, card_row_h, card_count, section.with_progress)
+        elseif section.allow_empty then
+            self:addDashboardEmptyBooks(empty_h)
+        end
+    end
+
+    self:addDashboardSectionBreak()
+    self:addDashboardHeader(_("Browse"), header_h)
+    self:addDashboardSpacer(inner_gap)
+    self:addDashboardBrowseGrid(action_entries, browse_tile_h, inner_gap, browse_cols)
+    self:finishCustomUpdate(old_dimen, select_number)
+end
+
 function BookOrbitCatalog:_recalculateDimen(no_recalculate_dimen)
-    if self:bookMode() then
+    if self:dashboardMode() then
+        return self:recalculateDashboardDimen()
+    elseif self:bookMode() then
         if self.view_mode == "list" then
             return self:recalculateListDimen()
         end
@@ -1584,11 +2265,42 @@ function BookOrbitCatalog:menuChromeHeight()
         top_height = self.title_bar:getHeight()
     end
     local bottom_height = 0
-    if self.page_return_arrow and self.page_info_text then
+    if self:dashboardMode() then
+        -- Reserve a deliberate bottom margin so the single-page dashboard does not
+        -- run edge-to-edge (the pagination footer that normally fills this is hidden).
+        bottom_height = Screen:scaleBySize(40)
+    elseif self.page_return_arrow and self.page_info_text then
         bottom_height = math.max(self.page_return_arrow:getSize().h, self.page_info_text:getSize().h)
             + Size.padding.button
     end
     return top_height, bottom_height
+end
+
+-- The dashboard is a single page with its own navigation tiles, so the inherited
+-- pagination/return footer is hidden there (it still shows in list/detail modes).
+function BookOrbitCatalog:updatePageInfo(select_number)
+    Menu.updatePageInfo(self, select_number)
+    if self:dashboardMode() then
+        self.page_info_text:setText("")
+        self.page_info_left_chev:hide()
+        self.page_info_right_chev:hide()
+        self.page_info_first_chev:hide()
+        self.page_info_last_chev:hide()
+        self.page_return_arrow:hide()
+    elseif self:pagedSectionMode() then
+        local context = self.current_context
+        local api_page = context.page or 1
+        self.page_info_left_chev:show()
+        self.page_info_right_chev:show()
+        self.page_info_first_chev:show()
+        self.page_info_last_chev:show()
+        self.page_info_left_chev:enableDisable(self.page > 1 or api_page > 1)
+        self.page_info_right_chev:enableDisable(self.page < self.page_num or context.has_next == true)
+        self.page_info_first_chev:enableDisable(self.page > 1 or api_page > 1)
+        self.page_info_last_chev:enableDisable(self.page < self.page_num)
+        self.page_return_arrow:showHide(self.onReturn ~= nil)
+        self.page_return_arrow:enableDisable(#self.paths > 0)
+    end
 end
 
 function BookOrbitCatalog:recalculateMosaicDimen()
@@ -1623,7 +2335,9 @@ function BookOrbitCatalog:recalculateDetailDimen()
 end
 
 function BookOrbitCatalog:updateItems(select_number, no_recalculate_dimen)
-    if self:bookMode() then
+    if self:dashboardMode() then
+        return self:updateDashboardItems(select_number, no_recalculate_dimen)
+    elseif self:bookMode() then
         if self.view_mode == "list" then
             return self:updateListItems(select_number, no_recalculate_dimen)
         end
@@ -1636,6 +2350,8 @@ end
 
 function BookOrbitCatalog:prepareCustomUpdate(no_recalculate_dimen)
     local old_dimen = self.dimen and self.dimen:copy()
+    local context = self.current_context or {}
+    self:resetTitleBar(context.title or self.title, context.subtitle or "")
     self.layout = {}
     self.item_group:clear()
     self.page_info:resetLayout()
@@ -1849,7 +2565,11 @@ function BookOrbitCatalog:buildDetailHeader(detail, width, height)
             enabled = #supported_files > 0,
             text_font_size = 16,
             callback = function()
-                self:showFileChoices(detail)
+                if #supported_files == 1 then
+                    self:downloadDefaultFile(detail, supported_files[1])
+                else
+                    self:showFileChoices(detail)
+                end
             end,
         }
         table.insert(buttons_row, self.detail_download_button)
@@ -1943,6 +2663,15 @@ function BookOrbitCatalog:onNextPage()
             return self:onGotoPage(context.page + 1)
         end
         return true
+    elseif self:pagedSectionMode() then
+        if self.page < self.page_num then
+            return Menu_onNextPage(self)
+        end
+        local context = self.current_context
+        if context.has_next then
+            self:loadSection(context.section, { page = (context.page or 1) + 1, q = context.q, replace = true })
+        end
+        return true
     elseif self:detailMode() then
         return true
     end
@@ -1956,6 +2685,15 @@ function BookOrbitCatalog:onPrevPage()
             return self:onGotoPage(context.page - 1)
         end
         return true
+    elseif self:pagedSectionMode() then
+        if self.page > 1 then
+            return Menu_onPrevPage(self)
+        end
+        local context = self.current_context
+        if (context.page or 1) > 1 then
+            self:loadSection(context.section, { page = (context.page or 1) - 1, q = context.q, replace = true })
+        end
+        return true
     elseif self:detailMode() then
         return true
     end
@@ -1965,6 +2703,15 @@ end
 function BookOrbitCatalog:onFirstPage()
     if self:bookMode() then
         return self:onGotoPage(1)
+    elseif self:pagedSectionMode() then
+        if self.page > 1 then
+            return Menu_onFirstPage(self)
+        end
+        local context = self.current_context
+        if (context.page or 1) > 1 then
+            self:loadSection(context.section, { page = 1, q = context.q, replace = true })
+        end
+        return true
     elseif self:detailMode() then
         return true
     end
@@ -1974,6 +2721,11 @@ end
 function BookOrbitCatalog:onLastPage()
     if self:bookMode() then
         return self:onGotoPage(self.current_context.page_count or 1)
+    elseif self:pagedSectionMode() then
+        if self.page < self.page_num then
+            return Menu_onLastPage(self)
+        end
+        return true
     elseif self:detailMode() then
         return true
     end
@@ -1983,6 +2735,14 @@ end
 function BookOrbitCatalog:onMenuSelect(item)
     if item.kind == "section" then
         self:loadSection(item.section)
+    elseif item.kind == "dashboard-book" then
+        self:loadBookDetail(item.book_id)
+    elseif item.kind == "dashboard-highlight" then
+        self:loadBookDetail(item.book_id)
+    elseif item.kind == "dashboard-search" then
+        self:promptSearch({})
+    elseif item.kind == "dashboard-reroll" then
+        self:rerollDiscover()
     elseif item.kind == "section-filter" then
         self:promptSectionFilter(item.section, item.q)
     elseif item.kind == "section-page" then
@@ -1999,36 +2759,63 @@ function BookOrbitCatalog:onMenuSelect(item)
     return true
 end
 
+-- Fetches a fresh set of random Discover books and swaps them into the current
+-- dashboard without reloading the rest of the page.
+function BookOrbitCatalog:rerollDiscover()
+    if not self:dashboardMode() then return end
+    self:runConnected(function()
+        local body, err = self:fetch(_("Finding books..."), function()
+            return self.client:catalogDiscover()
+        end)
+        if body and body.discover then
+            local context = self.current_context
+            if context and context.dashboard then
+                context.dashboard.discover = body.discover
+                self:cacheDashboard(context.dashboard)
+                self:scheduleThumbnailDownloads(self:dashboardBooks(context.dashboard))
+                self:updateItems()
+            end
+        elseif err and err ~= "cancelled" then
+            showError(err)
+        end
+    end)
+end
+
 function BookOrbitCatalog:onReturn()
     self:cancelThumbnailJobs()
     local previous = table.remove(self.stack)
+    local dirty = false
     if previous then
         self.current_context = previous.context
+        dirty = self.current_context.dirty == true
+        self.current_context.dirty = nil
         self:updateReturnPath()
         self:switchItemTable(previous.title, previous.item_table, nil, nil, previous.subtitle or "")
         if self.current_context.kind == "books" then
             self:scheduleThumbnailDownloads(self.current_context.books or {})
         elseif self.current_context.kind == "detail" then
             self:scheduleThumbnailDownloads({ self.current_context.detail })
+        elseif self.current_context.kind == "dashboard" then
+            self:scheduleThumbnailDownloads(self:dashboardBooks(self.current_context.dashboard))
         end
     else
-        self.item_table = self:rootItems()
-        self.current_context = { kind = "root", title = self.title }
+        self.item_table, self.current_context = self:dashboardRoot()
         self:updateReturnPath()
-        self:switchItemTable(self.title, self.item_table, nil, nil, "")
+        self:switchItemTable(self.current_context.title or self.title, self.item_table, nil, nil, self.current_context.subtitle or "")
+        if self.current_context.kind == "dashboard" then
+            self:scheduleThumbnailDownloads(self:dashboardBooks(self.current_context.dashboard))
+        end
     end
     self:updateLeftIcon()
+    if dirty then
+        self:refreshCurrent()
+    end
     return true
 end
 
 function BookOrbitCatalog:onHoldReturn()
     self:cancelThumbnailJobs()
-    self.stack = {}
-    self:updateReturnPath()
-    self.item_table = self:rootItems()
-    self.current_context = { kind = "root", title = self.title }
-    self:switchItemTable(self.title, self.item_table, nil, nil, "")
-    self:updateLeftIcon()
+    self:goDashboard()
     return true
 end
 

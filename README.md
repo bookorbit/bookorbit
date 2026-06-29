@@ -30,7 +30,7 @@ A self-hosted library management and reading platform for ebooks, PDFs, audioboo
 
 ## What is BookOrbit?
 
-**[BookOrbit](https://bookorbit.app)** is a self-hosted digital library and reading platform. Organize and read your books, sync seamlessly with Kobo and KOReader devices, enrich your collection with metadata from multiple providers, and support multiple users with OIDC/SSO authentication and detailed reading statistics. Built-in features include OPDS support, customizable dashboard widgets, Send-to-Kindle delivery, and Smart Scopes for dynamic rule-based shelves and filters - all running on infrastructure you control.
+**[BookOrbit](https://bookorbit.app)** is a self-hosted digital library and reading platform. Organize and read your books, sync progress and annotations seamlessly across Kobo, KOReader, and the web reader, enrich your collection with metadata from multiple providers, and push reading data to Hardcover automatically. Supports multiple users with OIDC/SSO, detailed reading statistics, OPDS, customizable dashboard widgets, Send-to-Kindle delivery, and Smart Scopes - all running on infrastructure you control.
 
 [![Visit Website](https://img.shields.io/badge/Visit%20Website-bookorbit.app-4169E1?style=for-the-badge&logo=googlechrome&logoColor=white)](https://bookorbit.app)
 
@@ -53,13 +53,17 @@ _Experience the interface, built-in readers, and dashboard first-hand._
 ### Reading Experience & Sync
 
 - **Built-in Web Readers**: Native support for eBooks (EPUB, MOBI, AZW3), PDFs, Comics (CBZ, CBR), and Audiobooks (M4B, MP3) with no extra plugins required.
-- **Kobo & KOReader Integration**: Automatically push books to your Kobo devices and maintain two-way reading progress sync via KOReader over OPDS.
+- **Three-Way Sync (Kobo + KOReader + BookOrbit)**: Progress and annotations flow bidirectionally between Kobo devices, KOReader, and the BookOrbit web reader. Pick up on any surface where you left off on another - including highlights and deletes.
+- **KOReader Plugin**: Native on-device catalog browser with search, download, and status/rating management, alongside full progress and annotation sync.
+- **Annotations & Highlights**: Highlights from the web reader, KOReader, and Kobo merge into a unified searchable hub - filterable by color, style, and source, exportable as Markdown, CSV, or JSON.
+- **Hardcover Sync**: Automatically pushes status, progress, reading dates, and ratings to Hardcover on configurable triggers. Pull read history back from Hardcover to backfill blank BookOrbit entries.
+- **Achievements & Reading Goals**: Yearly goals, daily streaks, monthly challenges, and 50+ achievements across five categories. Reading DNA profiles your reading style from your actual session history.
 - **Reading Statistics**: Track your daily reading time, view heatmaps, maintain streaks, and monitor library health.
 
 ### Library Management
 
 - **Multiple Libraries**: Isolate content with per-library folders, custom scan rules, and format priorities.
-- **Rich Metadata Providers**: Fetch robust metadata from Google Books, Amazon, Goodreads, Hardcover, Open Library, Audible, ComicVine, and more.
+- **Rich Metadata Providers**: Fetch robust metadata from Google Books, Amazon, Goodreads, Open Library, Audible, ComicVine, and more.
 - **Smart Scopes & Collections**: Organize your collection using curated lists and dynamic, rule-based saved filters.
 
 ### Platform & Delivery
@@ -99,6 +103,20 @@ docker compose up -d
 Open `http://your-server-ip:3000` and complete setup using your `SETUP_BOOTSTRAP_TOKEN`.
 
 For the full installation guide including reverse proxy setup, file permissions on NAS, external databases, and environment variable reference, see **[bookorbit.app/installation](https://bookorbit.app/installation.html)**.
+
+---
+
+## KOReader Plugin
+
+The BookOrbit plugin for KOReader adds progress sync, two-way annotation sync, and a native catalog browser: navigate, search, and download books from your library without leaving the device.
+
+1. In BookOrbit, go to **Settings > Integrations > KOReader** and click **Download Plugin**.
+2. Unzip `bookorbit.koplugin.zip`.
+3. Copy `bookorbit.koplugin` to `koreader/plugins/` on the device.
+4. Restart KOReader and open a book.
+5. Use **Tools > BookOrbit Sync** to connect.
+
+The download is pre-configured with your server URL and credentials; no manual entry on the device. For full setup and sync options, see **[bookorbit.app/koreader-plugin](https://bookorbit.app/koreader-plugin.html)**.
 
 ---
 

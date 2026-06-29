@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException, OnModuleInit, Optional } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { basename, dirname, extname, join, resolve } from 'path';
 import { access as fsAccess, readFile, stat, unlink } from 'fs/promises';
 import { and, eq, inArray, or, sql } from 'drizzle-orm';
@@ -15,6 +15,7 @@ import { NotificationType, resolveUploadPath } from '@bookorbit/types';
 import { NotificationService } from '../notification/notification.service';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
+import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { formatSeriesIndex } from '../../common/utils/series-index-format.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -28,6 +29,7 @@ import { UploadValidatorService } from '../upload/upload-validator.service';
 import { BookDockRepository } from './book-dock.repository';
 import { BookDockEventsService, BOOK_DOCK_FILE_INGESTED } from './book-dock-events.service';
 import { BookDockGateway } from './book-dock.gateway';
+import { BookDockWorkQueue } from './book-dock-work-queue';
 import type { BookDockFileRow } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -40,6 +42,7 @@ type FinalizeOverrideEntry = {
 };
 
 const BATCH_SIZE = 100;
+const AUTO_FINALIZE_QUEUE_CONCURRENCY = 1;
 const MIN_PUBLISHED_YEAR = 1000;
 const MAX_PUBLISHED_YEAR = 2200;
 const PUBLISHED_YEAR_RANGE_CONSTRAINT = 'book_metadata_published_year_range_chk';
@@ -64,8 +67,9 @@ type NormalizedFinalizeMetadata = {
 };
 
 @Injectable()
-export class BookDockFinalizeService implements OnModuleInit {
+export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BookDockFinalizeService.name);
+  private readonly autoFinalizeQueue: BookDockWorkQueue;
 
   constructor(
     @Inject(DB) private readonly db: Db,
@@ -81,12 +85,22 @@ export class BookDockFinalizeService implements OnModuleInit {
     private readonly notificationService: NotificationService,
     @Optional() private readonly seriesIdentity?: SeriesIdentityService,
     @Optional() private readonly seriesMemberships?: SeriesMembershipService,
-  ) {}
+  ) {
+    this.autoFinalizeQueue = new BookDockWorkQueue(
+      AUTO_FINALIZE_QUEUE_CONCURRENCY,
+      (fileId) => this.triggerAutoFinalize(fileId),
+      (fileId, error) => this.logAutoFinalizeQueueFailure(fileId, error),
+    );
+  }
 
   onModuleInit() {
     this.events.on(BOOK_DOCK_FILE_INGESTED, (fileId: number) => {
-      void this.triggerAutoFinalize(fileId);
+      this.enqueueAutoFinalize(fileId);
     });
+  }
+
+  onModuleDestroy(): void {
+    this.autoFinalizeQueue.stop();
   }
 
   async finalize(
@@ -304,6 +318,18 @@ export class BookDockFinalizeService implements OnModuleInit {
     } else {
       this.logger.warn(`Auto-finalize skipped for Book Dock file ${fileId}: ${result.message}`);
     }
+  }
+
+  private enqueueAutoFinalize(fileId: number): void {
+    this.autoFinalizeQueue.enqueue(fileId);
+  }
+
+  private logAutoFinalizeQueueFailure(fileId: number, err: unknown): void {
+    const errorClass = err instanceof Error ? err.name : 'Error';
+    const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+    this.logger.warn(
+      `[book_dock.auto_finalize_queue] [fail] fileId=${fileId} errorClass=${errorClass} error="${errorMessage}" - auto-finalize queue job failed`,
+    );
   }
 
   async previewNames(

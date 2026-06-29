@@ -8,6 +8,7 @@ export const appConfig = registerAs('app', () => ({
   githubReleasesRepo: process.env.GITHUB_RELEASES_REPO?.trim() || 'bookorbit/bookorbit',
   githubReleasesToken: process.env.GITHUB_RELEASES_TOKEN?.trim() || undefined,
   oidcAllowLocalIssuers: parseBooleanFlag(process.env.OIDC_ALLOW_LOCAL_ISSUERS, false),
+  swaggerEnabled: parseBooleanFlag(process.env.SWAGGER_ENABLED, false),
   koboCloudscraperPython: process.env.KOBO_CLOUDSCRAPER_PYTHON?.trim() || undefined,
   koreaderPluginSourcePath: process.env.KOREADER_PLUGIN_PATH?.trim() || undefined,
 }));

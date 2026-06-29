@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import { IsArray, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
 
-class UserMappingDto {
+export class UserMappingDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)
@@ -13,7 +13,7 @@ class UserMappingDto {
   targetUserId!: number;
 }
 
-class PathMappingDto {
+export class PathMappingDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(1024)

@@ -16,7 +16,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import type { CoverAspectRatio, OrganizationMode } from '@bookorbit/types';
+import { ICON_VALUE_MAX_LENGTH, type CoverAspectRatio, type OrganizationMode } from '@bookorbit/types';
 
 import {
   LIBRARY_AUTO_SCAN_CRON_EXPRESSION_ERROR,
@@ -45,7 +45,7 @@ export class CreateLibraryDto {
   @Transform(({ value }) => trimString(value))
   @IsString()
   @IsNotEmpty()
-  @MaxLength(100)
+  @MaxLength(ICON_VALUE_MAX_LENGTH)
   icon: string;
 
   @IsOptional()

@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 
-class PathMappingInputDto {
+export class PathMappingInputDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(1024)

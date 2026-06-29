@@ -41,6 +41,7 @@ function BookOrbitApi.normalizeServerUrl(input)
     local url = util.trim(input)
     if url == "" then return nil end
     url = url:gsub("/+$", "")
+    url = url:gsub("/api/v1/koreader$", "/api/v1")
     if not url:match("/api/v1$") then
         url = url .. "/api/v1"
     end
@@ -250,6 +251,14 @@ end
 
 function BookOrbitApi:catalogRoot()
     return self:request("GET", "/koreader/plugin/catalog/root")
+end
+
+function BookOrbitApi:catalogDashboard()
+    return self:request("GET", "/koreader/plugin/catalog/dashboard")
+end
+
+function BookOrbitApi:catalogDiscover()
+    return self:request("GET", "/koreader/plugin/catalog/dashboard/discover")
 end
 
 function BookOrbitApi:catalogSection(section, params)

@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import { IsArray, IsBoolean, IsOptional, IsString, IsUrl, Matches, MaxLength, MinLength, ValidateNested } from 'class-validator';
 
-class ClaimMappingDto {
+export class ClaimMappingDto {
   @IsString()
   @MaxLength(256)
   username: string;
@@ -19,7 +19,7 @@ class ClaimMappingDto {
   groups: string;
 }
 
-class AutoProvisionDto {
+export class AutoProvisionDto {
   @IsBoolean()
   enabled: boolean;
 

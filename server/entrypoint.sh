@@ -52,6 +52,57 @@ check_writable_current_user() {
   fi
 }
 
+read_memory_limit_bytes() {
+  for path in /sys/fs/cgroup/memory.max /sys/fs/cgroup/memory/memory.limit_in_bytes; do
+    if [ ! -r "$path" ]; then
+      continue
+    fi
+
+    value="$(cat "$path" 2>/dev/null || true)"
+    case "$value" in
+      '' | max | *[!0-9]*) continue ;;
+    esac
+
+    # cgroup v1 reports near-2^63 values for unlimited memory.
+    if [ "${#value}" -gt 15 ]; then
+      continue
+    fi
+
+    echo "$value"
+    return 0
+  done
+
+  return 1
+}
+
+auto_old_space_size_mb() {
+  limit_bytes="$(read_memory_limit_bytes || true)"
+  if [ -z "$limit_bytes" ]; then
+    echo 2048
+    return 0
+  fi
+
+  limit_mb=$((limit_bytes / 1048576))
+  if [ "$limit_mb" -lt 1 ]; then
+    echo 2048
+    return 0
+  fi
+
+  if [ "$limit_mb" -lt 512 ]; then
+    heap_mb=$((limit_mb / 2))
+  elif [ "$limit_mb" -lt 2048 ]; then
+    heap_mb=$((limit_mb * 65 / 100))
+  else
+    heap_mb=$((limit_mb * 75 / 100))
+  fi
+
+  if [ "$heap_mb" -lt 128 ]; then
+    heap_mb=128
+  fi
+
+  echo "$heap_mb"
+}
+
 # Percent-encode a single URL component so credentials containing reserved
 # characters (#, /, ?, @, :, spaces, ...) don't corrupt the DATABASE_URL.
 urlencode() {
@@ -71,7 +122,7 @@ export HOME="${HOME:-/tmp}"
 
 APP_UID="${PUID:-1000}"
 APP_GID="${PGID:-1000}"
-NODE_MAX_OLD_SPACE_SIZE="${NODE_MAX_OLD_SPACE_SIZE:-2048}"
+NODE_MAX_OLD_SPACE_SIZE="${NODE_MAX_OLD_SPACE_SIZE:-auto}"
 
 case "$APP_UID" in
   '' | *[!0-9]*)
@@ -87,12 +138,17 @@ case "$APP_GID" in
     ;;
 esac
 
-case "$NODE_MAX_OLD_SPACE_SIZE" in
-  '' | *[!0-9]*)
-    log "NODE_MAX_OLD_SPACE_SIZE must be a numeric MB value, got '$NODE_MAX_OLD_SPACE_SIZE'."
-    exit 1
-    ;;
-esac
+if [ "$NODE_MAX_OLD_SPACE_SIZE" = "auto" ]; then
+  NODE_MAX_OLD_SPACE_SIZE="$(auto_old_space_size_mb)"
+  log "using NODE_MAX_OLD_SPACE_SIZE=${NODE_MAX_OLD_SPACE_SIZE} MB from auto detection."
+else
+  case "$NODE_MAX_OLD_SPACE_SIZE" in
+    '' | *[!0-9]*)
+      log "NODE_MAX_OLD_SPACE_SIZE must be a numeric MB value or 'auto', got '$NODE_MAX_OLD_SPACE_SIZE'."
+      exit 1
+      ;;
+  esac
+fi
 
 if [ "$NODE_MAX_OLD_SPACE_SIZE" -lt 1 ]; then
   log "NODE_MAX_OLD_SPACE_SIZE must be greater than 0."

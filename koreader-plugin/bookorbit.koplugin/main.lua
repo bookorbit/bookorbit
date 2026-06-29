@@ -19,6 +19,7 @@ local Math = require("optmath")
 local MultiInputDialog = require("ui/widget/multiinputdialog")
 local NetworkMgr = require("ui/network/manager")
 local Notification = require("ui/widget/notification")
+local PluginShare = require("pluginshare")
 local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local logger = require("logger")
@@ -37,7 +38,7 @@ local BookOrbitMenuPin = require("bookorbit_menu_pin")
 local BookOrbitSweep = require("bookorbit_sweep")
 local BookOrbitUpdater = require("bookorbit_updater")
 
-local PLUGIN_VERSION = "0.1.0"
+local PLUGIN_VERSION = "1.0.0"
 
 local SYNC_STRATEGY = {
     PROMPT = 1,
@@ -75,6 +76,8 @@ BookOrbit.default_settings = {
     catalog_grid_cols = 3,
     catalog_grid_rows = 3,
     catalog_recent_searches = {},
+    catalog_auto_open = "off",
+    catalog_dashboard_cache = nil,
     update_check_last_at = 0,
 }
 
@@ -85,6 +88,7 @@ function BookOrbit:init()
     self.last_page_turn_timestamp = 0
     self.page_update_counter = 0
     self.periodic_push_scheduled = false
+    self.provision_applied = false
     self.periodic_push_task = function()
         self.periodic_push_scheduled = false
         self.page_update_counter = 0
@@ -132,6 +136,9 @@ function BookOrbit:init()
     if self.settings.update_check_last_at == nil then
         self.settings.update_check_last_at = 0
     end
+    if self.settings.catalog_auto_open == nil then
+        self.settings.catalog_auto_open = "off"
+    end
 
     self:applyProvision()
 
@@ -143,6 +150,7 @@ function BookOrbit:init()
     pcall(BookOrbitMenuPin.ensure)
     self:onDispatcherRegisterActions()
     self.ui.menu:registerToMainMenu(self)
+    self:onStart()
     UIManager:scheduleIn(5, function()
         self:maybeCheckForUpdate(false)
     end)
@@ -181,6 +189,7 @@ function BookOrbit:applyProvision()
         self.settings.username = provision.username
         self.settings.userkey = provision.userkey
         self.settings.provision_fingerprint = fingerprint
+        self.provision_applied = true
         G_reader_settings:flush()
         logger.info("BookOrbit: applied provision file for", provision.username)
         UIManager:nextTick(function()
@@ -210,6 +219,28 @@ end
 
 function BookOrbit:isLoggedIn()
     return self.settings.server_url ~= nil and self.settings.username ~= nil and self.settings.userkey ~= nil
+end
+
+function BookOrbit:onStart()
+    if PluginShare.bookorbit_auto_open_done then return end
+    PluginShare.bookorbit_auto_open_done = true
+
+    local mode = self.settings.catalog_auto_open or "off"
+    if mode == "off" then return end
+    UIManager:scheduleIn(1.2, function()
+        self:maybeAutoOpenCatalog(mode)
+    end)
+end
+
+function BookOrbit:maybeAutoOpenCatalog(mode)
+    if mode ~= "filemanager" and mode ~= "always" then return end
+    if self.provision_applied then return end
+    if not self:isLoggedIn() then return end
+    if self.catalog_browser ~= nil then return end
+    if mode == "filemanager" and not (self.ui and self.ui.file_chooser ~= nil) then
+        return
+    end
+    self:browseCatalog(true)
 end
 
 local function showSyncError()
@@ -331,6 +362,34 @@ function BookOrbit:updateCheckMenuText()
     return T(_("Installed plugin: v%1 (Login required)"), PLUGIN_VERSION)
 end
 
+function BookOrbit:catalogAutoOpenLabel()
+    local mode = self.settings.catalog_auto_open or "off"
+    if mode == "filemanager" then
+        return _("File manager only")
+    elseif mode == "always" then
+        return _("Every startup")
+    end
+    return _("Off")
+end
+
+function BookOrbit:catalogAutoOpenMenu()
+    local function item(text, value)
+        return {
+            text = text,
+            checked_func = function() return (self.settings.catalog_auto_open or "off") == value end,
+            callback = function()
+                self.settings.catalog_auto_open = value
+                G_reader_settings:flush()
+            end,
+        }
+    end
+    return {
+        item(_("Off"), "off"),
+        item(_("File manager only"), "filemanager"),
+        item(_("Every startup"), "always"),
+    }
+end
+
 function BookOrbit:addToMainMenu(menu_items)
     menu_items.bookorbit = {
         text = _("BookOrbit"),
@@ -339,108 +398,42 @@ function BookOrbit:addToMainMenu(menu_items)
         sorting_hint = "tools",
         sub_item_table = {
             {
-                text = _("BookOrbit server address"),
-                keep_menu_open = true,
-                callback = function()
-                    self:setServerAddress()
-                end,
-            },
-            {
-                text_func = function()
-                    return self.settings.userkey and _("Logout") or _("Login")
-                end,
-                enabled_func = function()
-                    return self.settings.server_url ~= nil
-                end,
-                keep_menu_open = true,
-                callback_func = function()
-                    if self.settings.userkey then
-                        return function(menu)
-                            self:logout(menu)
-                        end
-                    else
-                        return function(menu)
-                            self:login(menu)
-                        end
-                    end
-                end,
-                separator = true,
-            },
-            {
-                text = _("Browse library"),
+                text = _("Open dashboard"),
                 enabled_func = function()
                     return self:isLoggedIn()
                 end,
                 callback = function()
                     self:browseCatalog()
                 end,
-                separator = true,
             },
             {
-                text = _("Auto sync this book"),
-                checked_func = function() return self.settings.auto_sync end,
-                help_text = _([[Pulls progress when a book is opened; pushes progress, highlights, status, rating and reading time when it is closed and on suspend.]]),
-                callback = function()
-                    self:onBookOrbitToggleAutoSync(nil, true)
+                text_func = function()
+                    return self:updateCheckMenuText()
                 end,
-            },
-            {
-                text = _("Two-way highlight sync"),
-                checked_func = function() return self.settings.annotation_sync end,
-                help_text = _([[Also applies highlights, notes and deletions made in BookOrbit to this device: on book open, after the manual book sync, and during the full sweep for closed books. Turning this off keeps uploads only.]]),
+                enabled_func = function()
+                    return self:isLoggedIn()
+                        and not BookOrbitSweep.isRunning()
+                        and not BookOrbitBookSync.isRunning()
+                end,
+                keep_menu_open = true,
                 callback = function()
-                    self.settings.annotation_sync = not self.settings.annotation_sync
+                    self:checkForUpdate()
                 end,
             },
             {
                 text_func = function()
-                    return T(_("Periodically sync every # pages (%1)"), self:getSyncPeriod())
+                    local status = BookOrbitSweep.syncStatus()
+                    local when = (status.lastSweepAt == 0) and _("never")
+                        or os.date("%Y-%m-%d %H:%M", status.lastSweepAt)
+                    if status.unmatched > 0 then
+                        return T(_("Last sync: %1 (%2 linked, %3 unmatched)"), when, status.matched, status.unmatched)
+                    elseif status.matched > 0 then
+                        return T(_("Last sync: %1 (%2 linked)"), when, status.matched)
+                    end
+                    return T(_("Last sync: %1"), when)
                 end,
-                enabled_func = function() return self.settings.auto_sync end,
-                keep_menu_open = true,
-                callback = function(touchmenu_instance)
-                    local SpinWidget = require("ui/widget/spinwidget")
-                    local items = SpinWidget:new{
-                        text = _([[This value determines how many page turns it takes to push book progress.
-If set to 0, updating progress based on page turns will be disabled.]]),
-                        value = self.settings.pages_before_update or 0,
-                        value_min = 0,
-                        value_max = 999,
-                        value_step = 1,
-                        value_hold_step = 10,
-                        ok_text = _("Set"),
-                        title_text = _("Number of pages before update"),
-                        default_value = 10,
-                        callback = function(spin)
-                            self:setPagesBeforeUpdate(spin.value)
-                            if touchmenu_instance then touchmenu_instance:updateItems() end
-                        end,
-                    }
-                    UIManager:show(items)
-                end,
-            },
-            {
-                text = _("Sync behavior"),
-                sub_item_table = {
-                    {
-                        text_func = function()
-                            return T(_("Sync to a newer state (%1)"), getNameStrategy(self.settings.sync_forward))
-                        end,
-                        sub_item_table = self:strategyMenu(
-                            function() return self.settings.sync_forward end,
-                            function(value) self.settings.sync_forward = value end
-                        ),
-                    },
-                    {
-                        text_func = function()
-                            return T(_("Sync to an older state (%1)"), getNameStrategy(self.settings.sync_backward))
-                        end,
-                        sub_item_table = self:strategyMenu(
-                            function() return self.settings.sync_backward end,
-                            function(value) self.settings.sync_backward = value end
-                        ),
-                    },
-                },
+                enabled = false,
+                separator = true,
             },
             {
                 text = _("Sync this book now"),
@@ -463,61 +456,198 @@ If set to 0, updating progress based on page turns will be disabled.]]),
                 separator = true,
             },
             {
-                text_func = function()
-                    return self:updateCheckMenuText()
-                end,
-                enabled_func = function()
-                    return self:isLoggedIn()
-                        and not BookOrbitSweep.isRunning()
-                        and not BookOrbitBookSync.isRunning()
-                end,
-                keep_menu_open = true,
+                text = _("Auto sync this book"),
+                checked_func = function() return self.settings.auto_sync end,
+                help_text = _([[Pulls progress when a book is opened; pushes progress, highlights, status, rating and reading time when it is closed and on suspend.]]),
                 callback = function()
-                    self:checkForUpdate()
+                    self:onBookOrbitToggleAutoSync(nil, true)
+                end,
+            },
+            {
+                text = _("Two-way highlight sync"),
+                checked_func = function() return self.settings.annotation_sync end,
+                help_text = _([[Also applies highlights, notes and deletions made in BookOrbit to this device: on book open, after the manual book sync, and during the full sweep for closed books. Turning this off keeps uploads only.]]),
+                callback = function()
+                    self.settings.annotation_sync = not self.settings.annotation_sync
                 end,
                 separator = true,
             },
             {
-                text_func = function()
-                    local status = BookOrbitSweep.syncStatus()
-                    local when = (status.lastSweepAt == 0) and _("never")
-                        or os.date("%Y-%m-%d %H:%M", status.lastSweepAt)
-                    if status.unmatched > 0 then
-                        return T(_("Last sync: %1 (%2 linked, %3 unmatched)"), when, status.matched, status.unmatched)
-                    elseif status.matched > 0 then
-                        return T(_("Last sync: %1 (%2 linked)"), when, status.matched)
-                    end
-                    return T(_("Last sync: %1"), when)
-                end,
-                enabled = false,
-                separator = true,
+                text = _("Sync settings"),
+                sub_item_table = {
+                    {
+                        text_func = function()
+                            return T(_("Open dashboard on startup (%1)"), self:catalogAutoOpenLabel())
+                        end,
+                        sub_item_table = self:catalogAutoOpenMenu(),
+                    },
+                    {
+                        text_func = function()
+                            return T(_("Periodically sync every # pages (%1)"), self:getSyncPeriod())
+                        end,
+                        enabled_func = function() return self.settings.auto_sync end,
+                        keep_menu_open = true,
+                        callback = function(touchmenu_instance)
+                            local SpinWidget = require("ui/widget/spinwidget")
+                            local items = SpinWidget:new{
+                                text = _([[This value determines how many page turns it takes to push book progress.
+If set to 0, updating progress based on page turns will be disabled.]]),
+                                value = self.settings.pages_before_update or 0,
+                                value_min = 0,
+                                value_max = 999,
+                                value_step = 1,
+                                value_hold_step = 10,
+                                ok_text = _("Set"),
+                                title_text = _("Number of pages before update"),
+                                default_value = 10,
+                                callback = function(spin)
+                                    self:setPagesBeforeUpdate(spin.value)
+                                    if touchmenu_instance then touchmenu_instance:updateItems() end
+                                end,
+                            }
+                            UIManager:show(items)
+                        end,
+                    },
+                    {
+                        text_func = function()
+                            return T(_("Sync to a newer state (%1)"), getNameStrategy(self.settings.sync_forward))
+                        end,
+                        sub_item_table = self:strategyMenu(
+                            function() return self.settings.sync_forward end,
+                            function(value) self.settings.sync_forward = value end
+                        ),
+                    },
+                    {
+                        text_func = function()
+                            return T(_("Sync to an older state (%1)"), getNameStrategy(self.settings.sync_backward))
+                        end,
+                        sub_item_table = self:strategyMenu(
+                            function() return self.settings.sync_backward end,
+                            function(value) self.settings.sync_backward = value end
+                        ),
+                    },
+                },
+            },
+            {
+                text = _("Account & setup"),
+                sub_item_table = {
+                    {
+                        text = _("BookOrbit server address"),
+                        keep_menu_open = true,
+                        callback = function()
+                            self:setServerAddress()
+                        end,
+                    },
+                    {
+                        text_func = function()
+                            return self.settings.userkey and _("Logout") or _("Login")
+                        end,
+                        enabled_func = function()
+                            return self.settings.server_url ~= nil
+                        end,
+                        keep_menu_open = true,
+                        callback_func = function()
+                            if self.settings.userkey then
+                                return function(menu)
+                                    self:logout(menu)
+                                end
+                            else
+                                return function(menu)
+                                    self:login(menu)
+                                end
+                            end
+                        end,
+                    },
+                },
             },
         },
     }
 end
 
-function BookOrbit:browseCatalog()
+function BookOrbit:dashboardMenuItems(catalog)
+    local menu_items = {}
+    self:addToMainMenu(menu_items)
+    local bookorbit_items = menu_items.bookorbit.sub_item_table or {}
+    local items = {
+        icon = "appbar.menu",
+    }
+    for index, item in ipairs(bookorbit_items) do
+        if index ~= 1 then
+            table.insert(items, item)
+        end
+    end
+    return items
+end
+
+function BookOrbit:showDashboardMenu(catalog)
+    local CenterContainer = require("ui/widget/container/centercontainer")
+    local TouchMenu = require("ui/widget/touchmenu")
+    if self.dashboard_menu_container then
+        local old_container = self.dashboard_menu_container
+        self.dashboard_menu_container = nil
+        UIManager:close(old_container)
+    end
+    local menu_container = CenterContainer:new{
+        covers_header = true,
+        ignore = "height",
+        dimen = Device.screen:getSize(),
+    }
+    local dashboard_menu = TouchMenu:new{
+        width = Device.screen:getWidth(),
+        last_index = 1,
+        tab_item_table = { self:dashboardMenuItems(catalog) },
+        show_parent = menu_container,
+    }
+    local closing = false
+    dashboard_menu.close_callback = function()
+        if closing then return true end
+        closing = true
+        if self.dashboard_menu_container == menu_container then
+            self.dashboard_menu_container = nil
+        end
+        UIManager:close(menu_container)
+        return true
+    end
+    menu_container[1] = dashboard_menu
+    self.dashboard_menu_container = menu_container
+    UIManager:show(menu_container)
+end
+
+function BookOrbit:openCatalogBrowser(prefer_cached_dashboard)
+    if self.catalog_browser ~= nil then return end
+    self.catalog_browser = BookOrbitCatalog:new{
+        title = _("BookOrbit"),
+        api = self:apiOpts(),
+        settings = self.settings,
+        prefer_cached_dashboard = prefer_cached_dashboard,
+        save_settings = function()
+            G_reader_settings:flush()
+        end,
+        show_dashboard_menu = function(catalog)
+            self:showDashboardMenu(catalog)
+        end,
+        _manager = self,
+        close_callback = function()
+            UIManager:close(self.catalog_browser)
+            self.catalog_browser = nil
+        end,
+    }
+    UIManager:show(self.catalog_browser)
+end
+
+function BookOrbit:browseCatalog(allow_offline)
     if not self:isLoggedIn() then
         promptLogin()
         return
     end
 
-    NetworkMgr:runWhenConnected(function()
-        self.catalog_browser = BookOrbitCatalog:new{
-            title = _("BookOrbit"),
-            api = self:apiOpts(),
-            settings = self.settings,
-            save_settings = function()
-                G_reader_settings:flush()
-            end,
-            _manager = self,
-            close_callback = function()
-                UIManager:close(self.catalog_browser)
-                self.catalog_browser = nil
-            end,
-        }
-        UIManager:show(self.catalog_browser)
-    end)
+    if allow_offline then
+        self:openCatalogBrowser(true)
+    else
+        NetworkMgr:runWhenConnected(function()
+            self:openCatalogBrowser(false)
+        end)
+    end
 end
 
 function BookOrbit:setServerAddress()
@@ -1006,7 +1136,7 @@ function BookOrbit:onBookOrbitToggleAutoSync(toggle, from_menu)
             and Device:hasSeamlessWifiToggle()
             and G_reader_settings:readSetting("wifi_enable_action") ~= "turn_on" then
         UIManager:show(InfoMessage:new{
-            text = _("You will have to switch the 'Action when Wi-Fi is off' Network setting to 'turn on' to be able to enable this feature!"),
+            text = _("Auto sync needs KOReader to turn Wi-Fi on without asking. Open Network settings, set 'Action when Wi-Fi is off' to 'Turn on', then enable Auto sync again."),
         })
         return true
     end

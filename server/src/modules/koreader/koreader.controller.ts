@@ -24,7 +24,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { KoreaderAuthGuard } from './koreader-auth.guard';
 import { KoreaderPackageService } from './koreader-package.service';
 import { KoreaderService } from './koreader.service';
-import { CreateKoreaderUserDto, DownloadPluginPackageDto, SaveProgressDto, TestConnectionDto, UpdateKoreaderUserDto } from './dto';
+import { CreateKoreaderUserDto, DownloadPluginPackageDto, KoreaderSaveProgressDto, TestConnectionDto, UpdateKoreaderUserDto } from './dto';
 
 @Controller('koreader')
 export class KoreaderController {
@@ -51,7 +51,7 @@ export class KoreaderController {
   @Public()
   @UseGuards(KoreaderAuthGuard)
   @Put('syncs/progress')
-  async saveProgress(@CurrentUser() user: RequestUser, @Body() dto: SaveProgressDto) {
+  async saveProgress(@CurrentUser() user: RequestUser, @Body() dto: KoreaderSaveProgressDto) {
     return this.koreaderService.saveProgress(user.id, dto);
   }
 

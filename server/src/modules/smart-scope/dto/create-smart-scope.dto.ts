@@ -1,6 +1,6 @@
 import { Transform, Type } from 'class-transformer';
 import type { GroupRule, SortField, SortSpec } from '@bookorbit/types';
-import { SORT_FIELDS } from '@bookorbit/types';
+import { ICON_VALUE_MAX_LENGTH, SORT_FIELDS } from '@bookorbit/types';
 import { IsArray, IsBoolean, IsIn, IsNotEmpty, IsObject, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
 
 const SORT_DIRECTIONS: ReadonlyArray<SortSpec['dir']> = ['asc', 'desc'];
@@ -25,7 +25,7 @@ export class CreateSmartScopeDto {
   @Transform(({ value }) => trimString(value))
   @IsString()
   @IsNotEmpty()
-  @MaxLength(64)
+  @MaxLength(ICON_VALUE_MAX_LENGTH)
   icon: string;
 
   @IsOptional()

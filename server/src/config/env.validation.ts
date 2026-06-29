@@ -1,6 +1,8 @@
 import { parseIntoClientConfig } from 'pg-connection-string';
 import { z } from 'zod';
 
+const BOOLEAN_ENV_VALUES = ['true', 'false', '1', '0', 'yes', 'no', 'on', 'off'];
+
 function isValidPostgresConnectionString(value: string): boolean {
   if (!value.trim()) {
     return false;
@@ -16,6 +18,17 @@ function isValidPostgresConnectionString(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+function booleanEnvFlag(name: string) {
+  return z
+    .string()
+    .trim()
+    .toLowerCase()
+    .refine((val) => BOOLEAN_ENV_VALUES.includes(val), {
+      message: `${name} must be one of ${BOOLEAN_ENV_VALUES.join('/')}`,
+    })
+    .optional();
 }
 
 const envSchema = z.object({
@@ -43,22 +56,9 @@ const envSchema = z.object({
   TRUST_PROXY: z.string().optional(),
   EMAIL_ENCRYPTION_KEY: z.string().optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).optional(),
-  OIDC_ALLOW_LOCAL_ISSUERS: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .refine((val) => ['true', 'false', '1', '0', 'yes', 'no', 'on', 'off'].includes(val), {
-      message: 'OIDC_ALLOW_LOCAL_ISSUERS must be one of true/false/1/0/yes/no/on/off',
-    })
-    .optional(),
-  CSP_ALLOW_CLOUDFLARE_INSIGHTS: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .refine((val) => ['true', 'false', '1', '0', 'yes', 'no', 'on', 'off'].includes(val), {
-      message: 'CSP_ALLOW_CLOUDFLARE_INSIGHTS must be one of true/false/1/0/yes/no/on/off',
-    })
-    .optional(),
+  OIDC_ALLOW_LOCAL_ISSUERS: booleanEnvFlag('OIDC_ALLOW_LOCAL_ISSUERS'),
+  CSP_ALLOW_CLOUDFLARE_INSIGHTS: booleanEnvFlag('CSP_ALLOW_CLOUDFLARE_INSIGHTS'),
+  SWAGGER_ENABLED: booleanEnvFlag('SWAGGER_ENABLED'),
   KOBO_CLOUDSCRAPER_PYTHON: z
     .string()
     .transform((val) => val.trim())

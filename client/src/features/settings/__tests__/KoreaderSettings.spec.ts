@@ -92,7 +92,7 @@ describe('KoreaderSettings', () => {
     koreaderMock.createCredentials.mockResolvedValue(undefined)
     koreaderMock.updateCredentials.mockResolvedValue(undefined)
     koreaderMock.deleteCredentials.mockResolvedValue(undefined)
-    koreaderMock.getSyncUrl.mockReturnValue('https://bookorbit.example/api/v1/koreader')
+    koreaderMock.getSyncUrl.mockReturnValue('https://bookorbit.example')
     koreaderMock.downloadPluginPackage.mockResolvedValue(undefined)
   })
 
@@ -151,7 +151,7 @@ describe('KoreaderSettings', () => {
     expect(wrapper.text()).toContain('14 books')
     expect(wrapper.text()).toContain('1 device')
     const syncUrlInput = wrapper.find('input[readonly]').element as HTMLInputElement
-    expect(syncUrlInput.value).toBe('https://bookorbit.example/api/v1/koreader')
+    expect(syncUrlInput.value).toBe('https://bookorbit.example')
     expect(wrapper.text()).toContain('Kobo Libra 2')
     expect(wrapper.text()).toContain('Project Hail Mary')
     expect(wrapper.text()).toContain('Latest plugin: v0.5.0')
@@ -252,7 +252,7 @@ describe('KoreaderSettings', () => {
 
     expect(koreaderMock.fetchSyncStatus).toHaveBeenCalledTimes(2)
     expect(koreaderMock.updateCredentials).toHaveBeenCalledWith({ syncEnabled: false })
-    expect(vi.mocked(copyToClipboard)).toHaveBeenCalledWith('https://bookorbit.example/api/v1/koreader')
+    expect(vi.mocked(copyToClipboard)).toHaveBeenCalledWith('https://bookorbit.example')
     expect(koreaderMock.downloadPluginPackage).toHaveBeenCalledTimes(1)
     expect(wrapper.text()).toContain('Delete KOReader credentials?')
 

@@ -82,10 +82,6 @@ describe('EpubController', () => {
     expect(reply.header).toHaveBeenCalledWith('Cache-Control', 'public, max-age=3600');
   });
 
-  it('skips global throttling for EPUB archive file streams', () => {
-    expect(Reflect.getMetadata('THROTTLER:SKIPdefault', EpubController.prototype.getFile)).toBe(true);
-  });
-
   it('rejects malformed encoded file paths', async () => {
     await expect(
       controller.getFile(9, 'OPS/text/%E0%A4%A', undefined, { id: 1, isSuperuser: false, permissions: [] } as any, {} as any),

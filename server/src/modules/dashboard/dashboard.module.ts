@@ -13,5 +13,6 @@ import { DashboardWidgetService } from './dashboard-widget.service';
   imports: [BookModule, LibraryModule, SmartScopeModule],
   controllers: [DashboardController],
   providers: [DashboardService, DashboardRepository, DashboardWidgetService, DashboardWidgetRepository],
+  exports: [DashboardWidgetService],
 })
 export class DashboardModule {}

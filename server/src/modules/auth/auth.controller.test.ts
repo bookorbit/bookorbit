@@ -134,51 +134,32 @@ describe('AuthController', () => {
     expect(() => controller.listMagicLinks(user)).toThrow();
   });
 
-  it('defines throttling metadata for sensitive public endpoints', () => {
+  it('defines throttling metadata only for sensitive auth endpoints', () => {
     const limitKey = 'THROTTLER:LIMITdefault';
     const ttlKey = 'THROTTLER:TTLdefault';
+    const throttledEndpoints: Array<[object, number, number]> = [
+      [AuthController.prototype.register, 3, 60_000],
+      [AuthController.prototype.setup, 3, 60_000],
+      [AuthController.prototype.login, 5, 60_000],
+      [AuthController.prototype.forgotPassword, 3, 3_600_000],
+      [AuthController.prototype.resetPassword, 5, 60_000],
+      [AuthController.prototype.oidcGenerateState, 10, 60_000],
+      [AuthController.prototype.oidcCallback, 5, 60_000],
+      [AuthController.prototype.oidcGenerateLinkState, 5, 60_000],
+      [AuthController.prototype.oidcGeneratePreviewState, 5, 60_000],
+      [AuthController.prototype.createMagicLink, 5, 60_000],
+      [AuthController.prototype.loginWithMagicLink, 10, 60_000],
+    ];
 
-    const registerLimit = Reflect.getMetadata(limitKey, AuthController.prototype.register) as number;
-    const registerTtl = Reflect.getMetadata(ttlKey, AuthController.prototype.register) as number;
-    const setupLimit = Reflect.getMetadata(limitKey, AuthController.prototype.setup) as number;
-    const setupTtl = Reflect.getMetadata(ttlKey, AuthController.prototype.setup) as number;
-    const loginLimit = Reflect.getMetadata(limitKey, AuthController.prototype.login) as number;
-    const loginTtl = Reflect.getMetadata(ttlKey, AuthController.prototype.login) as number;
-    const forgotLimit = Reflect.getMetadata(limitKey, AuthController.prototype.forgotPassword) as number;
-    const forgotTtl = Reflect.getMetadata(ttlKey, AuthController.prototype.forgotPassword) as number;
-    const resetLimit = Reflect.getMetadata(limitKey, AuthController.prototype.resetPassword) as number;
-    const resetTtl = Reflect.getMetadata(ttlKey, AuthController.prototype.resetPassword) as number;
+    for (const [handler, limit, ttl] of throttledEndpoints) {
+      expect(Reflect.getMetadata(limitKey, handler)).toBe(limit);
+      expect(Reflect.getMetadata(ttlKey, handler)).toBe(ttl);
+    }
 
-    expect(registerLimit).toBe(3);
-    expect(registerTtl).toBe(60_000);
-    expect(setupLimit).toBe(3);
-    expect(setupTtl).toBe(60_000);
-    expect(loginLimit).toBe(5);
-    expect(loginTtl).toBe(60_000);
-    expect(forgotLimit).toBe(3);
-    expect(forgotTtl).toBe(3_600_000);
-    expect(resetLimit).toBe(5);
-    expect(resetTtl).toBe(60_000);
-
-    const oidcStateLimit = Reflect.getMetadata(limitKey, AuthController.prototype.oidcGenerateState) as number;
-    const oidcStateTtl = Reflect.getMetadata(ttlKey, AuthController.prototype.oidcGenerateState) as number;
-    const oidcCallbackLimit = Reflect.getMetadata(limitKey, AuthController.prototype.oidcCallback) as number;
-    const oidcCallbackTtl = Reflect.getMetadata(ttlKey, AuthController.prototype.oidcCallback) as number;
-
-    expect(oidcStateLimit).toBe(10);
-    expect(oidcStateTtl).toBe(60_000);
-    expect(oidcCallbackLimit).toBe(5);
-    expect(oidcCallbackTtl).toBe(60_000);
-
-    const createMlLimit = Reflect.getMetadata(limitKey, AuthController.prototype.createMagicLink) as number;
-    const createMlTtl = Reflect.getMetadata(ttlKey, AuthController.prototype.createMagicLink) as number;
-    const loginMlLimit = Reflect.getMetadata(limitKey, AuthController.prototype.loginWithMagicLink) as number;
-    const loginMlTtl = Reflect.getMetadata(ttlKey, AuthController.prototype.loginWithMagicLink) as number;
-
-    expect(createMlLimit).toBe(5);
-    expect(createMlTtl).toBe(60_000);
-    expect(loginMlLimit).toBe(10);
-    expect(loginMlTtl).toBe(60_000);
+    expect(Reflect.getMetadata(limitKey, AuthController.prototype.refresh)).toBeUndefined();
+    expect(Reflect.getMetadata(limitKey, AuthController.prototype.logout)).toBeUndefined();
+    expect(Reflect.getMetadata(limitKey, AuthController.prototype.me)).toBeUndefined();
+    expect(Reflect.getMetadata(limitKey, AuthController.prototype.listMagicLinks)).toBeUndefined();
   });
 
   it('defines forbidden-permission metadata for account edit endpoints', () => {

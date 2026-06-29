@@ -98,6 +98,24 @@ describe('AuthorEnrichmentRepository', () => {
     );
   });
 
+  it('upsertSchedule chunks large author id lists', async () => {
+    const { db, insertBuilder } = makeDb();
+    insertBuilder.returning.mockResolvedValueOnce([{ authorId: 1 }, { authorId: 2 }]).mockResolvedValueOnce([{ authorId: 3 }]);
+    const repo = new AuthorEnrichmentRepository(db as never);
+
+    const count = await repo.upsertSchedule([1, 2, 3], 'metadata_replace', 2);
+
+    expect(count).toBe(3);
+    expect(db.insert).toHaveBeenCalledTimes(2);
+    expect(insertBuilder.values).toHaveBeenNthCalledWith(1, [
+      expect.objectContaining({ authorId: 1, status: 'queued', reason: 'metadata_replace', attemptCount: 0 }),
+      expect.objectContaining({ authorId: 2, status: 'queued', reason: 'metadata_replace', attemptCount: 0 }),
+    ]);
+    expect(insertBuilder.values).toHaveBeenNthCalledWith(2, [
+      expect.objectContaining({ authorId: 3, status: 'queued', reason: 'metadata_replace', attemptCount: 0 }),
+    ]);
+  });
+
   it('fetchDue filters by active statuses and due time', async () => {
     const { db, selectBuilder } = makeDb();
     const repo = new AuthorEnrichmentRepository(db as never);
@@ -197,7 +215,7 @@ describe('AuthorEnrichmentRepository', () => {
 
   it('enqueueEligibleLinkedAuthors selects eligible linked ids directly in SQL', async () => {
     const { db, selectBuilder, insertBuilder } = makeDb();
-    selectBuilder.where.mockResolvedValueOnce([{ authorId: 31 }, { authorId: 32 }]);
+    selectBuilder.limit.mockResolvedValueOnce([{ authorId: 31 }, { authorId: 32 }]);
     insertBuilder.returning.mockResolvedValueOnce([{ authorId: 31 }, { authorId: 32 }]);
     const repo = new AuthorEnrichmentRepository(db as never);
 
@@ -209,6 +227,34 @@ describe('AuthorEnrichmentRepository', () => {
 
     expect(queued).toBe(2);
     expect(db.selectDistinct).toHaveBeenCalled();
+    expect(selectBuilder.orderBy).toHaveBeenCalled();
+    expect(selectBuilder.limit).toHaveBeenCalledWith(1000);
+  });
+
+  it('enqueueEligibleLinkedAuthors walks cursor pages and accumulates queued totals', async () => {
+    const { db, selectBuilder } = makeDb();
+    selectBuilder.limit
+      .mockResolvedValueOnce([{ authorId: 10 }, { authorId: 20 }])
+      .mockResolvedValueOnce([{ authorId: 40 }])
+      .mockResolvedValueOnce([]);
+    const repo = new AuthorEnrichmentRepository(db as never);
+    const upsert = vi.spyOn(repo, 'upsertSchedule').mockResolvedValueOnce(2).mockResolvedValueOnce(1);
+
+    const queued = await repo.enqueueEligibleLinkedAuthors(
+      AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL,
+      {
+        neverEnriched: false,
+        missingBio: true,
+        missingPhoto: false,
+      },
+      2,
+    );
+
+    expect(queued).toBe(3);
+    expect(upsert).toHaveBeenNthCalledWith(1, [10, 20], AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL, 2);
+    expect(upsert).toHaveBeenNthCalledWith(2, [40], AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL, 2);
+    expect(selectBuilder.limit).toHaveBeenCalledTimes(3);
+    expect(selectBuilder.limit).toHaveBeenCalledWith(2);
   });
 
   it('countEligibleLinkedAuthors returns SQL count without materializing all ids', async () => {
@@ -266,12 +312,28 @@ describe('AuthorEnrichmentRepository', () => {
 
   it('enqueueAllLinkedAuthors schedules distinct linked author ids', async () => {
     const { db, selectBuilder, insertBuilder } = makeDb();
-    selectBuilder.from.mockResolvedValueOnce([{ authorId: 11 }, { authorId: 12 }]);
+    selectBuilder.limit.mockResolvedValueOnce([{ authorId: 11 }, { authorId: 12 }]);
     insertBuilder.returning.mockResolvedValueOnce([{ authorId: 11 }, { authorId: 12 }]);
     const repo = new AuthorEnrichmentRepository(db as never);
 
     await expect(repo.enqueueAllLinkedAuthors(AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL_ALL)).resolves.toBe(2);
     expect(db.selectDistinct).toHaveBeenCalled();
+    expect(selectBuilder.orderBy).toHaveBeenCalled();
+  });
+
+  it('enqueueAllLinkedAuthors walks cursor pages and accumulates queued totals', async () => {
+    const { db, selectBuilder } = makeDb();
+    selectBuilder.limit
+      .mockResolvedValueOnce([{ authorId: 11 }, { authorId: 12 }])
+      .mockResolvedValueOnce([{ authorId: 15 }])
+      .mockResolvedValueOnce([]);
+    const repo = new AuthorEnrichmentRepository(db as never);
+    const upsert = vi.spyOn(repo, 'upsertSchedule').mockResolvedValueOnce(2).mockResolvedValueOnce(1);
+
+    await expect(repo.enqueueAllLinkedAuthors(AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL_ALL, 2)).resolves.toBe(3);
+    expect(upsert).toHaveBeenNthCalledWith(1, [11, 12], AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL_ALL, 2);
+    expect(upsert).toHaveBeenNthCalledWith(2, [15], AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL_ALL, 2);
+    expect(selectBuilder.limit).toHaveBeenCalledTimes(3);
   });
 
   it('markDone clears queue row and updates author enrichment fields', async () => {

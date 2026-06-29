@@ -276,6 +276,9 @@ importers:
       "@nestjs/schedule":
         specifier: ^6.1.3
         version: 6.1.3(@nestjs/common@11.1.27(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.27)
+      "@nestjs/swagger":
+        specifier: ^11.4.4
+        version: 11.4.4(@fastify/static@9.1.3)(@nestjs/common@11.1.27(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.27)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)
       "@nestjs/terminus":
         specifier: ^11.1.1
         version: 11.1.1(@nestjs/common@11.1.27(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.27)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -3865,6 +3868,12 @@ packages:
       }
     engines: { node: ">=8" }
 
+  "@microsoft/tsdoc@0.16.0":
+    resolution:
+      {
+        integrity: sha512-xgAyonlVVS+q7Vc7qLW0UrJU7rSFcETRWsqdXZtjzRU8dF+6CkozTK4V4y1LwOX7j8r/vHphjDeMeGI4tNGeGA==,
+      }
+
   "@napi-rs/nice-android-arm-eabi@1.1.1":
     resolution:
       {
@@ -4111,6 +4120,22 @@ packages:
     peerDependencies:
       "@nestjs/common": ^8.0.0 || ^9.0.0 || ^10.0.0 || ^11.0.0
 
+  "@nestjs/mapped-types@2.1.1":
+    resolution:
+      {
+        integrity: sha512-SCCoMEJ6jdeI5h/N+KCVF1+pmg/hmEkNA5nHTS8Gvww7T/LCl4o1gFLinw2iQ60w7slFkszHcGLKGdazVI4F8A==,
+      }
+    peerDependencies:
+      "@nestjs/common": ^10.0.0 || ^11.0.0
+      class-transformer: ^0.4.0 || ^0.5.0
+      class-validator: ^0.13.0 || ^0.14.0 || ^0.15.0
+      reflect-metadata: ^0.1.12 || ^0.2.0
+    peerDependenciesMeta:
+      class-transformer:
+        optional: true
+      class-validator:
+        optional: true
+
   "@nestjs/passport@11.0.5":
     resolution:
       {
@@ -4165,6 +4190,26 @@ packages:
       typescript: ">=4.8.2"
     peerDependenciesMeta:
       prettier:
+        optional: true
+
+  "@nestjs/swagger@11.4.4":
+    resolution:
+      {
+        integrity: sha512-VaIo1ruV2G7b+f2zPzkBSUNy9a/WQ9sg8TLKhWlrTfg4O6U10M/PA7Xi6XMXadOVhwOqoesijba8jH3i/3adrA==,
+      }
+    peerDependencies:
+      "@fastify/static": ^8.0.0 || ^9.0.0
+      "@nestjs/common": ^11.0.1
+      "@nestjs/core": ^11.0.1
+      class-transformer: "*"
+      class-validator: "*"
+      reflect-metadata: ^0.1.12 || ^0.2.0
+    peerDependenciesMeta:
+      "@fastify/static":
+        optional: true
+      class-transformer:
+        optional: true
+      class-validator:
         optional: true
 
   "@nestjs/terminus@11.1.1":
@@ -4570,136 +4615,6 @@ packages:
       {
         integrity: sha512-XO7cAxhnTZl0Yggq6jOgjiOHhbgcO4NqFqwSmQpjK3b6TEE6Uj/jfSk6wzYyemh3+I0sHirKSetjQwn5cZktFw==,
       }
-
-  "@parcel/watcher-android-arm64@2.5.6":
-    resolution:
-      {
-        integrity: sha512-YQxSS34tPF/6ZG7r/Ih9xy+kP/WwediEUsqmtf0cuCV5TPPKw/PQHRhueUo6JdeFJaqV3pyjm0GdYjZotbRt/A==,
-      }
-    engines: { node: ">= 10.0.0" }
-    cpu: [arm64]
-    os: [android]
-
-  "@parcel/watcher-darwin-arm64@2.5.6":
-    resolution:
-      {
-        integrity: sha512-Z2ZdrnwyXvvvdtRHLmM4knydIdU9adO3D4n/0cVipF3rRiwP+3/sfzpAwA/qKFL6i1ModaabkU7IbpeMBgiVEA==,
-      }
-    engines: { node: ">= 10.0.0" }
-    cpu: [arm64]
-    os: [darwin]
-
-  "@parcel/watcher-darwin-x64@2.5.6":
-    resolution:
-      {
-        integrity: sha512-HgvOf3W9dhithcwOWX9uDZyn1lW9R+7tPZ4sug+NGrGIo4Rk1hAXLEbcH1TQSqxts0NYXXlOWqVpvS1SFS4fRg==,
-      }
-    engines: { node: ">= 10.0.0" }
-    cpu: [x64]
-    os: [darwin]
-
-  "@parcel/watcher-freebsd-x64@2.5.6":
-    resolution:
-      {
-        integrity: sha512-vJVi8yd/qzJxEKHkeemh7w3YAn6RJCtYlE4HPMoVnCpIXEzSrxErBW5SJBgKLbXU3WdIpkjBTeUNtyBVn8TRng==,
-      }
-    engines: { node: ">= 10.0.0" }
-    cpu: [x64]
-    os: [freebsd]
-
-  "@parcel/watcher-linux-arm-glibc@2.5.6":
-    resolution:
-      {
-        integrity: sha512-9JiYfB6h6BgV50CCfasfLf/uvOcJskMSwcdH1PHH9rvS1IrNy8zad6IUVPVUfmXr+u+Km9IxcfMLzgdOudz9EQ==,
-      }
-    engines: { node: ">= 10.0.0" }
-    cpu: [arm]
-    os: [linux]
-    libc: [glibc]
-
-  "@parcel/watcher-linux-arm-musl@2.5.6":
-    resolution:
-      {
-        integrity: sha512-Ve3gUCG57nuUUSyjBq/MAM0CzArtuIOxsBdQ+ftz6ho8n7s1i9E1Nmk/xmP323r2YL0SONs1EuwqBp2u1k5fxg==,
-      }
-    engines: { node: ">= 10.0.0" }
-    cpu: [arm]
-    os: [linux]
-    libc: [musl]
-
-  "@parcel/watcher-linux-arm64-glibc@2.5.6":
-    resolution:
-      {
-        integrity: sha512-f2g/DT3NhGPdBmMWYoxixqYr3v/UXcmLOYy16Bx0TM20Tchduwr4EaCbmxh1321TABqPGDpS8D/ggOTaljijOA==,
-      }
-    engines: { node: ">= 10.0.0" }
-    cpu: [arm64]
-    os: [linux]
-    libc: [glibc]
-
-  "@parcel/watcher-linux-arm64-musl@2.5.6":
-    resolution:
-      {
-        integrity: sha512-qb6naMDGlbCwdhLj6hgoVKJl2odL34z2sqkC7Z6kzir8b5W65WYDpLB6R06KabvZdgoHI/zxke4b3zR0wAbDTA==,
-      }
-    engines: { node: ">= 10.0.0" }
-    cpu: [arm64]
-    os: [linux]
-    libc: [musl]
-
-  "@parcel/watcher-linux-x64-glibc@2.5.6":
-    resolution:
-      {
-        integrity: sha512-kbT5wvNQlx7NaGjzPFu8nVIW1rWqV780O7ZtkjuWaPUgpv2NMFpjYERVi0UYj1msZNyCzGlaCWEtzc+exjMGbQ==,
-      }
-    engines: { node: ">= 10.0.0" }
-    cpu: [x64]
-    os: [linux]
-    libc: [glibc]
-
-  "@parcel/watcher-linux-x64-musl@2.5.6":
-    resolution:
-      {
-        integrity: sha512-1JRFeC+h7RdXwldHzTsmdtYR/Ku8SylLgTU/reMuqdVD7CtLwf0VR1FqeprZ0eHQkO0vqsbvFLXUmYm/uNKJBg==,
-      }
-    engines: { node: ">= 10.0.0" }
-    cpu: [x64]
-    os: [linux]
-    libc: [musl]
-
-  "@parcel/watcher-win32-arm64@2.5.6":
-    resolution:
-      {
-        integrity: sha512-3ukyebjc6eGlw9yRt678DxVF7rjXatWiHvTXqphZLvo7aC5NdEgFufVwjFfY51ijYEWpXbqF5jtrK275z52D4Q==,
-      }
-    engines: { node: ">= 10.0.0" }
-    cpu: [arm64]
-    os: [win32]
-
-  "@parcel/watcher-win32-ia32@2.5.6":
-    resolution:
-      {
-        integrity: sha512-k35yLp1ZMwwee3Ez/pxBi5cf4AoBKYXj00CZ80jUz5h8prpiaQsiRPKQMxoLstNuqe2vR4RNPEAEcjEFzhEz/g==,
-      }
-    engines: { node: ">= 10.0.0" }
-    cpu: [ia32]
-    os: [win32]
-
-  "@parcel/watcher-win32-x64@2.5.6":
-    resolution:
-      {
-        integrity: sha512-hbQlYcCq5dlAX9Qx+kFb0FHue6vbjlf0FrNzSKdYK2APUf7tGfGxQCk2ihEREmbR6ZMc0MVAD5RIX/41gpUzTw==,
-      }
-    engines: { node: ">= 10.0.0" }
-    cpu: [x64]
-    os: [win32]
-
-  "@parcel/watcher@2.5.6":
-    resolution:
-      {
-        integrity: sha512-tmmZ3lQxAe/k/+rNnXQRawJ4NjxO2hqiOLTHvWchtGZULp4RyFeh6aU4XdOYBFe2KE1oShQTv4AblOs2iOrNnQ==,
-      }
-    engines: { node: ">= 10.0.0" }
 
   "@pdf-lib/standard-fonts@1.0.0":
     resolution:
@@ -5188,6 +5103,12 @@ packages:
       }
     cpu: [x64]
     os: [win32]
+
+  "@scarf/scarf@1.4.0":
+    resolution:
+      {
+        integrity: sha512-xxeapPiUXdZAE3che6f3xogoJPeZgig6omHEy1rIY5WVsB3H2BHNnZH+gHG6x91SCWyQCzWGsuL2Hh3ClO5/qQ==,
+      }
 
   "@sec-ant/readable-stream@0.4.1":
     resolution:
@@ -11095,12 +11016,6 @@ packages:
         integrity: sha512-AGK2yQKIjRuqnc6VkX2Xj5d+QW8xZ87pa1UK6yA6ouUyuxfHuMP6umE5QK7UmTeOAymo+Zx1Fxiuw9rVx8taHQ==,
       }
 
-  node-addon-api@7.1.1:
-    resolution:
-      {
-        integrity: sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ==,
-      }
-
   node-emoji@1.11.0:
     resolution:
       {
@@ -13191,6 +13106,12 @@ packages:
         integrity: sha512-2uCs/LZ9us+AktdzYJM8OcxQ8qnPS1kpaO7syGT/MgO+6Qr1Ybl+TqPq+97u7PHqmmMlye5ZkoyXONy5mjjAbw==,
       }
     engines: { node: ">=18" }
+
+  swagger-ui-dist@5.32.6:
+    resolution:
+      {
+        integrity: sha512-75ttZNaYCLoFPnozPZcTUU6mS3wKT8l7WLjU5zJSHFeJa23i5vtnze6IiCl4jDMPeQTXVXIgovq4M11NNfQvSA==,
+      }
 
   symbol-observable@4.0.0:
     resolution:
@@ -16966,6 +16887,8 @@ snapshots:
 
   "@lukeed/ms@2.0.2": {}
 
+  "@microsoft/tsdoc@0.16.0": {}
+
   "@napi-rs/nice-android-arm-eabi@1.1.1":
     optional: true
 
@@ -17126,6 +17049,14 @@ snapshots:
       "@types/jsonwebtoken": 9.0.10
       jsonwebtoken: 9.0.3
 
+  "@nestjs/mapped-types@2.1.1(@nestjs/common@11.1.27(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)":
+    dependencies:
+      "@nestjs/common": 11.1.27(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      reflect-metadata: 0.2.2
+    optionalDependencies:
+      class-transformer: 0.5.1
+      class-validator: 0.15.1
+
   "@nestjs/passport@11.0.5(@nestjs/common@11.1.27(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(passport@0.7.0)":
     dependencies:
       "@nestjs/common": 11.1.27(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -17191,6 +17122,22 @@ snapshots:
       prettier: 3.8.4
     transitivePeerDependencies:
       - chokidar
+
+  "@nestjs/swagger@11.4.4(@fastify/static@9.1.3)(@nestjs/common@11.1.27(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.27)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)":
+    dependencies:
+      "@microsoft/tsdoc": 0.16.0
+      "@nestjs/common": 11.1.27(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      "@nestjs/core": 11.1.27(@nestjs/common@11.1.27(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/websockets@11.1.27)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      "@nestjs/mapped-types": 2.1.1(@nestjs/common@11.1.27(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)
+      js-yaml: 4.1.1
+      lodash: 4.18.1
+      path-to-regexp: 8.4.2
+      reflect-metadata: 0.2.2
+      swagger-ui-dist: 5.32.6
+    optionalDependencies:
+      "@fastify/static": 9.1.3
+      class-transformer: 0.5.1
+      class-validator: 0.15.1
 
   "@nestjs/terminus@11.1.1(@nestjs/common@11.1.27(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.27)(reflect-metadata@0.2.2)(rxjs@7.8.2)":
     dependencies:
@@ -17366,66 +17313,6 @@ snapshots:
   "@paralleldrive/cuid2@2.3.1":
     dependencies:
       "@noble/hashes": 1.8.0
-
-  "@parcel/watcher-android-arm64@2.5.6":
-    optional: true
-
-  "@parcel/watcher-darwin-arm64@2.5.6":
-    optional: true
-
-  "@parcel/watcher-darwin-x64@2.5.6":
-    optional: true
-
-  "@parcel/watcher-freebsd-x64@2.5.6":
-    optional: true
-
-  "@parcel/watcher-linux-arm-glibc@2.5.6":
-    optional: true
-
-  "@parcel/watcher-linux-arm-musl@2.5.6":
-    optional: true
-
-  "@parcel/watcher-linux-arm64-glibc@2.5.6":
-    optional: true
-
-  "@parcel/watcher-linux-arm64-musl@2.5.6":
-    optional: true
-
-  "@parcel/watcher-linux-x64-glibc@2.5.6":
-    optional: true
-
-  "@parcel/watcher-linux-x64-musl@2.5.6":
-    optional: true
-
-  "@parcel/watcher-win32-arm64@2.5.6":
-    optional: true
-
-  "@parcel/watcher-win32-ia32@2.5.6":
-    optional: true
-
-  "@parcel/watcher-win32-x64@2.5.6":
-    optional: true
-
-  "@parcel/watcher@2.5.6":
-    dependencies:
-      detect-libc: 2.1.2
-      is-glob: 4.0.3
-      node-addon-api: 7.1.1
-      picomatch: 4.0.4
-    optionalDependencies:
-      "@parcel/watcher-android-arm64": 2.5.6
-      "@parcel/watcher-darwin-arm64": 2.5.6
-      "@parcel/watcher-darwin-x64": 2.5.6
-      "@parcel/watcher-freebsd-x64": 2.5.6
-      "@parcel/watcher-linux-arm-glibc": 2.5.6
-      "@parcel/watcher-linux-arm-musl": 2.5.6
-      "@parcel/watcher-linux-arm64-glibc": 2.5.6
-      "@parcel/watcher-linux-arm64-musl": 2.5.6
-      "@parcel/watcher-linux-x64-glibc": 2.5.6
-      "@parcel/watcher-linux-x64-musl": 2.5.6
-      "@parcel/watcher-win32-arm64": 2.5.6
-      "@parcel/watcher-win32-ia32": 2.5.6
-      "@parcel/watcher-win32-x64": 2.5.6
 
   "@pdf-lib/standard-fonts@1.0.0":
     dependencies:
@@ -17628,6 +17515,8 @@ snapshots:
 
   "@rollup/rollup-win32-x64-msvc@4.62.2":
     optional: true
+
+  "@scarf/scarf@1.4.0": {}
 
   "@sec-ant/readable-stream@0.4.1": {}
 
@@ -21225,8 +21114,6 @@ snapshots:
 
   node-abort-controller@3.1.1: {}
 
-  node-addon-api@7.1.1: {}
-
   node-emoji@1.11.0:
     dependencies:
       lodash: 4.18.1
@@ -22591,6 +22478,10 @@ snapshots:
       zimmerframe: 1.1.4
     transitivePeerDependencies:
       - "@typescript-eslint/types"
+
+  swagger-ui-dist@5.32.6:
+    dependencies:
+      "@scarf/scarf": 1.4.0
 
   symbol-observable@4.0.0: {}
 

@@ -232,6 +232,7 @@ describe('BookDockIngestService', () => {
       const { service, repo } = makeService();
       mockedStat.mockResolvedValue({ size: 1024 } as never);
       repo.create.mockResolvedValue({ id: 5 });
+      repo.findById.mockResolvedValue({ id: 5, status: 'pending', format: 'epub', absolutePath: '/watched/book.epub' });
 
       const metadataService = (service as any).metadataService;
       metadataService.extractAndSave.mockRejectedValue(new Error('parse failed'));
@@ -239,9 +240,34 @@ describe('BookDockIngestService', () => {
       const result = await service.ingestFromWatchedFolder('/watched/book.epub');
       expect(result).toBe(5);
 
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await (service as any).metadataQueue.waitForIdle();
 
+      expect(Logger.prototype.warn).toHaveBeenCalledWith(expect.stringContaining('metadata queue job failed'));
       expect(Logger.prototype.warn).toHaveBeenCalledWith(expect.stringContaining('parse failed'));
+    });
+
+    it('requeues existing unfinished rows found during a watched-folder rescan', async () => {
+      const { service, repo, metadataService } = makeService();
+      const row = { id: 6, status: 'extracting', format: 'epub', absolutePath: '/watched/book.epub' };
+      repo.findByAbsolutePath.mockResolvedValue(row);
+      repo.findById.mockResolvedValue(row);
+
+      const result = await service.ingestFromWatchedFolder('/watched/book.epub');
+      await (service as any).metadataQueue.waitForIdle();
+
+      expect(result).toBeNull();
+      expect(metadataService.extractAndSave).toHaveBeenCalledWith(6, '/watched/book.epub', 'epub', '/books/book-dock/covers');
+    });
+
+    it('does not requeue existing ready rows during a watched-folder rescan', async () => {
+      const { service, repo, metadataService } = makeService();
+      repo.findByAbsolutePath.mockResolvedValue({ id: 7, status: 'ready', format: 'epub', absolutePath: '/watched/book.epub' });
+
+      const result = await service.ingestFromWatchedFolder('/watched/book.epub');
+      await (service as any).metadataQueue.waitForIdle();
+
+      expect(result).toBeNull();
+      expect(metadataService.extractAndSave).not.toHaveBeenCalled();
     });
   });
 
@@ -269,7 +295,7 @@ describe('BookDockIngestService', () => {
       await service.retryFetch(3);
 
       expect(repo.update).toHaveBeenCalledWith(3, { status: 'pending', errorMessage: null });
-      expect(extractSpy).toHaveBeenCalledWith(3, '/bucket/3.epub', 'epub');
+      expect(extractSpy).toHaveBeenCalledWith(3, 'epub', { primary: 3, secondary: 3 });
     });
   });
 
@@ -418,19 +444,180 @@ describe('BookDockIngestService', () => {
       expect(repo.update).toHaveBeenNthCalledWith(1, 13, { status: 'fetching' });
       expect(repo.update).toHaveBeenNthCalledWith(2, 13, { status: 'ready' });
     });
+
+    it('emits a summary refresh before provider fetching starts', async () => {
+      const { service, appSettings, repo, metadataFetchPipeline } = makeService();
+      appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(true);
+      repo.findById.mockResolvedValue({
+        id: 14,
+        status: 'ready',
+        embeddedMetadata: { title: 'Dune' },
+      });
+      const emitSummarySpy = vi.spyOn(service as any, 'emitSummary').mockResolvedValue(undefined);
+      const runWithSources = vi.fn().mockResolvedValue({ resolved: {}, sources: {} });
+      (metadataFetchPipeline as any).runWithSources = runWithSources;
+
+      await (service as any).autoFetchMetadataAsync(14);
+
+      expect(repo.update).toHaveBeenNthCalledWith(1, 14, { status: 'fetching' });
+      expect(emitSummarySpy).toHaveBeenCalledTimes(1);
+      expect(emitSummarySpy.mock.invocationCallOrder[0]).toBeLessThan(runWithSources.mock.invocationCallOrder[0]);
+    });
   });
 
   it('extractMetadataAsync emits summary and ingestion events after successful extraction chain', async () => {
-    const { service, metadataService, events } = makeService();
+    const { service, repo, metadataService, events } = makeService();
     const autoFetchSpy = vi.spyOn(service as any, 'autoFetchMetadataAsync').mockResolvedValue(undefined);
     const emitSummarySpy = vi.spyOn(service as any, 'emitSummary').mockResolvedValue(undefined);
+    repo.findById.mockResolvedValue({ id: 12, status: 'pending', format: 'epub', absolutePath: '/bucket/12.epub' });
 
-    (service as any).extractMetadataAsync(12, '/bucket/12.epub', 'epub');
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    (service as any).extractMetadataAsync(12, 'epub');
+    await (service as any).metadataQueue.waitForIdle();
 
     expect(metadataService.extractAndSave).toHaveBeenCalledWith(12, '/bucket/12.epub', 'epub', '/books/book-dock/covers');
     expect(autoFetchSpy).toHaveBeenCalledWith(12);
-    expect(emitSummarySpy).toHaveBeenCalled();
+    expect(repo.update).toHaveBeenCalledWith(12, { status: 'extracting' });
+    expect(emitSummarySpy).toHaveBeenCalledTimes(2);
     expect(events.emit).toHaveBeenCalledWith('book-dock.file.ingested', 12);
+  });
+
+  it('runs metadata extraction jobs newest first and one at a time', async () => {
+    vi.useFakeTimers();
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const { service, repo, metadataService } = makeService();
+      repo.findById.mockImplementation((fileId: number) =>
+        Promise.resolve({ id: fileId, status: 'pending', format: 'epub', absolutePath: `/bucket/${fileId}.epub` }),
+      );
+
+      let active = 0;
+      let maxActive = 0;
+      let resolveNewest!: () => void;
+      let resolveNewestStarted!: () => void;
+      let resolveOlderStarted!: () => void;
+      const newestDone = new Promise<void>((resolve) => {
+        resolveNewest = resolve;
+      });
+      const newestStarted = new Promise<void>((resolve) => {
+        resolveNewestStarted = resolve;
+      });
+      const olderStarted = new Promise<void>((resolve) => {
+        resolveOlderStarted = resolve;
+      });
+
+      metadataService.extractAndSave.mockImplementation((fileId: number) =>
+        (async () => {
+          active++;
+          maxActive = Math.max(maxActive, active);
+          try {
+            if (fileId === 2) {
+              resolveNewestStarted();
+              await newestDone;
+            } else {
+              resolveOlderStarted();
+            }
+          } finally {
+            active--;
+          }
+        })(),
+      );
+
+      (service as any).extractMetadataAsync(1, 'epub');
+      (service as any).extractMetadataAsync(2, 'epub');
+
+      await vi.advanceTimersByTimeAsync(250);
+      await newestStarted;
+      expect(metadataService.extractAndSave).toHaveBeenCalledTimes(1);
+      expect(metadataService.extractAndSave).toHaveBeenCalledWith(2, '/bucket/2.epub', 'epub', '/books/book-dock/covers');
+
+      resolveNewest();
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(499);
+      expect(metadataService.extractAndSave).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1);
+      await olderStarted;
+      await (service as any).metadataQueue.waitForIdle();
+
+      expect(metadataService.extractAndSave).toHaveBeenCalledTimes(2);
+      expect(maxActive).toBe(1);
+    } finally {
+      randomSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not start the next Book Dock file while auto-fetch providers are still running', async () => {
+    vi.useFakeTimers();
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const { service, repo, appSettings, metadataService, metadataFetchPipeline } = makeService();
+      appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(true);
+      repo.findById.mockImplementation((fileId: number) =>
+        Promise.resolve({
+          id: fileId,
+          status: 'pending',
+          format: 'epub',
+          absolutePath: `/bucket/${fileId}.epub`,
+          embeddedMetadata: { title: `Book ${fileId}` },
+        }),
+      );
+
+      let activeFetches = 0;
+      let maxActiveFetches = 0;
+      let resolveNewestFetch!: () => void;
+      let resolveNewestFetchStarted!: () => void;
+      let resolveOlderFetchStarted!: () => void;
+      const newestFetchDone = new Promise<void>((resolve) => {
+        resolveNewestFetch = resolve;
+      });
+      const newestFetchStarted = new Promise<void>((resolve) => {
+        resolveNewestFetchStarted = resolve;
+      });
+      const olderFetchStarted = new Promise<void>((resolve) => {
+        resolveOlderFetchStarted = resolve;
+      });
+
+      (metadataFetchPipeline as any).runWithSources = vi.fn((params: { title?: string }) =>
+        (async () => {
+          activeFetches++;
+          maxActiveFetches = Math.max(maxActiveFetches, activeFetches);
+          try {
+            if (params.title === 'Book 2') {
+              resolveNewestFetchStarted();
+              await newestFetchDone;
+            } else {
+              resolveOlderFetchStarted();
+            }
+            return { resolved: {}, sources: {} };
+          } finally {
+            activeFetches--;
+          }
+        })(),
+      );
+
+      (service as any).extractMetadataAsync(1, 'epub');
+      (service as any).extractMetadataAsync(2, 'epub');
+
+      await vi.advanceTimersByTimeAsync(250);
+      await newestFetchStarted;
+      expect(metadataService.extractAndSave).toHaveBeenCalledTimes(1);
+
+      resolveNewestFetch();
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(499);
+      expect(metadataService.extractAndSave).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1);
+      await olderFetchStarted;
+      await (service as any).metadataQueue.waitForIdle();
+
+      expect(metadataService.extractAndSave).toHaveBeenCalledTimes(2);
+      expect((metadataFetchPipeline as any).runWithSources).toHaveBeenCalledTimes(2);
+      expect(maxActiveFetches).toBe(1);
+    } finally {
+      randomSpy.mockRestore();
+      vi.useRealTimers();
+    }
   });
 });

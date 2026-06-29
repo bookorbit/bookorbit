@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { AlertTriangle, CheckSquare, FileSpreadsheet, FolderOpen, Layers, Pencil, Search, SlidersHorizontal, Square, X } from '@lucide/vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -46,7 +46,7 @@ const router = useRouter()
 const { viewMode, effectiveViewMode } = useEffectiveViewMode()
 const { hasPermission, isDemoRestrictedAccount } = usePermissions()
 
-const collectionId = computed(() => Number(route.params.id))
+const collectionId = shallowRef(Number(route.params.id))
 const { tableDensity } = useDisplaySettings()
 const { allSavedViews, saveView, renameView, deleteView, duplicateView, toggleFavorite, importViews } = useSavedViews('collection', collectionId)
 const coverAspectRatio = computed(() => DEFAULT_COVER_ASPECT_RATIO)
@@ -427,6 +427,7 @@ defineOptions({ name: 'CollectionView' })
       <ViewHeader
         :title="collection?.name ?? 'Collection'"
         :icon="collection?.icon || 'FolderOpen'"
+        fallback-icon="FolderOpen"
         :total="total"
         v-model:coverSize="coverSize"
         v-model:gridGap="gridGap"

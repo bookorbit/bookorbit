@@ -88,6 +88,7 @@ vi.mock('vue-router', () => ({
 
 vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({
+    hasPermission: () => false,
     isDemoRestrictedAccount: computed(() => permissionState.isDemo),
   }),
 }))
@@ -184,9 +185,10 @@ describe('AppearanceSettings', () => {
   it('renders appearance tabs in the recommended order', () => {
     const wrapper = mountComponent()
 
-    expect(['theme', 'book-covers', 'layout', 'behavior'].map((id) => wrapper.get(`[data-testid="appearance-tab-${id}"]`).text())).toEqual([
+    expect(['theme', 'book-covers', 'icons', 'layout', 'behavior'].map((id) => wrapper.get(`[data-testid="appearance-tab-${id}"]`).text())).toEqual([
       'Theme',
       'Book Covers',
+      'Icons',
       'Layout',
       'Behavior',
     ])

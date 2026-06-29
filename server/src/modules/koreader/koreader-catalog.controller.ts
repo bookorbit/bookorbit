@@ -25,6 +25,18 @@ export class KoreaderCatalogController {
     return this.catalogService.getRoot();
   }
 
+  @Get('dashboard')
+  @Header('Cache-Control', 'private, max-age=30')
+  dashboard(@CurrentUser() user: RequestUser) {
+    return this.catalogService.getDashboard(user);
+  }
+
+  @Get('dashboard/discover')
+  @Header('Cache-Control', 'no-store')
+  discover(@CurrentUser() user: RequestUser) {
+    return this.catalogService.getDiscover(user);
+  }
+
   @Get('sections/:section')
   @Header('Cache-Control', 'private, max-age=30')
   sections(@CurrentUser() user: RequestUser, @Param('section') section: string, @Query() query: KoreaderCatalogSectionQueryDto) {

@@ -1,5 +1,5 @@
 import { onUnmounted, ref } from 'vue'
-import { api, getAccessToken } from '@/lib/api'
+import { api } from '@/lib/api'
 import { useFoliateAnnotations } from './useFoliateAnnotations'
 import { useFoliateSelection } from './useFoliateSelection'
 import { useFoliateInput } from './useFoliateInput'
@@ -199,10 +199,17 @@ export function useFoliate(
         bookLanguage.value = typeof rawLang === 'string' && rawLang ? (rawLang.split('-')[0] ?? 'en').toLowerCase() : 'en'
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const makeStreamingBook = (window as any).makeStreamingBook as
-          | ((id: number, base: string, info: unknown, token: string | null, bookType: null, fileId: number) => Promise<unknown>)
+          | ((
+              id: number,
+              base: string,
+              info: unknown,
+              fetchFile: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
+              bookType: null,
+              fileId: number,
+            ) => Promise<unknown>)
           | undefined
         if (!makeStreamingBook) throw new Error('makeStreamingBook not available')
-        const book = await makeStreamingBook(bookId, '/api/v1/epub', bookInfo, getAccessToken(), null, fileId)
+        const book = await makeStreamingBook(bookId, '/api/v1/epub', bookInfo, api, null, fileId)
         await view.open(book as never)
       } else {
         const mimeType = format === 'pdf' ? 'application/pdf' : 'application/zip'

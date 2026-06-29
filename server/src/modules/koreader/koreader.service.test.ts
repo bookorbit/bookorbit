@@ -17,7 +17,6 @@ vi.mock('crypto', () => ({
 }));
 
 import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED } from '../achievement/achievement-events.service';
-import { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import { KoreaderChapterExtractorService } from './koreader-chapter-extractor.service';
 import { KoreaderChapterService } from './koreader-chapter.service';
 import type { KoreaderPackageService } from './koreader-package.service';
@@ -73,9 +72,6 @@ describe('KoreaderService', () => {
   let mockChapterExtractor: {
     extractAndStoreChapters: ReturnType<typeof vi.fn>;
   };
-  let mockUserBookStatusService: {
-    autoUpdate: ReturnType<typeof vi.fn>;
-  };
   let mockAchievementEvents: {
     emit: ReturnType<typeof vi.fn>;
   };
@@ -88,6 +84,7 @@ describe('KoreaderService', () => {
   };
   let mockBookService: {
     syncKoboReadingStateForExternalProgress: ReturnType<typeof vi.fn>;
+    autoUpdateReadStatusForProgress: ReturnType<typeof vi.fn>;
   };
   let mockPackageService: {
     getVersionInfo: ReturnType<typeof vi.fn>;
@@ -140,10 +137,6 @@ describe('KoreaderService', () => {
       extractAndStoreChapters: vi.fn(),
     };
 
-    mockUserBookStatusService = {
-      autoUpdate: vi.fn(),
-    };
-
     mockAchievementEvents = {
       emit: vi.fn(),
     };
@@ -154,6 +147,7 @@ describe('KoreaderService', () => {
 
     mockBookService = {
       syncKoboReadingStateForExternalProgress: vi.fn().mockResolvedValue(undefined),
+      autoUpdateReadStatusForProgress: vi.fn().mockResolvedValue(undefined),
     };
     mockPackageService = {
       getVersionInfo: vi.fn().mockResolvedValue({ pluginVersion: 'unknown', serverVersion: '1.0.0' }),
@@ -178,7 +172,6 @@ describe('KoreaderService', () => {
     mockRepo.getAccessibleLibraryIds.mockResolvedValue([1, 2]);
     mockChapterService.parseChapterIndexFromProgress.mockReturnValue(null);
     mockChapterExtractor.extractAndStoreChapters.mockResolvedValue([]);
-    mockUserBookStatusService.autoUpdate.mockResolvedValue(undefined);
 
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
@@ -189,7 +182,6 @@ describe('KoreaderService', () => {
       mockPluginRepo as unknown as KoreaderPluginRepository,
       mockChapterService as unknown as KoreaderChapterService,
       mockChapterExtractor as unknown as KoreaderChapterExtractorService,
-      mockUserBookStatusService as unknown as UserBookStatusService,
       mockAchievementEvents as unknown as AchievementEventsService,
       mockPositionConverter as never,
       mockBookService as never,
@@ -343,7 +335,7 @@ describe('KoreaderService', () => {
 
   describe('saveProgress', () => {
     it('resolves the book file, parses progress, extracts chapters, and updates synced progress', async () => {
-      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 44, bookId: 55 });
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 44, bookId: 55, libraryId: 3 });
       mockChapterService.parseChapterIndexFromProgress.mockReturnValue(6);
       mockChapterExtractor.extractAndStoreChapters.mockRejectedValueOnce(new Error('extract failed'));
 
@@ -371,7 +363,7 @@ describe('KoreaderService', () => {
       });
       expect(mockRepo.upsertReadingProgress).toHaveBeenCalledWith(44, 12, 50, null, '/body/DocFragment[7]');
       expect(mockBookService.syncKoboReadingStateForExternalProgress).toHaveBeenCalledWith(12, 44, 50);
-      expect(mockUserBookStatusService.autoUpdate).toHaveBeenCalledWith(12, 55, 50);
+      expect(mockBookService.autoUpdateReadStatusForProgress).toHaveBeenCalledWith(12, { id: 44, bookId: 55, libraryId: 3 }, 50);
       expect(mockAchievementEvents.emit).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, {
         userId: 12,
         bookId: 55,
@@ -380,7 +372,7 @@ describe('KoreaderService', () => {
         source: 'koreader',
       });
       expect(mockAchievementEvents.emit.mock.invocationCallOrder[0]!).toBeGreaterThan(
-        mockUserBookStatusService.autoUpdate.mock.invocationCallOrder[0]!,
+        mockBookService.autoUpdateReadStatusForProgress.mock.invocationCallOrder[0]!,
       );
       expect(result).toEqual({
         document: 'abcdef1234567890fedcba',
@@ -400,7 +392,7 @@ describe('KoreaderService', () => {
 
       expect(mockRepo.upsertDeviceProgress).not.toHaveBeenCalled();
       expect(mockRepo.upsertReadingProgress).not.toHaveBeenCalled();
-      expect(mockUserBookStatusService.autoUpdate).not.toHaveBeenCalled();
+      expect(mockBookService.autoUpdateReadStatusForProgress).not.toHaveBeenCalled();
       expect(mockAchievementEvents.emit).not.toHaveBeenCalled();
     });
 
@@ -419,7 +411,7 @@ describe('KoreaderService', () => {
     });
 
     it('uses the default device and generated device id when the payload leaves them empty', async () => {
-      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 88, bookId: 99 });
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 88, bookId: 99, libraryId: 4 });
 
       await service.saveProgress(12, {
         document: 'default-device-document',
@@ -442,7 +434,7 @@ describe('KoreaderService', () => {
   describe('getProgress', () => {
     it('returns device progress when the device sync is latest', async () => {
       const latestDeviceTime = new Date('2026-02-01T10:00:00.000Z');
-      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20 });
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20, libraryId: 1 });
       mockRepo.getLatestDeviceProgress.mockResolvedValue({
         percentage: 0.66,
         progress: '/body/DocFragment[8]/body',
@@ -468,7 +460,7 @@ describe('KoreaderService', () => {
 
     it('returns web reader progress with null XPointer when no CFI is stored', async () => {
       const readerTime = new Date('2026-02-01T11:00:00.000Z');
-      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20 });
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20, libraryId: 1 });
       mockRepo.getLatestDeviceProgress.mockResolvedValue({
         percentage: 0.2,
         progress: '/body/DocFragment[5]/body',
@@ -495,7 +487,7 @@ describe('KoreaderService', () => {
 
     it('converts CFI to DocFragment XPointer using chapter service (no file I/O)', async () => {
       const readerTime = new Date('2026-02-01T11:00:00.000Z');
-      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20 });
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20, libraryId: 1 });
       mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
       mockRepo.getReadingProgress.mockResolvedValue({
         percentage: 50,
@@ -518,7 +510,7 @@ describe('KoreaderService', () => {
 
     it('returns exact web reader KOReader XPointer when it is stored', async () => {
       const readerTime = new Date('2026-02-01T11:00:00.000Z');
-      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20 });
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20, libraryId: 1 });
       mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
       mockRepo.getReadingProgress.mockResolvedValue({
         percentage: 50,
@@ -540,7 +532,7 @@ describe('KoreaderService', () => {
 
     it('returns null XPointer when chapter service cannot parse CFI spine index', async () => {
       const readerTime = new Date('2026-02-01T11:00:00.000Z');
-      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20 });
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20, libraryId: 1 });
       mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
       mockRepo.getReadingProgress.mockResolvedValue({
         percentage: 30,
@@ -554,7 +546,7 @@ describe('KoreaderService', () => {
     });
 
     it('returns null when neither device nor web reader progress exists', async () => {
-      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20 });
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20, libraryId: 1 });
       mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
       mockRepo.getReadingProgress.mockResolvedValue(null);
 

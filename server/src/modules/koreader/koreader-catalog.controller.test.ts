@@ -7,6 +7,7 @@ import { KoreaderCatalogController } from './koreader-catalog.controller';
 function makeController() {
   const catalogService = {
     getRoot: vi.fn().mockReturnValue({ sections: [] }),
+    getDashboard: vi.fn().mockResolvedValue({ generatedAt: '2026-06-26T00:00:00.000Z', sections: [], continueReading: [] }),
     getSectionEntries: vi.fn().mockResolvedValue({ section: 'libraries', items: [] }),
     getBooksPage: vi
       .fn()
@@ -34,6 +35,7 @@ describe('KoreaderCatalogController', () => {
     const sectionQuery = { page: 1 } as never;
 
     expect(controller.root()).toEqual({ sections: [] });
+    await expect(controller.dashboard(user)).resolves.toEqual(expect.objectContaining({ generatedAt: '2026-06-26T00:00:00.000Z' }));
     await expect(controller.sections(user, 'libraries', sectionQuery)).resolves.toEqual({ section: 'libraries', items: [] });
     await expect(controller.books(user, query)).resolves.toEqual(expect.objectContaining({ total: 0 }));
     await expect(controller.bookDetail(user, 10)).resolves.toEqual({ id: 10 });
@@ -42,6 +44,7 @@ describe('KoreaderCatalogController', () => {
     await controller.thumbnail(user, 10, reply, '"etag"');
     await controller.download(user, 100, reply);
 
+    expect(catalogService.getDashboard).toHaveBeenCalledWith(user);
     expect(catalogService.getSectionEntries).toHaveBeenCalledWith(user, 'libraries', sectionQuery);
     expect(catalogService.getBooksPage).toHaveBeenCalledWith(user, query);
     expect(catalogService.getBookDetail).toHaveBeenCalledWith(user, 10);

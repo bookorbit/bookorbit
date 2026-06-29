@@ -1,7 +1,7 @@
 import { Transform } from 'class-transformer';
 import { IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
-export class SaveProgressDto {
+export class KoreaderSaveProgressDto {
   @IsString()
   document!: string;
 

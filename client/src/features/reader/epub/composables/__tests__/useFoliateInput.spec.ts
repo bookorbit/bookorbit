@@ -4,6 +4,8 @@ import { useFoliateInput } from '../useFoliateInput'
 interface ViewLike {
   prev: () => void
   next: () => void
+  goLeft?: () => void
+  goRight?: () => void
   getBoundingClientRect: () => DOMRect
 }
 
@@ -100,6 +102,34 @@ describe('useFoliateInput', () => {
     input.cleanup()
   })
 
+  it('uses physical left and right helpers for arrow keys when available', () => {
+    const prev = vi.fn<() => void>()
+    const next = vi.fn<() => void>()
+    const goLeft = vi.fn<() => void>()
+    const goRight = vi.fn<() => void>()
+    const view: ViewLike = {
+      prev,
+      next,
+      goLeft,
+      goRight,
+      getBoundingClientRect: () => ({ left: 0, width: 100 }) as DOMRect,
+    }
+
+    const input = useFoliateInput(() => view, undefined, vi.fn<() => void>(), vi.fn<() => void>())
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageUp', bubbles: true }))
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageDown', bubbles: true }))
+
+    expect(goLeft).toHaveBeenCalledTimes(1)
+    expect(goRight).toHaveBeenCalledTimes(1)
+    expect(prev).toHaveBeenCalledTimes(1)
+    expect(next).toHaveBeenCalledTimes(1)
+
+    input.cleanup()
+  })
+
   it('routes click-zone window messages to prev/next/middle actions', () => {
     vi.useFakeTimers()
 
@@ -143,6 +173,58 @@ describe('useFoliateInput', () => {
     window.dispatchEvent(new MessageEvent('message', { data: { type: 'foliate-click', clientX: 50 }, origin: window.location.origin }))
     vi.advanceTimersByTime(300)
     expect(onMiddleTap).toHaveBeenCalledTimes(1)
+
+    input.cleanup()
+
+    if (originalMaxTouchPoints) {
+      Object.defineProperty(navigator, 'maxTouchPoints', originalMaxTouchPoints)
+    }
+    if (originalOntouchstart) {
+      Object.defineProperty(window, 'ontouchstart', originalOntouchstart)
+    }
+  })
+
+  it('routes click-zone window messages through physical left and right helpers when available', () => {
+    vi.useFakeTimers()
+
+    const prev = vi.fn<() => void>()
+    const next = vi.fn<() => void>()
+    const goLeft = vi.fn<() => void>()
+    const goRight = vi.fn<() => void>()
+    const onMiddleTap = vi.fn<() => void>()
+    const view: ViewLike = {
+      prev,
+      next,
+      goLeft,
+      goRight,
+      getBoundingClientRect: () => ({ left: 0, width: 100 }) as DOMRect,
+    }
+
+    const input = useFoliateInput(() => view, onMiddleTap, vi.fn<() => void>(), vi.fn<() => void>())
+    const doc = makeDocTarget()
+    input.attachIframeClicks(doc)
+
+    const originalMaxTouchPoints = Object.getOwnPropertyDescriptor(navigator, 'maxTouchPoints')
+    const originalOntouchstart = Object.getOwnPropertyDescriptor(window, 'ontouchstart')
+    Object.defineProperty(navigator, 'maxTouchPoints', {
+      configurable: true,
+      get: () => 0,
+    })
+    Reflect.deleteProperty(window as unknown as Record<string, unknown>, 'ontouchstart')
+
+    doc.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    window.dispatchEvent(new MessageEvent('message', { data: { type: 'foliate-click', clientX: 5 }, origin: window.location.origin }))
+    vi.advanceTimersByTime(300)
+
+    vi.advanceTimersByTime(300)
+    doc.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    window.dispatchEvent(new MessageEvent('message', { data: { type: 'foliate-click', clientX: 95 }, origin: window.location.origin }))
+    vi.advanceTimersByTime(300)
+
+    expect(goLeft).toHaveBeenCalledTimes(1)
+    expect(goRight).toHaveBeenCalledTimes(1)
+    expect(prev).not.toHaveBeenCalled()
+    expect(next).not.toHaveBeenCalled()
 
     input.cleanup()
 

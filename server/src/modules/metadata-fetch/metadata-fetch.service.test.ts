@@ -35,6 +35,14 @@ function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
   };
 }
 
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
 describe('MetadataFetchService', () => {
   let registry: Mocked<ProviderRegistry>;
   let throttleTracker: Mocked<ProviderThrottleTracker>;
@@ -99,6 +107,52 @@ describe('MetadataFetchService', () => {
     );
     expect(google.search).toHaveBeenCalledWith(expect.objectContaining({ title: 'Dune' }));
     expect(openLibrary.search).toHaveBeenCalledWith(expect.objectContaining({ title: 'Dune' }));
+  });
+
+  it('starts selected providers concurrently within one search', async () => {
+    let active = 0;
+    let maxActive = 0;
+
+    function makeBlockedProvider(key: MetadataProviderKey): MetadataProvider & { started: Promise<void>; release: () => void } {
+      const started = deferred();
+      const release = deferred();
+      return {
+        key,
+        label: key,
+        identifiable: false,
+        started: started.promise,
+        release: release.resolve,
+        search: vi.fn().mockImplementation(async (params) => {
+          active++;
+          maxActive = Math.max(maxActive, active);
+          started.resolve();
+          try {
+            await release.promise;
+            return [candidate(key, `${key}-1`, params.title ?? key)];
+          } finally {
+            active--;
+          }
+        }),
+      };
+    }
+
+    const google = makeBlockedProvider(MetadataProviderKey.GOOGLE);
+    const openLibrary = makeBlockedProvider(MetadataProviderKey.OPEN_LIBRARY);
+    registry.select.mockReturnValue([google, openLibrary]);
+
+    const search = firstValueFrom(service.search({ title: 'Dune' }).pipe(toArray()));
+
+    await Promise.all([google.started, openLibrary.started]);
+
+    expect(maxActive).toBe(2);
+
+    google.release();
+    openLibrary.release();
+
+    await expect(search).resolves.toEqual([
+      candidate(MetadataProviderKey.GOOGLE, 'google-1', 'Dune'),
+      candidate(MetadataProviderKey.OPEN_LIBRARY, 'openLibrary-1', 'Dune'),
+    ]);
   });
 
   it('falls back to non-isbn search when isbn search returns no results', async () => {

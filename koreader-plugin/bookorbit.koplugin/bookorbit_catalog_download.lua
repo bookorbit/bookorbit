@@ -40,7 +40,7 @@ function CatalogDownload.install(Catalog)
             if path then
                 self:openDownloadedFile(path)
             else
-                self:showDownloadDialog(detail, files[1])
+                self:downloadDefaultFile(detail, files[1])
             end
             return
         end
@@ -60,7 +60,7 @@ function CatalogDownload.install(Catalog)
                         if path then
                             self:openDownloadedFile(path)
                         else
-                            self:showDownloadDialog(detail, file)
+                            self:downloadDefaultFile(detail, file)
                         end
                     end,
                 },
@@ -82,6 +82,46 @@ function CatalogDownload.install(Catalog)
         filename = filename .. "." .. string.lower(filetype or "bin")
         filename = util.getSafeFilename(filename, download_dir)
         return (download_dir ~= "/" and download_dir or "") .. "/" .. filename
+    end
+
+    function Catalog:downloadDefaultFile(detail, file)
+        local filename = safeFilenameBase(detail)
+        local filetype = string.lower(file.format or "bin")
+        local local_path = self:getLocalDownloadPath(filename, filetype)
+        self:checkDownloadFile(local_path, detail, file)
+    end
+
+    function Catalog:showDownloadOptions(detail)
+        local files = self:supportedFiles(detail)
+
+        if #files == 0 then
+            UIManager:show(InfoMessage:new{ text = _("No KOReader-supported file found."), timeout = 3 })
+            return
+        end
+        if #files == 1 then
+            self:showDownloadDialog(detail, files[1])
+            return
+        end
+
+        local dialog
+        local buttons = {}
+        for _, file in ipairs(files) do
+            local label = self:fileLabel(file, false)
+            table.insert(buttons, {
+                {
+                    text = T(_("Options - %1"), label),
+                    callback = function()
+                        UIManager:close(dialog)
+                        self:showDownloadDialog(detail, file)
+                    end,
+                },
+            })
+        end
+        dialog = ButtonDialog:new{
+            title = _("Download options"),
+            buttons = buttons,
+        }
+        UIManager:show(dialog)
     end
 
     function Catalog:showDownloadDialog(detail, file)
@@ -222,6 +262,10 @@ function CatalogDownload.install(Catalog)
         local linked = self:linkDownloadedFile(local_path)
         if linked then
             self:refreshOnDevice()
+            if self.markStackDirty then self:markStackDirty() end
+            if self.detailMode and self:detailMode() then
+                self:refreshDetailView()
+            end
         end
         self:showDownloadedDialog(local_path, linked)
     end

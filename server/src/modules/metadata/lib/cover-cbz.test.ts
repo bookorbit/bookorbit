@@ -1,11 +1,11 @@
-vi.mock('fs/promises', () => ({ readFile: vi.fn() }));
+vi.mock('fs/promises', () => ({ open: vi.fn() }));
 
-import { readFile } from 'fs/promises';
+import { open } from 'fs/promises';
 import { deflateRawSync } from 'zlib';
 
 import { extractCbzCover } from './cover-cbz';
 
-const mockReadFile = readFile as MockedFunction<typeof readFile>;
+const mockOpen = open as MockedFunction<typeof open>;
 
 interface ZipEntry {
   name: string;
@@ -79,8 +79,23 @@ function buildZip(entries: ZipEntry[], eocdComment?: Buffer): Buffer {
 
 function mockZip(entries: ZipEntry[], eocdComment?: Buffer): Buffer {
   const buf = buildZip(entries, eocdComment);
-  mockReadFile.mockResolvedValue(buf as unknown as Awaited<ReturnType<typeof readFile>>);
+  mockBufferFile(buf);
   return buf;
+}
+
+function mockBufferFile(buf: Buffer): void {
+  mockOpen.mockImplementation(() => {
+    const handle = {
+      stat: vi.fn().mockResolvedValue({ size: buf.length }),
+      close: vi.fn().mockResolvedValue(undefined),
+      read: vi.fn((target: Buffer, targetOffset: number, length: number, position: number) => {
+        if (position >= buf.length) return Promise.resolve({ bytesRead: 0, buffer: target });
+        const bytesRead = buf.copy(target, targetOffset, position, Math.min(position + length, buf.length));
+        return Promise.resolve({ bytesRead, buffer: target });
+      }),
+    };
+    return Promise.resolve(handle as unknown as Awaited<ReturnType<typeof open>>);
+  });
 }
 
 function eocdOffset(buf: Buffer): number {
@@ -210,12 +225,12 @@ describe('extractCbzCover', () => {
   });
 
   it('returns null when no EOCD record is present (truncated or corrupt ZIP)', async () => {
-    mockReadFile.mockResolvedValue(Buffer.from('not a zip') as unknown as Awaited<ReturnType<typeof readFile>>);
+    mockBufferFile(Buffer.from('not a zip'));
     await expect(extractCbzCover('/book.cbz')).resolves.toBeNull();
   });
 
   it('returns null on I/O failure', async () => {
-    mockReadFile.mockRejectedValue(new Error('ENOENT'));
+    mockOpen.mockRejectedValue(new Error('ENOENT'));
     await expect(extractCbzCover('/missing.cbz')).resolves.toBeNull();
   });
 });

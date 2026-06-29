@@ -5,12 +5,13 @@
  * @param {number} bookId - The book ID for API requests
  * @param {string} baseUrl - API base URL (e.g., '/api/v1/epub')
  * @param {Object} bookInfo - Pre-fetched EPUB metadata from /info endpoint
- * @param {string} [authToken] - Optional authentication token
+ * @param {Function} [fetchFile] - Fetch implementation for file requests
  * @param {string} [bookType] - Optional book type for alternative format (e.g., 'EPUB')
  * @param {number|null} [fileId] - Optional specific file ID to stream (for books with multiple epub files)
  * @returns {Object} Loader interface compatible with Foliate's EPUB class
  */
-export const makeStreamingLoader = (bookId, baseUrl, bookInfo, authToken = null, bookType = null, fileId = null) => {
+export const makeStreamingLoader = (bookId, baseUrl, bookInfo, fetchFile = fetch, bookType = null, fileId = null) => {
+  const requestFile = typeof fetchFile === 'function' ? fetchFile : fetch
   const OPTIONAL_TEXT_FILES = new Set([
     'META-INF/encryption.xml',
     'META-INF/com.apple.ibooks.display-options.xml',
@@ -39,16 +40,6 @@ export const makeStreamingLoader = (bookId, baseUrl, bookInfo, authToken = null,
     return url
   }
 
-  // Build fetch options with auth header
-  const getFetchOptions = () => {
-    if (!authToken) return {}
-    return {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
-    }
-  }
-
   /**
    * Load file as text
    */
@@ -57,7 +48,7 @@ export const makeStreamingLoader = (bookId, baseUrl, bookInfo, authToken = null,
     if (shouldSkipOptionalFetch(name)) return null
     try {
       const url = getFileUrl(name)
-      const response = await fetch(url, getFetchOptions())
+      const response = await requestFile(url)
       if (!response.ok) {
         if (response.status === 404 && !manifestMap.has(name)) return null
         if (response.status === 404 && isOptionalTextPath(name)) return null
@@ -78,7 +69,7 @@ export const makeStreamingLoader = (bookId, baseUrl, bookInfo, authToken = null,
     if (!name) return null
     try {
       const url = getFileUrl(name)
-      const response = await fetch(url, getFetchOptions())
+      const response = await requestFile(url)
       if (!response.ok) {
         console.warn(`Failed to load blob: ${name}`, response.status)
         return null

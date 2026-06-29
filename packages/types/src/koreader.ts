@@ -1,3 +1,5 @@
+import type { HighlightOfTheDayWidgetData, ReadingGoalWidgetData, ReadingStreakWidgetData } from "./dashboard";
+
 export interface KoreaderCredentials {
   username: string;
   syncEnabled: boolean;
@@ -193,6 +195,20 @@ export interface KoreaderCatalogSectionResponse {
   nextUrl?: string | null;
   previousUrl?: string | null;
   query?: string | null;
+}
+
+export interface KoreaderCatalogDashboardResponse {
+  generatedAt: string;
+  sections: KoreaderCatalogEntry[];
+  continueReading: KoreaderCatalogBookListItem[];
+  discover: KoreaderCatalogBookListItem[];
+  readingGoal: ReadingGoalWidgetData;
+  readingStreak: ReadingStreakWidgetData;
+  highlightOfTheDay: HighlightOfTheDayWidgetData | null;
+}
+
+export interface KoreaderCatalogDiscoverResponse {
+  discover: KoreaderCatalogBookListItem[];
 }
 
 export interface KoreaderCatalogReadStatusResult {
