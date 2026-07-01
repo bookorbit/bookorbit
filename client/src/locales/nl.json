@@ -309,6 +309,13 @@
           "delete": "Pictogram verwijderen mislukt",
           "bulkDelete": "Pictogrammen verwijderen mislukt"
         }
+      },
+      "tabs": {
+        "theme": "Thema",
+        "book-covers": "Boekomslagen",
+        "icons": "Pictogrammen",
+        "layout": "Indeling",
+        "behavior": "Gedrag"
       }
     },
     "account": {
@@ -954,6 +961,11 @@
         "recalcStarted": "Herberekening van scores gestart op de achtergrond",
         "recalcFailed": "Herberekening mislukt",
         "resetToDefaults": "Gewichten teruggezet naar standaardwaarden. Sla op om toe te passen."
+      },
+      "tabs": {
+        "users": "Gebruikers",
+        "magic-links": "Magische links",
+        "oidc": "OIDC / SSO"
       }
     },
     "common": {
@@ -1279,6 +1291,33 @@
         "clear": "Wissen",
         "noLibraries": "Nog geen bibliotheken beschikbaar.",
         "allLibraries": "Alle bibliotheken"
+      },
+      "tabs": {
+        "providers": "Providers",
+        "field-rules": "Veldregels",
+        "custom-fields": "Aangepaste velden",
+        "genre-blocklist": "Genre-blokkeerlijst",
+        "score": "Score",
+        "auto-fetch": "Boeken",
+        "authors": "Auteurs"
+      },
+      "tabTitles": {
+        "providers": "Providers",
+        "field-rules": "Regels op veldniveau",
+        "custom-fields": "Aangepaste metadata",
+        "genre-blocklist": "Genre-blokkeerlijst",
+        "score": "Betrouwbaarheidsscore",
+        "auto-fetch": "Boeken automatisch ophalen",
+        "authors": "Auteurs automatisch ophalen"
+      },
+      "tabSubtitles": {
+        "providers": "Schakel externe metadatabronnen in en configureer hun inloggegevens.",
+        "field-rules": "Bepaal welke provider elk metadataveld levert en hoe waarden worden samengevoegd in je bibliotheken.",
+        "custom-fields": "Definieer aangepaste metadatavelden en kies welke bibliotheken ze gebruiken.",
+        "genre-blocklist": "Voorkom dat ongewenste genrewaarden van providers naar boeken worden geschreven.",
+        "score": "Ken gewichten toe aan metadatavelden om te berekenen hoeveel vertrouwen opgehaalde resultaten verdienen.",
+        "auto-fetch": "Haal automatisch omslagen, beschrijvingen en andere details op wanneer nieuwe boeken aan je bibliotheek worden toegevoegd.",
+        "authors": "Haal automatisch biografieën en profielfoto's op wanneer nieuwe auteurs in je bibliotheek verschijnen."
       }
     },
     "reader": {
@@ -1780,6 +1819,22 @@
         "deleteUserFailed": "Kan OPDS-gebruiker niet verwijderen",
         "labelCopied": "{label} gekopieerd",
         "copyLabelFailed": "Kan {label} niet kopiëren"
+      },
+      "tabs": {
+        "general": "Algemeen",
+        "ebook": "eBook",
+        "pdf": "PDF",
+        "comics": "Strips",
+        "audio": "Luisterboek",
+        "fonts": "Lettertypen"
+      }
+    },
+    "system": {
+      "tabs": {
+        "file-naming": "Bestandsnaamgeving",
+        "book-dock": "Book Dock",
+        "maintenance": "Onderhoud",
+        "audit-log": "Auditlogboek"
       }
     }
   },
@@ -5579,5 +5634,84 @@
     "closeImage": "Afbeelding sluiten",
     "previousImage": "Vorige afbeelding",
     "nextImage": "Volgende afbeelding"
+  },
+  "titles": {
+    "dashboard": "Dashboard",
+    "libraries": "Bibliotheken",
+    "opds": "OPDS",
+    "koboSync": "Kobo-synchronisatie",
+    "koreaderSync": "KOReader-synchronisatie",
+    "bookDock": "Book Dock",
+    "whatsNew": "Nieuw",
+    "annotations": "Annotaties",
+    "achievements": "Prestaties",
+    "statistics": "Statistieken",
+    "authors": "Auteurs",
+    "series": "Reeksen",
+    "entityManager": "Entiteitenbeheer",
+    "bulkRename": "Bulksgewijs hernoemen",
+    "notFound": "Niet gevonden",
+    "signIn": "Inloggen",
+    "initialSetup": "Eerste installatie",
+    "forgotPassword": "Wachtwoord vergeten",
+    "resetPassword": "Wachtwoord opnieuw instellen",
+    "completingSignIn": "Inloggen voltooien",
+    "magicLinkLogin": "Inloggen via magische link",
+    "readPrefix": "Lezen",
+    "emailSuffix": "E-mail",
+    "library": "Bibliotheek",
+    "smartScope": "SmartScope",
+    "collection": "Collectie",
+    "author": "Auteur",
+    "book": "Boek",
+    "seriesItem": "Reeks",
+    "appearance": {
+      "theme": "Weergave",
+      "book-covers": "Boekomslagen",
+      "icons": "Pictogrammen",
+      "layout": "Weergave-indeling",
+      "behavior": "Bibliotheekgedrag"
+    },
+    "reader": {
+      "general": "Lezerinstellingen",
+      "ebook": "eBook-lezer",
+      "pdf": "PDF-lezer",
+      "comics": "Stripboeklezer",
+      "audio": "Luisterboekspeler",
+      "fonts": "Lezerlettertypen"
+    },
+    "email": {
+      "providers": "Providers",
+      "recipients": "Ontvangers",
+      "groups": "Groepen",
+      "templates": "Sjablonen",
+      "preferences": "Voorkeuren",
+      "history": "Geschiedenis"
+    },
+    "metadata": {
+      "providers": "Providers",
+      "field-rules": "Regels op veldniveau",
+      "custom-fields": "Aangepaste metadata",
+      "genre-blocklist": "Genre-blokkeerlijst",
+      "score": "Betrouwbaarheidsscore",
+      "auto-fetch": "Boeken automatisch ophalen",
+      "authors": "Auteurs automatisch ophalen"
+    },
+    "admin": {
+      "users": "Gebruikers",
+      "magic-links": "Magische links",
+      "oidc": "OIDC / SSO"
+    },
+    "system": {
+      "file-naming": "Bestandsnaamgeving",
+      "book-dock": "Book Dock",
+      "maintenance": "Onderhoud",
+      "audit-log": "Auditlogboek"
+    },
+    "account": {
+      "profile": "Account",
+      "notifications": "Meldingen",
+      "restrictions": "Inhoudsbeperkingen"
+    }
   }
 }

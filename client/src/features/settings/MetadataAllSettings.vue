@@ -10,7 +10,7 @@ import MetadataScoreWeightsSettings from './MetadataScoreWeightsSettings.vue'
 import BookMetadataFetchSettings from './metadata-auto-fetch/BookMetadataFetchSettings.vue'
 import AuthorEnrichmentSettings from './AuthorEnrichmentSettings.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
-import { METADATA_TAB_INFO, METADATA_TABS, normalizeMetadataTab, type MetadataTab as Tab } from './lib/metadata-tabs'
+import { METADATA_TABS, normalizeMetadataTab, type MetadataTab as Tab } from './lib/metadata-tabs'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 
 const { t } = useI18n()
@@ -28,9 +28,9 @@ function canAccessTab(tab: Tab): boolean {
 const tabs = computed(() =>
   METADATA_TABS.filter(canAccessTab).map((id) => ({
     id,
-    navLabel: METADATA_TAB_INFO[id].navLabel,
-    titleLabel: METADATA_TAB_INFO[id].titleLabel,
-    subtitle: METADATA_TAB_INFO[id].subtitle,
+    navLabel: t(`settings.metadata.tabs.${id}`),
+    titleLabel: t(`settings.metadata.tabTitles.${id}`),
+    subtitle: t(`settings.metadata.tabSubtitles.${id}`),
   })),
 )
 
@@ -55,7 +55,10 @@ watch(
   },
 )
 
-const activeTabInfo = computed(() => METADATA_TAB_INFO[activeTab.value])
+const activeTabInfo = computed(() => ({
+  titleLabel: t(`settings.metadata.tabTitles.${activeTab.value}`),
+  subtitle: t(`settings.metadata.tabSubtitles.${activeTab.value}`),
+}))
 const hasAccessibleTabs = computed(() => tabs.value.length > 0)
 
 const tabWidths: Record<Tab, string> = {

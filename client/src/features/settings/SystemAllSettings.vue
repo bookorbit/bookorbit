@@ -20,7 +20,7 @@ const availableTabs = computed(() =>
     const perm = SYSTEM_TAB_INFO[id].permission
     if (id === 'audit-log') return isSuperuser.value
     return isSuperuser.value || (perm !== null && userPermissions.value.includes(perm))
-  }).map((id) => ({ id, label: SYSTEM_TAB_INFO[id].navLabel })),
+  }).map((id) => ({ id, label: t(`settings.system.tabs.${id}`) })),
 )
 
 function resolveTab(raw: unknown): Tab {

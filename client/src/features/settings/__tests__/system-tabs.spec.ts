@@ -19,15 +19,9 @@ describe('system-tabs', () => {
       }
     })
 
-    it('every entry has navLabel, titleLabel, subtitle, and permission', () => {
+    it('every entry has a permission', () => {
       for (const tab of SYSTEM_TABS) {
         const info = SYSTEM_TAB_INFO[tab]
-        expect(typeof info.navLabel).toBe('string')
-        expect(info.navLabel.length).toBeGreaterThan(0)
-        expect(typeof info.titleLabel).toBe('string')
-        expect(info.titleLabel.length).toBeGreaterThan(0)
-        expect(typeof info.subtitle).toBe('string')
-        expect(info.subtitle.length).toBeGreaterThan(0)
         expect(info.permission === null || typeof info.permission === 'string').toBe(true)
       }
     })
@@ -46,22 +40,6 @@ describe('system-tabs', () => {
 
     it('audit-log has null permission (superuser only)', () => {
       expect(SYSTEM_TAB_INFO['audit-log'].permission).toBeNull()
-    })
-
-    it('file-naming has correct nav label', () => {
-      expect(SYSTEM_TAB_INFO['file-naming'].navLabel).toBe('File Naming')
-    })
-
-    it('book-dock has correct nav label', () => {
-      expect(SYSTEM_TAB_INFO['book-dock'].navLabel).toBe('Book Dock')
-    })
-
-    it('maintenance has correct nav label', () => {
-      expect(SYSTEM_TAB_INFO.maintenance.navLabel).toBe('Maintenance')
-    })
-
-    it('audit-log has correct nav label', () => {
-      expect(SYSTEM_TAB_INFO['audit-log'].navLabel).toBe('Audit Log')
     })
   })
 

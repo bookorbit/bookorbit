@@ -9,7 +9,7 @@ import AppearanceIconsSettings from './AppearanceIconsSettings.vue'
 import AppearanceLayoutSettings from './AppearanceLayoutSettings.vue'
 import AppearanceThemeSettings from './AppearanceThemeSettings.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
-import { APPEARANCE_TAB_LABELS, APPEARANCE_TABS, normalizeAppearanceTab, type AppearanceTab as Tab } from './lib/appearance-tabs'
+import { APPEARANCE_TABS, normalizeAppearanceTab, type AppearanceTab as Tab } from './lib/appearance-tabs'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -17,7 +17,7 @@ const router = useRouter()
 const themeStore = useThemeStore()
 
 const activeTab = ref<Tab>(normalizeAppearanceTab(route.query.tab))
-const tabs: { id: Tab; label: string }[] = APPEARANCE_TABS.map((id) => ({ id, label: APPEARANCE_TAB_LABELS[id] }))
+const tabs = computed(() => APPEARANCE_TABS.map((id) => ({ id, label: t(`settings.appearance.tabs.${id}`) })))
 
 const accentLabel = computed(() => [...ACCENT_VIVID, ...ACCENT_PASTEL].find((opt) => opt.id === themeStore.accent)?.label ?? themeStore.accent)
 const backgroundLabel = computed(() => BACKGROUND_OPTIONS.find((opt) => opt.id === themeStore.background)?.label ?? themeStore.background)
