@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { Layers } from '@lucide/vue'
 
@@ -9,6 +10,8 @@ import { useTopSeries } from '../../composables/useTopSeries'
 import ChartCard from '../ChartCard.vue'
 
 const themeStore = useThemeStore()
+const { t } = useI18n()
+
 const { data, loading, error } = useTopSeries()
 const option = shallowRef({})
 
@@ -145,7 +148,7 @@ watchEffect(() => {
 </script>
 
 <template>
-  <ChartCard title="Top 50 Series" :icon="Layers" :color-index="8" :loading :error :empty="!data.items.length">
+  <ChartCard :title="t('statistics.charts.topSeries.title')" :icon="Layers" :color-index="8" :loading :error :empty="!data.items.length">
     <VChart :option autoresize style="height: 100%" />
   </ChartCard>
 </template>

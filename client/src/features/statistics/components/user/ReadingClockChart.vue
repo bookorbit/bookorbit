@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { Clock } from '@lucide/vue'
 import type { ReadingSessionSourceBucket } from '@bookorbit/types'
@@ -22,6 +23,8 @@ const HOUR_LABELS = [
 const MIN_EVENTS = 20
 
 const themeStore = useThemeStore()
+const { t } = useI18n()
+
 const { data, loading, error } = useUserPeakReadingHours()
 const option = shallowRef({})
 
@@ -123,15 +126,15 @@ watchEffect(() => {
 </script>
 
 <template>
-  <ChartCard title="Reading Clock" :icon="Clock" :color-index="5" :loading :error :empty="isEmpty">
+  <ChartCard :title="t('statistics.charts.readingClock.title')" :icon="Clock" :color-index="5" :loading :error :empty="isEmpty">
     <template #controls>
       <BreakdownSelect v-model="dimension" />
     </template>
     <ChartEmptyState
       v-if="lowConfidence"
       :icon="Clock"
-      title="Not enough data yet"
-      :description="`Need at least ${MIN_EVENTS} reading sessions for this chart.`"
+      :title="t('statistics.empty.notEnoughData')"
+      :description="t('statistics.charts.readingClock.notEnoughData', { count: MIN_EVENTS })"
     />
     <template v-else>
       <div v-if="peakHour" class="text-muted-foreground mb-1 text-center text-xs">

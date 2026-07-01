@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { useFoliate, type RelocateDetail } from './epub/composables/useFoliate'
@@ -36,6 +37,8 @@ import type { FoliateLocationContext, FoliateRenderer } from './epub/composables
 import type { EpubReaderSettings } from '@bookorbit/types'
 import { cfiRangesOverlap } from './epub/utils'
 import { getFormatGroup } from '@bookorbit/types'
+
+const { t } = useI18n()
 
 const route = useRoute()
 const router = useRouter()
@@ -310,14 +313,14 @@ onMounted(async () => {
     try {
       await goTo(deepLinkCfi)
     } catch {
-      toast.error('Could not open the linked highlight position')
+      toast.error(t('reader.toast.linkedHighlightError'))
     }
   }
 
   if (hadProgress) {
     const pct = Math.round(progress.percentage.value)
-    const label = chapterTitle.value || `Chapter ${sectionIndex.value + 1}`
-    toast.info(`Resumed at ${pct}% - ${label}`, { duration: 2500 })
+    const label = chapterTitle.value || t('reader.chapterNumber', { number: sectionIndex.value + 1 })
+    toast.info(t('reader.toast.resumed', { pct, label }), { duration: 2500 })
   }
 })
 
@@ -614,13 +617,13 @@ watch(
       <div v-if="loading" class="absolute inset-0 flex items-center justify-center z-10 bg-background">
         <div class="flex flex-col items-center gap-3">
           <div class="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-          <p class="text-sm text-muted-foreground">Loading book…</p>
+          <p class="text-sm text-muted-foreground">{{ t('reader.loadingBook') }}</p>
         </div>
       </div>
 
       <div v-if="error && !loading" class="absolute inset-0 flex items-center justify-center z-10 p-8 bg-background">
         <div class="text-center max-w-sm">
-          <p class="text-sm font-medium mb-2 text-foreground">Failed to load book</p>
+          <p class="text-sm font-medium mb-2 text-foreground">{{ t('reader.failedToLoadBook') }}</p>
           <p class="text-xs text-muted-foreground">{{ error }}</p>
         </div>
       </div>

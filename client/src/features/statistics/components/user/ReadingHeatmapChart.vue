@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { Calendar } from '@lucide/vue'
 import { READING_SESSION_SOURCE_BUCKETS, READING_SESSION_SOURCE_BUCKET_LABELS } from '@bookorbit/types'
@@ -13,6 +14,8 @@ import ChartEmptyState from '../ChartEmptyState.vue'
 const MIN_ACTIVE_DAYS = 5
 
 const themeStore = useThemeStore()
+const { t } = useI18n()
+
 const { data, loading, error } = useUserReadingHeatmap()
 const option = shallowRef({})
 
@@ -143,12 +146,12 @@ watchEffect(() => {
 </script>
 
 <template>
-  <ChartCard title="Reading Heatmap" :icon="Calendar" :color-index="4" :loading :error :empty="isEmpty">
+  <ChartCard :title="t('statistics.charts.readingHeatmap.title')" :icon="Calendar" :color-index="4" :loading :error :empty="isEmpty">
     <ChartEmptyState
       v-if="lowConfidence"
       :icon="Calendar"
-      title="Not enough data yet"
-      :description="`Need activity on at least ${MIN_ACTIVE_DAYS} days for this chart.`"
+      :title="t('statistics.empty.notEnoughData')"
+      :description="t('statistics.charts.readingHeatmap.notEnoughData', { count: MIN_ACTIVE_DAYS })"
     />
     <div v-else class="h-full min-h-0 rounded-md px-2 py-2">
       <VChart :option autoresize class="h-full w-full" />

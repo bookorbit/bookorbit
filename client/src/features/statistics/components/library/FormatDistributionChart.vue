@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { PieChart } from '@lucide/vue'
 import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
 
 import { useFormatDistribution } from '../../composables/useFormatDistribution'
 import ChartCard from '../ChartCard.vue'
+
+const { t } = useI18n()
 
 const { data, loading, error } = useFormatDistribution()
 const { md } = useBreakpoints(breakpointsTailwind)
@@ -37,7 +40,7 @@ watchEffect(() => {
 
 <template>
   <ChartCard
-    title="Format Distribution"
+    :title="t('statistics.charts.formatDistribution.title')"
     :icon="PieChart"
     :color-index="1"
     :loading

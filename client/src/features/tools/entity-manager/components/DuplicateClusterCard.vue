@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Check, ChevronDown, ChevronUp, UserMinus, X } from '@lucide/vue'
 import type { DuplicateCluster, EntityTypeCapabilities } from '@bookorbit/types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   cluster: DuplicateCluster
@@ -21,7 +24,7 @@ const selectedTargetId = ref<number | string>(props.cluster.suggestedTargetId)
 
 const sortedEntities = computed(() => [...props.cluster.entities].sort((a, b) => b.bookCount - a.bookCount))
 
-const primaryEntityName = computed(() => sortedEntities.value[0]?.name || 'Unknown')
+const primaryEntityName = computed(() => sortedEntities.value[0]?.name || t('tools.entityManager.unknown'))
 const otherCount = computed(() => sortedEntities.value.length - 1)
 
 const sourceIds = computed(() => props.cluster.entities.filter((e) => e.id !== selectedTargetId.value).map((e) => e.id))
@@ -62,10 +65,12 @@ function toggleExpanded(): void {
       <div class="flex items-center gap-3 min-w-0">
         <span class="text-sm font-medium truncate">
           {{ primaryEntityName }}
-          <span v-if="otherCount > 0" class="text-muted-foreground font-normal"> + {{ otherCount }} other{{ otherCount > 1 ? 's' : '' }}</span>
+          <span v-if="otherCount > 0" class="text-muted-foreground font-normal">
+            {{ t('tools.entityManager.duplicates.plusOthers', { count: otherCount }, otherCount) }}</span
+          >
         </span>
         <span class="text-xs px-2 py-0.5 rounded-full shrink-0 transition-colors" :class="getSimilarityColorClass(cluster.averageSimilarity)">
-          {{ (cluster.averageSimilarity * 100).toFixed(0) }}% similar
+          {{ t('tools.entityManager.duplicates.percentSimilar', { percent: (cluster.averageSimilarity * 100).toFixed(0) }) }}
         </span>
       </div>
       <component :is="expanded ? ChevronUp : ChevronDown" class="h-4 w-4 text-muted-foreground shrink-0" />
@@ -73,7 +78,7 @@ function toggleExpanded(): void {
 
     <div v-if="expanded" class="border-t border-border px-4 py-3 space-y-3">
       <div class="space-y-2">
-        <p class="text-xs text-muted-foreground font-medium uppercase tracking-wider">Select target to keep</p>
+        <p class="text-xs text-muted-foreground font-medium uppercase tracking-wider">{{ t('tools.entityManager.selectTargetToKeep') }}</p>
         <div
           v-for="entity in sortedEntities"
           :key="String(entity.id)"
@@ -87,8 +92,12 @@ function toggleExpanded(): void {
               <Check v-if="selectedTargetId === entity.id" class="h-4 w-4 text-primary shrink-0" />
             </div>
             <div class="flex items-center gap-2 mt-0.5">
-              <span class="text-xs text-muted-foreground">{{ entity.bookCount }} {{ entity.bookCount === 1 ? 'book' : 'books' }}</span>
-              <span v-if="entity.sortName" class="text-xs text-muted-foreground">· sort: {{ entity.sortName }}</span>
+              <span class="text-xs text-muted-foreground">{{
+                t('tools.entityManager.bookCount', { count: entity.bookCount }, entity.bookCount)
+              }}</span>
+              <span v-if="entity.sortName" class="text-xs text-muted-foreground">{{
+                t('tools.entityManager.sortPrefix', { sortName: entity.sortName })
+              }}</span>
             </div>
             <div v-if="entity.bookTitles.length > 0" class="mt-1">
               <span class="text-xs text-muted-foreground">{{ entity.bookTitles.slice(0, 3).join(', ') }}</span>
@@ -96,7 +105,7 @@ function toggleExpanded(): void {
           </div>
           <button
             class="shrink-0 text-muted-foreground hover:text-destructive transition-colors p-1 rounded"
-            title="Dismiss all pairs for this entity"
+            :title="t('tools.entityManager.duplicates.dismissEntityTitle')"
             @click.stop="handleDismissEntity(entity.id)"
           >
             <UserMinus class="h-4 w-4" />
@@ -105,7 +114,7 @@ function toggleExpanded(): void {
       </div>
 
       <div v-if="cluster.pairDetails.length > 0" class="space-y-1">
-        <p class="text-xs text-muted-foreground font-medium uppercase tracking-wider">Pair details</p>
+        <p class="text-xs text-muted-foreground font-medium uppercase tracking-wider">{{ t('tools.entityManager.duplicates.pairDetails') }}</p>
         <div v-for="(pair, idx) in cluster.pairDetails" :key="idx" class="flex items-center gap-2 text-xs px-2 py-1 rounded bg-muted/30">
           <span class="flex-1 text-muted-foreground truncate">
             {{ cluster.entities.find((e) => e.id === pair.idA)?.name }} <span class="text-foreground/50">&harr;</span>
@@ -116,7 +125,7 @@ function toggleExpanded(): void {
           </span>
           <button
             class="shrink-0 text-muted-foreground hover:text-destructive transition-colors p-0.5 rounded"
-            title="Dismiss this pair"
+            :title="t('tools.entityManager.duplicates.dismissPairTitle')"
             @click.stop="handleDismissPair(pair.idA, pair.idB)"
           >
             <X class="h-3.5 w-3.5" />
@@ -127,14 +136,14 @@ function toggleExpanded(): void {
       <div class="flex items-center justify-between pt-2 border-t border-border/50">
         <label class="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
           <input v-model="writeFiles" type="checkbox" class="rounded accent-primary" />
-          Write to files
+          {{ t('tools.entityManager.writeToFiles') }}
         </label>
         <button
           class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none transition-colors"
           :disabled="operationLoading || sourceIds.length === 0"
           @click="handleMerge"
         >
-          Merge {{ sourceIds.length }} into target
+          {{ t('tools.entityManager.mergeIntoTarget', { count: sourceIds.length }) }}
         </button>
       </div>
     </div>

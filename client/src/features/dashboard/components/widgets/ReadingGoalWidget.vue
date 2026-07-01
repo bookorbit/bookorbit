@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { Target, Pencil } from '@lucide/vue'
 
@@ -9,6 +10,7 @@ import { useDashboardWidgets } from '../../composables/useDashboardWidgets'
 
 const { data, loading, error, refresh } = useReadingGoalWidget()
 const { readingGoal, saveReadingGoal } = useDashboardWidgets()
+const { t } = useI18n()
 
 const editing = ref(false)
 const goalInput = ref('')
@@ -86,7 +88,7 @@ function handleCancelEdit() {
   <div class="flex h-full flex-col p-3">
     <div class="mb-3 flex items-center gap-2 self-start">
       <Target :size="16" class="text-primary/90" />
-      <span class="text-[15px] font-semibold text-foreground">Reading Goal {{ data?.year ?? '' }}</span>
+      <span class="text-[15px] font-semibold text-foreground">{{ t('dashboard.widgets.readingGoal.title', { year: data?.year ?? '' }) }}</span>
     </div>
 
     <!-- Loading -->
@@ -95,17 +97,19 @@ function handleCancelEdit() {
     </div>
 
     <!-- Error -->
-    <div v-else-if="error" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">Failed to load</div>
+    <div v-else-if="error" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+      {{ t('dashboard.common.failedToLoad') }}
+    </div>
 
     <!-- No goal set -->
     <template v-else-if="!hasGoal && !editing">
       <div class="flex flex-1 flex-col items-center justify-center gap-2">
-        <p class="text-center text-xs text-muted-foreground">Set a reading goal to track your progress</p>
+        <p class="text-center text-xs text-muted-foreground">{{ t('dashboard.widgets.readingGoal.setGoalPrompt') }}</p>
         <button
           class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           @click="handleStartEditing"
         >
-          Set goal
+          {{ t('dashboard.widgets.readingGoal.setGoal') }}
         </button>
       </div>
     </template>
@@ -113,7 +117,7 @@ function handleCancelEdit() {
     <!-- Editing goal -->
     <template v-else-if="editing">
       <div class="flex flex-1 flex-col items-center justify-center gap-2">
-        <label class="text-xs text-muted-foreground">Books per year</label>
+        <label class="text-xs text-muted-foreground">{{ t('dashboard.widgets.readingGoal.booksPerYear') }}</label>
         <input
           v-model="goalInput"
           type="number"
@@ -127,14 +131,14 @@ function handleCancelEdit() {
             :disabled="saving"
             @click="handleCancelEdit"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
           <button
             class="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             :disabled="saving"
             @click="handleSaveGoal"
           >
-            Save
+            {{ t('common.save') }}
           </button>
         </div>
       </div>
@@ -146,14 +150,16 @@ function handleCancelEdit() {
         <VChart :option="option" autoresize style="width: 124px; height: 124px" />
         <div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <p class="text-xl leading-none font-semibold tabular-nums text-foreground">{{ data?.completedBooks ?? 0 }}</p>
-          <p class="mt-1 text-[11px] leading-none text-muted-foreground">of {{ data?.goalBooks ?? 0 }}</p>
+          <p class="mt-1 text-[11px] leading-none text-muted-foreground">
+            {{ t('dashboard.widgets.readingGoal.ofGoal', { goal: data?.goalBooks ?? 0 }) }}
+          </p>
         </div>
       </div>
       <div class="flex items-center justify-between">
-        <p class="text-xs text-muted-foreground">{{ percentage }}% complete</p>
+        <p class="text-xs text-muted-foreground">{{ t('dashboard.widgets.readingGoal.percentComplete', { percentage }) }}</p>
         <button
           class="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/50 transition-colors hover:bg-muted hover:text-muted-foreground"
-          title="Edit goal"
+          :title="t('dashboard.widgets.readingGoal.editGoal')"
           @click="handleStartEditing"
         >
           <Pencil :size="12.5" />

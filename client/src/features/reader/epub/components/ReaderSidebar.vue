@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Bookmark, BookOpen, Highlighter, Trash2, TriangleAlert } from '@lucide/vue'
 import { ANNOTATION_COLOR_FILTER_OPTIONS } from '@bookorbit/types'
 import type { TocItem } from '../composables/useToc'
@@ -7,6 +8,8 @@ import type { Bookmark as BookmarkType } from '../composables/useBookmarks'
 import type { Annotation } from '../composables/useAnnotations'
 import { stripFragment, findNearestCfi, formatCfiLocation, formatDate, getCfiSortKey } from '../utils'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   chapters: TocItem[]
@@ -48,7 +51,7 @@ const HIGHLIGHT_COLOR_META = Object.fromEntries(ANNOTATION_COLOR_FILTER_OPTIONS.
 
 function getHighlightColorLabel(color: string): string {
   const normalized = color.trim().toUpperCase()
-  return HIGHLIGHT_COLOR_META[normalized]?.label ?? `Custom (${normalized})`
+  return HIGHLIGHT_COLOR_META[normalized]?.label ?? t('reader.sidebar.customColor', { color: normalized })
 }
 
 const highlightColorOptions = computed(() =>
@@ -110,7 +113,7 @@ watch(
 )
 
 function getLocationLabel(cfi: string | null | undefined): string {
-  return formatCfiLocation(cfi) ?? 'Location unavailable'
+  return formatCfiLocation(cfi) ?? t('reader.sidebar.locationUnavailable')
 }
 
 function getContextChapter(item: { cfi: string | null | undefined; chapterTitle?: string | null }): string | null {
@@ -208,9 +211,9 @@ function deleteAnnotation(id: number) {
       <div class="flex items-stretch border-b border-border shrink-0">
         <button
           v-for="tab in [
-            { id: 'chapters', icon: BookOpen, label: 'Chapters' },
-            { id: 'bookmarks', icon: Bookmark, label: 'Bookmarks' },
-            { id: 'highlights', icon: Highlighter, label: 'Highlights' },
+            { id: 'chapters', icon: BookOpen, label: t('reader.sidebar.tabs.chapters') },
+            { id: 'bookmarks', icon: Bookmark, label: t('reader.sidebar.tabs.bookmarks') },
+            { id: 'highlights', icon: Highlighter, label: t('reader.sidebar.tabs.highlights') },
           ] as const"
           :key="tab.id"
           class="flex-1 flex items-center justify-center gap-1 py-2.5 text-[13px] relative transition-colors"
@@ -233,17 +236,17 @@ function deleteAnnotation(id: number) {
             @navigate="emit('navigateChapter', $event)"
             @toggleExpand="emit('toggleExpand', $event)"
           />
-          <div v-if="chapters.length === 0" class="px-4 py-8 text-center text-sm text-muted-foreground">No chapters found</div>
+          <div v-if="chapters.length === 0" class="px-4 py-8 text-center text-sm text-muted-foreground">{{ t('reader.sidebar.noChapters') }}</div>
         </template>
 
         <template v-if="activeTab === 'bookmarks'">
-          <div v-if="bookmarks.length === 0" class="px-4 py-8 text-center text-sm text-muted-foreground">No bookmarks yet</div>
+          <div v-if="bookmarks.length === 0" class="px-4 py-8 text-center text-sm text-muted-foreground">{{ t('reader.sidebar.noBookmarks') }}</div>
           <template v-else>
             <div class="sticky top-0 z-10 border-b border-border/70 bg-card/95 backdrop-blur px-3 py-3 space-y-2">
               <input
                 v-model="bookmarkQuery"
                 type="text"
-                placeholder="Search bookmarks..."
+                :placeholder="t('reader.sidebar.searchBookmarks')"
                 class="h-8 w-full rounded-md border border-border bg-background px-2.5 text-sm outline-none focus:border-primary"
               />
               <div class="flex items-center gap-2">
@@ -251,9 +254,9 @@ function deleteAnnotation(id: number) {
                   v-model="bookmarkSort"
                   class="h-8 flex-1 rounded-md border border-border bg-background px-2 text-xs text-muted-foreground outline-none focus:border-primary"
                 >
-                  <option value="location">Reading order</option>
-                  <option value="newest">Newest first</option>
-                  <option value="oldest">Oldest first</option>
+                  <option value="location">{{ t('reader.sidebar.sort.readingOrder') }}</option>
+                  <option value="newest">{{ t('reader.sidebar.sort.newest') }}</option>
+                  <option value="oldest">{{ t('reader.sidebar.sort.oldest') }}</option>
                 </select>
                 <span class="text-[11px] text-muted-foreground tabular-nums">{{ filteredAndSortedBookmarks.length }}</span>
               </div>
@@ -269,7 +272,7 @@ function deleteAnnotation(id: number) {
                 <button type="button" class="flex flex-1 min-w-0 items-start gap-2.5 text-left cursor-pointer" @click="navigateBookmark(bm.cfi)">
                   <Bookmark :size="14" class="mt-0.5 shrink-0 text-muted-foreground" />
                   <div class="flex-1 min-w-0">
-                    <p class="text-[13px] font-medium leading-snug truncate">{{ bm.title || 'Bookmark' }}</p>
+                    <p class="text-[13px] font-medium leading-snug truncate">{{ bm.title || t('reader.sidebar.bookmarkFallback') }}</p>
                     <p class="text-[11px] text-muted-foreground mt-0.5">{{ getBookmarkContextLine(bm) }}</p>
                     <p class="text-[11px] text-muted-foreground mt-0.5">{{ formatDate(bm.createdAt) }}</p>
                   </div>
@@ -284,22 +287,24 @@ function deleteAnnotation(id: number) {
                       <Trash2 :size="13" />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent>Delete bookmark</TooltipContent>
+                  <TooltipContent>{{ t('reader.sidebar.deleteBookmark') }}</TooltipContent>
                 </Tooltip>
               </li>
             </ul>
-            <div v-else class="px-4 py-8 text-center text-sm text-muted-foreground">No bookmarks match your filters</div>
+            <div v-else class="px-4 py-8 text-center text-sm text-muted-foreground">{{ t('reader.sidebar.noBookmarksMatch') }}</div>
           </template>
         </template>
 
         <template v-if="activeTab === 'highlights'">
-          <div v-if="annotations.length === 0" class="px-4 py-8 text-center text-sm text-muted-foreground">No highlights yet</div>
+          <div v-if="annotations.length === 0" class="px-4 py-8 text-center text-sm text-muted-foreground">
+            {{ t('reader.sidebar.noHighlights') }}
+          </div>
           <template v-else>
             <div class="sticky top-0 z-10 border-b border-border/70 bg-card/95 backdrop-blur px-3 py-3 space-y-2">
               <input
                 v-model="highlightQuery"
                 type="text"
-                placeholder="Search highlights..."
+                :placeholder="t('reader.sidebar.searchHighlights')"
                 class="h-8 w-full rounded-md border border-border bg-background px-2.5 text-sm outline-none focus:border-primary"
               />
               <div class="grid grid-cols-2 gap-2">
@@ -307,28 +312,28 @@ function deleteAnnotation(id: number) {
                   v-model="highlightSort"
                   class="h-8 rounded-md border border-border bg-background px-2 text-xs text-muted-foreground outline-none focus:border-primary"
                 >
-                  <option value="location">Reading order</option>
-                  <option value="newest">Newest first</option>
-                  <option value="oldest">Oldest first</option>
+                  <option value="location">{{ t('reader.sidebar.sort.readingOrder') }}</option>
+                  <option value="newest">{{ t('reader.sidebar.sort.newest') }}</option>
+                  <option value="oldest">{{ t('reader.sidebar.sort.oldest') }}</option>
                 </select>
                 <select
                   v-model="highlightColorFilter"
                   class="h-8 rounded-md border border-border bg-background px-2 text-xs text-muted-foreground outline-none focus:border-primary"
                 >
-                  <option value="all">All colors</option>
+                  <option value="all">{{ t('reader.sidebar.allColors') }}</option>
                   <option v-for="color in highlightColorOptions" :key="color.hex" :value="color.hex">{{ color.label }}</option>
                 </select>
                 <select
                   v-model="highlightChapterFilter"
                   class="col-span-2 h-8 rounded-md border border-border bg-background px-2 text-xs text-muted-foreground outline-none focus:border-primary"
                 >
-                  <option value="all">All chapters</option>
+                  <option value="all">{{ t('reader.sidebar.allChapters') }}</option>
                   <option v-for="chapter in highlightChapterOptions" :key="chapter" :value="chapter">{{ chapter }}</option>
                 </select>
               </div>
               <label class="flex items-center gap-2 text-xs text-muted-foreground">
                 <input v-model="highlightNotesOnly" type="checkbox" class="h-3.5 w-3.5 rounded border-border accent-primary" />
-                Notes only
+                {{ t('reader.sidebar.notesOnly') }}
                 <span class="ml-auto tabular-nums">{{ filteredAndSortedHighlights.length }}</span>
               </label>
             </div>
@@ -351,7 +356,7 @@ function deleteAnnotation(id: number) {
                           <TooltipTrigger as-child>
                             <TriangleAlert :size="11" class="shrink-0 text-amber-500" />
                           </TooltipTrigger>
-                          <TooltipContent>Synced from device; exact position unavailable, jumps to the chapter</TooltipContent>
+                          <TooltipContent>{{ t('reader.sidebar.approximatePosition') }}</TooltipContent>
                         </Tooltip>
                         <span>{{ getHighlightContextLine(ann) }}</span>
                       </p>
@@ -369,12 +374,12 @@ function deleteAnnotation(id: number) {
                         <Trash2 :size="13" />
                       </button>
                     </TooltipTrigger>
-                    <TooltipContent>Delete highlight</TooltipContent>
+                    <TooltipContent>{{ t('reader.sidebar.deleteHighlight') }}</TooltipContent>
                   </Tooltip>
                 </div>
               </li>
             </ul>
-            <div v-else class="px-4 py-8 text-center text-sm text-muted-foreground">No highlights match your filters</div>
+            <div v-else class="px-4 py-8 text-center text-sm text-muted-foreground">{{ t('reader.sidebar.noHighlightsMatch') }}</div>
           </template>
         </template>
       </div>

@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { Loader2, Search } from '@lucide/vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 defineProps<{
   minSimilarity: number
@@ -23,7 +26,7 @@ function handleScan(): void {
 <template>
   <div class="flex flex-wrap items-center gap-4">
     <div class="flex items-center gap-2">
-      <label class="text-sm text-muted-foreground whitespace-nowrap">Similarity:</label>
+      <label class="text-sm text-muted-foreground whitespace-nowrap">{{ t('tools.entityManager.duplicates.similarity') }}</label>
       <input type="range" :value="minSimilarity" min="0.1" max="1.0" step="0.05" class="w-32 accent-primary" @input="handleSimilarityChange" />
       <span class="text-sm font-mono text-muted-foreground w-10 text-right">{{ (minSimilarity * 100).toFixed(0) }}%</span>
     </div>
@@ -35,7 +38,7 @@ function handleScan(): void {
     >
       <Loader2 v-if="scanning" class="h-4 w-4 animate-spin" />
       <Search v-else class="h-4 w-4" />
-      {{ scanning ? 'Scanning...' : 'Scan' }}
+      {{ scanning ? t('tools.entityManager.duplicates.scanning') : t('tools.entityManager.duplicates.scan') }}
     </button>
   </div>
 </template>

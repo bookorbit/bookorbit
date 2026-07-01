@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Check, Minus } from '@lucide/vue'
 import type { BookDetail, MetadataScoreWeights } from '@bookorbit/types'
 import { METADATA_SCORE_FIELDS, METADATA_SCORE_GROUP_LABELS, type MetadataScoreField, type MetadataScoreGroup } from '@bookorbit/types'
@@ -12,6 +13,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   editMetadata: []
 }>()
+
+const { t } = useI18n()
 
 function handleEditMetadata() {
   emit('editMetadata')
@@ -126,7 +129,7 @@ const missingCount = computed(() => groups.value.flatMap((g) => g.fields).filter
     </div>
     <div v-if="missingCount > 0" class="pt-1 border-t border-border/50">
       <button type="button" class="text-xs text-primary hover:underline" @click="handleEditMetadata">
-        {{ missingCount }} field{{ missingCount === 1 ? '' : 's' }} missing - edit metadata
+        {{ t('metadataScore.missingFields', { count: missingCount }, missingCount) }}
       </button>
     </div>
   </div>

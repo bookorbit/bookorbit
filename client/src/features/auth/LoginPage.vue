@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { OidcProviderPublic } from '@bookorbit/types'
 import { Moon, Sun, Wallpaper } from '@lucide/vue'
 import { ACCENT_VIVID, ACCENT_PASTEL, ACCENT_OPTIONS, RADIUS_OPTIONS, BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
@@ -8,6 +9,7 @@ import { useOidc } from './composables/useOidc'
 import { useSetupStatus } from './composables/useSetupStatus'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
+const { t } = useI18n()
 const themeStore = useThemeStore()
 const accentOpen = ref(false)
 const radiusOpen = ref(false)
@@ -60,17 +62,17 @@ const oidcProviders = ref<OidcProviderPublic[]>([])
 const oidcLoadingSlug = ref<string | null>(null)
 
 function resolveLoginError(err: unknown): string {
-  if (!(err instanceof Error)) return 'Invalid username or password'
+  if (!(err instanceof Error)) return t('auth.login.errors.invalidCredentials')
 
   const normalizedMessage = err.message.trim().toLowerCase()
   if (normalizedMessage.includes('too many requests')) {
-    return 'Too many login attempts. Please wait a minute and try again.'
+    return t('auth.login.errors.tooManyAttempts')
   }
   if (normalizedMessage.includes('invalid credentials')) {
-    return 'Invalid username or password'
+    return t('auth.login.errors.invalidCredentials')
   }
 
-  return err.message || 'Invalid username or password'
+  return err.message || t('auth.login.errors.invalidCredentials')
 }
 
 onMounted(async () => {
@@ -95,7 +97,7 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
   try {
     await initiateLogin(provider)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'OIDC login failed'
+    error.value = err instanceof Error ? err.message : t('auth.oidc.loginFailed')
     oidcLoadingSlug.value = null
   }
 }
@@ -113,7 +115,7 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
             <Moon v-else :size="14" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>{{ themeStore.theme === 'dark' ? 'Switch to light' : 'Switch to dark' }}</TooltipContent>
+        <TooltipContent>{{ themeStore.theme === 'dark' ? t('auth.themePicker.switchToLight') : t('auth.themePicker.switchToDark') }}</TooltipContent>
       </Tooltip>
 
       <!-- Radius picker -->
@@ -146,7 +148,7 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
               <span class="w-3.5 h-3.5 border-2 border-current block" :style="{ borderRadius: radiusPreview(themeStore.radius) }" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Change corner radius</TooltipContent>
+          <TooltipContent>{{ t('auth.themePicker.changeRadius') }}</TooltipContent>
         </Tooltip>
       </div>
 
@@ -178,7 +180,7 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
               <Wallpaper :size="14" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Change background</TooltipContent>
+          <TooltipContent>{{ t('auth.themePicker.changeBackground') }}</TooltipContent>
         </Tooltip>
       </div>
 
@@ -231,7 +233,7 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
               <span class="w-3.5 h-3.5 rounded-full block" :style="{ backgroundColor: currentAccent?.color }" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Change accent color</TooltipContent>
+          <TooltipContent>{{ t('auth.themePicker.changeAccent') }}</TooltipContent>
         </Tooltip>
       </div>
     </div>
@@ -242,12 +244,12 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
     <div class="login-card relative z-10 w-full max-w-sm rounded-2xl p-8">
       <div class="text-center mb-8 animate-fade-up">
         <h1 class="text-2xl font-serif font-semibold text-foreground">Book<span class="text-primary"> Orbit</span></h1>
-        <p class="text-sm text-muted-foreground mt-1">Sign in to your account</p>
+        <p class="text-sm text-muted-foreground mt-1">{{ t('auth.login.subtitle') }}</p>
       </div>
 
       <form @submit.prevent="handleSubmit" class="space-y-4">
         <div class="space-y-1.5 animate-fade-up" style="animation-delay: 80ms">
-          <label for="username" class="text-sm font-medium text-foreground">Username</label>
+          <label for="username" class="text-sm font-medium text-foreground">{{ t('auth.fields.username') }}</label>
           <input
             id="username"
             v-model="username"
@@ -259,7 +261,7 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
         </div>
 
         <div class="space-y-1.5 animate-fade-up" style="animation-delay: 160ms">
-          <label for="password" class="text-sm font-medium text-foreground">Password</label>
+          <label for="password" class="text-sm font-medium text-foreground">{{ t('auth.fields.password') }}</label>
           <input
             id="password"
             v-model="password"
@@ -279,14 +281,14 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
           class="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors animate-fade-up"
           style="animation-delay: 240ms"
         >
-          {{ loading ? 'Signing in...' : 'Sign in' }}
+          {{ loading ? t('auth.login.signingIn') : t('auth.login.signIn') }}
         </button>
       </form>
 
       <template v-if="oidcProviders.length > 0">
         <div class="flex items-center gap-3 my-6">
           <div class="flex-1 h-px bg-border" />
-          <span class="text-sm text-muted-foreground">or</span>
+          <span class="text-sm text-muted-foreground">{{ t('auth.login.orDivider') }}</span>
           <div class="flex-1 h-px bg-border" />
         </div>
 
@@ -300,13 +302,13 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
             @click="handleOidcLogin(provider)"
           >
             <img v-if="provider.iconUrl" :src="provider.iconUrl" alt="" class="h-4 w-4 shrink-0 object-contain" />
-            {{ oidcLoadingSlug === provider.slug ? 'Redirecting...' : `Sign in with ${provider.displayName}` }}
+            {{ oidcLoadingSlug === provider.slug ? t('auth.oidc.redirecting') : t('auth.oidc.signInWith', { provider: provider.displayName }) }}
           </button>
         </div>
       </template>
 
       <p class="mt-6 text-center text-sm text-muted-foreground">
-        <RouterLink to="/forgot-password" class="text-primary hover:underline">Forgot password?</RouterLink>
+        <RouterLink to="/forgot-password" class="text-primary hover:underline">{{ t('auth.login.forgotPassword') }}</RouterLink>
       </p>
     </div>
   </div>

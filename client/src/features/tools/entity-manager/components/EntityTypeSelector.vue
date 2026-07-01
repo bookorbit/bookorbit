@@ -1,18 +1,22 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ALL_ENTITY_TYPES, type EntityType } from '@bookorbit/types'
 
 defineProps<{ modelValue: EntityType }>()
 const emit = defineEmits<{ 'update:modelValue': [value: EntityType] }>()
 
-const labels: Record<EntityType, string> = {
-  author: 'Authors',
-  genre: 'Genres',
-  tag: 'Tags',
-  narrator: 'Narrators',
-  publisher: 'Publishers',
-  language: 'Languages',
-  series: 'Series',
-}
+const { t } = useI18n()
+
+const labels = computed<Record<EntityType, string>>(() => ({
+  author: t('tools.entityTypes.authors'),
+  genre: t('tools.entityTypes.genres'),
+  tag: t('tools.entityTypes.tags'),
+  narrator: t('tools.entityTypes.narrators'),
+  publisher: t('tools.entityTypes.publishers'),
+  language: t('tools.entityTypes.languages'),
+  series: t('tools.entityTypes.series'),
+}))
 
 function handleChange(event: Event): void {
   emit('update:modelValue', (event.target as HTMLSelectElement).value as EntityType)

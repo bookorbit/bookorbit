@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   ArchiveRestore,
   BookOpen,
@@ -32,6 +33,8 @@ import { copyToClipboard } from '@/lib/clipboard'
 type AnnotationListItemMode = 'book' | 'hub'
 type AnnotationListDensity = 'compact' | 'comfortable'
 type AnnotationListItem = AnnotationItem | AnnotationHubItem
+
+const { t } = useI18n()
 
 const props = withDefaults(
   defineProps<{
@@ -68,13 +71,13 @@ const emit = defineEmits<{
 
 const COLORS = ANNOTATION_HIGHLIGHT_COLORS
 
-const STYLES = [
-  { value: 'highlight', label: 'Highlight', icon: Highlighter },
-  { value: 'underline', label: 'Underline', icon: Underline },
-  { value: 'strikethrough', label: 'Strike', icon: Strikethrough },
-  { value: 'squiggly', label: 'Squiggle', icon: Waves },
-  { value: 'invert', label: 'Invert', icon: Contrast },
-]
+const STYLES = computed(() => [
+  { value: 'highlight', label: t('annotations.styles.highlight'), icon: Highlighter },
+  { value: 'underline', label: t('annotations.styles.underline'), icon: Underline },
+  { value: 'strikethrough', label: t('annotations.styles.strike'), icon: Strikethrough },
+  { value: 'squiggly', label: t('annotations.styles.squiggle'), icon: Waves },
+  { value: 'invert', label: t('annotations.styles.invert'), icon: Contrast },
+])
 
 const expanded = ref(false)
 const editingNote = ref(false)
@@ -90,16 +93,18 @@ const isLong = computed(() => props.annotation.text.length > (props.density === 
 const isApproximate = computed(() => props.annotation.cfi == null && props.annotation.origin !== 'web')
 const hasBookTitle = computed(() => 'bookTitle' in props.annotation && props.annotation.bookTitle != null)
 const showBookHeader = computed(() => props.mode === 'hub' && props.showBookHeader)
-const bookTitleText = computed(() => (hasBookTitle.value && 'bookTitle' in props.annotation ? props.annotation.bookTitle : 'Unknown book'))
+const bookTitleText = computed(() =>
+  hasBookTitle.value && 'bookTitle' in props.annotation ? props.annotation.bookTitle : t('annotations.unknownBook'),
+)
 const bookAuthor = computed(() => ('author' in props.annotation ? props.annotation.author : null))
 const bookLink = computed(() => ({ name: 'book-detail', params: { bookId: props.annotation.bookId }, query: { tab: 'highlights' } }))
 
 const styleLabel = computed(() => {
-  return STYLES.find((s) => s.value === props.annotation.style)?.label ?? props.annotation.style
+  return STYLES.value.find((s) => s.value === props.annotation.style)?.label ?? props.annotation.style
 })
 
 const styleIcon = computed(() => {
-  return STYLES.find((s) => s.value === props.annotation.style)?.icon ?? Highlighter
+  return STYLES.value.find((s) => s.value === props.annotation.style)?.icon ?? Highlighter
 })
 
 const originPill = computed(() => sourcePill(props.annotation.origin))
@@ -116,10 +121,11 @@ const noteClampClass = computed(() => (expanded.value ? '' : props.density === '
 
 const metadataItems = computed(() => {
   const items: string[] = []
-  if (props.mode !== 'hub' && hasBookTitle.value && 'bookTitle' in props.annotation) items.push(props.annotation.bookTitle ?? 'Unknown book')
+  if (props.mode !== 'hub' && hasBookTitle.value && 'bookTitle' in props.annotation)
+    items.push(props.annotation.bookTitle ?? t('annotations.unknownBook'))
   if (props.annotation.chapterTitle) items.push(props.annotation.chapterTitle)
-  if (props.annotation.pageno != null) items.push(`p. ${props.annotation.pageno}`)
-  if (props.annotation.chapterIndex != null) items.push(`chapter ${props.annotation.chapterIndex + 1}`)
+  if (props.annotation.pageno != null) items.push(t('annotations.listItem.pageNumber', { page: props.annotation.pageno }))
+  if (props.annotation.chapterIndex != null) items.push(t('annotations.listItem.chapterNumber', { chapter: props.annotation.chapterIndex + 1 }))
   const date = formatDate(props.annotation.createdAt)
   if (date) items.push(date)
   return items
@@ -223,7 +229,7 @@ function shouldSeparateMetadataItem(index: number): boolean {
       type="checkbox"
       class="mt-1 h-4 w-4 shrink-0 accent-[var(--primary)] cursor-pointer"
       :checked="selected"
-      aria-label="Select annotation"
+      :aria-label="t('annotations.listItem.selectAnnotation')"
       @change="handleToggleSelect"
     />
 
@@ -261,7 +267,7 @@ function shouldSeparateMetadataItem(index: number): boolean {
       >
         <ChevronUp v-if="expanded" :size="13" />
         <ChevronDown v-else :size="13" />
-        {{ expanded ? 'Collapse' : 'Expand' }}
+        {{ expanded ? t('annotations.listItem.collapse') : t('annotations.listItem.expand') }}
       </button>
 
       <p
@@ -343,15 +349,17 @@ function shouldSeparateMetadataItem(index: number): boolean {
                 {{ positionPill.label }}
               </button>
             </TooltipTrigger>
-            <TooltipContent>{{ showSyncDetail ? 'Hide sync detail' : 'Show sync detail' }}</TooltipContent>
+            <TooltipContent>{{
+              showSyncDetail ? t('annotations.listItem.hideSyncDetail') : t('annotations.listItem.showSyncDetail')
+            }}</TooltipContent>
           </Tooltip>
           <Tooltip v-if="isApproximate">
             <TooltipTrigger as-child>
               <TriangleAlert :size="12" class="text-muted-foreground" />
             </TooltipTrigger>
-            <TooltipContent>Exact reader position unavailable</TooltipContent>
+            <TooltipContent>{{ t('annotations.listItem.exactPositionUnavailable') }}</TooltipContent>
           </Tooltip>
-          <span v-if="saving" class="text-primary">Saving</span>
+          <span v-if="saving" class="text-primary">{{ t('annotations.listItem.saving') }}</span>
         </div>
 
         <div class="flex shrink-0 flex-wrap justify-start gap-0.5 sm:flex-nowrap sm:justify-end">
@@ -364,7 +372,7 @@ function shouldSeparateMetadataItem(index: number): boolean {
                 <Info :size="15" />
               </RouterLink>
             </TooltipTrigger>
-            <TooltipContent>Book details</TooltipContent>
+            <TooltipContent>{{ t('annotations.listItem.bookDetails') }}</TooltipContent>
           </Tooltip>
 
           <Tooltip v-if="canJump">
@@ -377,7 +385,7 @@ function shouldSeparateMetadataItem(index: number): boolean {
                 <BookOpen :size="15" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Open in reader</TooltipContent>
+            <TooltipContent>{{ t('annotations.listItem.openInReader') }}</TooltipContent>
           </Tooltip>
 
           <template v-if="trashed">
@@ -391,7 +399,7 @@ function shouldSeparateMetadataItem(index: number): boolean {
                   <ArchiveRestore :size="15" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Restore</TooltipContent>
+              <TooltipContent>{{ t('annotations.listItem.restore') }}</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger as-child>
@@ -403,7 +411,7 @@ function shouldSeparateMetadataItem(index: number): boolean {
                   <Trash2 :size="15" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Delete forever</TooltipContent>
+              <TooltipContent>{{ t('annotations.listItem.deleteForever') }}</TooltipContent>
             </Tooltip>
           </template>
 
@@ -418,7 +426,7 @@ function shouldSeparateMetadataItem(index: number): boolean {
                   <FileEdit :size="14" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>{{ annotation.note ? 'Edit note' : 'Add note' }}</TooltipContent>
+              <TooltipContent>{{ annotation.note ? t('annotations.listItem.editNote') : t('annotations.listItem.addNote') }}</TooltipContent>
             </Tooltip>
 
             <Tooltip v-if="canEdit">
@@ -432,7 +440,7 @@ function shouldSeparateMetadataItem(index: number): boolean {
                   <Palette :size="14" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Color and style</TooltipContent>
+              <TooltipContent>{{ t('annotations.listItem.colorAndStyle') }}</TooltipContent>
             </Tooltip>
 
             <Tooltip>
@@ -446,14 +454,14 @@ function shouldSeparateMetadataItem(index: number): boolean {
                   <Copy v-else :size="14" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>{{ copied ? 'Copied' : 'Copy text' }}</TooltipContent>
+              <TooltipContent>{{ copied ? t('annotations.listItem.copied') : t('annotations.listItem.copyText') }}</TooltipContent>
             </Tooltip>
 
             <template v-if="confirmTrash && mode === 'book'">
               <button
                 type="button"
                 class="flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                title="Cancel"
+                :title="t('common.cancel')"
                 @click="handleCancelTrash"
               >
                 <X :size="14" />
@@ -463,7 +471,7 @@ function shouldSeparateMetadataItem(index: number): boolean {
                 class="h-7 rounded bg-destructive/15 px-2 text-[10px] font-medium uppercase text-destructive ring-1 ring-destructive/40"
                 @click="handleTrash"
               >
-                Trash
+                {{ t('annotations.listItem.trash') }}
               </button>
             </template>
             <Tooltip v-else>
@@ -476,7 +484,7 @@ function shouldSeparateMetadataItem(index: number): boolean {
                   <Trash2 :size="14" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Move to trash</TooltipContent>
+              <TooltipContent>{{ t('annotations.listItem.moveToTrash') }}</TooltipContent>
             </Tooltip>
           </template>
         </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { X, ChevronLeft, ChevronRight, Check, Info, FolderOpen, ScanLine, Clock, Users, Tags, BookOpen, FileEdit } from '@lucide/vue'
 import type { CoverAspectRatio, Library, OrganizationMode } from '@bookorbit/types'
 import { api } from '@/lib/api'
@@ -22,24 +23,26 @@ const emit = defineEmits<{
   saved: [library: Library]
 }>()
 
+const { t } = useI18n()
+
 const creator = useLibraryCreator()
 const { form, mode, editingLibraryId, loading, prescanLoading, prescanResult, error } = creator
 
 type SectionId = 'details' | 'folders' | 'scanner' | 'metadata' | 'fileWrite' | 'reading' | 'schedule' | 'access'
 
-const ALL_SECTIONS: { id: SectionId; label: string; icon: unknown; component: unknown }[] = [
-  { id: 'details', label: 'Details', icon: Info, component: LibraryCreatorDetails },
-  { id: 'folders', label: 'Folders', icon: FolderOpen, component: LibraryCreatorFolders },
-  { id: 'scanner', label: 'Scanner', icon: ScanLine, component: LibraryCreatorScanner },
-  { id: 'metadata', label: 'Metadata', icon: Tags, component: LibraryCreatorMetadata },
-  { id: 'fileWrite', label: 'File Write', icon: FileEdit, component: LibraryCreatorFileWrite },
-  { id: 'reading', label: 'Reading', icon: BookOpen, component: LibraryCreatorReading },
-  { id: 'schedule', label: 'Schedule', icon: Clock, component: LibraryCreatorSchedule },
-  { id: 'access', label: 'Access', icon: Users, component: LibraryCreatorAccess },
-]
+const allSections = computed<{ id: SectionId; label: string; icon: unknown; component: unknown }[]>(() => [
+  { id: 'details', label: t('library.creator.sections.details'), icon: Info, component: LibraryCreatorDetails },
+  { id: 'folders', label: t('library.creator.sections.folders'), icon: FolderOpen, component: LibraryCreatorFolders },
+  { id: 'scanner', label: t('library.creator.sections.scanner'), icon: ScanLine, component: LibraryCreatorScanner },
+  { id: 'metadata', label: t('library.creator.sections.metadata'), icon: Tags, component: LibraryCreatorMetadata },
+  { id: 'fileWrite', label: t('library.creator.sections.fileWrite'), icon: FileEdit, component: LibraryCreatorFileWrite },
+  { id: 'reading', label: t('library.creator.sections.reading'), icon: BookOpen, component: LibraryCreatorReading },
+  { id: 'schedule', label: t('library.creator.sections.schedule'), icon: Clock, component: LibraryCreatorSchedule },
+  { id: 'access', label: t('library.creator.sections.access'), icon: Users, component: LibraryCreatorAccess },
+])
 
 // Access is only meaningful after a library exists
-const sections = computed(() => (mode.value === 'create' ? ALL_SECTIONS.slice(0, 7) : ALL_SECTIONS))
+const sections = computed(() => (mode.value === 'create' ? allSections.value.slice(0, 7) : allSections.value))
 
 // ── Stepper state ──────────────────────────────────────────────────────────
 
@@ -88,7 +91,7 @@ onMounted(async () => {
     const res = await api(`/api/v1/libraries/${props.library.id}`)
     const full: Library = res.ok ? await res.json() : props.library
     creator.initEdit(full)
-    visitedUpTo.value = ALL_SECTIONS.length - 1 // all unlocked in edit
+    visitedUpTo.value = allSections.value.length - 1 // all unlocked in edit
   } else {
     creator.initCreate()
     visitedUpTo.value = 0
@@ -114,7 +117,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 
 // ── Section props / events ─────────────────────────────────────────────────
 
-const title = computed(() => (props.library ? `Edit: ${props.library.name}` : 'Create Library'))
+const title = computed(() => (props.library ? t('library.creator.editTitle', { name: props.library.name }) : t('library.creator.createTitle')))
 
 const stepValid = computed(() => {
   const id = activeId.value
@@ -229,14 +232,14 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                 class="px-4 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 @click="emit('close')"
               >
-                Cancel
+                {{ t('common.cancel') }}
               </button>
               <button
                 class="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
                 :disabled="loading"
                 @click="handleSave"
               >
-                {{ loading ? 'Saving…' : 'Save changes' }}
+                {{ loading ? t('library.creator.actions.saving') : t('library.creator.actions.saveChanges') }}
               </button>
             </div>
           </div>
@@ -252,7 +255,7 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                 @click="mobileView = 'nav'"
               >
                 <ChevronLeft :size="18" />
-                <span class="text-sm">Back</span>
+                <span class="text-sm">{{ t('common.back') }}</span>
               </button>
               <span class="flex-1 text-sm font-medium text-foreground text-center" :class="mode === 'edit' ? 'pr-16' : ''">
                 {{ activeSection?.label }}
@@ -307,7 +310,7 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                   >
                     <X v-if="isFirstStep" :size="14" />
                     <ChevronLeft v-else :size="14" />
-                    {{ isFirstStep ? 'Cancel' : 'Back' }}
+                    {{ isFirstStep ? t('common.cancel') : t('common.back') }}
                   </button>
                   <button
                     v-if="!isLastStep"
@@ -315,7 +318,7 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                     :disabled="!stepValid"
                     @click="next"
                   >
-                    Next
+                    {{ t('common.next') }}
                     <ChevronRight :size="14" />
                   </button>
                   <button
@@ -324,7 +327,7 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                     :disabled="loading"
                     @click="handleSave"
                   >
-                    {{ loading ? 'Creating…' : 'Create library' }}
+                    {{ loading ? t('library.creator.actions.creating') : t('library.creator.actions.createLibrary') }}
                   </button>
                 </template>
                 <!-- Edit mode: Cancel / Save -->
@@ -334,14 +337,14 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                     @click="emit('close')"
                   >
                     <X :size="14" />
-                    Cancel
+                    {{ t('common.cancel') }}
                   </button>
                   <button
                     class="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
                     :disabled="loading"
                     @click="handleSave"
                   >
-                    {{ loading ? 'Saving…' : 'Save changes' }}
+                    {{ loading ? t('library.creator.actions.saving') : t('library.creator.actions.saveChanges') }}
                   </button>
                 </template>
               </div>
@@ -447,10 +450,12 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                 >
                   <X v-if="isFirstStep" :size="14" />
                   <ChevronLeft v-else :size="14" />
-                  {{ isFirstStep ? 'Cancel' : 'Back' }}
+                  {{ isFirstStep ? t('common.cancel') : t('common.back') }}
                 </button>
 
-                <span class="text-xs text-muted-foreground"> Step {{ stepIndex + 1 }} of {{ sections.length }} </span>
+                <span class="text-xs text-muted-foreground">
+                  {{ t('library.creator.stepOf', { current: stepIndex + 1, total: sections.length }) }}
+                </span>
 
                 <button
                   v-if="!isLastStep"
@@ -458,7 +463,7 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                   :disabled="!stepValid"
                   @click="next"
                 >
-                  Next
+                  {{ t('common.next') }}
                   <ChevronRight :size="14" />
                 </button>
                 <button
@@ -467,7 +472,7 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                   :disabled="loading"
                   @click="handleSave"
                 >
-                  {{ loading ? 'Creating…' : 'Create library' }}
+                  {{ loading ? t('library.creator.actions.creating') : t('library.creator.actions.createLibrary') }}
                 </button>
               </div>
 
@@ -478,14 +483,14 @@ function onSectionEvent(id: SectionId, event: string, value: unknown) {
                   @click="emit('close')"
                 >
                   <X :size="14" />
-                  Cancel
+                  {{ t('common.cancel') }}
                 </button>
                 <button
                   class="px-5 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
                   :disabled="loading"
                   @click="handleSave"
                 >
-                  {{ loading ? 'Saving…' : 'Save changes' }}
+                  {{ loading ? t('library.creator.actions.saving') : t('library.creator.actions.saveChanges') }}
                 </button>
               </div>
             </div>

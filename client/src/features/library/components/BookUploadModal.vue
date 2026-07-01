@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { CheckCircle2, FileUp, Loader2, Plus, RotateCcw, Upload, X, XCircle } from '@lucide/vue'
 import { api } from '@/lib/api'
 import type { Library } from '@bookorbit/types'
@@ -18,6 +19,7 @@ const emit = defineEmits<{
 }>()
 
 const router = useRouter()
+const { t } = useI18n()
 const { libraries, fetchLibraries } = useLibraries()
 
 const selectedLibraryId = ref<number | undefined>(props.libraryId)
@@ -36,10 +38,10 @@ const allDone = computed(() => hasFiles.value && files.value.every((f) => f.stat
 const allSuccess = computed(() => allDone.value && errorCount.value === 0)
 
 const headerTitle = computed(() => {
-  if (isUploading.value) return 'Uploading...'
-  if (allDone.value) return 'Upload complete'
-  if (libraryName.value) return `Upload to ${libraryName.value}`
-  return 'Upload Books'
+  if (isUploading.value) return t('library.upload.header.uploading')
+  if (allDone.value) return t('library.upload.header.complete')
+  if (libraryName.value) return t('library.upload.header.uploadTo', { library: libraryName.value })
+  return t('library.upload.header.uploadBooks')
 })
 
 const fileSummary = computed(() => {
@@ -215,19 +217,19 @@ function formatPillClass(filename: string): string {
         <div class="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
           <!-- Library selector (only when not pre-scoped to a library) -->
           <div v-if="!libraryId" class="flex flex-col gap-1.5">
-            <label class="text-xs font-medium text-muted-foreground">Library</label>
+            <label class="text-xs font-medium text-muted-foreground">{{ t('library.upload.library') }}</label>
             <select
               v-model="selectedLibraryId"
               class="h-8 rounded-md border border-input bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             >
-              <option :value="undefined" disabled>Select a library...</option>
+              <option :value="undefined" disabled>{{ t('library.upload.selectLibrary') }}</option>
               <option v-for="lib in libraries" :key="lib.id" :value="lib.id">{{ lib.name }}</option>
             </select>
           </div>
 
           <!-- Folder selector (only shown when library has multiple folders) -->
           <div v-if="folders.length > 1" class="flex flex-col gap-1.5">
-            <label class="text-xs font-medium text-muted-foreground">Target folder</label>
+            <label class="text-xs font-medium text-muted-foreground">{{ t('library.upload.targetFolder') }}</label>
             <select
               v-model="selectedFolderId"
               class="h-8 rounded-md border border-input bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
@@ -253,8 +255,8 @@ function formatPillClass(filename: string): string {
               <FileUp :size="20" class="text-primary" />
             </div>
             <div>
-              <p class="text-sm font-medium text-foreground">Drop files here or click to browse</p>
-              <p class="text-xs text-muted-foreground mt-0.5">{{ SUPPORTED_FORMATS.join(', ') }} - up to 500 MB each</p>
+              <p class="text-sm font-medium text-foreground">{{ t('library.upload.dropzone.title') }}</p>
+              <p class="text-xs text-muted-foreground mt-0.5">{{ t('library.upload.dropzone.hint', { formats: SUPPORTED_FORMATS.join(', ') }) }}</p>
             </div>
           </div>
 
@@ -273,20 +275,22 @@ function formatPillClass(filename: string): string {
             @click="openFilePicker"
           >
             <Plus :size="13" />
-            Add more files
+            {{ t('library.upload.addMoreFiles') }}
           </div>
 
           <!-- File list -->
           <div v-if="hasFiles" class="flex flex-col gap-2">
             <!-- Summary line -->
             <div v-if="fileSummary" class="flex items-center gap-1.5 flex-wrap text-xs text-muted-foreground">
-              <span class="font-medium text-foreground tabular-nums">{{ fileSummary.total }} file{{ fileSummary.total === 1 ? '' : 's' }}</span>
+              <span class="font-medium text-foreground tabular-nums">{{
+                t('library.upload.fileCount', { count: fileSummary.total }, fileSummary.total)
+              }}</span>
               <span>·</span>
               <span>{{ formatBytes(fileSummary.totalBytes) }}</span>
               <span>·</span>
               <span>{{ fileSummary.formatParts.join(', ') }}</span>
               <div class="flex-1" />
-              <button v-if="!isUploading" class="hover:text-foreground transition-colors" @click="reset">Clear all</button>
+              <button v-if="!isUploading" class="hover:text-foreground transition-colors" @click="reset">{{ t('library.upload.clearAll') }}</button>
             </div>
 
             <TransitionGroup name="file-row" tag="div" class="relative flex flex-col gap-1">
@@ -314,7 +318,9 @@ function formatPillClass(filename: string): string {
                     </span>
                     <span v-if="item.status === 'error'" class="text-[11px] text-destructive truncate">{{ item.error }}</span>
                     <span v-else-if="item.status === 'uploading'" class="text-[11px] text-primary tabular-nums">{{ item.progress }}%</span>
-                    <span v-else-if="item.status === 'done'" class="text-[11px] text-emerald-600 dark:text-emerald-400">Done</span>
+                    <span v-else-if="item.status === 'done'" class="text-[11px] text-emerald-600 dark:text-emerald-400">{{
+                      t('library.upload.done')
+                    }}</span>
                   </div>
 
                   <!-- Progress bar -->
@@ -328,7 +334,7 @@ function formatPillClass(filename: string): string {
                   <button
                     v-if="item.status === 'error'"
                     class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground/85 hover:text-primary hover:bg-primary/10 transition-colors"
-                    title="Retry"
+                    :title="t('library.upload.retry')"
                     @click="retryFile(item.id)"
                   >
                     <RotateCcw :size="11" />
@@ -350,28 +356,32 @@ function formatPillClass(filename: string): string {
         <div v-if="allSuccess" class="shrink-0 px-5 py-4 border-t border-border flex items-center justify-between gap-3">
           <div class="flex items-center gap-2">
             <CheckCircle2 class="size-4 text-emerald-500 shrink-0" />
-            <span class="text-sm font-medium text-foreground">{{ doneCount }} book{{ doneCount === 1 ? '' : 's' }} added</span>
+            <span class="text-sm font-medium text-foreground">{{ t('library.upload.booksAdded', { count: doneCount }, doneCount) }}</span>
           </div>
           <div class="flex items-center gap-2">
             <button
               class="px-3 py-1.5 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               @click="handleClose"
             >
-              Close
+              {{ t('common.close') }}
             </button>
             <button
               class="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
               @click="goToLibrary"
             >
-              View in Library
+              {{ t('library.upload.viewInLibrary') }}
             </button>
           </div>
         </div>
 
         <!-- Footer: normal / partial error state -->
         <div v-else class="shrink-0 px-5 py-4 border-t border-border flex items-center justify-between gap-3">
-          <span v-if="allDone && errorCount > 0" class="text-xs text-muted-foreground"> {{ doneCount }} uploaded, {{ errorCount }} failed </span>
-          <span v-else-if="isUploading" class="text-xs text-muted-foreground tabular-nums"> {{ doneCount }} of {{ files.length }} uploading... </span>
+          <span v-if="allDone && errorCount > 0" class="text-xs text-muted-foreground">
+            {{ t('library.upload.uploadedFailed', { done: doneCount, failed: errorCount }) }}
+          </span>
+          <span v-else-if="isUploading" class="text-xs text-muted-foreground tabular-nums">
+            {{ t('library.upload.progress', { done: doneCount, total: files.length }) }}
+          </span>
           <span v-else class="text-xs text-muted-foreground" />
 
           <div class="flex items-center gap-2">
@@ -379,7 +389,7 @@ function formatPillClass(filename: string): string {
               class="px-3 py-1.5 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               @click="handleClose"
             >
-              {{ allDone ? 'Close' : 'Cancel' }}
+              {{ allDone ? t('common.close') : t('common.cancel') }}
             </button>
             <button
               class="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
@@ -387,7 +397,7 @@ function formatPillClass(filename: string): string {
               @click="handleUpload"
             >
               <Upload :size="13" />
-              Upload{{ pendingCount > 0 ? ` (${pendingCount})` : '' }}
+              {{ pendingCount > 0 ? t('library.upload.uploadWithCount', { count: pendingCount }) : t('library.upload.upload') }}
             </button>
           </div>
         </div>

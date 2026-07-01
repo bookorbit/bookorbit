@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { ScanProgressEvent } from '@bookorbit/types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   progress: ScanProgressEvent | undefined
@@ -15,8 +18,8 @@ const pct = computed(() => {
 const label = computed(() => {
   if (!props.progress) return ''
   const p = props.progress
-  const parts = [`${p.processed.toLocaleString()}/${p.total.toLocaleString()} files`]
-  if (p.added > 0) parts.push(`${p.added} ${p.added === 1 ? 'book' : 'books'} found`)
+  const parts = [t('scanner.filesProgress', { processed: p.processed.toLocaleString(), total: p.total.toLocaleString() })]
+  if (p.added > 0) parts.push(t('scanner.booksFound', { count: p.added }, p.added))
   return parts.join(' · ')
 })
 </script>

@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Plus, Trash2, RefreshCw, FolderOpen, AlertTriangle, CheckCircle2, XCircle, Loader2 } from '@lucide/vue'
 import type { PrescanResult } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import FolderPickerModal from './FolderPickerModal.vue'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   folders: string[]
@@ -84,8 +87,8 @@ function onManualKeydown(e: KeyboardEvent) {
 <template>
   <div class="px-6 py-6 space-y-6">
     <div>
-      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-1">Scan folders</p>
-      <p class="text-xs text-muted-foreground mb-3">Add one or more directories to scan for books.</p>
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-1">{{ t('library.creator.folders.title') }}</p>
+      <p class="text-xs text-muted-foreground mb-3">{{ t('library.creator.folders.description') }}</p>
 
       <!-- Browse button -->
       <button
@@ -93,18 +96,18 @@ function onManualKeydown(e: KeyboardEvent) {
         @click="pickerOpen = true"
       >
         <Plus :size="15" class="shrink-0" />
-        Browse and add a folder
+        {{ t('library.creator.folders.browseAdd') }}
       </button>
 
       <!-- Manual entry -->
       <div class="mt-3">
-        <p class="text-xs text-muted-foreground mb-2">Or enter a path manually:</p>
+        <p class="text-xs text-muted-foreground mb-2">{{ t('library.creator.folders.manualEntry') }}</p>
         <div class="flex gap-2">
           <div class="relative flex-1">
             <input
               v-model="manualPath"
               type="text"
-              placeholder="/path/to/books"
+              :placeholder="t('library.creator.folders.pathPlaceholder')"
               class="w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground font-mono placeholder:text-muted-foreground/60 placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
               :class="testResult === 'ok' ? 'border-emerald-500' : testResult === 'error' ? 'border-destructive' : 'border-border'"
               @input="onManualInput"
@@ -123,7 +126,7 @@ function onManualKeydown(e: KeyboardEvent) {
             @click="testPath"
           >
             <Loader2 v-if="testLoading" :size="12" class="animate-spin" />
-            Test
+            {{ t('library.creator.folders.test') }}
           </button>
           <button
             class="flex items-center gap-1.5 px-3 py-2 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity shrink-0 disabled:opacity-50"
@@ -131,11 +134,13 @@ function onManualKeydown(e: KeyboardEvent) {
             @click="addManual"
           >
             <Plus :size="12" />
-            Add
+            {{ t('library.creator.folders.add') }}
           </button>
         </div>
-        <p v-if="testResult === 'error'" class="mt-1.5 text-xs text-destructive">Path is not accessible on the server.</p>
-        <p v-else-if="testResult === 'ok'" class="mt-1.5 text-xs text-emerald-600 dark:text-emerald-400">Path is accessible.</p>
+        <p v-if="testResult === 'error'" class="mt-1.5 text-xs text-destructive">{{ t('library.creator.folders.pathNotAccessible') }}</p>
+        <p v-else-if="testResult === 'ok'" class="mt-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+          {{ t('library.creator.folders.pathAccessible') }}
+        </p>
       </div>
 
       <!-- Folder list -->
@@ -156,16 +161,16 @@ function onManualKeydown(e: KeyboardEvent) {
           <div v-if="prescanStatusFor(folder)" class="mt-2 ml-6">
             <div v-if="!prescanStatusFor(folder)!.accessible" class="flex items-center gap-1.5 text-xs text-destructive">
               <XCircle :size="12" />
-              Path is not accessible
+              {{ t('library.creator.folders.pathNotAccessibleShort') }}
             </div>
             <div v-else class="flex items-center gap-3 text-xs text-muted-foreground">
               <span class="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                 <CheckCircle2 :size="12" />
-                {{ prescanStatusFor(folder)!.fileCount }} book file{{ prescanStatusFor(folder)!.fileCount === 1 ? '' : 's' }} found
+                {{ t('library.creator.folders.bookFilesFound', { count: prescanStatusFor(folder)!.fileCount }, prescanStatusFor(folder)!.fileCount) }}
               </span>
               <span v-if="prescanStatusFor(folder)!.overlapLibrary" class="flex items-center gap-1 text-amber-600 dark:text-amber-400">
                 <AlertTriangle :size="12" />
-                Overlaps with "{{ prescanStatusFor(folder)!.overlapLibrary }}"
+                {{ t('library.creator.folders.overlapsWith', { library: prescanStatusFor(folder)!.overlapLibrary }) }}
               </span>
             </div>
           </div>
@@ -173,24 +178,23 @@ function onManualKeydown(e: KeyboardEvent) {
 
         <div v-if="folders.length === 0" class="rounded-lg border border-dashed border-border px-4 py-6 text-center">
           <FolderOpen :size="22" class="text-muted-foreground/60 mx-auto mb-2" />
-          <p class="text-xs text-muted-foreground">No folders added yet</p>
+          <p class="text-xs text-muted-foreground">{{ t('library.creator.folders.noneAdded') }}</p>
         </div>
       </div>
 
       <!-- Prescan button -->
       <div class="flex items-center justify-between mt-4 pt-4 border-t border-border">
         <div v-if="prescanResult" class="text-xs text-muted-foreground">
-          {{ prescanResult.totalFiles }} book file{{ prescanResult.totalFiles === 1 ? '' : 's' }} found - actual book count may be lower if multiple
-          formats of the same book exist
+          {{ t('library.creator.folders.totalFilesFound', { count: prescanResult.totalFiles }, prescanResult.totalFiles) }}
         </div>
-        <div v-else class="text-xs text-muted-foreground">Run a prescan to validate paths before saving.</div>
+        <div v-else class="text-xs text-muted-foreground">{{ t('library.creator.folders.runPrescanHint') }}</div>
         <button
           class="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
           :disabled="folders.length === 0 || prescanLoading"
           @click="emit('prescan')"
         >
           <RefreshCw :size="12" :class="prescanLoading ? 'animate-spin' : ''" />
-          {{ prescanLoading ? 'Scanning…' : 'Prescan' }}
+          {{ prescanLoading ? t('library.creator.folders.scanning') : t('library.creator.folders.prescan') }}
         </button>
       </div>
     </div>

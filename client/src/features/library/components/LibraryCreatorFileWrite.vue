@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
 const props = defineProps<{
   fileRenameEnabled: boolean
   fileWriteEnabled: boolean
@@ -90,7 +94,7 @@ function onAudioMaxSizeInput(e: Event) {
   <div class="px-6 py-6 space-y-6">
     <div>
       <div class="flex items-center justify-between mb-1">
-        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">Rename files on metadata update</p>
+        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">{{ t('library.creator.fileWrite.rename.title') }}</p>
         <button
           class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none"
           :class="fileRenameEnabled ? 'bg-primary' : 'bg-muted-foreground/30'"
@@ -105,13 +109,13 @@ function onAudioMaxSizeInput(e: Event) {
         </button>
       </div>
       <p class="text-xs text-muted-foreground">
-        When enabled, updating title, author, series, or year will rename the physical file using the library naming pattern.
+        {{ t('library.creator.fileWrite.rename.hint') }}
       </p>
     </div>
 
     <div>
       <div class="flex items-center justify-between mb-1">
-        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">Write metadata to files</p>
+        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">{{ t('library.creator.fileWrite.write.title') }}</p>
         <button
           class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none"
           :class="fileWriteEnabled ? 'bg-primary' : 'bg-muted-foreground/30'"
@@ -125,14 +129,14 @@ function onAudioMaxSizeInput(e: Event) {
           />
         </button>
       </div>
-      <p class="text-xs text-muted-foreground">When enabled, saving metadata will also write changes back into the physical file on disk.</p>
+      <p class="text-xs text-muted-foreground">{{ t('library.creator.fileWrite.write.hint') }}</p>
     </div>
 
     <template v-if="fileWriteEnabled">
       <div class="flex items-center justify-between">
         <div>
-          <p class="text-sm font-medium text-foreground">Include cover image</p>
-          <p class="text-xs text-muted-foreground mt-0.5">Writes the stored cover back into supported file formats.</p>
+          <p class="text-sm font-medium text-foreground">{{ t('library.creator.fileWrite.cover.title') }}</p>
+          <p class="text-xs text-muted-foreground mt-0.5">{{ t('library.creator.fileWrite.cover.hint') }}</p>
         </div>
         <button
           class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none"
@@ -153,8 +157,8 @@ function onAudioMaxSizeInput(e: Event) {
       <div class="space-y-3">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-foreground">EPUB</p>
-            <p class="text-xs text-muted-foreground mt-0.5">Writes metadata into the OPF file inside the EPUB archive.</p>
+            <p class="text-sm font-medium text-foreground">{{ t('library.creator.fileWrite.epub.title') }}</p>
+            <p class="text-xs text-muted-foreground mt-0.5">{{ t('library.creator.fileWrite.epub.hint') }}</p>
           </div>
           <button
             class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none"
@@ -170,7 +174,7 @@ function onAudioMaxSizeInput(e: Event) {
           </button>
         </div>
         <div v-if="fileWriteEpubEnabled" class="flex items-center justify-between gap-4">
-          <p class="text-xs text-muted-foreground">Max file size (MB)</p>
+          <p class="text-xs text-muted-foreground">{{ t('library.creator.fileWrite.maxFileSizeMb') }}</p>
           <input
             type="number"
             :value="fileWriteEpubMaxFileSizeMb"
@@ -185,8 +189,8 @@ function onAudioMaxSizeInput(e: Event) {
       <div class="space-y-3">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-foreground">PDF</p>
-            <p class="text-xs text-muted-foreground mt-0.5">Embeds metadata into PDF Info dictionary and XMP stream.</p>
+            <p class="text-sm font-medium text-foreground">{{ t('library.creator.fileWrite.pdf.title') }}</p>
+            <p class="text-xs text-muted-foreground mt-0.5">{{ t('library.creator.fileWrite.pdf.hint') }}</p>
           </div>
           <button
             class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none"
@@ -202,7 +206,7 @@ function onAudioMaxSizeInput(e: Event) {
           </button>
         </div>
         <div v-if="fileWritePdfEnabled" class="flex items-center justify-between gap-4">
-          <p class="text-xs text-muted-foreground">Max file size (MB)</p>
+          <p class="text-xs text-muted-foreground">{{ t('library.creator.fileWrite.maxFileSizeMb') }}</p>
           <input
             type="number"
             :value="fileWritePdfMaxFileSizeMb"
@@ -217,8 +221,8 @@ function onAudioMaxSizeInput(e: Event) {
       <div class="space-y-3">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-foreground">Comic archives (CBX)</p>
-            <p class="text-xs text-muted-foreground mt-0.5">Writes ComicInfo.xml into CBZ and CB7 archives.</p>
+            <p class="text-sm font-medium text-foreground">{{ t('library.creator.fileWrite.cbx.title') }}</p>
+            <p class="text-xs text-muted-foreground mt-0.5">{{ t('library.creator.fileWrite.cbx.hint') }}</p>
           </div>
           <button
             class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none"
@@ -234,7 +238,7 @@ function onAudioMaxSizeInput(e: Event) {
           </button>
         </div>
         <div v-if="fileWriteCbxEnabled" class="flex items-center justify-between gap-4">
-          <p class="text-xs text-muted-foreground">Max file size (MB)</p>
+          <p class="text-xs text-muted-foreground">{{ t('library.creator.fileWrite.maxFileSizeMb') }}</p>
           <input
             type="number"
             :value="fileWriteCbxMaxFileSizeMb"
@@ -249,8 +253,8 @@ function onAudioMaxSizeInput(e: Event) {
       <div v-if="fileWriteWriteCover" class="space-y-3">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-foreground">Audio</p>
-            <p class="text-xs text-muted-foreground mt-0.5">Embeds the stored cover into M4B, M4A, MP3, and FLAC files.</p>
+            <p class="text-sm font-medium text-foreground">{{ t('library.creator.fileWrite.audio.title') }}</p>
+            <p class="text-xs text-muted-foreground mt-0.5">{{ t('library.creator.fileWrite.audio.hint') }}</p>
           </div>
           <button
             class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none"
@@ -266,7 +270,7 @@ function onAudioMaxSizeInput(e: Event) {
           </button>
         </div>
         <div v-if="fileWriteAudioEnabled" class="flex items-center justify-between gap-4">
-          <p class="text-xs text-muted-foreground">Max file size (MB)</p>
+          <p class="text-xs text-muted-foreground">{{ t('library.creator.fileWrite.maxFileSizeMb') }}</p>
           <input
             type="number"
             :value="fileWriteAudioMaxFileSizeMb"

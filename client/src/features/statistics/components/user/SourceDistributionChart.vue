@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { MonitorSmartphone } from '@lucide/vue'
 import { READING_SESSION_SOURCE_BUCKET_LABELS } from '@bookorbit/types'
@@ -9,6 +10,8 @@ import { useThemeStore } from '@/stores/theme'
 import { resolveSourceBucketColors } from '../../lib/source-bucket-colors'
 import { useUserReadingSourceDistribution } from '../../composables/useUserReadingSourceDistribution'
 import ChartCard from '../ChartCard.vue'
+
+const { t } = useI18n()
 
 const themeStore = useThemeStore()
 const { data, loading, error } = useUserReadingSourceDistribution()
@@ -70,14 +73,14 @@ watchEffect(() => {
 
 <template>
   <ChartCard
-    title="Where You Read"
+    :title="t('statistics.charts.sourceDistribution.title')"
     :icon="MonitorSmartphone"
     :color-index="6"
     :loading
     :error
     :empty="isEmpty"
-    empty-title="No reading activity yet"
-    empty-description="Read on the web, KOReader, or Kobo to see your source split."
+    :empty-title="t('statistics.charts.sourceDistribution.emptyTitle')"
+    :empty-description="t('statistics.charts.sourceDistribution.emptyDescription')"
   >
     <VChart :option autoresize style="height: 100%" />
   </ChartCard>

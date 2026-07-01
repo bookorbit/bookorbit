@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import type { CompletionStatus } from '../types/series'
+
+const { t } = useI18n()
 
 defineProps<{
   libraryId: number | null
@@ -39,21 +42,21 @@ function onCompletionChange(event: Event) {
 <template>
   <section :class="embedded ? 'rounded-md border border-border bg-card p-3' : 'mb-4 rounded-md border border-border bg-card p-3'">
     <div v-if="!embedded" class="mb-3 flex items-center justify-between">
-      <span class="text-xs font-medium text-muted-foreground">Series Filters</span>
+      <span class="text-xs font-medium text-muted-foreground">{{ t('series.filters.title') }}</span>
       <div class="flex items-center gap-2">
         <button
           v-if="(activeCount ?? 0) > 0"
           class="h-7 rounded-md border border-input px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           @click="onClear"
         >
-          Clear all
+          {{ t('series.filters.clearAll') }}
         </button>
         <button
           v-if="closable"
           class="h-7 rounded-md border border-input px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           @click="onClose"
         >
-          Close
+          {{ t('common.close') }}
         </button>
       </div>
     </div>
@@ -64,7 +67,7 @@ function onCompletionChange(event: Event) {
         class="h-9 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60"
         @change="onLibraryChange"
       >
-        <option value="">All Libraries</option>
+        <option value="">{{ t('series.filters.allLibraries') }}</option>
         <option v-for="library in libraries" :key="library.id" :value="library.id">{{ library.name }}</option>
       </select>
 
@@ -73,10 +76,10 @@ function onCompletionChange(event: Event) {
         class="h-9 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60"
         @change="onCompletionChange"
       >
-        <option value="">All completion</option>
-        <option value="not_started">Not started</option>
-        <option value="in_progress">In progress</option>
-        <option value="complete">Complete</option>
+        <option value="">{{ t('series.filters.allCompletion') }}</option>
+        <option value="not_started">{{ t('series.filters.notStarted') }}</option>
+        <option value="in_progress">{{ t('series.filters.inProgress') }}</option>
+        <option value="complete">{{ t('series.filters.complete') }}</option>
       </select>
     </div>
   </section>

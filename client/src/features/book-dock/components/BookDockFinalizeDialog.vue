@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { X, Check, AlertCircle, Copy, Loader2, ExternalLink, ChevronDown, FileText } from '@lucide/vue'
 
 import { api } from '@/lib/api'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useBookDockFinalize } from '../composables/useBookDockFinalize'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   selectionPayload: { fileIds?: number[]; selectAll?: boolean; excludedIds?: number[]; status?: string; search?: string }
@@ -242,7 +245,7 @@ async function handleReimportDuplicate(fileId: number) {
       <div class="relative z-10 w-full max-w-2xl mx-4 bg-card border border-border rounded-lg shadow-2xl overflow-hidden">
         <div class="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 class="text-base font-semibold text-foreground">
-            {{ result ? 'Finalize Results' : `Finalize ${selectionCount} file${selectionCount === 1 ? '' : 's'}` }}
+            {{ result ? t('bookDock.finalizeDialog.resultTitle') : t('bookDock.finalizeDialog.title', { count: selectionCount }, selectionCount) }}
           </h2>
           <button
             class="size-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
@@ -257,15 +260,22 @@ async function handleReimportDuplicate(fileId: number) {
             <p class="text-xs text-muted-foreground">
               {{
                 requiresDefaultDestination
-                  ? `${selectionSummary.withoutDestination} of ${selectionSummary.total} selected file${selectionSummary.total === 1 ? '' : 's'} need a destination`
-                  : 'All selected files already have destination set'
+                  ? t(
+                      'bookDock.finalizeDialog.needDestination',
+                      {
+                        count: selectionSummary.total,
+                        without: selectionSummary.withoutDestination,
+                      },
+                      selectionSummary.total,
+                    )
+                  : t('bookDock.finalizeDialog.allHaveDestination')
               }}
             </p>
           </div>
 
           <div v-if="requiresDefaultDestination" class="space-y-3">
             <label class="block">
-              <span class="text-xs font-medium text-muted-foreground">Default Destination Library</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.finalizeDialog.defaultDestinationLibrary') }}</span>
               <select
                 class="mt-1 w-full h-9 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
                 :value="defaultLibraryId ?? ''"
@@ -276,7 +286,7 @@ async function handleReimportDuplicate(fileId: number) {
             </label>
 
             <label class="block">
-              <span class="text-xs font-medium text-muted-foreground">Default Destination Folder</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.finalizeDialog.defaultDestinationFolder') }}</span>
               <select
                 class="mt-1 w-full h-9 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
                 :value="defaultFolderId ?? ''"
@@ -290,15 +300,15 @@ async function handleReimportDuplicate(fileId: number) {
           <div v-if="namePreview.length || previewLoading" class="space-y-1.5">
             <div class="flex items-center gap-1.5">
               <FileText class="size-3.5 text-muted-foreground" />
-              <span class="text-xs font-medium text-muted-foreground">Rename preview</span>
-              <span v-if="previewLoading" class="text-xs text-muted-foreground italic">Loading...</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.finalizeDialog.renamePreview') }}</span>
+              <span v-if="previewLoading" class="text-xs text-muted-foreground italic">{{ t('common.loading') }}</span>
             </div>
             <div class="rounded-lg border border-border bg-muted/20 divide-y divide-border max-h-48 overflow-y-auto">
               <div v-for="p in namePreview.slice(0, 8)" :key="p.fileId" class="px-3 py-1.5 text-xs">
                 <span class="text-foreground font-medium font-mono break-all">{{ p.newName }}</span>
               </div>
               <div v-if="namePreview.length > 8" class="px-3 py-1.5 text-xs text-muted-foreground italic">
-                +{{ namePreview.length - 8 }} more files
+                {{ t('bookDock.finalizeDialog.moreFiles', { count: namePreview.length - 8 }) }}
               </div>
             </div>
           </div>
@@ -307,7 +317,7 @@ async function handleReimportDuplicate(fileId: number) {
 
           <div class="flex items-center justify-end gap-2 pt-2">
             <button class="h-8 px-4 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-all" @click="handleClose">
-              Cancel
+              {{ t('common.cancel') }}
             </button>
             <button
               class="flex items-center gap-1.5 h-8 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
@@ -315,7 +325,7 @@ async function handleReimportDuplicate(fileId: number) {
               @click="start"
             >
               <Loader2 v-if="loading" class="size-3.5 animate-spin" />
-              Start
+              {{ t('bookDock.finalizeDialog.start') }}
             </button>
           </div>
         </div>
@@ -325,9 +335,15 @@ async function handleReimportDuplicate(fileId: number) {
             <Check v-if="result.failed === 0" class="size-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <AlertCircle v-else class="size-5 text-amber-600 dark:text-amber-400 shrink-0" />
             <div>
-              <p class="text-sm font-medium">{{ result.succeeded }} of {{ result.total }} files finalized</p>
+              <p class="text-sm font-medium">
+                {{ t('bookDock.finalizeDialog.filesFinalized', { succeeded: result.succeeded, total: result.total }) }}
+              </p>
               <p v-if="result.failed > 0" class="text-xs text-muted-foreground mt-0.5">
-                {{ result.failed }} failed{{ duplicateCount > 0 ? ` (${duplicateCount} duplicate${duplicateCount !== 1 ? 's' : ''})` : '' }}
+                {{
+                  duplicateCount > 0
+                    ? t('bookDock.finalizeDialog.failedWithDuplicates', { failed: result.failed, count: duplicateCount }, duplicateCount)
+                    : t('bookDock.nFailed', { count: result.failed })
+                }}
               </p>
             </div>
           </div>
@@ -349,14 +365,14 @@ async function handleReimportDuplicate(fileId: number) {
                   class="text-xs text-primary hover:underline flex items-center gap-1 shrink-0"
                   @click="goToBook(r.bookId!)"
                 >
-                  View <ExternalLink class="size-3" />
+                  {{ t('bookDock.finalizeDialog.view') }} <ExternalLink class="size-3" />
                 </button>
                 <button
                   v-if="!r.success && r.isDuplicate && r.existingBookId"
                   class="text-xs text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 shrink-0"
                   @click="goToBook(r.existingBookId!)"
                 >
-                  View existing <ExternalLink class="size-3" />
+                  {{ t('bookDock.finalizeDialog.viewExisting') }} <ExternalLink class="size-3" />
                 </button>
                 <button
                   v-if="!r.success && r.isDuplicate"
@@ -365,24 +381,24 @@ async function handleReimportDuplicate(fileId: number) {
                   @click="handleReimportDuplicate(r.fileId)"
                 >
                   <Loader2 v-if="reimportingIds.has(r.fileId)" class="size-3 animate-spin" />
-                  Import anyway
+                  {{ t('bookDock.finalizeDialog.importAnyway') }}
                 </button>
                 <button
                   v-if="!r.success && !r.isDuplicate && r.message && !isFileExistsError(r.message)"
                   class="text-xs text-red-500 flex items-center gap-1 shrink-0 hover:text-red-600 transition-colors"
                   @click="expandedErrors.has(r.fileId) ? expandedErrors.delete(r.fileId) : expandedErrors.add(r.fileId)"
                 >
-                  {{ expandedErrors.has(r.fileId) ? 'Hide' : 'Details' }}
+                  {{ expandedErrors.has(r.fileId) ? t('bookDock.finalizeDialog.hide') : t('bookDock.finalizeDialog.details') }}
                   <ChevronDown class="size-3 transition-transform" :class="expandedErrors.has(r.fileId) ? 'rotate-180' : ''" />
                 </button>
               </div>
               <div v-if="!r.success && isFileExistsError(r.message)" class="px-3 pb-2.5">
                 <div class="flex items-center gap-1.5">
-                  <span class="text-xs text-muted-foreground shrink-0">Already exists - save as:</span>
+                  <span class="text-xs text-muted-foreground shrink-0">{{ t('bookDock.finalizeDialog.alreadyExistsSaveAs') }}</span>
                   <input
                     type="text"
                     :value="getRenameInput(r.fileId)"
-                    :placeholder="'e.g. ' + r.fileName.replace(/\.[^.]+$/, '') + ' (2)'"
+                    :placeholder="t('bookDock.finalizeDialog.renamePlaceholder', { name: r.fileName.replace(/\.[^.]+$/, '') })"
                     class="flex-1 min-w-0 h-7 rounded-md border border-input bg-background px-2 text-xs outline-none focus:ring-1 focus:ring-ring"
                     @input="setRenameInput(r.fileId, ($event.target as HTMLInputElement).value)"
                   />
@@ -393,7 +409,7 @@ async function handleReimportDuplicate(fileId: number) {
                     @click="handleRenameAndRetry(r.fileId)"
                   >
                     <Loader2 v-if="reimportingIds.has(r.fileId)" class="size-3 animate-spin" />
-                    Import
+                    {{ t('bookDock.finalizeDialog.import') }}
                   </button>
                 </div>
               </div>
@@ -408,7 +424,7 @@ async function handleReimportDuplicate(fileId: number) {
               class="h-8 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium transition-all hover:opacity-90 active:scale-95"
               @click="handleClose"
             >
-              Done
+              {{ t('bookDock.done') }}
             </button>
           </div>
         </div>

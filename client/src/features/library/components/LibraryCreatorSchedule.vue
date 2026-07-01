@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Eye } from '@lucide/vue'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   watch: boolean
@@ -12,21 +15,21 @@ const emit = defineEmits<{
   'update:autoScanCronExpression': [value: string | null]
 }>()
 
-const PRESETS = [
-  { label: 'Never', value: null },
-  { label: 'Every hour', value: '0 * * * *' },
-  { label: 'Every 6 hours', value: '0 */6 * * *' },
-  { label: 'Every 12 hours', value: '0 */12 * * *' },
-  { label: 'Daily', value: '0 0 * * *' },
-  { label: 'Weekly', value: '0 0 * * 1' },
-  { label: 'Custom', value: '__custom__' },
-]
+const presets = computed(() => [
+  { label: t('library.creator.schedule.presets.never'), value: null },
+  { label: t('library.creator.schedule.presets.hourly'), value: '0 * * * *' },
+  { label: t('library.creator.schedule.presets.every6Hours'), value: '0 */6 * * *' },
+  { label: t('library.creator.schedule.presets.every12Hours'), value: '0 */12 * * *' },
+  { label: t('library.creator.schedule.presets.daily'), value: '0 0 * * *' },
+  { label: t('library.creator.schedule.presets.weekly'), value: '0 0 * * 1' },
+  { label: t('library.creator.schedule.presets.custom'), value: '__custom__' },
+])
 
 const CRON_REGEX = /^((\*|\d+(-\d+)?(,\d+(-\d+)?)*)(\/\d+)? ){4}(\*|\d+(-\d+)?(,\d+(-\d+)?)*)(\/\d+)?$/
 
 const isCustom = computed(() => {
   if (props.autoScanCronExpression === null) return false
-  return !PRESETS.some((p) => p.value === props.autoScanCronExpression)
+  return !presets.value.some((p) => p.value === props.autoScanCronExpression)
 })
 
 const isCronValid = computed(() => {
@@ -49,15 +52,15 @@ function selectPreset(value: string | null) {
 }
 
 function humanReadableCron(cron: string | null): string {
-  if (!cron) return 'Auto-scan disabled'
+  if (!cron) return t('library.creator.schedule.human.disabled')
   const map: Record<string, string> = {
-    '0 * * * *': 'Every hour',
-    '0 */6 * * *': 'Every 6 hours',
-    '0 */12 * * *': 'Every 12 hours',
-    '0 0 * * *': 'Daily at midnight',
-    '0 0 * * 1': 'Weekly on Monday at midnight',
+    '0 * * * *': t('library.creator.schedule.human.hourly'),
+    '0 */6 * * *': t('library.creator.schedule.human.every6Hours'),
+    '0 */12 * * *': t('library.creator.schedule.human.every12Hours'),
+    '0 0 * * *': t('library.creator.schedule.human.dailyMidnight'),
+    '0 0 * * 1': t('library.creator.schedule.human.weeklyMonday'),
   }
-  return map[cron] ?? `Cron: ${cron}`
+  return map[cron] ?? t('library.creator.schedule.human.cron', { cron })
 }
 </script>
 
@@ -65,12 +68,12 @@ function humanReadableCron(cron: string | null): string {
   <div class="px-6 py-6 space-y-8">
     <!-- Watch folders -->
     <div>
-      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-3">File watching</p>
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-3">{{ t('library.creator.schedule.fileWatching') }}</p>
       <div class="rounded-lg border border-border overflow-hidden divide-y divide-border">
         <label class="flex items-center justify-between px-5 py-4 bg-card cursor-pointer">
           <div>
-            <p class="text-sm font-medium text-foreground">Watch folders</p>
-            <p class="text-xs text-muted-foreground mt-0.5">Automatically detect new files added to library folders.</p>
+            <p class="text-sm font-medium text-foreground">{{ t('library.creator.schedule.watchFolders.title') }}</p>
+            <p class="text-xs text-muted-foreground mt-0.5">{{ t('library.creator.schedule.watchFolders.hint') }}</p>
           </div>
           <button
             role="switch"
@@ -90,10 +93,10 @@ function humanReadableCron(cron: string | null): string {
 
     <!-- Auto-scan schedule -->
     <div>
-      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-3">Auto-scan schedule</p>
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-3">{{ t('library.creator.schedule.autoScanSchedule') }}</p>
       <div class="grid grid-cols-3 gap-2 mb-4">
         <button
-          v-for="preset in PRESETS"
+          v-for="preset in presets"
           :key="String(preset.value)"
           class="px-3 py-2 rounded-lg border text-xs font-medium transition-colors"
           :class="
@@ -109,7 +112,7 @@ function humanReadableCron(cron: string | null): string {
 
       <!-- Custom cron input -->
       <div v-if="isCustom || selectedPreset === '__custom__'" class="mt-2">
-        <label class="block text-xs font-medium text-muted-foreground mb-1.5">Cron expression</label>
+        <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('library.creator.schedule.cronExpression') }}</label>
         <input
           type="text"
           :value="autoScanCronExpression ?? ''"
@@ -118,8 +121,8 @@ function humanReadableCron(cron: string | null): string {
           :class="isCronValid ? 'border-border focus:ring-ring' : 'border-destructive focus:ring-destructive'"
           @input="emit('update:autoScanCronExpression', ($event.target as HTMLInputElement).value || null)"
         />
-        <p v-if="!isCronValid" class="mt-1 text-xs text-destructive">Invalid cron expression.</p>
-        <p v-else class="mt-1 text-xs text-muted-foreground">Format: minute hour day month weekday</p>
+        <p v-if="!isCronValid" class="mt-1 text-xs text-destructive">{{ t('library.creator.schedule.cronInvalid') }}</p>
+        <p v-else class="mt-1 text-xs text-muted-foreground">{{ t('library.creator.schedule.cronFormat') }}</p>
       </div>
 
       <!-- Human readable preview -->

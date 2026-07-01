@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { X, BookOpen, Check, Trash2, Sparkles, ArrowLeft, Wand2, AlertCircle } from '@lucide/vue'
 import type { BookDockFile, BookDockMetadata, MetadataCandidate, MetadataSource, MetadataProviderKey } from '@bookorbit/types'
 import BookDockStatusBadge from './BookDockStatusBadge.vue'
@@ -11,6 +12,8 @@ import { useMetadataSearch } from '@/features/book/composables/useMetadataSearch
 import type { MetadataPatch } from '@/features/book/composables/useMetadataDiff'
 import { formatBytes } from '@/lib/formatting'
 import { toDisplayCoverUrl } from '@/features/book/lib/metadata-fetch'
+
+const { t } = useI18n()
 
 const props = defineProps<{ file: BookDockFile }>()
 
@@ -364,7 +367,7 @@ onMounted(() => {
         </div>
         <div v-if="saved" class="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
           <Check class="size-3.5" />
-          Saved
+          {{ t('bookDock.sheet.saved') }}
         </div>
       </div>
 
@@ -384,19 +387,19 @@ onMounted(() => {
           <div v-if="hasFetchedMetadata" class="flex items-center gap-2.5 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
             <Wand2 class="size-4 text-amber-600 dark:text-amber-400 shrink-0" />
             <p class="flex-1 text-sm text-amber-700 dark:text-amber-300">
-              {{ file.metadataEditedAt ? 'Provider metadata found - bulk apply will skip this file (you have edits)' : 'Provider metadata found' }}
+              {{ file.metadataEditedAt ? t('bookDock.sheet.providerMetadataFoundEdited') : t('bookDock.sheet.providerMetadataFound') }}
             </p>
             <button
               class="shrink-0 flex items-center gap-1.5 h-7 px-3 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-medium hover:bg-amber-500/20 transition-all active:scale-95"
               @click="openFetchedDiff"
             >
-              Review
+              {{ t('bookDock.sheet.review') }}
             </button>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label class="sm:col-span-2">
-              <span class="text-xs font-medium text-muted-foreground">Title</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.title') }}</span>
               <input
                 v-model="form.title"
                 class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
@@ -404,7 +407,7 @@ onMounted(() => {
               />
             </label>
             <label class="sm:col-span-2">
-              <span class="text-xs font-medium text-muted-foreground">Subtitle</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.subtitle') }}</span>
               <input
                 v-model="form.subtitle"
                 class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
@@ -412,7 +415,7 @@ onMounted(() => {
               />
             </label>
             <label class="sm:col-span-2">
-              <span class="text-xs font-medium text-muted-foreground">Authors (comma-separated)</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.authorsCommaSeparated') }}</span>
               <input
                 v-model="form.authors"
                 class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
@@ -420,7 +423,7 @@ onMounted(() => {
               />
             </label>
             <label>
-              <span class="text-xs font-medium text-muted-foreground">Publisher</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.publisher') }}</span>
               <input
                 v-model="form.publisher"
                 class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
@@ -428,7 +431,7 @@ onMounted(() => {
               />
             </label>
             <label>
-              <span class="text-xs font-medium text-muted-foreground">Year</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.year') }}</span>
               <input
                 v-model="form.publishedYear"
                 class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
@@ -436,7 +439,7 @@ onMounted(() => {
               />
             </label>
             <label>
-              <span class="text-xs font-medium text-muted-foreground">Language</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.language') }}</span>
               <input
                 v-model="form.language"
                 class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
@@ -444,7 +447,7 @@ onMounted(() => {
               />
             </label>
             <label>
-              <span class="text-xs font-medium text-muted-foreground">ISBN-13</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.isbn13') }}</span>
               <input
                 v-model="form.isbn13"
                 class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm font-mono outline-none focus:ring-1 focus:ring-ring"
@@ -452,7 +455,7 @@ onMounted(() => {
               />
             </label>
             <label>
-              <span class="text-xs font-medium text-muted-foreground">ISBN-10</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.isbn10') }}</span>
               <input
                 v-model="form.isbn10"
                 class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm font-mono outline-none focus:ring-1 focus:ring-ring"
@@ -460,7 +463,7 @@ onMounted(() => {
               />
             </label>
             <label>
-              <span class="text-xs font-medium text-muted-foreground">Series</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.series') }}</span>
               <input
                 v-model="form.seriesName"
                 class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
@@ -468,7 +471,7 @@ onMounted(() => {
               />
             </label>
             <label>
-              <span class="text-xs font-medium text-muted-foreground">Series #</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.seriesIndex') }}</span>
               <input
                 v-model="form.seriesIndex"
                 class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
@@ -476,7 +479,7 @@ onMounted(() => {
               />
             </label>
             <label class="sm:col-span-2">
-              <span class="text-xs font-medium text-muted-foreground">Genres (comma-separated)</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.genresCommaSeparated') }}</span>
               <input
                 v-model="form.genres"
                 class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
@@ -484,7 +487,7 @@ onMounted(() => {
               />
             </label>
             <label class="sm:col-span-2">
-              <span class="text-xs font-medium text-muted-foreground">Description</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.description') }}</span>
               <textarea
                 v-model="form.description"
                 rows="3"
@@ -496,7 +499,7 @@ onMounted(() => {
 
           <div class="space-y-3 pt-1">
             <label class="block">
-              <span class="text-xs font-medium text-muted-foreground">Destination Library</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.destinationLibrary') }}</span>
               <select
                 class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
                 :value="targetLibraryId ?? ''"
@@ -506,7 +509,7 @@ onMounted(() => {
               </select>
             </label>
             <label class="block">
-              <span class="text-xs font-medium text-muted-foreground">Destination Folder</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.destinationFolder') }}</span>
               <select
                 class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
                 :value="targetFolderId ?? ''"
@@ -517,7 +520,7 @@ onMounted(() => {
             </label>
           </div>
 
-          <p class="text-xs text-muted-foreground">Added {{ formatDate(file.createdAt) }}</p>
+          <p class="text-xs text-muted-foreground">{{ t('bookDock.sheet.added', { date: formatDate(file.createdAt) }) }}</p>
         </div>
 
         <div class="flex items-center justify-between gap-2 px-4 py-3 border-t border-border shrink-0">
@@ -526,7 +529,7 @@ onMounted(() => {
             @click="handleDiscard"
           >
             <Trash2 class="size-3.5" />
-            Discard
+            {{ t('bookDock.discard') }}
           </button>
           <div class="flex items-center gap-2">
             <button
@@ -538,13 +541,13 @@ onMounted(() => {
               @click="openSearch"
             >
               <Sparkles class="size-3.5" />
-              Search
+              {{ t('common.search') }}
             </button>
             <button
               class="relative h-8 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium transition-all hover:opacity-90 active:scale-95"
               @click="$emit('close')"
             >
-              Done
+              {{ t('bookDock.done') }}
             </button>
           </div>
         </div>
@@ -560,7 +563,7 @@ onMounted(() => {
             <ArrowLeft class="size-4" />
           </button>
           <Sparkles class="size-3.5 text-primary" />
-          <span class="text-sm font-medium">Search Metadata</span>
+          <span class="text-sm font-medium">{{ t('bookDock.sheet.searchMetadata') }}</span>
         </div>
         <div class="flex-1 min-h-0">
           <MetadataSearchPanel
@@ -589,7 +592,7 @@ onMounted(() => {
             :initial-candidate="selectedCandidate"
             :filtered-results="diffSource === 'fetched' ? [selectedCandidate] : filteredResults"
             :providers="providers"
-            :back-label="diffSource === 'fetched' ? 'Back' : 'Results'"
+            :back-label="diffSource === 'fetched' ? t('common.back') : t('bookDock.sheet.results')"
             :current-cover-url="currentBookDockCoverUrl"
             :provider-ids="(file.fetchedMetadataSources as any) ?? undefined"
             @back="backFromDiff"

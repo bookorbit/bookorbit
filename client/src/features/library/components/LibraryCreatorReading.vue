@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
 defineProps<{
   readingThreshold: number
   markAsFinishedPercentComplete: number
@@ -25,10 +29,10 @@ function onFinishPercentInput(e: Event) {
     <!-- Reading start -->
     <div>
       <div class="flex items-center justify-between mb-1">
-        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">Reading start</p>
+        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">{{ t('library.creator.reading.readingStart.title') }}</p>
         <span class="text-sm font-medium text-foreground tabular-nums">{{ readingThreshold }}%</span>
       </div>
-      <p class="text-xs text-muted-foreground mb-3">A book is marked as "reading" once this percentage of progress is reached.</p>
+      <p class="text-xs text-muted-foreground mb-3">{{ t('library.creator.reading.readingStart.hint') }}</p>
       <input type="range" :value="readingThreshold" min="0.05" max="5" step="0.05" class="w-full accent-primary" @input="onReadingThresholdInput" />
       <div class="flex justify-between text-xs text-muted-foreground mt-1">
         <span>0.05%</span>
@@ -39,10 +43,10 @@ function onFinishPercentInput(e: Event) {
     <!-- Mark as finished -->
     <div>
       <div class="flex items-center justify-between mb-1">
-        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">Mark as finished</p>
+        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">{{ t('library.creator.reading.markAsFinished.title') }}</p>
         <span class="text-sm font-medium text-foreground tabular-nums">{{ markAsFinishedPercentComplete }}%</span>
       </div>
-      <p class="text-xs text-muted-foreground mb-3">A book is automatically marked as "read" when this percentage of progress is reached.</p>
+      <p class="text-xs text-muted-foreground mb-3">{{ t('library.creator.reading.markAsFinished.hint') }}</p>
       <input
         type="range"
         :value="markAsFinishedPercentComplete"

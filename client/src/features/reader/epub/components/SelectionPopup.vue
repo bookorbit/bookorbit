@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { BookA, Check, Copy, FileText, Highlighter, Languages, Search, Trash2 } from '@lucide/vue'
 import { ANNOTATION_HIGHLIGHT_COLORS } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { copyToClipboard } from '@/lib/clipboard'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   visible: boolean
@@ -92,7 +95,7 @@ async function onCopy() {
                   <Copy v-else :size="15" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>{{ copied ? 'Copied!' : 'Copy' }}</TooltipContent>
+              <TooltipContent>{{ copied ? t('reader.selection.copied') : t('reader.selection.copy') }}</TooltipContent>
             </Tooltip>
 
             <Tooltip>
@@ -105,7 +108,7 @@ async function onCopy() {
                   <Highlighter :size="15" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Highlight</TooltipContent>
+              <TooltipContent>{{ t('reader.selection.highlight') }}</TooltipContent>
             </Tooltip>
 
             <Tooltip>
@@ -117,7 +120,7 @@ async function onCopy() {
                   <Search :size="15" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Search</TooltipContent>
+              <TooltipContent>{{ t('common.search') }}</TooltipContent>
             </Tooltip>
 
             <Tooltip>
@@ -129,7 +132,7 @@ async function onCopy() {
                   <Languages :size="15" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Translate</TooltipContent>
+              <TooltipContent>{{ t('reader.selection.translate') }}</TooltipContent>
             </Tooltip>
 
             <Tooltip>
@@ -141,7 +144,7 @@ async function onCopy() {
                   <BookA :size="15" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Define</TooltipContent>
+              <TooltipContent>{{ t('reader.selection.define') }}</TooltipContent>
             </Tooltip>
 
             <Tooltip>
@@ -153,7 +156,7 @@ async function onCopy() {
                   <FileText :size="15" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Add note</TooltipContent>
+              <TooltipContent>{{ t('reader.note.title') }}</TooltipContent>
             </Tooltip>
 
             <Tooltip v-if="overlappingAnnotationId !== null">
@@ -165,7 +168,7 @@ async function onCopy() {
                   <Trash2 :size="15" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Delete annotation</TooltipContent>
+              <TooltipContent>{{ t('reader.selection.deleteAnnotation') }}</TooltipContent>
             </Tooltip>
           </div>
 
@@ -199,7 +202,7 @@ async function onCopy() {
                 class="flex-1 ml-1 px-2 py-0.5 rounded text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
                 @click="applyHighlight(selectedColor, selectedStyle)"
               >
-                Apply
+                {{ t('reader.selection.apply') }}
               </button>
             </div>
           </div>

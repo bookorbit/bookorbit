@@ -138,7 +138,7 @@ describe('AddToCollectionSheet', () => {
 
     expect(addBooksToCollectionMock).toHaveBeenCalledWith(2, { bookIds: [1] })
     expect(removeBooksFromCollectionMock).not.toHaveBeenCalled()
-    expect(toastSuccess).toHaveBeenCalledWith('Added 1 book to "Queue"')
+    expect(toastSuccess).toHaveBeenCalledWith('Added one book to "Queue"')
 
     await findButtonByText(wrapper, 'Done').trigger('click')
 
@@ -158,7 +158,7 @@ describe('AddToCollectionSheet', () => {
 
     expect(removeBooksFromCollectionMock).toHaveBeenCalledWith(3, { bookIds: [1] })
     expect(addBooksToCollectionMock).not.toHaveBeenCalled()
-    expect(toastSuccess).toHaveBeenCalledWith('Removed 1 book from "Finished"')
+    expect(toastSuccess).toHaveBeenCalledWith('Removed one book from "Finished"')
 
     await findButtonByText(wrapper, 'Done').trigger('click')
 

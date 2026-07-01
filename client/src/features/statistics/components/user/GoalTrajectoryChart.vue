@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { Goal } from '@lucide/vue'
 
@@ -9,6 +10,8 @@ import ChartEmptyState from '../ChartEmptyState.vue'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const MIN_COMPLETIONS = 2
+
+const { t } = useI18n()
 
 const { data, loading, error } = useUserGoalTrajectory()
 const option = shallowRef({})
@@ -73,18 +76,18 @@ watchEffect(() => {
 </script>
 
 <template>
-  <ChartCard title="Pace vs Goal" :icon="Goal" :color-index="9" :loading :error :empty="isEmpty">
+  <ChartCard :title="t('statistics.charts.goalTrajectory.title')" :icon="Goal" :color-index="9" :loading :error :empty="isEmpty">
     <ChartEmptyState
       v-if="noCompletionsYet"
       :icon="Goal"
-      title="No completed books yet"
-      description="Complete a book in this period to compare your pace against your yearly goal."
+      :title="t('statistics.charts.goalTrajectory.noCompletedTitle')"
+      :description="t('statistics.charts.goalTrajectory.noCompletedDescription')"
     />
     <ChartEmptyState
       v-else-if="lowConfidence"
       :icon="Goal"
-      title="Not enough data yet"
-      :description="`Need at least ${MIN_COMPLETIONS} completed books for this chart.`"
+      :title="t('statistics.empty.notEnoughData')"
+      :description="t('statistics.charts.goalTrajectory.notEnoughData', { count: MIN_COMPLETIONS })"
     />
     <VChart v-else :option autoresize style="height: 100%" />
   </ChartCard>

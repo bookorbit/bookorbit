@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Folder, FolderOpen, FolderPlus, ChevronRight, ChevronUp, Search, X, Check, Loader2, HardDrive } from '@lucide/vue'
 import type { CreateFolderResult } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+
+const { t } = useI18n()
 
 interface DirEntry {
   name: string
@@ -59,11 +62,11 @@ async function loadEntries(path: string) {
     if (res.ok) {
       entries.value = await res.json()
     } else {
-      error.value = 'Could not read directory'
+      error.value = t('library.folderPicker.errors.readDirectory')
       entries.value = []
     }
   } catch {
-    error.value = 'Could not connect'
+    error.value = t('library.folderPicker.errors.connect')
     entries.value = []
   } finally {
     loading.value = false
@@ -101,7 +104,7 @@ async function submitNewFolder() {
   const name = newFolderName.value.trim()
   if (!name || createLoading.value) return
   if (name.includes('/') || name.includes('\\') || name === '.' || name === '..' || name.startsWith('.')) {
-    createError.value = 'Enter a single folder name without slashes or leading dots'
+    createError.value = t('library.folderPicker.errors.invalidName')
     return
   }
   createLoading.value = true
@@ -120,10 +123,10 @@ async function submitNewFolder() {
     } else {
       const body = await res.json().catch(() => ({}))
       const message = Array.isArray(body?.message) ? body.message[0] : body?.message
-      createError.value = message ?? 'Could not create folder'
+      createError.value = message ?? t('library.folderPicker.errors.createFolder')
     }
   } catch {
-    createError.value = 'Could not connect'
+    createError.value = t('library.folderPicker.errors.connect')
   } finally {
     createLoading.value = false
   }
@@ -153,7 +156,7 @@ function onNewFolderKeydown(e: KeyboardEvent) {
         <div class="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <div class="flex items-center gap-2">
             <HardDrive :size="15" class="text-primary" />
-            <span class="text-sm font-semibold text-foreground">Browse folders</span>
+            <span class="text-sm font-semibold text-foreground">{{ t('library.folderPicker.title') }}</span>
           </div>
           <div class="flex items-center gap-1">
             <button
@@ -161,7 +164,7 @@ function onNewFolderKeydown(e: KeyboardEvent) {
               @click="toggleNewFolder"
             >
               <FolderPlus :size="13" />
-              New folder
+              {{ t('library.folderPicker.newFolder') }}
             </button>
             <button
               class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -184,7 +187,7 @@ function onNewFolderKeydown(e: KeyboardEvent) {
                 <ChevronUp :size="13" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Go up</TooltipContent>
+            <TooltipContent>{{ t('library.folderPicker.goUp') }}</TooltipContent>
           </Tooltip>
           <template v-for="(crumb, i) in breadcrumbs" :key="crumb.path">
             <ChevronRight v-if="i > 0" :size="12" class="text-muted-foreground/70 shrink-0" />
@@ -204,7 +207,7 @@ function onNewFolderKeydown(e: KeyboardEvent) {
           <input
             v-model="search"
             type="text"
-            placeholder="Filter folders…"
+            :placeholder="t('library.folderPicker.filterPlaceholder')"
             class="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
           />
           <button v-if="search" class="text-muted-foreground hover:text-foreground" @click="search = ''">
@@ -220,7 +223,7 @@ function onNewFolderKeydown(e: KeyboardEvent) {
               ref="newFolderInput"
               v-model="newFolderName"
               type="text"
-              placeholder="New folder name"
+              :placeholder="t('library.folderPicker.newFolderNamePlaceholder')"
               class="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
               @keydown="onNewFolderKeydown"
             />
@@ -230,13 +233,13 @@ function onNewFolderKeydown(e: KeyboardEvent) {
               @click="submitNewFolder"
             >
               <Loader2 v-if="createLoading" :size="12" class="animate-spin" />
-              Create
+              {{ t('library.folderPicker.create') }}
             </button>
             <button
               class="px-2.5 py-1 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
               @click="cancelNewFolder"
             >
-              Cancel
+              {{ t('common.cancel') }}
             </button>
           </div>
           <p v-if="createError" class="mt-1.5 pl-5 text-xs text-destructive">{{ createError }}</p>
@@ -253,7 +256,7 @@ function onNewFolderKeydown(e: KeyboardEvent) {
           </div>
 
           <div v-else-if="filteredEntries.length === 0" class="flex items-center justify-center h-full">
-            <p class="text-sm text-muted-foreground">No folders found</p>
+            <p class="text-sm text-muted-foreground">{{ t('library.folderPicker.noFolders') }}</p>
           </div>
 
           <div v-else class="py-1">
@@ -279,14 +282,14 @@ function onNewFolderKeydown(e: KeyboardEvent) {
               class="px-3 py-1.5 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               @click="emit('close')"
             >
-              Cancel
+              {{ t('common.cancel') }}
             </button>
             <button
               class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
               @click="selectCurrent"
             >
               <Check :size="12" />
-              Select this folder
+              {{ t('library.folderPicker.selectFolder') }}
             </button>
           </div>
         </div>

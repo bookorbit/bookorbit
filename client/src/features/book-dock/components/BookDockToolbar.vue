@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Upload, RotateCw, Trash2, PenLine, FileText, Search, X, Wand2, RefreshCw, FolderPlus, Loader2 } from '@lucide/vue'
 import type { BookDockFileStatus } from '@bookorbit/types'
 import { api } from '@/lib/api'
@@ -29,6 +30,7 @@ const emit = defineEmits<{
   applyFetched: []
 }>()
 
+const { t } = useI18n()
 const { files: uploadFiles, isUploading, addFiles, clearCompleted } = useBookDockUpload()
 const { isDemoRestrictedAccount } = usePermissions()
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -61,12 +63,12 @@ onUnmounted(() => {
   if (popoverTimer) clearTimeout(popoverTimer)
 })
 
-const tabs: { label: string; value: BookDockFileStatus | undefined }[] = [
-  { label: 'All', value: undefined },
-  { label: 'Pending', value: 'pending' },
-  { label: 'Ready', value: 'ready' },
-  { label: 'Error', value: 'error' },
-]
+const tabs = computed<{ label: string; value: BookDockFileStatus | undefined }[]>(() => [
+  { label: t('bookDock.tab.all'), value: undefined },
+  { label: t('bookDock.tab.pending'), value: 'pending' },
+  { label: t('bookDock.tab.ready'), value: 'ready' },
+  { label: t('bookDock.tab.error'), value: 'error' },
+])
 
 function openFilePicker() {
   clearCompleted()
@@ -129,7 +131,7 @@ function clearSearch() {
         <Search class="size-3.5 text-muted-foreground shrink-0" />
         <input
           v-model="searchQuery"
-          placeholder="Search files..."
+          :placeholder="t('bookDock.searchPlaceholder')"
           class="h-full w-32 sm:w-44 bg-transparent text-xs outline-none placeholder:text-muted-foreground/80"
           @input="onSearchInput"
         />
@@ -157,7 +159,7 @@ function clearSearch() {
         @click="rescan"
       >
         <RotateCw class="size-3.5" :class="rescanning ? 'animate-spin' : ''" />
-        Rescan
+        {{ t('bookDock.rescan') }}
       </button>
 
       <div class="relative">
@@ -168,7 +170,7 @@ function clearSearch() {
         >
           <Loader2 v-if="isUploading" class="size-3.5 animate-spin" />
           <Upload v-else class="size-3.5" />
-          Upload
+          {{ t('bookDock.uploadAction') }}
         </button>
 
         <div
@@ -176,7 +178,7 @@ function clearSearch() {
           class="absolute right-0 top-full mt-1.5 z-20 w-52 rounded-lg border border-border bg-card shadow-lg p-3 space-y-2.5"
         >
           <div class="flex items-center justify-between">
-            <span class="text-xs font-medium text-foreground">{{ isUploading ? 'Uploading...' : 'Done' }}</span>
+            <span class="text-xs font-medium text-foreground">{{ isUploading ? t('bookDock.uploading') : t('bookDock.done') }}</span>
             <button class="text-muted-foreground hover:text-foreground transition-colors" @click="showUploadPopover = false">
               <X class="size-3" />
             </button>
@@ -189,16 +191,16 @@ function clearSearch() {
             />
           </div>
           <div class="flex items-center gap-3 text-[11px]">
-            <span class="text-emerald-600 dark:text-emerald-400 tabular-nums">{{ uploadDone }} done</span>
-            <span v-if="uploadError > 0" class="text-destructive tabular-nums">{{ uploadError }} failed</span>
-            <span class="text-muted-foreground tabular-nums ml-auto">{{ uploadTotal }} total</span>
+            <span class="text-emerald-600 dark:text-emerald-400 tabular-nums">{{ t('bookDock.upload.nDone', { count: uploadDone }) }}</span>
+            <span v-if="uploadError > 0" class="text-destructive tabular-nums">{{ t('bookDock.upload.nFailed', { count: uploadError }) }}</span>
+            <span class="text-muted-foreground tabular-nums ml-auto">{{ t('bookDock.upload.nTotal', { count: uploadTotal }) }}</span>
           </div>
         </div>
       </div>
     </div>
 
     <div v-if="hasSelection" class="flex flex-wrap items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
-      <span class="text-xs font-medium text-foreground">{{ selectionCount }} selected</span>
+      <span class="text-xs font-medium text-foreground">{{ t('bookDock.nSelected', { count: selectionCount }) }}</span>
       <div class="flex-1" />
       <button
         data-testid="book-dock-finalize"
@@ -206,7 +208,7 @@ function clearSearch() {
         @click="$emit('finalize')"
       >
         <FileText class="size-3.5" />
-        Finalize
+        {{ t('bookDock.finalize') }}
       </button>
       <button
         data-testid="book-dock-set-destination"
@@ -214,7 +216,7 @@ function clearSearch() {
         @click="$emit('setDestination')"
       >
         <FolderPlus class="size-3.5" />
-        Set Destination
+        {{ t('bookDock.setDestinationAction') }}
       </button>
       <Tooltip v-if="fetchedCount > 0">
         <TooltipTrigger as-child>
@@ -224,14 +226,14 @@ function clearSearch() {
             @click="$emit('applyFetched')"
           >
             <Wand2 class="size-3.5" />
-            Apply Fetched
+            {{ t('bookDock.applyFetched') }}
             <span
               class="ml-0.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-amber-500/20 text-[10px] font-semibold tabular-nums"
               >{{ fetchedCount }}</span
             >
           </button>
         </TooltipTrigger>
-        <TooltipContent>Apply auto-fetched provider metadata to {{ fetchedCount }} file{{ fetchedCount !== 1 ? 's' : '' }}</TooltipContent>
+        <TooltipContent>{{ t('bookDock.applyFetchedTooltip', { count: fetchedCount }, fetchedCount) }}</TooltipContent>
       </Tooltip>
       <Tooltip v-if="errorCount > 0">
         <TooltipTrigger as-child>
@@ -241,14 +243,14 @@ function clearSearch() {
             @click="$emit('retryFetch')"
           >
             <RefreshCw class="size-3.5" />
-            Retry Errors
+            {{ t('bookDock.retryErrors') }}
             <span
               class="ml-0.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-muted-foreground/20 text-[10px] font-semibold tabular-nums"
               >{{ errorCount }}</span
             >
           </button>
         </TooltipTrigger>
-        <TooltipContent>Retry metadata fetch for {{ errorCount }} error file{{ errorCount !== 1 ? 's' : '' }}</TooltipContent>
+        <TooltipContent>{{ t('bookDock.retryErrorsTooltip', { count: errorCount }, errorCount) }}</TooltipContent>
       </Tooltip>
       <button
         v-if="canBulkEdit"
@@ -257,7 +259,7 @@ function clearSearch() {
         @click="$emit('bulkEdit')"
       >
         <PenLine class="size-3.5" />
-        Bulk Edit
+        {{ t('bookDock.bulkEditAction') }}
       </button>
       <button
         data-testid="book-dock-bulk-discard"
@@ -265,7 +267,7 @@ function clearSearch() {
         @click="$emit('bulkDiscard')"
       >
         <Trash2 class="size-3.5" />
-        Discard
+        {{ t('bookDock.discard') }}
       </button>
     </div>
   </div>

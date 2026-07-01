@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { Moon, Sun, Wallpaper } from '@lucide/vue'
 import { ACCENT_VIVID, ACCENT_PASTEL, ACCENT_OPTIONS, RADIUS_OPTIONS, BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
+const { t } = useI18n()
 const themeStore = useThemeStore()
 const accentOpen = ref(false)
 const radiusOpen = ref(false)
@@ -57,7 +59,7 @@ const loading = ref(false)
 onMounted(() => {
   token.value = (route.query.token as string) ?? ''
   if (!token.value) {
-    error.value = 'Invalid reset link. Please request a new one.'
+    error.value = t('auth.resetPassword.errors.invalidLink')
   }
 })
 
@@ -65,7 +67,7 @@ async function handleSubmit() {
   error.value = null
 
   if (newPassword.value !== confirmPassword.value) {
-    error.value = 'Passwords do not match'
+    error.value = t('auth.errors.passwordsDoNotMatch')
     return
   }
 
@@ -79,13 +81,13 @@ async function handleSubmit() {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
-      error.value = err.message ?? 'Invalid or expired reset link. Please request a new one.'
+      error.value = err.message ?? t('auth.resetPassword.errors.invalidOrExpired')
       return
     }
 
     router.push({ path: '/login', query: { reset: '1' } })
   } catch {
-    error.value = 'Something went wrong. Please try again.'
+    error.value = t('auth.errors.generic')
   } finally {
     loading.value = false
   }
@@ -104,7 +106,7 @@ async function handleSubmit() {
             <Moon v-else :size="14" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>{{ themeStore.theme === 'dark' ? 'Switch to light' : 'Switch to dark' }}</TooltipContent>
+        <TooltipContent>{{ themeStore.theme === 'dark' ? t('auth.themePicker.switchToLight') : t('auth.themePicker.switchToDark') }}</TooltipContent>
       </Tooltip>
 
       <!-- Radius picker -->
@@ -137,7 +139,7 @@ async function handleSubmit() {
               <span class="w-3.5 h-3.5 border-2 border-current block" :style="{ borderRadius: radiusPreview(themeStore.radius) }" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Change corner radius</TooltipContent>
+          <TooltipContent>{{ t('auth.themePicker.changeRadius') }}</TooltipContent>
         </Tooltip>
       </div>
 
@@ -169,7 +171,7 @@ async function handleSubmit() {
               <Wallpaper :size="14" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Change background</TooltipContent>
+          <TooltipContent>{{ t('auth.themePicker.changeBackground') }}</TooltipContent>
         </Tooltip>
       </div>
 
@@ -219,7 +221,7 @@ async function handleSubmit() {
               <span class="w-3.5 h-3.5 rounded-full block" :style="{ backgroundColor: currentAccent?.color }" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Change accent color</TooltipContent>
+          <TooltipContent>{{ t('auth.themePicker.changeAccent') }}</TooltipContent>
         </Tooltip>
       </div>
     </div>
@@ -230,12 +232,12 @@ async function handleSubmit() {
     <div class="login-card relative z-10 w-full max-w-sm rounded-2xl p-8">
       <div class="text-center mb-8">
         <h1 class="text-2xl font-serif font-semibold text-foreground">Book<span class="text-primary"> Orbit</span></h1>
-        <p class="text-sm text-muted-foreground mt-1">Set a new password</p>
+        <p class="text-sm text-muted-foreground mt-1">{{ t('auth.resetPassword.subtitle') }}</p>
       </div>
 
       <form @submit.prevent="handleSubmit" class="space-y-4">
         <div class="space-y-1.5">
-          <label for="newPassword" class="text-sm font-medium text-foreground">New password</label>
+          <label for="newPassword" class="text-sm font-medium text-foreground">{{ t('auth.fields.newPassword') }}</label>
           <input
             id="newPassword"
             v-model="newPassword"
@@ -244,11 +246,11 @@ async function handleSubmit() {
             required
             class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
           />
-          <p class="text-xs text-muted-foreground">Min. 8 characters with uppercase, lowercase, and a digit</p>
+          <p class="text-xs text-muted-foreground">{{ t('auth.fields.passwordHint') }}</p>
         </div>
 
         <div class="space-y-1.5">
-          <label for="confirmPassword" class="text-sm font-medium text-foreground">Confirm password</label>
+          <label for="confirmPassword" class="text-sm font-medium text-foreground">{{ t('auth.fields.confirmPassword') }}</label>
           <input
             id="confirmPassword"
             v-model="confirmPassword"
@@ -266,12 +268,12 @@ async function handleSubmit() {
           :disabled="loading || !token"
           class="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
         >
-          {{ loading ? 'Saving...' : 'Set new password' }}
+          {{ loading ? t('auth.resetPassword.saving') : t('auth.resetPassword.setNewPassword') }}
         </button>
       </form>
 
       <p class="mt-4 text-center text-sm text-muted-foreground">
-        <RouterLink to="/login" class="text-primary hover:underline">Back to sign in</RouterLink>
+        <RouterLink to="/login" class="text-primary hover:underline">{{ t('auth.backToSignIn') }}</RouterLink>
       </p>
     </div>
   </div>
