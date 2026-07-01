@@ -23,6 +23,7 @@ import type { KoreaderPackageService } from './koreader-package.service';
 import { KoreaderPluginRepository } from './koreader-plugin.repository';
 import { KoreaderRepository } from './koreader.repository';
 import { KoreaderService } from './koreader.service';
+import { BookService } from '../book/book.service';
 
 function md5Hex(value: string): string {
   return `md5:${value}:hex:0123456789abcdef0123456789abcdef`;
@@ -170,6 +171,7 @@ describe('KoreaderService', () => {
     mockRepo.upsertDeviceProgress.mockResolvedValue(undefined);
     mockRepo.upsertReadingProgress.mockResolvedValue(undefined);
     mockRepo.getAccessibleLibraryIds.mockResolvedValue([1, 2]);
+    mockRepo.getChapters.mockResolvedValue([]);
     mockChapterService.parseChapterIndexFromProgress.mockReturnValue(null);
     mockChapterExtractor.extractAndStoreChapters.mockResolvedValue([]);
 
@@ -478,7 +480,7 @@ describe('KoreaderService', () => {
       await expect(service.getProgress(7, 'doc-hash')).resolves.toEqual({
         document: 'doc-hash',
         percentage: 0.7321,
-        progress: null,
+        progress: '',
         device: 'web',
         device_id: 'bookorbit-web',
         timestamp: Math.floor(readerTime.getTime() / 1000),
@@ -542,7 +544,35 @@ describe('KoreaderService', () => {
       mockChapterService.parseChapterIndexFromCfi.mockReturnValue(null);
 
       const result = await service.getProgress(7, 'doc-hash');
-      expect(result?.progress).toBeNull();
+      expect(result?.progress).toBe('');
+    });
+
+    it('resolves progress using chapters fallback when koreaderProgress and cfi are null', async () => {
+      const readerTime = new Date('2026-02-01T11:00:00.000Z');
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20 });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
+      mockRepo.getReadingProgress.mockResolvedValue({
+        percentage: 50,
+        cfi: null,
+        koboLocationSource: 'OEBPS/text/ch3.xhtml',
+        updatedAt: readerTime,
+      });
+
+      mockRepo.getChapters.mockResolvedValue([
+        { chapterIndex: 0, href: 'OEBPS/text/ch1.xhtml' },
+        { chapterIndex: 1, href: 'OEBPS/text/ch2.xhtml' },
+        { chapterIndex: 2, href: 'OEBPS/text/ch3.xhtml' },
+      ]);
+
+      await expect(service.getProgress(7, 'doc-hash')).resolves.toEqual({
+        document: 'doc-hash',
+        percentage: 0.5,
+        progress: '/body/DocFragment[3]/body',
+        device: 'web',
+        device_id: 'bookorbit-web',
+        timestamp: Math.floor(readerTime.getTime() / 1000),
+      });
+      expect(mockRepo.getChapters).toHaveBeenCalledWith(10);
     });
 
     it('returns null when neither device nor web reader progress exists', async () => {
@@ -557,6 +587,71 @@ describe('KoreaderService', () => {
       mockRepo.resolveBookFileByHash.mockResolvedValue(null);
 
       await expect(service.getProgress(7, 'doc-hash')).resolves.toBeNull();
+    });
+
+    it('uses primaryFileId if available when resolving progress', async () => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20, primaryFileId: 15 });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
+      mockRepo.getReadingProgress.mockResolvedValue({
+        percentage: 50,
+        cfi: null,
+        koreaderProgress: '/body/DocFragment[3]/body',
+        updatedAt: new Date('2026-02-01T11:00:00.000Z'),
+      });
+
+      await service.getProgress(7, 'doc-hash');
+
+      expect(mockRepo.getLatestDeviceProgress).toHaveBeenCalledWith(15, 7);
+      expect(mockRepo.getReadingProgress).toHaveBeenCalledWith(15, 7);
+    });
+
+    it('compares syncTimestamp instead of updatedAt for latest device check', async () => {
+      const readerTime = new Date('2026-02-01T11:00:00.000Z');
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20, primaryFileId: null });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue({
+        percentage: 0.66,
+        progress: '/body/DocFragment[8]/body',
+        device: 'Kobo Libra',
+        deviceId: 'device-1',
+        syncTimestamp: 1700000000, // 2023-11-14 (older than 2026 readerTime)
+        updatedAt: new Date('2026-02-01T12:00:00.000Z'), // updatedAt is newer, but syncTimestamp is older
+      });
+      mockRepo.getReadingProgress.mockResolvedValue({
+        percentage: 80,
+        koreaderProgress: '/body/DocFragment[5]/body',
+        updatedAt: readerTime,
+      });
+
+      await expect(service.getProgress(7, 'doc-hash')).resolves.toEqual({
+        document: 'doc-hash',
+        percentage: 0.8,
+        progress: '/body/DocFragment[5]/body',
+        device: 'web',
+        device_id: 'bookorbit-web',
+        timestamp: Math.floor(readerTime.getTime() / 1000),
+      });
+    });
+
+    it('resolves chapters fallback using requested bookFile.id instead of targetFileId', async () => {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 10, bookId: 20, primaryFileId: 15 });
+      mockRepo.getLatestDeviceProgress.mockResolvedValue(null);
+      mockRepo.getReadingProgress.mockResolvedValue({
+        percentage: 50,
+        cfi: null,
+        koreaderProgress: null,
+        koboLocationSource: 'OEBPS/text/ch3.xhtml',
+        updatedAt: new Date('2026-02-01T11:00:00.000Z'),
+      });
+
+      mockRepo.getChapters.mockResolvedValue([
+        { chapterIndex: 0, href: 'OEBPS/text/ch1.xhtml' },
+        { chapterIndex: 1, href: 'OEBPS/text/ch2.xhtml' },
+        { chapterIndex: 2, href: 'OEBPS/text/ch3.xhtml' },
+      ]);
+
+      await service.getProgress(7, 'doc-hash');
+
+      expect(mockRepo.getChapters).toHaveBeenCalledWith(10); // NOT 15
     });
   });
 

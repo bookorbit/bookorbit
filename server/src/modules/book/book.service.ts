@@ -1890,7 +1890,7 @@ export class BookService {
       dto.koboContentSourceProgressPercent ?? null,
       dto.koreaderProgress ?? null,
     );
-    if (file.format === 'epub' && this.hasPermission(user, Permission.KoboSync) && (await this.bookRepo.isKoboTwoWayProgressSyncEnabled(userId))) {
+    if (file.format && ['epub', 'kepub'].includes(file.format) && this.hasPermission(user, Permission.KoboSync) && (await this.bookRepo.isKoboTwoWayProgressSyncEnabled(userId))) {
       await this.bookRepo.syncKoboReadingStateFromProgress(
         userId,
         fileId,
@@ -1902,6 +1902,30 @@ export class BookService {
       );
     }
     await this.autoUpdateReadStatusForProgress(userId, file, dto.percentage);
+  }
+
+  async syncKoboReadingStateFromProgress(
+    userId: number,
+    fileId: number,
+    percentage: number,
+    koboLocationSource?: string | null,
+    koboLocationType?: string | null,
+    koboLocationValue?: string | null,
+    koboContentSourceProgressPercent?: number | null,
+  ): Promise<boolean> {
+    return this.bookRepo.syncKoboReadingStateFromProgress(
+      userId,
+      fileId,
+      percentage,
+      koboLocationSource,
+      koboLocationType,
+      koboLocationValue,
+      koboContentSourceProgressPercent,
+    );
+  }
+
+  async isKoboTwoWayProgressSyncEnabled(userId: number): Promise<boolean> {
+    return this.bookRepo.isKoboTwoWayProgressSyncEnabled(userId);
   }
 
   async clearFileProgress(userId: number, fileId: number, user: RequestUser): Promise<void> {

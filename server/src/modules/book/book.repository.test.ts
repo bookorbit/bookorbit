@@ -823,6 +823,8 @@ describe('BookRepository', () => {
       select: vi
         .fn()
         .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub' }]))
+        .mockReturnValueOnce(makeSelectChain('orderBy', []))
+        .mockReturnValueOnce(makeSelectChain('where', []))
         .mockReturnValueOnce(makeSelectChain('limit', [existingState])),
       insert: vi.fn().mockReturnValue(insertChain),
       execute: vi.fn().mockResolvedValue(undefined),
@@ -850,6 +852,8 @@ describe('BookRepository', () => {
       select: vi
         .fn()
         .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub' }]))
+        .mockReturnValueOnce(makeSelectChain('orderBy', []))
+        .mockReturnValueOnce(makeSelectChain('where', []))
         .mockReturnValueOnce(makeSelectChain('limit', [existingState])),
       insert: vi.fn(),
       execute: vi.fn(),
@@ -858,6 +862,7 @@ describe('BookRepository', () => {
 
     await expect(repo.syncKoboReadingStateFromProgress(5, 9, 80, null, null, null, null)).resolves.toBe(true);
 
+    expect(db.select).toHaveBeenCalledTimes(4);
     expect(db.insert).not.toHaveBeenCalled();
     expect(db.execute).not.toHaveBeenCalled();
   });

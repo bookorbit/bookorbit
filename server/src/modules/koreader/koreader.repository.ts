@@ -6,7 +6,7 @@ import { DB } from '../../db';
 import * as schema from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
-type ResolvedBookFileByHash = { id: number; bookId: number; libraryId: number };
+type ResolvedBookFileByHash = { id: number; bookId: number; libraryId: number; primaryFileId: number | null };
 
 @Injectable()
 export class KoreaderRepository {
@@ -43,7 +43,12 @@ export class KoreaderRepository {
     const libraryFilter = accessibleLibraryIds ? inArray(schema.books.libraryId, accessibleLibraryIds) : undefined;
 
     const [byFileHash] = await this.db
-      .select({ id: schema.bookFiles.id, bookId: schema.bookFiles.bookId, libraryId: schema.books.libraryId })
+      .select({
+        id: schema.bookFiles.id,
+        bookId: schema.bookFiles.bookId,
+        libraryId: schema.books.libraryId,
+        primaryFileId: schema.books.primaryFileId,
+      })
       .from(schema.bookFiles)
       .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
       .where(and(eq(schema.bookFiles.fileHash, hash), libraryFilter))
@@ -52,7 +57,12 @@ export class KoreaderRepository {
     if (byFileHash) return byFileHash;
 
     const [byFileHashHistory] = await this.db
-      .select({ id: schema.bookFiles.id, bookId: schema.bookFiles.bookId, libraryId: schema.books.libraryId })
+      .select({
+        id: schema.bookFiles.id,
+        bookId: schema.bookFiles.bookId,
+        libraryId: schema.books.libraryId,
+        primaryFileId: schema.books.primaryFileId,
+      })
       .from(schema.bookFileHashHistory)
       .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.bookFileHashHistory.bookFileId))
       .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
@@ -67,8 +77,8 @@ export class KoreaderRepository {
   async resolveBookFilesByHashes(
     hashes: string[],
     accessibleLibraryIds: number[] | null,
-  ): Promise<Map<string, { bookFileId: number; bookId: number; libraryId: number }>> {
-    const result = new Map<string, { bookFileId: number; bookId: number; libraryId: number }>();
+  ): Promise<Map<string, { bookFileId: number; bookId: number; libraryId: number; primaryFileId: number | null }>> {
+    const result = new Map<string, { bookFileId: number; bookId: number; libraryId: number; primaryFileId: number | null }>();
     if (hashes.length === 0) return result;
     if (accessibleLibraryIds !== null && accessibleLibraryIds.length === 0) return result;
 
@@ -80,6 +90,7 @@ export class KoreaderRepository {
         bookFileId: schema.bookFiles.id,
         bookId: schema.bookFiles.bookId,
         libraryId: schema.books.libraryId,
+        primaryFileId: schema.books.primaryFileId,
       })
       .from(schema.bookFiles)
       .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
@@ -87,7 +98,7 @@ export class KoreaderRepository {
 
     for (const row of direct) {
       if (row.hash && !result.has(row.hash)) {
-        result.set(row.hash, { bookFileId: row.bookFileId, bookId: row.bookId, libraryId: row.libraryId });
+        result.set(row.hash, { bookFileId: row.bookFileId, bookId: row.bookId, libraryId: row.libraryId, primaryFileId: row.primaryFileId });
       }
     }
 
@@ -100,6 +111,7 @@ export class KoreaderRepository {
         bookFileId: schema.bookFiles.id,
         bookId: schema.bookFiles.bookId,
         libraryId: schema.books.libraryId,
+        primaryFileId: schema.books.primaryFileId,
       })
       .from(schema.bookFileHashHistory)
       .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.bookFileHashHistory.bookFileId))
@@ -108,7 +120,7 @@ export class KoreaderRepository {
 
     for (const row of history) {
       if (!result.has(row.hash)) {
-        result.set(row.hash, { bookFileId: row.bookFileId, bookId: row.bookId, libraryId: row.libraryId });
+        result.set(row.hash, { bookFileId: row.bookFileId, bookId: row.bookId, libraryId: row.libraryId, primaryFileId: row.primaryFileId });
       }
     }
 
