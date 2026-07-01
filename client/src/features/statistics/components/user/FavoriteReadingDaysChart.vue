@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { CalendarDays } from '@lucide/vue'
 import type { ReadingSessionSourceBucket } from '@bookorbit/types'
@@ -16,6 +17,8 @@ const MIN_EVENTS = 14
 const DAYS_WINDOW = 365
 
 const themeStore = useThemeStore()
+const { t } = useI18n()
+
 const { data, loading, error } = useUserFavoriteReadingDays()
 const option = shallowRef({})
 
@@ -100,15 +103,15 @@ watchEffect(() => {
 </script>
 
 <template>
-  <ChartCard title="Favorite Reading Days" :icon="CalendarDays" :color-index="6" :loading :error :empty="isEmpty">
+  <ChartCard :title="t('statistics.charts.favoriteReadingDays.title')" :icon="CalendarDays" :color-index="6" :loading :error :empty="isEmpty">
     <template #controls>
       <BreakdownSelect v-model="dimension" />
     </template>
     <ChartEmptyState
       v-if="lowConfidence"
       :icon="CalendarDays"
-      title="Not enough data yet"
-      :description="`Need at least ${MIN_EVENTS} reading events for this chart.`"
+      :title="t('statistics.empty.notEnoughData')"
+      :description="t('statistics.charts.favoriteReadingDays.notEnoughData', { count: MIN_EVENTS })"
     />
     <VChart v-else :option autoresize style="height: 100%" />
   </ChartCard>

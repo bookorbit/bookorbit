@@ -4,7 +4,10 @@ import { X, RefreshCw } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import type { AuthorEnrichmentFailedPage } from '@bookorbit/types'
 import { api } from '@/lib/api'
+import { useI18n } from 'vue-i18n'
 import { useAuthorEnrichmentActions } from '@/features/settings/composables/useAuthorEnrichmentActions'
+
+const { t } = useI18n()
 
 const emit = defineEmits<{ close: [] }>()
 
@@ -33,10 +36,10 @@ async function handleRetryAll() {
   retrying.value = true
   try {
     await retryFailed()
-    toast.success('Failed items requeued')
+    toast.success(t('bookMetadataFetch.toast.failedItemsRequeued'))
     emit('close')
   } catch {
-    toast.error('Failed to retry')
+    toast.error(t('bookMetadataFetch.toast.failedToRetry'))
   } finally {
     retrying.value = false
   }
@@ -49,28 +52,30 @@ onMounted(() => loadPage(1))
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="emit('close')">
     <div class="bg-background border border-border rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
       <div class="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-        <h2 class="text-sm font-semibold">Failed Author Enrichments</h2>
+        <h2 class="text-sm font-semibold">{{ t('bookMetadataFetch.report.authorTitle') }}</h2>
         <button class="text-muted-foreground hover:text-foreground" @click="emit('close')">
           <X :size="16" />
         </button>
       </div>
 
       <div class="flex-1 overflow-y-auto">
-        <div v-if="loading" class="p-6 text-center text-sm text-muted-foreground">Loading...</div>
+        <div v-if="loading" class="p-6 text-center text-sm text-muted-foreground">{{ t('common.loading') }}</div>
 
-        <div v-else-if="!data || data.items.length === 0" class="p-6 text-center text-sm text-muted-foreground">No failed items.</div>
+        <div v-else-if="!data || data.items.length === 0" class="p-6 text-center text-sm text-muted-foreground">
+          {{ t('bookMetadataFetch.report.noFailedItems') }}
+        </div>
 
         <table v-else class="w-full text-xs">
           <thead class="sticky top-0 bg-background border-b border-border">
             <tr>
-              <th class="text-left px-4 py-2 text-muted-foreground font-medium">Author</th>
-              <th class="text-left px-4 py-2 text-muted-foreground font-medium">Error</th>
-              <th class="text-right px-4 py-2 text-muted-foreground font-medium">HTTP</th>
+              <th class="text-left px-4 py-2 text-muted-foreground font-medium">{{ t('bookMetadataFetch.report.columns.author') }}</th>
+              <th class="text-left px-4 py-2 text-muted-foreground font-medium">{{ t('bookMetadataFetch.report.columns.error') }}</th>
+              <th class="text-right px-4 py-2 text-muted-foreground font-medium">{{ t('bookMetadataFetch.report.columns.http') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="item in data.items" :key="item.authorId" class="border-b border-border/50 hover:bg-muted/40">
-              <td class="px-4 py-2 max-w-[200px] truncate">{{ item.name ?? `Author #${item.authorId}` }}</td>
+              <td class="px-4 py-2 max-w-[200px] truncate">{{ item.name ?? t('bookMetadataFetch.report.authorFallback', { id: item.authorId }) }}</td>
               <td class="px-4 py-2 text-muted-foreground max-w-[320px] truncate" :title="item.error ?? ''">{{ item.error ?? '-' }}</td>
               <td class="px-4 py-2 text-right text-muted-foreground">{{ item.httpStatus ?? '-' }}</td>
             </tr>
@@ -85,7 +90,7 @@ onMounted(() => loadPage(1))
             class="px-2 py-1 text-xs border border-border rounded hover:bg-muted disabled:opacity-40"
             @click="loadPage(page - 1)"
           >
-            Prev
+            {{ t('common.previous') }}
           </button>
           <span class="text-xs text-muted-foreground">{{ page }} / {{ Math.ceil(data.total / limit) }}</span>
           <button
@@ -93,7 +98,7 @@ onMounted(() => loadPage(1))
             class="px-2 py-1 text-xs border border-border rounded hover:bg-muted disabled:opacity-40"
             @click="loadPage(page + 1)"
           >
-            Next
+            {{ t('common.next') }}
           </button>
         </div>
         <button
@@ -102,7 +107,7 @@ onMounted(() => loadPage(1))
           @click="handleRetryAll"
         >
           <RefreshCw :size="12" :class="retrying ? 'animate-spin' : ''" />
-          Retry all failed
+          {{ t('bookMetadataFetch.report.retryAllFailed') }}
         </button>
       </div>
     </div>

@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { onUnmounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { X } from '@lucide/vue'
 import { copyToClipboard } from '@/lib/clipboard'
+
+const { t } = useI18n()
 
 defineProps<{ resetUrl: string }>()
 const emit = defineEmits<{ close: [] }>()
@@ -42,13 +45,13 @@ async function copy(url: string) {
   <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4" @click.self="emit('close')">
     <div class="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl">
       <div class="flex items-start justify-between mb-4">
-        <h2 class="text-base font-semibold text-foreground">Password Reset Link</h2>
+        <h2 class="text-base font-semibold text-foreground">{{ t('adminFeature.resetLink.title') }}</h2>
         <button @click="emit('close')" class="text-muted-foreground hover:text-foreground transition-colors">
           <X :size="16" />
         </button>
       </div>
 
-      <p class="text-sm text-muted-foreground mb-3">Share this link with the user. It expires in 15 minutes.</p>
+      <p class="text-sm text-muted-foreground mb-3">{{ t('adminFeature.resetLink.description') }}</p>
 
       <div class="flex gap-2">
         <input
@@ -60,11 +63,11 @@ async function copy(url: string) {
           @click="copy(resetUrl)"
           class="rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap"
         >
-          {{ copied ? 'Copied!' : copyFailed ? 'Copy failed' : 'Copy' }}
+          {{ copied ? t('adminFeature.resetLink.copied') : copyFailed ? t('adminFeature.resetLink.copyFailed') : t('adminFeature.resetLink.copy') }}
         </button>
       </div>
 
-      <p class="mt-3 text-xs text-amber-600 dark:text-amber-400">This link will not be shown again.</p>
+      <p class="mt-3 text-xs text-amber-600 dark:text-amber-400">{{ t('adminFeature.resetLink.notShownAgain') }}</p>
     </div>
   </div>
 </template>

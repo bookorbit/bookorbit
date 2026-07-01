@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { Tag } from '@lucide/vue'
 import { READING_SESSION_SOURCE_BUCKETS, READING_SESSION_SOURCE_BUCKET_LABELS } from '@bookorbit/types'
@@ -13,6 +14,8 @@ import ChartEmptyState from '../ChartEmptyState.vue'
 const MIN_GENRES = 2
 
 const themeStore = useThemeStore()
+const { t } = useI18n()
+
 const { data, loading, error } = useUserGenreReadingTime()
 
 const totalSeconds = computed(() => data.value.reduce((s, item) => s + item.readingSeconds, 0))
@@ -84,12 +87,12 @@ watchEffect(() => {
 </script>
 
 <template>
-  <ChartCard title="Genre Reading Time" :icon="Tag" :color-index="6" :loading :error :empty="isEmpty">
+  <ChartCard :title="t('statistics.charts.genreReadingTime.title')" :icon="Tag" :color-index="6" :loading :error :empty="isEmpty">
     <ChartEmptyState
       v-if="!hasEnoughData"
       :icon="Tag"
-      title="Not enough data yet"
-      :description="`Need at least ${MIN_GENRES} genres with reading time for this chart.`"
+      :title="t('statistics.empty.notEnoughData')"
+      :description="t('statistics.charts.genreReadingTime.notEnoughData', { count: MIN_GENRES })"
     />
     <VChart v-else :option autoresize style="height: 100%" />
   </ChartCard>

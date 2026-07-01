@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { shallowRef, watchEffect } from 'vue'
+import { computed, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { TrendingUp } from '@lucide/vue'
 
@@ -10,14 +11,16 @@ import ChartCard from '../ChartCard.vue'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-const DATE_RANGE_LABELS = {
-  'all-time': 'All Time',
-  'last-5-years': 'Last 5 Years',
-  'last-year': 'Last Year',
-} as const
+const { t } = useI18n()
 
 const { data, loading, error } = useBooksAddedOverTime()
 const { filters, setGranularity, setDateRange } = useStatisticsConfig()
+
+const dateRangeLabels = computed<Record<string, string>>(() => ({
+  'all-time': t('statistics.charts.booksAddedOverTime.allTime'),
+  'last-5-years': t('statistics.charts.booksAddedOverTime.last5Years'),
+  'last-year': t('statistics.charts.booksAddedOverTime.lastYear'),
+}))
 
 const option = shallowRef({})
 
@@ -85,7 +88,7 @@ function handleLastYear() {
 </script>
 
 <template>
-  <ChartCard title="Books Added Over Time" :icon="TrendingUp" :color-index="3" :loading :error :empty="!data.items.length">
+  <ChartCard :title="t('statistics.charts.booksAddedOverTime.title')" :icon="TrendingUp" :color-index="3" :loading :error :empty="!data.items.length">
     <template #controls>
       <div class="flex items-center gap-1">
         <div class="border-border flex rounded-md border text-xs">
@@ -96,7 +99,7 @@ function handleLastYear() {
             ]"
             @click="handleMonthly"
           >
-            Monthly
+            {{ t('statistics.charts.booksAddedOverTime.monthly') }}
           </button>
           <button
             :class="[
@@ -105,20 +108,20 @@ function handleLastYear() {
             ]"
             @click="handleYearly"
           >
-            Yearly
+            {{ t('statistics.charts.booksAddedOverTime.yearly') }}
           </button>
         </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
             <button class="border-border text-muted-foreground hover:text-foreground rounded-md border px-2 py-1 text-xs transition-colors">
-              {{ DATE_RANGE_LABELS[filters.booksOverTimeRange] }}
+              {{ dateRangeLabels[filters.booksOverTimeRange] }}
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" class="text-xs">
-            <DropdownMenuItem @click="handleAllTime">All Time</DropdownMenuItem>
-            <DropdownMenuItem @click="handleLast5Years">Last 5 Years</DropdownMenuItem>
-            <DropdownMenuItem @click="handleLastYear">Last Year</DropdownMenuItem>
+            <DropdownMenuItem @click="handleAllTime">{{ t('statistics.charts.booksAddedOverTime.allTime') }}</DropdownMenuItem>
+            <DropdownMenuItem @click="handleLast5Years">{{ t('statistics.charts.booksAddedOverTime.last5Years') }}</DropdownMenuItem>
+            <DropdownMenuItem @click="handleLastYear">{{ t('statistics.charts.booksAddedOverTime.lastYear') }}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

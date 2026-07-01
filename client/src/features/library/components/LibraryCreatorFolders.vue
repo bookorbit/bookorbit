@@ -5,6 +5,8 @@ import type { PrescanPathResult, PrescanResult } from '@bookorbit/types'
 import { useLibraryFolderSelection } from '../composables/useLibraryFolderSelection'
 import FolderPickerModal from './FolderPickerModal.vue'
 
+const { t } = useI18n()
+
 const props = defineProps<{
   folders: string[]
   prescanResult: PrescanResult | null

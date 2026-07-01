@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { Permission } from '@bookorbit/types'
 import ProvidersTab from './ProvidersTab.vue'
@@ -14,8 +15,9 @@ import { useEmailRecipients } from '../composables/useEmailRecipients'
 import { useEmailTemplates } from '../composables/useEmailTemplates'
 import { useEmailGroups } from '../composables/useEmailGroups'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
-import { EMAIL_TAB_LABELS, normalizeEmailTab, type EmailTab as Tab } from '@/features/email/lib/email-tabs'
+import { normalizeEmailTab, type EmailTab as Tab } from '@/features/email/lib/email-tabs'
 
+const { t } = useI18n()
 const { fetchProviders } = useEmailProviders()
 const { fetchRecipients } = useEmailRecipients()
 const { fetchTemplates } = useEmailTemplates()
@@ -27,14 +29,14 @@ const canSendEmail = computed(() => hasPermission(Permission.EmailSend))
 
 const tabs = computed<{ id: Tab; label: string }[]>(() => {
   const result: { id: Tab; label: string }[] = []
-  if (canManageEmail.value || canSendEmail.value) result.push({ id: 'providers', label: EMAIL_TAB_LABELS['providers'] })
+  if (canManageEmail.value || canSendEmail.value) result.push({ id: 'providers', label: t('email.tabs.providers') })
   if (canSendEmail.value) {
     result.push(
-      { id: 'recipients', label: EMAIL_TAB_LABELS['recipients'] },
-      { id: 'groups', label: EMAIL_TAB_LABELS['groups'] },
-      { id: 'templates', label: EMAIL_TAB_LABELS['templates'] },
-      { id: 'preferences', label: EMAIL_TAB_LABELS['preferences'] },
-      { id: 'history', label: EMAIL_TAB_LABELS['history'] },
+      { id: 'recipients', label: t('email.tabs.recipients') },
+      { id: 'groups', label: t('email.tabs.groups') },
+      { id: 'templates', label: t('email.tabs.templates') },
+      { id: 'preferences', label: t('email.tabs.preferences') },
+      { id: 'history', label: t('email.tabs.history') },
     )
   }
   return result
@@ -77,7 +79,7 @@ onMounted(async () => {
     if (canSendEmail.value) fetches.push(fetchRecipients(), fetchTemplates(), fetchGroups())
     await Promise.all(fetches)
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Failed to load'
+    error.value = e instanceof Error ? e.message : t('email.loadFailed')
   } finally {
     loading.value = false
   }
@@ -85,17 +87,17 @@ onMounted(async () => {
 </script>
 
 <template>
-  <SettingsPageHeader class="hidden md:flex" title="Email" subtitle="Send books to your e-reader via email." />
+  <SettingsPageHeader class="hidden md:flex" :title="t('email.title')" :subtitle="t('email.subtitle')" />
   <div class="md:hidden px-1">
-    <h1 class="text-xl font-semibold tracking-tight text-foreground">Email</h1>
+    <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ t('email.title') }}</h1>
     <p
       class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
     >
-      Send books to your e-reader via email.
+      {{ t('email.subtitle') }}
     </p>
   </div>
 
-  <div v-if="loading" class="mt-5 md:mt-0 text-sm text-muted-foreground">Loading...</div>
+  <div v-if="loading" class="mt-5 md:mt-0 text-sm text-muted-foreground">{{ t('common.loading') }}</div>
   <div v-else-if="error" class="text-sm text-destructive">{{ error }}</div>
   <template v-else>
     <!-- Tab bar -->

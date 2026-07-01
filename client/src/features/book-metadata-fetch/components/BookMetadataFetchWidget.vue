@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { Sparkles, Users } from '@lucide/vue'
 import { toast } from 'vue-sonner'
+import { useI18n } from 'vue-i18n'
 import { useBookMetadataFetchStatus } from '../composables/useBookMetadataFetchStatus'
 import { useAuthorEnrichmentStatus } from '@/features/settings/composables/useAuthorEnrichmentStatus'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -13,6 +14,7 @@ import AuthorEnrichmentReportModal from './AuthorEnrichmentReportModal.vue'
 const { status, subscribe } = useBookMetadataFetchStatus()
 const { status: authorStatus, subscribe: subscribeAuthors } = useAuthorEnrichmentStatus()
 const { hasPermission, isSuperuser } = usePermissions()
+const { t } = useI18n()
 
 const canView = computed(() => isSuperuser.value || hasPermission('manage_metadata_config'))
 
@@ -60,20 +62,20 @@ const authorProgressPercent = computed(() => {
 })
 
 const bookRemainingLabel = computed(() => {
-  if (status.value.paused) return 'Paused'
+  if (status.value.paused) return t('bookMetadataFetch.label.paused')
   const { queued, processing, failed } = status.value
-  if (queued > 0) return `${queued + processing} remaining`
-  if (processing > 0) return `${processing} processing`
-  if (failed > 0) return `${failed} failed`
+  if (queued > 0) return t('bookMetadataFetch.label.remaining', { count: queued + processing })
+  if (processing > 0) return t('bookMetadataFetch.label.processing', { count: processing })
+  if (failed > 0) return t('bookMetadataFetch.label.failed', { count: failed })
   return ''
 })
 const authorRemainingLabel = computed(() => {
-  if (authorStatus.value.paused) return 'Paused'
+  if (authorStatus.value.paused) return t('bookMetadataFetch.label.paused')
   const { queued, processing, rateLimited, failed } = authorStatus.value
-  if (rateLimited > 0) return `${rateLimited} rate limited`
-  if (queued > 0) return `${queued + processing} remaining`
-  if (processing > 0) return `${processing} processing`
-  if (failed > 0) return `${failed} failed`
+  if (rateLimited > 0) return t('bookMetadataFetch.label.rateLimited', { count: rateLimited })
+  if (queued > 0) return t('bookMetadataFetch.label.remaining', { count: queued + processing })
+  if (processing > 0) return t('bookMetadataFetch.label.processing', { count: processing })
+  if (failed > 0) return t('bookMetadataFetch.label.failed', { count: failed })
   return ''
 })
 
@@ -105,8 +107,8 @@ watch(status, (newVal, oldVal) => {
     bookSessionToasted = true
     const msg =
       newVal.failed > 0
-        ? `Metadata fetch done - ${newVal.sessionDone} processed, ${newVal.failed} failed`
-        : `Metadata fetch complete - ${newVal.sessionDone} books updated`
+        ? t('bookMetadataFetch.toast.bookDoneWithFailures', { done: newVal.sessionDone, failed: newVal.failed })
+        : t('bookMetadataFetch.toast.bookComplete', { done: newVal.sessionDone })
     toast.success(msg)
   }
   if (newVal.sessionTotal === 0) bookSessionToasted = false
@@ -121,8 +123,8 @@ watch(authorStatus, (newVal, oldVal) => {
     authorSessionToasted = true
     const msg =
       newVal.failed > 0
-        ? `Author enrichment done - ${newVal.sessionDone} processed, ${newVal.failed} failed`
-        : `Author enrichment complete - ${newVal.sessionDone} authors updated`
+        ? t('bookMetadataFetch.toast.authorDoneWithFailures', { done: newVal.sessionDone, failed: newVal.failed })
+        : t('bookMetadataFetch.toast.authorComplete', { done: newVal.sessionDone })
     toast.success(msg)
   }
   if (newVal.sessionTotal === 0) authorSessionToasted = false
@@ -192,7 +194,7 @@ onMounted(() => {
         <Sparkles :size="20" class="text-violet-500" :class="[bookIconOpacity, showBookDot ? 'animate-pulse' : '']" />
       </div>
       <div class="flex flex-col items-start gap-0.5 min-w-0">
-        <span class="text-xs font-semibold text-foreground leading-none">Fetching metadata</span>
+        <span class="text-xs font-semibold text-foreground leading-none">{{ t('bookMetadataFetch.card.fetchingMetadata') }}</span>
         <span class="text-xs text-muted-foreground leading-none">{{ bookRemainingLabel }}</span>
         <span class="text-xs text-muted-foreground/80 leading-none truncate mt-0.5" :class="lastBookName ? '' : 'invisible'">{{
           lastBookName ?? '\u00a0'
@@ -218,7 +220,7 @@ onMounted(() => {
         <Users :size="20" class="text-emerald-500" :class="[authorIconOpacity, showAuthorDot ? 'animate-pulse' : '']" />
       </div>
       <div class="flex flex-col items-start gap-0.5 min-w-0">
-        <span class="text-xs font-semibold text-foreground leading-none">Enriching authors</span>
+        <span class="text-xs font-semibold text-foreground leading-none">{{ t('bookMetadataFetch.card.enrichingAuthors') }}</span>
         <span class="text-xs text-muted-foreground leading-none">{{ authorRemainingLabel }}</span>
         <span class="text-xs text-muted-foreground/80 leading-none truncate mt-0.5" :class="lastAuthorName ? '' : 'invisible'">{{
           lastAuthorName ?? '\u00a0'

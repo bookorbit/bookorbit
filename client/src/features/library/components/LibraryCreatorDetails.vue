@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { CoverAspectRatio } from '@bookorbit/types'
 import AppIcon from '@/components/AppIcon.vue'
 import IconPicker from '@/components/IconPicker.vue'
@@ -45,7 +47,7 @@ function updateCoverAspectRatio(event: Event) {
           id="library-name"
           type="text"
           :value="name"
-          placeholder="My Library"
+          :placeholder="t('library.creator.details.namePlaceholder')"
           maxlength="255"
           class="flex-1 rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
           autocomplete="off"

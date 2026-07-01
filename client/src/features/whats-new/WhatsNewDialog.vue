@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ArrowRight, ChevronDown, ExternalLink, Sparkles, X } from '@lucide/vue'
 import { useModal } from '@/composables/useModal'
 import { useWhatsNew } from './composables/useWhatsNew'
@@ -7,6 +8,7 @@ import { formatReleaseDate } from './lib/whats-new.logic'
 import { anyLightboxOpen } from './lib/lightbox-state'
 import HighlightItem from './components/HighlightItem.vue'
 
+const { t } = useI18n()
 const { version, releases, hasMore, acknowledge, remindLater } = useWhatsNew()
 
 const expanded = ref(new Set<string>(releases.value[0] ? [releases.value[0].version] : []))
@@ -66,16 +68,17 @@ useModal({
                 <Sparkles :size="22" />
               </span>
               <div>
-                <h2 id="whats-new-title" class="text-lg font-semibold tracking-tight text-foreground">What's New</h2>
+                <h2 id="whats-new-title" class="text-lg font-semibold tracking-tight text-foreground">{{ t('whatsNew.title') }}</h2>
                 <p class="text-sm text-muted-foreground">
-                  <template v-if="version">Version {{ version }} · </template>{{ releases.length }} new update{{ releases.length === 1 ? '' : 's' }}
+                  <template v-if="version">{{ t('whatsNew.versionPrefix', { version }) }} · </template
+                  >{{ t('whatsNew.newUpdates', { count: releases.length }, releases.length) }}
                 </p>
               </div>
             </div>
             <button
               type="button"
               class="-mr-1 -mt-1 shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-              aria-label="Remind me later"
+              :aria-label="t('whatsNew.remindLater')"
               @click="handleLater"
             >
               <X :size="18" />
@@ -92,7 +95,7 @@ useModal({
                   v-if="index === 0"
                   class="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground"
                 >
-                  Latest
+                  {{ t('whatsNew.latest') }}
                 </span>
                 <span v-if="formatReleaseDate(release.date)" class="text-xs text-muted-foreground">{{ formatReleaseDate(release.date) }}</span>
               </div>
@@ -118,7 +121,7 @@ useModal({
               rel="noopener noreferrer"
               class="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:text-primary/85"
             >
-              Full changelog
+              {{ t('whatsNew.fullChangelog') }}
               <ExternalLink :size="12" />
             </a>
           </section>
@@ -129,7 +132,7 @@ useModal({
             class="inline-flex items-center gap-1 text-sm font-medium text-primary transition-colors hover:text-primary/85"
             @click="handleLater"
           >
-            See all releases
+            {{ t('whatsNew.seeAllReleases') }}
             <ArrowRight :size="14" />
           </RouterLink>
         </div>
@@ -140,7 +143,7 @@ useModal({
             class="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
             @click="handleLater"
           >
-            Remind me later
+            {{ t('whatsNew.remindLater') }}
           </button>
           <button
             ref="ackButton"
@@ -148,7 +151,7 @@ useModal({
             class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             @click="handleAck"
           >
-            Got it
+            {{ t('whatsNew.gotIt') }}
           </button>
         </footer>
       </div>

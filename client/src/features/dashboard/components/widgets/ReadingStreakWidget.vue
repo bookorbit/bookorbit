@@ -1,16 +1,18 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { Flame, Trophy } from '@lucide/vue'
 
 import { useReadingStreakWidget } from '../../composables/useReadingStreakWidget'
 
 const { data, loading, error } = useReadingStreakWidget()
+const { t } = useI18n()
 </script>
 
 <template>
   <div class="flex h-full flex-col p-3">
     <div class="mb-3 flex items-center gap-2 self-start">
       <Flame :size="16" class="text-primary/90" />
-      <span class="text-[15px] font-semibold text-foreground">Reading Streak</span>
+      <span class="text-[15px] font-semibold text-foreground">{{ t('dashboard.widgets.readingStreak.title') }}</span>
     </div>
 
     <!-- Loading -->
@@ -20,14 +22,16 @@ const { data, loading, error } = useReadingStreakWidget()
     </div>
 
     <!-- Error -->
-    <div v-else-if="error" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">Failed to load</div>
+    <div v-else-if="error" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+      {{ t('dashboard.common.failedToLoad') }}
+    </div>
 
     <!-- Empty (no reading at all) -->
     <div v-else-if="!data || (data.currentStreak === 0 && data.longestStreak === 0)" class="flex flex-1 flex-col items-center justify-center gap-2">
       <div class="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
         <Flame :size="16" class="text-muted-foreground/60" />
       </div>
-      <p class="text-center text-xs text-muted-foreground">Read today to start your streak</p>
+      <p class="text-center text-xs text-muted-foreground">{{ t('dashboard.widgets.readingStreak.empty') }}</p>
     </div>
 
     <!-- Streak data -->
@@ -38,13 +42,15 @@ const { data, loading, error } = useReadingStreakWidget()
           <Flame :size="20" class="text-orange-500" />
           <span class="text-3xl font-bold tabular-nums">{{ data.currentStreak }}</span>
         </div>
-        <span class="text-xs text-muted-foreground">{{ data.currentStreak === 1 ? 'day' : 'days' }} streak</span>
+        <span class="text-xs text-muted-foreground">{{
+          t('dashboard.widgets.readingStreak.streakLabel', { count: data.currentStreak }, data.currentStreak)
+        }}</span>
       </div>
 
       <!-- Best streak -->
       <div class="flex items-center gap-1 text-xs text-muted-foreground">
         <Trophy :size="12" />
-        <span>Best: {{ data.longestStreak }} {{ data.longestStreak === 1 ? 'day' : 'days' }}</span>
+        <span>{{ t('dashboard.widgets.readingStreak.best', { count: data.longestStreak }, data.longestStreak) }}</span>
       </div>
 
       <!-- Last 7 days dots -->
@@ -56,7 +62,7 @@ const { data, loading, error } = useReadingStreakWidget()
           :class="active ? 'bg-primary' : 'bg-muted'"
         />
       </div>
-      <p class="text-[11px] text-muted-foreground">Last 7 days</p>
+      <p class="text-[11px] text-muted-foreground">{{ t('dashboard.widgets.readingStreak.lastSevenDays') }}</p>
     </div>
   </div>
 </template>

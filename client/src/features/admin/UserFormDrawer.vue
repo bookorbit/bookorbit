@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { X } from '@lucide/vue'
 import { api } from '@/lib/api'
 import { Permission, PERMISSION_LABELS } from '@bookorbit/types'
@@ -31,12 +32,16 @@ const emit = defineEmits<{
   saved: [resetUrl?: string]
 }>()
 
-const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] = [
+const { t } = useI18n()
+
+const PERMISSION_GROUPS: { id: string; label: string; permissions: Permission[] }[] = [
   {
+    id: 'content',
     label: 'Content',
     permissions: [Permission.LibraryDownload, Permission.LibraryUpload, Permission.LibraryEditMetadata, Permission.LibraryDeleteBooks],
   },
   {
+    id: 'devicesAccess',
     label: 'Devices & Access',
     permissions: [
       Permission.KoboSync,
@@ -49,18 +54,25 @@ const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] = [
     ],
   },
   {
+    id: 'email',
     label: 'Email',
     permissions: [Permission.EmailSend, Permission.ManageEmail],
   },
   {
+    id: 'administration',
     label: 'Administration',
     permissions: [Permission.ManageLibraries, Permission.ManageMetadataConfig, Permission.ManageAppSettings, Permission.ManageUsers],
   },
   {
+    id: 'restrictions',
     label: 'Restrictions',
     permissions: [Permission.DemoRestricted],
   },
 ]
+
+const permissionGroups = computed(() =>
+  PERMISSION_GROUPS.map((group) => ({ ...group, label: t(`adminFeature.userForm.permissionGroups.${group.id}`) })),
+)
 
 const name = ref('')
 const username = ref('')
@@ -167,7 +179,7 @@ watch(
     }
 
     libraryAccessOpen.value = !isMobile.value
-    permissionGroupOpen.value = Object.fromEntries(PERMISSION_GROUPS.map((group) => [group.label, !isMobile.value]))
+    permissionGroupOpen.value = Object.fromEntries(PERMISSION_GROUPS.map((group) => [group.id, !isMobile.value]))
     contentFiltersOpen.value = false
     currentTab.value = 'general'
   },
@@ -183,7 +195,7 @@ watch(
 
 watch(isMobile, (mobile) => {
   libraryAccessOpen.value = !mobile
-  permissionGroupOpen.value = Object.fromEntries(PERMISSION_GROUPS.map((group) => [group.label, !mobile]))
+  permissionGroupOpen.value = Object.fromEntries(PERMISSION_GROUPS.map((group) => [group.id, !mobile]))
 })
 
 function togglePermission(permName: string) {
@@ -208,7 +220,7 @@ async function handleSubmit() {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        error.value = err.message ?? 'Failed to update user'
+        error.value = err.message ?? t('adminFeature.userForm.errors.updateUser')
         return
       }
 
@@ -219,7 +231,7 @@ async function handleSubmit() {
       })
       if (!permRes.ok) {
         const err = await permRes.json().catch(() => ({}))
-        error.value = err.message ?? 'Failed to update permissions'
+        error.value = err.message ?? t('adminFeature.userForm.errors.updatePermissions')
         return
       }
 
@@ -230,7 +242,7 @@ async function handleSubmit() {
       })
       if (!libRes.ok) {
         const err = await libRes.json().catch(() => ({}))
-        error.value = err.message ?? 'Failed to update library access'
+        error.value = err.message ?? t('adminFeature.userForm.errors.updateLibraryAccess')
         return
       }
 
@@ -247,13 +259,13 @@ async function handleSubmit() {
         })
         if (!cfRes.ok) {
           const err = await cfRes.json().catch(() => ({}))
-          error.value = err.message ?? 'Failed to update content filters'
+          error.value = err.message ?? t('adminFeature.userForm.errors.updateContentFilters')
           return
         }
       }
     } else {
       if (!isSharedAccount.value && !trimmedEmail) {
-        error.value = 'Email is required'
+        error.value = t('adminFeature.userForm.errors.emailRequired')
         return
       }
 
@@ -271,7 +283,7 @@ async function handleSubmit() {
         })
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
-          error.value = err.message ?? 'Failed to create shared account'
+          error.value = err.message ?? t('adminFeature.userForm.errors.createSharedAccount')
           return
         }
         emit('saved')
@@ -291,7 +303,7 @@ async function handleSubmit() {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        error.value = err.message ?? 'Failed to create user'
+        error.value = err.message ?? t('adminFeature.userForm.errors.createUser')
         return
       }
       const data = await res.json()
@@ -313,17 +325,23 @@ async function handleSubmit() {
       <div class="flex items-center justify-between px-6 pt-5 pb-4">
         <div class="flex items-center gap-3">
           <h2 class="text-base font-semibold text-foreground">
-            {{ isEdit ? name || username || 'Edit User' : isSharedAccount ? 'Create Shared Account' : 'Create User' }}
+            {{
+              isEdit
+                ? name || username || t('adminFeature.userForm.editUser')
+                : isSharedAccount
+                  ? t('adminFeature.userForm.createSharedAccount')
+                  : t('adminFeature.userForm.createUser')
+            }}
           </h2>
           <Badge
             v-if="isSharedAccount"
             variant="secondary"
             class="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 hover:bg-amber-500/20"
-            >Shared</Badge
+            >{{ t('adminFeature.userForm.sharedBadge') }}</Badge
           >
           <div v-if="isEdit" class="flex items-center gap-2">
             <ToggleSwitch v-model="active" />
-            <span class="text-xs text-muted-foreground">{{ active ? 'Active' : 'Suspended' }}</span>
+            <span class="text-xs text-muted-foreground">{{ active ? t('adminFeature.userForm.active') : t('adminFeature.userForm.suspended') }}</span>
           </div>
         </div>
         <button @click="emit('close')" class="text-muted-foreground hover:text-foreground">
@@ -340,7 +358,7 @@ async function handleSubmit() {
           :class="currentTab === tab ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
           @click="currentTab = tab"
         >
-          {{ tab }}
+          {{ t(`adminFeature.userForm.tabs.${tab}`) }}
         </button>
       </div>
 
@@ -350,18 +368,18 @@ async function handleSubmit() {
             <label class="flex items-start gap-3 cursor-pointer">
               <input id="isShared" v-model="isSharedAccount" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-input" />
               <div>
-                <p class="text-sm font-medium text-foreground">Shared account</p>
-                <p class="text-xs text-muted-foreground mt-0.5">No password. Access is granted via magic links only.</p>
+                <p class="text-sm font-medium text-foreground">{{ t('adminFeature.userForm.sharedAccount') }}</p>
+                <p class="text-xs text-muted-foreground mt-0.5">{{ t('adminFeature.userForm.sharedAccountHint') }}</p>
               </div>
             </label>
           </div>
           <div v-else-if="isSharedAccount" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-4 py-3">
-            <p class="text-sm text-amber-600 dark:text-amber-400 font-medium">Shared account</p>
-            <p class="text-xs text-muted-foreground mt-0.5">Manage login links from Settings - Magic Links.</p>
+            <p class="text-sm text-amber-600 dark:text-amber-400 font-medium">{{ t('adminFeature.userForm.sharedAccount') }}</p>
+            <p class="text-xs text-muted-foreground mt-0.5">{{ t('adminFeature.userForm.sharedAccountManageHint') }}</p>
           </div>
 
           <div v-if="!isEdit" class="space-y-1.5">
-            <label class="settings-label">Username</label>
+            <label class="settings-label">{{ t('adminFeature.userForm.username') }}</label>
             <input
               v-model="username"
               type="text"
@@ -370,7 +388,7 @@ async function handleSubmit() {
             />
           </div>
           <div class="space-y-1.5">
-            <label class="settings-label">Full name</label>
+            <label class="settings-label">{{ t('adminFeature.userForm.fullName') }}</label>
             <input
               v-model="name"
               type="text"
@@ -380,8 +398,8 @@ async function handleSubmit() {
           </div>
           <div class="space-y-1.5">
             <label class="settings-label">
-              Email
-              <span v-if="isSharedAccount && !isEdit" class="text-muted-foreground font-normal">(optional)</span>
+              {{ t('adminFeature.userForm.email') }}
+              <span v-if="isSharedAccount && !isEdit" class="text-muted-foreground font-normal">{{ t('adminFeature.userForm.optional') }}</span>
             </label>
             <input
               v-model="email"
@@ -394,7 +412,7 @@ async function handleSubmit() {
 
         <div v-if="currentTab === 'access'" class="space-y-6">
           <div v-if="libraries.length > 0" class="space-y-3">
-            <label class="settings-label">Library Access</label>
+            <label class="settings-label">{{ t('adminFeature.userForm.libraryAccess') }}</label>
             <div class="space-y-1.5 rounded-md border border-border p-3">
               <label v-for="lib in libraries" :key="lib.id" class="flex cursor-pointer items-center gap-2">
                 <input
@@ -406,23 +424,29 @@ async function handleSubmit() {
                 <span class="text-sm text-foreground">{{ lib.name }}</span>
               </label>
             </div>
-            <p v-if="selectedLibraryIds.size === 0" class="text-xs text-muted-foreground">No libraries selected. User cannot view any books.</p>
+            <p v-if="selectedLibraryIds.size === 0" class="text-xs text-muted-foreground">{{ t('adminFeature.userForm.noLibrariesSelected') }}</p>
           </div>
 
           <div class="space-y-3">
             <div class="flex items-center justify-between">
-              <label class="settings-label">Permissions</label>
+              <label class="settings-label">{{ t('adminFeature.userForm.permissions') }}</label>
               <div class="flex items-center gap-2">
-                <button type="button" @click="applyPreset('standard')" class="text-xs text-muted-foreground hover:text-foreground">Standard</button>
+                <button type="button" @click="applyPreset('standard')" class="text-xs text-muted-foreground hover:text-foreground">
+                  {{ t('adminFeature.userForm.presetStandard') }}
+                </button>
                 <span class="text-muted-foreground/30">•</span>
-                <button type="button" @click="applyPreset('admin')" class="text-xs text-muted-foreground hover:text-foreground">Admin</button>
+                <button type="button" @click="applyPreset('admin')" class="text-xs text-muted-foreground hover:text-foreground">
+                  {{ t('adminFeature.userForm.presetAdmin') }}
+                </button>
                 <span class="text-muted-foreground/30">•</span>
-                <button type="button" @click="applyPreset('clear')" class="text-xs text-muted-foreground hover:text-foreground">Clear All</button>
+                <button type="button" @click="applyPreset('clear')" class="text-xs text-muted-foreground hover:text-foreground">
+                  {{ t('adminFeature.userForm.presetClearAll') }}
+                </button>
               </div>
             </div>
 
             <div class="space-y-5">
-              <div v-for="group in PERMISSION_GROUPS" :key="group.label" class="space-y-2">
+              <div v-for="group in permissionGroups" :key="group.id" class="space-y-2">
                 <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{{ group.label }}</p>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                   <label v-for="permName in group.permissions" :key="permName" class="flex cursor-pointer items-start gap-2">
@@ -442,8 +466,8 @@ async function handleSubmit() {
 
         <div v-if="currentTab === 'restrictions'" class="space-y-5">
           <div v-if="isSuperuserTarget" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-4 py-3">
-            <p class="text-sm text-amber-600 dark:text-amber-400 font-medium">Superuser Target</p>
-            <p class="text-xs text-muted-foreground mt-0.5">Content restrictions cannot be applied to superusers.</p>
+            <p class="text-sm text-amber-600 dark:text-amber-400 font-medium">{{ t('adminFeature.userForm.superuserTarget') }}</p>
+            <p class="text-xs text-muted-foreground mt-0.5">{{ t('adminFeature.userForm.superuserTargetHint') }}</p>
           </div>
           <template v-else>
             <div
@@ -451,53 +475,73 @@ async function handleSubmit() {
               class="rounded-md border border-dashed border-border px-4 py-8 text-center flex flex-col items-center gap-3"
             >
               <div class="space-y-1">
-                <p class="text-sm font-medium text-foreground">No content restrictions</p>
-                <p class="text-xs text-muted-foreground">This user has full access to all books in their assigned libraries.</p>
+                <p class="text-sm font-medium text-foreground">{{ t('adminFeature.userForm.noRestrictions') }}</p>
+                <p class="text-xs text-muted-foreground">{{ t('adminFeature.userForm.noRestrictionsHint') }}</p>
               </div>
               <button
                 type="button"
                 @click="restrictionsEnabled = true"
                 class="text-xs font-medium text-primary hover:text-primary/80 bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-md transition-colors"
               >
-                + Add Content Restrictions
+                {{ t('adminFeature.userForm.addRestrictions') }}
               </button>
             </div>
             <div v-else class="space-y-5">
               <div class="flex items-center justify-between">
-                <p class="text-sm font-medium text-foreground">Content Restrictions</p>
+                <p class="text-sm font-medium text-foreground">{{ t('adminFeature.userForm.contentRestrictions') }}</p>
                 <button
                   type="button"
                   v-if="!hasRestrictions"
                   @click="restrictionsEnabled = false"
                   class="text-xs text-muted-foreground hover:text-foreground"
                 >
-                  Remove
+                  {{ t('adminFeature.userForm.remove') }}
                 </button>
               </div>
 
               <div class="space-y-1.5">
                 <label class="text-xs font-medium text-foreground"
-                  >Include tags <span class="text-muted-foreground font-normal">(show only books with these tags)</span></label
+                  >{{ t('adminFeature.userForm.includeTags') }}
+                  <span class="text-muted-foreground font-normal">{{ t('adminFeature.userForm.includeTagsHint') }}</span></label
                 >
-                <ContentFilterChipInput v-model="includeTagItems" placeholder="Search tags..." :search-fn="searchTags" />
+                <ContentFilterChipInput
+                  v-model="includeTagItems"
+                  :placeholder="t('adminFeature.userForm.searchTagsPlaceholder')"
+                  :search-fn="searchTags"
+                />
               </div>
               <div class="space-y-1.5">
                 <label class="text-xs font-medium text-foreground"
-                  >Exclude tags <span class="text-muted-foreground font-normal">(hide books with these tags)</span></label
+                  >{{ t('adminFeature.userForm.excludeTags') }}
+                  <span class="text-muted-foreground font-normal">{{ t('adminFeature.userForm.excludeTagsHint') }}</span></label
                 >
-                <ContentFilterChipInput v-model="excludeTagItems" placeholder="Search tags..." :search-fn="searchTags" />
+                <ContentFilterChipInput
+                  v-model="excludeTagItems"
+                  :placeholder="t('adminFeature.userForm.searchTagsPlaceholder')"
+                  :search-fn="searchTags"
+                />
               </div>
               <div class="space-y-1.5">
                 <label class="text-xs font-medium text-foreground"
-                  >Include genres <span class="text-muted-foreground font-normal">(show only books with these genres)</span></label
+                  >{{ t('adminFeature.userForm.includeGenres') }}
+                  <span class="text-muted-foreground font-normal">{{ t('adminFeature.userForm.includeGenresHint') }}</span></label
                 >
-                <ContentFilterChipInput v-model="includeGenreItems" placeholder="Search genres..." :search-fn="searchGenres" />
+                <ContentFilterChipInput
+                  v-model="includeGenreItems"
+                  :placeholder="t('adminFeature.userForm.searchGenresPlaceholder')"
+                  :search-fn="searchGenres"
+                />
               </div>
               <div class="space-y-1.5">
                 <label class="text-xs font-medium text-foreground"
-                  >Exclude genres <span class="text-muted-foreground font-normal">(hide books with these genres)</span></label
+                  >{{ t('adminFeature.userForm.excludeGenres') }}
+                  <span class="text-muted-foreground font-normal">{{ t('adminFeature.userForm.excludeGenresHint') }}</span></label
                 >
-                <ContentFilterChipInput v-model="excludeGenreItems" placeholder="Search genres..." :search-fn="searchGenres" />
+                <ContentFilterChipInput
+                  v-model="excludeGenreItems"
+                  :placeholder="t('adminFeature.userForm.searchGenresPlaceholder')"
+                  :search-fn="searchGenres"
+                />
               </div>
             </div>
           </template>
@@ -512,7 +556,7 @@ async function handleSubmit() {
           type="button"
           class="rounded-md border border-border px-4 py-2 settings-label hover:bg-muted transition-colors"
         >
-          Cancel
+          {{ t('common.cancel') }}
         </button>
         <button
           @click="handleSubmit"
@@ -520,7 +564,7 @@ async function handleSubmit() {
           :disabled="loading"
           class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
         >
-          {{ loading ? 'Saving...' : 'Save' }}
+          {{ loading ? t('adminFeature.userForm.saving') : t('common.save') }}
         </button>
       </div>
     </div>

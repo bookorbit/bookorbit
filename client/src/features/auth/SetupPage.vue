@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Moon, Sun, Wallpaper } from '@lucide/vue'
 import { ACCENT_VIVID, ACCENT_PASTEL, ACCENT_OPTIONS, RADIUS_OPTIONS, BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuth } from './composables/useAuth'
 
+const { t } = useI18n()
 const themeStore = useThemeStore()
 const accentOpen = ref(false)
 const radiusOpen = ref(false)
@@ -61,7 +63,7 @@ async function handleSubmit() {
   error.value = null
 
   if (password.value !== confirmPassword.value) {
-    error.value = 'Passwords do not match'
+    error.value = t('auth.errors.passwordsDoNotMatch')
     return
   }
 
@@ -75,7 +77,7 @@ async function handleSubmit() {
       setupToken: setupToken.value || undefined,
     })
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to complete setup'
+    error.value = err instanceof Error ? err.message : t('auth.setup.errors.failed')
   } finally {
     loading.value = false
   }
@@ -94,7 +96,7 @@ async function handleSubmit() {
             <Moon v-else :size="14" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>{{ themeStore.theme === 'dark' ? 'Switch to light' : 'Switch to dark' }}</TooltipContent>
+        <TooltipContent>{{ themeStore.theme === 'dark' ? t('auth.themePicker.switchToLight') : t('auth.themePicker.switchToDark') }}</TooltipContent>
       </Tooltip>
 
       <!-- Radius picker -->
@@ -127,7 +129,7 @@ async function handleSubmit() {
               <span class="w-3.5 h-3.5 border-2 border-current block" :style="{ borderRadius: radiusPreview(themeStore.radius) }" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Change corner radius</TooltipContent>
+          <TooltipContent>{{ t('auth.themePicker.changeRadius') }}</TooltipContent>
         </Tooltip>
       </div>
 
@@ -159,7 +161,7 @@ async function handleSubmit() {
               <Wallpaper :size="14" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Change background</TooltipContent>
+          <TooltipContent>{{ t('auth.themePicker.changeBackground') }}</TooltipContent>
         </Tooltip>
       </div>
 
@@ -211,7 +213,7 @@ async function handleSubmit() {
               <span class="w-3.5 h-3.5 rounded-full block" :style="{ backgroundColor: currentAccent?.color }" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Change accent color</TooltipContent>
+          <TooltipContent>{{ t('auth.themePicker.changeAccent') }}</TooltipContent>
         </Tooltip>
       </div>
     </div>
@@ -221,13 +223,13 @@ async function handleSubmit() {
 
     <div class="login-card relative z-10 w-full max-w-md rounded-2xl p-8">
       <div class="mb-6">
-        <h1 class="text-xl font-semibold text-foreground">Initial setup</h1>
-        <p class="text-sm text-muted-foreground mt-1">Create the first administrator account.</p>
+        <h1 class="text-xl font-semibold text-foreground">{{ t('auth.setup.title') }}</h1>
+        <p class="text-sm text-muted-foreground mt-1">{{ t('auth.setup.subtitle') }}</p>
       </div>
 
       <form class="space-y-4" @submit.prevent="handleSubmit">
         <div class="space-y-1.5">
-          <label for="setup-username" class="text-sm font-medium text-foreground">Username</label>
+          <label for="setup-username" class="text-sm font-medium text-foreground">{{ t('auth.fields.username') }}</label>
           <input
             id="setup-username"
             v-model="username"
@@ -239,7 +241,7 @@ async function handleSubmit() {
         </div>
 
         <div class="space-y-1.5">
-          <label for="setup-name" class="text-sm font-medium text-foreground">Full name</label>
+          <label for="setup-name" class="text-sm font-medium text-foreground">{{ t('auth.fields.fullName') }}</label>
           <input
             id="setup-name"
             v-model="name"
@@ -251,7 +253,7 @@ async function handleSubmit() {
         </div>
 
         <div class="space-y-1.5">
-          <label for="setup-email" class="text-sm font-medium text-foreground">Email</label>
+          <label for="setup-email" class="text-sm font-medium text-foreground">{{ t('auth.fields.email') }}</label>
           <input
             id="setup-email"
             v-model="email"
@@ -263,7 +265,7 @@ async function handleSubmit() {
         </div>
 
         <div class="space-y-1.5">
-          <label for="setup-password" class="text-sm font-medium text-foreground">Password</label>
+          <label for="setup-password" class="text-sm font-medium text-foreground">{{ t('auth.fields.password') }}</label>
           <input
             id="setup-password"
             v-model="password"
@@ -272,11 +274,11 @@ async function handleSubmit() {
             required
             class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
           />
-          <p class="text-xs text-muted-foreground">Min. 8 characters with uppercase, lowercase, and a digit</p>
+          <p class="text-xs text-muted-foreground">{{ t('auth.fields.passwordHint') }}</p>
         </div>
 
         <div class="space-y-1.5">
-          <label for="setup-confirm-password" class="text-sm font-medium text-foreground">Confirm password</label>
+          <label for="setup-confirm-password" class="text-sm font-medium text-foreground">{{ t('auth.fields.confirmPassword') }}</label>
           <input
             id="setup-confirm-password"
             v-model="confirmPassword"
@@ -289,8 +291,8 @@ async function handleSubmit() {
 
         <div class="space-y-1.5">
           <label for="setup-token" class="text-sm font-medium text-foreground">
-            Setup token
-            <span class="text-muted-foreground">(required in production)</span>
+            {{ t('auth.setup.setupToken') }}
+            <span class="text-muted-foreground">{{ t('auth.setup.setupTokenHint') }}</span>
           </label>
           <input
             id="setup-token"
@@ -308,7 +310,7 @@ async function handleSubmit() {
           :disabled="loading"
           class="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
         >
-          {{ loading ? 'Creating account...' : 'Create administrator account' }}
+          {{ loading ? t('auth.setup.creatingAccount') : t('auth.setup.createAccount') }}
         </button>
       </form>
     </div>

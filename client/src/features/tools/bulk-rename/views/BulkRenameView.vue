@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useElementSize } from '@vueuse/core'
 import { ChevronLeft, ChevronRight, ExternalLink, Loader2, Play, RefreshCw, SlidersHorizontal, X } from '@lucide/vue'
 import type { BulkRenameStatus, Library } from '@bookorbit/types'
@@ -11,6 +12,7 @@ import { useBulkRename } from '../../composables/useBulkRename'
 import BulkRenameStatusBadge from '../components/BulkRenameStatusBadge.vue'
 import BulkRenameConfirmDialog from '../components/BulkRenameConfirmDialog.vue'
 
+const { t } = useI18n()
 const { libraries, fetchLibraries } = useLibraries()
 const bulk = useBulkRename()
 
@@ -33,24 +35,24 @@ const columnVisibility = ref<BulkRenameColumnVisibility>(
   storage.get<BulkRenameColumnVisibility>('tools.bulkRename.columnVisibility', defaultColumnVisibility),
 )
 type ColumnOption = { key: keyof BulkRenameColumnVisibility; label: string }
-const columnOptions: ColumnOption[] = [
-  { key: 'title', label: 'Title' },
-  { key: 'currentPath', label: 'Current Path' },
-  { key: 'newPath', label: 'New Path' },
-]
+const columnOptions = computed<ColumnOption[]>(() => [
+  { key: 'title', label: t('tools.bulkRename.columns.title') },
+  { key: 'currentPath', label: t('tools.bulkRename.columns.currentPath') },
+  { key: 'newPath', label: t('tools.bulkRename.columns.newPath') },
+])
 
 const eligibleLibraries = computed(() => libraries.value.filter((lib: Library) => lib.fileRenameEnabled))
 const selectedLibrary = computed(() => eligibleLibraries.value.find((lib: Library) => lib.id === bulk.selectedLibraryId.value) ?? null)
 const selectedLibraryRoots = computed(() => selectedLibrary.value?.folders.map((folder) => folder.path) ?? [])
 
-const statusOptions: { value: BulkRenameStatus | undefined; label: string }[] = [
-  { value: undefined, label: 'All' },
-  { value: 'will_rename', label: 'Will Rename' },
-  { value: 'unchanged', label: 'Unchanged' },
-  { value: 'collision', label: 'Collision' },
-  { value: 'no_pattern', label: 'No Pattern' },
-  { value: 'error', label: 'Error' },
-]
+const statusOptions = computed<{ value: BulkRenameStatus | undefined; label: string }[]>(() => [
+  { value: undefined, label: t('tools.bulkRename.filter.all') },
+  { value: 'will_rename', label: t('tools.bulkRename.status.willRename') },
+  { value: 'unchanged', label: t('tools.bulkRename.status.unchanged') },
+  { value: 'collision', label: t('tools.bulkRename.status.collision') },
+  { value: 'no_pattern', label: t('tools.bulkRename.status.noPattern') },
+  { value: 'error', label: t('tools.bulkRename.status.error') },
+])
 
 const hasPreview = computed(() => bulk.previewItems.value.length > 0 || bulk.previewTotal.value > 0)
 const showTitleColumn = computed(() => columnVisibility.value.title)
@@ -243,21 +245,21 @@ watch(
         <div class="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:gap-3">
           <div class="min-w-0 flex flex-col gap-2">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-              <label class="text-sm font-medium text-foreground sm:shrink-0">Library</label>
+              <label class="text-sm font-medium text-foreground sm:shrink-0">{{ t('tools.bulkRename.library') }}</label>
               <select
                 ref="librarySelectRef"
                 class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-primary sm:flex-1"
                 :value="bulk.selectedLibraryId.value ?? ''"
                 @change="handleLibraryChange"
               >
-                <option value="" disabled>Select a library...</option>
+                <option value="" disabled>{{ t('tools.bulkRename.selectLibraryPlaceholder') }}</option>
                 <option v-for="lib in eligibleLibraries" :key="lib.id" :value="lib.id">
                   {{ lib.name }}
                 </option>
               </select>
             </div>
             <p v-if="eligibleLibraries.length === 0" class="text-sm text-muted-foreground">
-              No libraries have file rename enabled. Enable it in Library Settings.
+              {{ t('tools.bulkRename.noEligibleLibraries') }}
             </p>
           </div>
 
@@ -268,7 +270,7 @@ watch(
               @click="handleRefreshPreview"
             >
               <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': bulk.loading.value }" />
-              Refresh
+              {{ t('tools.bulkRename.refresh') }}
             </button>
 
             <button
@@ -278,7 +280,7 @@ watch(
               @click="handleOpenConfirm"
             >
               <Play class="h-4 w-4" />
-              Apply Rename
+              {{ t('tools.bulkRename.applyRename') }}
             </button>
 
             <button
@@ -287,7 +289,7 @@ watch(
               @click="handleCancelExecution"
             >
               <X class="h-4 w-4" />
-              Cancel
+              {{ t('common.cancel') }}
             </button>
           </div>
         </div>
@@ -295,20 +297,24 @@ watch(
         <div v-if="bulk.selectedLibraryId.value !== null" class="rounded-md bg-muted/20 px-3 py-2.5">
           <div class="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
             <div class="flex flex-wrap items-center gap-2">
-              <span class="font-medium text-foreground">Summary</span>
-              <span class="rounded-full bg-primary/15 px-2.5 py-0.5 text-primary">{{ bulk.totalByStatus.value.will_rename }} to rename</span>
-              <span class="rounded-full bg-muted px-2.5 py-0.5 text-muted-foreground">{{ bulk.totalByStatus.value.unchanged }} unchanged</span>
+              <span class="font-medium text-foreground">{{ t('tools.bulkRename.summary.label') }}</span>
+              <span class="rounded-full bg-primary/15 px-2.5 py-0.5 text-primary">{{
+                t('tools.bulkRename.summary.toRename', { count: bulk.totalByStatus.value.will_rename })
+              }}</span>
+              <span class="rounded-full bg-muted px-2.5 py-0.5 text-muted-foreground">{{
+                t('tools.bulkRename.summary.unchanged', { count: bulk.totalByStatus.value.unchanged })
+              }}</span>
               <span v-if="bulk.totalByStatus.value.collision > 0" class="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-amber-500">
-                {{ bulk.totalByStatus.value.collision }} collision{{ bulk.totalByStatus.value.collision === 1 ? '' : 's' }}
+                {{ t('tools.bulkRename.summary.collisions', { count: bulk.totalByStatus.value.collision }, bulk.totalByStatus.value.collision) }}
               </span>
               <span v-if="bulk.totalByStatus.value.error > 0" class="rounded-full bg-destructive/15 px-2.5 py-0.5 text-destructive">
-                {{ bulk.totalByStatus.value.error }} error{{ bulk.totalByStatus.value.error === 1 ? '' : 's' }}
+                {{ t('tools.bulkRename.summary.errors', { count: bulk.totalByStatus.value.error }, bulk.totalByStatus.value.error) }}
               </span>
             </div>
             <div class="flex items-center gap-2">
               <label class="inline-flex items-center gap-2 text-xs text-muted-foreground">
                 <input v-model="showFullPaths" type="checkbox" class="h-4 w-4 rounded border-border bg-background text-primary" />
-                Show full paths
+                {{ t('tools.bulkRename.showFullPaths') }}
               </label>
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
@@ -316,7 +322,7 @@ watch(
                     class="inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-background/70 px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
                   >
                     <SlidersHorizontal class="h-3.5 w-3.5" />
-                    Columns
+                    {{ t('tools.bulkRename.columnsMenu') }}
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" class="w-44">
@@ -362,33 +368,39 @@ watch(
         <SlidersHorizontal class="h-6 w-6 text-muted-foreground" />
       </div>
       <div class="space-y-1">
-        <p class="text-base font-semibold text-foreground">Pick a Library to Start</p>
+        <p class="text-base font-semibold text-foreground">{{ t('tools.bulkRename.empty.title') }}</p>
         <p class="max-w-sm text-sm text-muted-foreground">
-          Select a library above to preview rename changes, filter by status, and apply the bulk rename run.
+          {{ t('tools.bulkRename.empty.description') }}
         </p>
       </div>
       <button
         class="inline-flex h-9 items-center rounded-md border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/60"
         @click="focusLibrarySelect"
       >
-        Choose Library
+        {{ t('tools.bulkRename.empty.chooseLibrary') }}
       </button>
     </div>
 
     <template v-else>
       <div v-if="bulk.executing.value" class="flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 text-primary">
         <Loader2 class="h-4 w-4 animate-spin" />
-        <span class="text-sm">Renaming files - you can cancel at any time.</span>
+        <span class="text-sm">{{ t('tools.bulkRename.renamingInProgress') }}</span>
       </div>
 
       <div
         v-if="bulk.executionStats.value && !bulk.executing.value"
         class="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-emerald-600 dark:text-emerald-400"
       >
-        <p class="text-sm font-medium">Bulk rename completed</p>
+        <p class="text-sm font-medium">{{ t('tools.bulkRename.completed.title') }}</p>
         <p class="mt-1 text-sm">
-          {{ bulk.executionStats.value.succeeded }} renamed, {{ bulk.executionStats.value.failed }} failed,
-          {{ bulk.executionStats.value.skipped }} skipped ({{ bulk.executionStats.value.processed }} total)
+          {{
+            t('tools.bulkRename.completed.stats', {
+              succeeded: bulk.executionStats.value.succeeded,
+              failed: bulk.executionStats.value.failed,
+              skipped: bulk.executionStats.value.skipped,
+              processed: bulk.executionStats.value.processed,
+            })
+          }}
         </p>
       </div>
 
@@ -396,7 +408,7 @@ watch(
         v-if="bulk.executionError.value && !bulk.executing.value"
         class="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-destructive"
       >
-        <p class="text-sm font-medium">Bulk rename failed</p>
+        <p class="text-sm font-medium">{{ t('tools.bulkRename.executionFailed') }}</p>
         <p class="mt-1 text-sm">{{ bulk.executionError.value }}</p>
       </div>
 
@@ -404,7 +416,7 @@ watch(
         v-if="bulk.previewError.value && !hasPreview"
         class="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-6 text-center text-destructive"
       >
-        <p class="text-sm font-medium">Failed to load preview</p>
+        <p class="text-sm font-medium">{{ t('tools.bulkRename.previewFailed') }}</p>
         <p class="mt-1 text-sm">{{ bulk.previewError.value }}</p>
       </div>
 
@@ -427,7 +439,7 @@ watch(
                 <RouterLink
                   :to="{ name: 'book-detail', params: { bookId: item.bookId } }"
                   class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border/70 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                  aria-label="Open book details"
+                  :aria-label="t('tools.bulkRename.openBookDetails')"
                 >
                   <ExternalLink class="h-3.5 w-3.5" />
                 </RouterLink>
@@ -436,11 +448,11 @@ watch(
                 </p>
               </div>
               <div v-if="showCurrentPathColumn" class="space-y-0.5">
-                <p class="text-[11px] uppercase tracking-wide text-muted-foreground">Current Path</p>
+                <p class="text-[11px] uppercase tracking-wide text-muted-foreground">{{ t('tools.bulkRename.columns.currentPath') }}</p>
                 <p class="truncate font-mono text-xs text-muted-foreground" :title="item.currentPath">{{ formatCardPath(item.currentPath) }}</p>
               </div>
               <div v-if="showNewPathColumn" class="space-y-0.5">
-                <p class="text-[11px] uppercase tracking-wide text-muted-foreground">New Path</p>
+                <p class="text-[11px] uppercase tracking-wide text-muted-foreground">{{ t('tools.bulkRename.columns.newPath') }}</p>
                 <p class="truncate font-mono text-xs text-muted-foreground" :title="item.newPath ?? '-'">{{ formatCardPath(item.newPath) }}</p>
               </div>
             </article>
@@ -457,10 +469,16 @@ watch(
             <thead class="sticky top-0 z-10 bg-muted/70 backdrop-blur-sm">
               <tr>
                 <th class="px-4 py-2.5 text-left font-medium text-muted-foreground">#</th>
-                <th v-if="showTitleColumn" class="w-56 px-4 py-2.5 text-left font-medium text-muted-foreground">Title</th>
-                <th v-if="showCurrentPathColumn" class="px-4 py-2.5 text-left font-medium text-muted-foreground">Current Path</th>
-                <th v-if="showNewPathColumn" class="px-4 py-2.5 text-left font-medium text-muted-foreground">New Path</th>
-                <th class="w-30 px-4 py-2.5 text-left font-medium text-muted-foreground">Status</th>
+                <th v-if="showTitleColumn" class="w-56 px-4 py-2.5 text-left font-medium text-muted-foreground">
+                  {{ t('tools.bulkRename.columns.title') }}
+                </th>
+                <th v-if="showCurrentPathColumn" class="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                  {{ t('tools.bulkRename.columns.currentPath') }}
+                </th>
+                <th v-if="showNewPathColumn" class="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                  {{ t('tools.bulkRename.columns.newPath') }}
+                </th>
+                <th class="w-30 px-4 py-2.5 text-left font-medium text-muted-foreground">{{ t('tools.bulkRename.columns.status') }}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-border/60">
@@ -471,7 +489,7 @@ watch(
                     <RouterLink
                       :to="{ name: 'book-detail', params: { bookId: item.bookId } }"
                       class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border/70 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                      aria-label="Open book details"
+                      :aria-label="t('tools.bulkRename.openBookDetails')"
                     >
                       <ExternalLink class="h-3.5 w-3.5" />
                     </RouterLink>
@@ -506,10 +524,13 @@ watch(
 
         <div class="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 bg-muted/20 px-4 py-3">
           <p class="text-xs text-muted-foreground sm:text-sm">
-            Showing {{ (bulk.page.value - 1) * bulk.pageSize.value + 1 }}-{{
-              Math.min(bulk.page.value * bulk.pageSize.value, bulk.previewTotal.value)
+            {{
+              t('tools.bulkRename.pagination.showing', {
+                from: (bulk.page.value - 1) * bulk.pageSize.value + 1,
+                to: Math.min(bulk.page.value * bulk.pageSize.value, bulk.previewTotal.value),
+                total: bulk.previewTotal.value,
+              })
             }}
-            of {{ bulk.previewTotal.value }}
           </p>
           <div class="flex items-center gap-1">
             <button
@@ -535,7 +556,7 @@ watch(
         v-else
         class="flex flex-1 items-center justify-center rounded-lg border border-dashed border-border/60 bg-card/20 p-10 text-muted-foreground"
       >
-        <p>No books found matching the current filter.</p>
+        <p>{{ t('tools.bulkRename.noBooksMatch') }}</p>
       </div>
     </template>
 

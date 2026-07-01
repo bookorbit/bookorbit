@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   ComboboxAnchor,
   ComboboxContent,
@@ -30,6 +31,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: number | null]
 }>()
+
+const { t } = useI18n()
 
 const searchTerm = ref('')
 
@@ -69,7 +72,7 @@ function displayValue(value: unknown): string {
       <ComboboxInput
         v-model="searchTerm"
         :display-value="displayValue"
-        :placeholder="placeholder ?? 'Select user'"
+        :placeholder="placeholder ?? t('migration.userSelect.placeholder')"
         class="h-9 w-full bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground/70 disabled:opacity-50"
       />
       <ComboboxTrigger class="shrink-0 px-2 text-muted-foreground">
@@ -84,7 +87,7 @@ function displayValue(value: unknown): string {
         class="z-[90] max-h-60 w-[var(--reka-combobox-trigger-width)] overflow-hidden rounded-md border border-border bg-popover shadow-md"
       >
         <ComboboxViewport class="p-1">
-          <ComboboxEmpty class="px-3 py-2 text-sm text-muted-foreground"> No users found </ComboboxEmpty>
+          <ComboboxEmpty class="px-3 py-2 text-sm text-muted-foreground"> {{ t('migration.userSelect.noUsersFound') }} </ComboboxEmpty>
           <ComboboxItem
             v-for="user in filteredUsers"
             :key="user.id"

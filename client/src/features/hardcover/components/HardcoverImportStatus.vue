@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { AlertCircle, CheckCircle2, Download, FileSearch, Loader2, Table2, XCircle } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import HardcoverImportReviewModal from './HardcoverImportReviewModal.vue'
 import { useHardcoverImport } from '../composables/useHardcoverImport'
 import { useHardcoverSettings } from '../composables/useHardcoverSettings'
+
+const { t } = useI18n()
 
 const { settings } = useHardcoverSettings()
 const { preview, result, previewing, applying, error, loadPreview, applyPreview, clearImport } = useHardcoverImport()
@@ -15,11 +18,11 @@ const importProgress = ref(true)
 const importUnavailableReason = computed(() => {
   switch (settings.value?.disabledReason) {
     case 'permission_denied':
-      return 'You do not have permission to use Hardcover sync.'
+      return t('hardcover.import.unavailable.permissionDenied')
     case 'missing_token':
-      return 'Connect Hardcover before importing.'
+      return t('hardcover.import.unavailable.missingToken')
     case 'user_disabled':
-      return 'Sync is paused in your Hardcover settings.'
+      return t('hardcover.import.unavailable.userDisabled')
     default:
       return null
   }
@@ -32,25 +35,26 @@ const summaryItems = computed(() => {
   const summary = preview.value?.summary
   if (!summary) return []
   return [
-    { label: 'Ready', value: summary.willUpdate },
-    { label: 'Review', value: summary.needsReview },
-    { label: 'Conflicts', value: summary.conflicts },
-    { label: 'Unmatched', value: summary.unmatched },
-    { label: 'Skipped', value: summary.skipped },
+    { label: t('hardcover.import.summary.ready'), value: summary.willUpdate },
+    { label: t('hardcover.import.summary.review'), value: summary.needsReview },
+    { label: t('hardcover.import.summary.conflicts'), value: summary.conflicts },
+    { label: t('hardcover.import.summary.unmatched'), value: summary.unmatched },
+    { label: t('hardcover.import.summary.skipped'), value: summary.skipped },
   ]
 })
 const progressPreviewLabel = computed(() => {
   const summary = preview.value?.summary
   if (!summary) return null
-  const ready = `${summary.progressWillUpdate} progress update${summary.progressWillUpdate === 1 ? '' : 's'} available`
+  const ready = t('hardcover.import.progressAvailable', { count: summary.progressWillUpdate }, summary.progressWillUpdate)
   if (summary.progressConflicts === 0) return ready
-  return `${ready}, ${summary.progressConflicts} conflict${summary.progressConflicts === 1 ? '' : 's'}`
+  return `${ready}, ${t('hardcover.import.progressConflicts', { count: summary.progressConflicts }, summary.progressConflicts)}`
 })
 
 const resultLabel = computed(() => {
   if (!result.value) return null
-  const progress = result.value.progressApplied > 0 ? `, ${result.value.progressApplied} progress updated` : ''
-  return `${result.value.applied} imported${progress}, ${result.value.failed} failed`
+  const progress =
+    result.value.progressApplied > 0 ? `, ${t('hardcover.import.result.progressUpdated', { count: result.value.progressApplied })}` : ''
+  return t('hardcover.import.result.summary', { applied: result.value.applied, progress, failed: result.value.failed })
 })
 
 async function handlePreview(): Promise<void> {
@@ -82,12 +86,14 @@ async function handleApplySelected(hardcoverUserBookIds: number[]): Promise<void
 async function applyRows(hardcoverUserBookIds?: number[]): Promise<void> {
   const applied = await applyPreview(hardcoverUserBookIds, importProgress.value)
   if (!applied) {
-    toast.error(error.value ?? 'Failed to import Hardcover read status')
+    toast.error(error.value ?? t('hardcover.import.toast.importFailed'))
     return
   }
   reviewOpen.value = false
-  const progress = importProgress.value ? `, ${applied.progressApplied} progress update${applied.progressApplied === 1 ? '' : 's'}` : ''
-  toast.success(`${applied.applied} read status${applied.applied === 1 ? '' : 'es'} imported${progress}`)
+  const progress = importProgress.value
+    ? `, ${t('hardcover.import.toast.progressUpdates', { count: applied.progressApplied }, applied.progressApplied)}`
+    : ''
+  toast.success(t('hardcover.import.toast.imported', { count: applied.applied, progress }, applied.applied))
 }
 </script>
 
@@ -95,8 +101,8 @@ async function applyRows(hardcoverUserBookIds?: number[]): Promise<void> {
   <div class="space-y-4 rounded-lg border border-border bg-card px-4 py-4 shadow-xs md:px-5 md:py-5">
     <div class="flex items-start justify-between gap-4">
       <div class="min-w-0">
-        <p class="text-sm font-medium">Pull read status</p>
-        <p class="mt-0.5 text-xs text-muted-foreground">Preview Hardcover matches before filling blank BookOrbit statuses.</p>
+        <p class="text-sm font-medium">{{ t('hardcover.import.title') }}</p>
+        <p class="mt-0.5 text-xs text-muted-foreground">{{ t('hardcover.import.description') }}</p>
         <p v-if="importUnavailableReason" class="mt-1 text-xs text-muted-foreground">{{ importUnavailableReason }}</p>
         <p v-else-if="resultLabel && !preview" class="mt-1 flex items-center gap-1 text-xs text-primary">
           <CheckCircle2 class="size-3.5" />
@@ -117,7 +123,7 @@ async function applyRows(hardcoverUserBookIds?: number[]): Promise<void> {
           @click="handleClear"
         >
           <XCircle class="size-3.5" />
-          Clear
+          {{ t('hardcover.import.clear') }}
         </button>
         <button
           type="button"
@@ -127,7 +133,7 @@ async function applyRows(hardcoverUserBookIds?: number[]): Promise<void> {
         >
           <Loader2 v-if="previewing" class="size-3.5 animate-spin" />
           <FileSearch v-else class="size-3.5" />
-          Preview
+          {{ t('hardcover.import.preview') }}
         </button>
       </div>
     </div>
@@ -142,7 +148,7 @@ async function applyRows(hardcoverUserBookIds?: number[]): Promise<void> {
 
       <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div class="space-y-2">
-          <p class="text-xs text-muted-foreground">{{ readyRows.length }} exact matches can be imported without review.</p>
+          <p class="text-xs text-muted-foreground">{{ t('hardcover.import.exactMatches', { count: readyRows.length }, readyRows.length) }}</p>
           <label class="flex w-fit items-center gap-2 text-xs text-muted-foreground">
             <input
               v-model="importProgress"
@@ -150,7 +156,7 @@ async function applyRows(hardcoverUserBookIds?: number[]): Promise<void> {
               class="size-4 rounded border-border text-primary focus:ring-primary/40"
               :disabled="applying"
             />
-            <span>Import progress</span>
+            <span>{{ t('hardcover.import.importProgress') }}</span>
             <span v-if="progressPreviewLabel">({{ progressPreviewLabel }})</span>
           </label>
         </div>
@@ -161,7 +167,7 @@ async function applyRows(hardcoverUserBookIds?: number[]): Promise<void> {
             @click="handleOpenReview"
           >
             <Table2 class="size-3.5" />
-            Review matches
+            {{ t('hardcover.import.reviewMatches') }}
           </button>
           <button
             type="button"
@@ -171,7 +177,7 @@ async function applyRows(hardcoverUserBookIds?: number[]): Promise<void> {
           >
             <Loader2 v-if="applying" class="size-3.5 animate-spin" />
             <Download v-else class="size-3.5" />
-            Import ready
+            {{ t('hardcover.import.importReady') }}
           </button>
         </div>
       </div>

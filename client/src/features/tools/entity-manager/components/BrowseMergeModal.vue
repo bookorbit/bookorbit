@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Check, GitMerge, X } from '@lucide/vue'
 import type { BrowseEntityItem } from '@bookorbit/types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   items: BrowseEntityItem[]
@@ -38,7 +41,7 @@ function handleCancel(): void {
       <div class="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
         <h3 class="text-base font-semibold flex items-center gap-2">
           <GitMerge class="h-5 w-5 text-primary" />
-          Merge Entities
+          {{ t('tools.entityManager.mergeModal.title') }}
         </h3>
         <button class="text-muted-foreground hover:text-foreground transition-colors" @click="handleCancel">
           <X class="h-5 w-5" />
@@ -46,11 +49,11 @@ function handleCancel(): void {
       </div>
 
       <div class="px-5 py-4 flex-1 min-h-0 flex flex-col overflow-hidden">
-        <p class="text-sm text-muted-foreground shrink-0 mb-4">Select which entity to keep. The others will be merged into it and removed.</p>
+        <p class="text-sm text-muted-foreground shrink-0 mb-4">{{ t('tools.entityManager.mergeModal.description') }}</p>
 
         <div class="flex-1 min-h-0 overflow-y-auto pr-1">
           <p class="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-1.5 sticky top-0 bg-card py-1 z-10">
-            Select target to keep
+            {{ t('tools.entityManager.selectTargetToKeep') }}
           </p>
           <div class="space-y-1.5">
             <div
@@ -62,7 +65,7 @@ function handleCancel(): void {
             >
               <div class="flex-1 min-w-0">
                 <span class="text-sm font-medium truncate block">{{ item.name }}</span>
-                <span class="text-xs text-muted-foreground">{{ item.bookCount }} {{ item.bookCount === 1 ? 'book' : 'books' }}</span>
+                <span class="text-xs text-muted-foreground">{{ t('tools.entityManager.bookCount', { count: item.bookCount }, item.bookCount) }}</span>
               </div>
               <Check v-if="selectedTargetId === item.id" class="h-4 w-4 text-primary shrink-0" />
             </div>
@@ -71,18 +74,20 @@ function handleCancel(): void {
 
         <label class="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer shrink-0 mt-4">
           <input v-model="writeFiles" type="checkbox" class="rounded accent-primary" />
-          Write changes to files
+          {{ t('tools.entityManager.writeChangesToFiles') }}
         </label>
       </div>
 
       <div class="flex justify-end gap-2 px-5 py-3 border-t border-border bg-muted/20 shrink-0">
-        <button class="h-9 px-4 rounded-lg text-sm font-medium hover:bg-muted transition-colors" @click="handleCancel">Cancel</button>
+        <button class="h-9 px-4 rounded-lg text-sm font-medium hover:bg-muted transition-colors" @click="handleCancel">
+          {{ t('common.cancel') }}
+        </button>
         <button
           class="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none transition-colors"
           :disabled="loading || sourceIds.length === 0"
           @click="handleConfirm"
         >
-          Merge {{ sourceIds.length }} into target
+          {{ t('tools.entityManager.mergeIntoTarget', { count: sourceIds.length }) }}
         </button>
       </div>
     </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ChevronLeft, ChevronRight, GitMerge, MoreHorizontal, Pencil, Search, Scissors, Trash2, X } from '@lucide/vue'
 import type {
   BrowseEntityBookCountFilter,
@@ -27,6 +28,8 @@ const props = defineProps<{
   capabilities: EntityTypeCapabilities
   isInline: boolean
 }>()
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   'update:page': [value: number]
@@ -121,7 +124,7 @@ const emptyOnly = computed(() => props.bookCount === 'empty')
           <input
             type="text"
             :value="search"
-            placeholder="Search..."
+            :placeholder="t('tools.entityManager.browse.searchPlaceholder')"
             class="w-full h-9 pl-9 pr-3 rounded-lg border border-border bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
             @input="handleSearchInput"
           />
@@ -132,14 +135,14 @@ const emptyOnly = computed(() => props.bookCount === 'empty')
             class="h-8 rounded-md border border-border bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
             @change="handleSortChange"
           >
-            <option value="name-asc">Name A-Z</option>
-            <option value="name-desc">Name Z-A</option>
-            <option value="bookCount-asc">Fewest books</option>
-            <option value="bookCount-desc">Most books</option>
+            <option value="name-asc">{{ t('tools.entityManager.browse.sort.nameAsc') }}</option>
+            <option value="name-desc">{{ t('tools.entityManager.browse.sort.nameDesc') }}</option>
+            <option value="bookCount-asc">{{ t('tools.entityManager.browse.sort.fewestBooks') }}</option>
+            <option value="bookCount-desc">{{ t('tools.entityManager.browse.sort.mostBooks') }}</option>
           </select>
           <label v-if="!isInline" class="inline-flex h-8 items-center gap-2 rounded-md border border-border px-2 text-sm text-muted-foreground">
             <input type="checkbox" class="rounded accent-primary" :checked="emptyOnly" @change="handleEmptyOnlyChange" />
-            <span>Empty only</span>
+            <span>{{ t('tools.entityManager.browse.emptyOnly') }}</span>
           </label>
           <button
             v-if="hasSelection"
@@ -147,7 +150,7 @@ const emptyOnly = computed(() => props.bookCount === 'empty')
             @click="handleClearSelection"
           >
             <X class="h-3.5 w-3.5" />
-            <span class="text-sm font-medium">Clear</span>
+            <span class="text-sm font-medium">{{ t('tools.entityManager.browse.clear') }}</span>
           </button>
           <button
             v-if="canMerge"
@@ -155,7 +158,7 @@ const emptyOnly = computed(() => props.bookCount === 'empty')
             @click="handleBulkMerge"
           >
             <GitMerge class="h-3.5 w-3.5" />
-            Merge ({{ selectedIds.size }})
+            {{ t('tools.entityManager.browse.mergeCount', { count: selectedIds.size }) }}
           </button>
           <button
             v-if="hasSelection"
@@ -163,18 +166,20 @@ const emptyOnly = computed(() => props.bookCount === 'empty')
             @click="handleBulkDelete"
           >
             <Trash2 class="h-3.5 w-3.5" />
-            Delete ({{ selectedIds.size }})
+            {{ t('tools.entityManager.browse.deleteCount', { count: selectedIds.size }) }}
           </button>
-          <span class="text-sm text-muted-foreground">{{ total }} total</span>
+          <span class="text-sm text-muted-foreground">{{ t('tools.entityManager.browse.totalCount', { count: total }) }}</span>
         </div>
       </div>
     </div>
 
     <!-- Scrollable content area -->
     <div class="flex-1 overflow-y-auto min-h-0 divide-y divide-border">
-      <div v-if="loading" class="text-center py-8 text-muted-foreground text-sm">Loading...</div>
+      <div v-if="loading" class="text-center py-8 text-muted-foreground text-sm">{{ t('common.loading') }}</div>
 
-      <div v-else-if="items.length === 0" class="text-center py-8 text-muted-foreground text-sm">No entities found</div>
+      <div v-else-if="items.length === 0" class="text-center py-8 text-muted-foreground text-sm">
+        {{ t('tools.entityManager.browse.noEntities') }}
+      </div>
 
       <template v-else>
         <div v-for="item in items" :key="String(item.id)" class="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 transition-colors">
@@ -186,29 +191,33 @@ const emptyOnly = computed(() => props.bookCount === 'empty')
           />
           <div class="flex-1 min-w-0">
             <span class="text-sm font-medium truncate block">{{ item.name }}</span>
-            <div v-if="item.sortName" class="text-xs text-muted-foreground">sort: {{ item.sortName }}</div>
+            <div v-if="item.sortName" class="text-xs text-muted-foreground">
+              {{ t('tools.entityManager.browse.sortLabel', { sortName: item.sortName }) }}
+            </div>
           </div>
-          <span class="text-xs text-muted-foreground shrink-0">{{ item.bookCount }} {{ item.bookCount === 1 ? 'book' : 'books' }}</span>
+          <span class="text-xs text-muted-foreground shrink-0">{{
+            t('tools.entityManager.bookCount', { count: item.bookCount }, item.bookCount)
+          }}</span>
           <!-- Desktop: inline action buttons -->
           <div class="hidden sm:flex items-center gap-1 shrink-0">
             <button
               class="h-7 px-2 text-xs rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
               @click.stop="handleRename(item)"
             >
-              Rename
+              {{ t('tools.entityManager.actions.rename') }}
             </button>
             <button
               v-if="capabilities.canSplit && !isInline"
               class="h-7 px-2 text-xs rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
               @click.stop="handleSplit(item)"
             >
-              Split
+              {{ t('tools.entityManager.actions.split') }}
             </button>
             <button
               class="h-7 px-2 text-xs rounded hover:bg-muted text-destructive/70 hover:text-destructive transition-colors"
               @click.stop="handleDelete(item)"
             >
-              Delete
+              {{ t('common.delete') }}
             </button>
           </div>
           <!-- Mobile: dropdown menu -->
@@ -221,16 +230,16 @@ const emptyOnly = computed(() => props.bookCount === 'empty')
             <DropdownMenuContent align="end">
               <DropdownMenuItem @click="handleRename(item)">
                 <Pencil class="size-4 mr-2" />
-                Rename
+                {{ t('tools.entityManager.actions.rename') }}
               </DropdownMenuItem>
               <DropdownMenuItem v-if="capabilities.canSplit && !isInline" @click="handleSplit(item)">
                 <Scissors class="size-4 mr-2" />
-                Split
+                {{ t('tools.entityManager.actions.split') }}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem class="text-destructive focus:text-destructive" @click="handleDelete(item)">
                 <Trash2 class="size-4 mr-2" />
-                Delete
+                {{ t('common.delete') }}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

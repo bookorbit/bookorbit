@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { Users } from '@lucide/vue'
 
@@ -9,6 +10,8 @@ import { useTopAuthors } from '../../composables/useTopAuthors'
 import ChartCard from '../ChartCard.vue'
 
 const themeStore = useThemeStore()
+const { t } = useI18n()
+
 const { data, loading, error } = useTopAuthors()
 const option = shallowRef({})
 
@@ -123,7 +126,7 @@ watchEffect(() => {
 </script>
 
 <template>
-  <ChartCard title="Top 25 Authors" :icon="Users" :color-index="6" :loading :error :empty="!data.items.length">
+  <ChartCard :title="t('statistics.charts.topAuthors.title')" :icon="Users" :color-index="6" :loading :error :empty="!data.items.length">
     <VChart :option autoresize style="height: 100%" />
   </ChartCard>
 </template>

@@ -31,6 +31,8 @@ import { useReaderSettings } from '../shared/composables/useReaderSettings'
 import PdfReaderContent from './components/PdfReaderContent.vue'
 import { toRotation, toScrollStrategy, toSpreadMode, toZoomLevel } from './pdf-viewer-utils'
 
+const { t } = useI18n()
+
 const props = defineProps<{ bookId: number; fileId: number; peekMode?: boolean }>()
 const route = useRoute()
 const router = useRouter()

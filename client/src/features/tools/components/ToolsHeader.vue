@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const { hasPermission } = usePermissions()
 
 interface ToolSection {
@@ -16,8 +18,8 @@ const sections = computed<ToolSection[]>(() => {
   const result: ToolSection[] = []
 
   if (hasPermission('manage_libraries')) {
-    result.push({ label: 'Entity Manager', routeName: 'tools-entity-manager' })
-    result.push({ label: 'Bulk Rename', routeName: 'tools-bulk-rename' })
+    result.push({ label: t('tools.header.entityManager'), routeName: 'tools-entity-manager' })
+    result.push({ label: t('tools.header.bulkRename'), routeName: 'tools-bulk-rename' })
   }
 
   return result

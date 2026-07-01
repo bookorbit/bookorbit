@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch, type WatchStopHandle } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Bookmark,
@@ -35,6 +36,8 @@ import { useAudioSettings } from './composables/useAudioSettings'
 import { useAudioBookmarks, type AudioBookmark } from './composables/useAudioBookmarks'
 import { useReadingSession } from '../shared/composables/useReadingSession'
 import { useFullscreen } from '../shared/composables/useFullscreen'
+
+const { t } = useI18n()
 
 const props = defineProps<{ bookId: number; fileId: number; peekMode?: boolean }>()
 const route = useRoute()
@@ -231,11 +234,11 @@ onUnmounted(() => {
 })
 
 const displayTitle = computed(() => {
-  if (!detail.value) return 'Untitled'
+  if (!detail.value) return t('reader.audiobook.untitled')
   if (detail.value.title) return detail.value.title
   const currentFile = audioFiles.value[currentFileIndex.value]
   if (currentFile?.filename) return currentFile.filename
-  return detail.value.folderPath.split('/').pop() || 'Untitled'
+  return detail.value.folderPath.split('/').pop() || t('reader.audiobook.untitled')
 })
 
 const coverSeed = computed(() => detail.value?.title ?? detail.value?.folderPath.split('/').pop() ?? String(props.bookId))
@@ -468,11 +471,11 @@ let sleepChapterStartMs: number | null = null
 let sleepTimerInterval: ReturnType<typeof setInterval> | null = null
 
 const sleepTimerDisplay = computed(() => {
-  if (sleepAtChapterEnd.value) return 'Ch.'
-  const t = sleepTimerRemaining.value
-  if (t <= 0) return null
-  const m = Math.floor(t / 60)
-  const s = t % 60
+  if (sleepAtChapterEnd.value) return t('reader.audiobook.chapterAbbrev')
+  const secs = sleepTimerRemaining.value
+  if (secs <= 0) return null
+  const m = Math.floor(secs / 60)
+  const s = secs % 60
   return m > 0 ? `${m}m` : `${s}s`
 })
 
@@ -733,7 +736,7 @@ onMounted(async () => {
     }
   } catch (e) {
     if (!mounted) return
-    error.value = e instanceof Error ? e.message : 'Failed to load audiobook'
+    error.value = e instanceof Error ? e.message : t('reader.audiobook.loadError')
     loading.value = false
     return
   }
@@ -741,7 +744,7 @@ onMounted(async () => {
   loading.value = false
 
   if (!audioFiles.value.length) {
-    error.value = 'No audio files found for this book.'
+    error.value = t('reader.audiobook.noAudioFiles')
     return
   }
 
@@ -778,16 +781,16 @@ onMounted(async () => {
     <div v-if="loading" class="relative z-10 flex h-full items-center justify-center">
       <div class="flex flex-col items-center gap-3">
         <div class="w-8 h-8 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-        <p class="text-sm text-white/60">Loading audiobook...</p>
+        <p class="text-sm text-white/60">{{ t('reader.audiobook.loading') }}</p>
       </div>
     </div>
 
     <!-- Error state -->
     <div v-else-if="error" class="relative z-10 flex h-full items-center justify-center p-8">
       <div class="text-center max-w-sm">
-        <p class="text-sm font-medium text-white mb-2">Failed to load audiobook</p>
+        <p class="text-sm font-medium text-white mb-2">{{ t('reader.audiobook.loadError') }}</p>
         <p class="text-xs text-white/50 mb-4">{{ error }}</p>
-        <button class="text-sm text-white/80 underline" @click="router.back">Go back</button>
+        <button class="text-sm text-white/80 underline" @click="router.back">{{ t('reader.header.goBack') }}</button>
       </div>
     </div>
 
@@ -806,9 +809,9 @@ onMounted(async () => {
             </p>
           </div>
           <div v-if="props.peekMode" class="flex h-8 items-center gap-1 rounded-md border border-white/20 bg-white/10 px-1.5 text-white">
-            <span class="hidden text-[11px] font-medium sm:inline">Peeking</span>
+            <span class="hidden text-[11px] font-medium sm:inline">{{ t('reader.peek.badge') }}</span>
             <button class="h-6 rounded-sm bg-white px-2 text-[11px] font-semibold text-black hover:bg-white/90" @click="startTrackedReading">
-              Start reading
+              {{ t('reader.peek.startReading') }}
             </button>
           </div>
           <!-- Bookmark toggle -->
@@ -1000,7 +1003,7 @@ onMounted(async () => {
                 <ChevronUp v-if="showSpeedPicker" class="w-3 h-3 text-white/55" />
                 <ChevronDown v-else class="w-3 h-3 text-white/55" />
               </span>
-              <span class="text-[10px] font-medium tracking-wide">Speed</span>
+              <span class="text-[10px] font-medium tracking-wide">{{ t('reader.audiobook.speed') }}</span>
             </button>
 
             <!-- Chapters / Bookmarks -->
@@ -1009,7 +1012,7 @@ onMounted(async () => {
               @click="showChapters = !showChapters"
             >
               <BookOpen class="w-5 h-5" />
-              <span class="text-[10px] font-medium tracking-wide">Chapters</span>
+              <span class="text-[10px] font-medium tracking-wide">{{ t('reader.audiobook.chapters') }}</span>
             </button>
 
             <!-- Volume mute toggle -->
@@ -1021,7 +1024,9 @@ onMounted(async () => {
               <VolumeX v-if="settings.volume.value === 0" class="w-5 h-5" />
               <Volume1 v-else-if="settings.volume.value < 0.5" class="w-5 h-5" />
               <Volume2 v-else class="w-5 h-5" />
-              <span class="text-[10px] font-medium tracking-wide">{{ settings.volume.value === 0 ? 'Muted' : 'Volume' }}</span>
+              <span class="text-[10px] font-medium tracking-wide">{{
+                settings.volume.value === 0 ? t('reader.audiobook.muted') : t('reader.audiobook.volume')
+              }}</span>
             </button>
 
             <!-- Sleep timer -->
@@ -1034,7 +1039,7 @@ onMounted(async () => {
               >
                 <Moon class="w-5 h-5" />
                 <span class="text-[10px] font-medium tracking-wide">
-                  {{ sleepTimerDisplay ? sleepTimerDisplay : 'Sleep' }}
+                  {{ sleepTimerDisplay ? sleepTimerDisplay : t('reader.audiobook.sleep') }}
                 </span>
               </button>
             </div>
@@ -1046,7 +1051,7 @@ onMounted(async () => {
       <Transition name="fade">
         <div v-if="showSleepTimer" class="absolute inset-0 z-30" @click="showSleepTimer = false">
           <div class="absolute bg-black/85 backdrop-blur-xl border border-white/10 rounded-2xl p-3 shadow-2xl" :style="sleepPopoverStyle" @click.stop>
-            <p class="text-[10px] font-semibold text-white/50 uppercase tracking-widest px-2 mb-2">Sleep timer</p>
+            <p class="text-[10px] font-semibold text-white/50 uppercase tracking-widest px-2 mb-2">{{ t('reader.audiobook.sleepTimer') }}</p>
             <div class="flex flex-col gap-0.5">
               <button
                 v-for="mins in [15, 30, 45, 60]"
@@ -1054,16 +1059,16 @@ onMounted(async () => {
                 class="text-sm text-left px-3 py-2 rounded-lg transition-colors hover:bg-white/10 text-white"
                 @click="setSleepTimer(mins)"
               >
-                {{ mins }} minutes
+                {{ t('reader.audiobook.minutes', { count: mins }) }}
               </button>
               <button
                 class="text-sm text-left px-3 py-2 rounded-lg transition-colors text-white"
                 :class="detail?.audioMetadata?.chapters?.length ? 'hover:bg-white/10' : 'opacity-40 cursor-not-allowed'"
                 :disabled="!detail?.audioMetadata?.chapters?.length"
-                :title="!detail?.audioMetadata?.chapters?.length ? 'No chapters available' : undefined"
+                :title="!detail?.audioMetadata?.chapters?.length ? t('reader.audiobook.noChaptersAvailable') : undefined"
                 @click="setEndOfChapterSleep"
               >
-                End of chapter
+                {{ t('reader.audiobook.endOfChapter') }}
               </button>
               <template v-if="sleepTimerActive">
                 <div class="border-t border-white/10 my-1" />
@@ -1072,14 +1077,14 @@ onMounted(async () => {
                   class="text-sm text-left px-3 py-2 rounded-lg transition-colors hover:bg-white/10 text-white/70 w-full"
                   @click="extendSleepTimer"
                 >
-                  + 15 minutes
+                  {{ t('reader.audiobook.extend15') }}
                 </button>
                 <button
                   class="text-sm text-left px-3 py-2 rounded-lg transition-colors hover:bg-white/10 text-red-400 w-full"
                   @click="cancelSleepTimer"
                 >
-                  Cancel
-                  <span v-if="sleepTimerDisplay && !sleepAtChapterEnd">({{ sleepTimerDisplay }} left)</span>
+                  {{ t('common.cancel') }}
+                  <span v-if="sleepTimerDisplay && !sleepAtChapterEnd">{{ t('reader.audiobook.timeLeft', { time: sleepTimerDisplay }) }}</span>
                 </button>
               </template>
             </div>
@@ -1091,7 +1096,7 @@ onMounted(async () => {
       <Transition name="fade">
         <div v-if="showSpeedPicker" class="absolute inset-0 z-30" @click="showSpeedPicker = false">
           <div class="absolute bg-black/85 backdrop-blur-xl border border-white/10 rounded-2xl p-3 shadow-2xl" :style="speedPopoverStyle" @click.stop>
-            <p class="text-[10px] font-semibold text-white/50 uppercase tracking-widest px-2 mb-2">Playback speed</p>
+            <p class="text-[10px] font-semibold text-white/50 uppercase tracking-widest px-2 mb-2">{{ t('reader.audiobook.playbackSpeed') }}</p>
             <!-- Fine-grained stepper -->
             <div class="flex items-center justify-between px-2 mb-2 gap-2">
               <button
@@ -1146,14 +1151,14 @@ onMounted(async () => {
                 :class="chaptersTab === 'chapters' ? 'bg-primary/25 text-primary' : 'text-white/50 hover:text-white/80 hover:bg-white/10'"
                 @click="chaptersTab = 'chapters'"
               >
-                Chapters
+                {{ t('reader.audiobook.chapters') }}
               </button>
               <button
                 class="px-3 py-1.5 rounded-full text-xs font-semibold transition-colors"
                 :class="chaptersTab === 'bookmarks' ? 'bg-primary/25 text-primary' : 'text-white/50 hover:text-white/80 hover:bg-white/10'"
                 @click="chaptersTab = 'bookmarks'"
               >
-                Bookmarks
+                {{ t('reader.audiobook.bookmarks') }}
               </button>
             </div>
             <button class="p-1.5 hover:bg-white/10 rounded-full transition-colors" @click="showChapters = false">
@@ -1178,7 +1183,7 @@ onMounted(async () => {
                 </span>
               </button>
             </div>
-            <p v-else class="text-sm text-white/45 px-5 py-6 text-center">No chapters available.</p>
+            <p v-else class="text-sm text-white/45 px-5 py-6 text-center">{{ t('reader.audiobook.noChapters') }}</p>
           </div>
 
           <!-- Bookmarks list -->
@@ -1202,8 +1207,8 @@ onMounted(async () => {
               </div>
             </div>
             <div v-else class="px-5 py-8 text-center">
-              <p class="text-sm text-white/45 mb-3">No bookmarks yet.</p>
-              <p class="text-xs text-white/30">Tap the bookmark icon at the top to save your current position.</p>
+              <p class="text-sm text-white/45 mb-3">{{ t('reader.audiobook.noBookmarks') }}</p>
+              <p class="text-xs text-white/30">{{ t('reader.audiobook.noBookmarksHint') }}</p>
             </div>
           </div>
         </div>
@@ -1221,13 +1226,13 @@ onMounted(async () => {
           class="absolute inset-x-0 bottom-0 z-30 mx-auto bg-black/80 backdrop-blur-2xl rounded-t-2xl border-t border-white/10 shadow-2xl p-5 md:max-w-lg md:mb-6 md:rounded-2xl md:border"
         >
           <div class="flex items-center justify-between mb-5">
-            <p class="font-semibold text-sm">Player settings</p>
+            <p class="font-semibold text-sm">{{ t('reader.audiobook.playerSettings') }}</p>
             <button class="p-1.5 hover:bg-white/10 rounded-full transition-colors" @click="showSettings = false">
               <X class="w-4 h-4" />
             </button>
           </div>
           <div class="mb-4">
-            <p class="text-[10px] font-semibold text-white/45 uppercase tracking-widest mb-2.5">Skip back</p>
+            <p class="text-[10px] font-semibold text-white/45 uppercase tracking-widest mb-2.5">{{ t('reader.audiobook.skipBack') }}</p>
             <div class="flex gap-2">
               <button
                 v-for="secs in [5, 10, 15, 30]"
@@ -1241,7 +1246,7 @@ onMounted(async () => {
             </div>
           </div>
           <div class="mb-4">
-            <p class="text-[10px] font-semibold text-white/45 uppercase tracking-widest mb-2.5">Skip forward</p>
+            <p class="text-[10px] font-semibold text-white/45 uppercase tracking-widest mb-2.5">{{ t('reader.audiobook.skipForward') }}</p>
             <div class="flex gap-2">
               <button
                 v-for="secs in [10, 15, 30, 60]"
@@ -1255,7 +1260,7 @@ onMounted(async () => {
             </div>
           </div>
           <div>
-            <p class="text-[10px] font-semibold text-white/45 uppercase tracking-widest mb-2.5">Volume</p>
+            <p class="text-[10px] font-semibold text-white/45 uppercase tracking-widest mb-2.5">{{ t('reader.audiobook.volume') }}</p>
             <div class="flex items-center gap-3">
               <VolumeX v-if="settings.volume.value === 0" class="w-4 h-4 text-white/55 shrink-0" />
               <Volume1 v-else-if="settings.volume.value < 0.5" class="w-4 h-4 text-white/55 shrink-0" />

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { FolderMinus, Library, Loader2, Plus } from '@lucide/vue'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -23,6 +24,7 @@ const emit = defineEmits<{
 
 const { fetchCollectionsWithMembership, createCollection, addBooksToCollection, removeBooksFromCollection } = useCollections()
 const { keyboardHeight } = useVirtualKeyboard()
+const { t } = useI18n()
 
 const localCollections = ref<Collection[]>([])
 const changedCollectionIds = ref<Set<number>>(new Set())
@@ -45,7 +47,7 @@ watch(
       try {
         localCollections.value = await fetchCollectionsWithMembership(props.selectionPayload)
       } catch {
-        toast.error('Failed to load collections')
+        toast.error(t('collection.addToSheet.loadFailed'))
       }
     }
   },
@@ -73,12 +75,12 @@ function justAdded(collection: Collection): boolean {
 function membershipLabel(collection: Collection): string {
   const total = selectionCount()
   if (isFullyAdded(collection)) {
-    if (justAdded(collection)) return total === 1 ? 'Added' : `All ${total} added`
-    return total === 1 ? 'In this collection' : `All ${total} in this collection`
+    if (justAdded(collection)) return total === 1 ? t('collection.addToSheet.added') : t('collection.addToSheet.allAdded', { total })
+    return total === 1 ? t('collection.addToSheet.inCollection') : t('collection.addToSheet.allInCollection', { total })
   }
   const partial = partialCount(collection)
-  if (partial > 0) return `${partial} of ${total} in this collection`
-  return `${collection.bookCount} book${collection.bookCount === 1 ? '' : 's'}`
+  if (partial > 0) return t('collection.addToSheet.partialInCollection', { partial, total })
+  return t('collection.addToSheet.bookCount', { count: collection.bookCount }, collection.bookCount)
 }
 
 function markCollectionChanged(collectionId: number): void {
@@ -100,12 +102,12 @@ async function handleCreate() {
       const total = selectionCount()
       localCollections.value = localCollections.value.map((c) => (c.id === collection.id ? { ...c, memberCount: total } : c))
       markCollectionChanged(collection.id)
-      toast.success(`Created "${collection.name}" and added ${total} book${total === 1 ? '' : 's'}`)
+      toast.success(t('collection.addToSheet.createdAndAdded', { name: collection.name, count: total }, total))
     } catch {
-      toast.error(`Created "${collection.name}" but failed to add books`)
+      toast.error(t('collection.addToSheet.createdButAddFailed', { name: collection.name }))
     }
   } catch {
-    toast.error('Failed to create collection')
+    toast.error(t('collection.addToSheet.createFailed'))
   } finally {
     creating.value = false
   }
@@ -123,11 +125,11 @@ async function handleAddTo(collection: Collection) {
     const added = total - alreadyHad
     const msg =
       alreadyHad > 0
-        ? `Added ${added} new book${added === 1 ? '' : 's'} to "${collection.name}" (${alreadyHad} already there)`
-        : `Added ${total} book${total === 1 ? '' : 's'} to "${collection.name}"`
+        ? t('collection.addToSheet.addedNewWithExisting', { count: added, name: collection.name, alreadyHad }, added)
+        : t('collection.addToSheet.addedToCollection', { count: total, name: collection.name }, total)
     toast.success(msg)
   } catch {
-    toast.error('Failed to add to collection')
+    toast.error(t('collection.addToSheet.addFailed'))
   } finally {
     mutatingCollectionId.value = null
   }
@@ -141,9 +143,9 @@ async function handleRemoveFrom(collection: Collection) {
     await removeBooksFromCollection(collection.id, props.selectionPayload)
     markCollectionChanged(collection.id)
     localCollections.value = localCollections.value.map((c) => (c.id === collection.id ? { ...c, memberCount: 0 } : c))
-    toast.success(`Removed ${total} book${total === 1 ? '' : 's'} from "${collection.name}"`)
+    toast.success(t('collection.addToSheet.removedFromCollection', { count: total, name: collection.name }, total))
   } catch {
-    toast.error('Failed to remove from collection')
+    toast.error(t('collection.addToSheet.removeFailed'))
   } finally {
     mutatingCollectionId.value = null
   }
@@ -189,30 +191,32 @@ function handleFocusOut(e: FocusEvent) {
       <SheetHeader>
         <SheetTitle class="flex items-center gap-2">
           <Library :size="16" />
-          Manage Collections
+          {{ t('collection.addToSheet.title') }}
         </SheetTitle>
       </SheetHeader>
 
       <div class="px-4 pb-4 space-y-4">
-        <p class="text-xs text-muted-foreground animate-fade-up">{{ selectionCount() }} book{{ selectionCount() === 1 ? '' : 's' }} selected</p>
+        <p class="text-xs text-muted-foreground animate-fade-up">
+          {{ t('collection.addToSheet.selectedCount', { count: selectionCount() }, selectionCount()) }}
+        </p>
 
         <!-- Create new collection -->
         <div class="space-y-2 animate-fade-up" style="animation-delay: 50ms">
-          <p class="text-xs font-medium text-foreground uppercase tracking-wider">New Collection</p>
+          <p class="text-xs font-medium text-foreground uppercase tracking-wider">{{ t('collection.addToSheet.newCollection') }}</p>
           <div class="flex items-center gap-2">
-            <Input v-model="newName" placeholder="Collection name" class="flex-1 min-w-0" @keydown.enter="handleCreate" />
+            <Input v-model="newName" :placeholder="t('collection.addToSheet.namePlaceholder')" class="flex-1 min-w-0" @keydown.enter="handleCreate" />
             <IconPicker v-model="newIcon" hide-text class="shrink-0" />
             <Button :disabled="!newName.trim() || !newIcon.trim() || creating" class="shrink-0" @click="handleCreate">
               <Loader2 v-if="creating" :size="14" class="animate-spin mr-1" />
               <Plus v-else :size="14" class="mr-1" />
-              Create
+              {{ t('collection.addToSheet.create') }}
             </Button>
           </div>
         </div>
 
         <!-- Existing collections -->
         <div v-if="localCollections.length > 0" class="pt-4 border-t border-border space-y-2 animate-fade-up" style="animation-delay: 100ms">
-          <p class="text-xs font-medium text-foreground uppercase tracking-wider">Collections</p>
+          <p class="text-xs font-medium text-foreground uppercase tracking-wider">{{ t('collection.addToSheet.collections') }}</p>
           <div class="space-y-1">
             <button
               v-for="collection in localCollections"
@@ -242,12 +246,12 @@ function handleFocusOut(e: FocusEvent) {
         </div>
 
         <div v-else class="text-center py-4 border-t border-border">
-          <p class="text-xs text-muted-foreground">No collections yet. Create one above.</p>
+          <p class="text-xs text-muted-foreground">{{ t('collection.addToSheet.empty') }}</p>
         </div>
 
         <!-- Done -->
         <div class="pt-2 border-t border-border">
-          <Button variant="outline" class="w-full" @click="handleDone">Done</Button>
+          <Button variant="outline" class="w-full" @click="handleDone">{{ t('collection.addToSheet.done') }}</Button>
         </div>
       </div>
     </SheetContent>

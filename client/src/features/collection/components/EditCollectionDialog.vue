@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { X } from '@lucide/vue'
 import { toast } from 'vue-sonner'
@@ -12,6 +13,7 @@ const emit = defineEmits<{ close: []; deleted: [id: number, name: string] }>()
 
 const router = useRouter()
 const { updateCollection, deleteCollection } = useCollections()
+const { t } = useI18n()
 
 const name = ref('')
 const icon = ref('')
@@ -38,11 +40,11 @@ watch(
 
 async function submit() {
   if (!trimmedName.value) {
-    error.value = 'Name is required'
+    error.value = t('collection.dialog.nameRequired')
     return
   }
   if (!trimmedIcon.value) {
-    error.value = 'Choose an icon'
+    error.value = t('collection.dialog.iconRequired')
     return
   }
   saving.value = true
@@ -51,7 +53,7 @@ async function submit() {
     await updateCollection(props.collection.id, trimmedName.value, trimmedIcon.value, syncToKobo.value)
     emit('close')
   } catch {
-    error.value = 'Failed to update collection'
+    error.value = t('collection.editDialog.updateFailed')
   } finally {
     saving.value = false
   }
@@ -83,12 +85,12 @@ async function confirmDelete() {
   error.value = null
   try {
     await deleteCollection(id)
-    toast.success(`"${name}" deleted`)
+    toast.success(t('collection.editDialog.deleted', { name }))
     router.replace({ name: 'dashboard' })
     emit('deleted', id, name)
     emit('close')
   } catch {
-    error.value = 'Failed to delete collection'
+    error.value = t('collection.editDialog.deleteFailed')
     confirmingDelete.value = false
   } finally {
     deleting.value = false
@@ -102,7 +104,7 @@ async function confirmDelete() {
       <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="emit('close')" />
       <div class="relative z-10 w-full max-w-md mx-4 bg-card border border-border rounded-lg shadow-2xl p-6">
         <div class="flex items-center justify-between mb-5">
-          <h2 class="text-base font-semibold text-foreground">Edit Collection</h2>
+          <h2 class="text-base font-semibold text-foreground">{{ t('collection.editDialog.title') }}</h2>
           <button @click="emit('close')" class="text-muted-foreground hover:text-foreground transition-colors">
             <X :size="18" />
           </button>
@@ -110,7 +112,7 @@ async function confirmDelete() {
 
         <form @submit.prevent="submit" class="flex flex-col gap-4">
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">Name</label>
+            <label class="text-sm font-medium text-foreground">{{ t('collection.dialog.name') }}</label>
             <input
               v-model="name"
               type="text"
@@ -120,14 +122,14 @@ async function confirmDelete() {
           </div>
 
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground"> Icon </label>
-            <IconPicker v-model="icon" placeholder="Choose an icon..." />
+            <label class="text-sm font-medium text-foreground">{{ t('collection.dialog.icon') }}</label>
+            <IconPicker v-model="icon" :placeholder="t('collection.dialog.iconPlaceholder')" />
           </div>
 
           <div class="flex items-center justify-between py-1">
             <div>
-              <p class="text-sm font-medium text-foreground">Sync to Kobo</p>
-              <p class="text-xs text-muted-foreground mt-0.5">Books in this collection will appear on your Kobo device</p>
+              <p class="text-sm font-medium text-foreground">{{ t('collection.editDialog.syncToKobo') }}</p>
+              <p class="text-xs text-muted-foreground mt-0.5">{{ t('collection.editDialog.syncToKoboHint') }}</p>
             </div>
             <button
               type="button"
@@ -156,7 +158,13 @@ async function confirmDelete() {
               "
               @click="handleDeleteClick"
             >
-              {{ deleting ? 'Deleting...' : confirmingDelete ? 'Confirm?' : 'Delete collection' }}
+              {{
+                deleting
+                  ? t('collection.editDialog.deleting')
+                  : confirmingDelete
+                    ? t('collection.editDialog.confirmDelete')
+                    : t('collection.editDialog.deleteCollection')
+              }}
             </button>
 
             <div class="flex items-center gap-2">
@@ -166,14 +174,14 @@ async function confirmDelete() {
                 class="h-9 px-4 rounded-md border border-input bg-background text-sm text-foreground hover:bg-muted transition-colors disabled:opacity-50"
                 @click="handleCancelClick"
               >
-                Cancel
+                {{ t('common.cancel') }}
               </button>
               <button
                 type="submit"
                 :disabled="!trimmedName || !trimmedIcon || saving || deleting"
                 class="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {{ saving ? 'Saving...' : 'Save' }}
+                {{ saving ? t('collection.editDialog.saving') : t('common.save') }}
               </button>
             </div>
           </div>

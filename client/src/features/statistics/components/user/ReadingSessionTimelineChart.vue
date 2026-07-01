@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { CalendarRange } from '@lucide/vue'
 import { toast } from 'vue-sonner'
@@ -62,6 +63,7 @@ interface PointerOffset {
   y: number
 }
 
+const { t } = useI18n()
 const { filters } = useStatisticsConfig()
 const { coverUrl } = useCoverVersions()
 const themeStore = useThemeStore()
@@ -450,7 +452,7 @@ async function commitDrag() {
 
   if (!state || !preview) return
   if (preview.hasConflict) {
-    toast.error('Session overlaps another session in this window')
+    toast.error(t('statistics.charts.readingSessionTimeline.overlapError'))
     return
   }
 
@@ -462,7 +464,7 @@ async function commitDrag() {
       items: timeline.value.items.map((item) => (item.sessionId === updated.sessionId ? updated : item)),
     }
   } catch {
-    toast.error('Failed to move session')
+    toast.error(t('statistics.charts.readingSessionTimeline.moveError'))
     await loadTimeline()
   } finally {
     persistLoading.value = false
@@ -690,7 +692,14 @@ function getIsoWeekStart(year: number, week: number): Date {
 </script>
 
 <template>
-  <ChartCard title="Reading Session Timeline" :icon="CalendarRange" :color-index="11" :loading="loading" :error="error" :empty="false">
+  <ChartCard
+    :title="t('statistics.charts.readingSessionTimeline.title')"
+    :icon="CalendarRange"
+    :color-index="11"
+    :loading="loading"
+    :error="error"
+    :empty="false"
+  >
     <template #controls>
       <BreakdownSelect v-model="dimension" />
       <button
@@ -703,7 +712,7 @@ function getIsoWeekStart(year: number, week: number): Date {
         ]"
         @click="dragEnabled = !dragEnabled"
       >
-        {{ dragEnabled ? 'Drag: On' : 'Drag: Off' }}
+        {{ dragEnabled ? t('statistics.charts.readingSessionTimeline.dragOn') : t('statistics.charts.readingSessionTimeline.dragOff') }}
       </button>
     </template>
 
@@ -716,7 +725,7 @@ function getIsoWeekStart(year: number, week: number): Date {
             :disabled="persistLoading"
             @click="shiftWeek(-1)"
           >
-            Prev
+            {{ t('statistics.charts.readingSessionTimeline.prev') }}
           </button>
 
           <button
@@ -725,7 +734,7 @@ function getIsoWeekStart(year: number, week: number): Date {
             :disabled="persistLoading"
             @click="shiftWeek(1)"
           >
-            Next
+            {{ t('statistics.charts.readingSessionTimeline.next') }}
           </button>
 
           <select
@@ -741,7 +750,9 @@ function getIsoWeekStart(year: number, week: number): Date {
             class="border-border bg-background text-foreground rounded-md border px-2 py-1 text-xs"
             :disabled="persistLoading"
           >
-            <option v-for="week in weekOptions" :key="week" :value="week">Week {{ week }}</option>
+            <option v-for="week in weekOptions" :key="week" :value="week">
+              {{ t('statistics.charts.readingSessionTimeline.week', { week }) }}
+            </option>
           </select>
         </div>
 
@@ -757,15 +768,15 @@ function getIsoWeekStart(year: number, week: number): Date {
       </div>
 
       <p v-if="dragEnabled" class="text-muted-foreground border-border/60 bg-muted/20 rounded-md border px-2 py-1 text-xs">
-        Drag bars to move sessions. Duration is locked and overlapping sessions are rejected.
+        {{ t('statistics.charts.readingSessionTimeline.dragHint') }}
       </p>
 
       <div class="border-border/60 bg-muted/5 min-h-0 flex-1 rounded-lg border p-2">
         <ChartEmptyState
           v-if="isEmpty"
           :icon="CalendarRange"
-          title="No sessions this week"
-          description="Use Prev/Next or the week selector to view a different week."
+          :title="t('statistics.charts.readingSessionTimeline.noSessionsTitle')"
+          :description="t('statistics.charts.readingSessionTimeline.noSessionsDescription')"
         />
 
         <VChart

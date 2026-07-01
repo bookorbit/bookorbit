@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { BarChart3 } from '@lucide/vue'
 
 import { useMetadataScoreDistribution } from '../../composables/useMetadataScoreDistribution'
 import ChartCard from '../ChartCard.vue'
+
+const { t } = useI18n()
 
 const { data, loading, error } = useMetadataScoreDistribution()
 const option = shallowRef({})
@@ -70,7 +73,7 @@ watchEffect(() => {
 
 <template>
   <ChartCard
-    title="Metadata Score Distribution"
+    :title="t('statistics.charts.metadataScoreDistribution.title')"
     :icon="BarChart3"
     :color-index="2"
     :loading

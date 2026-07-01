@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { CalendarRange } from '@lucide/vue'
 
@@ -9,6 +10,8 @@ import ChartEmptyState from '../ChartEmptyState.vue'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const MIN_COMPLETIONS = 3
+
+const { t } = useI18n()
 
 const { data, loading, error } = useUserCompletionTimeline()
 const option = shallowRef({})
@@ -66,12 +69,12 @@ watchEffect(() => {
 </script>
 
 <template>
-  <ChartCard title="Completion Timeline" :icon="CalendarRange" :color-index="8" :loading :error :empty="isEmpty">
+  <ChartCard :title="t('statistics.charts.completionTimeline.title')" :icon="CalendarRange" :color-index="8" :loading :error :empty="isEmpty">
     <ChartEmptyState
       v-if="lowConfidence"
       :icon="CalendarRange"
-      title="Not enough data yet"
-      :description="`Need at least ${MIN_COMPLETIONS} completed books for this chart.`"
+      :title="t('statistics.empty.notEnoughData')"
+      :description="t('statistics.charts.completionTimeline.notEnoughData', { count: MIN_COMPLETIONS })"
     />
     <VChart v-else :option autoresize style="height: 100%" />
   </ChartCard>
