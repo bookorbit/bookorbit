@@ -11,6 +11,9 @@ export const i18n = createI18n({
   legacy: false,
   locale: DEFAULT_LOCALE,
   fallbackLocale: DEFAULT_LOCALE,
+  // Some messages intentionally contain inline HTML (e.g. <strong>/<code> in explanatory notes)
+  // rendered via v-html or <i18n-t>. Disable the HTML-in-message warning/throw.
+  warnHtmlMessage: false,
   // Non-default locales are loaded on demand via loadLocaleMessages().
   messages: { en },
 })
