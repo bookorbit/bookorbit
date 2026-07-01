@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Settings2, Sparkles } from '@lucide/vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -14,6 +15,7 @@ import { useDashboardConfig } from '@/features/dashboard/composables/useDashboar
 import { useOnboardingTour } from '@/features/onboarding/composables/useOnboardingTour'
 import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
 
+const { t } = useI18n()
 const { hasPermission } = usePermissions()
 const { user } = useAuth()
 const { libraries, loading: librariesLoading, fetchLibraries } = useLibraries()
@@ -28,16 +30,16 @@ const enabledScrollers = computed(() =>
 )
 
 const hasNoLibraries = computed(() => !librariesLoading.value && libraries.value.length === 0)
-const greetingLabel = computed(() => {
+const greetingText = computed(() => {
   const hour = new Date().getHours()
-  if (hour < 12) return 'morning'
-  if (hour < 18) return 'afternoon'
-  return 'evening'
+  if (hour < 12) return t('views.dashboard.greeting.morning')
+  if (hour < 18) return t('views.dashboard.greeting.afternoon')
+  return t('views.dashboard.greeting.evening')
 })
 const greetingName = computed(() => {
   const fullName = user.value?.name?.trim()
   if (fullName) return fullName.split(/\s+/)[0] ?? fullName
-  return user.value?.username?.trim() || 'there'
+  return user.value?.username?.trim() || t('views.dashboard.greeting.fallbackName')
 })
 
 watch(
@@ -76,7 +78,7 @@ onMounted(() => {
                 <Settings2 :size="18" />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="left" align="center">Customize dashboard</TooltipContent>
+            <TooltipContent side="left" align="center">{{ t('views.dashboard.customize') }}</TooltipContent>
           </Tooltip>
         </div>
       </div>
@@ -88,7 +90,7 @@ onMounted(() => {
           <div class="animate-fade-up flex items-center gap-2 px-1" style="animation-delay: 40ms">
             <Sparkles :size="16" class="shrink-0 text-primary/85" />
             <p class="text-[1.05rem] font-medium leading-tight tracking-[-0.01em] text-foreground/90 sm:text-[1.18rem]">
-              <span class="text-foreground/88">Good {{ greetingLabel }},</span>
+              <span class="text-foreground/88">{{ greetingText }}</span>
               <span class="ml-1 font-semibold text-primary">{{ greetingName }}</span>
             </p>
           </div>
@@ -105,8 +107,8 @@ onMounted(() => {
             :style="{ animationDelay: `${index * 100}ms` }"
           />
           <div v-if="enabledScrollers.length === 0" class="px-2 py-12 text-center">
-            <p class="text-sm text-muted-foreground">All shelves are hidden.</p>
-            <button class="mt-2 text-sm text-primary hover:underline" @click="settingsOpen = true">Customize dashboard</button>
+            <p class="text-sm text-muted-foreground">{{ t('views.dashboard.allShelvesHidden') }}</p>
+            <button class="mt-2 text-sm text-primary hover:underline" @click="settingsOpen = true">{{ t('views.dashboard.customize') }}</button>
           </div>
         </template>
       </div>

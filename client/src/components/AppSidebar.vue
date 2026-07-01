@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import * as Icons from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
@@ -43,6 +44,7 @@ function useSidebarSection(key: string) {
   return { isOpen, toggle }
 }
 
+const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const { isMobile, setOpenMobile } = useSidebar()
@@ -183,7 +185,7 @@ onUnmounted(() => stopLibraryUploadListener())
           <span class="text-lg font-serif font-semibold text-sidebar-foreground leading-tight tracking-tight">
             Book<span class="text-primary"> Orbit</span>
           </span>
-          <span class="mt-0.5 text-[10px] uppercase tracking-[0.16em] text-sidebar-foreground/65">Your Reading Space</span>
+          <span class="mt-0.5 text-[10px] uppercase tracking-[0.16em] text-sidebar-foreground/65">{{ t('components.sidebar.tagline') }}</span>
         </div>
       </div>
     </SidebarHeader>
@@ -195,31 +197,31 @@ onUnmounted(() => stopLibraryUploadListener())
           <SidebarMenu class="gap-0">
             <SidebarNavItem
               :is-active="isDashboardActive"
-              tooltip="Dashboard"
+              :tooltip="t('components.sidebar.dashboard')"
               :icon="Icons.LayoutDashboard"
-              label="Dashboard"
+              :label="t('components.sidebar.dashboard')"
               @click="navigateFromSidebar({ name: 'dashboard' })"
             />
             <SidebarNavItem
               :is-active="isAuthorsActive"
-              tooltip="Authors"
+              :tooltip="t('components.sidebar.authors')"
               :icon="Icons.Users"
-              label="Authors"
+              :label="t('components.sidebar.authors')"
               @click="navigateFromSidebar({ name: 'authors' })"
             />
             <SidebarNavItem
               :is-active="isSeriesActive"
-              tooltip="Series"
+              :tooltip="t('components.sidebar.series')"
               :icon="Icons.Library"
-              label="Series"
+              :label="t('components.sidebar.series')"
               @click="navigateFromSidebar({ name: 'series' })"
             />
             <SidebarNavItem
               v-if="hasPermission('manage_libraries')"
               :is-active="isToolsActive"
-              tooltip="Tools"
+              :tooltip="t('components.sidebar.tools')"
               :icon="Icons.Wrench"
-              label="Tools"
+              :label="t('components.sidebar.tools')"
               @click="navigateFromSidebar({ name: 'tools-entity-manager' })"
             />
           </SidebarMenu>
@@ -232,11 +234,11 @@ onUnmounted(() => stopLibraryUploadListener())
       <SidebarGroup>
         <SidebarSectionHeader
           data-tour="sidebar-libraries"
-          label="Libraries"
+          :label="t('components.sidebar.libraries')"
           :is-open="librariesOpen"
           :collapsed-count="libraries.length"
           :can-add="hasPermission('manage_libraries')"
-          add-title="New Library"
+          :add-title="t('components.sidebar.newLibrary')"
           :can-reorder="hasPermission('manage_libraries')"
           :is-reordering="isReorderingLibraries"
           @toggle="toggleLibraries"
@@ -260,7 +262,11 @@ onUnmounted(() => stopLibraryUploadListener())
                   v-for="lib in localLibraries"
                   :key="lib.id"
                   :is-active="activeLibraryId === lib.id"
-                  :tooltip="getProgress(lib.id)?.status === 'running' ? `${lib.name} - Scanning ${scanPct(lib.id)}%` : lib.name"
+                  :tooltip="
+                    getProgress(lib.id)?.status === 'running'
+                      ? t('components.sidebar.libraryScanning', { name: lib.name, pct: scanPct(lib.id) })
+                      : lib.name
+                  "
                   :icon="lib.icon || 'BookCopy'"
                   fallback-icon="BookCopy"
                   :icon-class="''"
@@ -299,7 +305,12 @@ onUnmounted(() => stopLibraryUploadListener())
                           />
                         </div>
                         <p class="mt-0.5 text-[10px] text-sidebar-foreground/45">
-                          {{ getProgress(lib.id)!.processed.toLocaleString() }} / {{ getProgress(lib.id)!.total.toLocaleString() }} books
+                          {{
+                            t('components.sidebar.scanProgress', {
+                              processed: getProgress(lib.id)!.processed.toLocaleString(),
+                              total: getProgress(lib.id)!.total.toLocaleString(),
+                            })
+                          }}
                         </p>
                       </div>
                     </Transition>
@@ -317,11 +328,11 @@ onUnmounted(() => stopLibraryUploadListener())
       <SidebarGroup>
         <SidebarSectionHeader
           data-tour="sidebar-smartScopes"
-          label="Smart Scopes"
+          :label="t('components.sidebar.smartScopes')"
           :is-open="smartScopesOpen"
           :collapsed-count="smartScopes.length"
           :can-add="true"
-          add-title="New Smart Scope"
+          :add-title="t('components.sidebar.newSmartScope')"
           :can-reorder="smartScopes.length > 1"
           :is-reordering="isReorderingSmartScopes"
           @toggle="toggleSmartScopes"
@@ -367,7 +378,9 @@ onUnmounted(() => stopLibraryUploadListener())
                 </SidebarNavItem>
               </VueDraggable>
               <div v-if="localSmartScopes.length === 0">
-                <span class="px-2 py-1 text-[11px] text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden">No Smart Scopes yet</span>
+                <span class="px-2 py-1 text-[11px] text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden">{{
+                  t('components.sidebar.noSmartScopes')
+                }}</span>
               </div>
             </SidebarGroupContent>
           </div>
@@ -380,11 +393,11 @@ onUnmounted(() => stopLibraryUploadListener())
       <SidebarGroup>
         <SidebarSectionHeader
           data-tour="sidebar-collections"
-          label="Collections"
+          :label="t('components.sidebar.collections')"
           :is-open="collectionsOpen"
           :collapsed-count="collections.length"
           :can-add="true"
-          add-title="New Collection"
+          :add-title="t('components.sidebar.newCollection')"
           :can-reorder="collections.length > 1"
           :is-reordering="isReorderingCollections"
           @toggle="toggleCollections"
@@ -430,7 +443,9 @@ onUnmounted(() => stopLibraryUploadListener())
                 </SidebarNavItem>
               </VueDraggable>
               <div v-if="localCollections.length === 0">
-                <span class="px-2 py-1 text-[11px] text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden">No collections yet</span>
+                <span class="px-2 py-1 text-[11px] text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden">{{
+                  t('components.sidebar.noCollections')
+                }}</span>
               </div>
             </SidebarGroupContent>
           </div>
@@ -443,7 +458,7 @@ onUnmounted(() => stopLibraryUploadListener())
         <div class="flex flex-wrap items-center justify-center gap-2 text-center text-[12px] font-medium leading-none text-sidebar-foreground/80">
           <RouterLink to="/whats-new" class="inline-flex items-center gap-1.5 transition-colors hover:text-sidebar-foreground">
             {{ versionUi.currentLabel }}
-            <span v-if="hasUnseenWhatsNew" class="h-1.5 w-1.5 rounded-full bg-primary" aria-label="New release notes available" />
+            <span v-if="hasUnseenWhatsNew" class="h-1.5 w-1.5 rounded-full bg-primary" :aria-label="t('components.sidebar.newReleaseNotes')" />
           </RouterLink>
 
           <span v-if="versionUi.showLatest" class="text-sidebar-foreground/45">•</span>
@@ -455,7 +470,7 @@ onUnmounted(() => stopLibraryUploadListener())
             rel="noopener noreferrer"
             class="font-semibold text-primary transition-colors hover:text-primary/85"
           >
-            Latest {{ versionUi.latestLabel }}
+            {{ t('components.sidebar.latest', { version: versionUi.latestLabel }) }}
           </a>
         </div>
       </div>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { AlertTriangle, CheckSquare, FileSpreadsheet, FolderOpen, Layers, Pencil, Search, SlidersHorizontal, Square, X } from '@lucide/vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
@@ -41,6 +42,7 @@ import type { BulkEditFields } from '@/features/book/composables/useBulkEditMeta
 import type { BookCard } from '@bookorbit/types'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const { viewMode, effectiveViewMode } = useEffectiveViewMode()
@@ -55,8 +57,8 @@ const { collections, loaded: collectionsLoaded, error: collectionsError, fetchCo
 const collectionNotFound = ref(false)
 const collection = computed(() => collections.value.find((c) => c.id === collectionId.value))
 const pageTitle = computed(() => {
-  if (collection.value?.name) return `Collection · ${collection.value.name}`
-  return Number.isFinite(collectionId.value) ? `Collection #${collectionId.value}` : 'Collection'
+  if (collection.value?.name) return t('views.collection.pageTitle', { name: collection.value.name })
+  return Number.isFinite(collectionId.value) ? t('views.collection.pageTitleWithId', { id: collectionId.value }) : t('views.collection.title')
 })
 usePageTitle(pageTitle)
 
@@ -231,9 +233,9 @@ async function handleRemoveFromCollection() {
     resetBooks()
     refreshBuckets()
     exitSelectionMode()
-    toast.success(`Removed ${ids.length} book${ids.length === 1 ? '' : 's'} from collection`)
+    toast.success(t('views.collection.toast.removed', { count: ids.length }, ids.length))
   } catch {
-    toast.error('Failed to remove books from collection')
+    toast.error(t('views.collection.toast.removeFailed'))
   } finally {
     removingInProgress = false
   }
@@ -425,7 +427,7 @@ defineOptions({ name: 'CollectionView' })
 
     <section class="flex flex-1 flex-col min-h-0">
       <ViewHeader
-        :title="collection?.name ?? 'Collection'"
+        :title="collection?.name ?? t('views.collection.title')"
         :icon="collection?.icon || 'FolderOpen'"
         fallback-icon="FolderOpen"
         :total="total"
@@ -453,7 +455,7 @@ defineOptions({ name: 'CollectionView' })
                 <Layers :size="14" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>{{ collapseEnabledRef ? 'Expand series' : 'Collapse series' }}</TooltipContent>
+            <TooltipContent>{{ collapseEnabledRef ? t('views.bookView.expandSeries') : t('views.bookView.collapseSeries') }}</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -466,7 +468,7 @@ defineOptions({ name: 'CollectionView' })
                 <FileSpreadsheet :size="14" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Export metadata</TooltipContent>
+            <TooltipContent>{{ t('views.bookView.exportMetadata') }}</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -479,7 +481,7 @@ defineOptions({ name: 'CollectionView' })
                 <Pencil :size="14" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Edit collection</TooltipContent>
+            <TooltipContent>{{ t('views.collection.editCollection') }}</TooltipContent>
           </Tooltip>
 
           <button
@@ -493,7 +495,7 @@ defineOptions({ name: 'CollectionView' })
           <DropdownMenuItem @click="handleToggleCollapse">
             <CheckSquare v-if="collapseEnabledRef" :size="14" class="mr-2" />
             <Square v-else :size="14" class="mr-2" />
-            Collapse series
+            {{ t('views.bookView.collapseSeries') }}
           </DropdownMenuItem>
         </template>
         <template v-if="effectiveViewMode === 'table'" #columns>
@@ -531,7 +533,7 @@ defineOptions({ name: 'CollectionView' })
           <input
             v-model="searchQuery"
             type="search"
-            placeholder="Search title, author, series, narrator..."
+            :placeholder="t('views.bookView.searchPlaceholder')"
             class="mobile-search-input h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/85"
           />
           <button v-if="searchQuery.trim()" class="ml-1 text-muted-foreground/85 transition-colors hover:text-foreground" @click="clearSearch">
@@ -550,7 +552,7 @@ defineOptions({ name: 'CollectionView' })
             @click="handleToggleCollapse"
           >
             <Layers :size="13" />
-            <span>{{ collapseEnabledRef ? 'Expanded' : 'Collapse series' }}</span>
+            <span>{{ collapseEnabledRef ? t('views.bookView.expanded') : t('views.bookView.collapseSeries') }}</span>
           </button>
           <button
             v-if="hasPermission('library_download') && !isDemoRestrictedAccount"
@@ -558,7 +560,7 @@ defineOptions({ name: 'CollectionView' })
             @click="openMetadataExport"
           >
             <FileSpreadsheet :size="13" />
-            <span>Export</span>
+            <span>{{ t('views.bookView.export') }}</span>
           </button>
           <button
             v-if="collection"
@@ -566,14 +568,14 @@ defineOptions({ name: 'CollectionView' })
             @click="openCollectionEditor"
           >
             <Pencil :size="13" />
-            <span>Edit</span>
+            <span>{{ t('common.edit') }}</span>
           </button>
           <button
             class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             @click="closeMobileControls"
           >
             <X :size="13" />
-            <span>Close</span>
+            <span>{{ t('common.close') }}</span>
           </button>
         </div>
       </section>
@@ -583,25 +585,27 @@ defineOptions({ name: 'CollectionView' })
           <div class="flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 text-destructive">
             <AlertTriangle :size="28" />
           </div>
-          <p class="text-sm font-medium text-foreground">Could not load this collection</p>
+          <p class="text-sm font-medium text-foreground">{{ t('views.collection.loadError') }}</p>
           <p class="max-w-md text-xs text-muted-foreground">{{ collectionLoadError }}</p>
           <button
             class="rounded-md border border-input px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
             @click="retryCollectionLoad"
           >
-            Retry
+            {{ t('views.common.retry') }}
           </button>
         </div>
 
-        <EntityNotFound v-else-if="collectionNotFound" entity="Collection" />
+        <EntityNotFound v-else-if="collectionNotFound" :entity="t('views.entity.collection')" />
 
         <div v-else-if="booksInitialized && !loading && books.length === 0" class="flex flex-col items-center justify-center gap-3 py-24 text-center">
           <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
             <FolderOpen :size="28" class="text-muted-foreground/70" />
           </div>
-          <p class="text-sm font-medium text-foreground">{{ debouncedQuery ? 'No books match this search' : 'No books in this collection' }}</p>
+          <p class="text-sm font-medium text-foreground">
+            {{ debouncedQuery ? t('views.collection.empty.noSearchMatch') : t('views.collection.empty.noBooks') }}
+          </p>
           <p class="text-xs text-muted-foreground">
-            {{ debouncedQuery ? 'Try a different search term or clear the search.' : 'Select books from your library and add them here.' }}
+            {{ debouncedQuery ? t('views.collection.empty.noSearchMatchHint') : t('views.collection.empty.noBooksHint') }}
           </p>
         </div>
 
@@ -657,10 +661,10 @@ defineOptions({ name: 'CollectionView' })
         />
 
         <div v-if="effectiveViewMode === 'list'" ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
-          <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
-          <span v-else-if="!hasMorePrefix && contiguousPrefix.length > 0" class="text-xs text-muted-foreground"
-            >All {{ total.toLocaleString() }} books loaded</span
-          >
+          <span v-if="loading" class="text-xs text-muted-foreground">{{ t('common.loading') }}</span>
+          <span v-else-if="!hasMorePrefix && contiguousPrefix.length > 0" class="text-xs text-muted-foreground">{{
+            t('views.bookView.allBooksLoaded', { count: total.toLocaleString() })
+          }}</span>
         </div>
 
         <JumpRail

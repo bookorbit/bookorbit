@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { CheckSquare, LayoutGrid, List, SlidersHorizontal, Square, Table2 } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -60,6 +61,8 @@ const emit = defineEmits<{
   'update:searchQuery': [value: string]
 }>()
 
+const { t } = useI18n()
+
 const mobileDisplayOpen = ref(false)
 const mobileSearchOpen = ref(false)
 </script>
@@ -92,7 +95,7 @@ const mobileSearchOpen = ref(false)
       >
         <CheckSquare v-if="selectionMode" :size="13" />
         <Square v-else :size="13" />
-        Select
+        {{ t('components.viewHeader.select') }}
       </Button>
 
       <div v-if="showSelection" class="mx-1.5 hidden h-3.5 w-px bg-border/40 md:block" />
@@ -158,7 +161,7 @@ const mobileSearchOpen = ref(false)
           >
             <template #columns>
               <slot name="columns">
-                <p class="text-xs text-muted-foreground">Use the column visibility panel in the table header to show or hide columns.</p>
+                <p class="text-xs text-muted-foreground">{{ t('components.viewHeader.columnVisibilityHint') }}</p>
               </slot>
             </template>
           </ViewHeaderDisplayControls>
@@ -189,8 +192,8 @@ const mobileSearchOpen = ref(false)
   <Sheet v-model:open="mobileDisplayOpen">
     <SheetContent side="bottom">
       <SheetHeader>
-        <SheetTitle>Display</SheetTitle>
-        <SheetDescription class="sr-only">Adjust cover size, grid spacing, and view display options.</SheetDescription>
+        <SheetTitle>{{ t('components.viewHeader.display') }}</SheetTitle>
+        <SheetDescription class="sr-only">{{ t('components.viewHeader.displayDescription') }}</SheetDescription>
       </SheetHeader>
       <div class="px-4 pb-6">
         <ViewHeaderDisplayControls
@@ -210,7 +213,7 @@ const mobileSearchOpen = ref(false)
         >
           <template #columns>
             <slot name="columns">
-              <p class="text-xs text-muted-foreground">Column visibility can be managed from the table header.</p>
+              <p class="text-xs text-muted-foreground">{{ t('components.viewHeader.columnVisibilityMobileHint') }}</p>
             </slot>
           </template>
         </ViewHeaderDisplayControls>

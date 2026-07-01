@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, useSlots } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { CheckSquare, MoreHorizontal, Search, SlidersHorizontal, Square } from '@lucide/vue'
+
+const { t } = useI18n()
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -71,8 +74,12 @@ const hasActions = computed(
     <DropdownMenuContent align="end" class="w-44">
       <template v-if="showViewModeToggle && (allowedViewModes.includes('grid') || allowedViewModes.includes('list'))">
         <DropdownMenuRadioGroup :model-value="viewMode" @update:model-value="handleViewModeUpdate">
-          <DropdownMenuRadioItem v-if="allowedViewModes.includes('grid')" value="grid">Grid</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem v-if="allowedViewModes.includes('list')" value="list">List</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem v-if="allowedViewModes.includes('grid')" value="grid">{{
+            t('components.viewHeader.mobileMenu.grid')
+          }}</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem v-if="allowedViewModes.includes('list')" value="list">{{
+            t('components.viewHeader.mobileMenu.list')
+          }}</DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
       </template>
@@ -80,7 +87,7 @@ const hasActions = computed(
       <template v-if="showDisplayAction">
         <DropdownMenuItem @click="emit('open-display')">
           <SlidersHorizontal :size="14" class="mr-2" />
-          Display
+          {{ t('components.viewHeader.displayControls.display') }}
         </DropdownMenuItem>
       </template>
 
@@ -93,7 +100,7 @@ const hasActions = computed(
         <DropdownMenuSeparator />
         <DropdownMenuItem @click="emit('open-mobile-search')">
           <Search :size="14" class="mr-2" />
-          Search
+          {{ t('common.search') }}
         </DropdownMenuItem>
       </template>
 
@@ -102,7 +109,7 @@ const hasActions = computed(
         <DropdownMenuItem @click="emit('toggle-selection')">
           <CheckSquare v-if="selectionMode" :size="14" class="mr-2" />
           <Square v-else :size="14" class="mr-2" />
-          {{ selectionMode ? 'Exit Select' : 'Select' }}
+          {{ selectionMode ? t('components.viewHeader.mobileMenu.exitSelect') : t('components.viewHeader.mobileMenu.select') }}
         </DropdownMenuItem>
       </template>
     </DropdownMenuContent>
