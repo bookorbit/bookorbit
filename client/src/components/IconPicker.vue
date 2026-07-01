@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import * as LucideIcons from '@lucide/vue'
 import { ChevronDown, Search, X } from '@lucide/vue'
 import { RecycleScroller } from 'vue-virtual-scroller'
@@ -19,6 +20,8 @@ const emit = defineEmits<{
   'update:modelValue': [value: string]
   'open-change': [value: boolean]
 }>()
+
+const { t } = useI18n()
 
 // ── Icon list ─────────────────────────────────────────────────────────────
 
@@ -129,7 +132,9 @@ const customRows = computed<CustomIconRow[]>(() => {
 })
 
 const activeCount = computed(() => (activeSource.value === 'lucide' ? filteredIcons.value.length : filteredCustomIcons.value.length))
-const searchPlaceholder = computed(() => (activeSource.value === 'lucide' ? 'Search Lucide icons...' : 'Search custom icons...'))
+const searchPlaceholder = computed(() =>
+  activeSource.value === 'lucide' ? t('components.iconPicker.searchLucide') : t('components.iconPicker.searchCustom'),
+)
 const customIconsSearching = computed(
   () =>
     serverSearchLoading.value ||
@@ -335,7 +340,7 @@ onUnmounted(() => {
               :class="activeSource === 'custom' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
               @click="selectCustomTab"
             >
-              Custom
+              {{ t('components.iconPicker.customTab') }}
             </button>
           </div>
           <div class="flex items-center gap-2 px-3 py-2 border-border shrink-0">
@@ -358,11 +363,11 @@ onUnmounted(() => {
 
         <!-- No results -->
         <div v-if="activeCount === 0" class="flex items-center justify-center py-12 text-xs text-muted-foreground">
-          <span v-if="activeSource === 'custom' && (customIconsLoading || customIconsSearching)">Searching...</span>
-          <span v-else-if="query">No icons match "{{ query }}"</span>
-          <span v-else-if="activeSource === 'custom' && catalogTruncated">Type to search all icons</span>
-          <span v-else-if="activeSource === 'custom'">No custom icons uploaded</span>
-          <span v-else>No icons available</span>
+          <span v-if="activeSource === 'custom' && (customIconsLoading || customIconsSearching)">{{ t('components.iconPicker.searching') }}</span>
+          <span v-else-if="query">{{ t('components.iconPicker.noIconsMatch', { query }) }}</span>
+          <span v-else-if="activeSource === 'custom' && catalogTruncated">{{ t('components.iconPicker.typeToSearch') }}</span>
+          <span v-else-if="activeSource === 'custom'">{{ t('components.iconPicker.noCustomIcons') }}</span>
+          <span v-else>{{ t('components.iconPicker.noIconsAvailable') }}</span>
         </div>
 
         <!-- Virtual icon grid -->

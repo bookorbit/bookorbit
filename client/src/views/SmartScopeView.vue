@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import {
   AlertTriangle,
   Settings2,
@@ -58,6 +59,7 @@ import type { BulkEditFields } from '@/features/book/composables/useBulkEditMeta
 import type { BookCard, GroupRule, SortField } from '@bookorbit/types'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const { viewMode, effectiveViewMode } = useEffectiveViewMode()
@@ -124,8 +126,8 @@ const smartScopeLoadError = computed(() => smartScopesError.value ?? booksError.
 
 const smartScope = computed(() => smartScopes.value.find((l) => l.id === smartScopeId.value))
 const pageTitle = computed(() => {
-  if (smartScope.value?.name) return `SmartScope · ${smartScope.value.name}`
-  return Number.isFinite(smartScopeId.value) ? `SmartScope #${smartScopeId.value}` : 'SmartScope'
+  if (smartScope.value?.name) return t('views.smartScope.pageTitle', { name: smartScope.value.name })
+  return Number.isFinite(smartScopeId.value) ? t('views.smartScope.pageTitleWithId', { id: smartScopeId.value }) : t('views.smartScope.title')
 })
 usePageTitle(pageTitle)
 
@@ -285,13 +287,13 @@ async function handleDelete() {
     return
   }
   deleting.value = true
-  const name = smartScope.value?.name ?? 'Smart scope'
+  const name = smartScope.value?.name ?? t('views.smartScope.defaultName')
   try {
     await deleteSmartScope(smartScopeId.value)
-    toast.success(`"${name}" deleted`)
+    toast.success(t('views.smartScope.toast.deleted', { name }))
     router.push({ name: 'dashboard' })
   } catch {
-    toast.error(`Failed to delete "${name}"`)
+    toast.error(t('views.smartScope.toast.deleteFailed', { name }))
   } finally {
     deleting.value = false
     confirmSmartScopeDelete.value = false
@@ -462,7 +464,7 @@ defineOptions({ name: 'SmartScopeView' })
 
     <section class="flex flex-1 flex-col min-h-0">
       <ViewHeader
-        :title="smartScope?.name ?? 'SmartScope'"
+        :title="smartScope?.name ?? t('views.smartScope.title')"
         :icon="smartScope?.icon ?? undefined"
         fallback-icon="Aperture"
         :total="total"
@@ -606,7 +608,7 @@ defineOptions({ name: 'SmartScopeView' })
           <input
             v-model="searchQuery"
             type="search"
-            placeholder="Search title, author, series, narrator..."
+            :placeholder="t('views.bookView.searchPlaceholder')"
             class="mobile-search-input h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/85"
           />
           <button v-if="searchQuery.trim()" class="ml-1 text-muted-foreground/85 transition-colors hover:text-foreground" @click="clearSearch">
@@ -629,14 +631,14 @@ defineOptions({ name: 'SmartScopeView' })
             class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <FileSpreadsheet :size="13" />
-            <span>Export</span>
+            <span>{{ t('views.bookView.export') }}</span>
           </button>
           <button
             @click="openEditor"
             class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <Settings2 :size="13" />
-            <span>Edit</span>
+            <span>{{ t('common.edit') }}</span>
           </button>
           <button
             @click="handleDelete"
@@ -649,14 +651,14 @@ defineOptions({ name: 'SmartScopeView' })
             "
           >
             <Trash2 :size="13" />
-            <span>{{ confirmSmartScopeDelete ? 'Confirm?' : 'Delete' }}</span>
+            <span>{{ confirmSmartScopeDelete ? t('views.smartScope.confirmDelete') : t('common.delete') }}</span>
           </button>
           <button
             class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             @click="closeMobileControls"
           >
             <X :size="13" />
-            <span>Close</span>
+            <span>{{ t('common.close') }}</span>
           </button>
         </div>
       </section>
@@ -666,17 +668,17 @@ defineOptions({ name: 'SmartScopeView' })
           <div class="flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 text-destructive">
             <AlertTriangle :size="28" />
           </div>
-          <p class="text-sm font-medium text-foreground">Could not load this SmartScope</p>
+          <p class="text-sm font-medium text-foreground">{{ t('views.smartScope.loadError') }}</p>
           <p class="max-w-md text-xs text-muted-foreground">{{ smartScopeLoadError }}</p>
           <button
             class="rounded-md border border-input px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
             @click="retrySmartScopeLoad"
           >
-            Retry
+            {{ t('views.common.retry') }}
           </button>
         </div>
 
-        <EntityNotFound v-else-if="smartScopeNotFound" entity="SmartScope" />
+        <EntityNotFound v-else-if="smartScopeNotFound" :entity="t('views.entity.smartScope')" />
 
         <template v-else>
           <!-- Filter summary -->
@@ -689,7 +691,7 @@ defineOptions({ name: 'SmartScopeView' })
             <span v-if="sortChip" class="inline-flex items-center text-xs rounded-md border border-border/60 overflow-hidden">
               <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-muted text-muted-foreground border-r border-border/60">
                 <ArrowUpDown :size="10" class="shrink-0" />
-                <span class="font-semibold">Sort</span>
+                <span class="font-semibold">{{ t('views.bookView.sort') }}</span>
               </span>
               <span class="px-2 py-0.5 bg-muted/40 text-foreground font-medium">{{ sortChip }}</span>
             </span>
@@ -704,16 +706,16 @@ defineOptions({ name: 'SmartScopeView' })
               <Settings2 :size="28" class="text-muted-foreground/70" />
             </div>
             <div class="flex flex-col gap-1">
-              <p class="text-sm font-medium text-foreground">No rules configured</p>
+              <p class="text-sm font-medium text-foreground">{{ t('views.smartScope.empty.noRules') }}</p>
               <p class="text-xs text-muted-foreground max-w-xs">
-                Open the editor to define which books appear in this smartScope using filters and sort rules.
+                {{ t('views.smartScope.empty.noRulesHint') }}
               </p>
             </div>
             <button
               @click="editorOpen = true"
               class="h-9 px-5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
             >
-              Configure SmartScope
+              {{ t('views.smartScope.empty.configure') }}
             </button>
           </div>
 
@@ -725,9 +727,9 @@ defineOptions({ name: 'SmartScopeView' })
             <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
               <Aperture :size="28" class="text-muted-foreground/70" />
             </div>
-            <p class="text-sm font-medium text-foreground">No books match this smartScope</p>
-            <p class="text-xs text-muted-foreground">Try adjusting the filter rules.</p>
-            <button @click="editorOpen = true" class="text-xs text-primary hover:underline">Edit SmartScope</button>
+            <p class="text-sm font-medium text-foreground">{{ t('views.smartScope.empty.noMatch') }}</p>
+            <p class="text-xs text-muted-foreground">{{ t('views.smartScope.empty.noMatchHint') }}</p>
+            <button @click="editorOpen = true" class="text-xs text-primary hover:underline">{{ t('views.smartScope.empty.edit') }}</button>
           </div>
 
           <!-- Grid view -->
@@ -784,9 +786,9 @@ defineOptions({ name: 'SmartScopeView' })
           />
 
           <div v-if="effectiveViewMode === 'list'" ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
-            <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
+            <span v-if="loading" class="text-xs text-muted-foreground">{{ t('common.loading') }}</span>
             <span v-else-if="!hasMorePrefix && contiguousPrefix.length > 0" class="text-xs text-muted-foreground">
-              All {{ total.toLocaleString() }} books loaded
+              {{ t('views.bookView.allBooksLoaded', { count: total.toLocaleString() }) }}
             </span>
           </div>
 

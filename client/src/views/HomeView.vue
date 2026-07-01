@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, provide, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import {
   ArrowUpDown,
   Bookmark,
@@ -65,6 +66,7 @@ import type { GroupRule, Rule, SortSpec } from '@bookorbit/types'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 import { type QuerySelectionState } from '@/features/book/composables/useBookBulkActions'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const { viewMode, effectiveViewMode } = useEffectiveViewMode()
@@ -77,11 +79,11 @@ const currentCoverAspectRatio = computed(() => currentLibrary.value?.coverAspect
 const { coverSize, gridGap } = useViewDisplaySettings('library', libraryId, currentCoverAspectRatio)
 
 const libraryNotFound = computed(() => librariesLoaded.value && libraryId.value !== null && !currentLibrary.value)
-const title = computed(() => currentLibrary.value?.name ?? 'Library')
+const title = computed(() => currentLibrary.value?.name ?? t('views.library.title'))
 const libraryIcon = computed(() => currentLibrary.value?.icon ?? 'BookOpen')
 const pageTitle = computed(() => {
-  if (currentLibrary.value?.name) return `Library · ${currentLibrary.value.name}`
-  return libraryId.value === null ? 'Library' : `Library #${libraryId.value}`
+  if (currentLibrary.value?.name) return t('views.library.pageTitle', { name: currentLibrary.value.name })
+  return libraryId.value === null ? t('views.library.title') : t('views.library.pageTitleWithId', { id: libraryId.value })
 })
 usePageTitle(pageTitle)
 
@@ -582,7 +584,7 @@ defineOptions({ name: 'HomeView' })
                   <ArrowUpDown :size="13" />
                   <span class="hidden lg:inline">{{ sortSummary }}</span>
                   <span class="lg:hidden"
-                    >Sort<template v-if="!isDefaultSort"> ({{ sort.length }})</template></span
+                    >{{ t('views.bookView.sort') }}<template v-if="!isDefaultSort"> ({{ sort.length }})</template></span
                   >
                 </button>
               </PopoverTrigger>
@@ -601,7 +603,7 @@ defineOptions({ name: 'HomeView' })
                   <X :size="13" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Reset sort to default</TooltipContent>
+              <TooltipContent>{{ t('views.bookView.resetSort') }}</TooltipContent>
             </Tooltip>
           </div>
           <div class="hidden sm:block w-px h-5 bg-border shrink-0" />
@@ -620,7 +622,7 @@ defineOptions({ name: 'HomeView' })
                 <Layers :size="14" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>{{ collapseEnabledRef ? 'Expand series' : 'Collapse series' }}</TooltipContent>
+            <TooltipContent>{{ collapseEnabledRef ? t('views.bookView.expandSeries') : t('views.bookView.collapseSeries') }}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger as-child>
@@ -633,7 +635,7 @@ defineOptions({ name: 'HomeView' })
                 <FileSpreadsheet :size="14" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Export metadata</TooltipContent>
+            <TooltipContent>{{ t('views.bookView.exportMetadata') }}</TooltipContent>
           </Tooltip>
           <button
             @click="toggleFilterPanel"
@@ -645,7 +647,7 @@ defineOptions({ name: 'HomeView' })
             "
           >
             <Filter :size="13" />
-            <span>Filters</span>
+            <span>{{ t('views.bookView.filters') }}</span>
             <span v-if="activeFilterCount > 0" class="text-xs font-semibold">({{ activeFilterCount }})</span>
           </button>
           <Tooltip>
@@ -656,10 +658,10 @@ defineOptions({ name: 'HomeView' })
                 class="hidden sm:flex items-center gap-1 h-8 px-2 rounded-md text-sm text-muted-foreground hover:text-destructive transition-colors"
               >
                 <X :size="13" />
-                Clear
+                {{ t('views.bookView.clear') }}
               </button>
             </TooltipTrigger>
-            <TooltipContent>Clear all filters</TooltipContent>
+            <TooltipContent>{{ t('views.bookView.clearAllFilters') }}</TooltipContent>
           </Tooltip>
 
           <button
@@ -685,7 +687,7 @@ defineOptions({ name: 'HomeView' })
           <DropdownMenuItem @click="handleToggleCollapse">
             <CheckSquare v-if="collapseEnabledRef" :size="14" class="mr-2" />
             <Square v-else :size="14" class="mr-2" />
-            Collapse series
+            {{ t('views.bookView.collapseSeries') }}
           </DropdownMenuItem>
         </template>
         <template v-if="effectiveViewMode === 'table'" #columns>
@@ -723,7 +725,7 @@ defineOptions({ name: 'HomeView' })
           <input
             v-model="searchQuery"
             type="search"
-            placeholder="Search title, author, series, narrator..."
+            :placeholder="t('views.bookView.searchPlaceholder')"
             class="mobile-search-input h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/85"
           />
           <button v-if="searchQuery.trim()" class="ml-1 text-muted-foreground/85 transition-colors hover:text-foreground" @click="clearSearch">
@@ -743,8 +745,10 @@ defineOptions({ name: 'HomeView' })
                 "
               >
                 <ArrowUpDown :size="13" />
-                <span>Sort</span>
-                <span v-if="!isDefaultSort" class="rounded-full border border-primary/40 px-1 py-0.5 text-[10px] font-semibold leading-none">On</span>
+                <span>{{ t('views.bookView.sort') }}</span>
+                <span v-if="!isDefaultSort" class="rounded-full border border-primary/40 px-1 py-0.5 text-[10px] font-semibold leading-none">{{
+                  t('views.bookView.sortOn')
+                }}</span>
               </button>
             </PopoverTrigger>
             <PopoverContent align="start" class="w-80 p-3">
@@ -770,7 +774,7 @@ defineOptions({ name: 'HomeView' })
             "
           >
             <Filter :size="13" />
-            <span>Filters</span>
+            <span>{{ t('views.bookView.filters') }}</span>
             <span v-if="activeFilterCount > 0" class="rounded-full bg-primary/10 px-1 py-0.5 text-[10px] font-semibold leading-none">
               {{ activeFilterCount }}
             </span>
@@ -782,7 +786,7 @@ defineOptions({ name: 'HomeView' })
             @click="openMetadataExport('all-matching')"
           >
             <FileSpreadsheet :size="13" />
-            <span>Export</span>
+            <span>{{ t('views.bookView.export') }}</span>
           </button>
 
           <button
@@ -790,7 +794,7 @@ defineOptions({ name: 'HomeView' })
             @click="clearFilters"
             class="h-8 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:text-destructive"
           >
-            Clear
+            {{ t('views.bookView.clear') }}
           </button>
         </div>
       </section>
@@ -798,7 +802,7 @@ defineOptions({ name: 'HomeView' })
       <!-- Filter builder panel rendered outside <main> so it stays anchored when the list is scrolled -->
       <div v-if="filterOpen && !libraryNotFound" class="mb-4 p-3 rounded-md border border-border bg-card">
         <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <span class="text-xs font-medium text-muted-foreground sm:shrink-0">Filter rules</span>
+          <span class="text-xs font-medium text-muted-foreground sm:shrink-0">{{ t('views.library.filterRules') }}</span>
           <div class="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:flex-nowrap">
             <Tooltip>
               <TooltipTrigger as-child>
@@ -808,11 +812,11 @@ defineOptions({ name: 'HomeView' })
                   class="flex min-h-7 items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   <Telescope :size="13" />
-                  <span class="hidden sm:inline whitespace-nowrap">Save as Smart Scope</span>
-                  <span class="sm:hidden whitespace-nowrap">Save Scope</span>
+                  <span class="hidden sm:inline whitespace-nowrap">{{ t('views.library.saveAsSmartScope') }}</span>
+                  <span class="sm:hidden whitespace-nowrap">{{ t('views.library.saveScope') }}</span>
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Save this filter as a named Smart Scope</TooltipContent>
+              <TooltipContent>{{ t('views.library.saveAsSmartScopeTooltip') }}</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger as-child>
@@ -828,10 +832,10 @@ defineOptions({ name: 'HomeView' })
                 >
                   <BookmarkCheck v-if="isFilterSaved" :size="13" />
                   <Bookmark v-else :size="13" />
-                  {{ isFilterSaved ? 'Saved' : 'Save filter' }}
+                  {{ isFilterSaved ? t('views.library.saved') : t('views.library.saveFilter') }}
                 </button>
               </TooltipTrigger>
-              <TooltipContent>{{ isFilterSaved ? 'Filter saved' : 'Save filter for this library' }}</TooltipContent>
+              <TooltipContent>{{ isFilterSaved ? t('views.library.filterSaved') : t('views.library.saveFilterTooltip') }}</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger as-child>
@@ -843,13 +847,13 @@ defineOptions({ name: 'HomeView' })
                   <X :size="11" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Remove saved filter</TooltipContent>
+              <TooltipContent>{{ t('views.library.removeSavedFilter') }}</TooltipContent>
             </Tooltip>
             <button
               class="min-h-7 whitespace-nowrap rounded-md border border-input px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               @click="closeFilterPanel"
             >
-              Close
+              {{ t('common.close') }}
             </button>
           </div>
         </div>
@@ -857,7 +861,7 @@ defineOptions({ name: 'HomeView' })
       </div>
 
       <main ref="mainRef" :class="effectiveViewMode === 'table' ? 'flex-1 min-h-0 flex flex-col overflow-hidden' : 'flex-1 min-h-0 overflow-y-auto'">
-        <EntityNotFound v-if="libraryNotFound" entity="Library" />
+        <EntityNotFound v-if="libraryNotFound" :entity="t('views.entity.library')" />
 
         <template v-else>
           <div v-if="error" class="text-sm text-destructive mb-4">{{ error }}</div>
@@ -869,9 +873,9 @@ defineOptions({ name: 'HomeView' })
             v-if="booksInitialized && !loading && books.length === 0 && activeFilterCount > 0"
             class="flex flex-col items-center justify-center py-24 gap-3 text-center"
           >
-            <p class="text-sm font-medium text-foreground">No books match your filters</p>
-            <p class="text-xs text-muted-foreground">Try adjusting or clearing your filters to see more books.</p>
-            <button @click="clearFilters" class="text-xs text-primary hover:underline">Clear filters</button>
+            <p class="text-sm font-medium text-foreground">{{ t('views.library.empty.noFilterMatch') }}</p>
+            <p class="text-xs text-muted-foreground">{{ t('views.library.empty.noFilterMatchHint') }}</p>
+            <button @click="clearFilters" class="text-xs text-primary hover:underline">{{ t('views.library.empty.clearFilters') }}</button>
           </div>
 
           <!-- Empty state: no books in library -->
@@ -883,12 +887,12 @@ defineOptions({ name: 'HomeView' })
               <BookOpen :size="28" class="text-muted-foreground/70" />
             </div>
             <div v-if="libraryId !== null && isScanning(libraryId)" class="flex flex-col gap-1">
-              <p class="text-sm font-medium text-foreground">Scanning your library...</p>
-              <p class="text-xs text-muted-foreground max-w-xs">Books will appear here as they are discovered.</p>
+              <p class="text-sm font-medium text-foreground">{{ t('views.library.empty.scanning') }}</p>
+              <p class="text-xs text-muted-foreground max-w-xs">{{ t('views.library.empty.scanningHint') }}</p>
             </div>
             <div v-else class="flex flex-col gap-1">
-              <p class="text-sm font-medium text-foreground">Your library is empty</p>
-              <p class="text-xs text-muted-foreground max-w-xs">Once you add books to this library, they will appear here.</p>
+              <p class="text-sm font-medium text-foreground">{{ t('views.library.empty.emptyLibrary') }}</p>
+              <p class="text-xs text-muted-foreground max-w-xs">{{ t('views.library.empty.emptyLibraryHint') }}</p>
             </div>
           </div>
 
@@ -951,10 +955,10 @@ defineOptions({ name: 'HomeView' })
           />
 
           <div v-if="effectiveViewMode === 'list'" ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
-            <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
-            <span v-else-if="!hasMorePrefix && contiguousPrefix.length > 0" class="text-xs text-muted-foreground"
-              >All {{ total.toLocaleString() }} books loaded</span
-            >
+            <span v-if="loading" class="text-xs text-muted-foreground">{{ t('common.loading') }}</span>
+            <span v-else-if="!hasMorePrefix && contiguousPrefix.length > 0" class="text-xs text-muted-foreground">{{
+              t('views.bookView.allBooksLoaded', { count: total.toLocaleString() })
+            }}</span>
           </div>
 
           <JumpRail
@@ -987,9 +991,11 @@ defineOptions({ name: 'HomeView' })
         v-if="showQuerySelectionBanner && !querySelection"
         class="fixed bottom-16 left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-lg border border-primary/30 bg-background px-4 py-2.5 text-sm shadow-lg"
       >
-        <span class="text-muted-foreground"> {{ selectedCount.toLocaleString() }} of {{ total.toLocaleString() }} loaded books selected. </span>
+        <span class="text-muted-foreground">
+          {{ t('views.library.querySelection.loadedSelected', { selected: selectedCount.toLocaleString(), total: total.toLocaleString() }) }}
+        </span>
         <button class="font-medium text-primary underline-offset-2 hover:underline" @click="activateQuerySelection">
-          Select all {{ total.toLocaleString() }} matching books
+          {{ t('views.library.querySelection.selectAllMatching', { total: total.toLocaleString() }) }}
         </button>
         <button class="text-muted-foreground hover:text-foreground" @click="dismissQuerySelectionBanner">
           <X :size="14" />

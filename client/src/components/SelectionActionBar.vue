@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, useSlots, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   BookOpen,
   Download,
@@ -87,6 +88,7 @@ const emit = defineEmits<{
   exit: []
 }>()
 
+const { t } = useI18n()
 const { hasPermission, isDemoRestrictedAccount } = usePermissions()
 const { search: searchPublisher } = usePublisherSearch()
 const { search: searchSeriesName } = useSeriesNameSearch()
@@ -107,7 +109,9 @@ const canShowMoreMenu = computed(() => canDownload.value || canEditMetadata.valu
 const canShare = computed(() => hasPermission('email_send') || canDownload.value)
 const numericFieldSelected = computed(() => bulkField.value === 'publishedYear')
 const arrayFieldSelected = computed(() => (BULK_EDITABLE_ARRAY_FIELDS as readonly string[]).includes(bulkField.value))
-const fieldValuePlaceholder = computed(() => (arrayFieldSelected.value ? 'Comma-separated (leave blank to clear)' : 'Leave blank to clear'))
+const fieldValuePlaceholder = computed(() =>
+  arrayFieldSelected.value ? t('components.selectionActionBar.fieldPlaceholderArray') : t('components.selectionActionBar.fieldPlaceholder'),
+)
 const typeaheadSearchFn = computed<((q: string) => Promise<string[]>) | null>(() => {
   if (bulkField.value === 'seriesName') return searchSeriesName
   if (bulkField.value === 'publisher') return searchPublisher
@@ -262,7 +266,7 @@ watch(
                         data-testid="action-bulk-set-status"
                         :disabled="count === 0"
                         :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]"
-                        aria-label="Set reading status"
+                        :aria-label="t('components.selectionActionBar.setReadingStatus')"
                       >
                         <BookOpen :size="ICON_SIZE" />
                       </button>
@@ -276,7 +280,7 @@ watch(
                   </DropdownMenu>
                 </span>
               </TooltipTrigger>
-              <TooltipContent side="top">Set reading status</TooltipContent>
+              <TooltipContent side="top">{{ t('components.selectionActionBar.setReadingStatus') }}</TooltipContent>
             </Tooltip>
 
             <Tooltip v-if="canEditMetadata">
@@ -290,7 +294,7 @@ watch(
                   <Star :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top">Set rating</TooltipContent>
+              <TooltipContent side="top">{{ t('components.selectionActionBar.setRating') }}</TooltipContent>
             </Tooltip>
 
             <div v-if="canEditMetadata" :class="DIVIDER" />
@@ -306,7 +310,7 @@ watch(
                   <Pencil :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top">Open metadata editor</TooltipContent>
+              <TooltipContent side="top">{{ t('components.selectionActionBar.openMetadataEditor') }}</TooltipContent>
             </Tooltip>
 
             <Tooltip v-if="canEditMetadata && !queryScoped">
@@ -320,7 +324,7 @@ watch(
                   <SquareArrowOutUpRight :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top">Edit books individually</TooltipContent>
+              <TooltipContent side="top">{{ t('components.selectionActionBar.editIndividually') }}</TooltipContent>
             </Tooltip>
 
             <div v-if="canBulkActions" :class="DIVIDER" />
@@ -336,7 +340,7 @@ watch(
                   <FolderPlus :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top">Add to collection</TooltipContent>
+              <TooltipContent side="top">{{ t('components.selectionActionBar.addToCollection') }}</TooltipContent>
             </Tooltip>
 
             <Tooltip v-if="inCollection">
@@ -349,7 +353,7 @@ watch(
                   <FolderMinus :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top">Remove from collection</TooltipContent>
+              <TooltipContent side="top">{{ t('components.selectionActionBar.removeFromCollection') }}</TooltipContent>
             </Tooltip>
 
             <div v-if="canShare" :class="DIVIDER" />
@@ -365,7 +369,7 @@ watch(
                   <Mail :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top">Send via email</TooltipContent>
+              <TooltipContent side="top">{{ t('components.selectionActionBar.sendViaEmail') }}</TooltipContent>
             </Tooltip>
 
             <Tooltip v-if="canDownload">
@@ -379,7 +383,7 @@ watch(
                   <Download :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top">Download files as ZIP</TooltipContent>
+              <TooltipContent side="top">{{ t('components.selectionActionBar.downloadFilesZip') }}</TooltipContent>
             </Tooltip>
 
             <div v-if="canShowMoreMenu" :class="DIVIDER" />
@@ -393,7 +397,7 @@ watch(
                         data-testid="action-bulk-metadata-menu"
                         :disabled="count === 0"
                         :class="[BTN_ICON, count > 0 ? BTN_MUTED : BTN_DISABLED]"
-                        aria-label="More actions"
+                        :aria-label="t('components.selectionActionBar.moreActions')"
                       >
                         <MoreHorizontal :size="ICON_SIZE" />
                       </button>
@@ -402,31 +406,31 @@ watch(
                       <template v-if="canEditMetadata">
                         <DropdownMenuItem data-testid="action-bulk-set-field" @click="openFieldEditor">
                           <SquarePen :size="14" />
-                          <span>Set field</span>
+                          <span>{{ t('components.selectionActionBar.setField') }}</span>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem data-testid="action-bulk-refresh-metadata" @click="onRefreshMetadata">
                           <RefreshCw :size="14" />
-                          <span>Refresh metadata</span>
+                          <span>{{ t('components.selectionActionBar.refreshMetadata') }}</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem data-testid="action-bulk-re-extract-cover" @click="onReExtractCover">
                           <ImageDown :size="14" />
-                          <span>Re-extract cover</span>
+                          <span>{{ t('components.selectionActionBar.reExtractCover') }}</span>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuSub>
                           <DropdownMenuSubTrigger data-testid="action-bulk-metadata-lock">
                             <Lock :size="14" />
-                            <span>Metadata lock</span>
+                            <span>{{ t('components.selectionActionBar.metadataLock') }}</span>
                           </DropdownMenuSubTrigger>
                           <DropdownMenuSubContent>
                             <DropdownMenuItem data-testid="action-bulk-lock-metadata" @click="lockAll">
                               <Lock :size="14" />
-                              <span>Lock all</span>
+                              <span>{{ t('components.selectionActionBar.lockAll') }}</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem data-testid="action-bulk-unlock-metadata" @click="unlockAll">
                               <Unlock :size="14" />
-                              <span>Unlock all</span>
+                              <span>{{ t('components.selectionActionBar.unlockAll') }}</span>
                             </DropdownMenuItem>
                           </DropdownMenuSubContent>
                         </DropdownMenuSub>
@@ -435,14 +439,14 @@ watch(
                         <DropdownMenuSeparator v-if="canEditMetadata" />
                         <DropdownMenuItem data-testid="action-export-metadata" @click="emit('export-metadata')">
                           <FileSpreadsheet :size="14" />
-                          <span>Export metadata</span>
+                          <span>{{ t('components.selectionActionBar.exportMetadata') }}</span>
                         </DropdownMenuItem>
                       </template>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </span>
               </TooltipTrigger>
-              <TooltipContent side="top">More actions</TooltipContent>
+              <TooltipContent side="top">{{ t('components.selectionActionBar.moreActions') }}</TooltipContent>
             </Tooltip>
 
             <div v-if="hasPermission('library_delete_books')" :class="DIVIDER" />
@@ -458,7 +462,7 @@ watch(
                   <Trash2 :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top">Delete selected</TooltipContent>
+              <TooltipContent side="top">{{ t('components.selectionActionBar.deleteSelected') }}</TooltipContent>
             </Tooltip>
 
             <div :class="DIVIDER" />
@@ -469,34 +473,40 @@ watch(
                   <X :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top">Exit selection</TooltipContent>
+              <TooltipContent side="top">{{ t('components.selectionActionBar.exitSelection') }}</TooltipContent>
             </Tooltip>
           </template>
 
           <!-- Export scope picker -->
           <template v-else-if="exportMenuOpen">
-            <span class="hidden sm:inline px-3 text-sm font-semibold text-foreground whitespace-nowrap">Download files as ZIP:</span>
+            <span class="hidden sm:inline px-3 text-sm font-semibold text-foreground whitespace-nowrap">{{
+              t('components.selectionActionBar.downloadFilesZipLabel')
+            }}</span>
             <div :class="DIVIDER" />
-            <button :class="BTN_TEXT_PRIMARY" @click="onExport('primary')">Primary only</button>
-            <button :class="BTN_TEXT_PRIMARY" @click="onExport('all')">All formats</button>
-            <button :class="BTN_TEXT_PRIMARY" @click="onExport('audio')">Audio only</button>
+            <button :class="BTN_TEXT_PRIMARY" @click="onExport('primary')">{{ t('components.selectionActionBar.primaryOnly') }}</button>
+            <button :class="BTN_TEXT_PRIMARY" @click="onExport('all')">{{ t('components.selectionActionBar.allFormats') }}</button>
+            <button :class="BTN_TEXT_PRIMARY" @click="onExport('audio')">{{ t('components.selectionActionBar.audioOnly') }}</button>
             <div :class="DIVIDER" />
-            <button :class="BTN_TEXT_CANCEL" @click="exportMenuOpen = false">Cancel</button>
+            <button :class="BTN_TEXT_CANCEL" @click="exportMenuOpen = false">{{ t('common.cancel') }}</button>
           </template>
 
           <!-- Star rating picker -->
           <template v-else-if="ratingMenuOpen">
-            <span class="hidden sm:inline px-3 text-sm font-semibold text-foreground whitespace-nowrap">Set rating:</span>
+            <span class="hidden sm:inline px-3 text-sm font-semibold text-foreground whitespace-nowrap">{{
+              t('components.selectionActionBar.setRatingLabel')
+            }}</span>
             <div :class="DIVIDER" />
             <button v-for="n in [1, 2, 3, 4, 5]" :key="n" :class="BTN_TEXT_PRIMARY" @click="onSetRating(n)">{{ n }}</button>
-            <button :class="BTN_TEXT_CANCEL" @click="clearRating">Clear</button>
+            <button :class="BTN_TEXT_CANCEL" @click="clearRating">{{ t('components.selectionActionBar.clear') }}</button>
             <div :class="DIVIDER" />
-            <button :class="BTN_TEXT_CANCEL" @click="ratingMenuOpen = false">Cancel</button>
+            <button :class="BTN_TEXT_CANCEL" @click="ratingMenuOpen = false">{{ t('common.cancel') }}</button>
           </template>
 
           <!-- Field editor -->
           <template v-else-if="fieldMenuOpen">
-            <span class="hidden sm:inline px-3 text-sm font-semibold text-foreground whitespace-nowrap">Set field:</span>
+            <span class="hidden sm:inline px-3 text-sm font-semibold text-foreground whitespace-nowrap">{{
+              t('components.selectionActionBar.setFieldLabel')
+            }}</span>
             <div :class="DIVIDER" />
             <select
               v-model="bulkField"
@@ -523,19 +533,21 @@ watch(
               :class="[BTN_TEXT_PRIMARY, !canApplyFieldValue && 'cursor-not-allowed opacity-40']"
               @click="applyFieldEdit"
             >
-              Apply
+              {{ t('components.selectionActionBar.apply') }}
             </button>
-            <button :class="BTN_TEXT_CANCEL" @click="resetFieldEditor">Cancel</button>
+            <button :class="BTN_TEXT_CANCEL" @click="resetFieldEditor">{{ t('common.cancel') }}</button>
           </template>
 
           <!-- Delete confirmation -->
           <template v-else>
-            <span class="px-3 text-sm font-semibold text-destructive whitespace-nowrap"> Delete {{ count }} book{{ count === 1 ? '' : 's' }}? </span>
+            <span class="px-3 text-sm font-semibold text-destructive whitespace-nowrap">
+              {{ t('components.selectionActionBar.deleteConfirm', { count }, count) }}
+            </span>
             <template v-if="count > 50">
               <input
                 v-model="deleteInput"
                 class="h-7 w-24 rounded border border-border bg-background px-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-destructive"
-                placeholder="Type DELETE"
+                :placeholder="t('components.selectionActionBar.typeDelete')"
               />
             </template>
             <div :class="DIVIDER" />
@@ -544,9 +556,9 @@ watch(
               :class="[BTN_TEXT_DESTRUCTIVE, !canConfirmDelete && 'opacity-40 cursor-not-allowed']"
               @click="onConfirmDelete"
             >
-              Delete
+              {{ t('common.delete') }}
             </button>
-            <button :class="BTN_TEXT_CANCEL" @click="cancelDelete">Cancel</button>
+            <button :class="BTN_TEXT_CANCEL" @click="cancelDelete">{{ t('common.cancel') }}</button>
           </template>
         </TooltipProvider>
       </div>

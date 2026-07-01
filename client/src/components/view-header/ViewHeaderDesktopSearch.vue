@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { nextTick, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Search, X } from '@lucide/vue'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     searchQuery?: string
     placeholder?: string
   }>(),
   {
     searchQuery: '',
-    placeholder: 'Search title, author, series, narrator...',
   },
 )
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   'update:searchQuery': [value: string]
@@ -61,7 +63,7 @@ function handleSearchKeydown(event: KeyboardEvent) {
       @input="handleSearchInput"
       @keydown="handleSearchKeydown"
       type="text"
-      :placeholder="placeholder"
+      :placeholder="props.placeholder ?? t('components.viewHeader.searchPlaceholder')"
       class="h-8 text-[13px] transition-all duration-300 focus:outline-none"
       :class="
         searchActive
