@@ -2,6 +2,7 @@ export * from "./audit";
 export * from "./auth";
 export * from "./theme";
 export * from "./display-preferences";
+export * from "./locale";
 export * from "./permissions";
 export * from "./content-filter";
 export * from "./metadata-preferences";

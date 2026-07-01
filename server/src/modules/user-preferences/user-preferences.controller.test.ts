@@ -1,5 +1,5 @@
 import type { Mocked } from 'vitest';
-import { EMPTY_CONTENT_FILTER_RULES, type DisplayPreferences, type ThemePreferences } from '@bookorbit/types';
+import { EMPTY_CONTENT_FILTER_RULES, type DisplayPreferences, type LocalePreferences, type ThemePreferences } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { UserPreferencesController } from './user-preferences.controller';
@@ -56,6 +56,10 @@ const validDisplayPreferences: DisplayPreferences = {
   thumbnailClickAction: 'reader',
 };
 
+const validLocalePreferences: LocalePreferences = {
+  locale: 'nl',
+};
+
 describe('UserPreferencesController', () => {
   let service: Mocked<UserPreferencesService>;
   let controller: UserPreferencesController;
@@ -64,8 +68,10 @@ describe('UserPreferencesController', () => {
     service = {
       getThemePreferences: vi.fn(),
       getDisplayPreferences: vi.fn(),
+      getLocalePreferences: vi.fn(),
       upsertThemePreferences: vi.fn(),
       upsertDisplayPreferences: vi.fn(),
+      upsertLocalePreferences: vi.fn(),
     } as unknown as Mocked<UserPreferencesService>;
 
     controller = new UserPreferencesController(service);
@@ -127,5 +133,34 @@ describe('UserPreferencesController', () => {
     await controller.upsertDisplayPreferences({ settings: validDisplayPreferences as unknown as Record<string, unknown> }, user);
 
     expect(service.upsertDisplayPreferences).toHaveBeenCalledWith(99, validDisplayPreferences);
+  });
+
+  it('GET /locale returns null settings when no saved preferences exist', async () => {
+    service.getLocalePreferences.mockResolvedValueOnce(null);
+
+    await expect(controller.getLocalePreferences(makeUser({ id: 11 }))).resolves.toEqual({ settings: null });
+    expect(service.getLocalePreferences).toHaveBeenCalledWith(11);
+  });
+
+  it('GET /locale returns saved settings when present', async () => {
+    service.getLocalePreferences.mockResolvedValueOnce(validLocalePreferences);
+
+    await expect(controller.getLocalePreferences(makeUser())).resolves.toEqual({ settings: validLocalePreferences });
+  });
+
+  it('PUT /locale delegates valid payloads to the service and returns 204', async () => {
+    const user = makeUser({ id: 42 });
+    const dto = { settings: validLocalePreferences as unknown as Record<string, unknown> };
+
+    await expect(controller.upsertLocalePreferences(dto, user)).resolves.toBeUndefined();
+    expect(service.upsertLocalePreferences).toHaveBeenCalledWith(42, validLocalePreferences);
+  });
+
+  it('PUT /locale forwards the current user id to the service', async () => {
+    const user = makeUser({ id: 99 });
+
+    await controller.upsertLocalePreferences({ settings: validLocalePreferences as unknown as Record<string, unknown> }, user);
+
+    expect(service.upsertLocalePreferences).toHaveBeenCalledWith(99, validLocalePreferences);
   });
 });

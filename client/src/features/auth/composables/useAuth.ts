@@ -4,6 +4,7 @@ import { api, refreshAccessToken, setAccessToken, setOnAuthFailure } from '@/lib
 import router from '@/router'
 import { cancelPendingDisplaySettingsSync, initDisplaySettingsSync, loadDisplaySettingsFromServer } from '@/composables/useDisplaySettingsSync'
 import { cancelPendingThemeSync, initThemeSync, loadFromServer } from '@/composables/useThemeSync'
+import { cancelPendingLocaleSync, initLocaleSync, loadLocaleFromServer } from '@/composables/useLocaleSync'
 import { useSetupStatus } from './useSetupStatus'
 import { disconnectAuthorEnrichmentSocket } from '@/features/settings/composables/useAuthorEnrichmentStatus'
 import { disconnectBookMetadataFetchSocket } from '@/features/book-metadata-fetch/composables/useBookMetadataFetchStatus'
@@ -51,6 +52,7 @@ if (typeof document !== 'undefined') {
 function clearAuth() {
   cancelPendingThemeSync()
   cancelPendingDisplaySettingsSync()
+  cancelPendingLocaleSync()
   stopSessionRefresh()
   resetLibraries()
   resetSmartScopes()
@@ -82,10 +84,12 @@ async function hydrateThemeSync(options: { refreshUser?: boolean } = {}): Promis
   if (user.value?.settings?.syncThemePreferences) {
     await loadFromServer()
     await loadDisplaySettingsFromServer()
+    await loadLocaleFromServer()
   }
 
   initThemeSync()
   initDisplaySettingsSync()
+  initLocaleSync()
 }
 
 export function useAuth() {
@@ -101,6 +105,7 @@ export function useAuth() {
     } finally {
       initThemeSync()
       initDisplaySettingsSync()
+      initLocaleSync()
       isLoading.value = false
     }
   }

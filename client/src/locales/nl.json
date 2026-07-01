@@ -1,0 +1,26 @@
+{
+  "common": {
+    "save": "Opslaan",
+    "cancel": "Annuleren",
+    "delete": "Verwijderen",
+    "edit": "Bewerken",
+    "close": "Sluiten",
+    "confirm": "Bevestigen",
+    "loading": "Laden...",
+    "search": "Zoeken",
+    "back": "Terug",
+    "next": "Volgende",
+    "previous": "Vorige",
+    "yes": "Ja",
+    "no": "Nee"
+  },
+  "settings": {
+    "appearance": {
+      "language": {
+        "title": "Taal",
+        "description": "Kies de taal die in de hele interface wordt gebruikt.",
+        "label": "Interfacetaal"
+      }
+    }
+  }
+}
