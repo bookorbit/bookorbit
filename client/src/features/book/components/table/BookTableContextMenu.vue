@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { BookOpen, ExternalLink, FolderPlus, Pencil, RefreshCw, Send, Trash2 } from '@lucide/vue'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -24,6 +25,7 @@ const emit = defineEmits<{
 }>()
 
 const router = useRouter()
+const { t } = useI18n()
 const { hasPermission } = usePermissions()
 const { refreshWithFeedback, refreshing } = useRefreshMetadata()
 const refreshFeedback = useBookRefreshFeedback()
@@ -150,11 +152,11 @@ onBeforeUnmount(() => {
     >
       <button class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent" @click="emitAction('quick-view')">
         <BookOpen :size="14" />
-        Quick View
+        {{ t('book.table.actions.quickView') }}
       </button>
       <button class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent" @click="openBookDetails">
         <ExternalLink :size="14" />
-        Book Details
+        {{ t('book.table.actions.bookDetails') }}
       </button>
       <button
         v-if="hasPermission('library_edit_metadata')"
@@ -162,7 +164,7 @@ onBeforeUnmount(() => {
         @click="openEditMetadata"
       >
         <Pencil :size="14" />
-        Edit Metadata
+        {{ t('book.table.actions.editMetadata') }}
       </button>
       <button
         v-if="hasPermission('library_edit_metadata')"
@@ -171,11 +173,11 @@ onBeforeUnmount(() => {
         @click="refreshMetadata"
       >
         <RefreshCw :size="14" :class="{ 'animate-spin': anyRefreshing }" />
-        Refresh Metadata
+        {{ t('book.table.actions.refreshMetadata') }}
       </button>
       <button class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent" @click="emitAction('add-to-collection')">
         <FolderPlus :size="14" />
-        Add to Collection
+        {{ t('book.table.actions.addToCollection') }}
       </button>
       <button
         v-if="hasPermission('email_send')"
@@ -183,7 +185,7 @@ onBeforeUnmount(() => {
         @click="openSendDialog"
       >
         <Send :size="14" />
-        Send to Device
+        {{ t('book.table.actions.sendToDevice') }}
       </button>
       <button
         v-if="hasPermission('library_delete_books')"
@@ -191,7 +193,7 @@ onBeforeUnmount(() => {
         @click="emitAction('delete')"
       >
         <Trash2 :size="14" />
-        Delete
+        {{ t('common.delete') }}
       </button>
     </div>
   </Teleport>

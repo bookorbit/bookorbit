@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { MonitorSmartphone } from '@lucide/vue'
 import type { BookReadingSessionStats, ReadingSessionSourceBucket } from '@bookorbit/types'
 import { READING_SESSION_SOURCE_BUCKET_LABELS } from '@bookorbit/types'
@@ -7,6 +8,8 @@ import { READING_SESSION_SOURCE_BUCKET_LABELS } from '@bookorbit/types'
 const props = defineProps<{
   stats: BookReadingSessionStats | null
 }>()
+
+const { t } = useI18n()
 
 const BUCKET_TOKEN: Record<ReadingSessionSourceBucket, string> = {
   bookorbit: '--pill-web',
@@ -46,7 +49,7 @@ const shouldShow = computed(() => segments.value.length >= 2 && totalSeconds.val
   <div v-if="shouldShow" class="rounded-lg border border-border bg-card p-4">
     <p class="mb-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
       <MonitorSmartphone class="size-3.5" />
-      Where you read this book
+      {{ t('book.detail.readingLog.sourceSplit.title') }}
     </p>
     <div class="flex h-3 w-full overflow-hidden rounded-full bg-muted">
       <div

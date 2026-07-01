@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { CalendarDays } from '@lucide/vue'
 import type { BookReadingSessionStats } from '@bookorbit/types'
@@ -12,8 +13,35 @@ const props = defineProps<{
   quickFilter: 'all' | 'last30' | 'last90' | 'thisYear'
 }>()
 
+const { t } = useI18n()
+
 const DAY_MS = 24 * 60 * 60 * 1000
-const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+const dayLabels = computed(
+  () =>
+    [
+      t('book.detail.readingLog.weekdays.sun'),
+      t('book.detail.readingLog.weekdays.mon'),
+      t('book.detail.readingLog.weekdays.tue'),
+      t('book.detail.readingLog.weekdays.wed'),
+      t('book.detail.readingLog.weekdays.thu'),
+      t('book.detail.readingLog.weekdays.fri'),
+      t('book.detail.readingLog.weekdays.sat'),
+    ] as const,
+)
+const monthLabels = computed(() => [
+  t('book.detail.readingLog.months.jan'),
+  t('book.detail.readingLog.months.feb'),
+  t('book.detail.readingLog.months.mar'),
+  t('book.detail.readingLog.months.apr'),
+  t('book.detail.readingLog.months.may'),
+  t('book.detail.readingLog.months.jun'),
+  t('book.detail.readingLog.months.jul'),
+  t('book.detail.readingLog.months.aug'),
+  t('book.detail.readingLog.months.sep'),
+  t('book.detail.readingLog.months.oct'),
+  t('book.detail.readingLog.months.nov'),
+  t('book.detail.readingLog.months.dec'),
+])
 
 const themeStore = useThemeStore()
 const option = shallowRef({})
@@ -58,8 +86,7 @@ const activeDays = computed(() => {
 const subtitle = computed(() => {
   if (consistencyWindowDays.value <= 0) return ''
   const ratio = Math.round((activeDays.value / consistencyWindowDays.value) * 100)
-  const dayWord = activeDays.value === 1 ? 'day' : 'days'
-  return `${activeDays.value} active ${dayWord} · ${ratio}% consistency`
+  return t('book.detail.readingLog.heatmap.subtitle', { count: activeDays.value, ratio }, activeDays.value)
 })
 
 const hasData = computed(() => (props.stats?.dailySummary ?? []).some((row) => row.totalMinutes > 0))
@@ -106,7 +133,7 @@ watchEffect(() => {
       textStyle: { color: palette.tooltipText, fontSize: 12 },
       formatter: (params: { value: [string, number] }) => {
         const [day, minutes] = params.value
-        return `${day}<br/><strong>${minutes}</strong> min`
+        return `${day}<br/><strong>${minutes}</strong> ${t('book.detail.readingLog.heatmap.minutesUnit')}`
       },
     },
     visualMap: {
@@ -137,7 +164,7 @@ watchEffect(() => {
         fontSize: 9,
         color: palette.axisColor,
         margin: 6,
-        nameMap: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+        nameMap: monthLabels.value,
       },
       dayLabel: {
         show: true,
@@ -145,7 +172,7 @@ watchEffect(() => {
         fontSize: 8,
         color: palette.axisColor,
         margin: 6,
-        nameMap: DAY_LABELS,
+        nameMap: dayLabels.value,
       },
       itemStyle: {
         color: 'transparent',
@@ -171,7 +198,7 @@ watchEffect(() => {
     <div class="mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
       <span class="flex items-center gap-2 text-sm font-medium text-foreground">
         <CalendarDays class="size-4 text-muted-foreground" />
-        Activity
+        {{ t('book.detail.readingLog.heatmap.title') }}
       </span>
       <span v-if="subtitle" class="text-xs text-muted-foreground">{{ subtitle }}</span>
     </div>
@@ -179,7 +206,7 @@ watchEffect(() => {
       <VChart :option autoresize class="absolute inset-0" />
     </div>
     <div v-else class="flex flex-1 items-center justify-center py-12 text-sm text-muted-foreground" style="min-height: 220px">
-      No reading activity in this window.
+      {{ t('book.detail.readingLog.heatmap.empty') }}
     </div>
   </div>
 </template>

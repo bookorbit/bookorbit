@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { BookOpen, ChevronDown, Eye, Play } from '@lucide/vue'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -12,6 +13,7 @@ const props = defineProps<{
 }>()
 
 const router = useRouter()
+const { t } = useI18n()
 
 const readableFiles = computed(() => {
   const normalized = props.book.files.filter((file) => {
@@ -66,7 +68,7 @@ const hasMultipleFormats = computed(() => openableFiles.value.length > 1)
 
 function actionVerb(file: BookFileRef | null): string {
   const format = file?.format?.toLowerCase()
-  return format && FORMAT_TO_GROUP[format] === 'audio' ? 'Play' : 'Read'
+  return format && FORMAT_TO_GROUP[format] === 'audio' ? t('book.table.read.play') : t('book.table.read.read')
 }
 
 function isAudioFile(file: BookFileRef | null): boolean {
@@ -75,7 +77,7 @@ function isAudioFile(file: BookFileRef | null): boolean {
 }
 
 function formatLabel(file: BookFileRef | null): string {
-  return file?.format?.trim().toUpperCase() ?? 'FILE'
+  return file?.format?.trim().toUpperCase() ?? t('book.table.read.fileFallback')
 }
 
 function formatBadgeStyle(format: string) {
@@ -124,7 +126,7 @@ function peekPrimaryFile() {
           <button
             type="button"
             class="inline-flex h-7 w-6 shrink-0 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-            aria-label="Choose format to read or play"
+            :aria-label="t('book.table.read.chooseFormat')"
             @click.stop
           >
             <ChevronDown :size="12" />
@@ -139,11 +141,11 @@ function peekPrimaryFile() {
               {{ file.format }}
             </span>
             <span class="flex-1 truncate text-xs">{{ actionVerb(file) }} {{ formatLabel(file) }}</span>
-            <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="text-[10px] text-primary">Primary</span>
+            <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="text-[10px] text-primary">{{ t('book.table.read.primary') }}</span>
           </DropdownMenuItem>
           <DropdownMenuItem v-for="file in openableFiles" :key="`peek-${file.id}`" class="gap-2" @select="openFile(file, 'peek')">
             <Eye :size="13" class="text-primary" />
-            <span class="flex-1 truncate text-xs">Peek {{ formatLabel(file) }}</span>
+            <span class="flex-1 truncate text-xs">{{ t('book.table.read.peekFormat', { format: formatLabel(file) }) }}</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -164,8 +166,8 @@ function peekPrimaryFile() {
       <button
         type="button"
         class="inline-flex h-7 w-7 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-        :aria-label="`Peek ${formatLabel(primaryFile)}`"
-        :title="`Peek ${formatLabel(primaryFile)}`"
+        :aria-label="t('book.table.read.peekFormat', { format: formatLabel(primaryFile) })"
+        :title="t('book.table.read.peekFormat', { format: formatLabel(primaryFile) })"
         @click.stop="peekPrimaryFile"
       >
         <Eye :size="13" class="text-primary" />

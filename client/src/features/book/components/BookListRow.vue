@@ -31,6 +31,9 @@ import { usePermissions } from '@/features/auth/composables/usePermissions'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import { RATING_STARS, getRatingStarClass } from '@/features/book/lib/rating-stars'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const router = useRouter()
 
@@ -225,7 +228,7 @@ function handleRowClick(event: MouseEvent) {
               <Star class="size-3" :class="getRatingStarClass(star, displayRating)" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Rate {{ star }}</TooltipContent>
+          <TooltipContent>{{ t('book.actions.rate', { star }) }}</TooltipContent>
         </Tooltip>
       </div>
 
@@ -236,7 +239,7 @@ function handleRowClick(event: MouseEvent) {
           class="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400"
         >
           <TriangleAlert class="size-3 shrink-0" />
-          <span class="hidden sm:inline">Missing</span>
+          <span class="hidden sm:inline">{{ t('book.card.missing') }}</span>
         </span>
         <Tooltip v-if="primaryFile && !isMissing">
           <TooltipTrigger as-child>
@@ -247,7 +250,7 @@ function handleRowClick(event: MouseEvent) {
               {{ primaryFile.format ?? '?' }}
             </button>
           </TooltipTrigger>
-          <TooltipContent>Open as {{ primaryFile.format?.toUpperCase() ?? 'unknown' }}</TooltipContent>
+          <TooltipContent>{{ t('book.actions.openAs', { format: primaryFile.format?.toUpperCase() ?? t('book.unknownFormat') }) }}</TooltipContent>
         </Tooltip>
         <Tooltip v-for="file in uniqueSecondaryFiles" :key="file.id">
           <TooltipTrigger as-child>
@@ -258,7 +261,7 @@ function handleRowClick(event: MouseEvent) {
               {{ file.format ?? '?' }}
             </button>
           </TooltipTrigger>
-          <TooltipContent>Open as {{ file.format?.toUpperCase() ?? 'unknown' }}</TooltipContent>
+          <TooltipContent>{{ t('book.actions.openAs', { format: file.format?.toUpperCase() ?? t('book.unknownFormat') }) }}</TooltipContent>
         </Tooltip>
       </div>
 
@@ -271,19 +274,19 @@ function handleRowClick(event: MouseEvent) {
         <DropdownMenuContent align="end">
           <DropdownMenuItem :disabled="!primaryFile || isMissing" @click="primaryFile && !isMissing && openFile(primaryFile)">
             <BookOpen class="size-4 mr-2" />
-            Read
+            {{ t('book.actions.read') }}
           </DropdownMenuItem>
           <DropdownMenuItem :disabled="!primaryFile || isMissing" @click="peekPrimaryFile">
             <Eye class="size-4 mr-2" />
-            Peek
+            {{ t('book.actions.peek') }}
           </DropdownMenuItem>
           <DropdownMenuItem @click="emit('action', 'quick-view')">
             <PanelRight class="size-4 mr-2" />
-            Quick View
+            {{ t('book.actions.quickView') }}
           </DropdownMenuItem>
           <DropdownMenuItem @click="openBookDetails">
             <ExternalLink class="size-4 mr-2" />
-            Book Details
+            {{ t('book.actions.bookDetails') }}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -291,20 +294,20 @@ function handleRowClick(event: MouseEvent) {
             @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })"
           >
             <Pencil class="size-4 mr-2" />
-            Edit Metadata
+            {{ t('book.actions.editMetadata') }}
           </DropdownMenuItem>
           <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" :disabled="refreshing" @click="refreshWithFeedback(book.id)">
             <Loader2 v-if="refreshing" class="size-4 mr-2 animate-spin" />
             <RefreshCw v-else class="size-4 mr-2" />
-            Refresh Metadata
+            {{ t('book.actions.refreshMetadata') }}
           </DropdownMenuItem>
           <DropdownMenuItem @click="emit('action', 'add-to-collection')">
             <FolderPlus class="size-4 mr-2" />
-            Add to Collection
+            {{ t('book.actions.addToCollection') }}
           </DropdownMenuItem>
           <DropdownMenuItem v-if="hasPermission('email_send')" @click="showSendDialog = true">
             <Send class="size-4 mr-2" />
-            Send via Email
+            {{ t('book.actions.sendViaEmail') }}
           </DropdownMenuItem>
           <DropdownMenuSeparator v-if="hasPermission('library_delete_books')" />
           <DropdownMenuItem
@@ -313,7 +316,7 @@ function handleRowClick(event: MouseEvent) {
             @click="emit('action', 'delete')"
           >
             <Trash2 class="size-4 mr-2" />
-            Delete
+            {{ t('common.delete') }}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

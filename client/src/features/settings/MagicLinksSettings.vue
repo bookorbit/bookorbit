@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Plus, Trash2, Copy, Check, Link, Pause, Play } from '@lucide/vue'
 import { api } from '@/lib/api'
 import { copyToClipboard } from '@/lib/clipboard'
@@ -13,6 +14,8 @@ const props = withDefaults(defineProps<{ withHeader?: boolean; withEmbeddedCreat
 })
 
 defineExpose({ openCreateForm })
+
+const { t } = useI18n()
 
 interface SharedUser {
   id: number
@@ -78,7 +81,7 @@ async function handleCreate() {
     })
     showCreateForm.value = false
   } catch (e) {
-    createError.value = e instanceof Error ? e.message : 'Failed to create'
+    createError.value = e instanceof Error ? e.message : t('settings.magicLinks.errors.create')
   } finally {
     creating.value = false
   }
@@ -91,7 +94,7 @@ function getMagicUrl(rawToken: string): string {
 async function copyMagicUrl(tokenId: number, rawToken: string) {
   const copied = await copyToClipboard(getMagicUrl(rawToken))
   if (!copied) {
-    error.value = 'Failed to copy magic link'
+    error.value = t('settings.magicLinks.errors.copy')
     return
   }
 
@@ -108,7 +111,7 @@ async function handleToggleActive(id: number, currentIsActive: boolean) {
   try {
     await setActive(id, !currentIsActive)
   } catch {
-    error.value = 'Failed to update magic link'
+    error.value = t('settings.magicLinks.errors.update')
   }
 }
 
@@ -119,7 +122,7 @@ async function handleRevoke() {
     await revokeToken(revokeConfirmId.value)
     revokeConfirmId.value = null
   } catch {
-    error.value = 'Failed to revoke'
+    error.value = t('settings.magicLinks.errors.revoke')
   } finally {
     revoking.value = false
   }
@@ -138,73 +141,73 @@ function isExpired(expiresAt: string | null | undefined): boolean {
 
 <template>
   <template v-if="props.withHeader">
-    <SettingsPageHeader class="hidden md:flex" title="Magic Links" subtitle="Create shareable login links for shared accounts.">
+    <SettingsPageHeader class="hidden md:flex" :title="t('settings.magicLinks.title')" :subtitle="t('settings.magicLinks.subtitle')">
       <button class="settings-btn-primary" :disabled="sharedUsers.length === 0" @click="openCreateForm">
         <Plus :size="14" />
-        Create link
+        {{ t('settings.magicLinks.createLink') }}
       </button>
     </SettingsPageHeader>
     <div class="md:hidden px-1">
-      <h1 class="text-xl font-semibold tracking-tight text-foreground">Magic Links</h1>
+      <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ t('settings.magicLinks.title') }}</h1>
       <p
         class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
       >
-        Create shareable login links for shared accounts.
+        {{ t('settings.magicLinks.subtitle') }}
       </p>
     </div>
     <div class="md:hidden sticky top-11 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2 mt-4 mb-3">
       <button class="settings-btn-primary w-full min-h-10 justify-center" :disabled="sharedUsers.length === 0" @click="openCreateForm">
         <Plus :size="14" />
-        Create link
+        {{ t('settings.magicLinks.createLink') }}
       </button>
     </div>
   </template>
   <div v-else-if="props.withEmbeddedCreateAction" class="mb-4 flex items-center justify-end md:mb-5">
     <button class="settings-btn-primary w-full justify-center md:w-auto" :disabled="sharedUsers.length === 0" @click="openCreateForm">
       <Plus :size="14" />
-      Create link
+      {{ t('settings.magicLinks.createLink') }}
     </button>
   </div>
 
   <p v-if="sharedUsers.length === 0 && !loading" class="text-sm text-muted-foreground mb-4">
-    No shared accounts found. Create a shared account from the Users page first.
+    {{ t('settings.magicLinks.noSharedAccounts') }}
   </p>
 
   <div v-if="error" class="mb-4 text-sm text-destructive">{{ error }}</div>
-  <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>
+  <div v-if="loading" class="text-sm text-muted-foreground">{{ t('common.loading') }}</div>
 
   <!-- Create form modal -->
   <div v-if="showCreateForm" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="showCreateForm = false">
     <button class="absolute inset-0 bg-black/45" @click="showCreateForm = false" />
     <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
-      <p class="text-base font-semibold text-foreground">Create magic link</p>
-      <p class="mt-1 text-sm text-muted-foreground">Generate a shareable login URL for a shared account.</p>
+      <p class="text-base font-semibold text-foreground">{{ t('settings.magicLinks.createDialog.title') }}</p>
+      <p class="mt-1 text-sm text-muted-foreground">{{ t('settings.magicLinks.createDialog.description') }}</p>
 
       <div class="mt-4 space-y-3">
         <div>
-          <label class="block text-sm font-medium text-foreground mb-1">Shared account</label>
+          <label class="block text-sm font-medium text-foreground mb-1">{{ t('settings.magicLinks.createDialog.sharedAccount') }}</label>
           <select
             v-model="createUserId"
             class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           >
-            <option :value="null" disabled>Select a shared account</option>
+            <option :value="null" disabled>{{ t('settings.magicLinks.createDialog.selectAccount') }}</option>
             <option v-for="u in sharedUsers" :key="u.id" :value="u.id">{{ u.name }} (@{{ u.username }})</option>
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-foreground mb-1">Label</label>
+          <label class="block text-sm font-medium text-foreground mb-1">{{ t('settings.magicLinks.createDialog.label') }}</label>
           <input
             v-model="createLabel"
             type="text"
             maxlength="100"
-            placeholder="e.g. Demo link for conference"
+            :placeholder="t('settings.magicLinks.createDialog.labelPlaceholder')"
             class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
         <div>
           <label class="block text-sm font-medium text-foreground mb-1">
-            Expires at
-            <span class="text-muted-foreground font-normal">(optional)</span>
+            {{ t('settings.magicLinks.createDialog.expiresAt') }}
+            <span class="text-muted-foreground font-normal">{{ t('settings.magicLinks.createDialog.optional') }}</span>
           </label>
           <input
             v-model="createExpiresAt"
@@ -221,14 +224,14 @@ function isExpired(expiresAt: string | null | undefined): boolean {
           class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
           @click="showCreateForm = false"
         >
-          Cancel
+          {{ t('common.cancel') }}
         </button>
         <button
           class="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
           :disabled="creating || !createUserId || !createLabel.trim()"
           @click="handleCreate"
         >
-          {{ creating ? 'Creating...' : 'Create' }}
+          {{ creating ? t('settings.magicLinks.createDialog.creating') : t('settings.magicLinks.createDialog.create') }}
         </button>
       </div>
     </div>
@@ -236,17 +239,17 @@ function isExpired(expiresAt: string | null | undefined): boolean {
 
   <!-- Active tokens -->
   <div v-if="!loading && activeTokens.length > 0" class="space-y-3">
-    <h2 class="text-sm font-medium text-muted-foreground">Active links</h2>
+    <h2 class="text-sm font-medium text-muted-foreground">{{ t('settings.magicLinks.activeLinks') }}</h2>
     <div class="hidden md:block rounded-lg border border-border overflow-hidden shadow-xs">
       <table class="w-full text-sm">
         <thead class="bg-muted/50">
           <tr>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Label</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Account</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Created by</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Expires</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Uses</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Last used</th>
+            <th class="px-4 py-3 text-left font-medium text-muted-foreground">{{ t('settings.magicLinks.columns.label') }}</th>
+            <th class="px-4 py-3 text-left font-medium text-muted-foreground">{{ t('settings.magicLinks.columns.account') }}</th>
+            <th class="px-4 py-3 text-left font-medium text-muted-foreground">{{ t('settings.magicLinks.columns.createdBy') }}</th>
+            <th class="px-4 py-3 text-left font-medium text-muted-foreground">{{ t('settings.magicLinks.columns.expires') }}</th>
+            <th class="px-4 py-3 text-left font-medium text-muted-foreground">{{ t('settings.magicLinks.columns.uses') }}</th>
+            <th class="px-4 py-3 text-left font-medium text-muted-foreground">{{ t('settings.magicLinks.columns.lastUsed') }}</th>
             <th class="px-4 py-3" />
           </tr>
         </thead>
@@ -260,17 +263,17 @@ function isExpired(expiresAt: string | null | undefined): boolean {
                   v-if="!token.isActive"
                   class="inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
                 >
-                  Paused
+                  {{ t('settings.magicLinks.paused') }}
                 </span>
               </div>
             </td>
             <td class="px-4 py-3 text-muted-foreground font-mono text-xs">@{{ token.username }}</td>
-            <td class="px-4 py-3 text-muted-foreground text-xs">{{ token.createdByUsername ?? 'Deleted user' }}</td>
+            <td class="px-4 py-3 text-muted-foreground text-xs">{{ token.createdByUsername ?? t('settings.magicLinks.deletedUser') }}</td>
             <td class="px-4 py-3">
               <span v-if="token.expiresAt" class="text-xs" :class="isExpired(token.expiresAt) ? 'text-destructive' : 'text-muted-foreground'">
-                {{ isExpired(token.expiresAt) ? 'Expired ' : '' }}{{ formatDate(token.expiresAt) }}
+                {{ isExpired(token.expiresAt) ? t('settings.magicLinks.expiredPrefix') : '' }}{{ formatDate(token.expiresAt) }}
               </span>
-              <span v-else class="text-xs text-muted-foreground">Never</span>
+              <span v-else class="text-xs text-muted-foreground">{{ t('settings.magicLinks.never') }}</span>
             </td>
             <td class="px-4 py-3 text-muted-foreground text-xs">{{ token.useCount }}</td>
             <td class="px-4 py-3 text-muted-foreground text-xs">{{ formatDate(token.lastUsedAt) }}</td>
@@ -287,7 +290,7 @@ function isExpired(expiresAt: string | null | undefined): boolean {
                       <Copy v-else :size="14" />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent>{{ copiedId === token.id ? 'Copied!' : 'Copy link' }}</TooltipContent>
+                  <TooltipContent>{{ copiedId === token.id ? t('settings.magicLinks.copied') : t('settings.magicLinks.copyLink') }}</TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger as-child>
@@ -299,7 +302,7 @@ function isExpired(expiresAt: string | null | undefined): boolean {
                       <Play v-else :size="14" />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent>{{ token.isActive ? 'Pause' : 'Resume' }}</TooltipContent>
+                  <TooltipContent>{{ token.isActive ? t('settings.magicLinks.pause') : t('settings.magicLinks.resume') }}</TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger as-child>
@@ -310,7 +313,7 @@ function isExpired(expiresAt: string | null | undefined): boolean {
                       <Trash2 :size="14" />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent>Revoke</TooltipContent>
+                  <TooltipContent>{{ t('settings.magicLinks.revoke') }}</TooltipContent>
                 </Tooltip>
               </div>
             </td>
@@ -336,7 +339,7 @@ function isExpired(expiresAt: string | null | undefined): boolean {
                 v-if="!token.isActive"
                 class="inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
               >
-                Paused
+                {{ t('settings.magicLinks.paused') }}
               </span>
             </div>
             <p class="mt-1 text-xs text-muted-foreground">@{{ token.username }}</p>
@@ -366,11 +369,15 @@ function isExpired(expiresAt: string | null | undefined): boolean {
           </div>
         </div>
         <div class="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
-          <span>{{ token.useCount }} uses</span>
+          <span>{{ t('settings.magicLinks.usesCount', { count: token.useCount }) }}</span>
           <span v-if="token.expiresAt" :class="isExpired(token.expiresAt) ? 'text-destructive' : ''">
-            {{ isExpired(token.expiresAt) ? 'Expired' : `Expires ${formatDate(token.expiresAt)}` }}
+            {{
+              isExpired(token.expiresAt)
+                ? t('settings.magicLinks.expired')
+                : t('settings.magicLinks.expiresOn', { date: formatDate(token.expiresAt) })
+            }}
           </span>
-          <span v-else>No expiry</span>
+          <span v-else>{{ t('settings.magicLinks.noExpiry') }}</span>
         </div>
       </div>
     </div>
@@ -378,16 +385,16 @@ function isExpired(expiresAt: string | null | undefined): boolean {
 
   <!-- Inactive tokens (revoked or expired) -->
   <div v-if="!loading && inactiveTokens.length > 0" class="mt-6 space-y-3">
-    <h2 class="text-sm font-medium text-muted-foreground">Inactive links</h2>
+    <h2 class="text-sm font-medium text-muted-foreground">{{ t('settings.magicLinks.inactiveLinks') }}</h2>
     <div class="hidden md:block rounded-lg border border-border overflow-hidden shadow-xs opacity-60">
       <table class="w-full text-sm">
         <thead class="bg-muted/50">
           <tr>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Label</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Account</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Created</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Total uses</th>
+            <th class="px-4 py-3 text-left font-medium text-muted-foreground">{{ t('settings.magicLinks.columns.label') }}</th>
+            <th class="px-4 py-3 text-left font-medium text-muted-foreground">{{ t('settings.magicLinks.columns.account') }}</th>
+            <th class="px-4 py-3 text-left font-medium text-muted-foreground">{{ t('settings.magicLinks.columns.created') }}</th>
+            <th class="px-4 py-3 text-left font-medium text-muted-foreground">{{ t('settings.magicLinks.columns.status') }}</th>
+            <th class="px-4 py-3 text-left font-medium text-muted-foreground">{{ t('settings.magicLinks.columns.totalUses') }}</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-border">
@@ -396,7 +403,11 @@ function isExpired(expiresAt: string | null | undefined): boolean {
             <td class="px-4 py-3 text-muted-foreground font-mono text-xs">@{{ token.username }}</td>
             <td class="px-4 py-3 text-muted-foreground text-xs">{{ formatDate(token.createdAt) }}</td>
             <td class="px-4 py-3 text-muted-foreground text-xs">
-              {{ token.revokedAt ? `Revoked ${formatDate(token.revokedAt)}` : `Expired ${formatDate(token.expiresAt)}` }}
+              {{
+                token.revokedAt
+                  ? t('settings.magicLinks.revokedOn', { date: formatDate(token.revokedAt) })
+                  : t('settings.magicLinks.expiredOn', { date: formatDate(token.expiresAt) })
+              }}
             </td>
             <td class="px-4 py-3 text-muted-foreground text-xs">{{ token.useCount }}</td>
           </tr>
@@ -407,16 +418,20 @@ function isExpired(expiresAt: string | null | undefined): boolean {
     <div class="md:hidden space-y-3 opacity-60">
       <div v-for="token in inactiveTokens" :key="token.id" class="rounded-lg border border-border bg-card px-4 py-3.5 shadow-xs">
         <p class="text-sm text-muted-foreground line-through">{{ token.label }}</p>
-        <p class="mt-1 text-xs text-muted-foreground">@{{ token.username }} - {{ token.useCount }} uses</p>
+        <p class="mt-1 text-xs text-muted-foreground">@{{ token.username }} - {{ t('settings.magicLinks.usesCount', { count: token.useCount }) }}</p>
         <p class="mt-0.5 text-xs text-muted-foreground">
-          {{ token.revokedAt ? `Revoked ${formatDate(token.revokedAt)}` : `Expired ${formatDate(token.expiresAt)}` }}
+          {{
+            token.revokedAt
+              ? t('settings.magicLinks.revokedOn', { date: formatDate(token.revokedAt) })
+              : t('settings.magicLinks.expiredOn', { date: formatDate(token.expiresAt) })
+          }}
         </p>
       </div>
     </div>
   </div>
 
   <p v-if="!loading && tokens.length === 0 && sharedUsers.length > 0" class="text-sm text-muted-foreground mt-4">
-    No magic links created yet. Click "Create link" to generate a shareable login URL.
+    {{ t('settings.magicLinks.emptyState', { action: t('settings.magicLinks.createLink') }) }}
   </p>
 
   <!-- Revoke confirmation modal -->
@@ -427,23 +442,23 @@ function isExpired(expiresAt: string | null | undefined): boolean {
   >
     <button class="absolute inset-0 bg-black/45" @click="revokeConfirmId = null" />
     <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
-      <p class="text-base font-semibold text-foreground">Revoke magic link?</p>
+      <p class="text-base font-semibold text-foreground">{{ t('settings.magicLinks.revokeDialog.title') }}</p>
       <p class="mt-1 text-sm text-muted-foreground">
-        This will immediately invalidate the link and terminate all active sessions for the linked account.
+        {{ t('settings.magicLinks.revokeDialog.description') }}
       </p>
       <div class="mt-4 flex items-center justify-end gap-2">
         <button
           class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
           @click="revokeConfirmId = null"
         >
-          Cancel
+          {{ t('common.cancel') }}
         </button>
         <button
           class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 transition-colors"
           :disabled="revoking"
           @click="handleRevoke"
         >
-          {{ revoking ? 'Revoking...' : 'Revoke' }}
+          {{ revoking ? t('settings.magicLinks.revoking') : t('settings.magicLinks.revoke') }}
         </button>
       </div>
     </div>

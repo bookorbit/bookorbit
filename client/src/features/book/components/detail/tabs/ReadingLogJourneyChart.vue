@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { TrendingUp } from '@lucide/vue'
 import type { BookReadingSessionStats } from '@bookorbit/types'
@@ -11,6 +12,7 @@ const props = defineProps<{
   loading: boolean
 }>()
 
+const { t } = useI18n()
 const themeStore = useThemeStore()
 const chartTheme = computed(() => getBookorbitThemeName(themeStore.theme, themeStore.accent))
 const option = shallowRef({})
@@ -40,7 +42,9 @@ watchEffect(() => {
         if (!params.length) return ''
         const day = params[0]!.value[0]
         const lines = params.map((p) =>
-          p.seriesName === 'Progress' ? `Progress: <strong>${p.value[1].toFixed(1)}%</strong>` : `Reading: <strong>${p.value[1]} min</strong>`,
+          p.seriesName === 'Progress'
+            ? `${t('book.detail.readingLog.journey.tooltipProgress')}: <strong>${p.value[1].toFixed(1)}%</strong>`
+            : `${t('book.detail.readingLog.journey.tooltipReading')}: <strong>${p.value[1]} ${t('book.detail.readingLog.journey.minutesUnit')}</strong>`,
         )
         return [day, ...lines].join('<br/>')
       },
@@ -94,13 +98,13 @@ watchEffect(() => {
   <div class="flex h-full flex-col rounded-lg border border-border bg-card p-3 sm:p-4">
     <div class="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
       <TrendingUp class="size-4 text-muted-foreground" />
-      Progress journey
+      {{ t('book.detail.readingLog.journey.title') }}
     </div>
     <div v-if="hasData" class="relative min-h-0 flex-1 transition-opacity" :class="{ 'opacity-50': loading }" style="min-height: 220px">
       <VChart :theme="chartTheme" :option autoresize class="absolute inset-0" />
     </div>
     <div v-else class="flex flex-1 items-center justify-center py-12 text-sm text-muted-foreground" style="min-height: 220px">
-      No progress data in this window.
+      {{ t('book.detail.readingLog.journey.empty') }}
     </div>
   </div>
 </template>

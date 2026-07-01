@@ -1,14 +1,30 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { MergeStrategy } from '@bookorbit/types'
+
+const { t } = useI18n()
 
 defineProps<{ modelValue: MergeStrategy; disabled?: boolean }>()
 defineEmits<{ 'update:modelValue': [value: MergeStrategy] }>()
 
-const options: { value: MergeStrategy; label: string; description: string }[] = [
-  { value: 'fillMissing', label: 'Fill missing', description: 'Only write if field is currently empty' },
-  { value: 'overwriteIfProvided', label: 'Overwrite if provided', description: 'Write if provider returned a value' },
-  { value: 'overwrite', label: 'Always overwrite', description: 'Always replace existing value' },
-]
+const options = computed<{ value: MergeStrategy; label: string; description: string }[]>(() => [
+  {
+    value: 'fillMissing',
+    label: t('settings.metadata.mergeStrategy.fillMissing.label'),
+    description: t('settings.metadata.mergeStrategy.fillMissing.description'),
+  },
+  {
+    value: 'overwriteIfProvided',
+    label: t('settings.metadata.mergeStrategy.overwriteIfProvided.label'),
+    description: t('settings.metadata.mergeStrategy.overwriteIfProvided.description'),
+  },
+  {
+    value: 'overwrite',
+    label: t('settings.metadata.mergeStrategy.overwrite.label'),
+    description: t('settings.metadata.mergeStrategy.overwrite.description'),
+  },
+])
 </script>
 
 <template>

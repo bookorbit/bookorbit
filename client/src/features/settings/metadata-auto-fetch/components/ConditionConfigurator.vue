@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import type { BookMetadataFetchConditions, MetadataField } from '@bookorbit/types'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import MissingFieldsPicker from './MissingFieldsPicker.vue'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   modelValue: BookMetadataFetchConditions
@@ -41,8 +44,8 @@ function updateNeverFetched(enabled: boolean) {
         class="mt-0.5 shrink-0"
       />
       <div>
-        <p class="settings-label">Never fetched</p>
-        <p class="settings-hint">Fetch books that have never had a metadata fetch attempt.</p>
+        <p class="settings-label">{{ t('settings.metadata.autoFetch.conditions.neverFetched.label') }}</p>
+        <p class="settings-hint">{{ t('settings.metadata.autoFetch.conditions.neverFetched.hint') }}</p>
       </div>
     </div>
 
@@ -54,10 +57,10 @@ function updateNeverFetched(enabled: boolean) {
         class="mt-0.5 shrink-0"
       />
       <div class="flex-1">
-        <p class="settings-label">Low metadata score</p>
-        <p class="settings-hint">Fetch if the metadata score is below a threshold.</p>
+        <p class="settings-label">{{ t('settings.metadata.autoFetch.conditions.scoreThreshold.label') }}</p>
+        <p class="settings-hint">{{ t('settings.metadata.autoFetch.conditions.scoreThreshold.hint') }}</p>
         <div v-if="modelValue.scoreThreshold.enabled" class="flex items-center gap-2 mt-2">
-          <span class="text-xs text-muted-foreground">Score below</span>
+          <span class="text-xs text-muted-foreground">{{ t('settings.metadata.autoFetch.conditions.scoreThreshold.scoreBelow') }}</span>
           <input
             type="number"
             min="0"
@@ -80,8 +83,8 @@ function updateNeverFetched(enabled: boolean) {
         class="mt-0.5 shrink-0"
       />
       <div class="flex-1">
-        <p class="settings-label">Missing fields</p>
-        <p class="settings-hint">Fetch if any of the selected fields are empty.</p>
+        <p class="settings-label">{{ t('settings.metadata.autoFetch.conditions.missingFields.label') }}</p>
+        <p class="settings-hint">{{ t('settings.metadata.autoFetch.conditions.missingFields.hint') }}</p>
         <MissingFieldsPicker
           v-if="modelValue.missingFields.enabled"
           :model-value="modelValue.missingFields.fields"

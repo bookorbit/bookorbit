@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { AlertTriangle, RotateCcw, Settings2 } from '@lucide/vue'
 import type { FieldPreference, MetadataField, ProviderStatus } from '@bookorbit/types'
 import MergeStrategyPicker from './MergeStrategyPicker.vue'
@@ -7,6 +8,8 @@ import ProviderChipList from './ProviderChipList.vue'
 import FieldConfigSheet from './FieldConfigSheet.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Badge } from '@/components/ui/badge'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   field: MetadataField
@@ -21,26 +24,7 @@ const emit = defineEmits<{
   revert: [field: MetadataField]
 }>()
 
-const FIELD_LABELS: Record<MetadataField, string> = {
-  title: 'Title',
-  subtitle: 'Subtitle',
-  description: 'Description',
-  cover: 'Cover',
-  authors: 'Authors',
-  publisher: 'Publisher',
-  publishedYear: 'Published year',
-  language: 'Language',
-  pageCount: 'Page count',
-  communityRating: 'Community rating',
-  seriesName: 'Series name',
-  seriesIndex: 'Series index',
-  genres: 'Genres',
-  narrators: 'Narrators',
-  duration: 'Duration',
-  abridged: 'Abridged',
-}
-
-const label = computed(() => FIELD_LABELS[props.field] ?? props.field)
+const label = computed(() => t(`settings.metadata.fields.${props.field}`))
 const noProviders = computed(() => props.preference.enabled && props.preference.providers.length === 0)
 const sheetOpen = ref(false)
 
@@ -83,7 +67,7 @@ function onSheetChange(pref: FieldPreference) {
           <TooltipTrigger as-child>
             <AlertTriangle :size="14" class="text-amber-500 animate-pulse shrink-0" />
           </TooltipTrigger>
-          <TooltipContent>Enabled but has no providers</TooltipContent>
+          <TooltipContent>{{ t('settings.metadata.fieldRules.field.noProviders') }}</TooltipContent>
         </Tooltip>
       </div>
     </div>
@@ -99,7 +83,7 @@ function onSheetChange(pref: FieldPreference) {
         />
         <span v-if="noProviders" class="flex items-center gap-1.5 text-xs text-amber-500 font-bold uppercase tracking-tight">
           <AlertTriangle :size="12" />
-          Empty
+          {{ t('settings.metadata.fieldRules.field.empty') }}
         </span>
       </div>
       <button
@@ -108,7 +92,7 @@ function onSheetChange(pref: FieldPreference) {
         @click="sheetOpen = true"
       >
         <Settings2 :size="13" />
-        Config
+        {{ t('settings.metadata.fieldRules.field.config') }}
       </button>
     </div>
 
@@ -126,7 +110,9 @@ function onSheetChange(pref: FieldPreference) {
         <Tooltip v-if="!inherited">
           <TooltipTrigger as-child>
             <div class="flex items-center gap-1">
-              <Badge variant="secondary" class="h-4.5 px-1.5 text-[9px] font-bold uppercase tracking-tight"> Custom </Badge>
+              <Badge variant="secondary" class="h-4.5 px-1.5 text-[9px] font-bold uppercase tracking-tight">
+                {{ t('settings.metadata.fieldRules.field.custom') }}
+              </Badge>
               <button
                 :disabled="saving"
                 class="flex items-center justify-center h-6 w-6 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-colors disabled:opacity-40"
@@ -136,9 +122,11 @@ function onSheetChange(pref: FieldPreference) {
               </button>
             </div>
           </TooltipTrigger>
-          <TooltipContent>Reset to default</TooltipContent>
+          <TooltipContent>{{ t('settings.metadata.fieldRules.field.resetToDefault') }}</TooltipContent>
         </Tooltip>
-        <Badge v-else variant="outline" class="h-4.5 px-1.5 text-[9px] font-bold uppercase tracking-tight opacity-40"> Default </Badge>
+        <Badge v-else variant="outline" class="h-4.5 px-1.5 text-[9px] font-bold uppercase tracking-tight opacity-40">
+          {{ t('settings.metadata.fieldRules.field.default') }}
+        </Badge>
       </div>
     </div>
 

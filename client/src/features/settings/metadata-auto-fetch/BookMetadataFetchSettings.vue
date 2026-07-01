@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { BookMetadataFetchConfig } from '@bookorbit/types'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useBookMetadataFetchConfig } from '@/features/book-metadata-fetch/composables/useBookMetadataFetchConfig'
 import GlobalAutoFetchConfig from './components/GlobalAutoFetchConfig.vue'
 import LibraryAutoFetchConfig from './components/LibraryAutoFetchConfig.vue'
 
+const { t } = useI18n()
 const { globalConfig, fetchGlobalConfig } = useBookMetadataFetchConfig()
 const { libraries, fetchLibraries } = useLibraries()
 const loading = ref(true)
@@ -24,14 +26,14 @@ function handleGlobalUpdated(updated: BookMetadataFetchConfig) {
 </script>
 
 <template>
-  <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>
+  <div v-if="loading" class="text-sm text-muted-foreground">{{ t('common.loading') }}</div>
 
   <template v-else>
-    <p class="settings-group-label">Global Settings</p>
+    <p class="settings-group-label">{{ t('settings.metadata.autoFetch.globalSettings') }}</p>
     <GlobalAutoFetchConfig v-if="globalConfig" :config="globalConfig" @updated="handleGlobalUpdated" />
 
     <template v-if="libraries.length > 0">
-      <p class="settings-group-label mt-8">Per-Library Overrides</p>
+      <p class="settings-group-label mt-8">{{ t('settings.metadata.autoFetch.perLibraryOverrides') }}</p>
       <div class="flex flex-col gap-3">
         <LibraryAutoFetchConfig v-for="lib in libraries" :key="lib.id" :library="lib" :global-config="globalConfig!" />
       </div>

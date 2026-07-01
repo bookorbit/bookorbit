@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ChevronDown, ChevronUp, ChevronsUpDown, Loader2, Trash2, X } from '@lucide/vue'
 import type { BookReadingSession, ReadingSessionSource } from '@bookorbit/types'
 
@@ -13,6 +14,8 @@ const props = defineProps<{
   hasMore: boolean
   hasMultipleFormats: boolean
 }>()
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   sortChange: [sortBy: string, sortDir: 'asc' | 'desc']
@@ -82,12 +85,12 @@ function formatPace(session: BookReadingSession): string {
 
 const PILL_BASE = 'inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium'
 
-const SESSION_SOURCE_PILLS: Record<ReadingSessionSource, { label: string; class: string }> = {
-  web: { label: 'Web', class: 'border-[var(--pill-web)]/40 bg-[var(--pill-web)]/10 text-[var(--pill-web)]' },
+const SESSION_SOURCE_PILLS = computed<Record<ReadingSessionSource, { label: string; class: string }>>(() => ({
+  web: { label: t('book.detail.readingLog.table.sourceWeb'), class: 'border-[var(--pill-web)]/40 bg-[var(--pill-web)]/10 text-[var(--pill-web)]' },
   koreader: { label: 'KOReader', class: 'border-[var(--pill-koreader)]/40 bg-[var(--pill-koreader)]/10 text-[var(--pill-koreader)]' },
   kobo: { label: 'Kobo', class: 'border-[var(--pill-kobo)]/40 bg-[var(--pill-kobo)]/10 text-[var(--pill-kobo)]' },
-  manual: { label: 'Manual', class: 'border-border bg-muted text-muted-foreground' },
-}
+  manual: { label: t('book.detail.readingLog.table.sourceManual'), class: 'border-border bg-muted text-muted-foreground' },
+}))
 
 const showSource = computed(() => props.sessions.some((s) => s.source != null))
 
@@ -115,15 +118,30 @@ function handleSort(col: string) {
   emit('sortChange', col, dir)
 }
 
-const SORTABLE_COLS = [
-  { id: 'startedAt', label: 'Date', mobileLabel: 'Date' },
-  { id: 'durationSeconds', label: 'Duration', mobileLabel: 'Duration' },
-  { id: 'progressDelta', label: 'Progress Change', mobileLabel: 'Delta' },
-  { id: 'endProgress', label: 'End Progress', mobileLabel: 'End' },
-] as const
+const SORTABLE_COLS = computed(
+  () =>
+    [
+      { id: 'startedAt', label: t('book.detail.readingLog.table.colDate'), mobileLabel: t('book.detail.readingLog.table.colDateMobile') },
+      {
+        id: 'durationSeconds',
+        label: t('book.detail.readingLog.table.colDuration'),
+        mobileLabel: t('book.detail.readingLog.table.colDurationMobile'),
+      },
+      {
+        id: 'progressDelta',
+        label: t('book.detail.readingLog.table.colProgressChange'),
+        mobileLabel: t('book.detail.readingLog.table.colProgressChangeMobile'),
+      },
+      {
+        id: 'endProgress',
+        label: t('book.detail.readingLog.table.colEndProgress'),
+        mobileLabel: t('book.detail.readingLog.table.colEndProgressMobile'),
+      },
+    ] as const,
+)
 
 const columnCount = computed(() => {
-  let count = SORTABLE_COLS.length + 2
+  let count = SORTABLE_COLS.value.length + 2
   if (showSource.value) count += 1
   if (props.hasMultipleFormats) count += 1
   return count
@@ -176,7 +194,7 @@ const rows = computed<TableRow[]>(() => {
 <template>
   <div @click.self="clearConfirmDelete">
     <div v-if="sessions.length === 0 && !loading" class="flex items-center justify-center py-16 text-muted-foreground text-sm">
-      No reading sessions recorded yet.
+      {{ t('book.detail.readingLog.table.empty') }}
     </div>
 
     <div v-else class="overflow-x-auto rounded-lg border border-border transition-opacity" :class="{ 'opacity-50 pointer-events-none': loading }">
@@ -199,20 +217,20 @@ const rows = computed<TableRow[]>(() => {
             <th
               class="hidden px-2 py-2.5 text-left text-[11px] font-medium text-muted-foreground uppercase tracking-wide sm:table-cell sm:px-4 sm:py-3 sm:text-xs"
             >
-              Pace
+              {{ t('book.detail.readingLog.table.colPace') }}
             </th>
             <th
               v-if="showSource"
               class="hidden px-2 py-2.5 text-left text-[11px] font-medium text-muted-foreground uppercase tracking-wide sm:table-cell sm:px-4 sm:py-3 sm:text-xs"
             >
-              Source
+              {{ t('book.detail.readingLog.table.colSource') }}
             </th>
             <th
               v-if="hasMultipleFormats"
               class="px-2 py-2.5 text-left text-[11px] font-medium text-muted-foreground uppercase tracking-wide sm:px-4 sm:py-3 sm:text-xs"
             >
-              <span class="sm:hidden">Fmt</span>
-              <span class="hidden sm:inline">Format</span>
+              <span class="sm:hidden">{{ t('book.detail.readingLog.table.colFormatMobile') }}</span>
+              <span class="hidden sm:inline">{{ t('book.detail.readingLog.table.colFormat') }}</span>
             </th>
             <th class="w-28 px-2 py-2.5 sm:px-4 sm:py-3" />
           </tr>
@@ -273,26 +291,26 @@ const rows = computed<TableRow[]>(() => {
                   <template v-if="confirmDeleteId === row.session.id">
                     <button
                       class="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      title="Cancel delete"
-                      aria-label="Cancel delete session"
+                      :title="t('book.detail.readingLog.table.cancelDelete')"
+                      :aria-label="t('book.detail.readingLog.table.cancelDeleteAria')"
                       @click="clearConfirmDelete"
                     >
                       <X :size="14" />
                     </button>
                     <button
                       class="inline-flex h-6 items-center justify-center rounded px-1.5 text-[10px] font-medium uppercase tracking-wide transition-colors bg-destructive/15 text-destructive ring-1 ring-destructive/40"
-                      title="Click again to confirm delete"
-                      aria-label="Confirm delete session"
+                      :title="t('book.detail.readingLog.table.confirmDeleteTitle')"
+                      :aria-label="t('book.detail.readingLog.table.confirmDeleteAria')"
                       @click="() => handleDeleteClick(row.session.id)"
                     >
-                      Confirm
+                      {{ t('common.confirm') }}
                     </button>
                   </template>
                   <button
                     v-else
                     class="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
-                    title="Delete"
-                    aria-label="Delete session"
+                    :title="t('common.delete')"
+                    :aria-label="t('book.detail.readingLog.table.deleteAria')"
                     @click="() => handleDeleteClick(row.session.id)"
                   >
                     <Trash2 :size="14" />
@@ -313,9 +331,9 @@ const rows = computed<TableRow[]>(() => {
         @click="handleLoadMore"
       >
         <Loader2 v-if="loadingMore" :size="14" class="animate-spin" />
-        Load more
+        {{ t('book.detail.readingLog.table.loadMore') }}
       </button>
-      <span class="text-xs text-muted-foreground">Showing {{ sessions.length }} of {{ total }} sessions</span>
+      <span class="text-xs text-muted-foreground">{{ t('book.detail.readingLog.table.showing', { shown: sessions.length, total }) }}</span>
     </div>
   </div>
 </template>

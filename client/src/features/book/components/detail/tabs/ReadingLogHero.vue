@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Check, ChevronDown, Clock, Minus, Plus, TrendingDown, TrendingUp } from '@lucide/vue'
 import type { BookDetail, BookReadingSessionStats, ReadStatus, UserBookStatus } from '@bookorbit/types'
 import { isAudioFormat } from '@bookorbit/types'
@@ -19,6 +20,7 @@ const emit = defineEmits<{
   addSession: []
 }>()
 
+const { t } = useI18n()
 const { setStatus, updateStatus } = useBookStatus()
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -40,7 +42,7 @@ function toDateInputValue(value: string | null | undefined): string {
 }
 
 function formatDisplayDate(dateKey: string): string {
-  if (!dateKey) return 'Not set'
+  if (!dateKey) return t('book.detail.readingLog.hero.notSet')
   const [year, month, day] = dateKey.split('-').map(Number)
   const d = new Date(year!, month! - 1, day!)
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
@@ -59,21 +61,21 @@ function formatRelative(iso: string | null): string {
   if (!iso) return '-'
   const diff = Date.now() - new Date(iso).getTime()
   const s = Math.floor(diff / 1000)
-  if (s < 60) return `${s}s ago`
+  if (s < 60) return t('book.detail.readingLog.hero.relative.seconds', { count: s })
   const m = Math.floor(s / 60)
-  if (m < 60) return `${m}m ago`
+  if (m < 60) return t('book.detail.readingLog.hero.relative.minutes', { count: m })
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
+  if (h < 24) return t('book.detail.readingLog.hero.relative.hours', { count: h })
   const d = Math.floor(h / 24)
-  if (d < 30) return `${d}d ago`
+  if (d < 30) return t('book.detail.readingLog.hero.relative.days', { count: d })
   const mo = Math.floor(d / 30)
-  if (mo < 12) return `${mo} month${mo === 1 ? '' : 's'} ago`
+  if (mo < 12) return t('book.detail.readingLog.hero.relative.months', { count: mo }, mo)
   const yr = Math.floor(mo / 12)
-  return `${yr} year${yr === 1 ? '' : 's'} ago`
+  return t('book.detail.readingLog.hero.relative.years', { count: yr }, yr)
 }
 
 function formatSessionDate(iso: string | null): string {
-  if (!iso) return 'No sessions'
+  if (!iso) return t('book.detail.readingLog.hero.noSessions')
   return new Date(iso).toLocaleString(undefined, {
     year: 'numeric',
     month: 'short',
@@ -113,9 +115,10 @@ watch(
 )
 
 function validateDates(values: { startedAt: string; finishedAt: string }): string | null {
-  if (values.startedAt && values.startedAt > todayDateInput.value) return 'Start date cannot be in the future.'
-  if (values.finishedAt && values.finishedAt > todayDateInput.value) return 'Finish date cannot be in the future.'
-  if (values.startedAt && values.finishedAt && values.finishedAt < values.startedAt) return 'Finish date must be on or after the start date.'
+  if (values.startedAt && values.startedAt > todayDateInput.value) return t('book.detail.readingLog.hero.dateErrors.startFuture')
+  if (values.finishedAt && values.finishedAt > todayDateInput.value) return t('book.detail.readingLog.hero.dateErrors.finishFuture')
+  if (values.startedAt && values.finishedAt && values.finishedAt < values.startedAt)
+    return t('book.detail.readingLog.hero.dateErrors.finishBeforeStart')
   return null
 }
 
@@ -170,7 +173,7 @@ async function saveDateField(field: 'startedAt' | 'finishedAt') {
     applyReadStatusUpdate(updated)
     activeDateField.value = null
   } catch {
-    datesError.value = 'Failed to save reading dates.'
+    datesError.value = t('book.detail.readingLog.hero.dateErrors.saveFailed')
   } finally {
     savingDates.value = false
   }
@@ -256,13 +259,13 @@ const etaLabel = computed(() => {
   if (remaining <= 0) return null
   const totalMinutes = (remaining / pace) * 60
   if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return null
-  if (totalMinutes > 99 * 60) return '99h+ to finish'
+  if (totalMinutes > 99 * 60) return t('book.detail.readingLog.hero.eta.max')
   const rounded = Math.max(5, Math.round(totalMinutes / 5) * 5)
   const h = Math.floor(rounded / 60)
   const m = rounded % 60
-  if (h <= 0) return `~${m}m to finish`
-  if (m === 0) return `~${h}h to finish`
-  return `~${h}h ${m}m to finish`
+  if (h <= 0) return t('book.detail.readingLog.hero.eta.minutes', { m })
+  if (m === 0) return t('book.detail.readingLog.hero.eta.hours', { h })
+  return t('book.detail.readingLog.hero.eta.hoursMinutes', { h, m })
 })
 
 function toUtcDayStart(date: Date): number {
@@ -283,19 +286,31 @@ const momentum = computed(() => {
     last7 += map.get(toUtcDayKey(todayStart - offset * DAY_MS)) ?? 0
     prev7 += map.get(toUtcDayKey(todayStart - (offset + 7) * DAY_MS)) ?? 0
   }
-  if (last7 === 0 && prev7 === 0) return { direction: 'flat' as const, title: 'No activity in the last two weeks' }
-  if (prev7 <= 0) return { direction: 'up' as const, title: 'New activity this week' }
+  if (last7 === 0 && prev7 === 0) return { direction: 'flat' as const, title: t('book.detail.readingLog.hero.momentum.none') }
+  if (prev7 <= 0) return { direction: 'up' as const, title: t('book.detail.readingLog.hero.momentum.new') }
   const pct = Math.round(((last7 - prev7) / prev7) * 100)
-  if (pct > 0) return { direction: 'up' as const, title: `+${pct}% vs previous 7 days` }
-  if (pct < 0) return { direction: 'down' as const, title: `${pct}% vs previous 7 days` }
-  return { direction: 'flat' as const, title: 'Unchanged vs previous 7 days' }
+  if (pct > 0) return { direction: 'up' as const, title: t('book.detail.readingLog.hero.momentum.up', { pct }) }
+  if (pct < 0) return { direction: 'down' as const, title: t('book.detail.readingLog.hero.momentum.down', { pct }) }
+  return { direction: 'flat' as const, title: t('book.detail.readingLog.hero.momentum.flat') }
 })
 
 const statCells = computed(() => [
-  { label: 'Total Time', value: props.stats ? formatDuration(props.stats.totalSeconds) : '0s', withMomentum: true },
-  { label: 'Sessions', value: String(props.stats?.totalSessions ?? 0), withMomentum: false },
-  { label: 'Avg Session', value: props.stats ? formatDuration(props.stats.avgDurationSeconds) : '0s', withMomentum: false },
-  { label: 'Last Read', value: props.stats ? formatRelative(props.stats.lastSessionAt) : '-', withMomentum: false },
+  {
+    label: t('book.detail.readingLog.hero.stats.totalTime'),
+    value: props.stats ? formatDuration(props.stats.totalSeconds) : '0s',
+    withMomentum: true,
+  },
+  { label: t('book.detail.readingLog.hero.stats.sessions'), value: String(props.stats?.totalSessions ?? 0), withMomentum: false },
+  {
+    label: t('book.detail.readingLog.hero.stats.avgSession'),
+    value: props.stats ? formatDuration(props.stats.avgDurationSeconds) : '0s',
+    withMomentum: false,
+  },
+  {
+    label: t('book.detail.readingLog.hero.stats.lastRead'),
+    value: props.stats ? formatRelative(props.stats.lastSessionAt) : '-',
+    withMomentum: false,
+  },
 ])
 
 const currentStatusOption = computed(() => STATUS_OPTIONS.find((o) => o.value === (localReadStatus.value ?? 'unread')))
@@ -338,18 +353,18 @@ function handleAddSession() {
 
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span class="flex items-center gap-1">
-              First Read
+              {{ t('book.detail.readingLog.hero.firstRead') }}
               <span class="font-medium text-foreground">{{ firstReadLabel }}</span>
             </span>
             <span class="flex items-center gap-1">
-              Last Read
+              {{ t('book.detail.readingLog.hero.lastRead') }}
               <span class="font-medium text-foreground">{{ lastReadLabel }}</span>
             </span>
           </div>
 
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span class="flex items-center gap-1">
-              Date Started
+              {{ t('book.detail.readingLog.hero.dateStarted') }}
               <input
                 v-if="activeDateField === 'startedAt'"
                 v-model="draftDates.startedAt"
@@ -367,7 +382,7 @@ function handleAddSession() {
               </button>
             </span>
             <span class="flex items-center gap-1">
-              Date Finished
+              {{ t('book.detail.readingLog.hero.dateFinished') }}
               <input
                 v-if="activeDateField === 'finishedAt'"
                 v-model="draftDates.finishedAt"
@@ -423,7 +438,7 @@ function handleAddSession() {
           @click="handleAddSession"
         >
           <Plus :size="14" />
-          Add session
+          {{ t('book.detail.readingLog.hero.addSession') }}
         </button>
       </div>
     </div>

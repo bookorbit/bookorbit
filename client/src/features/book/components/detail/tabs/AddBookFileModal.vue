@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { CheckCircle2, FileUp, Loader2, Plus, Upload, X, XCircle, RotateCcw } from '@lucide/vue'
+import { useI18n } from 'vue-i18n'
 import { Permission } from '@bookorbit/types'
 import { SUPPORTED_FORMATS_ACCEPT, useAddBookFile } from '@/features/book/composables/useAddBookFile'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -14,6 +15,7 @@ const emit = defineEmits<{
   uploaded: []
 }>()
 
+const { t } = useI18n()
 const { hasPermission } = usePermissions()
 
 const isDragging = ref(false)
@@ -28,9 +30,9 @@ const allDone = computed(() => hasFiles.value && files.value.every((f) => f.stat
 const allSuccess = computed(() => allDone.value && errorCount.value === 0)
 
 const headerTitle = computed(() => {
-  if (isUploading.value) return 'Uploading...'
-  if (allDone.value) return 'Upload complete'
-  return 'Add File'
+  if (isUploading.value) return t('book.detail.addFile.uploading')
+  if (allDone.value) return t('book.detail.addFile.uploadComplete')
+  return t('book.detail.addFile.title')
 })
 
 const fileSummary = computed(() => {
@@ -169,8 +171,8 @@ function formatPillClass(filename: string): string {
               <FileUp :size="20" class="text-primary" />
             </div>
             <div>
-              <p class="text-sm font-medium text-foreground">Drop files here or click to browse</p>
-              <p class="text-xs text-muted-foreground mt-0.5">epub, pdf, mobi, cbz, m4b and more - up to 500 MB each</p>
+              <p class="text-sm font-medium text-foreground">{{ t('book.detail.addFile.dropzone.title') }}</p>
+              <p class="text-xs text-muted-foreground mt-0.5">{{ t('book.detail.addFile.dropzone.hint') }}</p>
             </div>
           </div>
 
@@ -189,20 +191,24 @@ function formatPillClass(filename: string): string {
             @click="openFilePicker"
           >
             <Plus :size="13" />
-            Add more files
+            {{ t('book.detail.addFile.addMore') }}
           </div>
 
           <!-- File list -->
           <div v-if="hasFiles" class="flex flex-col gap-2">
             <!-- Summary line -->
             <div v-if="fileSummary" class="flex items-center gap-1.5 flex-wrap text-xs text-muted-foreground">
-              <span class="font-medium text-foreground tabular-nums">{{ fileSummary.total }} file{{ fileSummary.total === 1 ? '' : 's' }}</span>
+              <span class="font-medium text-foreground tabular-nums">{{
+                t('book.detail.addFile.fileCount', { count: fileSummary.total }, fileSummary.total)
+              }}</span>
               <span>·</span>
               <span>{{ formatBytes(fileSummary.totalBytes) }}</span>
               <span>·</span>
               <span>{{ fileSummary.formatParts.join(', ') }}</span>
               <div class="flex-1" />
-              <button v-if="!isUploading" class="hover:text-foreground transition-colors" @click="reset">Clear all</button>
+              <button v-if="!isUploading" class="hover:text-foreground transition-colors" @click="reset">
+                {{ t('book.detail.addFile.clearAll') }}
+              </button>
             </div>
 
             <TransitionGroup name="file-row" tag="div" class="relative flex flex-col gap-1">
@@ -230,7 +236,9 @@ function formatPillClass(filename: string): string {
                     </span>
                     <span v-if="item.status === 'error'" class="text-[11px] text-destructive truncate">{{ item.error }}</span>
                     <span v-else-if="item.status === 'uploading'" class="text-[11px] text-primary tabular-nums">{{ item.progress }}%</span>
-                    <span v-else-if="item.status === 'done'" class="text-[11px] text-emerald-600 dark:text-emerald-400">Done</span>
+                    <span v-else-if="item.status === 'done'" class="text-[11px] text-emerald-600 dark:text-emerald-400">{{
+                      t('book.detail.addFile.done')
+                    }}</span>
                   </div>
 
                   <!-- Progress bar -->
@@ -244,7 +252,7 @@ function formatPillClass(filename: string): string {
                   <button
                     v-if="item.status === 'error'"
                     class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground/85 hover:text-primary hover:bg-primary/10 transition-colors"
-                    title="Retry"
+                    :title="t('book.detail.addFile.retry')"
                     @click="retryFile(item.id)"
                   >
                     <RotateCcw :size="11" />
@@ -266,21 +274,25 @@ function formatPillClass(filename: string): string {
         <div v-if="allSuccess" class="shrink-0 px-5 py-4 border-t border-border flex items-center justify-between gap-3">
           <div class="flex items-center gap-2">
             <CheckCircle2 class="size-4 text-emerald-500 shrink-0" />
-            <span class="text-sm font-medium text-foreground">{{ doneCount }} file{{ doneCount === 1 ? '' : 's' }} added</span>
+            <span class="text-sm font-medium text-foreground">{{ t('book.detail.addFile.filesAdded', { count: doneCount }, doneCount) }}</span>
           </div>
           <button
             class="px-3 py-1.5 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             @click="handleClose"
           >
-            Close
+            {{ t('common.close') }}
           </button>
         </div>
 
         <!-- Footer: normal / partial error state -->
         <div v-else class="shrink-0 px-5 py-4 border-t border-border flex items-center justify-between gap-3">
           <div class="flex items-center gap-3 min-w-0">
-            <span v-if="allDone && errorCount > 0" class="text-xs text-muted-foreground">{{ doneCount }} uploaded, {{ errorCount }} failed</span>
-            <span v-else-if="isUploading" class="text-xs text-muted-foreground tabular-nums">{{ doneCount }} of {{ files.length }} uploading...</span>
+            <span v-if="allDone && errorCount > 0" class="text-xs text-muted-foreground">{{
+              t('book.detail.addFile.uploadedFailed', { done: doneCount, failed: errorCount })
+            }}</span>
+            <span v-else-if="isUploading" class="text-xs text-muted-foreground tabular-nums">{{
+              t('book.detail.addFile.uploadingProgress', { done: doneCount, total: files.length })
+            }}</span>
             <label v-else-if="hasPermission(Permission.LibraryEditMetadata)" class="flex items-center gap-2 cursor-pointer select-none">
               <input
                 v-model="renameAfter"
@@ -288,7 +300,7 @@ function formatPillClass(filename: string): string {
                 class="w-3.5 h-3.5 rounded border-border accent-primary cursor-pointer"
                 :disabled="isUploading"
               />
-              <span class="text-xs text-muted-foreground">Rename all book files after upload</span>
+              <span class="text-xs text-muted-foreground">{{ t('book.detail.addFile.renameAfter') }}</span>
             </label>
             <span v-else class="text-xs text-muted-foreground" />
           </div>
@@ -298,7 +310,7 @@ function formatPillClass(filename: string): string {
               class="px-3 py-1.5 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               @click="handleClose"
             >
-              {{ allDone ? 'Close' : 'Cancel' }}
+              {{ allDone ? t('common.close') : t('common.cancel') }}
             </button>
             <button
               class="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
@@ -306,7 +318,7 @@ function formatPillClass(filename: string): string {
               @click="handleUpload"
             >
               <Upload :size="13" />
-              Upload{{ pendingCount > 0 ? ` (${pendingCount})` : '' }}
+              {{ pendingCount > 0 ? t('book.detail.addFile.uploadCount', { count: pendingCount }) : t('book.detail.addFile.upload') }}
             </button>
           </div>
         </div>

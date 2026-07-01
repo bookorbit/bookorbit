@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue'
 import { useLocalStorage } from '@vueuse/core'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { BookOpen, Download, Eye, FilePlus, Files, Headphones, History, FolderOpen, ArrowUpDown, MoreVertical } from '@lucide/vue'
 import type { BookDetail, BookDetailFile, WriteLogEntry } from '@bookorbit/types'
 import { Permission, READER_OPENABLE_FORMATS } from '@bookorbit/types'
@@ -15,6 +16,7 @@ import AddBookFileModal from './AddBookFileModal.vue'
 
 const props = defineProps<{ book: BookDetail }>()
 const emit = defineEmits<{ refetch: [] }>()
+const { t } = useI18n()
 const router = useRouter()
 
 const { downloadFile: downloadBookFile } = useBookDownload()
@@ -96,13 +98,13 @@ function formatDate(iso: string): string {
 function formatRelative(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
   const s = Math.floor(diff / 1000)
-  if (s < 60) return `${s}s ago`
+  if (s < 60) return t('book.detail.files.relative.seconds', { value: s })
   const m = Math.floor(s / 60)
-  if (m < 60) return `${m}m ago`
+  if (m < 60) return t('book.detail.files.relative.minutes', { value: m })
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
+  if (h < 24) return t('book.detail.files.relative.hours', { value: h })
   const d = Math.floor(h / 24)
-  return `${d}d ago`
+  return t('book.detail.files.relative.days', { value: d })
 }
 
 function openFile(file: BookDetailFile, mode?: 'peek') {
@@ -163,7 +165,7 @@ async function submitRename() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ filename: renameInput.value.trim() }),
     })
-    if (!res.ok) throw new Error('Failed to rename file')
+    if (!res.ok) throw new Error(t('book.detail.files.renameFailed'))
     renameFileTarget.value = null
     emit('refetch')
   } catch (err) {
@@ -185,7 +187,7 @@ async function confirmDelete() {
     const res = await api(`/api/v1/books/files/${deleteFileTarget.value.id}`, {
       method: 'DELETE',
     })
-    if (!res.ok) throw new Error('Failed to delete file')
+    if (!res.ok) throw new Error(t('book.detail.files.deleteFailed'))
     emit('refetch')
   } catch (err) {
     alert(err instanceof Error ? err.message : String(err))
@@ -237,22 +239,22 @@ async function toggleWriteLog() {
             @click="openAddFileModal"
           >
             <FilePlus class="size-4 md:size-3" />
-            Add File
+            {{ t('book.detail.files.addFile') }}
           </button>
           <p v-if="book.lastWrittenAt" class="text-sm md:text-xs font-medium text-muted-foreground/90 truncate">
-            Last synced: {{ formatRelative(book.lastWrittenAt) }}
+            {{ t('book.detail.files.lastSynced', { time: formatRelative(book.lastWrittenAt) }) }}
           </p>
         </div>
         <div class="flex items-center gap-2 overflow-x-auto scrollbar-none pb-1 -mb-1 sm:overflow-visible sm:pb-0 sm:mb-0">
           <div class="flex items-center gap-1.5 whitespace-nowrap">
             <ArrowUpDown class="size-4 md:size-3 text-muted-foreground" />
-            <span class="text-sm md:text-xs font-medium text-muted-foreground">Sort:</span>
+            <span class="text-sm md:text-xs font-medium text-muted-foreground">{{ t('book.detail.files.sort.label') }}</span>
             <button
               v-for="opt in [
-                ['name', 'Name'],
-                ['format', 'Format'],
-                ['size', 'Size'],
-                ['date', 'Date'],
+                ['name', t('book.detail.files.sort.name')],
+                ['format', t('book.detail.files.sort.format')],
+                ['size', t('book.detail.files.sort.size')],
+                ['date', t('book.detail.files.sort.date')],
               ] as [SortKey, string][]"
               :key="opt[0]"
               class="h-8 md:h-6 px-2.5 md:px-1.5 rounded-md md:rounded text-sm md:text-xs transition-colors whitespace-nowrap"
@@ -267,7 +269,7 @@ async function toggleWriteLog() {
             @click="showPaths = !showPaths"
           >
             <FolderOpen class="size-4 md:size-3" />
-            {{ showPaths ? 'Hide paths' : 'Show paths' }}
+            {{ showPaths ? t('book.detail.files.hidePaths') : t('book.detail.files.showPaths') }}
           </button>
           <button
             v-if="book.lastWrittenAt"
@@ -275,7 +277,7 @@ async function toggleWriteLog() {
             @click="toggleWriteLog"
           >
             <History class="size-4 md:size-3" />
-            {{ writeLogOpen ? 'Hide log' : 'View sync log' }}
+            {{ writeLogOpen ? t('book.detail.files.hideLog') : t('book.detail.files.viewSyncLog') }}
           </button>
         </div>
       </div>
@@ -283,8 +285,8 @@ async function toggleWriteLog() {
 
     <!-- Inline sync log -->
     <div v-if="writeLogOpen" class="rounded-lg border border-border bg-muted/30 px-4 py-3 space-y-1.5">
-      <p v-if="writeLogLoading" class="text-sm md:text-xs text-muted-foreground">Loading...</p>
-      <p v-else-if="writeLog.length === 0" class="text-sm md:text-xs text-muted-foreground">No write history yet.</p>
+      <p v-if="writeLogLoading" class="text-sm md:text-xs text-muted-foreground">{{ t('common.loading') }}</p>
+      <p v-else-if="writeLog.length === 0" class="text-sm md:text-xs text-muted-foreground">{{ t('book.detail.files.noWriteHistory') }}</p>
       <div v-for="entry in writeLog" :key="entry.id" class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm md:text-xs">
         <span
           class="shrink-0 font-medium"
@@ -300,9 +302,9 @@ async function toggleWriteLog() {
         <span v-if="entry.status === 'failed' && entry.errorMessage" class="min-w-0 flex-1 basis-full sm:basis-auto text-destructive truncate">{{
           entry.errorMessage
         }}</span>
-        <span v-else-if="entry.fieldsWritten.length" class="min-w-0 flex-1 basis-full sm:basis-auto text-muted-foreground truncate"
-          >{{ entry.fieldsWritten.length }} fields</span
-        >
+        <span v-else-if="entry.fieldsWritten.length" class="min-w-0 flex-1 basis-full sm:basis-auto text-muted-foreground truncate">{{
+          t('book.detail.files.fieldsWritten', { count: entry.fieldsWritten.length }, entry.fieldsWritten.length)
+        }}</span>
       </div>
     </div>
 
@@ -350,12 +352,12 @@ async function toggleWriteLog() {
         <span
           v-if="isAudioFile(file) && audioTrackCount > 1"
           class="text-xs md:text-[11px] font-semibold md:font-medium px-2.5 md:px-2 py-1 md:py-0.5 rounded-md md:rounded bg-muted text-muted-foreground"
-          >Track {{ audioTrackIndex.get(file.id) }}</span
+          >{{ t('book.detail.files.track', { number: audioTrackIndex.get(file.id) }) }}</span
         >
         <span
           v-else-if="file.role === 'primary'"
           class="text-xs md:text-[11px] font-semibold md:font-medium px-2.5 md:px-2 py-1 md:py-0.5 rounded-md md:rounded bg-primary/10 text-primary"
-          >Primary</span
+          >{{ t('book.detail.files.primary') }}</span
         >
 
         <!-- Desktop actions -->
@@ -366,7 +368,7 @@ async function toggleWriteLog() {
             @click="openFile(file)"
           >
             <BookOpen class="size-3.5" />
-            Read
+            {{ t('book.detail.files.read') }}
           </button>
           <button
             v-if="isAudioFile(file)"
@@ -374,7 +376,7 @@ async function toggleWriteLog() {
             @click="openFile(file)"
           >
             <Headphones class="size-3.5" />
-            Play
+            {{ t('book.detail.files.play') }}
           </button>
           <button
             v-if="READER_OPENABLE_FORMATS.has(file.format ?? '')"
@@ -382,7 +384,7 @@ async function toggleWriteLog() {
             @click="openFile(file, 'peek')"
           >
             <Eye class="size-3.5" />
-            Peek
+            {{ t('book.detail.files.peek') }}
           </button>
           <Tooltip v-if="hasPermission('library_download')">
             <TooltipTrigger as-child>
@@ -393,27 +395,29 @@ async function toggleWriteLog() {
                 <Download class="size-3.5" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Download</TooltipContent>
+            <TooltipContent>{{ t('book.detail.files.download') }}</TooltipContent>
           </Tooltip>
 
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
               <button
                 class="flex items-center justify-center h-7 w-7 rounded border border-input bg-background hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                title="More actions"
+                :title="t('book.detail.files.moreActions')"
               >
                 <MoreVertical class="size-3.5" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" @click="openRenameModal(file)"> Rename </DropdownMenuItem>
+              <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" @click="openRenameModal(file)">
+                {{ t('book.detail.files.rename') }}
+              </DropdownMenuItem>
 
               <DropdownMenuItem
                 v-if="hasPermission('library_delete_books')"
                 class="text-destructive focus:text-destructive"
                 @click="openDeleteModal(file)"
               >
-                Delete
+                {{ t('common.delete') }}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -424,7 +428,7 @@ async function toggleWriteLog() {
           <DropdownMenuTrigger as-child>
             <button
               class="flex md:hidden items-center justify-center h-11 w-11 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              title="More actions"
+              :title="t('book.detail.files.moreActions')"
             >
               <MoreVertical class="size-4" />
             </button>
@@ -432,23 +436,23 @@ async function toggleWriteLog() {
           <DropdownMenuContent align="end">
             <DropdownMenuItem v-if="READER_OPENABLE_FORMATS.has(file.format ?? '') && !isAudioFile(file)" @click="openFile(file)">
               <BookOpen class="mr-2 size-4" />
-              Read
+              {{ t('book.detail.files.read') }}
             </DropdownMenuItem>
             <DropdownMenuItem v-if="isAudioFile(file)" @click="openFile(file)">
               <Headphones class="mr-2 size-4" />
-              Play
+              {{ t('book.detail.files.play') }}
             </DropdownMenuItem>
             <DropdownMenuItem v-if="READER_OPENABLE_FORMATS.has(file.format ?? '')" @click="openFile(file, 'peek')">
               <Eye class="mr-2 size-4" />
-              Peek
+              {{ t('book.detail.files.peek') }}
             </DropdownMenuItem>
             <DropdownMenuItem v-if="hasPermission('library_download')" @click="downloadFile(file)">
               <Download class="mr-2 size-4" />
-              Download
+              {{ t('book.detail.files.download') }}
             </DropdownMenuItem>
             <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" @click="openRenameModal(file)">
               <Pencil class="mr-2 size-4" />
-              Rename
+              {{ t('book.detail.files.rename') }}
             </DropdownMenuItem>
 
             <DropdownMenuItem
@@ -457,7 +461,7 @@ async function toggleWriteLog() {
               @click="openDeleteModal(file)"
             >
               <Trash2 class="mr-2 size-4" />
-              Delete
+              {{ t('common.delete') }}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -468,8 +472,8 @@ async function toggleWriteLog() {
       <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-muted mb-3">
         <Files class="size-5 text-muted-foreground/70" />
       </div>
-      <p class="text-base md:text-sm font-semibold md:font-medium">No files attached</p>
-      <p class="text-sm md:text-xs text-muted-foreground/90 mt-1">This book has no associated files.</p>
+      <p class="text-base md:text-sm font-semibold md:font-medium">{{ t('book.detail.files.empty.title') }}</p>
+      <p class="text-sm md:text-xs text-muted-foreground/90 mt-1">{{ t('book.detail.files.empty.description') }}</p>
     </div>
 
     <!-- Rename Modal -->
@@ -480,13 +484,13 @@ async function toggleWriteLog() {
     >
       <button class="absolute inset-0 bg-black/45" @click="renameFileTarget = null" />
       <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
-        <p class="text-base font-semibold text-foreground">Rename File</p>
-        <p class="mt-1 text-sm text-muted-foreground">Rename the physical file on disk.</p>
+        <p class="text-base font-semibold text-foreground">{{ t('book.detail.files.renameModal.title') }}</p>
+        <p class="mt-1 text-sm text-muted-foreground">{{ t('book.detail.files.renameModal.description') }}</p>
         <div class="mt-4">
           <input
             v-model="renameInput"
             class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
-            placeholder="New filename"
+            :placeholder="t('book.detail.files.renameModal.placeholder')"
             @keyup.enter="submitRename"
           />
         </div>
@@ -495,14 +499,14 @@ async function toggleWriteLog() {
             class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
             @click="renameFileTarget = null"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
           <button
             class="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
             :disabled="renaming"
             @click="submitRename"
           >
-            {{ renaming ? 'Saving...' : 'Save' }}
+            {{ renaming ? t('book.detail.files.saving') : t('common.save') }}
           </button>
         </div>
       </div>
@@ -516,23 +520,23 @@ async function toggleWriteLog() {
     >
       <button class="absolute inset-0 bg-black/45" @click="deleteFileTarget = null" />
       <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
-        <p class="text-base font-semibold text-foreground">Delete file?</p>
+        <p class="text-base font-semibold text-foreground">{{ t('book.detail.files.deleteModal.title') }}</p>
         <p class="mt-1 text-sm text-muted-foreground">
-          Are you sure you want to delete "{{ deleteFileTarget.filename }}"? This action cannot be undone.
+          {{ t('book.detail.files.deleteModal.description', { filename: deleteFileTarget.filename }) }}
         </p>
         <div class="mt-4 flex items-center justify-end gap-2">
           <button
             class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
             @click="deleteFileTarget = null"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
           <button
             class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 transition-colors"
             :disabled="deletingFile"
             @click="confirmDelete"
           >
-            {{ deletingFile ? 'Deleting...' : 'Delete' }}
+            {{ deletingFile ? t('book.detail.files.deleting') : t('common.delete') }}
           </button>
         </div>
       </div>

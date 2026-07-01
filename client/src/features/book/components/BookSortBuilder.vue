@@ -5,6 +5,9 @@ import type { SortField, SortSpec } from '@bookorbit/types'
 import { SORT_FIELDS } from '@bookorbit/types'
 import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   modelValue: SortSpec[]
@@ -71,7 +74,7 @@ const canAddMore = computed(() => props.modelValue.length < SORT_FIELDS.length)
               <ChevronUp :size="14" stroke-width="2.5" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Move up</TooltipContent>
+          <TooltipContent>{{ t('book.sort.moveUp') }}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
@@ -83,7 +86,7 @@ const canAddMore = computed(() => props.modelValue.length < SORT_FIELDS.length)
               <ChevronDown :size="14" stroke-width="2.5" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Move down</TooltipContent>
+          <TooltipContent>{{ t('book.sort.moveDown') }}</TooltipContent>
         </Tooltip>
       </div>
       <select
@@ -105,7 +108,7 @@ const canAddMore = computed(() => props.modelValue.length < SORT_FIELDS.length)
             <ArrowUpAZ v-else :size="15" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>{{ spec.dir === 'asc' ? 'Ascending' : 'Descending' }}</TooltipContent>
+        <TooltipContent>{{ spec.dir === 'asc' ? t('book.sort.ascending') : t('book.sort.descending') }}</TooltipContent>
       </Tooltip>
       <Tooltip>
         <TooltipTrigger as-child>
@@ -116,11 +119,11 @@ const canAddMore = computed(() => props.modelValue.length < SORT_FIELDS.length)
             <Trash2 :size="13" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>Remove</TooltipContent>
+        <TooltipContent>{{ t('book.sort.remove') }}</TooltipContent>
       </Tooltip>
     </div>
 
-    <p v-if="modelValue.length === 0" class="text-sm text-muted-foreground">No sort configured. Title ascending will be used.</p>
+    <p v-if="modelValue.length === 0" class="text-sm text-muted-foreground">{{ t('book.sort.emptyState') }}</p>
 
     <button
       v-if="canAddMore"
@@ -128,7 +131,7 @@ const canAddMore = computed(() => props.modelValue.length < SORT_FIELDS.length)
       class="flex items-center gap-1.5 h-9 px-4 rounded-lg border border-dashed border-input text-sm text-muted-foreground hover:text-foreground hover:border-foreground hover:bg-muted/30 transition-colors self-start"
     >
       <Plus :size="13" />
-      Add sort level
+      {{ t('book.sort.addLevel') }}
     </button>
   </div>
 </template>
