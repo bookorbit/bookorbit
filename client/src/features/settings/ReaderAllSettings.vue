@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import SettingsPageHeader from './SettingsPageHeader.vue'
@@ -9,7 +9,7 @@ import PdfSettings from './PdfSettings.vue'
 import ComicsSettings from './ComicsSettings.vue'
 import AudioSettings from './AudioSettings.vue'
 import FontsSettings from './FontsSettings.vue'
-import { READER_TAB_LABELS, READER_TABS, normalizeReaderTab, type ReaderTab as Tab } from './lib/reader-tabs'
+import { READER_TABS, normalizeReaderTab, type ReaderTab as Tab } from './lib/reader-tabs'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -28,9 +28,11 @@ watch(
   },
 )
 
-const tabs: { id: Tab; label: string }[] = READER_TABS.slice()
-  .sort((a, b) => (a === 'general' ? 1 : b === 'general' ? -1 : 0))
-  .map((id) => ({ id, label: READER_TAB_LABELS[id] }))
+const tabs = computed(() =>
+  READER_TABS.slice()
+    .sort((a, b) => (a === 'general' ? 1 : b === 'general' ? -1 : 0))
+    .map((id) => ({ id, label: t(`settings.reader.tabs.${id}`) })),
+)
 
 function selectTab(tab: Tab) {
   activeTab.value = tab

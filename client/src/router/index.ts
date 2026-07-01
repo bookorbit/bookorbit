@@ -10,6 +10,8 @@ import { INTEGRATION_TAB_INFO, normalizeIntegrationTab } from '@/features/settin
 import { registerAuthGuard } from './guards/auth.guard'
 import { registerRouteTitleHook } from './title-resolver'
 
+const t = i18n.global.t
+
 function firstText(value: unknown): string | null {
   if (Array.isArray(value)) return firstText(value[0])
   if (typeof value !== 'string') return null
@@ -24,43 +26,44 @@ function numericParam(to: RouteLocationNormalizedLoaded, key: string): number | 
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null
 }
 
-function fallbackById(prefix: string, id: number | null): string {
+function fallbackById(prefixKey: string, id: number | null): string {
+  const prefix = t(prefixKey)
   return id === null ? prefix : `${prefix} #${id}`
 }
 
 function resolveReaderTitle(to: RouteLocationNormalizedLoaded): string {
   const tab = normalizeReaderTab(to.query.tab)
-  return READER_TAB_TITLE_LABELS[tab]
+  return t(`titles.reader.${tab}`)
 }
 
 function resolveAppearanceTitle(to: RouteLocationNormalizedLoaded): string {
   const tab = normalizeAppearanceTab(to.query.tab)
-  return APPEARANCE_TAB_TITLE_LABELS[tab]
+  return t(`titles.appearance.${tab}`)
 }
 
 function resolveEmailTitle(to: RouteLocationNormalizedLoaded): string {
   const tab = normalizeEmailTab(to.query.tab)
-  return `${EMAIL_TAB_LABELS[tab]} · Email`
+  return `${t(`titles.email.${tab}`)} · ${t('titles.emailSuffix')}`
 }
 
 function resolveMetadataTitle(to: RouteLocationNormalizedLoaded): string {
   const tab = normalizeMetadataTab(to.query.tab)
-  return METADATA_TAB_INFO[tab].titleLabel
+  return t(`titles.metadata.${tab}`)
 }
 
 function resolveAdminTitle(to: RouteLocationNormalizedLoaded): string {
   const tab = normalizeAdminTab(to.query.tab)
-  return ADMIN_TAB_INFO[tab].titleLabel
+  return t(`titles.admin.${tab}`)
 }
 
 function resolveSystemTitle(to: RouteLocationNormalizedLoaded): string {
   const tab = normalizeSystemTab(to.query.tab)
-  return SYSTEM_TAB_INFO[tab].titleLabel
+  return t(`titles.system.${tab}`)
 }
 
 function resolveAccountTitle(to: RouteLocationNormalizedLoaded): string {
   const tab = normalizeAccountTab(to.query.tab)
-  return ACCOUNT_TAB_INFO[tab].titleLabel
+  return t(`titles.account.${tab}`)
 }
 
 function resolveIntegrationTitle(to: RouteLocationNormalizedLoaded): string {
@@ -69,7 +72,7 @@ function resolveIntegrationTitle(to: RouteLocationNormalizedLoaded): string {
 }
 
 function resolveStatisticsTitle(): string {
-  return 'Statistics'
+  return t('titles.statistics')
 }
 
 function resolveLegacyIntegrationRoute(tab: unknown): string | null {
@@ -92,7 +95,7 @@ export const routes: RouteRecordRaw[] = [
         path: '',
         name: 'dashboard',
         component: () => import('@/views/DashboardView.vue'),
-        meta: { title: 'Dashboard' },
+        meta: { title: () => t('titles.dashboard') },
       },
       {
         path: '/settings',
@@ -114,7 +117,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'libraries',
             name: 'settings-libraries',
             component: () => import('@/features/settings/LibrariesSettings.vue'),
-            meta: { maxWidth: 'max-w-[52rem]', title: 'Libraries' },
+            meta: { maxWidth: 'max-w-[52rem]', title: () => t('titles.libraries') },
           },
           {
             path: 'appearance',
@@ -126,7 +129,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'opds',
             name: 'settings-opds',
             component: () => import('@/features/settings/OpdsSettings.vue'),
-            meta: { title: 'OPDS' },
+            meta: { title: () => t('titles.opds') },
           },
           {
             path: 'integrations',
@@ -142,13 +145,13 @@ export const routes: RouteRecordRaw[] = [
             path: 'kobo',
             name: 'settings-kobo',
             component: () => import('@/features/settings/KoboSettings.vue'),
-            meta: { maxWidth: 'max-w-4xl', title: 'Kobo Sync' },
+            meta: { maxWidth: 'max-w-4xl', title: () => t('titles.koboSync') },
           },
           {
             path: 'koreader',
             name: 'settings-koreader',
             component: () => import('@/features/settings/KoreaderSettings.vue'),
-            meta: { maxWidth: 'max-w-4xl', title: 'KOReader Sync' },
+            meta: { maxWidth: 'max-w-4xl', title: () => t('titles.koreaderSync') },
           },
           {
             path: 'hardcover',
@@ -257,19 +260,19 @@ export const routes: RouteRecordRaw[] = [
         path: '/book-dock',
         name: 'book-dock',
         component: () => import('@/views/BookDockView.vue'),
-        meta: { title: 'Book Dock' },
+        meta: { title: () => t('titles.bookDock') },
       },
       {
         path: '/whats-new',
         name: 'whats-new',
         component: () => import('@/features/whats-new/WhatsNewView.vue'),
-        meta: { title: "What's New" },
+        meta: { title: () => t('titles.whatsNew') },
       },
       {
         path: '/annotations',
         name: 'annotations',
         component: () => import('@/features/annotations/views/AnnotationsHubView.vue'),
-        meta: { title: 'Annotations' },
+        meta: { title: () => t('titles.annotations') },
       },
       {
         path: '/statistics',
@@ -286,49 +289,49 @@ export const routes: RouteRecordRaw[] = [
         path: '/achievements',
         name: 'achievements',
         component: () => import('@/views/AchievementsView.vue'),
-        meta: { title: 'Achievements' },
+        meta: { title: () => t('titles.achievements') },
       },
       {
         path: '/library/:id',
         name: 'library',
         component: () => import('@/views/HomeView.vue'),
-        meta: { title: (to) => fallbackById('Library', numericParam(to, 'id')) },
+        meta: { title: (to) => fallbackById('titles.library', numericParam(to, 'id')) },
       },
       {
         path: '/smart-scope/:id',
         name: 'smartScope',
         component: () => import('@/views/SmartScopeView.vue'),
-        meta: { title: (to) => fallbackById('SmartScope', numericParam(to, 'id')) },
+        meta: { title: (to) => fallbackById('titles.smartScope', numericParam(to, 'id')) },
       },
       {
         path: '/collection/:id',
         name: 'collection',
         component: () => import('@/views/CollectionView.vue'),
-        meta: { title: (to) => fallbackById('Collection', numericParam(to, 'id')) },
+        meta: { title: (to) => fallbackById('titles.collection', numericParam(to, 'id')) },
       },
       {
         path: '/authors',
         name: 'authors',
         component: () => import('@/features/author/views/AuthorsView.vue'),
-        meta: { title: 'Authors' },
+        meta: { title: () => t('titles.authors') },
       },
       {
         path: '/authors/:id',
         name: 'author-detail',
         component: () => import('@/features/author/views/AuthorDetailView.vue'),
-        meta: { title: (to) => fallbackById('Author', numericParam(to, 'id')) },
+        meta: { title: (to) => fallbackById('titles.author', numericParam(to, 'id')) },
       },
       {
         path: '/series',
         name: 'series',
         component: () => import('@/features/series/views/SeriesView.vue'),
-        meta: { title: 'Series' },
+        meta: { title: () => t('titles.series') },
       },
       {
         path: '/series/:seriesId',
         name: 'series-detail',
         component: () => import('@/features/series/views/SeriesDetailView.vue'),
-        meta: { title: (to) => fallbackById('Series', numericParam(to, 'seriesId')) },
+        meta: { title: (to) => fallbackById('titles.seriesItem', numericParam(to, 'seriesId')) },
       },
       {
         path: '/tools',
@@ -339,13 +342,13 @@ export const routes: RouteRecordRaw[] = [
             path: 'entity-manager',
             name: 'tools-entity-manager',
             component: () => import('@/features/tools/entity-manager/views/EntityManagerView.vue'),
-            meta: { title: 'Entity Manager' },
+            meta: { title: () => t('titles.entityManager') },
           },
           {
             path: 'bulk-rename',
             name: 'tools-bulk-rename',
             component: () => import('@/features/tools/bulk-rename/views/BulkRenameView.vue'),
-            meta: { title: 'Bulk Rename' },
+            meta: { title: () => t('titles.bulkRename') },
           },
           { path: ':pathMatch(.*)*', redirect: { name: 'tools-entity-manager' } },
         ],
@@ -354,7 +357,7 @@ export const routes: RouteRecordRaw[] = [
         path: '/book/:bookId',
         name: 'book-detail',
         component: () => import('@/views/BookDetailView.vue'),
-        meta: { title: (to) => fallbackById('Book', numericParam(to, 'bookId')) },
+        meta: { title: (to) => fallbackById('titles.book', numericParam(to, 'bookId')) },
         beforeEnter: (to) => {
           if (!to.query.tab) {
             return { ...to, query: { ...to.query, tab: 'details' } }
@@ -369,50 +372,50 @@ export const routes: RouteRecordRaw[] = [
         path: '/book/:bookId/edit',
         redirect: (to) => ({ name: 'book-detail', params: to.params, query: { tab: 'edit' } }),
       },
-      { path: ':pathMatch(.*)*', component: () => import('@/views/NotFoundView.vue'), meta: { title: 'Not Found' } },
+      { path: ':pathMatch(.*)*', component: () => import('@/views/NotFoundView.vue'), meta: { title: () => t('titles.notFound') } },
     ],
   },
   {
     path: '/read/:bookId/:fileId',
     name: 'reader',
     component: () => import('@/features/reader/ReaderView.vue'),
-    meta: { title: (to) => `Read · ${fallbackById('Book', numericParam(to, 'bookId'))}` },
+    meta: { title: (to) => `${t('titles.readPrefix')} · ${fallbackById('titles.book', numericParam(to, 'bookId'))}` },
   },
   {
     path: '/login',
     name: 'login',
     component: () => import('@/features/auth/LoginPage.vue'),
-    meta: { public: true, title: 'Sign In' },
+    meta: { public: true, title: () => t('titles.signIn') },
   },
   {
     path: '/setup',
     name: 'setup',
     component: () => import('@/features/auth/SetupPage.vue'),
-    meta: { public: true, title: 'Initial Setup' },
+    meta: { public: true, title: () => t('titles.initialSetup') },
   },
   {
     path: '/forgot-password',
     name: 'forgot-password',
     component: () => import('@/features/auth/ForgotPasswordPage.vue'),
-    meta: { public: true, title: 'Forgot Password' },
+    meta: { public: true, title: () => t('titles.forgotPassword') },
   },
   {
     path: '/reset-password',
     name: 'reset-password',
     component: () => import('@/features/auth/ResetPasswordPage.vue'),
-    meta: { public: true, title: 'Reset Password' },
+    meta: { public: true, title: () => t('titles.resetPassword') },
   },
   {
     path: '/oauth2-callback',
     name: 'oidc-callback',
     component: () => import('@/features/auth/OidcCallbackPage.vue'),
-    meta: { public: true, title: 'Completing Sign In' },
+    meta: { public: true, title: () => t('titles.completingSignIn') },
   },
   {
     path: '/magic',
     name: 'magic-link-login',
     component: () => import('@/features/auth/MagicLinkLoginView.vue'),
-    meta: { public: true, title: 'Magic Link Login' },
+    meta: { public: true, title: () => t('titles.magicLinkLogin') },
   },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]

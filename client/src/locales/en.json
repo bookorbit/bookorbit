@@ -309,6 +309,13 @@
           "delete": "Failed to delete icon",
           "bulkDelete": "Failed to delete icons"
         }
+      },
+      "tabs": {
+        "theme": "Theme",
+        "book-covers": "Book Covers",
+        "icons": "Icons",
+        "layout": "Layout",
+        "behavior": "Behavior"
       }
     },
     "account": {
@@ -954,6 +961,11 @@
         "recalcStarted": "Score recalculation started in the background",
         "recalcFailed": "Recalculation failed",
         "resetToDefaults": "Weights reset to defaults. Save to apply."
+      },
+      "tabs": {
+        "users": "Users",
+        "magic-links": "Magic Links",
+        "oidc": "OIDC / SSO"
       }
     },
     "common": {
@@ -1279,6 +1291,33 @@
         "clear": "Clear",
         "noLibraries": "No libraries available yet.",
         "allLibraries": "All libraries"
+      },
+      "tabs": {
+        "providers": "Providers",
+        "field-rules": "Field Rules",
+        "custom-fields": "Custom Fields",
+        "genre-blocklist": "Genre Blocklist",
+        "score": "Score",
+        "auto-fetch": "Books",
+        "authors": "Authors"
+      },
+      "tabTitles": {
+        "providers": "Providers",
+        "field-rules": "Field-Level Rules",
+        "custom-fields": "Custom Metadata",
+        "genre-blocklist": "Genre Blocklist",
+        "score": "Confidence Score",
+        "auto-fetch": "Book Auto-Fetch",
+        "authors": "Author Auto-Fetch"
+      },
+      "tabSubtitles": {
+        "providers": "Enable external metadata sources and configure their credentials.",
+        "field-rules": "Control which provider supplies each metadata field and how values are merged across your libraries.",
+        "custom-fields": "Define custom metadata fields and choose which libraries use them.",
+        "genre-blocklist": "Prevent unwanted provider genre values from being written to books.",
+        "score": "Assign weights to metadata fields to calculate how much to trust fetched results.",
+        "auto-fetch": "Automatically fetch covers, descriptions, and other details when new books are added to your library.",
+        "authors": "Automatically fetch biographies and profile photos when new authors appear in your library."
       }
     },
     "reader": {
@@ -1780,6 +1819,22 @@
         "deleteUserFailed": "Failed to delete OPDS user",
         "labelCopied": "{label} copied",
         "copyLabelFailed": "Failed to copy {label}"
+      },
+      "tabs": {
+        "general": "General",
+        "ebook": "eBook",
+        "pdf": "PDF",
+        "comics": "Comics",
+        "audio": "Audiobook",
+        "fonts": "Fonts"
+      }
+    },
+    "system": {
+      "tabs": {
+        "file-naming": "File Naming",
+        "book-dock": "Book Dock",
+        "maintenance": "Maintenance",
+        "audit-log": "Audit Log"
       }
     }
   },
@@ -5579,5 +5634,84 @@
     "closeImage": "Close image",
     "previousImage": "Previous image",
     "nextImage": "Next image"
+  },
+  "titles": {
+    "dashboard": "Dashboard",
+    "libraries": "Libraries",
+    "opds": "OPDS",
+    "koboSync": "Kobo Sync",
+    "koreaderSync": "KOReader Sync",
+    "bookDock": "Book Dock",
+    "whatsNew": "What's New",
+    "annotations": "Annotations",
+    "achievements": "Achievements",
+    "statistics": "Statistics",
+    "authors": "Authors",
+    "series": "Series",
+    "entityManager": "Entity Manager",
+    "bulkRename": "Bulk Rename",
+    "notFound": "Not Found",
+    "signIn": "Sign In",
+    "initialSetup": "Initial Setup",
+    "forgotPassword": "Forgot Password",
+    "resetPassword": "Reset Password",
+    "completingSignIn": "Completing Sign In",
+    "magicLinkLogin": "Magic Link Login",
+    "readPrefix": "Read",
+    "emailSuffix": "Email",
+    "library": "Library",
+    "smartScope": "SmartScope",
+    "collection": "Collection",
+    "author": "Author",
+    "book": "Book",
+    "seriesItem": "Series",
+    "appearance": {
+      "theme": "Display",
+      "book-covers": "Book Covers",
+      "icons": "Icons",
+      "layout": "Display Layout",
+      "behavior": "Library Behavior"
+    },
+    "reader": {
+      "general": "Reader Settings",
+      "ebook": "eBook Reader",
+      "pdf": "PDF Reader",
+      "comics": "Comics Reader",
+      "audio": "Audiobook Player",
+      "fonts": "Reader Fonts"
+    },
+    "email": {
+      "providers": "Providers",
+      "recipients": "Recipients",
+      "groups": "Groups",
+      "templates": "Templates",
+      "preferences": "Preferences",
+      "history": "History"
+    },
+    "metadata": {
+      "providers": "Providers",
+      "field-rules": "Field-Level Rules",
+      "custom-fields": "Custom Metadata",
+      "genre-blocklist": "Genre Blocklist",
+      "score": "Confidence Score",
+      "auto-fetch": "Book Auto-Fetch",
+      "authors": "Author Auto-Fetch"
+    },
+    "admin": {
+      "users": "Users",
+      "magic-links": "Magic Links",
+      "oidc": "OIDC / SSO"
+    },
+    "system": {
+      "file-naming": "File Naming",
+      "book-dock": "Book Dock",
+      "maintenance": "Maintenance",
+      "audit-log": "Audit Log"
+    },
+    "account": {
+      "profile": "Account",
+      "notifications": "Notifications",
+      "restrictions": "Content Restrictions"
+    }
   }
 }

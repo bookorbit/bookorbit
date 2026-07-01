@@ -19,15 +19,9 @@ describe('admin-tabs', () => {
       }
     })
 
-    it('every entry has navLabel, titleLabel, subtitle, and permission', () => {
+    it('every entry has a permission', () => {
       for (const tab of ADMIN_TABS) {
         const info = ADMIN_TAB_INFO[tab]
-        expect(typeof info.navLabel).toBe('string')
-        expect(info.navLabel.length).toBeGreaterThan(0)
-        expect(typeof info.titleLabel).toBe('string')
-        expect(info.titleLabel.length).toBeGreaterThan(0)
-        expect(typeof info.subtitle).toBe('string')
-        expect(info.subtitle.length).toBeGreaterThan(0)
         expect(info.permission === null || typeof info.permission === 'string').toBe(true)
       }
     })
@@ -42,21 +36,6 @@ describe('admin-tabs', () => {
 
     it('magic-links entry is superuser-only', () => {
       expect(ADMIN_TAB_INFO['magic-links'].permission).toBeNull()
-    })
-
-    it('users entry has correct labels', () => {
-      expect(ADMIN_TAB_INFO.users.navLabel).toBe('Users')
-      expect(ADMIN_TAB_INFO.users.titleLabel).toBe('Users')
-    })
-
-    it('magic-links entry has correct labels', () => {
-      expect(ADMIN_TAB_INFO['magic-links'].navLabel).toBe('Magic Links')
-      expect(ADMIN_TAB_INFO['magic-links'].titleLabel).toBe('Magic Links')
-    })
-
-    it('oidc entry has correct labels', () => {
-      expect(ADMIN_TAB_INFO.oidc.navLabel).toBe('OIDC / SSO')
-      expect(ADMIN_TAB_INFO.oidc.titleLabel).toBe('OIDC / SSO')
     })
   })
 

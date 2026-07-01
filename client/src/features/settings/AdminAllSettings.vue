@@ -18,7 +18,7 @@ const availableTabs = computed(() =>
   ADMIN_TABS.filter((id) => {
     const perm = ADMIN_TAB_INFO[id].permission
     return isSuperuser.value || (perm !== null && userPermissions.value.includes(perm))
-  }).map((id) => ({ id, label: ADMIN_TAB_INFO[id].navLabel })),
+  }).map((id) => ({ id, label: t(`settings.admin.tabs.${id}`) })),
 )
 
 function resolveTab(raw: unknown): Tab {
