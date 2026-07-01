@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { getFormatColor } from '@/features/book/lib/format-colors'
 import type { BookFileRef } from '@bookorbit/types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   files: BookFileRef[]
@@ -44,7 +47,7 @@ const visibleFormats = computed(() => formats.value.slice(0, 2))
       </div>
     </TooltipTrigger>
     <TooltipContent>
-      <div v-for="file in formattedFiles" :key="file.id" class="text-xs">{{ file.format ?? 'unknown' }} ({{ file.role }})</div>
+      <div v-for="file in formattedFiles" :key="file.id" class="text-xs">{{ file.format ?? t('book.table.format.unknown') }} ({{ file.role }})</div>
     </TooltipContent>
   </Tooltip>
   <span v-else class="text-xs text-muted-foreground/40">-</span>

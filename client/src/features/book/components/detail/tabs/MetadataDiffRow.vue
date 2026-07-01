@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ArrowLeft, RotateCcw, CheckCircle2, X, ZoomIn, Layers } from '@lucide/vue'
 import type { MetadataProviderInfo, MetadataProviderKey } from '@bookorbit/types'
 import type { DiffField, DiffFieldKey } from '../../../composables/useMetadataDiff'
@@ -23,6 +24,7 @@ const emit = defineEmits<{
   pickFromProvider: [key: DiffFieldKey, provider: MetadataProviderKey]
 }>()
 
+const { t } = useI18n()
 const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 
 const lightboxSrc = ref<string | null>(null)
@@ -92,7 +94,7 @@ watch(
     <div class="mb-2.5 flex items-center gap-2">
       <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{{ field.label }}</p>
       <span v-if="field.isLocked" class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-medium text-primary">
-        Locked
+        {{ t('book.detail.editMetadata.diff.locked') }}
       </span>
     </div>
     <div class="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
@@ -112,11 +114,21 @@ watch(
             aria-hidden="true"
             class="absolute inset-0 w-full h-full object-cover scale-110 blur-md brightness-75"
           />
-          <img :src="field.pickedDisplay" alt="Preview" class="relative w-full h-full object-contain" @error="hideOnError" />
+          <img
+            :src="field.pickedDisplay"
+            :alt="t('book.detail.editMetadata.diff.previewAlt')"
+            class="relative w-full h-full object-contain"
+            @error="hideOnError"
+          />
         </template>
         <template v-else-if="field.bookValue">
           <img :src="field.bookValue" alt="" aria-hidden="true" class="absolute inset-0 w-full h-full object-cover scale-110 blur-md brightness-75" />
-          <img :src="field.bookValue" alt="Current cover" class="relative w-full h-full object-contain" @error="hideOnError" />
+          <img
+            :src="field.bookValue"
+            :alt="t('book.detail.editMetadata.diff.currentCoverAlt')"
+            class="relative w-full h-full object-contain"
+            @error="hideOnError"
+          />
         </template>
         <div v-else class="absolute inset-0">
           <BookCoverPlaceholder :title="bookSeed ?? null" :author-line="bookAuthorLine ?? null" :is-audio="false" :seed="bookSeed ?? 'book'" />
@@ -160,14 +172,16 @@ watch(
           <PopoverTrigger as-child>
             <button
               class="size-5 rounded-full flex items-center justify-center transition-all hover:bg-muted text-muted-foreground hover:text-foreground"
-              title="Pick cover from another provider"
+              :title="t('book.detail.editMetadata.diff.pickCoverFromProvider')"
             >
               <Layers class="size-3" />
             </button>
           </PopoverTrigger>
           <PopoverContent class="w-auto p-1.5" side="bottom" :side-offset="4">
             <div class="flex flex-col gap-1 min-w-48">
-              <p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2 py-1">Pick cover source</p>
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2 py-1">
+                {{ t('book.detail.editMetadata.diff.pickCoverSource') }}
+              </p>
               <button
                 v-for="pv in field.providerValues"
                 :key="pv.provider"
@@ -210,7 +224,12 @@ watch(
             aria-hidden="true"
             class="absolute inset-0 w-full h-full object-cover scale-110 blur-md brightness-75"
           />
-          <img :src="field.candidateDisplay" alt="New cover" class="relative w-full h-full object-contain" @error="hideOnError" />
+          <img
+            :src="field.candidateDisplay"
+            :alt="t('book.detail.editMetadata.diff.newCoverAlt')"
+            class="relative w-full h-full object-contain"
+            @error="hideOnError"
+          />
         </template>
         <div v-else class="absolute inset-0">
           <BookCoverPlaceholder
@@ -235,7 +254,7 @@ watch(
     <div class="mb-1.5 flex items-center gap-2">
       <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{{ field.label }}</p>
       <span v-if="field.isLocked" class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-medium text-primary">
-        Locked
+        {{ t('book.detail.editMetadata.diff.locked') }}
       </span>
     </div>
 
@@ -250,10 +269,10 @@ watch(
           class="wrap-break-word leading-snug text-sm w-full"
           :class="[!field.currentDisplay ? 'text-muted-foreground/60 italic' : 'text-foreground', currentTextClass]"
         >
-          {{ field.currentDisplay || 'empty' }}
+          {{ field.currentDisplay || t('book.detail.editMetadata.diff.empty') }}
         </p>
         <button v-if="canClampCurrent" class="mt-1 text-[10px] font-medium text-primary hover:underline" @click="toggleCurrentExpanded">
-          {{ isCurrentExpanded ? 'Show less' : 'Show more' }}
+          {{ isCurrentExpanded ? t('book.detail.editMetadata.diff.showLess') : t('book.detail.editMetadata.diff.showMore') }}
         </button>
         <!-- Badge when value is picked from a different provider than the active tab -->
         <span
@@ -291,14 +310,16 @@ watch(
           <PopoverTrigger as-child>
             <button
               class="size-5 rounded-full flex items-center justify-center transition-all hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
-              title="Pick from another provider"
+              :title="t('book.detail.editMetadata.diff.pickFromProvider')"
             >
               <Layers class="size-3" />
             </button>
           </PopoverTrigger>
           <PopoverContent class="w-auto p-1.5" side="bottom" :side-offset="4" align="center">
             <div class="flex flex-col gap-0.5 min-w-44 max-w-72">
-              <p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2 py-1">Pick source</p>
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2 py-1">
+                {{ t('book.detail.editMetadata.diff.pickSource') }}
+              </p>
               <button
                 v-for="pv in field.providerValues"
                 :key="pv.provider"
@@ -348,7 +369,7 @@ watch(
           class="mt-1 text-[10px] font-medium text-primary hover:underline"
           @click="toggleCandidateExpanded"
         >
-          {{ isCandidateExpanded ? 'Show less' : 'Show more' }}
+          {{ isCandidateExpanded ? t('book.detail.editMetadata.diff.showLess') : t('book.detail.editMetadata.diff.showMore') }}
         </button>
       </div>
     </div>
@@ -365,7 +386,7 @@ watch(
       </button>
       <img
         :src="lightboxSrc"
-        alt="Cover preview"
+        :alt="t('book.detail.editMetadata.diff.coverPreviewAlt')"
         class="max-h-[85vh] max-w-[85vw] rounded-lg shadow-2xl object-contain"
         @click.stop
         @error="hideOnError"

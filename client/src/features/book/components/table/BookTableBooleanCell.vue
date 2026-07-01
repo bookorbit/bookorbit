@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
 const props = defineProps<{
   value: boolean | null
   isReadOnly?: boolean
@@ -17,8 +21,8 @@ function handleToggle() {
 }
 
 function ariaLabel(): string {
-  if (props.value === null) return 'Not set - click to set true'
-  return props.value ? 'True - click to set false' : 'False - click to clear'
+  if (props.value === null) return t('book.table.boolean.ariaNotSet')
+  return props.value ? t('book.table.boolean.ariaTrue') : t('book.table.boolean.ariaFalse')
 }
 </script>
 

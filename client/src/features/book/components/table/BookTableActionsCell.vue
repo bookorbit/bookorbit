@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { BookOpen, ExternalLink, FolderPlus, MoreHorizontal, Pencil, RefreshCw, Send, Trash2 } from '@lucide/vue'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -24,6 +25,7 @@ const emit = defineEmits<{
 
 const router = useRouter()
 
+const { t } = useI18n()
 const { hasPermission } = usePermissions()
 const { refreshWithFeedback, refreshing } = useRefreshMetadata()
 const refreshFeedback = useBookRefreshFeedback()
@@ -59,11 +61,11 @@ async function handleRefresh() {
       <DropdownMenuContent align="end" class="w-44">
         <DropdownMenuItem @click="handleAction('quick-view')">
           <BookOpen :size="13" class="mr-2" />
-          Quick View
+          {{ t('book.table.actions.quickView') }}
         </DropdownMenuItem>
         <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id } })">
           <ExternalLink :size="13" class="mr-2" />
-          Book Details
+          {{ t('book.table.actions.bookDetails') }}
         </DropdownMenuItem>
         <DropdownMenuSeparator v-if="hasPermission('library_edit_metadata')" />
         <DropdownMenuItem
@@ -71,19 +73,19 @@ async function handleRefresh() {
           @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })"
         >
           <Pencil :size="13" class="mr-2" />
-          Edit Metadata
+          {{ t('book.table.actions.editMetadata') }}
         </DropdownMenuItem>
         <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" :disabled="anyRefreshing" @click="handleRefresh">
           <RefreshCw :size="13" class="mr-2" :class="{ 'animate-spin': anyRefreshing }" />
-          Refresh Metadata
+          {{ t('book.table.actions.refreshMetadata') }}
         </DropdownMenuItem>
         <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" @click="handleAction('add-to-collection')">
           <FolderPlus :size="13" class="mr-2" />
-          Add to Collection
+          {{ t('book.table.actions.addToCollection') }}
         </DropdownMenuItem>
         <DropdownMenuItem v-if="hasPermission('email_send')" @click="showSendDialog = true">
           <Send :size="13" class="mr-2" />
-          Send to Device
+          {{ t('book.table.actions.sendToDevice') }}
         </DropdownMenuItem>
         <DropdownMenuSeparator v-if="hasPermission('library_delete_books')" />
         <DropdownMenuItem
@@ -92,7 +94,7 @@ async function handleRefresh() {
           @click="handleAction('delete')"
         >
           <Trash2 :size="13" class="mr-2" />
-          Delete
+          {{ t('common.delete') }}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

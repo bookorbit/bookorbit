@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ArrowDown, ArrowUp, Plus, Trash2 } from '@lucide/vue'
 import InputWithSuggestions from '@/components/ui/InputWithSuggestions.vue'
 import type { EditableSeriesMembership } from '../../../composables/useMetadataEditor'
@@ -9,6 +10,8 @@ const props = defineProps<{
   searchFn: (q: string) => Promise<string[]>
   disabled?: boolean
 }>()
+
+const { t } = useI18n()
 
 const emit = defineEmits<{ 'update:modelValue': [EditableSeriesMembership[]] }>()
 
@@ -105,7 +108,7 @@ function moveMembership(index: number, offset: -1 | 1) {
         type="button"
         class="flex h-8 w-8 items-center justify-center rounded-md border border-input bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
         :disabled="disabled"
-        title="Add series"
+        :title="t('book.detail.seriesMembership.addSeries')"
         @click="addMembership"
       >
         <Plus class="size-3.5" />
@@ -116,7 +119,7 @@ function moveMembership(index: number, offset: -1 | 1) {
         :model-value="membership.seriesName"
         :search-fn="searchFn"
         :disabled="disabled"
-        placeholder="Series"
+        :placeholder="t('book.detail.seriesMembership.seriesPlaceholder')"
         :class="'h-8 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none transition-shadow focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50'"
         @update:model-value="updateSeriesName(index, $event)"
       />
@@ -135,7 +138,7 @@ function moveMembership(index: number, offset: -1 | 1) {
           type="button"
           class="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
           :disabled="disabled || index === 0"
-          title="Move up"
+          :title="t('book.detail.seriesMembership.moveUp')"
           @click="moveMembership(index, -1)"
         >
           <ArrowUp class="size-3.5" />
@@ -144,7 +147,7 @@ function moveMembership(index: number, offset: -1 | 1) {
           type="button"
           class="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
           :disabled="disabled || modelValue.length < 2 || index === visibleMemberships.length - 1"
-          title="Move down"
+          :title="t('book.detail.seriesMembership.moveDown')"
           @click="moveMembership(index, 1)"
         >
           <ArrowDown class="size-3.5" />
@@ -153,7 +156,7 @@ function moveMembership(index: number, offset: -1 | 1) {
           type="button"
           class="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-40"
           :disabled="disabled || modelValue.length === 0"
-          title="Remove series"
+          :title="t('book.detail.seriesMembership.removeSeries')"
           @click="removeMembership(index)"
         >
           <Trash2 class="size-3.5" />

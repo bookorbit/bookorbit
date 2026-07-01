@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { TrendingUp } from '@lucide/vue'
 import type { BookReadingSession, BookReadingSessionStats } from '@bookorbit/types'
@@ -12,6 +13,7 @@ const props = defineProps<{
   loading: boolean
 }>()
 
+const { t } = useI18n()
 const themeStore = useThemeStore()
 const chartTheme = computed(() => getBookorbitThemeName(themeStore.theme, themeStore.accent))
 const option = shallowRef({})

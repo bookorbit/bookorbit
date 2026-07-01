@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ChevronDown } from '@lucide/vue'
 import { STATUS_OPTIONS, STATUS_ICONS, STATUS_COLORS } from '@/features/book/composables/useBookStatus'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -18,13 +19,15 @@ const emit = defineEmits<{
   navigate: [direction: 'next' | 'prev']
 }>()
 
+const { t } = useI18n()
+
 const isOpen = ref(false)
 const saving = ref(false)
 
 const currentStatus = computed<ReadStatus>(() => props.value?.status ?? 'unread')
 const CurrentIcon = computed(() => STATUS_ICONS[currentStatus.value] as unknown)
 const currentColor = computed(() => STATUS_COLORS[currentStatus.value])
-const currentLabel = computed(() => STATUS_OPTIONS.find((o) => o.value === currentStatus.value)?.label ?? 'Unread')
+const currentLabel = computed(() => STATUS_OPTIONS.find((o) => o.value === currentStatus.value)?.label ?? t('book.table.readStatus.unread'))
 
 watch(
   () => props.isActive,

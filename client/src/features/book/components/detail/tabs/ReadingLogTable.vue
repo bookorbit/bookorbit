@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ChevronDown, ChevronUp, ChevronsUpDown, Loader2, Trash2, X } from '@lucide/vue'
 import type { BookReadingSession, ReadingSessionSource } from '@bookorbit/types'
 
@@ -13,6 +14,8 @@ const props = defineProps<{
   hasMore: boolean
   hasMultipleFormats: boolean
 }>()
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   sortChange: [sortBy: string, sortDir: 'asc' | 'desc']
@@ -82,12 +85,12 @@ function formatPace(session: BookReadingSession): string {
 
 const PILL_BASE = 'inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium'
 
-const SESSION_SOURCE_PILLS: Record<ReadingSessionSource, { label: string; class: string }> = {
-  web: { label: 'Web', class: 'border-[var(--pill-web)]/40 bg-[var(--pill-web)]/10 text-[var(--pill-web)]' },
+const SESSION_SOURCE_PILLS = computed<Record<ReadingSessionSource, { label: string; class: string }>>(() => ({
+  web: { label: t('book.detail.readingLog.table.sourceWeb'), class: 'border-[var(--pill-web)]/40 bg-[var(--pill-web)]/10 text-[var(--pill-web)]' },
   koreader: { label: 'KOReader', class: 'border-[var(--pill-koreader)]/40 bg-[var(--pill-koreader)]/10 text-[var(--pill-koreader)]' },
   kobo: { label: 'Kobo', class: 'border-[var(--pill-kobo)]/40 bg-[var(--pill-kobo)]/10 text-[var(--pill-kobo)]' },
-  manual: { label: 'Manual', class: 'border-border bg-muted text-muted-foreground' },
-}
+  manual: { label: t('book.detail.readingLog.table.sourceManual'), class: 'border-border bg-muted text-muted-foreground' },
+}))
 
 const showSource = computed(() => props.sessions.some((s) => s.source != null))
 
@@ -135,7 +138,7 @@ const SORTABLE_COLS = [
 ] as const
 
 const columnCount = computed(() => {
-  let count = SORTABLE_COLS.length + 2
+  let count = SORTABLE_COLS.value.length + 2
   if (showSource.value) count += 1
   if (props.hasMultipleFormats) count += 1
   return count
@@ -410,7 +413,7 @@ const rows = computed<TableRow[]>(() => {
         @click="handleLoadMore"
       >
         <Loader2 v-if="loadingMore" :size="14" class="animate-spin" />
-        Load more
+        {{ t('book.detail.readingLog.table.loadMore') }}
       </button>
       <span class="text-xs text-muted-foreground">Showing {{ sessions.length }} of {{ total }} sessions</span>
     </footer>

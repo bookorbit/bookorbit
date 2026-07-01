@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { Permission } from '@bookorbit/types'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const { isSuperuser, userPermissions } = usePermissions()
@@ -24,30 +26,30 @@ const sections = computed<Section[]>(() => {
   const result: Section[] = []
 
   if (su || perms.includes('manage_libraries')) {
-    result.push({ label: 'Libraries', routeName: 'settings-libraries' })
+    result.push({ label: t('settings.common.nav.libraries'), routeName: 'settings-libraries' })
   }
 
-  result.push({ label: 'Display', routeName: 'settings-appearance' })
-  result.push({ label: 'Reader', routeName: 'settings-reader-general' })
+  result.push({ label: t('settings.common.nav.display'), routeName: 'settings-appearance' })
+  result.push({ label: t('settings.common.nav.reader'), routeName: 'settings-reader-general' })
 
   if (su || perms.includes('manage_metadata_config') || perms.includes('manage_libraries')) {
-    result.push({ label: 'Metadata', routeName: 'settings-admin-metadata' })
+    result.push({ label: t('settings.common.nav.metadata'), routeName: 'settings-admin-metadata' })
   }
 
   if (su || perms.includes('email_send') || perms.includes('manage_email')) {
-    result.push({ label: 'Email', routeName: 'settings-email' })
+    result.push({ label: t('settings.common.nav.email'), routeName: 'settings-email' })
   }
 
   if (su || perms.includes('opds_access')) {
-    result.push({ label: 'OPDS', routeName: 'settings-opds' })
+    result.push({ label: t('settings.common.nav.opds'), routeName: 'settings-opds' })
   }
 
   if (su || perms.includes(Permission.KoboSync)) {
-    result.push({ label: 'Kobo', routeName: 'settings-kobo' })
+    result.push({ label: t('settings.common.nav.kobo'), routeName: 'settings-kobo' })
   }
 
   if (su || perms.includes(Permission.KoreaderSync)) {
-    result.push({ label: 'KOReader', routeName: 'settings-koreader' })
+    result.push({ label: t('settings.common.nav.koreader'), routeName: 'settings-koreader' })
   }
 
   if (su || perms.includes(Permission.HardcoverSync) || perms.includes(Permission.ReadwiseSync) || perms.includes(Permission.StorygraphSync)) {
@@ -55,14 +57,14 @@ const sections = computed<Section[]>(() => {
   }
 
   if (su || perms.includes('manage_users') || perms.includes('manage_app_settings')) {
-    result.push({ label: 'Admin', routeName: 'settings-admin' })
+    result.push({ label: t('settings.common.nav.admin'), routeName: 'settings-admin' })
   }
 
   if (su || perms.includes('manage_app_settings') || perms.includes('book_dock_access')) {
-    result.push({ label: 'System', routeName: 'settings-system' })
+    result.push({ label: t('settings.common.nav.system'), routeName: 'settings-system' })
   }
 
-  result.push({ label: 'Account', routeName: 'settings-account' })
+  result.push({ label: t('settings.common.nav.account'), routeName: 'settings-account' })
 
   return result
 })

@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
 const props = defineProps<{
   value: string | null
   variant?: 'default' | 'relative'
@@ -28,7 +32,7 @@ function formatDate(isoDate: string | null): string {
 function formatRelativeTime(date: Date): string {
   const diffMs = date.getTime() - Date.now()
   const absMs = Math.abs(diffMs)
-  if (absMs < 5_000) return 'just now'
+  if (absMs < 5_000) return t('book.table.date.justNow')
 
   const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
   const units = [

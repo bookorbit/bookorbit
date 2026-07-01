@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import UsersPage from '@/features/admin/UsersPage.vue'
@@ -8,6 +9,7 @@ import MagicLinksSettings from './MagicLinksSettings.vue'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { ADMIN_TAB_INFO, ADMIN_TABS, normalizeAdminTab, type AdminTab as Tab } from './lib/admin-tabs'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const { isSuperuser, userPermissions } = usePermissions()
@@ -59,7 +61,7 @@ function selectTab(tab: Tab) {
 </script>
 
 <template>
-  <SettingsPageHeader title="Admin" subtitle="Manage users and authentication settings." />
+  <SettingsPageHeader :title="t('settings.admin.title')" :subtitle="t('settings.admin.subtitle')" />
 
   <div
     :class="[

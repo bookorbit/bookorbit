@@ -2,6 +2,9 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { TransitionPresets, useElementSize, useMediaQuery, useTransition } from '@vueuse/core'
 import type { JumpBucket, JumpBucketKind } from '@bookorbit/types'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const SLOT_PX = 20
 const RAIL_PAD_PX = 8
@@ -197,7 +200,7 @@ function handleAfterLeave() {
       ref="railEl"
       class="jump-rail fixed right-1.5 top-1/2 z-30 flex max-h-[85vh] -translate-y-1/2 select-none flex-col items-stretch overflow-hidden rounded-full border border-border bg-background/85 py-2 shadow-sm backdrop-blur"
       :class="[engaged ? 'px-1.5' : 'px-1', reducedMotion ? '' : 'transition-[padding] duration-300 ease-out']"
-      aria-label="Jump to section"
+      :aria-label="t('book.jumpRail.jumpToSection')"
       data-testid="jump-rail"
       @pointerdown="handlePointerDown"
       @pointermove="handlePointerMove"
@@ -234,7 +237,7 @@ function handleAfterLeave() {
           index === hoveredIndex ? 'scale-[1.35] font-semibold text-foreground' : '',
         ]"
         :disabled="!slot.bucket"
-        :aria-label="`Jump to ${slot.label}`"
+        :aria-label="t('book.jumpRail.jumpTo', { label: slot.label })"
         :aria-current="slot.key === activeKey ? 'true' : undefined"
         :data-key="slot.key"
         @click="handleSlotClick(slot)"

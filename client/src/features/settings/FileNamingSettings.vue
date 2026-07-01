@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Check, ChevronDown, ChevronUp, ClipboardCopy, Info, Loader2, RotateCcw, Save } from '@lucide/vue'
 import {
   DEFAULT_DOWNLOAD_PATTERN,
@@ -17,6 +18,7 @@ import SettingsPageHeader from './SettingsPageHeader.vue'
 import { copyToClipboard } from '@/lib/clipboard'
 import AppIcon from '@/components/AppIcon.vue'
 
+const { t } = useI18n()
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
 const {
@@ -70,123 +72,123 @@ let globalPreviewTimer: ReturnType<typeof setTimeout> | null = null
 let folderPreviewTimer: ReturnType<typeof setTimeout> | null = null
 let downloadPreviewTimer: ReturnType<typeof setTimeout> | null = null
 
-const MODIFIERS = [
-  { key: ':first', description: 'First value only' },
-  { key: ':sort', description: 'Last, First format' },
-  { key: ':initial', description: 'First letter only' },
+const MODIFIERS = computed(() => [
+  { key: ':first', description: t('settings.reader.fileNaming.modFirst') },
+  { key: ':sort', description: t('settings.reader.fileNaming.modSort') },
+  { key: ':initial', description: t('settings.reader.fileNaming.modInitial') },
   { key: ':upper', description: 'UPPERCASE' },
   { key: ':lower', description: 'lowercase' },
-]
+])
 
-const EXAMPLES = [
+const EXAMPLES = computed(() => [
   {
-    label: 'Calibre-style default',
+    label: t('settings.reader.fileNaming.exCalibre'),
     pattern: '{authors}/{title}< ({year})>',
     cases: [
-      { label: 'with year', result: 'William Gibson/Neuromancer (1984).epub' },
-      { label: 'no year', result: 'William Gibson/Neuromancer.epub' },
+      { label: t('settings.reader.fileNaming.caseWithYear'), result: 'William Gibson/Neuromancer (1984).epub' },
+      { label: t('settings.reader.fileNaming.caseNoYear'), result: 'William Gibson/Neuromancer.epub' },
     ],
   },
   {
-    label: 'Series reader',
+    label: t('settings.reader.fileNaming.exSeriesReader'),
     pattern: '{authors:first}/<{series}/><{seriesIndex}. >{title}',
     cases: [
-      { label: 'in series', result: 'William Gibson/Sprawl/01. Neuromancer.epub' },
-      { label: 'standalone', result: 'William Gibson/Neuromancer.epub' },
+      { label: t('settings.reader.fileNaming.caseInSeries'), result: 'William Gibson/Sprawl/01. Neuromancer.epub' },
+      { label: t('settings.reader.fileNaming.caseStandalone'), result: 'William Gibson/Neuromancer.epub' },
     ],
   },
   {
-    label: 'Clean download filename',
+    label: t('settings.reader.fileNaming.exCleanDownload'),
     pattern: '{authors:first} - {title}< ({year})>',
     cases: [
-      { label: 'with year', result: 'William Gibson - Neuromancer (1984).epub' },
-      { label: 'no year', result: 'William Gibson - Neuromancer.epub' },
+      { label: t('settings.reader.fileNaming.caseWithYear'), result: 'William Gibson - Neuromancer (1984).epub' },
+      { label: t('settings.reader.fileNaming.caseNoYear'), result: 'William Gibson - Neuromancer.epub' },
     ],
   },
   {
-    label: 'Alphabetical grouping with series',
+    label: t('settings.reader.fileNaming.exAlphabetical'),
     pattern: '{authors:initial}/{authors:sort}/<{series}/><{seriesIndex}. >{title}',
     cases: [
-      { label: 'in series', result: 'G/Gibson, William/Sprawl/01. Neuromancer.epub' },
-      { label: 'standalone', result: 'G/Gibson, William/Neuromancer.epub' },
+      { label: t('settings.reader.fileNaming.caseInSeries'), result: 'G/Gibson, William/Sprawl/01. Neuromancer.epub' },
+      { label: t('settings.reader.fileNaming.caseStandalone'), result: 'G/Gibson, William/Neuromancer.epub' },
     ],
   },
   {
-    label: 'Series or Standalone fallback',
+    label: t('settings.reader.fileNaming.exSeriesFallback'),
     pattern: '<{series}|Standalone>/<{seriesIndex}. >{title}',
     cases: [
-      { label: 'in series', result: 'Sprawl/01. Neuromancer.epub' },
-      { label: 'no series', result: 'Standalone/Neuromancer.epub' },
+      { label: t('settings.reader.fileNaming.caseInSeries'), result: 'Sprawl/01. Neuromancer.epub' },
+      { label: t('settings.reader.fileNaming.caseNoSeries'), result: 'Standalone/Neuromancer.epub' },
     ],
   },
   {
-    label: 'Download with optional subtitle',
+    label: t('settings.reader.fileNaming.exOptionalSubtitle'),
     pattern: '{authors:first} - {title}< - {subtitle}>< ({year})>',
     cases: [
-      { label: 'full', result: 'Andrew Hunt - The Pragmatic Programmer - From Journeyman to Master (1999).epub' },
-      { label: 'minimal', result: 'Andrew Hunt - The Pragmatic Programmer.epub' },
+      { label: t('settings.reader.fileNaming.caseFull'), result: 'Andrew Hunt - The Pragmatic Programmer - From Journeyman to Master (1999).epub' },
+      { label: t('settings.reader.fileNaming.caseMinimal'), result: 'Andrew Hunt - The Pragmatic Programmer.epub' },
     ],
   },
   {
-    label: 'Multilingual library',
+    label: t('settings.reader.fileNaming.exMultilingual'),
     pattern: '<{language:upper}/>{authors}/{title}',
     cases: [
-      { label: 'with language', result: 'EN/William Gibson/Neuromancer.epub' },
-      { label: 'no language', result: 'William Gibson/Neuromancer.epub' },
+      { label: t('settings.reader.fileNaming.caseWithLanguage'), result: 'EN/William Gibson/Neuromancer.epub' },
+      { label: t('settings.reader.fileNaming.caseNoLanguage'), result: 'William Gibson/Neuromancer.epub' },
     ],
   },
   {
-    label: 'Publisher-organized',
+    label: t('settings.reader.fileNaming.exPublisher'),
     pattern: '<{publisher}/>{authors:first}/{title}',
     cases: [
-      { label: 'with publisher', result: "O'Reilly/Andrew Hunt/The Pragmatic Programmer.epub" },
-      { label: 'no publisher', result: 'Andrew Hunt/The Pragmatic Programmer.epub' },
+      { label: t('settings.reader.fileNaming.caseWithPublisher'), result: "O'Reilly/Andrew Hunt/The Pragmatic Programmer.epub" },
+      { label: t('settings.reader.fileNaming.caseNoPublisher'), result: 'Andrew Hunt/The Pragmatic Programmer.epub' },
     ],
   },
   {
-    label: 'Stacked optional folders',
+    label: t('settings.reader.fileNaming.exStacked'),
     pattern: '<{language:upper}/><{publisher}|Unknown Publisher>/{authors:first}/{title}',
     cases: [
-      { label: 'all set', result: "EN/O'Reilly/Andrew Hunt/The Pragmatic Programmer.epub" },
-      { label: 'no language', result: "O'Reilly/Andrew Hunt/The Pragmatic Programmer.epub" },
-      { label: 'no publisher', result: 'Unknown Publisher/Andrew Hunt/The Pragmatic Programmer.epub' },
+      { label: t('settings.reader.fileNaming.caseAllSet'), result: "EN/O'Reilly/Andrew Hunt/The Pragmatic Programmer.epub" },
+      { label: t('settings.reader.fileNaming.caseNoLanguage'), result: "O'Reilly/Andrew Hunt/The Pragmatic Programmer.epub" },
+      { label: t('settings.reader.fileNaming.caseNoPublisher'), result: 'Unknown Publisher/Andrew Hunt/The Pragmatic Programmer.epub' },
     ],
   },
   {
-    label: 'Folder-drop with sort name',
+    label: t('settings.reader.fileNaming.exFolderDrop'),
     pattern: '{authors:initial}/{authors:sort}/<{series}/>',
     cases: [
-      { label: 'in series', result: 'G/Gibson, William/Sprawl/neuromancer.epub' },
-      { label: 'standalone', result: 'G/Gibson, William/neuromancer.epub' },
+      { label: t('settings.reader.fileNaming.caseInSeries'), result: 'G/Gibson, William/Sprawl/neuromancer.epub' },
+      { label: t('settings.reader.fileNaming.caseStandalone'), result: 'G/Gibson, William/neuromancer.epub' },
     ],
   },
-]
+])
 
 async function copyToken(token: string) {
   const value = `{${token}}`
   const copied = await copyToClipboard(value)
   if (copied) {
-    toast.success(`${value} copied to clipboard`)
+    toast.success(t('settings.reader.fileNaming.copiedToClipboard', { value }))
   } else {
-    toast.error('Failed to copy token')
+    toast.error(t('settings.reader.fileNaming.copyTokenFailed'))
   }
 }
 
 async function copyPattern(pattern: string) {
   const copied = await copyToClipboard(pattern)
   if (copied) {
-    toast.success('Pattern copied to clipboard')
+    toast.success(t('settings.reader.fileNaming.patternCopied'))
   } else {
-    toast.error('Failed to copy pattern')
+    toast.error(t('settings.reader.fileNaming.copyPatternFailed'))
   }
 }
 
 async function copyText(text: string, label: string) {
   const copied = await copyToClipboard(text)
   if (copied) {
-    toast.success(`${label} copied to clipboard`)
+    toast.success(t('settings.reader.fileNaming.labelCopied', { label }))
   } else {
-    toast.error(`Failed to copy ${label.toLowerCase()}`)
+    toast.error(t('settings.reader.fileNaming.copyLabelFailed', { label: label.toLowerCase() }))
   }
 }
 
@@ -263,23 +265,30 @@ onUnmounted(() => {
     <SettingsPageHeader
       v-if="!props.embedded"
       class="hidden md:flex"
-      title="File Naming"
-      subtitle="Control how files are organized on disk when uploaded and how they are named when downloaded using placeholder tokens."
+      :title="t('settings.reader.fileNaming.title')"
+      :subtitle="t('settings.reader.fileNaming.subtitle')"
     />
     <div v-if="!props.embedded" class="md:hidden px-1">
-      <h1 class="text-xl font-semibold tracking-tight text-foreground">File Naming</h1>
+      <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ t('settings.reader.fileNaming.title') }}</h1>
       <p
         class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
       >
-        Control how files are organized on disk when uploaded and how they are named when downloaded using placeholder tokens.
+        {{ t('settings.reader.fileNaming.subtitle') }}
       </p>
     </div>
 
     <div class="md:hidden border border-border/60 bg-card rounded-lg p-3 space-y-3">
       <div class="space-y-1.5 pt-1 pb-4 border-border/60">
         <div class="flex items-center justify-between gap-2">
-          <p class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">File as Book preview</p>
-          <button class="text-xs text-primary hover:underline" @click="copyText(uploadPreviewValue, 'File as Book preview')">Copy</button>
+          <p class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {{ t('settings.reader.fileNaming.fileAsBookPreview') }}
+          </p>
+          <button
+            class="text-xs text-primary hover:underline"
+            @click="copyText(uploadPreviewValue, t('settings.reader.fileNaming.fileAsBookPreview'))"
+          >
+            {{ t('settings.reader.fileNaming.copy') }}
+          </button>
         </div>
         <div class="rounded-md border border-border bg-background px-2.5 py-2 font-mono text-xs overflow-x-auto whitespace-nowrap">
           {{ uploadPreviewValue }}
@@ -287,8 +296,15 @@ onUnmounted(() => {
       </div>
       <div class="space-y-1.5 pt-1 pb-4 border-border/60">
         <div class="flex items-center justify-between gap-2">
-          <p class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Folder as Book preview</p>
-          <button class="text-xs text-primary hover:underline" @click="copyText(folderPreviewValue, 'Folder as Book preview')">Copy</button>
+          <p class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {{ t('settings.reader.fileNaming.folderAsBookPreview') }}
+          </p>
+          <button
+            class="text-xs text-primary hover:underline"
+            @click="copyText(folderPreviewValue, t('settings.reader.fileNaming.folderAsBookPreview'))"
+          >
+            {{ t('settings.reader.fileNaming.copy') }}
+          </button>
         </div>
         <div class="rounded-md border border-border bg-background px-2.5 py-2 font-mono text-xs overflow-x-auto whitespace-nowrap">
           {{ folderPreviewValue }}
@@ -296,8 +312,15 @@ onUnmounted(() => {
       </div>
       <div class="space-y-1.5">
         <div class="flex items-center justify-between gap-2">
-          <p class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Download preview</p>
-          <button class="text-xs text-primary hover:underline" @click="copyText(downloadPreviewValue, 'Download preview')">Copy</button>
+          <p class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {{ t('settings.reader.fileNaming.downloadPreview') }}
+          </p>
+          <button
+            class="text-xs text-primary hover:underline"
+            @click="copyText(downloadPreviewValue, t('settings.reader.fileNaming.downloadPreview'))"
+          >
+            {{ t('settings.reader.fileNaming.copy') }}
+          </button>
         </div>
         <div class="rounded-md border border-border bg-background px-2.5 py-2 font-mono text-xs overflow-x-auto whitespace-nowrap">
           {{ downloadPreviewValue }}
@@ -307,15 +330,14 @@ onUnmounted(() => {
 
     <!-- Global Patterns -->
     <section class="space-y-4">
-      <p class="settings-group-label">Global Defaults</p>
+      <p class="settings-group-label">{{ t('settings.reader.fileNaming.globalDefaults') }}</p>
       <div class="border border-border rounded-lg bg-card overflow-hidden divide-y divide-border shadow-xs">
         <div class="px-4 py-4 md:px-6 md:py-5">
           <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div class="w-full lg:max-w-md">
-              <p class="settings-label">Cross-platform path sanitization</p>
+              <p class="settings-label">{{ t('settings.reader.fileNaming.crossPlatform') }}</p>
               <p class="settings-hint">
-                Make generated file and folder names safe on Windows by replacing invalid characters and reserved names, and removing trailing dots
-                and spaces. Disable only for Linux-only setups that intentionally keep those characters.
+                {{ t('settings.reader.fileNaming.crossPlatformHint') }}
               </p>
             </div>
             <div class="flex items-center gap-3 w-full lg:w-auto">
@@ -330,7 +352,7 @@ onUnmounted(() => {
               >
                 <Loader2 v-if="savingCrossPlatformSanitization" :size="14" class="animate-spin" />
                 <Save v-else :size="14" />
-                <span>Save</span>
+                <span>{{ t('common.save') }}</span>
               </button>
             </div>
           </div>
@@ -340,8 +362,8 @@ onUnmounted(() => {
         <div class="px-4 py-4 md:px-6 md:py-5 space-y-4">
           <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
             <div class="w-full lg:max-w-md">
-              <p class="settings-label">File as Book default</p>
-              <p class="settings-hint">Upload pattern for libraries using File as Book mode. Each file is one book.</p>
+              <p class="settings-label">{{ t('settings.reader.fileNaming.fileAsBookDefault') }}</p>
+              <p class="settings-hint">{{ t('settings.reader.fileNaming.fileAsBookDefaultHint') }}</p>
             </div>
             <div class="flex flex-col gap-4 w-full lg:flex-row lg:items-center lg:w-auto">
               <div class="relative flex-1 lg:w-120 xl:w-140">
@@ -363,13 +385,15 @@ onUnmounted(() => {
               >
                 <Loader2 v-if="savingGlobal" :size="14" class="animate-spin" />
                 <Save v-else :size="14" />
-                <span>Save</span>
+                <span>{{ t('common.save') }}</span>
               </button>
             </div>
           </div>
 
           <div class="hidden md:flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/40 border border-border/50 font-mono text-xs">
-            <span class="text-muted-foreground shrink-0 uppercase tracking-wider font-semibold text-[10px]">Preview:</span>
+            <span class="text-muted-foreground shrink-0 uppercase tracking-wider font-semibold text-[10px]">{{
+              t('settings.reader.fileNaming.previewLabel')
+            }}</span>
             <span class="text-foreground truncate">{{ uploadPreviewValue }}</span>
           </div>
         </div>
@@ -378,8 +402,8 @@ onUnmounted(() => {
         <div class="px-4 py-4 md:px-6 md:py-5 space-y-4">
           <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
             <div class="w-full lg:max-w-md">
-              <p class="settings-label">Folder as Book default</p>
-              <p class="settings-hint">Upload pattern for libraries using Folder as Book mode. Each book must be in its own folder.</p>
+              <p class="settings-label">{{ t('settings.reader.fileNaming.folderAsBookDefault') }}</p>
+              <p class="settings-hint">{{ t('settings.reader.fileNaming.folderAsBookDefaultHint') }}</p>
             </div>
             <div class="flex flex-col gap-4 w-full lg:flex-row lg:items-center lg:w-auto">
               <div class="relative flex-1 lg:w-120 xl:w-140">
@@ -401,13 +425,15 @@ onUnmounted(() => {
               >
                 <Loader2 v-if="savingFolder" :size="14" class="animate-spin" />
                 <Save v-else :size="14" />
-                <span>Save</span>
+                <span>{{ t('common.save') }}</span>
               </button>
             </div>
           </div>
 
           <div class="hidden md:flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/40 border border-border/50 font-mono text-xs">
-            <span class="text-muted-foreground shrink-0 uppercase tracking-wider font-semibold text-[10px]">Preview:</span>
+            <span class="text-muted-foreground shrink-0 uppercase tracking-wider font-semibold text-[10px]">{{
+              t('settings.reader.fileNaming.previewLabel')
+            }}</span>
             <span class="text-foreground truncate">{{ folderPreviewValue }}</span>
           </div>
         </div>
@@ -416,8 +442,8 @@ onUnmounted(() => {
         <div class="px-4 py-4 md:px-6 md:py-5 space-y-4">
           <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
             <div class="w-full lg:max-w-md">
-              <p class="settings-label">Download Pattern</p>
-              <p class="settings-hint">Suggested filenames for single-file downloads and files inside export ZIPs.</p>
+              <p class="settings-label">{{ t('settings.reader.fileNaming.downloadPattern') }}</p>
+              <p class="settings-hint">{{ t('settings.reader.fileNaming.downloadPatternHint') }}</p>
             </div>
             <div class="flex flex-col gap-4 w-full lg:flex-row lg:items-center lg:w-auto">
               <div class="relative flex-1 lg:w-120 xl:w-140">
@@ -439,13 +465,15 @@ onUnmounted(() => {
               >
                 <Loader2 v-if="savingDownload" :size="14" class="animate-spin" />
                 <Save v-else :size="14" />
-                <span>Save</span>
+                <span>{{ t('common.save') }}</span>
               </button>
             </div>
           </div>
 
           <div class="hidden md:flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/40 border border-border/50 font-mono text-xs">
-            <span class="text-muted-foreground shrink-0 uppercase tracking-wider font-semibold text-[10px]">Preview:</span>
+            <span class="text-muted-foreground shrink-0 uppercase tracking-wider font-semibold text-[10px]">{{
+              t('settings.reader.fileNaming.previewLabel')
+            }}</span>
             <span class="text-foreground truncate">{{ downloadPreviewValue }}</span>
           </div>
         </div>
@@ -454,10 +482,10 @@ onUnmounted(() => {
 
     <!-- Library Overrides -->
     <section class="space-y-4">
-      <p class="settings-group-label">Library Overrides</p>
+      <p class="settings-group-label">{{ t('settings.reader.fileNaming.libraryOverrides') }}</p>
       <div class="border border-border rounded-lg bg-card overflow-hidden divide-y divide-border shadow-xs">
         <div v-if="libraries.length === 0" class="px-4 py-8 md:px-6 md:py-10 text-center text-sm text-muted-foreground italic">
-          No libraries configured. Create one in Library settings to set custom naming patterns.
+          {{ t('settings.reader.fileNaming.noLibraries') }}
         </div>
 
         <div v-for="lib in libraries" :key="lib.id" class="px-4 py-4 md:px-6 md:py-5 space-y-3">
@@ -470,9 +498,11 @@ onUnmounted(() => {
                 <div class="flex items-center gap-2 flex-wrap">
                   <span class="settings-label truncate">{{ lib.name }}</span>
                   <Badge v-if="lib.fileNamingPattern" variant="secondary" class="h-4.5 px-1.5 text-[10px] font-bold uppercase tracking-tight">
-                    Custom
+                    {{ t('settings.reader.fileNaming.badgeCustom') }}
                   </Badge>
-                  <Badge v-else variant="outline" class="h-4.5 px-1.5 text-[10px] font-bold uppercase tracking-tight opacity-60"> Default </Badge>
+                  <Badge v-else variant="outline" class="h-4.5 px-1.5 text-[10px] font-bold uppercase tracking-tight opacity-60">
+                    {{ t('settings.reader.fileNaming.badgeDefault') }}
+                  </Badge>
                   <Badge
                     variant="outline"
                     class="h-4.5 px-1.5 text-[10px] font-bold uppercase tracking-tight"
@@ -480,7 +510,11 @@ onUnmounted(() => {
                       lib.organizationMode === 'book_per_folder' ? 'text-blue-500 border-blue-500/40' : 'text-emerald-500 border-emerald-500/40'
                     "
                   >
-                    {{ lib.organizationMode === 'book_per_folder' ? 'Folder as Book' : 'File as Book' }}
+                    {{
+                      lib.organizationMode === 'book_per_folder'
+                        ? t('settings.reader.fileNaming.orgFolderAsBook')
+                        : t('settings.reader.fileNaming.orgFileAsBook')
+                    }}
                   </Badge>
                 </div>
               </div>
@@ -514,13 +548,15 @@ onUnmounted(() => {
                     <RotateCcw :size="13" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>Reset to default</TooltipContent>
+                <TooltipContent>{{ t('settings.reader.fileNaming.resetToDefault') }}</TooltipContent>
               </Tooltip>
             </div>
           </div>
 
           <div class="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/40 border border-border/50 text-xs">
-            <span class="text-muted-foreground shrink-0 uppercase tracking-wider font-semibold text-[10px]">Preview:</span>
+            <span class="text-muted-foreground shrink-0 uppercase tracking-wider font-semibold text-[10px]">{{
+              t('settings.reader.fileNaming.previewLabel')
+            }}</span>
             <div class="overflow-x-auto min-w-0 font-mono">
               <span class="text-foreground whitespace-nowrap">{{ getEffectivePreview(lib) }}</span>
             </div>
@@ -531,7 +567,7 @@ onUnmounted(() => {
 
     <!-- Placeholder Reference -->
     <section class="space-y-4">
-      <p class="settings-group-label">Pattern Reference</p>
+      <p class="settings-group-label">{{ t('settings.reader.fileNaming.patternReference') }}</p>
 
       <!-- Reference accordion -->
       <div class="border border-border rounded-lg bg-card shadow-xs overflow-hidden">
@@ -541,8 +577,8 @@ onUnmounted(() => {
         >
           <div class="flex items-center gap-2.5">
             <Info :size="16" class="text-primary shrink-0" />
-            <span class="text-sm font-medium text-foreground">Placeholder Reference</span>
-            <span class="hidden sm:inline text-xs text-muted-foreground">- guide for creating custom naming patterns</span>
+            <span class="text-sm font-medium text-foreground">{{ t('settings.reader.fileNaming.placeholderReference') }}</span>
+            <span class="hidden sm:inline text-xs text-muted-foreground">{{ t('settings.reader.fileNaming.placeholderReferenceHint') }}</span>
           </div>
           <ChevronUp v-if="referenceOpen" :size="16" class="text-muted-foreground shrink-0" />
           <ChevronDown v-else :size="16" class="text-muted-foreground shrink-0" />
@@ -553,29 +589,29 @@ onUnmounted(() => {
           <div class="p-5 space-y-3">
             <button class="w-full flex items-center justify-between gap-2 text-left" @click="tokenHelpOpen = !tokenHelpOpen">
               <div>
-                <p class="text-xs font-semibold text-foreground uppercase tracking-wider">Tokens</p>
-                <p class="text-[11px] text-muted-foreground">Copy placeholders quickly</p>
+                <p class="text-xs font-semibold text-foreground uppercase tracking-wider">{{ t('settings.reader.fileNaming.tokens') }}</p>
+                <p class="text-[11px] text-muted-foreground">{{ t('settings.reader.fileNaming.tokensHint') }}</p>
               </div>
               <ChevronUp v-if="tokenHelpOpen" :size="15" class="text-muted-foreground shrink-0" />
               <ChevronDown v-else :size="15" class="text-muted-foreground shrink-0" />
             </button>
             <div v-if="tokenHelpOpen" class="space-y-3">
-              <p class="text-xs text-muted-foreground leading-relaxed">Click any token to copy it to your clipboard.</p>
+              <p class="text-xs text-muted-foreground leading-relaxed">{{ t('settings.reader.fileNaming.clickTokenHint') }}</p>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                <Tooltip v-for="t in PATTERN_TOKENS" :key="t.token">
+                <Tooltip v-for="tok in PATTERN_TOKENS" :key="tok.token">
                   <TooltipTrigger as-child>
                     <button
                       class="group flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-border bg-background text-left hover:border-primary/40 hover:bg-primary/5 transition-colors"
-                      @click="copyToken(t.token)"
+                      @click="copyToken(tok.token)"
                     >
                       <div class="min-w-0">
-                        <code class="text-xs font-mono font-semibold text-primary">{{ '{' + t.token + '}' }}</code>
-                        <p class="text-[11px] text-muted-foreground leading-tight mt-0.5">{{ t.description }}</p>
+                        <code class="text-xs font-mono font-semibold text-primary">{{ '{' + tok.token + '}' }}</code>
+                        <p class="text-[11px] text-muted-foreground leading-tight mt-0.5">{{ tok.description }}</p>
                       </div>
                       <ClipboardCopy :size="13" class="shrink-0 text-muted-foreground/60 group-hover:text-primary/60 transition-colors" />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent>Copy {{ '{' + t.token + '}' }}</TooltipContent>
+                  <TooltipContent>{{ t('settings.reader.fileNaming.copyValue', { value: '{' + tok.token + '}' }) }}</TooltipContent>
                 </Tooltip>
               </div>
             </div>
@@ -585,15 +621,15 @@ onUnmounted(() => {
           <div class="p-5 space-y-3">
             <button class="w-full flex items-center justify-between gap-2 text-left" @click="modifierHelpOpen = !modifierHelpOpen">
               <div>
-                <p class="text-xs font-semibold text-foreground uppercase tracking-wider">Modifiers</p>
-                <p class="text-[11px] text-muted-foreground">Transform token values</p>
+                <p class="text-xs font-semibold text-foreground uppercase tracking-wider">{{ t('settings.reader.fileNaming.modifiers') }}</p>
+                <p class="text-[11px] text-muted-foreground">{{ t('settings.reader.fileNaming.modifiersHint') }}</p>
               </div>
               <ChevronUp v-if="modifierHelpOpen" :size="15" class="text-muted-foreground shrink-0" />
               <ChevronDown v-else :size="15" class="text-muted-foreground shrink-0" />
             </button>
             <div v-if="modifierHelpOpen" class="space-y-3">
               <p class="text-xs text-muted-foreground leading-relaxed">
-                Append a modifier inside a token to transform its value:
+                {{ t('settings.reader.fileNaming.modifiersExplain') }}
                 <code class="bg-muted px-1.5 py-0.5 rounded font-mono text-foreground text-[11px]">{authors:first}</code>
               </p>
               <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -609,8 +645,9 @@ onUnmounted(() => {
               <div class="flex items-start gap-3 px-4 py-3 rounded-lg bg-primary/5 border border-primary/10">
                 <code class="text-sm font-mono text-primary shrink-0 mt-0.5">/</code>
                 <p class="text-xs text-muted-foreground leading-relaxed">
-                  End a pattern with <code class="bg-primary/10 text-primary px-1 py-0.5 rounded font-mono text-[11px]">/</code> to specify a folder
-                  only. The original filename will be preserved inside it.
+                  {{ t('settings.reader.fileNaming.folderOnlyPrefix') }}
+                  <code class="bg-primary/10 text-primary px-1 py-0.5 rounded font-mono text-[11px]">/</code>
+                  {{ t('settings.reader.fileNaming.folderOnlySuffix') }}
                 </p>
               </div>
             </div>
@@ -620,16 +657,18 @@ onUnmounted(() => {
           <div class="p-5 space-y-3">
             <button class="w-full flex items-center justify-between gap-2 text-left" @click="conditionalHelpOpen = !conditionalHelpOpen">
               <div>
-                <p class="text-xs font-semibold text-foreground uppercase tracking-wider">Conditional Logic</p>
-                <p class="text-[11px] text-muted-foreground">Optional segments and fallbacks</p>
+                <p class="text-xs font-semibold text-foreground uppercase tracking-wider">{{ t('settings.reader.fileNaming.conditionalLogic') }}</p>
+                <p class="text-[11px] text-muted-foreground">{{ t('settings.reader.fileNaming.conditionalLogicHint') }}</p>
               </div>
               <ChevronUp v-if="conditionalHelpOpen" :size="15" class="text-muted-foreground shrink-0" />
               <ChevronDown v-else :size="15" class="text-muted-foreground shrink-0" />
             </button>
             <p v-if="conditionalHelpOpen" class="text-xs text-muted-foreground leading-relaxed">
-              Wrap in <code class="bg-muted px-1 py-0.5 rounded font-mono text-foreground text-[11px]">&lt;...&gt;</code> to skip a segment when its
-              token is empty. Use <code class="bg-muted px-1 py-0.5 rounded font-mono text-foreground text-[11px]">|fallback</code> for a default
-              value.
+              {{ t('settings.reader.fileNaming.conditionalPart1') }}
+              <code class="bg-muted px-1 py-0.5 rounded font-mono text-foreground text-[11px]">&lt;...&gt;</code>
+              {{ t('settings.reader.fileNaming.conditionalPart2') }}
+              <code class="bg-muted px-1 py-0.5 rounded font-mono text-foreground text-[11px]">|fallback</code>
+              {{ t('settings.reader.fileNaming.conditionalPart3') }}
             </p>
           </div>
         </div>
@@ -638,13 +677,13 @@ onUnmounted(() => {
 
     <!-- Examples -->
     <section class="space-y-4">
-      <p class="settings-group-label">Examples</p>
+      <p class="settings-group-label">{{ t('settings.reader.fileNaming.examples') }}</p>
       <div class="border border-border rounded-lg bg-card shadow-xs overflow-hidden">
         <div class="p-5 space-y-3">
           <button class="w-full flex items-center justify-between gap-2 text-left" @click="examplesOpen = !examplesOpen">
             <div>
-              <p class="text-sm font-medium text-foreground">Pattern Examples</p>
-              <p class="text-xs text-muted-foreground">Ready-made patterns for common library styles</p>
+              <p class="text-sm font-medium text-foreground">{{ t('settings.reader.fileNaming.patternExamples') }}</p>
+              <p class="text-xs text-muted-foreground">{{ t('settings.reader.fileNaming.patternExamplesHint') }}</p>
             </div>
             <ChevronUp v-if="examplesOpen" :size="15" class="text-muted-foreground shrink-0" />
             <ChevronDown v-else :size="15" class="text-muted-foreground shrink-0" />
@@ -665,10 +704,10 @@ onUnmounted(() => {
                       @click="copyPattern(ex.pattern)"
                     >
                       <ClipboardCopy :size="12" />
-                      Copy
+                      {{ t('settings.reader.fileNaming.copy') }}
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent>Copy pattern to clipboard</TooltipContent>
+                  <TooltipContent>{{ t('settings.reader.fileNaming.copyPatternTooltip') }}</TooltipContent>
                 </Tooltip>
               </div>
               <div class="px-4 py-3 space-y-2">

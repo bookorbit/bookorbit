@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { VueDraggable } from 'vue-draggable-plus'
 import { GripVertical, X } from '@lucide/vue'
 import type { MetadataProviderKey, ProviderStatus } from '@bookorbit/types'
 import { providerChipStyle, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
 import { PROVIDER_DND_GROUP, toProviderDragItems } from '../lib/provider-drag'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   providers: MetadataProviderKey[]
@@ -118,7 +121,7 @@ function removeProvider(index: number) {
     </VueDraggable>
 
     <span v-if="localProviders.length === 0 && !disabled" class="text-xs text-muted-foreground/60 italic h-6 flex items-center px-1">
-      drag a provider here
+      {{ t('settings.metadata.fieldRules.dragProviderHere') }}
     </span>
   </div>
 </template>

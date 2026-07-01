@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { Cloud, Monitor } from '@lucide/vue'
 import { getDisplayPreferencesSnapshot } from '@/composables/useDisplaySettings'
@@ -10,6 +11,7 @@ import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { api } from '@/lib/api'
 import { useThemeStore } from '@/stores/theme'
 
+const { t } = useI18n()
 const themeStore = useThemeStore()
 const { user } = useAuth()
 const { isDemoRestrictedAccount } = usePermissions()
@@ -20,7 +22,7 @@ async function handleSetStorageMode(sync: boolean) {
   if (!user.value || syncEnabled.value === sync) return
 
   if (isDemoRestrictedAccount.value) {
-    toast.error('Demo-restricted account cannot change theme storage mode')
+    toast.error(t('settings.appearance.storage.errors.demoRestricted'))
     return
   }
 
@@ -32,7 +34,7 @@ async function handleSetStorageMode(sync: boolean) {
     })
 
     if (!res.ok) {
-      toast.error('Failed to update storage mode')
+      toast.error(t('settings.appearance.storage.errors.update'))
       return
     }
 
@@ -69,9 +71,9 @@ async function handleSetStorageMode(sync: boolean) {
       }
     }
 
-    toast.success(sync ? 'Preferences will now be synced' : 'Preferences will stay on this device')
+    toast.success(sync ? t('settings.appearance.storage.toasts.synced') : t('settings.appearance.storage.toasts.local'))
   } catch {
-    toast.error('An error occurred while updating storage mode')
+    toast.error(t('settings.appearance.storage.errors.generic'))
   }
 }
 
@@ -86,7 +88,7 @@ async function handleAccountMode() {
 
 <template>
   <div>
-    <p class="settings-group-label">Where to save appearance preferences</p>
+    <p class="settings-group-label">{{ t('settings.appearance.storage.title') }}</p>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <div
         class="flex items-start gap-4 px-4 py-3.5 md:px-5 md:py-4 rounded-lg border-2 cursor-pointer transition-colors"
@@ -101,13 +103,13 @@ async function handleAccountMode() {
         </div>
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1">
-            <span class="settings-label">This device only</span>
+            <span class="settings-label">{{ t('settings.appearance.storage.device.title') }}</span>
             <span v-if="!syncEnabled" class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/15 text-primary">
-              Active
+              {{ t('settings.appearance.storage.active') }}
             </span>
           </div>
           <span class="block text-xs text-muted-foreground leading-relaxed">
-            Preferences stay in your browser. Best if you want a different look on different devices.
+            {{ t('settings.appearance.storage.device.description') }}
           </span>
         </div>
       </div>
@@ -128,19 +130,19 @@ async function handleAccountMode() {
         </div>
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1">
-            <span class="settings-label">My account</span>
+            <span class="settings-label">{{ t('settings.appearance.storage.account.title') }}</span>
             <span v-if="syncEnabled" class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/15 text-primary">
-              Active
+              {{ t('settings.appearance.storage.active') }}
             </span>
             <span
               v-if="isDemoRestrictedAccount"
               class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
             >
-              Not available
+              {{ t('settings.appearance.storage.notAvailable') }}
             </span>
           </div>
           <span class="block text-xs text-muted-foreground leading-relaxed">
-            Preferences are saved to your account. Best if you want the same appearance on every device.
+            {{ t('settings.appearance.storage.account.description') }}
           </span>
         </div>
       </div>

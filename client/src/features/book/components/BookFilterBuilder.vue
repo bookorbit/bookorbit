@@ -19,6 +19,9 @@ import { useLibraries } from '@/features/library/composables/useLibraries'
 import FilterChipTypeahead from './FilterChipTypeahead.vue'
 import FilterFormatPicker from './FilterFormatPicker.vue'
 import FilterTextTypeahead from './FilterTextTypeahead.vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   modelValue: GroupRule | undefined
@@ -49,33 +52,33 @@ const BETWEEN_OPERATORS: RuleOperator[] = ['between']
 const COLLECTION_OPERATORS: RuleOperator[] = ['includesAny', 'includesAll', 'excludesAll']
 
 const SCORE_PRESETS = [
-  { label: 'Outstanding', gte: 90 },
-  { label: 'Good', gte: 70 },
-  { label: 'Fair', gte: 50 },
-  { label: 'Poor', lt: 50 },
+  { label: 'outstanding', gte: 90 },
+  { label: 'good', gte: 70 },
+  { label: 'fair', gte: 50 },
+  { label: 'poor', lt: 50 },
 ] as const
 
 const CHIP_TYPEAHEAD_FIELDS: RuleField[] = ['author', 'genre', 'tag', 'collection']
 const TEXT_TYPEAHEAD_FIELDS: RuleField[] = ['publisher', 'series', 'language']
 
-const READ_STATUS_LABELS: Record<string, string> = {
-  unread: 'Unread',
-  want_to_read: 'Want to Read',
-  reading: 'Reading',
-  on_hold: 'On Hold',
-  rereading: 'Rereading',
-  read: 'Read',
-  skimmed: 'Skimmed',
-  abandoned: 'Abandoned',
-}
+const READ_STATUS_LABELS = computed<Record<string, string>>(() => ({
+  unread: t('book.readStatus.unread'),
+  want_to_read: t('book.readStatus.wantToRead'),
+  reading: t('book.readStatus.reading'),
+  on_hold: t('book.readStatus.onHold'),
+  rereading: t('book.readStatus.rereading'),
+  read: t('book.readStatus.read'),
+  skimmed: t('book.readStatus.skimmed'),
+  abandoned: t('book.readStatus.abandoned'),
+}))
 
-const COMMUNITY_RATING_PROVIDER_OPTIONS: { value: CommunityRatingProvider; label: string }[] = [
-  { value: 'any', label: 'Any provider' },
+const COMMUNITY_RATING_PROVIDER_OPTIONS = computed<{ value: CommunityRatingProvider; label: string }[]>(() => [
+  { value: 'any', label: t('book.filter.anyProvider') },
   ...COMMUNITY_RATING_PROVIDER_KEYS.map((provider) => ({
     value: provider,
     label: PROVIDER_SHORT_LABELS[provider] ?? provider,
   })),
-]
+])
 
 const ENDPOINT_BY_FIELD: Partial<Record<RuleField, string>> = {
   author: '/api/v1/metadata/authors',
@@ -363,24 +366,24 @@ function showValueToInput(operator: RuleOperator): boolean {
   <div class="flex flex-col gap-2.5">
     <!-- AND / OR join toggle — always visible in sub-groups, shown at root only when 2+ nodes -->
     <div v-if="nodes.length > 1 || (depth ?? 0) > 0" class="flex items-center gap-2 mb-0.5">
-      <span class="text-xs text-muted-foreground">Match</span>
+      <span class="text-xs text-muted-foreground">{{ t('book.filter.match') }}</span>
       <div class="flex rounded-md border border-input overflow-hidden">
         <button
           @click="setJoin('AND')"
           class="px-3 py-1 text-xs font-semibold transition-colors"
           :class="join === 'AND' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-muted/80'"
         >
-          ALL
+          {{ t('book.filter.all') }}
         </button>
         <button
           @click="setJoin('OR')"
           class="px-3 py-1 text-xs font-semibold border-l border-input transition-colors"
           :class="join === 'OR' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-muted/80'"
         >
-          ANY
+          {{ t('book.filter.any') }}
         </button>
       </div>
-      <span class="text-xs text-muted-foreground">of the following rules</span>
+      <span class="text-xs text-muted-foreground">{{ t('book.filter.ofFollowingRules') }}</span>
     </div>
 
     <template v-for="(node, index) in nodes" :key="node.id">
@@ -415,7 +418,7 @@ function showValueToInput(operator: RuleOperator): boolean {
           <select
             v-model="node.rule.provider"
             class="h-7 bg-transparent text-foreground text-sm outline-none"
-            aria-label="Community rating provider"
+            :aria-label="t('book.filter.communityRatingProvider')"
             @change="emitUpdate"
           >
             <option v-for="provider in COMMUNITY_RATING_PROVIDER_OPTIONS" :key="provider.value" :value="provider.value">
@@ -455,7 +458,13 @@ function showValueToInput(operator: RuleOperator): boolean {
               @change="addLibraryChip(index, $event)"
             >
               <option value="" disabled>
-                {{ librariesLoading ? 'Loading libraries...' : libraryOptions.length === 0 ? 'No libraries available' : 'Select library...' }}
+                {{
+                  librariesLoading
+                    ? t('book.filter.loadingLibraries')
+                    : libraryOptions.length === 0
+                      ? t('book.filter.noLibrariesAvailable')
+                      : t('book.filter.selectLibrary')
+                }}
               </option>
               <option
                 v-for="libraryName in libraryOptions"
@@ -486,7 +495,7 @@ function showValueToInput(operator: RuleOperator): boolean {
               class="h-7 flex-1 min-w-32 bg-transparent text-foreground text-sm outline-none"
               @change="addStatusChip(index, $event)"
             >
-              <option value="" disabled>Select status...</option>
+              <option value="" disabled>{{ t('book.filter.selectStatus') }}</option>
               <option v-for="status in READ_STATUSES" :key="status" :value="status" :disabled="node.rule.valueChips.includes(status)">
                 {{ READ_STATUS_LABELS[status] ?? status }}
               </option>
@@ -499,7 +508,7 @@ function showValueToInput(operator: RuleOperator): boolean {
             v-model="node.rule.value"
             type="number"
             min="1"
-            placeholder="e.g. 7"
+            :placeholder="t('book.filter.withinLastPlaceholder')"
             class="h-9 w-20 rounded-md border border-input bg-background text-foreground text-sm px-2 focus:outline-none focus:ring-2 focus:ring-primary"
             @input="emitUpdate"
           />
@@ -508,9 +517,9 @@ function showValueToInput(operator: RuleOperator): boolean {
             class="h-9 rounded-md border border-input bg-background text-foreground text-sm px-2 focus:outline-none focus:ring-2 focus:ring-primary"
             @change="emitUpdate"
           >
-            <option value="days">days</option>
-            <option value="weeks">weeks</option>
-            <option value="months">months</option>
+            <option value="days">{{ t('book.filter.unit.days') }}</option>
+            <option value="weeks">{{ t('book.filter.unit.weeks') }}</option>
+            <option value="months">{{ t('book.filter.unit.months') }}</option>
           </select>
         </template>
         <!-- Text typeahead: publisher, series, language -->
@@ -536,7 +545,7 @@ function showValueToInput(operator: RuleOperator): boolean {
               "
               @click="applyScorePreset(index, preset)"
             >
-              {{ preset.label }}
+              {{ t(`book.filter.scorePreset.${preset.label}`) }}
             </button>
           </div>
           <input
@@ -546,11 +555,11 @@ function showValueToInput(operator: RuleOperator): boolean {
             min="0"
             :max="numericInputMax(node.rule.field)"
             :step="numericInputStep(node.rule.field)"
-            placeholder="0-100"
+            :placeholder="t('book.filter.scoreRangePlaceholder')"
             class="h-9 rounded-md border border-input bg-background text-foreground text-sm px-2 focus:outline-none focus:ring-2 focus:ring-primary w-24"
           />
           <template v-if="showValueToInput(node.rule.operator)">
-            <span class="text-xs text-muted-foreground">to</span>
+            <span class="text-xs text-muted-foreground">{{ t('book.filter.to') }}</span>
             <input
               v-model="node.rule.valueTo"
               @input="emitUpdate"
@@ -572,11 +581,11 @@ function showValueToInput(operator: RuleOperator): boolean {
             :min="numericInputMin(node.rule.field)"
             :max="numericInputMax(node.rule.field)"
             :step="numericInputStep(node.rule.field)"
-            placeholder="value"
+            :placeholder="t('book.filter.valuePlaceholder')"
             class="h-9 rounded-md border border-input bg-background text-foreground text-sm px-2 focus:outline-none focus:ring-2 focus:ring-primary min-w-32 flex-1"
           />
           <template v-if="showValueToInput(node.rule.operator)">
-            <span class="text-xs text-muted-foreground">to</span>
+            <span class="text-xs text-muted-foreground">{{ t('book.filter.to') }}</span>
             <input
               v-model="node.rule.valueTo"
               @input="emitUpdate"
@@ -584,7 +593,7 @@ function showValueToInput(operator: RuleOperator): boolean {
               :min="numericInputMin(node.rule.field)"
               :max="numericInputMax(node.rule.field)"
               :step="numericInputStep(node.rule.field)"
-              placeholder="max"
+              :placeholder="t('book.filter.maxPlaceholder')"
               class="h-9 rounded-md border border-input bg-background text-foreground text-sm px-2 focus:outline-none focus:ring-2 focus:ring-primary w-24"
             />
           </template>
@@ -602,7 +611,7 @@ function showValueToInput(operator: RuleOperator): boolean {
       <div v-else-if="node.kind === 'group'" class="flex items-start gap-2">
         <div class="flex-1 rounded-lg border border-primary/20 bg-primary/3 p-3">
           <div class="flex items-center justify-between mb-3">
-            <span class="text-[10px] font-semibold uppercase tracking-widest text-primary/50">Group</span>
+            <span class="text-[10px] font-semibold uppercase tracking-widest text-primary/50">{{ t('book.filter.group') }}</span>
           </div>
           <BookFilterBuilder :model-value="node.group" :depth="(depth ?? 0) + 1" @update:model-value="onSubGroupUpdate(index, $event)" />
         </div>
@@ -622,7 +631,7 @@ function showValueToInput(operator: RuleOperator): boolean {
         class="flex items-center gap-1.5 h-9 px-4 rounded-lg border border-dashed border-input text-sm text-muted-foreground hover:text-foreground hover:border-foreground hover:bg-muted/30 transition-colors"
       >
         <Plus :size="13" />
-        Add rule
+        {{ t('book.filter.addRule') }}
       </button>
       <button
         v-if="(depth ?? 0) < MAX_DEPTH"
@@ -630,7 +639,7 @@ function showValueToInput(operator: RuleOperator): boolean {
         class="flex items-center gap-1.5 h-9 px-4 rounded-lg border border-dashed border-primary/30 text-sm text-primary/50 hover:text-primary hover:border-primary hover:bg-primary/5 transition-colors"
       >
         <Plus :size="13" />
-        Add group
+        {{ t('book.filter.addGroup') }}
       </button>
     </div>
   </div>

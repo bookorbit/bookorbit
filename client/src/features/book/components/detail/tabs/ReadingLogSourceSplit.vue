@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { MonitorSmartphone } from '@lucide/vue'
 import type { BookReadingSessionStats, ReadingSessionSourceBucket } from '@bookorbit/types'
 import { READING_SESSION_SOURCE_BUCKET_LABELS } from '@bookorbit/types'
@@ -12,6 +13,8 @@ const props = withDefaults(
   }>(),
   { embedded: false, compact: false },
 )
+
+const { t } = useI18n()
 
 const BUCKET_TOKEN: Record<ReadingSessionSourceBucket, string> = {
   bookorbit: '--pill-web',

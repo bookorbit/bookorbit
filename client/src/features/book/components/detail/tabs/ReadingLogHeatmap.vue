@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { CalendarDays } from '@lucide/vue'
 import type { BookReadingSessionStats } from '@bookorbit/types'
@@ -16,8 +17,35 @@ const props = withDefaults(
   { embedded: false },
 )
 
+const { t } = useI18n()
+
 const DAY_MS = 24 * 60 * 60 * 1000
-const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+const dayLabels = computed(
+  () =>
+    [
+      t('book.detail.readingLog.weekdays.sun'),
+      t('book.detail.readingLog.weekdays.mon'),
+      t('book.detail.readingLog.weekdays.tue'),
+      t('book.detail.readingLog.weekdays.wed'),
+      t('book.detail.readingLog.weekdays.thu'),
+      t('book.detail.readingLog.weekdays.fri'),
+      t('book.detail.readingLog.weekdays.sat'),
+    ] as const,
+)
+const monthLabels = computed(() => [
+  t('book.detail.readingLog.months.jan'),
+  t('book.detail.readingLog.months.feb'),
+  t('book.detail.readingLog.months.mar'),
+  t('book.detail.readingLog.months.apr'),
+  t('book.detail.readingLog.months.may'),
+  t('book.detail.readingLog.months.jun'),
+  t('book.detail.readingLog.months.jul'),
+  t('book.detail.readingLog.months.aug'),
+  t('book.detail.readingLog.months.sep'),
+  t('book.detail.readingLog.months.oct'),
+  t('book.detail.readingLog.months.nov'),
+  t('book.detail.readingLog.months.dec'),
+])
 
 const themeStore = useThemeStore()
 const option = shallowRef({})
@@ -115,7 +143,7 @@ watchEffect(() => {
       textStyle: { color: palette.tooltipText, fontSize: 12 },
       formatter: (params: { value: [string, number] }) => {
         const [day, minutes] = params.value
-        return `${day}<br/><strong>${minutes}</strong> min`
+        return `${day}<br/><strong>${minutes}</strong> ${t('book.detail.readingLog.heatmap.minutesUnit')}`
       },
     },
     visualMap: {
@@ -146,7 +174,7 @@ watchEffect(() => {
         fontSize: 9,
         color: palette.axisColor,
         margin: 6,
-        nameMap: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+        nameMap: monthLabels.value,
       },
       dayLabel: {
         show: true,
@@ -154,7 +182,7 @@ watchEffect(() => {
         fontSize: 8,
         color: palette.axisColor,
         margin: 6,
-        nameMap: DAY_LABELS,
+        nameMap: dayLabels.value,
       },
       itemStyle: {
         color: 'transparent',

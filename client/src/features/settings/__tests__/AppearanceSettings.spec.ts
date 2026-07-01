@@ -115,6 +115,10 @@ vi.mock('@/stores/theme', () => ({
   useThemeStore: () => themeStore,
 }))
 
+vi.mock('@/stores/locale', () => ({
+  useLocaleStore: () => ({ locale: ref('en'), setLocale: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined) }),
+}))
+
 vi.mock('@/composables/useDisplaySettings', () => ({
   getDisplayPreferencesSnapshot: () => displaySnapshot,
   useDisplaySettings: () => displayRefs,

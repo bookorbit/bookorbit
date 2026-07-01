@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import MetadataPreferencesSettings from './metadata-preferences/MetadataPreferencesSettings.vue'
 import MetadataFieldRulesSettings from './metadata-preferences/MetadataFieldRulesSettings.vue'
@@ -12,6 +13,7 @@ import SettingsPageHeader from './SettingsPageHeader.vue'
 import { METADATA_TAB_INFO, METADATA_TABS, normalizeMetadataTab, type MetadataTab as Tab } from './lib/metadata-tabs'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const { hasPermission } = usePermissions()
@@ -75,16 +77,16 @@ function selectTab(tab: Tab) {
 <template>
   <div class="metadata-mobile-hints">
     <div class="md:hidden mb-3">
-      <h2 class="settings-title">{{ hasAccessibleTabs ? activeTabInfo.titleLabel : 'Metadata' }}</h2>
+      <h2 class="settings-title">{{ hasAccessibleTabs ? activeTabInfo.titleLabel : t('settings.metadata.title') }}</h2>
       <p class="settings-subtitle overflow-hidden" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2">
-        {{ hasAccessibleTabs ? activeTabInfo.subtitle : 'You do not have permission to manage metadata settings.' }}
+        {{ hasAccessibleTabs ? activeTabInfo.subtitle : t('settings.metadata.noPermission') }}
       </p>
     </div>
     <div v-if="hasAccessibleTabs" class="hidden md:block">
       <SettingsPageHeader :title="activeTabInfo.titleLabel" :subtitle="activeTabInfo.subtitle" />
     </div>
     <div v-else class="hidden md:block">
-      <SettingsPageHeader title="Metadata" subtitle="You do not have permission to manage metadata settings." />
+      <SettingsPageHeader :title="t('settings.metadata.title')" :subtitle="t('settings.metadata.noPermission')" />
     </div>
 
     <div
@@ -119,7 +121,7 @@ function selectTab(tab: Tab) {
       <AuthorEnrichmentSettings v-else-if="activeTab === 'authors'" />
     </div>
     <div v-else class="max-w-3xl rounded-lg border border-border bg-card px-4 py-5 text-sm text-muted-foreground">
-      You do not have permission to manage metadata settings.
+      {{ t('settings.metadata.noPermission') }}
     </div>
   </div>
 </template>

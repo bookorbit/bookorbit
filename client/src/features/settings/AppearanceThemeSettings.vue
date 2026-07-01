@@ -1,16 +1,18 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { Moon, Sun } from '@lucide/vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ACCENT_PASTEL, ACCENT_VIVID, BACKGROUND_OPTIONS, RADIUS_OPTIONS, useThemeStore } from '@/stores/theme'
 import AppearancePreferenceStorage from './AppearancePreferenceStorage.vue'
 
+const { t } = useI18n()
 const themeStore = useThemeStore()
 
 const BACKGROUND_GROUPS: { label: string; ids: string[] }[] = [
-  { label: 'Fundamental', ids: ['none', 'dots', 'cross', 'terminal', 'millimeter'] },
-  { label: 'Structural', ids: ['blueprint', 'brushed', 'scanlines', 'vinyl', 'carbon', 'perforated'] },
-  { label: 'Ambient', ids: ['aurora', 'horizon', 'glow', 'mesh', 'elevation'] },
-  { label: 'Refractive', ids: ['prism', 'spectrum', 'spectrum-x', 'spectrum-plus', 'eclipse'] },
+  { label: t('settings.appearance.theme.backgroundGroups.fundamental'), ids: ['none', 'dots', 'cross', 'terminal', 'millimeter'] },
+  { label: t('settings.appearance.theme.backgroundGroups.structural'), ids: ['blueprint', 'brushed', 'scanlines', 'vinyl', 'carbon', 'perforated'] },
+  { label: t('settings.appearance.theme.backgroundGroups.ambient'), ids: ['aurora', 'horizon', 'glow', 'mesh', 'elevation'] },
+  { label: t('settings.appearance.theme.backgroundGroups.refractive'), ids: ['prism', 'spectrum', 'spectrum-x', 'spectrum-plus', 'eclipse'] },
 ]
 
 function handleLightTheme() {
@@ -35,12 +37,12 @@ function handleBrightnessInput(event: Event) {
     <AppearancePreferenceStorage />
 
     <div>
-      <p class="settings-group-label">Theme</p>
+      <p class="settings-group-label">{{ t('settings.appearance.theme.title') }}</p>
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
           <div>
-            <p class="settings-label">Color scheme</p>
-            <p class="settings-hint">Light or dark interface</p>
+            <p class="settings-label">{{ t('settings.appearance.theme.colorScheme.label') }}</p>
+            <p class="settings-hint">{{ t('settings.appearance.theme.colorScheme.hint') }}</p>
           </div>
           <div class="flex items-center gap-1 p-1 rounded-lg border border-border bg-muted/50 self-start">
             <button
@@ -48,21 +50,21 @@ function handleBrightnessInput(event: Event) {
               :class="themeStore.theme === 'light' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
               @click="handleLightTheme"
             >
-              <Sun :size="12" /> Light
+              <Sun :size="12" /> {{ t('settings.appearance.themeMode.light') }}
             </button>
             <button
               class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
               :class="themeStore.theme === 'dark' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
               @click="handleDarkTheme"
             >
-              <Moon :size="12" /> Dark
+              <Moon :size="12" /> {{ t('settings.appearance.themeMode.dark') }}
             </button>
           </div>
         </div>
 
         <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
-          <p class="settings-label mb-0.5">Accent color</p>
-          <p class="text-xs text-muted-foreground mb-3">Controls highlights and interactive elements</p>
+          <p class="settings-label mb-0.5">{{ t('settings.appearance.theme.accentColor.label') }}</p>
+          <p class="text-xs text-muted-foreground mb-3">{{ t('settings.appearance.theme.accentColor.hint') }}</p>
           <div class="space-y-2">
             <div class="flex items-center gap-1.5 flex-wrap">
               <Tooltip v-for="opt in ACCENT_VIVID" :key="opt.id">
@@ -103,8 +105,8 @@ function handleBrightnessInput(event: Event) {
 
         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
           <div>
-            <p class="settings-label">Corner radius</p>
-            <p class="settings-hint">Roundness of cards and UI elements</p>
+            <p class="settings-label">{{ t('settings.appearance.theme.cornerRadius.label') }}</p>
+            <p class="settings-hint">{{ t('settings.appearance.theme.cornerRadius.hint') }}</p>
           </div>
           <div class="flex items-center gap-1.5 self-start">
             <button
@@ -127,7 +129,7 @@ function handleBrightnessInput(event: Event) {
         <div v-if="themeStore.theme === 'dark'" class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
           <div class="mb-3">
             <div class="flex items-center justify-between gap-3 mb-0.5">
-              <p class="settings-label">Surface brightness</p>
+              <p class="settings-label">{{ t('settings.appearance.theme.surfaceBrightness.label') }}</p>
               <div class="flex items-center gap-2">
                 <span class="settings-value md:hidden">{{ themeStore.brightness }}%</span>
                 <button
@@ -135,11 +137,11 @@ function handleBrightnessInput(event: Event) {
                   class="text-xs text-muted-foreground hover:text-foreground transition-colors"
                   @click="resetBrightness"
                 >
-                  Reset
+                  {{ t('settings.appearance.theme.surfaceBrightness.reset') }}
                 </button>
               </div>
             </div>
-            <p class="settings-hint">Lighten dark mode surfaces</p>
+            <p class="settings-hint">{{ t('settings.appearance.theme.surfaceBrightness.hint') }}</p>
             <div>
               <span class="settings-value hidden md:inline">{{ themeStore.brightness }}%</span>
             </div>
@@ -158,13 +160,13 @@ function handleBrightnessInput(event: Event) {
     </div>
 
     <div>
-      <p class="settings-group-label">Library Background</p>
+      <p class="settings-group-label">{{ t('settings.appearance.theme.libraryBackground.title') }}</p>
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
         <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
           <div class="mb-3">
             <div>
-              <p class="settings-label">Background pattern</p>
-              <p class="settings-hint">Pattern shown behind the book grid</p>
+              <p class="settings-label">{{ t('settings.appearance.theme.libraryBackground.pattern.label') }}</p>
+              <p class="settings-hint">{{ t('settings.appearance.theme.libraryBackground.pattern.hint') }}</p>
             </div>
           </div>
           <div class="space-y-5 md:space-y-6">

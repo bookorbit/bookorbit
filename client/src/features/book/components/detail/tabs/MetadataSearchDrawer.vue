@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { X, Sparkles } from '@lucide/vue'
 import { isAudioFormat } from '@bookorbit/types'
 import type { BookDetail, BookMetadataLockField, MetadataCandidate, MetadataProviderKey, MetadataSource } from '@bookorbit/types'
@@ -15,6 +16,7 @@ const emit = defineEmits<{
   apply: [{ formPatch: MetadataPatch; coverUrl?: string }]
 }>()
 
+const { t } = useI18n()
 const { coverUrl } = useCoverVersions()
 const bookCoverUrl = computed(() => coverUrl(props.book.id, 'cover', props.book.updatedAt ?? props.book.addedAt))
 const searchDefaults = computed(() => ({
@@ -61,9 +63,11 @@ const {
 
 const view = ref<'search' | 'diff'>('search')
 const selectedCandidate = ref<MetadataCandidate | null>(null)
-const drawerTitle = computed(() => (view.value === 'search' ? 'Search Metadata' : 'Compare Metadata'))
+const drawerTitle = computed(() =>
+  view.value === 'search' ? t('book.detail.editMetadata.searchDrawer.searchTitle') : t('book.detail.editMetadata.searchDrawer.compareTitle'),
+)
 const drawerSubtitle = computed(() =>
-  view.value === 'search' ? 'Find the best provider match for this book.' : 'Review differences and apply only what you want.',
+  view.value === 'search' ? t('book.detail.editMetadata.searchDrawer.searchSubtitle') : t('book.detail.editMetadata.searchDrawer.compareSubtitle'),
 )
 
 onMounted(() => {
@@ -179,7 +183,7 @@ function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string }) {
             :provider-ids="book.providerIds"
             :locked-fields="props.lockedFields"
             :filtered-results="filteredResults"
-            back-label="Results"
+            :back-label="t('book.detail.editMetadata.diffPanel.results')"
             @back="backToSearch"
             @apply="handleApply"
           />

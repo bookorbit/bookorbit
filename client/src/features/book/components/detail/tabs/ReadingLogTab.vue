@@ -21,6 +21,8 @@ const emit = defineEmits<{
   saved: [book: BookDetail]
 }>()
 
+const { t } = useI18n()
+
 const bookIdRef = computed(() => props.book.id)
 const {
   sessions,
@@ -63,7 +65,7 @@ const uniqueFormats = computed(() => {
 
 const hasMultipleFormats = computed(() => uniqueFormats.value.length >= 2)
 
-const bookTitle = computed(() => props.book.title ?? 'Untitled')
+const bookTitle = computed(() => props.book.title ?? t('book.detail.readingLog.untitled'))
 
 function buildDateFrom(q: QuickFilter): string | undefined {
   const now = new Date()
@@ -138,18 +140,18 @@ async function handleAddSessionSubmit(payload: AddReadingSessionPayload) {
     await addSession(payload)
     addDialogOpen.value = false
   } catch (e) {
-    addError.value = e instanceof Error ? e.message : 'Failed to add session'
+    addError.value = e instanceof Error ? e.message : t('book.detail.readingLog.addSessionFailed')
   } finally {
     addSaving.value = false
   }
 }
 
-const quickFilters: { label: string; value: QuickFilter }[] = [
-  { label: 'All time', value: 'all' },
-  { label: 'Last 30 days', value: 'last30' },
-  { label: 'Last 90 days', value: 'last90' },
-  { label: 'This year', value: 'thisYear' },
-]
+const quickFilters = computed<{ label: string; value: QuickFilter }[]>(() => [
+  { label: t('book.detail.readingLog.filters.allTime'), value: 'all' },
+  { label: t('book.detail.readingLog.filters.last30'), value: 'last30' },
+  { label: t('book.detail.readingLog.filters.last90'), value: 'last90' },
+  { label: t('book.detail.readingLog.filters.thisYear'), value: 'thisYear' },
+])
 </script>
 
 <template>

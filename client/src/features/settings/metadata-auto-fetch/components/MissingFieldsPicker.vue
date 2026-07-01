@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import type { MetadataField } from '@bookorbit/types'
 import { ALL_METADATA_FIELDS } from '@bookorbit/types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   modelValue: MetadataField[]
@@ -8,23 +11,8 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ 'update:modelValue': [MetadataField[]] }>()
 
-const FIELD_LABELS: Record<MetadataField, string> = {
-  title: 'Title',
-  subtitle: 'Subtitle',
-  description: 'Description',
-  cover: 'Cover',
-  authors: 'Authors',
-  publisher: 'Publisher',
-  publishedYear: 'Published year',
-  language: 'Language',
-  pageCount: 'Page count',
-  communityRating: 'Community rating',
-  seriesName: 'Series name',
-  seriesIndex: 'Series index',
-  genres: 'Genres',
-  narrators: 'Narrators',
-  duration: 'Duration',
-  abridged: 'Abridged',
+function fieldLabel(field: MetadataField): string {
+  return t(`settings.metadata.fields.${field}`)
 }
 
 function toggle(field: MetadataField) {
@@ -55,7 +43,7 @@ function toggle(field: MetadataField) {
         props.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
       ]"
     >
-      {{ FIELD_LABELS[field] }}
+      {{ fieldLabel(field) }}
     </button>
   </div>
 </template>

@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue'
 import { useLocalStorage } from '@vueuse/core'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { BookOpen, Download, Eye, FilePlus, Files, Headphones, History, FolderOpen, ArrowUpDown, MoreVertical, Pencil, Trash2 } from '@lucide/vue'
 import type { BookDetail, BookDetailFile, WriteLogEntry } from '@bookorbit/types'
 import { Permission, READER_OPENABLE_FORMATS } from '@bookorbit/types'
@@ -15,6 +16,7 @@ import AddBookFileModal from './AddBookFileModal.vue'
 
 const props = defineProps<{ book: BookDetail }>()
 const emit = defineEmits<{ refetch: [] }>()
+const { t } = useI18n()
 const router = useRouter()
 
 const { downloadFile: downloadBookFile } = useBookDownload()
@@ -114,13 +116,13 @@ function formatDate(iso: string): string {
 function formatRelative(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
   const s = Math.floor(diff / 1000)
-  if (s < 60) return `${s}s ago`
+  if (s < 60) return t('book.detail.files.relative.seconds', { value: s })
   const m = Math.floor(s / 60)
-  if (m < 60) return `${m}m ago`
+  if (m < 60) return t('book.detail.files.relative.minutes', { value: m })
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
+  if (h < 24) return t('book.detail.files.relative.hours', { value: h })
   const d = Math.floor(h / 24)
-  return `${d}d ago`
+  return t('book.detail.files.relative.days', { value: d })
 }
 
 function openFile(file: BookDetailFile, mode?: 'peek') {
@@ -194,7 +196,7 @@ async function submitRename() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ filename: renameInput.value.trim() }),
     })
-    if (!res.ok) throw new Error('Failed to rename file')
+    if (!res.ok) throw new Error(t('book.detail.files.renameFailed'))
     renameFileTarget.value = null
     emit('refetch')
   } catch (err) {
@@ -221,7 +223,7 @@ async function confirmDelete() {
     const res = await api(`/api/v1/books/files/${deleteFileTarget.value.id}`, {
       method: 'DELETE',
     })
-    if (!res.ok) throw new Error('Failed to delete file')
+    if (!res.ok) throw new Error(t('book.detail.files.deleteFailed'))
     emit('refetch')
   } catch (err) {
     alert(err instanceof Error ? err.message : String(err))
@@ -505,13 +507,13 @@ async function toggleWriteLog() {
     <div v-if="renameFileTarget" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="closeRenameModal">
       <button class="absolute inset-0 bg-black/45" @click="closeRenameModal" />
       <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
-        <p class="text-base font-semibold text-foreground">Rename File</p>
-        <p class="mt-1 text-sm text-muted-foreground">Rename the physical file on disk.</p>
+        <p class="text-base font-semibold text-foreground">{{ t('book.detail.files.renameModal.title') }}</p>
+        <p class="mt-1 text-sm text-muted-foreground">{{ t('book.detail.files.renameModal.description') }}</p>
         <div class="mt-4">
           <input
             v-model="renameInput"
             class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
-            placeholder="New filename"
+            :placeholder="t('book.detail.files.renameModal.placeholder')"
             @keyup.enter="submitRename"
           />
         </div>
@@ -520,14 +522,14 @@ async function toggleWriteLog() {
             class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
             @click="closeRenameModal"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
           <button
             class="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
             :disabled="renaming"
             @click="submitRename"
           >
-            {{ renaming ? 'Saving...' : 'Save' }}
+            {{ renaming ? t('book.detail.files.saving') : t('common.save') }}
           </button>
         </div>
       </div>
@@ -537,23 +539,23 @@ async function toggleWriteLog() {
     <div v-if="deleteFileTarget" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="closeDeleteModal">
       <button class="absolute inset-0 bg-black/45" @click="closeDeleteModal" />
       <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
-        <p class="text-base font-semibold text-foreground">Delete file?</p>
+        <p class="text-base font-semibold text-foreground">{{ t('book.detail.files.deleteModal.title') }}</p>
         <p class="mt-1 text-sm text-muted-foreground">
-          Are you sure you want to delete "{{ deleteFileTarget.filename }}"? This action cannot be undone.
+          {{ t('book.detail.files.deleteModal.description', { filename: deleteFileTarget.filename }) }}
         </p>
         <div class="mt-4 flex items-center justify-end gap-2">
           <button
             class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
             @click="closeDeleteModal"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
           <button
             class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 transition-colors"
             :disabled="deletingFile"
             @click="confirmDelete"
           >
-            {{ deletingFile ? 'Deleting...' : 'Delete' }}
+            {{ deletingFile ? t('book.detail.files.deleting') : t('common.delete') }}
           </button>
         </div>
       </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { ACCENT_PASTEL, ACCENT_VIVID, BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import AppearanceBehaviorSettings from './AppearanceBehaviorSettings.vue'
@@ -10,6 +11,7 @@ import AppearanceThemeSettings from './AppearanceThemeSettings.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import { APPEARANCE_TAB_LABELS, APPEARANCE_TABS, normalizeAppearanceTab, type AppearanceTab as Tab } from './lib/appearance-tabs'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const themeStore = useThemeStore()
@@ -44,12 +46,18 @@ function selectTab(tab: Tab) {
 </script>
 
 <template>
-  <SettingsPageHeader title="Display" subtitle="Control themes, covers, layout, and how your library is presented." />
+  <SettingsPageHeader :title="t('settings.appearance.pageTitle')" :subtitle="t('settings.appearance.pageSubtitle')" />
   <div
     class="md:hidden sticky top-0 z-20 -mx-4 mb-4 px-4 py-2 border-y border-border/70 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75"
   >
     <p class="text-[11px] font-medium text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
-      Theme: {{ themeStore.theme === 'dark' ? 'Dark' : 'Light' }} • Accent: {{ accentLabel }} • Background: {{ backgroundLabel }}
+      {{
+        t('settings.appearance.mobileSummary', {
+          theme: themeStore.theme === 'dark' ? t('settings.appearance.themeMode.dark') : t('settings.appearance.themeMode.light'),
+          accent: accentLabel,
+          background: backgroundLabel,
+        })
+      }}
     </p>
   </div>
 

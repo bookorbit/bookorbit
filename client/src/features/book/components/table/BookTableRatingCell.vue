@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Star } from '@lucide/vue'
 import { RATING_STARS, getRatingStarClass } from '@/features/book/lib/rating-stars'
 
@@ -11,6 +12,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   save: [value: number | null]
 }>()
+
+const { t } = useI18n()
 
 const STARS = RATING_STARS
 const groupRef = ref<HTMLDivElement | null>(null)
@@ -54,7 +57,7 @@ function handleStarKeydown(event: KeyboardEvent) {
 }
 
 function getAriaLabel(star: number): string {
-  return props.value === star ? 'Remove rating' : `Rate ${star} out of 5`
+  return props.value === star ? t('book.table.rating.remove') : t('book.table.rating.rate', { star })
 }
 
 function getTabIndex(star: number): number {
@@ -64,7 +67,7 @@ function getTabIndex(star: number): number {
 </script>
 
 <template>
-  <div ref="groupRef" role="group" aria-label="Rating" class="flex items-center gap-0.5">
+  <div ref="groupRef" role="group" :aria-label="t('book.table.rating.label')" class="flex items-center gap-0.5">
     <button
       v-for="star in STARS"
       :key="star"

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { CustomMetadataFieldType } from '@bookorbit/types'
+
+const { t } = useI18n()
 
 defineProps<{ type: CustomMetadataFieldType }>()
 
@@ -16,12 +19,14 @@ function toggleBoolean() {
 
 <template>
   <div class="space-y-1">
-    <span class="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-widest">Preview</span>
+    <span class="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-widest">{{
+      t('settings.metadata.customFields.preview')
+    }}</span>
     <input
       v-if="type === 'text' || type === 'url'"
       v-model="textValue"
       :type="type === 'url' ? 'url' : 'text'"
-      :placeholder="type === 'url' ? 'https://example.com' : 'Sample value'"
+      :placeholder="type === 'url' ? 'https://example.com' : t('settings.metadata.customFields.sampleValue')"
       class="input-field w-full"
     />
     <input v-else-if="type === 'number'" v-model="numberValue" type="number" placeholder="0" class="input-field w-full" />
