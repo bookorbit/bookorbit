@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DisplayPreferences, ThemePreferences } from '@bookorbit/types';
+import type { DisplayPreferences, LocalePreferences, ThemePreferences } from '@bookorbit/types';
 
 import { UserPreferencesRepository } from './user-preferences.repository';
 import { UserPreferencesService } from './user-preferences.service';
@@ -38,8 +38,12 @@ const validDisplayPreferences: DisplayPreferences = {
   thumbnailClickAction: 'reader',
 };
 
+const validLocalePreferences: LocalePreferences = {
+  locale: 'nl',
+};
+
 const repo = {
-  findByCategory: vi.fn<(...args: [number, string]) => Promise<{ data: ThemePreferences | DisplayPreferences } | undefined>>(),
+  findByCategory: vi.fn<(...args: [number, string]) => Promise<{ data: ThemePreferences | DisplayPreferences | LocalePreferences } | undefined>>(),
   upsert: vi.fn<(...args: [number, string, Record<string, unknown>]) => Promise<void>>(),
   delete: vi.fn<(...args: [number, string]) => Promise<void>>(),
 };
@@ -74,6 +78,34 @@ describe('UserPreferencesService', () => {
     repo.findByCategory.mockResolvedValueOnce({ data: validDisplayPreferences });
 
     await expect(service.getDisplayPreferences(7)).resolves.toEqual(validDisplayPreferences);
+  });
+
+  it('getLocalePreferences returns null when repository has no row', async () => {
+    await expect(service.getLocalePreferences(7)).resolves.toBeNull();
+    expect(repo.findByCategory).toHaveBeenCalledWith(7, 'locale');
+  });
+
+  it('getLocalePreferences returns saved locale settings when row exists', async () => {
+    repo.findByCategory.mockResolvedValueOnce({ data: validLocalePreferences });
+
+    await expect(service.getLocalePreferences(7)).resolves.toEqual(validLocalePreferences);
+  });
+
+  it('upsertLocalePreferences persists validated settings', async () => {
+    await expect(service.upsertLocalePreferences(11, validLocalePreferences)).resolves.toBeUndefined();
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'locale', validLocalePreferences);
+  });
+
+  it('upsertLocalePreferences rejects unsupported locale', async () => {
+    await expect(service.upsertLocalePreferences(11, { locale: 'de' } as never)).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.upsert).not.toHaveBeenCalled();
+  });
+
+  it('upsertLocalePreferences rejects extra unknown fields', async () => {
+    await expect(
+      service.upsertLocalePreferences(11, { ...validLocalePreferences, unexpected: true } as Record<string, unknown>),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.upsert).not.toHaveBeenCalled();
   });
 
   it('upsertThemePreferences persists validated settings', async () => {

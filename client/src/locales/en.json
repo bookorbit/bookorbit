@@ -1,0 +1,26 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "confirm": "Confirm",
+    "loading": "Loading...",
+    "search": "Search",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "settings": {
+    "appearance": {
+      "language": {
+        "title": "Language",
+        "description": "Choose the language used across the interface.",
+        "label": "Interface language"
+      }
+    }
+  }
+}

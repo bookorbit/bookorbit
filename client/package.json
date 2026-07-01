@@ -66,11 +66,13 @@
     "vue": "^3.5.38",
     "vue-draggable-plus": "^0.6.1",
     "vue-echarts": "8.1.0-beta.2",
+    "vue-i18n": "^11.4.6",
     "vue-router": "^5.1.0",
     "vue-sonner": "^2.0.9",
     "vue-virtual-scroller": "^3.0.4"
   },
   "devDependencies": {
+    "@intlify/unplugin-vue-i18n": "^11.2.4",
     "@tsconfig/node24": "^24.0.4",
     "@types/canvas-confetti": "^1.9.0",
     "@types/jsdom": "^28.0.3",
