@@ -92,6 +92,7 @@ export class AuthService {
       throw new ForbiddenException('Registration is not open');
     }
 
+    const defaultLibraryIds = await this.appSettings.getDefaultLibraryAccessLibraryIds();
     const passwordHash = await hash(dto.password, 12);
     return this.db.transaction(async (tx) => {
       const existingUsername = await tx.query.users.findFirst({
@@ -116,6 +117,13 @@ export class AuthService {
           isDefaultPassword: false,
         })
         .returning({ id: schema.users.id, username: schema.users.username, name: schema.users.name });
+
+      if (defaultLibraryIds.length > 0) {
+        await tx
+          .insert(schema.userLibraryAccess)
+          .values(defaultLibraryIds.map((libraryId) => ({ userId: user.id, libraryId, accessLevel: 'viewer' as const })))
+          .onConflictDoNothing();
+      }
 
       this.logger.log(`[auth.register] [end] userId=${user.id} username=${user.username} - registration completed`);
 

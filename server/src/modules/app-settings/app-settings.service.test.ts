@@ -17,6 +17,7 @@ function makeRepo(): jest.Mocked<AppSettingsRepository> {
     listPublic: vi.fn().mockResolvedValue([]),
     findByKey: vi.fn().mockResolvedValue(undefined),
     findMany: vi.fn().mockResolvedValue([]),
+    findExistingLibraryIds: vi.fn().mockResolvedValue([]),
     updateByKey: vi.fn().mockResolvedValue(null),
     upsert: vi.fn().mockResolvedValue(undefined),
   } as unknown as jest.Mocked<AppSettingsRepository>;
@@ -225,6 +226,37 @@ describe('AppSettingsService', () => {
       expect(result.claimMapping.groups).toBe('cognito:groups');
       expect(result.autoProvision.enabled).toBe(true);
       expect(result.autoProvision.allowLocalLinking).toBe(true);
+    });
+  });
+
+  describe('default library access', () => {
+    it('returns an empty list when no setting is stored', async () => {
+      repo.findByKey.mockResolvedValue(undefined);
+      await expect(service.getDefaultLibraryAccess()).resolves.toEqual({ libraryIds: [] });
+    });
+
+    it('normalizes stored IDs and drops IDs for deleted libraries', async () => {
+      repo.findByKey.mockResolvedValue({ key: 'default_library_access', value: JSON.stringify({ libraryIds: [3, 3, 5, -1, '7'] }) } as never);
+      repo.findExistingLibraryIds.mockResolvedValue([5, 3]);
+
+      await expect(service.getDefaultLibraryAccess()).resolves.toEqual({ libraryIds: [3, 5] });
+      expect(repo.findExistingLibraryIds).toHaveBeenCalledWith([3, 5]);
+    });
+
+    it('stores validated default library IDs', async () => {
+      repo.findExistingLibraryIds.mockResolvedValue([2, 4]);
+
+      const result = await service.setDefaultLibraryAccess({ libraryIds: [2, 4] });
+
+      expect(result).toEqual({ libraryIds: [2, 4] });
+      expect(repo.upsert).toHaveBeenCalledWith('default_library_access', JSON.stringify({ libraryIds: [2, 4] }));
+    });
+
+    it('rejects unknown default library IDs', async () => {
+      repo.findExistingLibraryIds.mockResolvedValue([2]);
+
+      await expect(service.setDefaultLibraryAccess({ libraryIds: [2, 9] })).rejects.toThrow(BadRequestException);
+      expect(repo.upsert).not.toHaveBeenCalled();
     });
   });
 

@@ -48,7 +48,7 @@ watch(availableTabs, (tabs) => {
 
 const tabWidths: Record<Tab, string> = {
   users: 'max-w-6xl',
-  'magic-links': 'max-w-6xl',
+  'magic-links': 'max-w-5xl',
   oidc: 'max-w-3xl',
 }
 

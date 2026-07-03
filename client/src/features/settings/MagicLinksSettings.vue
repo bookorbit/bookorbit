@@ -159,16 +159,6 @@ function isExpired(expiresAt: string | null | undefined): boolean {
       </button>
     </div>
   </template>
-  <div v-else-if="props.withEmbeddedCreateAction" class="mb-4 flex items-center justify-end md:mb-5">
-    <button class="settings-btn-primary w-full justify-center md:w-auto" :disabled="sharedUsers.length === 0" @click="openCreateForm">
-      <Plus :size="14" />
-      Create link
-    </button>
-  </div>
-
-  <p v-if="sharedUsers.length === 0 && !loading" class="text-sm text-muted-foreground mb-4">
-    No shared accounts found. Create a shared account from the Users page first.
-  </p>
 
   <div v-if="error" class="mb-4 text-sm text-destructive">{{ error }}</div>
   <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>
@@ -234,151 +224,189 @@ function isExpired(expiresAt: string | null | undefined): boolean {
     </div>
   </div>
 
-  <!-- Active tokens -->
-  <div v-if="!loading && activeTokens.length > 0" class="space-y-3">
-    <h2 class="text-sm font-medium text-muted-foreground">Active links</h2>
-    <div class="hidden md:block rounded-lg border border-border overflow-hidden shadow-xs">
-      <table class="w-full text-sm">
-        <thead class="bg-muted/50">
-          <tr>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Label</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Account</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Created by</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Expires</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Uses</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Last used</th>
-            <th class="px-4 py-3" />
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border">
-          <tr v-for="token in activeTokens" :key="token.id" class="hover:bg-muted/30 transition-colors" :class="!token.isActive ? 'opacity-60' : ''">
-            <td class="px-4 py-3 text-foreground font-medium">
-              <div class="flex items-center gap-1.5">
-                <Link :size="12" class="text-muted-foreground shrink-0" />
-                {{ token.label }}
-                <span
-                  v-if="!token.isActive"
-                  class="inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
-                >
-                  Paused
-                </span>
-              </div>
-            </td>
-            <td class="px-4 py-3 text-muted-foreground font-mono text-xs">@{{ token.username }}</td>
-            <td class="px-4 py-3 text-muted-foreground text-xs">{{ token.createdByUsername ?? 'Deleted user' }}</td>
-            <td class="px-4 py-3">
-              <span v-if="token.expiresAt" class="text-xs" :class="isExpired(token.expiresAt) ? 'text-destructive' : 'text-muted-foreground'">
-                {{ isExpired(token.expiresAt) ? 'Expired ' : '' }}{{ formatDate(token.expiresAt) }}
-              </span>
-              <span v-else class="text-xs text-muted-foreground">Never</span>
-            </td>
-            <td class="px-4 py-3 text-muted-foreground text-xs">{{ token.useCount }}</td>
-            <td class="px-4 py-3 text-muted-foreground text-xs">{{ formatDate(token.lastUsedAt) }}</td>
-            <td class="px-4 py-3">
-              <div class="flex items-center gap-1">
-                <Tooltip>
-                  <TooltipTrigger as-child>
-                    <button
-                      class="p-1.5 rounded transition-colors"
-                      :class="copiedId === token.id ? 'text-green-500' : 'text-muted-foreground hover:text-foreground hover:bg-muted'"
-                      @click="copyMagicUrl(token.id, token.rawToken)"
-                    >
-                      <Check v-if="copiedId === token.id" :size="14" />
-                      <Copy v-else :size="14" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>{{ copiedId === token.id ? 'Copied!' : 'Copy link' }}</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger as-child>
-                    <button
-                      class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                      @click="handleToggleActive(token.id, token.isActive)"
-                    >
-                      <Pause v-if="token.isActive" :size="14" />
-                      <Play v-else :size="14" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>{{ token.isActive ? 'Pause' : 'Resume' }}</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger as-child>
-                    <button
-                      class="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                      @click="revokeConfirmId = token.id"
-                    >
-                      <Trash2 :size="14" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>Revoke</TooltipContent>
-                </Tooltip>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+  <!-- Active links -->
+  <div v-if="!loading && !error" class="space-y-3">
+    <div class="flex items-center justify-between mb-3">
+      <p class="settings-group-label mb-0">Active Links</p>
+      <button v-if="props.withEmbeddedCreateAction" class="settings-btn-primary" :disabled="sharedUsers.length === 0" @click="openCreateForm">
+        <Plus :size="14" />
+        Create link
+      </button>
     </div>
 
-    <!-- Mobile active tokens -->
-    <div class="md:hidden space-y-3">
-      <div
-        v-for="token in activeTokens"
-        :key="token.id"
-        class="rounded-lg border border-border bg-card px-4 py-3.5 shadow-xs"
-        :class="!token.isActive ? 'opacity-60' : ''"
-      >
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <div class="flex items-center gap-1.5">
-              <Link :size="12" class="text-muted-foreground shrink-0" />
-              <p class="text-sm font-medium text-foreground truncate">{{ token.label }}</p>
-              <span
-                v-if="!token.isActive"
-                class="inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
-              >
-                Paused
-              </span>
-            </div>
-            <p class="mt-1 text-xs text-muted-foreground">@{{ token.username }}</p>
-          </div>
-          <div class="flex items-center gap-1 shrink-0">
-            <button
-              class="p-1.5 rounded transition-colors"
-              :class="copiedId === token.id ? 'text-green-500' : 'text-muted-foreground hover:text-foreground hover:bg-muted'"
-              @click="copyMagicUrl(token.id, token.rawToken)"
-            >
-              <Check v-if="copiedId === token.id" :size="14" />
-              <Copy v-else :size="14" />
-            </button>
-            <button
-              class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              @click="handleToggleActive(token.id, token.isActive)"
-            >
-              <Pause v-if="token.isActive" :size="14" />
-              <Play v-else :size="14" />
-            </button>
-            <button
-              class="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-              @click="revokeConfirmId = token.id"
-            >
-              <Trash2 :size="14" />
-            </button>
-          </div>
-        </div>
-        <div class="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
-          <span>{{ token.useCount }} uses</span>
-          <span v-if="token.expiresAt" :class="isExpired(token.expiresAt) ? 'text-destructive' : ''">
-            {{ isExpired(token.expiresAt) ? 'Expired' : `Expires ${formatDate(token.expiresAt)}` }}
-          </span>
-          <span v-else>No expiry</span>
-        </div>
-      </div>
+    <div v-if="sharedUsers.length === 0 && tokens.length === 0" class="rounded-lg border border-border bg-muted/30 px-5 py-8 text-center">
+      <Info :size="32" class="mx-auto mb-3 text-muted-foreground/60" />
+      <p class="text-sm font-medium text-foreground">No shared accounts found</p>
+      <p class="mt-1 text-xs text-muted-foreground">
+        Create a shared account from the
+        <RouterLink to="/settings/admin?tab=users" class="text-primary hover:underline font-medium">Users page</RouterLink>
+        first to generate magic links.
+      </p>
     </div>
+
+    <template v-else>
+      <template v-if="activeTokens.length > 0">
+        <div class="hidden md:block rounded-lg border border-border overflow-hidden shadow-xs">
+          <table class="w-full text-sm">
+            <thead class="bg-muted/50">
+              <tr>
+                <th class="px-4 py-3 text-left font-medium text-muted-foreground">Label</th>
+                <th class="px-4 py-3 text-left font-medium text-muted-foreground">Account</th>
+                <th class="px-4 py-3 text-left font-medium text-muted-foreground">Created by</th>
+                <th class="px-4 py-3 text-left font-medium text-muted-foreground">Expires</th>
+                <th class="px-4 py-3 text-left font-medium text-muted-foreground">Uses</th>
+                <th class="px-4 py-3 text-left font-medium text-muted-foreground">Last used</th>
+                <th class="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+              <tr
+                v-for="token in activeTokens"
+                :key="token.id"
+                class="hover:bg-muted/30 transition-colors"
+                :class="!token.isActive ? 'opacity-60' : ''"
+              >
+                <td class="px-4 py-3 text-foreground font-medium">
+                  <div class="flex items-center gap-1.5">
+                    <Link :size="12" class="text-muted-foreground shrink-0" />
+                    {{ token.label }}
+                    <span
+                      v-if="!token.isActive"
+                      class="inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+                    >
+                      Paused
+                    </span>
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">@{{ token.username }}</td>
+                <td class="px-4 py-3 text-muted-foreground text-xs">{{ token.createdByUsername ?? 'Deleted user' }}</td>
+                <td class="px-4 py-3">
+                  <span v-if="token.expiresAt" class="text-xs" :class="isExpired(token.expiresAt) ? 'text-destructive' : 'text-muted-foreground'">
+                    {{ isExpired(token.expiresAt) ? 'Expired ' : '' }}{{ formatDate(token.expiresAt) }}
+                  </span>
+                  <span v-else class="text-xs text-muted-foreground">Never</span>
+                </td>
+                <td class="px-4 py-3 text-muted-foreground text-xs">{{ token.useCount }}</td>
+                <td class="px-4 py-3 text-muted-foreground text-xs">{{ formatDate(token.lastUsedAt) }}</td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-1">
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <button
+                          class="p-1.5 rounded transition-colors"
+                          :class="copiedId === token.id ? 'text-green-500' : 'text-muted-foreground hover:text-foreground hover:bg-muted'"
+                          @click="copyMagicUrl(token.id, token.rawToken)"
+                        >
+                          <Check v-if="copiedId === token.id" :size="14" />
+                          <Copy v-else :size="14" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>{{ copiedId === token.id ? 'Copied!' : 'Copy link' }}</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <button
+                          class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                          @click="handleToggleActive(token.id, token.isActive)"
+                        >
+                          <Pause v-if="token.isActive" :size="14" />
+                          <Play v-else :size="14" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>{{ token.isActive ? 'Pause' : 'Resume' }}</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <button
+                          class="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                          @click="revokeConfirmId = token.id"
+                        >
+                          <Trash2 :size="14" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>Revoke</TooltipContent>
+                    </Tooltip>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Mobile active tokens -->
+        <div class="md:hidden space-y-3">
+          <div
+            v-for="token in activeTokens"
+            :key="token.id"
+            class="rounded-lg border border-border bg-card px-4 py-3.5 shadow-xs"
+            :class="!token.isActive ? 'opacity-60' : ''"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <Link :size="12" class="text-muted-foreground shrink-0" />
+                  <p class="text-sm font-medium text-foreground truncate">{{ token.label }}</p>
+                  <span
+                    v-if="!token.isActive"
+                    class="inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+                  >
+                    Paused
+                  </span>
+                </div>
+                <p class="mt-1 text-xs text-muted-foreground">@{{ token.username }}</p>
+              </div>
+              <div class="flex items-center gap-1 shrink-0">
+                <button
+                  class="p-1.5 rounded transition-colors"
+                  :class="copiedId === token.id ? 'text-green-500' : 'text-muted-foreground hover:text-foreground hover:bg-muted'"
+                  @click="copyMagicUrl(token.id, token.rawToken)"
+                >
+                  <Check v-if="copiedId === token.id" :size="14" />
+                  <Copy v-else :size="14" />
+                </button>
+                <button
+                  class="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  @click="handleToggleActive(token.id, token.isActive)"
+                >
+                  <Pause v-if="token.isActive" :size="14" />
+                  <Play v-else :size="14" />
+                </button>
+                <button
+                  class="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  @click="revokeConfirmId = token.id"
+                >
+                  <Trash2 :size="14" />
+                </button>
+              </div>
+            </div>
+            <div class="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
+              <span>{{ token.useCount }} uses</span>
+              <span v-if="token.expiresAt" :class="isExpired(token.expiresAt) ? 'text-destructive' : ''">
+                {{ isExpired(token.expiresAt) ? 'Expired' : `Expires ${formatDate(token.expiresAt)}` }}
+              </span>
+              <span v-else>No expiry</span>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <div v-else-if="tokens.length === 0" class="rounded-lg border border-border bg-muted/30 px-5 py-8 text-center">
+        <Link :size="32" class="mx-auto mb-3 text-muted-foreground/60" />
+        <p class="text-sm font-medium text-foreground">No magic links created yet</p>
+        <p class="mt-1 text-xs text-muted-foreground">Click "Create link" to generate a shareable login URL.</p>
+      </div>
+
+      <div v-else class="rounded-lg border border-border bg-muted/30 px-5 py-6 text-center">
+        <Link :size="24" class="mx-auto mb-2 text-muted-foreground/50" />
+        <p class="text-sm font-medium text-foreground">No active magic links</p>
+        <p class="mt-1 text-xs text-muted-foreground">All generated magic links for this page have expired or been revoked.</p>
+      </div>
+    </template>
   </div>
 
   <!-- Inactive tokens (revoked or expired) -->
   <div v-if="!loading && inactiveTokens.length > 0" class="mt-6 space-y-3">
-    <h2 class="text-sm font-medium text-muted-foreground">Inactive links</h2>
+    <p class="settings-group-label">Inactive Links</p>
     <div class="hidden md:block rounded-lg border border-border overflow-hidden shadow-xs opacity-60">
       <table class="w-full text-sm">
         <thead class="bg-muted/50">
@@ -414,10 +442,6 @@ function isExpired(expiresAt: string | null | undefined): boolean {
       </div>
     </div>
   </div>
-
-  <p v-if="!loading && tokens.length === 0 && sharedUsers.length > 0" class="text-sm text-muted-foreground mt-4">
-    No magic links created yet. Click "Create link" to generate a shareable login URL.
-  </p>
 
   <!-- Revoke confirmation modal -->
   <div

@@ -49,18 +49,23 @@ describe('UserService', () => {
   };
 
   const config = { get: vi.fn() };
+  const appSettingsService = {
+    getDefaultLibraryAccessLibraryIds: vi.fn(),
+  };
 
   let service: UserService;
 
   beforeEach(() => {
     vi.resetAllMocks();
-    service = new UserService(userRepo as any, config as any, contentFilterRepo as any);
+    service = new UserService(userRepo as any, config as any, contentFilterRepo as any, appSettingsService as any);
 
     mockHash.mockResolvedValue('hashed-secret');
     mockRandomBytes.mockReturnValue(Buffer.from('abcd', 'hex'));
     config.get.mockReturnValue('https://app.example.com');
+    appSettingsService.getDefaultLibraryAccessLibraryIds.mockResolvedValue([]);
 
     userRepo.create.mockResolvedValue({ id: 10, username: 'newuser', name: 'New User' });
+    userRepo.createOidcUser.mockResolvedValue({ id: 11, username: 'oidcuser', name: 'OIDC User' });
     userRepo.findByEmail.mockResolvedValue(null);
     userRepo.generateResetToken.mockResolvedValue('reset-token');
     userRepo.findExistingLibraryIds.mockImplementation((ids: number[]) => Promise.resolve(ids));
@@ -134,6 +139,29 @@ describe('UserService', () => {
     expect(userRepo.setPermissions).toHaveBeenCalledWith(10, [Permission.LibraryDownload, Permission.KoboSync]);
     expect(userRepo.assignViewerLibraries).toHaveBeenCalledWith(10, [3, 5]);
     expect(result).toEqual({ id: 10, username: 'newuser', name: 'New User', resetUrl: 'https://app.example.com/reset-password?token=reset-token' });
+  });
+
+  it('createUser applies default library access when libraries are omitted', async () => {
+    userRepo.findByUsername.mockResolvedValue(null);
+    appSettingsService.getDefaultLibraryAccessLibraryIds.mockResolvedValue([2, 4]);
+
+    await service.createUser({
+      username: 'newuser',
+      name: 'New User',
+      email: 'x@y.com',
+      permissionNames: [],
+    } as any);
+
+    expect(userRepo.assignViewerLibraries).toHaveBeenCalledWith(10, [2, 4]);
+  });
+
+  it('createOidcUser applies default library access', async () => {
+    appSettingsService.getDefaultLibraryAccessLibraryIds.mockResolvedValue([6, 8]);
+
+    await service.createOidcUser({ username: 'oidc', name: 'OIDC', email: 'oidc@example.com', oidcSubject: 'sub', oidcIssuer: 'iss' });
+
+    expect(userRepo.createOidcUser).toHaveBeenCalled();
+    expect(userRepo.assignViewerLibraries).toHaveBeenCalledWith(11, [6, 8]);
   });
 
   it('createUser rejects unknown library IDs', async () => {
@@ -562,11 +590,15 @@ describe('UserService.updateSeriesCollapsePreferences', () => {
     replaceFilters: vi.fn(),
   };
   const config = { get: vi.fn() };
+  const appSettingsService = {
+    getDefaultLibraryAccessLibraryIds: vi.fn(),
+  };
 
   beforeEach(() => {
     vi.resetAllMocks();
     config.get.mockReturnValue('http://localhost:5173');
-    service = new UserService(userRepo as any, config as any, contentFilterRepo as any);
+    appSettingsService.getDefaultLibraryAccessLibraryIds.mockResolvedValue([]);
+    service = new UserService(userRepo as any, config as any, contentFilterRepo as any, appSettingsService as any);
   });
 
   it('throws NotFoundException when user does not exist', async () => {

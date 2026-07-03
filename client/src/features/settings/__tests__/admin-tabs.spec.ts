@@ -3,8 +3,8 @@ import { ADMIN_TABS, ADMIN_TAB_INFO, normalizeAdminTab } from '../lib/admin-tabs
 
 describe('admin-tabs', () => {
   describe('ADMIN_TABS', () => {
-    it('contains exactly users, magic-links, and oidc', () => {
-      expect(ADMIN_TABS).toEqual(['users', 'magic-links', 'oidc'])
+    it('contains exactly users, oidc, and magic-links', () => {
+      expect(ADMIN_TABS).toEqual(['users', 'oidc', 'magic-links'])
     })
 
     it('has length 3', () => {

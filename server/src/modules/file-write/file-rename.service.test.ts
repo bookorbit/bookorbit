@@ -74,6 +74,8 @@ describe('FileRenameService', () => {
       findBookRenameData: vi.fn(),
       checkPathTakenByOtherBook: vi.fn().mockResolvedValue(false),
       applyFolderRename: vi.fn().mockResolvedValue(undefined),
+      findBookByExactFolderPath: vi.fn().mockResolvedValue(null),
+      applyExistingFolderMerge: vi.fn().mockResolvedValue(undefined),
       findAllBookFiles: vi.fn().mockImplementation(async () => {
         const data = await renameRepo.findBookRenameData();
         if (!data) return [];
@@ -236,6 +238,197 @@ describe('FileRenameService', () => {
           newPath: '/library/Frank Herbert/Dune.epub',
         },
       }),
+    );
+  });
+
+  it('renames every colliding audio track with PartNN suffixes including the primary track', async () => {
+    const { service, renameRepo } = makeService();
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        organizationMode: 'book_per_folder',
+        fileNamingPattern: 'Clayton M. Christensen/How Will You Measure Your Life_ (2012)/{title} - {authors}',
+        file: {
+          id: 10,
+          absolutePath: '/library/Clayton M. Christensen/How Will You Measure Your Life_ (2012)/How.Will.You.Measure.Your.Life-Part01.mp3',
+          relPath: 'Clayton M. Christensen/How Will You Measure Your Life_ (2012)/How.Will.You.Measure.Your.Life-Part01.mp3',
+          format: 'mp3',
+          role: 'content',
+        },
+        bookFolderPath: '/library/Clayton M. Christensen/How Will You Measure Your Life_ (2012)',
+        metadata: {
+          title: 'How Will You Measure Your Life_',
+          publishedYear: 2012,
+        },
+        authors: ['Clayton M. Christensen'],
+      }),
+    );
+    renameRepo.findAllBookFiles.mockResolvedValue([
+      {
+        id: 10,
+        absolutePath: '/library/Clayton M. Christensen/How Will You Measure Your Life_ (2012)/How.Will.You.Measure.Your.Life-Part01.mp3',
+        relPath: 'Clayton M. Christensen/How Will You Measure Your Life_ (2012)/How.Will.You.Measure.Your.Life-Part01.mp3',
+        role: 'content',
+        format: 'mp3',
+        sortOrder: 0,
+      },
+      {
+        id: 11,
+        absolutePath: '/library/Clayton M. Christensen/How Will You Measure Your Life_ (2012)/How.Will.You.Measure.Your.Life-Part02.mp3',
+        relPath: 'Clayton M. Christensen/How Will You Measure Your Life_ (2012)/How.Will.You.Measure.Your.Life-Part02.mp3',
+        role: 'content',
+        format: 'mp3',
+        sortOrder: 1,
+      },
+      {
+        id: 12,
+        absolutePath: '/library/Clayton M. Christensen/How Will You Measure Your Life_ (2012)/How.Will.You.Measure.Your.Life-Part03.mp3',
+        relPath: 'Clayton M. Christensen/How Will You Measure Your Life_ (2012)/How.Will.You.Measure.Your.Life-Part03.mp3',
+        role: 'content',
+        format: 'mp3',
+        sortOrder: 2,
+      },
+      {
+        id: 13,
+        absolutePath: '/library/Clayton M. Christensen/How Will You Measure Your Life_ (2012)/How.Will.You.Measure.Your.Life-Cover.jpg',
+        relPath: 'Clayton M. Christensen/How Will You Measure Your Life_ (2012)/How.Will.You.Measure.Your.Life-Cover.jpg',
+        role: 'cover',
+        format: 'jpg',
+        sortOrder: null,
+      },
+    ]);
+
+    const result = await service.performRename(521, 1);
+
+    const targetDir = '/library/Clayton M. Christensen/How Will You Measure Your Life_ (2012)';
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'success',
+        oldPath: `${targetDir}/How.Will.You.Measure.Your.Life-Part01.mp3`,
+        newPath: `${targetDir}/How Will You Measure Your Life_ - Clayton M. Christensen-Part01.mp3`,
+      }),
+    );
+    expect(renameRepo.applyFolderRename).toHaveBeenCalledWith(
+      521,
+      [
+        {
+          id: 10,
+          absolutePath: `${targetDir}/How Will You Measure Your Life_ - Clayton M. Christensen-Part01.mp3`,
+          relPath:
+            'Clayton M. Christensen/How Will You Measure Your Life_ (2012)/How Will You Measure Your Life_ - Clayton M. Christensen-Part01.mp3',
+        },
+        {
+          id: 11,
+          absolutePath: `${targetDir}/How Will You Measure Your Life_ - Clayton M. Christensen-Part02.mp3`,
+          relPath:
+            'Clayton M. Christensen/How Will You Measure Your Life_ (2012)/How Will You Measure Your Life_ - Clayton M. Christensen-Part02.mp3',
+        },
+        {
+          id: 12,
+          absolutePath: `${targetDir}/How Will You Measure Your Life_ - Clayton M. Christensen-Part03.mp3`,
+          relPath:
+            'Clayton M. Christensen/How Will You Measure Your Life_ (2012)/How Will You Measure Your Life_ - Clayton M. Christensen-Part03.mp3',
+        },
+        {
+          id: 13,
+          absolutePath: `${targetDir}/How.Will.You.Measure.Your.Life-Cover.jpg`,
+          relPath: 'Clayton M. Christensen/How Will You Measure Your Life_ (2012)/How.Will.You.Measure.Your.Life-Cover.jpg',
+        },
+      ],
+      targetDir,
+    );
+    expect(mockRename).toHaveBeenCalledTimes(3);
+    expect(mockRename).toHaveBeenNthCalledWith(
+      1,
+      `${targetDir}/How.Will.You.Measure.Your.Life-Part01.mp3`,
+      `${targetDir}/How Will You Measure Your Life_ - Clayton M. Christensen-Part01.mp3`,
+    );
+    expect(mockRename).toHaveBeenNthCalledWith(
+      2,
+      `${targetDir}/How.Will.You.Measure.Your.Life-Part02.mp3`,
+      `${targetDir}/How Will You Measure Your Life_ - Clayton M. Christensen-Part02.mp3`,
+    );
+    expect(mockRename).toHaveBeenNthCalledWith(
+      3,
+      `${targetDir}/How.Will.You.Measure.Your.Life-Part03.mp3`,
+      `${targetDir}/How Will You Measure Your Life_ - Clayton M. Christensen-Part03.mp3`,
+    );
+  });
+
+  it('uses sortOrder rather than database id when numbering colliding audio tracks', async () => {
+    const { service, renameRepo } = makeService();
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        file: {
+          id: 20,
+          absolutePath: '/library/audio/track-01.mp3',
+          relPath: 'audio/track-01.mp3',
+          format: 'mp3',
+          role: 'content',
+        },
+        fileNamingPattern: '{authors}/{title}',
+        bookFolderPath: '/library/audio/track-01.mp3',
+      }),
+    );
+    renameRepo.findAllBookFiles.mockResolvedValue([
+      { id: 10, absolutePath: '/library/audio/track-02.mp3', relPath: 'audio/track-02.mp3', role: 'content', format: 'mp3', sortOrder: 1 },
+      { id: 20, absolutePath: '/library/audio/track-01.mp3', relPath: 'audio/track-01.mp3', role: 'content', format: 'mp3', sortOrder: 0 },
+      { id: 30, absolutePath: '/library/audio/track-03.mp3', relPath: 'audio/track-03.mp3', role: 'content', format: 'mp3', sortOrder: 2 },
+    ]);
+
+    const result = await service.performRename(5, 12);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'success',
+        newPath: '/library/Frank Herbert/Dune-Part01.mp3',
+      }),
+    );
+    expect(renameRepo.applyFolderRename).toHaveBeenCalledWith(
+      5,
+      [
+        { id: 10, absolutePath: '/library/Frank Herbert/Dune-Part02.mp3', relPath: 'Frank Herbert/Dune-Part02.mp3' },
+        { id: 20, absolutePath: '/library/Frank Herbert/Dune-Part01.mp3', relPath: 'Frank Herbert/Dune-Part01.mp3' },
+        { id: 30, absolutePath: '/library/Frank Herbert/Dune-Part03.mp3', relPath: 'Frank Herbert/Dune-Part03.mp3' },
+      ],
+      '/library/Frank Herbert/Dune-Part01.mp3',
+    );
+  });
+
+  it('leaves multi-track audio filenames alone when the naming pattern already makes targets unique', async () => {
+    const { service, renameRepo } = makeService();
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        file: {
+          id: 10,
+          absolutePath: '/library/audio/track-01.mp3',
+          relPath: 'audio/track-01.mp3',
+          format: 'mp3',
+          role: 'content',
+        },
+        fileNamingPattern: '{authors}/{originalFilename}',
+        bookFolderPath: '/library/audio/track-01.mp3',
+      }),
+    );
+    renameRepo.findAllBookFiles.mockResolvedValue([
+      { id: 10, absolutePath: '/library/audio/track-01.mp3', relPath: 'audio/track-01.mp3', role: 'content', format: 'mp3', sortOrder: 0 },
+      { id: 11, absolutePath: '/library/audio/track-02.mp3', relPath: 'audio/track-02.mp3', role: 'content', format: 'mp3', sortOrder: 1 },
+    ]);
+
+    const result = await service.performRename(5, 12);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'success',
+        newPath: '/library/Frank Herbert/track-01.mp3',
+      }),
+    );
+    expect(renameRepo.applyFolderRename).toHaveBeenCalledWith(
+      5,
+      [
+        { id: 10, absolutePath: '/library/Frank Herbert/track-01.mp3', relPath: 'Frank Herbert/track-01.mp3' },
+        { id: 11, absolutePath: '/library/Frank Herbert/track-02.mp3', relPath: 'Frank Herbert/track-02.mp3' },
+      ],
+      '/library/Frank Herbert/track-01.mp3',
     );
   });
 
@@ -496,6 +689,77 @@ describe('FileRenameService', () => {
     expect(mockRename).not.toHaveBeenCalled();
   });
 
+  it('skips when a generated audio part target already exists on disk', async () => {
+    const { service, renameRepo } = makeService();
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        file: {
+          id: 10,
+          absolutePath: '/library/audio/track-01.mp3',
+          relPath: 'audio/track-01.mp3',
+          format: 'mp3',
+          role: 'content',
+        },
+        fileNamingPattern: '{authors}/{title}',
+        bookFolderPath: '/library/audio/track-01.mp3',
+      }),
+    );
+    renameRepo.findAllBookFiles.mockResolvedValue([
+      { id: 10, absolutePath: '/library/audio/track-01.mp3', relPath: 'audio/track-01.mp3', role: 'content', format: 'mp3', sortOrder: 0 },
+      { id: 11, absolutePath: '/library/audio/track-02.mp3', relPath: 'audio/track-02.mp3', role: 'content', format: 'mp3', sortOrder: 1 },
+    ]);
+    mockAccess.mockImplementation((path: any) => {
+      if (path.toString() === '/library/Frank Herbert/Dune-Part02.mp3') return Promise.resolve(undefined);
+      return Promise.reject(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+    });
+
+    const result = await service.performRename(5, 12);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'skipped',
+        reason: 'target path already exists on disk',
+        newPath: '/library/Frank Herbert/Dune-Part01.mp3',
+      }),
+    );
+    expect(renameRepo.applyFolderRename).not.toHaveBeenCalled();
+    expect(mockRename).not.toHaveBeenCalled();
+  });
+
+  it('skips when a generated audio part target is taken by another book', async () => {
+    const { service, renameRepo } = makeService();
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        file: {
+          id: 10,
+          absolutePath: '/library/audio/track-01.mp3',
+          relPath: 'audio/track-01.mp3',
+          format: 'mp3',
+          role: 'content',
+        },
+        fileNamingPattern: '{authors}/{title}',
+        bookFolderPath: '/library/audio/track-01.mp3',
+      }),
+    );
+    renameRepo.findAllBookFiles.mockResolvedValue([
+      { id: 10, absolutePath: '/library/audio/track-01.mp3', relPath: 'audio/track-01.mp3', role: 'content', format: 'mp3', sortOrder: 0 },
+      { id: 11, absolutePath: '/library/audio/track-02.mp3', relPath: 'audio/track-02.mp3', role: 'content', format: 'mp3', sortOrder: 1 },
+    ]);
+    renameRepo.checkPathTakenByOtherBook.mockImplementation((path: string) => Promise.resolve(path === '/library/Frank Herbert/Dune-Part02.mp3'));
+
+    const result = await service.performRename(5, 12);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'skipped',
+        reason: 'collision',
+        newPath: '/library/Frank Herbert/Dune-Part01.mp3',
+      }),
+    );
+    expect(renameRepo.applyFolderRename).not.toHaveBeenCalled();
+    expect(mockRename).not.toHaveBeenCalled();
+  });
+
   it('renames only the file (not folder) in book_per_folder mode when folder path is unchanged', async () => {
     const { service, renameRepo } = makeService();
     // Pattern resolves to the same folder but a different filename
@@ -680,6 +944,181 @@ describe('FileRenameService', () => {
     expect(mockRename).toHaveBeenNthCalledWith(1, '/library/2666.epub', '/library/Frank Herbert/Dune/Dune.epub');
     expect(mockRename).toHaveBeenNthCalledWith(2, '/library/2666.opf', '/library/Frank Herbert/Dune/2666.opf');
     expect(mockRename).toHaveBeenNthCalledWith(3, '/library/2666.jpg', '/library/Frank Herbert/Dune/2666.jpg');
+  });
+
+  it('merges renamed files into an existing folder book when target filenames are free', async () => {
+    const { service, renameRepo } = makeService();
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        organizationMode: 'book_per_folder',
+        fileNamingPattern: '{authors}/{title} ({year})/{title} ({year})',
+        file: {
+          absolutePath: '/library/Incoming/old.epub',
+          relPath: 'Incoming/old.epub',
+        },
+        bookFolderPath: '/library/Incoming',
+      }),
+    );
+    renameRepo.findAllBookFiles.mockResolvedValue([
+      { id: 10, absolutePath: '/library/Incoming/old.epub', relPath: 'Incoming/old.epub', role: 'primary', format: 'epub' },
+      { id: 11, absolutePath: '/library/Incoming/old.opf', relPath: 'Incoming/old.opf', role: 'metadata', format: 'opf' },
+    ]);
+    mockAccess.mockImplementation((path: any) => {
+      if (path.toString() === '/library/Frank Herbert/Dune (1965)') return Promise.resolve(undefined);
+      return Promise.reject(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+    });
+    renameRepo.findBookByExactFolderPath.mockResolvedValue({
+      id: 99,
+      folderPath: '/library/Frank Herbert/Dune (1965)',
+      primaryFileId: 42,
+      status: 'present',
+    });
+
+    const result = await service.performRename(5, 12);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'success',
+        oldPath: '/library/Incoming/old.epub',
+        newPath: '/library/Frank Herbert/Dune (1965)/Dune (1965).epub',
+      }),
+    );
+    expect(renameRepo.findBookByExactFolderPath).toHaveBeenCalledWith(1, '/library/Frank Herbert/Dune (1965)');
+    expect(renameRepo.applyExistingFolderMerge).toHaveBeenCalledWith({
+      sourceBookId: 5,
+      targetBookId: 99,
+      fallbackPrimaryFileId: 10,
+      updates: [
+        {
+          id: 10,
+          absolutePath: '/library/Frank Herbert/Dune (1965)/Dune (1965).epub',
+          relPath: 'Frank Herbert/Dune (1965)/Dune (1965).epub',
+        },
+        {
+          id: 11,
+          absolutePath: '/library/Frank Herbert/Dune (1965)/old.opf',
+          relPath: 'Frank Herbert/Dune (1965)/old.opf',
+        },
+      ],
+    });
+    expect(renameRepo.applyFolderRename).not.toHaveBeenCalled();
+    expect(mockRename).toHaveBeenNthCalledWith(1, '/library/Incoming/old.epub', '/library/Frank Herbert/Dune (1965)/Dune (1965).epub');
+    expect(mockRename).toHaveBeenNthCalledWith(2, '/library/Incoming/old.opf', '/library/Frank Herbert/Dune (1965)/old.opf');
+  });
+
+  it('skips existing-folder merge when the concrete target file already exists on disk', async () => {
+    const { service, renameRepo } = makeService();
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        organizationMode: 'book_per_folder',
+        fileNamingPattern: '{authors}/{title} ({year})/{title} ({year})',
+        file: {
+          absolutePath: '/library/Incoming/old.epub',
+          relPath: 'Incoming/old.epub',
+        },
+        bookFolderPath: '/library/Incoming',
+      }),
+    );
+    mockAccess.mockImplementation((path: any) => {
+      const value = path.toString();
+      if (value === '/library/Frank Herbert/Dune (1965)' || value === '/library/Frank Herbert/Dune (1965)/Dune (1965).epub') {
+        return Promise.resolve(undefined);
+      }
+      return Promise.reject(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+    });
+    renameRepo.findBookByExactFolderPath.mockResolvedValue({
+      id: 99,
+      folderPath: '/library/Frank Herbert/Dune (1965)',
+      primaryFileId: 42,
+      status: 'present',
+    });
+
+    const result = await service.performRename(5, 12);
+
+    expect(result).toEqual(expect.objectContaining({ status: 'skipped', reason: 'target path already exists on disk' }));
+    expect(renameRepo.applyExistingFolderMerge).not.toHaveBeenCalled();
+    expect(renameRepo.applyFolderRename).not.toHaveBeenCalled();
+    expect(mockRename).not.toHaveBeenCalled();
+  });
+
+  it('moves into an existing unowned folder without treating the folder as a collision', async () => {
+    const { service, renameRepo } = makeService();
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        organizationMode: 'book_per_folder',
+        fileNamingPattern: '{authors}/{title} ({year})/{title} ({year})',
+        file: {
+          absolutePath: '/library/Incoming/old.epub',
+          relPath: 'Incoming/old.epub',
+        },
+        bookFolderPath: '/library/Incoming',
+      }),
+    );
+    renameRepo.findAllBookFiles.mockResolvedValue([
+      { id: 10, absolutePath: '/library/Incoming/old.epub', relPath: 'Incoming/old.epub', role: 'primary', format: 'epub' },
+    ]);
+    mockAccess.mockImplementation((path: any) => {
+      if (path.toString() === '/library/Frank Herbert/Dune (1965)') return Promise.resolve(undefined);
+      return Promise.reject(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+    });
+    renameRepo.findBookByExactFolderPath.mockResolvedValue(null);
+
+    const result = await service.performRename(5, 12);
+
+    expect(result).toEqual(expect.objectContaining({ status: 'success' }));
+    expect(renameRepo.applyFolderRename).toHaveBeenCalledWith(
+      5,
+      [
+        {
+          id: 10,
+          absolutePath: '/library/Frank Herbert/Dune (1965)/Dune (1965).epub',
+          relPath: 'Frank Herbert/Dune (1965)/Dune (1965).epub',
+        },
+      ],
+      '/library/Frank Herbert/Dune (1965)',
+    );
+    expect(renameRepo.applyExistingFolderMerge).not.toHaveBeenCalled();
+    expect(mockRename).toHaveBeenCalledTimes(1);
+    expect(mockRename).toHaveBeenCalledWith('/library/Incoming/old.epub', '/library/Frank Herbert/Dune (1965)/Dune (1965).epub');
+  });
+
+  it('rolls back disk moves when an existing-folder merge fails in the database', async () => {
+    const { service, renameRepo } = makeService();
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        organizationMode: 'book_per_folder',
+        fileNamingPattern: '{authors}/{title} ({year})/{title} ({year})',
+        file: {
+          absolutePath: '/library/Incoming/old.epub',
+          relPath: 'Incoming/old.epub',
+        },
+        bookFolderPath: '/library/Incoming',
+      }),
+    );
+    renameRepo.findAllBookFiles.mockResolvedValue([
+      { id: 10, absolutePath: '/library/Incoming/old.epub', relPath: 'Incoming/old.epub', role: 'primary', format: 'epub' },
+      { id: 11, absolutePath: '/library/Incoming/old.jpg', relPath: 'Incoming/old.jpg', role: 'cover', format: 'jpg' },
+    ]);
+    mockAccess.mockImplementation((path: any) => {
+      if (path.toString() === '/library/Frank Herbert/Dune (1965)') return Promise.resolve(undefined);
+      return Promise.reject(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+    });
+    renameRepo.findBookByExactFolderPath.mockResolvedValue({
+      id: 99,
+      folderPath: '/library/Frank Herbert/Dune (1965)',
+      primaryFileId: 42,
+      status: 'present',
+    });
+    renameRepo.applyExistingFolderMerge.mockRejectedValue(new Error('db unavailable'));
+
+    const result = await service.performRename(5, 12);
+
+    expect(result).toEqual(expect.objectContaining({ status: 'failed', reason: 'db unavailable' }));
+    expect(mockRename).toHaveBeenCalledTimes(4);
+    expect(mockRename).toHaveBeenNthCalledWith(1, '/library/Incoming/old.epub', '/library/Frank Herbert/Dune (1965)/Dune (1965).epub');
+    expect(mockRename).toHaveBeenNthCalledWith(2, '/library/Incoming/old.jpg', '/library/Frank Herbert/Dune (1965)/old.jpg');
+    expect(mockRename).toHaveBeenNthCalledWith(3, '/library/Frank Herbert/Dune (1965)/old.jpg', '/library/Incoming/old.jpg');
+    expect(mockRename).toHaveBeenNthCalledWith(4, '/library/Frank Herbert/Dune (1965)/Dune (1965).epub', '/library/Incoming/old.epub');
   });
 
   it('detects case-only nested folder moves and uses per-file individual moves (avoids EINVAL on case-insensitive filesystems)', async () => {

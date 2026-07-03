@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 
 import {
   AuthorAutoEnrichmentWriteMode,
+  type DefaultLibraryAccessConfig,
   DEFAULT_DOWNLOAD_PATTERN,
   DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE,
   DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER,
@@ -11,7 +12,12 @@ import {
   type BookDockAutoFinalizeMetadataMode,
 } from '@bookorbit/types';
 
-import { APP_SETTING_KEYS, DEFAULT_OIDC_CONFIG, type OidcFullConfig } from '../../common/constants/app-settings.constants';
+import {
+  APP_SETTING_KEYS,
+  DEFAULT_LIBRARY_ACCESS_CONFIG,
+  DEFAULT_OIDC_CONFIG,
+  type OidcFullConfig,
+} from '../../common/constants/app-settings.constants';
 import { ensureSafeUrl } from '../../common/utils/ssrf.utils';
 import { AppSettingsRepository } from './app-settings.repository';
 
@@ -125,6 +131,36 @@ export class AppSettingsService {
     const merged = mergeOidcConfig(current, config);
     await this.repo.upsert(APP_SETTING_KEYS.OIDC_CONFIG, JSON.stringify(merged));
     return merged;
+  }
+
+  async getDefaultLibraryAccess(): Promise<DefaultLibraryAccessConfig> {
+    const row = await this.repo.findByKey(APP_SETTING_KEYS.DEFAULT_LIBRARY_ACCESS);
+    const stored = parseSafe<unknown>(APP_SETTING_KEYS.DEFAULT_LIBRARY_ACCESS, row?.value, DEFAULT_LIBRARY_ACCESS_CONFIG, this.logger);
+    const normalized = normalizeDefaultLibraryAccess(stored);
+    if (normalized.libraryIds.length === 0) return normalized;
+    const existingIds = await this.repo.findExistingLibraryIds(normalized.libraryIds);
+    return { libraryIds: normalized.libraryIds.filter((id) => existingIds.includes(id)) };
+  }
+
+  async getDefaultLibraryAccessLibraryIds(): Promise<number[]> {
+    return (await this.getDefaultLibraryAccess()).libraryIds;
+  }
+
+  async setDefaultLibraryAccess(config: DefaultLibraryAccessConfig): Promise<DefaultLibraryAccessConfig> {
+    const normalized = normalizeDefaultLibraryAccess(config);
+    await this.assertKnownLibraryIds(normalized.libraryIds);
+    await this.repo.upsert(APP_SETTING_KEYS.DEFAULT_LIBRARY_ACCESS, JSON.stringify(normalized));
+    return normalized;
+  }
+
+  private async assertKnownLibraryIds(libraryIds: number[]): Promise<void> {
+    if (libraryIds.length === 0) return;
+    const existingIds = await this.repo.findExistingLibraryIds(libraryIds);
+    const existingSet = new Set(existingIds);
+    const missing = libraryIds.filter((id) => !existingSet.has(id));
+    if (missing.length > 0) {
+      throw new BadRequestException(`Unknown library IDs: ${missing.join(', ')}`);
+    }
   }
 
   async testOidcConnection(issuerUri?: string): Promise<{
@@ -256,6 +292,17 @@ function mergeOidcConfig(base: OidcFullConfig, patch: Partial<OidcFullConfig>): 
     claimMapping: { ...base.claimMapping, ...(patch.claimMapping ?? {}) },
     autoProvision: { ...base.autoProvision, ...(patch.autoProvision ?? {}) },
   };
+}
+
+function normalizeDefaultLibraryAccess(value: unknown): DefaultLibraryAccessConfig {
+  if (typeof value !== 'object' || value === null || !Array.isArray((value as { libraryIds?: unknown }).libraryIds)) {
+    return { ...DEFAULT_LIBRARY_ACCESS_CONFIG };
+  }
+
+  const libraryIds = (value as { libraryIds: unknown[] }).libraryIds.filter(
+    (id): id is number => typeof id === 'number' && Number.isInteger(id) && id > 0,
+  );
+  return { libraryIds: Array.from(new Set(libraryIds)) };
 }
 
 function isOidcDiscoveryDoc(val: unknown): val is { issuer: string; authorization_endpoint: string } {

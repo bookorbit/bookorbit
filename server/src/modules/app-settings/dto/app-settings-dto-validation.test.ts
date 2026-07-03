@@ -5,6 +5,7 @@ import { validate } from 'class-validator';
 
 import { UpdateAppSettingDto } from './update-app-setting.dto';
 import { UpdateBooleanSettingDto } from './update-boolean-setting.dto';
+import { UpdateDefaultLibraryAccessDto } from './update-default-library-access.dto';
 import { UpdateFilePatternDto } from './update-file-pattern.dto';
 import { UpdateOidcConfigDto } from './update-oidc-config.dto';
 
@@ -29,6 +30,13 @@ describe('App settings DTO validation', () => {
     expect((await errorsFor(UpdateBooleanSettingDto, { enabled: true })).length).toBe(0);
     expect((await errorsFor(UpdateBooleanSettingDto, { enabled: false })).length).toBe(0);
     expect((await errorsFor(UpdateBooleanSettingDto, { enabled: 'true' })).length).toBeGreaterThan(0);
+  });
+
+  it('validates default library access payload', async () => {
+    expect((await errorsFor(UpdateDefaultLibraryAccessDto, { libraryIds: [1, 2] })).length).toBe(0);
+    expect((await errorsFor(UpdateDefaultLibraryAccessDto, { libraryIds: [1, 1] })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateDefaultLibraryAccessDto, { libraryIds: [0] })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateDefaultLibraryAccessDto, { libraryIds: ['x'] })).length).toBeGreaterThan(0);
   });
 
   it('validates nested OIDC claimMapping and autoProvision fields', async () => {

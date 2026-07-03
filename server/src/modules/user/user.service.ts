@@ -16,6 +16,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateMeSettingsDto } from './dto/update-me-settings.dto';
 import { UpdateSeriesCollapsePreferencesDto } from './dto/update-series-collapse-preferences.dto';
 import { UserRepository } from './user.repository';
+import { AppSettingsService } from '../app-settings/app-settings.service';
 
 @Injectable()
 export class UserService {
@@ -23,6 +24,7 @@ export class UserService {
     private readonly userRepo: UserRepository,
     private readonly config: ConfigService,
     private readonly contentFilterRepo: ContentFilterRepository,
+    private readonly appSettingsService: AppSettingsService,
   ) {}
 
   findByUsername(username: string) {
@@ -53,8 +55,10 @@ export class UserService {
     return this.userRepo.findPasswordHashById(userId);
   }
 
-  createOidcUser(data: Parameters<UserRepository['createOidcUser']>[0]) {
-    return this.userRepo.createOidcUser(data);
+  async createOidcUser(data: Parameters<UserRepository['createOidcUser']>[0]) {
+    const user = await this.userRepo.createOidcUser(data);
+    await this.assignConfiguredDefaultLibraries(user.id);
+    return user;
   }
 
   generatePasswordResetToken(userId: number): Promise<string> {
@@ -107,7 +111,7 @@ export class UserService {
       await this.userRepo.setPermissions(user.id, permissionNames);
     }
 
-    const libraryIds = this.uniqueIds(dto.libraryIds ?? []);
+    const libraryIds = await this.resolveNewUserLibraryIds(dto.libraryIds);
     if (libraryIds.length > 0) {
       await this.assertKnownLibraryIds(libraryIds);
       await this.userRepo.assignViewerLibraries(user.id, libraryIds);
@@ -143,7 +147,7 @@ export class UserService {
       await this.userRepo.setPermissions(user.id, permissionNames);
     }
 
-    const libraryIds = this.uniqueIds(dto.libraryIds ?? []);
+    const libraryIds = await this.resolveNewUserLibraryIds(dto.libraryIds);
     if (libraryIds.length > 0) {
       await this.assertKnownLibraryIds(libraryIds);
       await this.userRepo.assignViewerLibraries(user.id, libraryIds);
@@ -298,6 +302,17 @@ export class UserService {
 
   private uniqueIds(ids: number[]): number[] {
     return Array.from(new Set(ids));
+  }
+
+  private async resolveNewUserLibraryIds(libraryIds: number[] | undefined): Promise<number[]> {
+    if (libraryIds !== undefined) return this.uniqueIds(libraryIds);
+    return this.appSettingsService.getDefaultLibraryAccessLibraryIds();
+  }
+
+  private async assignConfiguredDefaultLibraries(userId: number): Promise<void> {
+    const libraryIds = await this.appSettingsService.getDefaultLibraryAccessLibraryIds();
+    if (libraryIds.length === 0) return;
+    await this.userRepo.assignViewerLibraries(userId, libraryIds);
   }
 
   private async assertEmailAvailable(email: string, targetUserId: number): Promise<void> {

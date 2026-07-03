@@ -24,6 +24,12 @@ export class AppSettingsRepository {
     return this.db.select().from(schema.appSettings).where(inArray(schema.appSettings.key, keys));
   }
 
+  async findExistingLibraryIds(libraryIds: number[]): Promise<number[]> {
+    if (libraryIds.length === 0) return [];
+    const rows = await this.db.select({ id: schema.libraries.id }).from(schema.libraries).where(inArray(schema.libraries.id, libraryIds));
+    return rows.map((row) => row.id);
+  }
+
   async updateByKey(key: string, value: string) {
     const [setting] = await this.db.update(schema.appSettings).set({ value }).where(eq(schema.appSettings.key, key)).returning();
     return setting ?? null;

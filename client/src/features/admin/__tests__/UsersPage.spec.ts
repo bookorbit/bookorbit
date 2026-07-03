@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed } from 'vue'
-import { shallowMount } from '@vue/test-utils'
+import { flushPromises, shallowMount } from '@vue/test-utils'
 import UsersPage from '../UsersPage.vue'
 
 const { apiMock, routeState, permState } = vi.hoisted(() => ({
@@ -23,6 +23,7 @@ vi.mock('@/lib/api', () => ({
 vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({
     isSuperuser: computed(() => permState.isSuperuser),
+    hasPermission: vi.fn<(name: string) => boolean>(() => true),
   }),
 }))
 
@@ -38,13 +39,16 @@ describe('UsersPage', () => {
       if (input === '/api/v1/libraries') {
         return { ok: true, json: async () => ({ libraries: [] }) }
       }
+      if (input === '/api/v1/app-settings/default-library-access') {
+        return { ok: true, json: async () => ({ libraryIds: [] }) }
+      }
       return { ok: false, json: async () => ({}) }
     })
   })
 
   it('shows create user CTA when embedded on users tab', async () => {
     const wrapper = shallowMount(UsersPage, { props: { embedded: true } })
-    await Promise.resolve()
+    await flushPromises()
 
     const createButton = wrapper.findAll('button').find((button) => button.text().includes('Create user'))
     expect(createButton).toBeDefined()

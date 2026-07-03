@@ -62,6 +62,7 @@ function mountComponent(props: { withHeader?: boolean; withEmbeddedCreateAction?
         Tooltip: { template: '<div><slot /></div>' },
         TooltipTrigger: { template: '<div><slot /></div>' },
         TooltipContent: { template: '<div><slot /></div>' },
+        RouterLink: { template: '<a><slot /></a>' },
       },
     },
   })

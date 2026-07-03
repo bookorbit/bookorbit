@@ -91,6 +91,7 @@ function makeService(dbOverrides?: Record<string, unknown>) {
   };
   const appSettings = {
     getOidcConfig: vi.fn().mockResolvedValue({ enabled: false }),
+    getDefaultLibraryAccessLibraryIds: vi.fn().mockResolvedValue([]),
   };
   const oidcSessionRepo = {
     findActiveByUserId: vi.fn().mockResolvedValue(null),
@@ -265,6 +266,21 @@ describe('AuthService', () => {
 
       const result = await service.register({ username: 'jdoe', name: 'John Doe', password: 'P@ssw0rd!', email: 'jdoe@example.com' } as never);
       expect(result).toEqual({ id: 1, username: 'jdoe', name: 'John Doe' });
+    });
+
+    it('grants configured default library access to self-registered users', async () => {
+      const { service, db, appSettings } = makeService();
+      (db.query as never as Record<string, Record<string, vi.Mock>>).appSettings.findFirst.mockResolvedValue({ value: 'true' });
+      (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValueOnce(null);
+      appSettings.getDefaultLibraryAccessLibraryIds.mockResolvedValue([2, 4]);
+      ((db as unknown as Record<string, unknown>).returning as vi.Mock).mockResolvedValueOnce([{ id: 1, username: 'jdoe', name: 'John Doe' }]);
+
+      await service.register({ username: 'jdoe', name: 'John Doe', password: 'P@ssw0rd!', email: 'jdoe@example.com' } as never);
+
+      expect((db as unknown as { values: vi.Mock }).values).toHaveBeenCalledWith([
+        { userId: 1, libraryId: 2, accessLevel: 'viewer' },
+        { userId: 1, libraryId: 4, accessLevel: 'viewer' },
+      ]);
     });
   });
 

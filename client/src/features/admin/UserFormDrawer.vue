@@ -23,6 +23,7 @@ interface NamedItem {
 const props = defineProps<{
   user: Partial<AuthUser> | null
   libraries: Library[]
+  defaultLibraryIds?: number[]
 }>()
 
 const emit = defineEmits<{
@@ -130,7 +131,7 @@ watch(
     active.value = u?.active ?? true
     isSharedAccount.value = u?.provisioningMethod === 'shared'
     selectedPermissionNames.value = new Set(u?.permissions?.filter((p) => p !== '*') ?? [])
-    selectedLibraryIds.value = new Set()
+    selectedLibraryIds.value = u?.id ? new Set() : new Set(props.defaultLibraryIds ?? [])
     error.value = null
     includeTagItems.value = []
     excludeTagItems.value = []
@@ -161,6 +162,13 @@ watch(
     currentTab.value = 'general'
   },
   { immediate: true },
+)
+
+watch(
+  () => props.defaultLibraryIds,
+  (ids) => {
+    if (!isEdit.value) selectedLibraryIds.value = new Set(ids ?? [])
+  },
 )
 
 watch(isMobile, (mobile) => {

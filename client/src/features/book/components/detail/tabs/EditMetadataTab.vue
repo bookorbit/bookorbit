@@ -125,9 +125,9 @@ const fileWriteManualTooltip = computed(() => {
   if (saving.value) return 'Save in progress'
   if (fileWriteManualDisabledReasonLabel.value) return fileWriteManualDisabledReasonLabel.value
   if (fileWriteStatus.value?.reason === 'library_disabled') {
-    return 'Write metadata to file and rename now; automatic write-back is disabled for this library'
+    return 'Write metadata to file and rename on disk; automatic write-back is disabled for this library'
   }
-  return `Write ${fileWriteFieldCountLabel.value} to ${fileWriteTargetSummary.value} and rename if pattern is set`
+  return `Write ${fileWriteFieldCountLabel.value} to ${fileWriteTargetSummary.value} and rename on disk`
 })
 const comicSectionOpen = ref(true)
 
@@ -716,11 +716,13 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               <button
                 class="flex-none flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-40"
                 :disabled="writingAndRenaming || saving || fileWriteManualDisabledReasonLabel !== null"
+                aria-label="Write to File & Rename"
                 @click="handleWriteAndRename"
               >
                 <Loader2 v-if="writingAndRenaming" class="size-3.5 animate-spin" />
                 <HardDriveDownload v-else class="size-3.5" />
-                <span class="hidden sm:inline">Write to file</span>
+                <span class="sm:hidden">Write & Rename</span>
+                <span class="hidden sm:inline">Write to File & Rename</span>
               </button>
             </TooltipTrigger>
             <TooltipContent>{{ fileWriteManualTooltip }}</TooltipContent>
