@@ -133,16 +133,19 @@ export class BookMoveRepository {
 
   async applyMove(bookId: number, target: BookMoveTarget, files: BookMoveFileUpdate[]): Promise<void> {
     await this.db.transaction(async (tx) => {
+      // books must be updated first: book_files_book_folder_consistency_fk references
+      // books(id, library_folder_id) with ON UPDATE CASCADE, so the new folder id
+      // propagates to the files; updating a file first violates the FK.
+      await tx
+        .update(books)
+        .set({ libraryId: target.libraryId, libraryFolderId: target.libraryFolderId, folderPath: target.folderPath })
+        .where(eq(books.id, bookId));
       for (const file of files) {
         await tx
           .update(bookFiles)
           .set({ absolutePath: file.absolutePath, relPath: file.relPath, libraryFolderId: target.libraryFolderId })
           .where(eq(bookFiles.id, file.id));
       }
-      await tx
-        .update(books)
-        .set({ libraryId: target.libraryId, libraryFolderId: target.libraryFolderId, folderPath: target.folderPath })
-        .where(eq(books.id, bookId));
     });
   }
 }

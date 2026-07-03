@@ -103,7 +103,7 @@ describe('BookMoveRepository', () => {
     expect(db.select).toHaveBeenCalledTimes(1);
   });
 
-  it('applyMove updates every file and the book row in one transaction', async () => {
+  it('applyMove updates the book row before the files so the folder-consistency FK can cascade', async () => {
     const setCalls: unknown[] = [];
     const tx = {
       update: vi.fn().mockImplementation(() => ({
@@ -125,10 +125,13 @@ describe('BookMoveRepository', () => {
     ]);
 
     expect(db.transaction).toHaveBeenCalledTimes(1);
+    // The books row must be updated first: book_files_book_folder_consistency_fk references
+    // books(id, library_folder_id) with ON UPDATE CASCADE, so updating a file's
+    // library_folder_id while the book still points at the old folder violates the FK.
     expect(setCalls).toEqual([
+      { libraryId: 3, libraryFolderId: 9, folderPath: '/dst-lib/Frank Herbert/Dune' },
       { absolutePath: '/dst-lib/Frank Herbert/Dune/Dune.epub', relPath: 'Frank Herbert/Dune/Dune.epub', libraryFolderId: 9 },
       { absolutePath: '/dst-lib/Frank Herbert/Dune/cover.jpg', relPath: 'Frank Herbert/Dune/cover.jpg', libraryFolderId: 9 },
-      { libraryId: 3, libraryFolderId: 9, folderPath: '/dst-lib/Frank Herbert/Dune' },
     ]);
   });
 });
