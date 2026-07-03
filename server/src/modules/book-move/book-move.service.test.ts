@@ -91,10 +91,11 @@ function makeService() {
   const libraryService = { verifyUserAccess: vi.fn().mockResolvedValue(undefined) };
   const lockService = { withLock: vi.fn((_key: string, fn: () => unknown) => fn()) };
   const fileRenameService = { scheduleRename: vi.fn() };
+  const scanGateway = { emitBookTransferred: vi.fn() };
 
-  const service = new BookMoveService(repo as never, libraryService as never, lockService as never, fileRenameService as never);
+  const service = new BookMoveService(repo as never, libraryService as never, lockService as never, fileRenameService as never, scanGateway as never);
 
-  return { service, repo, libraryService, lockService, fileRenameService };
+  return { service, repo, libraryService, lockService, fileRenameService, scanGateway };
 }
 
 beforeEach(() => {
@@ -306,6 +307,35 @@ describe('BookMoveService', () => {
       expect(repo.applyMove).toHaveBeenCalledWith(5, { libraryId: 3, libraryFolderId: 9, folderPath: '/dst-lib/Frank Herbert/Dune' }, [
         { id: 10, absolutePath: '/dst-lib/Frank Herbert/Dune/Dune.epub', relPath: 'Frank Herbert/Dune/Dune.epub' },
       ]);
+    });
+
+    it('emits a book:transferred event per source library so open views refresh', async () => {
+      const { service, repo, scanGateway } = makeService();
+      repo.findBookForMove.mockResolvedValueOnce(makeBook()).mockResolvedValueOnce(
+        makeBook({
+          id: 6,
+          libraryId: 2,
+          libraryFolderId: 4,
+          libraryFolderPath: '/other-lib',
+          folderPath: '/other-lib/Solo/Book',
+          files: [{ id: 20, absolutePath: '/other-lib/Solo/Book/Book.epub', relPath: 'Solo/Book/Book.epub', format: 'epub', role: 'primary' }],
+        }),
+      );
+
+      await service.moveBooks([5, 6], 3, 9, makeUser());
+
+      expect(scanGateway.emitBookTransferred).toHaveBeenCalledTimes(2);
+      expect(scanGateway.emitBookTransferred).toHaveBeenCalledWith({ fromLibraryId: 1, toLibraryId: 3, bookIds: [5] });
+      expect(scanGateway.emitBookTransferred).toHaveBeenCalledWith({ fromLibraryId: 2, toLibraryId: 3, bookIds: [6] });
+    });
+
+    it('does not emit a transfer event when no book was moved', async () => {
+      const { service, repo, scanGateway } = makeService();
+      repo.findBookForMove.mockResolvedValue(makeBook({ status: 'processing' }));
+
+      await service.moveBooks([5], 3, 9, makeUser());
+
+      expect(scanGateway.emitBookTransferred).not.toHaveBeenCalled();
     });
 
     it('serializes each book move behind the shared book operation lock', async () => {

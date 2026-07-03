@@ -8,6 +8,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { FileLockService, bookOperationLockKey } from '../file-write/file-lock.service';
 import { FileRenameService } from '../file-write/file-rename.service';
 import { LibraryService } from '../library/library.service';
+import { ScanGateway } from '../scanner/scan.gateway';
 import type { BookMoveBookData, BookMoveFileUpdate, BookMoveFolder, BookMoveLibrary } from './book-move.repository';
 import { BookMoveRepository } from './book-move.repository';
 
@@ -22,6 +23,7 @@ export class BookMoveService {
     private readonly libraryService: LibraryService,
     private readonly lockService: FileLockService,
     private readonly fileRenameService: FileRenameService,
+    private readonly scanGateway: ScanGateway,
   ) {}
 
   async moveBooks(bookIds: number[], targetLibraryId: number, targetFolderId: number | undefined, user: RequestUser): Promise<MoveBookOutcome[]> {
@@ -32,8 +34,15 @@ export class BookMoveService {
     const folder = await this.resolveTargetFolder(targetLibraryId, targetFolderId);
 
     const results: MoveBookOutcome[] = [];
+    const movedBySourceLibrary = new Map<number, number[]>();
     for (const bookId of bookIds) {
-      results.push(await this.lockService.withLock(bookOperationLockKey(bookId), () => this.moveBook(bookId, library, folder, user)));
+      results.push(
+        await this.lockService.withLock(bookOperationLockKey(bookId), () => this.moveBook(bookId, library, folder, user, movedBySourceLibrary)),
+      );
+    }
+
+    for (const [fromLibraryId, movedIds] of movedBySourceLibrary) {
+      this.scanGateway.emitBookTransferred({ fromLibraryId, toLibraryId: library.id, bookIds: movedIds });
     }
     return results;
   }
@@ -54,7 +63,13 @@ export class BookMoveService {
     return folders[0];
   }
 
-  private async moveBook(bookId: number, library: BookMoveLibrary, folder: BookMoveFolder, user: RequestUser): Promise<MoveBookOutcome> {
+  private async moveBook(
+    bookId: number,
+    library: BookMoveLibrary,
+    folder: BookMoveFolder,
+    user: RequestUser,
+    movedBySourceLibrary: Map<number, number[]>,
+  ): Promise<MoveBookOutcome> {
     const book = await this.moveRepo.findBookForMove(bookId);
     if (!book) return { bookId, status: 'failed', reason: 'book not found' };
 
@@ -121,6 +136,10 @@ export class BookMoveService {
       await this.tryRemoveEmptyDir(dirname(from));
     }
     await this.tryRemoveEmptyDir(book.folderPath);
+
+    const movedFromSource = movedBySourceLibrary.get(book.libraryId) ?? [];
+    movedFromSource.push(bookId);
+    movedBySourceLibrary.set(book.libraryId, movedFromSource);
 
     this.fileRenameService.scheduleRename(bookId, user.id);
     this.logger.log(
