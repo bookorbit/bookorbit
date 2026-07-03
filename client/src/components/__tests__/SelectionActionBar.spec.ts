@@ -189,6 +189,15 @@ describe('SelectionActionBar demo restriction', () => {
     expect(wrapper.find('[data-testid="action-bulk-move"]').exists()).toBe(false)
   })
 
+  it('keeps the move action for demo-restricted accounts with delete permission, mirroring delete', () => {
+    permissionState.allowed = new Set(['library_delete_books'])
+    permissionState.demoRestricted = true
+    const wrapper = mountBar()
+
+    expect(wrapper.find('[data-testid="action-delete"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="action-bulk-move"]').exists()).toBe(true)
+  })
+
   it('emits set-field from the field editor flow', async () => {
     const wrapper = mountBar()
     await wrapper.find('[data-testid="action-bulk-set-field"]').trigger('click')
