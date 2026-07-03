@@ -394,7 +394,10 @@ export function useBookBulkActions(
   }
 
   async function handleBulkMove(targetLibraryId: number, targetFolderId?: number) {
-    if (!hasSelection()) return
+    if (!hasSelection()) {
+      toast.error('No books selected to move')
+      return
+    }
     const res = await api('/api/v1/books/move', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

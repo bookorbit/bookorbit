@@ -417,6 +417,10 @@ const {
 } = useBookTableShell({
   books,
   querySelection,
+  onBooksMoved: () => {
+    resetBooks()
+    refreshBuckets()
+  },
 })
 
 const { onBookMissing, onBookRestored, onBookMoved, onBookTransferred } = useBookEvents()

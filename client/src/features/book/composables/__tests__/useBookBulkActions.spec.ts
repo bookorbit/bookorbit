@@ -499,6 +499,17 @@ describe('useBookBulkActions', () => {
     expect(onDeleted).toHaveBeenCalledWith([8])
   })
 
+  it('surfaces an error toast instead of silently doing nothing when the selection is empty', async () => {
+    const selectedIds = ref(new Set<number>())
+    const onDeleted = vi.fn<(ids: number[]) => void>()
+    const { handleBulkMove } = useBookBulkActions(selectedIds, onDeleted)
+
+    await handleBulkMove(3, 9)
+
+    expect(mocks.api).not.toHaveBeenCalled()
+    expect(mocks.toastError).toHaveBeenCalledWith('No books selected to move')
+  })
+
   it('shows an error toast and keeps the view when the move request fails', async () => {
     mocks.api.mockResolvedValue({ ok: false } as never)
     const selectedIds = ref(new Set([1]))

@@ -135,6 +135,16 @@ describe('useBookTableShell', () => {
     expect(shell.moveBooksOpen.value).toBe(false)
   })
 
+  it('notifies the view after a bulk move so it can refresh counts without relying on websockets', async () => {
+    const books = ref([makeBook()])
+    const onBooksMoved = vi.fn<() => void>()
+    const shell = useBookTableShell({ books, onBooksMoved })
+
+    await shell.confirmMoveBooks(3, 9)
+
+    expect(onBooksMoved).toHaveBeenCalledTimes(1)
+  })
+
   it('wires useBookBulkActions without an onBulkRefreshCompleted callback', () => {
     const books = ref([makeBook()])
     useBookTableShell({ books })

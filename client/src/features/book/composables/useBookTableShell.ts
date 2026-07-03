@@ -15,11 +15,14 @@ interface BookTableShellOptions {
   loading?: Ref<boolean>
   exitSelectionMode?: () => void
   querySelection?: Ref<QuerySelectionState | null>
+  // Called after a bulk move so the view can refresh counts/buckets itself,
+  // independent of the book:transferred websocket round-trip.
+  onBooksMoved?: () => void | Promise<void>
 }
 
 type BookActionType = 'quick-view' | 'add-to-collection' | 'delete'
 
-export function useBookTableShell({ books, querySelection }: BookTableShellOptions) {
+export function useBookTableShell({ books, querySelection, onBooksMoved }: BookTableShellOptions) {
   const router = useRouter()
   const { setBookContext } = useBookNavigation()
   const tableControls = useTableViewControls()
@@ -60,6 +63,13 @@ export function useBookTableShell({ books, querySelection }: BookTableShellOptio
     movingBooks.value = true
     try {
       await bulk.handleBulkMove(libraryId, folderId)
+      if (onBooksMoved) {
+        try {
+          await onBooksMoved()
+        } catch {
+          // The move itself succeeded; a failed view refresh must not surface as a move error.
+        }
+      }
     } finally {
       movingBooks.value = false
       moveBooksOpen.value = false

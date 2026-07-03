@@ -162,12 +162,24 @@ describe('SelectionActionBar demo restriction', () => {
     expect(wrapper.emitted('lock-metadata')?.map((args) => args[0])).toEqual([true, false])
   })
 
-  it('emits move from the more menu for users with delete permission', async () => {
+  it('emits move from a direct action button for users with delete permission', async () => {
     const wrapper = mountBar()
 
-    await wrapper.find('[data-testid="action-bulk-move"]').trigger('click')
+    const moveButton = wrapper.find('button[data-testid="action-bulk-move"]')
+    expect(moveButton.exists()).toBe(true)
+    await moveButton.trigger('click')
 
     expect(wrapper.emitted('move')).toHaveLength(1)
+  })
+
+  it('disables the move button while nothing is selected', () => {
+    const wrapper = mount(SelectionActionBar, {
+      props: { visible: true, count: 0, inCollection: false, inFlight: null },
+      global: globalStubs,
+    })
+
+    // Direct bar buttons are count-gated; the old dropdown entry was not.
+    expect(wrapper.find('button[data-testid="action-bulk-move"]').attributes('disabled')).toBeDefined()
   })
 
   it('hides the move action without delete permission', () => {
