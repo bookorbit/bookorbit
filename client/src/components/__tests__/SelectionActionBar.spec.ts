@@ -162,6 +162,21 @@ describe('SelectionActionBar demo restriction', () => {
     expect(wrapper.emitted('lock-metadata')?.map((args) => args[0])).toEqual([true, false])
   })
 
+  it('emits move from the more menu for users with delete permission', async () => {
+    const wrapper = mountBar()
+
+    await wrapper.find('[data-testid="action-bulk-move"]').trigger('click')
+
+    expect(wrapper.emitted('move')).toHaveLength(1)
+  })
+
+  it('hides the move action without delete permission', () => {
+    permissionState.allowed = new Set(['library_edit_metadata'])
+    const wrapper = mountBar()
+
+    expect(wrapper.find('[data-testid="action-bulk-move"]').exists()).toBe(false)
+  })
+
   it('emits set-field from the field editor flow', async () => {
     const wrapper = mountBar()
     await wrapper.find('[data-testid="action-bulk-set-field"]').trigger('click')

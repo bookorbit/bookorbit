@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   api: vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<{ ok: boolean }>>(),
   toastSuccess: vi.fn<(message: string) => void>(),
   toastError: vi.fn<(message: string) => void>(),
+  toastWarning: vi.fn<(message: string) => void>(),
   bumpVersion: vi.fn<(bookId: number) => void>(),
   markRefreshing: vi.fn<(bookIds: number[]) => void>(),
   clearRefreshing: vi.fn<(bookIds: number[]) => void>(),
@@ -37,7 +38,7 @@ vi.mock('vue-sonner', () => ({
   toast: {
     success: mocks.toastSuccess,
     error: mocks.toastError,
-    warning: vi.fn<(message: string) => void>(),
+    warning: mocks.toastWarning,
   },
 }))
 
@@ -411,6 +412,118 @@ describe('useBookBulkActions', () => {
     )
     expect(onDeleted).toHaveBeenCalledWith([])
     expect(mocks.toastSuccess).toHaveBeenCalledWith('Deleted 500 books')
+  })
+
+  it('moves selected books and removes moved ids from the current view', async () => {
+    mocks.api.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        results: [
+          { bookId: 1, status: 'moved' },
+          { bookId: 2, status: 'skipped', reason: 'already in target library' },
+        ],
+      }),
+    } as never)
+    const selectedIds = ref(new Set([1, 2]))
+    const onDeleted = vi.fn<(ids: number[]) => void>()
+    const { handleBulkMove } = useBookBulkActions(selectedIds, onDeleted)
+
+    await handleBulkMove(3, 9)
+
+    expect(mocks.api).toHaveBeenCalledWith(
+      '/api/v1/books/move',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ bookIds: [1, 2], targetLibraryId: 3, targetFolderId: 9 }),
+      }),
+    )
+    expect(onDeleted).toHaveBeenCalledWith([1])
+    expect(mocks.toastWarning).toHaveBeenCalledWith('Moved 1 of 2 books (1 skipped)')
+  })
+
+  it('reports a plain success toast when every book moves', async () => {
+    mocks.api.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        results: [
+          { bookId: 1, status: 'moved' },
+          { bookId: 2, status: 'moved' },
+        ],
+      }),
+    } as never)
+    const selectedIds = ref(new Set([1, 2]))
+    const onDeleted = vi.fn<(ids: number[]) => void>()
+    const { handleBulkMove } = useBookBulkActions(selectedIds, onDeleted)
+
+    await handleBulkMove(3)
+
+    expect(mocks.api).toHaveBeenCalledWith(
+      '/api/v1/books/move',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ bookIds: [1, 2], targetLibraryId: 3 }),
+      }),
+    )
+    expect(onDeleted).toHaveBeenCalledWith([1, 2])
+    expect(mocks.toastSuccess).toHaveBeenCalledWith('Moved 2 books')
+  })
+
+  it('sends move requests using query selection payloads', async () => {
+    mocks.api.mockResolvedValue({
+      ok: true,
+      json: async () => ({ results: [{ bookId: 8, status: 'moved' }] }),
+    } as never)
+    const selectedIds = ref(new Set<number>())
+    const onDeleted = vi.fn<(ids: number[]) => void>()
+    const querySelection = ref<QuerySelectionState | null>({
+      libraryId: 5,
+      filter: { type: 'group', join: 'AND', rules: [] },
+      q: 'space opera',
+      total: 500,
+    })
+    const { handleBulkMove } = useBookBulkActions(selectedIds, onDeleted, undefined, undefined, querySelection)
+
+    await handleBulkMove(3, 9)
+
+    expect(mocks.api).toHaveBeenCalledWith(
+      '/api/v1/books/move',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          query: { libraryId: 5, filter: { type: 'group', join: 'AND', rules: [] }, q: 'space opera' },
+          targetLibraryId: 3,
+          targetFolderId: 9,
+        }),
+      }),
+    )
+    expect(onDeleted).toHaveBeenCalledWith([8])
+  })
+
+  it('shows an error toast and keeps the view when the move request fails', async () => {
+    mocks.api.mockResolvedValue({ ok: false } as never)
+    const selectedIds = ref(new Set([1]))
+    const onDeleted = vi.fn<(ids: number[]) => void>()
+    const { handleBulkMove } = useBookBulkActions(selectedIds, onDeleted)
+
+    await handleBulkMove(3, 9)
+
+    expect(onDeleted).not.toHaveBeenCalled()
+    expect(mocks.toastError).toHaveBeenCalledWith('Failed to move books')
+  })
+
+  it('shows an error toast when no book could be moved', async () => {
+    mocks.api.mockResolvedValue({
+      ok: true,
+      json: async () => ({ results: [{ bookId: 1, status: 'failed', reason: 'book not found' }] }),
+    } as never)
+    const selectedIds = ref(new Set([1]))
+    const onDeleted = vi.fn<(ids: number[]) => void>()
+    const { handleBulkMove } = useBookBulkActions(selectedIds, onDeleted)
+
+    await handleBulkMove(3, 9)
+
+    expect(onDeleted).not.toHaveBeenCalled()
+    expect(mocks.toastError).toHaveBeenCalledWith('No books were moved (1 failed)')
   })
 
   it('bumps versions for all selected IDs after SSE stream even when no events are received', async () => {

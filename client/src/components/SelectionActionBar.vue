@@ -4,6 +4,7 @@ import {
   BookOpen,
   Download,
   FileSpreadsheet,
+  FolderInput,
   FolderMinus,
   FolderPlus,
   ImageDown,
@@ -83,6 +84,7 @@ const emit = defineEmits<{
   'set-rating': [rating: number | null]
   'set-field': [field: BulkEditableField, value: BulkEditableValue]
   'lock-metadata': [locked: boolean]
+  move: []
   delete: []
   exit: []
 }>()
@@ -103,7 +105,8 @@ const hasCustomContent = computed(() => Boolean(slots.content))
 const canBulkActions = computed(() => !isDemoRestrictedAccount.value)
 const canDownload = computed(() => hasPermission('library_download') && canBulkActions.value)
 const canEditMetadata = computed(() => hasPermission('library_edit_metadata') && canBulkActions.value)
-const canShowMoreMenu = computed(() => canDownload.value || canEditMetadata.value)
+const canMove = computed(() => hasPermission('library_delete_books') && canBulkActions.value)
+const canShowMoreMenu = computed(() => canDownload.value || canEditMetadata.value || canMove.value)
 const canShare = computed(() => hasPermission('email_send') || canDownload.value)
 const numericFieldSelected = computed(() => bulkField.value === 'publishedYear')
 const arrayFieldSelected = computed(() => (BULK_EDITABLE_ARRAY_FIELDS as readonly string[]).includes(bulkField.value))
@@ -436,6 +439,13 @@ watch(
                         <DropdownMenuItem data-testid="action-export-metadata" @click="emit('export-metadata')">
                           <FileSpreadsheet :size="14" />
                           <span>Export metadata</span>
+                        </DropdownMenuItem>
+                      </template>
+                      <template v-if="canMove">
+                        <DropdownMenuSeparator v-if="canEditMetadata || canDownload" />
+                        <DropdownMenuItem data-testid="action-bulk-move" @click="emit('move')">
+                          <FolderInput :size="14" />
+                          <span>Move to library</span>
                         </DropdownMenuItem>
                       </template>
                     </DropdownMenuContent>

@@ -27,6 +27,7 @@ import BulkEditMetadataDialog from '@/features/book/components/BulkEditMetadataD
 import MetadataExportDialog from '@/features/book/components/MetadataExportDialog.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
+import MoveBooksDialog from '@/features/book/components/MoveBooksDialog.vue'
 import JumpRail from '@/features/book/components/JumpRail.vue'
 import { toast } from 'vue-sonner'
 import { useBookViewWindow } from '@/features/book/composables/useBookViewWindow'
@@ -207,6 +208,9 @@ const {
   handleBulkSetField,
   handleBulkSetMetadataLock,
   handleDeleteSelected,
+  moveBooksOpen,
+  movingBooks,
+  confirmMoveBooks,
   addToCollectionOpen,
   bulkEditOpen,
   sendBookOpen,
@@ -395,8 +399,18 @@ defineOptions({ name: 'SmartScopeView' })
       @set-rating="handleBulkSetRating"
       @set-field="handleBulkSetField"
       @lock-metadata="handleBulkSetMetadataLock"
+      @move="moveBooksOpen = true"
       @delete="handleDeleteSelected"
       @exit="exitSelectionMode"
+    />
+
+    <MoveBooksDialog
+      :open="moveBooksOpen"
+      :count="selectedCount"
+      :current-library-id="null"
+      :moving="movingBooks"
+      @confirm="confirmMoveBooks"
+      @cancel="moveBooksOpen = false"
     />
 
     <MetadataExportDialog

@@ -165,11 +165,15 @@ function makeController() {
   const fileWriteService = {
     findWriteLog: vi.fn(),
   };
+  const bookMoveService = {
+    moveBooks: vi.fn(),
+  };
 
   return {
-    controller: new BookController(bookService as never, fileWriteService as never),
+    controller: new BookController(bookService as never, fileWriteService as never, bookMoveService as never),
     bookService,
     fileWriteService,
+    bookMoveService,
   };
 }
 
@@ -187,6 +191,18 @@ describe('BookController', () => {
     bookService.getCoverPath.mockResolvedValue(null);
 
     await expect(controller.getCover(7, makeUser(), reply, undefined, undefined)).rejects.toThrow(NotFoundException);
+  });
+
+  it('resolves the selection and delegates the move to the book move service', async () => {
+    const { controller, bookService, bookMoveService } = makeController();
+    bookMoveService.moveBooks.mockResolvedValue([{ bookId: 1, status: 'moved' }]);
+    const user = makeUser();
+
+    const result = await controller.moveBooks({ bookIds: [1, 2], targetLibraryId: 3, targetFolderId: 9 } as never, user);
+
+    expect(bookService.resolveSelectionToIds).toHaveBeenCalledWith(expect.objectContaining({ bookIds: [1, 2] }), user);
+    expect(bookMoveService.moveBooks).toHaveBeenCalledWith([1, 2], 3, 9, user);
+    expect(result).toEqual({ results: [{ bookId: 1, status: 'moved' }] });
   });
 
   it('delegates embed-all endpoint to service', async () => {

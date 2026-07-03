@@ -5,6 +5,8 @@ import type { BookCard } from '@bookorbit/types'
 const mockSelectionMode = { value: false }
 const mockSelectedIds = { value: new Set<number>() }
 
+const handleBulkMoveMock = vi.hoisted(() => vi.fn<(libraryId: number, folderId?: number) => Promise<void>>().mockResolvedValue(undefined))
+
 const mocks = vi.hoisted(() => ({
   enterSelectionMode: vi.fn<() => void>(),
   exitSelectionMode: vi.fn<() => void>(),
@@ -23,6 +25,7 @@ const mocks = vi.hoisted(() => ({
     handleBulkSetMetadataLock: vi.fn<() => void>(),
     handleDeleteSelected: vi.fn<() => void>(),
     handleDownloadFiles: vi.fn<() => void>(),
+    handleBulkMove: handleBulkMoveMock,
     inFlight: { value: null },
   })),
   useDeleteBookCallback: null as ((id: number) => void) | null,
@@ -116,6 +119,20 @@ describe('useBookTableShell', () => {
     mocks.useBookBulkActions.mockClear()
     mocks.routerPush.mockClear()
     mocks.setBookContext.mockClear()
+  })
+
+  it('runs bulk move behind a busy flag and closes the move dialog afterwards', async () => {
+    const books = ref([makeBook()])
+    const shell = useBookTableShell({ books })
+
+    shell.moveBooksOpen.value = true
+    const pending = shell.confirmMoveBooks(3, 9)
+    expect(shell.movingBooks.value).toBe(true)
+    await pending
+
+    expect(handleBulkMoveMock).toHaveBeenCalledWith(3, 9)
+    expect(shell.movingBooks.value).toBe(false)
+    expect(shell.moveBooksOpen.value).toBe(false)
   })
 
   it('wires useBookBulkActions without an onBulkRefreshCompleted callback', () => {

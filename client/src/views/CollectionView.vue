@@ -17,6 +17,7 @@ import MetadataExportDialog from '@/features/book/components/MetadataExportDialo
 import EditCollectionDialog from '@/features/collection/components/EditCollectionDialog.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
+import MoveBooksDialog from '@/features/book/components/MoveBooksDialog.vue'
 import JumpRail from '@/features/book/components/JumpRail.vue'
 import { toast } from 'vue-sonner'
 import { useCollections } from '@/features/collection/composables/useCollections'
@@ -200,6 +201,9 @@ const {
   handleBulkSetField,
   handleBulkSetMetadataLock,
   handleDeleteSelected,
+  moveBooksOpen,
+  movingBooks,
+  confirmMoveBooks,
   addToCollectionOpen,
   bulkEditOpen,
   sendBookOpen,
@@ -376,8 +380,18 @@ defineOptions({ name: 'CollectionView' })
       @set-rating="handleBulkSetRating"
       @set-field="handleBulkSetField"
       @lock-metadata="handleBulkSetMetadataLock"
+      @move="moveBooksOpen = true"
       @delete="handleDeleteSelected"
       @exit="exitSelectionMode"
+    />
+
+    <MoveBooksDialog
+      :open="moveBooksOpen"
+      :count="selectedCount"
+      :current-library-id="null"
+      :moving="movingBooks"
+      @confirm="confirmMoveBooks"
+      @cancel="moveBooksOpen = false"
     />
 
     <MetadataExportDialog

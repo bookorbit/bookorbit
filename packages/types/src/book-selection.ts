@@ -8,3 +8,13 @@ export type BookSelectionQuery = {
 };
 
 export type BookSelectionPayload = { bookIds: number[]; query?: never } | { query: BookSelectionQuery; bookIds?: never };
+
+export interface MoveBookOutcome {
+  bookId: number;
+  status: "moved" | "skipped" | "failed";
+  reason?: string;
+}
+
+export interface MoveBooksResponse {
+  results: MoveBookOutcome[];
+}

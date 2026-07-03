@@ -6,6 +6,7 @@ import {
   Check,
   ChevronDown,
   Eye,
+  FolderInput,
   Library,
   Headphones,
   Lock,
@@ -26,7 +27,7 @@ import { getProviderColor, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
 import { FORMAT_TO_GROUP, READER_OPENABLE_FORMATS } from '@bookorbit/types'
-import type { BookDetail, BookKoboState, CustomMetadataBookValue, ReadStatus, UserBookStatus } from '@bookorbit/types'
+import type { BookDetail, BookKoboState, CustomMetadataBookValue, MoveBooksResponse, ReadStatus, UserBookStatus } from '@bookorbit/types'
 import { STATUS_OPTIONS, STATUS_ICONS, STATUS_COLORS, useBookStatus } from '@/features/book/composables/useBookStatus'
 import BookDownloadButton from '@/features/book/components/BookDownloadButton.vue'
 import DiscoverRow from '@/features/book/components/detail/DiscoverRow.vue'
@@ -39,6 +40,8 @@ import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import { useMetadataLocks } from '@/features/book/composables/useMetadataLocks'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
+import MoveBooksDialog from '@/features/book/components/MoveBooksDialog.vue'
+import { toast } from 'vue-sonner'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import MetadataScoreBadge from '@/features/metadata-score/components/MetadataScoreBadge.vue'
@@ -814,6 +817,49 @@ function handleDeleteFromMenu() {
   promptDelete(props.book.id)
 }
 
+const moveBookOpen = ref(false)
+const movingBook = ref(false)
+
+function handleMoveFromMenu() {
+  moreMenuOpen.value = false
+  mobileMoreMenuOpen.value = false
+  moveBookOpen.value = true
+}
+
+async function confirmMoveBook(libraryId: number, folderId?: number) {
+  if (movingBook.value) return
+  movingBook.value = true
+  try {
+    const res = await api('/api/v1/books/move', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        bookIds: [props.book.id],
+        targetLibraryId: libraryId,
+        ...(folderId !== undefined ? { targetFolderId: folderId } : {}),
+      }),
+    })
+    if (!res.ok) {
+      toast.error('Failed to move book')
+      return
+    }
+    const { results } = (await res.json()) as MoveBooksResponse
+    const outcome = results[0]
+    if (outcome?.status !== 'moved') {
+      toast.error(`Book was not moved${outcome?.reason ? `: ${outcome.reason}` : ''}`)
+      return
+    }
+    toast.success('Book moved')
+    const detailRes = await api(`/api/v1/books/${props.book.id}`)
+    if (detailRes.ok) {
+      emit('saved', (await detailRes.json()) as BookDetail)
+    }
+  } finally {
+    movingBook.value = false
+    moveBookOpen.value = false
+  }
+}
+
 function handleSendFromMenu() {
   moreMenuOpen.value = false
   mobileMoreMenuOpen.value = false
@@ -1265,6 +1311,14 @@ watch(
           </button>
           <button
             v-if="hasPermission('library_delete_books')"
+            class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm text-foreground hover:bg-muted transition-colors"
+            @click="handleMoveFromMenu"
+          >
+            <FolderInput class="size-3.5" />
+            Move to Library
+          </button>
+          <button
+            v-if="hasPermission('library_delete_books')"
             class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm text-destructive hover:bg-destructive/10 transition-colors"
             @click="handleDeleteFromMenu"
           >
@@ -1417,6 +1471,14 @@ watch(
                 >
                   <Send class="size-3.5" />
                   Send via Email
+                </button>
+                <button
+                  v-if="hasPermission('library_delete_books')"
+                  class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm text-foreground hover:bg-muted transition-colors"
+                  @click="handleMoveFromMenu"
+                >
+                  <FolderInput class="size-3.5" />
+                  Move to Library
                 </button>
                 <button
                   v-if="hasPermission('library_delete_books')"
@@ -1960,6 +2022,15 @@ watch(
   />
 
   <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelDelete" />
+
+  <MoveBooksDialog
+    :open="moveBookOpen"
+    :count="1"
+    :current-library-id="book.libraryId"
+    :moving="movingBook"
+    @confirm="confirmMoveBook"
+    @cancel="moveBookOpen = false"
+  />
 
   <!-- Cover lightbox -->
   <DialogRoot :open="coverLightboxOpen" @update:open="coverLightboxOpen = $event">

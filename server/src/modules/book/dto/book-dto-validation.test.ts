@@ -15,6 +15,7 @@ import { BulkUpdateTagsDto } from './bulk-update-tags.dto';
 import { DeleteBooksDto } from './delete-books.dto';
 import { ExportBooksDto } from './export-books.dto';
 import { MetadataExportDto } from './metadata-export.dto';
+import { MoveBooksDto } from './move-books.dto';
 import { GetBooksDto } from './get-books.dto';
 import { SaveProgressDto } from './save-progress.dto';
 import { SearchBooksDto } from './search-books.dto';
@@ -33,6 +34,16 @@ async function strictErrorsFor<T extends object>(cls: new () => T, value: Record
 }
 
 describe('Book DTO validation', () => {
+  it('validates move books payloads', async () => {
+    expect((await errorsFor(MoveBooksDto, { bookIds: [1, 2], targetLibraryId: 3 })).length).toBe(0);
+    expect((await errorsFor(MoveBooksDto, { bookIds: [1], targetLibraryId: 3, targetFolderId: 9 })).length).toBe(0);
+    expect((await errorsFor(MoveBooksDto, { query: { libraryId: 5 }, targetLibraryId: 3 })).length).toBe(0);
+    expect((await errorsFor(MoveBooksDto, { bookIds: [1] })).length).toBeGreaterThan(0);
+    expect((await errorsFor(MoveBooksDto, { bookIds: [1], targetLibraryId: 0 })).length).toBeGreaterThan(0);
+    expect((await errorsFor(MoveBooksDto, { bookIds: [1], targetLibraryId: 3, targetFolderId: 0 })).length).toBeGreaterThan(0);
+    expect((await errorsFor(MoveBooksDto, { bookIds: [1], targetLibraryId: 'x' })).length).toBeGreaterThan(0);
+  });
+
   it('validates bulk selection DTOs for explicit ids and query payloads', async () => {
     expect((await errorsFor(BulkQuerySelectionDto, { libraryId: 5 })).length).toBe(0);
     expect((await errorsFor(BulkQuerySelectionDto, { filter: { type: 'group', join: 'AND', rules: [] } })).length).toBe(0);

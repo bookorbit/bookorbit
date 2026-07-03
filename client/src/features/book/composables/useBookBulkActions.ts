@@ -7,6 +7,7 @@ import {
   type BookCard,
   type BookDetail,
   type BookMetadataLockField,
+  type MoveBooksResponse,
   type ReadStatus,
   type UserBookStatus,
 } from '@bookorbit/types'
@@ -392,6 +393,35 @@ export function useBookBulkActions(
     toast.success(`${locked ? 'Locked' : 'Unlocked'} metadata for ${count} book${count === 1 ? '' : 's'}`)
   }
 
+  async function handleBulkMove(targetLibraryId: number, targetFolderId?: number) {
+    if (!hasSelection()) return
+    const res = await api('/api/v1/books/move', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...getSelectionPayload(), targetLibraryId, ...(targetFolderId !== undefined ? { targetFolderId } : {}) }),
+    })
+    if (!res.ok) {
+      toast.error('Failed to move books')
+      return
+    }
+    const { results } = (await res.json()) as MoveBooksResponse
+    const movedIds = results.filter((entry) => entry.status === 'moved').map((entry) => entry.bookId)
+    const skipped = results.filter((entry) => entry.status === 'skipped').length
+    const failed = results.filter((entry) => entry.status === 'failed').length
+    if (movedIds.length > 0) onDeleted(movedIds)
+    if (movedIds.length === results.length) {
+      toast.success(`Moved ${movedIds.length} book${movedIds.length === 1 ? '' : 's'}`)
+      return
+    }
+    if (movedIds.length === 0) {
+      const parts = [skipped > 0 ? `${skipped} skipped` : null, failed > 0 ? `${failed} failed` : null].filter(Boolean).join(', ')
+      toast.error(`No books were moved${parts ? ` (${parts})` : ''}`)
+      return
+    }
+    const parts = [skipped > 0 ? `${skipped} skipped` : null, failed > 0 ? `${failed} failed` : null].filter(Boolean).join(', ')
+    toast.warning(`Moved ${movedIds.length} of ${results.length} books${parts ? ` (${parts})` : ''}`)
+  }
+
   async function handleDeleteSelected() {
     if (!hasSelection()) return
     const ids = querySelection?.value ? [] : [...selectedIds.value]
@@ -418,6 +448,7 @@ export function useBookBulkActions(
     handleBulkSetRating,
     handleBulkSetField,
     handleBulkSetMetadataLock,
+    handleBulkMove,
     handleDeleteSelected,
     getSelectionPayload,
   }

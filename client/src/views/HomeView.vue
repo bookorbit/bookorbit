@@ -35,6 +35,7 @@ import MetadataExportDialog from '@/features/book/components/MetadataExportDialo
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import SaveAsSmartScopeDialog from '@/features/smart-scope/components/SaveAsSmartScopeDialog.vue'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
+import MoveBooksDialog from '@/features/book/components/MoveBooksDialog.vue'
 import JumpRail from '@/features/book/components/JumpRail.vue'
 import type { BookCard } from '@bookorbit/types'
 import { useBookViewWindow } from '@/features/book/composables/useBookViewWindow'
@@ -402,6 +403,9 @@ const {
   handleBulkSetMetadataLock,
   handleDeleteSelected,
   getSelectionPayload,
+  moveBooksOpen,
+  movingBooks,
+  confirmMoveBooks,
   addToCollectionOpen,
   bulkEditOpen,
   sendBookOpen,
@@ -1010,8 +1014,18 @@ defineOptions({ name: 'HomeView' })
       @set-rating="handleBulkSetRating"
       @set-field="handleBulkSetField"
       @lock-metadata="handleBulkSetMetadataLock"
+      @move="moveBooksOpen = true"
       @delete="handleDeleteSelected"
       @exit="exitSelectionMode"
+    />
+
+    <MoveBooksDialog
+      :open="moveBooksOpen"
+      :count="querySelection ? querySelection.total : selectedCount"
+      :current-library-id="libraryId ?? null"
+      :moving="movingBooks"
+      @confirm="confirmMoveBooks"
+      @cancel="moveBooksOpen = false"
     />
 
     <MetadataExportDialog

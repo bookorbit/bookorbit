@@ -50,8 +50,21 @@ export function useBookTableShell({ books, querySelection }: BookTableShellOptio
   const addToCollectionOpen = ref(false)
   const bulkEditOpen = ref(false)
   const sendBookOpen = ref(false)
+  const moveBooksOpen = ref(false)
+  const movingBooks = ref(false)
   const quickViewBookId = ref<number | null>(null)
   const quickViewOpen = ref(false)
+
+  async function confirmMoveBooks(libraryId: number, folderId?: number): Promise<void> {
+    if (movingBooks.value) return
+    movingBooks.value = true
+    try {
+      await bulk.handleBulkMove(libraryId, folderId)
+    } finally {
+      movingBooks.value = false
+      moveBooksOpen.value = false
+    }
+  }
 
   function handleBookAction(book: BookCard, action: BookActionType): void {
     if (action === 'quick-view') {
@@ -101,6 +114,9 @@ export function useBookTableShell({ books, querySelection }: BookTableShellOptio
     addToCollectionOpen,
     bulkEditOpen,
     sendBookOpen,
+    moveBooksOpen,
+    movingBooks,
+    confirmMoveBooks,
     quickViewBookId,
     quickViewOpen,
     handleBookAction,

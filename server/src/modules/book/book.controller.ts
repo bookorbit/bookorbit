@@ -29,6 +29,7 @@ import { ForbidPermission } from '../../common/decorators/forbid-permission.deco
 import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { RequestUser } from '../../common/types/request-user';
 import { FileWriteService } from '../file-write/file-write.service';
+import { BookMoveService } from '../book-move/book-move.service';
 import { BookService } from './book.service';
 import { BookQueryPipe } from './pipes/book-query.pipe';
 import { BulkBookIdsDto } from './dto/bulk-book-ids.dto';
@@ -39,6 +40,7 @@ import { BulkUpdateTagsDto } from './dto/bulk-update-tags.dto';
 import { BulkSetMetadataLockDto } from './dto/bulk-set-metadata-lock.dto';
 import { BulkEditMetadataDto } from './dto/bulk-edit-metadata.dto';
 import { DeleteBooksDto } from './dto/delete-books.dto';
+import { MoveBooksDto } from './dto/move-books.dto';
 import { ExportBooksDto } from './dto/export-books.dto';
 import { MetadataExportDto } from './dto/metadata-export.dto';
 import { SaveProgressDto } from './dto/save-progress.dto';
@@ -93,6 +95,7 @@ export class BookController {
   constructor(
     private readonly bookService: BookService,
     private readonly fileWriteService: FileWriteService,
+    private readonly bookMoveService: BookMoveService,
   ) {}
 
   @Post('embed-all')
@@ -115,6 +118,23 @@ export class BookController {
   async deleteBooks(@Body() dto: DeleteBooksDto, @CurrentUser() user: RequestUser) {
     const ids = await this.bookService.resolveSelectionToIds(dto, user);
     return this.bookService.deleteBooks(ids, user);
+  }
+
+  @Post('move')
+  @RequirePermission(Permission.LibraryDeleteBooks)
+  @Auditable({
+    action: AuditAction.BookBulkMove,
+    resource: AuditResource.Book,
+    description: (req) => {
+      const body = req.body as { bookIds?: number[]; targetLibraryId?: number };
+      const count = body?.bookIds?.length ?? 0;
+      return `Moved ${count} book${count !== 1 ? 's' : ''} to library ${body?.targetLibraryId}`;
+    },
+  })
+  async moveBooks(@Body() dto: MoveBooksDto, @CurrentUser() user: RequestUser) {
+    const ids = await this.bookService.resolveSelectionToIds(dto, user);
+    const results = await this.bookMoveService.moveBooks(ids, dto.targetLibraryId, dto.targetFolderId, user);
+    return { results };
   }
 
   // Must be before @Get(':id') so NestJS does not treat 'search' as an :id param
