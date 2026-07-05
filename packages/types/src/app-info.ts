@@ -3,4 +3,5 @@ export interface AppInfoResponse {
   updateAvailable: boolean | null;
   latestVersion: string | null;
   bookDockPath: string;
+  maxUploadSizeMb: number;
 }

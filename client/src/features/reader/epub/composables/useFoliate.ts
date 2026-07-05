@@ -160,6 +160,8 @@ export function useFoliate(
         const detail = (e as CustomEvent).detail
         if (!detail?.value || !onAnnotationClick) return
 
+        input.suppressNextTapNavigation()
+
         const range = detail.range as Range | undefined
         let x = window.innerWidth / 2
         let selectionTop = 0
@@ -364,6 +366,7 @@ export function useFoliate(
     addAnnotation: (cfi: string, color = '#FACC15', style = 'highlight') => annotations.addAnnotation(viewRef.value, cfi, color, style),
     addAnnotations: (anns: { cfi: string; color: string; style: string }[]) => annotations.addAnnotations(viewRef.value, anns),
     deleteAnnotation: (cfi: string) => annotations.deleteAnnotation(viewRef.value, cfi),
+    redrawAnnotation: (cfi: string, color: string, style: string) => annotations.redrawAnnotation(viewRef.value, cfi, color, style),
     setTextSelectedHandler: selection.setHandler,
     setAnnotationClickHandler,
   }

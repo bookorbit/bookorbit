@@ -62,6 +62,12 @@ export class AppSettingsService {
   }
 
   async update(key: string, value: string) {
+    if (key === APP_SETTING_KEYS.MAX_UPLOAD_SIZE_MB) {
+      const parsed = parseInt(value, 10);
+      if (isNaN(parsed) || parsed <= 0) {
+        throw new BadRequestException('Upload size limit must be an integer greater than 0');
+      }
+    }
     const setting = await this.repo.updateByKey(key, value);
     if (!setting) throw new NotFoundException(`Setting '${key}' not found`);
     return setting;
@@ -277,6 +283,12 @@ export class AppSettingsService {
   async isUpdateCheckEnabled(): Promise<boolean> {
     const row = await this.repo.findByKey(APP_SETTING_KEYS.UPDATE_CHECK_ENABLED);
     return parseBooleanSetting(row?.value, true);
+  }
+
+  async getMaxUploadSizeMb(): Promise<number> {
+    const row = await this.repo.findByKey(APP_SETTING_KEYS.MAX_UPLOAD_SIZE_MB);
+    const size = row?.value ? parseInt(row.value, 10) : 500;
+    return isNaN(size) || size <= 0 ? 500 : size;
   }
 }
 

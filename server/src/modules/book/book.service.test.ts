@@ -1524,6 +1524,85 @@ describe('BookService', () => {
       warnSpy.mockRestore();
     });
 
+    it('updateMetadata skips sync rename when file write returns a failed result', async () => {
+      const { service, fileWriteService, fileRenameService } = makeService();
+      const user = makeUser();
+      const failedWrite = {
+        status: 'failed',
+        fieldsWritten: ['title', 'authors'],
+        durationMs: 2200,
+        reason: '1 of 14 file writes failed',
+      };
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 5, title: 'Renamed Title' } as never);
+      fileWriteService.findLibraryWriteSettingsForBook.mockResolvedValue({ fileWriteEnabled: true, fileRenameEnabled: true });
+      fileWriteService.writeToFile.mockResolvedValue(failedWrite);
+
+      const result = await service.updateMetadata(5, { title: 'Renamed Title', authors: ['A1'] }, user, { postSaveMode: 'sync' });
+
+      expect(fileWriteService.cancelPendingWrite).toHaveBeenCalledWith(5);
+      expect(fileRenameService.cancelPendingRename).toHaveBeenCalledWith(5);
+      expect(fileWriteService.writeToFile).toHaveBeenCalledWith(5, 'sync', user.id, false, false, true);
+      expect(fileRenameService.performRename).not.toHaveBeenCalled();
+      expect(fileWriteService.scheduleWrite).not.toHaveBeenCalled();
+      expect(fileRenameService.scheduleRename).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        book: { id: 5, title: 'Renamed Title' },
+        write: failedWrite,
+        libraryAutoWriteEnabled: true,
+      });
+    });
+
+    it('updateMetadata skips sync rename when file write throws', async () => {
+      const { service, fileWriteService, fileRenameService } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 5, title: 'Throwing Write' } as never);
+      fileWriteService.findLibraryWriteSettingsForBook.mockResolvedValue({ fileWriteEnabled: true, fileRenameEnabled: true });
+      fileWriteService.writeToFile.mockRejectedValue(new Error('ffmpeg exited'));
+
+      const result = await service.updateMetadata(5, { title: 'Throwing Write' }, user, { postSaveMode: 'sync' });
+
+      expect(fileWriteService.writeToFile).toHaveBeenCalledWith(5, 'sync', user.id, false, false, true);
+      expect(fileRenameService.performRename).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        book: { id: 5, title: 'Throwing Write' },
+        write: {
+          status: 'failed',
+          fieldsWritten: [],
+          durationMs: 0,
+          reason: 'ffmpeg exited',
+        },
+        libraryAutoWriteEnabled: true,
+      });
+    });
+
+    it('updateMetadata still runs sync rename when file write is skipped without failure', async () => {
+      const { service, fileWriteService, fileRenameService } = makeService();
+      const user = makeUser();
+      const skippedWrite = {
+        status: 'skipped',
+        fieldsWritten: [],
+        durationMs: 0,
+        reason: 'format not supported',
+      };
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 5, title: 'Rename Only' } as never);
+      fileWriteService.findLibraryWriteSettingsForBook.mockResolvedValue({ fileWriteEnabled: true, fileRenameEnabled: true });
+      fileWriteService.writeToFile.mockResolvedValue(skippedWrite);
+      fileRenameService.performRename.mockResolvedValue({ status: 'success', durationMs: 8, oldPath: '/old', newPath: '/new' });
+
+      const result = await service.updateMetadata(5, { title: 'Rename Only' }, user, { postSaveMode: 'sync' });
+
+      expect(fileWriteService.writeToFile).toHaveBeenCalledWith(5, 'sync', user.id, false, false, true);
+      expect(fileRenameService.performRename).toHaveBeenCalledWith(5, user.id, false, true);
+      expect(result).toEqual({
+        book: { id: 5, title: 'Rename Only' },
+        write: skippedWrite,
+        libraryAutoWriteEnabled: true,
+      });
+    });
+
     it('updateMetadata rejects manual writes to locked fields', async () => {
       const { service, bookRepo, bookMetadataLockService } = makeService();
       const user = makeUser();

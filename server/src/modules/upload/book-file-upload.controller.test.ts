@@ -3,7 +3,6 @@ import { Permission } from '@bookorbit/types';
 import { PERMISSION_KEY } from '../../common/decorators/require-permission.decorator';
 
 import { BookFileUploadController } from './book-file-upload.controller';
-import { MAX_UPLOAD_BYTES } from './upload-storage.service';
 
 function makeUser(overrides: Record<string, unknown> = {}) {
   return { id: 1, isSuperuser: false, permissions: [], ...overrides } as any;
@@ -14,8 +13,11 @@ describe('BookFileUploadController', () => {
     addFileToBook: vi.fn(),
     renameBookFiles: vi.fn(),
   };
+  const appSettings = {
+    getMaxUploadSizeMb: () => Promise.resolve(500),
+  };
 
-  const controller = new BookFileUploadController(uploadService as any);
+  const controller = new BookFileUploadController(uploadService as any, appSettings as any);
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -41,7 +43,7 @@ describe('BookFileUploadController', () => {
 
       await controller.addFileToBook(5, makeUser(), req as any);
 
-      expect(req.file).toHaveBeenCalledWith({ limits: { fileSize: MAX_UPLOAD_BYTES } });
+      expect(req.file).toHaveBeenCalledWith({ limits: { fileSize: 500 * 1024 * 1024 } });
     });
 
     it('delegates to uploadService.addFileToBook with correct arguments', async () => {

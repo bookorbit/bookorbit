@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Plus, Trash2, Copy, Check, Pencil, X, Tablet, RefreshCw, History, Download, Upload, Bookmark } from '@lucide/vue'
+import { Plus, Trash2, Copy, Check, Pencil, X, Tablet, RefreshCw, History, Download, Upload, Bookmark, Info } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
@@ -636,7 +636,7 @@ async function saveSettings() {
             </div>
             <div>
               <p class="settings-label leading-none mb-0.5">Device paired successfully</p>
-              <p class="settings-hint">You're ready to set up your Kobo. Follow the instructions below.</p>
+              <p class="settings-hint">You're ready to set up your Kobo. Enable Kobo Sync on your collections to start syncing books.</p>
             </div>
           </div>
           <button @click="dismissToken()" class="text-muted-foreground hover:text-foreground transition-colors p-1 shrink-0">
@@ -664,6 +664,17 @@ async function saveSettings() {
           >
             <X :size="14" class="shrink-0" />
             This URL will not be shown again. Keep it private.
+          </div>
+          <div class="flex items-start gap-2.5 rounded-md border border-border bg-background p-4 text-xs mt-4">
+            <Info :size="16" class="text-primary shrink-0 mt-0.5" />
+            <div class="space-y-1">
+              <p class="font-semibold text-foreground">Next Steps</p>
+              <p class="text-muted-foreground leading-normal">1. Configure your Kobo device to sync with the Sync URL above.</p>
+              <p class="text-muted-foreground leading-normal">
+                2. In BookOrbit, go to any collection from the sidebar, click the Edit icon, and enable
+                <strong class="text-foreground">Sync to Kobo</strong>. Only books inside sync-enabled collections will download to your device.
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -741,6 +752,22 @@ async function saveSettings() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Setup Tip / Collection Sync Notice -->
+      <div class="mb-8 p-4 rounded-lg bg-primary/5 border border-primary/10 shadow-xs max-w-4xl">
+        <div class="flex items-start gap-3">
+          <Info :size="18" class="text-primary shrink-0 mt-0.5" />
+          <div class="space-y-1.5">
+            <p class="text-sm font-semibold text-foreground">How books are synced</p>
+            <p class="text-xs leading-relaxed text-muted-foreground">
+              To send books to your Kobo device, you must enable
+              <strong class="text-foreground font-medium">Sync to Kobo</strong> on the collections containing those books. Open any collection from
+              the sidebar, click the Edit icon, and toggle <strong class="text-foreground font-medium">Sync to Kobo</strong>. Books that are not part
+              of an enabled collection will not sync.
+            </p>
           </div>
         </div>
       </div>

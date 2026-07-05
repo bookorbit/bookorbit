@@ -1,6 +1,7 @@
 const LEFT_ZONE = 0.3
 const RIGHT_ZONE = 0.7
 const DOUBLE_CLICK_MS = 300
+const ANNOTATION_CLICK_SUPPRESSION_MS = DOUBLE_CLICK_MS + 100
 const SWIPE_THRESHOLD = 50
 
 export function useFoliateInput(
@@ -14,6 +15,7 @@ export function useFoliateInput(
   let lastClickTime = 0
   let lastClickZone: 'left' | 'middle' | 'right' | null = null
   let isNavigating = false
+  let suppressClickNavigationUntil = 0
   let touchStartX = 0
   let touchStartY = 0
   let touchStartTime = 0
@@ -49,6 +51,16 @@ export function useFoliateInput(
 
   function navigateNext() {
     getViewEl()?.next?.()
+  }
+
+  function suppressNextTapNavigation() {
+    suppressClickNavigationUntil = Date.now() + ANNOTATION_CLICK_SUPPRESSION_MS
+    lastClickTime = 0
+    lastClickZone = null
+  }
+
+  function isTapNavigationSuppressed() {
+    return Date.now() < suppressClickNavigationUntil
   }
 
   function handleTouchStart(e: TouchEvent) {
@@ -183,6 +195,7 @@ export function useFoliateInput(
   function handleWindowMessage(e: MessageEvent) {
     if (e.origin !== window.location.origin) return
     if (e.data?.type !== 'foliate-click') return
+    if (isTapNavigationSuppressed()) return
     const view = getViewEl()
     if (!view) return
 
@@ -213,6 +226,7 @@ export function useFoliateInput(
     lastClickZone = currentZone
 
     setTimeout(() => {
+      if (isTapNavigationSuppressed()) return
       if (Date.now() - lastClickTime < DOUBLE_CLICK_MS) return
       if (!longHoldTimeout) return
       if (isNavigating) return
@@ -267,5 +281,5 @@ export function useFoliateInput(
     document.removeEventListener('keydown', handleKeydown)
   }
 
-  return { attachIframeClicks, cleanup }
+  return { attachIframeClicks, suppressNextTapNavigation, cleanup }
 }

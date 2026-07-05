@@ -1,14 +1,16 @@
 import { BadRequestException } from '@nestjs/common';
 
-import { MAX_UPLOAD_BYTES } from './upload-storage.service';
 import { UploadController } from './upload.controller';
 
 describe('UploadController', () => {
   const uploadService = {
     upload: vi.fn(),
   };
+  const appSettings = {
+    getMaxUploadSizeMb: () => Promise.resolve(500),
+  };
 
-  const controller = new UploadController(uploadService as any);
+  const controller = new UploadController(uploadService as any, appSettings as any);
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -53,7 +55,7 @@ describe('UploadController', () => {
 
     await controller.uploadBook(3, '12', { id: 5, isSuperuser: false, permissions: [] } as any, req as any);
 
-    expect(req.file).toHaveBeenCalledWith({ limits: { fileSize: MAX_UPLOAD_BYTES } });
+    expect(req.file).toHaveBeenCalledWith({ limits: { fileSize: 500 * 1024 * 1024 } });
     expect(uploadService.upload).toHaveBeenCalledWith(3, 12, 'book.epub', stream, { id: 5, isSuperuser: false, permissions: [] });
   });
 

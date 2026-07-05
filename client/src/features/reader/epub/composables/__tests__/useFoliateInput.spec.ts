@@ -236,6 +236,88 @@ describe('useFoliateInput', () => {
     }
   })
 
+  it('ignores a page-turn click message that arrives after annotation tap suppression starts', () => {
+    vi.useFakeTimers()
+
+    const next = vi.fn<() => void>()
+    const onMiddleTap = vi.fn<() => void>()
+    const view: ViewLike = {
+      prev: vi.fn<() => void>(),
+      next,
+      getBoundingClientRect: () => ({ left: 0, width: 100 }) as DOMRect,
+    }
+
+    const input = useFoliateInput(() => view, onMiddleTap, vi.fn<() => void>(), vi.fn<() => void>())
+    const doc = makeDocTarget()
+    input.attachIframeClicks(doc)
+
+    const originalMaxTouchPoints = Object.getOwnPropertyDescriptor(navigator, 'maxTouchPoints')
+    const originalOntouchstart = Object.getOwnPropertyDescriptor(window, 'ontouchstart')
+    Object.defineProperty(navigator, 'maxTouchPoints', {
+      configurable: true,
+      get: () => 0,
+    })
+    Reflect.deleteProperty(window as unknown as Record<string, unknown>, 'ontouchstart')
+
+    doc.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    input.suppressNextTapNavigation()
+    window.dispatchEvent(new MessageEvent('message', { data: { type: 'foliate-click', clientX: 95 }, origin: window.location.origin }))
+    vi.advanceTimersByTime(500)
+
+    expect(next).not.toHaveBeenCalled()
+    expect(onMiddleTap).not.toHaveBeenCalled()
+
+    input.cleanup()
+
+    if (originalMaxTouchPoints) {
+      Object.defineProperty(navigator, 'maxTouchPoints', originalMaxTouchPoints)
+    }
+    if (originalOntouchstart) {
+      Object.defineProperty(window, 'ontouchstart', originalOntouchstart)
+    }
+  })
+
+  it('cancels a queued page turn when annotation tap suppression starts before the delay completes', () => {
+    vi.useFakeTimers()
+
+    const next = vi.fn<() => void>()
+    const onMiddleTap = vi.fn<() => void>()
+    const view: ViewLike = {
+      prev: vi.fn<() => void>(),
+      next,
+      getBoundingClientRect: () => ({ left: 0, width: 100 }) as DOMRect,
+    }
+
+    const input = useFoliateInput(() => view, onMiddleTap, vi.fn<() => void>(), vi.fn<() => void>())
+    const doc = makeDocTarget()
+    input.attachIframeClicks(doc)
+
+    const originalMaxTouchPoints = Object.getOwnPropertyDescriptor(navigator, 'maxTouchPoints')
+    const originalOntouchstart = Object.getOwnPropertyDescriptor(window, 'ontouchstart')
+    Object.defineProperty(navigator, 'maxTouchPoints', {
+      configurable: true,
+      get: () => 0,
+    })
+    Reflect.deleteProperty(window as unknown as Record<string, unknown>, 'ontouchstart')
+
+    doc.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    window.dispatchEvent(new MessageEvent('message', { data: { type: 'foliate-click', clientX: 95 }, origin: window.location.origin }))
+    input.suppressNextTapNavigation()
+    vi.advanceTimersByTime(500)
+
+    expect(next).not.toHaveBeenCalled()
+    expect(onMiddleTap).not.toHaveBeenCalled()
+
+    input.cleanup()
+
+    if (originalMaxTouchPoints) {
+      Object.defineProperty(navigator, 'maxTouchPoints', originalMaxTouchPoints)
+    }
+    if (originalOntouchstart) {
+      Object.defineProperty(window, 'ontouchstart', originalOntouchstart)
+    }
+  })
+
   it('stops responding to document keydown after cleanup', () => {
     const next = vi.fn<() => void>()
     const view: ViewLike = {

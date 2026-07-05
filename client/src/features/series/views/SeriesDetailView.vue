@@ -405,6 +405,7 @@ onUnmounted(() => {
 watch(
   [books, total],
   ([newBooks, newTotal]) => {
+    if (seriesId.value === null) return
     setBookContext(
       newBooks.map((book) => book.id),
       newTotal,
@@ -417,8 +418,10 @@ watch([sort, order, libraryId], () => {
   void loadBooks({ reset: true, keepPreviousData: true })
 })
 
-watch(seriesId, () => {
-  void loadBooks({ reset: true })
+watch(seriesId, (newSeriesId) => {
+  if (newSeriesId !== null) {
+    void loadBooks({ reset: true })
+  }
 })
 
 watch(

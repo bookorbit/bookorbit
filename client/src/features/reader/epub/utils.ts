@@ -126,3 +126,15 @@ export function cfiRangesOverlap(a: string, b: string): boolean {
   if (ra.spineStep !== rb.spineStep) return false
   return ra.startKey <= rb.endKey && ra.endKey >= rb.startKey
 }
+
+export function cfiRangesMatch(a: string, b: string): boolean {
+  const ra = parseCfiRange(a)
+  const rb = parseCfiRange(b)
+  if (!ra || !rb) return false
+  return ra.spineStep === rb.spineStep && ra.startKey === rb.startKey && ra.endKey === rb.endKey
+}
+
+export function findMatchingCfiRange<T extends { cfi: string | null | undefined }>(items: T[], selectedCfi: string | null | undefined): T | null {
+  if (!selectedCfi) return null
+  return items.find((item) => item.cfi != null && cfiRangesMatch(selectedCfi, item.cfi)) ?? null
+}

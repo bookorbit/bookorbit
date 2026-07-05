@@ -481,4 +481,52 @@ describe('SeriesDetailView', () => {
     expect(mocks.api).not.toHaveBeenCalled()
     expect(wrapper.find('[data-testid="lead-cover-artwork"]').exists()).toBe(false)
   })
+
+  it('loads all books and navigates to edit metadata, preserving the setBookContext when navigating away', async () => {
+    const book1 = makeBook({ id: 101 })
+    const book2 = makeBook({ id: 102 })
+
+    mocks.items.value = [book1]
+    mocks.total.value = 2
+    mocks.hasMore.value = true
+
+    mocks.loadBooks.mockImplementation(async (opts?: unknown) => {
+      const reset = opts && typeof opts === 'object' && 'reset' in opts ? Boolean((opts as Record<string, unknown>).reset) : false
+      if (reset) {
+        mocks.items.value = [book1]
+        mocks.hasMore.value = true
+        return
+      }
+      mocks.items.value = [book1, book2]
+      mocks.hasMore.value = false
+    })
+
+    const wrapper = mountView()
+    await nextTick()
+
+    const editBtn = wrapper.findAll('button').find((b) => b.text().includes('Edit Metadata'))
+    expect(editBtn).toBeDefined()
+
+    mocks.setBookContext.mockClear()
+    mocks.loadBooks.mockClear()
+
+    await editBtn!.trigger('click')
+    await flushPromises()
+
+    expect(mocks.loadBooks).toHaveBeenCalled()
+    expect(mocks.setBookContext).toHaveBeenCalledWith([101, 102], 2)
+    expect(mocks.routerPush).toHaveBeenCalledWith({
+      name: 'book-detail',
+      params: { bookId: 101 },
+      query: { tab: 'edit' },
+    })
+
+    mocks.setBookContext.mockClear()
+    mocks.loadBooks.mockClear()
+    mocks.route.params.seriesId = ''
+    await nextTick()
+
+    expect(mocks.loadBooks).not.toHaveBeenCalled()
+    expect(mocks.setBookContext).not.toHaveBeenCalled()
+  })
 })

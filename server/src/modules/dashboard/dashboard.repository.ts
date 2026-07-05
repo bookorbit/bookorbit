@@ -11,6 +11,7 @@ import { buildContentFilterClauses } from '../../common/utils/content-filter-sql
 type Db = NodePgDatabase<typeof schema>;
 type UpNextInSeriesRow = { id: number };
 const AUDIO_FORMATS = BOOK_FORMATS.filter(isAudioFormat);
+const CONTINUE_READING_EXCLUDED_READ_STATUSES = ['read', 'skimmed', 'abandoned'] as const satisfies readonly ReadStatus[];
 const DISCOVERY_EXCLUDED_READ_STATUSES = ['reading', 'rereading', 'on_hold', 'read', 'skimmed', 'abandoned'] as const satisfies readonly ReadStatus[];
 
 @Injectable()
@@ -44,12 +45,14 @@ export class DashboardRepository {
       .from(books)
       .leftJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
       .leftJoin(readingProgress, and(eq(readingProgress.bookFileId, bookFiles.id), eq(readingProgress.userId, userId)))
+      .leftJoin(userBookStatus, and(eq(userBookStatus.bookId, books.id), eq(userBookStatus.userId, userId)))
       .where(
         and(
           inArray(books.libraryId, accessibleLibraryIds),
           eq(books.status, 'present'),
           or(isNull(bookFiles.format), notInArray(bookFiles.format, AUDIO_FORMATS)),
           sql`${readingProgress.percentage} > 0 and ${readingProgress.percentage} < 100`,
+          or(isNull(userBookStatus.bookId), notInArray(userBookStatus.status, [...CONTINUE_READING_EXCLUDED_READ_STATUSES])),
           ...cfClauses,
         ),
       )

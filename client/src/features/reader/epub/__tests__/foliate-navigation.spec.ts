@@ -45,6 +45,11 @@ describe('Foliate navigation', () => {
   let getKoreaderDocFragmentIndex: (sections: { id: string }[], index: number) => number | null
   let getKoboSpanValue: (range: Range | null) => string | null
   let getPageProgressionRtl: (bookDir: string | null | undefined, contentRtl: boolean) => boolean
+  let FixedLayout: new () => HTMLElement & {
+    open: (book: { rendition: { layout: string; spread: string }; sections: { load: () => Promise<string> }[] }) => void
+    goTo: (target: { index: number }) => Promise<void>
+    getContents: () => { index?: number; doc?: Document }[]
+  }
   let Paginator: new () => {
     sections: { load: () => Promise<string | null> }[]
     goTo: (target: { index: number }) => Promise<void>
@@ -54,6 +59,7 @@ describe('Foliate navigation', () => {
     installBrowserGlobals()
 
     const viewModulePath = '../../../../../public/assets/foliate/view.js'
+    const fixedLayoutModulePath = '../../../../../public/assets/foliate/fixed-layout.js'
     const paginatorModulePath = '../../../../../public/assets/foliate/paginator.js'
     ;({ View, getKoreaderProgress, getKoreaderDocFragmentIndex, getKoboSpanValue } = (await import(viewModulePath)) as {
       View: typeof View
@@ -61,6 +67,7 @@ describe('Foliate navigation', () => {
       getKoreaderDocFragmentIndex: typeof getKoreaderDocFragmentIndex
       getKoboSpanValue: typeof getKoboSpanValue
     })
+    ;({ FixedLayout } = (await import(fixedLayoutModulePath)) as { FixedLayout: typeof FixedLayout })
     ;({ Paginator, getPageProgressionRtl } = (await import(paginatorModulePath)) as {
       Paginator: typeof Paginator
       getPageProgressionRtl: typeof getPageProgressionRtl
@@ -115,6 +122,52 @@ describe('Foliate navigation', () => {
     paginator.sections = [{ load: vi.fn<() => Promise<string | null>>().mockResolvedValue(null) }]
 
     await expect(paginator.goTo({ index: 0 })).rejects.toThrow('Failed to load section 0')
+  })
+
+  it('reports fixed-layout frame indexes for navigation success checks', async () => {
+    const originalCreateElement = document.createElement.bind(document)
+    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+      const element = originalCreateElement(tagName)
+      if (tagName === 'iframe') {
+        const frameDoc = document.implementation.createHTMLDocument('fixed-layout-frame')
+        frameDoc.head.innerHTML = '<meta name="viewport" content="width=100,height=200">'
+        Object.defineProperty(element, 'contentDocument', { configurable: true, value: frameDoc })
+        Object.defineProperty(element, 'src', {
+          configurable: true,
+          get() {
+            return this.getAttribute('src') ?? ''
+          },
+          set(value) {
+            this.setAttribute('src', value)
+            queueMicrotask(() => this.dispatchEvent(new window.Event('load')))
+          },
+        })
+      }
+      return element
+    })
+
+    const fixedLayout = new FixedLayout()
+    document.body.append(fixedLayout)
+
+    try {
+      fixedLayout.open({
+        rendition: { layout: 'pre-paginated', spread: 'none' },
+        sections: [
+          { load: vi.fn<() => Promise<string>>().mockResolvedValue('section-0.xhtml') },
+          { load: vi.fn<() => Promise<string>>().mockResolvedValue('section-1.xhtml') },
+        ],
+      })
+
+      await fixedLayout.goTo({ index: 0 })
+
+      const contents = fixedLayout.getContents()
+      expect(contents).toHaveLength(1)
+      expect(contents[0]).toMatchObject({ index: 0 })
+      expect(contents[0]?.doc?.documentElement).toBeTruthy()
+    } finally {
+      fixedLayout.remove()
+      createElementSpy.mockRestore()
+    }
   })
 
   it('uses explicit OPF page progression before content direction', () => {

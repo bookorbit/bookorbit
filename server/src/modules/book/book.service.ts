@@ -1636,7 +1636,8 @@ export class BookService {
           write = await this.writeMetadataToFileAfterSave(id, user);
         }
 
-        if (hasRenameRelevantField && settings?.fileRenameEnabled) {
+        const syncWriteFailed = write?.status === 'failed';
+        if (hasRenameRelevantField && settings?.fileRenameEnabled && !syncWriteFailed) {
           await this.renameFileAfterSave(id, user);
         }
       } else {

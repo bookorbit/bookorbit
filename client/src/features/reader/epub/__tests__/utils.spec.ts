@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { cfiRangesOverlap, findNearestCfi, formatCfiLocation, formatDate, getCfiSortKey, stripFragment } from '../utils'
+import {
+  cfiRangesMatch,
+  cfiRangesOverlap,
+  findMatchingCfiRange,
+  findNearestCfi,
+  formatCfiLocation,
+  formatDate,
+  getCfiSortKey,
+  stripFragment,
+} from '../utils'
 
 describe('epub utils', () => {
   it('removes hash fragments from href values', () => {
@@ -99,5 +108,54 @@ describe('cfiRangesOverlap', () => {
   it('returns false for invalid CFI strings', () => {
     expect(cfiRangesOverlap('not-a-cfi', ann)).toBe(false)
     expect(cfiRangesOverlap(ann, 'not-a-cfi')).toBe(false)
+  })
+})
+
+describe('cfiRangesMatch', () => {
+  const ann = 'epubcfi(/6/4!/4/2,/2/1:0,/2/1:20)'
+
+  it('detects exact range matches', () => {
+    expect(cfiRangesMatch(ann, ann)).toBe(true)
+  })
+
+  it('does not treat subset selections as the existing annotation range', () => {
+    const subset = 'epubcfi(/6/4!/4/2,/2/1:5,/2/1:10)'
+    expect(cfiRangesOverlap(subset, ann)).toBe(true)
+    expect(cfiRangesMatch(subset, ann)).toBe(false)
+  })
+
+  it('does not treat superset or partial overlaps as the existing annotation range', () => {
+    const superset = 'epubcfi(/6/4!/4/2,/2/1:0,/2/1:50)'
+    const partial = 'epubcfi(/6/4!/4/2,/2/1:10,/2/1:30)'
+
+    expect(cfiRangesOverlap(superset, ann)).toBe(true)
+    expect(cfiRangesOverlap(partial, ann)).toBe(true)
+    expect(cfiRangesMatch(superset, ann)).toBe(false)
+    expect(cfiRangesMatch(partial, ann)).toBe(false)
+  })
+
+  it('returns false for different spine items and invalid CFI strings', () => {
+    expect(cfiRangesMatch('epubcfi(/6/6!/4/2,/2/1:0,/2/1:20)', ann)).toBe(false)
+    expect(cfiRangesMatch('not-a-cfi', ann)).toBe(false)
+    expect(cfiRangesMatch(ann, 'not-a-cfi')).toBe(false)
+  })
+})
+
+describe('findMatchingCfiRange', () => {
+  const ann = { id: 1, cfi: 'epubcfi(/6/4!/4/2,/2/1:0,/2/1:20)' }
+
+  it('returns an annotation only when the selected range exactly matches it', () => {
+    expect(findMatchingCfiRange([ann], ann.cfi)?.id).toBe(1)
+  })
+
+  it('does not return a parent annotation when the selection is only a subset', () => {
+    const subset = 'epubcfi(/6/4!/4/2,/2/1:5,/2/1:10)'
+
+    expect(cfiRangesOverlap(subset, ann.cfi)).toBe(true)
+    expect(findMatchingCfiRange([ann], subset)).toBeNull()
+  })
+
+  it('returns null when there is no selected CFI', () => {
+    expect(findMatchingCfiRange([ann], null)).toBeNull()
   })
 })
