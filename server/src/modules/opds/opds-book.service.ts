@@ -107,6 +107,10 @@ export interface OpdsBookEntry {
   files: { id: number; format: string }[];
 }
 
+export type OpdsRecentGroupItem =
+  | { kind: 'series'; seriesId: number; seriesName: string; bookCount: number; lastAddedAt: Date }
+  | { kind: 'book'; book: OpdsBookEntry };
+
 @Injectable()
 export class OpdsBookService {
   constructor(
@@ -267,21 +271,70 @@ export class OpdsBookService {
     return or(...clauses)!;
   }
 
-  async getRecentBooksPage(
+  /**
+   * "Recent" grouped by series, mirroring Kavita's recently-updated feed: a book
+   * belonging to a series is folded into a single "Series Name (N)" entry alongside
+   * its series-mates, while a standalone book (no series) stays its own entry.
+   *
+   * Grouping key is `COALESCE(seriesId, 'book_' || bookId)` — the same idiom
+   * BookRepository already uses for the "collapse by series" book listing — so a
+   * NULL seriesId never accidentally merges unrelated standalone books into one
+   * bucket (SQL GROUP BY treats all NULLs as equal, which COALESCE avoids here by
+   * giving every standalone book its own unique group key).
+   */
+  async getRecentGroupedPage(
     userId: number,
     page: number,
     size: number,
     isSuperuser = false,
     contentFilters?: ContentFilterRules,
-  ): Promise<{ entries: OpdsBookEntry[]; total: number }> {
+  ): Promise<{ items: OpdsRecentGroupItem[]; total: number }> {
     const accessibleIds = await this.getAccessibleLibraryIds(userId, isSuperuser);
-    if (accessibleIds.length === 0) return { entries: [], total: 0 };
-    const clauses: SQL[] = [inArray(books.libraryId, accessibleIds), eq(books.status, 'present')];
-    if (!isSuperuser && contentFilters) {
-      clauses.push(...buildContentFilterClauses(contentFilters, this.db));
-    }
-    const where = and(...clauses);
-    return this.paginatedBookQuery(where!, 'recent', page, size);
+    if (accessibleIds.length === 0) return { items: [], total: 0 };
+
+    const filterClauses = !isSuperuser && contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
+    const where = and(inArray(books.libraryId, accessibleIds), eq(books.status, 'present'), ...filterClauses)!;
+    const groupKey = sql`COALESCE(${bookMetadata.seriesId}::text, 'book_' || ${books.id}::text)`;
+
+    const [[{ total }], rows] = await Promise.all([
+      this.db
+        .select({ total: sql<number>`count(DISTINCT ${groupKey})::int` })
+        .from(books)
+        .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+        .where(where),
+      this.db
+        .select({
+          seriesId: bookMetadata.seriesId,
+          seriesName: bookMetadata.seriesName,
+          bookCount: sql<number>`count(*)::int`,
+          lastAddedAt: sql<Date>`max(${books.addedAt})`,
+          latestBookId: sql<number>`(array_agg(${books.id} ORDER BY ${books.addedAt} DESC))[1]`,
+        })
+        .from(books)
+        .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+        .where(where)
+        .groupBy(groupKey, bookMetadata.seriesId, bookMetadata.seriesName)
+        .orderBy(sql`max(${books.addedAt}) DESC`)
+        .limit(size)
+        .offset((page - 1) * size),
+    ]);
+
+    const standaloneIds = rows.filter((r) => r.seriesId == null).map((r) => r.latestBookId);
+    const standaloneEntries = new Map((await this.fetchBookEntries(standaloneIds)).map((entry) => [entry.id, entry]));
+
+    const items: OpdsRecentGroupItem[] = rows.map((r) =>
+      r.seriesId != null
+        ? {
+            kind: 'series' as const,
+            seriesId: r.seriesId,
+            seriesName: r.seriesName ?? 'Untitled Series',
+            bookCount: r.bookCount,
+            lastAddedAt: r.lastAddedAt,
+          }
+        : { kind: 'book' as const, book: standaloneEntries.get(r.latestBookId)! },
+    );
+
+    return { items, total: Number(total) };
   }
 
   async getRandomBooks(userId: number, count: number, isSuperuser = false, contentFilters?: ContentFilterRules): Promise<OpdsBookEntry[]> {
