@@ -18,7 +18,7 @@ const emit = defineEmits<{
 
 const searchTitle = ref(props.initialTitle)
 const searchAuthor = ref(props.initialAuthor)
-const searchProvider = ref<'duckduckgo' | 'itunes' | 'all'>('duckduckgo')
+const searchProvider = ref<'duckduckgo' | 'itunes' | 'audiobookcovers' | 'all'>('duckduckgo')
 const isAudiobookSearch = ref(props.isAudiobook)
 const isSearching = ref(false)
 const searchResults = ref<CoverSearchResult[]>([])
@@ -41,6 +41,9 @@ watch(
 
 function toggleAudiobookSearch() {
   isAudiobookSearch.value = !isAudiobookSearch.value
+  if (!isAudiobookSearch.value && searchProvider.value === 'audiobookcovers') {
+    searchProvider.value = 'duckduckgo'
+  }
 }
 
 async function performSearch() {
@@ -120,6 +123,7 @@ function handleOpenChange(val: boolean) {
               >
                 <option value="duckduckgo">DuckDuckGo</option>
                 <option value="itunes">iTunes</option>
+                <option v-if="isAudiobookSearch" value="audiobookcovers">AudiobookCovers</option>
                 <option value="all">All Sources</option>
               </select>
             </div>

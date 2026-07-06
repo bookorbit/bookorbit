@@ -8,11 +8,12 @@ import { COVER_PROVIDERS } from './constants';
 import { CoverController } from './cover.controller';
 import { CoverService } from './cover.service';
 import type { CoverProvider } from './providers/cover-provider';
+import { AudiobookCoversCoverProvider } from './providers/audiobookcovers-cover-provider';
 import { DuckDuckGoCoverProvider } from './providers/duckduckgo-cover-provider';
 import { ITunesCoverProvider } from './providers/itunes-cover-provider';
 import { CoverProviderRegistry } from './provider-registry';
 
-const PROVIDER_CLASSES = [DuckDuckGoCoverProvider, ITunesCoverProvider];
+const PROVIDER_CLASSES = [DuckDuckGoCoverProvider, ITunesCoverProvider, AudiobookCoversCoverProvider];
 
 @Module({
   imports: [BookModule, BookMetadataLockModule, FileWriteModule, LibraryModule, MetadataPreferencesModule],

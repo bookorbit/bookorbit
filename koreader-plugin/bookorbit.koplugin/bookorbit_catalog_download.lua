@@ -156,7 +156,8 @@ function CatalogDownload.install(Catalog)
                             require("ui/downloadmgr"):new{
                                 onConfirm = function(path)
                                     logger.dbg("BookOrbit: download folder set to", path)
-                                    if self._manager and self._manager.ui and self._manager.ui.folder_shortcuts then
+                                    if self._manager and self._manager.ui and self._manager.ui.folder_shortcuts
+                                        and self._manager.ui.folder_shortcuts.updateShortcut then
                                         self._manager.ui.folder_shortcuts:updateShortcut("download_dir", path)
                                     end
                                     G_reader_settings:saveSetting("download_dir", path)

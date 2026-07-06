@@ -7,6 +7,12 @@ import { refreshPrimaryAuthorSortNamesForBooks } from '../../../db/book-author-s
 import * as schema from '../../../db/schema';
 import { authors, bookAuthors, books, bookMetadata } from '../../../db/schema';
 import { buildContentFilterClauses } from '../../../common/utils/content-filter-sql.utils';
+import {
+  chooseCanonicalMetadataTextRow,
+  normalizeMetadataText,
+  normalizeMetadataTextKey,
+  normalizeMetadataTextKeySql,
+} from '../../../common/utils/metadata-text-normalize.utils';
 import { AuthorImageStorageService } from '../../authors/author-image-storage.service';
 import { AuthorsRepository } from '../../authors/authors.repository';
 import { AuthorEnrichmentOrchestratorService } from '../../authors/author-enrichment-orchestrator.service';
@@ -28,6 +34,7 @@ import type {
 type Db = NodePgDatabase<typeof schema>;
 
 const AUTHOR_ENRICHMENT_REASONS = { AUTHOR_MERGE_TARGET: 'author_merge_target' as const };
+const NORMALIZED_AUTHOR_NAME_SQL = normalizeMetadataTextKeySql(authors.name);
 
 function escapeLike(s: string): string {
   return s.replace(/[%_\\]/g, '\\$&');
@@ -272,16 +279,21 @@ export class AuthorStrategy implements EntityStrategy {
     if (!entity) throw new NotFoundException('Author not found');
 
     const oldName = entity.name;
-    const trimmed = input.newName.trim();
-    if (!trimmed) throw new BadRequestException('Name cannot be empty');
+    const displayName = normalizeMetadataText(input.newName);
+    const normalizedName = normalizeMetadataTextKey(displayName);
+    if (!displayName || !normalizedName) throw new BadRequestException('Name cannot be empty');
 
-    const [existing] = await this.db.select({ id: authors.id }).from(authors).where(eq(authors.name, trimmed)).limit(1);
-    if (existing && existing.id !== entityId) {
-      const mergeResult = await this.merge({ targetId: existing.id, sourceIds: [entityId], userId: input.userId });
-      return { oldName, affectedBookIds: mergeResult.affectedBookIds, wasImplicitMerge: true, mergedEntityId: existing.id };
+    const existingRows = await this.db
+      .select({ id: authors.id, name: authors.name })
+      .from(authors)
+      .where(eq(NORMALIZED_AUTHOR_NAME_SQL, normalizedName));
+    const mergeTarget = this.selectPreferredAuthorMatch(existingRows, entityId, displayName);
+    if (mergeTarget) {
+      const mergeResult = await this.merge({ targetId: mergeTarget.id, sourceIds: [entityId], userId: input.userId });
+      return { oldName, affectedBookIds: mergeResult.affectedBookIds, wasImplicitMerge: true, mergedEntityId: mergeTarget.id };
     }
 
-    await this.authorsRepo.updateAuthorById(entityId, { name: trimmed });
+    await this.authorsRepo.updateAuthorById(entityId, { name: displayName });
     const affectedBookIds = await this.findAffectedBookIds([entityId]);
     return { oldName, affectedBookIds, wasImplicitMerge: false };
   }
@@ -312,16 +324,27 @@ export class AuthorStrategy implements EntityStrategy {
     const newEntities: { id: number; name: string }[] = [];
 
     await this.db.transaction(async (tx) => {
+      const seenNewNames = new Set<string>();
       for (const name of input.newNames) {
-        const trimmed = name.trim();
-        const [existing] = await tx.select({ id: authors.id }).from(authors).where(eq(authors.name, trimmed)).limit(1);
+        const displayName = normalizeMetadataText(name);
+        const normalizedName = normalizeMetadataTextKey(displayName);
+        if (!displayName || !normalizedName) continue;
+        if (seenNewNames.has(normalizedName)) continue;
+        seenNewNames.add(normalizedName);
+
+        const existingRows = await tx
+          .select({ id: authors.id, name: authors.name })
+          .from(authors)
+          .where(eq(NORMALIZED_AUTHOR_NAME_SQL, normalizedName));
+        const existing = this.selectPreferredAuthorMatch(existingRows, input.entityId as number, displayName);
         if (existing) {
-          newEntities.push({ id: existing.id, name: trimmed });
+          newEntities.push({ id: existing.id, name: existing.name });
         } else {
-          const [inserted] = await tx.insert(authors).values({ name: trimmed }).returning({ id: authors.id });
-          newEntities.push({ id: inserted!.id, name: trimmed });
+          const [inserted] = await tx.insert(authors).values({ name: displayName }).returning({ id: authors.id });
+          newEntities.push({ id: inserted!.id, name: displayName });
         }
       }
+      if (newEntities.length === 0) throw new BadRequestException('At least one name is required');
 
       const bookRows = await tx
         .select({ bookId: bookAuthors.bookId, displayOrder: bookAuthors.displayOrder })
@@ -345,6 +368,14 @@ export class AuthorStrategy implements EntityStrategy {
     await this.authorImageStorage.deleteAuthorDir(input.entityId);
 
     return { originalName: entity.name, newEntities, affectedBookIds };
+  }
+
+  private selectPreferredAuthorMatch(
+    rows: { id: number; name: string }[],
+    excludedAuthorId: number,
+    displayName: string,
+  ): { id: number; name: string } | null {
+    return chooseCanonicalMetadataTextRow(rows, { desiredName: displayName, excludedId: excludedAuthorId });
   }
 
   async findAffectedBookIds(ids: (number | string)[]): Promise<number[]> {

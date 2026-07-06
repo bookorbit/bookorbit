@@ -16,6 +16,7 @@ import { inArray, type SQL } from 'drizzle-orm';
 import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName } from '../../common/book-cover-storage';
 import { MAX_BOOK_QUERY_OFFSET_ROWS, isBookQueryOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { normalizeMetadataText, normalizeMetadataTextKey } from '../../common/utils/metadata-text-normalize.utils';
 import { formatSeriesIndex } from '../../common/utils/series-index-format.utils';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { isDateKey, resolveTimeZone, toDateKeyInTimeZone, toTimeZoneStartOfDay } from '../../common/utils/timezone.utils';
@@ -1508,12 +1509,12 @@ export class BookService {
     if (dto.title !== undefined) scalarFields.title = dto.title ?? null;
     if (dto.subtitle !== undefined) scalarFields.subtitle = dto.subtitle ?? null;
     if (dto.description !== undefined) scalarFields.description = dto.description ?? null;
-    if (dto.publisher !== undefined) scalarFields.publisher = dto.publisher ?? null;
+    if (dto.publisher !== undefined) scalarFields.publisher = normalizeMetadataText(dto.publisher);
     if (dto.publishedYear !== undefined) scalarFields.publishedYear = dto.publishedYear ?? null;
     if (dto.language !== undefined) scalarFields.language = dto.language ?? null;
     if (dto.pageCount !== undefined) scalarFields.pageCount = dto.pageCount ?? null;
     if (dto.seriesMemberships === undefined) {
-      if (dto.seriesName !== undefined) scalarFields.seriesName = dto.seriesName ?? null;
+      if (dto.seriesName !== undefined) scalarFields.seriesName = normalizeMetadataText(dto.seriesName);
       if (dto.seriesIndex !== undefined) scalarFields.seriesIndex = dto.seriesIndex ?? null;
     }
     if (dto.isbn10 !== undefined) scalarFields.isbn10 = dto.isbn10 ?? null;
@@ -2059,11 +2060,9 @@ export class BookService {
     const lockedIds = await this.bookMetadataLockService.getBookIdsWithLockedField(bookIds, lockField);
     const updatableIds = bookIds.filter((bookId) => !lockedIds.has(bookId));
     if (updatableIds.length > 0) {
-      const normalizeListValue = (raw: string | number | string[] | null): string[] => {
-        if (Array.isArray(raw)) return [...new Set(raw.map((entry) => entry.trim()).filter((entry) => entry.length > 0))];
-        if (raw === null) return [];
-        const normalized = String(raw).trim();
-        return normalized.length > 0 ? [normalized] : [];
+      const normalizeListValue = (raw: string | number | string[] | null, collapseWhitespace = false): string[] => {
+        const values = Array.isArray(raw) ? raw.map(String) : raw === null ? [] : [String(raw)];
+        return collapseWhitespace ? this.normalizePersonNameListValues(values) : this.normalizeListValues(values);
       };
       if (field === 'seriesName' || field === 'publisher' || field === 'language' || field === 'publishedYear') {
         if (field === 'publishedYear') {
@@ -2073,11 +2072,18 @@ export class BookService {
           }
           await this.bookRepo.bulkUpdateMetadataFields(updatableIds, { publishedYear: year, updatedAt: new Date() });
         } else {
-          const textValue = value === null ? null : String(value).trim();
+          const textValue =
+            field === 'language'
+              ? value === null
+                ? null
+                : String(value).trim() || null
+              : value === null
+                ? null
+                : normalizeMetadataText(String(value));
           await this.bookRepo.bulkUpdateMetadataFields(updatableIds, { [field]: textValue?.length ? textValue : null, updatedAt: new Date() });
         }
       } else {
-        const names = normalizeListValue(value);
+        const names = normalizeListValue(value, field === 'authors' || field === 'narrators');
         await this.bookRepo.withTransaction(async (tx) => {
           for (const bookId of updatableIds) {
             if (field === 'authors') {
@@ -2193,7 +2199,7 @@ export class BookService {
           recordResult(fieldName, ids);
           if (ids.length === 0) continue;
           const val = fields[fieldName].value;
-          const textValue = val === null ? null : String(val).trim() || null;
+          const textValue = fieldName === 'language' ? (val === null ? null : String(val).trim() || null) : normalizeMetadataText(val);
           await this.bookRepo.bulkUpdateMetadataFields(ids, { [fieldName]: textValue, updatedAt: new Date() }, tx);
         }
 
@@ -2221,7 +2227,7 @@ export class BookService {
           const ids = getUpdatableIds('authors');
           recordResult('authors', ids);
           if (ids.length > 0) {
-            const names = this.normalizeListValues(fields.authors.values);
+            const names = this.normalizePersonNameListValues(fields.authors.values);
             if (fields.authors.mode === 'replace') {
               for (const bookId of ids) {
                 await this.metadataService.replaceAuthors(
@@ -2234,7 +2240,10 @@ export class BookService {
               const currentMap = await this.bookRepo.findAuthorsByBookIds(ids, tx);
               for (const bookId of ids) {
                 const current = currentMap.get(bookId) ?? [];
-                const merged = fields.authors!.mode === 'add' ? [...new Set([...current, ...names])] : current.filter((n) => !names.includes(n));
+                const merged =
+                  fields.authors!.mode === 'add'
+                    ? this.normalizePersonNameListValues([...current, ...names])
+                    : this.removePersonNameValues(current, names);
                 await this.metadataService.replaceAuthors(
                   bookId,
                   merged.map((name) => ({ name, sortName: null })),
@@ -2289,7 +2298,7 @@ export class BookService {
           const ids = getUpdatableIds('narrators');
           recordResult('narrators', ids);
           if (ids.length > 0) {
-            const names = this.normalizeListValues(fields.narrators.values);
+            const names = this.normalizePersonNameListValues(fields.narrators.values);
             if (fields.narrators.mode === 'replace') {
               for (const bookId of ids) {
                 await this.narratorService.replaceForBook(bookId, names, { executor: tx });
@@ -2298,7 +2307,10 @@ export class BookService {
               const currentMap = await this.bookRepo.findNarratorsByBookIds(ids, tx);
               for (const bookId of ids) {
                 const current = currentMap.get(bookId) ?? [];
-                const merged = fields.narrators!.mode === 'add' ? [...new Set([...current, ...names])] : current.filter((n) => !names.includes(n));
+                const merged =
+                  fields.narrators!.mode === 'add'
+                    ? this.normalizePersonNameListValues([...current, ...names])
+                    : this.removePersonNameValues(current, names);
                 await this.narratorService.replaceForBook(bookId, merged, { executor: tx });
               }
             }
@@ -2333,6 +2345,27 @@ export class BookService {
 
   private normalizeListValues(values: string[]): string[] {
     return [...new Set(values.map((v) => v.trim()).filter((v) => v.length > 0))];
+  }
+
+  private normalizePersonNameListValues(values: string[]): string[] {
+    const names: string[] = [];
+    const seen = new Set<string>();
+    for (const value of values) {
+      const name = normalizeMetadataText(value);
+      const key = normalizeMetadataTextKey(name);
+      if (!name || !key || seen.has(key)) continue;
+      seen.add(key);
+      names.push(name);
+    }
+    return names;
+  }
+
+  private removePersonNameValues(current: string[], namesToRemove: string[]): string[] {
+    const removeKeys = new Set(namesToRemove.map((name) => normalizeMetadataTextKey(name)).filter((key): key is string => key !== null));
+    return this.normalizePersonNameListValues(current).filter((name) => {
+      const key = normalizeMetadataTextKey(name);
+      return key ? !removeKeys.has(key) : false;
+    });
   }
 
   async getKoboState(id: number, user: RequestUser): Promise<BookKoboState> {

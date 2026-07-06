@@ -6,6 +6,12 @@ import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookMetadata, bookSeries, bookSeriesMemberships } from '../../db/schema';
 import { sanitizeLogValue } from '../utils/log-sanitize.utils';
+import {
+  normalizeMetadataText,
+  normalizeMetadataTextKey,
+  normalizeMetadataTextKeySql,
+  normalizeMetadataTextOrNullSql,
+} from '../utils/metadata-text-normalize.utils';
 
 type Db = NodePgDatabase<typeof schema>;
 type SeriesWriteExecutor = Pick<Db, 'insert'>;
@@ -35,13 +41,11 @@ export class SeriesIdentityService implements OnModuleInit {
   }
 
   normalizeName(name: string | null | undefined): string | null {
-    const trimmed = name?.trim();
-    return trimmed ? trimmed.toLowerCase() : null;
+    return normalizeMetadataTextKey(name);
   }
 
   normalizeDisplayName(name: string | null | undefined): string | null {
-    const trimmed = name?.trim();
-    return trimmed || null;
+    return normalizeMetadataText(name);
   }
 
   async resolveSeriesId(name: string | null | undefined, executor: SeriesWriteExecutor = this.db): Promise<number | null> {
@@ -73,30 +77,40 @@ export class SeriesIdentityService implements OnModuleInit {
 
   async backfillMissingSeriesIds(executor: Pick<Db, 'execute'> = this.db): Promise<void> {
     await executor.execute(sql`
+      WITH normalized AS (
+        SELECT ${normalizeMetadataTextOrNullSql(bookMetadata.seriesName)} AS display_name
+        FROM ${bookMetadata}
+        WHERE ${bookMetadata.seriesName} IS NOT NULL
+      )
       INSERT INTO book_series (name, normalized_name)
-      SELECT min(btrim(${bookMetadata.seriesName})), lower(btrim(${bookMetadata.seriesName}))
-      FROM ${bookMetadata}
-      WHERE ${bookMetadata.seriesName} IS NOT NULL
-        AND btrim(${bookMetadata.seriesName}) != ''
-      GROUP BY lower(btrim(${bookMetadata.seriesName}))
+      SELECT min(display_name), ${normalizeMetadataTextKeySql(sql`display_name`)}
+      FROM normalized
+      WHERE display_name IS NOT NULL
+      GROUP BY ${normalizeMetadataTextKeySql(sql`display_name`)}
       ON CONFLICT (normalized_name)
       DO NOTHING
     `);
 
     await executor.execute(sql`
+      WITH normalized AS (
+        SELECT
+          ${bookMetadata.bookId} AS book_id,
+          ${normalizeMetadataTextOrNullSql(bookMetadata.seriesName)} AS display_name
+        FROM ${bookMetadata}
+      )
       UPDATE ${bookMetadata}
       SET series_id = ${bookSeries.id}
-      FROM ${bookSeries}
-      WHERE ${bookMetadata.seriesName} IS NOT NULL
-        AND btrim(${bookMetadata.seriesName}) != ''
-        AND lower(btrim(${bookMetadata.seriesName})) = ${bookSeries.normalizedName}
+      FROM normalized, ${bookSeries}
+      WHERE ${bookMetadata.bookId} = normalized.book_id
+        AND normalized.display_name IS NOT NULL
+        AND ${normalizeMetadataTextKeySql(sql`normalized.display_name`)} = ${bookSeries.normalizedName}
         AND (${bookMetadata.seriesId} IS NULL OR ${bookMetadata.seriesId} != ${bookSeries.id})
     `);
 
     await executor.execute(sql`
       UPDATE ${bookMetadata}
       SET series_id = NULL
-      WHERE (${bookMetadata.seriesName} IS NULL OR btrim(${bookMetadata.seriesName}) = '')
+      WHERE (${bookMetadata.seriesName} IS NULL OR ${normalizeMetadataTextOrNullSql(bookMetadata.seriesName)} IS NULL)
         AND ${bookMetadata.seriesId} IS NOT NULL
     `);
   }

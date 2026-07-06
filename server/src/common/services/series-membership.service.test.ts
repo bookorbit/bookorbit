@@ -1,17 +1,12 @@
 import { SeriesMembershipService } from './series-membership.service';
+import { normalizeMetadataText, normalizeMetadataTextKey } from '../utils/metadata-text-normalize.utils';
 
 function makeSeriesIdentity(ids: Record<string, number>) {
   return {
-    normalizeDisplayName: vi.fn((name: string | null | undefined) => {
-      const trimmed = name?.trim();
-      return trimmed || null;
-    }),
-    normalizeName: vi.fn((name: string | null | undefined) => {
-      const trimmed = name?.trim();
-      return trimmed ? trimmed.toLowerCase() : null;
-    }),
+    normalizeDisplayName: vi.fn((name: string | null | undefined) => normalizeMetadataText(name)),
+    normalizeName: vi.fn((name: string | null | undefined) => normalizeMetadataTextKey(name)),
     resolveSeriesId: vi.fn((name: string | null | undefined) => {
-      const key = name?.trim().toLowerCase() ?? '';
+      const key = normalizeMetadataTextKey(name) ?? '';
       return Promise.resolve(ids[key] ?? null);
     }),
   };
@@ -59,6 +54,7 @@ describe('SeriesMembershipService', () => {
       [
         { seriesName: '  Dune  ', seriesIndex: 1 },
         { seriesName: 'dune', seriesIndex: 2 },
+        { seriesName: 'The   Expanse', seriesIndex: 5 },
         { seriesName: 'The Expanse', seriesIndex: null },
         { seriesName: '   ', seriesIndex: 3 },
       ],
@@ -67,13 +63,13 @@ describe('SeriesMembershipService', () => {
 
     expect(result).toEqual([
       { seriesId: 101, seriesName: 'Dune', seriesIndex: 1, displayOrder: 0 },
-      { seriesId: 202, seriesName: 'The Expanse', seriesIndex: null, displayOrder: 1 },
+      { seriesId: 202, seriesName: 'The Expanse', seriesIndex: 5, displayOrder: 1 },
     ]);
     expect(deleteFrom).toHaveBeenCalledTimes(1);
     expect(identity.resolveSeriesId).toHaveBeenCalledTimes(2);
     expect(insertValues).toHaveBeenCalledWith([
       { bookId: 10, seriesId: 101, seriesIndex: 1, displayOrder: 0 },
-      { bookId: 10, seriesId: 202, seriesIndex: null, displayOrder: 1 },
+      { bookId: 10, seriesId: 202, seriesIndex: 5, displayOrder: 1 },
     ]);
     expect(updateSet).toHaveBeenNthCalledWith(1, {
       seriesId: 101,
