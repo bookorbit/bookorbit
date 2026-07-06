@@ -57,22 +57,14 @@ function setThumbnailClickAction(action: BookThumbnailClickAction) {
             {{ t('settings.appearance.language.description') }}
           </p>
         </div>
-        <div
-          class="grid w-full gap-1 rounded-lg border border-border bg-muted/50 p-1 sm:w-auto"
-          :style="{ gridTemplateColumns: `repeat(${LANGUAGE_OPTIONS.length}, minmax(0, 1fr))` }"
+        <select
+          class="text-xs border border-border rounded-md px-2 py-2 md:py-1.5 bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-primary self-start w-full sm:w-auto sm:min-w-44"
           data-testid="language-control"
+          :value="localeStore.locale"
+          @change="setLanguage(($event.target as HTMLSelectElement).value as Locale)"
         >
-          <button
-            v-for="opt in LANGUAGE_OPTIONS"
-            :key="opt.id"
-            class="min-w-0 rounded-md px-3 py-1.5 text-center text-xs font-medium transition-colors"
-            :class="localeStore.locale === opt.id ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
-            :data-testid="`language-option-${opt.id}`"
-            @click="setLanguage(opt.id)"
-          >
-            <span class="block truncate">{{ opt.label }}</span>
-          </button>
-        </div>
+          <option v-for="opt in LANGUAGE_OPTIONS" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
+        </select>
       </div>
     </div>
 
