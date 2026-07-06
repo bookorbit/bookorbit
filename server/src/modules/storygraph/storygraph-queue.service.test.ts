@@ -13,6 +13,7 @@ describe('StorygraphQueueService', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('should not wait on first request', async () => {
