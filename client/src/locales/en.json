@@ -433,7 +433,7 @@
       "title": "Magic Links",
       "subtitle": "Create shareable login links for shared accounts.",
       "createLink": "Create link",
-      "noSharedAccounts": "No shared accounts found. Create a shared account from the Users page first.",
+      "noSharedAccounts": "No shared accounts found",
       "activeLinks": "Active links",
       "inactiveLinks": "Inactive links",
       "paused": "Paused",
@@ -485,7 +485,12 @@
         "copy": "Failed to copy magic link",
         "update": "Failed to update magic link",
         "revoke": "Failed to revoke"
-      }
+      },
+      "usersPage": "Users page",
+      "emptyTitle": "No magic links created yet",
+      "emptyHint": "Click \"{action}\" to generate a shareable login URL.",
+      "noActiveTitle": "No active magic links",
+      "noActiveHint": "All generated magic links for this page have expired or been revoked."
     },
     "oidc": {
       "title": "OIDC / SSO",
@@ -632,7 +637,13 @@
         "achievementBackfillConfirm": "Run achievement backfill for all achievements across all users? This may take a while.",
         "achievementBackfillComplete": "Achievement backfill complete: {count} awards granted",
         "backfillRunFailed": "Failed to run backfill",
-        "achievementBackfillFailed": "Failed to run achievement backfill: {error}"
+        "achievementBackfillFailed": "Failed to run achievement backfill: {error}",
+        "uploadsGroup": "Uploads",
+        "maxUploadSize": "Maximum upload file size limit",
+        "maxUploadSizeHint": "Configure the maximum size limit for file uploads across the system.",
+        "save": "Save",
+        "uploadSizeInvalid": "Upload size limit must be greater than 0",
+        "uploadSizeUpdated": "Upload size limit updated"
       },
       "migration": {
         "title": "Migration",
@@ -1669,7 +1680,111 @@
         "thresholdOrderError": "Reading threshold must be less than finished threshold",
         "saveSettingsFailed": "Failed to save settings",
         "settingsSaved": "Kobo sync settings saved",
-        "saveFailed": "Failed to save"
+        "saveFailed": "Failed to save",
+        "activity": {
+          "waitingForActivity": "Waiting for activity",
+          "needsAttention": "Needs attention",
+          "syncHealthy": "Sync healthy",
+          "never": "Never",
+          "none": "None",
+          "unknown": "Unknown",
+          "failureCount": "{count} failure | {count} failures",
+          "noActivityRecorded": "No Kobo sync activity has been recorded.",
+          "lastSuccess": "Last success {time}",
+          "lastFailure": "Last failure {time}",
+          "noFailedActivity": "No failed Kobo activity in recent history.",
+          "noActivityYet": "No Kobo activity yet.",
+          "event": {
+            "librarySync": "Library checked for updates",
+            "bookDownload": "Book downloaded",
+            "progressUpdate": "Reading position updated",
+            "annotationsPull": "Highlights sent to Kobo",
+            "annotationsPush": "Highlights received from Kobo"
+          },
+          "outcome": {
+            "failed": "Failed",
+            "noUpdates": "No updates",
+            "noChanges": "No changes",
+            "pending": "Pending",
+            "completed": "Completed",
+            "downloaded": "Downloaded",
+            "updated": "Updated",
+            "sent": "Sent",
+            "imported": "Imported"
+          },
+          "failure": {
+            "librarySync": "Library check did not complete",
+            "bookDownload": "Download did not complete",
+            "progressUpdate": "Reading position did not update",
+            "annotationsPull": "Highlights were not sent",
+            "annotationsPush": "Highlights were not imported"
+          },
+          "chip": {
+            "morePending": "More pending",
+            "noUpdatesPending": "No updates pending",
+            "bookCount": "{count} book | {count} books",
+            "deletedAnnotations": "{count} deleted annotations",
+            "deviceAlreadyCurrent": "Device already current",
+            "freshHighlightData": "Fresh highlight data",
+            "created": "{count} created",
+            "updated": "{count} updated",
+            "deleted": "{count} deleted",
+            "unchanged": "{count} unchanged"
+          },
+          "readingPositionSyncedTitle": "Reading position synced: {title}",
+          "readingPositionSynced": "Reading position synced",
+          "labelWithTitle": "{label}: {title}",
+          "updateCount": "{count} update | {count} updates",
+          "directionToKobo": "BookOrbit -> Kobo",
+          "directionToBookOrbit": "Kobo -> BookOrbit",
+          "twoWaySyncEnabled": "Two-way sync enabled",
+          "deviceProgressSaved": "Device progress saved",
+          "summary": {
+            "noLibraryUpdatesPending": "No library updates are pending for this device",
+            "libraryUpdatesPrepared": "{count} library update prepared for the device | {count} library updates prepared for the device",
+            "bookDownloadedBy": "{title} was downloaded by {device}",
+            "booksDownloaded": "{count} book downloaded | {count} books downloaded",
+            "progressUpdatesSyncedFor": "{count} progress update synced for {title} | {count} progress updates synced for {title}",
+            "progressUpdatesSynced": "{count} progress update synced | {count} progress updates synced",
+            "newReadingPositionFor": "Kobo reported a new reading position for {title}",
+            "newReadingPosition": "Kobo reported a new reading position",
+            "noHighlightChangesNeededFor": "No highlight changes needed for {title}",
+            "noHighlightChangesNeeded": "No highlight changes needed",
+            "highlightsSentToKoboFor": "{count} highlight sent to Kobo for {title} | {count} highlights sent to Kobo for {title}",
+            "highlightsSentToKobo": "{count} highlight sent to Kobo | {count} highlights sent to Kobo",
+            "noKoboHighlightChangesFor": "No Kobo highlight changes for {title}",
+            "noKoboHighlightChanges": "No Kobo highlight changes",
+            "highlightsImportedFromKoboFor": "{count} highlight imported from Kobo for {title} | {count} highlights imported from Kobo for {title}",
+            "highlightsImportedFromKobo": "{count} highlight imported from Kobo | {count} highlights imported from Kobo"
+          },
+          "timeRange": "{from} to {to}",
+          "eventsGrouped": "{count} event grouped | {count} events grouped",
+          "removedDevice": "Removed device",
+          "loadMoreFailed": "Failed to load more history",
+          "historyRefreshed": "Kobo sync history refreshed",
+          "refreshFailed": "Failed to refresh history",
+          "recentActivity": "Recent Kobo Activity",
+          "filterAll": "All",
+          "filterFailures": "Failures",
+          "refresh": "Refresh",
+          "loadingActivity": "Loading Kobo activity...",
+          "noActivityHint": "Recent sync activity will appear after a paired Kobo contacts BookOrbit.",
+          "error": "Error",
+          "loading": "Loading...",
+          "loadMore": "Load more activity"
+        },
+        "howBooksSynced": {
+          "title": "How books are synced"
+        },
+        "nextSteps": {
+          "title": "Next Steps",
+          "step1": "1. Configure your Kobo device to sync with the Sync URL above."
+        },
+        "syncToKobo": "Sync to Kobo",
+        "tabs": {
+          "syncSettings": "Sync Settings",
+          "activityLog": "Activity Log"
+        }
       },
       "koreader": {
         "title": "KOReader Sync",
@@ -1803,7 +1918,11 @@
             "linkUpdated": "Link updated",
             "linkFailed": "Failed to link book",
             "linkRemoved": "Link removed",
-            "unlinkFailed": "Failed to unlink book"
+            "unlinkFailed": "Failed to unlink book",
+            "unmatchedDismissed": "Unmatched book dismissed",
+            "dismissFailed": "Failed to dismiss unmatched book",
+            "allDismissed": "Dismissed no unmatched books | Dismissed {count} unmatched book | Dismissed {count} unmatched books",
+            "dismissAllFailed": "Failed to dismiss all unmatched books"
           },
           "modal": {
             "linkTitle": "Link KOReader book",
@@ -1828,8 +1947,43 @@
             "unlinkTitle": "Unlink KOReader book?",
             "unlinkBody": "Future syncs for this hash will stop resolving to {title} until it is linked again. Already synced stats will stay on their current BookOrbit book.",
             "unlinking": "Unlinking..."
-          }
-        }
+          },
+          "dismiss": "Dismiss",
+          "dismissAll": "Dismiss all",
+          "dismissing": "Dismissing...",
+          "unlinking": "Unlinking...",
+          "unlinkConfirmTitle": "Unlink KOReader book?",
+          "unlinkConfirmBody": "Future syncs for this hash will stop resolving to {title} until it is linked again. Already synced stats will stay on their current BookOrbit book.",
+          "dismissConfirmTitle": "Dismiss {title}?",
+          "dismissConfirmBody": "This removes it from your unmatched books list. If any device reports this hash again, it will reappear as a new entry.",
+          "dismissAllConfirmTitle": "no unmatched books | Dismiss all {count} unmatched book? | Dismiss all {count} unmatched books?",
+          "dismissAllConfirmBody": "This clears your entire unmatched books list, not just the current page. If any device reports one of these hashes again, it will reappear as a new entry.",
+          "changeLinkTitle": "Change KOReader link",
+          "linkBookTitle": "Link KOReader book",
+          "bookOrbitBook": "BookOrbit book",
+          "searchLibraryPlaceholder": "Search your BookOrbit library",
+          "enterMinChars": "Enter at least 2 characters.",
+          "searching": "Searching...",
+          "noBooksFound": "No books found.",
+          "untitledBook": "Untitled book",
+          "selected": "Selected",
+          "select": "Select",
+          "loadMore": "Load more",
+          "loadingMore": "Loading...",
+          "confirmLinkTitle": "Confirm KOReader link",
+          "bookId": "Book ID: {id}",
+          "syncedStatsNote": "Already synced stats will stay on their current BookOrbit book.",
+          "chooseDifferent": "Choose different",
+          "saving": "Saving...",
+          "confirmLink": "Confirm link"
+        },
+        "remove": "Remove",
+        "removing": "Removing...",
+        "unmatchedBooks": "Unmatched books",
+        "deviceRemoved": "Device removed",
+        "removeDeviceFailed": "Failed to remove device",
+        "removeDeviceConfirmTitle": "Remove {device}?",
+        "removeDeviceConfirmBody": "This permanently deletes this device's synced progress, reading activity, and any unmatched-book entries no longer reported by another device. If the device syncs again later, it will reappear as a new entry."
       },
       "opds": {
         "title": "OPDS",
@@ -2027,6 +2181,17 @@
         "loadData": "Failed to load data",
         "load": "Failed to load",
         "deleteUser": "Failed to delete user"
+      },
+      "currentUsers": "Current Users",
+      "defaultLibraryAccess": {
+        "title": "Default Library Access",
+        "subtitle": "Viewer access granted to self-registered and OIDC-provisioned users.",
+        "description": "Select the libraries assigned automatically to new users.",
+        "noLibraries": "No libraries available.",
+        "save": "Save defaults",
+        "saving": "Saving...",
+        "saved": "Default library access saved.",
+        "saveError": "Failed to save default library access"
       }
     }
   },
@@ -2748,7 +2913,7 @@
         "title": "Add File",
         "dropzone": {
           "title": "Drop files here or click to browse",
-          "hint": "epub, pdf, mobi, cbz, m4b and more - up to 500 MB each"
+          "hint": "epub, pdf, mobi, cbz, m4b and more - up to {size} MB each"
         },
         "addMore": "Add more files",
         "fileCount": "no files | one file | {count} files",
@@ -2878,8 +3043,8 @@
         "fileExceedsSizeLimit": "This file exceeds the write-back size limit",
         "writing": "Writing...",
         "saveInProgress": "Save in progress",
-        "writeManualLibraryDisabled": "Write metadata to file and rename now; automatic write-back is disabled for this library",
-        "writeManualTooltip": "Write {fields} to {target} and rename if pattern is set",
+        "writeManualLibraryDisabled": "Write metadata to file and rename on disk; automatic write-back is disabled for this library",
+        "writeManualTooltip": "Write {fields} to {target} and rename on disk",
         "applyResult": "{skipped}, {updated}",
         "skippedLockedFields": "Skipped no locked fields | Skipped one locked field | Skipped {count} locked fields",
         "updatedFields": "updated no fields | updated one field | updated {count} fields",
@@ -3011,7 +3176,9 @@
           "noResults": "No results found",
           "noResultsHint": "Try adjusting the title or author",
           "searchPrompt": "Search above, then click a result to start comparing metadata."
-        }
+        },
+        "writeAndRename": "Write to File & Rename",
+        "writeAndRenameShort": "Write & Rename"
       },
       "files": {
         "relative": {
@@ -4491,7 +4658,7 @@
       },
       "dropzone": {
         "title": "Drop files here or click to browse",
-        "hint": "{formats} - up to 500 MB each"
+        "hint": "{formats} - up to {size} MB each"
       }
     }
   },

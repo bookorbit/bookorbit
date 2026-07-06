@@ -433,7 +433,7 @@
       "title": "Magic Links",
       "subtitle": "Maak deelbare inloglinks voor gedeelde accounts.",
       "createLink": "Link maken",
-      "noSharedAccounts": "Geen gedeelde accounts gevonden. Maak eerst een gedeeld account aan op de pagina Gebruikers.",
+      "noSharedAccounts": "Geen gedeelde accounts gevonden",
       "activeLinks": "Actieve links",
       "inactiveLinks": "Inactieve links",
       "paused": "Gepauzeerd",
@@ -485,7 +485,12 @@
         "copy": "Kopieren van magic link mislukt",
         "update": "Bijwerken van magic link mislukt",
         "revoke": "Intrekken mislukt"
-      }
+      },
+      "usersPage": "Gebruikerspagina",
+      "emptyTitle": "Nog geen magische links aangemaakt",
+      "emptyHint": "Klik op \"{action}\" om een deelbare login-URL te genereren.",
+      "noActiveTitle": "Geen actieve magische links",
+      "noActiveHint": "Alle gegenereerde magische links voor deze pagina zijn verlopen of ingetrokken."
     },
     "oidc": {
       "title": "OIDC / SSO",
@@ -632,7 +637,13 @@
         "achievementBackfillConfirm": "Prestatie-aanvulling uitvoeren voor alle prestaties van alle gebruikers? Dit kan even duren.",
         "achievementBackfillComplete": "Prestatie-aanvulling voltooid: {count} onderscheidingen toegekend",
         "backfillRunFailed": "Aanvulling uitvoeren mislukt",
-        "achievementBackfillFailed": "Prestatie-aanvulling uitvoeren mislukt: {error}"
+        "achievementBackfillFailed": "Prestatie-aanvulling uitvoeren mislukt: {error}",
+        "uploadsGroup": "Uploads",
+        "maxUploadSize": "Maximale bestandsgrootte voor uploads",
+        "maxUploadSizeHint": "Stel de maximale bestandsgrootte in voor uploads in het hele systeem.",
+        "save": "Opslaan",
+        "uploadSizeInvalid": "De maximale uploadgrootte moet groter zijn dan 0",
+        "uploadSizeUpdated": "Maximale uploadgrootte bijgewerkt"
       },
       "migration": {
         "title": "Migratie",
@@ -1669,7 +1680,111 @@
         "thresholdOrderError": "De leesdrempel moet lager zijn dan de voltooiingsdrempel",
         "saveSettingsFailed": "Kan instellingen niet opslaan",
         "settingsSaved": "Kobo-synchronisatie-instellingen opgeslagen",
-        "saveFailed": "Opslaan mislukt"
+        "saveFailed": "Opslaan mislukt",
+        "activity": {
+          "waitingForActivity": "Wachten op activiteit",
+          "needsAttention": "Vereist aandacht",
+          "syncHealthy": "Synchronisatie in orde",
+          "never": "Nooit",
+          "none": "Geen",
+          "unknown": "Onbekend",
+          "failureCount": "{count} fout | {count} fouten",
+          "noActivityRecorded": "Er is geen Kobo-synchronisatieactiviteit vastgelegd.",
+          "lastSuccess": "Laatste succes {time}",
+          "lastFailure": "Laatste fout {time}",
+          "noFailedActivity": "Geen mislukte Kobo-activiteit in de recente geschiedenis.",
+          "noActivityYet": "Nog geen Kobo-activiteit.",
+          "event": {
+            "librarySync": "Bibliotheek gecontroleerd op updates",
+            "bookDownload": "Boek gedownload",
+            "progressUpdate": "Leespositie bijgewerkt",
+            "annotationsPull": "Markeringen naar Kobo verzonden",
+            "annotationsPush": "Markeringen ontvangen van Kobo"
+          },
+          "outcome": {
+            "failed": "Mislukt",
+            "noUpdates": "Geen updates",
+            "noChanges": "Geen wijzigingen",
+            "pending": "In behandeling",
+            "completed": "Voltooid",
+            "downloaded": "Gedownload",
+            "updated": "Bijgewerkt",
+            "sent": "Verzonden",
+            "imported": "Geïmporteerd"
+          },
+          "failure": {
+            "librarySync": "Bibliotheekcontrole is niet voltooid",
+            "bookDownload": "Download is niet voltooid",
+            "progressUpdate": "Leespositie is niet bijgewerkt",
+            "annotationsPull": "Markeringen zijn niet verzonden",
+            "annotationsPush": "Markeringen zijn niet geïmporteerd"
+          },
+          "chip": {
+            "morePending": "Meer in behandeling",
+            "noUpdatesPending": "Geen updates in behandeling",
+            "bookCount": "{count} boek | {count} boeken",
+            "deletedAnnotations": "{count} verwijderde annotaties",
+            "deviceAlreadyCurrent": "Apparaat al actueel",
+            "freshHighlightData": "Nieuwe markeringsgegevens",
+            "created": "{count} aangemaakt",
+            "updated": "{count} bijgewerkt",
+            "deleted": "{count} verwijderd",
+            "unchanged": "{count} ongewijzigd"
+          },
+          "readingPositionSyncedTitle": "Leespositie gesynchroniseerd: {title}",
+          "readingPositionSynced": "Leespositie gesynchroniseerd",
+          "labelWithTitle": "{label}: {title}",
+          "updateCount": "{count} update | {count} updates",
+          "directionToKobo": "BookOrbit -> Kobo",
+          "directionToBookOrbit": "Kobo -> BookOrbit",
+          "twoWaySyncEnabled": "Tweerichtingssynchronisatie ingeschakeld",
+          "deviceProgressSaved": "Voortgang van apparaat opgeslagen",
+          "summary": {
+            "noLibraryUpdatesPending": "Er zijn geen bibliotheekupdates in behandeling voor dit apparaat",
+            "libraryUpdatesPrepared": "{count} bibliotheekupdate voorbereid voor het apparaat | {count} bibliotheekupdates voorbereid voor het apparaat",
+            "bookDownloadedBy": "{title} is gedownload door {device}",
+            "booksDownloaded": "{count} boek gedownload | {count} boeken gedownload",
+            "progressUpdatesSyncedFor": "{count} voortgangsupdate gesynchroniseerd voor {title} | {count} voortgangsupdates gesynchroniseerd voor {title}",
+            "progressUpdatesSynced": "{count} voortgangsupdate gesynchroniseerd | {count} voortgangsupdates gesynchroniseerd",
+            "newReadingPositionFor": "Kobo meldde een nieuwe leespositie voor {title}",
+            "newReadingPosition": "Kobo meldde een nieuwe leespositie",
+            "noHighlightChangesNeededFor": "Geen markeringswijzigingen nodig voor {title}",
+            "noHighlightChangesNeeded": "Geen markeringswijzigingen nodig",
+            "highlightsSentToKoboFor": "{count} markering naar Kobo verzonden voor {title} | {count} markeringen naar Kobo verzonden voor {title}",
+            "highlightsSentToKobo": "{count} markering naar Kobo verzonden | {count} markeringen naar Kobo verzonden",
+            "noKoboHighlightChangesFor": "Geen Kobo-markeringswijzigingen voor {title}",
+            "noKoboHighlightChanges": "Geen Kobo-markeringswijzigingen",
+            "highlightsImportedFromKoboFor": "{count} markering geïmporteerd van Kobo voor {title} | {count} markeringen geïmporteerd van Kobo voor {title}",
+            "highlightsImportedFromKobo": "{count} markering geïmporteerd van Kobo | {count} markeringen geïmporteerd van Kobo"
+          },
+          "timeRange": "{from} tot {to}",
+          "eventsGrouped": "{count} gebeurtenis gegroepeerd | {count} gebeurtenissen gegroepeerd",
+          "removedDevice": "Verwijderd apparaat",
+          "loadMoreFailed": "Meer geschiedenis laden mislukt",
+          "historyRefreshed": "Kobo-synchronisatiegeschiedenis vernieuwd",
+          "refreshFailed": "Vernieuwen van geschiedenis mislukt",
+          "recentActivity": "Recente Kobo-activiteit",
+          "filterAll": "Alles",
+          "filterFailures": "Fouten",
+          "refresh": "Vernieuwen",
+          "loadingActivity": "Kobo-activiteit laden...",
+          "noActivityHint": "Recente synchronisatieactiviteit verschijnt nadat een gekoppelde Kobo contact opneemt met BookOrbit.",
+          "error": "Fout",
+          "loading": "Laden...",
+          "loadMore": "Meer activiteit laden"
+        },
+        "howBooksSynced": {
+          "title": "Hoe boeken worden gesynchroniseerd"
+        },
+        "nextSteps": {
+          "title": "Volgende stappen",
+          "step1": "1. Configureer je Kobo-apparaat om te synchroniseren met de bovenstaande synchronisatie-URL."
+        },
+        "syncToKobo": "Synchroniseren naar Kobo",
+        "tabs": {
+          "syncSettings": "Synchronisatie-instellingen",
+          "activityLog": "Activiteitenlogboek"
+        }
       },
       "koreader": {
         "title": "KOReader-synchronisatie",
@@ -1803,7 +1918,11 @@
             "linkUpdated": "Koppeling bijgewerkt",
             "linkFailed": "Boek koppelen mislukt",
             "linkRemoved": "Koppeling verwijderd",
-            "unlinkFailed": "Boek ontkoppelen mislukt"
+            "unlinkFailed": "Boek ontkoppelen mislukt",
+            "unmatchedDismissed": "Niet-gekoppeld boek genegeerd",
+            "dismissFailed": "Negeren van niet-gekoppeld boek mislukt",
+            "allDismissed": "Geen niet-gekoppelde boeken genegeerd | {count} niet-gekoppeld boek genegeerd | {count} niet-gekoppelde boeken genegeerd",
+            "dismissAllFailed": "Negeren van alle niet-gekoppelde boeken mislukt"
           },
           "modal": {
             "linkTitle": "KOReader-boek koppelen",
@@ -1828,8 +1947,43 @@
             "unlinkTitle": "KOReader-boek ontkoppelen?",
             "unlinkBody": "Toekomstige synchronisaties voor deze hash worden niet meer aan {title} gekoppeld totdat het opnieuw wordt gekoppeld. Reeds gesynchroniseerde statistieken blijven bij hun huidige BookOrbit-boek.",
             "unlinking": "Ontkoppelen..."
-          }
-        }
+          },
+          "dismiss": "Negeren",
+          "dismissAll": "Alles negeren",
+          "dismissing": "Negeren...",
+          "unlinking": "Ontkoppelen...",
+          "unlinkConfirmTitle": "KOReader-boek ontkoppelen?",
+          "unlinkConfirmBody": "Toekomstige synchronisaties voor deze hash verwijzen niet langer naar {title} totdat deze opnieuw wordt gekoppeld. Reeds gesynchroniseerde statistieken blijven bij hun huidige BookOrbit-boek.",
+          "dismissConfirmTitle": "{title} negeren?",
+          "dismissConfirmBody": "Dit verwijdert het uit je lijst met niet-gekoppelde boeken. Als een apparaat deze hash opnieuw meldt, verschijnt het als een nieuwe vermelding.",
+          "dismissAllConfirmTitle": "geen niet-gekoppelde boeken | Alle {count} niet-gekoppelde boek negeren? | Alle {count} niet-gekoppelde boeken negeren?",
+          "dismissAllConfirmBody": "Dit wist je volledige lijst met niet-gekoppelde boeken, niet alleen de huidige pagina. Als een apparaat een van deze hashes opnieuw meldt, verschijnt het als een nieuwe vermelding.",
+          "changeLinkTitle": "KOReader-koppeling wijzigen",
+          "linkBookTitle": "KOReader-boek koppelen",
+          "bookOrbitBook": "BookOrbit-boek",
+          "searchLibraryPlaceholder": "Zoek in je BookOrbit-bibliotheek",
+          "enterMinChars": "Voer minstens 2 tekens in.",
+          "searching": "Zoeken...",
+          "noBooksFound": "Geen boeken gevonden.",
+          "untitledBook": "Boek zonder titel",
+          "selected": "Geselecteerd",
+          "select": "Selecteren",
+          "loadMore": "Meer laden",
+          "loadingMore": "Laden...",
+          "confirmLinkTitle": "KOReader-koppeling bevestigen",
+          "bookId": "Boek-ID: {id}",
+          "syncedStatsNote": "Reeds gesynchroniseerde statistieken blijven bij hun huidige BookOrbit-boek.",
+          "chooseDifferent": "Andere kiezen",
+          "saving": "Opslaan...",
+          "confirmLink": "Koppeling bevestigen"
+        },
+        "remove": "Verwijderen",
+        "removing": "Verwijderen...",
+        "unmatchedBooks": "Niet-gekoppelde boeken",
+        "deviceRemoved": "Apparaat verwijderd",
+        "removeDeviceFailed": "Verwijderen van apparaat mislukt",
+        "removeDeviceConfirmTitle": "{device} verwijderen?",
+        "removeDeviceConfirmBody": "Dit verwijdert permanent de gesynchroniseerde voortgang, leesactiviteit en niet-gekoppelde-boekvermeldingen van dit apparaat die niet langer door een ander apparaat worden gemeld. Als het apparaat later opnieuw synchroniseert, verschijnt het als een nieuwe vermelding."
       },
       "opds": {
         "title": "OPDS",
@@ -2027,6 +2181,17 @@
         "loadData": "Gegevens laden mislukt",
         "load": "Laden mislukt",
         "deleteUser": "Gebruiker verwijderen mislukt"
+      },
+      "currentUsers": "Huidige gebruikers",
+      "defaultLibraryAccess": {
+        "title": "Standaard bibliotheektoegang",
+        "subtitle": "Kijktoegang voor zelf-geregistreerde en via OIDC aangemaakte gebruikers.",
+        "description": "Selecteer de bibliotheken die automatisch aan nieuwe gebruikers worden toegewezen.",
+        "noLibraries": "Geen bibliotheken beschikbaar.",
+        "save": "Standaardwaarden opslaan",
+        "saving": "Opslaan...",
+        "saved": "Standaard bibliotheektoegang opgeslagen.",
+        "saveError": "Opslaan van standaard bibliotheektoegang mislukt"
       }
     }
   },
@@ -2748,7 +2913,7 @@
         "title": "Bestand toevoegen",
         "dropzone": {
           "title": "Sleep bestanden hierheen of klik om te bladeren",
-          "hint": "epub, pdf, mobi, cbz, m4b en meer - tot 500 MB per stuk"
+          "hint": "epub, pdf, mobi, cbz, m4b en meer - tot {size} MB per stuk"
         },
         "addMore": "Meer bestanden toevoegen",
         "fileCount": "geen bestanden | één bestand | {count} bestanden",
@@ -2878,8 +3043,8 @@
         "fileExceedsSizeLimit": "Dit bestand overschrijdt de groottelimiet voor terugschrijven",
         "writing": "Schrijven...",
         "saveInProgress": "Bezig met opslaan",
-        "writeManualLibraryDisabled": "Schrijf metadata nu naar bestand en hernoem; automatisch terugschrijven is uitgeschakeld voor deze bibliotheek",
-        "writeManualTooltip": "Schrijf {fields} naar {target} en hernoem als een patroon is ingesteld",
+        "writeManualLibraryDisabled": "Schrijf metadata naar bestand en hernoem op schijf; automatisch terugschrijven is uitgeschakeld voor deze bibliotheek",
+        "writeManualTooltip": "Schrijf {fields} naar {target} en hernoem op schijf",
         "applyResult": "{skipped}, {updated}",
         "skippedLockedFields": "Geen vergrendelde velden overgeslagen | Eén vergrendeld veld overgeslagen | {count} vergrendelde velden overgeslagen",
         "updatedFields": "geen velden bijgewerkt | één veld bijgewerkt | {count} velden bijgewerkt",
@@ -3011,7 +3176,9 @@
           "noResults": "Geen resultaten gevonden",
           "noResultsHint": "Probeer de titel of auteur aan te passen",
           "searchPrompt": "Zoek hierboven en klik op een resultaat om metadata te vergelijken."
-        }
+        },
+        "writeAndRename": "Naar bestand schrijven en hernoemen",
+        "writeAndRenameShort": "Schrijven en hernoemen"
       },
       "files": {
         "relative": {
@@ -4491,7 +4658,7 @@
       },
       "dropzone": {
         "title": "Sleep bestanden hierheen of klik om te bladeren",
-        "hint": "{formats} - tot 500 MB per stuk"
+        "hint": "{formats} - tot {size} MB per stuk"
       }
     }
   },
