@@ -148,19 +148,6 @@ describe('OpdsBookService', () => {
     expect(values).toContain('%100\\%\\_\\\\%');
   });
 
-  it('handles getRecentBooksPage empty-access and delegated paths', async () => {
-    const { service } = makeService();
-    const accessSpy = vi.spyOn(service, 'getAccessibleLibraryIds');
-    const paginatedSpy = vi.spyOn(testable(service), 'paginatedBookQuery');
-
-    accessSpy.mockResolvedValueOnce([]);
-    await expect(service.getRecentBooksPage(5, 1, 30)).resolves.toEqual({ entries: [], total: 0 });
-
-    accessSpy.mockResolvedValueOnce([2, 3]);
-    paginatedSpy.mockResolvedValueOnce({ entries: [{ id: 1 }], total: 1 });
-    await expect(service.getRecentBooksPage(5, 2, 15)).resolves.toEqual({ entries: [{ id: 1 }], total: 1 });
-  });
-
   it('handles getRandomBooks guard branches and randomized id selection', async () => {
     const { service, db } = makeService([[], [{ id: 11 }, { id: 10 }]]);
     const accessSpy = vi.spyOn(service, 'getAccessibleLibraryIds');
@@ -183,6 +170,48 @@ describe('OpdsBookService', () => {
     const orderBy = chains.at(-1)!['orderBy'] as ReturnType<typeof vi.fn>;
     const values = orderBy.mock.calls.flat().flatMap((arg: unknown) => collectValues(arg));
     expect(values).toContain('random()');
+  });
+
+  it('getRecentGroupedPage returns empty without touching the DB when the user has no accessible libraries', async () => {
+    const { service, db } = makeService();
+    vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValueOnce([]);
+
+    await expect(service.getRecentGroupedPage(7, 1, 20)).resolves.toEqual({ items: [], total: 0 });
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('getRecentGroupedPage folds series-owned books into one grouped entry and leaves standalone books as book entries', async () => {
+    const lastAddedAt = new Date('2026-01-03T00:00:00.000Z');
+    const { service } = makeService([
+      [{ total: 2 }],
+      [
+        { seriesId: 42, seriesName: 'Dune', bookCount: 3, lastAddedAt, latestBookId: 9 },
+        { seriesId: null, seriesName: null, bookCount: 1, lastAddedAt: new Date('2026-01-02'), latestBookId: 5 },
+      ],
+    ]);
+    vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValueOnce([1]);
+    const fetchSpy = vi.spyOn(testable(service), 'fetchBookEntries').mockResolvedValue([{ id: 5, title: 'Standalone' }]);
+
+    await expect(service.getRecentGroupedPage(7, 1, 20)).resolves.toEqual({
+      total: 2,
+      items: [
+        { kind: 'series', seriesId: 42, seriesName: 'Dune', bookCount: 3, lastAddedAt },
+        { kind: 'book', book: { id: 5, title: 'Standalone' } },
+      ],
+    });
+    expect(fetchSpy).toHaveBeenCalledWith([5]);
+  });
+
+  it('getRecentGroupedPage falls back to "Untitled Series" when a series-owned group has no series name', async () => {
+    const lastAddedAt = new Date('2026-01-03T00:00:00.000Z');
+    const { service } = makeService([[{ total: 1 }], [{ seriesId: 42, seriesName: null, bookCount: 2, lastAddedAt, latestBookId: 9 }]]);
+    vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValueOnce([1]);
+    vi.spyOn(testable(service), 'fetchBookEntries').mockResolvedValue([]);
+
+    await expect(service.getRecentGroupedPage(7, 1, 20)).resolves.toEqual({
+      total: 1,
+      items: [{ kind: 'series', seriesId: 42, seriesName: 'Untitled Series', bookCount: 2, lastAddedAt }],
+    });
   });
 
   it('returns distinct authors and membership-backed series with and without access', async () => {

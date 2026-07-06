@@ -11,7 +11,7 @@ import {
   xmlLink,
   xmlPseStreamLink,
 } from './opds-xml.helpers';
-import type { OpdsBookEntry } from './opds-book.service';
+import type { OpdsBookEntry, OpdsRecentGroupItem } from './opds-book.service';
 
 const BASE = '/api/v1/opds';
 
@@ -108,6 +108,43 @@ export class OpdsService {
     coverToken: string,
   ): string {
     const now = new Date().toISOString();
+    const links = this.paginationLinks(selfPath, page, size, total);
+    const entries = books.map((book) => this.bookEntry(book, coverToken));
+    return this.wrapFeed(title, feedId, now, links, entries, total);
+  }
+
+  /**
+   * "Recent" grouped by series (see OpdsBookService.getRecentGroupedPage): a series
+   * item renders as a plain subsection folder titled "Name (N)"; a standalone book
+   * renders exactly like a normal acquisition entry, side by side in the same feed.
+   */
+  generateRecentGroupedFeed(
+    title: string,
+    feedId: string,
+    items: OpdsRecentGroupItem[],
+    total: number,
+    page: number,
+    size: number,
+    selfPath: string,
+    coverToken: string,
+  ): string {
+    const now = new Date().toISOString();
+    const links = this.paginationLinks(selfPath, page, size, total);
+    const entries = items.map((item) =>
+      item.kind === 'book'
+        ? this.bookEntry(item.book, coverToken)
+        : this.navEntry(
+            `urn:bookorbit:series:${item.seriesId}`,
+            `${item.seriesName} (${item.bookCount})`,
+            `${item.bookCount} recently added`,
+            `${BASE}/catalog?seriesId=${item.seriesId}`,
+            item.lastAddedAt.toISOString(),
+          ),
+    );
+    return this.wrapFeed(title, feedId, now, links, entries, total);
+  }
+
+  private paginationLinks(selfPath: string, page: number, size: number, total: number): string[] {
     const totalPages = Math.max(1, Math.ceil(total / size));
     const links = [
       xmlLink('self', selfPath, OPDS_MIME_ACQ),
@@ -130,9 +167,7 @@ export class OpdsService {
       links.push(xmlLink('last', pageUrl(totalPages), OPDS_MIME_ACQ));
     }
 
-    const entries = books.map((book) => this.bookEntry(book, coverToken));
-
-    return this.wrapFeed(title, feedId, now, links, entries, total);
+    return links;
   }
 
   generateOpenSearchDescription(): string {

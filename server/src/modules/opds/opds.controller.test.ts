@@ -27,6 +27,7 @@ function makeController() {
     generateAuthorsNavigation: vi.fn().mockReturnValue('<authors />'),
     generateSeriesNavigation: vi.fn().mockReturnValue('<series />'),
     generateAcquisitionFeed: vi.fn().mockReturnValue('<feed />'),
+    generateRecentGroupedFeed: vi.fn().mockReturnValue('<recent />'),
     generateOpenSearchDescription: vi.fn().mockReturnValue('<search />'),
   } as never;
   const opdsBookService = {
@@ -39,7 +40,7 @@ function makeController() {
       { name: 'Dune', bookCount: 2 },
     ]),
     getBooksPage: vi.fn().mockResolvedValue({ entries: [{ id: 1 }], total: 1 }),
-    getRecentBooksPage: vi.fn().mockResolvedValue({ entries: [{ id: 2 }], total: 1 }),
+    getRecentGroupedPage: vi.fn().mockResolvedValue({ items: [{ kind: 'book', book: { id: 2 } }], total: 1 }),
     getRandomBooks: vi.fn().mockResolvedValue([{ id: 3 }]),
     validateBookAccess: vi.fn().mockResolvedValue(undefined),
     getBookFiles: vi.fn().mockResolvedValue({
@@ -235,7 +236,17 @@ describe('OpdsController', () => {
     await controller.recent(user, 0, 1000, makeReply());
     await controller.surprise(user, makeReply());
 
-    expect(opdsBookService.getRecentBooksPage).toHaveBeenCalledWith(12, 1, 100, false, undefined);
+    expect(opdsBookService.getRecentGroupedPage).toHaveBeenCalledWith(12, 1, 100, false, undefined);
+    expect(opdsService.generateRecentGroupedFeed).toHaveBeenCalledWith(
+      'Recent Books',
+      'urn:bookorbit:recent',
+      [{ kind: 'book', book: { id: 2 } }],
+      1,
+      1,
+      100,
+      '/api/v1/opds/recent?page=1&size=100',
+      'cover-token',
+    );
     expect(opdsBookService.getRandomBooks).toHaveBeenCalledWith(12, 25, false, undefined);
     expect(opdsService.generateAcquisitionFeed).toHaveBeenCalledWith(
       'Random Books',

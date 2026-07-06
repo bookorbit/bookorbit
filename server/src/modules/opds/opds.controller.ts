@@ -172,7 +172,7 @@ export class OpdsController {
     const clampedPage = Math.max(page, 1);
     this.assertPaginationWindow(clampedPage, clampedSize);
 
-    const { entries, total } = await this.opdsBookService.getRecentBooksPage(
+    const { items, total } = await this.opdsBookService.getRecentGroupedPage(
       user.userId,
       clampedPage,
       clampedSize,
@@ -180,10 +180,10 @@ export class OpdsController {
       user.contentFilters,
     );
     const selfPath = `/api/v1/opds/recent?page=${clampedPage}&size=${clampedSize}`;
-    const xml = this.opdsService.generateAcquisitionFeed(
+    const xml = this.opdsService.generateRecentGroupedFeed(
       'Recent Books',
       'urn:bookorbit:recent',
-      entries,
+      items,
       total,
       clampedPage,
       clampedSize,

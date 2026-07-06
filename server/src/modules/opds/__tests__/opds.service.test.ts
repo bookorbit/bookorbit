@@ -428,6 +428,87 @@ describe('OpdsService', () => {
     });
   });
 
+  describe('generateRecentGroupedFeed', () => {
+    it('renders a series-grouped item as a subsection folder titled "Name (count)"', () => {
+      const service = makeService();
+      const xml = service.generateRecentGroupedFeed(
+        'Recent Books',
+        'urn:bookorbit:recent',
+        [{ kind: 'series', seriesId: 42, seriesName: 'Dune', bookCount: 3, lastAddedAt: new Date('2026-01-03T00:00:00.000Z') }],
+        1,
+        1,
+        50,
+        `${BASE}/recent?page=1&size=50`,
+        'test-token',
+      );
+
+      expect(xml).toContain('<title>Dune (3)</title>');
+      expect(xml).toContain(`href="${BASE}/catalog?seriesId=42"`);
+      expect(xml).toContain('rel="subsection"');
+      expect(xml).not.toContain('http://opds-spec.org/acquisition');
+    });
+
+    it('renders a standalone book item exactly like a normal acquisition entry', () => {
+      const service = makeService();
+      const book = sampleBook();
+      const xml = service.generateRecentGroupedFeed(
+        'Recent Books',
+        'urn:bookorbit:recent',
+        [{ kind: 'book', book }],
+        1,
+        1,
+        50,
+        `${BASE}/recent?page=1&size=50`,
+        'test-token',
+      );
+
+      expect(xml).toContain('<title>Mistborn: The Final Empire</title>');
+      expect(xml).toContain('http://opds-spec.org/acquisition');
+    });
+
+    it('mixes series and standalone-book entries in the given order', () => {
+      const service = makeService();
+      const book = sampleBook({ id: 99, title: 'Standalone Novel' });
+      const xml = service.generateRecentGroupedFeed(
+        'Recent Books',
+        'urn:bookorbit:recent',
+        [
+          { kind: 'series', seriesId: 1, seriesName: 'Dune', bookCount: 2, lastAddedAt: new Date('2026-01-03') },
+          { kind: 'book', book },
+        ],
+        2,
+        1,
+        50,
+        `${BASE}/recent?page=1&size=50`,
+        'test-token',
+      );
+
+      const duneIndex = xml.indexOf('Dune (2)');
+      const standaloneIndex = xml.indexOf('Standalone Novel');
+      expect(duneIndex).toBeGreaterThanOrEqual(0);
+      expect(standaloneIndex).toBeGreaterThan(duneIndex);
+    });
+
+    it('includes pagination links the same way generateAcquisitionFeed does', () => {
+      const service = makeService();
+      const xml = service.generateRecentGroupedFeed(
+        'Recent Books',
+        'urn:bookorbit:recent',
+        [],
+        100,
+        2,
+        10,
+        `${BASE}/recent?page=2&size=10`,
+        'test-token',
+      );
+
+      expect(xml).toContain('rel="previous"');
+      expect(xml).toContain('rel="next"');
+      expect(xml).toContain('rel="first"');
+      expect(xml).toContain('rel="last"');
+    });
+  });
+
   describe('generateOpenSearchDescription', () => {
     it('produces valid OpenSearch XML with search template', () => {
       const service = makeService();
