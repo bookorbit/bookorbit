@@ -6,9 +6,11 @@ import {
   Headers,
   NotFoundException,
   Param,
+  ParseBoolPipe,
   ParseIntPipe,
   Query,
   Res,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { createReadStream } from 'fs';
@@ -21,10 +23,14 @@ import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName } f
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { Public } from '../../common/decorators/public.decorator';
 import { imageContentTypeFromPath } from '../../common/image-content-type';
+import { BookService } from '../book/book.service';
+import { UserService } from '../user/user.service';
+import type { SaveProgressDto } from '../book/dto/save-progress.dto';
 import { OPDS_MIME_ACQ, OPDS_MIME_NAV, OPDS_MIME_SEARCH, fileMimeType } from './opds-xml.helpers';
 import { OpdsAuthGuard } from './opds-auth.guard';
 import type { OpdsRequestUser } from './opds-auth.guard';
 import { OpdsEnabledGuard } from './opds-enabled.guard';
+import { OpdsPageStreamService } from './opds-page-stream.service';
 import { OpdsUser } from './opds-user.decorator';
 import { OpdsBookService } from './opds-book.service';
 import { OpdsService } from './opds.service';
@@ -38,6 +44,9 @@ export class OpdsController {
   constructor(
     private readonly opdsService: OpdsService,
     private readonly opdsBookService: OpdsBookService,
+    private readonly opdsPageStreamService: OpdsPageStreamService,
+    private readonly userService: UserService,
+    private readonly bookService: BookService,
     private readonly config: ConfigService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
@@ -284,6 +293,42 @@ export class OpdsController {
     reply.header('Content-Length', fileSize);
     reply.type(mime);
     reply.send(createReadStream(absolutePath));
+  }
+
+  @Get(':bookId/image')
+  async image(
+    @Param('bookId', ParseIntPipe) bookId: number,
+    @Query('fileId', ParseIntPipe) fileId: number,
+    @Query('pageNumber', ParseIntPipe) pageNumber: number,
+    @Query('saveProgress', new DefaultValuePipe(true), ParseBoolPipe) saveProgress: boolean,
+    @OpdsUser() opdsUser: OpdsRequestUser,
+    @Res() reply: FastifyReply,
+  ) {
+    if (pageNumber < 0) throw new BadRequestException('pageNumber must be >= 0');
+
+    await this.opdsBookService.validateBookAccess(bookId, opdsUser.userId, opdsUser.isSuperuser, opdsUser.contentFilters);
+    const file = await this.opdsBookService.getBookFiles(bookId, fileId);
+    if (!file) throw new NotFoundException('File not found');
+
+    const user = await this.userService.findByIdWithPermissions(opdsUser.userId);
+    if (!user) throw new UnauthorizedException('Account not found');
+
+    try {
+      const { stream, mimeType, totalPages } = await this.opdsPageStreamService.streamPage(file, pageNumber, user);
+
+      if (saveProgress) {
+        const percentage = totalPages > 0 ? Math.min(100, ((pageNumber + 1) / totalPages) * 100) : 0;
+        const dto: SaveProgressDto = { pageNumber, percentage };
+        await this.bookService.saveProgress(opdsUser.userId, fileId, dto, user);
+      }
+
+      reply.header('Cache-Control', 'private, max-age=31536000, immutable');
+      reply.type(mimeType);
+      reply.send(stream);
+    } catch (err) {
+      await this.opdsPageStreamService.invalidateCache(file);
+      throw err;
+    }
   }
 
   private sendXml(reply: FastifyReply, xml: string, mimeType: string) {

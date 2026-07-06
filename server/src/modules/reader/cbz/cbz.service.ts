@@ -6,26 +6,12 @@ import { getSevenZip } from '../../../common/sevenzip';
 import { imageContentTypeFromPath } from '../../../common/image-content-type';
 import { detectComicContainerFormat } from '../../../common/comic-format-detect';
 import { createCbzZipEntryReadStream, readCbzZipIndex, type CbzZipEntry } from '../../../common/cbz-zip-reader';
+import { isHiddenPage as isHidden, isImagePage as isImage, naturalPageSort as naturalSort } from '../../../common/comic-page-utils';
 
 import type { RequestUser } from '../../../common/types/request-user';
 import { BookService } from '../../book/book.service';
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
-
-const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.avif']);
-
-function isImage(name: string): boolean {
-  const dot = name.lastIndexOf('.');
-  return dot !== -1 && IMAGE_EXTS.has(name.substring(dot).toLowerCase());
-}
-
-function isHidden(name: string): boolean {
-  return name.split('/').some((p) => p.startsWith('.'));
-}
-
-function naturalSort(a: string, b: string): number {
-  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-}
 
 function mimeForExt(name: string): string {
   return imageContentTypeFromPath(name);

@@ -7,5 +7,6 @@ import { CbzService } from './cbz.service';
   imports: [BookModule],
   controllers: [CbzController],
   providers: [CbzService],
+  exports: [CbzService],
 })
 export class CbzModule {}

@@ -65,6 +65,7 @@ describe('Architecture boundaries', () => {
       'src/modules/metadata-preferences/provider-config.service.ts',
       'src/modules/migration/planner/matching.service.ts',
       'src/modules/opds/opds-book.service.ts',
+      'src/modules/opds/opds-page-count.service.ts',
       'src/modules/opds/opds-user.service.ts',
       'src/modules/scanner/file-watcher.service.ts',
       'src/modules/seed/cleanup.service.ts',

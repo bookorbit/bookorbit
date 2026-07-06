@@ -142,6 +142,15 @@ describe('OpdsAuthGuard', () => {
     expect((request.opdsUser as OpdsRequestUser).userId).toBe(1);
   });
 
+  it('accepts token auth on the PSE image streaming route', async () => {
+    const guard = makeGuard();
+    const token = createCoverToken(1, TEST_SECRET);
+    const { context, request } = mockContext(undefined, token, '/api/v1/opds/42/image');
+    const result = await guard.canActivate(context);
+    expect(result).toBe(true);
+    expect((request.opdsUser as OpdsRequestUser).userId).toBe(1);
+  });
+
   it('rejects a same-length tampered cover token', async () => {
     const guard = makeGuard();
     const token = createCoverToken(1, TEST_SECRET);

@@ -1,0 +1,2 @@
+ALTER TABLE "book_files" ADD COLUMN "page_count" integer;--> statement-breakpoint
+ALTER TABLE "book_files" ADD CONSTRAINT "book_files_page_count_nonnegative_chk" CHECK ("book_files"."page_count" is null or "book_files"."page_count" >= 0);
