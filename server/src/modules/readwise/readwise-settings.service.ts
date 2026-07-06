@@ -36,7 +36,7 @@ export class ReadwiseSettingsService {
     if (!existing?.apiToken && !rawToken) {
       throw new BadRequestException('API token is required to connect Readwise');
     }
-    const data: Parameters<typeof this.repo.upsertSettings>[1] = {};
+    const data: Parameters<ReadwiseRepository['upsertSettings']>[1] = {};
     if (rawToken) {
       data.apiToken = rawToken;
       data.disabledReason = null; // clear auto-disable reason on new token
