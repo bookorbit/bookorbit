@@ -83,17 +83,34 @@ describe('SettingsHeader', () => {
       expect(labels).not.toContain('Integrations')
     })
 
+    it('shows Readwise tab for users with readwise_sync', () => {
+      const labels = getTabLabels(mountHeader({ perms: ['readwise_sync'] }))
+      expect(labels).toContain('Readwise')
+      expect(labels).not.toContain('Integrations')
+    })
+
+    it('hides Readwise tab when user lacks readwise_sync', () => {
+      const labels = getTabLabels(mountHeader())
+      expect(labels).not.toContain('Readwise')
+    })
+
     it('shows integration tabs for superusers', () => {
       const labels = getTabLabels(mountHeader({ su: true }))
       expect(labels).toContain('Kobo')
       expect(labels).toContain('KOReader')
       expect(labels).toContain('Hardcover')
+      expect(labels).toContain('Readwise')
       expect(labels).not.toContain('Integrations')
     })
 
     it('places integration tabs after OPDS', () => {
       const labels = getTabLabels(mountHeader({ su: true }))
-      expect(labels.slice(labels.indexOf('OPDS'), labels.indexOf('Admin'))).toEqual(['OPDS', 'Kobo', 'KOReader', 'Hardcover'])
+      expect(labels.slice(labels.indexOf('OPDS'), labels.indexOf('Admin'))).toEqual(['OPDS', 'Kobo', 'KOReader', 'Hardcover', 'Readwise'])
+    })
+
+    it('places Readwise tab after Hardcover', () => {
+      const labels = getTabLabels(mountHeader({ su: true }))
+      expect(labels.indexOf('Readwise')).toBe(labels.indexOf('Hardcover') + 1)
     })
   })
 

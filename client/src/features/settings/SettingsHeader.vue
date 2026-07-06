@@ -54,6 +54,10 @@ const sections = computed<Section[]>(() => {
     result.push({ label: 'Hardcover', routeName: 'settings-hardcover' })
   }
 
+  if (su || perms.includes(Permission.ReadwiseSync)) {
+    result.push({ label: 'Readwise', routeName: 'settings-readwise' })
+  }
+
   if (su || perms.includes('manage_users') || perms.includes('manage_app_settings')) {
     result.push({ label: 'Admin', routeName: 'settings-admin' })
   }
