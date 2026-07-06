@@ -29,10 +29,10 @@ describe('SeriesIdentityService', () => {
   it('normalizes names for identity while preserving display casing', () => {
     const service = new SeriesIdentityService({} as never);
 
-    expect(service.normalizeName('  The Expanse  ')).toBe('the expanse');
+    expect(service.normalizeName('  The   Expanse  ')).toBe('the expanse');
     expect(service.normalizeName('   ')).toBeNull();
     expect(service.normalizeName(null)).toBeNull();
-    expect(service.normalizeDisplayName('  The Expanse  ')).toBe('The Expanse');
+    expect(service.normalizeDisplayName('  The   Expanse  ')).toBe('The Expanse');
     expect(service.normalizeDisplayName('   ')).toBeNull();
   });
 
@@ -49,7 +49,7 @@ describe('SeriesIdentityService', () => {
     const { db, insert, values, onConflictDoUpdate, returning } = makeInsertDb([{ id: 77 }]);
     const service = new SeriesIdentityService(db);
 
-    const id = await service.resolveSeriesId('  Dune Chronicles  ');
+    const id = await service.resolveSeriesId('  Dune   Chronicles  ');
 
     expect(id).toBe(77);
     expect(insert).toHaveBeenCalledTimes(1);
@@ -83,7 +83,7 @@ describe('SeriesIdentityService', () => {
     const { db } = makeInsertDb([{ id: 88 }]);
     const service = new SeriesIdentityService(db);
 
-    const patch = await service.resolveMetadataPatch({ bookId: 1, title: 'Caliban War', seriesName: '  The Expanse  ' });
+    const patch = await service.resolveMetadataPatch({ bookId: 1, title: 'Caliban War', seriesName: '  The   Expanse  ' });
 
     expect(patch).toEqual({ bookId: 1, title: 'Caliban War', seriesName: 'The Expanse', seriesId: 88 });
   });
@@ -106,6 +106,10 @@ describe('SeriesIdentityService', () => {
 
     expect(execute).toHaveBeenCalledTimes(3);
     const createSeriesSql = flattenSql(execute.mock.calls[0]![0]).replace(/\s+/g, ' ');
+    expect(createSeriesSql).toContain('regexp_replace');
+    expect(createSeriesSql).toContain('replace');
+    expect(createSeriesSql).toContain('chr(160)');
+    expect(createSeriesSql).toContain('btrim(regexp_replace');
     expect(createSeriesSql).toContain('ON CONFLICT (normalized_name) DO NOTHING');
     expect(createSeriesSql).not.toContain('DO UPDATE SET');
     expect(createSeriesSql).not.toContain('excluded.name');

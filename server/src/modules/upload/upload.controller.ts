@@ -5,12 +5,15 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { MultipartRequest } from '../../common/types/multipart-request';
 import type { RequestUser } from '../../common/types/request-user';
+import { AppSettingsService } from '../app-settings/app-settings.service';
 import { UploadService } from './upload.service';
-import { MAX_UPLOAD_BYTES } from './upload-storage.service';
 
 @Controller('libraries')
 export class UploadController {
-  constructor(private readonly uploadService: UploadService) {}
+  constructor(
+    private readonly uploadService: UploadService,
+    private readonly appSettings: AppSettingsService,
+  ) {}
 
   @Post(':id/upload')
   @HttpCode(HttpStatus.CREATED)
@@ -24,7 +27,8 @@ export class UploadController {
     // Override the global multipart fileSize limit for book uploads.
     // Per-request options are deep-merged with plugin defaults (busboy config),
     // so this fileSize takes precedence over the global 20 MB cover limit.
-    const data = await req.file({ limits: { fileSize: MAX_UPLOAD_BYTES } });
+    const limitMb = await this.appSettings.getMaxUploadSizeMb();
+    const data = await req.file({ limits: { fileSize: limitMb * 1024 * 1024 } });
     if (!data) throw new BadRequestException('No file provided');
 
     const folderId = this.parseFolderId(rawFolderId);

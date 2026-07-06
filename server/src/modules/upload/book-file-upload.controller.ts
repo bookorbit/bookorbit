@@ -4,18 +4,22 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { MultipartRequest } from '../../common/types/multipart-request';
 import type { RequestUser } from '../../common/types/request-user';
-import { MAX_UPLOAD_BYTES } from './upload-storage.service';
+import { AppSettingsService } from '../app-settings/app-settings.service';
 import { UploadService } from './upload.service';
 
 @Controller('books')
 export class BookFileUploadController {
-  constructor(private readonly uploadService: UploadService) {}
+  constructor(
+    private readonly uploadService: UploadService,
+    private readonly appSettings: AppSettingsService,
+  ) {}
 
   @Post(':id/files')
   @HttpCode(HttpStatus.CREATED)
   @RequirePermission(Permission.LibraryUpload)
   async addFileToBook(@Param('id', ParseIntPipe) bookId: number, @CurrentUser() user: RequestUser, @Req() req: MultipartRequest) {
-    const data = await req.file({ limits: { fileSize: MAX_UPLOAD_BYTES } });
+    const limitMb = await this.appSettings.getMaxUploadSizeMb();
+    const data = await req.file({ limits: { fileSize: limitMb * 1024 * 1024 } });
     if (!data) throw new BadRequestException('No file provided');
     return this.uploadService.addFileToBook(bookId, data.filename, data.file, user);
   }

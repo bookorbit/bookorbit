@@ -39,6 +39,7 @@ function makeController() {
   const finalizeService = { previewNames: vi.fn(), finalize: vi.fn() };
   const watcherService = { rescan: vi.fn() };
   const repo = { findById: vi.fn() };
+  const appSettings = { getMaxUploadSizeMb: vi.fn().mockResolvedValue(500) };
 
   const controller = new BookDockController(
     service as never,
@@ -46,9 +47,10 @@ function makeController() {
     finalizeService as never,
     watcherService as never,
     repo as never,
+    appSettings as never,
   );
 
-  return { controller, service, ingestService, finalizeService, watcherService, repo };
+  return { controller, service, ingestService, finalizeService, watcherService, repo, appSettings };
 }
 
 const MOCK_USER = { id: 1, isSuperuser: false } as any;

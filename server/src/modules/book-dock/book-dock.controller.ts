@@ -47,7 +47,7 @@ import {
   PreviewNamesDto,
   SelectionSummaryDto,
 } from './dto/index';
-import { MAX_UPLOAD_BYTES } from '../upload/upload-storage.service';
+import { AppSettingsService } from '../app-settings/app-settings.service';
 
 @Controller('book-dock')
 @RequirePermission(Permission.BookDockAccess)
@@ -58,6 +58,7 @@ export class BookDockController {
     private readonly finalizeService: BookDockFinalizeService,
     private readonly watcherService: BookDockWatcherService,
     private readonly repo: BookDockRepository,
+    private readonly appSettings: AppSettingsService,
   ) {}
 
   @Get('files')
@@ -109,7 +110,8 @@ export class BookDockController {
   @Post('upload')
   @HttpCode(HttpStatus.CREATED)
   async upload(@CurrentUser() user: RequestUser, @Req() req: MultipartRequest) {
-    const data = await req.file({ limits: { fileSize: MAX_UPLOAD_BYTES } });
+    const limitMb = await this.appSettings.getMaxUploadSizeMb();
+    const data = await req.file({ limits: { fileSize: limitMb * 1024 * 1024 } });
     if (!data) throw new BadRequestException('No file provided');
 
     const fileId = await this.ingestService.ingestUpload(data.filename, data.file as unknown as Readable, user.id);

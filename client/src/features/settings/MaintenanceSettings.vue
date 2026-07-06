@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Check, RefreshCw, Sparkles, ArrowUpFromLine, CheckCircle2, AlertCircle, Loader2, Bell, Award } from '@lucide/vue'
+import { Check, RefreshCw, Sparkles, ArrowUpFromLine, CheckCircle2, AlertCircle, Loader2, Bell, Award, Upload } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
@@ -22,6 +22,9 @@ const migrationLoading = ref(true)
 
 const updateCheckEnabled = ref(true)
 const updateCheckLoading = ref(false)
+const maxUploadSizeMb = ref(500)
+const localMaxUploadSizeMb = ref(500)
+const maxUploadSizeSaving = ref(false)
 const achievementBackfillRunning = ref(false)
 const achievementBackfillError = ref<string | null>(null)
 const achievementBackfillResult = ref<{ usersProcessed: number; awardsGranted: number } | null>(null)
@@ -53,6 +56,12 @@ onMounted(async () => {
       const settings: { key: string; value: string }[] = await res.json()
       const row = settings.find((s) => s.key === 'update_check_enabled')
       if (row) updateCheckEnabled.value = row.value === 'true'
+      const uploadRow = settings.find((s) => s.key === 'max_upload_size_mb')
+      if (uploadRow) {
+        const val = parseInt(uploadRow.value, 10) || 500
+        maxUploadSizeMb.value = val
+        localMaxUploadSizeMb.value = val
+      }
     }
   } catch {
     // non-fatal
@@ -137,6 +146,32 @@ async function runAchievementBackfill() {
   }
 }
 
+async function saveMaxUploadSize() {
+  const val = localMaxUploadSizeMb.value
+  if (isNaN(val) || val <= 0) {
+    toast.error('Upload size limit must be greater than 0')
+    return
+  }
+  maxUploadSizeSaving.value = true
+  try {
+    const res = await api('/api/v1/app-settings/max_upload_size_mb', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: String(val) }),
+    })
+    if (res.ok) {
+      maxUploadSizeMb.value = val
+      toast.success('Upload size limit updated')
+    } else {
+      toast.error('Failed to update setting')
+    }
+  } catch {
+    toast.error('Failed to update setting')
+  } finally {
+    maxUploadSizeSaving.value = false
+  }
+}
+
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return ''
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
@@ -161,6 +196,44 @@ function formatDate(iso: string | null | undefined): string {
   </div>
 
   <div class="mt-5 md:mt-0 space-y-6">
+    <!-- Uploads -->
+    <div v-if="isSuperuser">
+      <p class="settings-group-label">Uploads</p>
+      <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+          <div class="flex items-start gap-3">
+            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+              <Upload :size="16" class="text-primary" />
+            </div>
+            <div class="min-w-0">
+              <p class="settings-label">Maximum upload file size limit</p>
+              <p class="settings-hint">Configure the maximum size limit for file uploads across the system.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2">
+              <input
+                type="number"
+                v-model.number="localMaxUploadSizeMb"
+                min="1"
+                max="10000"
+                class="w-24 rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                :disabled="maxUploadSizeSaving"
+              />
+              <span class="text-sm text-muted-foreground">MB</span>
+            </div>
+            <button
+              class="settings-btn-outline"
+              :disabled="maxUploadSizeSaving || localMaxUploadSizeMb === maxUploadSizeMb"
+              @click="saveMaxUploadSize"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Booklore Import -->
     <div>
       <p class="settings-group-label">Import</p>

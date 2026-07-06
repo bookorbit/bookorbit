@@ -2,12 +2,12 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { CheckCircle2, FileUp, Loader2, Plus, RotateCcw, Upload, X, XCircle } from '@lucide/vue'
-import { api } from '@/lib/api'
 import type { Library } from '@bookorbit/types'
+import { useAppInfo } from '@/features/settings/composables/useAppInfo'
 import { SUPPORTED_FORMATS, SUPPORTED_FORMATS_ACCEPT, useBookUpload, type FileUploadStatus } from '../composables/useBookUpload'
 import { emitLibraryUploadCompleted } from '../composables/useLibraryUploadEvents'
 import { useLibraries } from '../composables/useLibraries'
-
+import { api } from '@/lib/api'
 const props = defineProps<{
   libraryId?: number
 }>()
@@ -19,6 +19,7 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const { libraries, fetchLibraries } = useLibraries()
+const { maxUploadSizeMb } = useAppInfo()
 
 const selectedLibraryId = ref<number | undefined>(props.libraryId)
 const folders = ref<Library['folders']>([])
@@ -254,7 +255,7 @@ function formatPillClass(filename: string): string {
             </div>
             <div>
               <p class="text-sm font-medium text-foreground">Drop files here or click to browse</p>
-              <p class="text-xs text-muted-foreground mt-0.5">{{ SUPPORTED_FORMATS.join(', ') }} - up to 500 MB each</p>
+              <p class="text-xs text-muted-foreground mt-0.5">{{ SUPPORTED_FORMATS.join(', ') }} - up to {{ maxUploadSizeMb }} MB each</p>
             </div>
           </div>
 
@@ -326,7 +327,7 @@ function formatPillClass(filename: string): string {
                 <!-- Actions -->
                 <div class="shrink-0 flex items-center gap-0.5">
                   <button
-                    v-if="item.status === 'error'"
+                    v-if="item.status === 'error' && !item.validationError"
                     class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground/85 hover:text-primary hover:bg-primary/10 transition-colors"
                     title="Retry"
                     @click="retryFile(item.id)"

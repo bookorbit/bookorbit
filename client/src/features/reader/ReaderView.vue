@@ -13,6 +13,7 @@ import { useVisibility } from './shared/composables/useVisibility'
 import { useWakeLock } from './shared/composables/useWakeLock'
 import { useBookmarks } from './epub/composables/useBookmarks'
 import { useAnnotations } from './epub/composables/useAnnotations'
+import { useReaderAnnotationActions } from './epub/composables/useReaderAnnotationActions'
 import { useToc } from './epub/composables/useToc'
 import { useSearch, type FoliateView } from './epub/composables/useSearch'
 import { useReaderSelection } from './epub/composables/useReaderSelection'
@@ -35,7 +36,7 @@ import AudiobookReaderView from './audiobook/AudiobookReaderView.vue'
 import type { ReaderState } from './epub/composables/useReaderState'
 import type { FoliateLocationContext, FoliateRenderer } from './epub/composables/useFoliate'
 import type { EpubReaderSettings } from '@bookorbit/types'
-import { cfiRangesOverlap } from './epub/utils'
+import { findMatchingCfiRange } from './epub/utils'
 import { getFormatGroup } from '@bookorbit/types'
 
 const route = useRoute()
@@ -241,6 +242,7 @@ const {
   addAnnotation,
   addAnnotations,
   deleteAnnotation,
+  redrawAnnotation,
   setTextSelectedHandler,
   setAnnotationClickHandler,
   view: foliateView,
@@ -248,9 +250,18 @@ const {
   isFixedLayout,
 } = useFoliate(() => containerRef.value, onRelocateHandler, onApplyStylesHandler, onMiddleTapHandler)
 
+const { handleHighlight, handleOpenNoteDialog, handleSaveNote } = useReaderAnnotationActions({
+  bookId,
+  fileId,
+  chapterTitle,
+  annotations,
+  selection,
+  addAnnotation,
+  redrawAnnotation,
+})
+
 function handleTextSelected(detail: SelectionDetail) {
-  const selCfi = detail.cfi
-  const match = selCfi ? (annotations.annotations.value.find((a) => a.cfi != null && cfiRangesOverlap(selCfi, a.cfi)) ?? null) : null
+  const match = findMatchingCfiRange(annotations.annotations.value, detail.cfi)
   selection.show(detail, match?.id ?? null)
 }
 
@@ -405,30 +416,6 @@ watch(
     if (renderer && shouldApplyStyles.value) applyToRenderer(renderer, isFixedLayout.value ? { flow: 'paginated' } : undefined)
   },
 )
-
-async function handleHighlight(color: string, style: string, note?: string) {
-  const annotationCfi = selection.cfi.value
-  if (!selection.text.value || !annotationCfi) return
-  const created = await annotations.create(bookId, {
-    cfi: annotationCfi,
-    bookFileId: fileId,
-    text: selection.text.value,
-    color,
-    style,
-    note: note ?? null,
-    chapterTitle: chapterTitle.value || null,
-  })
-  if (created?.cfi) {
-    addAnnotation(created.cfi, created.color, created.style)
-  }
-  selection.dismiss()
-}
-
-async function handleSaveNote(note: string) {
-  await handleHighlight('#FACC15', 'highlight', note)
-  selection.showNoteDialog.value = false
-  selection.noteText.value = ''
-}
 
 function handleDeleteAnnotation(id: number) {
   const ann = annotations.annotations.value.find((a) => a.id === id)
@@ -703,7 +690,7 @@ watch(
       @search="() => openSearchWithText(selection.text.value)"
       @translate="handleTranslate"
       @define="handleDefine"
-      @note="selection.openNoteDialog()"
+      @note="handleOpenNoteDialog"
       @deleteAnnotation="handleDeleteAnnotation"
       @dismiss="selection.dismiss()"
     />

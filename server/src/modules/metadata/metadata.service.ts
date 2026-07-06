@@ -15,9 +15,15 @@ import {
   isExtractedBookCoverFileName,
 } from '../../common/book-cover-storage';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import {
+  chooseCanonicalMetadataTextRow,
+  normalizeMetadataText,
+  normalizeMetadataTextKey,
+  normalizeMetadataTextKeySql,
+} from '../../common/utils/metadata-text-normalize.utils';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
-import { refreshPrimaryAuthorSortNamesForBooks } from '../../db/book-author-sort-key';
+import { refreshPrimaryAuthorSortNamesForAuthors, refreshPrimaryAuthorSortNamesForBooks } from '../../db/book-author-sort-key';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
 import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
 import { ComicMetadataRepository } from './comic-metadata.repository';
@@ -39,7 +45,7 @@ import type { PdfParseWarning } from './lib/pdf-parser';
 import { MetadataEventsService, METADATA_AUTHORS_REPLACED } from './metadata-events.service';
 
 type Db = NodePgDatabase<typeof schema>;
-type RelationMutationExecutor = Pick<Db, 'delete' | 'execute' | 'insert' | 'select'>;
+type RelationMutationExecutor = Pick<Db, 'delete' | 'execute' | 'insert' | 'select' | 'update'>;
 
 interface RelationMutationOptions {
   executor?: RelationMutationExecutor;
@@ -51,6 +57,7 @@ const MAX_RELATION_NAME_LENGTH = 200;
 const EXTRACTED_COVER_SOURCE = 'extracted';
 const MIN_PUBLISHED_YEAR = 1000;
 const MAX_PUBLISHED_YEAR = 2200;
+const NORMALIZED_AUTHOR_NAME_SQL = normalizeMetadataTextKeySql(authors.name);
 
 function normalizePublishedYear(year: number | null | undefined): number | null | undefined {
   if (year === undefined) return undefined;
@@ -312,14 +319,15 @@ export class MetadataService {
   ): Promise<number[]> {
     const normalized = parsedAuthors
       .map((author) => ({
-        name: author.name.trim(),
-        sortName: author.sortName?.trim() || null,
+        name: normalizeMetadataText(author.name),
+        sortName: normalizeMetadataText(author.sortName),
       }))
-      .filter((author) => author.name.length > 0);
+      .filter((author): author is { name: string; sortName: string | null } => author.name !== null);
 
     const seen = new Set<string>();
     const unique = normalized.filter((author) => {
-      const key = author.name.toLowerCase();
+      const key = normalizeMetadataTextKey(author.name);
+      if (!key) return false;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -392,29 +400,39 @@ export class MetadataService {
       return [];
     }
 
-    const authorByName = new Map<string, { id: number }>();
-    const insertedAuthors = await executor
-      .insert(authors)
-      .values(uniqueAuthors.map((author) => ({ name: author.name, sortName: author.sortName })))
-      .onConflictDoNothing()
-      .returning({ id: authors.id, name: authors.name });
-    for (const row of insertedAuthors) {
-      authorByName.set(row.name, { id: row.id });
-    }
+    const authorByNameKey = new Map<string, { id: number }>();
+    await this.addExistingAuthorsByNormalizedName(
+      executor,
+      authorByNameKey,
+      uniqueAuthors.map((author) => author.name),
+    );
 
-    const unresolvedNames = [...new Set(uniqueAuthors.map((author) => author.name))].filter((name) => !authorByName.has(name));
-    if (unresolvedNames.length > 0) {
-      const existingAuthors = await executor
-        .select({ id: authors.id, name: authors.name })
-        .from(authors)
-        .where(inArray(authors.name, unresolvedNames));
-      for (const row of existingAuthors) {
-        authorByName.set(row.name, { id: row.id });
+    const missingAuthors = uniqueAuthors.filter((author) => {
+      const key = normalizeMetadataTextKey(author.name);
+      return key ? !authorByNameKey.has(key) : false;
+    });
+
+    if (missingAuthors.length > 0) {
+      const insertedAuthors = await executor
+        .insert(authors)
+        .values(missingAuthors.map((author) => ({ name: author.name, sortName: author.sortName })))
+        .onConflictDoNothing()
+        .returning({ id: authors.id, name: authors.name });
+      for (const row of insertedAuthors) {
+        const key = normalizeMetadataTextKey(row.name);
+        if (key) authorByNameKey.set(key, { id: row.id });
       }
     }
 
+    await this.addExistingAuthorsByNormalizedName(
+      executor,
+      authorByNameKey,
+      uniqueAuthors.filter((author) => !authorByNameKey.has(normalizeMetadataTextKey(author.name) ?? '')).map((author) => author.name),
+    );
+
     const links = uniqueAuthors.flatMap((author, index) => {
-      const match = authorByName.get(author.name);
+      const key = normalizeMetadataTextKey(author.name);
+      const match = key ? authorByNameKey.get(key) : undefined;
       if (!match) return [];
       return [{ bookId, authorId: match.id, displayOrder: index }];
     });
@@ -426,6 +444,58 @@ export class MetadataService {
     await refreshPrimaryAuthorSortNamesForBooks(executor, [bookId]);
 
     return links.map((link) => link.authorId);
+  }
+
+  private async addExistingAuthorsByNormalizedName(
+    executor: RelationMutationExecutor,
+    authorByNameKey: Map<string, { id: number }>,
+    names: string[],
+  ): Promise<void> {
+    const keys = [...new Set(names.map((name) => normalizeMetadataTextKey(name)).filter((key): key is string => key !== null))].filter(
+      (key) => !authorByNameKey.has(key),
+    );
+    if (keys.length === 0) return;
+
+    const existingAuthors = await executor
+      .select({ id: authors.id, name: authors.name, normalizedName: NORMALIZED_AUTHOR_NAME_SQL })
+      .from(authors)
+      .where(inArray(NORMALIZED_AUTHOR_NAME_SQL, keys));
+
+    const desiredNameByKey = new Map<string, string>();
+    for (const name of names) {
+      const key = normalizeMetadataTextKey(name);
+      const displayName = normalizeMetadataText(name);
+      if (key && displayName && !desiredNameByKey.has(key)) {
+        desiredNameByKey.set(key, displayName);
+      }
+    }
+
+    const rowsByKey = new Map<string, typeof existingAuthors>();
+    for (const row of existingAuthors) {
+      const key = normalizeMetadataTextKey(row.normalizedName) ?? normalizeMetadataTextKey(row.name);
+      if (!key || authorByNameKey.has(key)) continue;
+      const rows = rowsByKey.get(key) ?? [];
+      rows.push(row);
+      rowsByKey.set(key, rows);
+    }
+
+    const canonicalizedAuthorIds: number[] = [];
+    for (const [key, rows] of rowsByKey) {
+      const desiredName = desiredNameByKey.get(key);
+      const match = chooseCanonicalMetadataTextRow(rows, { desiredName });
+      if (!match) continue;
+
+      const canonicalName = normalizeMetadataText(match.name);
+      if (canonicalName && match.name !== canonicalName && !rows.some((row) => row.id !== match.id && row.name === canonicalName)) {
+        await executor.update(authors).set({ name: canonicalName }).where(eq(authors.id, match.id));
+        canonicalizedAuthorIds.push(match.id);
+      }
+      authorByNameKey.set(key, { id: match.id });
+    }
+
+    if (canonicalizedAuthorIds.length > 0) {
+      await refreshPrimaryAuthorSortNamesForAuthors(executor, canonicalizedAuthorIds);
+    }
   }
 
   private async replaceGenresInExecutor(executor: RelationMutationExecutor, bookId: number, uniqueGenres: string[]): Promise<void> {
@@ -514,10 +584,10 @@ export class MetadataService {
       title: data.title,
       subtitle: data.subtitle,
       description: data.description,
-      publisher: data.publisher,
+      publisher: normalizeMetadataText(data.publisher),
       publishedYear: data.publishedYear,
       language: data.language,
-      seriesName: data.seriesName,
+      seriesName: normalizeMetadataText(data.seriesName),
       seriesIndex: data.seriesIndex,
       authors: data.authors.map((author) => author.name),
       genres: data.genres,
@@ -533,10 +603,10 @@ export class MetadataService {
     if (filtered.title !== undefined) scalarFields.title = filtered.title;
     if (filtered.subtitle !== undefined) scalarFields.subtitle = filtered.subtitle;
     if (filtered.description !== undefined) scalarFields.description = filtered.description;
-    if (filtered.publisher !== undefined) scalarFields.publisher = filtered.publisher;
+    if (filtered.publisher !== undefined) scalarFields.publisher = normalizeMetadataText(filtered.publisher);
     if (filtered.publishedYear !== undefined) scalarFields.publishedYear = normalizePublishedYear(filtered.publishedYear);
     if (filtered.language !== undefined) scalarFields.language = filtered.language;
-    if (filtered.seriesName !== undefined) scalarFields.seriesName = filtered.seriesName;
+    if (filtered.seriesName !== undefined) scalarFields.seriesName = normalizeMetadataText(filtered.seriesName);
     if (filtered.seriesIndex !== undefined) scalarFields.seriesIndex = filtered.seriesIndex;
     if (filtered.audibleId !== undefined) scalarFields.audibleId = filtered.audibleId;
     if (filtered.audioMetadata?.durationSeconds !== undefined) scalarFields.durationSeconds = filtered.audioMetadata.durationSeconds;
@@ -573,10 +643,10 @@ export class MetadataService {
       description: data.description,
       isbn10: data.isbn10 ? data.isbn10.replace(/[^0-9Xx]/g, '') : data.isbn10,
       isbn13: data.isbn13 ? data.isbn13.replace(/[^0-9]/g, '') : data.isbn13,
-      publisher: data.publisher,
+      publisher: normalizeMetadataText(data.publisher),
       publishedYear: data.publishedYear,
       language: data.language,
-      seriesName: data.seriesName,
+      seriesName: normalizeMetadataText(data.seriesName),
       seriesIndex: data.seriesIndex,
       authors: data.authors.map((author) => author.name),
       genres: data.genres,
@@ -603,10 +673,10 @@ export class MetadataService {
     if (filtered.description !== undefined) scalarFields.description = filtered.description;
     if (filtered.isbn10 !== undefined) scalarFields.isbn10 = filtered.isbn10;
     if (filtered.isbn13 !== undefined) scalarFields.isbn13 = filtered.isbn13;
-    if (filtered.publisher !== undefined) scalarFields.publisher = filtered.publisher;
+    if (filtered.publisher !== undefined) scalarFields.publisher = normalizeMetadataText(filtered.publisher);
     if (filtered.publishedYear !== undefined) scalarFields.publishedYear = normalizePublishedYear(filtered.publishedYear);
     if (filtered.language !== undefined) scalarFields.language = filtered.language;
-    if (filtered.seriesName !== undefined) scalarFields.seriesName = filtered.seriesName;
+    if (filtered.seriesName !== undefined) scalarFields.seriesName = normalizeMetadataText(filtered.seriesName);
     if (filtered.seriesIndex !== undefined) scalarFields.seriesIndex = filtered.seriesIndex;
     if (filtered.rating !== undefined) scalarFields.rating = filtered.rating;
     if (filtered.pageCount !== undefined) scalarFields.pageCount = filtered.pageCount;

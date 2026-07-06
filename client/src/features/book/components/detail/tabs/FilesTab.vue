@@ -2,7 +2,7 @@
 import { ref, watch, computed } from 'vue'
 import { useLocalStorage } from '@vueuse/core'
 import { useRouter } from 'vue-router'
-import { BookOpen, Download, Eye, FilePlus, Files, Headphones, History, FolderOpen, ArrowUpDown, MoreVertical } from '@lucide/vue'
+import { BookOpen, Download, Eye, FilePlus, Files, Headphones, History, FolderOpen, ArrowUpDown, MoreVertical, Pencil, Trash2 } from '@lucide/vue'
 import type { BookDetail, BookDetailFile, WriteLogEntry } from '@bookorbit/types'
 import { Permission, READER_OPENABLE_FORMATS } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'

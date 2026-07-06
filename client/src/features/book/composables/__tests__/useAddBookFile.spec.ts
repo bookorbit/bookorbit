@@ -4,6 +4,12 @@ vi.mock('@/lib/api', () => ({
   getAccessToken: vi.fn<() => string>().mockReturnValue('test-token'),
 }))
 
+vi.mock('@/features/settings/composables/useAppInfo', () => ({
+  useAppInfo: () => ({
+    maxUploadSizeMb: { value: 500 },
+  }),
+}))
+
 interface MockXhrInstance {
   open: ReturnType<typeof vi.fn>
   setRequestHeader: ReturnType<typeof vi.fn>

@@ -18,6 +18,7 @@ import { MetadataPreferenceResolver } from '../metadata-preferences/metadata-pre
 import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
 import { MetadataPreferencesService } from '../metadata-preferences/metadata-preferences.service';
 import { createGenreBlocklistTokenSet, filterGenresAgainstBlocklist } from '../../common/utils/genre-blocklist.utils';
+import { normalizeMetadataText, normalizeMetadataTextKey } from '../../common/utils/metadata-text-normalize.utils';
 import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
@@ -412,9 +413,9 @@ export class MetadataFetchPipeline {
     const normalized: MetadataSeriesMembership[] = [];
     const seen = new Set<string>();
     for (const membership of memberships) {
-      const seriesName = membership.seriesName.trim();
-      const key = seriesName.toLowerCase();
-      if (!seriesName || seen.has(key)) continue;
+      const seriesName = normalizeMetadataText(membership.seriesName);
+      const key = normalizeMetadataTextKey(seriesName);
+      if (!seriesName || !key || seen.has(key)) continue;
 
       const seriesIndex = typeof membership.seriesIndex === 'number' && Number.isFinite(membership.seriesIndex) ? membership.seriesIndex : null;
       seen.add(key);

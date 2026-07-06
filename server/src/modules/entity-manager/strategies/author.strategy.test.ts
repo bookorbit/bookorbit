@@ -393,9 +393,57 @@ describe('AuthorStrategy', () => {
       await expect(strategy.rename({ entityId: 1, newName: '\t\n', userId: 1, libraryIds: [] })).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('triggers implicit merge when another author with the same trimmed name exists', async () => {
-      const existingAuthorLimit = vi.fn().mockResolvedValue([{ id: 99 }]);
-      const existingAuthorWhere = vi.fn().mockReturnValue({ limit: existingAuthorLimit });
+    it('triggers implicit merge when another author with the same normalized name exists', async () => {
+      const existingAuthorWhere = vi.fn().mockResolvedValue([{ id: 99, name: 'New Name' }]);
+      const existingAuthorFrom = vi.fn().mockReturnValue({ where: existingAuthorWhere });
+
+      const entityLimit = vi.fn().mockResolvedValue([{ name: 'Old Name' }]);
+      const entityWhere = vi.fn().mockReturnValue({ limit: entityLimit });
+      const entityFrom = vi.fn().mockReturnValue({ where: entityWhere });
+
+      const sourceForMergeLimit = vi.fn().mockResolvedValue([{ id: 99, sortName: null, description: null, hasPhoto: false }]);
+      const sourceForMergeWhere = vi.fn().mockReturnValue({ limit: sourceForMergeLimit });
+      const sourceForMergeFrom = vi.fn().mockReturnValue({ where: sourceForMergeWhere });
+
+      const sourceFieldsLimit = vi.fn().mockResolvedValue([{ sortName: null, description: null }]);
+      const sourceFieldsWhere = vi.fn().mockReturnValue({ limit: sourceFieldsLimit });
+      const sourceFieldsFrom = vi.fn().mockReturnValue({ where: sourceFieldsWhere });
+
+      const affectedWhere = vi.fn().mockResolvedValue([{ bookId: 5 }]);
+      const affectedFrom = vi.fn().mockReturnValue({ where: affectedWhere });
+      const selectDistinct = vi.fn().mockReturnValue({ from: affectedFrom });
+
+      let callIdx = 0;
+      const select = vi.fn().mockImplementation(() => {
+        callIdx++;
+        if (callIdx === 1) return { from: entityFrom };
+        if (callIdx === 2) return { from: existingAuthorFrom };
+        if (callIdx === 3) return { from: sourceForMergeFrom };
+        return { from: sourceFieldsFrom };
+      });
+
+      const updateWhere = vi.fn().mockResolvedValue(undefined);
+      const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
+      const update = vi.fn().mockReturnValue({ set: updateSet });
+
+      const authorsRepo = { updateAuthorById: vi.fn().mockResolvedValue(undefined), mergeAuthors: vi.fn().mockResolvedValue(undefined) };
+      const authorImageStorage = { promoteImage: vi.fn().mockResolvedValue(false), deleteAuthorDir: vi.fn().mockResolvedValue(undefined) };
+      const enrichmentOrchestrator = { schedule: vi.fn().mockResolvedValue(undefined) };
+
+      const strategy = makeStrategy({ select, selectDistinct, update }, { authorsRepo, authorImageStorage, enrichmentOrchestrator });
+
+      const result = await strategy.rename({ entityId: 1, newName: 'New   Name', userId: 5, libraryIds: [] });
+
+      expect(result.wasImplicitMerge).toBe(true);
+      expect(result.mergedEntityId).toBe(99);
+      expect(result.oldName).toBe('Old Name');
+    });
+
+    it('chooses a non-current merge target when normalized lookup returns the current author first', async () => {
+      const existingAuthorWhere = vi.fn().mockResolvedValue([
+        { id: 1, name: 'New  Name' },
+        { id: 99, name: 'New Name' },
+      ]);
       const existingAuthorFrom = vi.fn().mockReturnValue({ where: existingAuthorWhere });
 
       const entityLimit = vi.fn().mockResolvedValue([{ name: 'Old Name' }]);
@@ -435,9 +483,9 @@ describe('AuthorStrategy', () => {
 
       const result = await strategy.rename({ entityId: 1, newName: 'New Name', userId: 5, libraryIds: [] });
 
+      expect(authorsRepo.updateAuthorById).not.toHaveBeenCalledWith(1, { name: 'New Name' });
       expect(result.wasImplicitMerge).toBe(true);
       expect(result.mergedEntityId).toBe(99);
-      expect(result.oldName).toBe('Old Name');
     });
 
     it('updates author name and returns wasImplicitMerge false when no conflict', async () => {
@@ -445,8 +493,7 @@ describe('AuthorStrategy', () => {
       const entityWhere = vi.fn().mockReturnValue({ limit: entityLimit });
       const entityFrom = vi.fn().mockReturnValue({ where: entityWhere });
 
-      const noExistingLimit = vi.fn().mockResolvedValue([]);
-      const noExistingWhere = vi.fn().mockReturnValue({ limit: noExistingLimit });
+      const noExistingWhere = vi.fn().mockResolvedValue([]);
       const noExistingFrom = vi.fn().mockReturnValue({ where: noExistingWhere });
 
       const affectedWhere = vi.fn().mockResolvedValue([{ bookId: 7 }]);
@@ -466,7 +513,7 @@ describe('AuthorStrategy', () => {
 
       const strategy = makeStrategy({ select, selectDistinct }, { authorsRepo, authorImageStorage, enrichmentOrchestrator });
 
-      const result = await strategy.rename({ entityId: 1, newName: 'New Name', userId: 5, libraryIds: [] });
+      const result = await strategy.rename({ entityId: 1, newName: ' New   Name ', userId: 5, libraryIds: [] });
 
       expect(authorsRepo.updateAuthorById).toHaveBeenCalledWith(1, { name: 'New Name' });
       expect(result.oldName).toBe('Old Name');
@@ -573,8 +620,7 @@ describe('AuthorStrategy', () => {
       const txInsertValues = vi.fn().mockReturnValue({ onConflictDoNothing: txInsertOnConflict, returning: txInsertReturning });
       const txInsert = vi.fn().mockReturnValue({ values: txInsertValues });
 
-      const txExistingLimit = vi.fn().mockResolvedValue([]);
-      const txExistingWhere = vi.fn().mockReturnValue({ limit: txExistingLimit });
+      const txExistingWhere = vi.fn().mockResolvedValue([]);
       const txSelectFrom = vi.fn().mockReturnValue({ where: txExistingWhere });
       const txSelect = vi.fn().mockReturnValue({ from: txSelectFrom });
 
@@ -604,9 +650,11 @@ describe('AuthorStrategy', () => {
 
       const strategy = makeStrategy({ select, selectDistinct, transaction }, { authorsRepo, authorImageStorage });
 
-      const result = await strategy.split({ entityId: 1, newNames: ['New A', 'New B'] });
+      const result = await strategy.split({ entityId: 1, newNames: [' New   A ', 'New\tB'] });
 
       expect(transaction).toHaveBeenCalledTimes(1);
+      expect(txInsertValues).toHaveBeenNthCalledWith(1, { name: 'New A' });
+      expect(txInsertValues).toHaveBeenNthCalledWith(2, { name: 'New B' });
       expect(txDeleteWhere).toHaveBeenCalledTimes(2);
       expect(authorImageStorage.deleteAuthorDir).toHaveBeenCalledWith(1);
       expect(result.originalName).toBe('Old Author');
@@ -629,8 +677,7 @@ describe('AuthorStrategy', () => {
         return { from: affectedFrom };
       });
 
-      const existingAuthorLimit = vi.fn().mockResolvedValue([{ id: 55 }]);
-      const existingAuthorWhere = vi.fn().mockReturnValue({ limit: existingAuthorLimit });
+      const existingAuthorWhere = vi.fn().mockResolvedValue([{ id: 55, name: 'Existing Author' }]);
       const existingAuthorFrom = vi.fn().mockReturnValue({ where: existingAuthorWhere });
 
       const bookRowsWhere = vi.fn().mockResolvedValue([]);
@@ -655,10 +702,59 @@ describe('AuthorStrategy', () => {
 
       const strategy = makeStrategy({ select, selectDistinct, transaction }, { authorsRepo, authorImageStorage });
 
-      const result = await strategy.split({ entityId: 1, newNames: ['Existing Author'] });
+      const result = await strategy.split({ entityId: 1, newNames: ['Existing   Author'] });
 
       expect(txInsert).not.toHaveBeenCalled();
       expect(result.newEntities[0]).toMatchObject({ id: 55, name: 'Existing Author' });
+    });
+
+    it('does not reuse the source author as a normalized split target', async () => {
+      const entityLimit = vi.fn().mockResolvedValue([{ name: 'Old  Author' }]);
+      const entityWhere = vi.fn().mockReturnValue({ limit: entityLimit });
+      const entityFrom = vi.fn().mockReturnValue({ where: entityWhere });
+
+      const affectedWhere = vi.fn().mockResolvedValue([]);
+      const affectedFrom = vi.fn().mockReturnValue({ where: affectedWhere });
+      const selectDistinct = vi.fn().mockReturnValue({ from: affectedFrom });
+
+      let outerIdx = 0;
+      const select = vi.fn().mockImplementation(() => {
+        outerIdx++;
+        if (outerIdx === 1) return { from: entityFrom };
+        return { from: affectedFrom };
+      });
+
+      const existingAuthorWhere = vi.fn().mockResolvedValue([{ id: 1, name: 'Old  Author' }]);
+      const existingAuthorFrom = vi.fn().mockReturnValue({ where: existingAuthorWhere });
+
+      const bookRowsWhere = vi.fn().mockResolvedValue([]);
+      const bookRowsFrom = vi.fn().mockReturnValue({ where: bookRowsWhere });
+
+      let txIdx = 0;
+      const txSelect = vi.fn().mockImplementation(() => {
+        txIdx++;
+        if (txIdx === 1) return { from: existingAuthorFrom };
+        return { from: bookRowsFrom };
+      });
+
+      const txInsertReturning = vi.fn().mockResolvedValue([{ id: 56 }]);
+      const txInsertValues = vi.fn().mockReturnValue({ returning: txInsertReturning });
+      const txInsert = vi.fn().mockReturnValue({ values: txInsertValues });
+      const txDeleteWhere = vi.fn().mockResolvedValue(undefined);
+      const txDeleteFrom = vi.fn().mockReturnValue({ where: txDeleteWhere });
+
+      const tx = { select: txSelect, insert: txInsert, delete: txDeleteFrom };
+      const transaction = vi.fn().mockImplementation(async (cb: (tx: typeof tx) => Promise<unknown>) => cb(tx));
+
+      const authorImageStorage = { deleteAuthorDir: vi.fn().mockResolvedValue(undefined) };
+      const authorsRepo = { updateAuthorById: vi.fn(), mergeAuthors: vi.fn(), deleteAuthors: vi.fn() };
+
+      const strategy = makeStrategy({ select, selectDistinct, transaction }, { authorsRepo, authorImageStorage });
+
+      const result = await strategy.split({ entityId: 1, newNames: ['Old Author'] });
+
+      expect(txInsertValues).toHaveBeenCalledWith({ name: 'Old Author' });
+      expect(result.newEntities[0]).toMatchObject({ id: 56, name: 'Old Author' });
     });
   });
 

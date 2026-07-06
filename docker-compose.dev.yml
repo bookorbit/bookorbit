@@ -3,7 +3,7 @@ name: bookorbit-dev
 services:
   postgres:
     container_name: bookorbit-dev-db
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector:pg18
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DEV_POSTGRES_USER:-bookorbit}
@@ -13,7 +13,7 @@ services:
     ports:
       - "${DEV_POSTGRES_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test:

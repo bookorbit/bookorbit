@@ -526,4 +526,38 @@ describe('AppSettingsService', () => {
       expect(await service.isUpdateCheckEnabled()).toBe(true);
     });
   });
+
+  describe('getMaxUploadSizeMb', () => {
+    it('returns 500 by default when setting is absent', async () => {
+      repo.findByKey.mockResolvedValue(undefined);
+      expect(await service.getMaxUploadSizeMb()).toBe(500);
+    });
+
+    it('returns parsed integer value when valid', async () => {
+      repo.findByKey.mockResolvedValue({ key: 'max_upload_size_mb', value: '1024' } as never);
+      expect(await service.getMaxUploadSizeMb()).toBe(1024);
+    });
+
+    it('returns 500 when value is invalid or <= 0', async () => {
+      repo.findByKey.mockResolvedValue({ key: 'max_upload_size_mb', value: '-50' } as never);
+      expect(await service.getMaxUploadSizeMb()).toBe(500);
+    });
+  });
+
+  describe('update max_upload_size_mb validation', () => {
+    it('allows valid positive integer', async () => {
+      const setting = { key: 'max_upload_size_mb', value: '1000' };
+      repo.updateByKey.mockResolvedValue(setting as never);
+      const result = await service.update('max_upload_size_mb', '1000');
+      expect(result).toEqual(setting);
+      expect(repo.updateByKey).toHaveBeenCalledWith('max_upload_size_mb', '1000');
+    });
+
+    it('throws BadRequestException for invalid integer', async () => {
+      await expect(service.update('max_upload_size_mb', 'invalid')).rejects.toThrow(BadRequestException);
+      await expect(service.update('max_upload_size_mb', '-10')).rejects.toThrow(BadRequestException);
+      await expect(service.update('max_upload_size_mb', '0')).rejects.toThrow(BadRequestException);
+      expect(repo.updateByKey).not.toHaveBeenCalled();
+    });
+  });
 });

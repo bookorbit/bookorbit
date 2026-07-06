@@ -1,5 +1,5 @@
 import { BadRequestException, Inject } from '@nestjs/common';
-import { asc, count, eq, sql } from 'drizzle-orm';
+import { SQL, asc, count, eq, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { InlineEntityType } from '@bookorbit/types';
@@ -38,6 +38,15 @@ export abstract class InlineEntityStrategy implements EntityStrategy {
 
   protected get field() {
     return (bookMetadata as any)[this.fieldName];
+  }
+
+  protected normalizeInputValue(value: string): string | null {
+    const trimmed = value.trim();
+    return trimmed || null;
+  }
+
+  protected buildIdentityEqualsCondition(alias: string, value: string): SQL {
+    return sql`${sql.raw(`${alias}.${this.rawFieldName}`)} = ${value}`;
   }
 
   async findCandidatePairs(libraryIds: number[], minSimilarity: number): Promise<RawCandidatePair[]> {
@@ -148,7 +157,7 @@ export abstract class InlineEntityStrategy implements EntityStrategy {
 
   async rename(input: RenameInput): Promise<StrategyRenameResult> {
     const currentValue = input.entityId as string;
-    const trimmed = input.newName.trim();
+    const trimmed = this.normalizeInputValue(input.newName);
     if (!trimmed) throw new BadRequestException('Name cannot be empty');
 
     const idsLiteral = sql.raw(`(${input.libraryIds.join(',')})`);
@@ -158,9 +167,10 @@ export abstract class InlineEntityStrategy implements EntityStrategy {
       FROM book_metadata bm
       JOIN books b ON b.id = bm.book_id
       WHERE b.library_id IN ${idsLiteral}
-      AND bm.${sql.raw(this.rawFieldName)} = ${trimmed}
+      AND bm.${sql.raw(this.rawFieldName)} <> ${currentValue}
+      AND ${this.buildIdentityEqualsCondition('bm', trimmed)}
     `);
-    const wasImplicitMerge = (existingCount.rows[0]?.cnt ?? 0) > 0 && currentValue !== trimmed;
+    const wasImplicitMerge = (existingCount.rows[0]?.cnt ?? 0) > 0;
 
     const affectedRows = await this.db.execute<{ bookId: number }>(sql`
       UPDATE book_metadata bm SET ${sql.raw(this.rawFieldName)} = ${trimmed}

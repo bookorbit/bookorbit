@@ -440,7 +440,7 @@ export class OpdsBookService {
         icon: smartScopes.icon,
       })
       .from(smartScopes)
-      .where(eq(smartScopes.userId, userId))
+      .where(or(eq(smartScopes.userId, userId), eq(smartScopes.isPublic, true)))
       .orderBy(smartScopes.name);
   }
 

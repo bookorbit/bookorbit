@@ -272,6 +272,38 @@ describe('KoboSyncController', () => {
     expect(reply.send).not.toHaveBeenCalled();
   });
 
+  it('acknowledges delete-tag requests for synced BookOrbit collection tags', async () => {
+    const req = { method: 'DELETE', url: '/api/v1/kobo/token/v1/library/tags/col-1' };
+    const reply = makeReply();
+
+    await controller.deleteTag('col-1', { deviceToken: 'token-1' } as never, req as never, reply as never);
+
+    expect(reply.status).toHaveBeenCalledWith(HttpStatus.OK);
+    expect(reply.send).toHaveBeenCalledWith({ RequestResult: 'Success' });
+    expect(proxyService.forward).not.toHaveBeenCalled();
+  });
+
+  it('proxies delete-tag requests for non-BookOrbit Kobo tags', async () => {
+    const req = { method: 'DELETE', url: '/api/v1/kobo/token/v1/library/tags/kobo-tag' };
+    const reply = makeReply();
+
+    await controller.deleteTag('kobo-tag', { deviceToken: 'token-1' } as never, req as never, reply as never);
+
+    expect(proxyService.forward).toHaveBeenCalledWith(req, reply, 'token-1');
+    expect(reply.send).not.toHaveBeenCalled();
+  });
+
+  it('does not proxy delete-tag requests for BookOrbit tag ids using a different device token', async () => {
+    const req = { method: 'DELETE', url: '/api/v1/kobo/other-token/v1/library/tags/col-42' };
+    const reply = makeReply();
+
+    await controller.deleteTag('col-42', { deviceToken: 'other-token' } as never, req as never, reply as never);
+
+    expect(reply.status).toHaveBeenCalledWith(HttpStatus.OK);
+    expect(reply.send).toHaveBeenCalledWith({ RequestResult: 'Success' });
+    expect(proxyService.forward).not.toHaveBeenCalled();
+  });
+
   it('proxies metadata/state/delete for non-numeric book ids', async () => {
     const req = { method: 'GET', url: '/api/v1/kobo/token/v1/library/abc/metadata' };
     const reply = makeReply();

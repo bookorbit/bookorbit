@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { getAccessToken } from '@/lib/api'
 import type { UploadResult } from '@bookorbit/types'
+import { useAppInfo } from '@/features/settings/composables/useAppInfo'
 
 export const SUPPORTED_FORMATS = ['epub', 'kepub', 'pdf', 'mobi', 'azw3', 'cbz', 'cbr', 'cb7', 'fb2', 'm4b', 'm4a', 'mp3', 'opus', 'ogg', 'flac']
 export const SUPPORTED_FORMATS_ACCEPT = SUPPORTED_FORMATS.map((f) => `.${f}`).join(',')
@@ -15,6 +16,7 @@ export interface FileUploadItem {
   progress: number
   error?: string
   bookId?: number
+  validationError?: boolean
 }
 
 const UPLOAD_CONCURRENCY = 3
@@ -24,8 +26,10 @@ function validateFile(file: File): string | null {
   if (!SUPPORTED_FORMATS.includes(ext)) {
     return `Unsupported type .${ext}. Allowed: ${SUPPORTED_FORMATS.join(', ')}`
   }
-  if (file.size > MAX_UPLOAD_BYTES) {
-    return `File exceeds the 500 MB limit`
+  const { maxUploadSizeMb } = useAppInfo()
+  const limitBytes = maxUploadSizeMb.value * 1024 * 1024
+  if (file.size > limitBytes) {
+    return `File exceeds the ${maxUploadSizeMb.value} MB limit`
   }
   return null
 }
@@ -97,6 +101,7 @@ export function useBookUpload() {
         status: error ? 'error' : 'pending',
         progress: 0,
         error,
+        validationError: error !== undefined,
       })
     }
   }
@@ -107,7 +112,7 @@ export function useBookUpload() {
 
   function retryFile(id: string) {
     const item = files.value.find((f) => f.id === id)
-    if (!item || item.status !== 'error') return
+    if (!item || item.status !== 'error' || item.validationError) return
     item.status = 'pending'
     item.error = undefined
     item.progress = 0

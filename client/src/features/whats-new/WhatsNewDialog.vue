@@ -53,7 +53,7 @@ useModal({
         ref="panel"
         class="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-t-2xl border border-border bg-card shadow-xl motion-safe:animate-in motion-safe:slide-in-from-bottom-4 sm:rounded-2xl"
       >
-        <header class="relative overflow-hidden border-b border-border px-5 pb-4 pt-5">
+        <header class="relative shrink-0 overflow-hidden border-b border-border px-5 pb-4 pt-5">
           <div
             class="pointer-events-none absolute inset-0"
             style="
@@ -134,7 +134,7 @@ useModal({
           </RouterLink>
         </div>
 
-        <footer class="flex items-center justify-end gap-3 border-t border-border px-5 py-4">
+        <footer class="flex shrink-0 items-center justify-end gap-3 border-t border-border px-5 py-4">
           <button
             type="button"
             class="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"

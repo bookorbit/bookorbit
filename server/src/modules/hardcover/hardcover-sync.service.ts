@@ -265,6 +265,15 @@ export class HardcoverSyncService {
 
     const syncOverride = resolveHardcoverBookSyncOverrideForToggle(settings.bookSyncMode, payload.syncEnabled);
     const state = await this.repo.setBookSyncOverride(userId, bookId, syncOverride);
+
+    if (payload.syncEnabled) {
+      void this.syncBook(userId, bookId).catch((err) => {
+        this.logger.error(
+          `[hardcover.sync_book_on_enable] [fail] userId=${userId} bookId=${bookId} errorClass=${err?.constructor?.name ?? 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - immediate sync on enable failed`,
+        );
+      });
+    }
+
     return this.toBookSyncState(bookId, book, settings, state);
   }
 
@@ -388,6 +397,10 @@ export class HardcoverSyncService {
       let progressSynced = true;
 
       if (startDate || endDate || book.progress != null) {
+        if (book.progress != null && !match.editionPages) {
+          throw new Error('missing_edition_pages');
+        }
+
         const progressPages = book.progress != null && match.editionPages ? Math.round((book.progress / 100) * match.editionPages) : undefined;
         progressSynced = book.progress == null || progressPages != null;
 

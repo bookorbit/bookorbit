@@ -4,6 +4,7 @@ import { CheckCircle2, FileUp, Loader2, Plus, Upload, X, XCircle, RotateCcw } fr
 import { Permission } from '@bookorbit/types'
 import { SUPPORTED_FORMATS_ACCEPT, useAddBookFile } from '@/features/book/composables/useAddBookFile'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useAppInfo } from '@/features/settings/composables/useAppInfo'
 
 const props = defineProps<{
   bookId: number
@@ -15,6 +16,7 @@ const emit = defineEmits<{
 }>()
 
 const { hasPermission } = usePermissions()
+const { maxUploadSizeMb } = useAppInfo()
 
 const isDragging = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -170,7 +172,7 @@ function formatPillClass(filename: string): string {
             </div>
             <div>
               <p class="text-sm font-medium text-foreground">Drop files here or click to browse</p>
-              <p class="text-xs text-muted-foreground mt-0.5">epub, pdf, mobi, cbz, m4b and more - up to 500 MB each</p>
+              <p class="text-xs text-muted-foreground mt-0.5">epub, pdf, mobi, cbz, m4b and more - up to {{ maxUploadSizeMb }} MB each</p>
             </div>
           </div>
 
