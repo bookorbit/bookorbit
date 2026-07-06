@@ -121,7 +121,7 @@ describe('OpdsController', () => {
     expect(opdsBookService.getUserSmartScopes).toHaveBeenCalledWith(8);
     expect(opdsBookService.getDistinctAuthors).toHaveBeenCalledWith(8, false, undefined);
     expect(opdsBookService.getDistinctSeries).toHaveBeenCalledWith(8, false, undefined);
-    expect(opdsService.generateSeriesNavigation).toHaveBeenCalledWith([{ name: 'Dune', bookCount: 2 }]);
+    expect(opdsService.generateSeriesNavigation).toHaveBeenCalledWith([{ name: 'Dune', bookCount: 2 }], undefined);
   });
 
   it('catalog clamps pagination and passes parsed filters to the book service', async () => {

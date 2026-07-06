@@ -341,7 +341,7 @@ export class OpdsBookService {
     userId: number,
     isSuperuser = false,
     contentFilters?: ContentFilterRules,
-  ): Promise<{ id: number; name: string; bookCount: number }[]> {
+  ): Promise<{ id: number; name: string; bookCount: number; coverBookId: number | null }[]> {
     const accessibleIds = await this.getAccessibleLibraryIds(userId, isSuperuser);
     if (accessibleIds.length === 0) return [];
 
@@ -352,10 +352,18 @@ export class OpdsBookService {
         id: bookSeries.id,
         name: bookSeries.name,
         bookCount: sql<number>`count(DISTINCT ${books.id})::int`,
+        // Earliest-in-series book that actually has a cover, mirroring the "series cover"
+        // candidate the web UI already picks (see BookRepository's series_first_volume CTE).
+        // Null when no book in the series has a cover.
+        coverBookId: sql<number | null>`
+          (array_agg(${books.id} ORDER BY ${bookSeriesMemberships.seriesIndex} ASC NULLS LAST, ${books.addedAt} ASC, ${books.id} ASC)
+            FILTER (WHERE ${bookMetadata.coverSource} IS NOT NULL))[1]
+        `,
       })
       .from(bookSeries)
       .innerJoin(bookSeriesMemberships, eq(bookSeriesMemberships.seriesId, bookSeries.id))
       .innerJoin(books, and(eq(books.id, bookSeriesMemberships.bookId), eq(books.status, 'present'), ...filterClauses))
+      .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .where(inArray(books.libraryId, accessibleIds))
       .groupBy(bookSeries.id, bookSeries.name)
       .orderBy(sql`${bookSeries.name} ASC`);

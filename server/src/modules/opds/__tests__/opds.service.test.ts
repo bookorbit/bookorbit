@@ -120,18 +120,50 @@ describe('OpdsService', () => {
   describe('generateSeriesNavigation', () => {
     it('URL-encodes series names', () => {
       const service = makeService();
-      const xml = service.generateSeriesNavigation([{ name: 'The Lord of the Rings', bookCount: 3 }]);
+      const xml = service.generateSeriesNavigation([{ name: 'The Lord of the Rings', bookCount: 3 }], 'test-token');
 
       expect(xml).toContain(encodeURIComponent('The Lord of the Rings'));
     });
 
     it('uses stable series ids when available', () => {
       const service = makeService();
-      const xml = service.generateSeriesNavigation([{ id: 42, name: 'The Lord of the Rings', bookCount: 3 }]);
+      const xml = service.generateSeriesNavigation([{ id: 42, name: 'The Lord of the Rings', bookCount: 3 }], 'test-token');
 
       expect(xml).toContain('urn:bookorbit:series:42');
       expect(xml).toContain(`${BASE}/catalog?seriesId=42`);
       expect(xml).not.toContain('catalog?series=The%20Lord%20of%20the%20Rings');
+    });
+
+    it('emits a cover and thumbnail link borrowed from the series cover book when known', () => {
+      const service = makeService();
+      const xml = service.generateSeriesNavigation([{ id: 42, name: 'Dragon Ball Super', bookCount: 24, coverBookId: 204 }], 'tok');
+
+      expect(xml).toContain(`${BASE}/204/cover?t=tok`);
+      expect(xml).toContain(`${BASE}/204/thumbnail?t=tok`);
+      expect(xml).toContain('rel="http://opds-spec.org/image"');
+      expect(xml).toContain('rel="http://opds-spec.org/image/thumbnail"');
+    });
+
+    it('omits the cover/thumbnail links when no book in the series has a cover', () => {
+      const service = makeService();
+      const xml = service.generateSeriesNavigation([{ id: 42, name: 'Dune', bookCount: 3, coverBookId: null }], 'tok');
+
+      expect(xml).not.toContain('http://opds-spec.org/image');
+    });
+
+    it('still emits the bare subsection entry when coverBookId is not provided at all', () => {
+      const service = makeService();
+      const xml = service.generateSeriesNavigation([{ id: 42, name: 'Dune', bookCount: 3 }], 'tok');
+
+      expect(xml).not.toContain('http://opds-spec.org/image');
+      expect(xml).toContain('rel="subsection"');
+    });
+
+    it('URL-encodes the cover token', () => {
+      const service = makeService();
+      const xml = service.generateSeriesNavigation([{ id: 1, name: 'Dune', bookCount: 1, coverBookId: 9 }], 'a b&c');
+
+      expect(xml).toContain(`t=${encodeURIComponent('a b&c')}`);
     });
   });
 
