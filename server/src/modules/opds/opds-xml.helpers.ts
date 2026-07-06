@@ -31,6 +31,34 @@ export function xmlLink(rel: string, href: string, type: string, title?: string)
   return `<link rel="${esc(rel)}" href="${esc(href)}" type="${esc(type)}"${t}/>`;
 }
 
+export const OPDS_PSE_NS = 'http://vaemendis.net/opds-pse/ns';
+export const OPDS_PSE_STREAM_REL = 'http://vaemendis.net/opds-pse/stream';
+
+const PSE_STREAMABLE_FORMATS = new Set(['cbz', 'cbr', 'cb7', 'pdf']);
+
+/** EPUB is HTML/CSS, not page images — PSE only applies to paginated-image content. */
+export function isPseStreamableFormat(format: string): boolean {
+  return PSE_STREAMABLE_FORMATS.has(format.toLowerCase());
+}
+
+export interface PseLastRead {
+  page: number;
+  date: Date;
+}
+
+/**
+ * `href` must already contain the literal `{pageNumber}` client-substitution
+ * token. `esc()` only XML-escapes `&`/`<`/`>`/`"`/`'`, so the token passes
+ * through unencoded, per the OPDS-PSE spec.
+ */
+export function xmlPseStreamLink(href: string, type: string, count: number, lastRead?: PseLastRead): string {
+  const attrs = [`rel="${esc(OPDS_PSE_STREAM_REL)}"`, `href="${esc(href)}"`, `type="${esc(type)}"`, `pse:count="${count}"`];
+  if (lastRead) {
+    attrs.push(`pse:lastRead="${lastRead.page}"`, `pse:lastReadDate="${esc(lastRead.date.toISOString())}"`);
+  }
+  return `<link ${attrs.join(' ')}/>`;
+}
+
 export function fileMimeType(format: string): string {
   switch (format.toLowerCase()) {
     case 'epub':

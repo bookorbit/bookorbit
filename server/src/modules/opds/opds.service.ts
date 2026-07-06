@@ -1,6 +1,16 @@
 import { Injectable } from '@nestjs/common';
 
-import { esc, fileMimeType, OPDS_MIME_ACQ, OPDS_MIME_NAV, OPDS_MIME_SEARCH, xmlEl, xmlLink } from './opds-xml.helpers';
+import {
+  esc,
+  fileMimeType,
+  isPseStreamableFormat,
+  OPDS_MIME_ACQ,
+  OPDS_MIME_NAV,
+  OPDS_MIME_SEARCH,
+  xmlEl,
+  xmlLink,
+  xmlPseStreamLink,
+} from './opds-xml.helpers';
 import type { OpdsBookEntry } from './opds-book.service';
 
 const BASE = '/api/v1/opds';
@@ -183,6 +193,12 @@ export class OpdsService {
       lines.push(
         `  ${xmlLink('http://opds-spec.org/acquisition', `${BASE}/${book.id}/download?fileId=${file.id}`, mime, file.format.toUpperCase())}`,
       );
+
+      if (isPseStreamableFormat(file.format) && file.pageCount != null) {
+        const href = `${BASE}/${book.id}/image?fileId=${file.id}&pageNumber={pageNumber}&t=${encodeURIComponent(coverToken)}`;
+        const lastRead = file.lastReadPage != null && file.lastReadDate ? { page: file.lastReadPage, date: file.lastReadDate } : undefined;
+        lines.push(`  ${xmlPseStreamLink(href, 'image/jpeg', file.pageCount, lastRead)}`);
+      }
     }
 
     lines.push('</entry>');
@@ -207,7 +223,8 @@ export class OpdsService {
       '<feed xmlns="http://www.w3.org/2005/Atom"',
       '      xmlns:dc="http://purl.org/dc/terms/"',
       '      xmlns:opds="http://opds-spec.org/2010/catalog"',
-      '      xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">',
+      '      xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/"',
+      '      xmlns:pse="http://vaemendis.net/opds-pse/ns">',
       `  ${xmlEl('title', title)}`,
       `  ${xmlEl('id', id)}`,
       `  ${xmlEl('updated', updated)}`,

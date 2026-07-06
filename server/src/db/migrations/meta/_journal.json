@@ -260,6 +260,13 @@
       "when": 1783034396046,
       "tag": "0036_kobo-sync-history",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1783318242860,
+      "tag": "0037_opds-pse-page-count",
+      "breakpoints": true
     }
   ]
 }
