@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 
 import type { ReadwiseSettings, ReadwiseSyncDisabledReason, ReadwiseTokenValidationResult, UpsertReadwiseSettingsPayload } from '@bookorbit/types';
 
@@ -7,8 +7,6 @@ import { ReadwiseRepository } from './readwise.repository';
 
 @Injectable()
 export class ReadwiseSettingsService {
-  private readonly logger = new Logger(ReadwiseSettingsService.name);
-
   constructor(
     private readonly repo: ReadwiseRepository,
     private readonly client: ReadwiseClientService,
