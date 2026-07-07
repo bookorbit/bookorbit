@@ -9,6 +9,7 @@ export interface ReadwiseHighlight {
   title?: string;
   author?: string;
   note?: string;
+  image_url?: string;
   highlighted_at?: string;
   source_type: string;
   category: string;

@@ -17,6 +17,8 @@ export interface NewHighlightRow {
   createdAt: Date;
   title: string | null;
   author: string; // joined, may be ''
+  isbn13: string | null;
+  isbn10: string | null;
 }
 
 @Injectable()
@@ -69,6 +71,8 @@ export class ReadwiseRepository {
         note: schema.annotations.note,
         createdAt: schema.annotations.createdAt,
         title: schema.bookMetadata.title,
+        isbn13: schema.bookMetadata.isbn13,
+        isbn10: schema.bookMetadata.isbn10,
         authorsCsv: sql<string>`coalesce(string_agg(${schema.authors.name}, '||' order by ${schema.bookAuthors.displayOrder}, ${schema.bookAuthors.authorId}), '')`,
       })
       .from(schema.annotations)
@@ -90,6 +94,8 @@ export class ReadwiseRepository {
         schema.annotations.note,
         schema.annotations.createdAt,
         schema.bookMetadata.title,
+        schema.bookMetadata.isbn13,
+        schema.bookMetadata.isbn10,
       )
       .orderBy(asc(schema.annotations.id))
       .limit(limit);
@@ -101,6 +107,8 @@ export class ReadwiseRepository {
       note: r.note,
       createdAt: r.createdAt,
       title: r.title,
+      isbn13: r.isbn13,
+      isbn10: r.isbn10,
       author: r.authorsCsv
         ? r.authorsCsv
             .split('||')

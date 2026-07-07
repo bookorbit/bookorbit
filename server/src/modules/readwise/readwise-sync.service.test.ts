@@ -29,6 +29,8 @@ function makeRow(overrides: Partial<NewHighlightRow> = {}): NewHighlightRow {
     createdAt: new Date('2026-01-02T03:04:05.000Z'),
     title: 'A Book',
     author: 'An Author',
+    isbn13: null,
+    isbn10: null,
     ...overrides,
   };
 }
@@ -118,6 +120,30 @@ describe('ReadwiseSyncService', () => {
       expect('note' in h).toBe(false);
       expect('title' in h).toBe(false);
       expect('author' in h).toBe(false);
+    });
+
+    it('sets image_url from the OpenLibrary cover for isbn13', async () => {
+      mockRepo.findSettings.mockResolvedValue(enabledSettings());
+      mockRepo.findNewHighlights.mockResolvedValueOnce([makeRow({ annotationId: 5, isbn13: '9781234567897' })]).mockResolvedValueOnce([]);
+      await makeService().flush(1);
+      const h = mockClient.createHighlights.mock.calls[0][2][0];
+      expect(h.image_url).toBe('https://covers.openlibrary.org/b/isbn/9781234567897-L.jpg?default=false');
+    });
+
+    it('falls back to isbn10 when isbn13 is absent', async () => {
+      mockRepo.findSettings.mockResolvedValue(enabledSettings());
+      mockRepo.findNewHighlights.mockResolvedValueOnce([makeRow({ annotationId: 5, isbn13: null, isbn10: '1234567890' })]).mockResolvedValueOnce([]);
+      await makeService().flush(1);
+      const h = mockClient.createHighlights.mock.calls[0][2][0];
+      expect(h.image_url).toBe('https://covers.openlibrary.org/b/isbn/1234567890-L.jpg?default=false');
+    });
+
+    it('omits image_url when the book has no ISBN', async () => {
+      mockRepo.findSettings.mockResolvedValue(enabledSettings());
+      mockRepo.findNewHighlights.mockResolvedValueOnce([makeRow({ annotationId: 5, isbn13: null, isbn10: null })]).mockResolvedValueOnce([]);
+      await makeService().flush(1);
+      const h = mockClient.createHighlights.mock.calls[0][2][0];
+      expect('image_url' in h).toBe(false);
     });
   });
 

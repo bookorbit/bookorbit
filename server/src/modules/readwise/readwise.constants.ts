@@ -18,5 +18,12 @@ export const READWISE_MAX = {
 export const READWISE_SOURCE_TYPE = 'bookorbit';
 export const READWISE_CATEGORY = 'books';
 
+// Public cover URL by ISBN. `?default=false` makes OpenLibrary return 404 for a
+// missing cover (Readwise then stores no image) instead of a blank placeholder pixel.
+export const OPENLIBRARY_COVER_BASE = 'https://covers.openlibrary.org/b/isbn';
+export function openLibraryCoverUrl(isbn: string): string {
+  return `${OPENLIBRARY_COVER_BASE}/${isbn}-L.jpg?default=false`;
+}
+
 // How many highlights to send per POST (Readwise accepts large batches; keep bounded).
 export const READWISE_BATCH_SIZE = 100;

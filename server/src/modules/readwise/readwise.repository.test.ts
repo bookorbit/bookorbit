@@ -121,6 +121,8 @@ describe('ReadwiseRepository', () => {
         note: 'my note',
         createdAt,
         title: 'Dune',
+        isbn13: '9780441172719',
+        isbn10: '0441172717',
         authorsCsv: 'Frank Herbert||Brian Herbert',
       },
       {
@@ -130,6 +132,8 @@ describe('ReadwiseRepository', () => {
         note: null,
         createdAt,
         title: null,
+        isbn13: null,
+        isbn10: null,
         authorsCsv: '',
       },
     ];
@@ -143,6 +147,8 @@ describe('ReadwiseRepository', () => {
         note: 'my note',
         createdAt,
         title: 'Dune',
+        isbn13: '9780441172719',
+        isbn10: '0441172717',
         author: 'Frank Herbert, Brian Herbert',
       },
       {
@@ -152,6 +158,8 @@ describe('ReadwiseRepository', () => {
         note: null,
         createdAt,
         title: null,
+        isbn13: null,
+        isbn10: null,
         author: '',
       },
     ]);

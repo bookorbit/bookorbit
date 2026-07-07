@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import { READWISE_BATCH_SIZE, READWISE_CATEGORY, READWISE_MAX, READWISE_SOURCE_TYPE } from './readwise.constants';
+import { openLibraryCoverUrl, READWISE_BATCH_SIZE, READWISE_CATEGORY, READWISE_MAX, READWISE_SOURCE_TYPE } from './readwise.constants';
 import { ReadwiseClientService, ReadwiseUnauthorizedError, type ReadwiseHighlight } from './readwise-client.service';
 import { ReadwiseRepository, type NewHighlightRow } from './readwise.repository';
 
@@ -44,11 +44,13 @@ export class ReadwiseSyncService {
   }
 
   private toHighlight(r: NewHighlightRow): ReadwiseHighlight {
+    const isbn = r.isbn13 || r.isbn10;
     return {
       text: truncate(r.text, READWISE_MAX.TEXT),
       ...(r.title ? { title: truncate(r.title, READWISE_MAX.TITLE) } : {}),
       ...(r.author ? { author: truncate(r.author, READWISE_MAX.AUTHOR) } : {}),
       ...(r.note ? { note: truncate(r.note, READWISE_MAX.NOTE) } : {}),
+      ...(isbn ? { image_url: openLibraryCoverUrl(isbn) } : {}),
       highlighted_at: r.createdAt.toISOString(),
       source_type: READWISE_SOURCE_TYPE,
       category: READWISE_CATEGORY,
