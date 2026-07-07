@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref, watch } from 'vue'
-import { ChevronDown, ChevronUp, CheckCircle2, AlertCircle, HelpCircle, Loader2, RefreshCw, Link2 } from '@lucide/vue'
+import { ChevronDown, ChevronUp, CheckCircle2, AlertCircle, ExternalLink, HelpCircle, Loader2, RefreshCw, Link2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import type { StorygraphEdition, StorygraphLinkedBook } from '@bookorbit/types'
 import {
@@ -253,31 +253,35 @@ async function handleSetEdition(book: StorygraphLinkedBook, edition: StorygraphE
                       <span v-if="edition.pages" class="text-muted-foreground">· {{ edition.pages }} pages</span>
                       <span v-if="edition.language" class="text-muted-foreground">· {{ edition.language }}</span>
                     </p>
-                    <p class="text-[11px] text-muted-foreground truncate">
+                    <p class="text-[11px] text-muted-foreground break-words">
                       <span v-if="edition.publisher">{{ edition.publisher }}</span>
                       <span v-if="edition.publisher && edition.publicationDate"> · </span>
                       <span v-if="edition.publicationDate">{{ edition.publicationDate }}</span>
                       <span v-if="(edition.publisher || edition.publicationDate) && edition.isbn"> · </span>
                       <span v-if="edition.isbn">ISBN {{ edition.isbn }}</span>
                     </p>
-                    <a
-                      :href="editionUrl(edition)"
-                      target="_blank"
-                      rel="noopener"
-                      class="block text-[11px] font-mono text-primary/80 hover:text-primary underline underline-offset-2 truncate"
-                    >
-                      {{ edition.id }}
-                    </a>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  :disabled="settingEdition[book.bookId] || edition.id === book.storygraphBookId"
-                  class="shrink-0 px-2 py-1 text-xs rounded-md border border-border bg-background hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  @click="handleSetEdition(book, edition)"
-                >
-                  {{ edition.id === book.storygraphBookId ? 'Current' : 'Use this' }}
-                </button>
+                <div class="flex shrink-0 items-center gap-1.5">
+                  <a
+                    :href="editionUrl(edition)"
+                    target="_blank"
+                    rel="noopener"
+                    title="Open on StoryGraph"
+                    aria-label="Open on StoryGraph"
+                    class="flex items-center justify-center p-1.5 rounded-md border border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  >
+                    <ExternalLink class="size-3.5" />
+                  </a>
+                  <button
+                    type="button"
+                    :disabled="settingEdition[book.bookId] || edition.id === book.storygraphBookId"
+                    class="px-2 py-1 text-xs rounded-md border border-border bg-background hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    @click="handleSetEdition(book, edition)"
+                  >
+                    {{ edition.id === book.storygraphBookId ? 'Current' : 'Use this' }}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

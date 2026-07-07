@@ -177,6 +177,37 @@ describe('StorygraphLinkedBooks', () => {
     expect(wrapper.text()).toContain('Try auto-match')
   })
 
+  it('shows an icon-only edition link instead of the raw edition id', async () => {
+    const wrapper = mountList()
+    await flushPromises()
+
+    mocks.fetchStorygraphEditions.mockResolvedValue([
+      {
+        id: 'sg-1',
+        title: 'First Printing',
+        format: 'Hardcover',
+        pages: 478,
+        isAudio: false,
+        language: 'English',
+        isbn: '9781234567890',
+        publisher: null,
+        publicationDate: null,
+        coverUrl: null,
+      },
+    ])
+
+    await wrapper.find('button').trigger('click')
+    const viewEditions = wrapper.findAll('button').find((b) => b.text().includes('View editions'))
+    await viewEditions!.trigger('click')
+    await flushPromises()
+
+    const link = wrapper.find('a[href="https://app.thestorygraph.com/books/sg-1"]')
+    expect(link.exists()).toBe(true)
+    expect(link.text().trim()).toBe('')
+    expect(link.attributes('aria-label')).toBe('Open on StoryGraph')
+    expect(link.attributes('target')).toBe('_blank')
+  })
+
   it('does not misattribute a reload failure to a successful link action', async () => {
     const wrapper = mountList()
     await flushPromises()
