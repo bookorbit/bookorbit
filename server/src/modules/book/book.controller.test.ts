@@ -414,12 +414,16 @@ describe('BookController', () => {
       projectedBytes: 30,
       bookCount: 2,
       scope: 'primary',
+      archiveFilename: 'Selected Books.zip',
     });
 
     await controller.exportBooks({ bookIds: [1, 2], allFormats: false }, makeUser(), reply);
 
     expect(raw.setHeader).toHaveBeenCalledWith('Content-Type', 'application/zip');
-    expect(raw.setHeader).toHaveBeenCalledWith('Content-Disposition', 'attachment; filename="books.zip"');
+    expect(raw.setHeader).toHaveBeenCalledWith(
+      'Content-Disposition',
+      `attachment; filename="Selected Books.zip"; filename*=UTF-8''Selected%20Books.zip`,
+    );
 
     const zipArchiveMock = ZipArchive as unknown as vi.Mock;
     expect(zipArchiveMock).toHaveBeenCalledWith({ zlib: { level: 0 } });

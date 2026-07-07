@@ -3,12 +3,12 @@ Dashboard mixin for the BookOrbit catalog browser.
 
 Builds and renders the single-page dashboard: a summary stats band, a
 Continue-reading hero row (two hero cards side by side, chevron-paged through
-all in-progress books), the Discover row and a compact Browse list, including
+all in-progress books), the Discover rows and a compact Browse list, including
 the offline cache and the Discover reroll. Installed onto the catalog
 controller as regular methods.
 
 Layout is budget-driven: fixed blocks are measured first. When the page gets
-too tight, the stats strip is dropped first, then the Discover row itself.
+too tight, the stats strip is dropped first, then Discover itself.
 ]]
 
 local Blitbuffer = require("ffi/blitbuffer")
@@ -46,6 +46,10 @@ local BookOrbitDashboardIconButton = CatalogWidgets.DashboardIconButton
 -- statistics.sqlite3 (the dashboard re-renders on every row page turn).
 local STATS_CACHE_TTL = 120
 local DISCOVER_TARGET_SLOTS = 5
+local DISCOVER_COMPACT_GAP = 6
+local DASHBOARD_TALL_ASPECT_RATIO = 1.55
+local DISCOVER_MAX_ROWS = 2
+local STATS_MIN_BODY_HEIGHT = 56
 
 local CatalogDashboard = {}
 
@@ -322,6 +326,10 @@ function CatalogDashboard:dashboardHeroSlots(count)
     return self.content_w >= Screen:scaleBySize(420) and 2 or 1
 end
 
+function CatalogDashboard:dashboardTallLayout()
+    return self.inner_dimen.h / math.max(1, self.inner_dimen.w) >= DASHBOARD_TALL_ASPECT_RATIO
+end
+
 -- The Continue-reading hero row: full-width hero cards side by side, paged
 -- through all in-progress books via the chevrons in the section header (the
 -- e-ink take on a horizontal scroll).
@@ -354,30 +362,32 @@ function CatalogDashboard:addDashboardHeroRow(books, height, slots, page)
     self.dash_used = self.dash_used + height
 end
 
-function CatalogDashboard:discoverRowMetrics(count)
+function CatalogDashboard:discoverRowMetrics(count, gap)
     local slots = math.min(DISCOVER_TARGET_SLOTS, count)
-    local gap = self.dash_inner_gap
+    gap = gap or self.dash_inner_gap
     local min_card_w = Screen:scaleBySize(72)
     while slots > 1
-        and math.floor((self.content_w - (slots + 1) * gap) / slots) < min_card_w do
+        and math.floor((self.content_w - (slots - 1) * gap) / slots) < min_card_w do
         slots = slots - 1
     end
-    local card_w = math.max(min_card_w, math.floor((self.content_w - (slots + 1) * gap) / slots))
+    local card_w = math.max(min_card_w, math.floor((self.content_w - (slots - 1) * gap) / slots))
     return slots, card_w, CatalogWidgets.coverCardHeight(card_w, false, false)
 end
 
 -- A paged row of cover cards, evenly distributed across the full
 -- content width. Paging is driven by the chevrons in the section header.
 function CatalogDashboard:addDashboardCoverRow(
-    _section_id, books, height, with_progress, with_caption, slots, card_w, page)
-    local first = (page - 1) * slots + 1
-    local card_gap = math.floor(math.max(0, self.content_w - slots * card_w) / (slots + 1))
+    _section_id, books, height, with_progress, with_caption, slots, card_w, page, first_index)
+    local first = first_index or ((page - 1) * slots + 1)
+    local card_gap = slots > 1 and math.floor(math.max(0, self.content_w - slots * card_w) / (slots - 1)) or 0
 
     local row = HorizontalGroup:new{ align = "center" }
     local focus_row = {}
     table.insert(row, HorizontalSpan:new{ width = self.content_inset })
     for slot = 1, slots do
-        table.insert(row, HorizontalSpan:new{ width = card_gap })
+        if slot > 1 then
+            table.insert(row, HorizontalSpan:new{ width = card_gap })
+        end
         local book = books[first + slot - 1]
         if book then
             local card = BookOrbitDashboardCoverCard:new{
@@ -395,13 +405,25 @@ function CatalogDashboard:addDashboardCoverRow(
             table.insert(row, HorizontalSpan:new{ width = card_w })
         end
     end
-    table.insert(row, HorizontalSpan:new{ width = card_gap })
     table.insert(row, HorizontalSpan:new{ width = self.content_inset })
     table.insert(self.item_group, row)
     if #focus_row > 0 then
         table.insert(self.layout, focus_row)
     end
     self.dash_used = self.dash_used + height
+end
+
+function CatalogDashboard:addDashboardCoverGrid(
+    section_id, books, height, with_progress, with_caption, slots, card_w, page, rows)
+    rows = math.max(1, rows or 1)
+    local first = (page - 1) * slots * rows + 1
+    for row = 1, rows do
+        self:addDashboardCoverRow(section_id, books, height, with_progress, with_caption, slots, card_w, 1, first)
+        first = first + slots
+        if row < rows then
+            self:addDashboardSpacer(self.dash_inner_gap)
+        end
+    end
 end
 
 -- A friendlier empty/unavailable state than a bare status line: a short
@@ -479,7 +501,7 @@ function CatalogDashboard:buildDashboardStatsStrip(summary, dashboard, height)
     end
     local line_h = Size.line.thin
     local body_h = height and math.max(row:getSize().h, height - 2 * line_h)
-        or math.max(row:getSize().h, Screen:scaleBySize(64))
+        or math.max(row:getSize().h, Screen:scaleBySize(STATS_MIN_BODY_HEIGHT))
     return VerticalGroup:new{
         align = "center",
         LineWidget:new{
@@ -580,18 +602,25 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
 
     local show_stats = stats_widget ~= nil
     local show_discover = #discover_books > 0
+    local discover_gap = inner_gap
     local discover_slots = 0
     local discover_card_w = 0
     local discover_row_h = 0
+    local discover_rows = 1
 
     local function updateDiscoverMetrics()
         if show_discover then
-            discover_slots, discover_card_w, discover_row_h = self:discoverRowMetrics(#discover_books)
+            discover_slots, discover_card_w, discover_row_h = self:discoverRowMetrics(#discover_books, discover_gap)
         else
             discover_slots, discover_card_w, discover_row_h = 0, 0, 0
         end
     end
     updateDiscoverMetrics()
+
+    local function discoverGridHeight()
+        if not show_discover then return 0 end
+        return discover_rows * discover_row_h + math.max(0, discover_rows - 1) * inner_gap
+    end
 
     -- Fixed blocks are measured up front. If the dashboard gets too tight, the
     -- stats strip drops first, then Discover.
@@ -601,7 +630,7 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
             + header_h + inner_gap
             + (has_continue and hero_h or empty_h)
             + section_gap
-            + (show_discover and (header_h + inner_gap + discover_row_h + section_gap) or 0)
+            + (show_discover and (header_h + inner_gap + discoverGridHeight() + section_gap) or 0)
             + header_h + inner_gap + browse_rows * browse_row_h
             + inner_gap
         return fixed
@@ -612,6 +641,35 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
     if show_discover and fixedHeight() > avail then
         show_discover = false
         updateDiscoverMetrics()
+    end
+    if show_discover then
+        local compact_gap = px(DISCOVER_COMPACT_GAP)
+        if compact_gap < discover_gap then
+            local previous_gap = discover_gap
+            local previous_slots, previous_card_w, previous_row_h = discover_slots, discover_card_w, discover_row_h
+            discover_gap = compact_gap
+            updateDiscoverMetrics()
+            if fixedHeight() > avail then
+                discover_gap = previous_gap
+                discover_slots, discover_card_w, discover_row_h = previous_slots, previous_card_w, previous_row_h
+            end
+        end
+    end
+    if show_discover and self:dashboardTallLayout() and discover_slots > 0 then
+        local full_rows = math.floor(#discover_books / discover_slots)
+        local remainder = #discover_books % discover_slots
+        local book_rows = full_rows
+        if remainder >= math.ceil(discover_slots * 0.5) then
+            book_rows = book_rows + 1
+        end
+        local max_rows = math.min(DISCOVER_MAX_ROWS, math.max(1, book_rows))
+        while discover_rows < max_rows do
+            discover_rows = discover_rows + 1
+            if fixedHeight() > avail then
+                discover_rows = discover_rows - 1
+                break
+            end
+        end
     end
     if show_stats then
         local extra_stats_h = math.min(px(56), math.max(0, avail - fixedHeight()))
@@ -657,7 +715,8 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
 
     if show_discover then
         discover_slots = math.min(discover_slots, #discover_books)
-        local discover_pages = math.max(1, math.ceil(#discover_books / discover_slots))
+        local discover_page_size = math.max(1, discover_slots * discover_rows)
+        local discover_pages = math.max(1, math.ceil(#discover_books / discover_page_size))
         local discover_page = self:dashboardPage("discover", discover_pages)
         local discover_controls = {}
         if discover_pages > 1 then
@@ -669,8 +728,8 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
 
         self:addDashboardHeader(_("Discover"), discover_controls)
         self:addDashboardSpacer(inner_gap)
-        self:addDashboardCoverRow("discover", discover_books, discover_row_h, false, false,
-            discover_slots, discover_card_w, discover_page)
+        self:addDashboardCoverGrid("discover", discover_books, discover_row_h, false, false,
+            discover_slots, discover_card_w, discover_page, discover_rows)
         self:addDashboardSpacer(section_gap)
     end
 

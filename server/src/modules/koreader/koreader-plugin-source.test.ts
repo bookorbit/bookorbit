@@ -67,6 +67,42 @@ describe('KOReader plugin update source wiring', () => {
     expect(syncSettingsBlock).not.toContain('text = _("Sync all books now")');
   });
 
+  it('keeps tall dashboard adaptation scoped to measured Discover rows', async () => {
+    const dashboard = await readPluginFile('bookorbit_catalog_dashboard.lua');
+
+    expect(dashboard).toContain('local DASHBOARD_TALL_ASPECT_RATIO = 1.55');
+    expect(dashboard).toContain('local DISCOVER_COMPACT_GAP = 6');
+    expect(dashboard).toContain('local DISCOVER_MAX_ROWS = 2');
+    expect(dashboard).toContain('local STATS_MIN_BODY_HEIGHT = 56');
+    expect(dashboard).toContain('function CatalogDashboard:dashboardTallLayout()');
+    expect(dashboard).toContain('function CatalogDashboard:addDashboardCoverGrid(');
+    expect(dashboard).toContain('math.floor((self.content_w - (slots - 1) * gap) / slots)');
+    expect(dashboard).toContain('local card_gap = slots > 1 and math.floor(math.max(0, self.content_w - slots * card_w) / (slots - 1)) or 0');
+    expect(dashboard).toContain('if slot > 1 then');
+    expect(dashboard).not.toContain('(slots + 1) * gap');
+    expect(dashboard).toContain('discover_slots, discover_card_w, discover_row_h = self:discoverRowMetrics(#discover_books, discover_gap)');
+    expect(dashboard).toContain('if fixedHeight() > avail then');
+    expect(dashboard).toContain('discover_rows * discover_row_h + math.max(0, discover_rows - 1) * inner_gap');
+    expect(dashboard).toContain('show_discover and self:dashboardTallLayout() and discover_slots > 0');
+    expect(dashboard).toContain('local discover_page_size = math.max(1, discover_slots * discover_rows)');
+    expect(dashboard).not.toContain('catalog_dashboard_max_height');
+  });
+
+  it('uses tall detail space for measured related-book grids', async () => {
+    const detail = await readPluginFile('bookorbit_catalog_detail.lua');
+
+    expect(detail).toContain('local DETAIL_RELATED_TALL_ASPECT_RATIO = 1.55');
+    expect(detail).toContain('local DETAIL_RELATED_MAX_ROWS = 2');
+    expect(detail).toContain('function CatalogDetail:detailTallLayout()');
+    expect(detail).toContain('if self:detailTallLayout() then');
+    expect(detail).toContain('local book_rows = math.ceil(#books / slots)');
+    expect(detail).toContain('rows = math.min(DETAIL_RELATED_MAX_ROWS, math.max(1, book_rows))');
+    expect(detail).toContain('while layout.rows > 1 and layout.total_h > height do');
+    expect(detail).toContain('local page_count = math.max(1, math.ceil(#books / layout.page_size))');
+    expect(detail).toContain('local focus_rows = { is_grid = true }');
+    expect(detail).toContain('if section_focus.is_grid then');
+  });
+
   it('reconciles remote progress before manual book sync uploads progress', async () => {
     const main = await readPluginFile('main.lua');
     const menu = await readPluginFile('bookorbit_main_menu.lua');

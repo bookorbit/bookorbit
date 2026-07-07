@@ -145,6 +145,7 @@ export type ExportPlan = {
   projectedBytes: number;
   bookCount: number;
   scope: ExportScope;
+  archiveFilename: string;
 };
 
 const METADATA_EXPORT_SCHEMA_VERSION = 1 as const;
@@ -1217,6 +1218,30 @@ export class BookService {
     }
     used.add(candidate);
     return candidate;
+  }
+
+  private resolveExportArchiveFilename(
+    bookCount: number,
+    orderedFiles: ExportCandidateFile[],
+    metadataByBookId: Map<number, Awaited<ReturnType<BookRepository['findPatternMetadataByBookIds']>>[number]>,
+    pattern: string,
+  ): string {
+    if (bookCount !== 1) return 'books.zip';
+
+    const firstFile = orderedFiles[0];
+    if (!firstFile) return 'books.zip';
+
+    const originalStem = basename(firstFile.absolutePath, extname(firstFile.absolutePath)).trim() || 'book';
+    const fallback = this.sanitizeFilenameSegment(`${originalStem}.zip`, 'book.zip');
+    const meta = metadataByBookId.get(firstFile.bookId);
+    const tokens = {
+      ...this.buildDownloadPatternTokens(firstFile.absolutePath, firstFile.format, meta),
+      originalFilename: meta?.title?.trim() || originalStem,
+      extension: 'zip',
+    };
+    const resolvedPath = resolveUploadPath(pattern || DEFAULT_DOWNLOAD_PATTERN, tokens, 'zip');
+    const resolvedName = resolvedPath?.split('/').filter(Boolean).pop() ?? null;
+    return this.sanitizeFilenameSegment(resolvedName ?? fallback, fallback);
   }
 
   private buildDownloadPatternTokens(
@@ -2738,6 +2763,7 @@ export class BookService {
         this.bookRepo.findPatternMetadataByBookIds([...new Set(orderedFiles.map((f) => f.bookId))]),
       ]);
       const metadataByBookId = new Map(metadataRows.map((row) => [row.bookId, row]));
+      const archiveFilename = this.resolveExportArchiveFilename(uniqueBookIds.length, orderedFiles, metadataByBookId, pattern);
       const usedPaths = new Set<string>();
       let projectedBytes = 0;
 
@@ -2766,6 +2792,7 @@ export class BookService {
         projectedBytes,
         bookCount: uniqueBookIds.length,
         scope,
+        archiveFilename,
       };
     } catch (err) {
       const errorClass = err instanceof Error ? err.name : 'Error';

@@ -65,6 +65,7 @@ local DETAIL_CACHE_MAX_BOOKS = 80
 -- Shared spacing scale for the detail page. INSET is the left/right content
 -- margin every section aligns to; the gaps are the only vertical rhythm used.
 local DETAIL_INSET = Screen:scaleBySize(16)
+local DETAIL_RELATED_SHELF_INSET = Screen:scaleBySize(12)
 local DETAIL_GAP_XS = Screen:scaleBySize(4)
 local DETAIL_GAP_S = Screen:scaleBySize(8)
 local DETAIL_GAP_M = Screen:scaleBySize(14)
@@ -75,6 +76,8 @@ local DETAIL_PROGRESS_BAR_HEIGHT = Screen:scaleBySize(7)
 local DETAIL_BUTTON_HEIGHT = Screen:scaleBySize(38)
 local DETAIL_DESCRIPTION_HEIGHT = Screen:scaleBySize(136)
 local DETAIL_COVER_ASPECT = 0.66
+local DETAIL_RELATED_TALL_ASPECT_RATIO = 1.55
+local DETAIL_RELATED_MAX_ROWS = 2
 
 -- Mirrors TextBoxWidget's own line height math so single/double line boxes
 -- can be sized exactly.
@@ -396,7 +399,7 @@ function CatalogDetail:showBookActionSheet(detail, opts)
             end,
         } or nil
         local download_button = {
-            text = _("Download"),
+            text = self:downloadButtonLabel(supported_files),
             enabled = show_download,
             callback = function()
                 closeThen(function()
@@ -638,6 +641,33 @@ function CatalogDetail:supportedFiles(detail)
     return files
 end
 
+function CatalogDetail:nextDownloadFile(supported_files)
+    for _, file in ipairs(supported_files or {}) do
+        if file.role == "primary" and not self:onDeviceFilePath(file) then
+            return file
+        end
+    end
+    for _, file in ipairs(supported_files or {}) do
+        if not self:onDeviceFilePath(file) then
+            return file
+        end
+    end
+    for _, file in ipairs(supported_files or {}) do
+        if file.role == "primary" then
+            return file
+        end
+    end
+    return (supported_files or {})[1]
+end
+
+function CatalogDetail:downloadButtonLabel(supported_files)
+    if #(supported_files or {}) == 0 then return _("No supported format") end
+    local file = self:nextDownloadFile(supported_files)
+    local format = cleanInlineText(file and file.format)
+    if not format then return _("Download") end
+    return T(_("Download (%1)"), string.upper(format))
+end
+
 function CatalogDetail:fileLabel(file, show_support)
     local label = string.upper(file.format or "file")
     local extras = {}
@@ -802,6 +832,10 @@ function CatalogDetail:detailRelatedPage(section_id, page_count)
     return page
 end
 
+function CatalogDetail:detailTallLayout()
+    return self.inner_dimen.h / math.max(1, self.inner_dimen.w) >= DETAIL_RELATED_TALL_ASPECT_RATIO
+end
+
 function CatalogDetail:turnDetailRelatedPage(section_id, delta)
     local context = self.current_context or {}
     context.related_pages = context.related_pages or {}
@@ -912,25 +946,38 @@ function CatalogDetail:buildDetailRating(detail, width)
     return row
 end
 
-function CatalogDetail:buildDetailPills(detail, width)
-    local items = self:detailPillItems(detail)
+function CatalogDetail:buildDetailPillRow(items, width, title, more_button_key)
     if #items == 0 then return nil end
 
     local max_pill_w = math.floor(width * 0.45)
     local row = HorizontalGroup:new{ align = "center" }
     local used = 0
     local shown = 0
-    for idx, text in ipairs(items) do
+    if more_button_key then self[more_button_key] = nil end
+
+    for i = 1, #items do
+        local text = items[i]
         local pill = DetailPillWidget:new{
             text = text,
             height = DETAIL_PILL_HEIGHT,
             max_width = max_pill_w,
             callback = function()
-                self:showFullList(_("Genres & Tags"), items)
+                self:showFullList(title, items)
             end,
         }
         local pill_w = pill:getSize().w
-        if shown > 0 and used + DETAIL_GAP_S + pill_w > width then break end
+        local remaining_after = #items - shown - 1
+        local more_w = 0
+        if remaining_after > 0 then
+            more_w = DetailPillWidget:new{
+                text = T(_("+%1"), remaining_after),
+                height = DETAIL_PILL_HEIGHT,
+                max_width = max_pill_w,
+            }:getSize().w
+        end
+        local gap_w = shown > 0 and DETAIL_GAP_S or 0
+        local reserve_w = remaining_after > 0 and (DETAIL_GAP_S + more_w) or 0
+        if shown > 0 and used + gap_w + pill_w + reserve_w > width then break end
         if shown > 0 then
             table.insert(row, HorizontalSpan:new{ width = DETAIL_GAP_S })
             used = used + DETAIL_GAP_S
@@ -940,23 +987,30 @@ function CatalogDetail:buildDetailPills(detail, width)
         shown = shown + 1
     end
     local remaining = #items - shown
-    self.detail_more_pills_button = nil
     if remaining > 0 then
         local more = DetailPillWidget:new{
             text = T(_("+%1"), remaining),
             height = DETAIL_PILL_HEIGHT,
             max_width = max_pill_w,
             callback = function()
-                self:showFullList(_("Genres & Tags"), items)
+                self:showFullList(title, items)
             end,
         }
-        self.detail_more_pills_button = more
         if shown == 0 or used + DETAIL_GAP_S + more:getSize().w <= width then
             if shown > 0 then table.insert(row, HorizontalSpan:new{ width = DETAIL_GAP_S }) end
             table.insert(row, more)
+            if more_button_key then self[more_button_key] = more end
         end
     end
     return row
+end
+
+function CatalogDetail:buildDetailPills(detail, width)
+    return self:buildDetailPillRow(
+        self:detailPillItems(detail),
+        width,
+        _("Genres & Tags"),
+        "detail_more_pills_button")
 end
 
 -- Progress line with the read status as a tappable caption on the right:
@@ -1010,7 +1064,7 @@ function CatalogDetail:buildDetailButtons(detail, width)
         return self.detail_read_button
     end
     self.detail_download_button = Button:new{
-        text = _("Download"),
+        text = self:downloadButtonLabel(supported_files),
         width = width,
         height = DETAIL_BUTTON_HEIGHT,
         enabled = #supported_files > 0,
@@ -1034,6 +1088,7 @@ function CatalogDetail:buildDetailHeader(detail, width)
     self.detail_status_button = nil
     self.detail_read_button = nil
     self.detail_download_button = nil
+    self.detail_more_pills_button = nil
 
     local title_face = Font:getFace("cfont", 21)
     local top = VerticalGroup:new{ align = "left" }
@@ -1153,9 +1208,9 @@ function CatalogDetail:buildDetailRelatedTabs(related, width, active_id)
     return col, focus_row
 end
 
--- One shelf row of related covers. Card size is derived from the available
--- height first so cards always hug their covers; the row is top-aligned and
--- only as tall as the cards, never stretched to fill leftover space.
+-- One or two shelf rows of related covers. Tall screens use a second row only
+-- when the measured shelf budget can fit it; compact e-ink layouts keep the
+-- original single-row carousel.
 function CatalogDetail:buildDetailRelatedSection(section, width, height)
     local books = type(section.books) == "table" and section.books or {}
     if #books == 0 then
@@ -1172,28 +1227,51 @@ function CatalogDetail:buildDetailRelatedSection(section, width, height)
         }, {}
     end
 
-    local content_w = width - 2 * DETAIL_INSET
+    local content_w = width - 2 * DETAIL_RELATED_SHELF_INSET
     local gap = Screen:scaleBySize(10)
-    local nav_w = Screen:scaleBySize(24)
+    local nav_w = Screen:scaleBySize(20)
+    local nav_gap = Screen:scaleBySize(4)
+    local nav_gutter_w = nav_w + nav_gap
     local slots = 4
-    local has_nav = #books > slots
-    local covers_w = content_w
-    if has_nav then
-        covers_w = content_w - 2 * (nav_w + gap)
-    end
-    local card_w = math.floor((covers_w - (slots - 1) * gap) / slots)
-    local card_h = CatalogWidgets.detailRelatedCardHeight(card_w)
 
-    local page_count = math.max(1, math.ceil(#books / slots))
+    local rows = 1
+    if self:detailTallLayout() then
+        local book_rows = math.ceil(#books / slots)
+        rows = math.min(DETAIL_RELATED_MAX_ROWS, math.max(1, book_rows))
+    end
+
+    local function metrics(row_count)
+        local page_size = slots * row_count
+        local has_nav = #books > page_size
+        local covers_w = math.max(1, content_w - 2 * nav_gutter_w)
+        local card_w = math.floor((covers_w - (slots - 1) * gap) / slots)
+        local card_h = CatalogWidgets.detailRelatedCardHeight(card_w)
+        return {
+            rows = row_count,
+            page_size = page_size,
+            has_nav = has_nav,
+            card_w = card_w,
+            card_h = card_h,
+            total_h = row_count * card_h + math.max(0, row_count - 1) * gap,
+        }
+    end
+
+    local layout = metrics(rows)
+    while layout.rows > 1 and layout.total_h > height do
+        layout = metrics(layout.rows - 1)
+    end
+
+    local page_count = math.max(1, math.ceil(#books / layout.page_size))
     local section_id = section.id or tostring(section.title or "related")
     local page = self:detailRelatedPage(section_id, page_count)
-    local first = (page - 1) * slots + 1
-    local last = math.min(#books, first + slots - 1)
+    local first = (page - 1) * layout.page_size + 1
 
-    local focus_row = {}
+    local focus_rows = { is_grid = true }
     local row = HorizontalGroup:new{ align = "center" }
-    if has_nav then
-        local prev_button = Button:new{
+    local prev_button
+    local next_button
+    if layout.has_nav then
+        prev_button = Button:new{
             icon = "chevron.left",
             icon_width = Screen:scaleBySize(16),
             icon_height = Screen:scaleBySize(16),
@@ -1205,38 +1283,53 @@ function CatalogDetail:buildDetailRelatedSection(section, width, height)
                 self:turnDetailRelatedPage(section_id, -1)
             end,
         }
-        table.insert(row, prev_button)
-        table.insert(row, HorizontalSpan:new{ width = gap })
-        table.insert(focus_row, prev_button)
+        table.insert(row, CenterContainer:new{
+            dimen = Geom:new{ w = nav_w, h = layout.total_h },
+            prev_button,
+        })
+        table.insert(row, HorizontalSpan:new{ width = nav_gap })
+    else
+        table.insert(row, HorizontalSpan:new{ width = nav_gutter_w })
     end
 
-    for index = first, last do
-        local book = books[index]
-        local card = BookOrbitDetailRelatedCard:new{
-            entry = {
-                text = coverLabel(book),
-                kind = "dashboard-book",
-                book_id = book.id,
-                book = book,
-            },
-            dimen = Geom:new{ w = card_w, h = card_h },
-            menu = self,
-        }
-        table.insert(row, card)
-        table.insert(focus_row, card)
-        if index < last then
-            table.insert(row, HorizontalSpan:new{ width = gap })
+    local grid = VerticalGroup:new{ align = "left" }
+    for row_index = 1, layout.rows do
+        local visual_row = HorizontalGroup:new{ align = "center" }
+        local focus_row = {}
+        local row_first = first + (row_index - 1) * slots
+        for slot = 1, slots do
+            if slot > 1 then
+                table.insert(visual_row, HorizontalSpan:new{ width = gap })
+            end
+            local book = books[row_first + slot - 1]
+            if book then
+                local card = BookOrbitDetailRelatedCard:new{
+                    entry = {
+                        text = coverLabel(book),
+                        kind = "dashboard-book",
+                        book_id = book.id,
+                        book = book,
+                    },
+                    dimen = Geom:new{ w = layout.card_w, h = layout.card_h },
+                    menu = self,
+                }
+                table.insert(visual_row, card)
+                table.insert(focus_row, card)
+            else
+                table.insert(visual_row, HorizontalSpan:new{ width = layout.card_w })
+            end
         end
+        if row_index > 1 then
+            table.insert(grid, VerticalSpan:new{ width = gap })
+        end
+        table.insert(grid, visual_row)
+        table.insert(focus_rows, focus_row)
     end
+    table.insert(row, grid)
 
-    if has_nav then
-        local visible_slots = last - first + 1
-        for _ = visible_slots + 1, slots do
-            table.insert(row, HorizontalSpan:new{ width = gap })
-            table.insert(row, HorizontalSpan:new{ width = card_w })
-        end
-        table.insert(row, HorizontalSpan:new{ width = gap })
-        local next_button = Button:new{
+    if layout.has_nav then
+        table.insert(row, HorizontalSpan:new{ width = nav_gap })
+        next_button = Button:new{
             icon = "chevron.right",
             icon_width = Screen:scaleBySize(16),
             icon_height = Screen:scaleBySize(16),
@@ -1248,18 +1341,24 @@ function CatalogDetail:buildDetailRelatedSection(section, width, height)
                 self:turnDetailRelatedPage(section_id, 1)
             end,
         }
-        table.insert(row, next_button)
-        table.insert(focus_row, next_button)
+        table.insert(row, CenterContainer:new{
+            dimen = Geom:new{ w = nav_w, h = layout.total_h },
+            next_button,
+        })
+        table.insert(focus_rows[1], 1, prev_button)
+        table.insert(focus_rows[1], next_button)
+    else
+        table.insert(row, HorizontalSpan:new{ width = nav_gutter_w })
     end
 
     return HorizontalGroup:new{
-        HorizontalSpan:new{ width = DETAIL_INSET },
+        HorizontalSpan:new{ width = DETAIL_RELATED_SHELF_INSET },
         LeftContainer:new{
-            dimen = Geom:new{ w = content_w, h = card_h },
+            dimen = Geom:new{ w = content_w, h = layout.total_h },
             row,
         },
-        HorizontalSpan:new{ width = DETAIL_INSET },
-    }, focus_row
+        HorizontalSpan:new{ width = DETAIL_RELATED_SHELF_INSET },
+    }, focus_rows
 end
 
 function CatalogDetail:updateDetailItems(select_number, no_recalculate_dimen)
@@ -1320,7 +1419,13 @@ function CatalogDetail:updateDetailItems(select_number, no_recalculate_dimen)
             if widget then
                 table.insert(self.item_group, widget)
                 if section_focus and #section_focus > 0 then
-                    table.insert(self.layout, section_focus)
+                    if section_focus.is_grid then
+                        for _, row in ipairs(section_focus) do
+                            if #row > 0 then table.insert(self.layout, row) end
+                        end
+                    else
+                        table.insert(self.layout, section_focus)
+                    end
                 end
             end
         end

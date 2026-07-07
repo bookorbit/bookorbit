@@ -281,7 +281,7 @@ export class BookController {
       projectedBytes = plan.projectedBytes;
 
       reply.raw.setHeader('Content-Type', 'application/zip');
-      reply.raw.setHeader('Content-Disposition', 'attachment; filename="books.zip"');
+      reply.raw.setHeader('Content-Disposition', contentDispositionHeader('attachment', plan.archiveFilename || 'books.zip', 'books.zip'));
       archive.pipe(reply.raw);
       for (const file of plan.files) {
         archive.file(file.absolutePath, { name: file.zipPath });

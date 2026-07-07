@@ -461,6 +461,55 @@ describe('BookService', () => {
         { absolutePath: '/books/a.epub', zipPath: 'Duplicate.epub', sizeBytes: 100 },
         { absolutePath: '/books/b.epub', zipPath: 'Duplicate (2).epub', sizeBytes: 200 },
       ]);
+      expect(plan.archiveFilename).toBe('books.zip');
+    });
+
+    it('uses the download pattern for single-book export archive filenames', async () => {
+      const { service, appSettings, bookRepo } = makeService();
+      const user = makeUser();
+
+      appSettings.getDownloadPattern.mockResolvedValue('{authors:first} - {title}');
+      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 1, libraryId: 77 }]);
+      bookRepo.findAllFilesByBookIds.mockResolvedValue([
+        { bookId: 1, absolutePath: '/books/track-01.mp3', format: 'mp3', sizeBytes: 5, sortOrder: 0 },
+        { bookId: 1, absolutePath: '/books/track-02.mp3', format: 'mp3', sizeBytes: 6, sortOrder: 1 },
+      ]);
+      bookRepo.findPatternMetadataByBookIds.mockResolvedValue([metaRow(1, { title: 'Dune', authors: ['Frank Herbert'] })]);
+
+      const plan = await service.getExportFiles([1], user, 'audio');
+
+      expect(plan.archiveFilename).toBe('Frank Herbert - Dune.zip');
+    });
+
+    it('uses the book title as originalFilename for single-book audiobook archive filenames', async () => {
+      const { service, appSettings, bookRepo } = makeService();
+      const user = makeUser();
+
+      appSettings.getDownloadPattern.mockResolvedValue('{originalFilename}');
+      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 1, libraryId: 77 }]);
+      bookRepo.findAllFilesByBookIds.mockResolvedValue([
+        { bookId: 1, absolutePath: '/books/CH01 THE DARK LORD ASCENDING.mp3', format: 'mp3', sizeBytes: 5, sortOrder: 0 },
+        { bookId: 1, absolutePath: '/books/CH02 IN MEMORIAM.mp3', format: 'mp3', sizeBytes: 6, sortOrder: 1 },
+      ]);
+      bookRepo.findPatternMetadataByBookIds.mockResolvedValue([metaRow(1, { title: 'Harry Potter and the Deathly Hallows' })]);
+
+      const plan = await service.getExportFiles([1], user, 'audio');
+
+      expect(plan.archiveFilename).toBe('Harry Potter and the Deathly Hallows.zip');
+    });
+
+    it('falls back to the original stem when a single-book archive pattern cannot resolve', async () => {
+      const { service, appSettings, bookRepo } = makeService();
+      const user = makeUser();
+
+      appSettings.getDownloadPattern.mockResolvedValue('{series}');
+      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 1, libraryId: 77 }]);
+      bookRepo.findPrimaryFilesByBookIds.mockResolvedValue([{ bookId: 1, absolutePath: '/books/source.epub', format: 'epub', sizeBytes: 100 }]);
+      bookRepo.findPatternMetadataByBookIds.mockResolvedValue([metaRow(1, { title: 'Standalone' })]);
+
+      const plan = await service.getExportFiles([1], user, 'primary');
+
+      expect(plan.archiveFilename).toBe('source.zip');
     });
 
     it('sanitizes unsafe path segments in generated zip paths', async () => {
