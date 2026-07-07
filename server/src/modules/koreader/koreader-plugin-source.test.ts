@@ -139,7 +139,7 @@ describe('KOReader plugin update source wiring', () => {
       detail.indexOf('function CatalogDetail:updateDetailItems'),
     );
 
-    expect(detailActionsBlock).toContain('text = _("Download")');
+    expect(detailActionsBlock).toContain('text = self:downloadButtonLabel(supported_files)');
     expect(detailActionsBlock).toContain('self:downloadDefaultFile(detail, supported_files[1])');
     expect(detailActionsBlock).toContain('self:showFileChoices(detail)');
     expect(detailActionsBlock).toContain('text = _("Download options")');

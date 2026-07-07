@@ -35,6 +35,7 @@ function makeSmartScope(overrides: Partial<SmartScope> = {}): SmartScope {
     filter: null,
     defaultSort: [],
     isPublic: false,
+    syncToKobo: false,
     displayOrder: 0,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -145,6 +146,7 @@ describe('SmartScopeService', () => {
       filter: null,
       defaultSort: [{ field: 'title', dir: 'asc' }],
       isPublic: false,
+      syncToKobo: false,
     });
     expect(result).toEqual(created);
   });
