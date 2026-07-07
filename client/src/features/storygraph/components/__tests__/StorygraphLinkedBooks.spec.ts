@@ -77,6 +77,56 @@ describe('StorygraphLinkedBooks', () => {
     expect(wrapper.text()).toContain('A Parade of Horribles')
   })
 
+  it('shows distinguishing edition identifiers in the editions list', async () => {
+    const wrapper = mount(StorygraphLinkedBooks)
+    await flushPromises()
+
+    mocks.fetchStorygraphEditions.mockResolvedValue([
+      {
+        id: 'sg-1',
+        title: 'First Printing',
+        format: 'Hardcover',
+        pages: 478,
+        isAudio: false,
+        language: 'English',
+        isbn: '9781234567890',
+        publisher: 'Ace Books',
+        publicationDate: '12 March 2024',
+        coverUrl: 'https://cdn.thestorygraph.com/covers/sg-1.jpg',
+      },
+      {
+        id: 'sg-9',
+        title: 'Special Edition',
+        format: 'Hardcover',
+        pages: 478,
+        isAudio: false,
+        language: 'English',
+        isbn: '9780987654321',
+        publisher: null,
+        publicationDate: null,
+        coverUrl: null,
+      },
+    ])
+
+    await wrapper.find('button').trigger('click')
+    const viewEditions = wrapper.findAll('button').find((b) => b.text().includes('View editions'))
+    await viewEditions!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('ISBN 9781234567890')
+    expect(wrapper.text()).toContain('ISBN 9780987654321')
+    expect(wrapper.text()).toContain('Ace Books')
+    expect(wrapper.text()).toContain('12 March 2024')
+    expect(wrapper.text()).toContain('First Printing')
+    const editionLinks = wrapper.findAll('a[target="_blank"]').map((a) => a.attributes('href'))
+    expect(editionLinks).toContain('https://app.thestorygraph.com/books/sg-9')
+    const cover = wrapper.find('img[src="https://cdn.thestorygraph.com/covers/sg-1.jpg"]')
+    expect(cover.exists()).toBe(true)
+    // sg-1 is the currently linked edition (matches storygraphBookId in makeBook)
+    const currentButton = wrapper.findAll('button').find((b) => b.text().trim() === 'Current')
+    expect(currentButton).toBeDefined()
+  })
+
   it('does not misattribute a reload failure to a successful link action', async () => {
     const wrapper = mount(StorygraphLinkedBooks)
     await flushPromises()

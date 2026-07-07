@@ -86,6 +86,10 @@ export interface StorygraphEdition {
   pages: number | null;
   isAudio: boolean;
   language: string | null;
+  isbn: string | null;
+  publisher: string | null;
+  publicationDate: string | null;
+  coverUrl: string | null;
 }
 
 export interface StorygraphLinkedBook {

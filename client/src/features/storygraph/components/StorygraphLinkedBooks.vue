@@ -11,6 +11,10 @@ import {
   setStorygraphEdition,
 } from '../api/storygraph.api'
 
+function editionUrl(edition: StorygraphEdition): string {
+  return `https://app.thestorygraph.com/books/${edition.id}`
+}
+
 const books = ref<StorygraphLinkedBook[]>([])
 const loading = ref(true)
 const loadError = ref(false)
@@ -214,15 +218,42 @@ async function handleSetEdition(book: StorygraphLinkedBook, edition: StorygraphE
                 :key="edition.id"
                 class="flex items-center justify-between gap-2 rounded-md border border-border/70 bg-muted/40 px-2.5 py-1.5"
               >
-                <span class="text-xs">
-                  {{ edition.format }}
-                  <span v-if="edition.pages" class="text-muted-foreground">· {{ edition.pages }} pages</span>
-                  <span v-if="edition.language" class="text-muted-foreground">· {{ edition.language }}</span>
-                </span>
+                <div class="flex min-w-0 items-center gap-2.5">
+                  <img
+                    v-if="edition.coverUrl"
+                    :src="edition.coverUrl"
+                    alt=""
+                    class="h-12 w-8 shrink-0 rounded-sm object-cover border border-border/60"
+                    loading="lazy"
+                  />
+                  <div class="min-w-0 space-y-0.5">
+                    <p class="text-xs truncate">
+                      <span v-if="edition.title" class="font-medium">{{ edition.title }} · </span>
+                      {{ edition.format }}
+                      <span v-if="edition.pages" class="text-muted-foreground">· {{ edition.pages }} pages</span>
+                      <span v-if="edition.language" class="text-muted-foreground">· {{ edition.language }}</span>
+                    </p>
+                    <p class="text-[11px] text-muted-foreground truncate">
+                      <span v-if="edition.publisher">{{ edition.publisher }}</span>
+                      <span v-if="edition.publisher && edition.publicationDate"> · </span>
+                      <span v-if="edition.publicationDate">{{ edition.publicationDate }}</span>
+                      <span v-if="(edition.publisher || edition.publicationDate) && edition.isbn"> · </span>
+                      <span v-if="edition.isbn">ISBN {{ edition.isbn }}</span>
+                    </p>
+                    <a
+                      :href="editionUrl(edition)"
+                      target="_blank"
+                      rel="noopener"
+                      class="block text-[11px] font-mono text-primary/80 hover:text-primary underline underline-offset-2 truncate"
+                    >
+                      {{ edition.id }}
+                    </a>
+                  </div>
+                </div>
                 <button
                   type="button"
                   :disabled="settingEdition[book.bookId] || edition.id === book.storygraphBookId"
-                  class="px-2 py-1 text-xs rounded-md border border-border bg-background hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  class="shrink-0 px-2 py-1 text-xs rounded-md border border-border bg-background hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   @click="handleSetEdition(book, edition)"
                 >
                   {{ edition.id === book.storygraphBookId ? 'Current' : 'Use this' }}

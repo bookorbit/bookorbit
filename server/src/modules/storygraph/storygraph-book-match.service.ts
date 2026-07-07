@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as cheerio from 'cheerio';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { STORYGRAPH_BASE_URL } from './storygraph.constants';
 import { StorygraphClientService, type StorygraphCookies } from './storygraph-client.service';
 import type { BookSyncData } from './storygraph.repository';
 import { StorygraphRepository } from './storygraph.repository';
@@ -235,14 +236,23 @@ export class StorygraphBookMatchService {
 
       let format = '';
       let language = '';
+      let isbn = '';
+      let publisher = '';
+      let publicationDate = '';
       pane.find('.edition-info p').each((_, p) => {
         const text = $(p).text().trim();
         if (text.includes('Format:')) format = text.replace(/.*Format:\s*/, '').trim();
         else if (text.includes('Language:')) language = text.replace(/.*Language:\s*/, '').trim();
+        else if (/ISBN/i.test(text)) isbn = text.replace(/.*ISBN[^:]*:\s*/i, '').trim();
+        else if (text.includes('Publisher:')) publisher = text.replace(/.*Publisher:\s*/, '').trim();
+        else if (/publication date/i.test(text)) publicationDate = text.replace(/.*publication date:\s*/i, '').trim();
       });
 
       const detailText = pane.find('p.text-xs.font-light').first().text().trim();
       const pagesMatch = /(\d+)\s*pages?/i.exec(detailText);
+
+      const coverSrc = pane.find('img').first().attr('src') ?? null;
+      const coverUrl = coverSrc ? (coverSrc.startsWith('http') ? coverSrc : `${STORYGRAPH_BASE_URL}${coverSrc}`) : null;
 
       editions.push({
         id,
@@ -251,6 +261,10 @@ export class StorygraphBookMatchService {
         pages: pagesMatch ? parseInt(pagesMatch[1]!, 10) : null,
         isAudio: /audio/i.test(format),
         language: language || null,
+        isbn: isbn || null,
+        publisher: publisher || null,
+        publicationDate: publicationDate || null,
+        coverUrl,
       });
     });
 

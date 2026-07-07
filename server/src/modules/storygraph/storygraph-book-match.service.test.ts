@@ -245,13 +245,27 @@ describe('StorygraphBookMatchService', () => {
   });
 
   describe('getEditions', () => {
-    function editionPaneHtml(opts: { id: string; title?: string; format?: string; pages?: number; language?: string }): string {
+    function editionPaneHtml(opts: {
+      id: string;
+      title?: string;
+      format?: string;
+      pages?: number;
+      language?: string;
+      isbn?: string;
+      publisher?: string;
+      publicationDate?: string;
+      coverSrc?: string;
+    }): string {
       return `
         <div class="book-pane" data-book-id="${opts.id}">
+          ${opts.coverSrc ? `<img src="${opts.coverSrc}" />` : ''}
           <a href="/books/${opts.id}">${opts.title ?? 'Edition Title'}</a>
           <div class="edition-info">
             <p>Format: ${opts.format ?? 'Hardcover'}</p>
             <p>Language: ${opts.language ?? 'English'}</p>
+            ${opts.isbn ? `<p>ISBN/UID: ${opts.isbn}</p>` : ''}
+            ${opts.publisher ? `<p>Publisher: ${opts.publisher}</p>` : ''}
+            ${opts.publicationDate ? `<p>Edition Publication Date: ${opts.publicationDate}</p>` : ''}
           </div>
           <p class="text-xs font-light">${opts.pages != null ? `${opts.pages} pages` : ''}</p>
         </div>
@@ -267,10 +281,69 @@ describe('StorygraphBookMatchService', () => {
       const result = await makeService().getEditions(1, cookies, 'canonical-id');
 
       expect(result).toEqual([
-        { id: 'ed-1', title: 'Hardcover Edition', format: 'Hardcover', pages: 688, isAudio: false, language: 'English' },
-        { id: 'ed-2', title: 'Audiobook Edition', format: 'Audio', pages: null, isAudio: true, language: 'English' },
+        {
+          id: 'ed-1',
+          title: 'Hardcover Edition',
+          format: 'Hardcover',
+          pages: 688,
+          isAudio: false,
+          language: 'English',
+          isbn: null,
+          publisher: null,
+          publicationDate: null,
+          coverUrl: null,
+        },
+        {
+          id: 'ed-2',
+          title: 'Audiobook Edition',
+          format: 'Audio',
+          pages: null,
+          isAudio: true,
+          language: 'English',
+          isbn: null,
+          publisher: null,
+          publicationDate: null,
+          coverUrl: null,
+        },
       ]);
       expect(mockClient.get).toHaveBeenCalledWith(1, cookies, '/books/canonical-id/editions');
+    });
+
+    it('parses distinguishing identifiers: isbn, publisher, publication date, and cover', async () => {
+      const html =
+        editionPaneHtml({
+          id: 'ed-1',
+          format: 'Hardcover',
+          pages: 478,
+          isbn: '9781234567890',
+          publisher: 'Ace Books',
+          publicationDate: '12 March 2024',
+          coverSrc: '/covers/ed-1.jpg',
+        }) +
+        editionPaneHtml({
+          id: 'ed-2',
+          format: 'Hardcover',
+          pages: 478,
+          isbn: '9780987654321',
+          coverSrc: 'https://cdn.thestorygraph.com/covers/ed-2.jpg',
+        });
+      mockClient.get.mockResolvedValue({ status: 200, redirectedToSignIn: false, html });
+
+      const result = await makeService().getEditions(1, cookies, 'canonical-id');
+
+      expect(result[0]).toMatchObject({
+        id: 'ed-1',
+        isbn: '9781234567890',
+        publisher: 'Ace Books',
+        publicationDate: '12 March 2024',
+        coverUrl: 'https://app.thestorygraph.com/covers/ed-1.jpg',
+      });
+      expect(result[1]).toMatchObject({
+        id: 'ed-2',
+        isbn: '9780987654321',
+        publisher: null,
+        coverUrl: 'https://cdn.thestorygraph.com/covers/ed-2.jpg',
+      });
     });
 
     it('returns an empty list when the session is invalid', async () => {
