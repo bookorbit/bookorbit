@@ -319,7 +319,12 @@ export class OpdsBookService {
           seriesId: bookMetadata.seriesId,
           seriesName: bookMetadata.seriesName,
           bookCount: sql<number>`count(*)::int`,
-          lastAddedAt: sql<Date>`max(${books.addedAt})`,
+          // .mapWith(books.addedAt) reuses the column's own driver-value decoder: a raw
+          // sql`` fragment is opaque to Drizzle (drizzle-orm/node-postgres disables pg's
+          // built-in timestamptz→Date parsing so columns can decode it themselves — see
+          // node-postgres/session.cjs), so without this the aggregate comes back as a
+          // string despite the `sql<Date>` type annotation lying about it at compile time.
+          lastAddedAt: sql`max(${books.addedAt})`.mapWith(books.addedAt),
           latestBookId: sql<number>`(array_agg(${books.id} ORDER BY ${books.addedAt} DESC))[1]`,
         })
         .from(books)
