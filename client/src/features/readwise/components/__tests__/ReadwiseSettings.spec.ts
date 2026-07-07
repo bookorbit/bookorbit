@@ -6,7 +6,7 @@ import ReadwiseSettingsPage from '../ReadwiseSettings.vue'
 
 const settings = ref<ReadwiseSettings | null>(null)
 
-vi.mock('vue-sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
+vi.mock('vue-sonner', () => ({ toast: { success: vi.fn<() => void>(), error: vi.fn<() => void>() } }))
 
 vi.mock('../../composables/useReadwiseSettings', () => ({
   useReadwiseSettings: () => ({
@@ -15,9 +15,9 @@ vi.mock('../../composables/useReadwiseSettings', () => ({
     saving: ref(false),
     validating: ref(false),
     error: ref<string | null>(null),
-    fetchSettings: vi.fn().mockResolvedValue(undefined),
-    saveSettings: vi.fn().mockResolvedValue(true),
-    validateToken: vi.fn().mockResolvedValue({ valid: true }),
+    fetchSettings: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    saveSettings: vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
+    validateToken: vi.fn<() => Promise<{ valid: boolean }>>().mockResolvedValue({ valid: true }),
   }),
 }))
 
