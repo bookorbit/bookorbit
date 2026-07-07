@@ -617,8 +617,9 @@ export class StorygraphSyncService {
       prev.runId === next.runId &&
       prev.status === next.status &&
       prev.syncedBooks === next.syncedBooks &&
-      prev.processedBooks === next.processedBooks &&
+      prev.skippedBooks === next.skippedBooks &&
       prev.failedBooks === next.failedBooks &&
+      prev.processedBooks === next.processedBooks &&
       prev.totalBooks === next.totalBooks
     );
   }
