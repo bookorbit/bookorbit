@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/api', () => ({
-  api: vi.fn<() => Promise<Response>>(),
+  api: vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(),
+  getAccessToken: vi.fn<() => string | null>(),
 }))
 
 vi.mock('../useFoliateAnnotations', () => ({
@@ -34,7 +35,7 @@ vi.mock('../useFoliateInput', () => ({
   useFoliateInput: () => inputMock,
 }))
 
-import { api } from '@/lib/api'
+import { api, getAccessToken } from '@/lib/api'
 import { useFoliate } from '../useFoliate'
 
 describe('useFoliate.open', () => {
@@ -86,6 +87,7 @@ describe('useFoliate.open', () => {
       ok: true,
       json: vi.fn<() => Promise<unknown>>().mockResolvedValue({}),
     } as unknown as Response)
+    vi.mocked(getAccessToken).mockReturnValue('reader-token')
     ;(window as { makeStreamingBook?: unknown }).makeStreamingBook = vi
       .fn<(...args: unknown[]) => Promise<unknown>>()
       .mockResolvedValue({ type: 'book' })
@@ -112,7 +114,22 @@ describe('useFoliate.open', () => {
     await foliate.open(1, 2, 'epub', null, undefined)
 
     const makeStreamingBook = (window as unknown as { makeStreamingBook: ReturnType<typeof vi.fn> }).makeStreamingBook
-    expect(makeStreamingBook).toHaveBeenCalledWith(1, '/api/v1/epub', {}, api, null, 2)
+    expect(makeStreamingBook).toHaveBeenCalledWith(1, '/api/v1/epub', {}, expect.any(Function), null, 2)
+    const fetchFile = makeStreamingBook.mock.calls[0]![3] as (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+    await fetchFile('/api/v1/epub/1/file/chapter.xhtml')
+    expect(api).toHaveBeenCalledWith('/api/v1/epub/1/file/chapter.xhtml', undefined)
+  })
+
+  it('passes a token-stringable fetcher for old cached Foliate assets', async () => {
+    const foliate = useFoliate(() => container)
+
+    await foliate.open(1, 2, 'epub', null, undefined)
+
+    const makeStreamingBook = (window as unknown as { makeStreamingBook: ReturnType<typeof vi.fn> }).makeStreamingBook
+    const fetchFile = makeStreamingBook.mock.calls[0]![3] as { toString: () => string; [Symbol.toPrimitive]: () => string }
+    expect(String(fetchFile)).toBe('reader-token')
+    vi.mocked(getAccessToken).mockReturnValue('fresh-reader-token')
+    expect(`${fetchFile}`).toBe('fresh-reader-token')
   })
 
   it('forces fixed-layout EPUB spreads off before opening when requested', async () => {

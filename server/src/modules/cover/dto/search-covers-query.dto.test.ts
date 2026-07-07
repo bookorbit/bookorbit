@@ -38,6 +38,7 @@ describe('SearchCoversQueryDto', () => {
   it('allows known provider values and rejects unknown values', async () => {
     expect((await validateInput({ title: 'Dune', provider: 'duckduckgo' })).errors).toHaveLength(0);
     expect((await validateInput({ title: 'Dune', provider: 'itunes' })).errors).toHaveLength(0);
+    expect((await validateInput({ title: 'Dune', provider: 'audiobookcovers' })).errors).toHaveLength(0);
     expect((await validateInput({ title: 'Dune', provider: 'all' })).errors).toHaveLength(0);
     expect((await validateInput({ title: 'Dune', provider: 'unknown' })).errors).toEqual(
       expect.arrayContaining([expect.objectContaining({ property: 'provider' })]),

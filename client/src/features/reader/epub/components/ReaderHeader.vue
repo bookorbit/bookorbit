@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
 import {
   ArrowLeft,
   BookOpen,
@@ -16,6 +15,7 @@ import {
 } from '@lucide/vue'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useFullscreen } from '../../shared/composables/useFullscreen'
 
 const props = defineProps<{
   chapterTitle: string
@@ -37,11 +37,7 @@ const emit = defineEmits<{
   startReading: []
 }>()
 
-const isFullscreen = ref(false)
-
-function onFullscreenChange() {
-  isFullscreen.value = !!document.fullscreenElement
-}
+const { isFullscreen } = useFullscreen()
 
 function onSettingsOpenChange(open: boolean) {
   emit('update:settingsOpen', open)
@@ -58,9 +54,6 @@ function getFooterModeTooltip(mode: 0 | 1 | 2): string {
   if (mode === 1) return 'Footer info: reading session + time left'
   return 'Footer info: chapter + chapter time left'
 }
-
-onMounted(() => document.addEventListener('fullscreenchange', onFullscreenChange))
-onUnmounted(() => document.removeEventListener('fullscreenchange', onFullscreenChange))
 </script>
 
 <template>
@@ -146,11 +139,7 @@ onUnmounted(() => document.removeEventListener('fullscreenchange', onFullscreenC
 
       <Tooltip>
         <TooltipTrigger as-child>
-          <button
-            class="viewer-btn hidden sm:flex"
-            :aria-label="isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
-            @click="emit('toggleFullscreen')"
-          >
+          <button class="viewer-btn" :aria-label="isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'" @click="emit('toggleFullscreen')">
             <Minimize v-if="isFullscreen" :size="18" />
             <Maximize v-else :size="18" />
           </button>

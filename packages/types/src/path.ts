@@ -3,6 +3,10 @@ export interface DirectoryEntry {
   path: string;
 }
 
+export interface PathConfig {
+  root: string;
+}
+
 export interface CreateFolderRequest {
   parentPath: string;
   name: string;

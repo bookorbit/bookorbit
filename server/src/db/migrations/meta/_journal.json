@@ -260,6 +260,20 @@
       "when": 1783034396046,
       "tag": "0036_kobo-sync-history",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1783316940342,
+      "tag": "0037_add_cascade_to_book_files_fk",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1783397661979,
+      "tag": "0038_user_book_notes_and_rating_tombstones",
+      "breakpoints": true
     }
   ]
 }

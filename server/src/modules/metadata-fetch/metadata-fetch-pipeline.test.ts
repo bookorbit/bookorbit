@@ -651,8 +651,9 @@ describe('MetadataFetchPipeline', () => {
           seriesName: 'Sword of Truth',
           seriesIndex: 11,
           seriesMemberships: [
-            { seriesName: 'Sword of Truth', seriesIndex: 11 },
-            { seriesName: 'Chainfire Trilogy', seriesIndex: 3 },
+            { seriesName: '  Sword   of Truth ', seriesIndex: 11 },
+            { seriesName: 'sword of truth', seriesIndex: 12 },
+            { seriesName: 'Chainfire\tTrilogy', seriesIndex: 3 },
           ],
         }),
       ),

@@ -797,13 +797,18 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
             <X class="size-3.5" />
           </button>
           <button
-            class="flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40"
+            class="inline-grid grid-cols-1 grid-rows-1 items-center justify-items-center h-8 px-2.5 sm:px-3 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40"
             :disabled="!hasPendingChanges || saving || writingAndRenaming"
             @click="submit"
           >
-            <Loader2 v-if="saving" class="size-3.5 animate-spin" />
-            <Check v-else class="size-3.5" />
-            <span class="hidden sm:inline">{{ saving ? 'Saving...' : 'Save' }}</span>
+            <span class="col-start-1 row-start-1 flex items-center gap-1.5" :class="{ invisible: saving }">
+              <Check class="size-3.5" />
+              <span class="hidden sm:inline">Save</span>
+            </span>
+            <span class="col-start-1 row-start-1 flex items-center gap-1.5" :class="{ invisible: !saving }">
+              <Loader2 class="size-3.5 animate-spin" />
+              <span class="hidden sm:inline">Saving...</span>
+            </span>
           </button>
           <Popover v-if="fileWriteEnabledForBook">
             <PopoverTrigger as-child>
@@ -1441,13 +1446,18 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           Cancel
         </button>
         <button
-          class="flex flex-1 items-center justify-center gap-1.5 h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40"
+          class="inline-grid grid-cols-1 grid-rows-1 flex-1 items-center justify-items-center h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40"
           :disabled="!hasPendingChanges || saving || writingAndRenaming"
           @click="submit"
         >
-          <Loader2 v-if="saving" class="size-3.5 animate-spin" />
-          <Check v-else class="size-3.5" />
-          {{ saving ? 'Saving...' : 'Save' }}
+          <span class="col-start-1 row-start-1 flex items-center gap-1.5" :class="{ invisible: saving }">
+            <Check class="size-3.5" />
+            Save
+          </span>
+          <span class="col-start-1 row-start-1 flex items-center gap-1.5" :class="{ invisible: !saving }">
+            <Loader2 class="size-3.5 animate-spin" />
+            Saving...
+          </span>
         </button>
       </div>
     </div>

@@ -204,10 +204,16 @@ describe('OpdsBookService', () => {
   });
 
   it('returns user collections and smartScopes', async () => {
-    const { service } = makeService([[{ id: 4, name: 'Favorites', bookCount: 1 }], [{ id: 7, name: 'Unread', icon: 'sparkles' }]]);
+    const { service, db } = makeService([[{ id: 4, name: 'Favorites', bookCount: 1 }], [{ id: 7, name: 'Unread', icon: 'sparkles' }]]);
 
     await expect(service.getUserCollections(8)).resolves.toEqual([{ id: 4, name: 'Favorites', bookCount: 1 }]);
     await expect(service.getUserSmartScopes(8)).resolves.toEqual([{ id: 7, name: 'Unread', icon: 'sparkles' }]);
+
+    const chains = (db.select as ReturnType<typeof vi.fn>).mock.results.map((r) => r.value as Record<string, unknown>);
+    const smartScopeChain = chains[1]!;
+    const whereClause = (smartScopeChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    expect(collectValues(whereClause)).toContain(8);
+    expect(collectValues(whereClause)).toContain(true);
   });
 
   it('enforces validateBookAccess ownership checks', async () => {

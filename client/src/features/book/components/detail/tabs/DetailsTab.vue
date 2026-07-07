@@ -15,6 +15,7 @@ import {
   RotateCcw,
   Send,
   Star,
+  StickyNote,
   Trash2,
   TriangleAlert,
   X,
@@ -39,6 +40,7 @@ import { api } from '@/lib/api'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import { useMetadataLocks } from '@/features/book/composables/useMetadataLocks'
+import { usePersonalNote, PERSONAL_NOTE_MAX_LENGTH } from '@/features/book/composables/usePersonalNote'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
 import MoveBooksDialog from '@/features/book/components/MoveBooksDialog.vue'
 import { toast } from 'vue-sonner'
@@ -93,6 +95,11 @@ const mobileMoreMenuOpen = ref(false)
 const readMenuOpen = ref(false)
 const mobileReadMenuOpen = ref(false)
 const showSendDialog = ref(false)
+const showPersonalReview = ref(false)
+
+function togglePersonalReview() {
+  showPersonalReview.value = !showPersonalReview.value
+}
 
 const { weights: scoreWeights, fetchWeights } = useMetadataScoreWeights()
 const { bookProgress: koreaderBookProgress, fetchBookProgress: fetchKoreaderProgress } = useKoreaderBookProgress()
@@ -385,6 +392,36 @@ async function setRating(star: number) {
 }
 
 const ratingStars = RATING_STARS
+
+const {
+  draft: personalNoteDraft,
+  editing: personalNoteEditing,
+  saving: personalNoteSaving,
+  error: personalNoteError,
+  preview: personalNotePreview,
+  hasNote: hasPersonalNote,
+  canSave: canSavePersonalNote,
+  canClearDraft: canClearPersonalNoteDraft,
+  charCount: personalNoteCharCount,
+  startEdit: startPersonalNoteEdit,
+  cancelEdit: cancelPersonalNoteEdit,
+  clearDraft: clearPersonalNoteDraft,
+  save: savePersonalNoteDraft,
+} = usePersonalNote(computed(() => props.book))
+
+const personalNoteUpdatedLabel = computed(() => (props.book.personalNoteUpdatedAt ? formatDateTime(props.book.personalNoteUpdatedAt) : null))
+
+watch(
+  () => props.book.id,
+  () => {
+    showPersonalReview.value = false
+  },
+)
+
+async function savePersonalNote() {
+  const updated = await savePersonalNoteDraft()
+  if (updated) emit('saved', updated)
+}
 
 const { setStatus, updateStatus } = useBookStatus()
 
@@ -1193,8 +1230,8 @@ watch(
             </span>
           </component>
         </div>
-        <!-- Read status: own row -->
-        <div class="mt-1">
+        <!-- Read status + Personal Review row -->
+        <div class="mt-1 flex items-center gap-1.5 flex-wrap">
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
               <button class="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-1 py-1">
@@ -1211,6 +1248,20 @@ watch(
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <div class="w-px h-3.5 bg-border mx-1" />
+
+          <button
+            type="button"
+            aria-label="Toggle personal review"
+            class="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-1 py-1"
+            :class="{ 'text-primary hover:text-primary/80': showPersonalReview }"
+            @click="togglePersonalReview"
+          >
+            <StickyNote class="size-3.5" />
+            <span>Personal Review</span>
+            <span v-if="hasPersonalNote" class="size-1.5 rounded-full bg-primary" />
+          </button>
         </div>
       </div>
     </div>
@@ -1639,7 +1690,111 @@ watch(
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <div class="w-px h-3.5 bg-border mx-1.5" />
+
+          <button
+            type="button"
+            aria-label="Toggle personal review"
+            class="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            :class="{ 'text-primary hover:text-primary/80': showPersonalReview }"
+            @click="togglePersonalReview"
+          >
+            <StickyNote class="size-3.5" />
+            <span>Personal Review</span>
+            <span v-if="hasPersonalNote" class="size-1.5 rounded-full bg-primary" />
+          </button>
         </div>
+      </div>
+
+      <!-- Collapsible Personal Review container -->
+      <div v-show="showPersonalReview" class="mt-4 p-4 border border-border/70 rounded-lg bg-card/60 shadow-sm">
+        <div class="mb-3 flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Personal Review</p>
+            <p v-if="personalNoteUpdatedLabel && !personalNoteEditing" class="mt-0.5 text-[11px] text-muted-foreground">
+              Updated {{ personalNoteUpdatedLabel }}
+            </p>
+          </div>
+          <Tooltip v-if="!personalNoteEditing">
+            <TooltipTrigger as-child>
+              <button
+                type="button"
+                class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Edit personal review"
+                @click="startPersonalNoteEdit"
+              >
+                <Pencil class="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{{ hasPersonalNote ? 'Edit personal review' : 'Add personal review' }}</TooltipContent>
+          </Tooltip>
+        </div>
+
+        <template v-if="personalNoteEditing">
+          <textarea
+            v-model="personalNoteDraft"
+            class="min-h-24 max-h-72 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary"
+            rows="4"
+            :maxlength="PERSONAL_NOTE_MAX_LENGTH"
+            placeholder="Private review"
+          />
+          <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-[11px] text-muted-foreground">{{ personalNoteCharCount }}/{{ PERSONAL_NOTE_MAX_LENGTH }}</p>
+            <div class="flex items-center gap-1.5">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    type="button"
+                    class="inline-flex h-8 w-8 items-center justify-center rounded border border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label="Clear personal review"
+                    :disabled="!canClearPersonalNoteDraft || personalNoteSaving"
+                    @click="clearPersonalNoteDraft"
+                  >
+                    <Trash2 class="size-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Clear personal review</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    type="button"
+                    class="inline-flex h-8 w-8 items-center justify-center rounded border border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label="Cancel personal review edit"
+                    :disabled="personalNoteSaving"
+                    @click="cancelPersonalNoteEdit"
+                  >
+                    <X class="size-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Cancel</TooltipContent>
+              </Tooltip>
+              <button
+                type="button"
+                class="inline-flex h-8 items-center gap-1.5 rounded bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="!canSavePersonalNote"
+                @click="savePersonalNote"
+              >
+                <Check class="size-3.5" />
+                {{ personalNoteSaving ? 'Saving...' : 'Save' }}
+              </button>
+            </div>
+          </div>
+          <p v-if="personalNoteError" class="mt-2 text-xs text-rose-500">{{ personalNoteError }}</p>
+        </template>
+        <template v-else-if="hasPersonalNote">
+          <p class="line-clamp-4 whitespace-pre-line break-words text-sm leading-relaxed text-foreground/80">{{ personalNotePreview }}</p>
+        </template>
+        <button
+          v-else
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-md border border-dashed border-input px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+          @click="startPersonalNoteEdit"
+        >
+          <Pencil class="size-3.5" />
+          Add personal review
+        </button>
       </div>
 
       <!-- Format badges + provider links -->

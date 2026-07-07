@@ -51,6 +51,7 @@ describe('useBookDownload', () => {
     expect(anchor.href).toContain('/api/v1/books/export/download?')
     expect(anchor.href).toContain('bookIds=1%2C2')
     expect(anchor.href).toContain('scope=primary')
+    expect(anchor.download).toBe('')
     expect(clickSpy).toHaveBeenCalledTimes(1)
 
     clickSpy.mockRestore()
@@ -68,6 +69,7 @@ describe('useBookDownload', () => {
 
     const anchor = appendSpy.mock.calls[0]?.[0] as HTMLAnchorElement
     expect(anchor.href).toContain('scope=all')
+    expect(anchor.download).toBe('')
     expect(clickSpy).toHaveBeenCalledTimes(1)
 
     clickSpy.mockRestore()
@@ -85,6 +87,7 @@ describe('useBookDownload', () => {
 
     const anchor = appendSpy.mock.calls[0]?.[0] as HTMLAnchorElement
     expect(anchor.href).toContain('scope=audio')
+    expect(anchor.download).toBe('')
     expect(clickSpy).toHaveBeenCalledTimes(1)
 
     clickSpy.mockRestore()

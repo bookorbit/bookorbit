@@ -201,6 +201,23 @@ export const getPageProgressionRtl = (bookDir, contentRtl) => {
   return contentRtl
 }
 
+export const usesNegativePageScroll = (vertical, pageProgressionRtl) => pageProgressionRtl && !vertical
+
+export const getPageScrollOffset = (page, size, vertical, pageProgressionRtl) =>
+  size * (usesNegativePageScroll(vertical, pageProgressionRtl) ? -page : page)
+
+export const normalizeStylesheetForReader = (data, width = innerWidth, height = innerHeight) =>
+  data
+    // unprefix as most of the props are (only) supported unprefixed
+    .replace(/(?<=[{\s;])-(?:epub|webkit)-(writing-mode|text-orientation|line-break)\s*:/gi, (_, prop) => `${prop}:`)
+    .replace(/(?<=[{\s;])-epub-/gi, '')
+    // replace vw and vh as they cause problems with layout
+    .replace(/(\d*\.?\d+)vw/gi, (_, d) => (parseFloat(d) * width) / 100 + 'px')
+    .replace(/(\d*\.?\d+)vh/gi, (_, d) => (parseFloat(d) * height) / 100 + 'px')
+    // `page-break-*` unsupported in columns; replace with `column-break-*`
+    .replace(/page-break-(after|before|inside)\s*:/gi, (_, x) => `-webkit-column-break-${x}:`)
+    .replace(/break-(after|before|inside)\s*:\s*(avoid-)?page/gi, (_, x, y) => `break-${x}: ${y ?? ''}column`)
+
 const makeMarginals = (length, part) =>
   Array.from({ length }, () => {
     const div = document.createElement('div')
@@ -661,17 +678,7 @@ export class Paginator extends HTMLElement {
       if (detail.type !== 'text/css') return
       const w = innerWidth
       const h = innerHeight
-      detail.data = Promise.resolve(detail.data).then((data) =>
-        data
-          // unprefix as most of the props are (only) supported unprefixed
-          .replace(/(?<=[{\s;])-epub-/gi, '')
-          // replace vw and vh as they cause problems with layout
-          .replace(/(\d*\.?\d+)vw/gi, (_, d) => (parseFloat(d) * w) / 100 + 'px')
-          .replace(/(\d*\.?\d+)vh/gi, (_, d) => (parseFloat(d) * h) / 100 + 'px')
-          // `page-break-*` unsupported in columns; replace with `column-break-*`
-          .replace(/page-break-(after|before|inside)\s*:/gi, (_, x) => `-webkit-column-break-${x}:`)
-          .replace(/break-(after|before|inside)\s*:\s*(avoid-)?page/gi, (_, x, y) => `break-${x}: ${y ?? ''}column`),
-      )
+      detail.data = Promise.resolve(detail.data).then((data) => normalizeStylesheetForReader(data, w, h))
     })
   }
   #createView() {
@@ -805,7 +812,7 @@ export class Paginator extends HTMLElement {
     const element = this.#container
     const { scrollProp } = this
     const [offset, a, b] = this.#scrollBounds
-    const rtl = this.#rtl
+    const rtl = usesNegativePageScroll(this.#vertical, this.#rtl)
     const min = rtl ? offset - b : offset - a
     const max = rtl ? offset + a : offset + b
     element[scrollProp] = Math.max(min, Math.min(max, element[scrollProp] + delta))
@@ -816,7 +823,7 @@ export class Paginator extends HTMLElement {
     const { start, end, pages, size } = this
     const min = Math.abs(offset) - a
     const max = Math.abs(offset) + b
-    const d = velocity * (this.#rtl ? -size : size)
+    const d = velocity * (usesNegativePageScroll(this.#vertical, this.#rtl) ? -size : size)
     const page = Math.floor(Math.max(min, Math.min(max, (start + end) / 2 + (isNaN(d) ? 0 : d))) / size)
 
     this.#scrollToPage(page, 'snap').then(() => {
@@ -883,7 +890,7 @@ export class Paginator extends HTMLElement {
         : ({ top, bottom }) => ({ left: top + margin, right: bottom + margin })
     }
     const pxSize = this.pages * this.size
-    return this.#rtl
+    return usesNegativePageScroll(this.#vertical, this.#rtl)
       ? ({ left, right }) => ({ left: pxSize - right, right: pxSize - left })
       : this.#vertical
         ? ({ top, bottom }) => ({ left: top, right: bottom })
@@ -895,7 +902,7 @@ export class Paginator extends HTMLElement {
       return this.#scrollTo(offset, reason)
     }
     const offset = this.#getRectMapper()(rect).left
-    return this.#scrollToPage(Math.floor(offset / this.size) + (this.#rtl ? -1 : 1), reason)
+    return this.#scrollToPage(Math.floor(offset / this.size) + (usesNegativePageScroll(this.#vertical, this.#rtl) ? -1 : 1), reason)
   }
   async #scrollTo(offset, reason, smooth) {
     const element = this.#container
@@ -919,7 +926,7 @@ export class Paginator extends HTMLElement {
     }
   }
   async #scrollToPage(page, reason, smooth) {
-    const offset = this.size * (this.#rtl ? -page : page)
+    const offset = getPageScrollOffset(page, this.size, this.#vertical, this.#rtl)
     return this.#scrollTo(offset, reason, smooth)
   }
   async scrollToAnchor(anchor, select) {
@@ -950,7 +957,7 @@ export class Paginator extends HTMLElement {
   }
   #getVisibleRange() {
     if (this.scrolled) return getVisibleRange(this.#view.document, this.start + this.#margin, this.end - this.#margin, this.#getRectMapper())
-    const size = this.#rtl ? -this.size : this.size
+    const size = usesNegativePageScroll(this.#vertical, this.#rtl) ? -this.size : this.size
     return getVisibleRange(this.#view.document, this.start - size, this.end - size, this.#getRectMapper())
   }
   #afterScroll(reason) {

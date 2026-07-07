@@ -2,6 +2,7 @@ vi.mock('fs/promises', () => ({
   readdir: vi.fn(),
   lstat: vi.fn(),
   mkdir: vi.fn(),
+  realpath: vi.fn(),
 }));
 
 import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
@@ -26,10 +27,23 @@ function entry(name: string, options: { directory?: boolean; symbolicLink?: bool
 }
 
 describe('PathService', () => {
-  const service = new PathService();
+  const pathPolicy = {
+    getBrowseRoot: vi.fn(() => '/books'),
+    resolveBrowsePath: vi.fn((path?: string) => Promise.resolve(path || '/books')),
+    assertWithinBrowseRoot: vi.fn((path: string) => Promise.resolve(path)),
+  };
+  let service: PathService;
 
   beforeEach(() => {
     vi.resetAllMocks();
+    pathPolicy.getBrowseRoot.mockReturnValue('/books');
+    pathPolicy.resolveBrowsePath.mockImplementation((path?: string) => Promise.resolve(path || '/books'));
+    pathPolicy.assertWithinBrowseRoot.mockImplementation((path: string) => Promise.resolve(path));
+    service = new PathService(pathPolicy as never);
+  });
+
+  it('returns the configured browse root in config', () => {
+    expect(service.getConfig()).toEqual({ root: '/books' });
   });
 
   it('returns empty for blocked system paths', async () => {
@@ -37,6 +51,16 @@ describe('PathService', () => {
     await expect(service.listDirectories('/sys/class')).resolves.toEqual([]);
 
     expect(readdirMock).not.toHaveBeenCalled();
+  });
+
+  it('uses the configured browse root when listing without a path', async () => {
+    lstatMock.mockResolvedValue({ isSymbolicLink: () => false, isDirectory: () => true } as never);
+    readdirMock.mockResolvedValue([] as never);
+
+    await expect(service.listDirectories()).resolves.toEqual([]);
+
+    expect(pathPolicy.resolveBrowsePath).toHaveBeenCalledWith(undefined);
+    expect(lstatMock).toHaveBeenCalledWith('/books');
   });
 
   it('rejects symlinked root paths', async () => {
@@ -125,6 +149,14 @@ describe('PathService', () => {
 
     it('rejects blocked parent paths without touching the filesystem', async () => {
       await expect(service.createDirectory('/etc', 'evil')).rejects.toBeInstanceOf(ForbiddenException);
+      expect(lstatMock).not.toHaveBeenCalled();
+      expect(mkdirMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects parent paths outside the configured browse root', async () => {
+      pathPolicy.resolveBrowsePath.mockRejectedValue(new ForbiddenException('outside root'));
+
+      await expect(service.createDirectory('/tmp/books', 'scifi')).rejects.toBeInstanceOf(ForbiddenException);
       expect(lstatMock).not.toHaveBeenCalled();
       expect(mkdirMock).not.toHaveBeenCalled();
     });

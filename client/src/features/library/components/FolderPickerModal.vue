@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { Folder, FolderOpen, FolderPlus, ChevronRight, ChevronUp, Search, X, Check, Loader2, HardDrive } from '@lucide/vue'
-import type { CreateFolderResult } from '@bookorbit/types'
+import type { CreateFolderResult, PathConfig } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -15,9 +15,11 @@ const emit = defineEmits<{
   close: []
 }>()
 
+const browseRoot = ref('/')
 const currentPath = ref('/')
 const entries = ref<DirEntry[]>([])
 const loading = ref(false)
+const initialized = ref(false)
 const search = ref('')
 const error = ref<string | null>(null)
 
@@ -27,28 +29,35 @@ const filteredEntries = computed(() => {
 })
 
 const breadcrumbs = computed(() => {
-  if (currentPath.value === '/') return [{ label: '/', path: '/' }]
-  const parts = currentPath.value.split('/').filter(Boolean)
-  const crumbs = [{ label: '/', path: '/' }]
-  let built = ''
+  const root = normalizePath(browseRoot.value)
+  const current = normalizePath(currentPath.value)
+  const crumbs = [{ label: root, path: root }]
+  if (current === root) return crumbs
+
+  const relative = root === '/' ? current.slice(1) : current.slice(root.length + 1)
+  const parts = relative.split('/').filter(Boolean)
+  let built = root === '/' ? '' : root
   for (const part of parts) {
-    built += '/' + part
+    built = built ? `${built}/${part}` : `/${part}`
     crumbs.push({ label: part, path: built })
   }
   return crumbs
 })
 
-const canGoUp = computed(() => currentPath.value !== '/')
+const canGoUp = computed(() => normalizePath(currentPath.value) !== normalizePath(browseRoot.value))
 
 async function navigate(path: string) {
   search.value = ''
-  currentPath.value = path
+  const normalized = normalizePath(path)
+  currentPath.value = isAtOrBelowBrowseRoot(normalized) ? normalized : browseRoot.value
 }
 
 async function goUp() {
+  if (!canGoUp.value) return
   const parts = currentPath.value.split('/').filter(Boolean)
   parts.pop()
-  navigate(parts.length === 0 ? '/' : '/' + parts.join('/'))
+  const parent = parts.length === 0 ? '/' : '/' + parts.join('/')
+  navigate(parent)
 }
 
 async function loadEntries(path: string) {
@@ -70,7 +79,29 @@ async function loadEntries(path: string) {
   }
 }
 
-watch(currentPath, (p) => loadEntries(p), { immediate: true })
+async function loadConfig() {
+  try {
+    const res = await api('/api/v1/path/config')
+    if (res.ok) {
+      const config: PathConfig = await res.json()
+      browseRoot.value = normalizePath(config.root)
+    }
+  } catch {
+    browseRoot.value = '/'
+  } finally {
+    currentPath.value = browseRoot.value
+    await loadEntries(currentPath.value)
+    initialized.value = true
+  }
+}
+
+watch(currentPath, (p) => {
+  if (initialized.value) void loadEntries(p)
+})
+
+onMounted(() => {
+  void loadConfig()
+})
 
 function selectCurrent() {
   emit('select', currentPath.value)
@@ -137,6 +168,17 @@ function onNewFolderKeydown(e: KeyboardEvent) {
     e.preventDefault()
     cancelNewFolder()
   }
+}
+
+function normalizePath(path: string): string {
+  const trimmed = path.trim() || '/'
+  if (trimmed === '/') return '/'
+  return trimmed.replace(/\/+$/, '')
+}
+
+function isAtOrBelowBrowseRoot(path: string): boolean {
+  const root = normalizePath(browseRoot.value)
+  return root === '/' || path === root || path.startsWith(`${root}/`)
 }
 </script>
 

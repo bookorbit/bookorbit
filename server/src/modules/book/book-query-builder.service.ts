@@ -358,7 +358,9 @@ export class BookQueryBuilder {
   }
 
   private ratingRuleToSql(operator: string, value: number | undefined, valueTo: number | undefined, userId: number): SQL {
-    const ratingExpr = sql<number>`(SELECT ${userBookRatings.rating} FROM ${userBookRatings} WHERE ${userBookRatings.bookId} = ${books.id} AND ${userBookRatings.userId} = ${userId})`;
+    const ratingExpr = sql<
+      number | null
+    >`(SELECT ${userBookRatings.rating} FROM ${userBookRatings} WHERE ${userBookRatings.bookId} = ${books.id} AND ${userBookRatings.userId} = ${userId})`;
     switch (operator) {
       case 'eq':
         this.assertNumber(value, operator, 'value');

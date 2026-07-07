@@ -47,6 +47,7 @@ import { SaveProgressDto } from './dto/save-progress.dto';
 import { UpsertAudioProgressDto } from './dto/upsert-audio-progress.dto';
 import { UpdateBookMetadataAndLocksDto } from './dto/update-book-metadata-and-locks.dto';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
+import { UpdatePersonalNoteDto } from './dto/update-personal-note.dto';
 import { SearchBooksDto } from './dto/search-books.dto';
 import { UpdateBookFileDto } from './dto/update-book-file.dto';
 import { SetStatusDto } from '../user-book-status/dto/set-status.dto';
@@ -300,7 +301,7 @@ export class BookController {
       projectedBytes = plan.projectedBytes;
 
       reply.raw.setHeader('Content-Type', 'application/zip');
-      reply.raw.setHeader('Content-Disposition', 'attachment; filename="books.zip"');
+      reply.raw.setHeader('Content-Disposition', contentDispositionHeader('attachment', plan.archiveFilename || 'books.zip', 'books.zip'));
       archive.pipe(reply.raw);
       for (const file of plan.files) {
         archive.file(file.absolutePath, { name: file.zipPath });
@@ -504,6 +505,11 @@ export class BookController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async saveAudioProgress(@Param('id', ParseIntPipe) id: number, @Body() dto: UpsertAudioProgressDto, @CurrentUser() user: RequestUser) {
     await this.bookService.saveAudioProgress(user.id, id, dto, user);
+  }
+
+  @Patch(':id/personal-note')
+  updatePersonalNote(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdatePersonalNoteDto, @CurrentUser() user: RequestUser) {
+    return this.bookService.updatePersonalNote(id, dto, user);
   }
 
   @Patch(':id/metadata')

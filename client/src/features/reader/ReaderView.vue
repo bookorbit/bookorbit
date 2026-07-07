@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { useFoliate, type RelocateDetail } from './epub/composables/useFoliate'
@@ -11,6 +11,7 @@ import { useReaderSettings } from './shared/composables/useReaderSettings'
 import { useCustomFonts } from './epub/composables/useCustomFonts'
 import { useVisibility } from './shared/composables/useVisibility'
 import { useWakeLock } from './shared/composables/useWakeLock'
+import { useFullscreen } from './shared/composables/useFullscreen'
 import { useBookmarks } from './epub/composables/useBookmarks'
 import { useAnnotations } from './epub/composables/useAnnotations'
 import { useReaderAnnotationActions } from './epub/composables/useReaderAnnotationActions'
@@ -58,7 +59,6 @@ const showSidebar = ref(false)
 const showSettings = ref(false)
 const showSearch = ref(false)
 const searchInitialQuery = ref('')
-const isFullscreen = ref(false)
 const sectionFractions = ref<number[]>([])
 const sidebarLocationMetaByCfi = ref<Record<string, { chapterTitle: string | null; percentage: number | null }>>({})
 let sidebarLocationResolveSeq = 0
@@ -107,6 +107,7 @@ const { cfi, chapterTitle, sectionIndex, totalSections, fraction, locationTotal,
 
 const visibility = useVisibility()
 const { headerVisible, footerVisible, handleMiddleTap, setVisibilityLock } = visibility
+const { toggleFullscreen } = useFullscreen()
 
 useWakeLock()
 
@@ -275,12 +276,6 @@ setTextSelectedHandler(handleTextSelected)
 setAnnotationClickHandler(handleAnnotationClick)
 
 onMounted(async () => {
-  const onFullscreenChange = () => {
-    isFullscreen.value = !!document.fullscreenElement
-  }
-  document.addEventListener('fullscreenchange', onFullscreenChange)
-  onUnmounted(() => document.removeEventListener('fullscreenchange', onFullscreenChange))
-
   // Specialized readers own their own progress/settings/loading lifecycle.
   if (isAudioFormat || isPdfFormat || isComicFormat) return
 
@@ -378,14 +373,6 @@ async function applyUpdate(partial: Partial<ReaderState>) {
   bookSettings.updateBookSettings(partial)
   if (shouldReopenForSpread) {
     await reopenEpubAtCurrentLocation()
-  }
-}
-
-function toggleFullscreen() {
-  if (document.fullscreenElement) {
-    document.exitFullscreen?.()
-  } else {
-    document.documentElement.requestFullscreen?.()
   }
 }
 

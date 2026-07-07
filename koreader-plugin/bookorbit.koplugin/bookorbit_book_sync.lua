@@ -80,6 +80,8 @@ function BookOrbitBookSync.capture(plugin)
         status = summary.status,
         status_modified = summary.status_modified,
         rating = summary.rating,
+        review_note = summary.review_note,
+        review_modified = summary.status_modified,
         annotations = annotations,
         ann_count = #annotations,
         ann_max_datetime = ann_max,
@@ -366,24 +368,17 @@ stepState = function(ctx)
     local book = ctx.state:getBook(ctx.snap.digest)
     if not book then return finish(ctx, "unmatched") end
 
-    if ctx.snap.status == nil and ctx.snap.rating == nil then
-        return step(ctx, stepProgress)
-    end
-    local status_changed = ctx.snap.status ~= nil
-        and (ctx.snap.status_modified or "") ~= (book.statusSyncedModified or "")
-    local rating_changed = (ctx.snap.rating or 0) ~= (book.ratingSynced or 0)
-    if not status_changed and not rating_changed then
+    local payload = BookOrbitSidecar.buildStatePayload(ctx.snap.digest, book, {
+        status = ctx.snap.status,
+        status_modified = ctx.snap.status_modified,
+        rating = ctx.snap.rating,
+        review_note = ctx.snap.review_note,
+    }, true)
+    if not payload then
         return step(ctx, stepProgress)
     end
 
-    local body, err = ctx.client:uploadBookStates({
-        {
-            hash = ctx.snap.digest,
-            status = ctx.snap.status,
-            statusModified = ctx.snap.status_modified,
-            rating = ctx.snap.rating,
-        },
-    })
+    local body, err = ctx.client:uploadBookStates({ payload })
     if not body then
         if isAuthError(err) then return finish(ctx, "auth") end
         ctx.had_errors = true
@@ -397,8 +392,22 @@ stepState = function(ctx)
     end
 
     -- A server-kept tie still counts as synced: the device value was considered.
-    book.statusSyncedModified = ctx.snap.status_modified or book.statusSyncedModified
-    book.ratingSynced = ctx.snap.rating or book.ratingSynced
+    book.statusSyncedModified = payload.statusModified or book.statusSyncedModified
+    local result = body.results and body.results[1] or nil
+    local server_state = BookOrbitSidecar.stateFromServerResult(result)
+    if server_state then
+        if ctx.reason == "close" and ctx.snap.file then
+            BookOrbitSidecar.applyServerStateSidecar(ctx.snap.file, server_state)
+        else
+            BookOrbitSidecar.applyServerStateLive(ctx.plugin and ctx.plugin.ui or nil, server_state)
+        end
+        BookOrbitSidecar.rememberServerState(book, server_state)
+    else
+        BookOrbitSidecar.rememberUploadedState(book, {
+            rating = ctx.snap.rating,
+            review_note = ctx.snap.review_note,
+        }, payload)
+    end
     return step(ctx, stepProgress)
 end
 

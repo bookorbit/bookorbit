@@ -124,12 +124,12 @@ export class UserBookStatusService {
   ): Promise<void> {
     const existing = await this.repo.findOne(userId, bookId);
 
-    if (existing?.source === 'manual') return;
-
     const normalizedPercentage = this.normalizePercentage(percentage);
     const { readThreshold, finishThreshold: normalizedFinishThreshold } = this.normalizeThresholds(readingThreshold, finishThreshold);
     const derived: ReadStatus =
       normalizedPercentage >= normalizedFinishThreshold ? 'read' : normalizedPercentage >= readThreshold ? 'reading' : 'unread';
+
+    if (existing?.source === 'manual' && (existing.status !== 'want_to_read' || derived === 'unread')) return;
 
     if (!existing && derived === 'unread') return;
     if (existing?.status === derived) return;

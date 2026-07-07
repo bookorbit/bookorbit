@@ -7,16 +7,16 @@ suspend, 25 second debounce) against BookOrbit's kosync-compatible endpoints.
 Closing or suspending additionally snapshots the open book from live memory
 (progress, highlights, status/rating, page stats) and uploads it per book.
 The full-library sweep is manual-only.
+
+This file owns the plugin lifecycle and reader events. The rest of the
+controller is split across mixins installed below: bookorbit_main_menu
+(Tools/dashboard menu and account dialogs), bookorbit_progress_sync (the
+kosync mirror) and bookorbit_updater (self-update checks and apply).
 ]]
 
-local ConfirmBox = require("ui/widget/confirmbox")
 local Device = require("device")
 local Dispatcher = require("dispatcher")
-local Event = require("ui/event")
 local InfoMessage = require("ui/widget/infomessage")
-local InputDialog = require("ui/widget/inputdialog")
-local Math = require("optmath")
-local MultiInputDialog = require("ui/widget/multiinputdialog")
 local NetworkMgr = require("ui/network/manager")
 local Notification = require("ui/widget/notification")
 local PluginShare = require("pluginshare")
@@ -24,8 +24,6 @@ local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local logger = require("logger")
 local md5 = require("ffi/sha2").md5
-local time = require("ui/time")
-local util = require("util")
 local T = require("ffi/util").template
 local _ = require("gettext")
 
@@ -34,20 +32,19 @@ local BookOrbitApi = require("bookorbit_api")
 local BookOrbitBookSync = require("bookorbit_book_sync")
 local BookOrbitCatalog = require("bookorbit_catalog")
 local BookOrbitState = require("bookorbit_state")
+local BookOrbitMainMenu = require("bookorbit_main_menu")
 local BookOrbitMenuPin = require("bookorbit_menu_pin")
+local BookOrbitProgressSync = require("bookorbit_progress_sync")
 local BookOrbitSweep = require("bookorbit_sweep")
 local BookOrbitUpdater = require("bookorbit_updater")
 
-local PLUGIN_VERSION = "1.1.0"
+local PLUGIN_VERSION = "1.2.0"
 
 local SYNC_STRATEGY = {
     PROMPT = 1,
     SILENT = 2,
     DISABLE = 3,
 }
-
-local API_CALL_DEBOUNCE_DELAY = time.s(25)
-local UPDATE_CHECK_INTERVAL = 24 * 60 * 60
 
 local BookOrbit = WidgetContainer:extend{
     name = "bookorbit",
@@ -60,6 +57,15 @@ local BookOrbit = WidgetContainer:extend{
 
     settings = nil,
 }
+
+-- The version literal is parsed out of main.lua by the BookOrbit server's
+-- plugin package endpoint; the mixin modules read it via the class field.
+BookOrbit.PLUGIN_VERSION = PLUGIN_VERSION
+BookOrbit.SYNC_STRATEGY = SYNC_STRATEGY
+
+BookOrbitMainMenu.install(BookOrbit)
+BookOrbitProgressSync.install(BookOrbit)
+BookOrbitUpdater.install(BookOrbit)
 
 BookOrbit.default_settings = {
     settings_version = 1,
@@ -74,12 +80,13 @@ BookOrbit.default_settings = {
     sync_backward = SYNC_STRATEGY.DISABLE,
     catalog_view_mode = "mosaic",
     catalog_sort = "recently_added",
-    catalog_grid_cols = 3,
+    catalog_grid_cols = 4,
     catalog_grid_rows = 3,
     catalog_mosaic_show_titles = false,
     catalog_recent_searches = {},
     catalog_auto_open = "off",
     catalog_dashboard_cache = nil,
+    catalog_detail_cache = nil,
     update_check_last_at = 0,
 }
 
@@ -245,18 +252,15 @@ function BookOrbit:maybeAutoOpenCatalog(mode)
     self:browseCatalog(true)
 end
 
-local function showSyncError()
-    UIManager:show(InfoMessage:new{
-        text = _("Something went wrong when syncing to BookOrbit, please check your network connection and try again later."),
-        timeout = 3,
-    })
-end
-
 local function promptLogin()
     UIManager:show(InfoMessage:new{
         text = _("Please configure the BookOrbit server and login first."),
         timeout = 3,
     })
+end
+
+function BookOrbit:promptLogin()
+    promptLogin()
 end
 
 function BookOrbit:onDispatcherRegisterActions()
@@ -331,318 +335,7 @@ function BookOrbit:exchangeAnnotationsForOpenBook()
     end
 end
 
--- Menu
-
-local function getNameStrategy(strategy)
-    if strategy == SYNC_STRATEGY.PROMPT then
-        return _("Prompt")
-    elseif strategy == SYNC_STRATEGY.SILENT then
-        return _("Silently")
-    else
-        return _("Never")
-    end
-end
-
-function BookOrbit:strategyMenu(getter, setter)
-    local function item(text, value)
-        return {
-            text = text,
-            checked_func = function() return getter() == value end,
-            callback = function() setter(value) end,
-        }
-    end
-    return {
-        item(_("Silently"), SYNC_STRATEGY.SILENT),
-        item(_("Prompt"), SYNC_STRATEGY.PROMPT),
-        item(_("Never"), SYNC_STRATEGY.DISABLE),
-    }
-end
-
-function BookOrbit:hasKnownUpdate()
-    return BookOrbitUpdater.isNewer(self.settings.update_latest_version, PLUGIN_VERSION) == true
-end
-
-function BookOrbit:updateCheckMenuText()
-    if self:hasKnownUpdate() then
-        return T(_("Plugin update available: v%1 -> v%2"), PLUGIN_VERSION, self.settings.update_latest_version)
-    end
-    if self:isLoggedIn() then
-        return T(_("Installed plugin: v%1 (Check for update)"), PLUGIN_VERSION)
-    end
-    return T(_("Installed plugin: v%1 (Login required)"), PLUGIN_VERSION)
-end
-
-function BookOrbit:catalogAutoOpenLabel()
-    local mode = self.settings.catalog_auto_open or "off"
-    if mode == "filemanager" then
-        return _("File manager only")
-    elseif mode == "always" then
-        return _("Every startup")
-    end
-    return _("Off")
-end
-
-function BookOrbit:catalogAutoOpenMenu()
-    local function item(text, value)
-        return {
-            text = text,
-            checked_func = function() return (self.settings.catalog_auto_open or "off") == value end,
-            callback = function()
-                self.settings.catalog_auto_open = value
-                G_reader_settings:flush()
-            end,
-        }
-    end
-    return {
-        item(_("Off"), "off"),
-        item(_("File manager only"), "filemanager"),
-        item(_("Every startup"), "always"),
-    }
-end
-
-function BookOrbit:addToMainMenu(menu_items)
-    menu_items.bookorbit = {
-        text = _("BookOrbit"),
-        -- Fallback placement only: BookOrbitMenuPin normally pins this entry
-        -- right below calibre on the first page of the Tools menu.
-        sorting_hint = "tools",
-        sub_item_table = {
-            {
-                text = _("Open dashboard"),
-                enabled_func = function()
-                    return self:isLoggedIn()
-                end,
-                callback = function()
-                    self:browseCatalog()
-                end,
-            },
-            {
-                text_func = function()
-                    return self:updateCheckMenuText()
-                end,
-                enabled_func = function()
-                    return self:isLoggedIn()
-                        and not BookOrbitSweep.isRunning()
-                        and not BookOrbitBookSync.isRunning()
-                end,
-                keep_menu_open = true,
-                callback = function()
-                    self:checkForUpdate()
-                end,
-            },
-            {
-                text_func = function()
-                    local status = BookOrbitSweep.syncStatus()
-                    local when = (status.lastSweepAt == 0) and _("never")
-                        or os.date("%Y-%m-%d %H:%M", status.lastSweepAt)
-                    if status.unmatched > 0 then
-                        return T(_("Last sync: %1 (%2 linked, %3 unmatched)"), when, status.matched, status.unmatched)
-                    elseif status.matched > 0 then
-                        return T(_("Last sync: %1 (%2 linked)"), when, status.matched)
-                    end
-                    return T(_("Last sync: %1"), when)
-                end,
-                enabled = false,
-                separator = true,
-            },
-            {
-                text = _("Sync this book now"),
-                enabled_func = function()
-                    return self:isLoggedIn() and self.ui.document ~= nil
-                        and not BookOrbitSweep.isRunning() and not BookOrbitBookSync.isRunning()
-                end,
-                callback = function()
-                    self:onBookOrbitSyncBook()
-                end,
-            },
-            {
-                text = _("Sync all books now"),
-                enabled_func = function()
-                    return self:isLoggedIn() and not BookOrbitSweep.isRunning() and not BookOrbitBookSync.isRunning()
-                end,
-                callback = function()
-                    self:startSweep()
-                end,
-                separator = true,
-            },
-            {
-                text = _("Auto sync this book"),
-                checked_func = function() return self.settings.auto_sync end,
-                help_text = _([[Pulls progress when a book is opened; pushes progress, highlights, status, rating and reading time when it is closed and on suspend.]]),
-                callback = function()
-                    self:onBookOrbitToggleAutoSync(nil, true)
-                end,
-            },
-            {
-                text = _("Two-way highlight sync"),
-                checked_func = function() return self.settings.annotation_sync end,
-                help_text = _([[Also applies highlights, notes and deletions made in BookOrbit to this device: on book open, after the manual book sync, and during the full sweep for closed books. Turning this off keeps uploads only.]]),
-                callback = function()
-                    self.settings.annotation_sync = not self.settings.annotation_sync
-                end,
-            },
-            {
-                text = _("Skip auto-sync when offline"),
-                checked_func = function() return self.settings.skip_sync_when_offline end,
-                enabled_func = function() return self.settings.auto_sync end,
-                help_text = _([[When enabled, automatic sync on book open is skipped if the device is not already online. Prevents the e-reader from stalling while trying to connect to Wi-Fi.]]),
-                callback = function()
-                    self.settings.skip_sync_when_offline = not self.settings.skip_sync_when_offline
-                end,
-                separator = true,
-            },
-            {
-                text = _("Sync settings"),
-                sub_item_table = {
-                    {
-                        text_func = function()
-                            return T(_("Open dashboard on startup (%1)"), self:catalogAutoOpenLabel())
-                        end,
-                        sub_item_table = self:catalogAutoOpenMenu(),
-                    },
-                    {
-                        text_func = function()
-                            return T(_("Periodically sync every # pages (%1)"), self:getSyncPeriod())
-                        end,
-                        enabled_func = function() return self.settings.auto_sync end,
-                        keep_menu_open = true,
-                        callback = function(touchmenu_instance)
-                            local SpinWidget = require("ui/widget/spinwidget")
-                            local items = SpinWidget:new{
-                                text = _([[This value determines how many page turns it takes to push book progress.
-If set to 0, updating progress based on page turns will be disabled.]]),
-                                value = self.settings.pages_before_update or 0,
-                                value_min = 0,
-                                value_max = 999,
-                                value_step = 1,
-                                value_hold_step = 10,
-                                ok_text = _("Set"),
-                                title_text = _("Number of pages before update"),
-                                default_value = 10,
-                                callback = function(spin)
-                                    self:setPagesBeforeUpdate(spin.value)
-                                    if touchmenu_instance then touchmenu_instance:updateItems() end
-                                end,
-                            }
-                            UIManager:show(items)
-                        end,
-                    },
-                    {
-                        text_func = function()
-                            return T(_("Sync to a newer state (%1)"), getNameStrategy(self.settings.sync_forward))
-                        end,
-                        sub_item_table = self:strategyMenu(
-                            function() return self.settings.sync_forward end,
-                            function(value) self.settings.sync_forward = value end
-                        ),
-                    },
-                    {
-                        text_func = function()
-                            return T(_("Sync to an older state (%1)"), getNameStrategy(self.settings.sync_backward))
-                        end,
-                        sub_item_table = self:strategyMenu(
-                            function() return self.settings.sync_backward end,
-                            function(value) self.settings.sync_backward = value end
-                        ),
-                    },
-                },
-            },
-            {
-                text = _("Account & setup"),
-                sub_item_table = {
-                    {
-                        text = _("BookOrbit server address"),
-                        keep_menu_open = true,
-                        callback = function()
-                            self:setServerAddress()
-                        end,
-                    },
-                    {
-                        text_func = function()
-                            return self.settings.userkey and _("Logout") or _("Login")
-                        end,
-                        enabled_func = function()
-                            return self.settings.server_url ~= nil
-                        end,
-                        keep_menu_open = true,
-                        callback_func = function()
-                            if self.settings.userkey then
-                                return function(menu)
-                                    self:logout(menu)
-                                end
-                            else
-                                return function(menu)
-                                    self:login(menu)
-                                end
-                            end
-                        end,
-                    },
-                },
-            },
-        },
-    }
-end
-
-function BookOrbit:dashboardMenuItems(catalog)
-    local menu_items = {}
-    self:addToMainMenu(menu_items)
-    local bookorbit_items = menu_items.bookorbit.sub_item_table or {}
-    local items = {
-        icon = "appbar.menu",
-    }
-    for index, item in ipairs(bookorbit_items) do
-        if index ~= 1 then
-            table.insert(items, item)
-        end
-    end
-    if catalog then
-        table.insert(items, {
-            text = _("Close BookOrbit"),
-            separator = true,
-            callback = function()
-                local menu_container = self.dashboard_menu_container
-                self.dashboard_menu_container = nil
-                if menu_container then UIManager:close(menu_container) end
-                catalog:onCloseAllMenus()
-            end,
-        })
-    end
-    return items
-end
-
-function BookOrbit:showDashboardMenu(catalog)
-    local CenterContainer = require("ui/widget/container/centercontainer")
-    local TouchMenu = require("ui/widget/touchmenu")
-    if self.dashboard_menu_container then
-        local old_container = self.dashboard_menu_container
-        self.dashboard_menu_container = nil
-        UIManager:close(old_container)
-    end
-    local menu_container = CenterContainer:new{
-        covers_header = true,
-        ignore = "height",
-        dimen = Device.screen:getSize(),
-    }
-    local dashboard_menu = TouchMenu:new{
-        width = Device.screen:getWidth(),
-        last_index = 1,
-        tab_item_table = { self:dashboardMenuItems(catalog) },
-        show_parent = menu_container,
-    }
-    local closing = false
-    dashboard_menu.close_callback = function()
-        if closing then return true end
-        closing = true
-        if self.dashboard_menu_container == menu_container then
-            self.dashboard_menu_container = nil
-        end
-        UIManager:close(menu_container)
-        return true
-    end
-    menu_container[1] = dashboard_menu
-    self.dashboard_menu_container = menu_container
-    UIManager:show(menu_container)
-end
+-- Catalog browser
 
 function BookOrbit:openCatalogBrowser(prefer_cached_dashboard)
     if self.catalog_browser ~= nil then return end
@@ -679,422 +372,6 @@ function BookOrbit:browseCatalog(allow_offline)
         NetworkMgr:runWhenConnected(function()
             self:openCatalogBrowser(false)
         end)
-    end
-end
-
-function BookOrbit:setServerAddress()
-    local dialog
-    dialog = InputDialog:new{
-        title = _("BookOrbit server address"),
-        input = self.settings.server_url or "https://",
-        input_hint = "https://bookorbit.example.com",
-        buttons = {
-            {
-                {
-                    text = _("Cancel"),
-                    id = "close",
-                    callback = function()
-                        UIManager:close(dialog)
-                    end,
-                },
-                {
-                    text = _("OK"),
-                    is_enter_default = true,
-                    callback = function()
-                        local normalized = BookOrbitApi.normalizeServerUrl(dialog:getInputText())
-                        self.settings.server_url = normalized
-                        UIManager:close(dialog)
-                        if normalized then
-                            Notification:notify(T(_("BookOrbit server set to %1"), normalized))
-                        end
-                    end,
-                },
-            },
-        },
-    }
-    UIManager:show(dialog)
-    dialog:onShowKeyboard()
-end
-
-function BookOrbit:login(menu)
-    if NetworkMgr:willRerunWhenOnline(function() self:login(menu) end) then
-        return
-    end
-
-    local dialog
-    dialog = MultiInputDialog:new{
-        title = self.title,
-        fields = {
-            {
-                text = self.settings.username,
-                hint = "username",
-            },
-            {
-                hint = "password",
-                text_type = "password",
-            },
-        },
-        description = _("Credentials are created in BookOrbit web settings under Settings, KOReader."),
-        buttons = {
-            {
-                {
-                    text = _("Cancel"),
-                    id = "close",
-                    callback = function()
-                        UIManager:close(dialog)
-                    end,
-                },
-                {
-                    text = _("Login"),
-                    is_enter_default = true,
-                    callback = function()
-                        local username, password = unpack(dialog:getFields())
-                        username = util.trim(username or "")
-                        if username == "" or not password or password == "" then
-                            UIManager:show(InfoMessage:new{ text = _("Please enter a username and password."), timeout = 2 })
-                            return
-                        end
-                        UIManager:close(dialog)
-                        UIManager:scheduleIn(0.5, function()
-                            self:doLogin(username, password, menu)
-                        end)
-                        UIManager:show(InfoMessage:new{ text = _("Logging in. Please wait."), timeout = 1 })
-                    end,
-                },
-            },
-        },
-    }
-    UIManager:show(dialog)
-    dialog:onShowKeyboard()
-end
-
-function BookOrbit:doLogin(username, password, menu)
-    Device:setIgnoreInput(true)
-    local userkey = md5(password)
-    local client = BookOrbitApi.new{
-        server_url = self.settings.server_url,
-        username = username,
-        userkey = userkey,
-        device_id = self.device_id,
-        device_model = Device.model,
-        plugin_version = PLUGIN_VERSION,
-    }
-    local body, err = client:auth()
-    Device:setIgnoreInput(false)
-
-    if body then
-        self.settings.username = username
-        self.settings.userkey = userkey
-        if menu then menu:updateItems() end
-        UIManager:show(InfoMessage:new{ text = _("Logged in to BookOrbit.") })
-        UIManager:scheduleIn(1, function()
-            self:maybeCheckForUpdate(false)
-        end)
-    elseif err == 401 or err == 403 then
-        UIManager:show(InfoMessage:new{
-            text = _("Login failed. Create or check your KOReader credentials in BookOrbit web settings."),
-        })
-    else
-        UIManager:show(InfoMessage:new{ text = T(_("Could not reach the BookOrbit server: %1"), tostring(err)) })
-    end
-end
-
-function BookOrbit:logout(menu)
-    self.settings.userkey = nil
-    if menu then menu:updateItems() end
-end
-
-function BookOrbit:getSyncPeriod()
-    if not self.settings.auto_sync then
-        return _("Not available")
-    end
-    local period = self.settings.pages_before_update
-    if period and period > 0 then
-        return period
-    end
-    return _("Never")
-end
-
-function BookOrbit:setPagesBeforeUpdate(value)
-    self.settings.pages_before_update = value
-end
-
-function BookOrbit:schedulePeriodicPush()
-    UIManager:unschedule(self.periodic_push_task)
-    -- A sizable delay debounces nicely while skimming.
-    UIManager:scheduleIn(10, self.periodic_push_task)
-    self.periodic_push_scheduled = true
-end
-
--- Live progress sync (kosync mirror)
-
-function BookOrbit:getLastPercent()
-    if self.ui.document.info.has_pages then
-        return Math.roundPercent(self.ui.paging:getLastPercent())
-    else
-        return Math.roundPercent(self.ui.rolling:getLastPercent())
-    end
-end
-
-function BookOrbit:getLastProgress()
-    if self.ui.document.info.has_pages then
-        return self.ui.paging:getLastProgress()
-    else
-        return self.ui.rolling:getLastProgress()
-    end
-end
-
--- Always the binary partial MD5: BookOrbit matches on the scanner-computed
--- partial MD5 of the file, so the filename checksum method does not exist here.
-function BookOrbit:getDocumentDigest()
-    local digest = self.ui.doc_settings:readSetting("partial_md5_checksum")
-    if digest then return digest end
-
-    local file = self.ui.document.file
-    if not file then return nil end
-    local ok, computed = pcall(util.partialMD5, file)
-    if not ok or not computed then return nil end
-    self.ui.doc_settings:saveSetting("partial_md5_checksum", computed)
-    return computed
-end
-
-function BookOrbit:syncToProgress(progress)
-    logger.dbg("BookOrbit: syncing to progress", progress)
-    if self.ui.document.info.has_pages then
-        self.ui:handleEvent(Event:new("GotoPage", tonumber(progress)))
-    else
-        self.ui:handleEvent(Event:new("GotoXPointer", progress))
-    end
-end
-
-local function hasUsableRemoteProgress(progress)
-    return progress ~= nil and progress ~= ""
-end
-
-function BookOrbit:remoteProgressIsNewer(body, local_percentage)
-    local local_timestamp = self.last_page_turn_timestamp or 0
-    if body.timestamp ~= nil then
-        if local_timestamp > 0 then
-            return body.timestamp > local_timestamp
-        end
-        return body.percentage > local_percentage
-    end
-    return body.percentage > local_percentage
-end
-
-function BookOrbit:applyRemoteProgress(body, on_done)
-    self:syncToProgress(body.progress)
-    if on_done then
-        UIManager:scheduleIn(0.1, function()
-            on_done(false)
-        end)
-    end
-end
-
-function BookOrbit:reconcileProgressBeforeBookSync(digest, on_done)
-    if not self.ui or not self.ui.document then
-        UIManager:show(InfoMessage:new{ text = _("Open a book to sync it."), timeout = 2 })
-        return
-    end
-    if self:getDocumentDigest() ~= digest then
-        UIManager:show(InfoMessage:new{ text = _("The open book changed. Start the sync again."), timeout = 3 })
-        return
-    end
-
-    local client = self:newClient()
-    local body, err = client:getProgress(digest)
-    self.pull_timestamp = UIManager:getElapsedTimeSinceBoot()
-
-    if not body then
-        logger.dbg("BookOrbit: progress check before book sync failed:", err)
-        UIManager:show(InfoMessage:new{ text = _("Could not check latest progress. Syncing book data without changing progress."), timeout = 4 })
-        on_done(true)
-        return
-    end
-
-    if not body.percentage then
-        on_done(false)
-        return
-    end
-
-    if body.device == Device.model and body.device_id == self.device_id then
-        on_done(false)
-        return
-    end
-
-    body.percentage = Math.roundPercent(body.percentage)
-    local local_progress = self:getLastProgress()
-    local local_percentage = self:getLastPercent()
-
-    if local_percentage == body.percentage or body.progress == local_progress then
-        on_done(false)
-        return
-    end
-
-    local remote_newer = self:remoteProgressIsNewer(body, local_percentage)
-    if not hasUsableRemoteProgress(body.progress) then
-        if remote_newer then
-            UIManager:show(InfoMessage:new{
-                text = _("BookOrbit has newer progress but no exact location. Syncing book data without changing progress."),
-                timeout = 4,
-            })
-            on_done(true)
-        else
-            on_done(false)
-        end
-        return
-    end
-
-    local strategy = remote_newer and self.settings.sync_forward or self.settings.sync_backward
-    if strategy == SYNC_STRATEGY.SILENT then
-        self:applyRemoteProgress(body, on_done)
-    elseif strategy == SYNC_STRATEGY.PROMPT then
-        local template = remote_newer and _("Sync to latest location %1% from device '%2' before uploading this book?")
-            or _("Sync to previous location %1% from device '%2' before uploading this book?")
-        UIManager:show(ConfirmBox:new{
-            text = T(template, Math.round(body.percentage * 100), body.device),
-            ok_callback = function()
-                self:applyRemoteProgress(body, on_done)
-            end,
-            cancel_callback = function()
-                on_done(remote_newer)
-            end,
-        })
-    elseif remote_newer then
-        UIManager:show(InfoMessage:new{
-            text = _("BookOrbit has newer progress. Syncing book data without changing progress."),
-            timeout = 4,
-        })
-        on_done(true)
-    else
-        on_done(false)
-    end
-end
-
-function BookOrbit:updateProgress(ensure_networking, interactive, on_suspend)
-    if not self:isLoggedIn() then
-        if interactive then promptLogin() end
-        return
-    end
-    if not self.ui or not self.ui.document then return end
-
-    local now = UIManager:getElapsedTimeSinceBoot()
-    if not interactive and now - self.push_timestamp <= API_CALL_DEBOUNCE_DELAY then
-        logger.dbg("BookOrbit: push debounced")
-        return
-    end
-
-    if ensure_networking and NetworkMgr:willRerunWhenOnline(function() self:updateProgress(ensure_networking, interactive, on_suspend) end) then
-        return
-    end
-
-    local digest = self:getDocumentDigest()
-    if not digest then return end
-
-    local client = self:newClient()
-    local body, err = client:updateProgress(digest, self:getLastPercent(), self:getLastProgress(), os.time())
-    if interactive then
-        if body then
-            UIManager:show(InfoMessage:new{ text = _("Progress has been pushed to BookOrbit."), timeout = 3 })
-            if not on_suspend then self:maybeCheckForUpdate(false) end
-        else
-            showSyncError()
-        end
-    elseif not body then
-        logger.dbg("BookOrbit: push failed:", err)
-    elseif not on_suspend then
-        self:maybeCheckForUpdate(false)
-    end
-
-    if on_suspend and Device:hasWifiManager() then
-        NetworkMgr:disableWifi()
-    end
-
-    self.push_timestamp = now
-end
-
-function BookOrbit:getProgress(ensure_networking, interactive)
-    if not self:isLoggedIn() then
-        if interactive then promptLogin() end
-        return
-    end
-    if not self.ui or not self.ui.document then return end
-
-    local now = UIManager:getElapsedTimeSinceBoot()
-    if not interactive and now - self.pull_timestamp <= API_CALL_DEBOUNCE_DELAY then
-        logger.dbg("BookOrbit: pull debounced")
-        return
-    end
-
-    if ensure_networking and NetworkMgr:willRerunWhenOnline(function() self:getProgress(ensure_networking, interactive) end) then
-        return
-    end
-
-    local digest = self:getDocumentDigest()
-    if not digest then return end
-
-    local client = self:newClient()
-    local body, err = client:getProgress(digest)
-    self.pull_timestamp = now
-
-    if not body then
-        if interactive then showSyncError() end
-        logger.dbg("BookOrbit: pull failed:", err)
-        return
-    end
-    self:maybeCheckForUpdate(false)
-
-    if not body.percentage then
-        if interactive then
-            UIManager:show(InfoMessage:new{ text = _("No progress found for this document."), timeout = 3 })
-        end
-        return
-    end
-
-    if body.device == Device.model and body.device_id == self.device_id then
-        if interactive then
-            UIManager:show(InfoMessage:new{ text = _("Latest progress is coming from this device."), timeout = 3 })
-        end
-        return
-    end
-
-    body.percentage = Math.roundPercent(body.percentage)
-    local progress = self:getLastProgress()
-    local percentage = self:getLastPercent()
-
-    if percentage == body.percentage or body.progress == progress then
-        if interactive then
-            UIManager:show(InfoMessage:new{ text = _("The progress has already been synchronized."), timeout = 3 })
-        end
-        return
-    end
-
-    if interactive then
-        self:syncToProgress(body.progress)
-        UIManager:show(InfoMessage:new{ text = _("Progress has been synchronized."), timeout = 3 })
-        return
-    end
-
-    local self_older
-    if body.timestamp ~= nil then
-        self_older = (body.timestamp > self.last_page_turn_timestamp)
-    else
-        self_older = (body.percentage > percentage)
-    end
-
-    local strategy = self_older and self.settings.sync_forward or self.settings.sync_backward
-    if strategy == SYNC_STRATEGY.SILENT then
-        self:syncToProgress(body.progress)
-        UIManager:show(InfoMessage:new{ text = _("Progress has been synchronized."), timeout = 3 })
-    elseif strategy == SYNC_STRATEGY.PROMPT then
-        local template = self_older and _("Sync to latest location %1% from device '%2'?")
-            or _("Sync to previous location %1% from device '%2'?")
-        UIManager:show(ConfirmBox:new{
-            text = T(template, Math.round(body.percentage * 100), body.device),
-            ok_callback = function()
-                self:syncToProgress(body.progress)
-            end,
-        })
     end
 end
 
@@ -1334,162 +611,6 @@ function BookOrbit:onCloseWidget()
         UIManager:unschedule(self.periodic_push_task)
         self.periodic_push_task = nil
     end
-end
-
-function BookOrbit:checkForUpdate()
-    if not self:isLoggedIn() then
-        promptLogin()
-        return
-    end
-    NetworkMgr:runWhenConnected(function()
-        self:doCheckForUpdate()
-    end)
-end
-
-function BookOrbit:maybeCheckForUpdate(interactive)
-    if not self:isLoggedIn() or self._checking_update or self._updating then return end
-    if BookOrbitSweep.isRunning() or BookOrbitBookSync.isRunning() then return end
-
-    local now = os.time()
-    if not interactive and now - (self.settings.update_check_last_at or 0) < UPDATE_CHECK_INTERVAL then
-        return
-    end
-
-    self._checking_update = true
-    local body, err = self:newClient():getPluginVersion()
-    self._checking_update = false
-
-    if not body then
-        if interactive then
-            UIManager:show(InfoMessage:new{
-                text = T(_("Could not check for update: %1"), tostring(err or "network error")),
-                timeout = 4,
-            })
-        else
-            logger.dbg("BookOrbit: plugin update check failed:", err)
-        end
-        return
-    end
-
-    self:handleUpdateVersionResponse(body, interactive, interactive or self.catalog_browser == nil)
-end
-
-function BookOrbit:doCheckForUpdate()
-    local checking = InfoMessage:new{ text = _("Checking for update...") }
-    UIManager:show(checking)
-
-    local body, err = self:newClient():getPluginVersion()
-    UIManager:close(checking)
-
-    if not body then
-        UIManager:show(InfoMessage:new{
-            text = T(_("Could not check for update: %1"), tostring(err or "network error")),
-            timeout = 4,
-        })
-        return
-    end
-
-    self:handleUpdateVersionResponse(body, true, true)
-end
-
-function BookOrbit:handleUpdateVersionResponse(body, interactive, prompt_allowed)
-    local server_ver = body.serverVersion or "unknown"
-    local plugin_latest = body.pluginVersion
-    self.settings.update_check_last_at = os.time()
-
-    if type(plugin_latest) ~= "string" or plugin_latest == "unknown" then
-        G_reader_settings:flush()
-        if interactive then
-            UIManager:show(InfoMessage:new{
-                text = _("Could not determine the latest plugin version from the server."),
-                timeout = 4,
-            })
-        end
-        return
-    end
-
-    self.settings.update_latest_version = plugin_latest
-    G_reader_settings:flush()
-
-    if BookOrbitUpdater.isNewer(plugin_latest, PLUGIN_VERSION) ~= true then
-        if interactive then
-            UIManager:show(InfoMessage:new{
-                text = T(_("Plugin is up to date (v%1).\nServer: v%2"), PLUGIN_VERSION, server_ver),
-                timeout = 4,
-            })
-        end
-        return
-    end
-
-    if not prompt_allowed then
-        return
-    end
-
-    if not interactive and self.settings.update_dismissed_version == plugin_latest then
-        return
-    end
-    if not interactive then
-        self.settings.update_dismissed_version = plugin_latest
-        G_reader_settings:flush()
-    end
-
-    UIManager:show(ConfirmBox:new{
-        text = T(_("Update available: v%1 -> v%2\nServer: v%3\n\nDownload and apply the update now?"),
-            PLUGIN_VERSION, plugin_latest, server_ver),
-        ok_text = _("Update"),
-        ok_callback = function()
-            self:applyUpdate(plugin_latest)
-        end,
-    })
-end
-
-function BookOrbit:applyUpdate(new_version)
-    if self._updating then
-        UIManager:show(InfoMessage:new{ text = _("An update is already in progress."), timeout = 3 })
-        return
-    end
-    self._updating = true
-    self:_doApplyUpdate(new_version)
-    self._updating = false
-end
-
-function BookOrbit:_doApplyUpdate(new_version)
-    if not self.path then
-        UIManager:show(InfoMessage:new{
-            text = _("Cannot determine plugin path. Update aborted."),
-            timeout = 3,
-        })
-        return
-    end
-
-    local progress = InfoMessage:new{ text = T(_("Downloading BookOrbit v%1..."), new_version) }
-    UIManager:show(progress)
-    UIManager:forceRePaint()
-
-    local ok, err = BookOrbitUpdater.apply(self:newClient(), self.path)
-    UIManager:close(progress)
-
-    if not ok then
-        local msg
-        if type(err) == "number" and err == 503 then
-            msg = _("Update failed: the server does not have the plugin package available.")
-        else
-            msg = T(_("Update failed: %1"), tostring(err or "unknown error"))
-        end
-        UIManager:show(InfoMessage:new{ text = msg, timeout = 6 })
-        return
-    end
-
-    UIManager:show(ConfirmBox:new{
-        text = T(_("BookOrbit v%1 installed. KOReader needs to restart to apply the update."), new_version),
-        ok_text = _("Restart now"),
-        ok_callback = function()
-            -- Exit code 85 triggers an app restart on Kobo and most e-ink platforms.
-            -- On other platforms KOReader exits cleanly; reopen it to apply the update.
-            UIManager:quit(UIManager.RETURN_CODE_REBOOT or 85)
-        end,
-        cancel_text = _("Later"),
-    })
 end
 
 return BookOrbit

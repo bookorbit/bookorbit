@@ -1,5 +1,5 @@
 import { onUnmounted, ref } from 'vue'
-import { api } from '@/lib/api'
+import { api, getAccessToken } from '@/lib/api'
 import { useFoliateAnnotations } from './useFoliateAnnotations'
 import { useFoliateSelection } from './useFoliateSelection'
 import { useFoliateInput } from './useFoliateInput'
@@ -39,6 +39,11 @@ export interface EpubOpenOptions {
   fixedLayoutSpread?: EpubReaderSettings['fixedLayoutSpread']
 }
 
+type FoliateFetchFile = ((input: RequestInfo | URL, init?: RequestInit) => Promise<Response>) & {
+  toString: () => string
+  [Symbol.toPrimitive]: () => string
+}
+
 function isResolvedNavigation(value: unknown): boolean {
   return Boolean(value && typeof value === 'object' && typeof (value as { index?: unknown }).index === 'number')
 }
@@ -57,6 +62,14 @@ function applyEpubOpenOptions(book: unknown, options: EpubOpenOptions | undefine
     ...epubBook.rendition,
     spread: 'none',
   }
+}
+
+function makeFoliateFetchFile(): FoliateFetchFile {
+  const fetchFile = ((input: RequestInfo | URL, init?: RequestInit) => api(input, init)) as FoliateFetchFile
+  const currentToken = () => getAccessToken() ?? ''
+  fetchFile.toString = currentToken
+  fetchFile[Symbol.toPrimitive] = currentToken
+  return fetchFile
 }
 
 export function useFoliate(
@@ -243,7 +256,7 @@ export function useFoliate(
             ) => Promise<unknown>)
           | undefined
         if (!makeStreamingBook) throw new Error('makeStreamingBook not available')
-        const book = await makeStreamingBook(bookId, '/api/v1/epub', bookInfo, api, null, fileId)
+        const book = await makeStreamingBook(bookId, '/api/v1/epub', bookInfo, makeFoliateFetchFile(), null, fileId)
         applyEpubOpenOptions(book, options)
         shouldRestoreByFraction = isFixedLayoutBook(book)
         isFixedLayout.value = shouldRestoreByFraction
