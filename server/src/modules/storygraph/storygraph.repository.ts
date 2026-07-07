@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Permission } from '@bookorbit/types';
-import { and, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -196,6 +196,36 @@ export class StorygraphRepository {
       .where(and(bookFilter, statusFilter));
 
     return rows as BookSyncData[];
+  }
+
+  // Books whose most recent sync attempt recorded an error — powers the manual-sync failure list.
+  async findBooksWithSyncErrors(
+    userId: number,
+  ): Promise<{ bookId: number; title: string | null; authorName: string | null; syncError: string; lastAttemptAt: Date | null }[]> {
+    const firstAuthorSq = this.db
+      .select({
+        bookId: schema.bookAuthors.bookId,
+        authorName: sql<string>`min(${schema.authors.name})`.as('author_name'),
+      })
+      .from(schema.bookAuthors)
+      .innerJoin(schema.authors, eq(schema.authors.id, schema.bookAuthors.authorId))
+      .groupBy(schema.bookAuthors.bookId)
+      .as('first_author_sq');
+
+    const rows = await this.db
+      .select({
+        bookId: schema.storygraphBookState.bookId,
+        title: schema.bookMetadata.title,
+        authorName: firstAuthorSq.authorName,
+        syncError: schema.storygraphBookState.syncError,
+        lastAttemptAt: schema.storygraphBookState.lastSyncedAt,
+      })
+      .from(schema.storygraphBookState)
+      .leftJoin(schema.bookMetadata, eq(schema.bookMetadata.bookId, schema.storygraphBookState.bookId))
+      .leftJoin(firstAuthorSq, eq(firstAuthorSq.bookId, schema.storygraphBookState.bookId))
+      .where(and(eq(schema.storygraphBookState.userId, userId), isNotNull(schema.storygraphBookState.syncError)));
+
+    return rows as { bookId: number; title: string | null; authorName: string | null; syncError: string; lastAttemptAt: Date | null }[];
   }
 
   async findBookIdByFileId(bookFileId: number): Promise<number | null> {

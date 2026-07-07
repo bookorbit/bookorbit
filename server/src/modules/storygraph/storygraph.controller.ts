@@ -70,6 +70,11 @@ export class StorygraphController {
     return this.syncService.getSyncPendingSummary(user.id);
   }
 
+  @Get('sync/failures')
+  listSyncFailures(@CurrentUser() user: RequestUser) {
+    return this.syncService.listSyncFailures(user.id);
+  }
+
   @Post('books/:bookId/rematch')
   async rematchBook(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number) {
     await this.bookService.verifyBookAccess(bookId, user);

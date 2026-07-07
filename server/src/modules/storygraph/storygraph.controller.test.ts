@@ -16,6 +16,7 @@ const mockSyncService = {
   getSyncStatus: vi.fn(),
   streamSyncStatus: vi.fn(),
   getSyncPendingSummary: vi.fn(),
+  listSyncFailures: vi.fn(),
   rematchBook: vi.fn(),
   getBookSyncState: vi.fn(),
   updateBookSyncState: vi.fn(),
@@ -83,6 +84,14 @@ describe('StorygraphController', () => {
     const emitted = await new Promise((resolve) => stream.subscribe((event) => resolve(event)));
     expect(emitted).toEqual({ data: { activeSyncStatus: null } });
     expect(mockSyncService.streamSyncStatus).toHaveBeenCalledWith(1);
+  });
+
+  it('listSyncFailures delegates to service', async () => {
+    const failures = [{ bookId: 7, title: 'Broken Book', authorName: null, syncError: 'no_match', lastAttemptAt: null }];
+    mockSyncService.listSyncFailures.mockResolvedValue(failures);
+    const result = await makeController().listSyncFailures(mockUser as any);
+    expect(result).toEqual(failures);
+    expect(mockSyncService.listSyncFailures).toHaveBeenCalledWith(1);
   });
 
   it('getSyncPendingSummary delegates to service', async () => {

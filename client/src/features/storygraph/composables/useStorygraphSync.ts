@@ -1,7 +1,8 @@
 import { computed, ref } from 'vue'
-import type { StorygraphActiveSyncStatus, StorygraphSyncPendingSummary } from '@bookorbit/types'
+import type { StorygraphActiveSyncStatus, StorygraphSyncFailure, StorygraphSyncPendingSummary } from '@bookorbit/types'
 import {
   cancelStorygraphSync,
+  fetchStorygraphSyncFailures,
   fetchStorygraphSyncPendingSummary,
   fetchStorygraphSyncStatus,
   startStorygraphSync,
@@ -10,6 +11,8 @@ import {
 import { useStorygraphSettings } from './useStorygraphSettings'
 
 const activeSyncStatus = ref<StorygraphActiveSyncStatus | null>(null)
+const lastRunSummary = ref<StorygraphActiveSyncStatus | null>(null)
+const syncFailures = ref<StorygraphSyncFailure[]>([])
 const pendingSummary = ref<StorygraphSyncPendingSummary>({ totalBooks: 0, pendingBooks: 0 })
 const syncing = ref(false)
 const loadingPending = ref(true)
@@ -22,7 +25,7 @@ const isSyncing = computed(() => activeSyncStatus.value?.status === 'running')
 const syncProgress = computed(() => {
   const s = activeSyncStatus.value
   if (!s || s.totalBooks === 0) return 0
-  return Math.round((s.syncedBooks / s.totalBooks) * 100)
+  return Math.round((s.processedBooks / s.totalBooks) * 100)
 })
 
 export function useStorygraphSync() {
@@ -34,10 +37,13 @@ export function useStorygraphSync() {
 
     void streamStorygraphSyncStatus(async (status) => {
       if (generation !== streamGeneration) return
+      if (status && status.status !== 'running') {
+        lastRunSummary.value = status
+      }
       activeSyncStatus.value = status
       if (status?.status !== 'running') {
         stopSyncTracking()
-        await fetchPendingSummary()
+        await Promise.all([fetchPendingSummary(), fetchSyncFailures()])
         await useStorygraphSettings().fetchSettings()
       }
     }, controller.signal)
@@ -67,6 +73,7 @@ export function useStorygraphSync() {
   async function startSync(): Promise<void> {
     syncing.value = true
     error.value = null
+    lastRunSummary.value = null
     try {
       const { runId } = await startStorygraphSync()
       if (runId <= 0) {
@@ -78,6 +85,9 @@ export function useStorygraphSync() {
         runId,
         status: 'running',
         syncedBooks: 0,
+        skippedBooks: 0,
+        failedBooks: 0,
+        processedBooks: 0,
         totalBooks: 0,
       }
       startSyncTracking()
@@ -97,10 +107,18 @@ export function useStorygraphSync() {
   }
 
   async function fetchStatus(): Promise<void> {
-    const [status] = await Promise.all([fetchStorygraphSyncStatus(), fetchPendingSummary()])
+    const [status] = await Promise.all([fetchStorygraphSyncStatus(), fetchPendingSummary(), fetchSyncFailures()])
     activeSyncStatus.value = status
     if (status?.status === 'running') {
       startSyncTracking()
+    }
+  }
+
+  async function fetchSyncFailures(): Promise<void> {
+    try {
+      syncFailures.value = await fetchStorygraphSyncFailures()
+    } catch {
+      // silent: the failure list is supplementary and must not break the sync card
     }
   }
 
@@ -117,6 +135,8 @@ export function useStorygraphSync() {
 
   return {
     activeSyncStatus,
+    lastRunSummary,
+    syncFailures,
     pendingSummary,
     syncing,
     loadingPending,
@@ -127,6 +147,7 @@ export function useStorygraphSync() {
     cancelSync,
     fetchStatus,
     fetchPendingSummary,
+    fetchSyncFailures,
     stopSyncTracking,
   }
 }

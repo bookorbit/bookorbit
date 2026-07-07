@@ -81,8 +81,10 @@ export function useStorygraphBookSyncState(bookId: Ref<number>) {
     { immediate: true },
   )
 
+  // bookSyncMode is a fetch source too: when the global scope flips, a mounted item's
+  // effectiveReason/toggle would otherwise keep showing state computed under the old mode.
   watch(
-    [bookId, visible],
+    [bookId, visible, () => settings.value?.bookSyncMode],
     async ([currentBookId, isVisible]) => {
       const requestId = ++stateRequestId
       state.value = null

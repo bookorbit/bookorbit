@@ -1,6 +1,7 @@
 import type { ReadStatus } from '@bookorbit/types';
 import type {
   StorygraphActiveSyncStatus,
+  StorygraphSyncFailure,
   StorygraphBookSyncEffectiveReason,
   StorygraphBookSyncState,
   StorygraphEdition,
@@ -210,6 +211,9 @@ export class StorygraphSyncService {
     const status: StorygraphActiveSyncStatus = {
       runId,
       syncedBooks: 0,
+      skippedBooks: 0,
+      failedBooks: 0,
+      processedBooks: 0,
       totalBooks: books.length,
       status: 'running',
     };
@@ -236,6 +240,7 @@ export class StorygraphSyncService {
     if (!run) return;
     this.cancelRequests.add(userId);
     this.activeSyncs.delete(userId);
+    this.emitSyncStatus(userId, { ...run, status: 'cancelled' });
     this.emitSyncStatus(userId, null);
     this.logger.log(`[storygraph.sync_all] userId=${userId} runId=${run.runId} - sync cancelled`);
   }
@@ -252,6 +257,17 @@ export class StorygraphSyncService {
         map((event) => event.status),
       ),
     ).pipe(distinctUntilChanged((prev, next) => this.isSameActiveStatus(prev, next)));
+  }
+
+  async listSyncFailures(userId: number): Promise<StorygraphSyncFailure[]> {
+    const rows = await this.repo.findBooksWithSyncErrors(userId);
+    return rows.map((row) => ({
+      bookId: row.bookId,
+      title: row.title ?? 'Unknown title',
+      authorName: row.authorName,
+      syncError: row.syncError,
+      lastAttemptAt: row.lastAttemptAt?.toISOString() ?? null,
+    }));
   }
 
   async getSyncPendingSummary(userId: number): Promise<StorygraphSyncPendingSummary> {
@@ -300,7 +316,7 @@ export class StorygraphSyncService {
 
       if (book.status === 'unread') {
         skipped++;
-        this.emitProgress(userId, synced);
+        this.emitProgress(userId, { synced, skipped, failed });
         continue;
       }
 
@@ -308,13 +324,13 @@ export class StorygraphSyncService {
       const settings = await this.settingsService.getSettings(userId);
       if (!this.resolveBookSyncDecision(settings, book, state, true).syncEnabled) {
         skipped++;
-        this.emitProgress(userId, synced);
+        this.emitProgress(userId, { synced, skipped, failed });
         continue;
       }
 
       if (!this.hasChanges(book, state)) {
         skipped++;
-        this.emitProgress(userId, synced);
+        this.emitProgress(userId, { synced, skipped, failed });
         continue;
       }
 
@@ -323,7 +339,7 @@ export class StorygraphSyncService {
       else if (result === 'skipped') skipped++;
       else failed++;
 
-      this.emitProgress(userId, synced);
+      this.emitProgress(userId, { synced, skipped, failed });
     }
 
     // Handle cancel requested after the last book was processed (loop exited without hitting the top check)
@@ -340,14 +356,31 @@ export class StorygraphSyncService {
     );
 
     await this.repo.updateLastSyncedAt(userId, new Date());
+    const current = this.activeSyncs.get(userId);
+    if (current) {
+      this.emitSyncStatus(userId, { ...current, status: 'completed' });
+    }
     this.activeSyncs.delete(userId);
     this.emitSyncStatus(userId, null);
   }
 
-  private emitProgress(userId: number, synced: number): void {
+  private emitProgress(userId: number, counts: { synced: number; skipped: number; failed: number }): void {
     const activeStatus = this.activeSyncs.get(userId);
-    if (activeStatus) activeStatus.syncedBooks = synced;
-    this.emitSyncStatus(userId, activeStatus ?? null);
+    if (!activeStatus) {
+      this.emitSyncStatus(userId, null);
+      return;
+    }
+    // Emit a fresh snapshot: mutating the stored object in place would make the stream's
+    // distinctUntilChanged compare an object against itself and drop every progress update.
+    const next: StorygraphActiveSyncStatus = {
+      ...activeStatus,
+      syncedBooks: counts.synced,
+      skippedBooks: counts.skipped,
+      failedBooks: counts.failed,
+      processedBooks: counts.synced + counts.skipped + counts.failed,
+    };
+    this.activeSyncs.set(userId, next);
+    this.emitSyncStatus(userId, next);
   }
 
   private async syncSingleBook(
@@ -571,7 +604,14 @@ export class StorygraphSyncService {
   private isSameActiveStatus(prev: StorygraphActiveSyncStatus | null, next: StorygraphActiveSyncStatus | null): boolean {
     if (prev === next) return true;
     if (!prev || !next) return false;
-    return prev.runId === next.runId && prev.status === next.status && prev.syncedBooks === next.syncedBooks && prev.totalBooks === next.totalBooks;
+    return (
+      prev.runId === next.runId &&
+      prev.status === next.status &&
+      prev.syncedBooks === next.syncedBooks &&
+      prev.processedBooks === next.processedBooks &&
+      prev.failedBooks === next.failedBooks &&
+      prev.totalBooks === next.totalBooks
+    );
   }
 
   private emitSyncStatus(userId: number, status: StorygraphActiveSyncStatus | null): void {

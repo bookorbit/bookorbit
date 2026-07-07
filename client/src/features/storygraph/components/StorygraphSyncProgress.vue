@@ -4,14 +4,41 @@ import { AlertCircle, RefreshCw, XCircle, Loader2 } from '@lucide/vue'
 import { useStorygraphSync } from '../composables/useStorygraphSync'
 import { useStorygraphSettings } from '../composables/useStorygraphSettings'
 
-const { activeSyncStatus, syncing, isSyncing, syncProgress, pendingSummary, loadingPending, error, startSync, cancelSync } = useStorygraphSync()
+const { activeSyncStatus, lastRunSummary, syncFailures, syncing, isSyncing, syncProgress, pendingSummary, loadingPending, error, startSync, cancelSync } =
+  useStorygraphSync()
 const { settings } = useStorygraphSettings()
 
 const progressLabel = computed(() => {
   const s = activeSyncStatus.value
   if (!s) return ''
-  return `${s.syncedBooks} / ${s.totalBooks} books`
+  return `${s.processedBooks} / ${s.totalBooks} books`
 })
+
+const liveCountsLabel = computed(() => {
+  const s = activeSyncStatus.value
+  if (!s) return ''
+  const parts = [`${s.syncedBooks} synced`]
+  if (s.skippedBooks > 0) parts.push(`${s.skippedBooks} skipped`)
+  return parts.join(' · ')
+})
+
+const lastRunLabel = computed(() => {
+  const s = lastRunSummary.value
+  if (!s) return null
+  const verb = s.status === 'cancelled' ? 'Last run cancelled' : 'Last run'
+  return `${verb}: ${s.syncedBooks} synced · ${s.skippedBooks} skipped · ${s.failedBooks} failed`
+})
+
+const failureLabel = (error: string): string => {
+  switch (error) {
+    case 'no_match':
+      return 'No StoryGraph match found'
+    case 'storygraph_session_expired':
+      return 'StoryGraph session expired — re-paste your cookies'
+    default:
+      return error.startsWith('status_update_failed') ? 'StoryGraph rejected the status update' : error
+  }
+}
 
 const hasPending = computed(() => pendingSummary.value.pendingBooks > 0)
 const syncScopeLabel = computed(() => (settings.value?.bookSyncMode === 'selected_only' ? 'selected books' : 'eligible books'))
@@ -96,12 +123,33 @@ const lastSyncedLabel = computed(() => {
 
     <div v-if="isSyncing" class="space-y-1.5">
       <div class="flex justify-between text-xs text-muted-foreground">
-        <span>Syncing...</span>
+        <span>
+          Syncing... {{ liveCountsLabel }}
+          <span v-if="activeSyncStatus && activeSyncStatus.failedBooks > 0" class="text-destructive">· {{ activeSyncStatus.failedBooks }} failed</span>
+        </span>
         <span>{{ progressLabel }}</span>
       </div>
       <div class="h-1.5 rounded-full bg-muted overflow-hidden">
         <div class="h-full rounded-full bg-primary transition-all duration-300" :style="{ width: `${syncProgress}%` }" />
       </div>
+    </div>
+
+    <p v-if="lastRunLabel && !isSyncing" class="text-xs text-muted-foreground">
+      {{ lastRunLabel }}
+    </p>
+
+    <div v-if="syncFailures.length > 0 && !isSyncing" class="space-y-1.5 pt-2 border-t border-border">
+      <p class="flex items-center gap-1.5 text-xs font-medium text-destructive">
+        <AlertCircle class="size-3.5 shrink-0" />
+        {{ syncFailures.length }} book{{ syncFailures.length === 1 ? '' : 's' }} failed to sync
+      </p>
+      <ul class="space-y-1">
+        <li v-for="failure in syncFailures" :key="failure.bookId" class="text-xs text-muted-foreground">
+          <span class="text-foreground">{{ failure.title }}</span>
+          <span v-if="failure.authorName"> — {{ failure.authorName }}</span>
+          <span class="text-destructive"> · {{ failureLabel(failure.syncError) }}</span>
+        </li>
+      </ul>
     </div>
   </div>
 </template>

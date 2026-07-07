@@ -64,8 +64,19 @@ export interface StorygraphBookSyncNowResult {
 export interface StorygraphActiveSyncStatus {
   runId: number;
   syncedBooks: number;
+  skippedBooks: number;
+  failedBooks: number;
+  processedBooks: number;
   totalBooks: number;
   status: StorygraphSyncRunStatus;
+}
+
+export interface StorygraphSyncFailure {
+  bookId: number;
+  title: string;
+  authorName: string | null;
+  syncError: string;
+  lastAttemptAt: string | null;
 }
 
 export interface StorygraphEdition {

@@ -3,6 +3,7 @@ import type {
   StorygraphActiveSyncStatus,
   StorygraphBookSyncNowResult,
   StorygraphBookSyncState,
+  StorygraphSyncFailure,
   StorygraphSyncPendingSummary,
   StorygraphSettings,
   StorygraphCookieValidationResult,
@@ -95,6 +96,12 @@ export async function streamStorygraphSyncStatus(onStatus: (status: StorygraphAc
       }
     }
   }
+}
+
+export async function fetchStorygraphSyncFailures(): Promise<StorygraphSyncFailure[]> {
+  const res = await api(`${BASE}/sync/failures`)
+  if (!res.ok) throw new Error('Failed to fetch StoryGraph sync failures')
+  return res.json()
 }
 
 export async function fetchStorygraphSyncPendingSummary(): Promise<StorygraphSyncPendingSummary> {

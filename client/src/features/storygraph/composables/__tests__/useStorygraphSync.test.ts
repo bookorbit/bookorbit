@@ -31,6 +31,9 @@ const RUNNING_STATUS: StorygraphActiveSyncStatus = {
   status: 'running',
   totalBooks: 10,
   syncedBooks: 3,
+  skippedBooks: 0,
+  failedBooks: 0,
+  processedBooks: 3,
 }
 
 const SETTINGS: StorygraphSettings = {
@@ -73,6 +76,9 @@ describe('useStorygraphSync', () => {
       runId: 1,
       status: 'running',
       syncedBooks: 0,
+      skippedBooks: 0,
+      failedBooks: 0,
+      processedBooks: 0,
       totalBooks: 0,
     })
     expect(c.isSyncing.value).toBe(true)
@@ -104,7 +110,7 @@ describe('useStorygraphSync', () => {
   })
 
   it('fetchStatus starts stream if sync is running', async () => {
-    mockStatus.mockResolvedValue({ runId: 2, status: 'running', totalBooks: 10, syncedBooks: 3 })
+    mockStatus.mockResolvedValue({ runId: 2, status: 'running', totalBooks: 10, syncedBooks: 3, skippedBooks: 0, failedBooks: 0, processedBooks: 3 })
     const c = await loadComposable()
     await c.fetchStatus()
     expect(c.isSyncing.value).toBe(true)

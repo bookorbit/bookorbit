@@ -12,6 +12,7 @@ const mockRepo = {
   findSyncableBook: vi.fn(),
   findBookSyncData: vi.fn(),
   clearBookMatch: vi.fn(),
+  findBooksWithSyncErrors: vi.fn(),
   findSettings: vi.fn(),
   setBookSyncOverride: vi.fn(),
 };
@@ -298,6 +299,60 @@ describe('StorygraphSyncService', () => {
       expect(mockRepo.updateLastSyncedAt).toHaveBeenCalledWith(1, expect.any(Date));
     });
 
+    it('streams a distinct progress snapshot for every processed book, including skipped ones', async () => {
+      mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
+      mockMatchService.matchBook.mockResolvedValue({ storygraphBookId: 'abc-123', matchMethod: 'isbn' });
+      mockRepo.findSyncableBooks.mockResolvedValue([
+        { ...readingBook, bookId: 10 },
+        // Already synced: processed as a skip, but must still advance progress.
+        { ...readingBook, bookId: 11, progress: 42 },
+        { ...readingBook, bookId: 12 },
+      ]);
+      mockRepo.findBookState.mockImplementation((_userId: number, bookId: number) =>
+        Promise.resolve(
+          bookId === 11 ? { lastSyncedAt: new Date('2024-02-01T00:00:00Z'), lastSyncedStatus: 'reading', lastSyncedProgress: 42 } : null,
+        ),
+      );
+
+      const svc = makeService();
+      const emissions: unknown[] = [];
+      const subscription = svc.streamSyncStatus(1).subscribe((status) => emissions.push(status));
+
+      await svc.syncAll(1);
+      await vi.waitFor(() => {
+        expect(emissions[emissions.length - 1]).toBeNull();
+      });
+      subscription.unsubscribe();
+
+      const runs = emissions.filter((e): e is { processedBooks: number; status: string } => e !== null && typeof e === 'object');
+      const processedSequence = runs.filter((e) => e.status === 'running').map((e) => e.processedBooks);
+      // initial 0, then one advance per book — the old in-place mutation collapsed these
+      // into a single reference that distinctUntilChanged dropped entirely.
+      expect(processedSequence).toEqual([0, 1, 2, 3]);
+      const terminal = runs[runs.length - 1]!;
+      expect(terminal).toMatchObject({ status: 'completed', processedBooks: 3, syncedBooks: 2, skippedBooks: 1, failedBooks: 0 });
+    });
+
+    it('processes match failures without stalling the progress stream', async () => {
+      mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
+      mockMatchService.matchBook.mockResolvedValue(null);
+      mockRepo.findSyncableBooks.mockResolvedValue([{ ...readingBook, bookId: 10 }]);
+      mockRepo.findBookState.mockResolvedValue(null);
+
+      const svc = makeService();
+      const emissions: unknown[] = [];
+      const subscription = svc.streamSyncStatus(1).subscribe((status) => emissions.push(status));
+
+      await svc.syncAll(1);
+      await vi.waitFor(() => {
+        expect(emissions[emissions.length - 1]).toBeNull();
+      });
+      subscription.unsubscribe();
+
+      const terminal = emissions.filter((e) => e !== null).pop();
+      expect(terminal).toMatchObject({ status: 'completed', failedBooks: 0, skippedBooks: 1 });
+    });
+
     it('includes previously finished books in the run', async () => {
       mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
       mockRepo.findSyncableBooks.mockResolvedValue([
@@ -315,6 +370,22 @@ describe('StorygraphSyncService', () => {
         expect(mockRepo.findBookState).toHaveBeenCalledWith(1, 10);
         expect(mockRepo.findBookState).toHaveBeenCalledWith(1, 11);
       });
+    });
+  });
+
+  describe('listSyncFailures', () => {
+    it('maps repository rows to sync failures', async () => {
+      mockRepo.findBooksWithSyncErrors.mockResolvedValue([
+        { bookId: 7, title: 'Broken Book', authorName: 'Some Author', syncError: 'no_match', lastAttemptAt: new Date('2026-07-01T00:00:00Z') },
+        { bookId: 8, title: null, authorName: null, syncError: 'status_update_failed:500', lastAttemptAt: null },
+      ]);
+
+      const failures = await makeService().listSyncFailures(1);
+
+      expect(failures).toEqual([
+        { bookId: 7, title: 'Broken Book', authorName: 'Some Author', syncError: 'no_match', lastAttemptAt: '2026-07-01T00:00:00.000Z' },
+        { bookId: 8, title: 'Unknown title', authorName: null, syncError: 'status_update_failed:500', lastAttemptAt: null },
+      ]);
     });
   });
 

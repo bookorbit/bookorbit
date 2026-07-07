@@ -190,6 +190,29 @@ describe('StorygraphRepository', () => {
     expect(mainSelect).toHaveProperty('format');
   });
 
+  it('findBooksWithSyncErrors selects failure fields filtered to errored states', async () => {
+    const { repo, db } = makeRepository();
+    const selectArgs: Array<Record<string, unknown>> = [];
+    const chain: Record<string, unknown> = {};
+    for (const method of ['from', 'innerJoin', 'leftJoin', 'where', 'groupBy', 'as']) {
+      chain[method] = vi.fn().mockReturnValue(chain);
+    }
+    chain.then = (resolve: (rows: unknown[]) => void) => resolve([]);
+    db.select.mockImplementation((cols: Record<string, unknown>) => {
+      selectArgs.push(cols);
+      return chain;
+    });
+
+    await repo.findBooksWithSyncErrors(7);
+
+    const mainSelect = selectArgs.find((cols) => cols && 'syncError' in cols);
+    expect(mainSelect).toBeDefined();
+    expect(mainSelect).toHaveProperty('bookId');
+    expect(mainSelect).toHaveProperty('title');
+    expect(mainSelect).toHaveProperty('authorName');
+    expect(mainSelect).toHaveProperty('lastAttemptAt');
+  });
+
   it('findSyncableBook returns a book from findSyncableBooks', async () => {
     const { repo } = makeRepository();
     const findBookSyncDataForUser = vi.spyOn(repo as any, 'findBookSyncDataForUser');
