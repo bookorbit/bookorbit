@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import { ChevronDown, ChevronUp, CheckCircle2, AlertCircle, HelpCircle, Loader2, RefreshCw, Link2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import type { StorygraphEdition, StorygraphLinkedBook } from '@bookorbit/types'
@@ -10,6 +10,7 @@ import {
   rematchStorygraphBook,
   setStorygraphEdition,
 } from '../api/storygraph.api'
+import { useStorygraphSync } from '../composables/useStorygraphSync'
 
 function editionUrl(edition: StorygraphEdition): string {
   return `https://app.thestorygraph.com/books/${edition.id}`
@@ -30,17 +31,31 @@ onMounted(async () => {
   await loadBooks()
 })
 
+// A bulk sync can link books after this list was fetched, leaving rows stuck on
+// "Not linked yet" until a manual refresh — reload whenever a run finishes. The refresh is
+// silent: toggling the loading state would swap the list for the spinner and collapse
+// whatever row the user is mid-interaction with.
+const { lastRunSummary } = useStorygraphSync()
+watch(lastRunSummary, async (summary) => {
+  if (summary) await loadBooks({ silent: true })
+})
+
 // Swallows its own failures (loadError drives the UI) so post-action refreshes can't
 // bubble into callers' try/catch and misattribute a reload failure to the action itself.
-async function loadBooks(): Promise<void> {
-  loading.value = true
+// The request id guards against concurrent reloads (mount, post-action, post-run) resolving
+// out of order and clobbering newer results with stale ones.
+let loadRequestId = 0
+async function loadBooks(options?: { silent?: boolean }): Promise<void> {
+  const requestId = ++loadRequestId
+  if (!options?.silent) loading.value = true
   loadError.value = false
   try {
-    books.value = await fetchStorygraphLinkedBooks()
+    const rows = await fetchStorygraphLinkedBooks()
+    if (requestId === loadRequestId) books.value = rows
   } catch {
-    loadError.value = true
+    if (requestId === loadRequestId) loadError.value = true
   } finally {
-    loading.value = false
+    if (requestId === loadRequestId && !options?.silent) loading.value = false
   }
 }
 
@@ -141,7 +156,7 @@ async function handleSetEdition(book: StorygraphLinkedBook, edition: StorygraphE
     <div v-else-if="loadError" class="flex items-center gap-2 text-xs text-destructive py-2">
       <AlertCircle class="size-3.5 shrink-0" />
       Failed to load books.
-      <button type="button" class="underline underline-offset-2" @click="loadBooks">Retry</button>
+      <button type="button" class="underline underline-offset-2" @click="() => loadBooks()">Retry</button>
     </div>
 
     <div v-else-if="books.length === 0" class="text-xs text-muted-foreground py-2">No books currently being read.</div>
@@ -169,6 +184,11 @@ async function handleSetEdition(book: StorygraphLinkedBook, edition: StorygraphE
         </button>
 
         <div v-if="expandedBookId === book.bookId" class="mt-3 space-y-3 pl-1">
+          <p v-if="!book.storygraphBookId" class="flex items-start gap-1.5 text-[11px] text-muted-foreground leading-relaxed">
+            <HelpCircle class="size-3.5 shrink-0 mt-0.5" />
+            This book couldn't be matched to StoryGraph automatically. Use "Try auto-match" to search again, or paste the book's StoryGraph URL below
+            for an exact link.
+          </p>
           <div class="flex gap-2">
             <input
               v-model="linkInputs[book.bookId]"
