@@ -151,6 +151,20 @@ describe('StorygraphRepository', () => {
     });
   });
 
+  it('resetSyncProgress nulls the synced markers while keeping the match', async () => {
+    const { repo, db, updateChain } = makeRepository();
+
+    await expect(repo.resetSyncProgress(7, 42)).resolves.toBeUndefined();
+    expect(db.update).toHaveBeenCalledTimes(1);
+    expect(updateChain.set).toHaveBeenCalledWith(
+      expect.objectContaining({ lastSyncedAt: null, lastSyncedStatus: null, lastSyncedProgress: null, syncError: null }),
+    );
+    // The match itself is preserved so the book stays "Linked".
+    const setArg = updateChain.set.mock.calls[0][0] as Record<string, unknown>;
+    expect(setArg).not.toHaveProperty('storygraphBookId');
+    expect(setArg).not.toHaveProperty('matchMethod');
+  });
+
   it('updateLastSyncedAt updates the settings timestamp', async () => {
     const { repo, updateChain } = makeRepository();
     const syncedAt = new Date('2026-01-01T00:00:00Z');

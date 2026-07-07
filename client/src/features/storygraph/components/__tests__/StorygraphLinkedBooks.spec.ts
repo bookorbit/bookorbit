@@ -69,7 +69,29 @@ describe('StorygraphLinkedBooks', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('A Parade of Horribles')
-    expect(wrapper.text()).toContain('Linked (cached)')
+    expect(wrapper.text()).toContain('Linked (Cached)')
+  })
+
+  it.each([
+    ['isbn', 'Linked (ISBN)'],
+    ['title', 'Linked (Title)'],
+    ['manual', 'Linked (Manual)'],
+  ])('presents the %s match method with proper casing', async (matchMethod, expected) => {
+    mocks.fetchStorygraphLinkedBooks.mockResolvedValue([makeBook({ matchMethod: matchMethod as StorygraphLinkedBook['matchMethod'] })])
+    const wrapper = mountList()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain(expected)
+  })
+
+  it('labels the manual-link field for a StoryGraph URL or book ID', async () => {
+    mocks.fetchStorygraphLinkedBooks.mockResolvedValue([makeBook({ storygraphBookId: null, matchMethod: null })])
+    const wrapper = mountList()
+    await flushPromises()
+
+    await wrapper.find('button').trigger('click')
+
+    expect(wrapper.find('input[type="text"]').attributes('placeholder')).toBe('Paste a StoryGraph URL or book ID')
   })
 
   it('shows an empty state when no books are being read', async () => {
@@ -161,7 +183,7 @@ describe('StorygraphLinkedBooks', () => {
     await flushPromises()
 
     expect(mocks.fetchStorygraphLinkedBooks).toHaveBeenCalledTimes(2)
-    expect(wrapper.text()).toContain('Linked (isbn)')
+    expect(wrapper.text()).toContain('Linked (ISBN)')
     // Silent refresh: the list stays rendered instead of flashing the loading spinner.
     expect(wrapper.text()).not.toContain('Loading books...')
   })

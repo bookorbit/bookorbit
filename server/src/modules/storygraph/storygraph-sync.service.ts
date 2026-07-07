@@ -72,7 +72,16 @@ export class StorygraphSyncService {
     if (!book) return 'skipped';
 
     const [settings, state] = await Promise.all([this.settingsService.getSettings(userId), this.repo.findBookState(userId, book.bookId)]);
-    if (!this.resolveBookSyncDecision(settings, book, state, true).syncEnabled) return 'skipped';
+    const decision = this.resolveBookSyncDecision(settings, book, state, true);
+    if (!decision.syncEnabled) {
+      // A book taken back to "unread" no longer maps to a StoryGraph shelf entry, so drop the
+      // synced markers (keeping the match) — otherwise re-adding it later reads as "already
+      // synced" against a stale status and is silently skipped.
+      if (decision.effectiveReason === 'unread' && state?.lastSyncedAt) {
+        await this.repo.resetSyncProgress(userId, book.bookId);
+      }
+      return 'skipped';
+    }
     if (!this.hasChanges(book, state)) return 'skipped';
 
     return this.syncSingleBook(userId, cookies, book, state);

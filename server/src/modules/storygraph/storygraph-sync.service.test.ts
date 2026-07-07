@@ -7,6 +7,7 @@ const mockRepo = {
   findBookState: vi.fn(),
   findBookStatesByBookIds: vi.fn(),
   upsertBookState: vi.fn(),
+  resetSyncProgress: vi.fn(),
   updateLastSyncedAt: vi.fn(),
   findSyncableBooks: vi.fn(),
   findSyncableBook: vi.fn(),
@@ -61,6 +62,7 @@ describe('StorygraphSyncService', () => {
     mockRepo.findSyncableBook.mockResolvedValue(null);
     mockRepo.findBookSyncData.mockImplementation((userId: number, bookId: number) => mockRepo.findSyncableBook(userId, bookId));
     mockRepo.upsertBookState.mockResolvedValue({});
+    mockRepo.resetSyncProgress.mockResolvedValue(undefined);
     mockRepo.updateLastSyncedAt.mockResolvedValue(undefined);
     mockRepo.clearBookMatch.mockResolvedValue(undefined);
     mockRepo.setBookSyncOverride.mockResolvedValue({});
@@ -99,6 +101,50 @@ describe('StorygraphSyncService', () => {
       mockRepo.findSyncableBook.mockResolvedValue({ ...readingBook, status: 'unread' });
       await expect(makeService().syncBook(1, 1)).resolves.toBe('skipped');
       expect(mockMatchService.matchBook).not.toHaveBeenCalled();
+      expect(mockRepo.resetSyncProgress).not.toHaveBeenCalled();
+    });
+
+    it('clears the synced markers when a previously synced book is taken back to unread', async () => {
+      mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
+      mockRepo.findSyncableBook.mockResolvedValue({ ...readingBook, status: 'unread' });
+      mockRepo.findBookState.mockResolvedValue({
+        storygraphBookId: 'sg-1',
+        matchMethod: 'isbn',
+        lastSyncedAt: new Date('2024-02-01T00:00:00Z'),
+        lastSyncedStatus: 'read',
+      });
+
+      await expect(makeService().syncBook(1, 1)).resolves.toBe('skipped');
+
+      // Re-marking the book later must re-push, so the stale "already synced" markers are dropped.
+      expect(mockRepo.resetSyncProgress).toHaveBeenCalledWith(1, 1);
+      expect(mockMatchService.matchBook).not.toHaveBeenCalled();
+    });
+
+    it('does not reset an unread book that was never synced', async () => {
+      mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
+      mockRepo.findSyncableBook.mockResolvedValue({ ...readingBook, status: 'unread' });
+      mockRepo.findBookState.mockResolvedValue({ storygraphBookId: 'sg-1', matchMethod: 'isbn', lastSyncedAt: null });
+
+      await expect(makeService().syncBook(1, 1)).resolves.toBe('skipped');
+
+      expect(mockRepo.resetSyncProgress).not.toHaveBeenCalled();
+    });
+
+    it('does not reset a synced book that is merely excluded from sync', async () => {
+      mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
+      mockRepo.findSyncableBook.mockResolvedValue(readingBook);
+      mockRepo.findBookState.mockResolvedValue({
+        syncOverride: 'excluded',
+        storygraphBookId: 'sg-1',
+        matchMethod: 'isbn',
+        lastSyncedAt: new Date('2024-02-01T00:00:00Z'),
+        lastSyncedStatus: 'reading',
+      });
+
+      await expect(makeService().syncBook(1, 1)).resolves.toBe('skipped');
+
+      expect(mockRepo.resetSyncProgress).not.toHaveBeenCalled();
     });
 
     it('skips when the local sync snapshot has no changes', async () => {

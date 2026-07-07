@@ -107,6 +107,16 @@ export class StorygraphRepository {
     return row!;
   }
 
+  // Clears the "already synced" markers while keeping the match, so a book that left the
+  // reading list (marked unread) re-syncs when it is added back instead of being treated as
+  // up to date against a StoryGraph shelf entry it no longer has.
+  async resetSyncProgress(userId: number, bookId: number): Promise<void> {
+    await this.db
+      .update(schema.storygraphBookState)
+      .set({ lastSyncedAt: null, lastSyncedStatus: null, lastSyncedProgress: null, syncError: null, updatedAt: new Date() })
+      .where(and(eq(schema.storygraphBookState.userId, userId), eq(schema.storygraphBookState.bookId, bookId)));
+  }
+
   // Clears the cached match and last-synced snapshot so the next sync re-runs matching from
   // scratch instead of trusting a previous (possibly wrong) match.
   async clearBookMatch(userId: number, bookId: number): Promise<void> {
