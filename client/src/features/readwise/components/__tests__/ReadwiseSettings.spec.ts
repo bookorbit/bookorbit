@@ -7,7 +7,15 @@ import ReadwiseSettingsPage from '../ReadwiseSettings.vue'
 const settings = ref<ReadwiseSettings | null>(null)
 const error = ref<string | null>(null)
 
-vi.mock('vue-sonner', () => ({ toast: { success: vi.fn<() => void>(), error: vi.fn<() => void>() } }))
+const { fetchSettings, saveSettings, validateToken, toastSuccess, toastError } = vi.hoisted(() => ({
+  fetchSettings: vi.fn<() => Promise<void>>(),
+  saveSettings: vi.fn<(payload: unknown) => Promise<boolean>>(),
+  validateToken: vi.fn<(token?: string) => Promise<{ valid: boolean }>>(),
+  toastSuccess: vi.fn<(message: string) => void>(),
+  toastError: vi.fn<(message: string) => void>(),
+}))
+
+vi.mock('vue-sonner', () => ({ toast: { success: toastSuccess, error: toastError } }))
 
 vi.mock('../../composables/useReadwiseSettings', () => ({
   useReadwiseSettings: () => ({
@@ -16,16 +24,27 @@ vi.mock('../../composables/useReadwiseSettings', () => ({
     saving: ref(false),
     validating: ref(false),
     error,
-    fetchSettings: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
-    saveSettings: vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
-    validateToken: vi.fn<() => Promise<{ valid: boolean }>>().mockResolvedValue({ valid: true }),
+    fetchSettings,
+    saveSettings,
+    validateToken,
   }),
 }))
 
 beforeEach(() => {
   settings.value = null
   error.value = null
+  fetchSettings.mockReset().mockResolvedValue(undefined)
+  saveSettings.mockReset().mockResolvedValue(true)
+  validateToken.mockReset().mockResolvedValue({ valid: true })
+  toastSuccess.mockReset()
+  toastError.mockReset()
 })
+
+function testButton(wrapper: Awaited<ReturnType<typeof mountPage>>, label: string) {
+  const btn = wrapper.findAll('button').find((b) => b.text().includes(label))
+  if (!btn) throw new Error(`button "${label}" not found`)
+  return btn
+}
 
 function baseSettings(overrides: Partial<ReadwiseSettings> = {}): ReadwiseSettings {
   return {
@@ -81,5 +100,65 @@ describe('ReadwiseSettings', () => {
     error.value = null
     const wrapper = await mountPage()
     expect(wrapper.text()).not.toContain('Failed to load settings')
+  })
+
+  it('rejects the Test action with an empty token and does not call validate', async () => {
+    settings.value = baseSettings()
+    const wrapper = await mountPage()
+    await testButton(wrapper, 'Test').trigger('click')
+    await flushPromises()
+    expect(validateToken).not.toHaveBeenCalled()
+    expect(toastError).toHaveBeenCalledWith('Enter your Readwise access token first')
+  })
+
+  it('validates a trimmed token and shows the valid result', async () => {
+    settings.value = baseSettings()
+    validateToken.mockResolvedValue({ valid: true })
+    const wrapper = await mountPage()
+    await wrapper.find('input').setValue('  my-token  ')
+    await testButton(wrapper, 'Test').trigger('click')
+    await flushPromises()
+    expect(validateToken).toHaveBeenCalledWith('my-token')
+    expect(wrapper.text()).toContain('Valid token')
+  })
+
+  it('shows an invalid result when the token is rejected', async () => {
+    settings.value = baseSettings()
+    validateToken.mockResolvedValue({ valid: false })
+    const wrapper = await mountPage()
+    await wrapper.find('input').setValue('bad-token')
+    await testButton(wrapper, 'Test').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Invalid token')
+  })
+
+  it('saves the token and enabled flag, then clears the token field', async () => {
+    settings.value = baseSettings()
+    saveSettings.mockResolvedValue(true)
+    const wrapper = await mountPage()
+    await wrapper.find('input').setValue('tok-123')
+    await testButton(wrapper, 'Save').trigger('click')
+    await flushPromises()
+    expect(saveSettings).toHaveBeenCalledWith({ apiToken: 'tok-123', enabled: false })
+    expect(toastSuccess).toHaveBeenCalledWith('Readwise settings saved')
+    expect((wrapper.find('input').element as HTMLInputElement).value).toBe('')
+  })
+
+  it('shows an error toast when saving fails', async () => {
+    settings.value = baseSettings()
+    saveSettings.mockResolvedValue(false)
+    error.value = 'Something broke'
+    const wrapper = await mountPage()
+    await testButton(wrapper, 'Save').trigger('click')
+    await flushPromises()
+    expect(toastError).toHaveBeenCalledWith('Something broke')
+  })
+
+  it('toggles the token field between hidden and visible', async () => {
+    settings.value = baseSettings()
+    const wrapper = await mountPage()
+    expect(wrapper.find('input').attributes('type')).toBe('password')
+    await testButton(wrapper, 'Show').trigger('click')
+    expect(wrapper.find('input').attributes('type')).toBe('text')
   })
 })
