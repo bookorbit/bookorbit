@@ -1,6 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 
-import { bookSeries, bookSeriesMemberships } from '../../../db/schema';
+import { books, bookSeries, bookSeriesMemberships } from '../../../db/schema';
 import { OpdsBookService } from '../opds-book.service';
 
 type BookPageResult = { entries: unknown[]; total: number };
@@ -199,6 +199,22 @@ describe('OpdsBookService', () => {
       ],
     });
     expect(fetchSpy).toHaveBeenCalledWith([5]);
+  });
+
+  it("getRecentGroupedPage decodes the lastAddedAt aggregate through books.addedAt's own driver-value decoder", async () => {
+    // A raw sql`` fragment (needed here for max()) is opaque to Drizzle: unlike a plain
+    // column select, it never gets timestamptz->Date conversion on its own (see
+    // drizzle-orm/node-postgres/session.cjs, which disables pg's built-in parser for
+    // that OID so columns can decode it themselves). .mapWith(books.addedAt) reuses that
+    // column's decoder instead of hand-rolling `new Date(...)`, which could subtly
+    // diverge from Drizzle's own timezone handling.
+    const { service, db } = makeService([[{ total: 0 }], []]);
+    vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValueOnce([1]);
+
+    await service.getRecentGroupedPage(7, 1, 20);
+
+    const rowsCall = (db.select as ReturnType<typeof vi.fn>).mock.calls[1] as [{ lastAddedAt: { decoder: unknown } }];
+    expect(rowsCall[0].lastAddedAt.decoder).toBe(books.addedAt);
   });
 
   it('getRecentGroupedPage falls back to "Untitled Series" when a series-owned group has no series name', async () => {
