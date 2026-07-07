@@ -75,6 +75,11 @@ function toggleTokenVisible() {
         </div>
       </div>
 
+      <div v-if="error" class="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-2">
+        <AlertCircle class="size-3.5 shrink-0 text-destructive mt-0.5" />
+        <p class="text-xs text-destructive leading-relaxed">{{ error }}</p>
+      </div>
+
       <div v-if="settings?.disabledReason" class="flex items-start gap-2 rounded-md border border-border/70 bg-muted/40 px-2.5 py-2">
         <Info class="size-3.5 shrink-0 text-muted-foreground mt-0.5" />
         <p class="text-xs text-muted-foreground leading-relaxed">

@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import type { ReadwiseSettings } from '@bookorbit/types'
 import ReadwiseSettingsPage from '../ReadwiseSettings.vue'
 
 const settings = ref<ReadwiseSettings | null>(null)
+const error = ref<string | null>(null)
 
 vi.mock('vue-sonner', () => ({ toast: { success: vi.fn<() => void>(), error: vi.fn<() => void>() } }))
 
@@ -14,12 +15,17 @@ vi.mock('../../composables/useReadwiseSettings', () => ({
     loading: ref(false),
     saving: ref(false),
     validating: ref(false),
-    error: ref<string | null>(null),
+    error,
     fetchSettings: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     saveSettings: vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
     validateToken: vi.fn<() => Promise<{ valid: boolean }>>().mockResolvedValue({ valid: true }),
   }),
 }))
+
+beforeEach(() => {
+  settings.value = null
+  error.value = null
+})
 
 function baseSettings(overrides: Partial<ReadwiseSettings> = {}): ReadwiseSettings {
   return {
@@ -61,5 +67,19 @@ describe('ReadwiseSettings', () => {
     settings.value = baseSettings({ tokenConfigured: true })
     const wrapper = await mountPage()
     expect(wrapper.text()).toContain('Connected')
+  })
+
+  it('surfaces a fetch error when loading settings fails', async () => {
+    settings.value = null
+    error.value = 'Failed to load settings'
+    const wrapper = await mountPage()
+    expect(wrapper.text()).toContain('Failed to load settings')
+  })
+
+  it('does not show an error banner when there is no error', async () => {
+    settings.value = baseSettings()
+    error.value = null
+    const wrapper = await mountPage()
+    expect(wrapper.text()).not.toContain('Failed to load settings')
   })
 })
