@@ -274,6 +274,13 @@
       "when": 1783397661979,
       "tag": "0038_user_book_notes_and_rating_tombstones",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1783458659132,
+      "tag": "0039_add_sync_to_kobo_smart_scopes",
+      "breakpoints": true
     }
   ]
 }
