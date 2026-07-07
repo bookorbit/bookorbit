@@ -51,6 +51,7 @@ import { formatCommunityRatingValue } from '@/features/book/lib/community-rating
 import BookCoverSurface from '@/features/book/components/BookCoverSurface.vue'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import HardcoverBookSyncGridItem from '@/features/hardcover/components/HardcoverBookSyncGridItem.vue'
+import StorygraphBookSyncGridItem from '@/features/storygraph/components/StorygraphBookSyncGridItem.vue'
 
 type FileProgress = {
   percentage: number
@@ -1763,6 +1764,7 @@ watch(
           <dd v-else class="text-sm text-foreground mt-0.5">-</dd>
         </div>
         <HardcoverBookSyncGridItem :book-id="book.id" />
+        <StorygraphBookSyncGridItem :book-id="book.id" />
         <div class="min-w-0">
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Date Started</dt>
           <template v-if="isEditingReadingDate('startedAt')">

@@ -285,13 +285,17 @@ describe('DetailsTab cover surface', () => {
     expect(tooltips.some((t) => t.includes('4.3 / 5') && t.includes('12,345'))).toBe(true)
   })
 
-  it('places the Hardcover sync grid item with the current book id', async () => {
+  it('places the sync grid items with the current book id', async () => {
     const wrapper = mountDetails(makeBook())
     await flushPromises()
 
-    const item = wrapper.findComponent({ name: 'HardcoverBookSyncGridItem' })
-    expect(item.exists()).toBe(true)
-    expect(item.props('bookId')).toBe(12)
+    const hardcoverItem = wrapper.findComponent({ name: 'HardcoverBookSyncGridItem' })
+    expect(hardcoverItem.exists()).toBe(true)
+    expect(hardcoverItem.props('bookId')).toBe(12)
+
+    const storygraphItem = wrapper.findComponent({ name: 'StorygraphBookSyncGridItem' })
+    expect(storygraphItem.exists()).toBe(true)
+    expect(storygraphItem.props('bookId')).toBe(12)
   })
 
   it('renders Send via Email button and opens dialog when user has email_send permission', async () => {

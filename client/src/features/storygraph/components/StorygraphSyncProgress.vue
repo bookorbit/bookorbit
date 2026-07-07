@@ -14,6 +14,7 @@ const progressLabel = computed(() => {
 })
 
 const hasPending = computed(() => pendingSummary.value.pendingBooks > 0)
+const syncScopeLabel = computed(() => (settings.value?.bookSyncMode === 'selected_only' ? 'selected books' : 'eligible books'))
 const syncUnavailableReason = computed(() => {
   switch (settings.value?.disabledReason) {
     case 'permission_denied':
@@ -49,7 +50,7 @@ const lastSyncedLabel = computed(() => {
     <div class="flex items-center justify-between gap-4">
       <div>
         <p class="font-medium text-sm">Manual sync</p>
-        <p class="text-xs text-muted-foreground mt-0.5">Push all your reading data to StoryGraph now.</p>
+        <p class="text-xs text-muted-foreground mt-0.5">Push your {{ syncScopeLabel }} to StoryGraph now.</p>
         <p v-if="!isSyncing" class="text-xs text-muted-foreground mt-1">
           <template v-if="loadingPending">Checking pending items...</template>
           <template v-else-if="hasPending">
@@ -57,7 +58,7 @@ const lastSyncedLabel = computed(() => {
             <span v-if="syncUnavailableReason">{{ syncUnavailableReason }}</span>
           </template>
           <template v-else-if="syncUnavailableReason">{{ syncUnavailableReason }}</template>
-          <template v-else-if="pendingSummary.totalBooks === 0">No eligible books to sync.</template>
+          <template v-else-if="pendingSummary.totalBooks === 0">No books in sync scope.</template>
           <template v-else>All books are already synced.</template>
         </p>
         <p v-if="lastSyncedLabel && !isSyncing" class="text-xs text-muted-foreground mt-0.5">

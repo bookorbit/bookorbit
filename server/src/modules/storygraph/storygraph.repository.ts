@@ -18,8 +18,6 @@ export interface BookSyncData {
   format: string | null;
   status: string;
   progress: number | null;
-  finishedAt: Date | null;
-  statusUpdatedAt: Date;
 }
 
 @Injectable()
@@ -97,6 +95,18 @@ export class StorygraphRepository {
     return row!;
   }
 
+  async setBookSyncOverride(userId: number, bookId: number, syncOverride: 'included' | 'excluded' | null): Promise<StorygraphBookState> {
+    const [row] = await this.db
+      .insert(schema.storygraphBookState)
+      .values({ userId, bookId, syncOverride })
+      .onConflictDoUpdate({
+        target: [schema.storygraphBookState.userId, schema.storygraphBookState.bookId],
+        set: { syncOverride, updatedAt: new Date() },
+      })
+      .returning();
+    return row!;
+  }
+
   // Clears the cached match and last-synced snapshot so the next sync re-runs matching from
   // scratch instead of trusting a previous (possibly wrong) match.
   async clearBookMatch(userId: number, bookId: number): Promise<void> {
@@ -126,16 +136,22 @@ export class StorygraphRepository {
   // ---- Books for sync ----
 
   async findSyncableBooks(userId: number): Promise<BookSyncData[]> {
-    return this.findSyncableBooksForUser(userId);
+    return this.findBookSyncDataForUser(userId, undefined, false);
   }
 
   async findSyncableBook(userId: number, bookId: number): Promise<BookSyncData | null> {
-    const [row] = await this.findSyncableBooksForUser(userId, bookId);
+    const [row] = await this.findBookSyncDataForUser(userId, bookId, false);
     return row ?? null;
   }
 
-  private async findSyncableBooksForUser(userId: number, bookId?: number): Promise<BookSyncData[]> {
+  async findBookSyncData(userId: number, bookId: number): Promise<BookSyncData | null> {
+    const [row] = await this.findBookSyncDataForUser(userId, bookId, true);
+    return row ?? null;
+  }
+
+  private async findBookSyncDataForUser(userId: number, bookId?: number, includeUnread = false): Promise<BookSyncData[]> {
     const bookFilter = bookId !== undefined ? eq(schema.books.id, bookId) : undefined;
+    const statusFilter = includeUnread ? undefined : ne(schema.userBookStatus.status, 'unread');
 
     const maxProgressSq = this.db
       .select({
@@ -168,21 +184,16 @@ export class StorygraphRepository {
         title: schema.bookMetadata.title,
         authorName: firstAuthorSq.authorName,
         format: schema.bookFiles.format,
-        status: schema.userBookStatus.status,
+        status: sql<string>`coalesce(${schema.userBookStatus.status}, 'unread')`,
         progress: maxProgressSq.maxProgress,
-        finishedAt: schema.userBookStatus.finishedAt,
-        statusUpdatedAt: schema.userBookStatus.updatedAt,
       })
       .from(schema.books)
-      .innerJoin(
-        schema.userBookStatus,
-        and(eq(schema.userBookStatus.bookId, schema.books.id), eq(schema.userBookStatus.userId, userId), ne(schema.userBookStatus.status, 'unread')),
-      )
+      .leftJoin(schema.userBookStatus, and(eq(schema.userBookStatus.bookId, schema.books.id), eq(schema.userBookStatus.userId, userId)))
       .leftJoin(schema.bookMetadata, eq(schema.bookMetadata.bookId, schema.books.id))
       .leftJoin(maxProgressSq, eq(maxProgressSq.bookId, schema.books.id))
       .leftJoin(firstAuthorSq, eq(firstAuthorSq.bookId, schema.books.id))
       .leftJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.books.primaryFileId))
-      .where(bookFilter);
+      .where(and(bookFilter, statusFilter));
 
     return rows as BookSyncData[];
   }

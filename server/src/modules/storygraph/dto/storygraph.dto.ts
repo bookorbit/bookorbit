@@ -1,4 +1,4 @@
-import { IsBoolean, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class UpsertStorygraphSettingsDto {
   @IsOptional()
@@ -14,6 +14,10 @@ export class UpsertStorygraphSettingsDto {
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
+
+  @IsOptional()
+  @IsIn(['all_eligible', 'selected_only'])
+  bookSyncMode?: 'all_eligible' | 'selected_only';
 
   @IsOptional()
   @IsBoolean()
@@ -48,4 +52,9 @@ export class SetStorygraphEditionDto {
   @IsString()
   @MaxLength(64)
   editionId!: string;
+}
+
+export class UpdateStorygraphBookSyncDto {
+  @IsBoolean()
+  syncEnabled!: boolean;
 }

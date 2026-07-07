@@ -188,19 +188,17 @@ describe('StorygraphRepository', () => {
     expect(mainSelect).toHaveProperty('title');
     expect(mainSelect).toHaveProperty('authorName');
     expect(mainSelect).toHaveProperty('format');
-    expect(mainSelect).toHaveProperty('finishedAt');
-    expect(mainSelect).toHaveProperty('statusUpdatedAt');
   });
 
   it('findSyncableBook returns a book from findSyncableBooks', async () => {
     const { repo } = makeRepository();
-    const findSyncableBooksForUser = vi.spyOn(repo as any, 'findSyncableBooksForUser');
-    findSyncableBooksForUser.mockResolvedValueOnce([{ bookId: 42 }]).mockResolvedValueOnce([]);
+    const findBookSyncDataForUser = vi.spyOn(repo as any, 'findBookSyncDataForUser');
+    findBookSyncDataForUser.mockResolvedValueOnce([{ bookId: 42 }]).mockResolvedValueOnce([]);
 
     await expect(repo.findSyncableBook(7, 42)).resolves.toEqual({ bookId: 42 });
     await expect(repo.findSyncableBook(7, 99)).resolves.toBeNull();
-    expect(findSyncableBooksForUser).toHaveBeenNthCalledWith(1, 7, 42);
-    expect(findSyncableBooksForUser).toHaveBeenNthCalledWith(2, 7, 99);
+    expect(findBookSyncDataForUser).toHaveBeenNthCalledWith(1, 7, 42, false);
+    expect(findBookSyncDataForUser).toHaveBeenNthCalledWith(2, 7, 99, false);
   });
 
   it('findBookIdByFileId returns the first matching book id', async () => {

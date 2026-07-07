@@ -12,12 +12,12 @@ export const storygraphUserSettings = pgTable('storygraph_user_settings', {
   sessionCookie: varchar('session_cookie', { length: 4096 }).notNull(),
   rememberToken: varchar('remember_token', { length: 4096 }).notNull(),
   enabled: boolean('enabled').notNull().default(true),
+  bookSyncMode: varchar('book_sync_mode', { length: 20 }).notNull().default('all_eligible'),
   autoSyncOnStatusChange: boolean('auto_sync_on_status_change').notNull().default(true),
   autoSyncOnProgressUpdate: boolean('auto_sync_on_progress_update').notNull().default(true),
   lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
   // When the user first connected StoryGraph. Books already finished before this moment are
   // assumed to already be logged on StoryGraph and are skipped by automatic/bulk sync.
-  connectedAt: timestamp('connected_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true })
     .defaultNow()
@@ -42,6 +42,7 @@ export const storygraphBookState = pgTable(
     lastSyncedStatus: varchar('last_synced_status', { length: 20 }),
     lastSyncedProgress: real('last_synced_progress'),
     syncError: text('sync_error'),
+    syncOverride: varchar('sync_override', { length: 20 }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .defaultNow()

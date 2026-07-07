@@ -5,7 +5,14 @@ import { map, Observable } from 'rxjs';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
-import { LinkStorygraphBookDto, SetStorygraphEditionDto, UpsertStorygraphSettingsDto, ValidateStorygraphCookiesDto } from './dto';
+import { BookService } from '../book/book.service';
+import {
+  LinkStorygraphBookDto,
+  SetStorygraphEditionDto,
+  UpdateStorygraphBookSyncDto,
+  UpsertStorygraphSettingsDto,
+  ValidateStorygraphCookiesDto,
+} from './dto';
 import { StorygraphSettingsService } from './storygraph-settings.service';
 import { StorygraphSyncService } from './storygraph-sync.service';
 
@@ -15,6 +22,7 @@ export class StorygraphController {
   constructor(
     private readonly settingsService: StorygraphSettingsService,
     private readonly syncService: StorygraphSyncService,
+    private readonly bookService: BookService,
   ) {}
 
   @Get('settings')
@@ -63,7 +71,8 @@ export class StorygraphController {
   }
 
   @Post('books/:bookId/rematch')
-  rematchBook(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number) {
+  async rematchBook(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number) {
+    await this.bookService.verifyBookAccess(bookId, user);
     return this.syncService.rematchBook(user.id, bookId).then((result) => ({ result }));
   }
 
@@ -73,17 +82,44 @@ export class StorygraphController {
   }
 
   @Patch('books/:bookId/link')
-  linkBookManually(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number, @Body() dto: LinkStorygraphBookDto) {
+  async linkBookManually(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number, @Body() dto: LinkStorygraphBookDto) {
+    await this.bookService.verifyBookAccess(bookId, user);
     return this.syncService.linkBookManually(user.id, bookId, dto.input);
   }
 
   @Get('books/:bookId/editions')
-  listEditions(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number) {
+  async listEditions(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number) {
+    await this.bookService.verifyBookAccess(bookId, user);
     return this.syncService.listEditions(user.id, bookId);
   }
 
   @Patch('books/:bookId/edition')
-  setEdition(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number, @Body() dto: SetStorygraphEditionDto) {
+  async setEdition(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number, @Body() dto: SetStorygraphEditionDto) {
+    await this.bookService.verifyBookAccess(bookId, user);
     return this.syncService.setEdition(user.id, bookId, dto.editionId);
+  }
+
+  @Get('books/:bookId/sync-state')
+  async getBookSyncState(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number) {
+    await this.bookService.verifyBookAccess(bookId, user);
+    return this.syncService.getBookSyncState(user.id, bookId);
+  }
+
+  @Patch('books/:bookId/sync-state')
+  async updateBookSyncState(
+    @CurrentUser() user: RequestUser,
+    @Param('bookId', ParseIntPipe) bookId: number,
+    @Body() dto: UpdateStorygraphBookSyncDto,
+  ) {
+    await this.bookService.verifyBookAccess(bookId, user);
+    return this.syncService.updateBookSyncState(user.id, bookId, dto);
+  }
+
+  @Post('books/:bookId/sync')
+  async syncBook(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number) {
+    await this.bookService.verifyBookAccess(bookId, user);
+    const result = await this.syncService.syncBook(user.id, bookId);
+    const state = await this.syncService.getBookSyncState(user.id, bookId);
+    return { result, state };
   }
 }

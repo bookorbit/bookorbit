@@ -38,10 +38,10 @@ const SETTINGS: StorygraphSettings = {
   enabled: true,
   effectiveEnabled: true,
   disabledReason: null,
+  bookSyncMode: 'all_eligible',
   autoSyncOnStatusChange: true,
   autoSyncOnProgressUpdate: true,
   lastSyncedAt: null,
-  connectedAt: null,
 }
 
 async function loadComposable() {

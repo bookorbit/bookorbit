@@ -47,10 +47,10 @@ function makeSettings(overrides: Partial<StorygraphSettings> = {}): StorygraphSe
     enabled: true,
     effectiveEnabled: true,
     disabledReason: null,
+    bookSyncMode: 'all_eligible',
     autoSyncOnStatusChange: true,
     autoSyncOnProgressUpdate: true,
     lastSyncedAt: null,
-    connectedAt: null,
     ...overrides,
   }
 }

@@ -1,12 +1,15 @@
 import { api } from '@/lib/api'
 import type {
   StorygraphActiveSyncStatus,
+  StorygraphBookSyncNowResult,
+  StorygraphBookSyncState,
   StorygraphSyncPendingSummary,
   StorygraphSettings,
   StorygraphCookieValidationResult,
   StorygraphEdition,
   StorygraphLinkedBook,
   StorygraphLinkResult,
+  UpdateStorygraphBookSyncPayload,
   UpsertStorygraphSettingsPayload,
 } from '@bookorbit/types'
 
@@ -103,6 +106,28 @@ export async function fetchStorygraphSyncPendingSummary(): Promise<StorygraphSyn
 export async function rematchStorygraphBook(bookId: number): Promise<{ result: 'synced' | 'skipped' | 'failed' }> {
   const res = await api(`${BASE}/books/${bookId}/rematch`, { method: 'POST' })
   if (!res.ok) throw new Error('Failed to re-match with StoryGraph')
+  return res.json()
+}
+
+export async function fetchStorygraphBookSyncState(bookId: number): Promise<StorygraphBookSyncState> {
+  const res = await api(`${BASE}/books/${bookId}/sync-state`)
+  if (!res.ok) throw new Error('Failed to fetch StoryGraph sync state')
+  return res.json()
+}
+
+export async function updateStorygraphBookSyncState(bookId: number, payload: UpdateStorygraphBookSyncPayload): Promise<StorygraphBookSyncState> {
+  const res = await api(`${BASE}/books/${bookId}/sync-state`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error('Failed to update StoryGraph sync state')
+  return res.json()
+}
+
+export async function startStorygraphBookSync(bookId: number): Promise<StorygraphBookSyncNowResult> {
+  const res = await api(`${BASE}/books/${bookId}/sync`, { method: 'POST' })
+  if (!res.ok) throw new Error('Failed to sync StoryGraph book')
   return res.json()
 }
 

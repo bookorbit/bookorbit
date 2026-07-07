@@ -17,16 +17,23 @@ const mockSyncService = {
   streamSyncStatus: vi.fn(),
   getSyncPendingSummary: vi.fn(),
   rematchBook: vi.fn(),
+  getBookSyncState: vi.fn(),
+  updateBookSyncState: vi.fn(),
+  syncBook: vi.fn(),
   listLinkedBooks: vi.fn(),
   linkBookManually: vi.fn(),
   listEditions: vi.fn(),
   setEdition: vi.fn(),
 };
 
+const mockBookService = {
+  verifyBookAccess: vi.fn(),
+};
+
 const mockUser = { id: 1, isSuperuser: false, permissions: [] };
 
 function makeController() {
-  return new StorygraphController(mockSettingsService as any, mockSyncService as any);
+  return new StorygraphController(mockSettingsService as any, mockSyncService as any, mockBookService as any);
 }
 
 describe('StorygraphController', () => {
@@ -89,6 +96,7 @@ describe('StorygraphController', () => {
     mockSyncService.rematchBook.mockResolvedValue('synced');
     const result = await makeController().rematchBook(mockUser as any, 42);
     expect(result).toEqual({ result: 'synced' });
+    expect(mockBookService.verifyBookAccess).toHaveBeenCalledWith(42, mockUser);
     expect(mockSyncService.rematchBook).toHaveBeenCalledWith(1, 42);
   });
 
@@ -103,6 +111,7 @@ describe('StorygraphController', () => {
     mockSyncService.linkBookManually.mockResolvedValue({ success: true, storygraphBookId: 'abc-123' });
     const result = await makeController().linkBookManually(mockUser as any, 42, { input: 'https://app.thestorygraph.com/books/abc-123' });
     expect(result).toEqual({ success: true, storygraphBookId: 'abc-123' });
+    expect(mockBookService.verifyBookAccess).toHaveBeenCalledWith(42, mockUser);
     expect(mockSyncService.linkBookManually).toHaveBeenCalledWith(1, 42, 'https://app.thestorygraph.com/books/abc-123');
   });
 
@@ -110,6 +119,7 @@ describe('StorygraphController', () => {
     mockSyncService.listEditions.mockResolvedValue([{ id: 'ed-1' }]);
     const result = await makeController().listEditions(mockUser as any, 42);
     expect(result).toEqual([{ id: 'ed-1' }]);
+    expect(mockBookService.verifyBookAccess).toHaveBeenCalledWith(42, mockUser);
     expect(mockSyncService.listEditions).toHaveBeenCalledWith(1, 42);
   });
 
@@ -117,6 +127,33 @@ describe('StorygraphController', () => {
     mockSyncService.setEdition.mockResolvedValue({ success: true });
     const result = await makeController().setEdition(mockUser as any, 42, { editionId: 'ed-2' });
     expect(result).toEqual({ success: true });
+    expect(mockBookService.verifyBookAccess).toHaveBeenCalledWith(42, mockUser);
     expect(mockSyncService.setEdition).toHaveBeenCalledWith(1, 42, 'ed-2');
+  });
+
+  it('getBookSyncState verifies access and delegates to service', async () => {
+    mockSyncService.getBookSyncState.mockResolvedValue({ bookId: 42 });
+    const result = await makeController().getBookSyncState(mockUser as any, 42);
+    expect(result).toEqual({ bookId: 42 });
+    expect(mockBookService.verifyBookAccess).toHaveBeenCalledWith(42, mockUser);
+    expect(mockSyncService.getBookSyncState).toHaveBeenCalledWith(1, 42);
+  });
+
+  it('updateBookSyncState verifies access and delegates to service', async () => {
+    mockSyncService.updateBookSyncState.mockResolvedValue({ bookId: 42, syncEnabled: false });
+    const result = await makeController().updateBookSyncState(mockUser as any, 42, { syncEnabled: false });
+    expect(result).toEqual({ bookId: 42, syncEnabled: false });
+    expect(mockBookService.verifyBookAccess).toHaveBeenCalledWith(42, mockUser);
+    expect(mockSyncService.updateBookSyncState).toHaveBeenCalledWith(1, 42, { syncEnabled: false });
+  });
+
+  it('syncBook verifies access and returns result with refreshed state', async () => {
+    mockSyncService.syncBook.mockResolvedValue('synced');
+    mockSyncService.getBookSyncState.mockResolvedValue({ bookId: 42 });
+    const result = await makeController().syncBook(mockUser as any, 42);
+    expect(result).toEqual({ result: 'synced', state: { bookId: 42 } });
+    expect(mockBookService.verifyBookAccess).toHaveBeenCalledWith(42, mockUser);
+    expect(mockSyncService.syncBook).toHaveBeenCalledWith(1, 42);
+    expect(mockSyncService.getBookSyncState).toHaveBeenCalledWith(1, 42);
   });
 });

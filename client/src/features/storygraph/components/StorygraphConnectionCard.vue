@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import { Link, Save, CheckCircle2, AlertCircle, Info, Loader2, Unlink } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
@@ -14,6 +14,7 @@ const validationResult = ref<{ valid: boolean } | null>(null)
 
 const form = reactive({
   enabled: true,
+  bookSyncMode: 'all_eligible' as 'all_eligible' | 'selected_only',
   autoSyncOnStatusChange: true,
   autoSyncOnProgressUpdate: true,
 })
@@ -22,6 +23,7 @@ onMounted(async () => {
   await fetchSettings()
   if (settings.value) {
     form.enabled = settings.value.enabled
+    form.bookSyncMode = settings.value.bookSyncMode
     form.autoSyncOnStatusChange = settings.value.autoSyncOnStatusChange
     form.autoSyncOnProgressUpdate = settings.value.autoSyncOnProgressUpdate
   }
@@ -50,6 +52,7 @@ async function handleSave() {
   const ok = await saveSettings({
     ...(hasNewCookies ? { sessionCookie: sessionCookieInput.value.trim(), rememberToken: rememberTokenInput.value.trim() } : {}),
     enabled: form.enabled,
+    bookSyncMode: form.bookSyncMode,
     autoSyncOnStatusChange: form.autoSyncOnStatusChange,
     autoSyncOnProgressUpdate: form.autoSyncOnProgressUpdate,
   })
@@ -74,11 +77,22 @@ function toggleCookiesVisible() {
   cookiesVisible.value = !cookiesVisible.value
 }
 
-const connectedAtLabel = computed(() => {
-  const iso = settings.value?.connectedAt
-  if (!iso) return null
-  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-})
+const bookSyncModeOptions = [
+  {
+    id: 'all_eligible' as const,
+    label: 'All eligible books',
+    description: 'StoryGraph sync runs for every eligible book unless you exclude it on the book details page.',
+  },
+  {
+    id: 'selected_only' as const,
+    label: 'Selected books only',
+    description: 'StoryGraph sync only runs for books you turn on from the book details page.',
+  },
+]
+
+function selectBookSyncMode(mode: 'all_eligible' | 'selected_only') {
+  form.bookSyncMode = mode
+}
 </script>
 
 <template>
@@ -180,11 +194,32 @@ const connectedAtLabel = computed(() => {
         <Info class="size-3.5 shrink-0 text-muted-foreground mt-0.5" />
         <p class="text-xs text-muted-foreground leading-relaxed">
           Sync runs only for books that are not unread. This applies to status and progress triggers. These switches control when a sync runs.
-          <template v-if="connectedAtLabel">
-            Books already marked Read, Skimmed, or Abandoned before you connected ({{ connectedAtLabel }}) are skipped by automatic and bulk sync —
-            use "Linked books" below to push one of those anyway.
-          </template>
         </p>
+      </div>
+
+      <div class="space-y-2">
+        <div>
+          <p class="text-sm">Book sync scope</p>
+          <p class="text-xs text-muted-foreground mt-0.5">Choose whether StoryGraph sync starts broadly or only for books you pick.</p>
+        </div>
+        <div class="grid gap-2 sm:grid-cols-2">
+          <button
+            v-for="option in bookSyncModeOptions"
+            :key="option.id"
+            type="button"
+            class="rounded-md border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="!form.enabled"
+            :class="
+              form.bookSyncMode === option.id
+                ? 'border-primary bg-primary/10 text-foreground'
+                : 'border-border bg-background text-muted-foreground hover:bg-muted/50'
+            "
+            @click="selectBookSyncMode(option.id)"
+          >
+            <div class="text-sm font-medium">{{ option.label }}</div>
+            <div class="mt-0.5 text-xs leading-relaxed">{{ option.description }}</div>
+          </button>
+        </div>
       </div>
 
       <div class="flex items-center justify-between">

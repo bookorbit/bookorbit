@@ -10,8 +10,10 @@ const mockRepo = {
   updateLastSyncedAt: vi.fn(),
   findSyncableBooks: vi.fn(),
   findSyncableBook: vi.fn(),
+  findBookSyncData: vi.fn(),
   clearBookMatch: vi.fn(),
   findSettings: vi.fn(),
+  setBookSyncOverride: vi.fn(),
 };
 
 const mockClient = {
@@ -29,6 +31,7 @@ const mockMatchService = {
 
 const mockSettingsService = {
   getCookiesForUser: vi.fn(),
+  getSettings: vi.fn(),
 };
 
 function makeService() {
@@ -55,10 +58,22 @@ describe('StorygraphSyncService', () => {
     mockRepo.findBookStatesByBookIds.mockResolvedValue([]);
     mockRepo.findSyncableBooks.mockResolvedValue([]);
     mockRepo.findSyncableBook.mockResolvedValue(null);
+    mockRepo.findBookSyncData.mockImplementation((userId: number, bookId: number) => mockRepo.findSyncableBook(userId, bookId));
     mockRepo.upsertBookState.mockResolvedValue({});
     mockRepo.updateLastSyncedAt.mockResolvedValue(undefined);
     mockRepo.clearBookMatch.mockResolvedValue(undefined);
-    mockRepo.findSettings.mockResolvedValue({ connectedAt: null });
+    mockRepo.setBookSyncOverride.mockResolvedValue({});
+    mockRepo.findSettings.mockResolvedValue({});
+    mockSettingsService.getSettings.mockResolvedValue({
+      cookiesConfigured: true,
+      enabled: true,
+      effectiveEnabled: true,
+      disabledReason: null,
+      bookSyncMode: 'all_eligible',
+      autoSyncOnStatusChange: true,
+      autoSyncOnProgressUpdate: true,
+      lastSyncedAt: null,
+    });
     mockClient.extractCsrfToken.mockReturnValue('csrf-token');
     mockClient.get.mockResolvedValue({ status: 200, html: '<html></html>', redirectedToSignIn: false });
     mockClient.post.mockResolvedValue({ status: 302, html: '', redirectedToSignIn: false });
@@ -202,48 +217,56 @@ describe('StorygraphSyncService', () => {
       expect(mockRepo.upsertBookState).toHaveBeenCalledWith(expect.objectContaining({ syncError: 'network timeout' }));
     });
 
-    it('skips a book already finished before the user connected StoryGraph', async () => {
+    it('syncs a book finished long before connecting in all-eligible mode', async () => {
       mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
-      mockRepo.findSettings.mockResolvedValue({ connectedAt: new Date('2026-06-01T00:00:00Z') });
       mockRepo.findSyncableBook.mockResolvedValue({
         ...readingBook,
         status: 'read',
-        finishedAt: new Date('2026-01-01T00:00:00Z'),
-        statusUpdatedAt: new Date('2026-01-01T00:00:00Z'),
+        progress: 100,
       });
+      mockRepo.findBookState.mockResolvedValue(null);
+      mockMatchService.matchBook.mockResolvedValue({ storygraphBookId: 'abc-123', matchMethod: 'isbn' });
+
+      await expect(makeService().syncBook(1, 1)).resolves.toBe('synced');
+      expect(mockMatchService.matchBook).toHaveBeenCalled();
+    });
+
+    it('skips unselected books when sync mode is selected-only', async () => {
+      mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
+      mockSettingsService.getSettings.mockResolvedValue({
+        cookiesConfigured: true,
+        enabled: true,
+        effectiveEnabled: true,
+        disabledReason: null,
+        bookSyncMode: 'selected_only',
+        autoSyncOnStatusChange: true,
+        autoSyncOnProgressUpdate: true,
+        lastSyncedAt: null,
+      });
+      mockRepo.findSyncableBook.mockResolvedValue(readingBook);
 
       await expect(makeService().syncBook(1, 1)).resolves.toBe('skipped');
       expect(mockMatchService.matchBook).not.toHaveBeenCalled();
     });
 
-    it('syncs a finished book whose finish date is after the connection date', async () => {
+    it('syncs selected books when sync mode is selected-only', async () => {
       mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
-      mockRepo.findSettings.mockResolvedValue({ connectedAt: new Date('2026-01-01T00:00:00Z') });
-      mockRepo.findSyncableBook.mockResolvedValue({
-        ...readingBook,
-        status: 'read',
-        progress: 100,
-        finishedAt: new Date('2026-06-01T00:00:00Z'),
-        statusUpdatedAt: new Date('2026-06-01T00:00:00Z'),
+      mockSettingsService.getSettings.mockResolvedValue({
+        cookiesConfigured: true,
+        enabled: true,
+        effectiveEnabled: true,
+        disabledReason: null,
+        bookSyncMode: 'selected_only',
+        autoSyncOnStatusChange: true,
+        autoSyncOnProgressUpdate: true,
+        lastSyncedAt: null,
       });
-      mockRepo.findBookState.mockResolvedValue(null);
+      mockRepo.findBookState.mockResolvedValue({ syncOverride: 'included' });
+      mockRepo.findSyncableBook.mockResolvedValue(readingBook);
       mockMatchService.matchBook.mockResolvedValue({ storygraphBookId: 'abc-123', matchMethod: 'isbn' });
 
       await expect(makeService().syncBook(1, 1)).resolves.toBe('synced');
-    });
-
-    it('still syncs a currently-reading book that predates the connection date', async () => {
-      mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
-      mockRepo.findSettings.mockResolvedValue({ connectedAt: new Date('2026-06-01T00:00:00Z') });
-      mockRepo.findSyncableBook.mockResolvedValue({
-        ...readingBook,
-        status: 'reading',
-        statusUpdatedAt: new Date('2026-01-01T00:00:00Z'),
-      });
-      mockRepo.findBookState.mockResolvedValue(null);
-      mockMatchService.matchBook.mockResolvedValue({ storygraphBookId: 'abc-123', matchMethod: 'isbn' });
-
-      await expect(makeService().syncBook(1, 1)).resolves.toBe('synced');
+      expect(mockMatchService.matchBook).toHaveBeenCalled();
     });
   });
 
@@ -275,27 +298,23 @@ describe('StorygraphSyncService', () => {
       expect(mockRepo.updateLastSyncedAt).toHaveBeenCalledWith(1, expect.any(Date));
     });
 
-    it('excludes books already finished before the connection date from the run', async () => {
+    it('includes previously finished books in the run', async () => {
       mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
-      mockRepo.findSettings.mockResolvedValue({ connectedAt: new Date('2026-06-01T00:00:00Z') });
       mockRepo.findSyncableBooks.mockResolvedValue([
         {
           ...readingBook,
           bookId: 10,
           status: 'read',
-          finishedAt: new Date('2026-01-01T00:00:00Z'),
-          statusUpdatedAt: new Date('2026-01-01T00:00:00Z'),
         },
         { ...readingBook, bookId: 11, status: 'reading' },
       ]);
 
       const svc = makeService();
       await svc.syncAll(1);
-      await Promise.resolve();
-      await Promise.resolve();
-
-      expect(mockRepo.findBookState).toHaveBeenCalledWith(1, 11);
-      expect(mockRepo.findBookState).not.toHaveBeenCalledWith(1, 10);
+      await vi.waitFor(() => {
+        expect(mockRepo.findBookState).toHaveBeenCalledWith(1, 10);
+        expect(mockRepo.findBookState).toHaveBeenCalledWith(1, 11);
+      });
     });
   });
 
@@ -322,23 +341,20 @@ describe('StorygraphSyncService', () => {
       expect(result).toEqual({ totalBooks: 2, pendingBooks: 1 });
     });
 
-    it('excludes books already finished before the connection date from the totals', async () => {
+    it('includes previously finished books in the totals', async () => {
       mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
-      mockRepo.findSettings.mockResolvedValue({ connectedAt: new Date('2026-06-01T00:00:00Z') });
       mockRepo.findSyncableBooks.mockResolvedValue([
         {
           ...readingBook,
           bookId: 10,
           status: 'read',
-          finishedAt: new Date('2026-01-01T00:00:00Z'),
-          statusUpdatedAt: new Date('2026-01-01T00:00:00Z'),
         },
         { ...readingBook, bookId: 11, status: 'reading' },
       ]);
       mockRepo.findBookStatesByBookIds.mockResolvedValue([]);
 
       const result = await makeService().getSyncPendingSummary(1);
-      expect(result).toEqual({ totalBooks: 1, pendingBooks: 1 });
+      expect(result).toEqual({ totalBooks: 2, pendingBooks: 2 });
     });
   });
 
