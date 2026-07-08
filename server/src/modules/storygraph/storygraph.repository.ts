@@ -208,7 +208,7 @@ export class StorygraphRepository {
     return rows as BookSyncData[];
   }
 
-  // Books whose most recent sync attempt recorded an error — powers the manual-sync failure list.
+  // Books whose most recent sync attempt recorded an error - powers the manual-sync failure list.
   async findBooksWithSyncErrors(
     userId: number,
   ): Promise<{ bookId: number; title: string | null; authorName: string | null; syncError: string; lastAttemptAt: Date | null }[]> {

@@ -372,7 +372,7 @@ describe('StorygraphSyncService', () => {
 
       const runs = emissions.filter((e): e is { processedBooks: number; status: string } => e !== null && typeof e === 'object');
       const processedSequence = runs.filter((e) => e.status === 'running').map((e) => e.processedBooks);
-      // initial 0, then one advance per book — the old in-place mutation collapsed these
+      // initial 0, then one advance per book - the old in-place mutation collapsed these
       // into a single reference that distinctUntilChanged dropped entirely.
       expect(processedSequence).toEqual([0, 1, 2, 3]);
       const terminal = runs[runs.length - 1]!;

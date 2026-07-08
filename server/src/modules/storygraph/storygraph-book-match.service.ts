@@ -167,15 +167,15 @@ export class StorygraphBookMatchService {
 
   /**
    * Resolves a manually-provided StoryGraph URL or book id directly, with no search/scoring
-   * involved — the user is telling us exactly which book is correct, so we just verify it exists.
+   * involved - the user is telling us exactly which book is correct, so we just verify it exists.
    */
   async resolveManualInput(userId: number, cookies: StorygraphCookies, input: string): Promise<{ storygraphBookId: string; title: string } | null> {
     const bookId = this.extractBookIdFromInput(input);
     if (!bookId) return null;
 
     try {
-      // The id can be pasted directly by the user, so encode it before putting it in the path —
-      // a stray ?, #, or / would otherwise change which URL we request.
+      // The id can be pasted directly by the user, so encode it before putting it in the path.
+      // A stray ?, #, or / would otherwise change which URL we request.
       const response = await this.client.get(userId, cookies, `/books/${encodeURIComponent(bookId)}`);
       if (response.redirectedToSignIn || response.status !== 200) return null;
 

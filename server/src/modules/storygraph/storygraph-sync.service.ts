@@ -28,8 +28,8 @@ import {
   resolveStorygraphBookSyncOverrideForToggle,
 } from './storygraph-sync-policy';
 
-// "Linked books" only needs to manage matches for books actively being read right now —
-// finished/want-to-read books aren't useful to manually re-link from that view.
+// "Linked books" only needs to manage matches for books actively being read right now.
+// Finished/want-to-read books aren't useful to manually re-link from that view.
 const CURRENTLY_READING_STATUSES = new Set<ReadStatus>(['reading', 'rereading']);
 
 const STATUS_MAP: Partial<Record<ReadStatus, string>> = {
@@ -75,7 +75,7 @@ export class StorygraphSyncService {
     const decision = this.resolveBookSyncDecision(settings, book, state, true);
     if (!decision.syncEnabled) {
       // A book taken back to "unread" no longer maps to a StoryGraph shelf entry, so drop the
-      // synced markers (keeping the match) — otherwise re-adding it later reads as "already
+      // synced markers (keeping the match) - otherwise re-adding it later reads as "already
       // synced" against a stale status and is silently skipped.
       if (decision.effectiveReason === 'unread' && state?.lastSyncedAt) {
         await this.repo.resetSyncProgress(userId, book.bookId);
@@ -116,7 +116,7 @@ export class StorygraphSyncService {
   }
 
   // Links a book directly to a StoryGraph URL/id the user supplied, bypassing search/scoring
-  // entirely — the user is telling us exactly which book is correct.
+  // entirely - the user is telling us exactly which book is correct.
   async linkBookManually(userId: number, bookId: number, input: string): Promise<StorygraphLinkResult> {
     const cookies = await this.settingsService.getCookiesForUser(userId);
     if (!cookies) return { success: false };

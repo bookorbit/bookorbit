@@ -32,7 +32,7 @@ onMounted(async () => {
 })
 
 // A bulk sync can link books after this list was fetched, leaving rows stuck on
-// "Not linked yet" until a manual refresh — reload whenever a run finishes. The refresh is
+// "Not linked yet" until a manual refresh, so reload whenever a run finishes. The refresh is
 // silent: toggling the loading state would swap the list for the spinner and collapse
 // whatever row the user is mid-interaction with.
 const { lastRunSummary } = useStorygraphSync()
@@ -110,7 +110,7 @@ async function handleRematch(book: StorygraphLinkedBook) {
   try {
     const { result } = await rematchStorygraphBook(book.bookId)
     if (result === 'synced') toast.success('Re-matched and synced with StoryGraph')
-    else if (result === 'failed') toast.error('StoryGraph re-match failed — check the server logs')
+    else if (result === 'failed') toast.error('StoryGraph re-match failed, check the server logs')
     else toast.info('StoryGraph sync is not connected for your account')
     delete editionsByBookId[book.bookId]
     await loadBooks()
@@ -198,8 +198,8 @@ async function handleSetEdition(book: StorygraphLinkedBook, edition: StorygraphE
         <div v-if="expandedBookId === book.bookId" class="mt-3 space-y-3 pl-1">
           <p v-if="!book.storygraphBookId" class="flex items-start gap-1.5 text-[11px] text-muted-foreground leading-relaxed">
             <HelpCircle class="size-3.5 shrink-0 mt-0.5" />
-            This book couldn't be matched to StoryGraph automatically. Use "Try auto-match" to search again, or paste the book's StoryGraph URL —
-            or its StoryGraph book ID, the code after <code class="px-1 rounded bg-muted">/books/</code> in the URL (not an ISBN) — below for an exact
+            This book couldn't be matched to StoryGraph automatically. Use "Try auto-match" to search again, or paste the book's StoryGraph URL, or
+            its StoryGraph book ID (the code after <code class="px-1 rounded bg-muted">/books/</code> in the URL, not an ISBN), below for an exact
             link.
           </p>
           <div class="flex gap-2">

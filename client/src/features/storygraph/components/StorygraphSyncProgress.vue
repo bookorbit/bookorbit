@@ -4,8 +4,19 @@ import { AlertCircle, RefreshCw, XCircle, Loader2 } from '@lucide/vue'
 import { useStorygraphSync } from '../composables/useStorygraphSync'
 import { useStorygraphSettings } from '../composables/useStorygraphSettings'
 
-const { activeSyncStatus, lastRunSummary, syncFailures, syncing, isSyncing, syncProgress, pendingSummary, loadingPending, error, startSync, cancelSync } =
-  useStorygraphSync()
+const {
+  activeSyncStatus,
+  lastRunSummary,
+  syncFailures,
+  syncing,
+  isSyncing,
+  syncProgress,
+  pendingSummary,
+  loadingPending,
+  error,
+  startSync,
+  cancelSync,
+} = useStorygraphSync()
 const { settings } = useStorygraphSettings()
 
 const progressLabel = computed(() => {
@@ -34,7 +45,7 @@ const failureLabel = (error: string): string => {
     case 'no_match':
       return 'No StoryGraph match found'
     case 'storygraph_session_expired':
-      return 'StoryGraph session expired — re-paste your cookies'
+      return 'StoryGraph session expired, re-paste your cookies'
     default:
       return error.startsWith('status_update_failed') ? 'StoryGraph rejected the status update' : error
   }
@@ -125,7 +136,9 @@ const lastSyncedLabel = computed(() => {
       <div class="flex justify-between text-xs text-muted-foreground">
         <span>
           Syncing... {{ liveCountsLabel }}
-          <span v-if="activeSyncStatus && activeSyncStatus.failedBooks > 0" class="text-destructive">· {{ activeSyncStatus.failedBooks }} failed</span>
+          <span v-if="activeSyncStatus && activeSyncStatus.failedBooks > 0" class="text-destructive"
+            >· {{ activeSyncStatus.failedBooks }} failed</span
+          >
         </span>
         <span>{{ progressLabel }}</span>
       </div>
@@ -146,7 +159,7 @@ const lastSyncedLabel = computed(() => {
       <ul class="space-y-1">
         <li v-for="failure in syncFailures" :key="failure.bookId" class="text-xs text-muted-foreground">
           <span class="text-foreground">{{ failure.title }}</span>
-          <span v-if="failure.authorName"> — {{ failure.authorName }}</span>
+          <span v-if="failure.authorName"> - {{ failure.authorName }}</span>
           <span class="text-destructive"> · {{ failureLabel(failure.syncError) }}</span>
         </li>
       </ul>
