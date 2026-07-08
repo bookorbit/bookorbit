@@ -41,7 +41,7 @@ beforeEach(() => {
 })
 
 function testButton(wrapper: Awaited<ReturnType<typeof mountPage>>, label: string) {
-  const btn = wrapper.findAll('button').find((b) => b.text().includes(label))
+  const btn = wrapper.findAll('button').find((b) => b.text().trim() === label)
   if (!btn) throw new Error(`button "${label}" not found`)
   return btn
 }
