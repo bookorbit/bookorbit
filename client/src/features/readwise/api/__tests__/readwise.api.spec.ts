@@ -39,7 +39,13 @@ describe('readwise.api', () => {
     expect(mockApi).toHaveBeenNthCalledWith(1, '/api/v1/readwise/settings')
   })
 
-  it('throws when fetching settings fails', async () => {
+  it('surfaces server message when fetching settings fails', async () => {
+    mockApi.mockResolvedValueOnce(jsonResponse({ message: 'Permission denied' }, false))
+
+    await expect(fetchReadwiseSettings()).rejects.toThrow('Permission denied')
+  })
+
+  it('uses default message when fetch failure has no message', async () => {
     mockApi.mockResolvedValueOnce(jsonResponse({}, false))
 
     await expect(fetchReadwiseSettings()).rejects.toThrow('Failed to fetch Readwise settings')
@@ -110,7 +116,13 @@ describe('readwise.api', () => {
     )
   })
 
-  it('throws when token validation fails', async () => {
+  it('surfaces server message when token validation fails', async () => {
+    mockApi.mockResolvedValueOnce(jsonResponse({ message: 'Missing token' }, false))
+
+    await expect(validateReadwiseToken('t')).rejects.toThrow('Missing token')
+  })
+
+  it('uses default message when token validation failure has no message', async () => {
     mockApi.mockResolvedValueOnce(jsonResponse({}, false))
 
     await expect(validateReadwiseToken('t')).rejects.toThrow('Failed to validate token')

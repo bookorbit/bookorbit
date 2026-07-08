@@ -31,6 +31,16 @@ export class ReadwiseRepository {
     });
   }
 
+  async findLatestAnnotationId(userId: number): Promise<number> {
+    const [row] = await this.db
+      .select({ latestAnnotationId: sql<number>`coalesce(max(${schema.annotations.id}), 0)::int` })
+      .from(schema.annotations)
+      .where(eq(schema.annotations.userId, userId))
+      .limit(1);
+
+    return row?.latestAnnotationId ?? 0;
+  }
+
   async upsertSettings(
     userId: number,
     data: Partial<Omit<ReadwiseUserSetting, 'id' | 'userId' | 'createdAt' | 'updatedAt'>>,

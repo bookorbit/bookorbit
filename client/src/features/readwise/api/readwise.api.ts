@@ -3,9 +3,14 @@ import type { ReadwiseSettings, ReadwiseTokenValidationResult, UpsertReadwiseSet
 
 const BASE = '/api/v1/readwise'
 
+async function errorMessage(res: Response, fallback: string): Promise<string> {
+  const body = await res.json().catch(() => ({}))
+  return (body as { message?: string }).message ?? fallback
+}
+
 export async function fetchReadwiseSettings(): Promise<ReadwiseSettings> {
   const res = await api(`${BASE}/settings`)
-  if (!res.ok) throw new Error('Failed to fetch Readwise settings')
+  if (!res.ok) throw new Error(await errorMessage(res, 'Failed to fetch Readwise settings'))
   return res.json()
 }
 
@@ -16,8 +21,7 @@ export async function upsertReadwiseSettings(payload: UpsertReadwiseSettingsPayl
     body: JSON.stringify(payload),
   })
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error((body as { message?: string }).message ?? 'Failed to save settings')
+    throw new Error(await errorMessage(res, 'Failed to save settings'))
   }
   return res.json()
 }
@@ -28,6 +32,6 @@ export async function validateReadwiseToken(token?: string): Promise<ReadwiseTok
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(token ? { token } : {}),
   })
-  if (!res.ok) throw new Error('Failed to validate token')
+  if (!res.ok) throw new Error(await errorMessage(res, 'Failed to validate token'))
   return res.json()
 }

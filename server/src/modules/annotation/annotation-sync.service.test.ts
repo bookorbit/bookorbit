@@ -260,6 +260,30 @@ describe('AnnotationSyncService', () => {
       expect(emitCallsAtTxResolve).toBe(0);
       expect(emitSpy).toHaveBeenCalledTimes(1);
     });
+
+    it('does not fail ingest or skip later emits when a post-commit listener throws', async () => {
+      const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      let nextId = 100;
+      repo.createCanonical.mockImplementation(((annotation: Record<string, unknown>) =>
+        Promise.resolve(makeAnnotationRow({ ...annotation, id: nextId++ }))) as never);
+      emitSpy.mockImplementationOnce(() => {
+        throw new Error('listener failed');
+      });
+
+      const result = await ingest(service, [
+        makeIncoming(),
+        makeIncoming({ datetime: '2026-06-02 09:00:00', pos0: '/body/DocFragment[9]/body/p[3]/text().0' }),
+      ]);
+
+      expect(result.created).toBe(2);
+      expect(emitSpy).toHaveBeenCalledTimes(2);
+      expect(emitSpy).toHaveBeenNthCalledWith(2, ACHIEVEMENT_EVENT_ANNOTATION_CREATED, {
+        userId: USER_ID,
+        bookId: BOOK_ID,
+        annotationId: 101,
+      });
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[annotation.sync_event] [fail]'));
+    });
   });
 
   describe('device-key match path', () => {

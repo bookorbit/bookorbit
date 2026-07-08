@@ -50,17 +50,18 @@ describe('ReadwiseClientService', () => {
   describe('validateToken', () => {
     it('returns true on 204', async () => {
       fetchMock.mockResolvedValueOnce(makeFetchResponse(204));
-      await expect(service.validateToken('tok')).resolves.toBe(true);
+      await expect(service.validateToken(1, 'tok')).resolves.toBe(true);
+      expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
     });
 
     it('returns false on 401', async () => {
       fetchMock.mockResolvedValueOnce(makeFetchResponse(401));
-      await expect(service.validateToken('tok')).resolves.toBe(false);
+      await expect(service.validateToken(1, 'tok')).resolves.toBe(false);
     });
 
     it('returns false when fetch throws', async () => {
       fetchMock.mockRejectedValueOnce(new Error('network down'));
-      await expect(service.validateToken('tok')).resolves.toBe(false);
+      await expect(service.validateToken(1, 'tok')).resolves.toBe(false);
     });
   });
 
@@ -83,6 +84,7 @@ describe('ReadwiseClientService', () => {
       expect(init.headers.Authorization).toBe('Token tok');
       expect(init.headers['Content-Type']).toBe('application/json');
       expect(init.body).toBe(JSON.stringify({ highlights }));
+      expect(init.signal).toBeInstanceOf(AbortSignal);
     });
 
     it('calls queue.throttle before fetching', async () => {

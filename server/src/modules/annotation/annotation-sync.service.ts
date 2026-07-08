@@ -20,6 +20,7 @@ import {
 } from '../achievement/achievement-events.service';
 
 const INGEST_EVENT = 'annotation.sync_ingest';
+const INGEST_EMIT_EVENT = 'annotation.sync_event';
 
 export interface IncomingDeviceAnnotation {
   /**
@@ -104,11 +105,7 @@ export class AnnotationSyncService {
       // Emit only after the tx commits so listeners (e.g. Readwise flush that queries
       // rows with id > watermark) see the committed, visible rows.
       for (const annotationId of createdIds) {
-        this.achievementEvents.emit(ACHIEVEMENT_EVENT_ANNOTATION_CREATED, {
-          userId: params.userId,
-          bookId: params.bookId,
-          annotationId,
-        } satisfies AnnotationCreatedPayload);
+        this.emitCreatedAnnotation(params.userId, params.bookId, annotationId);
       }
       this.logger.log(
         `[${INGEST_EVENT}] [end] userId=${params.userId} bookId=${params.bookId} deviceId=${params.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} created=${result.created} updated=${result.updated} moved=${result.moved} unchanged=${result.unchanged} skippedDeleted=${result.skippedDeleted} - device annotations ingested`,
@@ -129,6 +126,22 @@ export class AnnotationSyncService {
       byKey.set(keyOf(annotation), annotation);
     }
     return [...byKey.values()];
+  }
+
+  private emitCreatedAnnotation(userId: number, bookId: number, annotationId: number): void {
+    const startedAtMs = Date.now();
+    try {
+      this.achievementEvents.emit(ACHIEVEMENT_EVENT_ANNOTATION_CREATED, {
+        userId,
+        bookId,
+        annotationId,
+      } satisfies AnnotationCreatedPayload);
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.constructor.name : 'UnknownError';
+      this.logger.warn(
+        `[${INGEST_EMIT_EVENT}] [fail] userId=${userId} bookId=${bookId} annotationId=${annotationId} durationMs=${Date.now() - startedAtMs} errorClass=${errorClass} error="${sanitizeLogValue(error instanceof Error ? error.message : 'unknown error')}" - created annotation event dispatch failed`,
+      );
+    }
   }
 
   private async ingestOne(

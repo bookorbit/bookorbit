@@ -2,7 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { Link, Save, CheckCircle2, AlertCircle, Info, Loader2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import type { ReadwiseSyncDisabledReason } from '@bookorbit/types'
+import type { ReadwiseSyncDisabledReason, ReadwiseTokenValidationResult } from '@bookorbit/types'
 import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import { useReadwiseSettings } from '../composables/useReadwiseSettings'
@@ -13,7 +13,8 @@ const { settings, saving, validating, error, fetchSettings, saveSettings, valida
 
 const tokenInput = ref('')
 const tokenVisible = ref(false)
-const validationResult = ref<{ valid: boolean } | null>(null)
+const tokenInputId = 'readwise-access-token'
+const validationResult = ref<ReadwiseTokenValidationResult | null>(null)
 
 const form = reactive({
   enabled: false,
@@ -23,7 +24,7 @@ const disabledReasonMessages: Record<ReadwiseSyncDisabledReason, string> = {
   permission_denied: "Your account doesn't have Readwise sync permission.",
   missing_token: 'Add your Readwise access token to start syncing.',
   user_disabled: 'Sync is turned off.',
-  invalid_token: 'Your Readwise token was rejected — paste a new one and re-enable.',
+  invalid_token: 'Your Readwise token was rejected. Paste a new one and re-enable.',
 }
 
 onMounted(async () => {
@@ -32,11 +33,12 @@ onMounted(async () => {
 })
 
 async function handleValidateToken() {
-  if (!tokenInput.value.trim()) {
+  const token = tokenInput.value.trim()
+  if (!token && !settings.value?.tokenConfigured) {
     toast.error('Enter your Readwise access token first')
     return
   }
-  const result = await validateToken(tokenInput.value.trim())
+  const result = await validateToken(token || undefined)
   validationResult.value = result
 }
 
@@ -69,7 +71,7 @@ function toggleTokenVisible() {
           <p class="font-medium text-sm">Connection</p>
           <p class="text-xs text-muted-foreground mt-0.5">Connect your Readwise account to sync your highlights.</p>
         </div>
-        <div v-if="settings?.tokenConfigured" class="ml-auto flex items-center gap-1.5 text-xs text-green-600">
+        <div v-if="settings?.tokenConfigured" class="ml-auto flex items-center gap-1.5 text-xs text-primary">
           <CheckCircle2 class="size-3.5" />
           Connected
         </div>
@@ -88,9 +90,10 @@ function toggleTokenVisible() {
       </div>
 
       <div class="space-y-2">
-        <label class="text-xs font-medium text-muted-foreground uppercase tracking-wider"> Access Token </label>
+        <label :for="tokenInputId" class="text-xs font-medium text-muted-foreground uppercase tracking-wider"> Access Token </label>
         <div class="flex gap-2">
           <input
+            :id="tokenInputId"
             v-model="tokenInput"
             :type="tokenVisible ? 'text' : 'password'"
             placeholder="Paste your Readwise access token"
@@ -126,7 +129,7 @@ function toggleTokenVisible() {
         <span
           v-if="validationResult !== null"
           class="flex items-center gap-1 text-xs"
-          :class="validationResult.valid ? 'text-green-600' : 'text-destructive'"
+          :class="validationResult.valid ? 'text-primary' : 'text-destructive'"
         >
           <CheckCircle2 v-if="validationResult.valid" class="size-3.5" />
           <AlertCircle v-else class="size-3.5" />

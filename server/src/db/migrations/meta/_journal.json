@@ -288,6 +288,13 @@
       "when": 1783465177576,
       "tag": "0040_add_readwise_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1783469412249,
+      "tag": "0041_readwise_annotation_user_id_id_index",
+      "breakpoints": true
     }
   ]
 }

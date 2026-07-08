@@ -6,6 +6,7 @@ import { ReadwiseSettingsService } from './readwise-settings.service';
 const mockRepo = {
   findSettings: vi.fn(),
   userHasReadwiseSyncPermission: vi.fn(),
+  findLatestAnnotationId: vi.fn(),
   upsertSettings: vi.fn(),
 };
 
@@ -13,15 +14,21 @@ const mockClient = {
   validateToken: vi.fn(),
 };
 
+const mockScheduler = {
+  requestSync: vi.fn(),
+};
+
 function makeService() {
-  return new ReadwiseSettingsService(mockRepo as any, mockClient as any);
+  return new ReadwiseSettingsService(mockRepo as any, mockClient as any, mockScheduler as any);
 }
 
 describe('ReadwiseSettingsService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRepo.userHasReadwiseSyncPermission.mockResolvedValue(true);
+    mockRepo.findLatestAnnotationId.mockResolvedValue(42);
     mockRepo.upsertSettings.mockResolvedValue(undefined);
+    mockScheduler.requestSync.mockClear();
   });
 
   describe('getSettings', () => {
@@ -86,19 +93,48 @@ describe('ReadwiseSettingsService', () => {
     });
 
     it('preserves existing token when payload omits it (only enabled changes)', async () => {
-      mockRepo.findSettings.mockResolvedValue({ apiToken: 'existing', enabled: true, disabledReason: null, lastSyncedAt: null });
+      mockRepo.findSettings
+        .mockResolvedValueOnce({ apiToken: 'existing', enabled: true, disabledReason: null, lastSyncedAt: null })
+        .mockResolvedValueOnce({ apiToken: 'existing', enabled: false, disabledReason: null, lastSyncedAt: null });
       await makeService().upsertSettings(1, { enabled: false });
       const data = mockRepo.upsertSettings.mock.calls[0][1];
       expect(data.apiToken).toBeUndefined();
       expect(data.enabled).toBe(false);
+      expect(mockScheduler.requestSync).not.toHaveBeenCalled();
     });
 
     it('sets disabledReason null and trims when a new token is provided', async () => {
-      mockRepo.findSettings.mockResolvedValue(undefined);
+      mockRepo.findSettings
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce({ apiToken: 'fresh-token', enabled: true, disabledReason: null, lastSyncedAt: null });
       await makeService().upsertSettings(1, { apiToken: '  fresh-token  ' });
       const data = mockRepo.upsertSettings.mock.calls[0][1];
       expect(data.apiToken).toBe('fresh-token');
       expect(data.disabledReason).toBeNull();
+      expect(data.lastSyncedAnnotationId).toBe(42);
+      expect(mockScheduler.requestSync).toHaveBeenCalledWith(1);
+    });
+
+    it('seeds the watermark when enabling an existing disabled integration', async () => {
+      mockRepo.findSettings
+        .mockResolvedValueOnce({ apiToken: 'existing', enabled: false, disabledReason: null, lastSyncedAt: null })
+        .mockResolvedValueOnce({ apiToken: 'existing', enabled: true, disabledReason: null, lastSyncedAt: null });
+      await makeService().upsertSettings(1, { enabled: true });
+      const data = mockRepo.upsertSettings.mock.calls[0][1];
+      expect(data.enabled).toBe(true);
+      expect(data.lastSyncedAnnotationId).toBe(42);
+      expect(mockScheduler.requestSync).toHaveBeenCalledWith(1);
+    });
+
+    it('does not seed the watermark when recovering from invalid_token auto-disable', async () => {
+      mockRepo.findSettings
+        .mockResolvedValueOnce({ apiToken: 'existing', enabled: false, disabledReason: 'invalid_token', lastSyncedAt: null })
+        .mockResolvedValueOnce({ apiToken: 'fresh-token', enabled: true, disabledReason: null, lastSyncedAt: null });
+      await makeService().upsertSettings(1, { apiToken: 'fresh-token', enabled: true });
+      const data = mockRepo.upsertSettings.mock.calls[0][1];
+      expect(data.apiToken).toBe('fresh-token');
+      expect('lastSyncedAnnotationId' in data).toBe(false);
+      expect(mockScheduler.requestSync).toHaveBeenCalledWith(1);
     });
 
     it('sets disabledReason null when enabled:true is provided', async () => {
@@ -110,10 +146,13 @@ describe('ReadwiseSettingsService', () => {
     });
 
     it('does not clear disabledReason when only disabling (enabled:false)', async () => {
-      mockRepo.findSettings.mockResolvedValue({ apiToken: 'existing', enabled: true, disabledReason: null, lastSyncedAt: null });
+      mockRepo.findSettings
+        .mockResolvedValueOnce({ apiToken: 'existing', enabled: true, disabledReason: null, lastSyncedAt: null })
+        .mockResolvedValueOnce({ apiToken: 'existing', enabled: false, disabledReason: null, lastSyncedAt: null });
       await makeService().upsertSettings(1, { enabled: false });
       const data = mockRepo.upsertSettings.mock.calls[0][1];
       expect('disabledReason' in data).toBe(false);
+      expect(mockScheduler.requestSync).not.toHaveBeenCalled();
     });
 
     it('returns fresh settings via getSettings after upsert', async () => {
@@ -130,7 +169,7 @@ describe('ReadwiseSettingsService', () => {
     it('uses the passed token when present', async () => {
       mockClient.validateToken.mockResolvedValue(true);
       const result = await makeService().validateToken(1, '  passed-token ');
-      expect(mockClient.validateToken).toHaveBeenCalledWith('passed-token');
+      expect(mockClient.validateToken).toHaveBeenCalledWith(1, 'passed-token');
       expect(mockRepo.findSettings).not.toHaveBeenCalled();
       expect(result).toEqual({ valid: true });
     });
@@ -139,7 +178,7 @@ describe('ReadwiseSettingsService', () => {
       mockRepo.findSettings.mockResolvedValue({ apiToken: 'stored-token' });
       mockClient.validateToken.mockResolvedValue(false);
       const result = await makeService().validateToken(1);
-      expect(mockClient.validateToken).toHaveBeenCalledWith('stored-token');
+      expect(mockClient.validateToken).toHaveBeenCalledWith(1, 'stored-token');
       expect(result).toEqual({ valid: false });
     });
 

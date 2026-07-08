@@ -87,6 +87,13 @@ describe('ReadwiseRepository', () => {
     );
   });
 
+  it('findLatestAnnotationId returns the max user annotation id', async () => {
+    const { repo, db } = makeRepository();
+    db.select.mockReturnValueOnce(makeSelectChain([{ latestAnnotationId: 99 }]));
+
+    await expect(repo.findLatestAnnotationId(7)).resolves.toBe(99);
+  });
+
   it('userHasReadwiseSyncPermission returns true for a superuser', async () => {
     const { repo, db, permissionFrom, permissionLimit } = makeRepository();
     permissionLimit.mockResolvedValueOnce([{ isSuperuser: true, permissionName: null }]);

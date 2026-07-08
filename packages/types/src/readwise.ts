@@ -15,4 +15,5 @@ export interface UpsertReadwiseSettingsPayload {
 
 export interface ReadwiseTokenValidationResult {
   valid: boolean;
+  message?: string;
 }

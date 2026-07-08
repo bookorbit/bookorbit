@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
-import { READWISE_AUTH_URL, READWISE_HIGHLIGHTS_URL, READWISE_MAX_RETRIES } from './readwise.constants';
+import { READWISE_AUTH_URL, READWISE_HIGHLIGHTS_URL, READWISE_MAX_RETRIES, READWISE_REQUEST_TIMEOUT_MS } from './readwise.constants';
 import { ReadwiseQueueService } from './readwise-queue.service';
 
 export interface ReadwiseHighlight {
@@ -11,6 +11,7 @@ export interface ReadwiseHighlight {
   note?: string;
   image_url?: string;
   highlighted_at?: string;
+  highlight_url?: string;
   source_type: string;
   category: string;
 }
@@ -21,12 +22,19 @@ export class ReadwiseClientService {
 
   constructor(private readonly queue: ReadwiseQueueService) {}
 
-  async validateToken(token: string): Promise<boolean> {
+  async validateToken(userId: number, token: string): Promise<boolean> {
+    const startedAtMs = Date.now();
     try {
-      const res = await fetch(READWISE_AUTH_URL, { headers: { Authorization: `Token ${token}` } });
+      const res = await fetch(READWISE_AUTH_URL, {
+        headers: { Authorization: `Token ${token}` },
+        signal: AbortSignal.timeout(READWISE_REQUEST_TIMEOUT_MS),
+      });
       return res.status === 204;
     } catch (err) {
-      this.logger.warn(`[readwise.client] token validation failed: ${sanitizeLogValue(err instanceof Error ? err.message : String(err))}`);
+      const errorClass = err instanceof Error ? err.constructor.name : 'UnknownError';
+      this.logger.warn(
+        `[readwise.client.validate_token] [fail] userId=${userId} durationMs=${Date.now() - startedAtMs} errorClass=${errorClass} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - token validation failed`,
+      );
       return false;
     }
   }
@@ -35,6 +43,7 @@ export class ReadwiseClientService {
     if (highlights.length === 0) return;
     await this.queue.throttle(userId);
 
+    const startedAtMs = Date.now();
     let res: Response;
     try {
       res = await fetch(READWISE_HIGHLIGHTS_URL, {
@@ -42,13 +51,15 @@ export class ReadwiseClientService {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Token ${token}`,
-          'User-Agent': 'BookOrbit Readwise Sync (https://bookorbit.app)',
+          'User-Agent': 'BookOrbit Readwise Sync',
         },
         body: JSON.stringify({ highlights }),
+        signal: AbortSignal.timeout(READWISE_REQUEST_TIMEOUT_MS),
       });
     } catch (err) {
+      const errorClass = err instanceof Error ? err.constructor.name : 'UnknownError';
       this.logger.error(
-        `[readwise.client] [fail] userId=${userId} attempt=${attempt} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}"`,
+        `[readwise.client.create_highlights] [fail] userId=${userId} attempt=${attempt} durationMs=${Date.now() - startedAtMs} errorClass=${errorClass} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - Readwise highlights create request failed`,
       );
       throw err;
     }

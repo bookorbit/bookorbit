@@ -1,10 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
 import { READWISE_MIN_INTERVAL_MS } from './readwise.constants';
 
 @Injectable()
 export class ReadwiseQueueService {
-  private readonly logger = new Logger(ReadwiseQueueService.name);
   private readonly lastRequestAt = new Map<number, number>();
 
   async throttle(userId: number): Promise<void> {

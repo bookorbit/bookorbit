@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { ReadwiseSettings, UpsertReadwiseSettingsPayload } from '@bookorbit/types'
+import type { ReadwiseSettings, ReadwiseTokenValidationResult, UpsertReadwiseSettingsPayload } from '@bookorbit/types'
 import { fetchReadwiseSettings, upsertReadwiseSettings, validateReadwiseToken } from '../api/readwise.api'
 
 const settings = ref<ReadwiseSettings | null>(null)
@@ -35,11 +35,10 @@ export function useReadwiseSettings() {
     }
   }
 
-  async function validateToken(token?: string): Promise<{ valid: boolean }> {
+  async function validateToken(token?: string): Promise<ReadwiseTokenValidationResult> {
     validating.value = true
     try {
-      const result = await validateReadwiseToken(token)
-      return { valid: result.valid }
+      return await validateReadwiseToken(token)
     } catch {
       return { valid: false }
     } finally {

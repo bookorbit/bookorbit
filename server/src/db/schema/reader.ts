@@ -306,6 +306,7 @@ export const annotations = pgTable(
   },
   (t) => [
     index('annotations_user_id_idx').on(t.userId),
+    index('annotations_user_id_id_idx').on(t.userId, t.id),
     index('annotations_user_book_idx').on(t.userId, t.bookId),
     index('annotations_user_book_active_idx')
       .on(t.userId, t.bookId)

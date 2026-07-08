@@ -2,7 +2,12 @@ import { Logger } from '@nestjs/common';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ReadwiseAutoSyncSchedulerService } from './readwise-auto-sync-scheduler.service';
-import { READWISE_AUTO_SYNC_DEBOUNCE_MS } from './readwise.constants';
+import {
+  READWISE_AUTO_SYNC_DEBOUNCE_MS,
+  READWISE_AUTO_SYNC_MAX_RETRIES,
+  READWISE_AUTO_SYNC_MAX_WAIT_MS,
+  READWISE_AUTO_SYNC_RETRY_BASE_MS,
+} from './readwise.constants';
 import { ReadwiseSyncService } from './readwise-sync.service';
 
 const mockSyncService = {
@@ -28,6 +33,7 @@ describe('ReadwiseAutoSyncSchedulerService', () => {
 
     mockSyncService.flush.mockResolvedValue(undefined);
     vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
 
     service = new ReadwiseAutoSyncSchedulerService(mockSyncService as unknown as ReadwiseSyncService);
   });
@@ -100,13 +106,41 @@ describe('ReadwiseAutoSyncSchedulerService', () => {
     expect(mockSyncService.flush).toHaveBeenNthCalledWith(2, 1);
   });
 
-  it('swallows and logs flush failures', async () => {
-    const errorSpy = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+  it('does not postpone a pending flush past the max wait under continuous requests', async () => {
+    service.requestSync(1);
+
+    for (let i = 0; i < 5; i += 1) {
+      await vi.advanceTimersByTimeAsync(900);
+      service.requestSync(1);
+    }
+
+    await vi.advanceTimersByTimeAsync(READWISE_AUTO_SYNC_MAX_WAIT_MS - 4500 - 1);
+    expect(mockSyncService.flush).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(mockSyncService.flush).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries and logs transient flush failures', async () => {
+    const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     mockSyncService.flush.mockRejectedValueOnce(new Error('boom'));
 
     service.requestSync(1);
     await vi.runAllTimersAsync();
 
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('[readwise.scheduler] flush failed userId=1'));
+    expect(mockSyncService.flush).toHaveBeenCalledTimes(2);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[readwise.scheduler] [fail] userId=1'));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(`nextDelayMs=${READWISE_AUTO_SYNC_RETRY_BASE_MS}`));
+  });
+
+  it('stops retrying after the retry budget is exhausted', async () => {
+    const errorSpy = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    mockSyncService.flush.mockRejectedValue(new Error('boom'));
+
+    service.requestSync(1);
+    await vi.runAllTimersAsync();
+
+    expect(mockSyncService.flush).toHaveBeenCalledTimes(READWISE_AUTO_SYNC_MAX_RETRIES + 1);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('retryExhausted=true'));
   });
 });

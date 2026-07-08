@@ -17,7 +17,7 @@ const mockClient = {
 };
 
 function makeService() {
-  return new ReadwiseSyncService(mockRepo as any, mockClient as any);
+  return new ReadwiseSyncService(mockRepo as any, mockClient as any, { appUrl: 'https://bookorbit.example/' } as any);
 }
 
 function makeRow(overrides: Partial<NewHighlightRow> = {}): NewHighlightRow {
@@ -89,6 +89,7 @@ describe('ReadwiseSyncService', () => {
         author: 'An Author',
         note: 'a note',
         highlighted_at: '2026-01-02T03:04:05.000Z',
+        highlight_url: 'https://bookorbit.example/book/10?tab=highlights&annotationId=5',
         source_type: 'bookorbit',
         category: 'books',
       });
@@ -182,11 +183,11 @@ describe('ReadwiseSyncService', () => {
   });
 
   describe('failure handling', () => {
-    it('does not advance the watermark on a generic push error', async () => {
+    it('does not advance the watermark and propagates a generic push error for retry', async () => {
       mockRepo.findSettings.mockResolvedValue(enabledSettings());
       mockRepo.findNewHighlights.mockResolvedValueOnce([makeRow({ annotationId: 9 })]);
       mockClient.createHighlights.mockRejectedValueOnce(new Error('boom'));
-      await makeService().flush(1);
+      await expect(makeService().flush(1)).rejects.toThrow('boom');
       expect(mockRepo.upsertSettings).not.toHaveBeenCalled();
       expect(mockRepo.findNewHighlights).toHaveBeenCalledTimes(1);
     });

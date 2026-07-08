@@ -2,6 +2,8 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 
 import type { ReadwiseSettings, ReadwiseSyncDisabledReason, ReadwiseTokenValidationResult, UpsertReadwiseSettingsPayload } from '@bookorbit/types';
 
+import type { ReadwiseUserSetting } from '../../db/schema';
+import { ReadwiseAutoSyncSchedulerService } from './readwise-auto-sync-scheduler.service';
 import { ReadwiseClientService } from './readwise-client.service';
 import { ReadwiseRepository } from './readwise.repository';
 
@@ -10,6 +12,7 @@ export class ReadwiseSettingsService {
   constructor(
     private readonly repo: ReadwiseRepository,
     private readonly client: ReadwiseClientService,
+    private readonly scheduler: ReadwiseAutoSyncSchedulerService,
   ) {}
 
   async getSettings(userId: number): Promise<ReadwiseSettings> {
@@ -45,14 +48,33 @@ export class ReadwiseSettingsService {
       data.enabled = payload.enabled;
       if (payload.enabled) data.disabledReason = null; // user re-enabling clears stored reason
     }
+    if (this.shouldSeedWatermark(existing, rawToken, payload)) {
+      data.lastSyncedAnnotationId = await this.repo.findLatestAnnotationId(userId);
+    }
     await this.repo.upsertSettings(userId, data);
-    return this.getSettings(userId);
+    const settings = await this.getSettings(userId);
+    if (settings.effectiveEnabled) this.scheduler.requestSync(userId);
+    return settings;
   }
 
   async validateToken(userId: number, token?: string): Promise<ReadwiseTokenValidationResult> {
     const effective = token?.trim() || (await this.repo.findSettings(userId))?.apiToken;
     if (!effective) return { valid: false };
-    return { valid: await this.client.validateToken(effective) };
+    return { valid: await this.client.validateToken(userId, effective) };
+  }
+
+  private shouldSeedWatermark(
+    existing: ReadwiseUserSetting | undefined,
+    rawToken: string | undefined,
+    payload: UpsertReadwiseSettingsPayload,
+  ): boolean {
+    const nextTokenConfigured = Boolean(rawToken || existing?.apiToken);
+    const nextEnabled = payload.enabled ?? existing?.enabled ?? true;
+    if (!nextTokenConfigured || !nextEnabled) return false;
+    if (!existing) return true;
+    if (!existing.apiToken) return true;
+    if (!existing.enabled && payload.enabled === true && existing.disabledReason !== 'invalid_token') return true;
+    return false;
   }
 
   private resolveDisabledReason(input: { hasPermission: boolean; tokenConfigured: boolean; enabled: boolean }): ReadwiseSyncDisabledReason | null {
