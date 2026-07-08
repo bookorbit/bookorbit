@@ -174,7 +174,9 @@ export class StorygraphBookMatchService {
     if (!bookId) return null;
 
     try {
-      const response = await this.client.get(userId, cookies, `/books/${bookId}`);
+      // The id can be pasted directly by the user, so encode it before putting it in the path —
+      // a stray ?, #, or / would otherwise change which URL we request.
+      const response = await this.client.get(userId, cookies, `/books/${encodeURIComponent(bookId)}`);
       if (response.redirectedToSignIn || response.status !== 200) return null;
 
       return { storygraphBookId: bookId, title: this.parseBookTitle(response.html) };
