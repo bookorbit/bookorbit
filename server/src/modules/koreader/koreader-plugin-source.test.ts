@@ -9,45 +9,63 @@ async function readPluginFile(name: string): Promise<string> {
 }
 
 describe('KOReader plugin update source wiring', () => {
-  it('keeps update status on the first BookOrbit menu page and groups advanced settings', async () => {
+  it('keeps top-level actions separate from nested settings', async () => {
     const menu = await readPluginFile('bookorbit_main_menu.lua');
     const updater = await readPluginFile('bookorbit_updater.lua');
-    const dashboardIndex = menu.indexOf('text = _("Open dashboard")');
-    const updateRowIndex = menu.indexOf('return self:updateCheckMenuText()');
-    const lastSyncIndex = menu.indexOf('return T(_("Last sync: %1")');
-    const syncThisIndex = menu.indexOf('text = _("Sync this book now")');
+    const dashboardIndex = menu.indexOf('id = "open_dashboard"');
+    const updateRowIndex = menu.indexOf('self:updateCheckMenuText()');
+    const syncThisIndex = menu.indexOf('text = _("Sync current book now")');
+    const autoSyncIndex = menu.indexOf('text = _("Auto sync current book")');
     const syncAllIndex = menu.indexOf('text = _("Sync all books now")');
-    const autoSyncIndex = menu.indexOf('text = _("Auto sync this book")');
-    const twoWayIndex = menu.indexOf('text = _("Two-way highlight sync")');
-    const syncSettingsIndex = menu.indexOf('text = _("Sync settings")');
+    const topLevelSettingsIndex = menu.indexOf('text = _("Settings")', dashboardIndex);
+    const settingsMenuIndex = menu.indexOf('function MainMenu:settingsMenu');
+    const dashboardSettingsIndex = menu.indexOf('text = _("Dashboard")', settingsMenuIndex);
+    const syncSettingsIndex = menu.indexOf('text = _("Sync")', settingsMenuIndex);
+    const pluginSettingsIndex = menu.indexOf('text = _("Plugin")', settingsMenuIndex);
     const accountIndex = menu.indexOf('text = _("Account & setup")');
-    const syncSettingsBlock = menu.slice(syncSettingsIndex, accountIndex);
-    const autoSyncBlock = menu.slice(autoSyncIndex, syncSettingsIndex);
+    const topLevelActionBlock = menu.slice(dashboardIndex, topLevelSettingsIndex);
+    const dashboardMenuBlock = menu.slice(menu.indexOf('function MainMenu:dashboardMenuItems'), menu.indexOf('function MainMenu:showDashboardMenu'));
+    const dashboardSettingsBlock = menu.slice(
+      menu.indexOf('function MainMenu:dashboardSettingsMenu'),
+      menu.indexOf('function MainMenu:syncSettingsMenu'),
+    );
+    const syncSettingsBlock = menu.slice(menu.indexOf('function MainMenu:syncSettingsMenu'), menu.indexOf('function MainMenu:pluginSettingsMenu'));
+    const pluginSettingsBlock = menu.slice(menu.indexOf('function MainMenu:pluginSettingsMenu'), settingsMenuIndex);
 
     expect(updater).toContain('function UpdateCheck:updateCheckMenuText()');
     expect(dashboardIndex).toBeGreaterThan(0);
-    expect(updateRowIndex).toBeGreaterThan(dashboardIndex);
-    expect(updateRowIndex).toBeLessThan(lastSyncIndex);
-    expect(lastSyncIndex).toBeLessThan(syncThisIndex);
+    expect(dashboardIndex).toBeLessThan(syncThisIndex);
+    expect(syncThisIndex).toBeLessThan(autoSyncIndex);
+    expect(autoSyncIndex).toBeLessThan(syncAllIndex);
     expect(syncThisIndex).toBeLessThan(syncAllIndex);
-    expect(syncAllIndex).toBeLessThan(autoSyncIndex);
-    expect(autoSyncIndex).toBeLessThan(twoWayIndex);
-    expect(twoWayIndex).toBeLessThan(syncSettingsIndex);
-    expect(syncSettingsIndex).toBeLessThan(accountIndex);
-    expect(autoSyncBlock).toContain('separator = true');
-    expect(syncSettingsBlock).toContain('return T(_("Open dashboard on startup (%1)"), self:catalogAutoOpenLabel())');
+    expect(syncAllIndex).toBeLessThan(topLevelSettingsIndex);
+    expect(topLevelSettingsIndex).toBeLessThan(accountIndex);
+    expect(dashboardSettingsIndex).toBeGreaterThan(settingsMenuIndex);
+    expect(dashboardSettingsIndex).toBeLessThan(syncSettingsIndex);
+    expect(syncSettingsIndex).toBeLessThan(pluginSettingsIndex);
+    expect(topLevelActionBlock).not.toContain('self:updateCheckMenuText()');
+    expect(topLevelActionBlock).toContain('id = "sync_current_book"');
+    expect(topLevelActionBlock).toContain('id = "auto_sync_current_book"');
+    expect(topLevelActionBlock).toContain('text = _("Auto sync current book")');
+    expect(topLevelActionBlock).toContain('self:onBookOrbitToggleAutoSync(nil, true)');
+    expect(dashboardSettingsBlock).toContain('return T(_("Open dashboard on startup (%1)"), self:catalogAutoOpenLabel())');
+    expect(syncSettingsBlock).not.toContain('text = _("Auto sync current book")');
+    expect(syncSettingsBlock).toContain('text = _("Two-way highlight sync")');
+    expect(syncSettingsBlock).toContain('text = _("Skip auto-sync when offline")');
+    expect(syncSettingsBlock).not.toContain('return T(_("Open dashboard on startup (%1)"), self:catalogAutoOpenLabel())');
     expect(syncSettingsBlock).toContain('return T(_("Periodically sync every # pages (%1)")');
     expect(syncSettingsBlock).toContain('return T(_("Sync to a newer state (%1)"), getNameStrategy(self.settings.sync_forward))');
     expect(syncSettingsBlock).toContain('return T(_("Sync to an older state (%1)"), getNameStrategy(self.settings.sync_backward))');
-    expect(
-      menu
-        .slice(menu.indexOf('return T(_("Periodically sync every # pages (%1)")'), menu.indexOf('return T(_("Sync to a newer state (%1)")'))
-        .includes('separator = true'),
-    ).toBe(false);
+    expect(updateRowIndex).toBeGreaterThan(menu.indexOf('function MainMenu:pluginSettingsMenu'));
+    expect(pluginSettingsBlock).toContain('self:updateCheckMenuText()');
+    expect(pluginSettingsBlock).toContain('self:checkForUpdate()');
+    expect(dashboardMenuBlock).toContain('local plugin_update = self:pluginSettingsMenu()[1]');
+    expect(dashboardMenuBlock).toContain('plugin_update.separator = true');
+    expect(dashboardMenuBlock).toContain('item.id ~= "sync_current_book"');
+    expect(dashboardMenuBlock).toContain('item.id ~= "auto_sync_current_book"');
+    expect(dashboardMenuBlock).toContain('include_plugin = false');
 
-    expect(menu.indexOf('keep_menu_open = true,\n                callback = function()\n                    self:checkForUpdate()')).toBeGreaterThan(
-      0,
-    );
+    expect(menu.indexOf('self:checkForUpdate()')).toBeGreaterThan(0);
     expect(updater).toContain('return T(_("Plugin update available: v%1 -> v%2"), PLUGIN_VERSION, self.settings.update_latest_version)');
     expect(updater).toContain('return T(_("Installed plugin: v%1 (Check for update)"), PLUGIN_VERSION)');
     expect(updater).toContain('return T(_("Installed plugin: v%1 (Login required)"), PLUGIN_VERSION)');
@@ -56,14 +74,15 @@ describe('KOReader plugin update source wiring', () => {
 
   it('keeps manual sync actions above advanced sync settings', async () => {
     const menu = await readPluginFile('bookorbit_main_menu.lua');
-    const syncSettingsBlock = menu.slice(
-      menu.indexOf('return T(_("Periodically sync every # pages (%1)")'),
-      menu.indexOf('text = _("Account & setup")'),
-    );
+    const dashboardIndex = menu.indexOf('id = "open_dashboard"');
+    const settingsIndex = menu.indexOf('text = _("Settings")', dashboardIndex);
+    const syncSettingsBlock = menu.slice(menu.indexOf('function MainMenu:syncSettingsMenu'), menu.indexOf('function MainMenu:pluginSettingsMenu'));
 
-    expect(menu.indexOf('text = _("Sync this book now")')).toBeLessThan(menu.indexOf('text = _("Sync settings")'));
-    expect(menu.indexOf('text = _("Sync all books now")')).toBeLessThan(menu.indexOf('text = _("Sync settings")'));
-    expect(syncSettingsBlock).not.toContain('text = _("Sync this book now")');
+    expect(menu.indexOf('text = _("Sync current book now")')).toBeLessThan(settingsIndex);
+    expect(menu.indexOf('text = _("Auto sync current book")')).toBeLessThan(settingsIndex);
+    expect(menu.indexOf('text = _("Sync all books now")')).toBeLessThan(settingsIndex);
+    expect(syncSettingsBlock).not.toContain('text = _("Sync current book now")');
+    expect(syncSettingsBlock).not.toContain('text = _("Auto sync current book")');
     expect(syncSettingsBlock).not.toContain('text = _("Sync all books now")');
   });
 
@@ -167,7 +186,7 @@ describe('KOReader plugin update source wiring', () => {
     const main = await readPluginFile('main.lua');
     const sweep = await readPluginFile('bookorbit_sweep.lua');
 
-    expect(main).toContain('if not err then self:maybeCheckForUpdate(false) end');
+    expect(main).toContain('self:requestUpdateCheck(false, "sweep_done")');
     expect(sweep).toContain('on_finish = opts.on_finish');
     expect(sweep).toContain('pcall(ctx.on_finish, err)');
   });

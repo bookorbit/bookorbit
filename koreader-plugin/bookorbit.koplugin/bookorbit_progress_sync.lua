@@ -53,14 +53,18 @@ end
 -- Always the binary partial MD5: BookOrbit matches on the scanner-computed
 -- partial MD5 of the file, so the filename checksum method does not exist here.
 function ProgressSync:getDocumentDigest()
-    local digest = self.ui.doc_settings:readSetting("partial_md5_checksum")
+    if not self.ui or not self.ui.document then return nil end
+    local doc_settings = self.ui.doc_settings
+    local digest = doc_settings and doc_settings:readSetting("partial_md5_checksum") or nil
     if digest then return digest end
 
     local file = self.ui.document.file
     if not file then return nil end
     local ok, computed = pcall(util.partialMD5, file)
     if not ok or not computed then return nil end
-    self.ui.doc_settings:saveSetting("partial_md5_checksum", computed)
+    if doc_settings then
+        doc_settings:saveSetting("partial_md5_checksum", computed)
+    end
     return computed
 end
 
@@ -99,12 +103,12 @@ end
 
 function ProgressSync:reconcileProgressBeforeBookSync(digest, on_done)
     if not self.ui or not self.ui.document then
-        UIManager:show(InfoMessage:new{ text = _("Open a book to sync it."), timeout = 2 })
-        return
+        UIManager:show(InfoMessage:new{ text = _("No reader book is open."), timeout = 2 })
+        return false
     end
     if self:getDocumentDigest() ~= digest then
         UIManager:show(InfoMessage:new{ text = _("The open book changed. Start the sync again."), timeout = 3 })
-        return
+        return false
     end
 
     local client = self:newClient()
@@ -115,17 +119,17 @@ function ProgressSync:reconcileProgressBeforeBookSync(digest, on_done)
         logger.dbg("BookOrbit: progress check before book sync failed:", err)
         UIManager:show(InfoMessage:new{ text = _("Could not check latest progress. Syncing book data without changing progress."), timeout = 4 })
         on_done(true)
-        return
+        return true
     end
 
     if not body.percentage then
         on_done(false)
-        return
+        return true
     end
 
     if body.device == Device.model and body.device_id == self.device_id then
         on_done(false)
-        return
+        return true
     end
 
     body.percentage = Math.roundPercent(body.percentage)
@@ -134,7 +138,7 @@ function ProgressSync:reconcileProgressBeforeBookSync(digest, on_done)
 
     if local_percentage == body.percentage or body.progress == local_progress then
         on_done(false)
-        return
+        return true
     end
 
     local remote_newer = self:remoteProgressIsNewer(body, local_percentage)
@@ -148,12 +152,13 @@ function ProgressSync:reconcileProgressBeforeBookSync(digest, on_done)
         else
             on_done(false)
         end
-        return
+        return true
     end
 
     local strategy = remote_newer and self.settings.sync_forward or self.settings.sync_backward
     if strategy == SYNC_STRATEGY.SILENT then
         self:applyRemoteProgress(body, on_done)
+        return true
     elseif strategy == SYNC_STRATEGY.PROMPT then
         local template = remote_newer and _("Sync to latest location %1% from device '%2' before uploading this book?")
             or _("Sync to previous location %1% from device '%2' before uploading this book?")
@@ -166,14 +171,17 @@ function ProgressSync:reconcileProgressBeforeBookSync(digest, on_done)
                 on_done(remote_newer)
             end,
         })
+        return true
     elseif remote_newer then
         UIManager:show(InfoMessage:new{
             text = _("BookOrbit has newer progress. Syncing book data without changing progress."),
             timeout = 4,
         })
         on_done(true)
+        return true
     else
         on_done(false)
+        return true
     end
 end
 
@@ -182,7 +190,12 @@ function ProgressSync:updateProgress(ensure_networking, interactive, on_suspend)
         if interactive then self:promptLogin() end
         return
     end
-    if not self.ui or not self.ui.document then return end
+    if not self.ui or not self.ui.document then
+        if interactive then
+            UIManager:show(InfoMessage:new{ text = _("No reader book is open."), timeout = 2 })
+        end
+        return
+    end
 
     local now = UIManager:getElapsedTimeSinceBoot()
     if not interactive and now - self.push_timestamp <= API_CALL_DEBOUNCE_DELAY then
@@ -201,15 +214,37 @@ function ProgressSync:updateProgress(ensure_networking, interactive, on_suspend)
     local body, err = client:updateProgress(digest, self:getLastPercent(), self:getLastProgress(), os.time())
     if interactive then
         if body then
+            if self.recordSyncSuccess then
+                self:recordSyncSuccess("progress_push", _("Progress pushed"))
+            end
             UIManager:show(InfoMessage:new{ text = _("Progress has been pushed to BookOrbit."), timeout = 3 })
-            if not on_suspend then self:maybeCheckForUpdate(false) end
+            if not on_suspend then
+                if self.requestUpdateCheck then
+                    self:requestUpdateCheck(false, "progress_push")
+                else
+                    self:maybeCheckForUpdate(false)
+                end
+            end
         else
+            if self.recordSyncError then
+                self:recordSyncError("progress_push", err)
+            end
             showSyncError()
         end
     elseif not body then
+        if self.recordSyncError then
+            self:recordSyncError("progress_push", err)
+        end
         logger.dbg("BookOrbit: push failed:", err)
     elseif not on_suspend then
-        self:maybeCheckForUpdate(false)
+        if self.recordSyncSuccess then
+            self:recordSyncSuccess("progress_push", _("Progress pushed"))
+        end
+        if self.requestUpdateCheck then
+            self:requestUpdateCheck(false, "progress_push")
+        else
+            self:maybeCheckForUpdate(false)
+        end
     end
 
     if on_suspend and Device:hasWifiManager() then
@@ -224,7 +259,12 @@ function ProgressSync:getProgress(ensure_networking, interactive)
         if interactive then self:promptLogin() end
         return
     end
-    if not self.ui or not self.ui.document then return end
+    if not self.ui or not self.ui.document then
+        if interactive then
+            UIManager:show(InfoMessage:new{ text = _("No reader book is open."), timeout = 2 })
+        end
+        return
+    end
 
     local now = UIManager:getElapsedTimeSinceBoot()
     if not interactive and now - self.pull_timestamp <= API_CALL_DEBOUNCE_DELAY then
@@ -245,10 +285,17 @@ function ProgressSync:getProgress(ensure_networking, interactive)
 
     if not body then
         if interactive then showSyncError() end
+        if self.recordSyncError then
+            self:recordSyncError("progress_pull", err)
+        end
         logger.dbg("BookOrbit: pull failed:", err)
         return
     end
-    self:maybeCheckForUpdate(false)
+    if self.requestUpdateCheck then
+        self:requestUpdateCheck(false, "progress_pull")
+    else
+        self:maybeCheckForUpdate(false)
+    end
 
     if not body.percentage then
         if interactive then
@@ -277,6 +324,9 @@ function ProgressSync:getProgress(ensure_networking, interactive)
 
     if interactive then
         self:syncToProgress(body.progress)
+        if self.recordSyncSuccess then
+            self:recordSyncSuccess("progress_pull", _("Progress pulled"))
+        end
         UIManager:show(InfoMessage:new{ text = _("Progress has been synchronized."), timeout = 3 })
         return
     end
@@ -291,6 +341,9 @@ function ProgressSync:getProgress(ensure_networking, interactive)
     local strategy = self_older and self.settings.sync_forward or self.settings.sync_backward
     if strategy == SYNC_STRATEGY.SILENT then
         self:syncToProgress(body.progress)
+        if self.recordSyncSuccess then
+            self:recordSyncSuccess("progress_pull", _("Progress pulled"))
+        end
         UIManager:show(InfoMessage:new{ text = _("Progress has been synchronized."), timeout = 3 })
     elseif strategy == SYNC_STRATEGY.PROMPT then
         local template = self_older and _("Sync to latest location %1% from device '%2'?")
@@ -299,6 +352,9 @@ function ProgressSync:getProgress(ensure_networking, interactive)
             text = T(template, Math.round(body.percentage * 100), body.device),
             ok_callback = function()
                 self:syncToProgress(body.progress)
+                if self.recordSyncSuccess then
+                    self:recordSyncSuccess("progress_pull", _("Progress pulled"))
+                end
             end,
         })
     end

@@ -72,6 +72,8 @@ describe('KoboSyncController', () => {
     expect(resources.image_host).toBe('https://reader.example.com');
     expect(resources.image_url_template).toContain('/api/v1/kobo/device-token/v1/books/{ImageId}/thumbnail/{Width}/{Height}/false/image.jpg');
     expect(resources.library_sync).toBe('https://reader.example.com/api/v1/kobo/device-token/v1/library/sync');
+    expect(resources.get_tests_request).toBe('https://reader.example.com/api/v1/kobo/device-token/v1/analytics/gettests');
+    expect(resources.post_analytics_event).toBe('https://reader.example.com/api/v1/kobo/device-token/v1/analytics/event');
   });
 
   it('initialization appends x-forwarded-port when host has no port (Vite dev proxy scenario)', () => {

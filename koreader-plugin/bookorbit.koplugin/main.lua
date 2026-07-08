@@ -31,7 +31,10 @@ local BookOrbitAnnotations = require("bookorbit_annotations")
 local BookOrbitApi = require("bookorbit_api")
 local BookOrbitBookSync = require("bookorbit_book_sync")
 local BookOrbitCatalog = require("bookorbit_catalog")
+local BookOrbitHighlightSummary = require("bookorbit_highlight_summary")
+local BookOrbitOpenAnnotationScheduler = require("bookorbit_open_annotation_scheduler")
 local BookOrbitState = require("bookorbit_state")
+local BookOrbitSyncCoordinator = require("bookorbit_sync_coordinator")
 local BookOrbitMainMenu = require("bookorbit_main_menu")
 local BookOrbitMenuPin = require("bookorbit_menu_pin")
 local BookOrbitProgressSync = require("bookorbit_progress_sync")
@@ -45,6 +48,20 @@ local SYNC_STRATEGY = {
     SILENT = 2,
     DISABLE = 3,
 }
+
+local LAST_ERROR_LABELS = {
+    auth = _("login failed"),
+    network = _("server not reachable"),
+    invalid_json = _("invalid server response"),
+    unsupported_server = _("server update required"),
+    body_too_large = _("request too large"),
+    partial_failure = _("partial sync failure"),
+}
+
+local SYNC_JOB_PRIORITY = BookOrbitSyncCoordinator.PRIORITY
+local OPEN_ANNOTATION_SYNC_DELAY = 2
+local OPEN_HIGHLIGHT_RETRY_DELAY = 8
+local OPEN_HIGHLIGHT_MAX_RETRIES = 2
 
 local BookOrbit = WidgetContainer:extend{
     name = "bookorbit",
@@ -104,7 +121,7 @@ function BookOrbit:init()
         -- Push only, no pull, no network nagging: relies on the connection
         -- being already up, like the stock kosync periodic push.
         if self.settings.auto_sync and (self.settings.pages_before_update or 0) > 0 then
-            self:updateProgress(false, false)
+            self:requestProgressPush(false, false, "periodic")
         end
     end
 
@@ -161,7 +178,7 @@ function BookOrbit:init()
     self.ui.menu:registerToMainMenu(self)
     self:onStart()
     UIManager:scheduleIn(5, function()
-        self:maybeCheckForUpdate(false)
+        self:requestUpdateCheck(false, "startup")
     end)
 end
 
@@ -230,6 +247,419 @@ function BookOrbit:isLoggedIn()
     return self.settings.server_url ~= nil and self.settings.username ~= nil and self.settings.userkey ~= nil
 end
 
+function BookOrbit:errorLabel(err, fallback)
+    if LAST_ERROR_LABELS[err] then return LAST_ERROR_LABELS[err] end
+    if err == 401 or err == 403 then return LAST_ERROR_LABELS.auth end
+    if type(err) == "number" then
+        return T(_("server error %1"), err)
+    end
+    return fallback or tostring(err or _("unknown error"))
+end
+
+function BookOrbit:recordSyncSuccess(event, message)
+    self.settings.last_sync = {
+        event = event,
+        at = os.time(),
+        message = message,
+    }
+    self.settings.last_error = nil
+    G_reader_settings:flush()
+end
+
+function BookOrbit:recordSyncError(event, err, message)
+    self.settings.last_error = {
+        event = event,
+        at = os.time(),
+        code = err,
+        message = message or self:errorLabel(err),
+    }
+    G_reader_settings:flush()
+end
+
+function BookOrbit:recordHighlightSync(summary, err)
+    summary = BookOrbitHighlightSummary.normalize(summary)
+    summary.message = summary.message or BookOrbitHighlightSummary.message(summary)
+    self.settings.last_highlight_sync = summary
+
+    local code = BookOrbitHighlightSummary.actionableError(summary, err)
+    if code then
+        local message
+        if code == "unsupported_server" then
+            message = _("BookOrbit server needs an update for two-way highlights.")
+        end
+        self:recordSyncError("highlight_sync", code, message)
+    else
+        G_reader_settings:flush()
+    end
+end
+
+function BookOrbit:shouldSkipAutoSyncOffline(event)
+    if self.settings.skip_sync_when_offline and not NetworkMgr:isOnline() then
+        logger.dbg("BookOrbit: automatic sync skipped while offline:", event)
+        return true
+    end
+    return false
+end
+
+function BookOrbit:getSyncCoordinator()
+    if not self.sync_coordinator then
+        self.sync_coordinator = BookOrbitSyncCoordinator.new()
+    end
+    return self.sync_coordinator
+end
+
+function BookOrbit:getSyncCoordinatorStatus()
+    if not self.sync_coordinator then
+        return { pending_count = 0 }
+    end
+    return self.sync_coordinator:status()
+end
+
+function BookOrbit:getOpenAnnotationScheduler()
+    if not self.open_annotation_scheduler then
+        self.open_annotation_scheduler = BookOrbitOpenAnnotationScheduler.new{
+            delay = OPEN_ANNOTATION_SYNC_DELAY,
+            schedule_in = function(delay, callback)
+                UIManager:scheduleIn(delay, callback)
+            end,
+        }
+    end
+    return self.open_annotation_scheduler
+end
+
+function BookOrbit:isOpenBookMatched(digest)
+    if not digest then return false end
+    local state = BookOrbitState.open()
+    return state:getBook(digest) ~= nil
+end
+
+function BookOrbit:recordOpenAnnotationUnmatched(reason)
+    self:recordHighlightSync({
+        event = "open_book",
+        reason = reason or "annotation_open",
+        skipped = 1,
+    }, "unmatched")
+end
+
+function BookOrbit:scheduleOpenAnnotationSync(digest, reason, opts)
+    return self:getOpenAnnotationScheduler():schedule(self, digest, reason or "annotation_open", opts)
+end
+
+function BookOrbit:retryOpenHighlightSync()
+    if not self:isLoggedIn() then
+        self:promptLogin()
+        return
+    end
+    if not self.ui or not self.ui.document then
+        UIManager:show(InfoMessage:new{ text = _("No reader book is open."), timeout = 2 })
+        return
+    end
+    self.open_highlight_retry_status = nil
+    self:requestAnnotationExchange("diagnostics_retry")
+    UIManager:show(InfoMessage:new{ text = _("BookOrbit highlight sync queued."), timeout = 2 })
+end
+
+function BookOrbit:retryOpenBookMatch()
+    if not self:isLoggedIn() then
+        self:promptLogin()
+        return
+    end
+    if not self.ui or not self.ui.document then
+        UIManager:show(InfoMessage:new{ text = _("No reader book is open."), timeout = 2 })
+        return
+    end
+    local digest = self:getDocumentDigest()
+    if not digest then
+        UIManager:show(InfoMessage:new{ text = _("Could not identify the open book."), timeout = 2 })
+        return
+    end
+    local state = BookOrbitState.open()
+    state.unmatched[digest] = nil
+    state:flush()
+    self:requestOpenBookMatch("diagnostics", {
+        schedule_annotation_sync = self.settings.annotation_sync,
+        annotation_digest = digest,
+    })
+    UIManager:show(InfoMessage:new{ text = _("BookOrbit match retry queued."), timeout = 2 })
+end
+
+function BookOrbit:submitSyncJob(job)
+    local result = self:getSyncCoordinator():submit(job)
+    if (result == "queued" or result == "kept") and job.interactive then
+        UIManager:show(InfoMessage:new{ text = _("BookOrbit sync queued."), timeout = 2 })
+    end
+    return result
+end
+
+function BookOrbit:requestUpdateCheck(interactive, source)
+    if interactive and not self:isLoggedIn() then
+        self:promptLogin()
+        return
+    end
+
+    local submit = function()
+        self:submitSyncJob{
+            family = "update_check",
+            label = _("Update check"),
+            source = source or (interactive and "manual" or "auto"),
+            priority = interactive and SYNC_JOB_PRIORITY.manual or SYNC_JOB_PRIORITY.auto,
+            interactive = interactive == true,
+            run = function()
+                if interactive then
+                    self:doCheckForUpdate()
+                else
+                    self:maybeCheckForUpdate(false)
+                end
+            end,
+        }
+    end
+
+    if interactive then
+        NetworkMgr:runWhenConnected(submit)
+    else
+        submit()
+    end
+end
+
+function BookOrbit:requestProgressPush(ensure_networking, interactive, source, priority)
+    self:submitSyncJob{
+        family = "progress_push",
+        label = _("Progress push"),
+        source = source or (interactive and "manual" or "auto"),
+        priority = priority or (interactive and SYNC_JOB_PRIORITY.manual or SYNC_JOB_PRIORITY.auto),
+        interactive = interactive == true,
+        run = function()
+            self:updateProgress(ensure_networking, interactive)
+        end,
+    }
+end
+
+function BookOrbit:requestProgressPull(ensure_networking, interactive, source, priority)
+    self:submitSyncJob{
+        family = "progress_pull",
+        label = _("Progress pull"),
+        source = source or (interactive and "manual" or "auto"),
+        priority = priority or (interactive and SYNC_JOB_PRIORITY.manual or SYNC_JOB_PRIORITY.auto),
+        interactive = interactive == true,
+        run = function()
+            self:getProgress(ensure_networking, interactive)
+        end,
+    }
+end
+
+function BookOrbit:requestAnnotationExchange(source)
+    self:submitSyncJob{
+        family = "annotation_exchange",
+        label = _("Highlight sync"),
+        source = source or "auto",
+        priority = SYNC_JOB_PRIORITY.auto,
+        interactive = false,
+        async = true,
+        run = function(done)
+            local execute = function()
+                self:exchangeAnnotationsForOpenBook(source or "auto")
+                done()
+            end
+            if NetworkMgr:willRerunWhenConnected(execute) then
+                return
+            end
+            execute()
+        end,
+    }
+end
+
+function BookOrbit:scheduleOpenHighlightRetry(reason, retry_count)
+    retry_count = retry_count or 0
+    if retry_count >= OPEN_HIGHLIGHT_MAX_RETRIES then
+        self.open_highlight_retry_status = nil
+        return
+    end
+    self.open_highlight_retry_status = {
+        pending = true,
+        reason = reason or "annotation_retry",
+        retry_count = retry_count + 1,
+        max_retries = OPEN_HIGHLIGHT_MAX_RETRIES,
+    }
+    UIManager:scheduleIn(OPEN_HIGHLIGHT_RETRY_DELAY, function()
+        self.open_highlight_retry_status = nil
+        if self:shouldSkipAutoSyncOffline("annotation_retry") then return end
+        self:submitSyncJob{
+            family = "annotation_exchange",
+            label = _("Highlight sync"),
+            source = reason or "annotation_retry",
+            priority = SYNC_JOB_PRIORITY.auto,
+            interactive = false,
+            async = true,
+            run = function(done)
+                local execute = function()
+                    self:exchangeAnnotationsForOpenBook(reason or "annotation_retry", retry_count + 1)
+                    done()
+                end
+                if NetworkMgr:willRerunWhenConnected(execute) then
+                    return
+                end
+                execute()
+            end,
+        }
+    end)
+end
+
+function BookOrbit:requestOpenBookMatch(source, opts)
+    opts = opts or {}
+    self:submitSyncJob{
+        family = "match_open_book",
+        label = _("Open book match"),
+        source = source or "auto",
+        priority = SYNC_JOB_PRIORITY.auto,
+        interactive = false,
+        async = true,
+        run = function(done)
+            self:matchOpenBookForAutoSync(function(matched)
+                done()
+                if not matched then return end
+                if opts.schedule_annotation_sync and self.settings.annotation_sync then
+                    self:scheduleOpenAnnotationSync(opts.annotation_digest or self:getDocumentDigest(), "annotation_open")
+                end
+                self:requestProgressPull(true, false, "reader_ready")
+            end)
+        end,
+    }
+end
+
+function BookOrbit:requestSweep(interactive, source)
+    local submit = function()
+        self:submitSyncJob{
+            family = "sweep",
+            label = _("Library sync"),
+            source = source or (interactive and "manual" or "auto"),
+            priority = interactive and SYNC_JOB_PRIORITY.manual or SYNC_JOB_PRIORITY.auto,
+            interactive = interactive == true,
+            async = true,
+            run = function(done)
+                local started = BookOrbitSweep.run{
+                    api = self:apiOpts(),
+                    interactive = interactive == true,
+                    annotation_sync = self.settings.annotation_sync,
+                    plugin = self,
+                    on_finish = function(err)
+                        if not err then
+                            self:requestUpdateCheck(false, "sweep_done")
+                        end
+                        done()
+                    end,
+                }
+                if started == false then
+                    done()
+                end
+            end,
+        }
+    end
+
+    if NetworkMgr:willRerunWhenOnline(submit) then
+        return
+    end
+    submit()
+end
+
+function BookOrbit:requestManualBookSync(snap)
+    if not snap then return end
+    local api_opts = self:apiOpts()
+
+    self:submitSyncJob{
+        family = "book_snapshot",
+        label = _("Book sync"),
+        source = "manual",
+        priority = SYNC_JOB_PRIORITY.manual,
+        interactive = true,
+        async = true,
+        run = function(done)
+            local function run_book_sync(skip_progress)
+                local latest_snap = BookOrbitBookSync.capture(self)
+                if not latest_snap then
+                    UIManager:show(InfoMessage:new{ text = _("Could not read this book's data."), timeout = 2 })
+                    done()
+                    return
+                end
+                if latest_snap.digest ~= snap.digest then
+                    UIManager:show(InfoMessage:new{ text = _("The open book changed. Start the sync again."), timeout = 3 })
+                    done()
+                    return
+                end
+                local started = BookOrbitBookSync.run{
+                    api = api_opts,
+                    snap = latest_snap,
+                    reason = "manual",
+                    interactive = true,
+                    plugin = self,
+                    annotation_sync = self.settings.annotation_sync,
+                    skip_progress = skip_progress,
+                    on_finish = done,
+                }
+                if started == false then
+                    done()
+                end
+            end
+
+            local run = function()
+                local will_finish = self:reconcileProgressBeforeBookSync(snap.digest, run_book_sync)
+                if will_finish == false then
+                    done()
+                end
+            end
+            if NetworkMgr:willRerunWhenOnline(run) then
+                return
+            end
+            run()
+        end,
+    }
+end
+
+function BookOrbit:requestBookSnapshotSync(opts)
+    opts = opts or {}
+    if not opts.snap then return end
+    local api_opts = self:apiOpts()
+
+    self:submitSyncJob{
+        family = "book_snapshot",
+        label = opts.label or _("Book sync"),
+        source = opts.reason or "auto",
+        priority = opts.priority or SYNC_JOB_PRIORITY.auto,
+        interactive = opts.interactive == true,
+        async = true,
+        run = function(done)
+            local function run()
+                local started = BookOrbitBookSync.run{
+                    api = api_opts,
+                    snap = opts.snap,
+                    reason = opts.reason,
+                    interactive = opts.interactive == true,
+                    synchronous = opts.synchronous == true,
+                    plugin = self,
+                    on_finish = function()
+                        if opts.on_finish then
+                            pcall(opts.on_finish)
+                        end
+                        done()
+                    end,
+                    annotation_sync = self.settings.annotation_sync,
+                }
+                if started == false then
+                    done()
+                end
+            end
+
+            if opts.go_online then
+                NetworkMgr:goOnlineToRun(run)
+                return
+            end
+            if opts.ensure_networking and NetworkMgr:willRerunWhenOnline(run) then
+                return
+            end
+            run()
+        end,
+    }
+end
+
 function BookOrbit:onStart()
     if PluginShare.bookorbit_auto_open_done then return end
     PluginShare.bookorbit_auto_open_done = true
@@ -279,28 +709,92 @@ end
 function BookOrbit:onReaderReady()
     if self.settings.auto_sync then
         UIManager:nextTick(function()
-            if self.settings.skip_sync_when_offline and not NetworkMgr:isOnline() then
-                return
-            end
-            self:getProgress(true, false)
-        end)
-        if self.settings.annotation_sync then
-            UIManager:scheduleIn(2, function()
-                if self.settings.skip_sync_when_offline and not NetworkMgr:isOnline() then
-                    return
+            if self:shouldSkipAutoSyncOffline("reader_ready") then return end
+            local digest = self:getDocumentDigest()
+            if self.settings.annotation_sync then
+                if self:isOpenBookMatched(digest) then
+                    self:scheduleOpenAnnotationSync(digest, "annotation_open")
                 end
-                self:exchangeAnnotationsForOpenBook()
-            end)
-        end
+            end
+            self:requestOpenBookMatch("reader_ready", {
+                schedule_annotation_sync = self.settings.annotation_sync,
+                annotation_digest = digest,
+            })
+        end)
     end
     self:registerEvents()
 
     self.last_page = self.ui:getCurrentPage()
 end
 
+local function titleFromFile(file)
+    if not file or file == "" then return nil end
+    local name = file:gsub(".*/", "")
+    if name == "" then return nil end
+    local title = name:gsub("%.[^%.]+$", "")
+    return title ~= "" and title or name
+end
+
+function BookOrbit:matchOpenBookForAutoSync(on_done)
+    if not self:isLoggedIn() or not self.ui or not self.ui.document then
+        if on_done then on_done(false) end
+        return
+    end
+
+    local digest = self:getDocumentDigest()
+    if not digest then
+        if on_done then on_done(false) end
+        return
+    end
+
+    local state = BookOrbitState.open()
+    if state:getBook(digest) then
+        if on_done then on_done(true) end
+        return
+    end
+
+    local run = function()
+        if not self.ui or not self.ui.document then
+            if on_done then on_done(false) end
+            return
+        end
+        local body, err = self:newClient():matchCheck({ digest }, {
+            [digest] = {
+                title = titleFromFile(self.ui.document.file),
+                source = "current_file",
+            },
+        })
+        if not body then
+            self:recordSyncError("match_open_book", err)
+            if on_done then on_done(false) end
+            return
+        end
+
+        local matched = false
+        for _, match in ipairs(body.matches or {}) do
+            if match.hash == digest then
+                state:setMatched(match.hash, match.bookFileId, match.bookId, self.ui.document.file)
+                matched = true
+                break
+            end
+        end
+        state:flush()
+        if on_done then on_done(matched) end
+    end
+
+    if self:shouldSkipAutoSyncOffline("match_open_book") then
+        if on_done then on_done(false) end
+        return
+    end
+    if NetworkMgr:willRerunWhenConnected(run) then
+        return
+    end
+    run()
+end
+
 -- Two-way annotation pull/push for the open book. Runs once per book open;
 -- safe to call again manually, guarded against concurrent syncs.
-function BookOrbit:exchangeAnnotationsForOpenBook()
+function BookOrbit:exchangeAnnotationsForOpenBook(reason, retry_count)
     if self.annotation_exchange_running then return end
     if not self:isLoggedIn() or not self.ui or not self.ui.document then return end
     if BookOrbitBookSync.isRunning() or BookOrbitSweep.isRunning() then return end
@@ -310,6 +804,11 @@ function BookOrbit:exchangeAnnotationsForOpenBook()
     local state = BookOrbitState.open()
     if not state:getBook(digest) then
         -- Unknown or unmatched book: the close-path snapshot sync matches it.
+        self:recordHighlightSync({
+            event = "open_book",
+            reason = reason or "auto",
+            skipped = 1,
+        }, "unmatched")
         return
     end
 
@@ -325,13 +824,36 @@ function BookOrbit:exchangeAnnotationsForOpenBook()
 
     if not ok then
         logger.err("BookOrbit: annotation exchange error:", result)
+        self:recordHighlightSync({
+            event = "open_book",
+            reason = reason or "auto",
+            failed = 1,
+        }, "partial_failure")
     elseif result then
-        local touched = (result.applied or 0) + (result.deleted or 0)
-        if touched > 0 then
-            Notification:notify(T(_("BookOrbit: %1 highlight(s) updated"), touched))
+        local summary = BookOrbitHighlightSummary.add({
+            event = "open_book",
+            reason = reason or "auto",
+        }, result)
+        self:recordHighlightSync(summary)
+        if BookOrbitHighlightSummary.hasRemoteChanges(summary) then
+            Notification:notify(T(_("BookOrbit: %1 highlight(s) updated"),
+                summary.applied + summary.deleted))
         end
-    elseif err and err ~= "unmatched" and err ~= "unsupported_server" and err ~= "network" then
-        logger.dbg("BookOrbit: annotation exchange skipped:", err)
+        if reason == "annotation_open" and (summary.failed or 0) > 0 then
+            self:scheduleOpenHighlightRetry(reason, retry_count or 0)
+        elseif (summary.failed or 0) == 0 then
+            self.open_highlight_retry_status = nil
+        end
+    elseif err then
+        self:recordHighlightSync({
+            event = "open_book",
+            reason = reason or "auto",
+            skipped = err == "unmatched" and 1 or 0,
+            failed = (err == "network" or err == "unsupported_server") and 1 or 0,
+        }, err)
+        if err ~= "unmatched" and err ~= "unsupported_server" and err ~= "network" then
+            logger.dbg("BookOrbit: annotation exchange skipped:", err)
+        end
     end
 end
 
@@ -382,23 +904,7 @@ function BookOrbit:startSweep()
         promptLogin()
         return
     end
-    if BookOrbitBookSync.isRunning() then
-        UIManager:show(InfoMessage:new{ text = _("BookOrbit is syncing the current book, try again shortly."), timeout = 2 })
-        return
-    end
-
-    local sweep_opts = {
-        api = self:apiOpts(),
-        interactive = true,
-        annotation_sync = self.settings.annotation_sync,
-        on_finish = function(err)
-            if not err then self:maybeCheckForUpdate(false) end
-        end,
-    }
-    if NetworkMgr:willRerunWhenOnline(function() BookOrbitSweep.run(sweep_opts) end) then
-        return
-    end
-    BookOrbitSweep.run(sweep_opts)
+    self:requestSweep(true, "manual")
 end
 
 function BookOrbit:onBookOrbitSyncBook()
@@ -407,11 +913,7 @@ function BookOrbit:onBookOrbitSyncBook()
         return
     end
     if not self.ui or not self.ui.document then
-        UIManager:show(InfoMessage:new{ text = _("Open a book to sync it."), timeout = 2 })
-        return
-    end
-    if BookOrbitSweep.isRunning() or BookOrbitBookSync.isRunning() then
-        UIManager:show(InfoMessage:new{ text = _("BookOrbit sync is already running."), timeout = 2 })
+        UIManager:show(InfoMessage:new{ text = _("No reader book is open."), timeout = 2 })
         return
     end
 
@@ -421,27 +923,7 @@ function BookOrbit:onBookOrbitSyncBook()
         return
     end
 
-    local api_opts = self:apiOpts()
-    local run_book_sync = function(skip_progress)
-        local latest_snap = BookOrbitBookSync.capture(self)
-        if not latest_snap then
-            UIManager:show(InfoMessage:new{ text = _("Could not read this book's data."), timeout = 2 })
-            return
-        end
-        if latest_snap.digest ~= snap.digest then
-            UIManager:show(InfoMessage:new{ text = _("The open book changed. Start the sync again."), timeout = 3 })
-            return
-        end
-        BookOrbitBookSync.run{ api = api_opts, snap = latest_snap, reason = "manual", interactive = true, plugin = self,
-            annotation_sync = self.settings.annotation_sync, skip_progress = skip_progress }
-    end
-    local run = function()
-        self:reconcileProgressBeforeBookSync(snap.digest, run_book_sync)
-    end
-    if NetworkMgr:willRerunWhenOnline(run) then
-        return
-    end
-    run()
+    self:requestManualBookSync(snap)
 end
 
 -- Events
@@ -453,10 +935,7 @@ function BookOrbit:_onCloseDocument()
     UIManager:unschedule(self.periodic_push_task)
     self.periodic_push_scheduled = false
 
-    if BookOrbitSweep.isRunning() or BookOrbitBookSync.isRunning() then
-        logger.dbg("BookOrbit: close sync skipped, another sync is running")
-        return
-    end
+    if self:shouldSkipAutoSyncOffline("close") then return end
 
     -- Snapshot now: reader objects die after this handler returns. ReaderUI
     -- already flushed the sidecar and statistics before broadcasting
@@ -464,11 +943,14 @@ function BookOrbit:_onCloseDocument()
     local snap = BookOrbitBookSync.capture(self)
     if not snap then return end
 
-    local api_opts = self:apiOpts()
-    NetworkMgr:goOnlineToRun(function()
-        BookOrbitBookSync.run{ api = api_opts, snap = snap, reason = "close", interactive = false,
-            annotation_sync = self.settings.annotation_sync }
-    end)
+    self:requestBookSnapshotSync{
+        snap = snap,
+        reason = "close",
+        label = _("Close sync"),
+        priority = SYNC_JOB_PRIORITY.lifecycle,
+        interactive = false,
+        go_online = true,
+    }
 end
 
 function BookOrbit:_onPageUpdate(page)
@@ -491,8 +973,9 @@ function BookOrbit:_onResume()
     if Device:hasWifiRestore() and NetworkMgr.wifi_was_on and G_reader_settings:isTrue("auto_restore_wifi") then
         return
     end
+    if self:shouldSkipAutoSyncOffline("resume") then return end
     UIManager:scheduleIn(1, function()
-        self:getProgress(true, false)
+        self:requestProgressPull(true, false, "resume")
     end)
 end
 
@@ -502,51 +985,48 @@ function BookOrbit:_onSuspend()
     self.periodic_push_scheduled = false
 
     if not self:isLoggedIn() then return end
-    if BookOrbitSweep.isRunning() or BookOrbitBookSync.isRunning() then return end
+    if self:shouldSkipAutoSyncOffline("suspend") then return end
 
     local snap = BookOrbitBookSync.capture(self)
     if not snap then return end
 
     local on_finish
-    if Device:hasWifiManager() then
+    if Device:hasWifiManager() and not self:getSyncCoordinator():isBusy() then
         on_finish = function() NetworkMgr:disableWifi() end
     end
-    local api_opts = self:apiOpts()
-    -- Synchronous: the device is about to sleep, so the uploads must not be
-    -- parked on the scheduler (they would run after resume and then kill
-    -- wifi mid-read via on_finish).
-    local run = function()
-        BookOrbitBookSync.run{
-            api = api_opts, snap = snap, reason = "suspend",
-            interactive = false, synchronous = true, plugin = self, on_finish = on_finish,
-            annotation_sync = self.settings.annotation_sync,
-        }
-    end
-    if NetworkMgr:willRerunWhenOnline(run) then
-        return
-    end
-    run()
+    self:requestBookSnapshotSync{
+        snap = snap,
+        reason = "suspend",
+        label = _("Suspend sync"),
+        priority = SYNC_JOB_PRIORITY.lifecycle,
+        interactive = false,
+        synchronous = true,
+        ensure_networking = true,
+        on_finish = on_finish,
+    }
 end
 
 function BookOrbit:_onNetworkConnected()
     logger.dbg("BookOrbit: onNetworkConnected")
     UIManager:scheduleIn(0.5, function()
-        self:getProgress(false, false)
-        self:maybeCheckForUpdate(false)
+        if self:shouldSkipAutoSyncOffline("network_connected") then return end
+        self:requestProgressPull(false, false, "network_connected")
+        self:requestUpdateCheck(false, "network_connected")
     end)
 end
 
 function BookOrbit:_onNetworkDisconnecting()
     logger.dbg("BookOrbit: onNetworkDisconnecting")
-    self:updateProgress(false, false)
+    if self:shouldSkipAutoSyncOffline("network_disconnecting") then return end
+    self:requestProgressPush(false, false, "network_disconnecting", SYNC_JOB_PRIORITY.lifecycle)
 end
 
 function BookOrbit:onBookOrbitPushProgress()
-    self:updateProgress(true, true)
+    self:requestProgressPush(true, true, "manual")
 end
 
 function BookOrbit:onBookOrbitPullProgress()
-    self:getProgress(true, true)
+    self:requestProgressPull(true, true, "manual")
 end
 
 function BookOrbit:onBookOrbitSyncNow()
@@ -573,13 +1053,13 @@ function BookOrbit:onBookOrbitToggleAutoSync(toggle, from_menu)
     self:registerEvents()
 
     if self.settings.auto_sync then
-        self:getProgress(true, true)
+        self:requestProgressPull(true, true, "auto_enabled")
     else
         UIManager:unschedule(self.periodic_push_task)
         self.periodic_push_scheduled = false
         self.page_update_counter = 0
         if from_menu then
-            self:updateProgress(true, true)
+            self:requestProgressPush(true, true, "auto_disabled")
         end
     end
 

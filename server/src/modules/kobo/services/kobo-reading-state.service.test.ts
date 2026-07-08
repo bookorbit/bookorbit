@@ -270,19 +270,47 @@ describe('KoboReadingStateService', () => {
     expect(db.execute).not.toHaveBeenCalled();
   });
 
-  it('does not mirror Kobo percent to internal progress when two-way sync is disabled', async () => {
+  it('mirrors Kobo percent to internal progress when two-way sync is disabled', async () => {
     const db = makeDb();
     const stateInsert = makeInsertChain();
-    db.insert.mockReturnValue(stateInsert);
+    const progressInsert = makeInsertChain();
+    db.insert.mockReturnValueOnce(stateInsert).mockReturnValueOnce(progressInsert);
+    db.select
+      .mockReturnValueOnce(makeSelectChain([{ fileId: 55 }]))
+      .mockReturnValueOnce(makeSelectChain([{ percentage: 20, cfi: null, updatedAt: new Date('2025-12-31T00:00:00.000Z') }]));
     db.query.books.findFirst.mockResolvedValue({ id: 5 });
     db.query.koboReadingStates.findFirst
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ entitlementId: '5', currentBookmark: { ProgressPercent: 42.5 } });
 
-    await makeService(db).upsertState(1, 5, { CurrentBookmark: { LastModified: '2026-01-01T00:00:00Z', ProgressPercent: 42.5 } }, 1, 99, false);
+    await makeService(db).upsertState(
+      1,
+      5,
+      {
+        CurrentBookmark: {
+          LastModified: '2026-01-01T00:00:00Z',
+          ProgressPercent: 42.5,
+          Location: { Source: 'OEBPS/html/ch5.xhtml', Type: 'KoboSpan', Value: 'kobo.25.1' },
+        },
+      },
+      1,
+      99,
+      false,
+    );
 
     expect(userBookStatusService.autoUpdate).toHaveBeenCalledWith(1, 5, 42.5, 1, 99);
-    expect(db.select).not.toHaveBeenCalled();
+    expect(progressBridge.koboBookmarkToCanonical).not.toHaveBeenCalled();
+    expect(progressInsert.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 1,
+        bookFileId: 55,
+        percentage: 42.5,
+        cfi: null,
+        koboLocationSource: 'OEBPS/html/ch5.xhtml',
+        koboLocationType: 'KoboSpan',
+        koboLocationValue: 'kobo.25.1',
+      }),
+    );
     expect(db.execute).not.toHaveBeenCalled();
     expect(achievementEvents.emit).toHaveBeenCalledWith(
       ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED,

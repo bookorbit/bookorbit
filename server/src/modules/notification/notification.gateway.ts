@@ -81,6 +81,10 @@ export class NotificationGateway implements OnGatewayInit, OnGatewayConnection, 
     this.server?.to(`user:${userId}`).emit('notification:dismissed', { id: notificationId });
   }
 
+  emitAllRead(userId: number): void {
+    this.server?.to(`user:${userId}`).emit('notification:all-read', {});
+  }
+
   emitCleared(userId: number): void {
     this.server?.to(`user:${userId}`).emit('notification:cleared', {});
   }

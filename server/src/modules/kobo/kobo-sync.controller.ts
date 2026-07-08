@@ -106,6 +106,8 @@ export class KoboSyncController {
         image_url_template: `${baseUrl}/api/v1/kobo/${t}/v1/books/{ImageId}/thumbnail/{Width}/{Height}/false/image.jpg`,
         image_url_quality_template: `${baseUrl}/api/v1/kobo/${t}/v1/books/{ImageId}/thumbnail/{Width}/{Height}/{Quality}/{IsGreyscale}/image.jpg`,
         library_sync: `${baseUrl}/api/v1/kobo/${t}/v1/library/sync`,
+        get_tests_request: `${baseUrl}/api/v1/kobo/${t}/v1/analytics/gettests`,
+        post_analytics_event: `${baseUrl}/api/v1/kobo/${t}/v1/analytics/event`,
         reading_services_host: readingServicesBaseUrl,
       },
     };
