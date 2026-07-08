@@ -1,4 +1,5 @@
-import { boolean, integer, pgTable, real, serial, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { boolean, index, integer, pgTable, real, serial, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
 import { books } from './books';
 import { users } from './auth';
@@ -16,8 +17,6 @@ export const storygraphUserSettings = pgTable('storygraph_user_settings', {
   autoSyncOnStatusChange: boolean('auto_sync_on_status_change').notNull().default(true),
   autoSyncOnProgressUpdate: boolean('auto_sync_on_progress_update').notNull().default(true),
   lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
-  // When the user first connected StoryGraph. Books already finished before this moment are
-  // assumed to already be logged on StoryGraph and are skipped by automatic/bulk sync.
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true })
     .defaultNow()
@@ -49,7 +48,13 @@ export const storygraphBookState = pgTable(
       .notNull()
       .$onUpdateFn(() => new Date()),
   },
-  (t) => [unique('storygraph_book_state_user_book_uidx').on(t.userId, t.bookId)],
+  (t) => [
+    unique('storygraph_book_state_user_book_uidx').on(t.userId, t.bookId),
+    index('storygraph_book_state_user_sync_override_idx').on(t.userId, t.syncOverride, t.bookId),
+    index('storygraph_book_state_user_sync_error_idx')
+      .on(t.userId, t.bookId)
+      .where(sql`${t.syncError} is not null`),
+  ],
 );
 
 export type StorygraphUserSetting = typeof storygraphUserSettings.$inferSelect;

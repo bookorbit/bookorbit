@@ -10,6 +10,10 @@ const mockRepo = {
   resetSyncProgress: vi.fn(),
   updateLastSyncedAt: vi.fn(),
   findSyncableBooks: vi.fn(),
+  findCurrentReadingBooks: vi.fn(),
+  findSyncableBooksBatch: vi.fn(),
+  countSyncableBooks: vi.fn(),
+  countPendingSyncableBooks: vi.fn(),
   findSyncableBook: vi.fn(),
   findBookSyncData: vi.fn(),
   clearBookMatch: vi.fn(),
@@ -36,8 +40,18 @@ const mockSettingsService = {
   getSettings: vi.fn(),
 };
 
+const mockLibraryService = {
+  findAccessibleLibraryIds: vi.fn(),
+};
+
 function makeService() {
-  return new StorygraphSyncService(mockRepo as any, mockClient as any, mockMatchService as any, mockSettingsService as any);
+  return new StorygraphSyncService(
+    mockRepo as any,
+    mockClient as any,
+    mockMatchService as any,
+    mockSettingsService as any,
+    mockLibraryService as any,
+  );
 }
 
 const cookies = { sessionCookie: 'sess', rememberToken: 'remember' };
@@ -59,6 +73,10 @@ describe('StorygraphSyncService', () => {
     mockRepo.findBookState.mockResolvedValue(undefined);
     mockRepo.findBookStatesByBookIds.mockResolvedValue([]);
     mockRepo.findSyncableBooks.mockResolvedValue([]);
+    mockRepo.findCurrentReadingBooks.mockResolvedValue([]);
+    mockRepo.findSyncableBooksBatch.mockResolvedValue([]);
+    mockRepo.countSyncableBooks.mockResolvedValue(0);
+    mockRepo.countPendingSyncableBooks.mockResolvedValue(0);
     mockRepo.findSyncableBook.mockResolvedValue(null);
     mockRepo.findBookSyncData.mockImplementation((userId: number, bookId: number) => mockRepo.findSyncableBook(userId, bookId));
     mockRepo.upsertBookState.mockResolvedValue({});
@@ -77,6 +95,7 @@ describe('StorygraphSyncService', () => {
       autoSyncOnProgressUpdate: true,
       lastSyncedAt: null,
     });
+    mockLibraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
     mockClient.extractCsrfToken.mockReturnValue('csrf-token');
     mockClient.get.mockResolvedValue({ status: 200, html: '<html></html>', redirectedToSignIn: false });
     mockClient.post.mockResolvedValue({ status: 302, html: '', redirectedToSignIn: false });
@@ -210,6 +229,23 @@ describe('StorygraphSyncService', () => {
       );
     });
 
+    it('records a failure when StoryGraph rejects the progress update', async () => {
+      mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
+      mockRepo.findSyncableBook.mockResolvedValue(readingBook);
+      mockRepo.findBookState.mockResolvedValue(null);
+      mockMatchService.matchBook.mockResolvedValue({ storygraphBookId: 'abc-123', matchMethod: 'isbn' });
+      mockClient.post
+        .mockResolvedValueOnce({ status: 302, html: '', redirectedToSignIn: false })
+        .mockResolvedValueOnce({ status: 500, html: '', redirectedToSignIn: false });
+
+      await expect(makeService().syncBook(1, 1)).resolves.toBe('failed');
+
+      expect(mockRepo.upsertBookState).toHaveBeenCalledWith(
+        expect.objectContaining({ storygraphBookId: 'abc-123', syncError: 'progress_update_failed:500' }),
+      );
+      expect(mockRepo.upsertBookState).not.toHaveBeenCalledWith(expect.objectContaining({ syncError: null }));
+    });
+
     it('falls back to rereading when currently-reading status update fails', async () => {
       mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
       mockRepo.findSyncableBook.mockResolvedValue(readingBook);
@@ -320,13 +356,14 @@ describe('StorygraphSyncService', () => {
   describe('syncAll', () => {
     it('returns existing run id if already running', async () => {
       mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
-      mockRepo.findSyncableBooks.mockResolvedValue([readingBook]);
-      mockRepo.findBookState.mockReturnValue(new Promise(() => {}));
+      mockRepo.countSyncableBooks.mockResolvedValue(1);
+      mockRepo.findSyncableBooksBatch.mockResolvedValue([readingBook]);
+      mockRepo.findBookStatesByBookIds.mockReturnValue(new Promise(() => {}));
       const svc = makeService();
       const id1 = await svc.syncAll(1);
       const id2 = await svc.syncAll(1);
       expect(id1).toBe(id2);
-      expect(mockRepo.findSyncableBooks).toHaveBeenCalledTimes(1);
+      expect(mockRepo.countSyncableBooks).toHaveBeenCalledTimes(1);
     });
 
     it('returns 0 when no cookies', async () => {
@@ -337,7 +374,8 @@ describe('StorygraphSyncService', () => {
 
     it('calls updateLastSyncedAt on successful completion', async () => {
       mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
-      mockRepo.findSyncableBooks.mockResolvedValue([]);
+      mockRepo.countSyncableBooks.mockResolvedValue(0);
+      mockRepo.findSyncableBooksBatch.mockResolvedValue([]);
       const svc = makeService();
       await svc.syncAll(1);
       await Promise.resolve();
@@ -348,17 +386,18 @@ describe('StorygraphSyncService', () => {
     it('streams a distinct progress snapshot for every processed book, including skipped ones', async () => {
       mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
       mockMatchService.matchBook.mockResolvedValue({ storygraphBookId: 'abc-123', matchMethod: 'isbn' });
-      mockRepo.findSyncableBooks.mockResolvedValue([
-        { ...readingBook, bookId: 10 },
-        // Already synced: processed as a skip, but must still advance progress.
-        { ...readingBook, bookId: 11, progress: 42 },
-        { ...readingBook, bookId: 12 },
+      mockRepo.countSyncableBooks.mockResolvedValue(3);
+      mockRepo.findSyncableBooksBatch
+        .mockResolvedValueOnce([
+          { ...readingBook, bookId: 10 },
+          // Already synced: processed as a skip, but must still advance progress.
+          { ...readingBook, bookId: 11, progress: 42 },
+          { ...readingBook, bookId: 12 },
+        ])
+        .mockResolvedValueOnce([]);
+      mockRepo.findBookStatesByBookIds.mockResolvedValue([
+        { bookId: 11, lastSyncedAt: new Date('2024-02-01T00:00:00Z'), lastSyncedStatus: 'reading', lastSyncedProgress: 42 },
       ]);
-      mockRepo.findBookState.mockImplementation((_userId: number, bookId: number) =>
-        Promise.resolve(
-          bookId === 11 ? { lastSyncedAt: new Date('2024-02-01T00:00:00Z'), lastSyncedStatus: 'reading', lastSyncedProgress: 42 } : null,
-        ),
-      );
 
       const svc = makeService();
       const emissions: unknown[] = [];
@@ -382,8 +421,9 @@ describe('StorygraphSyncService', () => {
     it('processes match failures without stalling the progress stream', async () => {
       mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
       mockMatchService.matchBook.mockResolvedValue(null);
-      mockRepo.findSyncableBooks.mockResolvedValue([{ ...readingBook, bookId: 10 }]);
-      mockRepo.findBookState.mockResolvedValue(null);
+      mockRepo.countSyncableBooks.mockResolvedValue(1);
+      mockRepo.findSyncableBooksBatch.mockResolvedValueOnce([{ ...readingBook, bookId: 10 }]).mockResolvedValueOnce([]);
+      mockRepo.findBookStatesByBookIds.mockResolvedValue([]);
 
       const svc = makeService();
       const emissions: unknown[] = [];
@@ -401,20 +441,23 @@ describe('StorygraphSyncService', () => {
 
     it('includes previously finished books in the run', async () => {
       mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
-      mockRepo.findSyncableBooks.mockResolvedValue([
-        {
-          ...readingBook,
-          bookId: 10,
-          status: 'read',
-        },
-        { ...readingBook, bookId: 11, status: 'reading' },
-      ]);
+      mockRepo.countSyncableBooks.mockResolvedValue(2);
+      mockRepo.findSyncableBooksBatch
+        .mockResolvedValueOnce([
+          {
+            ...readingBook,
+            bookId: 10,
+            status: 'read',
+          },
+          { ...readingBook, bookId: 11, status: 'reading' },
+        ])
+        .mockResolvedValueOnce([]);
+      mockRepo.findBookStatesByBookIds.mockResolvedValue([]);
 
       const svc = makeService();
       await svc.syncAll(1);
       await vi.waitFor(() => {
-        expect(mockRepo.findBookState).toHaveBeenCalledWith(1, 10);
-        expect(mockRepo.findBookState).toHaveBeenCalledWith(1, 11);
+        expect(mockRepo.findBookStatesByBookIds).toHaveBeenCalledWith(1, [10, 11]);
       });
     });
   });
@@ -440,19 +483,13 @@ describe('StorygraphSyncService', () => {
       mockSettingsService.getCookiesForUser.mockResolvedValue(null);
       const result = await makeService().getSyncPendingSummary(1);
       expect(result).toEqual({ totalBooks: 0, pendingBooks: 0 });
-      expect(mockRepo.findSyncableBooks).not.toHaveBeenCalled();
+      expect(mockRepo.countSyncableBooks).not.toHaveBeenCalled();
     });
 
     it('counts only books with unsynced changes', async () => {
       mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
-      mockRepo.findSyncableBooks.mockResolvedValue([
-        { ...readingBook, bookId: 10, progress: 42 },
-        { ...readingBook, bookId: 11, progress: 88 },
-      ]);
-      mockRepo.findBookStatesByBookIds.mockResolvedValue([
-        { bookId: 10, lastSyncedAt: new Date('2024-02-01T00:00:00Z'), lastSyncedStatus: 'reading', lastSyncedProgress: 42 },
-        { bookId: 11, lastSyncedAt: new Date('2024-02-01T00:00:00Z'), lastSyncedStatus: 'reading', lastSyncedProgress: 10 },
-      ]);
+      mockRepo.countSyncableBooks.mockResolvedValue(2);
+      mockRepo.countPendingSyncableBooks.mockResolvedValue(1);
 
       const result = await makeService().getSyncPendingSummary(1);
       expect(result).toEqual({ totalBooks: 2, pendingBooks: 1 });
@@ -460,15 +497,8 @@ describe('StorygraphSyncService', () => {
 
     it('includes previously finished books in the totals', async () => {
       mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
-      mockRepo.findSyncableBooks.mockResolvedValue([
-        {
-          ...readingBook,
-          bookId: 10,
-          status: 'read',
-        },
-        { ...readingBook, bookId: 11, status: 'reading' },
-      ]);
-      mockRepo.findBookStatesByBookIds.mockResolvedValue([]);
+      mockRepo.countSyncableBooks.mockResolvedValue(2);
+      mockRepo.countPendingSyncableBooks.mockResolvedValue(2);
 
       const result = await makeService().getSyncPendingSummary(1);
       expect(result).toEqual({ totalBooks: 2, pendingBooks: 2 });
@@ -483,7 +513,8 @@ describe('StorygraphSyncService', () => {
 
     it('clears active run when cancelled', async () => {
       mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
-      mockRepo.findSyncableBooks.mockResolvedValue([]);
+      mockRepo.countSyncableBooks.mockResolvedValue(0);
+      mockRepo.findSyncableBooksBatch.mockResolvedValue([]);
       const svc = makeService();
       await svc.syncAll(1);
       svc.cancelSync(1);
@@ -623,7 +654,7 @@ describe('StorygraphSyncService', () => {
 
   describe('listLinkedBooks', () => {
     it('combines syncable books with their current match state', async () => {
-      mockRepo.findSyncableBooks.mockResolvedValue([
+      mockRepo.findCurrentReadingBooks.mockResolvedValue([
         { ...readingBook, bookId: 10, title: 'Book Ten' },
         { ...readingBook, bookId: 11, title: 'Book Eleven' },
       ]);
@@ -638,11 +669,9 @@ describe('StorygraphSyncService', () => {
     });
 
     it('only includes books currently being read, not finished/want-to-read ones', async () => {
-      mockRepo.findSyncableBooks.mockResolvedValue([
+      mockRepo.findCurrentReadingBooks.mockResolvedValue([
         { ...readingBook, bookId: 10, title: 'Reading Now', status: 'reading' },
         { ...readingBook, bookId: 11, title: 'Rereading Now', status: 'rereading' },
-        { ...readingBook, bookId: 12, title: 'Already Read', status: 'read' },
-        { ...readingBook, bookId: 13, title: 'Want To Read', status: 'want_to_read' },
       ]);
       mockRepo.findBookStatesByBookIds.mockResolvedValue([]);
 

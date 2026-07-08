@@ -70,6 +70,7 @@ describe('StorygraphController', () => {
     mockSyncService.syncAll.mockResolvedValue(42);
     const result = await makeController().startSync(mockUser as any);
     expect(result).toEqual({ runId: 42 });
+    expect(mockSyncService.syncAll).toHaveBeenCalledWith(mockUser);
   });
 
   it('getSyncStatus delegates to service', () => {
@@ -91,14 +92,14 @@ describe('StorygraphController', () => {
     mockSyncService.listSyncFailures.mockResolvedValue(failures);
     const result = await makeController().listSyncFailures(mockUser as any);
     expect(result).toEqual(failures);
-    expect(mockSyncService.listSyncFailures).toHaveBeenCalledWith(1);
+    expect(mockSyncService.listSyncFailures).toHaveBeenCalledWith(mockUser);
   });
 
   it('getSyncPendingSummary delegates to service', async () => {
     mockSyncService.getSyncPendingSummary.mockResolvedValue({ totalBooks: 10, pendingBooks: 2 });
     const result = await makeController().getSyncPendingSummary(mockUser as any);
     expect(result).toEqual({ totalBooks: 10, pendingBooks: 2 });
-    expect(mockSyncService.getSyncPendingSummary).toHaveBeenCalledWith(1);
+    expect(mockSyncService.getSyncPendingSummary).toHaveBeenCalledWith(mockUser);
   });
 
   it('rematchBook delegates to service', async () => {
@@ -113,7 +114,7 @@ describe('StorygraphController', () => {
     mockSyncService.listLinkedBooks.mockResolvedValue([{ bookId: 42 }]);
     const result = await makeController().listLinkedBooks(mockUser as any);
     expect(result).toEqual([{ bookId: 42 }]);
-    expect(mockSyncService.listLinkedBooks).toHaveBeenCalledWith(1);
+    expect(mockSyncService.listLinkedBooks).toHaveBeenCalledWith(mockUser);
   });
 
   it('linkBookManually delegates to service', async () => {

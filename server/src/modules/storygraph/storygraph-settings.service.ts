@@ -74,31 +74,58 @@ export class StorygraphSettingsService {
   }
 
   async disconnectUser(userId: number): Promise<void> {
-    const existing = await this.repo.findSettings(userId);
-    if (!existing) throw new NotFoundException('StoryGraph integration not configured');
-    await this.repo.deleteSettings(userId);
-    this.logger.log(`[storygraph.disconnect] [end] userId=${userId} - user disconnected`);
+    const startedAt = Date.now();
+    this.logger.log(`[storygraph.disconnect] [start] userId=${userId} - disconnect started`);
+    try {
+      const existing = await this.repo.findSettings(userId);
+      if (!existing) throw new NotFoundException('StoryGraph integration not configured');
+      await this.repo.deleteSettings(userId);
+      this.logger.log(`[storygraph.disconnect] [end] userId=${userId} durationMs=${Date.now() - startedAt} - user disconnected`);
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.constructor.name : 'Error';
+      const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.warn(
+        `[storygraph.disconnect] [fail] userId=${userId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${error}" - disconnect failed`,
+      );
+      throw err;
+    }
   }
 
   async validateCookies(userId: number, sessionCookie?: string, rememberToken?: string): Promise<StorygraphCookieValidationResult> {
+    const startedAt = Date.now();
     let cookies: StorygraphCookies;
 
     const trimmedSession = sessionCookie?.trim();
     const trimmedRemember = rememberToken?.trim();
+    const source = trimmedSession && trimmedRemember ? 'payload' : 'stored';
+    this.logger.log(`[storygraph.validate_cookies] [start] userId=${userId} source=${source} - cookie validation started`);
+
     if (trimmedSession && trimmedRemember) {
       cookies = { sessionCookie: trimmedSession, rememberToken: trimmedRemember };
     } else {
       const settings = await this.repo.findSettings(userId);
-      if (!settings) return { valid: false };
+      if (!settings) {
+        this.logger.log(
+          `[storygraph.validate_cookies] [end] userId=${userId} durationMs=${Date.now() - startedAt} valid=false - cookie validation completed`,
+        );
+        return { valid: false };
+      }
       cookies = { sessionCookie: settings.sessionCookie, rememberToken: settings.rememberToken };
     }
 
     try {
       const response = await this.client.get(userId, cookies, '/journal');
-      return { valid: response.status === 200 && !response.redirectedToSignIn };
+      const valid = response.status === 200 && !response.redirectedToSignIn;
+      this.logger.log(
+        `[storygraph.validate_cookies] [end] userId=${userId} durationMs=${Date.now() - startedAt} valid=${valid} - cookie validation completed`,
+      );
+      return { valid };
     } catch (err) {
+      const errorClass = err instanceof Error ? err.constructor.name : 'Error';
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
-      this.logger.warn(`[storygraph.validate_cookies] [fail] userId=${userId} error="${error}" - cookie validation failed`);
+      this.logger.warn(
+        `[storygraph.validate_cookies] [fail] userId=${userId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${error}" - cookie validation failed`,
+      );
       return { valid: false };
     }
   }

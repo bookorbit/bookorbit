@@ -59,6 +59,10 @@ async function loadBooks(options?: { silent?: boolean }): Promise<void> {
   }
 }
 
+async function handleRetryLoadBooks(): Promise<void> {
+  await loadBooks()
+}
+
 function toggleExpanded(bookId: number) {
   expandedBookId.value = expandedBookId.value === bookId ? null : bookId
 }
@@ -168,7 +172,7 @@ async function handleSetEdition(book: StorygraphLinkedBook, edition: StorygraphE
     <div v-else-if="loadError" class="flex items-center gap-2 text-xs text-destructive py-2">
       <AlertCircle class="size-3.5 shrink-0" />
       Failed to load books.
-      <button type="button" class="underline underline-offset-2" @click="() => loadBooks()">Retry</button>
+      <button type="button" class="underline underline-offset-2" @click="handleRetryLoadBooks">Retry</button>
     </div>
 
     <div v-else-if="books.length === 0" class="text-xs text-muted-foreground py-2">No books currently being read.</div>

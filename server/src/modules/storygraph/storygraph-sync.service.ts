@@ -17,9 +17,11 @@ import * as cheerio from 'cheerio';
 import { distinctUntilChanged, filter, map, merge, Observable, of, Subject } from 'rxjs';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import type { RequestUser } from '../../common/types/request-user';
+import { LibraryService } from '../library/library.service';
 import { StorygraphBookMatchService } from './storygraph-book-match.service';
 import { StorygraphClientService, type StorygraphCookies } from './storygraph-client.service';
-import { type BookSyncData, StorygraphRepository } from './storygraph.repository';
+import { type BookSyncData, type StorygraphBookAccessScope, StorygraphRepository } from './storygraph.repository';
 import { StorygraphSettingsService } from './storygraph-settings.service';
 import { STORYGRAPH_STATUS } from './storygraph.constants';
 import {
@@ -28,9 +30,8 @@ import {
   resolveStorygraphBookSyncOverrideForToggle,
 } from './storygraph-sync-policy';
 
-// "Linked books" only needs to manage matches for books actively being read right now.
-// Finished/want-to-read books aren't useful to manually re-link from that view.
-const CURRENTLY_READING_STATUSES = new Set<ReadStatus>(['reading', 'rereading']);
+const SYNC_ALL_BATCH_SIZE = 100;
+const SYNC_FAILURE_LIST_LIMIT = 100;
 
 const STATUS_MAP: Partial<Record<ReadStatus, string>> = {
   want_to_read: STORYGRAPH_STATUS.WANT_TO_READ,
@@ -55,6 +56,7 @@ export class StorygraphSyncService {
   private readonly cancelRequests = new Set<number>();
   private readonly syncStatusEvents = new Subject<{ userId: number; status: StorygraphActiveSyncStatus | null }>();
   private readonly activeSyncs = new Map<number, StorygraphActiveSyncStatus>();
+  private readonly syncRunStartedAt = new Map<number, number>();
   private syncRunCounter = 0;
 
   constructor(
@@ -62,6 +64,7 @@ export class StorygraphSyncService {
     private readonly client: StorygraphClientService,
     private readonly matchService: StorygraphBookMatchService,
     private readonly settingsService: StorygraphSettingsService,
+    private readonly libraryService: LibraryService,
   ) {}
 
   async syncBook(userId: number, bookId: number): Promise<StorygraphSyncBookResult> {
@@ -173,9 +176,10 @@ export class StorygraphSyncService {
     return { success: true };
   }
 
-  async listLinkedBooks(userId: number): Promise<StorygraphLinkedBook[]> {
-    const allBooks = await this.repo.findSyncableBooks(userId);
-    const books = allBooks.filter((book) => CURRENTLY_READING_STATUSES.has(book.status as ReadStatus));
+  async listLinkedBooks(userOrId: RequestUser | number): Promise<StorygraphLinkedBook[]> {
+    const userId = this.resolveUserId(userOrId);
+    const accessScope = await this.resolveAccessScope(userOrId);
+    const books = await this.repo.findCurrentReadingBooks(userId, accessScope);
     const states = await this.repo.findBookStatesByBookIds(
       userId,
       books.map((book) => book.bookId),
@@ -195,10 +199,14 @@ export class StorygraphSyncService {
     });
   }
 
-  async syncAll(userId: number): Promise<number> {
+  async syncAll(userOrId: RequestUser | number): Promise<number> {
+    const userId = this.resolveUserId(userOrId);
     const existing = this.activeSyncs.get(userId);
     if (existing) {
-      this.logger.warn(`[storygraph.sync_all] userId=${userId} runId=${existing.runId} - sync already running`);
+      const durationMs = Date.now() - (this.syncRunStartedAt.get(userId) ?? Date.now());
+      this.logger.warn(
+        `[storygraph.sync_all] [end] userId=${userId} runId=${existing.runId} durationMs=${durationMs} result=already_running - sync already running`,
+      );
       this.emitSyncStatus(userId, existing);
       return existing.runId;
     }
@@ -206,16 +214,22 @@ export class StorygraphSyncService {
     const cookies = await this.settingsService.getCookiesForUser(userId);
     if (!cookies) return 0;
 
-    const books = await this.filterBooksInSyncScope(userId, await this.repo.findSyncableBooks(userId));
+    const accessScope = await this.resolveAccessScope(userOrId);
+    const settings = await this.settingsService.getSettings(userId);
+    const totalBooks = await this.repo.countSyncableBooks(userId, accessScope, settings);
 
-    // Re-check: a concurrent syncAll may have won the race during findSyncableBooks
+    // Re-check: a concurrent syncAll may have won the race during scope/count resolution.
     const recheck = this.activeSyncs.get(userId);
     if (recheck) {
-      this.logger.warn(`[storygraph.sync_all] userId=${userId} runId=${recheck.runId} - sync started concurrently`);
+      const durationMs = Date.now() - (this.syncRunStartedAt.get(userId) ?? Date.now());
+      this.logger.warn(
+        `[storygraph.sync_all] [end] userId=${userId} runId=${recheck.runId} durationMs=${durationMs} result=already_running - sync started concurrently`,
+      );
       this.emitSyncStatus(userId, recheck);
       return recheck.runId;
     }
 
+    const startedAt = Date.now();
     const runId = ++this.syncRunCounter;
     const status: StorygraphActiveSyncStatus = {
       runId,
@@ -223,21 +237,23 @@ export class StorygraphSyncService {
       skippedBooks: 0,
       failedBooks: 0,
       processedBooks: 0,
-      totalBooks: books.length,
+      totalBooks,
       status: 'running',
     };
     this.activeSyncs.set(userId, status);
+    this.syncRunStartedAt.set(userId, startedAt);
 
-    this.logger.log(`[storygraph.sync_all] [start] userId=${userId} runId=${runId} totalBooks=${books.length} - sync all started`);
+    this.logger.log(`[storygraph.sync_all] [start] userId=${userId} runId=${runId} totalBooks=${totalBooks} - sync all started`);
     this.emitSyncStatus(userId, status);
 
-    this.runSyncAll(userId, cookies, books, runId).catch((err) => {
+    this.runSyncAll(userId, cookies, accessScope, runId, totalBooks).catch((err) => {
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
       this.logger.error(
-        `[storygraph.sync_all] [fail] userId=${userId} runId=${runId} errorClass=${err?.constructor?.name ?? 'Error'} error="${error}" - sync all crashed`,
+        `[storygraph.sync_all] [fail] userId=${userId} runId=${runId} durationMs=${Date.now() - startedAt} errorClass=${err?.constructor?.name ?? 'Error'} error="${error}" - sync all crashed`,
       );
       this.cancelRequests.delete(userId);
       this.activeSyncs.delete(userId);
+      this.syncRunStartedAt.delete(userId);
       this.emitSyncStatus(userId, null);
     });
 
@@ -251,7 +267,11 @@ export class StorygraphSyncService {
     this.activeSyncs.delete(userId);
     this.emitSyncStatus(userId, { ...run, status: 'cancelled' });
     this.emitSyncStatus(userId, null);
-    this.logger.log(`[storygraph.sync_all] userId=${userId} runId=${run.runId} - sync cancelled`);
+    const targetRunDurationMs = Date.now() - (this.syncRunStartedAt.get(userId) ?? Date.now());
+    this.syncRunStartedAt.delete(userId);
+    this.logger.log(
+      `[storygraph.sync_all_cancel] [end] userId=${userId} runId=${run.runId} durationMs=0 targetRunDurationMs=${targetRunDurationMs} status=requested - sync cancel requested`,
+    );
   }
 
   getSyncStatus(userId: number): StorygraphActiveSyncStatus | null {
@@ -268,8 +288,9 @@ export class StorygraphSyncService {
     ).pipe(distinctUntilChanged((prev, next) => this.isSameActiveStatus(prev, next)));
   }
 
-  async listSyncFailures(userId: number): Promise<StorygraphSyncFailure[]> {
-    const rows = await this.repo.findBooksWithSyncErrors(userId);
+  async listSyncFailures(userOrId: RequestUser | number): Promise<StorygraphSyncFailure[]> {
+    const userId = this.resolveUserId(userOrId);
+    const rows = await this.repo.findBooksWithSyncErrors(userId, await this.resolveAccessScope(userOrId), SYNC_FAILURE_LIST_LIMIT);
     return rows.map((row) => ({
       bookId: row.bookId,
       title: row.title ?? 'Unknown title',
@@ -279,97 +300,116 @@ export class StorygraphSyncService {
     }));
   }
 
-  async getSyncPendingSummary(userId: number): Promise<StorygraphSyncPendingSummary> {
+  async getSyncPendingSummary(userOrId: RequestUser | number): Promise<StorygraphSyncPendingSummary> {
+    const userId = this.resolveUserId(userOrId);
     const cookies = await this.settingsService.getCookiesForUser(userId);
     if (!cookies) {
       return { totalBooks: 0, pendingBooks: 0 };
     }
 
-    const books = await this.filterBooksInSyncScope(userId, await this.repo.findSyncableBooks(userId));
-    if (books.length === 0) {
-      return { totalBooks: 0, pendingBooks: 0 };
-    }
+    const accessScope = await this.resolveAccessScope(userOrId);
+    const settings = await this.settingsService.getSettings(userId);
+    const [totalBooks, pendingBooks] = await Promise.all([
+      this.repo.countSyncableBooks(userId, accessScope, settings),
+      this.repo.countPendingSyncableBooks(userId, accessScope, settings),
+    ]);
 
-    const states = await this.repo.findBookStatesByBookIds(
-      userId,
-      books.map((book) => book.bookId),
-    );
-    const stateByBookId = new Map(states.map((state) => [state.bookId, state]));
-
-    let pendingBooks = 0;
-    for (const book of books) {
-      if (book.status === 'unread') continue;
-      if (this.hasChanges(book, stateByBookId.get(book.bookId))) {
-        pendingBooks++;
-      }
-    }
-
-    return {
-      totalBooks: books.length,
-      pendingBooks,
-    };
+    return { totalBooks, pendingBooks };
   }
 
-  private async runSyncAll(userId: number, cookies: StorygraphCookies, books: BookSyncData[], runId: number): Promise<void> {
-    const startedAt = Date.now();
+  private async runSyncAll(
+    userId: number,
+    cookies: StorygraphCookies,
+    accessScope: StorygraphBookAccessScope | undefined,
+    runId: number,
+    totalBooks: number,
+  ): Promise<void> {
+    const startedAt = this.syncRunStartedAt.get(userId) ?? Date.now();
     let synced = 0;
     let failed = 0;
     let skipped = 0;
+    let afterBookId: number | undefined;
 
-    for (const book of books) {
-      if (this.cancelRequests.has(userId)) {
-        this.cancelRequests.delete(userId);
-        this.logger.log(`[storygraph.sync_all] userId=${userId} runId=${runId} - cancelled mid-run`);
-        return;
-      }
-
-      if (book.status === 'unread') {
-        skipped++;
-        this.emitProgress(userId, { synced, skipped, failed });
-        continue;
-      }
-
-      const state = await this.repo.findBookState(userId, book.bookId);
+    while (true) {
       const settings = await this.settingsService.getSettings(userId);
-      if (!this.resolveBookSyncDecision(settings, book, state, true).syncEnabled) {
-        skipped++;
+      if (!settings.effectiveEnabled) {
+        skipped += Math.max(0, totalBooks - (synced + skipped + failed));
         this.emitProgress(userId, { synced, skipped, failed });
-        continue;
+        break;
       }
 
-      if (!this.hasChanges(book, state)) {
-        skipped++;
+      const books = await this.repo.findSyncableBooksBatch(userId, accessScope, settings, SYNC_ALL_BATCH_SIZE, afterBookId);
+      if (books.length === 0) break;
+
+      const states = await this.repo.findBookStatesByBookIds(
+        userId,
+        books.map((book) => book.bookId),
+      );
+      const stateByBookId = new Map(states.map((state) => [state.bookId, state]));
+
+      for (const book of books) {
+        afterBookId = book.bookId;
+
+        if (this.cancelRequests.has(userId)) {
+          this.cancelRequests.delete(userId);
+          this.syncRunStartedAt.delete(userId);
+          this.logger.log(
+            `[storygraph.sync_all] [end] userId=${userId} runId=${runId} durationMs=${Date.now() - startedAt} status=cancelled - cancelled mid-run`,
+          );
+          return;
+        }
+
+        if (book.status === 'unread') {
+          skipped++;
+          this.emitProgress(userId, { synced, skipped, failed });
+          continue;
+        }
+
+        const state = stateByBookId.get(book.bookId);
+        if (!this.resolveBookSyncDecision(settings, book, state, true).syncEnabled) {
+          skipped++;
+          this.emitProgress(userId, { synced, skipped, failed });
+          continue;
+        }
+
+        if (!this.hasChanges(book, state)) {
+          skipped++;
+          this.emitProgress(userId, { synced, skipped, failed });
+          continue;
+        }
+
+        const result = await this.syncSingleBook(userId, cookies, book, state);
+        if (result === 'synced') synced++;
+        else if (result === 'skipped') skipped++;
+        else failed++;
+
         this.emitProgress(userId, { synced, skipped, failed });
-        continue;
       }
-
-      const result = await this.syncSingleBook(userId, cookies, book, state);
-      if (result === 'synced') synced++;
-      else if (result === 'skipped') skipped++;
-      else failed++;
-
-      this.emitProgress(userId, { synced, skipped, failed });
     }
 
     // Handle cancel requested after the last book was processed (loop exited without hitting the top check)
     if (this.cancelRequests.has(userId)) {
       this.cancelRequests.delete(userId);
-      this.logger.log(`[storygraph.sync_all] userId=${userId} runId=${runId} - cancelled after last book`);
+      this.logger.log(
+        `[storygraph.sync_all] [end] userId=${userId} runId=${runId} durationMs=${Date.now() - startedAt} status=cancelled - cancelled after last book`,
+      );
       this.activeSyncs.delete(userId);
+      this.syncRunStartedAt.delete(userId);
       return;
     }
 
+    await this.repo.updateLastSyncedAt(userId, new Date());
     const durationMs = Date.now() - startedAt;
     this.logger.log(
       `[storygraph.sync_all] [end] userId=${userId} runId=${runId} durationMs=${durationMs} syncedBooks=${synced} failedBooks=${failed} skippedBooks=${skipped} - sync all completed`,
     );
 
-    await this.repo.updateLastSyncedAt(userId, new Date());
     const current = this.activeSyncs.get(userId);
     if (current) {
       this.emitSyncStatus(userId, { ...current, status: 'completed' });
     }
     this.activeSyncs.delete(userId);
+    this.syncRunStartedAt.delete(userId);
     this.emitSyncStatus(userId, null);
   }
 
@@ -430,9 +470,8 @@ export class StorygraphSyncService {
     try {
       await this.updateStatus(userId, cookies, match.storygraphBookId, storygraphStatus);
 
-      let progressSynced = true;
       if (book.progress != null) {
-        progressSynced = await this.updateProgress(userId, cookies, match.storygraphBookId, book.progress);
+        await this.updateProgress(userId, cookies, match.storygraphBookId, book.progress);
       }
 
       await this.repo.upsertBookState({
@@ -444,7 +483,7 @@ export class StorygraphSyncService {
         syncError: null,
         lastSyncedAt: new Date(),
         lastSyncedStatus: book.status,
-        lastSyncedProgress: progressSynced ? book.progress : null,
+        lastSyncedProgress: book.progress,
       });
 
       this.logger.log(
@@ -502,7 +541,7 @@ export class StorygraphSyncService {
     throw new Error(`status_update_failed:${response.status}`);
   }
 
-  private async updateProgress(userId: number, cookies: StorygraphCookies, storygraphBookId: string, progress: number): Promise<boolean> {
+  private async updateProgress(userId: number, cookies: StorygraphCookies, storygraphBookId: string, progress: number): Promise<void> {
     const { html, csrf } = await this.fetchBookPage(userId, cookies, storygraphBookId);
     const bookNumOfPages = this.extractBookNumOfPages(html);
 
@@ -520,25 +559,17 @@ export class StorygraphSyncService {
       csrf,
     );
 
-    return isSuccessStatus(response.status) && !response.redirectedToSignIn;
+    if (isSuccessStatus(response.status) && !response.redirectedToSignIn) return;
+    if (response.redirectedToSignIn) {
+      throw new Error('storygraph_session_expired');
+    }
+    throw new Error(`progress_update_failed:${response.status}`);
   }
 
   private extractBookNumOfPages(html: string): string {
     const $ = cheerio.load(html);
     const value = $('input[name="read_status[book_num_of_pages]"]').attr('value');
     return value ?? '0';
-  }
-
-  private async filterBooksInSyncScope(userId: number, books: BookSyncData[]): Promise<BookSyncData[]> {
-    const [settings, states] = await Promise.all([
-      this.settingsService.getSettings(userId),
-      this.repo.findBookStatesByBookIds(
-        userId,
-        books.map((book) => book.bookId),
-      ),
-    ]);
-    const stateByBookId = new Map(states.map((state) => [state.bookId, state]));
-    return books.filter((book) => this.resolveBookSyncDecision(settings, book, stateByBookId.get(book.bookId), true).syncEnabled);
   }
 
   private hasChanges(book: BookSyncData, state: StorygraphBookStateSnapshot): boolean {
@@ -626,5 +657,18 @@ export class StorygraphSyncService {
 
   private emitSyncStatus(userId: number, status: StorygraphActiveSyncStatus | null): void {
     this.syncStatusEvents.next({ userId, status });
+  }
+
+  private resolveUserId(userOrId: RequestUser | number): number {
+    return typeof userOrId === 'number' ? userOrId : userOrId.id;
+  }
+
+  private async resolveAccessScope(userOrId: RequestUser | number): Promise<StorygraphBookAccessScope | undefined> {
+    if (typeof userOrId === 'number') return undefined;
+
+    return {
+      accessibleLibraryIds: await this.libraryService.findAccessibleLibraryIds(userOrId),
+      contentFilters: userOrId.isSuperuser ? undefined : userOrId.contentFilters,
+    };
   }
 }

@@ -186,9 +186,10 @@ describe('StorygraphRepository', () => {
     const { repo, db } = makeRepository();
     const selectArgs: Array<Record<string, unknown>> = [];
     const chain: Record<string, unknown> = {};
-    for (const method of ['from', 'innerJoin', 'leftJoin', 'where', 'groupBy', 'as']) {
+    for (const method of ['from', 'innerJoin', 'leftJoin', 'where', 'groupBy', 'orderBy', 'as']) {
       chain[method] = vi.fn().mockReturnValue(chain);
     }
+    chain.limit = vi.fn().mockResolvedValue([]);
     chain.then = (resolve: (rows: unknown[]) => void) => resolve([]);
     db.select.mockImplementation((cols: Record<string, unknown>) => {
       selectArgs.push(cols);
@@ -208,9 +209,10 @@ describe('StorygraphRepository', () => {
     const { repo, db } = makeRepository();
     const selectArgs: Array<Record<string, unknown>> = [];
     const chain: Record<string, unknown> = {};
-    for (const method of ['from', 'innerJoin', 'leftJoin', 'where', 'groupBy', 'as']) {
+    for (const method of ['from', 'innerJoin', 'leftJoin', 'where', 'groupBy', 'orderBy', 'as']) {
       chain[method] = vi.fn().mockReturnValue(chain);
     }
+    chain.limit = vi.fn().mockResolvedValue([]);
     chain.then = (resolve: (rows: unknown[]) => void) => resolve([]);
     db.select.mockImplementation((cols: Record<string, unknown>) => {
       selectArgs.push(cols);
@@ -234,8 +236,8 @@ describe('StorygraphRepository', () => {
 
     await expect(repo.findSyncableBook(7, 42)).resolves.toEqual({ bookId: 42 });
     await expect(repo.findSyncableBook(7, 99)).resolves.toBeNull();
-    expect(findBookSyncDataForUser).toHaveBeenNthCalledWith(1, 7, 42, false);
-    expect(findBookSyncDataForUser).toHaveBeenNthCalledWith(2, 7, 99, false);
+    expect(findBookSyncDataForUser).toHaveBeenNthCalledWith(1, 7, { bookId: 42, includeUnread: false, accessScope: undefined });
+    expect(findBookSyncDataForUser).toHaveBeenNthCalledWith(2, 7, { bookId: 99, includeUnread: false, accessScope: undefined });
   });
 
   it('findBookIdByFileId returns the first matching book id', async () => {

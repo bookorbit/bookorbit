@@ -47,7 +47,7 @@ export class StorygraphController {
 
   @Post('sync')
   startSync(@CurrentUser() user: RequestUser) {
-    return this.syncService.syncAll(user.id).then((runId) => ({ runId }));
+    return this.syncService.syncAll(user).then((runId) => ({ runId }));
   }
 
   @Delete('sync')
@@ -67,12 +67,12 @@ export class StorygraphController {
 
   @Get('sync/pending')
   getSyncPendingSummary(@CurrentUser() user: RequestUser) {
-    return this.syncService.getSyncPendingSummary(user.id);
+    return this.syncService.getSyncPendingSummary(user);
   }
 
   @Get('sync/failures')
   listSyncFailures(@CurrentUser() user: RequestUser) {
-    return this.syncService.listSyncFailures(user.id);
+    return this.syncService.listSyncFailures(user);
   }
 
   @Post('books/:bookId/rematch')
@@ -83,7 +83,7 @@ export class StorygraphController {
 
   @Get('books')
   listLinkedBooks(@CurrentUser() user: RequestUser) {
-    return this.syncService.listLinkedBooks(user.id);
+    return this.syncService.listLinkedBooks(user);
   }
 
   @Patch('books/:bookId/link')

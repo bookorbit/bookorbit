@@ -62,6 +62,7 @@ export class StorygraphClientService {
     post: { form: Record<string, string>; csrfToken: string } | undefined,
     attempt: number,
   ): Promise<StorygraphResponse> {
+    const startedAt = Date.now();
     await this.queue.throttle(userId);
 
     const url = path.startsWith('http') ? path : `${STORYGRAPH_BASE_URL}${path}`;
@@ -85,13 +86,17 @@ export class StorygraphClientService {
     } catch (err) {
       const errorClass = err instanceof Error ? err.constructor.name : 'UnknownError';
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
-      this.logger.error(`[storygraph.client] [fail] userId=${userId} attempt=${attempt} errorClass=${errorClass} error="${error}" - fetch failed`);
+      this.logger.error(
+        `[storygraph.client_request] [fail] userId=${userId} attempt=${attempt} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${error}" - fetch failed`,
+      );
       throw err;
     }
 
     if ((response.status === 429 || response.status >= 500) && attempt < STORYGRAPH_MAX_RETRIES) {
       const backoffMs = Math.pow(2, attempt + 1) * 1000;
-      this.logger.warn(`[storygraph.client] userId=${userId} attempt=${attempt} status=${response.status} backoffMs=${backoffMs} - retrying`);
+      this.logger.warn(
+        `[storygraph.client_request] [end] userId=${userId} attempt=${attempt} durationMs=${Date.now() - startedAt} status=${response.status} retryable=true backoffMs=${backoffMs} - retrying`,
+      );
       await new Promise((resolve) => setTimeout(resolve, backoffMs));
       return this.executeWithRetry(userId, cookies, path, method, post, attempt + 1);
     }
@@ -109,9 +114,13 @@ export class StorygraphClientService {
     for (const cookie of setCookieHeaders) {
       const match = new RegExp(`${STORYGRAPH_SESSION_COOKIE_NAME}=([^;]+)`).exec(cookie);
       if (match?.[1]) {
+        const startedAt = Date.now();
         await this.repo.updateSessionCookie(userId, match[1]).catch((err) => {
+          const errorClass = err instanceof Error ? err.constructor.name : 'Error';
           const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
-          this.logger.warn(`[storygraph.client] userId=${userId} error="${error}" - failed to persist rotated session cookie`);
+          this.logger.warn(
+            `[storygraph.session_cookie] [fail] userId=${userId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${error}" - failed to persist rotated session cookie`,
+          );
         });
         return;
       }
