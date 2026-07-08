@@ -101,6 +101,7 @@ function BookOrbit:init()
     self.periodic_push_task = function()
         self.periodic_push_scheduled = false
         self.page_update_counter = 0
+        if self:skipAutoSyncOffline() then return end
         -- Push only, no pull, no network nagging: relies on the connection
         -- being already up, like the stock kosync periodic push.
         if self.settings.auto_sync and (self.settings.pages_before_update or 0) > 0 then
@@ -230,6 +231,10 @@ function BookOrbit:isLoggedIn()
     return self.settings.server_url ~= nil and self.settings.username ~= nil and self.settings.userkey ~= nil
 end
 
+function BookOrbit:skipAutoSyncOffline()
+    return self.settings.skip_sync_when_offline == true and not NetworkMgr:isConnected()
+end
+
 function BookOrbit:onStart()
     if PluginShare.bookorbit_auto_open_done then return end
     PluginShare.bookorbit_auto_open_done = true
@@ -279,14 +284,14 @@ end
 function BookOrbit:onReaderReady()
     if self.settings.auto_sync then
         UIManager:nextTick(function()
-            if self.settings.skip_sync_when_offline and not NetworkMgr:isOnline() then
+            if self:skipAutoSyncOffline() then
                 return
             end
             self:getProgress(true, false)
         end)
         if self.settings.annotation_sync then
             UIManager:scheduleIn(2, function()
-                if self.settings.skip_sync_when_offline and not NetworkMgr:isOnline() then
+                if self:skipAutoSyncOffline() then
                     return
                 end
                 self:exchangeAnnotationsForOpenBook()
@@ -395,7 +400,7 @@ function BookOrbit:startSweep()
             if not err then self:maybeCheckForUpdate(false) end
         end,
     }
-    if NetworkMgr:willRerunWhenOnline(function() BookOrbitSweep.run(sweep_opts) end) then
+    if NetworkMgr:willRerunWhenConnected(function() BookOrbitSweep.run(sweep_opts) end) then
         return
     end
     BookOrbitSweep.run(sweep_opts)
@@ -438,7 +443,7 @@ function BookOrbit:onBookOrbitSyncBook()
     local run = function()
         self:reconcileProgressBeforeBookSync(snap.digest, run_book_sync)
     end
-    if NetworkMgr:willRerunWhenOnline(run) then
+    if NetworkMgr:willRerunWhenConnected(run) then
         return
     end
     run()
@@ -457,6 +462,8 @@ function BookOrbit:_onCloseDocument()
         logger.dbg("BookOrbit: close sync skipped, another sync is running")
         return
     end
+
+    if self:skipAutoSyncOffline() then return end
 
     -- Snapshot now: reader objects die after this handler returns. ReaderUI
     -- already flushed the sidecar and statistics before broadcasting
@@ -492,6 +499,7 @@ function BookOrbit:_onResume()
         return
     end
     UIManager:scheduleIn(1, function()
+        if self:skipAutoSyncOffline() then return end
         self:getProgress(true, false)
     end)
 end
@@ -503,6 +511,7 @@ function BookOrbit:_onSuspend()
 
     if not self:isLoggedIn() then return end
     if BookOrbitSweep.isRunning() or BookOrbitBookSync.isRunning() then return end
+    if self:skipAutoSyncOffline() then return end
 
     local snap = BookOrbitBookSync.capture(self)
     if not snap then return end
@@ -522,7 +531,7 @@ function BookOrbit:_onSuspend()
             annotation_sync = self.settings.annotation_sync,
         }
     end
-    if NetworkMgr:willRerunWhenOnline(run) then
+    if NetworkMgr:willRerunWhenConnected(run) then
         return
     end
     run()
@@ -538,6 +547,7 @@ end
 
 function BookOrbit:_onNetworkDisconnecting()
     logger.dbg("BookOrbit: onNetworkDisconnecting")
+    if self:skipAutoSyncOffline() then return end
     self:updateProgress(false, false)
 end
 

@@ -156,6 +156,7 @@ end
 
 function UpdateCheck:maybeCheckForUpdate(interactive)
     if not self:isLoggedIn() or self._checking_update or self._updating then return end
+    if not interactive and self:skipAutoSyncOffline() then return end
     if BookOrbitSweep.isRunning() or BookOrbitBookSync.isRunning() then return end
 
     local now = os.time()

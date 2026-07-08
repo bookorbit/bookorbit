@@ -166,7 +166,7 @@ function MainMenu:addToMainMenu(menu_items)
                 text = _("Skip auto-sync when offline"),
                 checked_func = function() return self.settings.skip_sync_when_offline end,
                 enabled_func = function() return self.settings.auto_sync end,
-                help_text = _([[When enabled, automatic sync on book open is skipped if the device is not already online. Prevents the e-reader from stalling while trying to connect to Wi-Fi.]]),
+                help_text = _([[When enabled, automatic sync (book open, resume, suspend, close, and periodic push) is skipped if the device is not already online. Prevents the e-reader from stalling while trying to connect to Wi-Fi.]]),
                 callback = function()
                     self.settings.skip_sync_when_offline = not self.settings.skip_sync_when_offline
                 end,
@@ -360,7 +360,7 @@ function MainMenu:setServerAddress()
 end
 
 function MainMenu:login(menu)
-    if NetworkMgr:willRerunWhenOnline(function() self:login(menu) end) then
+    if NetworkMgr:willRerunWhenConnected(function() self:login(menu) end) then
         return
     end
 
