@@ -100,6 +100,7 @@ export class SmartScopeService {
       filter,
       defaultSort: dto.defaultSort ?? [],
       isPublic: dto.isPublic ?? false,
+      syncToKobo: dto.syncToKobo ?? false,
     });
     return smartScope;
   }
@@ -120,6 +121,7 @@ export class SmartScopeService {
       filter,
       defaultSort: dto.defaultSort,
       isPublic: dto.isPublic,
+      syncToKobo: dto.syncToKobo,
     });
     return updated;
   }

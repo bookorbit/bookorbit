@@ -203,6 +203,27 @@ export interface KoreaderCatalogBookListItem {
   updatedAt: string;
 }
 
+export type KoreaderCatalogRelatedSectionId = "series" | "author" | "similar";
+
+export interface KoreaderCatalogRelatedBook {
+  id: number;
+  title: string | null;
+  authors: string[];
+  seriesIndex: number | null;
+  hasCover: boolean;
+  thumbnailUrl: string | null;
+  detailUrl: string;
+  updatedAt: string | null;
+  isAudiobook?: boolean;
+  isComic?: boolean;
+}
+
+export interface KoreaderCatalogRelatedSection {
+  id: KoreaderCatalogRelatedSectionId;
+  title: string;
+  books: KoreaderCatalogRelatedBook[];
+}
+
 export interface KoreaderCatalogBookDetail extends KoreaderCatalogBookListItem {
   subtitle: string | null;
   description: string | null;
@@ -220,6 +241,7 @@ export interface KoreaderCatalogBookDetail extends KoreaderCatalogBookListItem {
   tags: string[];
   progress: KoreaderCatalogProgress | null;
   files: KoreaderCatalogFile[];
+  relatedSections: KoreaderCatalogRelatedSection[];
 }
 
 export interface KoreaderCatalogPage<T> {
@@ -250,6 +272,9 @@ export interface KoreaderCatalogSectionResponse {
 
 export interface KoreaderCatalogDashboardResponse {
   generatedAt: string;
+  username: string;
+  displayName: string;
+  totalBooks: number;
   sections: KoreaderCatalogEntry[];
   continueReading: KoreaderCatalogBookListItem[];
   discover: KoreaderCatalogBookListItem[];

@@ -27,6 +27,7 @@ services:
       PGID: ${PGID:-1000}
       NODE_MAX_OLD_SPACE_SIZE: ${NODE_MAX_OLD_SPACE_SIZE:-auto}
       BOOK_DOCK_PATH: ${BOOK_DOCK_PATH:-}
+      LIBRARY_BROWSE_ROOT: ${LIBRARY_BROWSE_ROOT:-}
     depends_on:
       postgres:
         condition: service_healthy

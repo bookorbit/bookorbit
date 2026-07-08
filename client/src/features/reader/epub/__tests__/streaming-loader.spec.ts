@@ -53,4 +53,21 @@ describe('makeStreamingLoader auth integration', () => {
       { url: chapterUrl, auth: 'Bearer fresh-token' },
     ])
   })
+
+  it('supports the legacy static token argument for already-cached app bundles', async () => {
+    const calls: { url: string; auth: string | null }[] = []
+    const chapterUrl = '/api/v1/epub/42/file/text/chapter%201.xhtml?fileId=9'
+    const fetchMock = vi.fn<typeof fetch>((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      const headers = new Headers(init?.headers)
+      calls.push({ url, auth: headers.get('Authorization') })
+      return Promise.resolve(new Response('<html>chapter</html>', { status: 200 }))
+    })
+    globalThis.fetch = fetchMock as never
+
+    const loader = makeStreamingLoader(42, '/api/v1/epub', { manifest: [{ href: 'text/chapter 1.xhtml', size: 20 }] }, 'legacy-token', null, 9)
+
+    await expect(loader.loadText('text/chapter 1.xhtml')).resolves.toBe('<html>chapter</html>')
+    expect(calls).toEqual([{ url: chapterUrl, auth: 'Bearer legacy-token' }])
+  })
 })

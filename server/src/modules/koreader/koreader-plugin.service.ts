@@ -5,6 +5,7 @@ import type { ReadStatus } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED, AchievementEventsService } from '../achievement/achievement-events.service';
+import { UserBookNoteService } from '../user-book-note/user-book-note.service';
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import type { BookStatesUploadDto, BulkProgressDto, MatchCheckDto, SweepCompleteDto } from './dto';
 import { KoreaderPluginRepository } from './koreader-plugin.repository';
@@ -29,8 +30,31 @@ export interface MatchCheckResult {
 }
 
 export interface BookStatesUploadResult {
-  results: { hash: string; statusApplied: boolean; ratingApplied: boolean }[];
+  results: {
+    hash: string;
+    statusApplied: boolean;
+    ratingApplied: boolean;
+    reviewApplied: boolean;
+    rating: number | null;
+    ratingSet: boolean;
+    ratingUpdatedAt: string | null;
+    reviewNote: string | null;
+    reviewNoteSet: boolean;
+    reviewUpdatedAt: string | null;
+  }[];
   unmatched: string[];
+}
+
+interface RatingApplyResult {
+  applied: boolean;
+  rating: number | null;
+  updatedAt: Date | null;
+}
+
+interface ReviewApplyResult {
+  applied: boolean;
+  note: string | null;
+  updatedAt: string | null;
 }
 
 export interface BulkProgressResult {
@@ -53,6 +77,7 @@ export class KoreaderPluginService {
     private readonly pluginRepo: KoreaderPluginRepository,
     private readonly koreaderService: KoreaderService,
     private readonly userBookStatusService: UserBookStatusService,
+    private readonly userBookNoteService: UserBookNoteService,
     private readonly achievementEvents: AchievementEventsService,
   ) {}
 
@@ -109,18 +134,49 @@ export class KoreaderPluginService {
         }
 
         let statusApplied = false;
-        let ratingApplied = false;
         if (book.status) {
           statusApplied = await this.applyStatus(user.id, match.bookId, book.status, book.statusModified);
         }
-        if (book.rating) {
-          ratingApplied = await this.applyRating(user.id, match.bookId, book.rating, book.statusModified);
+
+        const hasRatingField = Object.prototype.hasOwnProperty.call(book, 'rating');
+        let ratingResult: RatingApplyResult;
+        if (hasRatingField || book.ratingCleared === true) {
+          ratingResult = await this.applyRating(user.id, match.bookId, hasRatingField ? (book.rating ?? null) : null, book.statusModified);
+        } else {
+          const current = await this.pluginRepo.getRating(user.id, match.bookId);
+          ratingResult = { applied: false, rating: current?.rating ?? null, updatedAt: current?.updatedAt ?? null };
         }
-        results.push({ hash, statusApplied, ratingApplied });
+
+        const hasReviewField = Object.prototype.hasOwnProperty.call(book, 'reviewNote');
+        let reviewResult: ReviewApplyResult;
+        if (hasReviewField || book.reviewCleared === true) {
+          reviewResult = await this.applyReview(
+            user.id,
+            match.bookId,
+            hasReviewField ? (book.reviewNote ?? null) : null,
+            book.reviewModified ?? book.statusModified,
+          );
+        } else {
+          const current = await this.userBookNoteService.findOne(user.id, match.bookId);
+          reviewResult = { applied: false, note: current?.note ?? null, updatedAt: current?.updatedAt ?? null };
+        }
+
+        results.push({
+          hash,
+          statusApplied,
+          ratingApplied: ratingResult.applied,
+          reviewApplied: reviewResult.applied,
+          rating: ratingResult.rating,
+          ratingSet: ratingResult.rating != null,
+          ratingUpdatedAt: ratingResult.updatedAt ? ratingResult.updatedAt.toISOString() : null,
+          reviewNote: reviewResult.note,
+          reviewNoteSet: reviewResult.note != null,
+          reviewUpdatedAt: reviewResult.updatedAt,
+        });
       }
 
       this.logger.log(
-        `[${BOOK_STATES_EVENT}] [end] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} applied=${results.filter((r) => r.statusApplied || r.ratingApplied).length} unmatched=${unmatched.length} - book states upload completed`,
+        `[${BOOK_STATES_EVENT}] [end] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} applied=${results.filter((r) => r.statusApplied || r.ratingApplied || r.reviewApplied).length} unmatched=${unmatched.length} - book states upload completed`,
       );
 
       return { results, unmatched };
@@ -273,17 +329,36 @@ export class KoreaderPluginService {
     return true;
   }
 
-  private async applyRating(userId: number, bookId: number, rating: number, statusModified?: string): Promise<boolean> {
+  private async applyRating(userId: number, bookId: number, rating: number | null, statusModified?: string): Promise<RatingApplyResult> {
     const current = await this.pluginRepo.getRating(userId, bookId);
     if (current) {
-      if (current.rating === rating) return true;
+      if (current.rating === rating) return { applied: true, rating: current.rating, updatedAt: current.updatedAt };
       const serverDate = current.updatedAt.toISOString().slice(0, 10);
-      if (!statusModified || statusModified <= serverDate) return false;
+      if (!statusModified || statusModified <= serverDate) {
+        return { applied: false, rating: current.rating, updatedAt: current.updatedAt };
+      }
     }
 
-    await this.pluginRepo.upsertRating(userId, bookId, rating);
+    const updated = await this.pluginRepo.upsertRating(userId, bookId, rating);
     this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED, { userId, bookIds: [bookId], rating });
-    return true;
+    return { applied: true, rating: updated.rating, updatedAt: updated.updatedAt };
+  }
+
+  private async applyReview(userId: number, bookId: number, reviewNote: string | null, reviewModified?: string): Promise<ReviewApplyResult> {
+    const current = await this.userBookNoteService.findRow(userId, bookId);
+    const normalized = this.userBookNoteService.normalizeNote(reviewNote);
+    if (current) {
+      if ((current.note ?? null) === normalized) {
+        return { applied: true, note: current.note ?? null, updatedAt: current.updatedAt.toISOString() };
+      }
+      const serverDate = current.updatedAt.toISOString().slice(0, 10);
+      if (!reviewModified || reviewModified <= serverDate) {
+        return { applied: false, note: current.note ?? null, updatedAt: current.updatedAt.toISOString() };
+      }
+    }
+
+    const updated = await this.userBookNoteService.setNote(userId, bookId, normalized);
+    return { applied: true, note: updated.note, updatedAt: updated.updatedAt };
   }
 
   private async isStaleProgress(userId: number, bookFileId: number, timestamp?: number): Promise<boolean> {

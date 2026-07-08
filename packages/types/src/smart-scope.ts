@@ -8,6 +8,7 @@ export interface SmartScope {
   filter: GroupRule | null;
   defaultSort: SortSpec[];
   isPublic: boolean;
+  syncToKobo: boolean;
   displayOrder: number;
   bookCount?: number;
   createdAt: string;
@@ -20,4 +21,5 @@ export interface CreateSmartScopePayload {
   filter?: GroupRule;
   defaultSort: SortSpec[];
   isPublic?: boolean;
+  syncToKobo?: boolean;
 }

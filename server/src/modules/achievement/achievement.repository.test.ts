@@ -1653,6 +1653,17 @@ describe('AchievementRepository', () => {
 
       expect(result).toBe(9);
     });
+
+    it('excludes tombstone rows with a null rating', async () => {
+      const chain = makeSelectChain([{ value: 9 }]);
+      const db = { select: vi.fn().mockReturnValue(chain) };
+      const repo = makeRepo(db);
+
+      await repo.countRatings(1);
+
+      const whereSql = flattenSql(chain.where.mock.calls[0][0]);
+      expect(whereSql).toContain('is not null');
+    });
   });
 
   describe('countRatingsAtMost', () => {
@@ -1676,6 +1687,17 @@ describe('AchievementRepository', () => {
       const result = await repo.countDistinctRatingValues(1);
 
       expect(result).toBe(5);
+    });
+
+    it('excludes tombstone rows with a null rating', async () => {
+      const chain = makeSelectChain([{ value: 5 }]);
+      const db = { select: vi.fn().mockReturnValue(chain) };
+      const repo = makeRepo(db);
+
+      await repo.countDistinctRatingValues(1);
+
+      const whereSql = flattenSql(chain.where.mock.calls[0][0]);
+      expect(whereSql).toContain('is not null');
     });
   });
 

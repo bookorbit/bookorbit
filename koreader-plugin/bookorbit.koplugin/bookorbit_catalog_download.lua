@@ -49,7 +49,7 @@ function CatalogDownload.install(Catalog)
         local buttons = {}
         local open_tpl = _("Open - %1")
         local download_tpl = _("Download - %1")
-        for _, file in ipairs(files) do
+        for index, file in ipairs(files) do
             local path = self:onDeviceFilePath(file)
             local label = self:fileLabel(file, false)
             table.insert(buttons, {
@@ -105,7 +105,7 @@ function CatalogDownload.install(Catalog)
 
         local dialog
         local buttons = {}
-        for _, file in ipairs(files) do
+        for index, file in ipairs(files) do
             local label = self:fileLabel(file, false)
             table.insert(buttons, {
                 {
@@ -226,8 +226,9 @@ function CatalogDownload.install(Catalog)
     end
 
     function Catalog:downloadFile(local_path, detail, file)
+        local filename = local_path:match("[^/]+$") or safeFilenameBase(detail)
         local total = file.sizeBytes
-        local info = InfoMessage:new{ text = _("Downloading...") }
+        local info = InfoMessage:new{ text = T(_("Downloading:\n%1"), filename) }
         UIManager:show(info)
         UIManager:forceRePaint()
 
@@ -238,11 +239,11 @@ function CatalogDownload.install(Catalog)
                 local pct = math.min(100, math.floor(received / total * 100))
                 bucket = math.floor(pct / 5)
                 if bucket == last_bucket then return end
-                text = T(_("Downloading... %1"), pct .. "%")
+                text = T(_("Downloading:\n%1\n\n%2"), filename, pct .. "%")
             else
                 bucket = math.floor(received / (256 * 1024))
                 if bucket == last_bucket then return end
-                text = T(_("Downloading... %1"), formatBytes(received))
+                text = T(_("Downloading:\n%1\n\n%2"), filename, formatBytes(received))
             end
             last_bucket = bucket
             UIManager:close(info)
@@ -290,7 +291,7 @@ function CatalogDownload.install(Catalog)
 
         local state = BookOrbitState.open()
         state:rememberFile(local_path, digest)
-        for _, match in ipairs(body.matches or {}) do
+        for index, match in ipairs(body.matches or {}) do
             if match.hash == digest then
                 state:setMatched(digest, match.bookFileId, match.bookId, local_path)
                 state:flush()

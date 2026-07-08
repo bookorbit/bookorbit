@@ -490,6 +490,34 @@ describe('useReaderProgress', () => {
       expect(body.koreaderProgress).toBe('/body/p[1]')
     })
 
+    it('does not send non-string kobo location source from relocate events', async () => {
+      mockApi.mockResolvedValue(makeOkResponse({}))
+      const elapsedMinutes = ref(0)
+      const { onRelocate, save } = useReaderProgress(1, 42, elapsedMinutes)
+
+      onRelocate({
+        cfi: 'epubcfi(/6/38!/4,/488/2/1:604,/512/2/1:89)',
+        fraction: 0.69604585363819,
+        source: 18,
+        koboLocationValue: null,
+        koboLocationType: null,
+        contentSourceProgressPercent: 87.5,
+        koreaderProgress: '/body/DocFragment[19]/body/p[222]/font/text().604',
+      } as never)
+
+      vi.clearAllTimers()
+      await save()
+
+      const body = postedProgressBody()
+      expect(body.cfi).toBe('epubcfi(/6/38!/4,/488/2/1:604,/512/2/1:89)')
+      expect(body.percentage).toBe(69.604585363819)
+      expect(body.koboLocationSource).toBeNull()
+      expect(body.koboLocationValue).toBeNull()
+      expect(body.koboLocationType).toBeNull()
+      expect(body.koboContentSourceProgressPercent).toBe(87.5)
+      expect(body.koreaderProgress).toBe('/body/DocFragment[19]/body/p[222]/font/text().604')
+    })
+
     it('serializes finite progress after invalid relocate values', async () => {
       mockApi.mockResolvedValue(makeOkResponse({}))
       const elapsedMinutes = ref(0)

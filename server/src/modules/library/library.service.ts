@@ -18,6 +18,7 @@ import { normalizeIconValue } from '../../common/utils/icon-value.utils';
 import type { RequestUser } from '../../common/types/request-user';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED } from '../achievement/achievement-events.service';
 import { FileWriteService } from '../file-write/file-write.service';
+import { PathPolicyService } from '../path/path-policy.service';
 import { isPrimaryFormat } from '../scanner/lib/classify';
 import { FileWatcherService } from '../scanner/file-watcher.service';
 import { ScannerService } from '../scanner/scanner.service';
@@ -54,6 +55,7 @@ export class LibraryService {
     private readonly fileWatcherService: FileWatcherService,
     private readonly fileWriteService: FileWriteService,
     private readonly achievementEvents: AchievementEventsService,
+    private readonly pathPolicy: PathPolicyService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
@@ -102,6 +104,7 @@ export class LibraryService {
 
   async create(dto: CreateLibraryDto) {
     await this.assertNameAvailable(dto.name);
+    const folderPaths = await this.assertFolderPathsWithinBrowseRoot(dto.folders);
     const icon = normalizeIconValue(dto.icon);
     if (!icon) {
       throw new BadRequestException('Icon is required');
@@ -135,7 +138,7 @@ export class LibraryService {
       fileRenameEnabled: dto.fileRenameEnabled ?? false,
     });
 
-    const folders = await Promise.all(dto.folders.map((path) => this.libraryRepo.insertFolder({ libraryId: library.id, path })));
+    const folders = await Promise.all(folderPaths.map((path) => this.libraryRepo.insertFolder({ libraryId: library.id, path })));
 
     if (library.watch) {
       await this.fileWatcherService.startWatcher(
@@ -164,7 +167,8 @@ export class LibraryService {
       await this.assertNameAvailable(dto.name, id);
     }
 
-    const { folders: folderPaths, ...fields } = dto;
+    const { folders: rawFolderPaths, ...fields } = dto;
+    const folderPaths = rawFolderPaths === undefined ? undefined : await this.assertFolderPathsWithinBrowseRoot(rawFolderPaths);
     const icon = fields.icon !== undefined ? normalizeIconValue(fields.icon) : normalizeIconValue(existing.icon);
     if (!icon) {
       throw new BadRequestException('Icon is required');
@@ -235,9 +239,19 @@ export class LibraryService {
         let error: string | undefined;
         let overlapLibrary: string | undefined;
 
+        const resolvedInputPath = await this.pathPolicy.resolveBrowsePath(inputPath).catch(() => null);
+        if (resolvedInputPath === null) {
+          return {
+            path: inputPath,
+            accessible: false,
+            fileCount: 0,
+            error: 'Path is outside the configured library browse root',
+          };
+        }
+
         let inputStat: Awaited<ReturnType<typeof stat>> | null = null;
         try {
-          inputStat = await stat(inputPath);
+          inputStat = await stat(resolvedInputPath);
         } catch (err) {
           error = formatPrescanError(err);
         }
@@ -245,11 +259,11 @@ export class LibraryService {
         if (inputStat === null) {
           accessible = false;
         } else if (!inputStat.isDirectory()) {
-          return { path: inputPath, accessible: false, fileCount: 0, error: 'Not a directory' };
+          return { path: resolvedInputPath, accessible: false, fileCount: 0, error: 'Not a directory' };
         } else {
           accessible = true;
           try {
-            fileCount = await countPrimaryFiles(inputPath);
+            fileCount = await countPrimaryFiles(resolvedInputPath);
           } catch (err) {
             accessible = false;
             fileCount = 0;
@@ -258,13 +272,13 @@ export class LibraryService {
         }
 
         for (const existing of allFolderPaths) {
-          if (pathsOverlap(inputPath, existing.path)) {
+          if (pathsOverlap(resolvedInputPath, existing.path)) {
             overlapLibrary = existing.libraryName;
             break;
           }
         }
 
-        return { path: inputPath, accessible, fileCount, overlapLibrary, error };
+        return { path: resolvedInputPath, accessible, fileCount, overlapLibrary, error };
       }),
     );
 
@@ -359,6 +373,10 @@ export class LibraryService {
   private async assertNameAvailable(name: string, excludeId?: number) {
     const existing = await this.libraryRepo.findByName(name, excludeId);
     if (existing.length > 0) throw new ConflictException('A library with this name already exists');
+  }
+
+  private async assertFolderPathsWithinBrowseRoot(paths: string[]): Promise<string[]> {
+    return Promise.all(paths.map((path) => this.pathPolicy.assertWithinBrowseRoot(path)));
   }
 
   private async cleanupCoverDirectories(bookIds: number[]): Promise<void> {

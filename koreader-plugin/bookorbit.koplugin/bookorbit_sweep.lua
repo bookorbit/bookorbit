@@ -359,48 +359,56 @@ local function stepSidecars(ctx)
     for md5, book in pairs(ctx.state.books) do
         if book.file then
             local mtime = BookOrbitSidecar.sidecarMtime(book.file)
-            if mtime and mtime ~= book.sidecarMtime then
-                local extract = BookOrbitSidecar.extract(book.file)
+            if mtime then
+                local sidecar_changed = mtime ~= book.sidecarMtime
+                local state_unknown = book.ratingSyncedKnown ~= true or book.reviewSyncedKnown ~= true
+                local extract = nil
+                if sidecar_changed or state_unknown then
+                    extract = BookOrbitSidecar.extract(book.file)
+                end
+
                 if extract then
                     local pending = {
                         md5 = md5,
                         mtime = mtime,
-                        ann_count = extract.annotations_count,
-                        ann_max_datetime = extract.annotations_max_datetime,
-                        ann_done = false,
+                        ann_count = sidecar_changed and extract.annotations_count or (book.annCount or 0),
+                        ann_max_datetime = sidecar_changed and extract.annotations_max_datetime or nil,
+                        ann_done = not sidecar_changed,
                         failed = false,
                         need_state = false,
                         need_progress = false,
                     }
 
-                    -- Every changed sidecar goes through the exchange, even with
-                    -- no new local highlights: the full key set is what lets the
-                    -- server detect on-device deletions.
-                    table.insert(ctx.ann_queue, {
-                        md5 = md5,
-                        file = book.file,
-                        annotations = extract.annotations,
-                        ann_max_datetime = extract.annotations_max_datetime,
-                    })
-
-                    if extract.status or extract.rating then
-                        local state_changed = extract.status ~= nil
-                            and (extract.status_modified or "") ~= (book.statusSyncedModified or "")
-                        local rating_changed = (extract.rating or 0) ~= (book.ratingSynced or 0)
-                        if state_changed or rating_changed then
-                            pending.need_state = true
-                            pending.status_modified = extract.status_modified
-                            pending.rating = extract.rating
-                            table.insert(ctx.states_items, {
-                                hash = md5,
-                                status = extract.status,
-                                statusModified = extract.status_modified,
-                                rating = extract.rating,
-                            })
-                        end
+                    if sidecar_changed then
+                        -- Every changed sidecar goes through the exchange, even with
+                        -- no new local highlights: the full key set is what lets the
+                        -- server detect on-device deletions.
+                        table.insert(ctx.ann_queue, {
+                            md5 = md5,
+                            file = book.file,
+                            annotations = extract.annotations,
+                            ann_max_datetime = extract.annotations_max_datetime,
+                        })
                     end
 
-                    if extract.percent_finished then
+                    local state_payload = BookOrbitSidecar.buildStatePayload(md5, book, {
+                        status = extract.status,
+                        status_modified = extract.status_modified,
+                        rating = extract.rating,
+                        review_note = extract.review_note,
+                    }, true)
+                    if state_payload then
+                        pending.need_state = true
+                        pending.status_modified = state_payload.statusModified
+                        pending.state_payload = state_payload
+                        pending.state_summary = {
+                            rating = extract.rating,
+                            review_note = extract.review_note,
+                        }
+                        table.insert(ctx.states_items, state_payload)
+                    end
+
+                    if sidecar_changed and extract.percent_finished then
                         local pushed = book.progressPushedPct or -1
                         if math.abs(extract.percent_finished - pushed) > 0.001 then
                             pending.need_progress = true
@@ -416,6 +424,20 @@ local function stepSidecars(ctx)
                     end
 
                     ctx.pending_books[md5] = pending
+                elseif not sidecar_changed then
+                    local state_payload = { hash = md5 }
+                    ctx.pending_books[md5] = {
+                        md5 = md5,
+                        mtime = mtime,
+                        ann_count = book.annCount or 0,
+                        ann_done = true,
+                        failed = false,
+                        need_state = true,
+                        need_progress = false,
+                        state_payload = state_payload,
+                        state_summary = {},
+                    }
+                    table.insert(ctx.states_items, state_payload)
                 end
             end
         end
@@ -599,6 +621,10 @@ local function stepStatesNext(ctx)
     for _, hash in ipairs(body.unmatched or {}) do
         unmatched[hash] = true
     end
+    local results = {}
+    for _, result in ipairs(body.results or {}) do
+        results[result.hash] = result
+    end
 
     for _, item in ipairs(batch) do
         local pending = ctx.pending_books[item.hash]
@@ -608,6 +634,18 @@ local function stepStatesNext(ctx)
         elseif pending then
             -- A server-kept tie still counts as synced: the device value was considered.
             pending.state_acked = true
+            local book = ctx.state:getBook(item.hash)
+            local server_state = BookOrbitSidecar.stateFromServerResult(results[item.hash])
+            if book and server_state then
+                if book.file and book.file ~= currentlyOpenFile() then
+                    local touched = BookOrbitSidecar.applyServerStateSidecar(book.file, server_state)
+                    if touched then
+                        pending.mtime = BookOrbitSidecar.sidecarMtime(book.file) or pending.mtime
+                    end
+                end
+                BookOrbitSidecar.rememberServerState(book, server_state)
+                pending.state_used_server = true
+            end
         end
     end
 
@@ -673,7 +711,9 @@ local function stepDone(ctx)
                 BookOrbitAnnotations.advanceWatermark(book, pending.ann_max_datetime, device_now)
                 if state_done and pending.need_state then
                     book.statusSyncedModified = pending.status_modified or book.statusSyncedModified
-                    book.ratingSynced = pending.rating or book.ratingSynced
+                    if not pending.state_used_server then
+                        BookOrbitSidecar.rememberUploadedState(book, pending.state_summary or {}, pending.state_payload)
+                    end
                 end
                 if progress_done and pending.need_progress then
                     book.progressPushedPct = pending.percentage

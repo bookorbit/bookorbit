@@ -14,7 +14,7 @@ local _ = require("gettext")
 
 local CatalogUtil = {}
 
-CatalogUtil.DEFAULT_GRID_COLUMNS = 3
+CatalogUtil.DEFAULT_GRID_COLUMNS = 4
 CatalogUtil.DEFAULT_GRID_ROWS = 3
 CatalogUtil.THUMBNAIL_BATCH_SIZE = 2
 CatalogUtil.MAX_RECENT_SEARCHES = 8

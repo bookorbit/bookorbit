@@ -47,6 +47,7 @@ describe('ReaderHeader', () => {
     expect(wrapper.emitted('cycleFooterMode')?.length).toBe(1)
     expect(wrapper.emitted('toggleHelp')?.length).toBe(1)
     expect(wrapper.emitted('toggleFullscreen')?.length).toBe(1)
+    expect(wrapper.get('button[aria-label="Enter fullscreen"]').classes()).not.toContain('hidden')
   })
 
   it('forwards dropdown open changes', () => {

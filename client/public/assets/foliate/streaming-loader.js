@@ -11,7 +11,16 @@
  * @returns {Object} Loader interface compatible with Foliate's EPUB class
  */
 export const makeStreamingLoader = (bookId, baseUrl, bookInfo, fetchFile = fetch, bookType = null, fileId = null) => {
-  const requestFile = typeof fetchFile === 'function' ? fetchFile : fetch
+  const requestFile =
+    typeof fetchFile === 'function'
+      ? fetchFile
+      : typeof fetchFile === 'string' && fetchFile
+        ? (input, init) => {
+            const headers = new Headers(init?.headers)
+            headers.set('Authorization', `Bearer ${fetchFile}`)
+            return fetch(input, { ...init, headers })
+          }
+        : fetch
   const OPTIONAL_TEXT_FILES = new Set([
     'META-INF/encryption.xml',
     'META-INF/com.apple.ibooks.display-options.xml',

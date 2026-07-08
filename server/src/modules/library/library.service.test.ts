@@ -8,7 +8,7 @@ vi.mock('../scanner/lib/classify', () => ({
   isPrimaryFormat: vi.fn(),
 }));
 
-import { BadRequestException, ConflictException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 import { readdir, rm, stat } from 'fs/promises';
 
@@ -66,6 +66,10 @@ describe('LibraryService', () => {
   const achievementEvents = {
     emit: vi.fn(),
   };
+  const pathPolicy = {
+    assertWithinBrowseRoot: vi.fn((path: string) => Promise.resolve(path)),
+    resolveBrowsePath: vi.fn((path: string) => Promise.resolve(path)),
+  };
 
   let service: LibraryService;
 
@@ -79,12 +83,15 @@ describe('LibraryService', () => {
       fileWatcherService as any,
       fileWriteService as any,
       achievementEvents as any,
+      pathPolicy as any,
     );
 
     mockStat.mockResolvedValue({ isDirectory: () => true } as Awaited<ReturnType<typeof stat>>);
     mockReaddir.mockResolvedValue([] as unknown as Awaited<ReturnType<typeof readdir>>);
     mockRm.mockResolvedValue(undefined);
     mockIsPrimaryFormat.mockReturnValue(false);
+    pathPolicy.assertWithinBrowseRoot.mockImplementation((path: string) => Promise.resolve(path));
+    pathPolicy.resolveBrowsePath.mockImplementation((path: string) => Promise.resolve(path));
   });
 
   it('findAll uses scoped folder query for non-superusers', async () => {
@@ -220,6 +227,16 @@ describe('LibraryService', () => {
     await expect(service.create({ name: 'Dup', icon: 'BookOpen', folders: ['/x'] } as any)).rejects.toBeInstanceOf(ConflictException);
   });
 
+  it('create rejects folders outside the configured browse root before inserting the library', async () => {
+    libraryRepo.findByName.mockResolvedValue([]);
+    pathPolicy.assertWithinBrowseRoot.mockRejectedValue(new ForbiddenException('outside root'));
+
+    await expect(service.create({ name: 'Sci-Fi', icon: 'BookOpen', folders: ['/outside'] } as any)).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(libraryRepo.insert).not.toHaveBeenCalled();
+    expect(libraryRepo.insertFolder).not.toHaveBeenCalled();
+  });
+
   it('create rejects missing icons', async () => {
     libraryRepo.findByName.mockResolvedValue([]);
 
@@ -246,6 +263,17 @@ describe('LibraryService', () => {
     expect(libraryRepo.insertFolder).toHaveBeenCalledWith({ libraryId: 3, path: '/add' });
     expect(fileWatcherService.startWatcher).not.toHaveBeenCalled();
     expect(fileWatcherService.stopWatcher).not.toHaveBeenCalled();
+  });
+
+  it('update rejects folders outside the configured browse root before changing the library', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 3, name: 'Current', icon: 'BookOpen', watch: false }]);
+    pathPolicy.assertWithinBrowseRoot.mockRejectedValue(new ForbiddenException('outside root'));
+
+    await expect(service.update(3, { folders: ['/outside'] } as any)).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(libraryRepo.update).not.toHaveBeenCalled();
+    expect(libraryRepo.insertFolder).not.toHaveBeenCalled();
+    expect(libraryRepo.deleteFolder).not.toHaveBeenCalled();
   });
 
   it('update starts watcher when watch toggles on', async () => {
@@ -418,6 +446,19 @@ describe('LibraryService', () => {
     expect(result.totalFiles).toBe(2);
     expect(result.paths[0]).toEqual(expect.objectContaining({ path: '/books/new', accessible: true, fileCount: 2 }));
     expect(result.paths[1]).toEqual(expect.objectContaining({ overlapLibrary: 'Existing Library' }));
+  });
+
+  it('prescan reports paths outside the configured browse root without touching the filesystem', async () => {
+    libraryRepo.findAllFolderPaths.mockResolvedValue([]);
+    pathPolicy.resolveBrowsePath.mockRejectedValue(new ForbiddenException('outside root'));
+
+    const result = await service.prescan({ paths: ['/outside'] } as any);
+
+    expect(result).toEqual({
+      paths: [{ path: '/outside', accessible: false, fileCount: 0, error: 'Path is outside the configured library browse root' }],
+      totalFiles: 0,
+    });
+    expect(mockStat).not.toHaveBeenCalled();
   });
 
   it('prescan reports non-directory paths with explicit error', async () => {

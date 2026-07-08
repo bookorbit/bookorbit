@@ -904,4 +904,48 @@ describe('BookRepository', () => {
     expect(readingWhere).toHaveBeenCalledTimes(1);
     expect(audioWhere).toHaveBeenCalledTimes(1);
   });
+
+  describe('bulkSetRating', () => {
+    it('does nothing for an empty book id list', async () => {
+      const db = { insert: vi.fn() };
+      const repo = new BookRepository(db as never);
+
+      await repo.bulkSetRating([], 4, 7);
+
+      expect(db.insert).not.toHaveBeenCalled();
+    });
+
+    it('upserts a rating row per book id', async () => {
+      const insertChain = makeInsertChain();
+      const db = { insert: vi.fn().mockReturnValue(insertChain) };
+      const repo = new BookRepository(db as never);
+
+      await repo.bulkSetRating([10, 20], 4, 7);
+
+      expect(insertChain.values).toHaveBeenCalledWith([
+        { userId: 7, bookId: 10, rating: 4 },
+        { userId: 7, bookId: 20, rating: 4 },
+      ]);
+      expect(insertChain.onConflictDoUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          set: expect.objectContaining({ rating: 4 }),
+        }),
+      );
+    });
+
+    it('upserts a null rating tombstone instead of deleting the row', async () => {
+      const insertChain = makeInsertChain();
+      const db = { insert: vi.fn().mockReturnValue(insertChain) };
+      const repo = new BookRepository(db as never);
+
+      await repo.bulkSetRating([10], null, 7);
+
+      expect(insertChain.values).toHaveBeenCalledWith([{ userId: 7, bookId: 10, rating: null }]);
+      expect(insertChain.onConflictDoUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          set: expect.objectContaining({ rating: null }),
+        }),
+      );
+    });
+  });
 });

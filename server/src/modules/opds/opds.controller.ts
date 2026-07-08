@@ -21,6 +21,7 @@ import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName } f
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { Public } from '../../common/decorators/public.decorator';
 import { imageContentTypeFromPath } from '../../common/image-content-type';
+import { contentDispositionHeader } from '../../common/utils/content-disposition.utils';
 import { OPDS_MIME_ACQ, OPDS_MIME_NAV, OPDS_MIME_SEARCH, fileMimeType } from './opds-xml.helpers';
 import { OpdsAuthGuard } from './opds-auth.guard';
 import type { OpdsRequestUser } from './opds-auth.guard';
@@ -28,6 +29,7 @@ import { OpdsEnabledGuard } from './opds-enabled.guard';
 import { OpdsUser } from './opds-user.decorator';
 import { OpdsBookService } from './opds-book.service';
 import { OpdsService } from './opds.service';
+import { BookService } from '../book/book.service';
 
 @Controller('opds')
 @Public()
@@ -39,6 +41,7 @@ export class OpdsController {
     private readonly opdsService: OpdsService,
     private readonly opdsBookService: OpdsBookService,
     private readonly config: ConfigService,
+    private readonly bookService: BookService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
@@ -271,16 +274,17 @@ export class OpdsController {
     const bookFiles = await this.opdsBookService.getBookFiles(bookId, fileId);
     if (!bookFiles) throw new NotFoundException('File not found');
 
-    const { absolutePath, format, title, authorName } = bookFiles;
+    const { absolutePath, format } = bookFiles;
     const { size: fileSize } = await stat(absolutePath);
     const mime = fileMimeType(format);
 
-    const safeName =
-      [title, authorName]
-        .filter(Boolean)
-        .join(' - ')
-        .replace(/[^\w\s.-]/g, '') || `book-${bookId}`;
-    reply.header('Content-Disposition', `attachment; filename="${safeName}.${format}"`);
+    const filename = await this.bookService.resolveDownloadFilename({
+      bookId,
+      absolutePath,
+      format: format === 'unknown' ? null : format,
+    });
+
+    reply.header('Content-Disposition', contentDispositionHeader('attachment', filename, 'download'));
     reply.header('Content-Length', fileSize);
     reply.type(mime);
     reply.send(createReadStream(absolutePath));

@@ -264,8 +264,43 @@
     {
       "idx": 37,
       "version": "7",
-      "when": 1783382381384,
-      "tag": "0037_add-storygraph-sync",
+      "when": 1783316940342,
+      "tag": "0037_add_cascade_to_book_files_fk",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1783397661979,
+      "tag": "0038_user_book_notes_and_rating_tombstones",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1783458659132,
+      "tag": "0039_add_sync_to_kobo_smart_scopes",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1783465177576,
+      "tag": "0040_add_readwise_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1783469412249,
+      "tag": "0041_readwise_annotation_user_id_id_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1783475628231,
+      "tag": "0042_add-storygraph-sync",
       "breakpoints": true
     }
   ]

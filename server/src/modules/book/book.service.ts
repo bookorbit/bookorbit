@@ -70,6 +70,7 @@ import type { MetadataSearchParams } from '../metadata-fetch/providers/metadata-
 import { FileRenameService, RENAME_RELEVANT_FIELDS } from '../file-write/file-rename.service';
 import { FileWriteService } from '../file-write/file-write.service';
 import { NarratorService } from '../narrator/narrator.service';
+import { UserBookNoteService } from '../user-book-note/user-book-note.service';
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED } from '../achievement/achievement-events.service';
 import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
@@ -87,6 +88,7 @@ import type { MetadataExportColumnMode } from './dto/metadata-export-options.dto
 import { SaveProgressDto } from './dto/save-progress.dto';
 import { UpsertAudioProgressDto } from './dto/upsert-audio-progress.dto';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
+import { UpdatePersonalNoteDto } from './dto/update-personal-note.dto';
 import type { UpdateBookMetadataAndLocksDto } from './dto/update-book-metadata-and-locks.dto';
 import { buildBookDetailSupplementalFields } from './utils/build-book-detail-supplemental-fields';
 import type { SetStatusDto } from '../user-book-status/dto/set-status.dto';
@@ -143,6 +145,7 @@ export type ExportPlan = {
   projectedBytes: number;
   bookCount: number;
   scope: ExportScope;
+  archiveFilename: string;
 };
 
 const METADATA_EXPORT_SCHEMA_VERSION = 1 as const;
@@ -239,6 +242,7 @@ export class BookService {
     private readonly config: ConfigService,
     private readonly appSettings: AppSettingsService,
     private readonly userBookStatusService: UserBookStatusService,
+    private readonly userBookNoteService: UserBookNoteService,
     private readonly narratorService: NarratorService,
     private readonly comicMetadataService: ComicMetadataRepository,
     private readonly customMetadataService: CustomMetadataService,
@@ -1214,6 +1218,30 @@ export class BookService {
     }
     used.add(candidate);
     return candidate;
+  }
+
+  private resolveExportArchiveFilename(
+    bookCount: number,
+    orderedFiles: ExportCandidateFile[],
+    metadataByBookId: Map<number, Awaited<ReturnType<BookRepository['findPatternMetadataByBookIds']>>[number]>,
+    pattern: string,
+  ): string {
+    if (bookCount !== 1) return 'books.zip';
+
+    const firstFile = orderedFiles[0];
+    if (!firstFile) return 'books.zip';
+
+    const originalStem = basename(firstFile.absolutePath, extname(firstFile.absolutePath)).trim() || 'book';
+    const fallback = this.sanitizeFilenameSegment(`${originalStem}.zip`, 'book.zip');
+    const meta = metadataByBookId.get(firstFile.bookId);
+    const tokens = {
+      ...this.buildDownloadPatternTokens(firstFile.absolutePath, firstFile.format, meta),
+      originalFilename: meta?.title?.trim() || originalStem,
+      extension: 'zip',
+    };
+    const resolvedPath = resolveUploadPath(pattern || DEFAULT_DOWNLOAD_PATTERN, tokens, 'zip');
+    const resolvedName = resolvedPath?.split('/').filter(Boolean).pop() ?? null;
+    return this.sanitizeFilenameSegment(resolvedName ?? fallback, fallback);
   }
 
   private buildDownloadPatternTokens(
@@ -2735,6 +2763,7 @@ export class BookService {
         this.bookRepo.findPatternMetadataByBookIds([...new Set(orderedFiles.map((f) => f.bookId))]),
       ]);
       const metadataByBookId = new Map(metadataRows.map((row) => [row.bookId, row]));
+      const archiveFilename = this.resolveExportArchiveFilename(uniqueBookIds.length, orderedFiles, metadataByBookId, pattern);
       const usedPaths = new Set<string>();
       let projectedBytes = 0;
 
@@ -2763,6 +2792,7 @@ export class BookService {
         projectedBytes,
         bookCount: uniqueBookIds.length,
         scope,
+        archiveFilename,
       };
     } catch (err) {
       const errorClass = err instanceof Error ? err.name : 'Error';
@@ -2776,9 +2806,10 @@ export class BookService {
 
   async getDetail(id: number, user: RequestUser): Promise<BookDetailDto> {
     await this.verifyBookAccess(id, user);
-    const [result, personalRating, readStatus, comicMeta, collectionRows] = await Promise.all([
+    const [result, personalRating, personalNote, readStatus, comicMeta, collectionRows] = await Promise.all([
       this.bookRepo.findById(id),
       this.bookRepo.findRatingByBookAndUser(id, user.id),
+      this.userBookNoteService.findOne(user.id, id),
       this.userBookStatusService.findOne(user.id, id),
       this.comicMetadataService.findByBookId(id),
       this.bookRepo.findCollectionsByBookId(id, user.id),
@@ -2825,6 +2856,8 @@ export class BookService {
       seriesIndex: meta?.seriesIndex ?? null,
       seriesMemberships: seriesMembershipRows,
       rating: personalRating,
+      personalNote: personalNote?.note ?? null,
+      personalNoteUpdatedAt: personalNote ? new Date(personalNote.updatedAt) : null,
       communityRatings: this.mapCommunityRatingRows(communityRatingRows),
       coverSource: (meta?.coverSource as 'extracted' | 'custom' | null) ?? null,
       hardcoverEditionId: meta?.hardcoverEditionId ?? null,
@@ -2916,6 +2949,12 @@ export class BookService {
       libraryAutoWriteEnabled: settings?.fileWriteEnabled ?? false,
       libraryAutoRenameEnabled: settings?.fileRenameEnabled ?? false,
     };
+  }
+
+  async updatePersonalNote(id: number, dto: UpdatePersonalNoteDto, user: RequestUser): Promise<BookDetailDto> {
+    await this.verifyBookAccess(id, user);
+    await this.userBookNoteService.setNote(user.id, id, dto.note ?? null);
+    return this.getDetail(id, user);
   }
 
   async getMetadataFromFile(id: number, user: RequestUser): Promise<Record<string, unknown>> {

@@ -134,6 +134,8 @@ export type BookDetail = {
   seriesIndex: number | null;
   seriesMemberships?: BookSeriesMembership[];
   rating: number | null;
+  personalNote: string | null;
+  personalNoteUpdatedAt: string | null;
   communityRatings: BookCommunityRating[];
   coverSource: "extracted" | "custom" | null;
   hardcoverEditionId: string | null;

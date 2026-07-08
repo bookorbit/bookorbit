@@ -47,6 +47,7 @@ const draftName = ref('')
 const draftIcon = ref('')
 const draftFilter = ref<GroupRule | undefined>(undefined)
 const draftSort = ref<SortSpec[]>([])
+const draftSyncToKobo = ref(false)
 const saving = ref(false)
 const saveError = ref<string | null>(null)
 const trimmedDraftName = computed(() => draftName.value.trim())
@@ -64,6 +65,7 @@ watch(
       draftIcon.value = props.smartScope.icon ?? ''
       draftFilter.value = props.smartScope.filter ?? undefined
       draftSort.value = props.smartScope.defaultSort ? [...props.smartScope.defaultSort] : []
+      draftSyncToKobo.value = props.smartScope.syncToKobo
       schedulePreview()
     }
   },
@@ -127,6 +129,7 @@ async function save() {
       icon: trimmedDraftIcon.value,
       filter: hasCompleteRules(draftFilter.value) ? draftFilter.value : undefined,
       defaultSort: draftSort.value,
+      syncToKobo: draftSyncToKobo.value,
     })
     emit('saved')
     emit('close')
@@ -191,6 +194,26 @@ async function save() {
                 <label class="text-xs font-medium text-foreground/70">Icon</label>
                 <IconPicker v-model="draftIcon" placeholder="Choose an icon..." />
               </div>
+            </div>
+
+            <div class="flex items-center justify-between py-1">
+              <div>
+                <p class="text-sm font-medium text-foreground">Sync to Kobo</p>
+                <p class="text-xs text-muted-foreground mt-0.5">Books matching this scope will appear on your Kobo device</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                :aria-checked="draftSyncToKobo"
+                class="w-11 h-6 rounded-full transition-colors relative shrink-0"
+                :class="draftSyncToKobo ? 'bg-primary' : 'bg-muted'"
+                @click="draftSyncToKobo = !draftSyncToKobo"
+              >
+                <div
+                  class="absolute top-1 w-4 h-4 rounded-full bg-white transition-transform shadow-sm"
+                  :class="draftSyncToKobo ? 'translate-x-6' : 'translate-x-1'"
+                />
+              </button>
             </div>
           </div>
 
