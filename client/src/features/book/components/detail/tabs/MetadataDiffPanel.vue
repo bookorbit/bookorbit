@@ -287,7 +287,7 @@ onBeforeUnmount(() => {
             <span class="min-w-0 flex-1">
               <span class="block text-xs font-medium text-foreground line-clamp-1">{{ candidate.title }}</span>
               <span class="block text-[10px] text-muted-foreground line-clamp-1">
-                {{ candidate.publishedYear ?? 'Year unknown' }} - {{ index + 1 }} of {{ resultsForActiveProvider.length }}
+                {{ candidate.publishedDate ?? candidate.publishedYear ?? 'Date unknown' }} - {{ index + 1 }} of {{ resultsForActiveProvider.length }}
               </span>
             </span>
           </button>

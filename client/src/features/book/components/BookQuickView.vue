@@ -13,6 +13,7 @@ import { lubimyczytacBookUrl } from '@/features/book/lib/provider-links'
 import { useBookDetail } from '../composables/useBookDetail'
 import { useCoverVersions } from '../composables/useCoverVersions'
 import { getFormatColor } from '../lib/format-colors'
+import { displayPublishedDate } from '../lib/published-date'
 import { FORMAT_TO_GROUP } from '@bookorbit/types'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
@@ -190,6 +191,7 @@ const isPrimaryComic = computed(() => primaryFile.value?.format != null && FORMA
 const knownFormats = computed(() => [
   ...new Set((detail.value?.files ?? []).filter((f) => f.format && FORMAT_TO_GROUP[f.format]).map((f) => f.format!)),
 ])
+const publishedDisplay = computed(() => (detail.value ? displayPublishedDate(detail.value.publishedDate, detail.value.publishedYear) : null))
 
 function providerLinkStyle(provider: string) {
   const color = getProviderColor(provider)
@@ -386,8 +388,8 @@ function handleDelete() {
                 <span v-if="detail.pageCount" class="text-[10px] font-semibold px-2 py-0.5 rounded bg-muted text-muted-foreground">
                   {{ detail.pageCount }} pages
                 </span>
-                <span v-if="detail.publishedYear" class="text-[10px] font-semibold px-2 py-0.5 rounded bg-muted text-muted-foreground">
-                  {{ detail.publishedYear }}
+                <span v-if="publishedDisplay" class="text-[10px] font-semibold px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                  {{ publishedDisplay }}
                 </span>
                 <span
                   v-if="detail.language"

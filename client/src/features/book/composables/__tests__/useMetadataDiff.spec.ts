@@ -11,6 +11,7 @@ describe('useMetadataDiff', () => {
     genres: ['Genre 1'],
     description: 'Original Description',
     publisher: 'Original Publisher',
+    publishedDate: null,
     publishedYear: 2020,
     language: 'en',
     pageCount: 300,
@@ -111,6 +112,55 @@ describe('useMetadataDiff', () => {
     // Should auto-include provider IDs
     expect(formPatch.googleBooksId).toBe('g1')
     expect(formPatch.goodreadsId).toBe('gr1')
+  })
+
+  it('builds a date and derived year patch when published date is picked', () => {
+    const candidate: MetadataCandidate = {
+      provider: 'google',
+      providerId: 'g1',
+      title: 'Google Title',
+      publishedDate: '1965-08-01',
+      publishedYear: 1965,
+    }
+    const candidates = ref([candidate])
+    const activeProvider = ref<MetadataProviderKey>('google')
+    const { toggleField, buildPatch } = useMetadataDiff(mockCurrent, candidates, activeProvider, providers)
+
+    toggleField('publishedDate')
+
+    expect(buildPatch().formPatch).toMatchObject({
+      publishedDate: '1965-08-01',
+      publishedYear: 1965,
+    })
+  })
+
+  it('uses the publishedYear lock for publishedDate picks', () => {
+    const candidate: MetadataCandidate = {
+      provider: 'google',
+      providerId: 'g1',
+      title: 'Google Title',
+      publishedDate: '1965-08-01',
+      publishedYear: 1965,
+    }
+    const candidates = ref([candidate])
+    const activeProvider = ref<MetadataProviderKey>('google')
+    const { fields, toggleField, buildPatch } = useMetadataDiff(
+      mockCurrent,
+      candidates,
+      activeProvider,
+      providers,
+      undefined,
+      undefined,
+      ref(['publishedYear']),
+    )
+
+    const field = fields.value.find((f) => f.key === 'publishedDate')
+    expect(field?.isLocked).toBe(true)
+
+    toggleField('publishedDate')
+
+    expect(buildPatch().formPatch.publishedDate).toBeUndefined()
+    expect(buildPatch().formPatch.publishedYear).toBeUndefined()
   })
 
   it('builds a provider-specific community ratings patch', () => {

@@ -150,6 +150,7 @@ function makeResult(id: number, title = 'Prey'): GlobalSearchResult {
     seriesName: null,
     seriesIndex: null,
     files: [{ id: id * 10, format: 'epub', role: 'primary', sizeBytes: null }],
+    publishedDate: null,
     publishedYear: null,
     language: null,
     genres: [],

@@ -17,6 +17,7 @@ import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName } f
 import { MAX_BOOK_QUERY_OFFSET_ROWS, isBookQueryOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { normalizeMetadataText, normalizeMetadataTextKey } from '../../common/utils/metadata-text-normalize.utils';
+import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
 import { formatSeriesIndex } from '../../common/utils/series-index-format.utils';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { isDateKey, resolveTimeZone, toDateKeyInTimeZone, toTimeZoneStartOfDay } from '../../common/utils/timezone.utils';
@@ -362,6 +363,7 @@ export class BookService {
     if (r.authors !== undefined) preview.authors = r.authors as string[];
     if (r.genres !== undefined) preview.genres = r.genres as string[];
     if (r.publisher !== undefined) preview.publisher = r.publisher as string | null;
+    if (r.publishedDate !== undefined) preview.publishedDate = r.publishedDate as string | null;
     if (r.publishedYear !== undefined) preview.publishedYear = r.publishedYear as number | null;
     if (r.language !== undefined) preview.language = r.language as string | null;
     if (r.pageCount !== undefined) preview.pageCount = r.pageCount as number | null;
@@ -444,6 +446,15 @@ export class BookService {
         ratingCount: row.ratingCount,
         updatedAt: row.updatedAt?.toISOString() ?? null,
       }));
+  }
+
+  private normalizeUpdatePublishedDate(value: string | null | undefined): string | null {
+    const normalized = normalizePublishedDate(value);
+    if (normalized === undefined) return null;
+    if (normalized === null && value !== null && value !== undefined && value.trim() !== '') {
+      throw new BadRequestException('Invalid publishedDate value');
+    }
+    return normalized;
   }
 
   async verifyBookAccess(bookId: number, user: RequestUser): Promise<void> {
@@ -700,6 +711,7 @@ export class BookService {
       authors: ['authors'],
       seriesName: ['seriesName'],
       seriesIndex: ['seriesIndex'],
+      publishedDate: ['publishedDate'],
       publishedYear: ['publishedYear'],
       language: ['language'],
       genres: ['genres'],
@@ -743,6 +755,7 @@ export class BookService {
       'authors',
       'seriesName',
       'seriesIndex',
+      'publishedDate',
       'publishedYear',
       'language',
       'publisher',
@@ -898,6 +911,7 @@ export class BookService {
         authors: row.authors,
         seriesName: row.seriesName,
         seriesIndex: row.seriesIndex,
+        publishedDate: row.publishedDate,
         publishedYear: row.publishedYear,
         language: row.language,
         publisher: row.publisher,
@@ -1538,7 +1552,18 @@ export class BookService {
     if (dto.subtitle !== undefined) scalarFields.subtitle = dto.subtitle ?? null;
     if (dto.description !== undefined) scalarFields.description = dto.description ?? null;
     if (dto.publisher !== undefined) scalarFields.publisher = normalizeMetadataText(dto.publisher);
-    if (dto.publishedYear !== undefined) scalarFields.publishedYear = dto.publishedYear ?? null;
+    if (dto.publishedDate !== undefined) {
+      const publishedDate = this.normalizeUpdatePublishedDate(dto.publishedDate);
+      scalarFields.publishedDate = publishedDate;
+      if (publishedDate !== null) {
+        scalarFields.publishedYear = publishedYearFromDateKey(publishedDate);
+      } else if (dto.publishedYear !== undefined) {
+        scalarFields.publishedYear = dto.publishedYear ?? null;
+      }
+    } else if (dto.publishedYear !== undefined) {
+      scalarFields.publishedDate = null;
+      scalarFields.publishedYear = dto.publishedYear ?? null;
+    }
     if (dto.language !== undefined) scalarFields.language = dto.language ?? null;
     if (dto.pageCount !== undefined) scalarFields.pageCount = dto.pageCount ?? null;
     if (dto.seriesMemberships === undefined) {
@@ -2098,7 +2123,7 @@ export class BookService {
           if (year !== null && (!Number.isFinite(year) || !Number.isInteger(year))) {
             throw new BadRequestException('Invalid publishedYear value');
           }
-          await this.bookRepo.bulkUpdateMetadataFields(updatableIds, { publishedYear: year, updatedAt: new Date() });
+          await this.bookRepo.bulkUpdateMetadataFields(updatableIds, { publishedDate: null, publishedYear: year, updatedAt: new Date() });
         } else {
           const textValue =
             field === 'language'
@@ -2247,7 +2272,7 @@ export class BookService {
             if (val !== null && (!Number.isFinite(val) || !Number.isInteger(val))) {
               throw new BadRequestException('Invalid publishedYear value');
             }
-            await this.bookRepo.bulkUpdateMetadataFields(ids, { publishedYear: val, updatedAt: new Date() }, tx);
+            await this.bookRepo.bulkUpdateMetadataFields(ids, { publishedDate: null, publishedYear: val, updatedAt: new Date() }, tx);
           }
         }
 
@@ -2520,6 +2545,7 @@ export class BookService {
       if (r.authors !== undefined) dto.authors = r.authors as string[];
       if (r.genres !== undefined) dto.genres = r.genres as string[];
       if (r.publisher !== undefined) dto.publisher = r.publisher as string | null;
+      if (r.publishedDate !== undefined) dto.publishedDate = r.publishedDate as string | null;
       if (r.publishedYear !== undefined) dto.publishedYear = r.publishedYear as number | null;
       if (r.language !== undefined) dto.language = r.language as string | null;
       if (r.pageCount !== undefined) dto.pageCount = r.pageCount as number | null;
@@ -2848,6 +2874,7 @@ export class BookService {
       isbn10: meta?.isbn10 ?? null,
       isbn13: meta?.isbn13 ?? null,
       publisher: meta?.publisher ?? null,
+      publishedDate: meta?.publishedDate ?? null,
       publishedYear: meta?.publishedYear ?? null,
       language: meta?.language ?? null,
       pageCount: meta?.pageCount ?? null,
@@ -2975,6 +3002,7 @@ export class BookService {
           subtitle: parsed.subtitle,
           description: parsed.description,
           publisher: parsed.publisher,
+          publishedDate: parsed.publishedDate,
           publishedYear: parsed.publishedYear,
           language: parsed.language,
           pageCount: parsed.pageCount,
@@ -3009,6 +3037,7 @@ export class BookService {
           subtitle: parsed.subtitle,
           description: parsed.description,
           publisher: parsed.publisher,
+          publishedDate: parsed.publishedDate,
           publishedYear: parsed.publishedYear,
           language: parsed.language,
           pageCount: parsed.pageCount,
@@ -3036,11 +3065,13 @@ export class BookService {
       case 'azw': {
         const parsed = await parseMobiFile(absolutePath);
         if (!parsed) return {};
-        const year = parsed.publishedDate ? parseInt(parsed.publishedDate.substring(0, 4), 10) || undefined : undefined;
+        const publishedDate = normalizePublishedDate(parsed.publishedDate ?? undefined) ?? undefined;
+        const year = publishedDate ? publishedYearFromDateKey(publishedDate) : undefined;
         return {
           title: parsed.title,
           description: parsed.description,
           publisher: parsed.publisher,
+          publishedDate,
           publishedYear: year,
           language: parsed.language,
           isbn13: parsed.isbn,
@@ -3060,6 +3091,7 @@ export class BookService {
           subtitle: parsed.subtitle,
           description: parsed.description,
           publisher: parsed.publisher,
+          publishedDate: parsed.publishedDate,
           publishedYear: parsed.publishedYear,
           language: parsed.language,
           pageCount: parsed.pageCount,
@@ -3089,6 +3121,7 @@ export class BookService {
         return {
           title: parsed.title,
           description: parsed.description,
+          publishedDate: parsed.publishedDate,
           publishedYear: parsed.publishedYear,
           language: parsed.language,
           seriesName: parsed.seriesName,
@@ -3105,6 +3138,7 @@ export class BookService {
           if (parsed.subtitle !== null) result.subtitle = parsed.subtitle;
           if (parsed.description !== null) result.description = parsed.description;
           if (parsed.publisher !== null) result.publisher = parsed.publisher;
+          if (parsed.publishedDate !== null) result.publishedDate = parsed.publishedDate;
           if (parsed.publishedYear !== null) result.publishedYear = parsed.publishedYear;
           if (parsed.language !== null) result.language = parsed.language;
           if (parsed.seriesName !== null) result.seriesName = parsed.seriesName;

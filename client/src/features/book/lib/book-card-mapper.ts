@@ -18,6 +18,7 @@ export function mergeBookCardWithDetail(book: BookCard, detail: BookDetail): Boo
     subtitle: detail.subtitle,
     isbn13: detail.isbn13,
     publisher: detail.publisher,
+    publishedDate: detail.publishedDate,
     publishedYear: detail.publishedYear,
     language: detail.language,
     pageCount: detail.pageCount,
@@ -67,6 +68,7 @@ export function detectChangedColumns(previous: BookCard, next: BookCard): Column
   if (!sameStringArray(previous.authors, next.authors)) changed.add('authors')
   if (previous.seriesName !== next.seriesName) changed.add('seriesName')
   if (previous.seriesIndex !== next.seriesIndex) changed.add('seriesIndex')
+  if (previous.publishedDate !== next.publishedDate) changed.add('publishedDate')
   if (previous.publishedYear !== next.publishedYear) changed.add('publishedYear')
   if (previous.language !== next.language) changed.add('language')
   if (previous.rating !== next.rating) changed.add('rating')

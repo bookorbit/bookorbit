@@ -309,6 +309,13 @@
       "when": 1783549738764,
       "tag": "0043_storygraph_sync_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1783575766119,
+      "tag": "0044_add_published_date",
+      "breakpoints": true
     }
   ]
 }

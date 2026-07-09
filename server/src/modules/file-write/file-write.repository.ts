@@ -195,6 +195,7 @@ export class FileWriteRepository {
       subtitle: meta.subtitle,
       description: meta.description,
       publisher: meta.publisher,
+      publishedDate: meta.publishedDate,
       publishedYear: meta.publishedYear,
       language: meta.language,
       pageCount: meta.pageCount,

@@ -1,13 +1,10 @@
 import { ComicMetadataFields, MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
+import { parsePublishedDateKey, parsePublishedYear, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
 import { ComicVineIssue, ComicVinePersonCredit } from './comicvine.types';
 
 function parseYear(dateStr: string | null | undefined): number | undefined {
-  if (!dateStr) return undefined;
-  const yearToken = dateStr.substring(0, 4);
-  if (!/^\d{4}$/.test(yearToken)) return undefined;
-  const year = parseInt(yearToken, 10);
-  return Number.isNaN(year) ? undefined : year;
+  return parsePublishedYear(dateStr ?? undefined);
 }
 
 function parseSeriesIndex(issueNumber: string): number | undefined {
@@ -45,6 +42,8 @@ function buildTitle(issue: ComicVineIssue): string {
 
 export function mapIssueToCandidate(issue: ComicVineIssue): MetadataCandidate {
   const writers = extractByRole(issue.person_credits ?? [], 'writer');
+  const rawPublishedDate = issue.cover_date ?? issue.store_date;
+  const publishedDate = parsePublishedDateKey(rawPublishedDate ?? undefined);
 
   return {
     provider: MetadataProviderKey.COMICVINE,
@@ -53,7 +52,8 @@ export function mapIssueToCandidate(issue: ComicVineIssue): MetadataCandidate {
     subtitle: issue.name ?? undefined,
     authors: writers,
     description: issue.description ?? issue.deck ?? undefined,
-    publishedYear: parseYear(issue.cover_date ?? issue.store_date),
+    publishedDate,
+    publishedYear: publishedDate ? publishedYearFromDateKey(publishedDate) : parseYear(rawPublishedDate),
     seriesName: issue.volume.name,
     seriesIndex: parseSeriesIndex(issue.issue_number),
     coverUrl: issue.image?.original_url,

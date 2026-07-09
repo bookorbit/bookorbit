@@ -10,6 +10,7 @@ export interface BookDockMetadata {
   narrators?: string[];
   description?: string;
   publisher?: string;
+  publishedDate?: string;
   publishedYear?: number;
   language?: string;
   pageCount?: number;

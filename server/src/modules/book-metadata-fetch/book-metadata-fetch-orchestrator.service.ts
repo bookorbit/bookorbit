@@ -3,6 +3,7 @@ import type { BookMetadataFetchReason, MetadataField } from '@bookorbit/types';
 import { MetadataProviderKey, NotificationType } from '@bookorbit/types';
 import { NotificationService } from '../notification/notification.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
 import { BookReadService } from '../book/book-read.service';
 import * as schema from '../../db/schema';
 import { MetadataScoreService } from '../metadata-score/metadata-score.service';
@@ -267,8 +268,18 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     if (description !== undefined) scalarFields.description = description;
     const publisher = this.asNullableString(filteredResolved.publisher);
     if (publisher !== undefined) scalarFields.publisher = publisher;
+    const publishedDate = this.asNullablePublishedDate(filteredResolved.publishedDate);
+    if (publishedDate !== undefined) {
+      scalarFields.publishedDate = publishedDate;
+      if (publishedDate !== null) scalarFields.publishedYear = publishedYearFromDateKey(publishedDate);
+    }
     const publishedYear = this.asNullableNumber(filteredResolved.publishedYear);
-    if (publishedYear !== undefined) scalarFields.publishedYear = publishedYear;
+    if (publishedYear !== undefined && publishedDate === undefined) {
+      scalarFields.publishedDate = null;
+      scalarFields.publishedYear = publishedYear;
+    } else if (publishedYear !== undefined && publishedDate === null) {
+      scalarFields.publishedYear = publishedYear;
+    }
     const language = this.asNullableString(filteredResolved.language);
     if (language !== undefined) scalarFields.language = language;
     const pageCount = this.asNullableNumber(filteredResolved.pageCount);
@@ -458,6 +469,13 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     if (value === undefined) return undefined;
     if (value === null) return null;
     return typeof value === 'string' ? value : undefined;
+  }
+
+  private asNullablePublishedDate(value: unknown): string | null | undefined {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    if (typeof value !== 'string') return undefined;
+    return normalizePublishedDate(value) ?? undefined;
   }
 
   private asNullableNumber(value: unknown): number | null | undefined {

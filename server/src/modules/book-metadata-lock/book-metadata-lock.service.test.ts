@@ -176,6 +176,42 @@ describe('BookMetadataLockService', () => {
     });
   });
 
+  it('uses the publishedYear lock for publishedDate updates', async () => {
+    const { service } = makeService(['publishedYear']);
+
+    const automated = await service.filterAutomatedBookUpdate(12, {
+      publishedDate: '1965-08-01',
+      publishedYear: 1965,
+      title: 'Allowed',
+    });
+
+    expect(automated).toEqual({
+      dto: { title: 'Allowed' },
+      skippedFields: ['publishedYear'],
+    });
+    await expect(service.assertManualUpdateAllowed(12, { publishedDate: '1965-08-01' })).rejects.toThrow(ConflictException);
+  });
+
+  it('filters resolved publishedDate with the publishedYear lock', async () => {
+    const { service } = makeService(['publishedYear']);
+
+    await expect(
+      service.filterResolvedMetadata(
+        12,
+        {
+          publishedDate: '1965-08-01',
+          publishedYear: 1965,
+          publisher: 'Allowed Publisher',
+        },
+        {},
+      ),
+    ).resolves.toEqual({
+      resolved: { publisher: 'Allowed Publisher' },
+      providerIds: {},
+      skippedFields: ['publishedYear'],
+    });
+  });
+
   it('propagates repository errors', async () => {
     const lockRepo = {
       findLockedFields: vi.fn().mockRejectedValue(new Error('db failure')),

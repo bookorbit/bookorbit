@@ -55,6 +55,7 @@ export interface KoboBookEntry {
   authors: string[];
   description: string | null;
   publisher: string | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   seriesName: string | null;
@@ -588,7 +589,11 @@ export class KoboSyncService {
     const id = book.koboEntitlementId;
     const downloadUrl = `${baseUrl}/api/v1/kobo/${deviceToken}/v1/books/${id}/download`;
     const slug = book.title ? book.title.toLowerCase().replace(/[^a-z0-9]/g, '-') : id;
-    const publicationDate = book.publishedYear ? new Date(Date.UTC(book.publishedYear, 0, 1)).toISOString() : null;
+    const publicationDate = book.publishedDate
+      ? `${book.publishedDate}T00:00:00.000Z`
+      : book.publishedYear
+        ? new Date(Date.UTC(book.publishedYear, 0, 1)).toISOString()
+        : null;
     const publisher = book.publisher ? { Name: book.publisher, Imprint: book.publisher } : null;
     const series = book.seriesName
       ? {
@@ -844,6 +849,7 @@ export class KoboSyncService {
         title: schema.bookMetadata.title,
         description: schema.bookMetadata.description,
         publisher: schema.bookMetadata.publisher,
+        publishedDate: schema.bookMetadata.publishedDate,
         publishedYear: schema.bookMetadata.publishedYear,
         language: schema.bookMetadata.language,
         seriesName: schema.bookMetadata.seriesName,
@@ -915,6 +921,7 @@ export class KoboSyncService {
         authors,
         description: row.description,
         publisher: row.publisher,
+        publishedDate: row.publishedDate,
         publishedYear: row.publishedYear,
         language: row.language,
         seriesName: row.seriesName,

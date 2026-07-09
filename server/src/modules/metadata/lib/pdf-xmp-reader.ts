@@ -2,12 +2,14 @@ import { XMLParser } from 'fast-xml-parser';
 import { decodePDFRawStream, PDFDocument, PDFName, PDFRawStream, PDFRef } from 'pdf-lib';
 
 import { BOOKORBIT_NS_PREFIX } from '../../../common/bookorbit-ns';
+import { parsePublishedDateKey, parsePublishedYear } from '../../../common/utils/published-date.utils';
 
 export interface XmpParsed {
   title: string | null;
   subtitle: string | null;
   description: string | null;
   publisher: string | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   authors: { name: string; sortName: string | null }[];
@@ -119,9 +121,7 @@ function num(val: unknown): number | null {
 
 function parseYear(val: unknown): number | null {
   const t = getText(val);
-  if (!t) return null;
-  const m = t.match(/^(\d{4})/);
-  return m ? parseInt(m[1], 10) : null;
+  return parsePublishedYear(t) ?? null;
 }
 
 export function parseXmp(xmpXml: string): XmpParsed | null {
@@ -154,6 +154,7 @@ export function parseXmp(xmpXml: string): XmpParsed | null {
     subtitle: str(merged[`${px}:subtitle`]),
     description: str(merged['dc:description']),
     publisher: str(merged['dc:publisher']),
+    publishedDate: parsePublishedDateKey(getText(merged['dc:date'])) ?? null,
     publishedYear: parseYear(merged['dc:date']),
     language: str(merged['dc:language']),
     authors: getList(merged['dc:creator']).map((name) => ({ name, sortName: null })),

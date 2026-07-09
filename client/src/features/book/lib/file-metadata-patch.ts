@@ -6,6 +6,7 @@ const FILE_METADATA_PATCH_FIELDS = [
   'subtitle',
   'description',
   'publisher',
+  'publishedDate',
   'publishedYear',
   'language',
   'pageCount',

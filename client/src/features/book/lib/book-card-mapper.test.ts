@@ -11,16 +11,26 @@ function makeBook(overrides: Partial<BookCard> = {}): BookCard {
     genres: [],
     files: [],
     narrators: [],
+    tags: [],
     customMetadata: [],
     seriesName: null,
     seriesIndex: null,
     seriesMemberships: [],
+    publishedDate: null,
+    publishedYear: null,
+    language: null,
+    publisher: null,
+    pageCount: null,
+    isbn13: null,
+    addedAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: null,
+    readingProgress: null,
+    readStatus: null,
     rating: null,
     metadataScore: null,
     hasCover: false,
     hasMetadataLocks: false,
     lockedFields: [],
-    readStatus: null,
     status: null,
     ...overrides,
   } as BookCard
@@ -40,6 +50,7 @@ function makeDetail(overrides: Partial<BookDetail> = {}): BookDetail {
     isbn10: null,
     isbn13: null,
     publisher: null,
+    publishedDate: null,
     publishedYear: null,
     language: null,
     pageCount: null,
@@ -77,6 +88,7 @@ describe('mergeBookCardWithDetail', () => {
       subtitle: 'A Subtitle',
       isbn13: '9781234567890',
       publisher: 'Pub House',
+      publishedDate: '2021-02-03',
       publishedYear: 2021,
       language: 'en',
       pageCount: 350,
@@ -95,6 +107,7 @@ describe('mergeBookCardWithDetail', () => {
     expect(result.subtitle).toBe('A Subtitle')
     expect(result.isbn13).toBe('9781234567890')
     expect(result.publisher).toBe('Pub House')
+    expect(result.publishedDate).toBe('2021-02-03')
     expect(result.publishedYear).toBe(2021)
     expect(result.language).toBe('en')
     expect(result.pageCount).toBe(350)

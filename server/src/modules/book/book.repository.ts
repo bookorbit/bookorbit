@@ -56,6 +56,7 @@ type CollapsedRawRow = {
   series_id: number | null;
   series_name: string | null;
   series_index: number | null;
+  published_date: string | null;
   published_year: number | null;
   language: string | null;
   rating: number | null;
@@ -84,6 +85,7 @@ type PatternMetadataRow = {
   title: string | null;
   subtitle: string | null;
   publisher: string | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   seriesId: number | null;
@@ -161,6 +163,7 @@ export class BookRepository {
         seriesId: bookMetadata.seriesId,
         seriesName: bookMetadata.seriesName,
         seriesIndex: bookMetadata.seriesIndex,
+        publishedDate: bookMetadata.publishedDate,
         publishedYear: bookMetadata.publishedYear,
         language: bookMetadata.language,
         rating: userBookRatings.rating,
@@ -351,6 +354,7 @@ export class BookRepository {
       seriesName: string | null;
       seriesId: number | null;
       seriesIndex: number | null;
+      publishedDate: string | null;
       publishedYear: number | null;
       language: string | null;
       rating: number | null;
@@ -408,6 +412,7 @@ export class BookRepository {
           book_metadata.series_id,
           book_metadata.series_name,
           book_metadata.series_index,
+          book_metadata.published_date,
           book_metadata.published_year,
           book_metadata.language,
           book_metadata.cover_source,
@@ -538,6 +543,7 @@ export class BookRepository {
           base.series_id,
           base.series_name,
           base.series_index,
+          base.published_date,
           base.published_year,
           base.language,
           ubr.rating,
@@ -603,6 +609,7 @@ export class BookRepository {
       seriesId: r.series_id,
       seriesName: r.series_name,
       seriesIndex: r.series_index,
+      publishedDate: r.published_date,
       publishedYear: r.published_year,
       language: r.language,
       rating: r.rating,
@@ -672,6 +679,7 @@ export class BookRepository {
           book_metadata.series_id,
           book_metadata.series_name,
           book_metadata.series_index,
+          book_metadata.published_date,
           book_metadata.published_year,
           book_metadata.publisher,
           book_metadata.page_count,
@@ -695,6 +703,7 @@ export class BookRepository {
           base.primary_file_id,
           base.updated_at,
           base.series_index,
+          base.published_date,
           base.published_year,
           base.publisher,
           base.page_count,
@@ -1144,6 +1153,7 @@ export class BookRepository {
           title: bookMetadata.title,
           subtitle: bookMetadata.subtitle,
           publisher: bookMetadata.publisher,
+          publishedDate: bookMetadata.publishedDate,
           publishedYear: bookMetadata.publishedYear,
           language: bookMetadata.language,
           seriesId: bookMetadata.seriesId,

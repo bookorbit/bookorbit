@@ -54,6 +54,7 @@ export type BookCard = {
   seriesIndex: number | null;
   seriesMemberships?: BookSeriesMembership[];
   files: BookFileRef[];
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   genres: string[];
@@ -126,6 +127,7 @@ export type BookDetail = {
   isbn10: string | null;
   isbn13: string | null;
   publisher: string | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   pageCount: number | null;
@@ -169,6 +171,7 @@ export type BookMetadataRefreshPreviewFields = {
   authors?: string[];
   genres?: string[];
   publisher?: string | null;
+  publishedDate?: string | null;
   publishedYear?: number | null;
   language?: string | null;
   pageCount?: number | null;

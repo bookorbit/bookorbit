@@ -31,6 +31,7 @@ function makeBook(overrides = {}) {
     isbn10: null,
     isbn13: null,
     publisher: null,
+    publishedDate: null,
     publishedYear: null,
     language: null,
     pageCount: null,

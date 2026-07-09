@@ -19,6 +19,11 @@ describe("jumpBucketKindForSort", () => {
     expect(jumpBucketKindForSort([{ field: "publishedYear", dir: "desc" }])).toBe("year");
   });
 
+  it("returns year for publishedDate sorts", () => {
+    expect(jumpBucketKindForSort([{ field: "publishedDate", dir: "asc" }])).toBe("year");
+    expect(jumpBucketKindForSort([{ field: "publishedDate", dir: "desc" }])).toBe("year");
+  });
+
   it("returns letter for an empty sort (defaults to title asc)", () => {
     expect(jumpBucketKindForSort([])).toBe("letter");
   });

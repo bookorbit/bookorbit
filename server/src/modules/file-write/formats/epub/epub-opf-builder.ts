@@ -238,9 +238,9 @@ function buildFreshMetadata(payload: BookWritePayload, epubVersion: 3 | 2, uidNo
     nodes.push(makeTextNode('dc:publisher', payload.publisher));
   }
 
-  // dc:date
-  if (payload.publishedYear != null) {
-    nodes.push(makeTextNode('dc:date', `${payload.publishedYear}-01-01`));
+  const publicationDate = resolvePublicationDate(payload);
+  if (publicationDate != null) {
+    nodes.push(makeTextNode('dc:date', publicationDate));
   }
 
   // dc:language
@@ -391,3 +391,9 @@ export function build(opfXml: string, payload: BookWritePayload): { newOpfXml: s
 
 type EpubProviderIdentifierKey = keyof typeof EPUB_PROVIDER_IDENTIFIER_SCHEMES;
 const EPUB_PROVIDER_IDENTIFIER_KEYS = Object.keys(EPUB_PROVIDER_IDENTIFIER_SCHEMES) as EpubProviderIdentifierKey[];
+
+function resolvePublicationDate(payload: BookWritePayload): string | null {
+  if (payload.publishedDate != null && payload.publishedDate !== '') return payload.publishedDate;
+  if (payload.publishedYear != null) return `${payload.publishedYear}-01-01`;
+  return null;
+}

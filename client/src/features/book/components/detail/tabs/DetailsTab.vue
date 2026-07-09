@@ -1910,7 +1910,7 @@ watch(
         </div>
         <div>
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Published</dt>
-          <dd class="text-sm text-foreground mt-0.5">{{ book.publishedYear || '-' }}</dd>
+          <dd class="text-sm text-foreground mt-0.5">{{ book.publishedDate ? formatDisplayDate(book.publishedDate) : book.publishedYear || '-' }}</dd>
         </div>
         <div>
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Language</dt>

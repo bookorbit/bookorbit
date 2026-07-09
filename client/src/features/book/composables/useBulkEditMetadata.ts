@@ -145,6 +145,7 @@ function applyOptimisticUpdates(fields: BulkEditFields, ids: number[], books: Re
       updated.language = fields.language.value
     }
     if (fields.publishedYear !== undefined) {
+      updated.publishedDate = null
       updated.publishedYear = fields.publishedYear.value
     }
     if (fields.authors?.mode === 'replace') {

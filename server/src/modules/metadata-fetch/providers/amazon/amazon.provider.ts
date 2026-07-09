@@ -81,6 +81,7 @@ export class AmazonProvider implements IdentifiableProvider {
       isbn13: data.isbn13,
       isbn10: data.isbn10,
       publisher: data.publisher,
+      publishedDate: data.publishedDate,
       publishedYear: data.publishedYear,
       language: data.language,
       pageCount: data.pageCount,

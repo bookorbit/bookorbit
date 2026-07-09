@@ -138,6 +138,8 @@ export class BookQueryBuilder {
           : this.textRuleToSql(bookMetadata.language, operator, value as string);
       case 'series':
         return this.seriesRuleToSql(operator, value as string | string[] | undefined);
+      case 'publishedDate':
+        return this.publishedDateRuleToSql(operator, value as string | number, valueTo as string | number | undefined, timeZone);
       case 'publishedYear':
         return this.numericRuleToSql(bookMetadata.publishedYear, operator, value as number, valueTo as number | undefined);
       case 'seriesIndex':
@@ -586,6 +588,32 @@ export class BookQueryBuilder {
     }
   }
 
+  private publishedDateRuleToSql(operator: string, value: string | number | undefined, valueTo: string | number | undefined, timeZone: string): SQL {
+    const dateExpr = sql`coalesce(${bookMetadata.publishedDate}, make_date(${bookMetadata.publishedYear}, 1, 1))`;
+    switch (operator) {
+      case 'before':
+        return sql`${dateExpr} < ${this.parseDateKey(value, operator, 'value', timeZone)}::date`;
+      case 'after':
+        return sql`${dateExpr} > ${this.parseDateKey(value, operator, 'value', timeZone)}::date`;
+      case 'between':
+        return sql`${dateExpr} >= ${this.parseDateKey(value, operator, 'value', timeZone)}::date and ${dateExpr} <= ${this.parseDateKey(valueTo, operator, 'valueTo', timeZone)}::date`;
+      case 'withinLast': {
+        const days = typeof value === 'string' ? Number(value) : value;
+        this.assertNumber(days, operator, 'value');
+        if (days! < 0) throw new BadRequestException(`Operator '${operator}' requires a non-negative value`);
+        const wholeDays = Math.floor(days!);
+        const shiftDays = wholeDays > 0 ? wholeDays - 1 : 0;
+        return sql`${dateExpr} >= (timezone(${timeZone}, now())::date - ${shiftDays}::int)`;
+      }
+      case 'isEmpty':
+        return and(isNull(bookMetadata.publishedDate), isNull(bookMetadata.publishedYear))!;
+      case 'isNotEmpty':
+        return or(isNotNull(bookMetadata.publishedDate), isNotNull(bookMetadata.publishedYear))!;
+      default:
+        throw new BadRequestException(`Invalid operator '${operator}' for publishedDate field`);
+    }
+  }
+
   private readStatusDateExpr(field: 'startedAt' | 'finishedAt', userId: number, timeZone: string): SQL {
     const column = field === 'startedAt' ? userBookStatus.startedAt : userBookStatus.finishedAt;
     return sql`(SELECT (${column} AT TIME ZONE ${timeZone})::date FROM ${userBookStatus} WHERE ${userBookStatus.bookId} = ${books.id} AND ${userBookStatus.userId} = ${userId})`;
@@ -917,6 +945,9 @@ export class BookQueryBuilder {
           break;
         case 'publishedYear':
           parts.push(`published_year ${D} NULLS LAST`);
+          break;
+        case 'publishedDate':
+          parts.push(`coalesce(published_date, make_date(published_year, 1, 1)) ${D} NULLS LAST`);
           break;
         case 'rating':
           parts.push(`rating ${D} NULLS LAST`);

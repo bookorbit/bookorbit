@@ -397,6 +397,7 @@ describe('BookDockMetadataService', () => {
       title: 'Mobi Title',
       description: 'Mobi Desc',
       publisher: 'Mobi Pub',
+      publishedDate: '1999-01-01',
       publishedYear: 1999,
       language: 'en',
       isbn13: '9780306406157',

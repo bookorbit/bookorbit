@@ -102,6 +102,7 @@ const USER_CTX = { accessibleLibraryIds: [1] as number[], userId: 10 };
  */
 function buildValueFor(operator: RuleOperator, field: RuleField): { value?: unknown; valueTo?: unknown } {
   const numericFields: RuleField[] = ['publishedYear', 'seriesIndex', 'pageCount', 'rating', 'communityRating', 'metadataScore'];
+  const dateFields: RuleField[] = ['publishedDate', 'addedAt', 'startedAt', 'finishedAt'];
   const isNumericField = numericFields.includes(field);
 
   switch (operator) {
@@ -130,9 +131,7 @@ function buildValueFor(operator: RuleOperator, field: RuleField): { value?: unkn
     case 'lte':
       return { value: 10 };
     case 'between':
-      return field === 'addedAt' || field === 'startedAt' || field === 'finishedAt'
-        ? { value: '2023-01-01', valueTo: '2023-12-31' }
-        : { value: 10, valueTo: 20 };
+      return dateFields.includes(field) ? { value: '2023-01-01', valueTo: '2023-12-31' } : { value: 10, valueTo: 20 };
     case 'before':
     case 'after':
       return { value: '2023-01-01' };
@@ -1090,6 +1089,37 @@ describe('dateRuleToSql (addedAt)', () => {
   });
 });
 
+describe('publishedDateRuleToSql', () => {
+  it('filters against full dates with published year fallback', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(
+      wrapRule({ type: 'rule', field: 'publishedDate', operator: 'before', value: '1970-01-01' }) as never,
+      BASE_CTX,
+    ) as any;
+
+    const clause = getRuleSql(where);
+    expect(clause).toMatchObject({ type: 'sql' });
+    expect(collectSqlText(clause).join(' ')).toContain('coalesce(');
+    expect(collectSqlText(clause).join(' ')).toContain('make_date(');
+    expect(clause.values[1]).toBe('1970-01-01');
+  });
+
+  it('treats publishedDate as empty only when both full date and year are missing', () => {
+    const { builder } = makeBuilder();
+    const emptyWhere = builder.buildWhere(wrapRule({ type: 'rule', field: 'publishedDate', operator: 'isEmpty' }) as never, BASE_CTX) as any;
+    const notEmptyWhere = builder.buildWhere(wrapRule({ type: 'rule', field: 'publishedDate', operator: 'isNotEmpty' }) as never, BASE_CTX) as any;
+
+    expect(getRuleSql(emptyWhere)).toMatchObject({
+      type: 'and',
+      clauses: [{ type: 'isNull' }, { type: 'isNull' }],
+    });
+    expect(getRuleSql(notEmptyWhere)).toMatchObject({
+      type: 'or',
+      clauses: [{ type: 'isNotNull' }, { type: 'isNotNull' }],
+    });
+  });
+});
+
 describe('read status date filters (startedAt / finishedAt)', () => {
   it('requires an authenticated user', () => {
     const { builder } = makeBuilder();
@@ -1492,6 +1522,12 @@ describe('BookQueryBuilder.buildCollapseOrderBy', () => {
 
   it('generates publishedYear sort', () => {
     expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'publishedYear', dir: 'asc' }], 1)).toBe('published_year ASC NULLS LAST, r.id ASC');
+  });
+
+  it('generates publishedDate sort with year fallback', () => {
+    expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'publishedDate', dir: 'desc' }], 1)).toBe(
+      'coalesce(published_date, make_date(published_year, 1, 1)) DESC NULLS LAST, r.id ASC',
+    );
   });
 
   it('generates rating sort', () => {
