@@ -51,7 +51,14 @@ export class OpdsPageCountService {
       return null;
     }
 
-    await this.db.update(bookFiles).set({ pageCount: count }).where(eq(bookFiles.id, file.id));
+    try {
+      await this.db.update(bookFiles).set({ pageCount: count }).where(eq(bookFiles.id, file.id));
+    } catch (error) {
+      // Persistence is just a cache: if the write fails, the count is still
+      // recomputed correctly next time. Don't let a DB hiccup break feed rendering.
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.logger.warn(`[opds.pse_page_count] [persist_fail] fileId=${file.id} error="${err.message}" - count computed but not cached`);
+    }
     return count;
   }
 }

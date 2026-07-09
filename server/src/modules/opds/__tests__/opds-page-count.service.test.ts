@@ -58,4 +58,12 @@ describe('OpdsPageCountService', () => {
     await expect(service.ensure({ id: 7, format: 'cbr', absolutePath: '/a.cbr', pageCount: null })).resolves.toBeNull();
     expect(update).not.toHaveBeenCalled();
   });
+
+  it('still returns the computed count when persisting it fails', async () => {
+    mockCountComicPages.mockResolvedValue(18);
+    const { service, where } = makeService();
+    where.mockRejectedValue(new Error('db unavailable'));
+
+    await expect(service.ensure({ id: 5, format: 'cbz', absolutePath: '/a.cbz', pageCount: null })).resolves.toBe(18);
+  });
 });
