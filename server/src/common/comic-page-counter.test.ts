@@ -56,20 +56,44 @@ describe('countComicPages', () => {
     await expect(countComicPages(2, '/books/b.cbr', 'cbr')).resolves.toBe(2);
   });
 
-  it('counts image files extracted from a cb7 archive', async () => {
+  it('counts image files extracted from a cb7 archive, recursing into subdirectories and skipping hidden ones', async () => {
+    // In-memory tree simulating the extracted archive's directory structure, so
+    // the walk can be exercised the same way it would against the real WASM FS.
+    const tree: Record<string, string[] | 'file'> = {
+      '/countOut3': ['page1.jpg', 'vol1', '.hidden', 'notes.txt'],
+      '/countOut3/page1.jpg': 'file',
+      '/countOut3/vol1': ['page2.jpg', 'page3.png'],
+      '/countOut3/vol1/page2.jpg': 'file',
+      '/countOut3/vol1/page3.png': 'file',
+      '/countOut3/.hidden': ['page99.jpg'],
+      '/countOut3/.hidden/page99.jpg': 'file',
+      '/countOut3/notes.txt': 'file',
+    };
     const write = vi.fn();
     const open = vi.fn().mockReturnValue(1);
     const close = vi.fn();
     const unlink = vi.fn();
     const rmdir = vi.fn();
     const mkdir = vi.fn();
-    const readdir = vi.fn().mockReturnValue(['.', '..', 'page1.jpg', 'page2.jpg', 'notes.txt']);
+    const readdir = vi.fn().mockImplementation((path: string) => {
+      const entry = tree[path];
+      return Array.isArray(entry) ? entry : [];
+    });
+    const stat = vi.fn().mockImplementation((path: string) => ({ mode: tree[path] === 'file' ? 0o100000 : 0o040000 }));
+    const isDir = vi.fn().mockImplementation((mode: number) => mode === 0o040000);
     mockReadFile.mockResolvedValue(Buffer.from('7z-bytes'));
     mockGetSevenZip.mockResolvedValue({
-      FS: { open, write, close, mkdir, readdir, readFile: vi.fn(), unlink, rmdir },
+      FS: { open, write, close, mkdir, readdir, readFile: vi.fn(), unlink, rmdir, stat, isDir },
       callMain: vi.fn(),
     });
 
-    await expect(countComicPages(3, '/books/c.cb7', 'cb7')).resolves.toBe(2);
+    // page1.jpg + vol1/page2.jpg + vol1/page3.png = 3; notes.txt is not an image
+    // and .hidden/page99.jpg is skipped because .hidden is a hidden directory.
+    await expect(countComicPages(3, '/books/c.cb7', 'cb7')).resolves.toBe(3);
+    expect(unlink).toHaveBeenCalledWith('/countOut3/page1.jpg');
+    expect(unlink).toHaveBeenCalledWith('/countOut3/vol1/page2.jpg');
+    expect(unlink).toHaveBeenCalledWith('/countOut3/.hidden/page99.jpg');
+    expect(rmdir).toHaveBeenCalledWith('/countOut3/vol1');
+    expect(rmdir).toHaveBeenCalledWith('/countOut3/.hidden');
   });
 });

@@ -4,7 +4,7 @@ import { createExtractorFromData } from 'node-unrar-js';
 import { detectComicContainerFormat, type ComicContainerFormat } from './comic-format-detect';
 import { isHiddenPage, isImagePage } from './comic-page-utils';
 import { readCbzZipIndex } from './cbz-zip-reader';
-import { getSevenZip } from './sevenzip';
+import { getSevenZip, type SevenZipFS } from './sevenzip';
 
 // Buffer.buffer is a shared pool; slice out only the bytes for this buffer.
 function toArrayBuffer(buf: Buffer): ArrayBuffer {
@@ -35,6 +35,36 @@ async function countCbrPages(absolutePath: string): Promise<number> {
   return count;
 }
 
+// Recursively counts image-page entries under `dir`, skipping hidden directories
+// (e.g. __MACOSX) entirely rather than just filtering their files by name.
+function countImagePagesRecursive(fs: SevenZipFS, dir: string): number {
+  let count = 0;
+  for (const name of fs.readdir(dir)) {
+    if (name === '.' || name === '..') continue;
+    const path = `${dir}/${name}`;
+    if (fs.isDir(fs.stat(path).mode)) {
+      if (!isHiddenPage(name)) count += countImagePagesRecursive(fs, path);
+    } else if (isImagePage(name) && !isHiddenPage(name)) {
+      count++;
+    }
+  }
+  return count;
+}
+
+// Mirrors countImagePagesRecursive's traversal to remove everything under `dir`.
+function removeRecursive(fs: SevenZipFS, dir: string): void {
+  for (const name of fs.readdir(dir)) {
+    if (name === '.' || name === '..') continue;
+    const path = `${dir}/${name}`;
+    if (fs.isDir(fs.stat(path).mode)) {
+      removeRecursive(fs, path);
+      fs.rmdir(path);
+    } else {
+      fs.unlink(path);
+    }
+  }
+}
+
 async function countCb7Pages(fileId: number, absolutePath: string): Promise<number> {
   const sz = await getSevenZip();
   const archivePath = `/count${fileId}`;
@@ -52,14 +82,14 @@ async function countCb7Pages(fileId: number, absolutePath: string): Promise<numb
   }
 
   try {
-    sz.callMain(['e', archivePath, `-o${outDir}`, '-y']);
-    const files = sz.FS.readdir(outDir);
-    return files.filter((f) => f !== '.' && f !== '..' && isImagePage(f) && !isHiddenPage(f)).length;
+    // `x` preserves the archive's directory structure, unlike `e` (which flattens
+    // everything into outDir and can collide same-named files from different
+    // subdirectories, or miscount extracted dot-directory entries as pages).
+    sz.callMain(['x', archivePath, `-o${outDir}`, '-y']);
+    return countImagePagesRecursive(sz.FS, outDir);
   } finally {
     sz.FS.unlink(archivePath);
-    for (const f of sz.FS.readdir(outDir)) {
-      if (f !== '.' && f !== '..') sz.FS.unlink(`${outDir}/${f}`);
-    }
+    removeRecursive(sz.FS, outDir);
     sz.FS.rmdir(outDir);
   }
 }
