@@ -9,7 +9,7 @@ vi.mock('fs/promises', () => ({
 
 import { createReadStream } from 'fs';
 import { readdir, stat } from 'fs/promises';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import type { MockedFunction } from 'vitest';
 
 import { OpdsController } from './opds.controller';
@@ -378,6 +378,16 @@ describe('OpdsController', () => {
       const { controller, opdsBookService } = makeController();
       await expect(controller.image(1, 10, -1, true, opdsUser, makeReply())).rejects.toThrow(BadRequestException);
       expect(opdsBookService.validateBookAccess).not.toHaveBeenCalled();
+    });
+
+    it('throws UnauthorizedException when the OPDS user has no matching account, without streaming or saving progress', async () => {
+      const { controller, opdsBookService, opdsPageStreamService, userService, bookService } = makeController();
+      opdsBookService.getBookFiles.mockResolvedValue({ id: 10, absolutePath: '/a.cbz', format: 'cbz', pageCount: 20, title: 't', authorName: 'a' });
+      userService.findByIdWithPermissions.mockResolvedValue(null);
+
+      await expect(controller.image(1, 10, 0, true, opdsUser, makeReply())).rejects.toThrow(UnauthorizedException);
+      expect(opdsPageStreamService.streamPage).not.toHaveBeenCalled();
+      expect(bookService.saveProgress).not.toHaveBeenCalled();
     });
 
     it('streams the page, saves progress, and sets long-lived cache headers', async () => {
