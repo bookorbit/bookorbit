@@ -315,21 +315,24 @@ export class OpdsController {
     const user = await this.userService.findByIdWithPermissions(opdsUser.userId);
     if (!user) throw new UnauthorizedException('Account not found');
 
+    let streamed: { stream: NodeJS.ReadableStream; mimeType: string; totalPages: number };
     try {
-      const { stream, mimeType, totalPages } = await this.opdsPageStreamService.streamPage(file, pageNumber, user);
-
-      if (saveProgress) {
-        const percentage = totalPages > 0 ? Math.min(100, ((pageNumber + 1) / totalPages) * 100) : 0;
-        const dto: SaveProgressDto = { pageNumber, percentage };
-        await this.bookService.saveProgress(opdsUser.userId, fileId, dto, user);
-      }
-
-      reply.header('Cache-Control', 'private, max-age=31536000, immutable');
-      reply.type(mimeType);
-      reply.send(stream);
+      streamed = await this.opdsPageStreamService.streamPage(file, pageNumber, user);
     } catch (err) {
-      await this.opdsPageStreamService.invalidateCache(file);
+      await this.opdsPageStreamService.invalidateCache(file).catch(() => undefined);
       throw err;
+    }
+
+    reply.header('Cache-Control', 'private, max-age=31536000, immutable');
+    reply.type(streamed.mimeType);
+    reply.send(streamed.stream);
+
+    if (saveProgress) {
+      // Best-effort: the page has already been sent, so a progress-write
+      // failure shouldn't fail the request or invalidate a perfectly good cache.
+      const percentage = streamed.totalPages > 0 ? Math.min(100, ((pageNumber + 1) / streamed.totalPages) * 100) : 0;
+      const dto: SaveProgressDto = { pageNumber, percentage };
+      this.bookService.saveProgress(opdsUser.userId, fileId, dto, user).catch(() => undefined);
     }
   }
 
