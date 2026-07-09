@@ -4,6 +4,7 @@ import {
   DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE,
   DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER,
   EXAMPLE_PATTERN_METADATA,
+  MAX_PATH_SEGMENT_BYTES,
   replacePlaceholders,
   resolveDownloadFilename,
   resolveUploadPath,
@@ -478,6 +479,54 @@ describe('cross-platform sanitization option', () => {
     });
     expect(result).toContain('/');
     expect(result).not.toMatch(/[:"]/);
+  });
+});
+
+describe('path segment byte limits', () => {
+  function expectSegmentsWithinLimit(path: string) {
+    for (const segment of path.split('/').filter(Boolean)) {
+      expect(Buffer.byteLength(segment, 'utf8')).toBeLessThanOrEqual(MAX_PATH_SEGMENT_BYTES);
+    }
+  }
+
+  it('truncates long generated upload path segments and preserves the file extension', () => {
+    const result = resolveUploadPath('{authors}/{title}', { ...FULL, authors: 'A'.repeat(300), title: 'B'.repeat(300) }, 'epub');
+
+    expect(result).not.toBeNull();
+    expectSegmentsWithinLimit(result!);
+    expect(result!.split('/')).toHaveLength(2);
+    expect(result!.endsWith('.epub')).toBe(true);
+    expect(result).toContain('~');
+  });
+
+  it('truncates download filenames before the filesystem segment limit', () => {
+    const result = resolveDownloadFilename('{title}', { ...FULL, title: 'Long Title '.repeat(40) }, 'epub');
+
+    expect(result).not.toBeNull();
+    expect(Buffer.byteLength(result!, 'utf8')).toBeLessThanOrEqual(MAX_PATH_SEGMENT_BYTES);
+    expect(result!.endsWith('.epub')).toBe(true);
+    expect(result).toContain('~');
+  });
+
+  it('does not split multibyte characters while truncating', () => {
+    const result = resolveDownloadFilename('{title}', { ...FULL, title: 'é'.repeat(200) }, 'epub');
+
+    expect(result).not.toBeNull();
+    expect(Buffer.byteLength(result!, 'utf8')).toBeLessThanOrEqual(MAX_PATH_SEGMENT_BYTES);
+    expect(result!.endsWith('.epub')).toBe(true);
+
+    const [stem] = result!.split('~');
+    expect([...stem].every((char) => char === 'é')).toBe(true);
+  });
+
+  it('uses a deterministic suffix so distinct long values do not collapse to the same filename', () => {
+    const prefix = 'Same prefix '.repeat(30);
+    const first = resolveDownloadFilename('{title}', { ...FULL, title: `${prefix}one` }, 'epub');
+    const second = resolveDownloadFilename('{title}', { ...FULL, title: `${prefix}two` }, 'epub');
+
+    expect(first).not.toBe(second);
+    expect(Buffer.byteLength(first!, 'utf8')).toBeLessThanOrEqual(MAX_PATH_SEGMENT_BYTES);
+    expect(Buffer.byteLength(second!, 'utf8')).toBeLessThanOrEqual(MAX_PATH_SEGMENT_BYTES);
   });
 });
 

@@ -60,6 +60,7 @@ function makeController() {
   } as never;
   const bookService = {
     saveProgress: vi.fn(),
+    resolveDownloadFilename: vi.fn().mockResolvedValue('BadTitle - Author.epub'),
   } as never;
   const config = {
     get: vi.fn().mockReturnValue('/books'),
@@ -353,7 +354,10 @@ describe('OpdsController', () => {
 
     await controller.download(99, 0, { userId: 2, isSuperuser: false } as never, reply);
 
-    expect(reply.header).toHaveBeenCalledWith('Content-Disposition', 'attachment; filename="BadTitle - Author.epub"');
+    expect(reply.header).toHaveBeenCalledWith(
+      'Content-Disposition',
+      'attachment; filename="BadTitle - Author.epub"; filename*=UTF-8\'\'BadTitle%20-%20Author.epub',
+    );
     expect(reply.header).toHaveBeenCalledWith('Content-Length', 12345);
     expect(reply.type).toHaveBeenCalledWith('application/epub+zip');
     expect(reply.send).toHaveBeenCalledWith(stream);

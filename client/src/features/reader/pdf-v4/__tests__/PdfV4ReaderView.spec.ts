@@ -45,6 +45,9 @@ vi.mock('../../shared/composables/useReadingSession', () => ({
   }),
 }))
 
+const requestFullscreenMock = vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
+const exitFullscreenMock = vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
+
 vi.mock('@/lib/api', () => ({
   getAccessToken: () => 'test-token-abc',
 }))
@@ -82,13 +85,30 @@ describe('PdfV4ReaderView', () => {
     document.documentElement.className = ''
     localStorage.clear()
     setActivePinia(createPinia())
+    requestFullscreenMock.mockClear()
+    exitFullscreenMock.mockClear()
+    Object.defineProperty(document.documentElement, 'requestFullscreen', {
+      configurable: true,
+      value: requestFullscreenMock,
+    })
+    Object.defineProperty(document, 'exitFullscreen', {
+      configurable: true,
+      value: exitFullscreenMock,
+    })
   })
 
   async function mountComponent() {
     const pinia = createPinia()
     const wrapper = mount(PdfV4ReaderView, {
       props: { bookId: 42, fileId: 101 },
-      global: { plugins: [pinia] },
+      global: {
+        plugins: [pinia],
+        stubs: {
+          Tooltip: { template: '<div><slot /></div>' },
+          TooltipTrigger: { template: '<div><slot /></div>' },
+          TooltipContent: { template: '<div><slot /></div>' },
+        },
+      },
     })
     await flushPromises()
     await nextTick()
@@ -104,6 +124,14 @@ describe('PdfV4ReaderView', () => {
     it('renders viewer only after config is ready', async () => {
       const wrapper = await mountComponent()
       expect(wrapper.find('.mock-pdf-viewer').exists()).toBe(true)
+    })
+
+    it('requests fullscreen from the floating fullscreen control', async () => {
+      const wrapper = await mountComponent()
+      await wrapper.get('button[aria-label="Enter fullscreen"]').trigger('click')
+      await flushPromises()
+
+      expect(requestFullscreenMock).toHaveBeenCalled()
     })
   })
 

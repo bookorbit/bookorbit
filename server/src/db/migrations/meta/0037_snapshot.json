@@ -1,5 +1,5 @@
 {
-  "id": "6c98e844-4dbc-458b-9e05-1e1b3a82c501",
+  "id": "dc639d00-3f3c-4522-bad8-80dd7d52a534",
   "prevId": "9c539320-4049-43a1-a2fa-96ec6b657c7d",
   "version": "7",
   "dialect": "postgresql",
@@ -2890,12 +2890,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "page_count": {
-          "name": "page_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -3070,7 +3064,7 @@
           "tableTo": "books",
           "columnsFrom": ["book_id", "library_folder_id"],
           "columnsTo": ["id", "library_folder_id"],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "cascade"
         }
       },
@@ -3089,10 +3083,6 @@
         "book_files_duration_seconds_nonnegative_chk": {
           "name": "book_files_duration_seconds_nonnegative_chk",
           "value": "\"book_files\".\"duration_seconds\" is null or \"book_files\".\"duration_seconds\" >= 0"
-        },
-        "book_files_page_count_nonnegative_chk": {
-          "name": "book_files_page_count_nonnegative_chk",
-          "value": "\"book_files\".\"page_count\" is null or \"book_files\".\"page_count\" >= 0"
         }
       },
       "isRLSEnabled": false

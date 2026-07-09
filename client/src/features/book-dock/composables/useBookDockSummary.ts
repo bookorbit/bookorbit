@@ -3,7 +3,7 @@ import { io, Socket } from 'socket.io-client'
 import { api, getAccessToken } from '@/lib/api'
 import type { BookDockSummary } from '@bookorbit/types'
 
-const summary = ref<BookDockSummary>({ pending: 0, ready: 0, error: 0, total: 0 })
+const summary = ref<BookDockSummary>({ pending: 0, ready: 0, error: 0, total: 0, paused: false })
 const loading = ref(false)
 const socketConnected = ref(true)
 let socket: Socket | null = null

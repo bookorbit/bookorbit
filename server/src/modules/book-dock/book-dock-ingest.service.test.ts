@@ -24,6 +24,7 @@ function makeService(bookDockPath = '/books/book-dock') {
     create: vi.fn(),
     findById: vi.fn(),
     findByAbsolutePath: vi.fn().mockResolvedValue(null),
+    findSelectionBatch: vi.fn(),
     update: vi.fn(),
     countsByStatus: vi.fn().mockResolvedValue({}),
   };
@@ -52,6 +53,11 @@ function makeService(bookDockPath = '/books/book-dock') {
 
   const metadataFetchPipeline = {};
 
+  const processingState = {
+    isPaused: vi.fn().mockResolvedValue(false),
+    getCachedPaused: vi.fn().mockReturnValue(false),
+  };
+
   const gateway = {
     emitSummary: vi.fn(),
   };
@@ -65,10 +71,11 @@ function makeService(bookDockPath = '/books/book-dock') {
     events as never,
     appSettings as never,
     metadataFetchPipeline as never,
+    processingState as never,
     gateway as never,
   );
 
-  return { service, repo, validator, storage, metadataService, events, appSettings, metadataFetchPipeline, gateway };
+  return { service, repo, validator, storage, metadataService, events, appSettings, metadataFetchPipeline, processingState, gateway };
 }
 
 describe('BookDockIngestService', () => {
@@ -99,6 +106,16 @@ describe('BookDockIngestService', () => {
     expect(mkdir).toHaveBeenCalledWith('/books/bookdrop', { recursive: true });
     expect(realpath).toHaveBeenCalledWith('/books/bookdrop');
     expect((service as any).bookDockPath).toBe('/real/books/bookdrop');
+  });
+
+  it('pauses metadata queue on bootstrap when Book Dock is paused', async () => {
+    const { service, processingState } = makeService();
+    processingState.isPaused.mockResolvedValue(true);
+    const pauseSpy = vi.spyOn((service as any).metadataQueue, 'pause');
+
+    await service.onApplicationBootstrap();
+
+    expect(pauseSpy).toHaveBeenCalledTimes(1);
   });
 
   describe('ingestUpload', () => {
@@ -479,6 +496,50 @@ describe('BookDockIngestService', () => {
     expect(repo.update).toHaveBeenCalledWith(12, { status: 'extracting' });
     expect(emitSummarySpy).toHaveBeenCalledTimes(2);
     expect(events.emit).toHaveBeenCalledWith('book-dock.file.ingested', 12);
+  });
+
+  it('processMetadataJob stops before loading rows when processing is paused', async () => {
+    const { service, repo, processingState } = makeService();
+    processingState.isPaused.mockResolvedValue(true);
+    const pauseSpy = vi.spyOn((service as any).metadataQueue, 'pause');
+
+    await (service as any).processMetadataJob(15);
+
+    expect(pauseSpy).toHaveBeenCalledTimes(1);
+    expect(repo.findById).not.toHaveBeenCalled();
+  });
+
+  it('requeueProcessableFiles batches unfinished rows and skips ready rows', async () => {
+    const { service, repo } = makeService();
+    repo.findSelectionBatch
+      .mockResolvedValueOnce([
+        { id: 1, status: 'pending', format: 'epub', absolutePath: '/bucket/1.epub' },
+        { id: 2, status: 'extracting', format: 'epub', absolutePath: '/bucket/2.epub' },
+        { id: 3, status: 'ready', format: 'epub', absolutePath: '/bucket/3.epub' },
+      ])
+      .mockResolvedValueOnce([]);
+    const enqueueSpy = vi.spyOn((service as any).metadataQueue, 'enqueue').mockReturnValue(true);
+
+    await expect(service.requeueProcessableFiles()).resolves.toBe(2);
+
+    expect(repo.findSelectionBatch).toHaveBeenCalledWith({
+      limit: 500,
+      afterId: undefined,
+      status: 'pending',
+      userId: 0,
+      isSuperuser: true,
+    });
+    expect(enqueueSpy).toHaveBeenCalledWith(1, { primary: 1, secondary: 1 });
+    expect(enqueueSpy).toHaveBeenCalledWith(2, { primary: 2, secondary: 2 });
+  });
+
+  it('requeueProcessableFiles does no work while paused', async () => {
+    const { service, repo, processingState } = makeService();
+    processingState.isPaused.mockResolvedValue(true);
+
+    await expect(service.requeueProcessableFiles()).resolves.toBe(0);
+
+    expect(repo.findSelectionBatch).not.toHaveBeenCalled();
   });
 
   it('runs metadata extraction jobs newest first and one at a time', async () => {

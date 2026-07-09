@@ -698,6 +698,7 @@ function CatalogBulkDownload.install(Catalog)
     end
 
     function Catalog:bulkDownloadFile(ctx, detail, file, local_path)
+        local filename = local_path:match("[^/]+$") or safeFilenameBase(detail)
         local total = file.sizeBytes
         local last_bucket = -1
         local function on_progress(received)
@@ -706,17 +707,17 @@ function CatalogBulkDownload.install(Catalog)
                 local pct = math.min(100, math.floor(received / total * 100))
                 bucket = math.floor(pct / 5)
                 if bucket == last_bucket then return end
-                text = T(_("Downloading %1/%2... %3"), ctx.index, ctx.total, pct .. "%")
+                text = T(_("Downloading %1/%2:\n%3\n\n%4"), ctx.index, ctx.total, filename, pct .. "%")
             else
                 bucket = math.floor(received / (256 * 1024))
                 if bucket == last_bucket then return end
-                text = T(_("Downloading %1/%2... %3"), ctx.index, ctx.total, formatBytes(received))
+                text = T(_("Downloading %1/%2:\n%3\n\n%4"), ctx.index, ctx.total, filename, formatBytes(received))
             end
             last_bucket = bucket
             self:bulkSetProgress(ctx, text, true)
         end
 
-        self:bulkSetProgress(ctx, T(_("Downloading %1/%2..."), ctx.index, ctx.total), true)
+        self:bulkSetProgress(ctx, T(_("Downloading %1/%2:\n%3"), ctx.index, ctx.total, filename), true)
         local ok, err = self.client:downloadCatalogFile(file.id, local_path, on_progress)
         if not ok then
             logger.warn("BookOrbit: bulk file download failed", detail.id, file.id, err)

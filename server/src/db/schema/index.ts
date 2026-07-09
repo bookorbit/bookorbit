@@ -29,4 +29,6 @@ export * from './fonts';
 export * from './koreader';
 export * from './achievements';
 export * from './hardcover';
+export * from './readwise';
+export * from './storygraph';
 export * from './user-preferences';

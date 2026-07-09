@@ -37,7 +37,7 @@ vi.mock('@/lib/api', () => ({
   api: (...args: unknown[]) => apiMock(...args),
 }))
 
-function mountToolbar() {
+function mountToolbar(overrides: Partial<{ paused: boolean; hasSelection: boolean; fetchedCount: number; errorCount: number }> = {}) {
   return mount(BookDockToolbar, {
     props: {
       activeStatus: undefined,
@@ -45,6 +45,8 @@ function mountToolbar() {
       hasSelection: true,
       fetchedCount: 1,
       errorCount: 1,
+      paused: false,
+      ...overrides,
     },
     global: {
       stubs: {
@@ -139,6 +141,34 @@ describe('BookDockToolbar demo restriction', () => {
 
     expect(apiMock).toHaveBeenCalledWith('/api/v1/book-dock/rescan', { method: 'POST' })
     expect(wrapper.emitted('rescan')).toHaveLength(1)
+  })
+
+  it('calls pause and resume endpoints from the processing toggle', async () => {
+    apiMock.mockResolvedValue({ ok: true })
+    const runningWrapper = mountToolbar()
+    await runningWrapper.find('[data-testid="book-dock-processing-toggle"]').trigger('click')
+    await nextTick()
+
+    expect(apiMock).toHaveBeenCalledWith('/api/v1/book-dock/pause', { method: 'POST' })
+    expect(runningWrapper.emitted('pause')).toHaveLength(1)
+
+    apiMock.mockClear()
+    const pausedWrapper = mountToolbar({ paused: true })
+    await pausedWrapper.find('[data-testid="book-dock-processing-toggle"]').trigger('click')
+    await nextTick()
+
+    expect(apiMock).toHaveBeenCalledWith('/api/v1/book-dock/resume', { method: 'POST' })
+    expect(pausedWrapper.emitted('resume')).toHaveLength(1)
+  })
+
+  it('emits pauseError when the pause endpoint fails', async () => {
+    apiMock.mockResolvedValue({ ok: false })
+    const wrapper = mountToolbar()
+
+    await wrapper.find('[data-testid="book-dock-processing-toggle"]').trigger('click')
+    await nextTick()
+
+    expect(wrapper.emitted('pauseError')).toHaveLength(1)
   })
 
   it('emits rescanError when API call fails', async () => {

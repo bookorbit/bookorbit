@@ -26,6 +26,7 @@ import { imageContentTypeFromPath } from '../../common/image-content-type';
 import { BookService } from '../book/book.service';
 import { UserService } from '../user/user.service';
 import type { SaveProgressDto } from '../book/dto/save-progress.dto';
+import { contentDispositionHeader } from '../../common/utils/content-disposition.utils';
 import { OPDS_MIME_ACQ, OPDS_MIME_NAV, OPDS_MIME_SEARCH, fileMimeType } from './opds-xml.helpers';
 import { OpdsAuthGuard } from './opds-auth.guard';
 import type { OpdsRequestUser } from './opds-auth.guard';
@@ -280,16 +281,17 @@ export class OpdsController {
     const bookFiles = await this.opdsBookService.getBookFiles(bookId, fileId);
     if (!bookFiles) throw new NotFoundException('File not found');
 
-    const { absolutePath, format, title, authorName } = bookFiles;
+    const { absolutePath, format } = bookFiles;
     const { size: fileSize } = await stat(absolutePath);
     const mime = fileMimeType(format);
 
-    const safeName =
-      [title, authorName]
-        .filter(Boolean)
-        .join(' - ')
-        .replace(/[^\w\s.-]/g, '') || `book-${bookId}`;
-    reply.header('Content-Disposition', `attachment; filename="${safeName}.${format}"`);
+    const filename = await this.bookService.resolveDownloadFilename({
+      bookId,
+      absolutePath,
+      format: format === 'unknown' ? null : format,
+    });
+
+    reply.header('Content-Disposition', contentDispositionHeader('attachment', filename, 'download'));
     reply.header('Content-Length', fileSize);
     reply.type(mime);
     reply.send(createReadStream(absolutePath));

@@ -75,6 +75,8 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     seriesName: null,
     seriesIndex: null,
     rating: 2,
+    personalNote: null,
+    personalNoteUpdatedAt: null,
     communityRatings: [],
     coverSource: null,
     hardcoverEditionId: null,

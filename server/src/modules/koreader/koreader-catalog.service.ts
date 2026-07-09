@@ -1,6 +1,6 @@
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
-import { basename, extname } from 'path';
+import { basename } from 'path';
 
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
@@ -17,6 +17,8 @@ import type {
   KoreaderCatalogProgress,
   KoreaderCatalogRatingResult,
   KoreaderCatalogReadStatusResult,
+  KoreaderCatalogRelatedBook,
+  KoreaderCatalogRelatedSection,
   KoreaderCatalogSection,
   KoreaderCatalogSectionResponse,
   KoreaderCatalogSeriesSummary,
@@ -36,6 +38,7 @@ import type { BookDetailDto } from '../book/dto/book-detail.dto';
 import { DashboardWidgetService } from '../dashboard/dashboard-widget.service';
 import { fileMimeType } from '../opds/opds-xml.helpers';
 import { OpdsBookEntry, OpdsBookService } from '../opds/opds-book.service';
+import { RecommendationService } from '../recommendation/recommendation.service';
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import { KoreaderCatalogBooksQueryDto } from './dto/koreader-catalog-query.dto';
 
@@ -48,7 +51,8 @@ type BatchProgressCandidate = BatchProgressRow & { percentage: number; updatedAt
 const CATALOG_BASE = '/api/v1/koreader/plugin/catalog';
 const AUTHOR_SERIES_PAGE_SIZE = 60;
 const DASHBOARD_CONTINUE_READING_LIMIT = 5;
-const DASHBOARD_DISCOVER_LIMIT = 8;
+const DASHBOARD_DISCOVER_LIMIT = 10;
+const DETAIL_RELATED_LIMIT = 8;
 
 const NATURAL_SORT_ORDER: Record<KoreaderCatalogSort, KoreaderCatalogSortOrder> = {
   title: 'asc',
@@ -118,6 +122,7 @@ export class KoreaderCatalogService {
     private readonly bookReadService: BookReadService,
     private readonly userBookStatusService: UserBookStatusService,
     private readonly dashboardWidgetService: DashboardWidgetService,
+    private readonly recommendationService: RecommendationService,
     @Inject(storageConfig.KEY) private readonly storage: ConfigType<typeof storageConfig>,
   ) {}
 
@@ -133,16 +138,20 @@ export class KoreaderCatalogService {
       readStatus: 'reading' as const,
     });
 
-    const [continueReading, discover, readingGoal, readingStreak, highlightOfTheDay] = await Promise.all([
+    const [continueReading, discover, readingGoal, readingStreak, highlightOfTheDay, totalBooks] = await Promise.all([
       this.getBooksPage(user, continueReadingQuery),
       this.buildDiscover(user),
       this.dashboardWidgetService.getReadingGoal(user),
       this.dashboardWidgetService.getReadingStreak(user),
       this.dashboardWidgetService.getHighlightOfTheDay(user),
+      this.countBooks(user, {}),
     ]);
 
     return {
       generatedAt: new Date().toISOString(),
+      username: user.username,
+      displayName: user.name || user.username,
+      totalBooks,
       sections: ROOT_SECTIONS.map((section) => ({ ...section })),
       continueReading: continueReading.items,
       discover,
@@ -218,9 +227,9 @@ export class KoreaderCatalogService {
   }
 
   async getBookDetail(user: RequestUser, bookId: number): Promise<KoreaderCatalogBookDetail> {
-    const detail = await this.bookService.getDetail(bookId, user);
+    const [detail, relatedSections] = await Promise.all([this.bookService.getDetail(bookId, user), this.buildRelatedSections(user, bookId)]);
     const progress = await this.findBestProgress(user.id, detail.id);
-    return this.mapBookDetail(detail, progress);
+    return this.mapBookDetail(detail, progress, relatedSections);
   }
 
   async streamThumbnail(user: RequestUser, bookId: number, reply: FastifyReply, ifNoneMatch?: string): Promise<void> {
@@ -249,9 +258,12 @@ export class KoreaderCatalogService {
       throw new NotFoundException('File not found');
     }
 
-    const detail = await this.bookService.getDetail(file.bookId, user);
     const format = this.normalizeFormat(file.format);
-    const filename = this.downloadFilename(detail, fileId, format);
+    const filename = await this.bookService.resolveDownloadFilename({
+      bookId: file.bookId,
+      absolutePath: file.absolutePath,
+      format: file.format,
+    });
 
     try {
       const { size } = await stat(file.absolutePath);
@@ -417,7 +429,11 @@ export class KoreaderCatalogService {
     };
   }
 
-  private mapBookDetail(detail: BookDetailDto, progress: KoreaderCatalogProgress | null): KoreaderCatalogBookDetail {
+  private mapBookDetail(
+    detail: BookDetailDto,
+    progress: KoreaderCatalogProgress | null,
+    relatedSections: KoreaderCatalogRelatedSection[] = [],
+  ): KoreaderCatalogBookDetail {
     const title = detail.title ?? (basename(detail.folderPath) || `Book ${detail.id}`);
     const files = detail.files
       .filter((file) => file.role === 'primary' || file.role === 'content')
@@ -461,6 +477,80 @@ export class KoreaderCatalogService {
       tags: detail.tags,
       progress,
       files,
+      relatedSections,
+    };
+  }
+
+  private async buildRelatedSections(user: RequestUser, bookId: number): Promise<KoreaderCatalogRelatedSection[]> {
+    const [seriesBooks, authorBooks, similarBooks] = await Promise.all([
+      this.safeRelatedLookup(() => this.recommendationService.getSeriesBooks(bookId, user)),
+      this.safeRelatedLookup(() => this.recommendationService.getAuthorBooks(bookId, user)),
+      this.safeRelatedLookup(() => this.recommendationService.getRecommendations(bookId, user)),
+    ]);
+
+    const sections: KoreaderCatalogRelatedSection[] = [];
+    const excludedFromSimilar = new Set<number>([bookId]);
+    const series = seriesBooks.filter((book) => book.id !== bookId).slice(0, DETAIL_RELATED_LIMIT);
+    for (const book of series) excludedFromSimilar.add(book.id);
+    if (series.length > 0) {
+      sections.push({
+        id: 'series',
+        title: 'More in series',
+        books: series.map((book) => this.mapRelatedBook(book)),
+      });
+    }
+
+    const authors = authorBooks.filter((book) => book.id !== bookId).slice(0, DETAIL_RELATED_LIMIT);
+    for (const book of authors) excludedFromSimilar.add(book.id);
+    if (authors.length > 0) {
+      sections.push({
+        id: 'author',
+        title: 'Also by this author',
+        books: authors.map((book) => this.mapRelatedBook(book)),
+      });
+    }
+
+    const similar = similarBooks.filter((book) => !excludedFromSimilar.has(book.id)).slice(0, DETAIL_RELATED_LIMIT);
+    if (similar.length > 0) {
+      sections.push({
+        id: 'similar',
+        title: 'Similar books',
+        books: similar.map((book) => this.mapRelatedBook(book)),
+      });
+    }
+
+    return sections;
+  }
+
+  private async safeRelatedLookup<T>(lookup: () => Promise<T[]>): Promise<T[]> {
+    try {
+      return await lookup();
+    } catch {
+      return [];
+    }
+  }
+
+  private mapRelatedBook(book: {
+    id: number;
+    title: string | null;
+    authors: string[];
+    seriesIndex?: number | null;
+    hasCover: boolean;
+    updatedAt: string | null;
+    isAudiobook?: boolean;
+    isComic?: boolean;
+  }): KoreaderCatalogRelatedBook {
+    return {
+      id: book.id,
+      title: book.title,
+      authors: book.authors,
+      seriesIndex: book.seriesIndex ?? null,
+      hasCover: book.hasCover,
+      thumbnailUrl: book.hasCover ? `${CATALOG_BASE}/books/${book.id}/thumbnail` : null,
+      detailUrl: `${CATALOG_BASE}/books/${book.id}`,
+      updatedAt: book.updatedAt,
+      isAudiobook: book.isAudiobook,
+      isComic: book.isComic,
     };
   }
 
@@ -626,19 +716,5 @@ export class KoreaderCatalogService {
 
   private uniqueFormats(formats: string[]): string[] {
     return [...new Set(formats.map((format) => this.normalizeFormat(format)).filter(Boolean))];
-  }
-
-  private downloadFilename(detail: BookDetailDto, fileId: number, format: string): string {
-    const title = detail.title ?? (basename(detail.folderPath) || `book-${detail.id}`);
-    const author = detail.authors[0]?.name;
-    const base = [title, author].filter(Boolean).join(' - ');
-    const safeBase =
-      base
-        .replace(/["\\/:*?<>|]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim() || `book-${detail.id}-file-${fileId}`;
-    const ext = extname(safeBase).replace(/^\./, '').toLowerCase();
-    if (ext === format) return safeBase;
-    return `${safeBase}.${format}`;
   }
 }

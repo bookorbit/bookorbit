@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { X, Check, AlertCircle, Copy, Loader2, ExternalLink, ChevronDown, FileText } from '@lucide/vue'
+import { X, Check, AlertCircle, Copy, Loader2, ExternalLink, ChevronDown, FileText, Trash2 } from '@lucide/vue'
+import type { BookDockDiscardDuplicatesResult, BookDockFinalizePreviewResult } from '@bookorbit/types'
 
 import { api } from '@/lib/api'
 import { useLibraries } from '@/features/library/composables/useLibraries'
@@ -11,6 +12,16 @@ const props = defineProps<{
   selectionPayload: { fileIds?: number[]; selectAll?: boolean; excludedIds?: number[]; status?: string; search?: string }
   selectionCount: number
 }>()
+
+type FinalizePayload = {
+  fileIds?: number[]
+  selectAll?: boolean
+  excludedIds?: number[]
+  status?: string
+  search?: string
+  defaultLibraryId?: number
+  defaultFolderId?: number
+}
 
 const emit = defineEmits<{
   close: []
@@ -27,8 +38,17 @@ const expandedErrors = ref<Set<number>>(new Set())
 const reimportingIds = reactive(new Set<number>())
 const renameInputs = ref<Map<number, string>>(new Map())
 const selectionSummary = ref<{ total: number; withDestination: number; withoutDestination: number } | null>(null)
+const finalizePreview = ref<BookDockFinalizePreviewResult | null>(null)
+const finalizePreviewLoading = ref(false)
+const finalizePreviewError = ref<string | null>(null)
+const duplicateDiscardLoading = ref(false)
+const discardedIds = ref<Set<number>>(new Set())
 
-const duplicateCount = computed(() => result.value?.results.filter((r) => r.isDuplicate).length ?? 0)
+const resultDuplicateIds = computed(() => result.value?.results.filter((r) => !r.success && r.isDuplicate).map((r) => r.fileId) ?? [])
+const resultDuplicateCount = computed(() => resultDuplicateIds.value.length)
+const previewDuplicateItems = computed(() => finalizePreview.value?.items.filter((item) => item.status === 'duplicate') ?? [])
+const previewDuplicateCount = computed(() => finalizePreview.value?.duplicates ?? 0)
+const effectiveSelectionCount = computed(() => finalizePreview.value?.total ?? Math.max(0, props.selectionCount - discardedIds.value.size))
 
 function isFileExistsError(msg: string | undefined): boolean {
   return !!msg?.includes('file with this name already exists')
@@ -46,6 +66,43 @@ function getRenameInput(fileId: number): string {
 function setRenameInput(fileId: number, value: string) {
   renameInputs.value.set(fileId, value)
   renameInputs.value = new Map(renameInputs.value)
+}
+
+function markDiscarded(ids: number[]) {
+  if (!ids.length) return
+  discardedIds.value = new Set([...discardedIds.value, ...ids])
+}
+
+function effectiveSelectionPayload(): {
+  fileIds?: number[]
+  selectAll?: boolean
+  excludedIds?: number[]
+  status?: string
+  search?: string
+} {
+  if (props.selectionPayload.selectAll) {
+    return {
+      ...props.selectionPayload,
+      excludedIds: [...new Set([...(props.selectionPayload.excludedIds ?? []), ...discardedIds.value])],
+    }
+  }
+
+  return {
+    ...props.selectionPayload,
+    fileIds: (props.selectionPayload.fileIds ?? []).filter((id) => !discardedIds.value.has(id)),
+  }
+}
+
+function finalizePayload(): FinalizePayload {
+  return {
+    ...effectiveSelectionPayload(),
+    ...(requiresDefaultDestination.value && defaultLibraryId.value !== null && defaultFolderId.value !== null
+      ? {
+          defaultLibraryId: defaultLibraryId.value,
+          defaultFolderId: defaultFolderId.value,
+        }
+      : {}),
+  }
 }
 
 async function handleRenameAndRetry(fileId: number) {
@@ -92,6 +149,7 @@ const folders = computed(() => selectedLibrary.value?.folders ?? [])
 
 const requiresDefaultDestination = computed(() => (selectionSummary.value?.withoutDestination ?? props.selectionCount) > 0)
 const canStart = computed(() => {
+  if (effectiveSelectionCount.value <= 0) return false
   if (!selectionSummary.value) return false
   if (!requiresDefaultDestination.value) return true
   return defaultLibraryId.value !== null && defaultFolderId.value !== null
@@ -105,7 +163,7 @@ onMounted(async () => {
     const firstFolder = first.folders?.[0]
     if (firstFolder) defaultFolderId.value = firstFolder.id
   }
-  void fetchNamePreview(requiresDefaultDestination.value ? defaultLibraryId.value : null)
+  void fetchFinalizePreview()
 })
 
 function onLibraryChange(event: Event) {
@@ -126,33 +184,53 @@ function onFolderChange(event: Event) {
   defaultFolderId.value = Number.isFinite(raw) && raw > 0 ? raw : null
 }
 
-async function fetchNamePreview(libId: number | null) {
-  if (requiresDefaultDestination.value && !libId) {
+function syncNamePreviewFromFinalizePreview(preview: BookDockFinalizePreviewResult | null) {
+  namePreview.value =
+    preview?.items.filter((item) => !!item.newName).map((item) => ({ fileId: item.fileId, fileName: item.fileName, newName: item.newName! })) ?? []
+}
+
+async function fetchFinalizePreview() {
+  if (requiresDefaultDestination.value && (defaultLibraryId.value === null || defaultFolderId.value === null)) {
+    finalizePreview.value = null
     namePreview.value = []
     previewLoading.value = false
+    finalizePreviewLoading.value = false
     return
   }
   const reqId = ++previewReqSeq
   previewLoading.value = true
+  finalizePreviewLoading.value = true
+  finalizePreviewError.value = null
   try {
-    const payload = {
-      ...props.selectionPayload,
-      ...(requiresDefaultDestination.value && libId ? { defaultLibraryId: libId } : {}),
-    }
-    const res = await api('/api/v1/book-dock/files/preview-names', {
+    const res = await api('/api/v1/book-dock/finalize/preview', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(finalizePayload()),
     })
-    if (!res.ok || reqId !== previewReqSeq) return
-    const rows: { fileId: number; fileName: string; newName: string }[] = await res.json()
+    if (!res.ok) {
+      if (reqId === previewReqSeq) {
+        finalizePreview.value = null
+        finalizePreviewError.value = `Preview failed (${res.status})`
+        namePreview.value = []
+        previewLoading.value = false
+        finalizePreviewLoading.value = false
+      }
+      return
+    }
     if (reqId !== previewReqSeq) return
-    namePreview.value = rows
+    const preview: BookDockFinalizePreviewResult = await res.json()
+    if (reqId !== previewReqSeq) return
+    finalizePreview.value = preview
+    syncNamePreviewFromFinalizePreview(preview)
     previewLoading.value = false
+    finalizePreviewLoading.value = false
   } catch {
     if (reqId !== previewReqSeq) return
+    finalizePreview.value = null
+    finalizePreviewError.value = 'Finalize preview failed'
     namePreview.value = []
     previewLoading.value = false
+    finalizePreviewLoading.value = false
   }
 }
 
@@ -161,7 +239,7 @@ async function fetchSelectionSummary() {
     const res = await api('/api/v1/book-dock/files/selection-summary', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(props.selectionPayload),
+      body: JSON.stringify(effectiveSelectionPayload()),
     })
     if (res.ok) {
       selectionSummary.value = await res.json()
@@ -173,21 +251,13 @@ async function fetchSelectionSummary() {
   selectionSummary.value = { total: props.selectionCount, withDestination: 0, withoutDestination: props.selectionCount }
 }
 
-watch([defaultLibraryId, requiresDefaultDestination], ([libId]) => {
-  void fetchNamePreview(libId)
+watch([defaultLibraryId, defaultFolderId, requiresDefaultDestination], () => {
+  void fetchFinalizePreview()
 })
 
 async function start() {
   if (!canStart.value) return
-  await finalize({
-    ...props.selectionPayload,
-    ...(requiresDefaultDestination.value
-      ? {
-          defaultLibraryId: defaultLibraryId.value!,
-          defaultFolderId: defaultFolderId.value!,
-        }
-      : {}),
-  })
+  await finalize(finalizePayload())
   if (result.value?.succeeded) refreshLibraries()
 }
 
@@ -233,6 +303,55 @@ async function handleReimportDuplicate(fileId: number) {
     reimportingIds.delete(fileId)
   }
 }
+
+async function discardDuplicateSelection(payload: FinalizePayload): Promise<BookDockDiscardDuplicatesResult | null> {
+  const res = await api('/api/v1/book-dock/finalize/discard-duplicates', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) return null
+  return (await res.json()) as BookDockDiscardDuplicatesResult
+}
+
+async function handleDiscardPreviewDuplicates() {
+  if (duplicateDiscardLoading.value || previewDuplicateCount.value === 0) return
+  duplicateDiscardLoading.value = true
+  try {
+    const discardResult = await discardDuplicateSelection(finalizePayload())
+    if (!discardResult || discardResult.discarded === 0) return
+    markDiscarded(discardResult.discardedFileIds)
+    await fetchSelectionSummary()
+    await fetchFinalizePreview()
+  } finally {
+    duplicateDiscardLoading.value = false
+  }
+}
+
+async function handleDiscardResultDuplicates() {
+  if (!result.value || duplicateDiscardLoading.value || resultDuplicateIds.value.length === 0) return
+  duplicateDiscardLoading.value = true
+  try {
+    const discardResult = await discardDuplicateSelection({
+      fileIds: resultDuplicateIds.value,
+      ...(defaultLibraryId.value !== null && defaultFolderId.value !== null
+        ? {
+            defaultLibraryId: defaultLibraryId.value,
+            defaultFolderId: defaultFolderId.value,
+          }
+        : {}),
+    })
+    if (!discardResult || discardResult.discarded === 0) return
+
+    const removedIds = new Set(discardResult.discardedFileIds)
+    markDiscarded(discardResult.discardedFileIds)
+    result.value.results = result.value.results.filter((item) => !removedIds.has(item.fileId))
+    result.value.total = Math.max(0, result.value.total - discardResult.discarded)
+    result.value.failed = Math.max(0, result.value.failed - discardResult.discarded)
+  } finally {
+    duplicateDiscardLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -242,7 +361,7 @@ async function handleReimportDuplicate(fileId: number) {
       <div class="relative z-10 w-full max-w-2xl mx-4 bg-card border border-border rounded-lg shadow-2xl overflow-hidden">
         <div class="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 class="text-base font-semibold text-foreground">
-            {{ result ? 'Finalize Results' : `Finalize ${selectionCount} file${selectionCount === 1 ? '' : 's'}` }}
+            {{ result ? 'Finalize Results' : `Finalize ${effectiveSelectionCount} file${effectiveSelectionCount === 1 ? '' : 's'}` }}
           </h2>
           <button
             class="size-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
@@ -262,6 +381,67 @@ async function handleReimportDuplicate(fileId: number) {
               }}
             </p>
           </div>
+
+          <div v-if="finalizePreviewLoading" class="flex items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2.5">
+            <Loader2 class="size-3.5 animate-spin text-muted-foreground" />
+            <span class="text-xs text-muted-foreground">Checking selected files...</span>
+          </div>
+
+          <div v-else-if="finalizePreview" class="rounded-lg border border-border bg-muted/20 px-3 py-2.5 space-y-2">
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+              <span class="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-1 text-emerald-700 dark:text-emerald-300">
+                <Check class="size-3" />
+                {{ finalizePreview.ready }} ready
+              </span>
+              <span
+                v-if="finalizePreview.duplicates > 0"
+                class="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-1 text-amber-700 dark:text-amber-300"
+              >
+                <Copy class="size-3" />
+                {{ finalizePreview.duplicates }} already in library
+              </span>
+              <span
+                v-if="finalizePreview.destinationConflicts > 0"
+                class="inline-flex items-center gap-1 rounded-md bg-red-500/10 px-2 py-1 text-red-600 dark:text-red-400"
+              >
+                <AlertCircle class="size-3" />
+                {{ finalizePreview.destinationConflicts }} filename conflict{{ finalizePreview.destinationConflicts === 1 ? '' : 's' }}
+              </span>
+              <span
+                v-if="finalizePreview.missingDestination > 0"
+                class="inline-flex items-center gap-1 rounded-md bg-red-500/10 px-2 py-1 text-red-600 dark:text-red-400"
+              >
+                <AlertCircle class="size-3" />
+                {{ finalizePreview.missingDestination }} missing destination
+              </span>
+              <span
+                v-if="finalizePreview.blocked > 0"
+                class="inline-flex items-center gap-1 rounded-md bg-red-500/10 px-2 py-1 text-red-600 dark:text-red-400"
+              >
+                <AlertCircle class="size-3" />
+                {{ finalizePreview.blocked }} blocked
+              </span>
+            </div>
+
+            <div v-if="previewDuplicateItems.length > 0" class="rounded-md border border-amber-500/20 bg-amber-500/5 divide-y divide-amber-500/10">
+              <div v-for="item in previewDuplicateItems.slice(0, 5)" :key="item.fileId" class="flex items-center gap-2 px-2.5 py-1.5">
+                <Copy class="size-3.5 text-amber-500 shrink-0" />
+                <span class="min-w-0 flex-1 truncate font-mono text-xs text-foreground" :title="item.fileName">{{ item.fileName }}</span>
+                <button
+                  v-if="item.existingBookId"
+                  class="text-xs text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 shrink-0"
+                  @click="goToBook(item.existingBookId)"
+                >
+                  View existing <ExternalLink class="size-3" />
+                </button>
+              </div>
+              <div v-if="previewDuplicateCount > previewDuplicateItems.length" class="px-2.5 py-1.5 text-xs text-muted-foreground">
+                +{{ previewDuplicateCount - previewDuplicateItems.length }} more already in library
+              </div>
+            </div>
+          </div>
+
+          <p v-if="finalizePreviewError" class="text-xs text-red-500 bg-red-500/10 rounded-lg p-2">{{ finalizePreviewError }}</p>
 
           <div v-if="requiresDefaultDestination" class="space-y-3">
             <label class="block">
@@ -310,6 +490,16 @@ async function handleReimportDuplicate(fileId: number) {
               Cancel
             </button>
             <button
+              v-if="previewDuplicateCount > 0"
+              class="flex items-center gap-1.5 h-8 px-4 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 text-sm font-medium transition-all hover:bg-red-500/20 active:scale-95 disabled:opacity-50"
+              :disabled="duplicateDiscardLoading"
+              @click="handleDiscardPreviewDuplicates"
+            >
+              <Loader2 v-if="duplicateDiscardLoading" class="size-3.5 animate-spin" />
+              <Trash2 v-else class="size-3.5" />
+              Discard duplicates
+            </button>
+            <button
               class="flex items-center gap-1.5 h-8 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
               :disabled="!canStart || loading"
               @click="start"
@@ -327,7 +517,9 @@ async function handleReimportDuplicate(fileId: number) {
             <div>
               <p class="text-sm font-medium">{{ result.succeeded }} of {{ result.total }} files finalized</p>
               <p v-if="result.failed > 0" class="text-xs text-muted-foreground mt-0.5">
-                {{ result.failed }} failed{{ duplicateCount > 0 ? ` (${duplicateCount} duplicate${duplicateCount !== 1 ? 's' : ''})` : '' }}
+                {{ result.failed }} failed{{
+                  resultDuplicateCount > 0 ? ` (${resultDuplicateCount} duplicate${resultDuplicateCount !== 1 ? 's' : ''})` : ''
+                }}
               </p>
             </div>
           </div>
@@ -403,7 +595,18 @@ async function handleReimportDuplicate(fileId: number) {
             </div>
           </div>
 
-          <div class="flex justify-end pt-2">
+          <div class="flex justify-between gap-2 pt-2">
+            <button
+              v-if="resultDuplicateCount > 0"
+              class="flex items-center gap-1.5 h-8 px-4 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 text-sm font-medium transition-all hover:bg-red-500/20 active:scale-95 disabled:opacity-50"
+              :disabled="duplicateDiscardLoading"
+              @click="handleDiscardResultDuplicates"
+            >
+              <Loader2 v-if="duplicateDiscardLoading" class="size-3.5 animate-spin" />
+              <Trash2 v-else class="size-3.5" />
+              Discard duplicates
+            </button>
+            <div v-else />
             <button
               class="h-8 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium transition-all hover:opacity-90 active:scale-95"
               @click="handleClose"

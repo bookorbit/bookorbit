@@ -16,6 +16,10 @@ function finiteNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
+function normalizeString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null
+}
+
 function normalizeFraction(value: unknown): number | null {
   const parsed = finiteNumber(value)
   return parsed === null ? null : clamp(parsed, 0, 1)
@@ -94,28 +98,28 @@ export function useReaderProgress(
     const res = await api(`/api/v1/books/files/${fileId}/progress`)
     if (!res.ok) return
     const data = await res.json()
-    cfi.value = data.cfi ?? null
+    cfi.value = normalizeString(data.cfi)
     pageNumber.value = normalizePageNumber(data.pageNumber)
     updatePercentage(data.percentage, 0)
-    koboLocationSource.value = data.koboLocationSource ?? null
-    koboLocationType.value = data.koboLocationType ?? null
-    koboLocationValue.value = data.koboLocationValue ?? null
+    koboLocationSource.value = normalizeString(data.koboLocationSource)
+    koboLocationType.value = normalizeString(data.koboLocationType)
+    koboLocationValue.value = normalizeString(data.koboLocationValue)
     koboContentSourceProgressPercent.value = normalizeNullablePercentage(data.koboContentSourceProgressPercent)
-    koreaderProgress.value = data.koreaderProgress ?? null
+    koreaderProgress.value = normalizeString(data.koreaderProgress)
   }
 
   function onRelocate(detail: RelocateDetail) {
-    cfi.value = detail?.cfi ?? null
+    cfi.value = normalizeString(detail?.cfi)
     const relocatedFraction = normalizeFraction(detail?.fraction)
     if (relocatedFraction !== null) {
       fraction.value = relocatedFraction
       updatePercentage(relocatedFraction * 100)
     }
-    koboLocationSource.value = detail?.source ?? null
-    koboLocationValue.value = detail?.koboLocationValue ?? null
-    koboLocationType.value = koboLocationValue.value ? (detail?.koboLocationType ?? 'KoboSpan') : null
+    koboLocationSource.value = normalizeString(detail?.source)
+    koboLocationValue.value = normalizeString(detail?.koboLocationValue)
+    koboLocationType.value = koboLocationValue.value ? (normalizeString(detail?.koboLocationType) ?? 'KoboSpan') : null
     koboContentSourceProgressPercent.value = normalizeNullablePercentage(detail?.contentSourceProgressPercent)
-    koreaderProgress.value = detail?.koreaderProgress ?? null
+    koreaderProgress.value = normalizeString(detail?.koreaderProgress)
     const hasSaveableLocation =
       relocatedFraction !== null || cfi.value !== null || koboLocationValue.value !== null || koreaderProgress.value !== null
     chapterTitle.value = detail?.tocItem?.label ?? ''

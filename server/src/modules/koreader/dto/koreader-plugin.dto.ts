@@ -218,7 +218,25 @@ export class BookStateDto {
   @IsInt()
   @Min(1)
   @Max(5)
-  rating?: number;
+  rating?: number | null;
+
+  @IsOptional()
+  @IsBoolean()
+  ratingCleared?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10000)
+  reviewNote?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  reviewCleared?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @Matches(DATE_ONLY)
+  reviewModified?: string;
 }
 
 export class BookStatesUploadDto extends PluginDeviceDto {

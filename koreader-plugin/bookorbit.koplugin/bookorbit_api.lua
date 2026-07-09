@@ -31,8 +31,22 @@ local function scrubNulls(value)
     return value
 end
 
+local function decodeResponse(parts)
+    local raw = table.concat(parts or {})
+    if raw == "" then
+        return {}
+    end
+    local ok, decoded, decode_err = pcall(rapidjson.decode, raw)
+    if not ok or decoded == nil then
+        logger.dbg("BookOrbit: invalid JSON response:", ok and decode_err or decoded)
+        return nil, "invalid_json"
+    end
+    return scrubNulls(decoded) or {}
+end
+
 local BookOrbitApi = {}
 BookOrbitApi.__index = BookOrbitApi
+BookOrbitApi.decodeResponse = decodeResponse
 
 -- Normalizes a user-entered server address to the API base, e.g.
 -- "https://books.example.com/" -> "https://books.example.com/api/v1".
@@ -100,13 +114,14 @@ function BookOrbitApi:request(method, path, body)
         return nil, tostring(status or code or "network_error")
     end
 
-    local decoded = nil
-    if sink[1] then
-        decoded = scrubNulls(rapidjson.decode(table.concat(sink)))
-    end
+    local decoded, decode_err = decodeResponse(sink)
 
     if code < 200 or code >= 300 then
         return nil, code, decoded
+    end
+
+    if decode_err then
+        return nil, decode_err
     end
 
     return decoded or {}

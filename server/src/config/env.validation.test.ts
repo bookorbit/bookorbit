@@ -116,4 +116,22 @@ describe('validateEnv', () => {
       }),
     ).not.toThrow();
   });
+
+  it('accepts a custom library browse root path', () => {
+    expect(() =>
+      validateEnv({
+        ...BASE_ENV,
+        LIBRARY_BROWSE_ROOT: '/books',
+      }),
+    ).not.toThrow();
+  });
+
+  it('accepts an empty library browse root as an unset override', () => {
+    expect(() =>
+      validateEnv({
+        ...BASE_ENV,
+        LIBRARY_BROWSE_ROOT: '',
+      }),
+    ).not.toThrow();
+  });
 });

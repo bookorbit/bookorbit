@@ -5,6 +5,7 @@ import { CoverController } from './cover.controller';
 import { CoverModule } from './cover.module';
 import { CoverService } from './cover.service';
 import { CoverProviderRegistry } from './provider-registry';
+import { AudiobookCoversCoverProvider } from './providers/audiobookcovers-cover-provider';
 import { DuckDuckGoCoverProvider } from './providers/duckduckgo-cover-provider';
 import { ITunesCoverProvider } from './providers/itunes-cover-provider';
 
@@ -15,7 +16,9 @@ describe('CoverModule', () => {
     const exportsList = Reflect.getMetadata('exports', CoverModule) as unknown[];
 
     expect(controllers).toEqual([CoverController]);
-    expect(providers).toEqual(expect.arrayContaining([DuckDuckGoCoverProvider, ITunesCoverProvider, CoverProviderRegistry, CoverService]));
+    expect(providers).toEqual(
+      expect.arrayContaining([DuckDuckGoCoverProvider, ITunesCoverProvider, AudiobookCoversCoverProvider, CoverProviderRegistry, CoverService]),
+    );
     expect(exportsList).toEqual([CoverService]);
 
     const providerFactory = providers.find((value): value is { provide: symbol; inject: unknown[]; useFactory: (...args: unknown[]) => unknown[] } =>
@@ -23,10 +26,11 @@ describe('CoverModule', () => {
     );
 
     expect(providerFactory).toBeDefined();
-    expect(providerFactory?.inject).toEqual([DuckDuckGoCoverProvider, ITunesCoverProvider]);
+    expect(providerFactory?.inject).toEqual([DuckDuckGoCoverProvider, ITunesCoverProvider, AudiobookCoversCoverProvider]);
 
     const duck = { key: 'duckduckgo' };
     const itunes = { key: 'itunes' };
-    expect(providerFactory?.useFactory(duck, itunes)).toEqual([duck, itunes]);
+    const audiobookcovers = { key: 'audiobookcovers' };
+    expect(providerFactory?.useFactory(duck, itunes, audiobookcovers)).toEqual([duck, itunes, audiobookcovers]);
   });
 });

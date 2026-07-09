@@ -6,6 +6,7 @@ vi.mock('../file-write/file-write.module', () => ({ FileWriteModule: class FileW
 vi.mock('../library/library.module', () => ({ LibraryModule: class LibraryModule {} }));
 vi.mock('../metadata/metadata.module', () => ({ MetadataModule: class MetadataModule {} }));
 vi.mock('../metadata-fetch/metadata-fetch.module', () => ({ MetadataFetchModule: class MetadataFetchModule {} }));
+vi.mock('../user-book-note/user-book-note.module', () => ({ UserBookNoteModule: class UserBookNoteModule {} }));
 
 import { MODULE_METADATA } from '@nestjs/common/constants';
 

@@ -374,6 +374,34 @@ describe('autoUpdate normalization and guard behavior', () => {
     expect(mockRepo.upsertState).not.toHaveBeenCalled();
   });
 
+  it.each([
+    { percentage: 50, expectedStatus: 'reading' },
+    { percentage: 98, expectedStatus: 'read' },
+  ] as const)('updates manual want_to_read to $expectedStatus when progress crosses thresholds', async ({ percentage, expectedStatus }) => {
+    const existing = makeRow({ status: 'want_to_read', source: 'manual' });
+    mockRepo.findOne.mockResolvedValue(existing);
+
+    await service.autoUpdate(1, 10, percentage);
+
+    expect(mockRepo.upsert).toHaveBeenCalledOnce();
+    expect(mockRepo.upsert).toHaveBeenCalledWith(1, 10, expectedStatus, 'auto', expect.any(Date), existing);
+    expect(mockRepo.upsertState).not.toHaveBeenCalled();
+    expect(mockAchievementEvents.emit).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ userId: 1, bookId: 10, previousStatus: 'want_to_read', newStatus: expectedStatus }),
+    );
+  });
+
+  it('does not change manual want_to_read to unread below the reading threshold', async () => {
+    mockRepo.findOne.mockResolvedValue(makeRow({ status: 'want_to_read', source: 'manual' }));
+
+    await service.autoUpdate(1, 10, 0.1);
+
+    expect(mockRepo.upsert).not.toHaveBeenCalled();
+    expect(mockRepo.upsertState).not.toHaveBeenCalled();
+    expect(mockAchievementEvents.emit).not.toHaveBeenCalled();
+  });
+
   it('skips updates when derived status is unchanged', async () => {
     mockRepo.findOne.mockResolvedValue(makeRow({ status: 'reading', source: 'auto' }));
 

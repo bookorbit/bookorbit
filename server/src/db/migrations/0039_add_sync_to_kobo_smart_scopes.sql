@@ -1,0 +1,1 @@
+ALTER TABLE "smart_scopes" ADD COLUMN "sync_to_kobo" boolean DEFAULT false NOT NULL;

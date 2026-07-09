@@ -115,6 +115,21 @@ describe('AppSettingsService', () => {
     });
   });
 
+  describe('Book Dock paused state', () => {
+    it('defaults to false when setting is absent', async () => {
+      repo.findByKey.mockResolvedValue(undefined);
+      expect(await service.isBookDockPaused()).toBe(false);
+    });
+
+    it('reads and writes paused state as string booleans', async () => {
+      repo.findByKey.mockResolvedValue({ key: 'book_dock_paused', value: 'true' } as never);
+      expect(await service.isBookDockPaused()).toBe(true);
+
+      await service.setBookDockPaused(false);
+      expect(repo.upsert).toHaveBeenCalledWith('book_dock_paused', 'false');
+    });
+  });
+
   describe('author settings', () => {
     it('getAuthorsAutoEnrichmentWriteMode defaults to missing_only', async () => {
       repo.findByKey.mockResolvedValue(undefined);

@@ -16,6 +16,7 @@ import { BookDockFinalizeService } from './book-dock-finalize.service';
 import { BookDockGateway } from './book-dock.gateway';
 import { BookDockIngestService } from './book-dock-ingest.service';
 import { BookDockMetadataService } from './book-dock-metadata.service';
+import { BookDockProcessingStateService } from './book-dock-processing-state.service';
 import { BookDockWatcherService } from './book-dock-watcher.service';
 import { BookDockService } from './book-dock.service';
 import { BookDockRepository } from './book-dock.repository';
@@ -44,6 +45,7 @@ import { BookDockRepository } from './book-dock.repository';
     BookDockEventsService,
     BookDockIngestService,
     BookDockMetadataService,
+    BookDockProcessingStateService,
     BookDockFinalizeService,
     BookDockWatcherService,
     BookDockGateway,

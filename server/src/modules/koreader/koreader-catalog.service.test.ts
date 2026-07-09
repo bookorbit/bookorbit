@@ -106,6 +106,7 @@ function makeService() {
       absolutePath: '/books/dune.epub',
       format: 'epub',
     }),
+    resolveDownloadFilename: vi.fn().mockResolvedValue('Dune - Frank Herbert.epub'),
   };
   const bookReadService = {
     findProgressByBook: vi.fn().mockResolvedValue([
@@ -144,6 +145,58 @@ function makeService() {
       createdAt: '2026-03-01T00:00:00.000Z',
     }),
   };
+  const recommendationService = {
+    getSeriesBooks: vi.fn().mockResolvedValue([
+      {
+        id: 10,
+        title: 'Dune',
+        updatedAt: '2026-02-01T00:00:00.000Z',
+        seriesIndex: 1,
+        hasCover: true,
+        authors: ['Frank Herbert'],
+      },
+      {
+        id: 11,
+        title: 'Dune Messiah',
+        updatedAt: '2026-02-02T00:00:00.000Z',
+        seriesIndex: 2,
+        hasCover: true,
+        authors: ['Frank Herbert'],
+      },
+    ]),
+    getAuthorBooks: vi.fn().mockResolvedValue([
+      {
+        id: 10,
+        title: 'Dune',
+        updatedAt: '2026-02-01T00:00:00.000Z',
+        hasCover: true,
+        authors: ['Frank Herbert'],
+      },
+      {
+        id: 12,
+        title: 'The Dosadi Experiment',
+        updatedAt: '2026-02-03T00:00:00.000Z',
+        hasCover: false,
+        authors: ['Frank Herbert'],
+      },
+    ]),
+    getRecommendations: vi.fn().mockResolvedValue([
+      {
+        id: 11,
+        title: 'Dune Messiah',
+        updatedAt: '2026-02-02T00:00:00.000Z',
+        hasCover: true,
+        authors: ['Frank Herbert'],
+      },
+      {
+        id: 13,
+        title: 'Hyperion',
+        updatedAt: '2026-02-04T00:00:00.000Z',
+        hasCover: true,
+        authors: ['Dan Simmons'],
+      },
+    ]),
+  };
 
   const service = new KoreaderCatalogService(
     opdsBookService as never,
@@ -151,10 +204,11 @@ function makeService() {
     bookReadService as never,
     userBookStatusService as never,
     dashboardWidgetService as never,
+    recommendationService as never,
     { appDataPath: '/data', bookDockPath: '/data/book-dock' },
   );
 
-  return { service, opdsBookService, bookService, bookReadService, userBookStatusService, dashboardWidgetService };
+  return { service, opdsBookService, bookService, bookReadService, userBookStatusService, dashboardWidgetService, recommendationService };
 }
 
 describe('KoreaderCatalogService', () => {
@@ -216,6 +270,7 @@ describe('KoreaderCatalogService', () => {
         },
       ],
     });
+    opdsBookService.getBooksPage.mockResolvedValueOnce({ total: 99, entries: [] });
 
     opdsBookService.getRandomBooks.mockResolvedValueOnce([
       {
@@ -240,8 +295,12 @@ describe('KoreaderCatalogService', () => {
     const dashboard = await service.getDashboard(user);
 
     expect(opdsBookService.getBooksPage).toHaveBeenCalledWith(7, 'recently_read', 1, 5, { readStatus: 'reading' }, false, user.contentFilters);
-    expect(opdsBookService.getRandomBooks).toHaveBeenCalledWith(7, 8, false, user.contentFilters);
+    expect(opdsBookService.getBooksPage).toHaveBeenCalledWith(7, 'title_asc', 1, 1, {}, false, user.contentFilters);
+    expect(opdsBookService.getRandomBooks).toHaveBeenCalledWith(7, 10, false, user.contentFilters);
     expect(dashboard.sections.map((section) => section.id)).toContain('all-books');
+    expect(dashboard.username).toBe('testuser');
+    expect(dashboard.displayName).toBe('Test User');
+    expect(dashboard.totalBooks).toBe(99);
     expect(dashboard.continueReading[0]).toEqual(expect.objectContaining({ id: 10, progressPercentage: 47.4, readStatus: 'reading' }));
     expect(dashboard.discover[0]).toEqual(expect.objectContaining({ id: 22, title: 'Neuromancer' }));
     expect(dashboard.readingGoal).toEqual({ goalBooks: 24, completedBooks: 6, year: 2026 });
@@ -277,7 +336,7 @@ describe('KoreaderCatalogService', () => {
 
     const result = await service.getDiscover(user);
 
-    expect(opdsBookService.getRandomBooks).toHaveBeenCalledWith(7, 8, false, user.contentFilters);
+    expect(opdsBookService.getRandomBooks).toHaveBeenCalledWith(7, 10, false, user.contentFilters);
     expect(result.discover).toHaveLength(1);
     expect(result.discover[0]).toEqual(expect.objectContaining({ id: 33, title: 'Frankenstein' }));
   });
@@ -422,8 +481,8 @@ describe('KoreaderCatalogService', () => {
     expect(result.nextUrl).toContain('page=3');
   });
 
-  it('maps book detail without exposing absolute paths', async () => {
-    const { service } = makeService();
+  it('maps book detail with related rows without exposing absolute paths', async () => {
+    const { service, recommendationService } = makeService();
 
     const detail = await service.getBookDetail(makeUser({ id: 7 }), 10);
 
@@ -444,8 +503,47 @@ describe('KoreaderCatalogService', () => {
             downloadUrl: '/api/v1/koreader/plugin/catalog/files/100/download',
           },
         ],
+        relatedSections: [
+          {
+            id: 'series',
+            title: 'More in series',
+            books: [
+              expect.objectContaining({
+                id: 11,
+                title: 'Dune Messiah',
+                seriesIndex: 2,
+                thumbnailUrl: '/api/v1/koreader/plugin/catalog/books/11/thumbnail',
+              }),
+            ],
+          },
+          {
+            id: 'author',
+            title: 'Also by this author',
+            books: [
+              expect.objectContaining({
+                id: 12,
+                title: 'The Dosadi Experiment',
+                thumbnailUrl: null,
+              }),
+            ],
+          },
+          {
+            id: 'similar',
+            title: 'Similar books',
+            books: [
+              expect.objectContaining({
+                id: 13,
+                title: 'Hyperion',
+                thumbnailUrl: '/api/v1/koreader/plugin/catalog/books/13/thumbnail',
+              }),
+            ],
+          },
+        ],
       }),
     );
+    expect(recommendationService.getSeriesBooks).toHaveBeenCalledWith(10, expect.objectContaining({ id: 7 }));
+    expect(recommendationService.getAuthorBooks).toHaveBeenCalledWith(10, expect.objectContaining({ id: 7 }));
+    expect(recommendationService.getRecommendations).toHaveBeenCalledWith(10, expect.objectContaining({ id: 7 }));
     expect(JSON.stringify(detail)).not.toContain('/books/dune.epub');
   });
 
@@ -484,12 +582,7 @@ describe('KoreaderCatalogService', () => {
   it('encodes non-ASCII content file download filenames for Content-Disposition', async () => {
     const { service, bookService } = makeService();
     const reply = makeReply();
-    bookService.getDetail.mockResolvedValueOnce(
-      makeDetail({
-        title: 'Dune’s Café',
-        authors: [{ id: 1, name: 'Frank Herbert', sortName: 'Herbert, Frank' }],
-      }),
-    );
+    bookService.resolveDownloadFilename.mockResolvedValueOnce('Dune’s Café - Frank Herbert.epub');
 
     await service.streamFile(makeUser({ permissions: [] }), 100, reply as never);
 

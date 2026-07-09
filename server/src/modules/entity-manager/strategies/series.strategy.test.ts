@@ -410,20 +410,20 @@ describe('SeriesStrategy', () => {
   });
 
   it('upserts a series by normalized name', async () => {
-    const returning = vi.fn().mockResolvedValue([{ id: 9, name: 'Dune' }]);
+    const returning = vi.fn().mockResolvedValue([{ id: 9, name: 'Dune Chronicles' }]);
     const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
     const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
     const insert = vi.fn().mockReturnValue({ values });
     const strategy = makeStrategy({ insert });
 
     await expect(
-      (strategy as unknown as { upsertSeries(name: string): Promise<{ id: number; name: string }> }).upsertSeries('Dune'),
+      (strategy as unknown as { upsertSeries(name: string): Promise<{ id: number; name: string }> }).upsertSeries('  Dune   Chronicles '),
     ).resolves.toEqual({
       id: 9,
-      name: 'Dune',
+      name: 'Dune Chronicles',
     });
 
-    expect(values).toHaveBeenCalledWith({ name: 'Dune', normalizedName: 'dune' });
+    expect(values).toHaveBeenCalledWith({ name: 'Dune Chronicles', normalizedName: 'dune chronicles' });
   });
 
   it('rejects a series upsert when the database returns no row', async () => {

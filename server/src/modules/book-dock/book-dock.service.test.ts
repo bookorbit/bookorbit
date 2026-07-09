@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 
 import { BookDockService } from './book-dock.service';
 
@@ -46,14 +46,49 @@ function makeService() {
     countsByStatus: vi.fn(),
     getStatistics: vi.fn(),
   };
-  const ingestService = { retryFetch: vi.fn() };
-  const service = new BookDockService(db as never, repo as never, ingestService as never);
-  return { service, db, repo, ingestService };
+  const ingestService = {
+    retryFetch: vi.fn(),
+    pauseProcessing: vi.fn(),
+    resumeProcessing: vi.fn().mockResolvedValue(undefined),
+    requeueProcessableFiles: vi.fn().mockResolvedValue(0),
+  };
+  const finalizeService = {
+    pauseProcessing: vi.fn(),
+    resumeProcessing: vi.fn().mockResolvedValue(undefined),
+    requeueAutoFinalizeCandidates: vi.fn().mockResolvedValue(0),
+  };
+  const watcherService = {
+    rescan: vi.fn().mockResolvedValue(undefined),
+  };
+  const processingState = {
+    isPaused: vi.fn().mockResolvedValue(false),
+    pause: vi.fn().mockResolvedValue(undefined),
+    resume: vi.fn().mockResolvedValue(undefined),
+  };
+  const gateway = {
+    emitSummary: vi.fn(),
+  };
+  const service = new BookDockService(
+    db as never,
+    repo as never,
+    ingestService as never,
+    finalizeService as never,
+    watcherService as never,
+    processingState as never,
+    gateway as never,
+  );
+  return { service, db, repo, ingestService, finalizeService, watcherService, processingState, gateway };
 }
 
 describe('BookDockService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('maps list rows to API DTOs with pagination fields', async () => {
@@ -213,7 +248,39 @@ describe('BookDockService', () => {
     repo.countsByStatus.mockResolvedValue({ pending: 1, ready: 2, error: 3, total: 6 });
     repo.getStatistics.mockResolvedValue({ totalSizeBytes: 10, byFormat: [] });
 
-    await expect(service.getSummary()).resolves.toEqual({ pending: 1, ready: 2, error: 3, total: 6 });
+    await expect(service.getSummary()).resolves.toEqual({ pending: 1, ready: 2, error: 3, total: 6, paused: false });
     await expect(service.getStatistics()).resolves.toEqual({ totalSizeBytes: 10, byFormat: [] });
+  });
+
+  it('pauseProcessing persists paused state, pauses queues, and broadcasts summary', async () => {
+    const { service, repo, processingState, ingestService, finalizeService, gateway } = makeService();
+    repo.countsByStatus.mockResolvedValue({ pending: 4, ready: 5, error: 0, total: 9 });
+    processingState.isPaused.mockResolvedValue(true);
+
+    await expect(service.pauseProcessing()).resolves.toEqual({ pending: 4, ready: 5, error: 0, total: 9, paused: true });
+
+    expect(processingState.pause).toHaveBeenCalledTimes(1);
+    expect(ingestService.pauseProcessing).toHaveBeenCalledTimes(1);
+    expect(finalizeService.pauseProcessing).toHaveBeenCalledTimes(1);
+    expect(gateway.emitSummary).toHaveBeenCalledWith({ pending: 4, ready: 5, error: 0, total: 9, paused: true });
+  });
+
+  it('resumeProcessing resumes queues, broadcasts summary, and starts recovery once', async () => {
+    const { service, repo, processingState, ingestService, finalizeService, watcherService, gateway } = makeService();
+    repo.countsByStatus.mockResolvedValue({ pending: 2, ready: 3, error: 1, total: 6 });
+    processingState.isPaused.mockResolvedValue(false);
+    ingestService.requeueProcessableFiles.mockResolvedValue(7);
+    finalizeService.requeueAutoFinalizeCandidates.mockResolvedValue(2);
+
+    await expect(service.resumeProcessing()).resolves.toEqual({ pending: 2, ready: 3, error: 1, total: 6, paused: false });
+    await (service as any).resumeWorkPromise;
+
+    expect(processingState.resume).toHaveBeenCalledTimes(1);
+    expect(ingestService.resumeProcessing).toHaveBeenCalledTimes(1);
+    expect(finalizeService.resumeProcessing).toHaveBeenCalledTimes(1);
+    expect(ingestService.requeueProcessableFiles).toHaveBeenCalledTimes(1);
+    expect(finalizeService.requeueAutoFinalizeCandidates).toHaveBeenCalledTimes(1);
+    expect(watcherService.rescan).toHaveBeenCalledTimes(1);
+    expect(gateway.emitSummary).toHaveBeenCalledWith({ pending: 2, ready: 3, error: 1, total: 6, paused: false });
   });
 });

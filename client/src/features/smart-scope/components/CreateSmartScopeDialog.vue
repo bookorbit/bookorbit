@@ -14,6 +14,7 @@ const { createSmartScope } = useSmartScopes()
 const name = ref('')
 const icon = ref('')
 const isPublic = ref(false)
+const syncToKobo = ref(false)
 const saving = ref(false)
 const error = ref<string | null>(null)
 const trimmedName = computed(() => name.value.trim())
@@ -36,10 +37,12 @@ async function submit() {
       icon: trimmedIcon.value,
       defaultSort: [],
       isPublic: isPublic.value,
+      syncToKobo: syncToKobo.value,
     })
     name.value = ''
     icon.value = ''
     isPublic.value = false
+    syncToKobo.value = false
     emit('close')
     router.push({ name: 'smartScope', params: { id: smartScope.id } })
   } catch {
@@ -82,6 +85,11 @@ async function submit() {
           <label class="flex items-center gap-2.5 cursor-pointer select-none">
             <input type="checkbox" v-model="isPublic" class="h-4 w-4 rounded border border-input accent-primary" />
             <span class="text-sm text-foreground">Visible to all users</span>
+          </label>
+
+          <label class="flex items-center gap-2.5 cursor-pointer select-none">
+            <input type="checkbox" v-model="syncToKobo" class="h-4 w-4 rounded border border-input accent-primary" />
+            <span class="text-sm text-foreground">Sync to Kobo</span>
           </label>
 
           <p v-if="error" class="text-sm text-destructive">{{ error }}</p>

@@ -51,6 +51,8 @@ export class BookDetailDto {
   seriesIndex: number | null;
   seriesMemberships: BookSeriesMembership[];
   rating: number | null;
+  personalNote: string | null;
+  personalNoteUpdatedAt: Date | null;
   communityRatings: BookCommunityRating[];
   coverSource: 'extracted' | 'custom' | null;
   hardcoverEditionId: string | null;

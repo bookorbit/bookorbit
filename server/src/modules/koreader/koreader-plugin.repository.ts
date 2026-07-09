@@ -278,7 +278,7 @@ export class KoreaderPluginRepository {
       });
   }
 
-  async getRating(userId: number, bookId: number): Promise<{ rating: number; updatedAt: Date } | null> {
+  async getRating(userId: number, bookId: number): Promise<{ rating: number | null; updatedAt: Date } | null> {
     const [row] = await this.db
       .select({ rating: schema.userBookRatings.rating, updatedAt: schema.userBookRatings.updatedAt })
       .from(schema.userBookRatings)
@@ -287,14 +287,16 @@ export class KoreaderPluginRepository {
     return row ?? null;
   }
 
-  async upsertRating(userId: number, bookId: number, rating: number) {
-    await this.db
+  async upsertRating(userId: number, bookId: number, rating: number | null): Promise<{ rating: number | null; updatedAt: Date }> {
+    const [row] = await this.db
       .insert(schema.userBookRatings)
       .values({ userId, bookId, rating })
       .onConflictDoUpdate({
         target: [schema.userBookRatings.userId, schema.userBookRatings.bookId],
         set: { rating, updatedAt: new Date() },
-      });
+      })
+      .returning({ rating: schema.userBookRatings.rating, updatedAt: schema.userBookRatings.updatedAt });
+    return row!;
   }
 
   async upsertSweep(data: {

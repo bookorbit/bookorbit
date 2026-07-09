@@ -93,6 +93,8 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     seriesName: null,
     seriesIndex: null,
     rating: null,
+    personalNote: null,
+    personalNoteUpdatedAt: null,
     communityRatings: [],
     coverSource: null,
     hardcoverEditionId: null,
@@ -209,6 +211,42 @@ describe('DetailsTab - present state', () => {
     expect(vi.mocked(api)).toHaveBeenCalledWith('/api/v1/collections/membership', COLLECTION_MEMBERSHIP_REQUEST)
     expect(wrapper.text()).not.toContain('Favorites')
     expect(wrapper.text()).not.toContain('Collections')
+  })
+
+  it('saves personal reviews through the personal note endpoint', async () => {
+    const updated = makeBook({ personalNote: 'Loved it.', personalNoteUpdatedAt: '2026-07-06T12:00:00.000Z' })
+    let personalNoteRequest: RequestInit | undefined
+
+    vi.mocked(api).mockImplementation(async (input, init) => {
+      if (input === '/api/v1/books/1/personal-note') {
+        personalNoteRequest = init
+        return makeApiResponse(updated)
+      }
+
+      if (input === '/api/v1/collections/membership') return makeApiResponse([])
+      return makeApiResponse({}, false)
+    })
+
+    const wrapper = mount(DetailsTab, {
+      props: { book: makeBook({ id: 1 }) },
+      global: globalStubs,
+    })
+    await flushPromises()
+
+    await wrapper.find('button[aria-label="Toggle personal review"]').trigger('click')
+    await wrapper.find('button[aria-label="Edit personal review"]').trigger('click')
+    await wrapper.find('textarea').setValue('  Loved it.  ')
+    const saveButton = wrapper.findAll('button').find((button) => button.text().includes('Save'))
+    expect(saveButton).toBeTruthy()
+    await saveButton!.trigger('click')
+    await flushPromises()
+
+    expect(personalNoteRequest).toEqual({
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ note: 'Loved it.' }),
+    })
+    expect(wrapper.emitted('saved')?.[0]).toEqual([updated])
   })
 
   it('shows reading date fields when both dates are null and status is null', () => {

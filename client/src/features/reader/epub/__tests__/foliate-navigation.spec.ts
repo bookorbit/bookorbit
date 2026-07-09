@@ -45,6 +45,9 @@ describe('Foliate navigation', () => {
   let getKoreaderDocFragmentIndex: (sections: { id: string }[], index: number) => number | null
   let getKoboSpanValue: (range: Range | null) => string | null
   let getPageProgressionRtl: (bookDir: string | null | undefined, contentRtl: boolean) => boolean
+  let usesNegativePageScroll: (vertical: boolean, pageProgressionRtl: boolean) => boolean
+  let getPageScrollOffset: (page: number, size: number, vertical: boolean, pageProgressionRtl: boolean) => number
+  let normalizeStylesheetForReader: (data: string, width?: number, height?: number) => string
   let FixedLayout: new () => HTMLElement & {
     open: (book: { rendition: { layout: string; spread: string }; sections: { load: () => Promise<string> }[] }) => void
     goTo: (target: { index: number }) => Promise<void>
@@ -68,9 +71,14 @@ describe('Foliate navigation', () => {
       getKoboSpanValue: typeof getKoboSpanValue
     })
     ;({ FixedLayout } = (await import(fixedLayoutModulePath)) as { FixedLayout: typeof FixedLayout })
-    ;({ Paginator, getPageProgressionRtl } = (await import(paginatorModulePath)) as {
+    ;({ Paginator, getPageProgressionRtl, usesNegativePageScroll, getPageScrollOffset, normalizeStylesheetForReader } = (await import(
+      paginatorModulePath
+    )) as {
       Paginator: typeof Paginator
       getPageProgressionRtl: typeof getPageProgressionRtl
+      usesNegativePageScroll: typeof usesNegativePageScroll
+      getPageScrollOffset: typeof getPageScrollOffset
+      normalizeStylesheetForReader: typeof normalizeStylesheetForReader
     })
   })
 
@@ -175,6 +183,41 @@ describe('Foliate navigation', () => {
     expect(getPageProgressionRtl('ltr', true)).toBe(false)
     expect(getPageProgressionRtl('default', true)).toBe(true)
     expect(getPageProgressionRtl(undefined, false)).toBe(false)
+  })
+
+  it('normalizes legacy vertical writing CSS used by Japanese EPUBs', () => {
+    const css = `
+      .vrtl {
+        -webkit-writing-mode: vertical-rl;
+        -epub-text-orientation: upright;
+        -webkit-line-break: strict;
+      }
+      .page {
+        width: 50vw;
+        height: 25vh;
+        page-break-after: always;
+      }
+    `
+
+    const normalized = normalizeStylesheetForReader(css, 1200, 800)
+
+    expect(normalized).toContain('writing-mode: vertical-rl;')
+    expect(normalized).toContain('text-orientation: upright;')
+    expect(normalized).toContain('line-break: strict;')
+    expect(normalized).toContain('width: 600px;')
+    expect(normalized).toContain('height: 200px;')
+    expect(normalized).toContain('-webkit-column-break-after: always;')
+    expect(normalized).not.toContain('-webkit-writing-mode')
+    expect(normalized).not.toContain('-epub-text-orientation')
+    expect(normalized).not.toContain('-webkit-line-break')
+  })
+
+  it('uses positive page scroll offsets for vertical RTL paginated EPUBs', () => {
+    expect(usesNegativePageScroll(false, true)).toBe(true)
+    expect(usesNegativePageScroll(true, true)).toBe(false)
+    expect(getPageScrollOffset(1, 800, false, true)).toBe(-800)
+    expect(getPageScrollOffset(1, 800, true, true)).toBe(800)
+    expect(getPageScrollOffset(1, 800, true, false)).toBe(800)
   })
 
   it('maps physical left and right navigation using OPF RTL page progression', async () => {

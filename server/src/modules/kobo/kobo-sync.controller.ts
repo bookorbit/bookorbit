@@ -37,6 +37,10 @@ function readHeaderValue(value: string | string[] | undefined): string | undefin
   return Array.isArray(value) ? value[0] : value;
 }
 
+function isBookOrbitTag(tagId: string): boolean {
+  return tagId.startsWith('col-') || tagId.startsWith('ss-');
+}
+
 function buildBaseUrl(req: FastifyRequest): string {
   const fwdHost = readHeaderValue(req.headers['x-forwarded-host']);
   const fwdPort = readHeaderValue(req.headers['x-forwarded-port']);
@@ -102,6 +106,8 @@ export class KoboSyncController {
         image_url_template: `${baseUrl}/api/v1/kobo/${t}/v1/books/{ImageId}/thumbnail/{Width}/{Height}/false/image.jpg`,
         image_url_quality_template: `${baseUrl}/api/v1/kobo/${t}/v1/books/{ImageId}/thumbnail/{Width}/{Height}/{Quality}/{IsGreyscale}/image.jpg`,
         library_sync: `${baseUrl}/api/v1/kobo/${t}/v1/library/sync`,
+        get_tests_request: `${baseUrl}/api/v1/kobo/${t}/v1/analytics/gettests`,
+        post_analytics_event: `${baseUrl}/api/v1/kobo/${t}/v1/analytics/event`,
         reading_services_host: readingServicesBaseUrl,
       },
     };
@@ -154,14 +160,21 @@ export class KoboSyncController {
     @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,
   ) {
-    if (!tagId.startsWith('col-')) return this.proxyService.forward(req, reply, device.deviceToken);
+    if (!isBookOrbitTag(tagId)) return this.proxyService.forward(req, reply, device.deviceToken);
     reply.status(HttpStatus.OK).send({ RequestResult: 'Success' });
   }
 
   @Post('v1/library/tags/:tagId/items')
   @HttpCode(HttpStatus.OK)
   async addTagItems(@Param('tagId') tagId: string, @KoboDevice() device: KoboDeviceContext, @Req() req: FastifyRequest, @Res() reply: FastifyReply) {
-    if (!tagId.startsWith('col-')) return this.proxyService.forward(req, reply, device.deviceToken);
+    if (!isBookOrbitTag(tagId)) return this.proxyService.forward(req, reply, device.deviceToken);
+    reply.status(HttpStatus.OK).send({ RequestResult: 'Success' });
+  }
+
+  @Delete('v1/library/tags/:tagId')
+  @HttpCode(HttpStatus.OK)
+  async deleteTag(@Param('tagId') tagId: string, @KoboDevice() device: KoboDeviceContext, @Req() req: FastifyRequest, @Res() reply: FastifyReply) {
+    if (!isBookOrbitTag(tagId)) return this.proxyService.forward(req, reply, device.deviceToken);
     reply.status(HttpStatus.OK).send({ RequestResult: 'Success' });
   }
 

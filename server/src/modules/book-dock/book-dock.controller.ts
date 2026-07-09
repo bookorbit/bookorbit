@@ -80,6 +80,18 @@ export class BookDockController {
     return this.service.getSummary(user.id, user.isSuperuser);
   }
 
+  @Post('pause')
+  @HttpCode(HttpStatus.OK)
+  pause() {
+    return this.service.pauseProcessing();
+  }
+
+  @Post('resume')
+  @HttpCode(HttpStatus.OK)
+  resume() {
+    return this.service.resumeProcessing();
+  }
+
   @Get('statistics')
   getStatistics(@CurrentUser() user: RequestUser) {
     return this.service.getStatistics(user.id, user.isSuperuser);
@@ -183,8 +195,51 @@ export class BookDockController {
   }
 
   @Post('files/preview-names')
-  previewNames(@Body() dto: PreviewNamesDto) {
-    return this.finalizeService.previewNames(dto.fileIds, dto.selectAll, dto.excludedIds, dto.defaultLibraryId, dto.status, dto.search);
+  previewNames(@CurrentUser() user: RequestUser, @Body() dto: PreviewNamesDto) {
+    return this.finalizeService.previewNames(
+      dto.fileIds,
+      dto.selectAll,
+      dto.excludedIds,
+      dto.defaultLibraryId,
+      user.id,
+      user.isSuperuser,
+      dto.status,
+      dto.search,
+    );
+  }
+
+  @Post('finalize/preview')
+  @HttpCode(HttpStatus.OK)
+  previewFinalize(@CurrentUser() user: RequestUser, @Body() dto: FinalizeBookDockDto) {
+    return this.finalizeService.previewFinalize(
+      user.id,
+      user.isSuperuser,
+      dto.fileIds,
+      dto.selectAll,
+      dto.excludedIds,
+      dto.defaultLibraryId,
+      dto.defaultFolderId,
+      dto.overrides,
+      dto.status,
+      dto.search,
+    );
+  }
+
+  @Post('finalize/discard-duplicates')
+  @HttpCode(HttpStatus.OK)
+  discardFinalizeDuplicates(@CurrentUser() user: RequestUser, @Body() dto: FinalizeBookDockDto) {
+    return this.finalizeService.discardDuplicateCandidates(
+      user.id,
+      user.isSuperuser,
+      dto.fileIds,
+      dto.selectAll,
+      dto.excludedIds,
+      dto.defaultLibraryId,
+      dto.defaultFolderId,
+      dto.overrides,
+      dto.status,
+      dto.search,
+    );
   }
 
   @Post('finalize')

@@ -10,6 +10,19 @@ function makeQueryChain(result: unknown) {
   };
   chain.from = vi.fn().mockReturnValue(chain);
   chain.where = vi.fn().mockReturnValue(chain);
+  chain.limit = vi.fn().mockReturnValue(chain);
+  return chain;
+}
+
+function makeInsertChain(result: unknown) {
+  const chain: Record<string, unknown> = {
+    then(resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) {
+      return Promise.resolve(result).then(resolve, reject);
+    },
+  };
+  chain.values = vi.fn().mockReturnValue(chain);
+  chain.onConflictDoUpdate = vi.fn().mockReturnValue(chain);
+  chain.returning = vi.fn().mockReturnValue(chain);
   return chain;
 }
 
@@ -17,6 +30,7 @@ function makeDb() {
   return {
     execute: vi.fn(),
     select: vi.fn(),
+    insert: vi.fn(),
   };
 }
 
@@ -90,6 +104,40 @@ describe('KoreaderPluginRepository', () => {
       db.select.mockReturnValue(makeQueryChain([]));
 
       await expect(repo.getHashLinkVersion(7)).resolves.toEqual({ count: 0, maxTs: null });
+    });
+  });
+
+  describe('getRating', () => {
+    it('returns the current rating row for a user and book', async () => {
+      const updatedAt = new Date('2026-06-01T10:00:00.000Z');
+      db.select.mockReturnValue(makeQueryChain([{ rating: 4, updatedAt }]));
+
+      await expect(repo.getRating(7, 20)).resolves.toEqual({ rating: 4, updatedAt });
+    });
+
+    it('returns null when no rating row exists', async () => {
+      db.select.mockReturnValue(makeQueryChain([]));
+
+      await expect(repo.getRating(7, 20)).resolves.toBeNull();
+    });
+  });
+
+  describe('upsertRating', () => {
+    it('returns the canonical rating row written by the upsert', async () => {
+      const updatedAt = new Date('2026-06-02T10:00:00.000Z');
+      const insertChain = makeInsertChain([{ rating: 4, updatedAt }]);
+      db.insert.mockReturnValue(insertChain);
+
+      await expect(repo.upsertRating(7, 20, 4)).resolves.toEqual({ rating: 4, updatedAt });
+      expect(insertChain.values).toHaveBeenCalledWith({ userId: 7, bookId: 20, rating: 4 });
+    });
+
+    it('supports clearing a rating to null', async () => {
+      const updatedAt = new Date('2026-06-03T10:00:00.000Z');
+      const insertChain = makeInsertChain([{ rating: null, updatedAt }]);
+      db.insert.mockReturnValue(insertChain);
+
+      await expect(repo.upsertRating(7, 20, null)).resolves.toEqual({ rating: null, updatedAt });
     });
   });
 });

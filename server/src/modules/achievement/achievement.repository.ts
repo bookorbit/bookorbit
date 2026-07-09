@@ -895,7 +895,10 @@ export class AchievementRepository {
   // ── Ratings ──
 
   async countRatings(userId: number): Promise<number> {
-    const [{ value }] = await this.db.select({ value: count() }).from(userBookRatings).where(eq(userBookRatings.userId, userId));
+    const [{ value }] = await this.db
+      .select({ value: count() })
+      .from(userBookRatings)
+      .where(and(eq(userBookRatings.userId, userId), isNotNull(userBookRatings.rating)));
     return value;
   }
 
@@ -911,7 +914,7 @@ export class AchievementRepository {
     const [{ value }] = await this.db
       .select({ value: countDistinct(userBookRatings.rating) })
       .from(userBookRatings)
-      .where(eq(userBookRatings.userId, userId));
+      .where(and(eq(userBookRatings.userId, userId), isNotNull(userBookRatings.rating)));
     return value;
   }
 

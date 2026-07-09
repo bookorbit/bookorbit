@@ -1,4 +1,4 @@
-import type { CreateFolderResult, DirectoryEntry } from '@bookorbit/types';
+import type { CreateFolderResult, DirectoryEntry, PathConfig } from '@bookorbit/types';
 import {
   BadRequestException,
   ConflictException,
@@ -12,6 +12,7 @@ import { lstat, mkdir, readdir } from 'fs/promises';
 import { join, resolve, sep } from 'path';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { PathPolicyService } from './path-policy.service';
 
 const BLOCKED = ['/proc', '/sys', '/dev', '/run', '/var/run', '/etc', '/root'];
 
@@ -19,8 +20,14 @@ const BLOCKED = ['/proc', '/sys', '/dev', '/run', '/var/run', '/etc', '/root'];
 export class PathService {
   private readonly logger = new Logger(PathService.name);
 
-  async listDirectories(rawPath: string): Promise<DirectoryEntry[]> {
-    const resolved = resolve(rawPath || '/');
+  constructor(private readonly pathPolicy: PathPolicyService) {}
+
+  getConfig(): PathConfig {
+    return { root: this.pathPolicy.getBrowseRoot() };
+  }
+
+  async listDirectories(rawPath?: string): Promise<DirectoryEntry[]> {
+    const resolved = await this.pathPolicy.resolveBrowsePath(rawPath);
     if (this.isBlocked(resolved)) {
       return [];
     }
@@ -49,7 +56,7 @@ export class PathService {
 
   async createDirectory(rawParent: string, rawName: string): Promise<CreateFolderResult> {
     const name = this.assertSafeName(rawName);
-    const parent = resolve(rawParent || '/');
+    const parent = await this.pathPolicy.resolveBrowsePath(rawParent);
     if (this.isBlocked(parent)) {
       throw new ForbiddenException('Cannot create a folder in this location');
     }
@@ -63,9 +70,11 @@ export class PathService {
 
       const target = join(parent, name);
       const prefix = parent.endsWith(sep) ? parent : parent + sep;
-      if (!resolve(target).startsWith(prefix)) {
+      const resolvedTarget = resolve(target);
+      if (!resolvedTarget.startsWith(prefix)) {
         throw new BadRequestException('Invalid folder name');
       }
+      await this.pathPolicy.assertWithinBrowseRoot(resolvedTarget);
 
       await mkdir(target); // codeql[js/path-injection]
       this.logger.log(`[path.create_folder] [end] path="${sanitizeLogValue(target)}" durationMs=${Date.now() - startedAt} - create folder completed`);

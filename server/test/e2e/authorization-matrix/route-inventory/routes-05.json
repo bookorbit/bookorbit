@@ -410,6 +410,18 @@
   {
     "file": "server/src/modules/path/path.controller.ts",
     "className": "PathController",
+    "methodName": "getConfig",
+    "httpMethod": "GET",
+    "path": "/path/config",
+    "permissions": ["Permission.ManageLibraries"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/path/path.controller.ts",
+    "className": "PathController",
     "methodName": "listDirectories",
     "httpMethod": "GET",
     "path": "/path",

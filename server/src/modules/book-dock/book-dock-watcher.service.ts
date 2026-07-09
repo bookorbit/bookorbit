@@ -10,6 +10,7 @@ import { waitForStability } from '../scanner/lib/stability';
 import { BookDockIngestService } from './book-dock-ingest.service';
 import { BookDockRepository } from './book-dock.repository';
 import { BookDockGateway } from './book-dock.gateway';
+import { BookDockProcessingStateService } from './book-dock-processing-state.service';
 
 type EventType = 'delete' | 'create';
 
@@ -28,6 +29,7 @@ export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleD
     private readonly ingestService: BookDockIngestService,
     private readonly repo: BookDockRepository,
     private readonly gateway: BookDockGateway,
+    private readonly processingState: BookDockProcessingStateService,
   ) {
     const appDataPath = this.config.get<string>('storage.appDataPath') ?? '/data';
     this.bookDockPath = this.config.get<string>('storage.bookDockPath') ?? join(appDataPath, 'book-dock');
@@ -48,6 +50,10 @@ export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleD
   }
 
   async rescan(): Promise<void> {
+    if (await this.processingState.isPaused()) {
+      await this.emitSummary();
+      return;
+    }
     await this.walkAndIngest(this.bookDockPath);
     await this.emitSummary();
   }
@@ -99,8 +105,10 @@ export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleD
 
   private async process(type: EventType, path: string): Promise<void> {
     if (type === 'create') {
+      if (await this.processingState.isPaused()) return;
       if (!isPrimaryFormat(path)) return;
       await waitForStability(path);
+      if (await this.processingState.isPaused()) return;
       const id = await this.ingestService.ingestFromWatchedFolder(path);
       if (id !== null) await this.emitSummary();
     } else {
@@ -117,6 +125,8 @@ export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleD
   }
 
   private async walkAndIngest(dir: string): Promise<void> {
+    if (await this.processingState.isPaused()) return;
+
     let entries: Dirent[];
     try {
       entries = await readdir(dir, { withFileTypes: true });
@@ -125,6 +135,7 @@ export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleD
     }
 
     for (const entry of entries) {
+      if (await this.processingState.isPaused()) return;
       const full = join(dir, entry.name);
       if (entry.isDirectory()) {
         if (entry.name === COVERS_DIR && dir === this.bookDockPath) continue;
@@ -137,7 +148,8 @@ export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleD
 
   private async emitSummary(): Promise<void> {
     const summary = await this.repo.countsByStatus();
-    this.gateway.emitSummary(summary);
+    const paused = await this.processingState.isPaused();
+    this.gateway.emitSummary({ ...summary, paused });
   }
 }
 

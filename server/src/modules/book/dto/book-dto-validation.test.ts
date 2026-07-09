@@ -19,6 +19,7 @@ import { GetBooksDto } from './get-books.dto';
 import { SaveProgressDto } from './save-progress.dto';
 import { SearchBooksDto } from './search-books.dto';
 import { UpdateBookMetadataDto } from './update-book-metadata.dto';
+import { UpdatePersonalNoteDto } from './update-personal-note.dto';
 import { UpdateRatingDto } from './update-rating.dto';
 import { UpsertAudioProgressDto } from './upsert-audio-progress.dto';
 
@@ -277,6 +278,12 @@ describe('Book DTO validation', () => {
     expect((await errorsFor(UpdateRatingDto, { rating: 3 })).length).toBe(0);
     expect((await errorsFor(UpdateRatingDto, { rating: 0 })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateRatingDto, { rating: 6 })).length).toBeGreaterThan(0);
+  });
+
+  it('validates personal note updates', async () => {
+    expect((await errorsFor(UpdatePersonalNoteDto, { note: 'My private review' })).length).toBe(0);
+    expect((await errorsFor(UpdatePersonalNoteDto, { note: null })).length).toBe(0);
+    expect((await errorsFor(UpdatePersonalNoteDto, { note: 'a'.repeat(10001) })).length).toBeGreaterThan(0);
   });
 
   it('validates audiobook progress bounds for percentage and position', async () => {

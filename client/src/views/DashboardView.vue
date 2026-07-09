@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Settings2, Sparkles } from '@lucide/vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 import { useAuth } from '@/features/auth/composables/useAuth'
+import { getDashboardGreetingLabel } from '@/features/dashboard/lib/greeting'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import DashboardScroller from '@/features/dashboard/components/DashboardScroller.vue'
@@ -22,6 +23,8 @@ const { maybeStartTour } = useOnboardingTour()
 const { smartScopes, loaded: smartScopesLoaded, fetchSmartScopes } = useSmartScopes()
 
 const settingsOpen = ref(false)
+const now = ref(new Date())
+let greetingTimer: number | null = null
 
 const enabledScrollers = computed(() =>
   (Array.isArray(scrollers.value) ? scrollers.value : []).filter((s) => s.enabled).sort((a, b) => a.order - b.order),
@@ -29,10 +32,7 @@ const enabledScrollers = computed(() =>
 
 const hasNoLibraries = computed(() => !librariesLoading.value && libraries.value.length === 0)
 const greetingLabel = computed(() => {
-  const hour = new Date().getHours()
-  if (hour < 12) return 'morning'
-  if (hour < 18) return 'afternoon'
-  return 'evening'
+  return getDashboardGreetingLabel(now.value, user.value?.settings?.timezone)
 })
 const greetingName = computed(() => {
   const fullName = user.value?.name?.trim()
@@ -52,9 +52,19 @@ watch(
 onMounted(() => {
   fetchLibraries()
   fetchSmartScopes()
+  greetingTimer = window.setInterval(() => {
+    now.value = new Date()
+  }, 60_000)
   nextTick(() => {
     setTimeout(maybeStartTour, 500)
   })
+})
+
+onUnmounted(() => {
+  if (greetingTimer !== null) {
+    window.clearInterval(greetingTimer)
+    greetingTimer = null
+  }
 })
 </script>
 

@@ -1246,10 +1246,6 @@ export class BookRepository {
 
   async bulkSetRating(bookIds: number[], rating: number | null, userId: number): Promise<void> {
     if (bookIds.length === 0) return;
-    if (rating === null) {
-      await this.db.delete(userBookRatings).where(and(eq(userBookRatings.userId, userId), inArray(userBookRatings.bookId, bookIds)));
-      return;
-    }
 
     await this.db
       .insert(userBookRatings)

@@ -9,6 +9,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  Maximize,
+  Minimize,
   Minus,
   Moon,
   Pause,
@@ -32,6 +34,7 @@ import { useAudioQueue } from './composables/useAudioQueue'
 import { useAudioSettings } from './composables/useAudioSettings'
 import { useAudioBookmarks, type AudioBookmark } from './composables/useAudioBookmarks'
 import { useReadingSession } from '../shared/composables/useReadingSession'
+import { useFullscreen } from '../shared/composables/useFullscreen'
 
 const props = defineProps<{ bookId: number; fileId: number; peekMode?: boolean }>()
 const route = useRoute()
@@ -46,6 +49,8 @@ const chaptersTab = ref<'chapters' | 'bookmarks'>('chapters')
 const showSettings = ref(false)
 const showSleepTimer = ref(false)
 const showSpeedPicker = ref(false)
+const { isFullscreen, toggleFullscreen } = useFullscreen()
+const fullscreenLabel = computed(() => (isFullscreen.value ? 'Exit fullscreen' : 'Enter fullscreen'))
 
 const sleepButtonRef = ref<HTMLButtonElement | null>(null)
 const speedButtonRef = ref<HTMLButtonElement | null>(null)
@@ -814,6 +819,15 @@ onMounted(async () => {
           >
             <BookmarkCheck v-if="isNearBookmark" class="w-5 h-5" />
             <Bookmark v-else class="w-5 h-5" />
+          </button>
+          <button
+            class="p-2 rounded-full hover:bg-white/10 transition-colors text-white/65"
+            :aria-label="fullscreenLabel"
+            :title="fullscreenLabel"
+            @click="toggleFullscreen"
+          >
+            <Minimize v-if="isFullscreen" class="w-5 h-5" />
+            <Maximize v-else class="w-5 h-5" />
           </button>
           <button class="p-2 rounded-full hover:bg-white/10 transition-colors text-white/65" @click="showSettings = !showSettings">
             <Settings class="w-5 h-5" />
