@@ -265,6 +265,51 @@ describe('DetailsTab cover surface', () => {
     expect(wrapper.text()).toContain('Author One, Author Two')
   })
 
+  it('links every series membership to its series detail page', async () => {
+    const wrapper = mountDetails(
+      makeBook({
+        seriesId: 20,
+        seriesName: 'Mistborn Era 2',
+        seriesIndex: 4,
+        seriesMemberships: [
+          { seriesId: 22, seriesName: 'Cosmere', seriesIndex: null, displayOrder: 2 },
+          { seriesId: 20, seriesName: 'Mistborn Era 2', seriesIndex: 4, displayOrder: 0 },
+          { seriesId: 21, seriesName: 'Mistborn Saga', seriesIndex: 7.5, displayOrder: 1 },
+        ],
+      }),
+    )
+    await flushPromises()
+
+    const expectedLinks = [
+      { text: 'Mistborn Era 2 #4', to: { name: 'series-detail', params: { seriesId: 20 } } },
+      { text: 'Mistborn Saga #7.5', to: { name: 'series-detail', params: { seriesId: 21 } } },
+      { text: 'Cosmere', to: { name: 'series-detail', params: { seriesId: 22 } } },
+    ]
+    const seriesLinks = wrapper.findAllComponents(RouterLinkStub).filter((link) => expectedLinks.some((expected) => expected.text === link.text()))
+
+    expect(seriesLinks).toHaveLength(6)
+    expect(seriesLinks.map((link) => ({ text: link.text(), to: link.props('to') }))).toEqual([...expectedLinks, ...expectedLinks])
+  })
+
+  it('falls back to primary series fields when memberships are absent', async () => {
+    const wrapper = mountDetails(
+      makeBook({
+        seriesId: 20,
+        seriesName: 'Mistborn Era 2',
+        seriesIndex: 4,
+      }),
+    )
+    await flushPromises()
+
+    const seriesLinks = wrapper.findAllComponents(RouterLinkStub).filter((link) => link.text() === 'Mistborn Era 2 #4')
+
+    expect(seriesLinks).toHaveLength(2)
+    expect(seriesLinks.map((link) => link.props('to'))).toEqual([
+      { name: 'series-detail', params: { seriesId: 20 } },
+      { name: 'series-detail', params: { seriesId: 20 } },
+    ])
+  })
+
   it('renders community rating badges with score and tooltip per provider', async () => {
     const wrapper = mountDetails(
       makeBook({
