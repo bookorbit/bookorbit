@@ -105,9 +105,16 @@ export class BookDockRepository {
     return rows.map((r) => r.id);
   }
 
-  async findByIds(ids: number[]): Promise<BookDockFileRow[]> {
+  async findByIds(ids: number[], userId?: number, isSuperuser?: boolean): Promise<BookDockFileRow[]> {
     if (ids.length === 0) return [];
-    return this.db.select().from(bookDockFiles).where(inArray(bookDockFiles.id, ids));
+    const conditions: SQL[] = [inArray(bookDockFiles.id, ids)];
+    if (userId !== undefined && !isSuperuser) {
+      conditions.push(or(eq(bookDockFiles.uploadedBy, userId), isNull(bookDockFiles.uploadedBy))!);
+    }
+    return this.db
+      .select()
+      .from(bookDockFiles)
+      .where(and(...conditions));
   }
 
   async findSelectionBatch(options: SelectionBatchOptions): Promise<BookDockFileRow[]> {

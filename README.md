@@ -57,6 +57,7 @@ _Experience the interface, built-in readers, and dashboard first-hand._
 - **KOReader Plugin**: Native on-device catalog browser with search, download, and status/rating management, alongside full progress and annotation sync.
 - **Annotations & Highlights**: Highlights from the web reader, KOReader, and Kobo merge into a unified searchable hub - filterable by color, style, and source, exportable as Markdown, CSV, or JSON.
 - **Hardcover Sync**: Automatically pushes status, progress, reading dates, and ratings to Hardcover on configurable triggers. Pull read history back from Hardcover to backfill blank BookOrbit entries.
+- **Readwise Sync**: Automatically pushes new highlights and notes to Readwise as you create them, from both the web reader and synced devices, with book covers matched by ISBN.
 - **Achievements & Reading Goals**: Yearly goals, daily streaks, monthly challenges, and 50+ achievements across five categories. Reading DNA profiles your reading style from your actual session history.
 - **Reading Statistics**: Track your daily reading time, view heatmaps, maintain streaks, and monitor library health.
 

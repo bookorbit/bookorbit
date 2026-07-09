@@ -15,12 +15,14 @@ import { BookDockRepository } from './book-dock.repository';
 import { BookDockMetadataService } from './book-dock-metadata.service';
 import { BookDockEventsService, BOOK_DOCK_FILE_INGESTED } from './book-dock-events.service';
 import { BookDockGateway } from './book-dock.gateway';
+import { BookDockProcessingStateService } from './book-dock-processing-state.service';
 import { BookDockWorkQueue, type BookDockWorkPriority } from './book-dock-work-queue';
 
 const METADATA_QUEUE_CONCURRENCY = 1;
 const METADATA_QUEUE_DRAIN_DELAY_MS = 250;
 const METADATA_QUEUE_INTER_BOOK_DELAY_MIN_MS = 500;
 const METADATA_QUEUE_INTER_BOOK_DELAY_MAX_MS = 1_000;
+const REQUEUE_BATCH_SIZE = 500;
 const PROCESSABLE_METADATA_STATUSES = new Set(['pending', 'extracting', 'fetching']);
 
 @Injectable()
@@ -38,6 +40,7 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     private readonly events: BookDockEventsService,
     private readonly appSettings: AppSettingsService,
     private readonly metadataFetchPipeline: MetadataFetchPipeline,
+    private readonly processingState: BookDockProcessingStateService,
     private readonly gateway: BookDockGateway,
   ) {
     const appDataPath = this.config.get<string>('storage.appDataPath') ?? '/data';
@@ -57,6 +60,9 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
   async onApplicationBootstrap(): Promise<void> {
     await mkdir(this.bookDockPath, { recursive: true });
     this.bookDockPath = await realpath(this.bookDockPath);
+    if (await this.processingState.isPaused()) {
+      this.metadataQueue.pause();
+    }
   }
 
   onModuleDestroy(): void {
@@ -137,17 +143,57 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
 
   private extractMetadataAsync(fileId: number, format: string, priority?: BookDockWorkPriority): void {
     if (!isSupportedFormat(format)) return;
+    if (this.processingState.getCachedPaused()) this.metadataQueue.pause();
     this.metadataQueue.enqueue(fileId, priority);
   }
 
-  private requeueExistingIfProcessable(row: BookDockFileRow): void {
-    if (!PROCESSABLE_METADATA_STATUSES.has(row.status)) return;
+  pauseProcessing(): void {
+    this.metadataQueue.pause();
+  }
+
+  async resumeProcessing(): Promise<void> {
+    if (await this.processingState.isPaused()) return;
+    this.metadataQueue.resume();
+  }
+
+  async requeueProcessableFiles(): Promise<number> {
+    if (await this.processingState.isPaused()) return 0;
+
+    let queued = 0;
+    let afterId: number | undefined;
+    while (!(await this.processingState.isPaused())) {
+      const rows = await this.repo.findSelectionBatch({
+        limit: REQUEUE_BATCH_SIZE,
+        afterId,
+        status: 'pending',
+        userId: 0,
+        isSuperuser: true,
+      });
+      if (rows.length === 0) break;
+
+      for (const row of rows) {
+        if (this.requeueExistingIfProcessable(row)) queued++;
+      }
+      afterId = rows[rows.length - 1]?.id;
+    }
+
+    return queued;
+  }
+
+  private requeueExistingIfProcessable(row: BookDockFileRow): boolean {
+    if (!PROCESSABLE_METADATA_STATUSES.has(row.status)) return false;
     const format = resolveSupportedFormat(row);
-    if (!format) return;
-    this.extractMetadataAsync(row.id, format, metadataQueuePriority(row));
+    if (!format) return false;
+    if (this.processingState.getCachedPaused()) this.metadataQueue.pause();
+    return this.metadataQueue.enqueue(row.id, metadataQueuePriority(row));
   }
 
   private async processMetadataJob(fileId: number): Promise<void> {
+    if (await this.processingState.isPaused()) {
+      this.metadataQueue.pause();
+      return;
+    }
+
     const row = await this.repo.findById(fileId);
     if (!row || !PROCESSABLE_METADATA_STATUSES.has(row.status)) return;
 
@@ -226,7 +272,8 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
 
   private async emitSummary(): Promise<void> {
     const summary = await this.repo.countsByStatus();
-    this.gateway.emitSummary(summary);
+    const paused = await this.processingState.isPaused();
+    this.gateway.emitSummary({ ...summary, paused });
   }
 }
 
@@ -306,11 +353,11 @@ function authorSimilarity(embAuthors: string[], fetchAuthors: string[]): number 
 }
 
 function computeConfidence(embedded: BookDockMetadata, fetched: BookDockMetadata): number {
-  // ISBN exact match — definitive
+  // ISBN exact match - definitive
   if (embedded.isbn13 && fetched.isbn13 && embedded.isbn13 === fetched.isbn13) return 95;
   if (embedded.isbn10 && fetched.isbn10 && embedded.isbn10 === fetched.isbn10) return 90;
 
-  // Conflicting ISBNs — almost certainly wrong book
+  // Conflicting ISBNs - almost certainly wrong book
   const embIsbn = embedded.isbn13 ?? embedded.isbn10;
   const fetchIsbn = fetched.isbn13 ?? fetched.isbn10;
   if (embIsbn && fetchIsbn && embIsbn !== fetchIsbn) return 10;

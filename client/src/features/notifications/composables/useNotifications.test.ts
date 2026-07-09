@@ -363,6 +363,31 @@ describe('useNotifications', () => {
       expect(notifications.value.every((n) => n.read)).toBe(true)
       expect(unreadCount.value).toBe(0)
     })
+
+    it('keeps notifications visible when all-read socket event arrives', async () => {
+      const useNotifications = await loadModule()
+      const { fetchNotifications, notifications, subscribe, total, unreadCount } = useNotifications()
+
+      mockApi.mockReturnValueOnce(
+        mockOk({
+          items: [makeNotification({ id: 1, read: false }), makeNotification({ id: 2, read: false })],
+          total: 2,
+        }),
+      )
+      await fetchNotifications(true)
+      unreadCount.value = 2
+
+      subscribe()
+      const allReadHandler = mockSocket.on.mock.calls.find(([event]: unknown[]) => event === 'notification:all-read')?.[1] as (() => void) | undefined
+
+      expect(allReadHandler).toBeDefined()
+      allReadHandler!()
+
+      expect(notifications.value).toHaveLength(2)
+      expect(notifications.value.every((n) => n.read)).toBe(true)
+      expect(total.value).toBe(2)
+      expect(unreadCount.value).toBe(0)
+    })
   })
 
   describe('dismiss', () => {

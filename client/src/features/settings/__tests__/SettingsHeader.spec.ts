@@ -83,17 +83,41 @@ describe('SettingsHeader', () => {
       expect(labels).not.toContain('Integrations')
     })
 
+    it('shows Readwise tab for users with readwise_sync', () => {
+      const labels = getTabLabels(mountHeader({ perms: ['readwise_sync'] }))
+      expect(labels).toContain('Readwise')
+      expect(labels).not.toContain('Integrations')
+    })
+
+    it('hides Readwise tab when user lacks readwise_sync', () => {
+      const labels = getTabLabels(mountHeader())
+      expect(labels).not.toContain('Readwise')
+    })
+
     it('shows integration tabs for superusers', () => {
       const labels = getTabLabels(mountHeader({ su: true }))
       expect(labels).toContain('Kobo')
       expect(labels).toContain('KOReader')
       expect(labels).toContain('Hardcover')
+      expect(labels).toContain('Readwise')
       expect(labels).not.toContain('Integrations')
     })
 
     it('places integration tabs after OPDS', () => {
       const labels = getTabLabels(mountHeader({ su: true }))
-      expect(labels.slice(labels.indexOf('OPDS'), labels.indexOf('Admin'))).toEqual(['OPDS', 'Kobo', 'KOReader', 'Hardcover'])
+      expect(labels.slice(labels.indexOf('OPDS'), labels.indexOf('Admin'))).toEqual([
+        'OPDS',
+        'Kobo',
+        'KOReader',
+        'Hardcover',
+        'Readwise',
+        'StoryGraph',
+      ])
+    })
+
+    it('places Readwise tab after Hardcover', () => {
+      const labels = getTabLabels(mountHeader({ su: true }))
+      expect(labels.indexOf('Readwise')).toBe(labels.indexOf('Hardcover') + 1)
     })
   })
 
@@ -243,6 +267,12 @@ describe('SettingsHeader', () => {
     it('Hardcover tab is active when route is settings-hardcover', () => {
       const wrapper = mountHeader({ routeName: 'settings-hardcover', perms: ['hardcover_sync'] })
       const btn = wrapper.findAll('button').find((b) => b.text() === 'Hardcover')
+      expect(btn?.classes()).toContain('border-primary')
+    })
+
+    it('StoryGraph tab is active when route is settings-storygraph', () => {
+      const wrapper = mountHeader({ routeName: 'settings-storygraph', perms: ['storygraph_sync'] })
+      const btn = wrapper.findAll('button').find((b) => b.text() === 'StoryGraph')
       expect(btn?.classes()).toContain('border-primary')
     })
 

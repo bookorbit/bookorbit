@@ -1,4 +1,15 @@
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnApplicationBootstrap,
+  OnModuleDestroy,
+  OnModuleInit,
+  Optional,
+} from '@nestjs/common';
 import { basename, dirname, extname, join, resolve } from 'path';
 import { access as fsAccess, readFile, stat, unlink } from 'fs/promises';
 import { and, eq, inArray, or, sql } from 'drizzle-orm';
@@ -7,7 +18,11 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type {
   AudiobookChapter,
   BookDockAutoFinalizeMetadataMode,
+  BookDockDiscardDuplicatesResult,
   BookDockFinalizeFileResult,
+  BookDockFinalizePreviewItem,
+  BookDockFinalizePreviewResult,
+  BookDockFinalizePreviewStatus,
   BookDockFinalizeResult,
   BookDockMetadata,
 } from '@bookorbit/types';
@@ -29,10 +44,13 @@ import { UploadValidatorService } from '../upload/upload-validator.service';
 import { BookDockRepository } from './book-dock.repository';
 import { BookDockEventsService, BOOK_DOCK_FILE_INGESTED } from './book-dock-events.service';
 import { BookDockGateway } from './book-dock.gateway';
+import { BookDockProcessingStateService } from './book-dock-processing-state.service';
 import { BookDockWorkQueue } from './book-dock-work-queue';
 import type { BookDockFileRow } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
+type LibraryRow = typeof libraries.$inferSelect;
+type LibraryFolderRow = typeof libraryFolders.$inferSelect;
 
 type FinalizeOverrideEntry = {
   libraryId?: number;
@@ -42,6 +60,7 @@ type FinalizeOverrideEntry = {
 };
 
 const BATCH_SIZE = 100;
+const PREVIEW_ITEM_LIMIT = 200;
 const AUTO_FINALIZE_QUEUE_CONCURRENCY = 1;
 const MIN_PUBLISHED_YEAR = 1000;
 const MAX_PUBLISHED_YEAR = 2200;
@@ -66,8 +85,22 @@ type NormalizedFinalizeMetadata = {
   coverUrl: string | null;
 };
 
+type FinalizeCandidateAnalysis = {
+  fileId: number;
+  fileName: string;
+  row: BookDockFileRow;
+  status: BookDockFinalizePreviewStatus;
+  message?: string;
+  existingBookId?: number;
+  newName?: string;
+  library?: LibraryRow;
+  folder?: LibraryFolderRow;
+  format?: string;
+  destPath?: string;
+};
+
 @Injectable()
-export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
+export class BookDockFinalizeService implements OnModuleInit, OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(BookDockFinalizeService.name);
   private readonly autoFinalizeQueue: BookDockWorkQueue;
 
@@ -83,6 +116,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
     private readonly events: BookDockEventsService,
     private readonly gateway: BookDockGateway,
     private readonly notificationService: NotificationService,
+    private readonly processingState: BookDockProcessingStateService,
     @Optional() private readonly seriesIdentity?: SeriesIdentityService,
     @Optional() private readonly seriesMemberships?: SeriesMembershipService,
   ) {
@@ -97,6 +131,12 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
     this.events.on(BOOK_DOCK_FILE_INGESTED, (fileId: number) => {
       this.enqueueAutoFinalize(fileId);
     });
+  }
+
+  async onApplicationBootstrap(): Promise<void> {
+    if (await this.processingState.isPaused()) {
+      this.autoFinalizeQueue.pause();
+    }
   }
 
   onModuleDestroy(): void {
@@ -149,7 +189,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
     } else {
       for (let i = 0; i < ids.length; i += BATCH_SIZE) {
         const batch = ids.slice(i, i + BATCH_SIZE);
-        const rows = await this.repo.findByIds(batch);
+        const rows = await this.repo.findByIds(batch, userId, isSuperuser);
         const rowById = new Map(rows.map((row) => [row.id, row]));
         const duplicateLookup = await this.buildDuplicateLookup(rows, defaultLibraryId, overrideMap);
 
@@ -199,58 +239,12 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
     duplicateLookup?: Map<string, number>,
   ): Promise<BookDockFinalizeFileResult> {
     try {
-      const override = overrideMap.get(row.id);
-      const libraryId = override?.libraryId ?? row.targetLibraryId ?? defaultLibraryId ?? null;
-      const folderId = override?.folderId ?? row.targetFolderId ?? defaultFolderId ?? null;
+      const analysis = await this.analyzeFinalizeCandidate(row, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser, duplicateLookup);
+      if (analysis.status !== 'ready') return this.analysisToFileResult(analysis);
 
-      if (libraryId === null || folderId === null) {
-        return {
-          fileId: row.id,
-          fileName: row.fileName,
-          success: false,
-          message: 'Destination is not set for this file',
-        };
-      }
-
-      const library = await this.findLibraryOrFail(libraryId);
-      await this.libraryService.verifyUserAccess(userId, libraryId, isSuperuser);
-
-      const folder = await this.findFolderOrFail(folderId, libraryId);
-      const format = row.format ?? extname(row.fileName).toLowerCase().slice(1);
-      this.validator.validateFormat(row.fileName, library.allowedFormats);
-
-      const patternDestPath = await this.resolveDestination(library, folder.path, row, format);
-      let destPath = patternDestPath;
-      if (override?.targetFileName) {
-        const stem = format ? override.targetFileName.replace(new RegExp(`\\.${format}$`, 'i'), '') : override.targetFileName;
-        const safeFileName = this.validator.sanitizeFilename(format ? `${stem}.${format}` : stem);
-        const candidate = join(dirname(patternDestPath), safeFileName);
-        if (resolve(dirname(candidate)) !== resolve(dirname(patternDestPath))) {
-          return { fileId: row.id, fileName: row.fileName, success: false, message: 'Invalid file name' };
-        }
-        destPath = candidate;
-      }
-
-      const exists = await fsAccess(destPath)
-        .then(() => true)
-        .catch(() => false);
-      if (exists) {
-        return { fileId: row.id, fileName: row.fileName, success: false, message: 'A file with this name already exists at the target location' };
-      }
-
-      if (!override?.skipDuplicateCheck && !override?.targetFileName) {
-        const meta = normalizeFinalizeMetadata(row.selectedMetadata ?? row.embeddedMetadata ?? {});
-        const existingBookId = await this.findDuplicate(libraryId, meta, duplicateLookup);
-        if (existingBookId !== null) {
-          return {
-            fileId: row.id,
-            fileName: row.fileName,
-            success: false,
-            isDuplicate: true,
-            existingBookId,
-            message: `Duplicate: this book already exists in the library`,
-          };
-        }
+      const { destPath, folder, library, format } = analysis;
+      if (!destPath || !folder || !library || !format) {
+        return { fileId: row.id, fileName: row.fileName, success: false, message: 'Finalization target could not be resolved' };
       }
 
       await this.storage.moveToPath(row.absolutePath, destPath);
@@ -260,7 +254,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
         const { size } = await stat(destPath);
         const bookFolderPath = library.organizationMode === 'book_per_file' ? destPath : dirname(destPath);
         ({ bookId } = await this.processor.createBookRecord(
-          libraryId,
+          library.id,
           folder.id,
           bookFolderPath,
           destPath,
@@ -285,7 +279,268 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async previewFinalize(
+    userId: number,
+    isSuperuser: boolean,
+    fileIds: number[] | undefined,
+    selectAll: boolean | undefined,
+    excludedIds: number[] | undefined,
+    defaultLibraryId: number | undefined,
+    defaultFolderId: number | undefined,
+    overrides?: Array<{ fileId: number } & FinalizeOverrideEntry>,
+    status?: string,
+    search?: string,
+  ): Promise<BookDockFinalizePreviewResult> {
+    const summary = createFinalizePreviewSummary();
+    const overrideMap = new Map((overrides ?? []).map((o) => [o.fileId, o]));
+
+    await this.processFinalizeSelection(userId, isSuperuser, fileIds, selectAll, excludedIds, status, search, async (rows, missingIds) => {
+      const duplicateLookup = await this.buildDuplicateLookup(rows, defaultLibraryId, overrideMap);
+      for (const row of rows) {
+        const analysis = await this.analyzeFinalizeCandidate(
+          row,
+          defaultLibraryId,
+          defaultFolderId,
+          overrideMap,
+          userId,
+          isSuperuser,
+          duplicateLookup,
+        );
+        addFinalizePreviewAnalysis(summary, analysis);
+      }
+      for (const fileId of missingIds) {
+        addFinalizePreviewItem(summary, {
+          fileId,
+          fileName: `book-dock-file-${fileId}`,
+          status: 'error',
+          message: 'Book Dock file not found',
+        });
+      }
+    });
+
+    return summary;
+  }
+
+  async discardDuplicateCandidates(
+    userId: number,
+    isSuperuser: boolean,
+    fileIds: number[] | undefined,
+    selectAll: boolean | undefined,
+    excludedIds: number[] | undefined,
+    defaultLibraryId: number | undefined,
+    defaultFolderId: number | undefined,
+    overrides?: Array<{ fileId: number } & FinalizeOverrideEntry>,
+    status?: string,
+    search?: string,
+  ): Promise<BookDockDiscardDuplicatesResult> {
+    const startedAt = Date.now();
+    this.logger.log(`[book_dock.discard_duplicates] [start] userId=${userId} selectAll=${selectAll === true} - duplicate discard started`);
+
+    const overrideMap = new Map((overrides ?? []).map((o) => [o.fileId, o]));
+    let total = 0;
+    let discarded = 0;
+    const discardedFileIds: number[] = [];
+
+    try {
+      await this.processFinalizeSelection(userId, isSuperuser, fileIds, selectAll, excludedIds, status, search, async (rows, missingIds) => {
+        total += rows.length + missingIds.length;
+        const duplicateLookup = await this.buildDuplicateLookup(rows, defaultLibraryId, overrideMap);
+        const duplicateRows: BookDockFileRow[] = [];
+
+        for (const row of rows) {
+          const analysis = await this.analyzeFinalizeCandidate(
+            row,
+            defaultLibraryId,
+            defaultFolderId,
+            overrideMap,
+            userId,
+            isSuperuser,
+            duplicateLookup,
+          );
+          if (analysis.status === 'duplicate') duplicateRows.push(row);
+        }
+
+        if (duplicateRows.length === 0) return;
+
+        for (const row of duplicateRows) {
+          await this.cleanupDiscardedBookDockFile(row);
+          discardedFileIds.push(row.id);
+        }
+        await this.repo.deleteByIds(duplicateRows.map((row) => row.id));
+        discarded += duplicateRows.length;
+      });
+
+      await this.emitSummary();
+      const result = { total, discarded, skipped: total - discarded, discardedFileIds: selectAll ? [] : discardedFileIds };
+      this.logger.log(
+        `[book_dock.discard_duplicates] [end] userId=${userId} durationMs=${Date.now() - startedAt} total=${total} discarded=${discarded} skipped=${result.skipped} - duplicate discard completed`,
+      );
+      return result;
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.name : 'Error';
+      const errorMessage = sanitizeLogValue(error instanceof Error ? error.message : String(error));
+      this.logger.warn(
+        `[book_dock.discard_duplicates] [fail] userId=${userId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - duplicate discard failed`,
+      );
+      throw error;
+    }
+  }
+
+  private async analyzeFinalizeCandidate(
+    row: BookDockFileRow,
+    defaultLibraryId: number | undefined,
+    defaultFolderId: number | undefined,
+    overrideMap: Map<number, FinalizeOverrideEntry>,
+    userId: number,
+    isSuperuser: boolean,
+    duplicateLookup?: Map<string, number>,
+  ): Promise<FinalizeCandidateAnalysis> {
+    try {
+      const override = overrideMap.get(row.id);
+      const libraryId = override?.libraryId ?? row.targetLibraryId ?? defaultLibraryId ?? null;
+      const folderId = override?.folderId ?? row.targetFolderId ?? defaultFolderId ?? null;
+
+      if (libraryId === null || folderId === null) {
+        return {
+          fileId: row.id,
+          fileName: row.fileName,
+          row,
+          status: 'missing_destination',
+          message: 'Destination is not set for this file',
+        };
+      }
+
+      const library = await this.findLibraryOrFail(libraryId);
+      await this.libraryService.verifyUserAccess(userId, libraryId, isSuperuser);
+
+      const folder = await this.findFolderOrFail(folderId, libraryId);
+      const format = row.format ?? extname(row.fileName).toLowerCase().slice(1);
+      this.validator.validateFormat(row.fileName, library.allowedFormats);
+
+      const patternDestPath = await this.resolveDestination(library, folder.path, row, format);
+      let destPath = patternDestPath;
+      if (override?.targetFileName) {
+        const stem = format ? override.targetFileName.replace(new RegExp(`\\.${format}$`, 'i'), '') : override.targetFileName;
+        const safeFileName = this.validator.sanitizeFilename(format ? `${stem}.${format}` : stem);
+        const candidate = join(dirname(patternDestPath), safeFileName);
+        if (resolve(dirname(candidate)) !== resolve(dirname(patternDestPath))) {
+          return { fileId: row.id, fileName: row.fileName, row, status: 'invalid_target', message: 'Invalid file name' };
+        }
+        destPath = candidate;
+      }
+
+      const newName = destPath.substring(folder.path.length + 1);
+
+      if (!override?.skipDuplicateCheck) {
+        const meta = normalizeFinalizeMetadata(row.selectedMetadata ?? row.embeddedMetadata ?? {});
+        const existingBookId = await this.findDuplicate(libraryId, meta, duplicateLookup);
+        if (existingBookId !== null) {
+          return {
+            fileId: row.id,
+            fileName: row.fileName,
+            row,
+            status: 'duplicate',
+            existingBookId,
+            newName,
+            message: 'Duplicate: this book already exists in the library',
+          };
+        }
+      }
+
+      const exists = await fsAccess(destPath)
+        .then(() => true)
+        .catch(() => false);
+      if (exists) {
+        return {
+          fileId: row.id,
+          fileName: row.fileName,
+          row,
+          status: 'destination_conflict',
+          newName,
+          message: 'A file with this name already exists at the target location',
+        };
+      }
+
+      return { fileId: row.id, fileName: row.fileName, row, status: 'ready', newName, library, folder, format, destPath };
+    } catch (error) {
+      return {
+        fileId: row.id,
+        fileName: row.fileName,
+        row,
+        status: classifyFinalizePreviewError(error),
+        message: resolveFinalizeErrorMessage(error),
+      };
+    }
+  }
+
+  private analysisToFileResult(analysis: FinalizeCandidateAnalysis): BookDockFinalizeFileResult {
+    if (analysis.status === 'duplicate') {
+      return {
+        fileId: analysis.fileId,
+        fileName: analysis.fileName,
+        newName: analysis.newName,
+        success: false,
+        isDuplicate: true,
+        existingBookId: analysis.existingBookId,
+        message: analysis.message,
+      };
+    }
+
+    return {
+      fileId: analysis.fileId,
+      fileName: analysis.fileName,
+      newName: analysis.newName,
+      success: false,
+      message: analysis.message,
+    };
+  }
+
+  private async processFinalizeSelection(
+    userId: number,
+    isSuperuser: boolean,
+    fileIds: number[] | undefined,
+    selectAll: boolean | undefined,
+    excludedIds: number[] | undefined,
+    status: string | undefined,
+    search: string | undefined,
+    processBatch: (rows: BookDockFileRow[], missingIds: number[]) => Promise<void>,
+  ): Promise<void> {
+    if (selectAll) {
+      let afterId: number | undefined;
+      while (true) {
+        const rows = await this.repo.findSelectionBatch({
+          limit: BATCH_SIZE,
+          afterId,
+          excludedIds,
+          status,
+          search,
+          userId,
+          isSuperuser,
+        });
+        if (rows.length === 0) break;
+
+        await processBatch(rows, []);
+        afterId = rows[rows.length - 1]?.id;
+      }
+      return;
+    }
+
+    const ids = dedupeIds(fileIds ?? []);
+    for (let index = 0; index < ids.length; index += BATCH_SIZE) {
+      const batch = ids.slice(index, index + BATCH_SIZE);
+      const rows = await this.repo.findByIds(batch, userId, isSuperuser);
+      const rowById = new Map(rows.map((row) => [row.id, row]));
+      const missingIds = batch.filter((id) => !rowById.has(id));
+      await processBatch(rows, missingIds);
+    }
+  }
+
   async triggerAutoFinalize(fileId: number): Promise<void> {
+    if (await this.processingState.isPaused()) {
+      this.autoFinalizeQueue.pause();
+      return;
+    }
+
     const settings = await this.appSettings.getAutoFinalizeSettings();
     if (!settings.enabled || settings.libraryId === null || settings.folderId === null) return;
 
@@ -321,7 +576,46 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
   }
 
   private enqueueAutoFinalize(fileId: number): void {
+    if (this.processingState.getCachedPaused()) this.autoFinalizeQueue.pause();
     this.autoFinalizeQueue.enqueue(fileId);
+  }
+
+  pauseProcessing(): void {
+    this.autoFinalizeQueue.pause();
+  }
+
+  async resumeProcessing(): Promise<void> {
+    if (await this.processingState.isPaused()) return;
+    this.autoFinalizeQueue.resume();
+  }
+
+  async requeueAutoFinalizeCandidates(): Promise<number> {
+    if (await this.processingState.isPaused()) return 0;
+
+    const settings = await this.appSettings.getAutoFinalizeSettings();
+    if (!settings.enabled || settings.libraryId === null || settings.folderId === null) return 0;
+
+    let queued = 0;
+    let afterId: number | undefined;
+    while (!(await this.processingState.isPaused())) {
+      const rows = await this.repo.findSelectionBatch({
+        limit: BATCH_SIZE,
+        afterId,
+        status: 'ready',
+        userId: 0,
+        isSuperuser: true,
+      });
+      if (rows.length === 0) break;
+
+      for (const row of rows) {
+        if (shouldAutoFinalize(row, settings.metadataMode, settings.threshold) && this.autoFinalizeQueue.enqueue(row.id)) {
+          queued++;
+        }
+      }
+      afterId = rows[rows.length - 1]?.id;
+    }
+
+    return queued;
   }
 
   private logAutoFinalizeQueueFailure(fileId: number, err: unknown): void {
@@ -337,13 +631,15 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
     selectAll: boolean | undefined,
     excludedIds: number[] | undefined,
     defaultLibraryId: number | undefined,
+    userId: number | undefined,
+    isSuperuser: boolean | undefined,
     status?: string,
     search?: string,
   ): Promise<{ fileId: number; fileName: string; newName: string }[]> {
-    const ids = selectAll ? await this.repo.findAllIds(excludedIds, status, search) : (fileIds ?? []);
+    const ids = selectAll ? await this.repo.findAllIds(excludedIds, status, search, userId, isSuperuser) : (fileIds ?? []);
     if (!ids.length) return [];
 
-    const rows = await this.repo.findByIds(ids);
+    const rows = await this.repo.findByIds(ids, userId, isSuperuser);
     const appPatternFile = await this.appSettings.getUploadPattern();
     const appPatternFolder = await this.appSettings.getUploadPatternBookPerFolder();
     const sanitizeForCrossPlatform = await this.appSettings.isCrossPlatformPathSanitizationEnabled();
@@ -668,6 +964,15 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
     await this.repo.deleteById(row.id);
   }
 
+  private async cleanupDiscardedBookDockFile(row: BookDockFileRow): Promise<void> {
+    await safeUnlink(row.absolutePath);
+    if (row.coverPath) {
+      await safeUnlink(row.coverPath);
+      const thumbPath = row.coverPath.replace(/\.\w+$/, '_thumb.jpg');
+      await safeUnlink(thumbPath);
+    }
+  }
+
   private async findLibraryOrFail(libraryId: number) {
     const [library] = await this.db.select().from(libraries).where(eq(libraries.id, libraryId)).limit(1);
     if (!library) throw new NotFoundException('Library not found');
@@ -682,7 +987,8 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
 
   private async emitSummary(): Promise<void> {
     const summary = await this.repo.countsByStatus();
-    this.gateway.emitSummary(summary);
+    const paused = await this.processingState.isPaused();
+    this.gateway.emitSummary({ ...summary, paused });
   }
 }
 
@@ -692,6 +998,57 @@ async function safeUnlink(path: string): Promise<void> {
   } catch {
     // file may already be deleted
   }
+}
+
+function createFinalizePreviewSummary(): BookDockFinalizePreviewResult {
+  return {
+    total: 0,
+    ready: 0,
+    duplicates: 0,
+    destinationConflicts: 0,
+    missingDestination: 0,
+    blocked: 0,
+    truncated: false,
+    itemLimit: PREVIEW_ITEM_LIMIT,
+    items: [],
+  };
+}
+
+function addFinalizePreviewAnalysis(summary: BookDockFinalizePreviewResult, analysis: FinalizeCandidateAnalysis): void {
+  addFinalizePreviewItem(summary, {
+    fileId: analysis.fileId,
+    fileName: analysis.fileName,
+    newName: analysis.newName,
+    status: analysis.status,
+    existingBookId: analysis.existingBookId,
+    message: analysis.message,
+  });
+}
+
+function addFinalizePreviewItem(summary: BookDockFinalizePreviewResult, item: BookDockFinalizePreviewItem): void {
+  summary.total++;
+  if (item.status === 'ready') summary.ready++;
+  else if (item.status === 'duplicate') summary.duplicates++;
+  else if (item.status === 'destination_conflict') summary.destinationConflicts++;
+  else if (item.status === 'missing_destination') summary.missingDestination++;
+  else summary.blocked++;
+
+  if (summary.items.length < PREVIEW_ITEM_LIMIT) {
+    summary.items.push(item);
+  } else {
+    summary.truncated = true;
+  }
+}
+
+function classifyFinalizePreviewError(error: unknown): BookDockFinalizePreviewStatus {
+  if (error instanceof ForbiddenException) return 'access_denied';
+  if (error instanceof NotFoundException) return 'invalid_target';
+  if (error instanceof BadRequestException) {
+    const message = error.message.toLowerCase();
+    if (message.includes('file type') || message.includes('does not allow')) return 'invalid_format';
+    return 'invalid_target';
+  }
+  return 'error';
 }
 
 function normalizeText(value: unknown, maxLength?: number): string | null {

@@ -70,7 +70,7 @@ vi.mock('@/features/book-dock/composables/useBookDockSummary', async () => {
   const { ref: vueRef } = await import('vue')
   return {
     useBookDockSummary: () => ({
-      summary: vueRef({ total: 0 }),
+      summary: vueRef({ pending: 0, ready: 0, error: 0, total: 0, paused: false }),
       fetchSummary: vi.fn<() => void>(),
       subscribe: vi.fn<() => void>(),
     }),

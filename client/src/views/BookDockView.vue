@@ -57,10 +57,12 @@ const newFilesDetected = ref(false)
 const namePreviewByFileId = ref<Record<number, string>>({})
 const applyFetchedResult = ref<ApplyFetchedResult | null>(null)
 const rescanFailed = ref(false)
+const processingStateFailed = ref(false)
 const retryQueued = ref<number | null>(null)
 let newFilesTimer: ReturnType<typeof setTimeout> | null = null
 let applyFetchedTimer: ReturnType<typeof setTimeout> | null = null
 let rescanFailedTimer: ReturnType<typeof setTimeout> | null = null
+let processingStateFailedTimer: ReturnType<typeof setTimeout> | null = null
 let retryQueuedTimer: ReturnType<typeof setTimeout> | null = null
 let namePreviewTimer: ReturnType<typeof setTimeout> | null = null
 let namePreviewReqSeq = 0
@@ -232,6 +234,16 @@ function handleRescanError() {
   rescanFailedTimer = setTimeout(() => (rescanFailed.value = false), 4000)
 }
 
+function handleProcessingStateChanged() {
+  refresh()
+}
+
+function handleProcessingStateError() {
+  processingStateFailed.value = true
+  if (processingStateFailedTimer) clearTimeout(processingStateFailedTimer)
+  processingStateFailedTimer = setTimeout(() => (processingStateFailed.value = false), 4000)
+}
+
 function openFinalize() {
   showFinalizeDialog.value = true
 }
@@ -350,6 +362,7 @@ onUnmounted(() => {
   if (newFilesTimer) clearTimeout(newFilesTimer)
   if (applyFetchedTimer) clearTimeout(applyFetchedTimer)
   if (rescanFailedTimer) clearTimeout(rescanFailedTimer)
+  if (processingStateFailedTimer) clearTimeout(processingStateFailedTimer)
   if (retryQueuedTimer) clearTimeout(retryQueuedTimer)
   if (namePreviewTimer) clearTimeout(namePreviewTimer)
 })
@@ -369,6 +382,13 @@ onUnmounted(() => {
             class="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary/15 text-primary text-xs font-semibold tabular-nums"
           >
             {{ summary.total }}
+          </span>
+          <span
+            v-if="summary.paused"
+            class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 text-xs font-medium"
+          >
+            <span class="size-1.5 rounded-full bg-current" />
+            Paused
           </span>
           <Transition name="fade">
             <span
@@ -415,6 +435,15 @@ onUnmounted(() => {
               Rescan failed
             </span>
           </Transition>
+          <Transition name="fade">
+            <span
+              v-if="processingStateFailed"
+              class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-red-500/15 text-red-600 dark:text-red-400 text-xs font-medium"
+            >
+              <AlertCircle class="size-3.5" />
+              Pause update failed
+            </span>
+          </Transition>
         </div>
 
         <BookDockToolbar
@@ -423,8 +452,13 @@ onUnmounted(() => {
           :has-selection="hasSelection"
           :fetched-count="fetchedCount"
           :error-count="errorCount"
+          :paused="summary.paused"
           @status-filter="setStatus"
           @search="setSearch"
+          @pause="handleProcessingStateChanged"
+          @resume="handleProcessingStateChanged"
+          @pause-error="handleProcessingStateError"
+          @resume-error="handleProcessingStateError"
           @rescan="refresh"
           @rescan-error="handleRescanError"
           @retry-fetch="handleRetryFetch"

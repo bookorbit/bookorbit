@@ -1,4 +1,16 @@
+import { sql } from 'drizzle-orm';
+import * as schema from '../../../db/schema';
 import { KoboSyncService } from './kobo-sync.service';
+
+// Recursively counts bound query params (drizzle-orm's `Param` chunks) in a built SQL tree,
+// so tests can assert a clause isn't binding one parameter per matched book id.
+function countSqlParams(node: unknown, seen = new Set<unknown>()): number {
+  if (!node || typeof node !== 'object' || seen.has(node)) return 0;
+  seen.add(node);
+  if ((node as { constructor?: { name?: string } }).constructor?.name === 'Param') return 1;
+  const children = Array.isArray(node) ? node : ((node as { queryChunks?: unknown[] }).queryChunks ?? []);
+  return children.reduce((sum: number, child) => sum + countSqlParams(child, seen), 0);
+}
 
 type QueueState = {
   select: unknown[];
@@ -59,15 +71,23 @@ function makeDb(state?: Partial<QueueState>) {
     delete: [...(state?.delete ?? [])],
     execute: [...(state?.execute ?? [])],
   };
+  const chains: ReturnType<typeof makeChain>[] = [];
 
   return {
+    __chains: chains,
     query: {
+      users: { findFirst: vi.fn().mockResolvedValue({ settings: {} }) },
       koboLibrarySnapshots: { findFirst: vi.fn() },
       koboSnapshotBooks: { findFirst: vi.fn() },
       koboSyncSettings: { findFirst: vi.fn() },
       collections: { findMany: vi.fn() },
+      smartScopes: { findMany: vi.fn().mockResolvedValue([]) },
     },
-    select: vi.fn(() => makeChain(queue.select.shift() ?? [])),
+    select: vi.fn(() => {
+      const chain = makeChain(queue.select.shift() ?? []);
+      chains.push(chain);
+      return chain;
+    }),
     insert: vi.fn(() => makeChain(queue.insert.shift() ?? [])),
     update: vi.fn(() => makeChain(queue.update.shift() ?? [])),
     delete: vi.fn(() => makeChain(queue.delete.shift() ?? [])),
@@ -122,6 +142,9 @@ describe('KoboSyncService', () => {
     markLegacyNumericRemovalComplete: vi.fn(),
     buildVersionedCoverImageId: vi.fn(),
   };
+  const queryBuilder = {
+    buildWhere: vi.fn(),
+  };
 
   function makeIdentity(bookId: number, needsLegacyNumericRemoval = false) {
     return {
@@ -143,6 +166,7 @@ describe('KoboSyncService', () => {
       readingStateService as never,
       contentFilterRepository as never,
       bookIdentityService as never,
+      queryBuilder as never,
     );
   }
 
@@ -203,7 +227,7 @@ describe('KoboSyncService', () => {
 
     const [metadata] = (await service.getBookMetadata(3, 12, 'tok', 'https://base')) as Array<Record<string, unknown>>;
 
-    expect(fetchSpy).toHaveBeenCalledWith(3, [12], true);
+    expect(fetchSpy).toHaveBeenCalledWith(3, [12], true, expect.any(Map));
     expect(metadata.Title).toBe('Book 12');
     expect(metadata.DownloadUrls).toEqual([
       {
@@ -267,7 +291,7 @@ describe('KoboSyncService', () => {
     db.query.koboLibrarySnapshots.findFirst.mockResolvedValue(null);
     const service = makeService(db);
 
-    await expect((service as any).getPageFromSnapshot(7, 'tok', 'https://base', new Set())).resolves.toEqual({
+    await expect((service as any).getPageFromSnapshot(7, 'tok', 'https://base', new Set(), new Map())).resolves.toEqual({
       entitlements: [],
       hasMore: false,
       syncToken: expect.stringMatching(/^PX\./),
@@ -280,7 +304,7 @@ describe('KoboSyncService', () => {
     const service = makeService(db);
     vi.spyOn(service as any, 'buildTagItems').mockResolvedValue([{ ChangedTag: {} }]);
 
-    const result = await (service as any).getPageFromSnapshot(7, 'tok', 'https://base', new Set([1]));
+    const result = await (service as any).getPageFromSnapshot(7, 'tok', 'https://base', new Set([1]), new Map());
 
     expect(result).toEqual({
       entitlements: [{ ChangedTag: {} }],
@@ -308,7 +332,7 @@ describe('KoboSyncService', () => {
     );
     readingStateService.getRawState.mockResolvedValue(null);
 
-    const result = await (service as any).getPageFromSnapshot(7, 'tok', 'https://base', new Set([1, 2, 3]));
+    const result = await (service as any).getPageFromSnapshot(7, 'tok', 'https://base', new Set([1, 2, 3]), new Map());
 
     expect(result.hasMore).toBe(false);
     expect(result.entitlements).toHaveLength(3);
@@ -328,7 +352,7 @@ describe('KoboSyncService', () => {
     vi.spyOn(service as any, 'fetchEligibleBooksByIds').mockResolvedValue(new Map([[3, makeBook(3)]]));
     readingStateService.getRawState.mockResolvedValue({ EntitlementId: 'entitlement-3', CurrentBookmark: { ProgressPercent: 61 } });
 
-    const result = await (service as any).getPageFromSnapshot(7, 'tok', 'https://base', new Set([3]));
+    const result = await (service as any).getPageFromSnapshot(7, 'tok', 'https://base', new Set([3]), new Map());
 
     expect(result.entitlements).toHaveLength(2);
     expect(result.entitlements[0]).toHaveProperty('ChangedProductMetadata');
@@ -349,7 +373,7 @@ describe('KoboSyncService', () => {
     bookIdentityService.findByBookIds.mockResolvedValue(new Map([[3, makeIdentity(3, true)]]));
     readingStateService.getRawState.mockResolvedValue({ EntitlementId: 'entitlement-3', CurrentBookmark: { ProgressPercent: 61 } });
 
-    const result = await (service as any).getPageFromSnapshot(7, 'tok', 'https://base', new Set([3]));
+    const result = await (service as any).getPageFromSnapshot(7, 'tok', 'https://base', new Set([3]), new Map());
 
     expect(result.entitlements).toHaveLength(2);
     expect(result.entitlements[0]).toHaveProperty('ChangedEntitlement');
@@ -377,7 +401,7 @@ describe('KoboSyncService', () => {
     ]);
     const service = makeService(db);
 
-    const tags = await (service as any).buildTagItems(3, new Set([10, 22]));
+    const tags = await (service as any).buildTagItems(3, new Set([10, 22]), new Map());
 
     expect(tags).toHaveLength(2);
     expect(tags[0]).toEqual(
@@ -390,6 +414,127 @@ describe('KoboSyncService', () => {
         }),
       }),
     );
+  });
+
+  it('buildTagItems includes a tag per synced smart scope with matching, eligible books', async () => {
+    const db = makeDb({
+      select: [[{ id: 10 }, { id: 30 }]],
+    });
+    db.query.collections.findMany.mockResolvedValue([]);
+    const filter = { type: 'group', join: 'AND', rules: [] };
+    db.query.smartScopes.findMany.mockResolvedValue([{ id: 5, name: 'To Read', filter, syncToKobo: true }]);
+    bookAccessService.getAccessibleLibraryIds.mockResolvedValue([1, 2]);
+    queryBuilder.buildWhere.mockReturnValue('WHERE_CLAUSE');
+    const service = makeService(db);
+
+    const tags = await (service as any).buildTagItems(9, new Set([10, 22]), new Map());
+
+    expect(queryBuilder.buildWhere).toHaveBeenCalledWith(filter, { accessibleLibraryIds: [1, 2], userId: 9, timeZone: 'UTC' });
+    expect(tags).toHaveLength(1);
+    expect(tags[0]).toEqual(
+      expect.objectContaining({
+        ChangedTag: expect.objectContaining({
+          Tag: expect.objectContaining({
+            Id: 'ss-5',
+            Name: 'To Read',
+            // book 30 matched the scope but isn't in the eligible set, and 22 is eligible but didn't match the scope
+            Items: [{ RevisionId: 'entitlement-10', Type: 'ProductRevisionTagItem' }],
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('buildTagItems excludes synced smart scopes without a filter instead of matching everything', async () => {
+    const db = makeDb();
+    db.query.collections.findMany.mockResolvedValue([]);
+    db.query.smartScopes.findMany.mockResolvedValue([{ id: 6, name: 'Empty Scope', filter: null, syncToKobo: true }]);
+    bookAccessService.getAccessibleLibraryIds.mockResolvedValue([1]);
+    const service = makeService(db);
+
+    const tags = await (service as any).buildTagItems(9, new Set([10]), new Map());
+
+    expect(queryBuilder.buildWhere).not.toHaveBeenCalled();
+    expect(tags).toEqual([
+      expect.objectContaining({
+        ChangedTag: expect.objectContaining({
+          Tag: expect.objectContaining({ Id: 'ss-6', Items: [] }),
+        }),
+      }),
+    ]);
+  });
+
+  it('getSyncedSmartScopeMatches resolves multiple scopes independently, keyed by scope id', async () => {
+    const db = makeDb({ select: [[{ id: 10 }], [{ id: 20 }, { id: 21 }]] });
+    const filterA = { type: 'group', join: 'AND', rules: [] };
+    const filterB = { type: 'group', join: 'OR', rules: [] };
+    db.query.smartScopes.findMany.mockResolvedValue([
+      { id: 1, name: 'Scope A', filter: filterA, syncToKobo: true },
+      { id: 2, name: 'Scope B', filter: filterB, syncToKobo: true },
+    ]);
+    queryBuilder.buildWhere.mockReturnValue('WHERE_CLAUSE');
+    const service = makeService(db);
+
+    const matches = await (service as any).getSyncedSmartScopeMatches(9, [1], 'America/New_York');
+
+    expect(queryBuilder.buildWhere).toHaveBeenCalledWith(filterA, { accessibleLibraryIds: [1], userId: 9, timeZone: 'America/New_York' });
+    expect(queryBuilder.buildWhere).toHaveBeenCalledWith(filterB, { accessibleLibraryIds: [1], userId: 9, timeZone: 'America/New_York' });
+    expect(matches.get(1)).toEqual({ name: 'Scope A', bookIds: [10], where: 'WHERE_CLAUSE' });
+    expect(matches.get(2)).toEqual({ name: 'Scope B', bookIds: [20, 21], where: 'WHERE_CLAUSE' });
+  });
+
+  it('fetches synced smart scope book ids with the metadata join required by metadata-backed filters', async () => {
+    const db = makeDb({ select: [[{ id: 10 }]] });
+    const filter = { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }] };
+    db.query.smartScopes.findMany.mockResolvedValue([{ id: 1, name: 'Dune Scope', filter, syncToKobo: true }]);
+    queryBuilder.buildWhere.mockReturnValue(sql`${schema.bookMetadata.title} ilike ${'%Dune%'}`);
+    const service = makeService(db);
+
+    const matches = await (service as any).getSyncedSmartScopeMatches(9, [1], 'UTC');
+
+    expect(matches.get(1)?.bookIds).toEqual([10]);
+    expect(db.__chains[0].leftJoin).toHaveBeenCalledWith(schema.bookMetadata, expect.anything());
+  });
+
+  it('reuses a shared smartScopeMatchCache instead of re-querying smart scopes for each caller', async () => {
+    const db = makeDb({
+      select: [[{ id: 10 }]], // getSyncedSmartScopeMatches' single per-scope book lookup
+    });
+    db.query.collections.findMany.mockResolvedValue([]);
+    db.query.smartScopes.findMany.mockResolvedValue([
+      { id: 5, name: 'To Read', filter: { type: 'group', join: 'AND', rules: [] }, syncToKobo: true },
+    ]);
+    bookAccessService.getAccessibleLibraryIds.mockResolvedValue([1]);
+    contentFilterRepository.findByUserId.mockResolvedValue({ includeTagIds: [], includeGenreIds: [], excludeTagIds: [], excludeGenreIds: [] });
+    queryBuilder.buildWhere.mockReturnValue('WHERE_CLAUSE');
+    const service = makeService(db);
+    const cache = new Map();
+
+    await (service as any).buildEligibleBooksWhereClause(9, cache);
+    await (service as any).buildTagItems(9, new Set([10]), cache);
+
+    expect(db.query.smartScopes.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("buildEligibleBooksWhereClause ORs in each scope's own SQL predicate instead of an inArray of matched book ids", async () => {
+    const manyBookIds = Array.from({ length: 500 }, (_, i) => i + 1);
+    const db = makeDb({ select: [manyBookIds.map((id) => ({ id }))] });
+    db.query.collections.findMany.mockResolvedValue([]);
+    db.query.smartScopes.findMany.mockResolvedValue([
+      { id: 5, name: 'To Read', filter: { type: 'group', join: 'AND', rules: [] }, syncToKobo: true },
+    ]);
+    bookAccessService.getAccessibleLibraryIds.mockResolvedValue([1]);
+    contentFilterRepository.findByUserId.mockResolvedValue({ includeTagIds: [], includeGenreIds: [], excludeTagIds: [], excludeGenreIds: [] });
+    // A real (param-free) SQL fragment standing in for the scope's compiled filter, so we can
+    // inspect the final where clause's structure instead of a mocked opaque string.
+    queryBuilder.buildWhere.mockReturnValue(sql`EXISTS (FAKE_SCOPE_CONDITION)`);
+    const service = makeService(db);
+
+    const where = await (service as any).buildEligibleBooksWhereClause(9, new Map());
+
+    // Regardless of how many books the scope matched, the clause should only bind params for
+    // the fixed set of eligibility conditions (status/format/library/userId), not one per book.
+    expect(countSqlParams(where)).toBeLessThan(10);
   });
 
   describe('reconcileSnapshot', () => {
@@ -745,7 +890,7 @@ describe('KoboSyncService', () => {
     const service = makeService(db);
     vi.spyOn(service as any, 'buildEligibleBooksWhereClause').mockResolvedValue({ where: true });
 
-    const snapshotRows = await (service as any).fetchEligibleSnapshotRows(8, true);
+    const snapshotRows = await (service as any).fetchEligibleSnapshotRows(8, true, new Map());
     expect(snapshotRows).toEqual([
       {
         bookId: 5,
@@ -755,7 +900,7 @@ describe('KoboSyncService', () => {
       },
     ]);
 
-    const books = await (service as any).fetchEligibleBooksByIds(8, [5, 5], true);
+    const books = await (service as any).fetchEligibleBooksByIds(8, [5, 5], true, new Map());
     expect(books.get(5)).toEqual(
       expect.objectContaining({
         title: 'Dune',

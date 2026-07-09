@@ -114,6 +114,11 @@ function getSocket(): Socket {
       total.value = Math.max(0, total.value - 1)
     })
 
+    socket.on('notification:all-read', () => {
+      notifications.value.forEach((n) => (n.read = true))
+      unreadCount.value = 0
+    })
+
     socket.on('notification:cleared', () => {
       notifications.value = []
       total.value = 0

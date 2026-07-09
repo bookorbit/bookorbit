@@ -56,6 +56,7 @@ import { formatCommunityRatingValue } from '@/features/book/lib/community-rating
 import BookCoverSurface from '@/features/book/components/BookCoverSurface.vue'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import HardcoverBookSyncGridItem from '@/features/hardcover/components/HardcoverBookSyncGridItem.vue'
+import StorygraphBookSyncGridItem from '@/features/storygraph/components/StorygraphBookSyncGridItem.vue'
 
 type FileProgress = {
   percentage: number
@@ -81,6 +82,12 @@ type ProviderLink = {
   url: string
   iconUrl: string
   fallback: string
+}
+
+type SeriesDisplayLink = {
+  key: string
+  seriesId: number | null
+  label: string
 }
 
 const props = defineProps<{ book: BookDetail }>()
@@ -799,10 +806,34 @@ const koboAnomaly = computed(() => {
   return null
 })
 
-const seriesLine = computed(() => {
-  if (!props.book.seriesName) return null
-  const idx = props.book.seriesIndex
-  return idx != null ? `${props.book.seriesName} #${idx % 1 === 0 ? Math.floor(idx) : idx}` : props.book.seriesName
+function formatSeriesLabel(seriesName: string, seriesIndex: number | null): string {
+  if (seriesIndex == null) return seriesName
+  const formattedIndex = seriesIndex % 1 === 0 ? Math.floor(seriesIndex) : seriesIndex
+  return `${seriesName} #${formattedIndex}`
+}
+
+const seriesLinks = computed<SeriesDisplayLink[]>(() => {
+  const memberships = props.book.seriesMemberships ?? []
+  if (memberships.length > 0) {
+    return memberships
+      .filter((membership) => membership.seriesName.trim().length > 0)
+      .slice()
+      .sort((a, b) => a.displayOrder - b.displayOrder || a.seriesId - b.seriesId)
+      .map((membership) => ({
+        key: `${membership.seriesId}-${membership.displayOrder}`,
+        seriesId: membership.seriesId,
+        label: formatSeriesLabel(membership.seriesName, membership.seriesIndex),
+      }))
+  }
+
+  if (!props.book.seriesName) return []
+  return [
+    {
+      key: `primary-${props.book.seriesId ?? 'unknown'}`,
+      seriesId: props.book.seriesId ?? null,
+      label: formatSeriesLabel(props.book.seriesName, props.book.seriesIndex),
+    },
+  ]
 })
 
 function formatDateTime(iso: string): string {
@@ -1161,13 +1192,17 @@ watch(
             <span class="text-muted-foreground">narrated by</span>
             <span class="ml-1 font-medium text-foreground">{{ narratorLine }}</span>
           </p>
-          <RouterLink
-            v-if="seriesLine && book.seriesId != null"
-            :to="{ name: 'series-detail', params: { seriesId: book.seriesId } }"
-            class="inline-block text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
-            >{{ seriesLine }}</RouterLink
-          >
-          <span v-else-if="seriesLine" class="inline-block text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{{ seriesLine }}</span>
+          <div v-if="seriesLinks.length" class="flex flex-wrap gap-1">
+            <template v-for="series in seriesLinks" :key="series.key">
+              <RouterLink
+                v-if="series.seriesId != null"
+                :to="{ name: 'series-detail', params: { seriesId: series.seriesId } }"
+                class="inline-block text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
+                >{{ series.label }}</RouterLink
+              >
+              <span v-else class="inline-block text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{{ series.label }}</span>
+            </template>
+          </div>
         </div>
         <!-- Stars: own row -->
         <div class="mt-2 flex items-center gap-0.5" @mouseleave="hoverRating = null">
@@ -1625,15 +1660,19 @@ watch(
             <span class="text-muted-foreground">narrated by</span>
             <span class="ml-1 font-medium text-foreground">{{ narratorLine }}</span>
           </p>
-          <template v-if="seriesLine">
+          <template v-if="seriesLinks.length">
             <span class="text-muted-foreground/60 text-xs">·</span>
-            <RouterLink
-              v-if="book.seriesId != null"
-              :to="{ name: 'series-detail', params: { seriesId: book.seriesId } }"
-              class="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
-              >{{ seriesLine }}</RouterLink
-            >
-            <span v-else class="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{{ seriesLine }}</span>
+            <span class="inline-flex flex-wrap items-center gap-1">
+              <template v-for="series in seriesLinks" :key="series.key">
+                <RouterLink
+                  v-if="series.seriesId != null"
+                  :to="{ name: 'series-detail', params: { seriesId: series.seriesId } }"
+                  class="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
+                  >{{ series.label }}</RouterLink
+                >
+                <span v-else class="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{{ series.label }}</span>
+              </template>
+            </span>
           </template>
         </div>
 
@@ -1980,6 +2019,7 @@ watch(
           <dd v-else class="text-sm text-foreground mt-0.5">-</dd>
         </div>
         <HardcoverBookSyncGridItem :book-id="book.id" />
+        <StorygraphBookSyncGridItem :book-id="book.id" />
         <div class="min-w-0">
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Date Started</dt>
           <template v-if="isEditingReadingDate('startedAt')">

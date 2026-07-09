@@ -23,6 +23,7 @@ local _ = require("gettext")
 
 local BookOrbitAnnotations = require("bookorbit_annotations")
 local BookOrbitApi = require("bookorbit_api")
+local BookOrbitHighlightSummary = require("bookorbit_highlight_summary")
 local BookOrbitSidecar = require("bookorbit_sidecar")
 local BookOrbitState = require("bookorbit_state")
 local BookOrbitStatsReader = require("bookorbit_stats_reader")
@@ -97,8 +98,27 @@ local function finish(ctx, err)
         ctx.progress_msg = nil
     end
     ctx.state:flush()
-    if ctx.on_finish then
-        pcall(ctx.on_finish, err)
+
+    if ctx.plugin and ctx.plugin.recordSyncError then
+        if err == "auth" or err == "network" then
+            ctx.plugin:recordSyncError("sweep", err)
+        elseif not err and ctx.had_errors then
+            ctx.plugin:recordSyncError("sweep", "partial_failure")
+        elseif not err and ctx.plugin.recordSyncSuccess then
+            ctx.plugin:recordSyncSuccess(
+                "sweep",
+                T(_("%1 books, %2 reading events, %3 highlights"),
+                    ctx.counts.books_matched, ctx.counts.page_stats, ctx.counts.annotations))
+        end
+    end
+
+    if ctx.plugin and ctx.plugin.recordHighlightSync and ctx.highlight_summary
+            and BookOrbitHighlightSummary.hasCounts(ctx.highlight_summary) then
+        local highlight_err = ctx.highlight_unsupported and "unsupported_server" or nil
+        if ctx.had_errors and not highlight_err then
+            highlight_err = "partial_failure"
+        end
+        ctx.plugin:recordHighlightSync(ctx.highlight_summary, highlight_err)
     end
 
     if err == "auth" then
@@ -106,6 +126,9 @@ local function finish(ctx, err)
             UIManager:show(InfoMessage:new{ text = _("BookOrbit sync: login failed. Check your credentials."), timeout = 4 })
         else
             Notification:notify(_("BookOrbit sync: login failed"))
+        end
+        if ctx.on_finish then
+            pcall(ctx.on_finish, err)
         end
         return
     end
@@ -115,20 +138,37 @@ local function finish(ctx, err)
             UIManager:show(InfoMessage:new{ text = _("BookOrbit sync: server not reachable."), timeout = 4 })
         end
         logger.dbg("BookOrbit: sweep aborted, server not reachable")
+        if ctx.on_finish then
+            pcall(ctx.on_finish, err)
+        end
         return
     end
 
     if ctx.interactive then
         local text = T(_("BookOrbit sync done: %1 books matched, %2 reading events, %3 highlights."),
             ctx.counts.books_matched, ctx.counts.page_stats, ctx.counts.annotations)
+        if ctx.highlight_summary and BookOrbitHighlightSummary.hasRemoteChanges(ctx.highlight_summary) then
+            text = text .. "\n" .. T(_("Highlights updated: %1 applied, %2 deleted, %3 closed book(s)."),
+                ctx.highlight_summary.applied, ctx.highlight_summary.deleted, ctx.highlight_summary.touched_books)
+        end
+        if ctx.highlight_unsupported then
+            text = text .. "\n" .. _("BookOrbit server needs an update for two-way highlights.")
+        end
+        if ctx.highlight_disabled_reported then
+            text = text .. "\n" .. _("Two-way highlight sync is disabled.")
+        end
         if ctx.had_errors then
             text = text .. "\n" .. _("Some books failed and will retry on the next sync.")
         end
         UIManager:show(InfoMessage:new{ text = text, timeout = 5 })
     end
     logger.info(string.format(
-        "BookOrbit: sweep done matched=%d pageStats=%d annotations=%d errors=%s",
-        ctx.counts.books_matched, ctx.counts.page_stats, ctx.counts.annotations, tostring(ctx.had_errors)))
+        "BookOrbit: sweep done matched=%d pageStats=%d annotations=%d applied=%d deleted=%d errors=%s",
+        ctx.counts.books_matched, ctx.counts.page_stats, ctx.counts.annotations,
+        ctx.counts.ann_applied or 0, ctx.counts.ann_deleted or 0, tostring(ctx.had_errors)))
+    if ctx.on_finish then
+        pcall(ctx.on_finish, err)
+    end
 end
 
 local function step(ctx, fn)
@@ -479,6 +519,9 @@ local function stepAnnotationsNext(ctx)
     local apply_mode = "skip"
     if ctx.annotation_sync and entry.file ~= currentlyOpenFile() then
         apply_mode = "sidecar"
+    elseif not ctx.annotation_sync and ctx.interactive and not ctx.highlight_disabled_reported then
+        ctx.highlight_disabled_reported = true
+        ctx.highlight_summary = BookOrbitHighlightSummary.add(ctx.highlight_summary, nil, { skipped = 1 })
     end
 
     local result, err = BookOrbitAnnotations.exchangeBook({
@@ -496,11 +539,14 @@ local function stepAnnotationsNext(ctx)
             -- Re-queue everything, including this entry, for the legacy path.
             table.insert(ctx.ann_queue, 1, entry)
             ctx.use_legacy_annotations = true
+            ctx.highlight_unsupported = true
+            ctx.highlight_summary = BookOrbitHighlightSummary.add(ctx.highlight_summary, nil, { skipped = 1 })
             buildLegacyAnnotationChunks(ctx)
             return step(ctx, ctx.steps.annotationsLegacyNext)
         end
         ctx.had_errors = true
         if pending then pending.failed = true end
+        ctx.highlight_summary = BookOrbitHighlightSummary.add(ctx.highlight_summary, { had_errors = true })
         logger.dbg("BookOrbit: annotation exchange failed for", entry.md5, err)
         return step(ctx, ctx.steps.annotationsNext)
     end
@@ -513,6 +559,10 @@ local function stepAnnotationsNext(ctx)
     end
     ctx.counts.annotations = ctx.counts.annotations + result.uploaded
     ctx.counts.ann_applied = (ctx.counts.ann_applied or 0) + result.applied
+    ctx.counts.ann_deleted = (ctx.counts.ann_deleted or 0) + result.deleted
+    ctx.highlight_summary = BookOrbitHighlightSummary.add(ctx.highlight_summary, result, {
+        closed_book = apply_mode == "sidecar",
+    })
     return step(ctx, ctx.steps.annotationsNext)
 end
 
@@ -565,6 +615,7 @@ local function stepAnnotationsLegacyNext(ctx)
         if isAuthError(err) then return finish(ctx, "auth") end
         logger.dbg("BookOrbit: annotations upload failed:", err)
         ctx.had_errors = true
+        ctx.highlight_summary = BookOrbitHighlightSummary.add(ctx.highlight_summary, { had_errors = true })
         for _, book in ipairs(books) do
             local pending = ctx.pending_books[book.hash]
             if pending then pending.failed = true end
@@ -586,6 +637,9 @@ local function stepAnnotationsLegacyNext(ctx)
         elseif pending then
             pending.ann_chunks_left = pending.ann_chunks_left - 1
             ctx.counts.annotations = ctx.counts.annotations + #book.annotations
+            ctx.highlight_summary = BookOrbitHighlightSummary.add(ctx.highlight_summary, {
+                uploaded = #book.annotations,
+            })
         end
     end
 
@@ -747,7 +801,7 @@ function BookOrbitSweep.run(opts)
         if opts.interactive then
             UIManager:show(InfoMessage:new{ text = _("BookOrbit sync is already running."), timeout = 2 })
         end
-        return
+        return false
     end
 
     local BookOrbitBookSync = require("bookorbit_book_sync")
@@ -755,7 +809,7 @@ function BookOrbitSweep.run(opts)
         if opts.interactive then
             UIManager:show(InfoMessage:new{ text = _("BookOrbit is syncing the current book, try again shortly."), timeout = 2 })
         end
-        return
+        return false
     end
 
     local client = BookOrbitApi.new(opts.api)
@@ -763,7 +817,7 @@ function BookOrbitSweep.run(opts)
         if opts.interactive then
             UIManager:show(InfoMessage:new{ text = _("Please configure the BookOrbit server and login first."), timeout = 3 })
         end
-        return
+        return false
     end
 
     BookOrbitSweep.running = true
@@ -781,9 +835,14 @@ function BookOrbitSweep.run(opts)
         state = state,
         interactive = opts.interactive or false,
         annotation_sync = opts.annotation_sync ~= false,
+        plugin = opts.plugin,
         full_recheck = opts.interactive or state.global.needsFullRecheck or false,
         on_finish = opts.on_finish,
-        counts = { books_matched = 0, page_stats = 0, annotations = 0, ann_applied = 0 },
+        counts = { books_matched = 0, page_stats = 0, annotations = 0, ann_applied = 0, ann_deleted = 0 },
+        highlight_summary = BookOrbitHighlightSummary.normalize{
+            event = "sweep",
+            reason = opts.interactive and "manual" or "auto",
+        },
         had_errors = false,
     }
     ctx.steps = {
@@ -803,6 +862,7 @@ function BookOrbitSweep.run(opts)
     logger.info("BookOrbit: sweep started, interactive:", ctx.interactive)
 
     step(ctx, ctx.steps.enumerate)
+    return true
 end
 
 return BookOrbitSweep

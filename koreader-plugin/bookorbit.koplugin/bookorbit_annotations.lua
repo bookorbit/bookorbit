@@ -76,12 +76,56 @@ local function normalizeText(text)
     return util.trim(text:gsub("%s+", " "))
 end
 
-local function findByDatetime(annotations, datetime)
-    for index, a in ipairs(annotations or {}) do
-        if a.datetime == datetime then
-            return index, a
+local ackApplied
+local applyEditFields
+
+local function normalizePos(pos)
+    if type(pos) ~= "string" then return "" end
+    return util.trim(pos)
+end
+
+local function sameRangeAndText(annotation, entry)
+    local text = normalizeText(entry.text)
+    if text == "" or normalizePos(entry.pos0) == "" then return false end
+    if normalizeText(annotation.text) ~= text then return false end
+    if normalizePos(annotation.pos0) ~= normalizePos(entry.pos0) then return false end
+    local entry_pos1 = normalizePos(entry.pos1)
+    if entry_pos1 ~= "" and normalizePos(annotation.pos1) ~= entry_pos1 then return false end
+    return true
+end
+
+local function findByIdentity(annotations, entry)
+    local found_index, found_annotation, found_count = nil, nil, 0
+    if type(entry.datetime) == "string" and entry.datetime ~= "" then
+        for index, annotation in ipairs(annotations or {}) do
+            if annotation.datetime == entry.datetime then
+                found_index, found_annotation = index, annotation
+                found_count = found_count + 1
+            end
+        end
+        if found_count == 1 then return found_index, found_annotation end
+    end
+    for index, annotation in ipairs(annotations or {}) do
+        if sameRangeAndText(annotation, entry) then
+            return index, annotation
         end
     end
+end
+
+local function applyIdentityFields(annotation, entry)
+    if type(entry.datetime) == "string" and entry.datetime ~= "" then
+        annotation.datetime = entry.datetime
+    end
+    applyEditFields(annotation, entry)
+end
+
+local function ackExisting(entry, annotation, verified)
+    return ackApplied(entry, {
+        verified = verified == true,
+        pos0 = annotation.pos0 or entry.pos0,
+        pos1 = annotation.pos1 or entry.pos1,
+        pageno = type(annotation.pageno) == "number" and annotation.pageno or entry.pageno,
+    })
 end
 
 -- crengine verification: both endpoints must resolve and, when the server
@@ -133,7 +177,7 @@ local function repairRange(document, entry)
     return nil
 end
 
-local function ackApplied(entry, opts)
+ackApplied = function(entry, opts)
     return {
         serverId = entry.serverId,
         version = entry.version,
@@ -147,7 +191,7 @@ local function ackApplied(entry, opts)
     }
 end
 
-local function applyEditFields(annotation, entry)
+applyEditFields = function(annotation, entry)
     annotation.drawer = entry.drawer or annotation.drawer
     annotation.color = entry.color or annotation.color
     if entry.text and entry.text ~= "" then annotation.text = entry.text end
@@ -163,12 +207,15 @@ function BookOrbitAnnotations.applyLive(ui, to_apply)
     local document = ui.document
     local annotations = ui.annotation.annotations
     local touched = 0
+    local deleted_touched = 0
 
     for _, entry in ipairs(to_apply.add or {}) do
-        local existing_index = findByDatetime(annotations, entry.datetime)
+        local existing_index, existing_annotation = findByIdentity(annotations, entry)
         if existing_index then
-            -- Idempotent retry of an earlier apply that lost its ack.
-            table.insert(applied, ackApplied(entry, { verified = true, pos0 = entry.pos0, pos1 = entry.pos1 }))
+            applyIdentityFields(existing_annotation, entry)
+            ui:handleEvent(Event:new("AnnotationsModified", { existing_annotation, index_modified = existing_index }))
+            touched = touched + 1
+            table.insert(applied, ackExisting(entry, existing_annotation, true))
         elseif entry.posFormat ~= "xpointer" or not ui.rolling then
             -- PDF adds from the web are out of scope; never expected here.
             table.insert(applied, ackApplied(entry, { failed = true }))
@@ -200,8 +247,15 @@ function BookOrbitAnnotations.applyLive(ui, to_apply)
                     pos0 = pos0,
                     pos1 = pos1,
                 }
-                ui.annotation:addItem(item)
-                ui:handleEvent(Event:new("AnnotationsModified", { item, nb_highlights_added = 1 }))
+                local index = ui.annotation:addItem(item)
+                if ui.view and ui.view.footer and ui.view.footer.maybeUpdateFooter then
+                    pcall(ui.view.footer.maybeUpdateFooter, ui.view.footer)
+                end
+                ui:handleEvent(Event:new("AnnotationsModified", {
+                    item,
+                    nb_highlights_added = 1,
+                    index_modified = index,
+                }))
                 touched = touched + 1
                 table.insert(applied, ackApplied(entry, {
                     verified = true,
@@ -215,7 +269,7 @@ function BookOrbitAnnotations.applyLive(ui, to_apply)
     end
 
     for _, entry in ipairs(to_apply.edit or {}) do
-        local index, annotation = findByDatetime(annotations, entry.datetime)
+        local index, annotation = findByIdentity(annotations, entry)
         if not index then
             logger.dbg("BookOrbit: annotation edit target missing:", entry.serverId)
             table.insert(applied, ackApplied(entry, { failed = true }))
@@ -228,13 +282,14 @@ function BookOrbitAnnotations.applyLive(ui, to_apply)
     end
 
     for _, entry in ipairs(to_apply.delete or {}) do
-        local index, annotation = findByDatetime(annotations, entry.datetime)
+        local index, annotation = findByIdentity(annotations, entry)
         if index then
             if ui.paging then
                 pcall(ui.highlight.writePdfAnnotation, ui.highlight, "delete", annotation)
             end
             ui.bookmark:removeItemByIndex(index)
             touched = touched + 1
+            deleted_touched = deleted_touched + 1
         end
         -- Missing entries were already deleted locally; ack either way.
         table.insert(deleted, { serverId = entry.serverId, status = "applied" })
@@ -243,7 +298,7 @@ function BookOrbitAnnotations.applyLive(ui, to_apply)
     if touched > 0 then
         UIManager:setDirty("all", "ui")
     end
-    return applied, deleted, touched
+    return applied, deleted, touched, deleted_touched
 end
 
 -- Merges server changes into the sidecar of a CLOSED book and raises
@@ -253,13 +308,17 @@ function BookOrbitAnnotations.applySidecar(file, to_apply)
     local doc_settings = DocSettings:open(file)
     local annotations = doc_settings:readSetting("annotations") or {}
     local touched = 0
+    local deleted_touched = 0
 
     for _, entry in ipairs(to_apply.add or {}) do
         if entry.posFormat ~= "xpointer" then
             table.insert(applied, ackApplied(entry, { failed = true }))
         else
-            local existing = findByDatetime(annotations, entry.datetime)
-            if not existing then
+            local existing_index, existing = findByIdentity(annotations, entry)
+            if existing_index then
+                applyIdentityFields(existing, entry)
+                touched = touched + 1
+            else
                 table.insert(annotations, {
                     datetime = entry.datetime,
                     datetime_updated = entry.datetimeUpdated,
@@ -276,12 +335,16 @@ function BookOrbitAnnotations.applySidecar(file, to_apply)
                 touched = touched + 1
             end
             -- Unverified until the book is opened; the server keeps it pending.
-            table.insert(applied, ackApplied(entry, { pos0 = entry.pos0, pos1 = entry.pos1, pageno = entry.pageno }))
+            table.insert(applied, ackExisting(entry, existing or {
+                pos0 = entry.pos0,
+                pos1 = entry.pos1,
+                pageno = entry.pageno,
+            }, false))
         end
     end
 
     for _, entry in ipairs(to_apply.edit or {}) do
-        local index, annotation = findByDatetime(annotations, entry.datetime)
+        local index, annotation = findByIdentity(annotations, entry)
         if not index then
             table.insert(applied, ackApplied(entry, { failed = true }))
         else
@@ -292,10 +355,11 @@ function BookOrbitAnnotations.applySidecar(file, to_apply)
     end
 
     for _, entry in ipairs(to_apply.delete or {}) do
-        local index = findByDatetime(annotations, entry.datetime)
+        local index = findByIdentity(annotations, entry)
         if index then
             table.remove(annotations, index)
             touched = touched + 1
+            deleted_touched = deleted_touched + 1
         end
         table.insert(deleted, { serverId = entry.serverId, status = "applied" })
     end
@@ -305,7 +369,7 @@ function BookOrbitAnnotations.applySidecar(file, to_apply)
         doc_settings:makeTrue("annotations_externally_modified")
         doc_settings:flush()
     end
-    return applied, deleted, touched
+    return applied, deleted, touched, deleted_touched
 end
 
 local function hasPending(to_apply)
@@ -396,16 +460,18 @@ function BookOrbitAnnotations.exchangeBook(opts)
     local rounds = 0
     while response and hasPending(response.toApply) and rounds < MAX_PULL_ROUNDS do
         rounds = rounds + 1
-        local applied, deleted, touched
+        local applied, deleted, touched, deleted_touched
         if opts.apply_mode == "live" and opts.ui and opts.ui.document then
-            applied, deleted, touched = BookOrbitAnnotations.applyLive(opts.ui, response.toApply)
+            applied, deleted, touched, deleted_touched = BookOrbitAnnotations.applyLive(opts.ui, response.toApply)
         elseif opts.apply_mode == "sidecar" and opts.file then
-            applied, deleted, touched = BookOrbitAnnotations.applySidecar(opts.file, response.toApply)
+            applied, deleted, touched, deleted_touched = BookOrbitAnnotations.applySidecar(opts.file, response.toApply)
         else
             break
         end
 
-        result.applied = result.applied + touched
+        deleted_touched = deleted_touched or 0
+        result.applied = result.applied + math.max(0, touched - deleted_touched)
+        result.deleted = result.deleted + deleted_touched
         for _, entry in ipairs(applied) do
             if entry.status == "failed" then result.failed = result.failed + 1 end
         end

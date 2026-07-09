@@ -145,6 +145,10 @@ function UpdateCheck:updateCheckMenuText()
 end
 
 function UpdateCheck:checkForUpdate()
+    if self.requestUpdateCheck then
+        self:requestUpdateCheck(true, "manual")
+        return
+    end
     if not self:isLoggedIn() then
         self:promptLogin()
         return
@@ -168,6 +172,9 @@ function UpdateCheck:maybeCheckForUpdate(interactive)
     self._checking_update = false
 
     if not body then
+        if self.recordSyncError then
+            self:recordSyncError("update_check", err)
+        end
         if interactive then
             UIManager:show(InfoMessage:new{
                 text = T(_("Could not check for update: %1"), tostring(err or "network error")),
@@ -190,6 +197,9 @@ function UpdateCheck:doCheckForUpdate()
     UIManager:close(checking)
 
     if not body then
+        if self.recordSyncError then
+            self:recordSyncError("update_check", err)
+        end
         UIManager:show(InfoMessage:new{
             text = T(_("Could not check for update: %1"), tostring(err or "network error")),
             timeout = 4,
@@ -207,6 +217,9 @@ function UpdateCheck:handleUpdateVersionResponse(body, interactive, prompt_allow
 
     if type(plugin_latest) ~= "string" or plugin_latest == "unknown" then
         G_reader_settings:flush()
+        if self.recordSyncError then
+            self:recordSyncError("update_check", "unsupported_server", _("latest plugin version unavailable"))
+        end
         if interactive then
             UIManager:show(InfoMessage:new{
                 text = _("Could not determine the latest plugin version from the server."),

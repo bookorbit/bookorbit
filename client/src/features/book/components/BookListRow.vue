@@ -9,9 +9,11 @@ import { useRouter } from 'vue-router'
 import {
   BookOpen,
   Check,
+  ChevronRight,
   Eye,
   ExternalLink,
   FolderPlus,
+  LibraryBig,
   Loader2,
   MoreHorizontal,
   PanelRight,
@@ -32,6 +34,8 @@ import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import { RATING_STARS, getRatingStarClass } from '@/features/book/lib/rating-stars'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
+const COLLAPSED_SERIES_COVER_LIMIT = 3
+
 const router = useRouter()
 
 const props = defineProps<{
@@ -51,6 +55,28 @@ const { hasPermission } = usePermissions()
 const { thumbnailClickAction } = useDisplaySettings()
 const showSendDialog = ref(false)
 
+const collapsedSeries = computed(() => props.book.collapsedSeries ?? null)
+const isCollapsedSeries = computed(() => collapsedSeries.value !== null)
+const canOpenSeries = computed(() => isCollapsedSeries.value && props.book.seriesId != null)
+const collapsedSeriesName = computed(() => props.book.seriesName?.trim() || props.book.title?.trim() || 'Series')
+const collapsedBookCount = computed(() => collapsedSeries.value?.bookCount ?? 0)
+const collapsedReadCount = computed(() => collapsedSeries.value?.readCount ?? 0)
+const collapsedCoverIds = computed(
+  () => collapsedSeries.value?.coverBookIds.filter((bookId) => bookId > 0).slice(0, COLLAPSED_SERIES_COVER_LIMIT) ?? [],
+)
+const collapsedCoverIsStacked = computed(() => collapsedCoverIds.value.length > 1)
+const collapsedCoverContainerClass = computed(() =>
+  collapsedCoverIsStacked.value ? 'flex h-20 w-20 shrink-0 items-center' : 'flex h-20 w-16 shrink-0 items-center',
+)
+const collapsedCoverSurfaceClass = computed(() => [
+  'book-cover-surface--spine-fitted relative shrink-0 overflow-hidden rounded-sm shadow-sm',
+  collapsedCoverIsStacked.value ? '-ml-8 first:ml-0 w-12 ring-1 ring-background/80' : 'w-16',
+])
+const collapsedCountLabel = computed(() => `${collapsedBookCount.value} ${collapsedBookCount.value === 1 ? 'book' : 'books'}`)
+const collapsedProgressPercent = computed(() => {
+  if (collapsedBookCount.value <= 0) return 0
+  return Math.min(100, Math.max(0, (collapsedReadCount.value / collapsedBookCount.value) * 100))
+})
 const authorLine = computed(() => props.book.authors.join(', ') || null)
 const authorQuery = computed(() => props.book.authors[0] ?? null)
 const seriesLine = computed(() => {
@@ -137,9 +163,28 @@ function openBookDetails() {
   void router.push({ name: 'book-detail', params: { bookId: props.book.id } })
 }
 
+function openSeriesDetails() {
+  if (props.book.seriesId == null) return
+  void router.push({ name: 'series-detail', params: { seriesId: props.book.seriesId } })
+}
+
+function collapsedCoverVersion(bookId: number): string | null | undefined {
+  if (bookId === props.book.id) return props.book.updatedAt ?? props.book.addedAt
+  return collapsedSeries.value?.coverUpdatedAtByBookId?.[bookId]
+}
+
+function collapsedCoverSrc(bookId: number): string {
+  return coverUrl(bookId, 'thumbnail', collapsedCoverVersion(bookId))
+}
+
 function handleRowClick(event: MouseEvent) {
   if (props.selectionMode) {
     emit('select', event)
+    return
+  }
+
+  if (isCollapsedSeries.value) {
+    openSeriesDetails()
     return
   }
 
@@ -154,6 +199,89 @@ function handleRowClick(event: MouseEvent) {
 
 <template>
   <div
+    v-if="isCollapsedSeries"
+    data-testid="collapsed-series-list-row"
+    class="flex items-center gap-3 py-3 px-2 rounded-md transition-colors"
+    :class="[
+      selectionMode ? 'cursor-pointer select-none' : canOpenSeries ? 'cursor-pointer hover:bg-muted/50' : 'cursor-default',
+      selected ? 'bg-primary/8 ring-1 ring-primary/30' : '',
+    ]"
+    @click="handleRowClick"
+  >
+    <div
+      v-if="selectionMode"
+      class="h-5 w-5 rounded shrink-0 flex items-center justify-center transition-colors"
+      :class="selected ? 'bg-primary' : 'border border-border bg-background'"
+    >
+      <Check v-if="selected" class="text-primary-foreground" :size="12" />
+    </div>
+
+    <div :class="collapsedCoverContainerClass">
+      <template v-if="collapsedCoverIds.length > 0">
+        <BookCoverSurface
+          v-for="bookId in collapsedCoverIds"
+          :key="bookId"
+          data-testid="collapsed-series-cover"
+          size="mini"
+          :class="collapsedCoverSurfaceClass"
+          :disable-spine="isAudiobook"
+          :is-comic="isComic"
+          :style="{ aspectRatio: coverAspectRatio }"
+        >
+          <img :src="collapsedCoverSrc(bookId)" class="absolute inset-0 h-full w-full object-cover" loading="lazy" decoding="async" alt="" />
+        </BookCoverSurface>
+      </template>
+      <BookCoverSurface
+        v-else
+        data-testid="collapsed-series-cover-fallback"
+        size="mini"
+        :class="collapsedCoverSurfaceClass"
+        :disable-spine="isAudiobook"
+        :is-comic="isComic"
+        :style="{ aspectRatio: coverAspectRatio }"
+      >
+        <BookCoverArtwork
+          :src="null"
+          :has-cover="false"
+          :title="collapsedSeriesName"
+          :author-line="authorLine"
+          :is-audio="isAudiobook"
+          :seed="`series-${book.seriesId ?? book.id}`"
+          alt=""
+          :spine="!isAudiobook"
+          :is-comic="isComic"
+        />
+      </BookCoverSurface>
+    </div>
+
+    <div class="flex min-w-0 flex-1 flex-col gap-1">
+      <div class="flex min-w-0 items-center gap-2">
+        <span class="truncate text-sm font-semibold leading-snug text-foreground">{{ collapsedSeriesName }}</span>
+        <span class="hidden shrink-0 rounded-sm bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary sm:inline-flex"> Series </span>
+      </div>
+      <button v-if="authorLine" class="w-fit max-w-full truncate text-xs text-muted-foreground hover:underline" @click.stop="openAuthorBrowse">
+        {{ authorLine }}
+      </button>
+      <div class="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+        <LibraryBig class="size-3.5 shrink-0 text-muted-foreground/70" />
+        <span class="truncate">{{ collapsedCountLabel }}</span>
+        <span v-if="collapsedReadCount > 0" class="shrink-0">&middot; {{ collapsedReadCount }} read</span>
+      </div>
+      <div
+        v-if="collapsedReadCount > 0 && collapsedBookCount > 0"
+        data-testid="collapsed-series-progress"
+        class="mt-1 h-1 w-32 max-w-full overflow-hidden rounded-full bg-muted"
+      >
+        <div class="h-full rounded-full bg-primary/60 transition-all" :style="{ width: `${collapsedProgressPercent}%` }" />
+      </div>
+    </div>
+
+    <div v-if="!selectionMode" class="flex shrink-0 items-center gap-2">
+      <ChevronRight class="size-4 text-muted-foreground/60 transition-colors" />
+    </div>
+  </div>
+  <div
+    v-else
     class="flex items-center gap-3 py-3 px-2 rounded-md transition-colors cursor-pointer"
     :class="[
       selectionMode ? 'cursor-pointer select-none' : '',
