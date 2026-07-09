@@ -44,6 +44,7 @@ describe('OpdsPdfPageService', () => {
     expect(mockExecFile).toHaveBeenCalledWith(
       'pdftoppm',
       ['-jpeg', '-singlefile', '-r', '150', '-f', '1', '-l', '1', '/books/a.pdf', '/data/pse-cache/1/0'],
+      { timeout: 30_000 },
       expect.any(Function),
     );
   });

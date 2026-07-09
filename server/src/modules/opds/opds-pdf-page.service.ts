@@ -8,6 +8,10 @@ import { ConfigService } from '@nestjs/config';
 
 const execFileAsync = promisify(execFile);
 
+// A corrupt or pathological PDF can hang pdftoppm indefinitely, which would
+// otherwise leave the HTTP request open forever.
+const PDFTOPPM_TIMEOUT_MS = 30_000;
+
 /**
  * Rasterizes a single PDF page to JPEG via `pdftoppm` (poppler-utils, already
  * a runtime dependency — see `metadata/lib/pdf-cover.ts`), cached to disk per
@@ -50,18 +54,11 @@ export class OpdsPdfPageService {
     await mkdir(dir, { recursive: true });
     const pdfPageNumber = pageNumber + 1; // pdftoppm pages are 1-based; PSE pageNumber is 0-based
     const outPrefix = join(dir, String(pageNumber));
-    await execFileAsync('pdftoppm', [
-      '-jpeg',
-      '-singlefile',
-      '-r',
-      '150',
-      '-f',
-      String(pdfPageNumber),
-      '-l',
-      String(pdfPageNumber),
-      absolutePath,
-      outPrefix,
-    ]);
+    await execFileAsync(
+      'pdftoppm',
+      ['-jpeg', '-singlefile', '-r', '150', '-f', String(pdfPageNumber), '-l', String(pdfPageNumber), absolutePath, outPrefix],
+      { timeout: PDFTOPPM_TIMEOUT_MS },
+    );
     return pagePath;
   }
 
