@@ -11,7 +11,7 @@ vi.mock('vue-router', async (importOriginal) => {
   return { ...actual, useRouter: () => ({ push: routerPushMock }) }
 })
 vi.mock('@/features/book/composables/useCoverVersions', () => ({
-  useCoverVersions: () => ({ coverUrl: () => '/cover.jpg', bumpVersion: vi.fn<(...args: unknown[]) => void>() }),
+  useCoverVersions: () => ({ coverUrl: (bookId: number) => `/cover-${bookId}.jpg`, bumpVersion: vi.fn<(...args: unknown[]) => void>() }),
 }))
 vi.mock('@/features/book/lib/book-cover', () => ({
   bookCoverStyle: () => ({ background: 'oklch(0.22 0.07 200)', color: 'oklch(0.92 0.03 200)' }),
@@ -107,7 +107,33 @@ const presentBook: BookCard = {
   customMetadata: [],
 }
 
-describe('BookListRow — missing state', () => {
+const collapsedSeriesBook: BookCard = {
+  ...presentBook,
+  id: 20,
+  title: 'Representative Volume',
+  authors: ['Series Author'],
+  seriesId: 99,
+  seriesName: 'The Trilogy',
+  seriesIndex: 1,
+  readingProgress: 33,
+  collapsedSeries: {
+    bookCount: 4,
+    readCount: 1,
+    coverBookIds: [20, 21, 22, 23],
+    coverUpdatedAtByBookId: {
+      20: '2026-01-01T00:00:00.000Z',
+      21: '2026-01-02T00:00:00.000Z',
+      22: '2026-01-03T00:00:00.000Z',
+      23: '2026-01-04T00:00:00.000Z',
+    },
+    seriesLatestAddedAt: '2026-01-04T00:00:00.000Z',
+    firstVolumeBookId: 20,
+    latestVolumeBookId: 23,
+    firstUnreadBookId: 21,
+  },
+}
+
+describe('BookListRow - missing state', () => {
   it('applies grayscale and opacity-60 to the root row', () => {
     const wrapper = mount(BookListRow, { props: { book: missingBook }, global: globalStubs })
     const root = wrapper.find('.flex.items-center')
@@ -138,7 +164,7 @@ describe('BookListRow — missing state', () => {
   })
 })
 
-describe('BookListRow — present state', () => {
+describe('BookListRow - present state', () => {
   it('emits quick-view on row click by default', async () => {
     const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
 
@@ -226,5 +252,90 @@ describe('BookListRow — present state', () => {
 
     const cover = wrapper.find('.book-cover-surface')
     expect(cover.attributes('data-cover-spine')).toBe('off')
+  })
+})
+
+describe('BookListRow collapsed series', () => {
+  it('renders the series summary instead of the representative book title', () => {
+    const wrapper = mount(BookListRow, { props: { book: collapsedSeriesBook }, global: globalStubs })
+    const row = wrapper.get('[data-testid="collapsed-series-list-row"]')
+
+    expect(row.text()).toContain('The Trilogy')
+    expect(row.text()).toContain('4 books')
+    expect(row.text()).toContain('1 read')
+    expect(row.text()).toContain('Series Author')
+    expect(row.text()).not.toContain('Representative Volume')
+  })
+
+  it('caps collapsed series cover thumbnails to a bounded set', () => {
+    const wrapper = mount(BookListRow, { props: { book: collapsedSeriesBook }, global: globalStubs })
+    const covers = wrapper.findAll('[data-testid="collapsed-series-cover"]')
+
+    expect(covers).toHaveLength(3)
+    expect(wrapper.findAll('img').map((img) => img.attributes('src'))).toEqual(['/cover-20.jpg', '/cover-21.jpg', '/cover-22.jpg'])
+  })
+
+  it('opens the series detail route on row click', async () => {
+    thumbnailClickAction.value = 'details'
+    const wrapper = mount(BookListRow, { props: { book: collapsedSeriesBook }, global: globalStubs })
+
+    await wrapper.get('[data-testid="collapsed-series-list-row"]').trigger('click')
+
+    expect(routerPushMock).toHaveBeenCalledWith({ name: 'series-detail', params: { seriesId: 99 } })
+    expect(routerPushMock).not.toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 20 } })
+    expect(wrapper.emitted('action')).toBeUndefined()
+  })
+
+  it('selects the collapsed row instead of navigating in selection mode', async () => {
+    const wrapper = mount(BookListRow, {
+      props: { book: collapsedSeriesBook, selectionMode: true },
+      global: globalStubs,
+    })
+
+    await wrapper.get('[data-testid="collapsed-series-list-row"]').trigger('click')
+
+    expect(wrapper.emitted('select')).toHaveLength(1)
+    expect(routerPushMock).not.toHaveBeenCalled()
+  })
+
+  it('renders a fallback cover when collapsed cover ids are unavailable', () => {
+    const wrapper = mount(BookListRow, {
+      props: {
+        book: {
+          ...collapsedSeriesBook,
+          collapsedSeries: {
+            ...collapsedSeriesBook.collapsedSeries!,
+            coverBookIds: [],
+          },
+        },
+      },
+      global: globalStubs,
+    })
+
+    expect(wrapper.find('[data-testid="collapsed-series-cover-fallback"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-testid="collapsed-series-cover"]')).toHaveLength(0)
+  })
+
+  it('uses the normal list cover width and no empty progress bar for a one-book series', () => {
+    const wrapper = mount(BookListRow, {
+      props: {
+        book: {
+          ...collapsedSeriesBook,
+          collapsedSeries: {
+            ...collapsedSeriesBook.collapsedSeries!,
+            bookCount: 1,
+            readCount: 0,
+            coverBookIds: [20],
+          },
+        },
+      },
+      global: globalStubs,
+    })
+    const cover = wrapper.get('[data-testid="collapsed-series-cover"]')
+
+    expect(cover.classes()).toContain('w-16')
+    expect(cover.classes()).not.toContain('w-12')
+    expect(wrapper.get('[data-testid="collapsed-series-list-row"]').text()).toContain('1 book')
+    expect(wrapper.find('[data-testid="collapsed-series-progress"]').exists()).toBe(false)
   })
 })

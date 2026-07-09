@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { unlink } from 'fs/promises';
 import { eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -7,8 +7,13 @@ import type { BookDockFile, BookDockFilesPage, BookDockMetadata, BookDockSummary
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { libraries, libraryFolders } from '../../db/schema';
+import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { BookDockRepository, type ListOptions } from './book-dock.repository';
 import { BookDockIngestService } from './book-dock-ingest.service';
+import { BookDockFinalizeService } from './book-dock-finalize.service';
+import { BookDockGateway } from './book-dock.gateway';
+import { BookDockProcessingStateService } from './book-dock-processing-state.service';
+import { BookDockWatcherService } from './book-dock-watcher.service';
 import type { BookDockFileRow } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -16,10 +21,17 @@ const BULK_SELECTION_BATCH_SIZE = 500;
 
 @Injectable()
 export class BookDockService {
+  private readonly logger = new Logger(BookDockService.name);
+  private resumeWorkPromise: Promise<void> | null = null;
+
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly repo: BookDockRepository,
     private readonly ingestService: BookDockIngestService,
+    private readonly finalizeService: BookDockFinalizeService,
+    private readonly watcherService: BookDockWatcherService,
+    private readonly processingState: BookDockProcessingStateService,
+    private readonly gateway: BookDockGateway,
   ) {}
 
   async listFiles(query: ListOptions): Promise<BookDockFilesPage> {
@@ -306,11 +318,44 @@ export class BookDockService {
   }
 
   async getSummary(userId?: number, isSuperuser?: boolean): Promise<BookDockSummary> {
-    return this.repo.countsByStatus(userId, isSuperuser);
+    const [summary, paused] = await Promise.all([this.repo.countsByStatus(userId, isSuperuser), this.processingState.isPaused()]);
+    return { ...summary, paused };
   }
 
   async getStatistics(userId?: number, isSuperuser?: boolean) {
     return this.repo.getStatistics(userId, isSuperuser);
+  }
+
+  async pauseProcessing(): Promise<BookDockSummary> {
+    const startedAt = Date.now();
+    this.logger.log(`[book_dock.processing_pause] [start] - Book Dock processing pause requested`);
+    try {
+      await this.processingState.pause();
+      this.ingestService.pauseProcessing();
+      this.finalizeService.pauseProcessing();
+      const summary = await this.emitSummary();
+      this.logger.log(`[book_dock.processing_pause] [end] durationMs=${Date.now() - startedAt} - Book Dock processing paused`);
+      return summary;
+    } catch (error) {
+      this.logProcessingControlFailure('book_dock.processing_pause', startedAt, error, 'Book Dock processing pause failed');
+      throw error;
+    }
+  }
+
+  async resumeProcessing(): Promise<BookDockSummary> {
+    const startedAt = Date.now();
+    this.logger.log(`[book_dock.processing_resume] [start] - Book Dock processing resume requested`);
+    try {
+      await this.processingState.resume();
+      await Promise.all([this.ingestService.resumeProcessing(), this.finalizeService.resumeProcessing()]);
+      this.startResumeBackgroundWork();
+      const summary = await this.emitSummary();
+      this.logger.log(`[book_dock.processing_resume] [end] durationMs=${Date.now() - startedAt} - Book Dock processing resumed`);
+      return summary;
+    } catch (error) {
+      this.logProcessingControlFailure('book_dock.processing_resume', startedAt, error, 'Book Dock processing resume failed');
+      throw error;
+    }
   }
 
   private async cleanupFiles(row: BookDockFileRow): Promise<void> {
@@ -320,6 +365,40 @@ export class BookDockService {
       const thumbPath = row.coverPath.replace(/\.\w+$/, '_thumb.jpg');
       await safeUnlink(thumbPath);
     }
+  }
+
+  private startResumeBackgroundWork(): void {
+    if (this.resumeWorkPromise) return;
+    this.resumeWorkPromise = this.resumeBackgroundWork().finally(() => {
+      this.resumeWorkPromise = null;
+    });
+  }
+
+  private async resumeBackgroundWork(): Promise<void> {
+    const startedAt = Date.now();
+    this.logger.log(`[book_dock.resume_recovery] [start] - Book Dock resume recovery started`);
+    try {
+      const metadataQueued = await this.ingestService.requeueProcessableFiles();
+      const autoFinalizeQueued = await this.finalizeService.requeueAutoFinalizeCandidates();
+      await this.watcherService.rescan();
+      this.logger.log(
+        `[book_dock.resume_recovery] [end] durationMs=${Date.now() - startedAt} metadataQueued=${metadataQueued} autoFinalizeQueued=${autoFinalizeQueued} - Book Dock resume recovery completed`,
+      );
+    } catch (error) {
+      this.logProcessingControlFailure('book_dock.resume_recovery', startedAt, error, 'Book Dock resume recovery failed');
+    }
+  }
+
+  private async emitSummary(): Promise<BookDockSummary> {
+    const summary = await this.getSummary();
+    this.gateway.emitSummary(summary);
+    return summary;
+  }
+
+  private logProcessingControlFailure(event: string, startedAt: number, error: unknown, message: string): void {
+    const errorClass = error instanceof Error ? error.name : 'Error';
+    const errorMessage = sanitizeLogValue(error instanceof Error ? error.message : String(error));
+    this.logger.warn(`[${event}] [fail] durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - ${message}`);
   }
 
   private async assertValidTarget(targetLibraryId?: number | null, targetFolderId?: number | null): Promise<void> {

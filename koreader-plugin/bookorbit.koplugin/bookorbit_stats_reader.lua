@@ -126,6 +126,48 @@ function BookOrbitStatsReader.getBookIds(md5)
     return result or {}
 end
 
+-- Aggregated local reading activity for the dashboard stats strip: seconds
+-- read today and over the past 7 days, plus the current daily reading streak
+-- (consecutive days with any reading, still counting if today has none yet).
+function BookOrbitStatsReader.getReadingSummary()
+    return withConn(function(conn)
+        local today = os.date("*t")
+        today.hour, today.min, today.sec = 0, 0, 0
+        local day_start = os.time(today)
+        local function sumSince(start_time)
+            local res = conn:exec(string.format(
+                "SELECT COALESCE(SUM(MIN(duration, 86400)), 0) FROM page_stat_data WHERE start_time >= %d;",
+                start_time))
+            return res and tonumber(res[1][1]) or 0
+        end
+
+        local streak = 0
+        local res = conn:exec(string.format(
+            "SELECT DISTINCT date(start_time, 'unixepoch', 'localtime') FROM page_stat_data WHERE start_time >= %d;",
+            day_start - 366 * 86400))
+        if res then
+            local days = {}
+            for i = 1, #res[1] do
+                days[res[1][i]] = true
+            end
+            local cursor = day_start
+            if not days[os.date("%Y-%m-%d", cursor)] then
+                cursor = cursor - 86400
+            end
+            while days[os.date("%Y-%m-%d", cursor)] do
+                streak = streak + 1
+                cursor = cursor - 86400
+            end
+        end
+
+        return {
+            today_seconds = sumSince(day_start),
+            week_seconds = sumSince(day_start - 6 * 86400),
+            streak_days = streak,
+        }
+    end)
+end
+
 -- Returns events newer than the watermark across all stat row ids of a book,
 -- ordered by start_time. The caller handles batching via the limit.
 function BookOrbitStatsReader.getEventsAfter(ids, watermark, limit)

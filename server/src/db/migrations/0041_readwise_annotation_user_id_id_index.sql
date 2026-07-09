@@ -1,0 +1,1 @@
+CREATE INDEX "annotations_user_id_id_idx" ON "annotations" USING btree ("user_id","id");

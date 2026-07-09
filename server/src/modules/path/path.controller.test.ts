@@ -2,6 +2,7 @@ import { PathController } from './path.controller';
 
 describe('PathController', () => {
   const pathService = {
+    getConfig: vi.fn(),
     listDirectories: vi.fn(),
     createDirectory: vi.fn(),
   };
@@ -12,10 +13,16 @@ describe('PathController', () => {
     vi.resetAllMocks();
   });
 
-  it('defaults to root path when query path is missing', async () => {
+  it('returns path config from the service', () => {
+    pathService.getConfig.mockReturnValue({ root: '/books' });
+
+    expect(controller.getConfig()).toEqual({ root: '/books' });
+  });
+
+  it('lets the service apply the default path when query path is missing', async () => {
     await controller.listDirectories(undefined as never);
 
-    expect(pathService.listDirectories).toHaveBeenCalledWith('/');
+    expect(pathService.listDirectories).toHaveBeenCalledWith(undefined);
   });
 
   it('passes provided query path through to the service', async () => {

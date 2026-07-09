@@ -1,22 +1,27 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
-import { Upload, RotateCw, Trash2, PenLine, FileText, Search, X, Wand2, RefreshCw, FolderPlus, Loader2 } from '@lucide/vue'
+import { Upload, RotateCw, Trash2, PenLine, FileText, Search, X, Wand2, RefreshCw, FolderPlus, Loader2, Pause, Play } from '@lucide/vue'
 import type { BookDockFileStatus } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { SUPPORTED_FORMATS_ACCEPT, useBookDockUpload } from '../composables/useBookDockUpload'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
-defineProps<{
+const props = defineProps<{
   activeStatus: BookDockFileStatus | undefined
   selectionCount: number
   hasSelection: boolean
   fetchedCount: number
   errorCount: number
+  paused: boolean
 }>()
 
 const emit = defineEmits<{
   statusFilter: [BookDockFileStatus | undefined]
+  pause: []
+  pauseError: []
+  resume: []
+  resumeError: []
   rescan: []
   rescanError: []
   retryFetch: []
@@ -33,6 +38,7 @@ const { files: uploadFiles, isUploading, addFiles, clearCompleted } = useBookDoc
 const { isDemoRestrictedAccount } = usePermissions()
 const fileInput = ref<HTMLInputElement | null>(null)
 const rescanning = ref(false)
+const processingStateChanging = ref(false)
 const searchQuery = ref('')
 const showSearch = ref(false)
 const showUploadPopover = ref(false)
@@ -82,6 +88,7 @@ function onFilesSelected(event: Event) {
 }
 
 async function rescan() {
+  if (props.paused) return
   rescanning.value = true
   try {
     const res = await api('/api/v1/book-dock/rescan', { method: 'POST' })
@@ -97,6 +104,28 @@ async function rescan() {
   }
 }
 
+async function toggleProcessingState() {
+  if (processingStateChanging.value) return
+  processingStateChanging.value = true
+  const endpoint = props.paused ? '/api/v1/book-dock/resume' : '/api/v1/book-dock/pause'
+  const wasPaused = props.paused
+  try {
+    const res = await api(endpoint, { method: 'POST' })
+    if (res.ok) {
+      if (wasPaused) emit('resume')
+      else emit('pause')
+    } else {
+      if (wasPaused) emit('resumeError')
+      else emit('pauseError')
+    }
+  } catch {
+    if (wasPaused) emit('resumeError')
+    else emit('pauseError')
+  } finally {
+    processingStateChanging.value = false
+  }
+}
+
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 function onSearchInput() {
@@ -109,6 +138,38 @@ function clearSearch() {
   showSearch.value = false
   emit('search', '')
 }
+
+function openSearch() {
+  showSearch.value = true
+}
+
+function closeUploadPopover() {
+  showUploadPopover.value = false
+}
+
+function emitFinalize() {
+  emit('finalize')
+}
+
+function emitSetDestination() {
+  emit('setDestination')
+}
+
+function emitApplyFetched() {
+  emit('applyFetched')
+}
+
+function emitRetryFetch() {
+  emit('retryFetch')
+}
+
+function emitBulkEdit() {
+  emit('bulkEdit')
+}
+
+function emitBulkDiscard() {
+  emit('bulkDiscard')
+}
 </script>
 
 <template>
@@ -118,7 +179,9 @@ function clearSearch() {
         v-for="tab in tabs"
         :key="tab.label"
         class="h-7 px-3 rounded-lg text-xs font-medium transition-all active:scale-95"
-        :class="activeStatus === tab.value ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-muted text-muted-foreground hover:text-foreground'"
+        :class="
+          props.activeStatus === tab.value ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-muted text-muted-foreground hover:text-foreground'
+        "
         @click="$emit('statusFilter', tab.value)"
       >
         {{ tab.label }}
@@ -141,7 +204,7 @@ function clearSearch() {
         v-else
         data-testid="book-dock-search-toggle"
         class="flex items-center justify-center size-7 rounded-lg bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-95"
-        @click="showSearch = true"
+        @click="openSearch"
       >
         <Search class="size-3.5" />
       </button>
@@ -151,9 +214,21 @@ function clearSearch() {
       <input ref="fileInput" type="file" :accept="SUPPORTED_FORMATS_ACCEPT" multiple class="hidden" @change="onFilesSelected" />
 
       <button
+        data-testid="book-dock-processing-toggle"
+        class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-95 disabled:opacity-60 disabled:active:scale-100"
+        :disabled="processingStateChanging"
+        @click="toggleProcessingState"
+      >
+        <Loader2 v-if="processingStateChanging" class="size-3.5 animate-spin" />
+        <Play v-else-if="props.paused" class="size-3.5" />
+        <Pause v-else class="size-3.5" />
+        {{ props.paused ? 'Resume' : 'Pause' }}
+      </button>
+
+      <button
         data-testid="book-dock-rescan"
         class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-95"
-        :disabled="rescanning"
+        :disabled="rescanning || props.paused"
         @click="rescan"
       >
         <RotateCw class="size-3.5" :class="rescanning ? 'animate-spin' : ''" />
@@ -177,7 +252,7 @@ function clearSearch() {
         >
           <div class="flex items-center justify-between">
             <span class="text-xs font-medium text-foreground">{{ isUploading ? 'Uploading...' : 'Done' }}</span>
-            <button class="text-muted-foreground hover:text-foreground transition-colors" @click="showUploadPopover = false">
+            <button class="text-muted-foreground hover:text-foreground transition-colors" @click="closeUploadPopover">
               <X class="size-3" />
             </button>
           </div>
@@ -197,13 +272,13 @@ function clearSearch() {
       </div>
     </div>
 
-    <div v-if="hasSelection" class="flex flex-wrap items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
-      <span class="text-xs font-medium text-foreground">{{ selectionCount }} selected</span>
+    <div v-if="props.hasSelection" class="flex flex-wrap items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
+      <span class="text-xs font-medium text-foreground">{{ props.selectionCount }} selected</span>
       <div class="flex-1" />
       <button
         data-testid="book-dock-finalize"
         class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:opacity-90 transition-all active:scale-95"
-        @click="$emit('finalize')"
+        @click="emitFinalize"
       >
         <FileText class="size-3.5" />
         Finalize
@@ -211,50 +286,52 @@ function clearSearch() {
       <button
         data-testid="book-dock-set-destination"
         class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-emerald-500/12 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 transition-all active:scale-95"
-        @click="$emit('setDestination')"
+        @click="emitSetDestination"
       >
         <FolderPlus class="size-3.5" />
         Set Destination
       </button>
-      <Tooltip v-if="fetchedCount > 0">
+      <Tooltip v-if="props.fetchedCount > 0">
         <TooltipTrigger as-child>
           <button
             data-testid="book-dock-apply-fetched"
             class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition-all active:scale-95"
-            @click="$emit('applyFetched')"
+            @click="emitApplyFetched"
           >
             <Wand2 class="size-3.5" />
             Apply Fetched
             <span
               class="ml-0.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-amber-500/20 text-[10px] font-semibold tabular-nums"
-              >{{ fetchedCount }}</span
+              >{{ props.fetchedCount }}</span
             >
           </button>
         </TooltipTrigger>
-        <TooltipContent>Apply auto-fetched provider metadata to {{ fetchedCount }} file{{ fetchedCount !== 1 ? 's' : '' }}</TooltipContent>
+        <TooltipContent
+          >Apply auto-fetched provider metadata to {{ props.fetchedCount }} file{{ props.fetchedCount !== 1 ? 's' : '' }}</TooltipContent
+        >
       </Tooltip>
-      <Tooltip v-if="errorCount > 0">
+      <Tooltip v-if="props.errorCount > 0">
         <TooltipTrigger as-child>
           <button
             data-testid="book-dock-retry-errors"
             class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-sky-500/12 text-sky-700 dark:text-sky-300 hover:bg-sky-500/20 transition-all active:scale-95"
-            @click="$emit('retryFetch')"
+            @click="emitRetryFetch"
           >
             <RefreshCw class="size-3.5" />
             Retry Errors
             <span
               class="ml-0.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-muted-foreground/20 text-[10px] font-semibold tabular-nums"
-              >{{ errorCount }}</span
+              >{{ props.errorCount }}</span
             >
           </button>
         </TooltipTrigger>
-        <TooltipContent>Retry metadata fetch for {{ errorCount }} error file{{ errorCount !== 1 ? 's' : '' }}</TooltipContent>
+        <TooltipContent>Retry metadata fetch for {{ props.errorCount }} error file{{ props.errorCount !== 1 ? 's' : '' }}</TooltipContent>
       </Tooltip>
       <button
         v-if="canBulkEdit"
         data-testid="book-dock-bulk-edit"
         class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-violet-500/12 text-violet-700 dark:text-violet-300 hover:bg-violet-500/20 transition-all active:scale-95"
-        @click="$emit('bulkEdit')"
+        @click="emitBulkEdit"
       >
         <PenLine class="size-3.5" />
         Bulk Edit
@@ -262,7 +339,7 @@ function clearSearch() {
       <button
         data-testid="book-dock-bulk-discard"
         class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-all active:scale-95"
-        @click="$emit('bulkDiscard')"
+        @click="emitBulkDiscard"
       >
         <Trash2 class="size-3.5" />
         Discard

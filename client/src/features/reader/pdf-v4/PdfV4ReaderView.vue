@@ -7,10 +7,12 @@ import { getAccessToken } from '@/lib/api'
 import { useReaderProgress } from '../shared/composables/useReaderProgress'
 import { useReadingSession } from '../shared/composables/useReadingSession'
 import { useReaderSettings } from '../shared/composables/useReaderSettings'
+import { useFullscreen } from '../shared/composables/useFullscreen'
 import { useThemeStore, ACCENT_OPTIONS } from '@/stores/theme'
 import type { PdfReaderSettings } from '@bookorbit/types'
 import { getIsDark, lookupAccentHex } from './pdf-viewer-utils'
-import { ArrowLeft } from '@lucide/vue'
+import { ArrowLeft, Maximize, Minimize } from '@lucide/vue'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const props = defineProps<{ bookId: number; fileId: number; peekMode?: boolean }>()
 const route = useRoute()
@@ -18,6 +20,8 @@ const router = useRouter()
 const trackingEnabled = computed(() => !props.peekMode)
 
 const themeStore = useThemeStore()
+const { isFullscreen, toggleFullscreen } = useFullscreen()
+const fullscreenLabel = computed(() => (isFullscreen.value ? 'Exit fullscreen' : 'Enter fullscreen'))
 
 const bookSettings = useReaderSettings(props.fileId, 'pdf')
 const { onActivity, elapsedMinutes } = useReadingSession(
@@ -182,6 +186,10 @@ async function startTrackedReading() {
   onActivity()
 }
 
+function goBack() {
+  router.back()
+}
+
 onUnmounted(() => {
   unsubPageChange?.()
   unsubLayoutReady?.()
@@ -192,15 +200,34 @@ onUnmounted(() => {
 
 <template>
   <div class="fixed inset-0 flex flex-col">
-    <!-- Floating Back Button (FAB) -->
-    <div class="pointer-events-none absolute bottom-6 left-6 z-50 flex">
-      <button
-        class="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-background/95 text-foreground shadow-lg border border-border backdrop-blur-md transition-transform hover:scale-105 active:scale-95"
-        @click="router.back()"
-        aria-label="Go back"
-      >
-        <ArrowLeft :size="22" />
-      </button>
+    <!-- Floating reader controls -->
+    <div class="pointer-events-none absolute bottom-6 left-6 z-50 flex gap-2">
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <button
+            class="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-background/95 text-foreground shadow-lg border border-border backdrop-blur-md transition-transform hover:scale-105 active:scale-95"
+            aria-label="Go back"
+            @click="goBack"
+          >
+            <ArrowLeft :size="22" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Go back</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <button
+            class="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-background/95 text-foreground shadow-lg border border-border backdrop-blur-md transition-transform hover:scale-105 active:scale-95"
+            :aria-label="fullscreenLabel"
+            @click="toggleFullscreen"
+          >
+            <Minimize v-if="isFullscreen" :size="22" />
+            <Maximize v-else :size="22" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{{ fullscreenLabel }}</TooltipContent>
+      </Tooltip>
     </div>
 
     <div v-if="props.peekMode" class="pointer-events-none absolute left-0 right-0 top-3 z-50 flex justify-center">

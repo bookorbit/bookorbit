@@ -146,7 +146,7 @@ describe('AuthorsService', () => {
     expect(result.affectedBookCount).toBe(8);
   });
 
-  it('update trims values and normalizes blank optional fields to null', async () => {
+  it('update normalizes author names and blank optional fields', async () => {
     authorsRepo.findVisibleAuthorIds.mockResolvedValue([20]);
     authorsRepo.findRelatedLibraryIds.mockResolvedValue([1]);
     authorsRepo.updateAuthorById.mockResolvedValue({ id: 20, name: 'Updated', sortName: null, description: 'Bio' });
@@ -160,14 +160,14 @@ describe('AuthorsService', () => {
     });
 
     await service.update(reqUser(), 20, {
-      name: '  Updated  ',
-      sortName: '   ',
+      name: '  Updated   Author  ',
+      sortName: '  Author,\tUpdated  ',
       description: '  Bio  ',
     });
 
     expect(authorsRepo.updateAuthorById).toHaveBeenCalledWith(20, {
-      name: 'Updated',
-      sortName: null,
+      name: 'Updated Author',
+      sortName: 'Author, Updated',
       description: 'Bio',
     });
     expect(enrichmentOrchestrator.schedule).toHaveBeenCalledWith(20, AUTHOR_ENRICHMENT_REASONS.AUTHOR_RENAME);

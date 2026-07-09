@@ -54,6 +54,7 @@ export interface BookDockSummary {
   ready: number;
   error: number;
   total: number;
+  paused: boolean;
 }
 
 export interface BookDockFinalizeOverride {
@@ -91,6 +92,44 @@ export interface BookDockFinalizeResult {
   succeeded: number;
   failed: number;
   results: BookDockFinalizeFileResult[];
+}
+
+export type BookDockFinalizePreviewStatus =
+  | "ready"
+  | "duplicate"
+  | "destination_conflict"
+  | "missing_destination"
+  | "invalid_target"
+  | "access_denied"
+  | "invalid_format"
+  | "error";
+
+export interface BookDockFinalizePreviewItem {
+  fileId: number;
+  fileName: string;
+  newName?: string;
+  status: BookDockFinalizePreviewStatus;
+  existingBookId?: number;
+  message?: string;
+}
+
+export interface BookDockFinalizePreviewResult {
+  total: number;
+  ready: number;
+  duplicates: number;
+  destinationConflicts: number;
+  missingDestination: number;
+  blocked: number;
+  truncated: boolean;
+  itemLimit: number;
+  items: BookDockFinalizePreviewItem[];
+}
+
+export interface BookDockDiscardDuplicatesResult {
+  total: number;
+  discarded: number;
+  skipped: number;
+  discardedFileIds: number[];
 }
 
 export interface BookDockBulkEditRequest {

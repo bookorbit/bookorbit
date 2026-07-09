@@ -34,9 +34,11 @@ function makeController() {
     bulkSetTarget: vi.fn(),
     selectionSummary: vi.fn(),
     bulkEdit: vi.fn(),
+    pauseProcessing: vi.fn(),
+    resumeProcessing: vi.fn(),
   };
   const ingestService = { ingestUpload: vi.fn() };
-  const finalizeService = { previewNames: vi.fn(), finalize: vi.fn() };
+  const finalizeService = { previewNames: vi.fn(), previewFinalize: vi.fn(), discardDuplicateCandidates: vi.fn(), finalize: vi.fn() };
   const watcherService = { rescan: vi.fn() };
   const repo = { findById: vi.fn() };
   const appSettings = { getMaxUploadSizeMb: vi.fn().mockResolvedValue(500) };
@@ -154,16 +156,39 @@ describe('BookDockController', () => {
       enabledFields: ['title'],
       mergeArrays: false,
     } as any);
-    await controller.previewNames({ fileIds: [10], selectAll: false, excludedIds: [], defaultLibraryId: 2 } as any);
+    await controller.previewNames(MOCK_USER, { fileIds: [10], selectAll: false, excludedIds: [], defaultLibraryId: 2 } as any);
+    await controller.previewFinalize(MOCK_USER, {
+      fileIds: [10],
+      selectAll: false,
+      excludedIds: [],
+      defaultLibraryId: 2,
+      defaultFolderId: 3,
+      overrides: [],
+    } as any);
+    await controller.discardFinalizeDuplicates(MOCK_USER, {
+      fileIds: [10],
+      selectAll: false,
+      excludedIds: [],
+      defaultLibraryId: 2,
+      defaultFolderId: 3,
+      overrides: [],
+    } as any);
     await controller.finalize(
       { id: 99, isSuperuser: true } as any,
       { fileIds: [1], defaultLibraryId: 2, defaultFolderId: 3, selectAll: false, excludedIds: [], overrides: [] } as any,
     );
     await controller.rescan();
+    await controller.pause();
+    await controller.resume();
 
     expect(service.bulkSetTarget).toHaveBeenCalledWith([5], false, [6], null, null, undefined, undefined, MOCK_USER.id, MOCK_USER.isSuperuser);
+    expect(finalizeService.previewNames).toHaveBeenCalledWith([10], false, [], 2, MOCK_USER.id, MOCK_USER.isSuperuser, undefined, undefined);
+    expect(finalizeService.previewFinalize).toHaveBeenCalledWith(1, false, [10], false, [], 2, 3, [], undefined, undefined);
+    expect(finalizeService.discardDuplicateCandidates).toHaveBeenCalledWith(1, false, [10], false, [], 2, 3, [], undefined, undefined);
     expect(finalizeService.finalize).toHaveBeenCalledWith(99, true, [1], false, [], 2, 3, [], undefined, undefined);
     expect(watcherService.rescan).toHaveBeenCalled();
+    expect(service.pauseProcessing).toHaveBeenCalledTimes(1);
+    expect(service.resumeProcessing).toHaveBeenCalledTimes(1);
   });
 
   it('marks bulk edit endpoint as demo-restricted', () => {

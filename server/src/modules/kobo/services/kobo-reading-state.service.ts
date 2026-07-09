@@ -141,29 +141,29 @@ export class KoboReadingStateService {
 
     const percent = this.extractPercent(mergedBookmark);
     if (percent !== null) {
+      const locationSource = this.extractKoboLocationSource(mergedBookmark);
+      const locationType = this.extractKoboLocationType(mergedBookmark);
+      const locationValue = this.extractKoboLocationValue(mergedBookmark);
+
+      // KoboSpan bookmarks convert to precise canonical points; web and KOReader
+      // resume at the same paragraph instead of a percent approximation.
+      const precise =
+        twoWayProgressSync && locationType === 'KoboSpan' && locationSource && locationValue
+          ? await this.progressBridge.koboBookmarkToCanonical(userId, bookId, locationSource, locationValue)
+          : null;
+
+      await this.syncPercentToInternalProgress(
+        userId,
+        bookId,
+        percent,
+        this.extractProgressModifiedAt(mergedBookmark, lastModified),
+        locationSource,
+        locationType,
+        locationValue,
+        this.extractContentSourceProgressPercent(mergedBookmark),
+        precise,
+      );
       if (twoWayProgressSync) {
-        const locationSource = this.extractKoboLocationSource(mergedBookmark);
-        const locationType = this.extractKoboLocationType(mergedBookmark);
-        const locationValue = this.extractKoboLocationValue(mergedBookmark);
-
-        // KoboSpan bookmarks convert to precise canonical points; web and KOReader
-        // resume at the same paragraph instead of a percent approximation.
-        const precise =
-          locationType === 'KoboSpan' && locationSource && locationValue
-            ? await this.progressBridge.koboBookmarkToCanonical(userId, bookId, locationSource, locationValue)
-            : null;
-
-        await this.syncPercentToInternalProgress(
-          userId,
-          bookId,
-          percent,
-          this.extractProgressModifiedAt(mergedBookmark, lastModified),
-          locationSource,
-          locationType,
-          locationValue,
-          this.extractContentSourceProgressPercent(mergedBookmark),
-          precise,
-        );
         await this.markSnapshotBookUnsynced(userId, bookId);
       }
       await this.autoUpdateReadStatus(userId, bookId, percent, readingThreshold, finishedThreshold);

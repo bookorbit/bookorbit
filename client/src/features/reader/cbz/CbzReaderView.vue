@@ -18,6 +18,7 @@ import {
   Layers,
   LayoutGrid,
   Maximize,
+  Minimize,
   Moon,
   ScanLine,
   Settings,
@@ -30,6 +31,7 @@ import { useCbz } from './composables/useCbz'
 import { useCbzSettings } from './composables/useCbzSettings'
 import type { BgColor, Direction, FitMode, ScrollMode, SpreadAlignment, ViewMode, WidePageSingletonMode } from './composables/useCbzSettings'
 import { useReaderSettings } from '../shared/composables/useReaderSettings'
+import { useFullscreen } from '../shared/composables/useFullscreen'
 import type { CbxReaderSettings } from '@bookorbit/types'
 import { DEFAULT_WIDE_PAGE_RATIO_THRESHOLD, createCbzSpreadLayout } from './lib/spread-layout'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -43,6 +45,7 @@ const router = useRouter()
 const trackingEnabled = computed(() => !props.peekMode)
 
 const { headerVisible, footerVisible, handleMiddleTap, showHeader, showFooter, setVisibilityLock } = useVisibility()
+const { isFullscreen, toggleFullscreen } = useFullscreen()
 
 const { onActivity, elapsedMinutes } = useReadingSession(
   props.fileId,
@@ -246,6 +249,8 @@ const pageLabel = computed(() => {
   }
   return `${start + 1} / ${pageCount.value}`
 })
+
+const fullscreenLabel = computed(() => (isFullscreen.value ? 'Exit fullscreen' : 'Enter fullscreen'))
 
 const progressPageIndex = computed(() => {
   const spread = currentSpread.value
@@ -622,6 +627,15 @@ onUnmounted(() => {
             Start reading
           </button>
         </div>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button class="viewer-btn" :aria-label="fullscreenLabel" @click="toggleFullscreen">
+              <Minimize v-if="isFullscreen" :size="15" />
+              <Maximize v-else :size="15" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>{{ fullscreenLabel }}</TooltipContent>
+        </Tooltip>
         <DropdownMenu v-model:open="showSettings">
           <DropdownMenuTrigger as-child>
             <button class="viewer-btn" :class="showSettings ? '!bg-muted !text-foreground' : ''">

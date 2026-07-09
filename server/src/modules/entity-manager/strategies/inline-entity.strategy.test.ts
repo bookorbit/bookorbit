@@ -151,7 +151,7 @@ describe('InlineEntityStrategy', () => {
     it('sets wasImplicitMerge=false when renaming to same value (same identity)', async () => {
       const execute = vi
         .fn()
-        .mockResolvedValueOnce({ rows: [{ cnt: 1 }] })
+        .mockResolvedValueOnce({ rows: [{ cnt: 0 }] })
         .mockResolvedValueOnce({ rows: [{ bookId: 7 }] });
       const strategy = makeStrategy({ execute });
 

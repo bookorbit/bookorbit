@@ -150,6 +150,7 @@ function makeController() {
     saveProgress: vi.fn(),
     clearFileProgress: vi.fn(),
     saveAudioProgress: vi.fn(),
+    updatePersonalNote: vi.fn(),
     updateMetadata: vi.fn(),
     updateMetadataAndLocks: vi.fn(),
     updateMetadataLocks: vi.fn(),
@@ -195,6 +196,16 @@ describe('BookController', () => {
 
     await expect(controller.embedAll()).resolves.toEqual({ queued: 5 });
     expect(bookService.embedAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('updates a personal note through the service', async () => {
+    const { controller, bookService } = makeController();
+    const user = makeUser();
+    const updated = { id: 7, personalNote: 'private note' };
+    bookService.updatePersonalNote.mockResolvedValue(updated);
+
+    await expect(controller.updatePersonalNote(7, { note: 'private note' }, user)).resolves.toBe(updated);
+    expect(bookService.updatePersonalNote).toHaveBeenCalledWith(7, { note: 'private note' }, user);
   });
 
   it('returns 304 when cover etag matches (unversioned → 24h private cache)', async () => {
@@ -403,12 +414,16 @@ describe('BookController', () => {
       projectedBytes: 30,
       bookCount: 2,
       scope: 'primary',
+      archiveFilename: 'Selected Books.zip',
     });
 
     await controller.exportBooks({ bookIds: [1, 2], allFormats: false }, makeUser(), reply);
 
     expect(raw.setHeader).toHaveBeenCalledWith('Content-Type', 'application/zip');
-    expect(raw.setHeader).toHaveBeenCalledWith('Content-Disposition', 'attachment; filename="books.zip"');
+    expect(raw.setHeader).toHaveBeenCalledWith(
+      'Content-Disposition',
+      `attachment; filename="Selected Books.zip"; filename*=UTF-8''Selected%20Books.zip`,
+    );
 
     const zipArchiveMock = ZipArchive as unknown as vi.Mock;
     expect(zipArchiveMock).toHaveBeenCalledWith({ zlib: { level: 0 } });

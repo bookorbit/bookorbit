@@ -62,13 +62,14 @@ describe('BookDockGateway', () => {
     const emit = vi.fn();
     gateway.server = { emit } as any;
 
-    gateway.emitSummary({ pending: 2, ready: 4, error: 1, total: 7 });
+    gateway.emitSummary({ pending: 2, ready: 4, error: 1, total: 7, paused: true });
 
     expect(emit).toHaveBeenCalledWith('book-dock:summary', {
       pending: 2,
       ready: 4,
       error: 1,
       total: 7,
+      paused: true,
     });
   });
 });

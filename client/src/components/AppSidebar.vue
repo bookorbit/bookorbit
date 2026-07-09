@@ -33,6 +33,7 @@ import { useThemeStore } from '@/stores/theme'
 import { useAppInfo } from '@/features/settings/composables/useAppInfo'
 import { buildSidebarVersionUi } from '@/components/sidebar/versionUi'
 import { useWhatsNew } from '@/features/whats-new/composables/useWhatsNew'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 function useSidebarSection(key: string) {
   const isOpen = ref(localStorage.getItem(`bookorbit:sidebar:${key}`) !== 'false')
@@ -55,6 +56,7 @@ const { handleLibraryCreated } = useLibraryCreationRedirect()
 const themeStore = useThemeStore()
 const { version, updateAvailable, latestVersion, loadAppInfo } = useAppInfo()
 const { hasUnseen: hasUnseenWhatsNew } = useWhatsNew()
+const supportUrl = 'https://ko-fi.com/neonbookorbit'
 
 const iconRadiusClass = computed(() => (themeStore.radius === 'sharp' ? 'rounded-none' : 'rounded-full'))
 const versionUi = computed(() => {
@@ -438,13 +440,49 @@ onUnmounted(() => stopLibraryUploadListener())
       </SidebarGroup>
     </SidebarContent>
 
-    <SidebarFooter v-if="versionUi.currentLabel" class="border-t border-sidebar-border/60">
+    <SidebarFooter class="border-t border-sidebar-border/60">
+      <div class="hidden justify-center group-data-[collapsible=icon]:flex">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <a
+              :href="supportUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Support BookOrbit on Ko-fi"
+              class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-sidebar-border/60 text-primary transition-colors hover:bg-primary/8 hover:text-primary/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+            >
+              <Icons.Heart class="h-4 w-4 fill-primary/20" aria-hidden="true" />
+            </a>
+          </TooltipTrigger>
+          <TooltipContent side="right">Support BookOrbit</TooltipContent>
+        </Tooltip>
+      </div>
+
       <div class="px-2 py-2 group-data-[collapsible=icon]:hidden">
-        <div class="flex flex-wrap items-center justify-center gap-2 text-center text-[12px] font-medium leading-none text-sidebar-foreground/80">
-          <RouterLink to="/whats-new" class="inline-flex items-center gap-1.5 transition-colors hover:text-sidebar-foreground">
-            {{ versionUi.currentLabel }}
-            <span v-if="hasUnseenWhatsNew" class="h-1.5 w-1.5 rounded-full bg-primary" aria-label="New release notes available" />
+        <div
+          class="flex min-w-0 flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-[12px] font-medium leading-none text-sidebar-foreground/80"
+        >
+          <RouterLink
+            v-if="versionUi.currentLabel"
+            to="/whats-new"
+            class="inline-flex min-w-0 max-w-full items-center gap-1.5 transition-colors hover:text-sidebar-foreground"
+          >
+            <span class="truncate">{{ versionUi.currentLabel }}</span>
+            <span v-if="hasUnseenWhatsNew" class="h-1.5 w-1.5 flex-none rounded-full bg-primary" aria-label="New release notes available" />
           </RouterLink>
+
+          <span v-if="versionUi.currentLabel" class="text-sidebar-foreground/45">•</span>
+
+          <a
+            :href="supportUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Support BookOrbit on Ko-fi"
+            class="inline-flex shrink-0 items-center gap-1.5 text-sidebar-foreground/85 transition-colors hover:text-primary"
+          >
+            <Icons.Heart class="h-3.5 w-3.5 fill-primary/20 text-primary" aria-hidden="true" />
+            <span>Support</span>
+          </a>
 
           <span v-if="versionUi.showLatest" class="text-sidebar-foreground/45">•</span>
 
@@ -453,9 +491,9 @@ onUnmounted(() => stopLibraryUploadListener())
             :href="versionUi.latestHref"
             target="_blank"
             rel="noopener noreferrer"
-            class="font-semibold text-primary transition-colors hover:text-primary/85"
+            class="inline-flex min-w-0 max-w-full font-semibold text-primary transition-colors hover:text-primary/85"
           >
-            Latest {{ versionUi.latestLabel }}
+            <span class="truncate">Latest {{ versionUi.latestLabel }}</span>
           </a>
         </div>
       </div>

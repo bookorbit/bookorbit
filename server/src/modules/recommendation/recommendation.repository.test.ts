@@ -1,7 +1,7 @@
 import { RecommendationRepository } from './recommendation.repository';
 
 type SelectStep = {
-  terminal: 'where' | 'limit';
+  terminal: 'where' | 'limit' | 'groupBy';
   result: unknown;
 };
 
@@ -26,7 +26,10 @@ function makeDb(steps: SelectStep[]) {
     chain.innerJoin.mockReturnValue(chain);
     chain.leftJoin.mockReturnValue(chain);
     chain.orderBy.mockReturnValue(chain);
-    chain.groupBy.mockReturnValue(chain);
+    chain.groupBy.mockImplementation(() => {
+      if (step.terminal === 'groupBy') return Promise.resolve(step.result);
+      return chain;
+    });
     chain.where.mockImplementation(() => {
       if (step.terminal === 'where') return Promise.resolve(step.result);
       return chain;

@@ -38,7 +38,15 @@ const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] = [
   },
   {
     label: 'Devices & Access',
-    permissions: [Permission.KoboSync, Permission.KoreaderSync, Permission.HardcoverSync, Permission.OpdsAccess, Permission.BookDockAccess],
+    permissions: [
+      Permission.KoboSync,
+      Permission.KoreaderSync,
+      Permission.HardcoverSync,
+      Permission.ReadwiseSync,
+      Permission.StorygraphSync,
+      Permission.OpdsAccess,
+      Permission.BookDockAccess,
+    ],
   },
   {
     label: 'Email',
@@ -108,6 +116,8 @@ function applyPreset(preset: 'standard' | 'admin' | 'clear') {
       Permission.KoboSync,
       Permission.KoreaderSync,
       Permission.HardcoverSync,
+      Permission.ReadwiseSync,
+      Permission.StorygraphSync,
       Permission.OpdsAccess,
       Permission.BookDockAccess,
     ])

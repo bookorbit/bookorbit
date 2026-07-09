@@ -7,7 +7,9 @@ import { BookModule } from '../book/book.module';
 import { DashboardModule } from '../dashboard/dashboard.module';
 import { OpdsModule } from '../opds/opds.module';
 import { PositionConverterModule } from '../position-converter/position-converter.module';
+import { RecommendationModule } from '../recommendation/recommendation.module';
 import { UserModule } from '../user/user.module';
+import { UserBookNoteModule } from '../user-book-note/user-book-note.module';
 import { UserBookStatusModule } from '../user-book-status/user-book-status.module';
 import { KoreaderAnnotationExchangeService } from './koreader-annotation-exchange.service';
 import { KoreaderAuthGuard } from './koreader-auth.guard';
@@ -30,6 +32,7 @@ import { KoreaderStatsService } from './koreader-stats.service';
   imports: [
     CommonModule,
     UserModule,
+    UserBookNoteModule,
     UserBookStatusModule,
     AchievementModule,
     AnnotationModule,
@@ -37,6 +40,7 @@ import { KoreaderStatsService } from './koreader-stats.service';
     DashboardModule,
     OpdsModule,
     PositionConverterModule,
+    RecommendationModule,
   ],
   controllers: [KoreaderController, KoreaderPluginController, KoreaderCatalogController],
   providers: [

@@ -17,7 +17,7 @@ export const userBookStatus = pgTable(
       .references(() => books.id, { onDelete: 'cascade' }),
     // 'unread' | 'want_to_read' | 'reading' | 'on_hold' | 'rereading' | 'read' | 'skimmed' | 'abandoned'
     status: varchar('status', { length: 20 }).$type<ReadStatus>().notNull().default('unread'),
-    // 'auto' (derived from progress) | 'manual' (user-set; never auto-overridden)
+    // 'auto' (derived from progress) | 'manual' (user-set/imported; protected from progress updates except want_to_read)
     source: varchar('source', { length: 10 }).$type<ReadStatusSource>().notNull().default('auto'),
     startedAt: timestamp('started_at', { withTimezone: true }),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
@@ -52,7 +52,7 @@ export const userBookRatings = pgTable(
     bookId: integer('book_id')
       .notNull()
       .references(() => books.id, { onDelete: 'cascade' }),
-    rating: integer('rating').notNull(),
+    rating: integer('rating'),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow()
@@ -63,12 +63,39 @@ export const userBookRatings = pgTable(
     index('ubr_user_id_idx').on(t.userId),
     index('ubr_book_id_idx').on(t.bookId),
     index('ubr_book_user_rating_idx').on(t.bookId, t.userId),
-    check('user_book_ratings_rating_range_chk', sql`${t.rating} >= 1 and ${t.rating} <= 5`),
+    check('user_book_ratings_rating_range_chk', sql`${t.rating} is null or (${t.rating} >= 1 and ${t.rating} <= 5)`),
   ],
 );
 
 export type UserBookRatingRow = typeof userBookRatings.$inferSelect;
 export type NewUserBookRating = typeof userBookRatings.$inferInsert;
+
+export const userBookNotes = pgTable(
+  'user_book_notes',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bookId: integer('book_id')
+      .notNull()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    note: text('note'),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.bookId] }),
+    index('ubn_user_id_idx').on(t.userId),
+    index('ubn_book_id_idx').on(t.bookId),
+    index('ubn_book_user_idx').on(t.bookId, t.userId),
+    check('user_book_notes_note_length_chk', sql`${t.note} is null or char_length(${t.note}) <= 10000`),
+  ],
+);
+
+export type UserBookNoteRow = typeof userBookNotes.$inferSelect;
+export type NewUserBookNote = typeof userBookNotes.$inferInsert;
 
 export const readingProgress = pgTable(
   'reading_progress',
@@ -279,6 +306,7 @@ export const annotations = pgTable(
   },
   (t) => [
     index('annotations_user_id_idx').on(t.userId),
+    index('annotations_user_id_id_idx').on(t.userId, t.id),
     index('annotations_user_book_idx').on(t.userId, t.bookId),
     index('annotations_user_book_active_idx')
       .on(t.userId, t.bookId)

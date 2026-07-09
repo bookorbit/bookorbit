@@ -16,6 +16,7 @@ function makeSmartScope(overrides: Partial<SmartScope> = {}): SmartScope {
     filter: null,
     defaultSort: [],
     isPublic: false,
+    syncToKobo: false,
     displayOrder: 0,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',

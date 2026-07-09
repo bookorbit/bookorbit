@@ -3,6 +3,7 @@ import { SQL, and, asc, count, desc, eq, exists, ilike, inArray, notExists, or, 
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { buildContentFilterClauses } from '../../../common/utils/content-filter-sql.utils';
+import { normalizeMetadataText, normalizeMetadataTextKey } from '../../../common/utils/metadata-text-normalize.utils';
 import { DB } from '../../../db';
 import * as schema from '../../../db/schema';
 import { bookMetadata, books, bookSeries, bookSeriesMemberships } from '../../../db/schema';
@@ -24,10 +25,6 @@ type Db = NodePgDatabase<typeof schema>;
 
 function escapeLike(s: string): string {
   return s.replace(/[%_\\]/g, '\\$&');
-}
-
-function normalizedName(name: string): string {
-  return name.trim().toLowerCase();
 }
 
 function numericIds(ids: (number | string)[]): number[] {
@@ -203,7 +200,7 @@ export class SeriesStrategy implements EntityStrategy {
     const current = await this.findEntityById(entityId);
     if (!current) throw new NotFoundException('series not found');
 
-    const newName = input.newName.trim();
+    const newName = normalizeMetadataText(input.newName);
     if (!newName) throw new BadRequestException('Name cannot be empty');
 
     const affectedBookIds = await this.findAffectedBookIdsInLibraries([entityId], input.libraryIds);
@@ -298,13 +295,15 @@ export class SeriesStrategy implements EntityStrategy {
   }
 
   private async upsertSeries(name: string): Promise<{ id: number; name: string }> {
-    const normalized = normalizedName(name);
+    const displayName = normalizeMetadataText(name);
+    const normalized = normalizeMetadataTextKey(displayName);
+    if (!displayName || !normalized) throw new BadRequestException('Name cannot be empty');
     const [row] = await this.db
       .insert(bookSeries)
-      .values({ name, normalizedName: normalized })
+      .values({ name: displayName, normalizedName: normalized })
       .onConflictDoUpdate({
         target: bookSeries.normalizedName,
-        set: { name, updatedAt: new Date() },
+        set: { name: displayName, updatedAt: new Date() },
       })
       .returning({ id: bookSeries.id, name: bookSeries.name });
     if (!row) throw new BadRequestException('Unable to resolve series');

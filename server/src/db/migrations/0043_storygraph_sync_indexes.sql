@@ -1,0 +1,2 @@
+CREATE INDEX "storygraph_book_state_user_sync_override_idx" ON "storygraph_book_state" USING btree ("user_id","sync_override","book_id");--> statement-breakpoint
+CREATE INDEX "storygraph_book_state_user_sync_error_idx" ON "storygraph_book_state" USING btree ("user_id","book_id") WHERE "storygraph_book_state"."sync_error" is not null;

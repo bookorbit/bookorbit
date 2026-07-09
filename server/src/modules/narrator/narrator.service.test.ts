@@ -54,5 +54,24 @@ describe('NarratorService', () => {
       const [, names] = (narratorRepo.replaceForBook as ReturnType<typeof vi.fn>).mock.calls[0];
       expect(names[0].sortName).toBeNull();
     });
+
+    it('normalizes whitespace, filters blanks, and deduplicates names case-insensitively', async () => {
+      const { service, narratorRepo } = makeService();
+
+      await service.replaceForBook(1, ['  Michael\t Kramer ', 'michael kramer', '   ', 'Kate   Reading']);
+
+      expect(narratorRepo.replaceForBook).toHaveBeenCalledWith(1, [
+        { name: 'Michael Kramer', sortName: null },
+        { name: 'Kate Reading', sortName: null },
+      ]);
+    });
+
+    it('normalizes object-form narrator names and sort names', async () => {
+      const { service, narratorRepo } = makeService();
+
+      await service.replaceForBook(1, [{ name: '  Simon   Vance ', sortName: ' Vance,\tSimon ' }]);
+
+      expect(narratorRepo.replaceForBook).toHaveBeenCalledWith(1, [{ name: 'Simon Vance', sortName: 'Vance, Simon' }]);
+    });
   });
 });
