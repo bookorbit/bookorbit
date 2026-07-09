@@ -17,6 +17,7 @@ function makeService() {
 }
 
 beforeEach(() => {
+  mockExecFile.mockClear();
   mockExecFile.mockImplementation((...args: unknown[]) => {
     const cb = args[args.length - 1] as (err: unknown, out: { stdout: string; stderr: string }) => void;
     cb(null, { stdout: '', stderr: '' });
@@ -45,6 +46,26 @@ describe('OpdsPdfPageService', () => {
       ['-jpeg', '-singlefile', '-r', '150', '-f', '1', '-l', '1', '/books/a.pdf', '/data/pse-cache/1/0'],
       expect.any(Function),
     );
+  });
+
+  it('dedupes concurrent requests for the same page into a single pdftoppm invocation', async () => {
+    mockStat.mockRejectedValue(new Error('ENOENT'));
+    const service = makeService();
+
+    const [first, second] = await Promise.all([service.ensurePage(1, '/books/a.pdf', 0), service.ensurePage(1, '/books/a.pdf', 0)]);
+
+    expect(first).toBe('/data/pse-cache/1/0.jpg');
+    expect(second).toBe('/data/pse-cache/1/0.jpg');
+    expect(mockExecFile).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not dedupe requests for different pages of the same file', async () => {
+    mockStat.mockRejectedValue(new Error('ENOENT'));
+    const service = makeService();
+
+    await Promise.all([service.ensurePage(1, '/books/a.pdf', 0), service.ensurePage(1, '/books/a.pdf', 1)]);
+
+    expect(mockExecFile).toHaveBeenCalledTimes(2);
   });
 
   it('invalidate removes the file cache directory for the file', async () => {

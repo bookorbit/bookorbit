@@ -19,6 +19,10 @@ const execFileAsync = promisify(execFile);
 @Injectable()
 export class OpdsPdfPageService {
   private readonly cacheRoot: string;
+  // Keyed by fileId:pageNumber so concurrent requests for the same page await
+  // the same render instead of both shelling out to pdftoppm and racing to
+  // write the same cache file (which can interleave into a corrupt JPEG).
+  private readonly inflight = new Map<string, Promise<string>>();
 
   constructor(config: ConfigService) {
     this.cacheRoot = join(config.get<string>('storage.appDataPath')!, 'pse-cache');
@@ -29,6 +33,16 @@ export class OpdsPdfPageService {
   }
 
   async ensurePage(fileId: number, absolutePath: string, pageNumber: number): Promise<string> {
+    const key = `${fileId}:${pageNumber}`;
+    const existing = this.inflight.get(key);
+    if (existing) return existing;
+
+    const promise = this.renderPage(fileId, absolutePath, pageNumber).finally(() => this.inflight.delete(key));
+    this.inflight.set(key, promise);
+    return promise;
+  }
+
+  private async renderPage(fileId: number, absolutePath: string, pageNumber: number): Promise<string> {
     const dir = this.cacheDir(fileId);
     const pagePath = join(dir, `${pageNumber}.jpg`);
     if (await this.exists(pagePath)) return pagePath;
