@@ -340,9 +340,10 @@ export class OpdsBookService {
         id: bookSeries.id,
         name: bookSeries.name,
         bookCount: sql<number>`count(DISTINCT ${books.id})::int`,
-        // Earliest-in-series book that actually has a cover, mirroring the "series cover"
-        // candidate the web UI already picks (see BookRepository's series_first_volume CTE).
-        // Null when no book in the series has a cover.
+        // Same "earliest in series" ordering as BookRepository's series_first_volume CTE,
+        // but additionally requires a cover - unlike the web UI's collage, an OPDS image
+        // link can't gracefully degrade for a coverless pick, so it skips ahead to the
+        // first volume that actually has one. Null when no book in the series has a cover.
         coverBookId: sql<number | null>`
           (array_agg(${books.id} ORDER BY ${bookSeriesMemberships.seriesIndex} ASC NULLS LAST, ${books.addedAt} ASC, ${books.id} ASC)
             FILTER (WHERE ${bookMetadata.coverSource} IS NOT NULL))[1]
