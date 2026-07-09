@@ -368,7 +368,7 @@ describe('OpdsService', () => {
       expect(xml).not.toContain('opds-pse/stream');
     });
 
-    it('includes pse:lastRead/pse:lastReadDate only when progress exists', () => {
+    it('includes pse:lastRead/pse:lastReadDate only when progress exists, converted to 1-based numbering', () => {
       const service = makeService();
       const date = new Date('2026-02-01T00:00:00.000Z');
       const withProgress = sampleBook({
@@ -388,7 +388,7 @@ describe('OpdsService', () => {
         'test-token',
       );
 
-      expect(xml).toContain('pse:lastRead="12"');
+      expect(xml).toContain('pse:lastRead="13"');
       expect(xml).toContain('pse:lastReadDate="2026-02-01T00:00:00.000Z"');
 
       const secondLinkIndex = xml.indexOf('fileId=11');

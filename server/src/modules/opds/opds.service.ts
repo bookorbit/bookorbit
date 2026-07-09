@@ -196,7 +196,9 @@ export class OpdsService {
 
       if (isPseStreamableFormat(file.format) && file.pageCount != null) {
         const href = `${BASE}/${book.id}/image?fileId=${file.id}&pageNumber={pageNumber}&t=${encodeURIComponent(coverToken)}`;
-        const lastRead = file.lastReadPage != null && file.lastReadDate ? { page: file.lastReadPage, date: file.lastReadDate } : undefined;
+        // pse:lastRead is 1-based per the OPDS-PSE spec, while the {pageNumber} URL
+        // template above and the stored progress value are both 0-based.
+        const lastRead = file.lastReadPage != null && file.lastReadDate ? { page: file.lastReadPage + 1, date: file.lastReadDate } : undefined;
         lines.push(`  ${xmlPseStreamLink(href, 'image/jpeg', file.pageCount, lastRead)}`);
       }
     }
