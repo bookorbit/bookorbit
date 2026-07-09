@@ -749,14 +749,21 @@ export class OpdsBookService {
     const pending = fileRows.filter((row) => row.pageCount == null && row.format && isPseStreamableFormat(row.format));
     if (pending.length === 0) return;
 
-    await Promise.all(
-      pending.map(async (row) => {
-        const count = await this.pageCountService.ensure({ id: row.id, format: row.format!, absolutePath: row.absolutePath, pageCount: null });
-        if (count == null) return;
-        const entry = entriesById.get(row.id);
-        if (entry) entry.pageCount = count;
-      }),
-    );
+    // A first-load feed can have dozens of uncached files at once; counting
+    // pages means reading whole archives off disk, so cap how many run at a
+    // time instead of firing every computation in parallel.
+    const concurrency = 5;
+    for (let index = 0; index < pending.length; index += concurrency) {
+      const chunk = pending.slice(index, index + concurrency);
+      await Promise.all(
+        chunk.map(async (row) => {
+          const count = await this.pageCountService.ensure({ id: row.id, format: row.format!, absolutePath: row.absolutePath, pageCount: null });
+          if (count == null) return;
+          const entry = entriesById.get(row.id);
+          if (entry) entry.pageCount = count;
+        }),
+      );
+    }
   }
 
   private resolveSeriesFilter(filters?: OpdsBookFilters): SeriesFilter | undefined {
