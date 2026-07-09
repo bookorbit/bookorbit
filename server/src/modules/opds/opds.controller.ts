@@ -332,7 +332,7 @@ export class OpdsController {
       // failure shouldn't fail the request or invalidate a perfectly good cache.
       const percentage = streamed.totalPages > 0 ? Math.min(100, ((pageNumber + 1) / streamed.totalPages) * 100) : 0;
       const dto: SaveProgressDto = { pageNumber, percentage };
-      this.bookService.saveProgress(opdsUser.userId, fileId, dto, user).catch(() => undefined);
+      this.bookService.saveProgress(opdsUser.userId, file.id, dto, user).catch(() => undefined);
     }
   }
 
