@@ -328,12 +328,7 @@ export class AuthorsRepository {
 
   private orderByDirection(
     expression:
-      | SQL
-      | typeof authors.name
-      | typeof authors.sortName
-      | typeof bookMetadata.title
-      | typeof bookMetadata.publishedYear
-      | typeof books.addedAt,
+      SQL | typeof authors.name | typeof authors.sortName | typeof bookMetadata.title | typeof bookMetadata.publishedYear | typeof books.addedAt,
     order: SortDirection,
   ) {
     return order === 'asc' ? asc(expression) : desc(expression);

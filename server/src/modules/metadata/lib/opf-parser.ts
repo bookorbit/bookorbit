@@ -91,17 +91,7 @@ function parseBookOrbitTags(raw: string | null): string[] {
 }
 
 type ProviderKey =
-  | 'google'
-  | 'amazon'
-  | 'goodreads'
-  | 'hardcover'
-  | 'hardcoverEdition'
-  | 'openlibrary'
-  | 'ranobedb'
-  | 'kobo'
-  | 'lubimyczytac'
-  | 'aladin'
-  | 'itunes';
+  'google' | 'amazon' | 'goodreads' | 'hardcover' | 'hardcoverEdition' | 'openlibrary' | 'ranobedb' | 'kobo' | 'lubimyczytac' | 'aladin' | 'itunes';
 
 // Calibre 9.x (opf3) writes provider identifiers as bare `prefix:value` text inside <dc:identifier>.
 // Only these known prefixes are recognized, as a lowest-priority fallback after opf:scheme and urn:.

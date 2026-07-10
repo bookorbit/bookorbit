@@ -7,10 +7,7 @@ import { NotificationGateway } from './notification.gateway';
 import { NotificationRepository } from './notification.repository';
 
 export type NotificationScope =
-  | { kind: 'library'; libraryId: number }
-  | { kind: 'user'; userId: number }
-  | { kind: 'permission'; permission: Permission }
-  | { kind: 'all' };
+  { kind: 'library'; libraryId: number } | { kind: 'user'; userId: number } | { kind: 'permission'; permission: Permission } | { kind: 'all' };
 
 export interface NotifyPayload {
   type: NotificationType;
