@@ -233,7 +233,7 @@ describe('BookRepository', () => {
       },
     ]);
     const koboReadingChain = makeSelectChain('limit', [{ createdAtKobo: null }]);
-    const koboSnapshotChain = makeSelectChain('limit', [{ snapshotId: 8 }]);
+    const koboSnapshotChain = makeSelectChain('orderBy', [{ deviceId: 3, deviceName: 'Libra', snapshotId: 8 }]);
     const koboCollectionsChain = makeSelectChain('where', [{ name: 'Sync Me' }]);
     const db = {
       select: vi
@@ -282,7 +282,7 @@ describe('BookRepository', () => {
       },
     ]);
     await expect(repo.findKoboReadingState(1, 10)).resolves.toEqual({ createdAtKobo: null });
-    await expect(repo.findKoboSnapshotState(1, 10)).resolves.toEqual({ snapshotId: 8 });
+    await expect(repo.findKoboSnapshotStates(1, 10)).resolves.toEqual([{ deviceId: 3, deviceName: 'Libra', snapshotId: 8 }]);
     await expect(repo.findKoboSyncCollectionNamesForBook(1, 10)).resolves.toEqual(['Sync Me']);
   });
 

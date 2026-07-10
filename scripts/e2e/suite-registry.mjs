@@ -9,11 +9,7 @@ export const E2E_GLOBAL_CHANGE_PATHS = Object.freeze([
   "docker/**",
 ]);
 
-const SHARED_DB_AND_HELPER_PATHS = Object.freeze([
-  "server/src/db/schema/**",
-  "scripts/e2e/**",
-  "scripts/db/**",
-]);
+const SHARED_DB_AND_HELPER_PATHS = Object.freeze(["server/src/db/schema/**", "scripts/e2e/**", "scripts/db/**"]);
 
 const SHARED_AUTH_TYPE_PATHS = Object.freeze(["packages/types/src/auth.ts", "packages/types/src/permissions.ts"]);
 
@@ -478,6 +474,25 @@ export const E2E_SUITES = Object.freeze({
       "server/test/kobo-annotation-sync.e2e-spec.ts",
       "server/test/e2e/reader-state-isolation/**",
       "packages/types/src/kobo.ts",
+      ...SHARED_DB_AND_HELPER_PATHS,
+    ],
+  },
+  "kobo-multi-device-sync": {
+    id: "kobo-multi-device-sync",
+    name: "Kobo Multi-Device Sync",
+    timeout: 60,
+    lane: "full",
+    description: "Kobo device-owned library snapshot suite",
+    vitestTarget: "test/kobo-multi-device-sync.e2e-spec.ts",
+    junitOutput: `${TEST_RESULTS_DIR}/kobo-multi-device-sync-e2e-junit.xml`,
+    prepareDedicatedDatabase: true,
+    useDedicatedDatabase: true,
+    changedPaths: [
+      "server/src/modules/kobo/**",
+      "server/src/modules/book/**",
+      "server/test/kobo-multi-device-sync.e2e-spec.ts",
+      "server/test/e2e/reader-state-isolation/**",
+      "packages/types/src/book.ts",
       ...SHARED_DB_AND_HELPER_PATHS,
     ],
   },

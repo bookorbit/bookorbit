@@ -351,6 +351,7 @@ export function useBookBulkActions(
         case 'publishedYear':
           return {
             ...book,
+            publishedDate: null,
             publishedYear: typeof value === 'number' ? value : value === null ? null : Number.isFinite(Number(value)) ? Number(value) : null,
           }
         case 'authors':

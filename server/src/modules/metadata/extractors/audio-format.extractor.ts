@@ -9,6 +9,7 @@ export class AudioFormatExtractor implements FormatExtractor {
       subtitle: audio.subtitle,
       description: audio.description,
       publisher: audio.publisher,
+      publishedDate: audio.publishedDate,
       publishedYear: audio.publishedYear,
       language: audio.language,
       seriesName: audio.seriesName,

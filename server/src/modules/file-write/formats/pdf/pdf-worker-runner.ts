@@ -12,8 +12,7 @@ export interface PdfWriteWorkerData {
 }
 
 export type PdfWriteWorkerMessage =
-  | { type: 'result'; result: WriteResult }
-  | { type: 'error'; errorClass: string; errorMessage: string; stack?: string };
+  { type: 'result'; result: WriteResult } | { type: 'error'; errorClass: string; errorMessage: string; stack?: string };
 
 interface PdfWorkerProcess {
   once(event: 'message', listener: (message: unknown) => void): this;

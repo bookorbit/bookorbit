@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { NotificationModule } from '../notification/notification.module';
+import { UserModule } from '../user/user.module';
 import { AchievementController } from './achievement.controller';
 import { AchievementService } from './achievement.service';
 import { AchievementBackfillService } from './achievement-backfill.service';
@@ -17,7 +18,7 @@ import { RatingEvaluator } from './evaluators/rating.evaluator';
 import { DevicesEvaluator } from './evaluators/devices.evaluator';
 
 @Module({
-  imports: [NotificationModule, AppSettingsModule],
+  imports: [NotificationModule, AppSettingsModule, UserModule],
   controllers: [AchievementController],
   providers: [
     AchievementService,

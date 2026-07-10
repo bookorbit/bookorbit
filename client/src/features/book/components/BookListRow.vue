@@ -33,6 +33,7 @@ import { usePermissions } from '@/features/auth/composables/usePermissions'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import { RATING_STARS, getRatingStarClass } from '@/features/book/lib/rating-stars'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { displayPublishedDate } from '../lib/published-date'
 
 const COLLAPSED_SERIES_COVER_LIMIT = 3
 
@@ -106,7 +107,8 @@ const uniqueSecondaryFiles = computed(() => {
 
 const metaLine = computed(() => {
   const parts: string[] = []
-  if (props.book.publishedYear) parts.push(String(props.book.publishedYear))
+  const published = displayPublishedDate(props.book.publishedDate, props.book.publishedYear)
+  if (published) parts.push(published)
   if (props.book.language) parts.push(props.book.language.toUpperCase())
   return parts.length > 0 ? parts.join(' · ') : null
 })

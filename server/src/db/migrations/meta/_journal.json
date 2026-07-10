@@ -313,8 +313,29 @@
     {
       "idx": 44,
       "version": "7",
-      "when": 1783581196061,
-      "tag": "0044_opds-pse-page-count",
+      "when": 1783575766119,
+      "tag": "0044_add_published_date",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1783630272168,
+      "tag": "0045_kobo-device-owner-key",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1783630311448,
+      "tag": "0046_kobo-device-snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1783710380528,
+      "tag": "0047_opds-pse-page-count",
       "breakpoints": true
     }
   ]

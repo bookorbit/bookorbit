@@ -39,6 +39,7 @@ function makeBook(overrides: Partial<BookCard> = {}): BookCard {
     seriesName: null,
     seriesIndex: null,
     files: [],
+    publishedDate: null,
     publishedYear: null,
     language: null,
     genres: [],
@@ -63,8 +64,8 @@ function makeBook(overrides: Partial<BookCard> = {}): BookCard {
 }
 
 describe('tableColumnSchema', () => {
-  it('exposes 26 total column definitions including the lock row', () => {
-    expect([LOCK_ROW_COLUMN_DEF, ...COLUMN_DEFS]).toHaveLength(26)
+  it('exposes 27 total column definitions including the lock row', () => {
+    expect([LOCK_ROW_COLUMN_DEF, ...COLUMN_DEFS]).toHaveLength(27)
   })
 
   it('builds a map entry for every column definition in COLUMN_DEFS', () => {
@@ -114,6 +115,7 @@ describe('tableColumnSchema', () => {
       seriesName: null,
       seriesIndex: null,
       files: [{ id: 10, format: 'epub', role: 'primary', sizeBytes: 2048 }],
+      publishedDate: '1965-08-01',
       publishedYear: 1965,
       language: 'en',
       genres: [],
@@ -146,6 +148,7 @@ describe('tableColumnSchema', () => {
       title: 'Dune',
       seriesName: 'Dune Series',
       seriesIndex: 1,
+      publishedDate: '1965-08-01',
       publishedYear: 1965,
       language: 'en',
       rating: 4,
@@ -185,6 +188,16 @@ describe('tableColumnSchema', () => {
     const book = makeBook({ seriesIndex: 2 })
     const def = COLUMN_DEFS.find((c) => c.id === 'seriesIndex')!
     expect(def.accessor!(book)).toBe(2)
+  })
+
+  it('publishedDate column uses the published year lock and full date sort field', () => {
+    const book = makeBook({ publishedDate: '1965-08-01', publishedYear: 1965 })
+    const def = COLUMN_DEFS.find((c) => c.id === 'publishedDate')!
+
+    expect(def.accessor!(book)).toBe('1965-08-01')
+    expect(def.sortField).toBe('publishedDate')
+    expect(def.lockField).toBe('publishedYear')
+    expect(def.isEditable).not.toBe(true)
   })
 
   it('readingProgress accessor returns the progress value', () => {

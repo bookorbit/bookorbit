@@ -16,8 +16,7 @@ export interface KepubReaderFile {
 }
 
 export type KepubContextResult =
-  | { ok: true; ctx: KepubContext; file: KepubReaderFile; settings: KoboSettings }
-  | { ok: false; reason: string; settings: KoboSettings | null };
+  { ok: true; ctx: KepubContext; file: KepubReaderFile; settings: KoboSettings } | { ok: false; reason: string; settings: KoboSettings | null };
 
 /**
  * Resolves the kepub artifact context for a book: the primary reader file, the

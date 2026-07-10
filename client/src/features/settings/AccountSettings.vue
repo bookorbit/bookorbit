@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import type { OidcProviderPublic, UserSettings } from '@bookorbit/types'
-import { ChevronDown, ChevronUp, Clock, KeyRound, Link, LinkIcon, MapPin, Save, Trash2, Upload } from '@lucide/vue'
+import { ChevronDown, ChevronUp, Clock, KeyRound, Link, LinkIcon, MapPin, Save, Trash2, Trophy, Upload } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import UserAvatar from '@/components/UserAvatar.vue'
 import { api } from '@/lib/api'
@@ -36,6 +36,8 @@ const formName = ref('')
 const formTimezone = ref('UTC')
 const savingTimezone = ref(false)
 const timezoneChanged = computed(() => formTimezone.value !== ((user.value?.settings as UserSettings | undefined)?.timezone ?? 'UTC'))
+const savingAchievements = ref(false)
+const achievementsEnabled = computed(() => (user.value?.settings as UserSettings | undefined)?.achievementPreferences?.enabled !== false)
 
 const timezones = (() => {
   try {
@@ -175,6 +177,33 @@ async function saveTimezone() {
     toast.success('Preferences saved')
   } finally {
     savingTimezone.value = false
+  }
+}
+
+async function handleAchievementsToggle() {
+  if (shouldBlockAccountEdit() || !user.value || savingAchievements.value) return
+
+  const enabled = !achievementsEnabled.value
+  savingAchievements.value = true
+  try {
+    const res = await api('/api/v1/users/me/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ settings: { achievementPreferences: { enabled } } }),
+    })
+    if (!res.ok) {
+      const payload = (await res.json().catch(() => null)) as { message?: string | string[] } | null
+      const message = Array.isArray(payload?.message)
+        ? (payload.message[0] ?? 'Failed to update achievement preference')
+        : (payload?.message ?? 'Failed to update achievement preference')
+      toast.error(message)
+      return
+    }
+
+    await me()
+    toast.success(`Achievements ${enabled ? 'enabled' : 'disabled'}`)
+  } finally {
+    savingAchievements.value = false
   }
 }
 
@@ -428,6 +457,34 @@ function closeUnlinkDialog() {
         <Save :size="14" />
         {{ savingTimezone ? 'Saving...' : 'Save preferences' }}
       </button>
+    </section>
+
+    <section class="rounded-lg border border-border bg-card p-4 md:p-5 shadow-xs">
+      <div class="flex items-center justify-between gap-4 py-1.5">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <Trophy :size="16" class="text-muted-foreground shrink-0" />
+            <p class="text-sm font-semibold text-foreground">Enable achievements</p>
+          </div>
+          <p class="mt-1 text-xs text-muted-foreground">
+            Track achievement progress and show achievement-related interface. Manage achievement notifications separately in Notifications.
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          :aria-checked="achievementsEnabled"
+          :disabled="savingAchievements || accountEditBlocked"
+          class="relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+          :class="achievementsEnabled ? 'bg-primary' : 'bg-muted-foreground/30'"
+          @click="handleAchievementsToggle"
+        >
+          <span
+            class="pointer-events-none block h-4 w-4 rounded-full bg-white shadow-xs ring-0 transition-transform"
+            :class="achievementsEnabled ? 'translate-x-4' : 'translate-x-0'"
+          />
+        </button>
+      </div>
     </section>
 
     <section class="rounded-lg border border-border bg-card p-4 md:p-5 space-y-4 shadow-xs">

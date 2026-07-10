@@ -143,6 +143,7 @@ export class BookMetadataLockService {
     this.copyResolvedField(filteredResolved, resolved, 'description', 'description', lockedSet, skippedFields);
     this.copyResolvedField(filteredResolved, resolved, 'authors', 'authors', lockedSet, skippedFields);
     this.copyResolvedField(filteredResolved, resolved, 'publisher', 'publisher', lockedSet, skippedFields);
+    this.copyResolvedField(filteredResolved, resolved, 'publishedDate', 'publishedYear', lockedSet, skippedFields);
     this.copyResolvedField(filteredResolved, resolved, 'publishedYear', 'publishedYear', lockedSet, skippedFields);
     this.copyResolvedField(filteredResolved, resolved, 'language', 'language', lockedSet, skippedFields);
     this.copyResolvedField(filteredResolved, resolved, 'pageCount', 'pageCount', lockedSet, skippedFields);
@@ -224,6 +225,7 @@ export class BookMetadataLockService {
     this.copyUpdateField(filteredDto, dto, 'subtitle', 'subtitle', lockedSet, skippedFields);
     this.copyUpdateField(filteredDto, dto, 'description', 'description', lockedSet, skippedFields);
     this.copyUpdateField(filteredDto, dto, 'publisher', 'publisher', lockedSet, skippedFields);
+    this.copyUpdateField(filteredDto, dto, 'publishedDate', 'publishedYear', lockedSet, skippedFields);
     this.copyUpdateField(filteredDto, dto, 'publishedYear', 'publishedYear', lockedSet, skippedFields);
     this.copyUpdateField(filteredDto, dto, 'language', 'language', lockedSet, skippedFields);
     this.copyUpdateField(filteredDto, dto, 'pageCount', 'pageCount', lockedSet, skippedFields);
@@ -394,6 +396,7 @@ export class BookMetadataLockService {
     this.addFieldIfPresent(fields, dto, 'subtitle', 'subtitle');
     this.addFieldIfPresent(fields, dto, 'description', 'description');
     this.addFieldIfPresent(fields, dto, 'publisher', 'publisher');
+    this.addFieldIfPresent(fields, dto, 'publishedDate', 'publishedYear');
     this.addFieldIfPresent(fields, dto, 'publishedYear', 'publishedYear');
     this.addFieldIfPresent(fields, dto, 'language', 'language');
     this.addFieldIfPresent(fields, dto, 'pageCount', 'pageCount');

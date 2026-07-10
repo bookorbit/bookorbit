@@ -1,6 +1,8 @@
 import { readFile } from 'fs/promises';
 import { XMLParser } from 'fast-xml-parser';
 
+import { parsePublishedDateKey } from '../../../common/utils/published-date.utils';
+
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
@@ -65,10 +67,30 @@ function parseFb2YearNode(val: unknown): number | null {
   return null;
 }
 
+function parseFb2DateNode(val: unknown): string | null {
+  const candidates: string[] = [];
+  const direct = text(val);
+  if (direct) candidates.push(direct);
+
+  if (typeof val === 'object' && val !== null) {
+    const objectNode = val as Record<string, unknown>;
+    const valueAttr = text(objectNode['@_value']);
+    if (valueAttr) candidates.push(valueAttr);
+  }
+
+  for (const candidate of candidates) {
+    const publishedDate = parsePublishedDateKey(candidate);
+    if (publishedDate) return publishedDate;
+  }
+
+  return null;
+}
+
 export interface Fb2Metadata {
   title: string | null;
   description: string | null;
   language: string | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   seriesName: string | null;
   seriesIndex: number | null;
@@ -133,6 +155,7 @@ export async function parseFb2File(absolutePath: string): Promise<Fb2Metadata | 
     let publishedYear: number | null = null;
     const publishInfo = description?.['publish-info'] as Record<string, unknown> | undefined;
     const yearRaw = publishInfo?.['year'] ?? titleInfo['date'];
+    const publishedDate = parseFb2DateNode(yearRaw);
     publishedYear = parseFb2YearNode(yearRaw);
 
     // Annotation (description)
@@ -143,7 +166,7 @@ export async function parseFb2File(absolutePath: string): Promise<Fb2Metadata | 
       if (annotStr) annotationDescription = stripHtml(annotStr) || null;
     }
 
-    return { title, description: annotationDescription, language, publishedYear, seriesName, seriesIndex, authors, genres };
+    return { title, description: annotationDescription, language, publishedDate, publishedYear, seriesName, seriesIndex, authors, genres };
   } catch {
     return null;
   }

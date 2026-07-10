@@ -805,7 +805,7 @@ describe('BookController', () => {
     bookService.updateMetadataLocks.mockResolvedValue({ id: 7, lockedFields: ['title'] });
     bookService.refreshMetadata.mockResolvedValue({ id: 7 });
     bookService.getMetadataFromFile.mockResolvedValue({ title: 'File Title' });
-    bookService.getKoboState.mockResolvedValue({ eligibleForKoboSync: false, syncCollections: [], readingState: null, snapshot: null });
+    bookService.getKoboState.mockResolvedValue({ eligibleForKoboSync: false, syncCollections: [], readingState: null, snapshots: [] });
     bookService.getAudioProgress.mockResolvedValue({ positionSeconds: 15 });
     bookService.getDetail.mockResolvedValue({ id: 7, title: 'Detail' });
 

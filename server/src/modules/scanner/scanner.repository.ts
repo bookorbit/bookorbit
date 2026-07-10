@@ -539,6 +539,7 @@ export class ScannerRepository {
           title: bookMetadata.title,
           seriesName: bookMetadata.seriesName,
           seriesIndex: bookMetadata.seriesIndex,
+          publishedDate: bookMetadata.publishedDate,
           publishedYear: bookMetadata.publishedYear,
           language: bookMetadata.language,
           rating: bookMetadata.rating,

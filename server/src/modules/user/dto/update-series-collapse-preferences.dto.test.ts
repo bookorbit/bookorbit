@@ -33,6 +33,12 @@ describe('UpdateSeriesCollapsePreferencesDto', () => {
     expect(errors).toHaveLength(0);
   });
 
+  it('accepts smart scope overrides', async () => {
+    const dto = toDto({ smartScopes: { '8': true, '9': null } });
+    const errors = await validate(dto);
+    expect(errors).toHaveLength(0);
+  });
+
   it('rejects non-boolean/non-null values in libraries', async () => {
     const dto = toDto({ libraries: { '1': 'yes' } });
     const errors = await validate(dto);
@@ -41,6 +47,12 @@ describe('UpdateSeriesCollapsePreferencesDto', () => {
 
   it('rejects number values in collections', async () => {
     const dto = toDto({ collections: { '1': 42 } });
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it('rejects non-boolean values in smart scope overrides', async () => {
+    const dto = toDto({ smartScopes: { '8': 'yes' } });
     const errors = await validate(dto);
     expect(errors.length).toBeGreaterThan(0);
   });

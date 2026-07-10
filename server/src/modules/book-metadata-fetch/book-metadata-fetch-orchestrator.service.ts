@@ -1,13 +1,15 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy, Optional } from '@nestjs/common';
-import type { BookMetadataFetchReason, MetadataField } from '@bookorbit/types';
+import type { BookMetadataFetchReason } from '@bookorbit/types';
 import { MetadataProviderKey, NotificationType } from '@bookorbit/types';
 import { NotificationService } from '../notification/notification.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
 import { BookReadService } from '../book/book-read.service';
 import * as schema from '../../db/schema';
 import { MetadataScoreService } from '../metadata-score/metadata-score.service';
+import { ComicMetadataRepository } from '../metadata/comic-metadata.repository';
 import { MetadataService } from '../metadata/metadata.service';
-import { MetadataFetchPipeline, ResolvedMetadataFields } from '../metadata-fetch/metadata-fetch-pipeline';
+import { ExistingMetadataFields, MetadataFetchPipeline, ResolvedMetadataFields } from '../metadata-fetch/metadata-fetch-pipeline';
 import { ProviderThrottleTracker } from '../metadata-fetch/provider-throttle.tracker';
 import type { MetadataSearchParams } from '../metadata-fetch/providers/metadata-search-params';
 import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
@@ -20,6 +22,8 @@ import { BookMetadataFetchSessionService } from './book-metadata-fetch-session.s
 const POLL_INTERVAL_MS = 4_000;
 const BATCH_SIZE = 1;
 const SCHEDULE_BATCH_SIZE = 1000;
+
+type BookReadResult = NonNullable<Awaited<ReturnType<BookReadService['findById']>>>;
 
 @Injectable()
 export class BookMetadataFetchOrchestratorService implements OnApplicationBootstrap, OnModuleDestroy {
@@ -35,6 +39,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     private readonly bookReadService: BookReadService,
     private readonly pipeline: MetadataFetchPipeline,
     private readonly metadataService: MetadataService,
+    private readonly comicMetadataRepository: ComicMetadataRepository,
     private readonly scoreService: MetadataScoreService,
     private readonly bookMetadataLockService: BookMetadataLockService,
     private readonly session: BookMetadataFetchSessionService,
@@ -59,20 +64,16 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     }
   }
 
-  async scheduleIfEligible(bookId: number, libraryId: number, reason: BookMetadataFetchReason): Promise<void> {
+  async scheduleImportedBooksIfEligible(libraryId: number, bookIds: readonly number[]): Promise<number> {
     const config = await this.configService.getEffectiveConfig(libraryId);
-    if (!config.enabled || !config.triggerOnImport) return;
+    if (!config.enabled || !config.triggerOnImport) return 0;
 
-    const bookData = await this.loadEligibilityData(bookId);
-    if (!bookData) return;
-
-    if (!this.eligibilityService.isEligible(bookData, config)) return;
-
-    const queued = await this.queueRepo.upsertSchedule([bookId], reason);
+    const queued = await this.queueRepo.scheduleEligibleBookIdsInBatches(config, 'event_import', libraryId, bookIds, SCHEDULE_BATCH_SIZE);
     if (queued > 0) {
       this.session.addToTotal(queued);
       await this.emitStatus();
     }
+    return queued;
   }
 
   async triggerGlobal(): Promise<number> {
@@ -141,7 +142,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
       if (this.paused) return;
       const dueRows = await this.queueRepo.fetchDue(BATCH_SIZE);
       if (dueRows.length > 0) {
-        await this.processOne(dueRows[0].bookId, dueRows[0].title);
+        await this.processOne(dueRows[0].bookId, dueRows[0].title, dueRows[0].reason);
         await this.randomDelay();
       }
     } catch (error) {
@@ -155,7 +156,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     }
   }
 
-  private async processOne(bookId: number, title: string | null): Promise<void> {
+  private async processOne(bookId: number, title: string | null, reason: BookMetadataFetchReason = 'manual_trigger'): Promise<void> {
     const startedAt = Date.now();
     const claimed = await this.queueRepo.markProcessing(bookId);
     if (!claimed) return;
@@ -180,6 +181,42 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
       const meta = book.book_metadata;
       const libraryId = book.books.libraryId;
 
+      if (book.books.status === 'processing') {
+        await this.queueRepo.deferProcessing(bookId);
+        this.session.setCurrentItemName(null);
+        this.logger.debug(
+          `[book.metadata_fetch] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} outcome=awaiting_import_completion - metadata fetch deferred`,
+        );
+        await this.emitStatus();
+        return;
+      }
+
+      if (book.books.status !== undefined && book.books.status !== 'present') {
+        await this.queueRepo.markDone(bookId);
+        this.session.incrementDone();
+        this.session.setCurrentItemName(null);
+        this.logger.debug(
+          `[book.metadata_fetch] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} outcome=book_not_present - metadata fetch completed`,
+        );
+        await this.emitStatus();
+        return;
+      }
+
+      const preserveExisting = reason === 'event_import';
+      if (preserveExisting) {
+        const config = await this.configService.getEffectiveConfig(libraryId);
+        if (!config.enabled || !config.triggerOnImport || !this.eligibilityService.isEligible(this.toEligibilityData(found), config)) {
+          await this.queueRepo.markDone(bookId);
+          this.session.incrementDone();
+          this.session.setCurrentItemName(null);
+          this.logger.debug(
+            `[book.metadata_fetch] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} outcome=event_import_no_longer_eligible - metadata fetch completed`,
+          );
+          await this.emitStatus();
+          return;
+        }
+      }
+
       const searchParams: MetadataSearchParams = {
         title: meta?.title ?? undefined,
         author: authorRows[0]?.name ?? undefined,
@@ -189,7 +226,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         maxCandidatesPerProvider: 1,
       };
 
-      const existingFields: Partial<Record<MetadataField, unknown>> = {
+      const existingFields: ExistingMetadataFields = {
         title: meta?.title,
         subtitle: meta?.subtitle,
         description: meta?.description,
@@ -206,9 +243,17 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         duration: meta?.durationSeconds ?? undefined,
         abridged: meta?.abridged ?? undefined,
         narrators: narratorRows.map((n) => n.name),
+        chapters: meta?.chapters,
+        hardcoverEditionId: meta?.hardcoverEditionId,
       };
 
-      const { resolved, providerIds } = await this.pipeline.runWithSources(searchParams, existingFields, libraryId);
+      if (preserveExisting) {
+        existingFields.comicMetadata = await this.comicMetadataRepository.findByBookId(bookId);
+      }
+
+      const { resolved, providerIds } = preserveExisting
+        ? await this.pipeline.runWithSources(searchParams, existingFields, libraryId, { preserveExisting: true })
+        : await this.pipeline.runWithSources(searchParams, existingFields, libraryId);
 
       await this.persistResolved(bookId, resolved, providerIds, authorRows, genreRows, narratorRows);
 
@@ -267,8 +312,18 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     if (description !== undefined) scalarFields.description = description;
     const publisher = this.asNullableString(filteredResolved.publisher);
     if (publisher !== undefined) scalarFields.publisher = publisher;
+    const publishedDate = this.asNullablePublishedDate(filteredResolved.publishedDate);
+    if (publishedDate !== undefined) {
+      scalarFields.publishedDate = publishedDate;
+      if (publishedDate !== null) scalarFields.publishedYear = publishedYearFromDateKey(publishedDate);
+    }
     const publishedYear = this.asNullableNumber(filteredResolved.publishedYear);
-    if (publishedYear !== undefined) scalarFields.publishedYear = publishedYear;
+    if (publishedYear !== undefined && publishedDate === undefined) {
+      scalarFields.publishedDate = null;
+      scalarFields.publishedYear = publishedYear;
+    } else if (publishedYear !== undefined && publishedDate === null) {
+      scalarFields.publishedYear = publishedYear;
+    }
     const language = this.asNullableString(filteredResolved.language);
     if (language !== undefined) scalarFields.language = language;
     const pageCount = this.asNullableNumber(filteredResolved.pageCount);
@@ -355,9 +410,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     }
   }
 
-  private async loadEligibilityData(bookId: number) {
-    const found = await this.bookReadService.findById(bookId);
-    if (!found) return null;
+  private toEligibilityData(found: BookReadResult) {
     const { book, authorRows, genreRows, narratorRows, communityRatingRows } = found;
     const meta = book.book_metadata;
     return {
@@ -458,6 +511,13 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     if (value === undefined) return undefined;
     if (value === null) return null;
     return typeof value === 'string' ? value : undefined;
+  }
+
+  private asNullablePublishedDate(value: unknown): string | null | undefined {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    if (typeof value !== 'string') return undefined;
+    return normalizePublishedDate(value) ?? undefined;
   }
 
   private asNullableNumber(value: unknown): number | null | undefined {

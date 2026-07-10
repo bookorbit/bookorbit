@@ -1,15 +1,17 @@
 import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
+import { parsePublishedDateKey, parsePublishedYear, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
 import { HardcoverBookWithEditions, HardcoverCachedContributor, HardcoverEdition, HardcoverSearchDocument } from './hardcover.types';
 
 function parseYear(releaseYear: number | undefined | null, releaseDate: string | undefined): number | undefined {
-  if (releaseYear != null) {
-    return releaseYear >= 1000 && releaseYear <= 2200 ? releaseYear : undefined;
-  }
-  if (!releaseDate) return undefined;
-  const year = parseInt(releaseDate.substring(0, 4), 10);
-  if (Number.isNaN(year) || year < 1000 || year > 2200) return undefined;
-  return year;
+  return parsePublishedYear(releaseYear) ?? parsePublishedYear(releaseDate);
+}
+
+function parseDate(releaseYear: number | undefined | null, releaseDate: string | undefined): string | undefined {
+  const publishedDate = parsePublishedDateKey(releaseDate);
+  if (!publishedDate) return undefined;
+  const year = parsePublishedYear(releaseYear);
+  return year === undefined || year === publishedYearFromDateKey(publishedDate) ? publishedDate : undefined;
 }
 
 function extractAuthorsFromContributors(contributors: HardcoverCachedContributor[] | undefined): string[] {
@@ -42,6 +44,10 @@ function resolveEditionPublishedYear(edition: HardcoverEdition, book: HardcoverB
   return parseYear(edition.release_year, edition.release_date) ?? parseYear(book.release_year, book.release_date);
 }
 
+function resolveEditionPublishedDate(edition: HardcoverEdition, book: HardcoverBookWithEditions): string | undefined {
+  return parseDate(edition.release_year, edition.release_date) ?? parseDate(book.release_year, book.release_date);
+}
+
 function normalizeCommunityRating(value: number | undefined): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 5 ? value : undefined;
 }
@@ -63,6 +69,7 @@ export function mapSearchDocument(doc: HardcoverSearchDocument): MetadataCandida
     description: doc.description,
     authors: doc.author_names ?? [],
     pageCount: doc.pages,
+    publishedDate: parseDate(doc.release_year, doc.release_date),
     publishedYear: parseYear(doc.release_year, doc.release_date),
     isbn10,
     isbn13,
@@ -98,6 +105,7 @@ function mapEdition(edition: HardcoverEdition, book: HardcoverBookWithEditions):
     publisher: edition.publisher?.name,
     language: edition.language?.code2,
     pageCount: isAudiobookEdition(edition) ? undefined : (edition.pages ?? book.pages),
+    publishedDate: resolveEditionPublishedDate(edition, book),
     publishedYear: resolveEditionPublishedYear(edition, book),
     isbn10: edition.isbn_10,
     isbn13: edition.isbn_13,

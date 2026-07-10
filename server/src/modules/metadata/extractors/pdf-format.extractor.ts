@@ -22,6 +22,7 @@ export class PdfFormatExtractor implements FormatExtractor {
       isbn10: pdf.isbn10,
       isbn13: pdf.isbn13,
       publisher: pdf.publisher,
+      publishedDate: pdf.publishedDate,
       publishedYear: pdf.publishedYear ?? fb?.publishedYear ?? null,
       language: pdf.language,
       seriesName: pdf.seriesName,

@@ -77,47 +77,41 @@ describe('SettingsHeader', () => {
       expect(labels).not.toContain('Integrations')
     })
 
-    it('shows Hardcover tab for users with hardcover_sync', () => {
+    it('shows Integrations tab for users with hardcover_sync', () => {
       const labels = getTabLabels(mountHeader({ perms: ['hardcover_sync'] }))
-      expect(labels).toContain('Hardcover')
-      expect(labels).not.toContain('Integrations')
+      expect(labels).toContain('Integrations')
+      expect(labels).not.toContain('Hardcover')
     })
 
-    it('shows Readwise tab for users with readwise_sync', () => {
+    it('shows Integrations tab for users with readwise_sync', () => {
       const labels = getTabLabels(mountHeader({ perms: ['readwise_sync'] }))
-      expect(labels).toContain('Readwise')
-      expect(labels).not.toContain('Integrations')
-    })
-
-    it('hides Readwise tab when user lacks readwise_sync', () => {
-      const labels = getTabLabels(mountHeader())
+      expect(labels).toContain('Integrations')
       expect(labels).not.toContain('Readwise')
     })
 
-    it('shows integration tabs for superusers', () => {
+    it('hides Integrations tab when user lacks integration permissions', () => {
+      const labels = getTabLabels(mountHeader())
+      expect(labels).not.toContain('Integrations')
+    })
+
+    it('shows Integrations tab for superusers', () => {
       const labels = getTabLabels(mountHeader({ su: true }))
       expect(labels).toContain('Kobo')
       expect(labels).toContain('KOReader')
-      expect(labels).toContain('Hardcover')
-      expect(labels).toContain('Readwise')
-      expect(labels).not.toContain('Integrations')
+      expect(labels).toContain('Integrations')
+      expect(labels).not.toContain('Hardcover')
+      expect(labels).not.toContain('Readwise')
+      expect(labels).not.toContain('StoryGraph')
     })
 
     it('places integration tabs after OPDS', () => {
       const labels = getTabLabels(mountHeader({ su: true }))
-      expect(labels.slice(labels.indexOf('OPDS'), labels.indexOf('Admin'))).toEqual([
-        'OPDS',
-        'Kobo',
-        'KOReader',
-        'Hardcover',
-        'Readwise',
-        'StoryGraph',
-      ])
+      expect(labels.slice(labels.indexOf('OPDS'), labels.indexOf('Admin'))).toEqual(['OPDS', 'Kobo', 'KOReader', 'Integrations'])
     })
 
-    it('places Readwise tab after Hardcover', () => {
+    it('places Integrations after KOReader', () => {
       const labels = getTabLabels(mountHeader({ su: true }))
-      expect(labels.indexOf('Readwise')).toBe(labels.indexOf('Hardcover') + 1)
+      expect(labels.indexOf('Integrations')).toBe(labels.indexOf('KOReader') + 1)
     })
   })
 
@@ -264,15 +258,9 @@ describe('SettingsHeader', () => {
       expect(btn?.classes()).toContain('border-primary')
     })
 
-    it('Hardcover tab is active when route is settings-hardcover', () => {
-      const wrapper = mountHeader({ routeName: 'settings-hardcover', perms: ['hardcover_sync'] })
-      const btn = wrapper.findAll('button').find((b) => b.text() === 'Hardcover')
-      expect(btn?.classes()).toContain('border-primary')
-    })
-
-    it('StoryGraph tab is active when route is settings-storygraph', () => {
-      const wrapper = mountHeader({ routeName: 'settings-storygraph', perms: ['storygraph_sync'] })
-      const btn = wrapper.findAll('button').find((b) => b.text() === 'StoryGraph')
+    it('Integrations tab is active when route is settings-integrations', () => {
+      const wrapper = mountHeader({ routeName: 'settings-integrations', perms: ['storygraph_sync'] })
+      const btn = wrapper.findAll('button').find((b) => b.text() === 'Integrations')
       expect(btn?.classes()).toContain('border-primary')
     })
 

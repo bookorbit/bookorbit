@@ -43,6 +43,7 @@ const form = reactive({
   authors: '',
   description: '',
   publisher: '',
+  publishedDate: '',
   publishedYear: '',
   language: '',
   isbn13: '',
@@ -62,6 +63,7 @@ watch(
     form.authors = m.authors?.join(', ') ?? ''
     form.description = m.description ?? ''
     form.publisher = m.publisher ?? ''
+    form.publishedDate = m.publishedDate ?? ''
     form.publishedYear = m.publishedYear != null ? String(m.publishedYear) : ''
     form.language = m.language ?? ''
     form.isbn13 = m.isbn13 ?? ''
@@ -111,6 +113,7 @@ function buildMetadataPatchFromForm(): Partial<BookDockMetadata> {
       : undefined,
     description: form.description || undefined,
     publisher: form.publisher || undefined,
+    publishedDate: form.publishedDate || undefined,
     publishedYear: form.publishedYear ? ((n) => (isNaN(n) ? undefined : n))(parseInt(form.publishedYear, 10)) : undefined,
     language: form.language || undefined,
     isbn13: form.isbn13 || undefined,
@@ -133,6 +136,18 @@ function onFieldChange() {
     const updated = await saveMetadata(props.file.id, buildMetadataPatchFromForm())
     if (updated) emit('updated', updated)
   }, 1000)
+}
+
+function onPublishedDateChange() {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(form.publishedDate)) {
+    form.publishedYear = form.publishedDate.slice(0, 4)
+  }
+  onFieldChange()
+}
+
+function onPublishedYearChange() {
+  form.publishedDate = ''
+  onFieldChange()
 }
 
 async function onLibraryChange(event: Event) {
@@ -186,6 +201,7 @@ const currentSource = computed<MetadataSource>(() => ({
   subtitle: form.subtitle || null,
   description: form.description || null,
   publisher: form.publisher || null,
+  publishedDate: form.publishedDate || null,
   publishedYear: form.publishedYear ? ((n) => (isNaN(n) ? null : n))(parseInt(form.publishedYear, 10)) : null,
   language: form.language || null,
   pageCount: null,
@@ -242,6 +258,7 @@ async function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string 
   if ('subtitle' in p) form.subtitle = p.subtitle ?? ''
   if ('description' in p) form.description = p.description ?? ''
   if ('publisher' in p) form.publisher = p.publisher ?? ''
+  if ('publishedDate' in p) form.publishedDate = p.publishedDate ?? ''
   if ('publishedYear' in p) form.publishedYear = p.publishedYear == null ? '' : String(p.publishedYear)
   if ('language' in p) form.language = p.language ?? ''
   if ('isbn13' in p) form.isbn13 = p.isbn13 ?? ''
@@ -428,11 +445,20 @@ onMounted(() => {
               />
             </label>
             <label>
+              <span class="text-xs font-medium text-muted-foreground">Published Date</span>
+              <input
+                v-model="form.publishedDate"
+                type="date"
+                class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
+                @input="onPublishedDateChange"
+              />
+            </label>
+            <label>
               <span class="text-xs font-medium text-muted-foreground">Year</span>
               <input
                 v-model="form.publishedYear"
                 class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
-                @input="onFieldChange"
+                @input="onPublishedYearChange"
               />
             </label>
             <label>

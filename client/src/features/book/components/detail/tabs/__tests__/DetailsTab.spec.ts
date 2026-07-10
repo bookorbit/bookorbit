@@ -42,6 +42,7 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     isbn10: null,
     isbn13: null,
     publisher: null,
+    publishedDate: null,
     publishedYear: null,
     language: null,
     pageCount: null,
@@ -114,6 +115,9 @@ function mountDetails(book: BookDetail) {
         Popover: { template: '<div><slot /><slot name="content" /></div>' },
         PopoverTrigger: { template: '<div><slot /></div>' },
         PopoverContent: { template: '<div><slot /></div>' },
+        Tooltip: { template: '<div><slot /></div>' },
+        TooltipTrigger: { template: '<div><slot /></div>' },
+        TooltipContent: { template: '<div><slot /></div>' },
       },
     },
   })
@@ -145,13 +149,13 @@ describe('DetailsTab cover surface', () => {
       const url = String(input)
       if (url.includes('/metadata-score/weights')) return response({})
       if (url.includes('/audio-progress')) return response(null)
-      if (url.includes('/collections?')) return response([])
+      if (url.includes('/collections/membership')) return response([])
       if (url.includes('/kobo-state')) {
         return response({
           eligibleForKoboSync: false,
           syncCollections: [],
           readingState: null,
-          snapshot: null,
+          snapshots: [],
         })
       }
       if (url.includes('/koreader/books/')) return response(null)
@@ -265,6 +269,59 @@ describe('DetailsTab cover surface', () => {
     expect(wrapper.text()).toContain('Author One, Author Two')
   })
 
+  it('summarizes pending Kobo sync state for each affected device', async () => {
+    mocks.api.mockImplementation(async (input) => {
+      const url = String(input)
+      if (url.includes('/metadata-score/weights')) return response({})
+      if (url.includes('/audio-progress')) return response(null)
+      if (url.includes('/collections/membership')) return response([])
+      if (url.includes('/kobo-state')) {
+        return response({
+          eligibleForKoboSync: true,
+          syncCollections: ['Favorites'],
+          readingState: null,
+          snapshots: [
+            {
+              deviceId: 1,
+              deviceName: 'Libra',
+              snapshotId: 11,
+              snapshotUpdatedAt: '2026-01-01T00:00:00.000Z',
+              inSnapshot: true,
+              synced: false,
+              pendingDelete: true,
+              isNew: false,
+              removedByDevice: false,
+              fileHash: null,
+              metadataHash: null,
+            },
+            {
+              deviceId: 2,
+              deviceName: 'Elipsa',
+              snapshotId: 12,
+              snapshotUpdatedAt: '2026-01-01T00:00:00.000Z',
+              inSnapshot: true,
+              synced: false,
+              pendingDelete: true,
+              isNew: false,
+              removedByDevice: false,
+              fileHash: null,
+              metadataHash: null,
+            },
+          ],
+        })
+      }
+      if (url.includes('/koreader/books/')) return response(null)
+      if (url.includes('/progress')) return response([])
+      return response({})
+    })
+
+    const wrapper = mountDetails(makeBook())
+    await flushPromises()
+
+    expect(mocks.api).toHaveBeenCalledWith('/api/v1/books/12/kobo-state')
+    expect(wrapper.text()).toContain('Pending delete on Libra and Elipsa')
+  })
+
   it('links every series membership to its series detail page', async () => {
     const wrapper = mountDetails(
       makeBook({
@@ -345,13 +402,13 @@ describe('DetailsTab cover surface', () => {
     expect(storygraphItem.props('bookId')).toBe(12)
   })
 
-  it('renders Send via Email button and opens dialog when user has email_send permission', async () => {
+  it('renders a Send via Email action button and opens dialog when user has email_send permission', async () => {
     mocks.hasPermission.mockImplementation((perm) => perm === 'email_send')
     const wrapper = mountDetails(makeBook())
     await flushPromises()
 
-    const sendButtons = wrapper.findAll('button').filter((b) => b.text().includes('Send via Email'))
-    expect(sendButtons.length).toBeGreaterThan(0) // Desktop and mobile menus
+    const sendButtons = wrapper.findAll('button[aria-label="Send via Email"]')
+    expect(sendButtons).toHaveLength(2)
 
     // Find the stubbed SendBookDialog
     const sendDialog = wrapper.findComponent({ name: 'SendBookDialog' })
@@ -367,7 +424,77 @@ describe('DetailsTab cover surface', () => {
     const wrapper = mountDetails(makeBook())
     await flushPromises()
 
-    const sendButtons = wrapper.findAll('button').filter((b) => b.text().includes('Send via Email'))
+    const sendButtons = wrapper.findAll('button[aria-label="Send via Email"]')
     expect(sendButtons.length).toBe(0)
+  })
+
+  it('offers reset in both overflow menus and refreshes supplemental reading state after confirmation', async () => {
+    mocks.hasPermission.mockImplementation(
+      (permission) => permission === 'library_edit_metadata' || permission === 'kobo_sync' || permission === 'koreader_sync',
+    )
+    const wrapper = mountDetails(makeBook())
+    await flushPromises()
+
+    const resetButtons = wrapper.findAll('button').filter((button) => button.text().includes('Reset reading state'))
+    expect(resetButtons).toHaveLength(2)
+
+    const resetDialog = wrapper.findComponent({ name: 'ResetReadingStateDialog' })
+    expect(resetDialog.exists()).toBe(true)
+    expect(resetDialog.props('open')).toBe(false)
+
+    await resetButtons[0]!.trigger('click')
+    expect(resetDialog.props('open')).toBe(true)
+
+    mocks.api.mockClear()
+    mocks.api.mockImplementation(async (input) => {
+      const url = String(input)
+      if (url.endsWith('/reset-reading-state')) {
+        return response({
+          readStatus: {
+            status: 'unread',
+            source: 'manual',
+            startedAt: null,
+            finishedAt: null,
+            updatedAt: '2026-07-09T12:00:00.000Z',
+          },
+        })
+      }
+      if (url.includes('/collections/membership')) return response([])
+      if (url.includes('/kobo-state')) {
+        return response({ eligibleForKoboSync: false, syncCollections: [], readingState: null, snapshots: [] })
+      }
+      if (url.includes('/koreader/books/')) return response(null)
+      if (url.includes('/progress')) return response([])
+      return response({})
+    })
+
+    resetDialog.vm.$emit('confirm')
+    await flushPromises()
+
+    expect(mocks.api).toHaveBeenNthCalledWith(1, '/api/v1/books/12/reset-reading-state', { method: 'POST' })
+    expect(mocks.api).toHaveBeenCalledWith('/api/v1/books/12/progress')
+    expect(mocks.api).toHaveBeenCalledWith('/api/v1/books/12/kobo-state')
+    expect(mocks.api).toHaveBeenCalledWith('/api/v1/koreader/books/12/progress')
+    expect(wrapper.emitted('saved')).toEqual([
+      [
+        expect.objectContaining({
+          readStatus: {
+            status: 'unread',
+            source: 'manual',
+            startedAt: null,
+            finishedAt: null,
+            updatedAt: '2026-07-09T12:00:00.000Z',
+          },
+        }),
+      ],
+    ])
+  })
+
+  it('hides reset reading state when the user cannot edit metadata', async () => {
+    mocks.hasPermission.mockReturnValue(false)
+    const wrapper = mountDetails(makeBook())
+    await flushPromises()
+
+    expect(wrapper.findAll('button').some((button) => button.text().includes('Reset reading state'))).toBe(false)
   })
 })

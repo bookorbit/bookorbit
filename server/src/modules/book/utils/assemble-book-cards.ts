@@ -21,6 +21,7 @@ type BookRow = {
   seriesId?: number | null;
   seriesName: string | null;
   seriesIndex: number | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   rating: number | null;
@@ -195,6 +196,7 @@ export function assembleBookCards(
         })),
       authors: authorsByBook.get(row.id) ?? [],
       files,
+      publishedDate: row.publishedDate ?? null,
       publishedYear: row.publishedYear ?? null,
       language: row.language ?? null,
       genres: genresByBook.get(row.id) ?? [],

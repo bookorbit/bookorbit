@@ -159,6 +159,7 @@ describe('Book DTO validation', () => {
       (
         await errorsFor(UpdateBookMetadataDto, {
           title: 'Dune',
+          publishedDate: '1965-08-01',
           publishedYear: 1965,
           rating: 5,
           authors: ['Frank Herbert'],
@@ -189,6 +190,10 @@ describe('Book DTO validation', () => {
     expect((await errorsFor(UpdateBookMetadataDto, { publishedYear: 0 })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookMetadataDto, { publishedYear: 999 })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookMetadataDto, { publishedYear: 2201 })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { publishedDate: null })).length).toBe(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { publishedDate: '1965-08-01' })).length).toBe(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { publishedDate: '1965' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { publishedDate: '1965-8-1' })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookMetadataDto, { authors: ['ok', 1] })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookMetadataDto, { language: 'a'.repeat(101) })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookMetadataDto, { isbn10: '12345678901' })).length).toBeGreaterThan(0);

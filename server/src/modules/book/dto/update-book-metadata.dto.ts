@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { MetadataProviderKey } from '@bookorbit/types';
 import { CustomMetadataValueDto } from '../../custom-metadata/dto/custom-metadata-value.dto';
@@ -46,6 +46,7 @@ export class UpdateBookMetadataDto {
   @IsOptional() @IsString() @MaxLength(1000) subtitle?: string | null;
   @IsOptional() @IsString() description?: string | null;
   @IsOptional() @IsString() @MaxLength(500) publisher?: string | null;
+  @IsOptional() @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) publishedDate?: string | null;
   @IsOptional() @IsInt() @Min(1000) @Max(2200) publishedYear?: number | null;
   @IsOptional() @IsString() @MaxLength(100) language?: string | null;
   // A provider page count of 0 (e.g. Google Books returns 0 when unknown) means "unknown"; normalize it to null instead of rejecting it (issue #329).

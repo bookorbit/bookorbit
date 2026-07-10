@@ -127,6 +127,11 @@ export function useBookReadingLog(bookIdRef: Ref<number>) {
     await fetchSessions()
   }
 
+  async function reload() {
+    page.value = 1
+    await fetchSessions()
+  }
+
   async function exportAll(): Promise<BookReadingSession[]> {
     const bookId = bookIdRef.value
     const items: BookReadingSession[] = []
@@ -189,6 +194,7 @@ export function useBookReadingLog(bookIdRef: Ref<number>) {
     hasMore,
     deleteSession,
     addSession,
+    reload,
     exportAll,
     loadMore,
     setSort,

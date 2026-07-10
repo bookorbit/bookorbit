@@ -17,6 +17,7 @@ import type { CommunityRatingProviderKey } from "./metadata-fetch";
  * - `library` - resolved via `books.library_id` join to `libraries.name`
  * - `format` - resolved via `book_files.format` (primary file)
  * - `isbn` - matches both `isbn10` and `isbn13` in `book_metadata`
+ * - `publishedDate` - uses full dates when available and falls back to published year
  * - `lockStatus` - derived from `book_metadata.locked_fields` (non-empty array = locked)
  * - `seriesStatus` - computed per-user: "up next in series" (next unstarted book whose earlier series entries are all finished)
  */
@@ -26,6 +27,7 @@ export type RuleField =
   | "language"
   | "series"
   | "seriesIndex"
+  | "publishedDate"
   | "publishedYear"
   | "pageCount"
   | "author"
@@ -89,6 +91,7 @@ export const FIELD_OPERATORS: Record<RuleField, RuleOperator[]> = {
   collection: ["includesAny", "excludesAll", "isEmpty", "isNotEmpty"],
   library: ["includesAny", "excludesAll"],
   format: ["includesAny", "excludesAll"],
+  publishedDate: ["before", "after", "between", "withinLast", "isEmpty", "isNotEmpty"],
   publishedYear: ["eq", "notEq", "gt", "gte", "lt", "lte", "between", "isEmpty", "isNotEmpty"],
   seriesIndex: ["eq", "notEq", "gt", "gte", "lt", "lte", "between", "isEmpty", "isNotEmpty"],
   pageCount: ["gt", "gte", "lt", "lte", "between", "isEmpty", "isNotEmpty"],
@@ -181,6 +184,7 @@ export type GroupRule = {
  * - `finishedAt` - from `user_book_status.finished_at` (per-user, correlated subquery)
  * - `rating` - from `user_book_ratings.rating` (per-user, correlated subquery)
  * - `format` - from `book_files.format` for the primary file (correlated subquery)
+ * - `publishedDate` - uses full dates when available and falls back to published year
  * - `random` - day-seeded pseudorandom based on book id and user id
  *
  * Fields marked "per-user, correlated subquery" require an authenticated userId and
@@ -193,6 +197,7 @@ export type SortField =
   | "seriesIndex"
   | "addedAt"
   | "updatedAt"
+  | "publishedDate"
   | "publishedYear"
   | "pageCount"
   | "rating"
@@ -215,6 +220,7 @@ export const SORT_FIELDS: SortField[] = [
   "seriesIndex",
   "addedAt",
   "updatedAt",
+  "publishedDate",
   "publishedYear",
   "pageCount",
   "rating",

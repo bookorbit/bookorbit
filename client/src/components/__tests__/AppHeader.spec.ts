@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   loadingMore: null as unknown as Ref<boolean>,
   settled: null as unknown as Ref<boolean>,
   hasMore: null as unknown as Ref<boolean>,
+  user: null as unknown as Ref<{ provisioningMethod: string; settings?: { achievementPreferences?: { enabled?: boolean } } }>,
   loadMore: vi.fn<() => Promise<void>>(),
   clearGlobalSearch: vi.fn<() => void>(),
 }))
@@ -39,10 +40,9 @@ vi.mock('@/features/book/composables/useGlobalSearch', () => ({
 }))
 
 vi.mock('@/features/auth/composables/useAuth', async () => {
-  const { ref: vueRef } = await import('vue')
   return {
     useAuth: () => ({
-      user: vueRef({ provisioningMethod: 'password' }),
+      user: mocks.user,
       logout: vi.fn<() => void>(),
     }),
   }
@@ -150,6 +150,7 @@ function makeResult(id: number, title = 'Prey'): GlobalSearchResult {
     seriesName: null,
     seriesIndex: null,
     files: [{ id: id * 10, format: 'epub', role: 'primary', sizeBytes: null }],
+    publishedDate: null,
     publishedYear: null,
     language: null,
     genres: [],
@@ -194,6 +195,7 @@ describe('AppHeader global search', () => {
     mocks.loadingMore = ref(false)
     mocks.settled = ref(true)
     mocks.hasMore = ref(true)
+    mocks.user = ref({ provisioningMethod: 'password', settings: {} })
   })
 
   it('does not leave the dropdown for a separate search route on Enter when no result is selected', async () => {
@@ -274,5 +276,13 @@ describe('AppHeader global search', () => {
 
     expect(wrapper.text()).not.toContain('Prey 1')
     expect(wrapper.text()).toContain('Prey 60')
+  })
+
+  it('hides achievement entry points when achievements are disabled', () => {
+    mocks.user = ref({ provisioningMethod: 'password', settings: { achievementPreferences: { enabled: false } } })
+
+    const wrapper = mountHeader()
+
+    expect(wrapper.text()).not.toContain('Achievements')
   })
 })

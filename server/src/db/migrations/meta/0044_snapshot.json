@@ -1,5 +1,5 @@
 {
-  "id": "11f6b2da-4cb8-4ed7-ad15-de1229dc0e2b",
+  "id": "9a8e5e8e-a645-43f5-b998-4c94eb275512",
   "prevId": "2c216307-102e-4980-8d71-6c7056074553",
   "version": "7",
   "dialect": "postgresql",
@@ -2890,12 +2890,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "page_count": {
-          "name": "page_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -3089,10 +3083,6 @@
         "book_files_duration_seconds_nonnegative_chk": {
           "name": "book_files_duration_seconds_nonnegative_chk",
           "value": "\"book_files\".\"duration_seconds\" is null or \"book_files\".\"duration_seconds\" >= 0"
-        },
-        "book_files_page_count_nonnegative_chk": {
-          "name": "book_files_page_count_nonnegative_chk",
-          "value": "\"book_files\".\"page_count\" is null or \"book_files\".\"page_count\" >= 0"
         }
       },
       "isRLSEnabled": false
@@ -4521,6 +4511,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "published_date": {
+          "name": "published_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
         "published_year": {
           "name": "published_year",
           "type": "integer",
@@ -4878,6 +4874,21 @@
           "method": "gin",
           "with": {}
         },
+        "bm_published_date_idx": {
+          "name": "bm_published_date_idx",
+          "columns": [
+            {
+              "expression": "published_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "bm_published_year_idx": {
           "name": "bm_published_year_idx",
           "columns": [
@@ -4885,6 +4896,21 @@
               "expression": "published_year",
               "isExpression": false,
               "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "bm_published_date_sort_idx": {
+          "name": "bm_published_date_sort_idx",
+          "columns": [
+            {
+              "expression": "coalesce(\"published_date\", make_date(\"published_year\", 1, 1))",
+              "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
@@ -4987,6 +5013,10 @@
         "book_metadata_rating_range_chk": {
           "name": "book_metadata_rating_range_chk",
           "value": "\"book_metadata\".\"rating\" is null or (\"book_metadata\".\"rating\" >= 1 and \"book_metadata\".\"rating\" <= 10)"
+        },
+        "book_metadata_published_date_range_chk": {
+          "name": "book_metadata_published_date_range_chk",
+          "value": "\"book_metadata\".\"published_date\" is null or (extract(year from \"book_metadata\".\"published_date\") >= 1000 and extract(year from \"book_metadata\".\"published_date\") <= 2200)"
         },
         "book_metadata_published_year_range_chk": {
           "name": "book_metadata_published_year_range_chk",

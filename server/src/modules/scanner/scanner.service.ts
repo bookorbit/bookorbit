@@ -140,6 +140,19 @@ interface ProcessedFileResult {
   fileId: number | null;
 }
 
+interface UpsertBookResult extends BookEntry {
+  created: boolean;
+}
+
+interface ProcessCandidateResult {
+  bookId: number;
+  added: number;
+  updated: number;
+  retainedFileIds: Set<number>;
+  becameVisible: boolean;
+  created: boolean;
+}
+
 function normalizeOrganizationMode(mode: string | null | undefined): OrganizationMode {
   return mode === 'book_per_file' ? 'book_per_file' : 'book_per_folder';
 }
@@ -858,6 +871,7 @@ export class ScannerService implements OnApplicationBootstrap {
     const totals = { added: 0, updated: 0 };
     const allRetainedFileIds = new Set<number>();
     const seenBookIds = new Set<number>();
+    const importedBookIds: number[] = [];
     const candidateFolderPaths = new Set(candidates.map((candidate) => candidate.folderPath));
     for (const candidate of candidates) {
       const result = await this.processCandidate(
@@ -872,6 +886,7 @@ export class ScannerService implements OnApplicationBootstrap {
       );
       this.emitTargetedScanResult(libraryId, result);
       seenBookIds.add(result.bookId);
+      if (result.created) importedBookIds.push(result.bookId);
       for (const fid of result.retainedFileIds) allRetainedFileIds.add(fid);
       totals.added += result.added;
       totals.updated += result.updated;
@@ -882,6 +897,7 @@ export class ScannerService implements OnApplicationBootstrap {
       await this.pruneMissingBookFiles(bookId, allRetainedFileIds, maps.fileIdsByBookId, maps.fileByPath, maps.fileByIno, pruneCounts);
     }
     totals.updated += pruneCounts.updated;
+    await this.scheduleImportedBookMetadataFetch(libraryId, importedBookIds);
 
     this.logger.log(
       `[${event}] [end] libraryId=${libraryId} path="${sanitizeLogValue(dirPath)}" durationMs=${Date.now() - startedAt} candidateCount=${candidates.length} skippedDirCount=${skippedDirs.size} added=${totals.added} updated=${totals.updated} - targeted directory scan completed`,
@@ -978,6 +994,7 @@ export class ScannerService implements OnApplicationBootstrap {
       updated: 0,
     });
     this.emitTargetedScanResult(libraryId, result);
+    await this.scheduleImportedBookMetadataFetch(libraryId, result.created ? [result.bookId] : []);
     this.logger.log(
       `[${event}] [end] libraryId=${libraryId} path="${sanitizeLogValue(filePath)}" durationMs=${Date.now() - startedAt} added=${result.added} updated=${result.updated} scanScope=file - targeted book scan completed`,
     );
@@ -1046,6 +1063,7 @@ export class ScannerService implements OnApplicationBootstrap {
       updated: 0,
     });
     this.emitTargetedScanResult(libraryId, result);
+    await this.scheduleImportedBookMetadataFetch(libraryId, result.created ? [result.bookId] : []);
     this.logger.log(
       `[${event}] [end] libraryId=${libraryId} path="${sanitizeLogValue(filePath)}" durationMs=${Date.now() - startedAt} added=${result.added} updated=${result.updated} scanScope=root_file - targeted book scan completed`,
     );
@@ -1134,6 +1152,7 @@ export class ScannerService implements OnApplicationBootstrap {
       updated: 0,
     });
     this.emitTargetedScanResult(libraryId, result);
+    await this.scheduleImportedBookMetadataFetch(libraryId, result.created ? [result.bookId] : []);
     this.logger.log(
       `[${event}] [end] libraryId=${libraryId} path="${sanitizeLogValue(filePath)}" durationMs=${Date.now() - startedAt} scanScope=folder folder="${sanitizeLogValue(basename(resolvedBookFolder))}" added=${result.added} updated=${result.updated} - targeted book scan completed`,
     );
@@ -1325,6 +1344,7 @@ export class ScannerService implements OnApplicationBootstrap {
 
       const seenBookIds = new Set<number>();
       const allRetainedFileIds = new Set<number>();
+      const importedBookIds: number[] = [];
       const candidateFolderPaths = new Set(candidates.map((candidate) => candidate.folderPath));
 
       for (const candidate of candidates) {
@@ -1339,6 +1359,7 @@ export class ScannerService implements OnApplicationBootstrap {
           candidateFolderPaths,
         );
         seenBookIds.add(result.bookId);
+        if (result.created) importedBookIds.push(result.bookId);
         for (const fid of result.retainedFileIds) allRetainedFileIds.add(fid);
         counts.addedCount += result.added;
         counts.updatedCount += result.updated;
@@ -1390,6 +1411,8 @@ export class ScannerService implements OnApplicationBootstrap {
         this.bufferBooksUnavailableNotification(libraryId, missingIds);
       }
 
+      await this.scheduleImportedBookMetadataFetch(libraryId, importedBookIds);
+
       this.logger.log(
         `[${event}] [end] libraryId=${libraryId} jobId=${jobId} libraryFolderId=${libraryFolderId} durationMs=${Date.now() - startedAt} addedCount=${counts.addedCount} updatedCount=${counts.updatedCount} missingCount=${counts.missingCount} - folder candidate scan completed`,
       );
@@ -1413,7 +1436,7 @@ export class ScannerService implements OnApplicationBootstrap {
     metadataPrecedence: string[],
     isFirstScan: boolean,
     candidateFolderPaths: Set<string>,
-  ): Promise<{ bookId: number; added: number; updated: number; retainedFileIds: Set<number>; becameVisible: boolean }> {
+  ): Promise<ProcessCandidateResult> {
     const { bookByFolderPath, booksByParentDir, fileByPath, fileByIno } = maps;
     const counts = { added: 0, updated: 0 };
     const fileCounts: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
@@ -1565,7 +1588,7 @@ export class ScannerService implements OnApplicationBootstrap {
     }
 
     const becameVisible = await this.scannerRepo.promoteProcessingBookToPresent(book.id);
-    return { bookId: book.id, ...counts, retainedFileIds, becameVisible };
+    return { bookId: book.id, ...counts, retainedFileIds, becameVisible, created: book.created };
   }
 
   private buildMetadataExtractionSources(
@@ -1643,7 +1666,7 @@ export class ScannerService implements OnApplicationBootstrap {
     fileByIno: Map<number, FileByInoEntry>,
     counts: ScanCounts,
     candidateFolderPaths: Set<string>,
-  ) {
+  ): Promise<UpsertBookResult> {
     const existing = bookByFolderPath.get(candidate.folderPath);
     const candidateOwnedBookIds = new Set<number>();
     for (const file of candidate.files) {
@@ -1682,14 +1705,14 @@ export class ScannerService implements OnApplicationBootstrap {
         this.logger.log(
           `[scanner.upsert_book] [end] libraryId=${libraryId} bookId=${survivor.id} folder="${sanitizeLogValue(candidate.folderPath)}" mergedCount=${virtualChildren.length} action=merge_stem_split - stem-split books merged`,
         );
-        return { ...survivor, folderPath: candidate.folderPath };
+        return { ...survivor, folderPath: candidate.folderPath, created: false };
       }
 
       const movedInLibrary = await this.tryReuseMovedBookInLibrary(candidate, libraryId, bookByFolderPath, fileByPath, fileByIno, counts);
-      if (movedInLibrary) return movedInLibrary;
+      if (movedInLibrary) return { ...movedInLibrary, created: false };
 
       const transferred = await this.tryTransferMissingBook(candidate, libraryId, libraryFolderId, bookByFolderPath, counts);
-      if (transferred) return transferred;
+      if (transferred) return { ...transferred, created: false };
 
       const book = await this.scannerRepo.createBook({
         libraryId,
@@ -1698,16 +1721,9 @@ export class ScannerService implements OnApplicationBootstrap {
         status: 'processing',
       });
       counts.addedCount++;
-      this.autoFetchOrchestrator
-        ?.scheduleIfEligible(book.id, libraryId, 'event_import')
-        .catch((err: Error) =>
-          this.logger.warn(
-            `[scanner.upsert_book] [fail] libraryId=${libraryId} bookId=${book.id} action=schedule_metadata_fetch errorClass=${err.name} error="${sanitizeLogValue(err.message)}" - metadata fetch schedule failed`,
-          ),
-        );
       const entry = { id: book.id, status: book.status, folderPath: book.folderPath, primaryFileId: book.primaryFileId ?? null };
       bookByFolderPath.set(candidate.folderPath, entry);
-      return entry;
+      return { ...entry, created: true };
     }
 
     if (existing.status === 'missing') {
@@ -1733,7 +1749,28 @@ export class ScannerService implements OnApplicationBootstrap {
       );
     }
 
-    return existing;
+    return { ...existing, created: false };
+  }
+
+  private async scheduleImportedBookMetadataFetch(libraryId: number, bookIds: readonly number[]): Promise<void> {
+    const ids = [...new Set(bookIds)].filter((bookId) => Number.isInteger(bookId) && bookId > 0);
+    if (ids.length === 0 || !this.autoFetchOrchestrator) return;
+
+    const event = 'scanner.schedule_metadata_fetch';
+    const startedAt = Date.now();
+    this.logger.debug(`[${event}] [start] libraryId=${libraryId} bookCount=${ids.length} - metadata fetch scheduling started`);
+    try {
+      const queued = await this.autoFetchOrchestrator.scheduleImportedBooksIfEligible(libraryId, ids);
+      this.logger.debug(
+        `[${event}] [end] libraryId=${libraryId} durationMs=${Date.now() - startedAt} bookCount=${ids.length} queued=${queued} - metadata fetch scheduling completed`,
+      );
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.warn(
+        `[${event}] [fail] libraryId=${libraryId} durationMs=${Date.now() - startedAt} bookCount=${ids.length} errorClass=${errorClass} error="${errorMessage}" - metadata fetch scheduling failed`,
+      );
+    }
   }
 
   private async tryReuseMovedBookInLibrary(

@@ -82,9 +82,21 @@ export class UploadService {
       shouldCleanupDestination = true;
       await this.storage.moveToPath(tempPath, absolutePath);
 
-      const { bookId } = await this.processor.createBookRecord(libraryId, folder.id, bookFolderPath, absolutePath, relPath, format, sizeBytes);
+      const { bookId, created } = await this.processor.createBookRecord(
+        libraryId,
+        folder.id,
+        bookFolderPath,
+        absolutePath,
+        relPath,
+        format,
+        sizeBytes,
+      );
 
-      this.processor.extractMetadataAsync(bookId, absolutePath, format);
+      if (created) {
+        this.processor.processNewBookImportAsync(bookId, libraryId, absolutePath, format);
+      } else {
+        this.processor.extractMetadataAsync(bookId, absolutePath, format);
+      }
 
       this.logger.log(
         `[${event}] [end] libraryId=${libraryId} userId=${user.id} folderId=${folder.id} bookId=${bookId} format=${format} sizeBytes=${sizeBytes} durationMs=${Date.now() - startedAt} - upload completed`,

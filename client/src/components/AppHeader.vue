@@ -76,6 +76,7 @@ const isBookDockActive = computed(() => route.name === 'book-dock')
 const isAchievementsActive = computed(() => route.name === 'achievements')
 const isStatisticsActive = computed(() => route.name === 'statistics')
 const isAnnotationsActive = computed(() => route.name === 'annotations')
+const achievementsEnabled = computed(() => user.value?.settings?.achievementPreferences?.enabled !== false)
 
 const iconRadiusClass = computed(() => (themeStore.radius === 'sharp' ? 'rounded-none' : 'rounded-full'))
 const canChangePassword = computed(
@@ -624,7 +625,7 @@ function formatBadgeStyle(fmt: string) {
               <BarChart3 :size="15" class="mr-2 text-muted-foreground" />
               Statistics
             </DropdownMenuItem>
-            <DropdownMenuItem @click="navigateToAchievements">
+            <DropdownMenuItem v-if="achievementsEnabled" @click="navigateToAchievements">
               <Trophy :size="15" class="mr-2 text-muted-foreground" />
               Achievements
             </DropdownMenuItem>
@@ -761,7 +762,7 @@ function formatBadgeStyle(fmt: string) {
           </Tooltip>
 
           <!-- Achievements button -->
-          <Tooltip>
+          <Tooltip v-if="achievementsEnabled">
             <TooltipTrigger as-child>
               <Button
                 variant="ghost"

@@ -39,6 +39,7 @@ describe('GoogleMapper', () => {
       authors: ['F. Scott Fitzgerald'],
       description: 'A classic story.',
       publisher: "Charles Scribner's Sons",
+      publishedDate: '1925-04-10',
       publishedYear: 1925,
       language: 'en',
       pageCount: 180,
@@ -74,6 +75,7 @@ describe('GoogleMapper', () => {
     };
 
     const result = mapGoogleVolume(mockItem as GoogleVolumeItem);
+    expect(result.publishedDate).toBeUndefined();
     expect(result.publishedYear).toBe(1925);
   });
 

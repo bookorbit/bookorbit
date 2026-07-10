@@ -90,7 +90,7 @@ async function exportJson() {
   <Popover v-model:open="open">
     <PopoverTrigger as-child>
       <button
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
         :disabled="total === 0 || exporting"
       >
         <Loader2 v-if="exporting" :size="14" class="animate-spin" />

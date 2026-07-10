@@ -6,6 +6,7 @@ import { ADMIN_TAB_INFO, normalizeAdminTab } from '@/features/settings/lib/admin
 import { SYSTEM_TAB_INFO, normalizeSystemTab } from '@/features/settings/lib/system-tabs'
 import { ACCOUNT_TAB_INFO, normalizeAccountTab } from '@/features/settings/lib/account-tabs'
 import { APPEARANCE_TAB_TITLE_LABELS, normalizeAppearanceTab } from '@/features/settings/lib/appearance-tabs'
+import { INTEGRATION_TAB_INFO, normalizeIntegrationTab } from '@/features/settings/lib/integration-tabs'
 import { registerAuthGuard } from './guards/auth.guard'
 import { registerRouteTitleHook } from './title-resolver'
 
@@ -62,23 +63,23 @@ function resolveAccountTitle(to: RouteLocationNormalizedLoaded): string {
   return ACCOUNT_TAB_INFO[tab].titleLabel
 }
 
+function resolveIntegrationTitle(to: RouteLocationNormalizedLoaded): string {
+  const tab = normalizeIntegrationTab(to.query.tab)
+  return INTEGRATION_TAB_INFO[tab].titleLabel
+}
+
 function resolveStatisticsTitle(): string {
   return 'Statistics'
 }
 
-function resolveLegacyIntegrationsRoute(tab: unknown): string {
+function resolveLegacyIntegrationRoute(tab: unknown): string | null {
   switch (firstText(tab)) {
     case 'koreader':
       return 'settings-koreader'
-    case 'hardcover':
-      return 'settings-hardcover'
-    case 'readwise':
-      return 'settings-readwise'
-    case 'storygraph':
-      return 'settings-storygraph'
     case 'kobo':
-    default:
       return 'settings-kobo'
+    default:
+      return null
   }
 }
 
@@ -130,7 +131,12 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'integrations',
             name: 'settings-integrations',
-            redirect: (to) => ({ name: resolveLegacyIntegrationsRoute(to.query.tab) }),
+            component: () => import('@/features/settings/IntegrationAllSettings.vue'),
+            meta: { maxWidth: 'max-w-3xl', title: resolveIntegrationTitle },
+            beforeEnter: (to) => {
+              const legacyRoute = resolveLegacyIntegrationRoute(to.query.tab)
+              return legacyRoute ? { name: legacyRoute } : undefined
+            },
           },
           {
             path: 'kobo',
@@ -147,20 +153,17 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'hardcover',
             name: 'settings-hardcover',
-            component: () => import('@/features/hardcover/components/HardcoverSettings.vue'),
-            meta: { maxWidth: 'max-w-3xl', title: 'Hardcover' },
+            redirect: (to) => ({ name: 'settings-integrations', query: { ...to.query, tab: 'hardcover' } }),
           },
           {
             path: 'readwise',
             name: 'settings-readwise',
-            component: () => import('@/features/readwise/components/ReadwiseSettings.vue'),
-            meta: { maxWidth: 'max-w-3xl', title: 'Readwise' },
+            redirect: (to) => ({ name: 'settings-integrations', query: { ...to.query, tab: 'readwise' } }),
           },
           {
             path: 'storygraph',
             name: 'settings-storygraph',
-            component: () => import('@/features/storygraph/components/StorygraphSettings.vue'),
-            meta: { maxWidth: 'max-w-3xl', title: 'StoryGraph' },
+            redirect: (to) => ({ name: 'settings-integrations', query: { ...to.query, tab: 'storygraph' } }),
           },
           {
             path: 'email',
