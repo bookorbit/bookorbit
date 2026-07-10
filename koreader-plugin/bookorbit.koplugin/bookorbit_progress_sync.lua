@@ -68,8 +68,15 @@ function ProgressSync:getDocumentDigest()
     return computed
 end
 
-function ProgressSync:syncToProgress(progress)
-    logger.dbg("BookOrbit: syncing to progress", progress)
+function ProgressSync:syncToProgress(progress, percentage_fallback)
+    logger.dbg("BookOrbit: syncing to progress", progress, "percent", percentage_fallback)
+    local has_position = progress ~= nil and progress ~= ""
+    if not has_position and percentage_fallback then
+        -- No exact position (push came from web/audio sync); jump by percentage.
+        -- kosync percentage is 0-1; GotoPercent expects 0-100.
+        self.ui:handleEvent(Event:new("GotoPercent", percentage_fallback * 100))
+        return
+    end
     if self.ui.document.info.has_pages then
         self.ui:handleEvent(Event:new("GotoPage", tonumber(progress)))
     else
@@ -93,7 +100,7 @@ function ProgressSync:remoteProgressIsNewer(body, local_percentage)
 end
 
 function ProgressSync:applyRemoteProgress(body, on_done)
-    self:syncToProgress(body.progress)
+    self:syncToProgress(body.progress, body.percentage)
     if on_done then
         UIManager:scheduleIn(0.1, function()
             on_done(false)
@@ -331,7 +338,7 @@ function ProgressSync:getProgress(ensure_networking, interactive)
     end
 
     if interactive then
-        self:syncToProgress(body.progress)
+        self:syncToProgress(body.progress, body.percentage)
         if self.recordSyncSuccess then
             self:recordSyncSuccess("progress_pull", _("Progress pulled"))
         end
@@ -348,7 +355,7 @@ function ProgressSync:getProgress(ensure_networking, interactive)
 
     local strategy = self_older and self.settings.sync_forward or self.settings.sync_backward
     if strategy == SYNC_STRATEGY.SILENT then
-        self:syncToProgress(body.progress)
+        self:syncToProgress(body.progress, body.percentage)
         if self.recordSyncSuccess then
             self:recordSyncSuccess("progress_pull", _("Progress pulled"))
         end
@@ -359,7 +366,7 @@ function ProgressSync:getProgress(ensure_networking, interactive)
         UIManager:show(ConfirmBox:new{
             text = T(template, Math.round(body.percentage * 100), body.device),
             ok_callback = function()
-                self:syncToProgress(body.progress)
+                self:syncToProgress(body.progress, body.percentage)
                 if self.recordSyncSuccess then
                     self:recordSyncSuccess("progress_pull", _("Progress pulled"))
                 end
