@@ -261,8 +261,7 @@ export async function bulkRefreshAuthorsMetadata(
       if (!line.startsWith('data: ')) continue
       try {
         const payload = JSON.parse(line.slice(6)) as
-          | (BulkAuthorMetadataRefreshEvent & { done?: false })
-          | (BulkAuthorMetadataRefreshResult & { done: true })
+          (BulkAuthorMetadataRefreshEvent & { done?: false }) | (BulkAuthorMetadataRefreshResult & { done: true })
 
         if ('done' in payload && payload.done) {
           summary = {

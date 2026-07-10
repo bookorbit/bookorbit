@@ -1,6 +1,7 @@
 import { execFile as execFileCallback, spawn } from 'child_process';
 import { promisify } from 'util';
 import type { AudiobookChapter } from '@bookorbit/types';
+import { parsePublishedDateKey, parsePublishedYear, publishedYearFromDateKey } from '../../../common/utils/published-date.utils';
 
 const execFile = promisify(execFileCallback);
 
@@ -13,6 +14,7 @@ export interface AudioExtractResult {
   authors: { name: string; sortName: string | null }[];
   narrators: string[];
   publisher: string | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   description: string | null;
   language: string | null;
@@ -79,7 +81,9 @@ export async function extractAudioMetadata(absolutePath: string): Promise<AudioE
     const subtitle = tagValue(tags, 'subtitle');
 
     const publisher = tagValue(tags, 'publisher');
-    const publishedYear = parseYear(tagValue(tags, 'date') ?? tagValue(tags, 'year'));
+    const rawPublicationDate = tagValue(tags, 'date') ?? tagValue(tags, 'year');
+    const publishedDate = parsePublishedDateKey(rawPublicationDate) ?? null;
+    const publishedYear = publishedDate ? publishedYearFromDateKey(publishedDate) : (parsePublishedYear(rawPublicationDate) ?? null);
     const description = resolveDescription(
       tagValue(tags, 'comment'),
       tagValue(tags, 'description'),
@@ -109,6 +113,7 @@ export async function extractAudioMetadata(absolutePath: string): Promise<AudioE
       authors: authorNames.map((name) => ({ name, sortName: null })),
       narrators: narratorNames,
       publisher,
+      publishedDate,
       publishedYear,
       description,
       language,
@@ -200,12 +205,6 @@ function escapeCharClass(value: string): string {
   return value.replace(/[\\\]^/-]/g, '\\$&');
 }
 
-function parseYear(raw: string | null): number | null {
-  if (!raw) return null;
-  const match = raw.match(/\d{4}/);
-  return match ? parseInt(match[0], 10) : null;
-}
-
 function parseDurationSeconds(raw: string | undefined): number | null {
   if (!raw) return null;
   const parsed = Number.parseFloat(raw);
@@ -255,6 +254,7 @@ function emptyResult(): AudioExtractResult {
     authors: [],
     narrators: [],
     publisher: null,
+    publishedDate: null,
     publishedYear: null,
     description: null,
     language: null,

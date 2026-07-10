@@ -309,6 +309,27 @@
       "when": 1783549738764,
       "tag": "0043_storygraph_sync_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1783575766119,
+      "tag": "0044_add_published_date",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1783630272168,
+      "tag": "0045_kobo-device-owner-key",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1783630311448,
+      "tag": "0046_kobo-device-snapshots",
+      "breakpoints": true
     }
   ]
 }

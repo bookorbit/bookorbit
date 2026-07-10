@@ -140,7 +140,11 @@ export function useTableCellEditor() {
           body: JSON.stringify({ [metaKey]: newValue }),
         })
         if (!res.ok) throw new Error(await getApiErrorMessage(res as Response))
-        onSuccess({ [columnId as keyof BookCard]: newValue } as Partial<BookCard>)
+        onSuccess(
+          columnId === 'publishedYear'
+            ? ({ publishedDate: null, publishedYear: newValue as number | null } satisfies Partial<BookCard>)
+            : ({ [columnId as keyof BookCard]: newValue } as Partial<BookCard>),
+        )
       }
       if (activeCellKey.value === sourceCellKey) cancelCellIfActive(bookId, columnId)
     } catch (err) {

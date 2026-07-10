@@ -16,7 +16,7 @@ describe('UploadProcessorService', () => {
     extractAndAggregateAudioDuration: vi.fn(),
   };
   const orchestrator = {
-    scheduleIfEligible: vi.fn(),
+    scheduleImportedBooksIfEligible: vi.fn(),
   };
 
   const insertBooksReturning = vi.fn();
@@ -74,7 +74,7 @@ describe('UploadProcessorService', () => {
     updateBooksSet.mockReturnValue({ where: updateBooksWhere });
     updateBooksWhere.mockResolvedValue(undefined);
 
-    orchestrator.scheduleIfEligible.mockResolvedValue(undefined);
+    orchestrator.scheduleImportedBooksIfEligible.mockResolvedValue(0);
 
     mockStat.mockResolvedValue({ ino: 111n, mtime: new Date('2024-01-01') } as Awaited<ReturnType<typeof stat>>);
     mockComputeFileHash.mockResolvedValue('hash-abc');
@@ -85,7 +85,7 @@ describe('UploadProcessorService', () => {
   it('creates book, metadata, and content file rows with fingerprint/stat data in a transaction', async () => {
     const result = await service.createBookRecord(1, 2, '/folder', '/folder/book.epub', 'book/book.epub', 'epub', 12345);
 
-    expect(result).toEqual({ bookId: 42 });
+    expect(result).toEqual({ bookId: 42, created: true });
     expect(db.transaction).toHaveBeenCalledTimes(1);
     expect(insertBooksValues).toHaveBeenCalledWith({ libraryId: 1, libraryFolderId: 2, folderPath: '/folder', status: 'present' });
     expect(insertBookMetadataValues).toHaveBeenCalledWith({ bookId: 42 });
@@ -103,7 +103,7 @@ describe('UploadProcessorService', () => {
       }),
     );
     expect(updateBooksSet).toHaveBeenCalledWith({ primaryFileId: 420 });
-    expect(orchestrator.scheduleIfEligible).toHaveBeenCalledWith(42, 1, 'event_import');
+    expect(orchestrator.scheduleImportedBooksIfEligible).not.toHaveBeenCalled();
   });
 
   it('adds a file to an existing book when the folder path already exists in the library', async () => {
@@ -111,7 +111,7 @@ describe('UploadProcessorService', () => {
 
     const result = await service.createBookRecord(1, 2, '/folder', '/folder/book2.epub', 'book/book2.epub', 'epub', 5000);
 
-    expect(result).toEqual({ bookId: 99 });
+    expect(result).toEqual({ bookId: 99, created: false });
     expect(insertBooksValues).not.toHaveBeenCalled();
     expect(insertBookMetadataValues).not.toHaveBeenCalled();
     expect(updateBooksSet).not.toHaveBeenCalled();
@@ -131,7 +131,7 @@ describe('UploadProcessorService', () => {
         set: expect.objectContaining({ bookId: 99, libraryFolderId: 2, format: 'epub' }),
       }),
     );
-    expect(orchestrator.scheduleIfEligible).toHaveBeenCalledWith(99, 1, 'event_import');
+    expect(orchestrator.scheduleImportedBooksIfEligible).not.toHaveBeenCalled();
   });
 
   it('clamps oversized MergerFS inode values to 0 before persisting', async () => {
@@ -179,7 +179,7 @@ describe('UploadProcessorService', () => {
 
     const result = await service.createBookRecord(1, 2, '/folder', '/folder/stale.epub', 'book/stale.epub', 'epub', 1000);
 
-    expect(result).toEqual({ bookId: 99 });
+    expect(result).toEqual({ bookId: 99, created: false });
     expect(insertBookFilesOnConflict).toHaveBeenCalled();
   });
 
@@ -208,12 +208,28 @@ describe('UploadProcessorService', () => {
     );
   });
 
-  it('logs but suppresses scheduling failures', async () => {
-    const warn = vi.spyOn((service as unknown as { logger: { warn: (m: string) => void } }).logger, 'warn').mockImplementation();
-    orchestrator.scheduleIfEligible.mockRejectedValue(new Error('queue offline'));
+  it('extracts local metadata before queueing an import fetch', async () => {
+    const order: string[] = [];
+    metadataService.extractAndSave.mockImplementation(() => {
+      order.push('extract');
+      return Promise.resolve();
+    });
+    orchestrator.scheduleImportedBooksIfEligible.mockImplementation(() => {
+      order.push('schedule');
+      return Promise.resolve(1);
+    });
 
-    await service.createBookRecord(1, 2, '/folder', '/folder/book.epub', 'book/book.epub', 'epub', 12345);
-    await new Promise((resolve) => setImmediate(resolve));
+    await (service as any).runNewBookImport(42, 1, '/folder/book.cbz', 'cbz');
+
+    expect(order).toEqual(['extract', 'schedule']);
+    expect(orchestrator.scheduleImportedBooksIfEligible).toHaveBeenCalledWith(1, [42]);
+  });
+
+  it('logs but suppresses post-extraction scheduling failures', async () => {
+    const warn = vi.spyOn((service as unknown as { logger: { warn: (m: string) => void } }).logger, 'warn').mockImplementation();
+    orchestrator.scheduleImportedBooksIfEligible.mockRejectedValue(new Error('queue offline'));
+
+    await (service as any).runNewBookImport(42, 1, '/folder/book.epub', 'epub');
 
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('queue offline'));
   });
@@ -300,8 +316,8 @@ describe('UploadProcessorService', () => {
     it('createBookRecord completes without scheduling when orchestrator is undefined', async () => {
       const result = await serviceNoOrch.createBookRecord(1, 2, '/folder', '/folder/book.epub', 'book/book.epub', 'epub', 12345);
 
-      expect(result).toEqual({ bookId: 42 });
-      expect(orchestrator.scheduleIfEligible).not.toHaveBeenCalled();
+      expect(result).toEqual({ bookId: 42, created: true });
+      expect(orchestrator.scheduleImportedBooksIfEligible).not.toHaveBeenCalled();
     });
 
     it('extractMetadataAsync handles supported format boundary', () => {

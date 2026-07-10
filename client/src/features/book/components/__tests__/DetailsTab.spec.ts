@@ -70,6 +70,7 @@ const globalStubs = {
     DialogClose: { template: '<button><slot /></button>' },
     AddToCollectionSheet: true,
     DeleteBookDialog: true,
+    ResetReadingStateDialog: true,
   },
 }
 
@@ -87,6 +88,7 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     isbn10: null,
     isbn13: null,
     publisher: null,
+    publishedDate: null,
     publishedYear: null,
     language: null,
     pageCount: null,

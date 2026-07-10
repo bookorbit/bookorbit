@@ -50,16 +50,8 @@ const sections = computed<Section[]>(() => {
     result.push({ label: 'KOReader', routeName: 'settings-koreader' })
   }
 
-  if (su || perms.includes(Permission.HardcoverSync)) {
-    result.push({ label: 'Hardcover', routeName: 'settings-hardcover' })
-  }
-
-  if (su || perms.includes(Permission.ReadwiseSync)) {
-    result.push({ label: 'Readwise', routeName: 'settings-readwise' })
-  }
-
-  if (su || perms.includes(Permission.StorygraphSync)) {
-    result.push({ label: 'StoryGraph', routeName: 'settings-storygraph' })
+  if (su || perms.includes(Permission.HardcoverSync) || perms.includes(Permission.ReadwiseSync) || perms.includes(Permission.StorygraphSync)) {
+    result.push({ label: 'Integrations', routeName: 'settings-integrations' })
   }
 
   if (su || perms.includes('manage_users') || perms.includes('manage_app_settings')) {

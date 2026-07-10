@@ -1,6 +1,8 @@
 import * as cheerio from 'cheerio';
 import type { CheerioAPI } from 'cheerio';
 
+import { parsePublishedDateKey, parsePublishedYear, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
+
 export interface LubimyczytacSearchResultLink {
   providerId: string;
   url: string;
@@ -12,6 +14,7 @@ export interface LubimyczytacBookData {
   authors?: string[];
   description?: string;
   publisher?: string;
+  publishedDate?: string;
   publishedYear?: number;
   language?: string;
   pageCount?: number;
@@ -103,6 +106,7 @@ export function parseLubimyczytacBookPage(html: string, sourceUrl?: string): Lub
     authors: jsonLd.authors?.length ? jsonLd.authors : extractAuthors($),
     description: extractDescription($),
     publisher: extractPublisher($),
+    publishedDate: jsonLd.publishedDate,
     publishedYear: jsonLd.publishedYear,
     language: extractLanguage($) ?? (jsonLd.language ? mapLanguage(jsonLd.language) : undefined),
     pageCount: jsonLd.pageCount,
@@ -220,6 +224,7 @@ function extractCoverUrl($: CheerioAPI): string | undefined {
 
 type JsonLdFields = {
   authors?: string[];
+  publishedDate?: string;
   publishedYear?: number;
   pageCount?: number;
   genre?: string;
@@ -243,8 +248,14 @@ function parseJsonLd($: CheerioAPI): JsonLdFields {
       if (pages !== undefined) fields.pageCount = pages;
     }
     if (fields.publishedYear === undefined) {
-      const year = parseYear(node.datePublished);
-      if (year !== undefined) fields.publishedYear = year;
+      const publishedDate = parsePublishedDateKey(node.datePublished);
+      if (publishedDate !== undefined) {
+        fields.publishedDate = publishedDate;
+        fields.publishedYear = publishedYearFromDateKey(publishedDate);
+      } else {
+        const year = parseYear(node.datePublished);
+        if (year !== undefined) fields.publishedYear = year;
+      }
     }
     if (!fields.genre && typeof node.genre === 'string') {
       fields.genre = node.genre.split('/').filter(Boolean).pop();
@@ -339,7 +350,5 @@ function parseInteger(value: unknown): number | undefined {
 }
 
 function parseYear(value: unknown): number | undefined {
-  if (typeof value !== 'string') return undefined;
-  const match = value.match(/\b(1[0-9]{3}|2[0-9]{3})\b/);
-  return match ? parseInt(match[1], 10) : undefined;
+  return parsePublishedYear(typeof value === 'string' ? value : undefined);
 }

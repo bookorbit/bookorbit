@@ -1,14 +1,14 @@
 import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
+import { parseCompactPublishedDate, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
 import { RanobeDbBook, RanobeDbRelease } from './ranobedb.types';
 
 const IMAGE_BASE_URL = 'https://images.ranobedb.org';
 const RANOBEDB_BASE_URL = 'https://ranobedb.org';
 
 export function parseDateInt(value: number | null | undefined): number | undefined {
-  if (!value) return undefined;
-  const year = Math.floor(value / 10000);
-  return year >= 1000 && year <= 2200 ? year : undefined;
+  const publishedDate = parseCompactPublishedDate(value);
+  return publishedDate ? publishedYearFromDateKey(publishedDate) : undefined;
 }
 
 function selectEnglishRelease(releases: RanobeDbRelease[]): RanobeDbRelease | undefined {
@@ -80,15 +80,20 @@ function resolveGenres(book: RanobeDbBook): string[] {
 }
 
 function resolvePublishedYear(book: RanobeDbBook, release: RanobeDbRelease | undefined): number | undefined {
+  const publishedDate = resolvePublishedDate(book, release);
+  return publishedDate ? publishedYearFromDateKey(publishedDate) : undefined;
+}
+
+function resolvePublishedDate(book: RanobeDbBook, release: RanobeDbRelease | undefined): string | undefined {
   if (release?.release_date) {
-    const year = parseDateInt(release.release_date);
-    if (year) return year;
+    const date = parseCompactPublishedDate(release.release_date);
+    if (date) return date;
   }
   if (book.olang && book.c_release_dates && book.c_release_dates[book.olang]) {
-    const year = parseDateInt(book.c_release_dates[book.olang]);
-    if (year) return year;
+    const date = parseCompactPublishedDate(book.c_release_dates[book.olang]);
+    if (date) return date;
   }
-  return parseDateInt(book.c_release_date);
+  return parseCompactPublishedDate(book.c_release_date);
 }
 
 function normalizeCommunityRating(book: RanobeDbBook): { communityRating?: number; communityRatingCount?: number } {
@@ -115,6 +120,7 @@ export function mapRanobeDbBook(book: RanobeDbBook): MetadataCandidate | null {
     subtitle: resolveSubtitle(book),
     authors: resolveAuthors(book),
     publisher: resolvePublisher(book),
+    publishedDate: resolvePublishedDate(book, selectedRelease),
     publishedYear: resolvePublishedYear(book, selectedRelease),
     language: book.releases.some((r) => r.lang === 'en') ? 'en' : (book.olang ?? book.lang ?? undefined),
     pageCount: selectedRelease?.pages ?? undefined,

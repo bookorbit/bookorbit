@@ -1,4 +1,5 @@
 import { XMLParser } from 'fast-xml-parser';
+import { parsePublishedDateKey, parsePublishedYear } from '../../../common/utils/published-date.utils';
 
 export interface ParsedOpf {
   title: string | null;
@@ -7,6 +8,7 @@ export interface ParsedOpf {
   isbn10: string | null;
   isbn13: string | null;
   publisher: string | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   pageCount: number | null;
@@ -65,8 +67,7 @@ function parseIsbn(raw: string): {
 }
 
 function parseYear(raw: string): number | null {
-  const match = raw.match(/\d{4}/);
-  return match ? parseInt(match[0], 10) : null;
+  return parsePublishedYear(raw) ?? null;
 }
 
 function parseNumber(raw: string | null): number | null {
@@ -90,17 +91,7 @@ function parseBookOrbitTags(raw: string | null): string[] {
 }
 
 type ProviderKey =
-  | 'google'
-  | 'amazon'
-  | 'goodreads'
-  | 'hardcover'
-  | 'hardcoverEdition'
-  | 'openlibrary'
-  | 'ranobedb'
-  | 'kobo'
-  | 'lubimyczytac'
-  | 'aladin'
-  | 'itunes';
+  'google' | 'amazon' | 'goodreads' | 'hardcover' | 'hardcoverEdition' | 'openlibrary' | 'ranobedb' | 'kobo' | 'lubimyczytac' | 'aladin' | 'itunes';
 
 // Calibre 9.x (opf3) writes provider identifiers as bare `prefix:value` text inside <dc:identifier>.
 // Only these known prefixes are recognized, as a lowest-priority fallback after opf:scheme and urn:.
@@ -451,7 +442,9 @@ export function parseOpf(xml: string): ParsedOpf {
   const language = getText(metadata['language']) || null;
 
   const rawDate = toArray(metadata['date'])[0];
-  const publishedYear = rawDate ? parseYear(getText(rawDate)) : null;
+  const rawDateText = rawDate ? getText(rawDate) : null;
+  const publishedDate = rawDateText ? (parsePublishedDateKey(rawDateText) ?? null) : null;
+  const publishedYear = rawDateText ? parseYear(rawDateText) : null;
 
   // ── Cover href (for sidecar OPFs linking to a sibling image file) ──────────
   // Priority 1: EPUB2 <guide><reference type="cover" href="..."/>
@@ -512,6 +505,7 @@ export function parseOpf(xml: string): ParsedOpf {
     isbn10,
     isbn13,
     publisher,
+    publishedDate,
     publishedYear,
     language: language || null,
     pageCount,

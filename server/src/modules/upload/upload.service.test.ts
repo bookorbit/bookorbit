@@ -69,6 +69,7 @@ describe('UploadService', () => {
   };
   const processor = {
     createBookRecord: vi.fn(),
+    processNewBookImportAsync: vi.fn(),
     extractMetadataAsync: vi.fn(),
     extractAudioDurationAsync: vi.fn(),
   };
@@ -100,7 +101,7 @@ describe('UploadService', () => {
     storage.streamToTemp.mockResolvedValue({ tempPath: '/tmp/upload.bin', sizeBytes: 456 });
     storage.moveToPath.mockResolvedValue(undefined);
     storage.cleanup.mockResolvedValue(undefined);
-    processor.createBookRecord.mockResolvedValue({ bookId: 99 });
+    processor.createBookRecord.mockResolvedValue({ bookId: 99, created: true });
     libraryService.verifyUserAccess.mockResolvedValue(undefined);
     appSettings.getUploadPattern.mockResolvedValue(null);
     appSettings.getUploadPatternBookPerFolder.mockResolvedValue(null);
@@ -128,7 +129,7 @@ describe('UploadService', () => {
     mockStat.mockResolvedValue({ ino: 12345n, mtime: new Date('2025-01-01') } as any);
   });
 
-  it('uploads successfully and kicks off async metadata extraction', async () => {
+  it('uploads successfully and processes a new-book import after the record is created', async () => {
     db.select
       .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: '{authors:first}/{title}.{extension}' }]))
       .mockReturnValueOnce(selectChain([{ id: 2, libraryId: 1, path: '/library' }]));
@@ -161,7 +162,19 @@ describe('UploadService', () => {
       'epub',
       456,
     );
-    expect(processor.extractMetadataAsync).toHaveBeenCalledWith(99, '/library/Frank Herbert/Dune.epub', 'epub');
+    expect(processor.processNewBookImportAsync).toHaveBeenCalledWith(99, 1, '/library/Frank Herbert/Dune.epub', 'epub');
+  });
+
+  it('only extracts metadata when an upload adds a file to an existing book', async () => {
+    processor.createBookRecord.mockResolvedValue({ bookId: 99, created: false });
+    db.select
+      .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: null }]))
+      .mockReturnValueOnce(selectChain([{ id: 2, libraryId: 1, path: '/library' }]));
+
+    await service.upload(1, 2, 'raw.epub', {} as any, user);
+
+    expect(processor.extractMetadataAsync).toHaveBeenCalledWith(99, '/library/book/book.epub', 'epub');
+    expect(processor.processNewBookImportAsync).not.toHaveBeenCalled();
   });
 
   it('sanitizes generated destination path tokens when cross-platform mode is enabled', async () => {

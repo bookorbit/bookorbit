@@ -50,12 +50,19 @@ function makeNotificationService() {
   };
 }
 
+function makeUserService() {
+  return {
+    isAchievementEnabled: vi.fn().mockResolvedValue(true),
+  };
+}
+
 describe('AchievementService', () => {
   let service: AchievementService;
   let repo: ReturnType<typeof makeRepo>;
   let events: AchievementEventsService;
   let registry: ReturnType<typeof makeRegistry>;
   let notificationService: ReturnType<typeof makeNotificationService>;
+  let userService: ReturnType<typeof makeUserService>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -63,7 +70,8 @@ describe('AchievementService', () => {
     events = new AchievementEventsService();
     registry = makeRegistry();
     notificationService = makeNotificationService();
-    service = new AchievementService(repo as never, events, registry as never, notificationService as never);
+    userService = makeUserService();
+    service = new AchievementService(repo as never, events, registry as never, notificationService as never, userService as never);
   });
 
   describe('onModuleInit', () => {
@@ -522,6 +530,16 @@ describe('AchievementService', () => {
   });
 
   describe('handleEvent', () => {
+    it('skips evaluation when achievements are disabled', async () => {
+      userService.isAchievementEnabled.mockResolvedValue(false);
+
+      await service.handleEvent(ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, { userId: 1, bookId: 5, newStatus: 'read' });
+
+      expect(registry.evaluate).not.toHaveBeenCalled();
+      expect(repo.award).not.toHaveBeenCalled();
+      expect(notificationService.notify).not.toHaveBeenCalled();
+    });
+
     it('evaluates and awards achievements', async () => {
       registry.evaluate.mockResolvedValueOnce([{ key: 'books_finished_1', context: { count: 1 } }]).mockResolvedValueOnce([]);
       repo.findAchievementByKey.mockResolvedValue({ key: 'books_finished_1', name: 'Ink Initiate', rarity: 'common', iconName: 'book-open' });
@@ -564,6 +582,14 @@ describe('AchievementService', () => {
 
     it('does nothing when no userId in payload', async () => {
       await service.handleEvent(ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, { bookId: 5 });
+      expect(registry.evaluate).not.toHaveBeenCalled();
+    });
+
+    it('handles achievement preference lookup errors gracefully', async () => {
+      userService.isAchievementEnabled.mockRejectedValue(new Error('Settings lookup failed'));
+
+      await expect(service.handleEvent(ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, { userId: 1, bookId: 5, newStatus: 'read' })).resolves.toBeUndefined();
+
       expect(registry.evaluate).not.toHaveBeenCalled();
     });
 

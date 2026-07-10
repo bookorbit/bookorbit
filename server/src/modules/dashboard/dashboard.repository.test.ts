@@ -64,7 +64,7 @@ describe('DashboardRepository', () => {
     expect(listChain.limit).toHaveBeenCalledWith(2);
   });
 
-  it('maps continue-reading rows to id list and excludes terminal read statuses', async () => {
+  it('maps continue-reading rows to id list and excludes unread plus terminal read statuses', async () => {
     const listChain = makeLimitChain([{ id: 40 }, { id: 9 }]);
     const db = { select: vi.fn().mockReturnValue(listChain) };
     const repo = new DashboardRepository(db as never);
@@ -79,7 +79,7 @@ describe('DashboardRepository', () => {
     expect(listChain.leftJoin.mock.calls[1]?.[0]).toBe(readingProgress);
     expect(listChain.leftJoin.mock.calls[2]?.[0]).toBe(userBookStatus);
     expect(listChain.leftJoin.mock.calls.some((call) => call[0] === audiobookProgress)).toBe(false);
-    expect(whereValues).toEqual(expect.arrayContaining(['read', 'skimmed', 'abandoned']));
+    expect(whereValues).toEqual(expect.arrayContaining(['unread', 'read', 'skimmed', 'abandoned']));
     expect(listChain.innerJoin).not.toHaveBeenCalled();
     expect(listChain.orderBy).toHaveBeenCalledTimes(1);
     expect(listChain.limit).toHaveBeenCalledWith(10);

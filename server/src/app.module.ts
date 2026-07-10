@@ -52,6 +52,7 @@ import { MetadataScoreModule } from './modules/metadata-score/metadata-score.mod
 import { StatisticsModule } from './modules/statistics/statistics.module';
 import { UserStatisticsModule } from './modules/user-statistics/user-statistics.module';
 import { ReadingSessionModule } from './modules/reading-session/reading-session.module';
+import { ReadingStateModule } from './modules/reading-state/reading-state.module';
 import { UserBookStatusModule } from './modules/user-book-status/user-book-status.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { MigrationModule } from './modules/migration/migration.module';
@@ -129,6 +130,7 @@ import { CustomIconModule } from './modules/custom-icon/custom-icon.module';
     StatisticsModule,
     UserStatisticsModule,
     ReadingSessionModule,
+    ReadingStateModule,
     UserBookStatusModule,
     AuditModule,
     MigrationModule,

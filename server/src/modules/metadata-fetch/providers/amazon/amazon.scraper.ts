@@ -1,6 +1,8 @@
 import * as cheerio from 'cheerio';
 import type { CheerioAPI } from 'cheerio';
 
+import { parsePublishedDateKey, parsePublishedYear, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
+
 export interface AmazonBookData {
   title?: string;
   subtitle?: string;
@@ -9,6 +11,7 @@ export interface AmazonBookData {
   isbn13?: string;
   isbn10?: string;
   publisher?: string;
+  publishedDate?: string;
   publishedYear?: number;
   language?: string;
   pageCount?: number;
@@ -25,6 +28,7 @@ const SKIP_TITLE_PATTERNS = /box\s*set|collection\s*set|books\s*set|omnibus|summ
 export function parseBookPage(html: string): AmazonBookData {
   const $ = cheerio.load(html);
   const { title, subtitle } = extractTitle($);
+  const publishedDate = extractPublishedDate($);
   return {
     title,
     subtitle,
@@ -33,7 +37,8 @@ export function parseBookPage(html: string): AmazonBookData {
     isbn13: extractIsbn($, 'isbn13'),
     isbn10: extractIsbn($, 'isbn10'),
     publisher: extractPublisher($),
-    publishedYear: extractPublishedYear($),
+    publishedDate,
+    publishedYear: publishedDate ? publishedYearFromDateKey(publishedDate) : extractPublishedYear($),
     language: extractLanguage($),
     pageCount: extractPageCount($),
     seriesName: extractSeriesName($),
@@ -163,15 +168,31 @@ function extractPublisher($: CheerioAPI): string | undefined {
   return raw.replace(/\s*\([^)]*\)\s*$/, '').trim() || undefined;
 }
 
-function extractPublishedYear($: CheerioAPI): number | undefined {
+function extractPublishedDate($: CheerioAPI): string | undefined {
   // Newer layout
+  const rpiText = $('#rpi-attribute-book_details-publication_date .rpi-attribute-value span').first().text().trim();
+  if (rpiText) {
+    const date = parsePublishedDateKey(rpiText);
+    if (date) return date;
+  }
+
+  // Older layout: extract date from parenthesised text in publisher bullet
+  const publisherBullet = detailBulletValue($, /publisher/i);
+  const match = publisherBullet.match(/\(([^)]+)\)/);
+  if (match) {
+    const date = parsePublishedDateKey(match[1]);
+    if (date) return date;
+  }
+  return undefined;
+}
+
+function extractPublishedYear($: CheerioAPI): number | undefined {
   const rpiText = $('#rpi-attribute-book_details-publication_date .rpi-attribute-value span').first().text().trim();
   if (rpiText) {
     const y = parseYearFromText(rpiText);
     if (y) return y;
   }
 
-  // Older layout: extract year from parenthesised date in publisher bullet
   const publisherBullet = detailBulletValue($, /publisher/i);
   const match = publisherBullet.match(/\(([^)]+)\)/);
   if (match) {
@@ -299,8 +320,7 @@ function detailBulletValue($: CheerioAPI, labelPattern: RegExp): string {
 }
 
 function parseYearFromText(text: string): number | undefined {
-  const match = text.match(/\b(1[0-9]{3}|2[0-9]{3})\b/);
-  return match ? parseInt(match[1], 10) : undefined;
+  return parsePublishedYear(text);
 }
 
 function parseRating(text: string | undefined): number | undefined {

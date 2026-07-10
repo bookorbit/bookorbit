@@ -145,7 +145,10 @@ const mockMetadata = {
   extractAudioChaptersAndNarrators: vi.fn().mockResolvedValue(undefined),
 };
 
-function makeService(repo: ReturnType<typeof makeRepo>) {
+function makeService(
+  repo: ReturnType<typeof makeRepo>,
+  autoFetchOrchestrator?: { scheduleImportedBooksIfEligible: (...args: unknown[]) => Promise<number> },
+) {
   const jobStore = new ScanJobStore();
   const notificationService = { notify: vi.fn().mockResolvedValue(undefined) };
   const achievementEvents = { emit: vi.fn() };
@@ -155,7 +158,7 @@ function makeService(repo: ReturnType<typeof makeRepo>) {
     jobStore,
     mockGateway as any,
     notificationService as any,
-    undefined,
+    autoFetchOrchestrator as any,
     achievementEvents as any,
   );
   return { service, jobStore, notificationService, achievementEvents };
@@ -590,6 +593,37 @@ describe('genuinely new primary file', () => {
     await done;
 
     expect(mockMetadata.extractAndSave).toHaveBeenCalledWith(expect.any(Number), '/library/Author/Book/book.epub', 'epub');
+  });
+
+  it('queues import metadata fetch only after local metadata extraction and book promotion', async () => {
+    const candidate = makeCandidate('/library/Author/Book', [makeFileStat()]);
+    mockFindCandidates.mockResolvedValue({ candidates: [candidate], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
+
+    const order: string[] = [];
+    mockMetadata.extractAndSave.mockImplementation(() => {
+      order.push('extract');
+      return Promise.resolve();
+    });
+    const repo = makeRepo({
+      promoteProcessingBookToPresent: vi.fn().mockImplementation(() => {
+        order.push('promote');
+        return Promise.resolve(true);
+      }),
+    });
+    const autoFetchOrchestrator = {
+      scheduleImportedBooksIfEligible: vi.fn().mockImplementation(() => {
+        order.push('schedule');
+        return Promise.resolve(1);
+      }),
+    };
+    const done = awaitScan(repo);
+    const { service } = makeService(repo, autoFetchOrchestrator);
+
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(order).toEqual(['extract', 'promote', 'schedule']);
+    expect(autoFetchOrchestrator.scheduleImportedBooksIfEligible).toHaveBeenCalledWith(1, [1]);
   });
 
   it('does not extract metadata for non-primary files', async () => {

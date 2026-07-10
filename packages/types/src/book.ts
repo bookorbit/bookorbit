@@ -30,6 +30,10 @@ export type UserBookStatus = {
   updatedAt: string;
 };
 
+export type ResetBookReadingStateResponse = {
+  readStatus: UserBookStatus;
+};
+
 export type BookFileRef = {
   id: number;
   format: string | null;
@@ -54,6 +58,7 @@ export type BookCard = {
   seriesIndex: number | null;
   seriesMemberships?: BookSeriesMembership[];
   files: BookFileRef[];
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   genres: string[];
@@ -126,6 +131,7 @@ export type BookDetail = {
   isbn10: string | null;
   isbn13: string | null;
   publisher: string | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   pageCount: number | null;
@@ -169,6 +175,7 @@ export type BookMetadataRefreshPreviewFields = {
   authors?: string[];
   genres?: string[];
   publisher?: string | null;
+  publishedDate?: string | null;
   publishedYear?: number | null;
   language?: string | null;
   pageCount?: number | null;
@@ -214,6 +221,8 @@ export type BookKoboReadingState = {
 };
 
 export type BookKoboSnapshotState = {
+  deviceId: number;
+  deviceName: string;
   snapshotId: number;
   snapshotUpdatedAt: string;
   inSnapshot: boolean;
@@ -229,7 +238,7 @@ export type BookKoboState = {
   eligibleForKoboSync: boolean;
   syncCollections: string[];
   readingState: BookKoboReadingState | null;
-  snapshot: BookKoboSnapshotState | null;
+  snapshots: BookKoboSnapshotState[];
 };
 
 export type BooksPage = {

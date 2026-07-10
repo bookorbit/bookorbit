@@ -9,9 +9,13 @@ import {
   ChevronUp,
   ArrowUpDown,
   Aperture,
+  CheckSquare,
   FileSpreadsheet,
+  Filter,
+  Layers,
   Search,
   SlidersHorizontal,
+  Square,
   X,
 } from '@lucide/vue'
 import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
@@ -20,6 +24,8 @@ import VirtualBookTable from '@/features/book/components/VirtualBookTable.vue'
 import TableColumnPanel from '@/features/book/components/TableColumnPanel.vue'
 import BookQuickView from '@/features/book/components/BookQuickView.vue'
 import ViewHeader from '@/components/ViewHeader.vue'
+import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import SmartScopeEditorPanel from '@/features/smart-scope/components/SmartScopeEditorPanel.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
@@ -30,6 +36,7 @@ import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
 import JumpRail from '@/features/book/components/JumpRail.vue'
 import { toast } from 'vue-sonner'
 import { useBookViewWindow } from '@/features/book/composables/useBookViewWindow'
+import { useSeriesCollapsePreference } from '@/features/book/composables/useSeriesCollapsePreference'
 import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useEffectiveViewMode } from '@/composables/useEffectiveViewMode'
@@ -63,6 +70,17 @@ const { coverSize, gridGap } = useViewDisplaySettings('smartScope', smartScopeId
 const { tableDensity } = useDisplaySettings()
 const { allSavedViews, saveView, renameView, deleteView, duplicateView, toggleFavorite, importViews } = useSavedViews('smartScope', smartScopeId)
 
+const { getEffectivePreference, setPreference, prefs } = useSeriesCollapsePreference()
+const collapseEnabledRef = ref(getEffectivePreference({ smartScopeId: smartScopeId.value }))
+
+watch(smartScopeId, (id) => {
+  collapseEnabledRef.value = getEffectivePreference({ smartScopeId: id })
+})
+
+watch(prefs, () => {
+  collapseEnabledRef.value = getEffectivePreference({ smartScopeId: smartScopeId.value })
+})
+
 const { searchQuery, debouncedQuery, clearSearch } = useViewSearch()
 const {
   booksProxy: books,
@@ -93,6 +111,7 @@ const {
   listEndpoint: (id) => `/api/v1/smart-scopes/${id}/books/query`,
   bucketsEndpoint: (id) => `/api/v1/smart-scopes/${id}/books/jump-buckets`,
   viewMode: effectiveViewMode,
+  collapseEnabled: collapseEnabledRef,
   q: debouncedQuery,
 })
 const { setBookContext } = useBookNavigation()
@@ -314,6 +333,12 @@ function openMetadataExport() {
   collapseMobileControlsIfNeeded()
 }
 
+async function handleToggleCollapse() {
+  const next = !collapseEnabledRef.value
+  collapseEnabledRef.value = next
+  await setPreference({ smartScopeId: smartScopeId.value }, next)
+}
+
 function onSaved() {
   resetBooks()
   refreshBuckets()
@@ -450,51 +475,101 @@ defineOptions({ name: 'SmartScopeView' })
         v-model:searchQuery="searchQuery"
         @toggle-selection="toggleSelectionMode"
       >
-        <template #actions>
+        <template #toolbar>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                v-if="smartScope?.filter || sortChip"
+                class="hidden sm:flex h-8 items-center gap-1.5 rounded-md border px-3 text-sm transition-colors"
+                :class="
+                  filterExpanded
+                    ? 'border-primary text-primary bg-primary/10'
+                    : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
+                "
+                :aria-label="filterExpanded ? 'Hide filter summary' : 'Show filter summary'"
+                @click="toggleFilterSummary"
+              >
+                <Filter :size="13" />
+                <span>Filter</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{{ filterExpanded ? 'Hide filter summary' : 'Show filter summary' }}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md border transition-colors"
+                :class="
+                  collapseEnabledRef
+                    ? 'border-primary text-primary bg-primary/10'
+                    : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
+                "
+                :aria-label="collapseEnabledRef ? 'Expand series' : 'Collapse series'"
+                @click="handleToggleCollapse"
+              >
+                <Layers :size="14" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{{ collapseEnabledRef ? 'Expand series' : 'Collapse series' }}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                v-if="hasPermission('library_download') && !isDemoRestrictedAccount"
+                class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md border border-input text-muted-foreground bg-background transition-colors hover:text-foreground hover:bg-muted"
+                aria-label="Export metadata"
+                @click="openMetadataExport"
+              >
+                <FileSpreadsheet :size="14" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Export metadata</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="hidden sm:flex h-8 items-center gap-1.5 rounded-md border border-input px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Edit Smart Scope"
+                @click="openEditor"
+              >
+                <Settings2 :size="13" />
+                <span>Edit</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Edit Smart Scope</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                :disabled="deleting"
+                class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md border transition-colors"
+                :class="
+                  confirmSmartScopeDelete
+                    ? 'border-destructive text-destructive bg-destructive/10 hover:bg-destructive/20'
+                    : 'border-input text-muted-foreground hover:text-destructive hover:border-destructive'
+                "
+                :aria-label="confirmSmartScopeDelete ? 'Confirm delete Smart Scope' : 'Delete Smart Scope'"
+                @click="handleDelete"
+              >
+                <Trash2 :size="14" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{{ confirmSmartScopeDelete ? 'Confirm delete' : 'Delete Smart Scope' }}</TooltipContent>
+          </Tooltip>
           <button
             class="sm:hidden flex h-8 w-8 items-center justify-center rounded-md border border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            aria-label="Show Smart Scope controls"
             @click="toggleMobileControls"
           >
             <SlidersHorizontal :size="14" />
           </button>
-
-          <button
-            v-if="smartScope?.filter || sortChip"
-            @click="filterExpanded = !filterExpanded"
-            class="hidden md:flex items-center gap-1.5 h-8 px-3 rounded-md border border-input text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            :title="filterExpanded ? 'Hide filter' : 'Show filter'"
-          >
-            <component :is="filterExpanded ? ChevronUp : ChevronDown" :size="13" />
-            <span>Filter</span>
-          </button>
-          <button
-            v-if="hasPermission('library_download') && !isDemoRestrictedAccount"
-            @click="openMetadataExport"
-            class="hidden md:flex items-center gap-1.5 h-8 px-3 rounded-md border border-input text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          >
-            <FileSpreadsheet :size="13" />
-            <span>Export</span>
-          </button>
-          <button
-            @click="openEditor"
-            class="hidden md:flex items-center gap-1.5 h-8 px-3 rounded-md border border-input text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          >
-            <Settings2 :size="13" />
-            <span>Edit</span>
-          </button>
-          <button
-            @click="handleDelete"
-            :disabled="deleting"
-            class="hidden md:flex items-center gap-1.5 h-8 px-3 rounded-md border text-sm transition-colors"
-            :class="
-              confirmSmartScopeDelete
-                ? 'border-destructive text-destructive bg-destructive/10 hover:bg-destructive/20'
-                : 'border-input text-muted-foreground hover:text-destructive hover:border-destructive'
-            "
-          >
-            <Trash2 :size="13" />
-            <span>{{ confirmSmartScopeDelete ? 'Confirm?' : 'Delete' }}</span>
-          </button>
+        </template>
+        <template #mobile-menu>
+          <DropdownMenuItem @click="handleToggleCollapse">
+            <CheckSquare v-if="collapseEnabledRef" :size="14" class="mr-2" />
+            <Square v-else :size="14" class="mr-2" />
+            Collapse series
+          </DropdownMenuItem>
         </template>
         <template v-if="effectiveViewMode === 'table'" #columns>
           <TableColumnPanel
@@ -546,7 +621,7 @@ defineOptions({ name: 'SmartScopeView' })
             class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <component :is="filterExpanded ? ChevronUp : ChevronDown" :size="13" />
-            <span>{{ filterExpanded ? 'Hide Filter' : 'Show Filter' }}</span>
+            <span>{{ filterExpanded ? 'Hide filter' : 'Show filter' }}</span>
           </button>
           <button
             v-if="hasPermission('library_download') && !isDemoRestrictedAccount"

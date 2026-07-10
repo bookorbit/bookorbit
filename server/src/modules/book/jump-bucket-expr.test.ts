@@ -30,9 +30,17 @@ describe('jump-bucket-expr', () => {
     expect(text).toBe('"book_metadata"."published_year"::text');
   });
 
+  it('builds a year expression for flat publishedDate sort using the year fallback', () => {
+    const text = toSqlText(flatJumpBucketExpr('publishedDate'));
+    expect(text).toContain('extract(year from coalesce("book_metadata"."published_date", make_date("book_metadata"."published_year", 1, 1)))');
+  });
+
   it('builds collapsed expressions over representative aliases', () => {
     expect(toSqlText(collapsedJumpBucketExpr('title'))).toContain('r.sort_title');
     expect(toSqlText(collapsedJumpBucketExpr('author'))).toContain('r.author_sort_name');
+    expect(toSqlText(collapsedJumpBucketExpr('publishedDate'))).toContain(
+      'extract(year from coalesce(r.published_date, make_date(r.published_year, 1, 1)))',
+    );
     expect(toSqlText(collapsedJumpBucketExpr('publishedYear'))).toBe('r.published_year::text');
   });
 

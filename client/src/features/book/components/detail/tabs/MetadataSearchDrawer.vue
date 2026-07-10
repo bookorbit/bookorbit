@@ -28,6 +28,7 @@ const currentSource = computed<MetadataSource>(() => ({
   subtitle: props.book.subtitle,
   description: props.book.description,
   publisher: props.book.publisher,
+  publishedDate: props.book.publishedDate,
   publishedYear: props.book.publishedYear,
   language: props.book.language,
   pageCount: props.book.pageCount,

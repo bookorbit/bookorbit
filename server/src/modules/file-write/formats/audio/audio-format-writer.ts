@@ -94,9 +94,12 @@ function buildAudioMetadataArgs(payload: BookWritePayload, options: FormatWriteO
   }
 
   if (canWriteField(payload, options, 'publishedYear')) {
+    const date = payload.publishedDate ?? (payload.publishedYear == null ? '' : String(payload.publishedYear));
     const year = payload.publishedYear == null ? '' : String(payload.publishedYear);
-    pushFormatMetadata(metadata, 'date', year);
+    pushFormatMetadata(metadata, 'date', date);
     pushFormatMetadata(metadata, 'year', year);
+  } else if (canWriteField(payload, options, 'publishedDate')) {
+    pushFormatMetadata(metadata, 'date', payload.publishedDate ?? '');
   }
 
   if (canWriteField(payload, options, 'publisher')) {

@@ -31,6 +31,7 @@ import { NotificationService } from '../notification/notification.service';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
 import { formatSeriesIndex } from '../../common/utils/series-index-format.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -75,6 +76,7 @@ type NormalizedFinalizeMetadata = {
   isbn10: string | null;
   isbn13: string | null;
   publisher: string | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   pageCount: number | null;
@@ -921,6 +923,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       isbn10: meta.isbn10 ?? null,
       isbn13: meta.isbn13 ?? null,
       publisher: meta.publisher ?? null,
+      publishedDate: meta.publishedDate ?? null,
       publishedYear: meta.publishedYear ?? null,
       language: meta.language ?? null,
       seriesName: meta.seriesName ?? null,
@@ -1123,6 +1126,7 @@ function normalizeDuplicateAuthors(value: string[] | null | undefined): string[]
 }
 
 function normalizeFinalizeMetadata(meta: BookDockMetadata | null | undefined): NormalizedFinalizeMetadata {
+  const publishedDate = normalizePublishedDate(meta?.publishedDate) ?? null;
   return {
     title: normalizeText(meta?.title, 1000),
     subtitle: normalizeText(meta?.subtitle, 1000),
@@ -1130,7 +1134,8 @@ function normalizeFinalizeMetadata(meta: BookDockMetadata | null | undefined): N
     isbn10: normalizeIsbn(meta?.isbn10, 10),
     isbn13: normalizeIsbn(meta?.isbn13, 13),
     publisher: normalizeText(meta?.publisher, 500),
-    publishedYear: normalizePublishedYear(meta?.publishedYear),
+    publishedDate,
+    publishedYear: publishedDate ? publishedYearFromDateKey(publishedDate) : normalizePublishedYear(meta?.publishedYear),
     language: normalizeLanguage(meta?.language),
     pageCount: normalizeInteger(meta?.pageCount),
     seriesName: normalizeText(meta?.seriesName, 500),

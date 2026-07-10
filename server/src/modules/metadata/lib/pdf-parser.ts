@@ -14,6 +14,7 @@ export interface PdfParsed {
   authors: { name: string; sortName: string | null }[];
   description: string | null;
   publisher: string | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   genres: string[];
@@ -158,6 +159,7 @@ export async function parsePdfBuffer(absolutePath: string, buf: Buffer, options:
     authors: hasXmp ? xmp.authors : infoAuthors,
     description: hasXmp ? xmp.description : infoSubject,
     publisher: hasXmp ? (xmp.publisher ?? null) : isBookorbitInfo ? infoProducer : null,
+    publishedDate: xmp?.publishedDate ?? null,
     publishedYear: xmp?.publishedYear ?? null,
     language: xmp?.language ?? null,
     genres: xmp?.genres?.length ? xmp.genres : [],

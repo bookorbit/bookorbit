@@ -595,6 +595,7 @@ defineOptions({ name: 'HomeView' })
                 <button
                   v-if="!isDefaultSort"
                   @click="handleResetSort"
+                  aria-label="Reset sort to default"
                   class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors"
                 >
                   <X :size="13" />
@@ -613,6 +614,7 @@ defineOptions({ name: 'HomeView' })
                     ? 'border-primary text-primary bg-primary/10'
                     : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
                 "
+                :aria-label="collapseEnabledRef ? 'Expand series' : 'Collapse series'"
                 @click="handleToggleCollapse"
               >
                 <Layers :size="14" />
@@ -625,6 +627,7 @@ defineOptions({ name: 'HomeView' })
               <button
                 v-if="hasPermission('library_download') && !isDemoRestrictedAccount"
                 class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md border border-input text-muted-foreground bg-background transition-colors hover:text-foreground hover:bg-muted"
+                aria-label="Export metadata"
                 @click="openMetadataExport('all-matching')"
               >
                 <FileSpreadsheet :size="14" />
@@ -666,6 +669,7 @@ defineOptions({ name: 'HomeView' })
                 ? 'border-primary text-primary bg-primary/10'
                 : 'border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
             "
+            aria-label="Show library controls"
             @click="toggleMobileControls"
           >
             <SlidersHorizontal :size="14" />

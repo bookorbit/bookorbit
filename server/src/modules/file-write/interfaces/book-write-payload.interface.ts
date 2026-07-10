@@ -6,6 +6,7 @@ export interface BookWritePayload {
   subtitle?: string | null;
   description?: string | null;
   publisher?: string | null;
+  publishedDate?: string | null;
   publishedYear?: number | null;
   language?: string | null;
   pageCount?: number | null;

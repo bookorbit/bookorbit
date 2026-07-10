@@ -448,6 +448,7 @@ defineOptions({ name: 'CollectionView' })
                     ? 'border-primary text-primary bg-primary/10'
                     : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
                 "
+                :aria-label="collapseEnabledRef ? 'Expand series' : 'Collapse series'"
                 @click="handleToggleCollapse"
               >
                 <Layers :size="14" />
@@ -461,6 +462,7 @@ defineOptions({ name: 'CollectionView' })
               <button
                 v-if="hasPermission('library_download') && !isDemoRestrictedAccount"
                 class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md border border-input text-muted-foreground bg-background transition-colors hover:text-foreground hover:bg-muted"
+                aria-label="Export metadata"
                 @click="openMetadataExport"
               >
                 <FileSpreadsheet :size="14" />
@@ -474,6 +476,7 @@ defineOptions({ name: 'CollectionView' })
               <button
                 v-if="collection"
                 class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                aria-label="Edit collection"
                 @click="openCollectionEditor"
               >
                 <Pencil :size="14" />
@@ -484,6 +487,7 @@ defineOptions({ name: 'CollectionView' })
 
           <button
             class="sm:hidden flex h-8 w-8 items-center justify-center rounded-md border border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            aria-label="Show collection controls"
             @click="toggleMobileControls"
           >
             <SlidersHorizontal :size="14" />
@@ -540,18 +544,6 @@ defineOptions({ name: 'CollectionView' })
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
-          <button
-            class="flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors"
-            :class="
-              collapseEnabledRef
-                ? 'border-primary text-primary bg-primary/10'
-                : 'border-input text-muted-foreground hover:bg-muted hover:text-foreground'
-            "
-            @click="handleToggleCollapse"
-          >
-            <Layers :size="13" />
-            <span>{{ collapseEnabledRef ? 'Expanded' : 'Collapse series' }}</span>
-          </button>
           <button
             v-if="hasPermission('library_download') && !isDemoRestrictedAccount"
             class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

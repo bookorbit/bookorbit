@@ -1,5 +1,6 @@
 import { AudiobookChapter, MetadataProviderKey, type MetadataCandidate, type MetadataSeriesMembership } from '@bookorbit/types';
 
+import { parsePublishedDateKey, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
 import { stripHtml } from '../provider-utils';
 import { AudNexusBook, AudNexusChaptersResponse, AudNexusSeriesReference } from './audnexus.types';
 
@@ -43,11 +44,8 @@ function extractSeriesMemberships(book: AudNexusBook): MetadataSeriesMembership[
 }
 
 export function mapAudNexusBook(book: AudNexusBook, chaptersResponse?: AudNexusChaptersResponse): MetadataCandidate {
-  let publishedYear: number | undefined;
-  if (book.releaseDate) {
-    const year = new Date(book.releaseDate).getFullYear();
-    if (!isNaN(year)) publishedYear = year;
-  }
+  const publishedDate = parsePublishedDateKey(book.releaseDate);
+  const publishedYear = publishedDate ? publishedYearFromDateKey(publishedDate) : undefined;
 
   const durationSeconds = book.runtimeLengthMin != null ? book.runtimeLengthMin * 60 : undefined;
 
@@ -77,6 +75,7 @@ export function mapAudNexusBook(book: AudNexusBook, chaptersResponse?: AudNexusC
     narrators: Array.isArray(book.narrators) ? book.narrators.map((n) => n.name) : [],
     description,
     publisher: book.publisherName,
+    publishedDate,
     publishedYear,
     language: book.language,
     coverUrl: book.image,

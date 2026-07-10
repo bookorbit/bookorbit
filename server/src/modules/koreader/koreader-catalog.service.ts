@@ -464,6 +464,7 @@ export class KoreaderCatalogService {
       subtitle: detail.subtitle,
       description: detail.description,
       publisher: detail.publisher,
+      publishedDate: detail.publishedDate,
       publishedYear: detail.publishedYear,
       language: detail.language,
       isbn10: detail.isbn10,

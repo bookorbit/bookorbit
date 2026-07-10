@@ -26,6 +26,7 @@ function makeBook(id: number): BookCard {
     seriesName: null,
     seriesIndex: null,
     files: [{ id: id * 10, format: 'epub', role: 'primary', sizeBytes: null }],
+    publishedDate: null,
     publishedYear: null,
     language: null,
     genres: [],

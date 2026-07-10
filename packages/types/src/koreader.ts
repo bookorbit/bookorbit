@@ -228,6 +228,7 @@ export interface KoreaderCatalogBookDetail extends KoreaderCatalogBookListItem {
   subtitle: string | null;
   description: string | null;
   publisher: string | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   isbn10: string | null;

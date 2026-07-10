@@ -9,6 +9,13 @@ function makeSelectChain(rows: unknown[]) {
   return { from, where, orderBy, limit };
 }
 
+function collectNumericValues(value: unknown, seen = new Set<unknown>()): number[] {
+  if (typeof value === 'number') return [value];
+  if (!value || typeof value !== 'object' || seen.has(value)) return [];
+  seen.add(value);
+  return Object.values(value as Record<string, unknown>).flatMap((child) => collectNumericValues(child, seen));
+}
+
 function makeDb() {
   return {
     query: {
@@ -35,7 +42,7 @@ describe('KoboAnalyticsResolverService', () => {
     bookAccessService.assertBookAccessible.mockRejectedValue(new Error('forbidden'));
     const db = makeDb();
 
-    await expect(makeService(db).resolveBookFileId(1, 9)).resolves.toEqual({
+    await expect(makeService(db).resolveBookFileId(1, 3, 9)).resolves.toEqual({
       kind: 'skipped',
       reason: 'book_not_accessible',
     });
@@ -52,10 +59,11 @@ describe('KoboAnalyticsResolverService', () => {
     };
     db.select.mockReturnValueOnce(snapChain).mockReturnValueOnce(hashChain);
 
-    await expect(makeService(db).resolveBookFileId(1, 9)).resolves.toEqual({
+    await expect(makeService(db).resolveBookFileId(101, 303, 909)).resolves.toEqual({
       kind: 'resolved',
       bookFileId: 42,
     });
+    expect(collectNumericValues(snapChain.where.mock.calls[0]![0])).toEqual(expect.arrayContaining([101, 303, 909]));
   });
 
   it('prefers the current primary when multiple files share the snapshot hash', async () => {
@@ -69,7 +77,7 @@ describe('KoboAnalyticsResolverService', () => {
     };
     db.select.mockReturnValueOnce(snapChain).mockReturnValueOnce(hashChain);
 
-    await expect(makeService(db).resolveBookFileId(1, 9)).resolves.toEqual({
+    await expect(makeService(db).resolveBookFileId(1, 3, 9)).resolves.toEqual({
       kind: 'resolved',
       bookFileId: 51,
     });
@@ -86,7 +94,7 @@ describe('KoboAnalyticsResolverService', () => {
     };
     db.select.mockReturnValueOnce(snapChain).mockReturnValueOnce(hashChain);
 
-    await expect(makeService(db).resolveBookFileId(1, 9)).resolves.toEqual({
+    await expect(makeService(db).resolveBookFileId(1, 3, 9)).resolves.toEqual({
       kind: 'resolved',
       bookFileId: 44,
     });
@@ -99,7 +107,7 @@ describe('KoboAnalyticsResolverService', () => {
     db.select.mockReturnValueOnce(snapChain);
     db.query.bookFiles.findFirst.mockResolvedValue({ id: 50 });
 
-    await expect(makeService(db).resolveBookFileId(1, 9)).resolves.toEqual({
+    await expect(makeService(db).resolveBookFileId(1, 3, 9)).resolves.toEqual({
       kind: 'resolved',
       bookFileId: 50,
     });
@@ -117,7 +125,7 @@ describe('KoboAnalyticsResolverService', () => {
     db.select.mockReturnValueOnce(snapChain).mockReturnValueOnce(hashChain);
     db.query.bookFiles.findFirst.mockResolvedValue({ id: 50 });
 
-    await expect(makeService(db).resolveBookFileId(1, 9)).resolves.toEqual({
+    await expect(makeService(db).resolveBookFileId(1, 3, 9)).resolves.toEqual({
       kind: 'resolved',
       bookFileId: 50,
     });
@@ -129,7 +137,7 @@ describe('KoboAnalyticsResolverService', () => {
     const snapChain = makeSelectChain([]);
     db.select.mockReturnValueOnce(snapChain);
 
-    await expect(makeService(db).resolveBookFileId(1, 9)).resolves.toEqual({
+    await expect(makeService(db).resolveBookFileId(1, 3, 9)).resolves.toEqual({
       kind: 'skipped',
       reason: 'no_epub_file',
     });
@@ -139,7 +147,7 @@ describe('KoboAnalyticsResolverService', () => {
     const db = makeDb();
     db.query.books.findFirst.mockResolvedValue(null);
 
-    await expect(makeService(db).resolveBookFileId(1, 9)).resolves.toEqual({
+    await expect(makeService(db).resolveBookFileId(1, 3, 9)).resolves.toEqual({
       kind: 'skipped',
       reason: 'book_not_found',
     });
@@ -152,7 +160,7 @@ describe('KoboAnalyticsResolverService', () => {
     db.select.mockReturnValueOnce(snapChain);
     db.query.bookFiles.findFirst.mockResolvedValue(null);
 
-    await expect(makeService(db).resolveBookFileId(1, 9)).resolves.toEqual({
+    await expect(makeService(db).resolveBookFileId(1, 3, 9)).resolves.toEqual({
       kind: 'skipped',
       reason: 'no_epub_file',
     });

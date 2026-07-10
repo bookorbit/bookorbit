@@ -354,6 +354,7 @@ describe('SmartScopeService', () => {
       sort: [{ field: 'author', dir: 'desc' }],
       pagination: { page: 0, size: 50 },
       q: 'needle',
+      collapseSeries: true,
     });
 
     expect(queryBuilder.buildWhere).toHaveBeenCalledWith(
@@ -373,6 +374,7 @@ describe('SmartScopeService', () => {
       sort: [{ field: 'author', dir: 'desc' }],
       pagination: { page: 0, size: 50 },
       q: 'needle',
+      collapseSeries: true,
     });
   });
 

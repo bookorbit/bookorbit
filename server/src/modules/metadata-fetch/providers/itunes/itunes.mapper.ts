@@ -1,4 +1,5 @@
 import { MetadataCandidate, MetadataProviderKey, type ITunesCoverResolution } from '@bookorbit/types';
+import { parsePublishedDateKey, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
 import { ITunesResult } from './itunes.types';
 
 function mapCoverUrl(artworkUrl100: string | undefined, coverResolution: ITunesCoverResolution): string | undefined {
@@ -20,7 +21,8 @@ function normalizeCommunityRatingCount(value: number | undefined): number | unde
 export function mapITunesResult(result: ITunesResult, coverResolution: ITunesCoverResolution = 'high'): MetadataCandidate {
   const coverUrl = mapCoverUrl(result.artworkUrl100, coverResolution);
 
-  const publishedYear = result.releaseDate ? new Date(result.releaseDate).getFullYear() : undefined;
+  const publishedDate = parsePublishedDateKey(result.releaseDate);
+  const publishedYear = publishedDate ? publishedYearFromDateKey(publishedDate) : undefined;
 
   const providerId = (result.trackId ?? result.collectionId)?.toString();
   if (!providerId) {
@@ -36,6 +38,7 @@ export function mapITunesResult(result: ITunesResult, coverResolution: ITunesCov
     authors: result.artistName ? [result.artistName] : [],
     description: result.description,
     publisher: result.sellerName,
+    publishedDate,
     publishedYear,
     language: result.languageCodesISO2A?.[0],
     genres: result.genres,

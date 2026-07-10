@@ -83,6 +83,7 @@ describe('Kobo scraper', () => {
       authors: ['Rebecca Yarros'],
       description: 'A young dragon rider enters a war college.',
       publisher: 'Entangled Publishing, LLC',
+      publishedDate: '2023-05-02',
       publishedYear: 2023,
       language: 'English',
       pageCount: 640,

@@ -1,6 +1,8 @@
 import * as cheerio from 'cheerio';
 import type { CheerioAPI } from 'cheerio';
 
+import { parsePublishedDateKey, parsePublishedYear, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
+
 export interface KoboRegionConfig {
   country: string;
   language: string;
@@ -18,6 +20,7 @@ export interface KoboBookData {
   authors?: string[];
   description?: string;
   publisher?: string;
+  publishedDate?: string;
   publishedYear?: number;
   language?: string;
   pageCount?: number;
@@ -32,6 +35,7 @@ export interface KoboBookData {
 
 type KoboDetails = {
   publisher?: string;
+  publishedDate?: string;
   publishedYear?: number;
   language?: string;
   pageCount?: number;
@@ -107,6 +111,7 @@ export function parseKoboBookPage(html: string, sourceUrl?: string): KoboBookDat
     authors: extractAuthors($),
     description: extractDescription($),
     publisher: details.publisher,
+    publishedDate: details.publishedDate,
     publishedYear: details.publishedYear,
     language: details.language,
     pageCount: details.pageCount ?? extractPageCount($),
@@ -260,7 +265,9 @@ function extractDetails($: CheerioAPI): KoboDetails {
     if (!label || !value) continue;
 
     if (/^release date$/i.test(label)) {
-      details.publishedYear = parseYearFromText(value);
+      const publishedDate = parsePublishedDateKey(value);
+      details.publishedDate = publishedDate;
+      details.publishedYear = publishedDate ? publishedYearFromDateKey(publishedDate) : parseYearFromText(value);
     } else if (/^pages$/i.test(label)) {
       details.pageCount = parseIntegerFromText(value);
     } else if (/^(isbn|book id)$/i.test(label)) {
@@ -342,8 +349,7 @@ function normalizeIsbn(value: string): string | undefined {
 }
 
 function parseYearFromText(text: string): number | undefined {
-  const match = text.match(/\b(1[0-9]{3}|2[0-9]{3})\b/);
-  return match ? parseInt(match[1], 10) : undefined;
+  return parsePublishedYear(text);
 }
 
 function parseIntegerFromText(text: string | undefined): number | undefined {

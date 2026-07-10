@@ -6,6 +6,11 @@ const props = defineProps<{
 
 function parseDate(isoDate: string | null): Date | null {
   if (!isoDate?.trim()) return null
+  const dateKeyMatch = isoDate.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (dateKeyMatch) {
+    const [, year, month, day] = dateKeyMatch
+    return new Date(Number(year), Number(month) - 1, Number(day))
+  }
   const date = new Date(isoDate)
   return Number.isNaN(date.getTime()) ? null : date
 }

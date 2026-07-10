@@ -32,7 +32,7 @@ const emit = defineEmits<{
 
 const MAX_DEPTH = 5
 const NUMERIC_FIELDS: RuleField[] = ['seriesIndex', 'publishedYear', 'pageCount', 'rating', 'communityRating', 'metadataScore']
-const DATE_FIELDS: RuleField[] = ['addedAt', 'startedAt', 'finishedAt']
+const DATE_FIELDS: RuleField[] = ['publishedDate', 'addedAt', 'startedAt', 'finishedAt']
 const NO_VALUE_OPERATORS: RuleOperator[] = [
   'isEmpty',
   'isNotEmpty',

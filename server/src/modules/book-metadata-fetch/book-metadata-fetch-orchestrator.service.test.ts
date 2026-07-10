@@ -20,10 +20,11 @@ function makeService(withGateway = true) {
     resetAllProcessingOnBoot: vi.fn().mockResolvedValue(0),
     recoverStuckProcessing: vi.fn().mockResolvedValue(0),
     fetchDue: vi.fn().mockResolvedValue([]),
-    upsertSchedule: vi.fn().mockResolvedValue(0),
+    scheduleEligibleBookIdsInBatches: vi.fn().mockResolvedValue(0),
     markProcessing: vi.fn().mockResolvedValue(true),
     markDone: vi.fn().mockResolvedValue(undefined),
     markFailed: vi.fn().mockResolvedValue(undefined),
+    deferProcessing: vi.fn().mockResolvedValue(undefined),
     getStatusSummary: vi.fn().mockResolvedValue({ queued: 0, processing: 0, failed: 0 }),
     scheduleEligibleBooksInBatches: vi.fn().mockResolvedValue(0),
     cancelPending: vi.fn().mockResolvedValue(0),
@@ -54,6 +55,9 @@ function makeService(withGateway = true) {
     upsertComicMetadata: vi.fn().mockResolvedValue(undefined),
     downloadAndSaveCover: vi.fn().mockResolvedValue(true),
   };
+  const comicMetadataRepository = {
+    findByBookId: vi.fn().mockResolvedValue(null),
+  };
   const scoreService = {
     calculateAndSave: vi.fn().mockResolvedValue(undefined),
   };
@@ -82,6 +86,7 @@ function makeService(withGateway = true) {
     bookReadService as never,
     pipeline as never,
     metadataService as never,
+    comicMetadataRepository as never,
     scoreService as never,
     bookMetadataLockService as never,
     session,
@@ -98,6 +103,7 @@ function makeService(withGateway = true) {
     bookReadService,
     pipeline,
     metadataService,
+    comicMetadataRepository,
     scoreService,
     bookMetadataLockService,
     session,
@@ -171,42 +177,15 @@ describe('BookMetadataFetchOrchestratorService', () => {
     expect(session.getSnapshot().sessionTotal).toBe(4);
   });
 
-  it('scheduleIfEligible only queues when trigger-on-import is enabled and eligibility passes', async () => {
-    const { service, configService, eligibilityService, queueRepo, bookReadService, session } = makeService();
+  it('schedules imported books in bounded batches only when import auto-fetch is enabled', async () => {
+    const { service, configService, queueRepo, session } = makeService();
     configService.getEffectiveConfig.mockResolvedValue(baseConfig(true, true));
-    bookReadService.findById.mockResolvedValue({
-      book: {
-        books: { libraryId: 7 },
-        book_metadata: {
-          metadataScore: 50,
-          lastMetadataFetchAt: null,
-          title: 'Book',
-          subtitle: null,
-          description: null,
-          publisher: null,
-          publishedYear: null,
-          language: null,
-          pageCount: null,
-          communityRating: null,
-          seriesName: null,
-          seriesIndex: null,
-          coverSource: null,
-          durationSeconds: null,
-          abridged: null,
-        },
-      },
-      authorRows: [],
-      genreRows: [],
-      narratorRows: [],
-      communityRatingRows: [],
-    });
-    eligibilityService.isEligible.mockReturnValue(true);
-    queueRepo.upsertSchedule = vi.fn().mockResolvedValue(1);
+    queueRepo.scheduleEligibleBookIdsInBatches.mockResolvedValue(2);
 
-    await service.scheduleIfEligible(99, 7, 'import' as any);
+    await expect(service.scheduleImportedBooksIfEligible(7, [99, 100])).resolves.toBe(2);
 
-    expect(queueRepo.upsertSchedule).toHaveBeenCalledWith([99], 'import');
-    expect(session.getSnapshot().sessionTotal).toBe(1);
+    expect(queueRepo.scheduleEligibleBookIdsInBatches).toHaveBeenCalledWith(baseConfig(true, true), 'event_import', 7, [99, 100], 1000);
+    expect(session.getSnapshot().sessionTotal).toBe(2);
   });
 
   it('pause, resume, cancelPending, and requeueFailed update orchestrator/session state', async () => {
@@ -387,13 +366,13 @@ describe('BookMetadataFetchOrchestratorService', () => {
 
   it('pollOnce processes due items and waits random delay', async () => {
     const { service, queueRepo } = makeService();
-    queueRepo.fetchDue.mockResolvedValue([{ bookId: 44, title: 'Queued Book' }]);
+    queueRepo.fetchDue.mockResolvedValue([{ bookId: 44, title: 'Queued Book', reason: 'manual_trigger' }]);
     const processSpy = vi.spyOn(service as any, 'processOne').mockResolvedValue(undefined);
     const delaySpy = vi.spyOn(service as any, 'randomDelay').mockResolvedValue(undefined);
 
     await (service as any).pollOnce();
 
-    expect(processSpy).toHaveBeenCalledWith(44, 'Queued Book');
+    expect(processSpy).toHaveBeenCalledWith(44, 'Queued Book', 'manual_trigger');
     expect(delaySpy).toHaveBeenCalledTimes(1);
   });
 
@@ -405,6 +384,87 @@ describe('BookMetadataFetchOrchestratorService', () => {
 
     expect(bookReadService.findById).not.toHaveBeenCalled();
     expect(queueRepo.markDone).not.toHaveBeenCalled();
+  });
+
+  it('defers an event-import job while its book is still being scanned', async () => {
+    const { service, queueRepo, bookReadService, pipeline } = makeService();
+    bookReadService.findById.mockResolvedValue({
+      book: {
+        books: { libraryId: 2, status: 'processing' },
+        book_metadata: { title: null },
+      },
+      authorRows: [],
+      genreRows: [],
+      narratorRows: [],
+      communityRatingRows: [],
+    });
+
+    await (service as any).processOne(31, 'Importing', 'event_import');
+
+    expect(queueRepo.deferProcessing).toHaveBeenCalledWith(31);
+    expect(pipeline.runWithSources).not.toHaveBeenCalled();
+    expect(queueRepo.markDone).not.toHaveBeenCalled();
+  });
+
+  it('discards an event-import job if auto-fetch is disabled before it runs', async () => {
+    const { service, configService, queueRepo, bookReadService, pipeline } = makeService();
+    configService.getEffectiveConfig.mockResolvedValue(baseConfig(false, true));
+    bookReadService.findById.mockResolvedValue({
+      book: {
+        books: { libraryId: 2, status: 'present' },
+        book_metadata: { title: 'Imported', lastMetadataFetchAt: null },
+      },
+      authorRows: [],
+      genreRows: [],
+      narratorRows: [],
+      communityRatingRows: [],
+    });
+
+    await (service as any).processOne(32, 'Imported', 'event_import');
+
+    expect(queueRepo.markDone).toHaveBeenCalledWith(32);
+    expect(pipeline.runWithSources).not.toHaveBeenCalled();
+  });
+
+  it('runs event-import fetches in preserve-existing mode after local metadata is available', async () => {
+    const { service, bookReadService, pipeline, comicMetadataRepository } = makeService();
+    bookReadService.findById.mockResolvedValue({
+      book: {
+        books: { libraryId: 2, status: 'present' },
+        book_metadata: {
+          title: 'Akira',
+          isbn13: null,
+          isbn10: null,
+          durationSeconds: null,
+          audibleId: null,
+          hardcoverEditionId: null,
+          chapters: null,
+          lastMetadataFetchAt: null,
+        },
+      },
+      authorRows: [{ name: 'Katsuhiro Otomo' }],
+      genreRows: [{ name: 'Manga' }],
+      narratorRows: [],
+      communityRatingRows: [],
+    });
+    comicMetadataRepository.findByBookId.mockResolvedValue({ issueNumber: '28', volumeName: null });
+    pipeline.runWithSources.mockResolvedValue({ resolved: {}, providerIds: {} });
+    vi.spyOn(service as any, 'persistResolved').mockResolvedValue(undefined);
+
+    await (service as any).processOne(33, 'Akira', 'event_import');
+
+    expect(comicMetadataRepository.findByBookId).toHaveBeenCalledWith(33);
+    expect(pipeline.runWithSources).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Akira' }),
+      expect.objectContaining({
+        title: 'Akira',
+        authors: ['Katsuhiro Otomo'],
+        genres: ['Manga'],
+        comicMetadata: { issueNumber: '28', volumeName: null },
+      }),
+      2,
+      { preserveExisting: true },
+    );
   });
 
   it('processOne marks done and clears session when metadata pipeline succeeds', async () => {
@@ -474,53 +534,17 @@ describe('BookMetadataFetchOrchestratorService', () => {
     expect(resetSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('scheduleIfEligible skips queue writes when disabled, import trigger is disabled, book is missing, or eligibility fails', async () => {
-    const { service, configService, eligibilityService, queueRepo, bookReadService } = makeService();
+  it('does not schedule imported books when auto-fetch or its import trigger is disabled', async () => {
+    const { service, configService, queueRepo } = makeService();
     configService.getEffectiveConfig.mockResolvedValue(baseConfig(false, true));
 
-    await service.scheduleIfEligible(1, 2, 'import' as never);
-    expect(bookReadService.findById).not.toHaveBeenCalled();
-    expect(queueRepo.upsertSchedule).not.toHaveBeenCalled();
+    await expect(service.scheduleImportedBooksIfEligible(2, [1])).resolves.toBe(0);
+    expect(queueRepo.scheduleEligibleBookIdsInBatches).not.toHaveBeenCalled();
 
     configService.getEffectiveConfig.mockResolvedValue(baseConfig(true, false));
 
-    await service.scheduleIfEligible(1, 2, 'import' as never);
-    expect(queueRepo.upsertSchedule).not.toHaveBeenCalled();
-
-    configService.getEffectiveConfig.mockResolvedValue(baseConfig(true, true));
-    bookReadService.findById.mockResolvedValue(null);
-    await service.scheduleIfEligible(1, 2, 'import' as never);
-    expect(queueRepo.upsertSchedule).not.toHaveBeenCalled();
-
-    bookReadService.findById.mockResolvedValue({
-      book: {
-        books: { libraryId: 2 },
-        book_metadata: {
-          metadataScore: 50,
-          lastMetadataFetchAt: null,
-          title: 'Book',
-          subtitle: null,
-          description: null,
-          publisher: null,
-          publishedYear: null,
-          language: null,
-          pageCount: null,
-          communityRating: null,
-          seriesName: null,
-          seriesIndex: null,
-          coverSource: null,
-          durationSeconds: null,
-          abridged: null,
-        },
-      },
-      authorRows: [],
-      genreRows: [],
-      narratorRows: [],
-      communityRatingRows: [],
-    });
-    eligibilityService.isEligible.mockReturnValue(false);
-    await service.scheduleIfEligible(1, 2, 'import' as never);
-    expect(queueRepo.upsertSchedule).not.toHaveBeenCalled();
+    await expect(service.scheduleImportedBooksIfEligible(2, [1])).resolves.toBe(0);
+    expect(queueRepo.scheduleEligibleBookIdsInBatches).not.toHaveBeenCalled();
   });
 
   it('requeueFailed returns zero without session update', async () => {

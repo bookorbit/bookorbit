@@ -9,6 +9,7 @@ export function hasOpfMetadata(metadata: ParsedOpf): boolean {
     metadata.isbn10 !== null ||
     metadata.isbn13 !== null ||
     metadata.publisher !== null ||
+    metadata.publishedDate !== null ||
     metadata.publishedYear !== null ||
     metadata.language !== null ||
     metadata.pageCount !== null ||
@@ -40,6 +41,7 @@ export function mapOpfMetadata(metadata: ParsedOpf, cover: Buffer | null): Parse
     isbn10: metadata.isbn10,
     isbn13: metadata.isbn13,
     publisher: metadata.publisher,
+    publishedDate: metadata.publishedDate,
     publishedYear: metadata.publishedYear,
     language: metadata.language,
     seriesName: metadata.seriesName,

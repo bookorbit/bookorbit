@@ -342,6 +342,7 @@ defineOptions({ name: 'SeriesView' })
           <button
             v-if="!isDefaultSort"
             class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-destructive hover:bg-muted"
+            aria-label="Reset sort to default"
             @click="resetSort"
           >
             <X :size="13" />
@@ -380,6 +381,7 @@ defineOptions({ name: 'SeriesView' })
               ? 'border-primary text-primary bg-primary/10'
               : 'border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
           "
+          aria-label="Show series controls"
           @click="toggleMobileControls"
         >
           <SlidersHorizontal :size="14" />

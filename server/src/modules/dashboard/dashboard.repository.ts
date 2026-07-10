@@ -11,7 +11,7 @@ import { buildContentFilterClauses } from '../../common/utils/content-filter-sql
 type Db = NodePgDatabase<typeof schema>;
 type UpNextInSeriesRow = { id: number };
 const AUDIO_FORMATS = BOOK_FORMATS.filter(isAudioFormat);
-const CONTINUE_READING_EXCLUDED_READ_STATUSES = ['read', 'skimmed', 'abandoned'] as const satisfies readonly ReadStatus[];
+const CONTINUE_READING_EXCLUDED_READ_STATUSES = ['unread', 'read', 'skimmed', 'abandoned'] as const satisfies readonly ReadStatus[];
 const DISCOVERY_EXCLUDED_READ_STATUSES = ['reading', 'rereading', 'on_hold', 'read', 'skimmed', 'abandoned'] as const satisfies readonly ReadStatus[];
 
 @Injectable()

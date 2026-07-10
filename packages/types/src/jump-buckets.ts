@@ -22,6 +22,7 @@ export type JumpBucketsResponse = {
 const KIND_BY_PRIMARY_SORT_FIELD: Partial<Record<SortField, JumpBucketKind>> = {
   title: "letter",
   author: "letter",
+  publishedDate: "year",
   publishedYear: "year",
 };
 

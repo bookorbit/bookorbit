@@ -38,6 +38,11 @@ export class UserBookStatusService {
     let nextStartedAt = hasStartedAt ? (patch.startedAt ?? null) : (existing?.startedAt ?? null);
     let nextFinishedAt = hasFinishedAt ? (patch.finishedAt ?? null) : (existing?.finishedAt ?? null);
 
+    if (nextStatus === 'unread' || nextStatus === 'want_to_read') {
+      nextStartedAt = null;
+      nextFinishedAt = null;
+    }
+
     // When dates were not explicitly provided and would be null, seed from session history.
     // Explicit null patches (user clearing a date) are preserved as-is.
     // Mirror the same status guard used in repo.upsert(): unread/want_to_read always have null dates.
@@ -93,11 +98,12 @@ export class UserBookStatusService {
     await Promise.all(
       bookIds.map((bookId) => {
         const current = existingMap.get(bookId) ?? null;
+        const clearsLifecycle = status === 'unread' || status === 'want_to_read';
         return this.repo.upsertState(userId, bookId, {
           status,
           source: 'manual',
-          startedAt: current?.startedAt ?? null,
-          finishedAt: current?.finishedAt ?? null,
+          startedAt: clearsLifecycle ? null : (current?.startedAt ?? null),
+          finishedAt: clearsLifecycle ? null : (current?.finishedAt ?? null),
           updatedAt: now,
         });
       }),

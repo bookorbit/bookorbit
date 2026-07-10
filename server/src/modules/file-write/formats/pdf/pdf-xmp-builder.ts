@@ -51,8 +51,9 @@ export function buildXmp(payload: BookWritePayload, fieldMask: Set<BookWritePayl
   if (fieldMask.has('publisher') && payload.publisher != null) {
     lines.push(elem('dc:publisher', payload.publisher));
   }
-  if (fieldMask.has('publishedYear') && payload.publishedYear != null) {
-    lines.push(elem('dc:date', `${payload.publishedYear}-01-01`));
+  const publicationDate = resolvePublicationDate(payload, fieldMask);
+  if (publicationDate != null) {
+    lines.push(elem('dc:date', publicationDate));
   }
   if (fieldMask.has('language') && payload.language != null) {
     lines.push(elem('dc:language', payload.language));
@@ -121,3 +122,12 @@ export function buildXmp(payload: BookWritePayload, fieldMask: Set<BookWritePayl
 
 type ProviderIdKey = keyof typeof EPUB_PROVIDER_IDENTIFIER_SCHEMES;
 const PROVIDER_ID_KEYS = Object.keys(EPUB_PROVIDER_IDENTIFIER_SCHEMES) as ProviderIdKey[];
+
+function resolvePublicationDate(payload: BookWritePayload, fieldMask: Set<BookWritePayloadKey>): string | null {
+  if (fieldMask.has('publishedDate') && payload.publishedDate != null) return payload.publishedDate;
+  if (fieldMask.has('publishedYear')) {
+    if (payload.publishedDate != null) return payload.publishedDate;
+    if (payload.publishedYear != null) return `${payload.publishedYear}-01-01`;
+  }
+  return null;
+}
