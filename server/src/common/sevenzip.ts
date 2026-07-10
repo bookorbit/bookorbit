@@ -10,6 +10,8 @@ export interface SevenZipFS {
   readFile(path: string): Uint8Array;
   unlink(path: string): void;
   rmdir(path: string): void;
+  stat(path: string): { mode: number };
+  isDir(mode: number): boolean;
 }
 
 export interface SevenZipModule {

@@ -67,6 +67,7 @@ export const bookFiles = pgTable(
     role: varchar('role', { length: 20 }).notNull().default('content'),
     sortOrder: integer('sort_order'),
     durationSeconds: integer('duration_seconds'),
+    pageCount: integer('page_count'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .defaultNow()
@@ -92,6 +93,7 @@ export const bookFiles = pgTable(
     check('book_files_role_chk', sql`${t.role} in ('content', 'cover', 'metadata', 'supplement')`),
     check('book_files_size_bytes_nonnegative_chk', sql`${t.sizeBytes} is null or ${t.sizeBytes} >= 0`),
     check('book_files_duration_seconds_nonnegative_chk', sql`${t.durationSeconds} is null or ${t.durationSeconds} >= 0`),
+    check('book_files_page_count_nonnegative_chk', sql`${t.pageCount} is null or ${t.pageCount} >= 0`),
   ],
 );
 

@@ -1,4 +1,4 @@
-import { esc, xmlEl, xmlLink, fileMimeType } from '../opds-xml.helpers';
+import { esc, xmlEl, xmlLink, fileMimeType, isPseStreamableFormat, xmlPseStreamLink, OPDS_PSE_STREAM_REL } from '../opds-xml.helpers';
 
 describe('esc', () => {
   it('escapes all five XML special characters', () => {
@@ -81,6 +81,56 @@ describe('xmlLink', () => {
   it('escapes href', () => {
     const result = xmlLink('self', '/feed?a=1&b=2', 'text/xml');
     expect(result).toContain('href="/feed?a=1&amp;b=2"');
+  });
+});
+
+describe('isPseStreamableFormat', () => {
+  it.each(['cbz', 'cbr', 'cb7', 'pdf', 'CBZ'])('accepts %s', (format) => {
+    expect(isPseStreamableFormat(format)).toBe(true);
+  });
+
+  it('rejects epub (HTML/CSS, not paginated images)', () => {
+    expect(isPseStreamableFormat('epub')).toBe(false);
+  });
+
+  it.each(['mobi', 'azw3', 'fb2', 'unknown'])('rejects %s', (format) => {
+    expect(isPseStreamableFormat(format)).toBe(false);
+  });
+});
+
+describe('xmlPseStreamLink', () => {
+  it('uses the exact OPDS-PSE stream rel', () => {
+    const result = xmlPseStreamLink('/opds/1/image?fileId=2&pageNumber={pageNumber}', 'image/jpeg', 24);
+    expect(result).toContain(`rel="${OPDS_PSE_STREAM_REL}"`);
+    expect(OPDS_PSE_STREAM_REL).toBe('http://vaemendis.net/opds-pse/stream');
+  });
+
+  it('leaves the {pageNumber} template token unencoded', () => {
+    const result = xmlPseStreamLink('/opds/1/image?fileId=2&pageNumber={pageNumber}', 'image/jpeg', 24);
+    expect(result).toContain('pageNumber={pageNumber}');
+    expect(result).not.toContain('%7BpageNumber%7D');
+  });
+
+  it('includes pse:count', () => {
+    const result = xmlPseStreamLink('/href', 'image/jpeg', 42);
+    expect(result).toContain('pse:count="42"');
+  });
+
+  it('omits pse:lastRead/pse:lastReadDate when no progress exists', () => {
+    const result = xmlPseStreamLink('/href', 'image/jpeg', 42);
+    expect(result).not.toContain('pse:lastRead');
+  });
+
+  it('includes pse:lastRead and pse:lastReadDate (ISO 8601) when progress exists', () => {
+    const date = new Date('2026-01-15T10:30:00.000Z');
+    const result = xmlPseStreamLink('/href', 'image/jpeg', 42, { page: 7, date });
+    expect(result).toContain('pse:lastRead="7"');
+    expect(result).toContain('pse:lastReadDate="2026-01-15T10:30:00.000Z"');
+  });
+
+  it('escapes the href', () => {
+    const result = xmlPseStreamLink('/href?a=1&b=2', 'image/jpeg', 1);
+    expect(result).toContain('href="/href?a=1&amp;b=2"');
   });
 });
 

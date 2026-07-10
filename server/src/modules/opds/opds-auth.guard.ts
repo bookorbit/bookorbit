@@ -32,7 +32,7 @@ function stripQuery(url: string): string {
 }
 
 function isTokenImagePath(requestPath: string): boolean {
-  return /(?:^|\/)(?:api\/v1\/)?opds\/\d+\/(cover|thumbnail)$/.test(requestPath.replace(/^\//, ''));
+  return /(?:^|\/)(?:api\/v1\/)?opds\/\d+\/(cover|thumbnail|image)$/.test(requestPath.replace(/^\//, ''));
 }
 
 function parseCoverToken(token: string, secret: string): number | null {

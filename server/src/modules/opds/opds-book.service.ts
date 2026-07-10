@@ -14,6 +14,7 @@ import {
   books,
   collections,
   collectionBooks,
+  readingProgress,
   smartScopes,
   libraries,
   userBookStatus,
@@ -22,6 +23,8 @@ import {
 import { BookQueryBuilder } from '../book/book-query-builder.service';
 import type { ContentFilterRules, GroupRule } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
+import { OpdsPageCountService } from './opds-page-count.service';
+import { isPseStreamableFormat } from './opds-xml.helpers';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -104,7 +107,15 @@ export interface OpdsBookEntry {
   isbn13: string | null;
   hasCover: boolean;
   authors: string[];
-  files: { id: number; format: string }[];
+  files: OpdsBookFileEntry[];
+}
+
+export interface OpdsBookFileEntry {
+  id: number;
+  format: string;
+  pageCount: number | null;
+  lastReadPage: number | null;
+  lastReadDate: Date | null;
 }
 
 @Injectable()
@@ -112,6 +123,7 @@ export class OpdsBookService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly queryBuilder: BookQueryBuilder,
+    private readonly pageCountService: OpdsPageCountService,
   ) {}
 
   async getAccessibleLibraryIds(userId: number, isSuperuser = false): Promise<number[]> {
@@ -281,7 +293,7 @@ export class OpdsBookService {
       clauses.push(...buildContentFilterClauses(contentFilters, this.db));
     }
     const where = and(...clauses);
-    return this.paginatedBookQuery(where!, 'recent', page, size);
+    return this.paginatedBookQuery(where!, 'recent', page, size, userId);
   }
 
   async getRandomBooks(userId: number, count: number, isSuperuser = false, contentFilters?: ContentFilterRules): Promise<OpdsBookEntry[]> {
@@ -303,7 +315,7 @@ export class OpdsBookService {
 
     const ids = idRows.map((row) => row.id);
     if (ids.length === 0) return [];
-    return this.fetchBookEntries(ids);
+    return this.fetchBookEntries(ids, userId);
   }
 
   async getDistinctAuthors(userId: number, isSuperuser = false, contentFilters?: ContentFilterRules): Promise<{ name: string; bookCount: number }[]> {
@@ -463,11 +475,16 @@ export class OpdsBookService {
     }
   }
 
-  async getBookFiles(bookId: number, fileId?: number): Promise<{ absolutePath: string; format: string; title: string; authorName: string } | null> {
+  async getBookFiles(
+    bookId: number,
+    fileId?: number,
+  ): Promise<{ id: number; absolutePath: string; format: string; pageCount: number | null; title: string; authorName: string } | null> {
     const fileQuery = this.db
       .select({
+        id: bookFiles.id,
         absolutePath: bookFiles.absolutePath,
         format: bookFiles.format,
+        pageCount: bookFiles.pageCount,
         title: bookMetadata.title,
       })
       .from(bookFiles)
@@ -488,8 +505,10 @@ export class OpdsBookService {
       .limit(1);
 
     return {
+      id: file.id,
       absolutePath: file.absolutePath,
       format: file.format ?? 'unknown',
+      pageCount: file.pageCount,
       title: file.title ?? `book-${bookId}`,
       authorName: authorRow?.name ?? '',
     };
@@ -603,15 +622,16 @@ export class OpdsBookService {
 
     const entries = await this.fetchBookEntries(
       idRows.map((r) => r.id),
+      userId,
       options,
     );
     return { entries, total: Number(total) };
   }
 
-  private async fetchBookEntries(bookIds: number[], options: FetchBookEntriesOptions = {}): Promise<OpdsBookEntry[]> {
+  private async fetchBookEntries(bookIds: number[], userId?: number, options: FetchBookEntriesOptions = {}): Promise<OpdsBookEntry[]> {
     if (bookIds.length === 0) return [];
 
-    const [metaRows, authorRows, fileRows, contextSeriesRows] = await Promise.all([
+    const [metaRows, authorRows, fileRows, contextSeriesRows, progressRows] = await Promise.all([
       this.db
         .select({
           id: books.id,
@@ -638,12 +658,26 @@ export class OpdsBookService {
         .where(inArray(bookAuthors.bookId, bookIds))
         .orderBy(bookAuthors.displayOrder),
       this.db
-        .select({ bookId: books.id, id: bookFiles.id, format: bookFiles.format, role: bookFiles.role })
+        .select({
+          bookId: books.id,
+          id: bookFiles.id,
+          format: bookFiles.format,
+          role: bookFiles.role,
+          absolutePath: bookFiles.absolutePath,
+          pageCount: bookFiles.pageCount,
+        })
         .from(bookFiles)
         .innerJoin(books, eq(books.id, bookFiles.bookId))
         .where(and(inArray(bookFiles.bookId, bookIds), eq(bookFiles.role, 'content')))
         .orderBy(sql`case when ${bookFiles.id} = ${books.primaryFileId} then 0 else 1 end`, bookFiles.sortOrder, bookFiles.id),
       options.contextSeries ? this.fetchContextSeriesRows(bookIds, options.contextSeries) : Promise.resolve<ContextSeriesRow[]>([]),
+      userId !== undefined
+        ? this.db
+            .select({ bookFileId: readingProgress.bookFileId, pageNumber: readingProgress.pageNumber, updatedAt: readingProgress.updatedAt })
+            .from(readingProgress)
+            .innerJoin(bookFiles, eq(bookFiles.id, readingProgress.bookFileId))
+            .where(and(inArray(bookFiles.bookId, bookIds), eq(readingProgress.userId, userId)))
+        : Promise.resolve<{ bookFileId: number; pageNumber: number | null; updatedAt: Date }[]>([]),
     ]);
 
     const authorsByBook = new Map<number, string[]>();
@@ -653,13 +687,24 @@ export class OpdsBookService {
       authorsByBook.set(row.bookId, list);
     }
 
-    const filesByBook = new Map<number, { id: number; format: string }[]>();
+    const progressByFile = new Map(progressRows.filter((row) => row.pageNumber != null).map((row) => [row.bookFileId, row]));
+
+    const filesByBook = new Map<number, OpdsBookFileEntry[]>();
     for (const row of fileRows) {
       if (row.role !== 'content') continue;
+      const progress = progressByFile.get(row.id);
       const list = filesByBook.get(row.bookId) ?? [];
-      list.push({ id: row.id, format: row.format ?? 'unknown' });
+      list.push({
+        id: row.id,
+        format: row.format ?? 'unknown',
+        pageCount: row.pageCount,
+        lastReadPage: progress?.pageNumber ?? null,
+        lastReadDate: progress?.updatedAt ?? null,
+      });
       filesByBook.set(row.bookId, list);
     }
+
+    await this.fillMissingPageCounts(fileRows, filesByBook);
 
     const idOrder = new Map(bookIds.map((id, i) => [id, i]));
     const contextSeriesByBook = new Map(contextSeriesRows.map((row) => [row.bookId, row]));
@@ -686,6 +731,39 @@ export class OpdsBookService {
         };
       })
       .sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
+  }
+
+  /**
+   * PSE requires `pse:count` on every stream link. For files never rendered
+   * in a feed before, compute it now (once) and cache it on `bookFiles.pageCount`.
+   */
+  private async fillMissingPageCounts(
+    fileRows: { id: number; format: string | null; absolutePath: string; pageCount: number | null }[],
+    filesByBook: Map<number, OpdsBookFileEntry[]>,
+  ): Promise<void> {
+    const entriesById = new Map<number, OpdsBookFileEntry>();
+    for (const entries of filesByBook.values()) {
+      for (const entry of entries) entriesById.set(entry.id, entry);
+    }
+
+    const pending = fileRows.filter((row) => row.pageCount == null && row.format && isPseStreamableFormat(row.format));
+    if (pending.length === 0) return;
+
+    // A first-load feed can have dozens of uncached files at once; counting
+    // pages means reading whole archives off disk, so cap how many run at a
+    // time instead of firing every computation in parallel.
+    const concurrency = 5;
+    for (let index = 0; index < pending.length; index += concurrency) {
+      const chunk = pending.slice(index, index + concurrency);
+      await Promise.all(
+        chunk.map(async (row) => {
+          const count = await this.pageCountService.ensure({ id: row.id, format: row.format!, absolutePath: row.absolutePath, pageCount: null });
+          if (count == null) return;
+          const entry = entriesById.get(row.id);
+          if (entry) entry.pageCount = count;
+        }),
+      );
+    }
   }
 
   private resolveSeriesFilter(filters?: OpdsBookFilters): SeriesFilter | undefined {

@@ -8,7 +8,7 @@ type BookPageResult = { entries: unknown[]; total: number };
 type TestableOpdsBookService = {
   buildCatalogSearchClause(q: string): unknown;
   buildReadStatusClause(userId: number, status: 'unread' | 'reading' | 'finished'): unknown;
-  fetchBookEntries(bookIds: number[], options?: unknown): Promise<unknown[]>;
+  fetchBookEntries(bookIds: number[], userId?: number, options?: unknown): Promise<unknown[]>;
   getBooksBySmartScope(
     userId: number,
     smartScopeId: number,
@@ -57,8 +57,9 @@ function makeService(selectQueue: unknown[] = [], queryBuilderOverrides: Record<
     buildWhere: vi.fn().mockReturnValue(undefined),
     ...queryBuilderOverrides,
   };
-  const service = new OpdsBookService(db as never, queryBuilder as never);
-  return { service, db, queryBuilder };
+  const pageCountService = { ensure: vi.fn().mockResolvedValue(null) };
+  const service = new OpdsBookService(db as never, queryBuilder as never, pageCountService as never);
+  return { service, db, queryBuilder, pageCountService };
 }
 
 function collectValues(value: unknown, seen = new WeakSet<object>()): unknown[] {
@@ -176,7 +177,7 @@ describe('OpdsBookService', () => {
     accessSpy.mockResolvedValueOnce([1]);
     fetchSpy.mockResolvedValueOnce([{ id: 11 }, { id: 10 }]);
     await expect(service.getRandomBooks(7, 2)).resolves.toEqual([{ id: 11 }, { id: 10 }]);
-    expect(fetchSpy).toHaveBeenCalledWith([11, 10]);
+    expect(fetchSpy).toHaveBeenCalledWith([11, 10], 7);
 
     const chains = (db.select as ReturnType<typeof vi.fn>).mock.results.map((r) => r.value as Record<string, unknown>);
     const orderBy = chains.at(-1)!['orderBy'] as ReturnType<typeof vi.fn>;
@@ -228,13 +229,15 @@ describe('OpdsBookService', () => {
   });
 
   it('resolves getBookFiles with fallback formatting and title values', async () => {
-    const { service } = makeService([[], [{ absolutePath: '/books/a.epub', format: null, title: null }], []]);
+    const { service } = makeService([[], [{ id: 55, absolutePath: '/books/a.epub', format: null, pageCount: null, title: null }], []]);
 
     await expect(service.getBookFiles(7, 42)).resolves.toBeNull();
 
     await expect(service.getBookFiles(7)).resolves.toEqual({
+      id: 55,
       absolutePath: '/books/a.epub',
       format: 'unknown',
+      pageCount: null,
       title: 'book-7',
       authorName: '',
     });
@@ -298,7 +301,7 @@ describe('OpdsBookService', () => {
       entries: [{ id: 3 }, { id: 1 }],
       total: 2,
     });
-    expect(fetchSpy).toHaveBeenCalledWith([3, 1], {});
+    expect(fetchSpy).toHaveBeenCalledWith([3, 1], undefined, {});
   });
 
   it('builds read-status, format, and id filters and forwards the user id to pagination', async () => {
@@ -488,8 +491,8 @@ describe('OpdsBookService', () => {
         hasCover: true,
         authors: ['Author One'],
         files: [
-          { id: 10, format: 'epub' },
-          { id: 11, format: 'mobi' },
+          { id: 10, format: 'epub', pageCount: undefined, lastReadPage: null, lastReadDate: null },
+          { id: 11, format: 'mobi', pageCount: undefined, lastReadPage: null, lastReadDate: null },
         ],
       }),
       expect.objectContaining({
@@ -497,7 +500,7 @@ describe('OpdsBookService', () => {
         title: 'second',
         hasCover: false,
         authors: ['Author Two'],
-        files: [{ id: 20, format: 'unknown' }],
+        files: [{ id: 20, format: 'unknown', pageCount: undefined, lastReadPage: null, lastReadDate: null }],
       }),
     ]);
 
@@ -529,7 +532,7 @@ describe('OpdsBookService', () => {
       [{ bookId: 1, seriesId: 42, seriesName: 'Secondary Arc', seriesIndex: 3 }],
     ]);
 
-    await expect(testable(service).fetchBookEntries([1], { contextSeries: { seriesId: 42 } })).resolves.toEqual([
+    await expect(testable(service).fetchBookEntries([1], undefined, { contextSeries: { seriesId: 42 } })).resolves.toEqual([
       expect.objectContaining({
         id: 1,
         seriesId: 42,

@@ -330,6 +330,13 @@
       "when": 1783630311448,
       "tag": "0046_kobo-device-snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1783710380528,
+      "tag": "0047_opds-pse-page-count",
+      "breakpoints": true
     }
   ]
 }

@@ -1,13 +1,17 @@
 import { XMLParser } from 'fast-xml-parser';
 
 import { OpdsService } from '../opds.service';
-import type { OpdsBookEntry } from '../opds-book.service';
+import type { OpdsBookEntry, OpdsBookFileEntry } from '../opds-book.service';
 
 function makeService() {
   return new OpdsService();
 }
 
 const BASE = '/api/v1/opds';
+
+function pseFile(overrides: Partial<OpdsBookFileEntry> & Pick<OpdsBookFileEntry, 'id' | 'format'>): OpdsBookFileEntry {
+  return { pageCount: null, lastReadPage: null, lastReadDate: null, ...overrides };
+}
 
 function sampleBook(overrides?: Partial<OpdsBookEntry>): OpdsBookEntry {
   return {
@@ -25,7 +29,7 @@ function sampleBook(overrides?: Partial<OpdsBookEntry>): OpdsBookEntry {
     isbn13: '9780765311788',
     hasCover: true,
     authors: ['Brandon Sanderson'],
-    files: [{ id: 10, format: 'epub' }],
+    files: [pseFile({ id: 10, format: 'epub' })],
     ...overrides,
   };
 }
@@ -311,10 +315,7 @@ describe('OpdsService', () => {
     it('handles multiple file formats per book', () => {
       const service = makeService();
       const book = sampleBook({
-        files: [
-          { id: 10, format: 'epub' },
-          { id: 11, format: 'pdf' },
-        ],
+        files: [pseFile({ id: 10, format: 'epub' }), pseFile({ id: 11, format: 'pdf', pageCount: 24 })],
       });
       const xml = service.generateAcquisitionFeed(
         'Catalog',
@@ -331,6 +332,67 @@ describe('OpdsService', () => {
       expect(xml).toContain('application/pdf');
       expect(xml).toContain('fileId=10');
       expect(xml).toContain('fileId=11');
+    });
+  });
+
+  describe('OPDS-PSE', () => {
+    it('declares the pse namespace on every feed', () => {
+      const service = makeService();
+      const xml = service.generateAcquisitionFeed('Catalog', 'urn:bookorbit:catalog', [], 0, 1, 50, `${BASE}/catalog`, 'test-token');
+      expect(xml).toContain('xmlns:pse="http://vaemendis.net/opds-pse/ns"');
+    });
+
+    it('emits a pse:stream link for a streamable format with a known page count', () => {
+      const service = makeService();
+      const book = sampleBook({ files: [pseFile({ id: 10, format: 'cbz', pageCount: 24 })] });
+      const xml = service.generateAcquisitionFeed('Catalog', 'urn:bookorbit:catalog', [book], 1, 1, 50, `${BASE}/catalog`, 'test-token');
+
+      expect(xml).toContain('rel="http://vaemendis.net/opds-pse/stream"');
+      expect(xml).toContain('pse:count="24"');
+      expect(xml).toContain(`href="${BASE}/1/image?fileId=10&amp;pageNumber={pageNumber}&amp;t=test-token"`);
+    });
+
+    it('omits the pse:stream link for epub (not paginated images)', () => {
+      const service = makeService();
+      const book = sampleBook({ files: [pseFile({ id: 10, format: 'epub', pageCount: 300 })] });
+      const xml = service.generateAcquisitionFeed('Catalog', 'urn:bookorbit:catalog', [book], 1, 1, 50, `${BASE}/catalog`, 'test-token');
+
+      expect(xml).not.toContain('opds-pse/stream');
+    });
+
+    it('omits the pse:stream link when the page count is not yet known', () => {
+      const service = makeService();
+      const book = sampleBook({ files: [pseFile({ id: 10, format: 'cbz', pageCount: null })] });
+      const xml = service.generateAcquisitionFeed('Catalog', 'urn:bookorbit:catalog', [book], 1, 1, 50, `${BASE}/catalog`, 'test-token');
+
+      expect(xml).not.toContain('opds-pse/stream');
+    });
+
+    it('includes pse:lastRead/pse:lastReadDate only when progress exists, converted to 1-based numbering', () => {
+      const service = makeService();
+      const date = new Date('2026-02-01T00:00:00.000Z');
+      const withProgress = sampleBook({
+        id: 1,
+        files: [pseFile({ id: 10, format: 'pdf', pageCount: 100, lastReadPage: 12, lastReadDate: date })],
+      });
+      const withoutProgress = sampleBook({ id: 2, files: [pseFile({ id: 11, format: 'pdf', pageCount: 100 })] });
+
+      const xml = service.generateAcquisitionFeed(
+        'Catalog',
+        'urn:bookorbit:catalog',
+        [withProgress, withoutProgress],
+        2,
+        1,
+        50,
+        `${BASE}/catalog`,
+        'test-token',
+      );
+
+      expect(xml).toContain('pse:lastRead="13"');
+      expect(xml).toContain('pse:lastReadDate="2026-02-01T00:00:00.000Z"');
+
+      const secondLinkIndex = xml.indexOf('fileId=11');
+      expect(xml.slice(secondLinkIndex, secondLinkIndex + 80)).not.toContain('pse:lastRead');
     });
   });
 
@@ -377,7 +439,7 @@ describe('OpdsService', () => {
         description: 'How AI was built',
         seriesName: null,
         seriesIndex: null,
-        files: [{ id: 9001, format: 'epub' }],
+        files: [pseFile({ id: 9001, format: 'epub' })],
       });
       const children = sampleBook({
         id: 500,
@@ -385,7 +447,7 @@ describe('OpdsService', () => {
         description: 'Book three of the Dune\u0000 Chronicles',
         seriesName: null,
         seriesIndex: null,
-        files: [{ id: 9000, format: 'epub' }],
+        files: [pseFile({ id: 9000, format: 'epub' })],
       });
 
       const xml = service.generateAcquisitionFeed(

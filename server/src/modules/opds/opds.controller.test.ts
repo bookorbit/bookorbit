@@ -9,7 +9,7 @@ vi.mock('fs/promises', () => ({
 
 import { createReadStream } from 'fs';
 import { readdir, stat } from 'fs/promises';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import type { MockedFunction } from 'vitest';
 
 import { OpdsController } from './opds.controller';
@@ -43,23 +43,35 @@ function makeController() {
     getRandomBooks: vi.fn().mockResolvedValue([{ id: 3 }]),
     validateBookAccess: vi.fn().mockResolvedValue(undefined),
     getBookFiles: vi.fn().mockResolvedValue({
+      id: 99,
       absolutePath: '/books/library/book.epub',
       format: 'epub',
+      pageCount: null,
       title: 'Book Title',
       authorName: 'Author Name',
     }),
   } as never;
+  const opdsPageStreamService = {
+    streamPage: vi.fn(),
+    invalidateCache: vi.fn().mockResolvedValue(undefined),
+  } as never;
+  const userService = {
+    findByIdWithPermissions: vi.fn(),
+  } as never;
+  const bookService = {
+    saveProgress: vi.fn().mockResolvedValue(undefined),
+    resolveDownloadFilename: vi.fn().mockResolvedValue('BadTitle - Author.epub'),
+  } as never;
   const config = {
     get: vi.fn().mockReturnValue('/books'),
   } as never;
-  const bookService = {
-    resolveDownloadFilename: vi.fn().mockResolvedValue('BadTitle - Author.epub'),
-  } as never;
 
   return {
-    controller: new OpdsController(opdsService, opdsBookService, config, bookService),
+    controller: new OpdsController(opdsService, opdsBookService, opdsPageStreamService, userService, bookService, config),
     opdsService,
     opdsBookService,
+    opdsPageStreamService,
+    userService,
     bookService,
   };
 }
@@ -356,5 +368,89 @@ describe('OpdsController', () => {
     opdsBookService.getBookFiles.mockResolvedValue(null);
 
     await expect(controller.download(88, 77, { userId: 2, isSuperuser: false } as never, makeReply())).rejects.toThrow(NotFoundException);
+  });
+
+  describe('image (OPDS-PSE streaming)', () => {
+    const opdsUser = { userId: 2, isSuperuser: false, contentFilters: undefined } as never;
+    const fullUser = { id: 2, username: 'reader' };
+
+    it('rejects negative page numbers before any lookup', async () => {
+      const { controller, opdsBookService } = makeController();
+      await expect(controller.image(1, 10, -1, true, opdsUser, makeReply())).rejects.toThrow(BadRequestException);
+      expect(opdsBookService.validateBookAccess).not.toHaveBeenCalled();
+    });
+
+    it('throws UnauthorizedException when the OPDS user has no matching account, without streaming or saving progress', async () => {
+      const { controller, opdsBookService, opdsPageStreamService, userService, bookService } = makeController();
+      opdsBookService.getBookFiles.mockResolvedValue({ id: 10, absolutePath: '/a.cbz', format: 'cbz', pageCount: 20, title: 't', authorName: 'a' });
+      userService.findByIdWithPermissions.mockResolvedValue(null);
+
+      await expect(controller.image(1, 10, 0, true, opdsUser, makeReply())).rejects.toThrow(UnauthorizedException);
+      expect(opdsPageStreamService.streamPage).not.toHaveBeenCalled();
+      expect(bookService.saveProgress).not.toHaveBeenCalled();
+    });
+
+    it('streams the page, saves progress, and sets long-lived cache headers', async () => {
+      const { controller, opdsBookService, opdsPageStreamService, userService, bookService } = makeController();
+      const stream = { kind: 'page-stream' };
+      opdsBookService.getBookFiles.mockResolvedValue({ id: 10, absolutePath: '/a.cbz', format: 'cbz', pageCount: 20, title: 't', authorName: 'a' });
+      userService.findByIdWithPermissions.mockResolvedValue(fullUser);
+      opdsPageStreamService.streamPage.mockResolvedValue({ stream, mimeType: 'image/jpeg', totalPages: 20 });
+      const reply = makeReply();
+
+      await controller.image(1, 10, 4, true, opdsUser, reply);
+
+      expect(opdsBookService.validateBookAccess).toHaveBeenCalledWith(1, 2, false, undefined);
+      expect(opdsPageStreamService.streamPage).toHaveBeenCalledWith(expect.objectContaining({ id: 10, format: 'cbz' }), 4, fullUser);
+      expect(bookService.saveProgress).toHaveBeenCalledWith(2, 10, { pageNumber: 4, percentage: 25 }, fullUser);
+      expect(reply.header).toHaveBeenCalledWith('Cache-Control', 'private, max-age=31536000, immutable');
+      expect(reply.type).toHaveBeenCalledWith('image/jpeg');
+      expect(reply.send).toHaveBeenCalledWith(stream);
+    });
+
+    it('does not save progress when saveProgress=false', async () => {
+      const { controller, opdsBookService, opdsPageStreamService, userService, bookService } = makeController();
+      opdsBookService.getBookFiles.mockResolvedValue({ id: 10, absolutePath: '/a.cbz', format: 'cbz', pageCount: 20, title: 't', authorName: 'a' });
+      userService.findByIdWithPermissions.mockResolvedValue(fullUser);
+      opdsPageStreamService.streamPage.mockResolvedValue({ stream: {}, mimeType: 'image/jpeg', totalPages: 20 });
+
+      await controller.image(1, 10, 0, false, opdsUser, makeReply());
+
+      expect(bookService.saveProgress).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when the file does not exist', async () => {
+      const { controller, opdsBookService } = makeController();
+      opdsBookService.getBookFiles.mockResolvedValue(null);
+
+      await expect(controller.image(1, 10, 0, true, opdsUser, makeReply())).rejects.toThrow(NotFoundException);
+    });
+
+    it('invalidates the page cache and rethrows when streaming fails', async () => {
+      const { controller, opdsBookService, opdsPageStreamService, userService } = makeController();
+      const file = { id: 10, absolutePath: '/a.cbz', format: 'cbz', pageCount: 20, title: 't', authorName: 'a' };
+      opdsBookService.getBookFiles.mockResolvedValue(file);
+      userService.findByIdWithPermissions.mockResolvedValue(fullUser);
+      const failure = new BadRequestException('pageNumber out of range');
+      opdsPageStreamService.streamPage.mockRejectedValue(failure);
+
+      await expect(controller.image(1, 10, 999, true, opdsUser, makeReply())).rejects.toThrow(failure);
+      expect(opdsPageStreamService.invalidateCache).toHaveBeenCalledWith(expect.objectContaining({ id: 10 }));
+    });
+
+    it('sends the page and does not invalidate the cache when saveProgress fails after streaming', async () => {
+      const { controller, opdsBookService, opdsPageStreamService, userService, bookService } = makeController();
+      const stream = { kind: 'page-stream' };
+      opdsBookService.getBookFiles.mockResolvedValue({ id: 10, absolutePath: '/a.cbz', format: 'cbz', pageCount: 20, title: 't', authorName: 'a' });
+      userService.findByIdWithPermissions.mockResolvedValue(fullUser);
+      opdsPageStreamService.streamPage.mockResolvedValue({ stream, mimeType: 'image/jpeg', totalPages: 20 });
+      bookService.saveProgress.mockRejectedValue(new Error('db unavailable'));
+      const reply = makeReply();
+
+      await expect(controller.image(1, 10, 4, true, opdsUser, reply)).resolves.toBeUndefined();
+
+      expect(reply.send).toHaveBeenCalledWith(stream);
+      expect(opdsPageStreamService.invalidateCache).not.toHaveBeenCalled();
+    });
   });
 });
