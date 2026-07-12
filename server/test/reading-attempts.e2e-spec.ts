@@ -284,6 +284,7 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
       1,
       98,
       false,
+      1,
     );
     await kobo.upsertState(
       adminUserId,
@@ -296,6 +297,7 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
       1,
       98,
       false,
+      1,
     );
     const history = await listAttempts(book.bookId);
     expect(history.total).toBe(2);

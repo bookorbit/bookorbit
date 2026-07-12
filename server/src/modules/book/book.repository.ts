@@ -1687,6 +1687,7 @@ export class BookRepository {
       WHERE snap.id = sb.snapshot_id
         AND snap.user_id = ${userId}
         AND sb.book_id = ${bookId}
+        AND sb.synced = true
         AND sb.pending_delete = false
         AND sb.removed_by_device = false
     `);

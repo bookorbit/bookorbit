@@ -20,6 +20,7 @@ import {
 
 type KoboDevice = { id: number; token: string };
 type SyncResponse = { entries: unknown[]; hasMore: boolean; syncToken: string };
+type NewEntitlement = { BookEntitlement: { Id: string }; ReadingState: Record<string, unknown> };
 
 const MIGRATIONS_DIRECTORY = join(dirname(fileURLToPath(import.meta.url)), '../src/db/migrations');
 
@@ -46,6 +47,20 @@ function newEntitlementIds(entries: unknown[]): string[] {
     const value = entry as Record<string, Record<string, Record<string, string>>>;
     const bookEntitlement = value.NewEntitlement?.BookEntitlement;
     return bookEntitlement?.Id ? [bookEntitlement.Id] : [];
+  });
+}
+
+function newEntitlements(entries: unknown[]): NewEntitlement[] {
+  return entries.flatMap((entry) => {
+    const value = entry as { NewEntitlement?: NewEntitlement };
+    return value.NewEntitlement ? [value.NewEntitlement] : [];
+  });
+}
+
+function changedReadingStates(entries: unknown[]): Record<string, unknown>[] {
+  return entries.flatMap((entry) => {
+    const value = entry as { ChangedReadingState?: { ReadingState: Record<string, unknown> } };
+    return value.ChangedReadingState ? [value.ChangedReadingState.ReadingState] : [];
   });
 }
 
@@ -191,6 +206,27 @@ describe('Kobo multi-device library sync (e2e)', { timeout: 180_000 }, () => {
     return body;
   }
 
+  async function putReadingState(device: KoboDevice, entitlementId: string, readingState: Record<string, unknown>): Promise<void> {
+    const response = await ctx.app.inject({
+      method: 'PUT',
+      url: `/api/v1/kobo/${device.token}/v1/library/${entitlementId}/state`,
+      payload: { ReadingStates: [readingState] },
+    });
+    expect(response.statusCode).toBe(200);
+  }
+
+  async function snapshotState(bookId: number): Promise<Array<{ deviceId: number; synced: boolean; isNew: boolean }>> {
+    return ctx.db
+      .select({
+        deviceId: schema.koboLibrarySnapshots.deviceId,
+        synced: schema.koboSnapshotBooks.synced,
+        isNew: schema.koboSnapshotBooks.isNew,
+      })
+      .from(schema.koboSnapshotBooks)
+      .innerJoin(schema.koboLibrarySnapshots, eq(schema.koboLibrarySnapshots.id, schema.koboSnapshotBooks.snapshotId))
+      .where(and(eq(schema.koboLibrarySnapshots.userId, userId), eq(schema.koboSnapshotBooks.bookId, bookId)));
+  }
+
   beforeAll(async () => {
     ctx = await createReaderStateIsolationE2EContext();
     library = await createLibraryWithFolder(ctx, { name: `kobo-multi-device-${randomUUID()}` });
@@ -234,6 +270,46 @@ describe('Kobo multi-device library sync (e2e)', { timeout: 180_000 }, () => {
     if (ctx) await closeReaderStateIsolationE2EContext(ctx);
   });
 
+  it('finishes pagination when Kobo echoes first-page reading states before requesting the next page', async () => {
+    const settingsResponse = await ctx.app.inject({
+      method: 'PATCH',
+      url: '/api/v1/kobo/settings',
+      headers: authHeader(ctx.adminToken),
+      payload: { twoWayProgressSync: true },
+    });
+    expect(settingsResponse.statusCode).toBe(200);
+
+    const echoDevice = await createDevice('Kobo pagination echo');
+    const first = await sync(echoDevice);
+    const firstEntitlements = newEntitlements(first.entries);
+    expect(first.hasMore).toBe(true);
+    expect(firstEntitlements).toHaveLength(5);
+
+    for (const entitlement of firstEntitlements) {
+      await putReadingState(echoDevice, entitlement.BookEntitlement.Id, entitlement.ReadingState);
+    }
+
+    const second = await sync(echoDevice, first.syncToken);
+    const firstIds = entitlementIds(first.entries);
+    const secondIds = entitlementIds(second.entries);
+    const expectedIdentityRows = await ctx.db
+      .select({ entitlementId: schema.koboBookEntitlements.entitlementId })
+      .from(schema.koboBookEntitlements)
+      .where(and(eq(schema.koboBookEntitlements.userId, userId), inArray(schema.koboBookEntitlements.bookId, bookIds)));
+
+    expect(second.hasMore).toBe(false);
+    expect(secondIds).toHaveLength(1);
+    expect(secondIds.some((id) => firstIds.includes(id))).toBe(false);
+    expect([...firstIds, ...secondIds].sort()).toEqual(expectedIdentityRows.map((row) => row.entitlementId).sort());
+
+    const revokeResponse = await ctx.app.inject({
+      method: 'DELETE',
+      url: `/api/v1/kobo/devices/${echoDevice.id}`,
+      headers: authHeader(ctx.adminToken),
+    });
+    expect(revokeResponse.statusCode).toBe(204);
+  });
+
   it('delivers every initial page independently when two devices interleave', async () => {
     const aFirst = await sync(deviceA);
     const bFirst = await sync(deviceB);
@@ -243,9 +319,28 @@ describe('Kobo multi-device library sync (e2e)', { timeout: 180_000 }, () => {
     expect(entitlementIds(bFirst.entries)).toHaveLength(5);
 
     const aSecond = await sync(deviceA, aFirst.syncToken);
-    const bSecond = await sync(deviceB, bFirst.syncToken);
     expect(aSecond.hasMore).toBe(false);
+    const [remainingEntitlementId] = entitlementIds(aSecond.entries);
+    const [remainingIdentity] = await ctx.db
+      .select({ bookId: schema.koboBookEntitlements.bookId })
+      .from(schema.koboBookEntitlements)
+      .where(and(eq(schema.koboBookEntitlements.userId, userId), eq(schema.koboBookEntitlements.entitlementId, remainingEntitlementId!)));
+    await putReadingState(deviceA, remainingEntitlementId!, {
+      EntitlementId: remainingEntitlementId,
+      LastModified: '2026-11-01T00:00:00.000Z',
+      CurrentBookmark: { LastModified: '2026-11-01T00:00:00.000Z', ProgressPercent: 15 },
+      StatusInfo: { LastModified: '2026-11-01T00:00:00.000Z', Status: 'Reading' },
+    });
+    expect(await snapshotState(remainingIdentity!.bookId)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ deviceId: deviceA.id, synced: true }),
+        expect.objectContaining({ deviceId: deviceB.id, synced: false, isNew: true }),
+      ]),
+    );
+
+    const bSecond = await sync(deviceB, bFirst.syncToken);
     expect(bSecond.hasMore).toBe(false);
+    expect(newEntitlementIds(bSecond.entries)).toContain(remainingEntitlementId);
 
     const expectedIds = await ctx.db
       .select({ entitlementId: schema.koboBookEntitlements.entitlementId })
@@ -272,6 +367,47 @@ describe('Kobo multi-device library sync (e2e)', { timeout: 180_000 }, () => {
       );
     expect(rows).toHaveLength(12);
     expect(rows.every((row) => row.synced)).toBe(true);
+  });
+
+  it('fans genuine state changes to other devices without reopening either device on echo', async () => {
+    const targetBookId = bookIds[0]!;
+    const [identity] = await ctx.db
+      .select({ entitlementId: schema.koboBookEntitlements.entitlementId })
+      .from(schema.koboBookEntitlements)
+      .where(and(eq(schema.koboBookEntitlements.userId, userId), eq(schema.koboBookEntitlements.bookId, targetBookId)));
+    const readingState = {
+      EntitlementId: identity!.entitlementId,
+      LastModified: '2026-12-01T00:00:00.000Z',
+      PriorityTimestamp: '2026-12-01T00:00:00.000Z',
+      CurrentBookmark: { LastModified: '2026-12-01T00:00:00.000Z', ProgressPercent: 42 },
+      Statistics: { LastModified: '2026-12-01T00:00:00.000Z', SpentReadingMinutes: 12 },
+      StatusInfo: { LastModified: '2026-12-01T00:00:00.000Z', Status: 'Reading' },
+    };
+
+    await putReadingState(deviceA, identity!.entitlementId, readingState);
+
+    expect(await snapshotState(targetBookId)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ deviceId: deviceA.id, synced: true }),
+        expect.objectContaining({ deviceId: deviceB.id, synced: false, isNew: false }),
+      ]),
+    );
+
+    const sourceAfterOwnUpdate = await sync(deviceA);
+    expect(entitlementIds(sourceAfterOwnUpdate.entries)).toEqual([]);
+
+    const deliveredToB = await sync(deviceB);
+    const deliveredStates = changedReadingStates(deliveredToB.entries);
+    expect(entitlementIds(deliveredToB.entries)).toEqual([identity!.entitlementId]);
+    expect(deliveredStates).toHaveLength(1);
+    expect(deliveredStates[0]).toEqual(expect.objectContaining({ CurrentBookmark: expect.objectContaining({ ProgressPercent: 42 }) }));
+    expect((await snapshotState(targetBookId)).every((row) => row.synced)).toBe(true);
+
+    await putReadingState(deviceB, identity!.entitlementId, deliveredStates[0]!);
+
+    expect((await snapshotState(targetBookId)).every((row) => row.synced)).toBe(true);
+    const sourceAfterEcho = await sync(deviceA);
+    expect(entitlementIds(sourceAfterEcho.entries)).toEqual([]);
   });
 
   it('fans metadata and delivery changes out to every device independently', async () => {

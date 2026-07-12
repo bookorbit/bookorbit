@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -22,6 +23,9 @@ function mergeSubObject(incoming: JsonObj | null | undefined, existing: JsonObj 
   const a = incoming.LastModified as string | undefined;
   const b = existing.LastModified as string | undefined;
   if (!a || !b) return incoming;
+  const aMs = new Date(a).getTime();
+  const bMs = new Date(b).getTime();
+  if (!Number.isNaN(aMs) && !Number.isNaN(bMs)) return aMs >= bMs ? incoming : existing;
   return a >= b ? incoming : existing;
 }
 
@@ -66,6 +70,7 @@ export class KoboReadingStateService {
     readingThreshold: number,
     finishedThreshold: number,
     twoWayProgressSync: boolean,
+    sourceDeviceId: number,
   ) {
     const now = new Date().toISOString();
 
@@ -108,17 +113,22 @@ export class KoboReadingStateService {
     const previousBookmark = this.asJsonObj(existing?.currentBookmark ?? null);
     const previousStatus = this.asJsonObj(existing?.statusInfo ?? null);
     const previousPercent = this.extractPercent(previousBookmark);
-    const incomingPercent = this.extractPercent(incomingBookmark);
     const previousTimesStarted = typeof previousStatus?.TimesStartedReading === 'number' ? previousStatus.TimesStartedReading : null;
-    const incomingTimesStarted = typeof incomingStatus?.TimesStartedReading === 'number' ? incomingStatus.TimesStartedReading : null;
-    const strongRereadEvidence =
-      (incomingStatus?.Status === 'Reading' && previousStatus?.Status !== 'Reading') ||
-      (incomingTimesStarted !== null && previousTimesStarted !== null && incomingTimesStarted > previousTimesStarted) ||
-      (incomingPercent !== null && previousPercent !== null && previousPercent - incomingPercent >= 10);
 
     const mergedBookmark = mergeSubObject(incomingBookmark, existing?.currentBookmark as JsonObj | null);
     const mergedStats = mergeSubObject(incomingStats, existing?.statistics as JsonObj | null);
     const mergedStatus = mergeSubObject(incomingStatus, existing?.statusInfo as JsonObj | null);
+    const bookmarkChanged = !isDeepStrictEqual(mergedBookmark, previousBookmark);
+    const statisticsChanged = !isDeepStrictEqual(mergedStats, this.asJsonObj(existing?.statistics ?? null));
+    const statusChanged = !isDeepStrictEqual(mergedStatus, previousStatus);
+    const stateChanged = bookmarkChanged || statisticsChanged || statusChanged;
+
+    const mergedPercent = this.extractPercent(mergedBookmark);
+    const mergedTimesStarted = typeof mergedStatus?.TimesStartedReading === 'number' ? mergedStatus.TimesStartedReading : null;
+    const strongRereadEvidence =
+      (mergedStatus?.Status === 'Reading' && previousStatus?.Status !== 'Reading') ||
+      (mergedTimesStarted !== null && previousTimesStarted !== null && mergedTimesStarted > previousTimesStarted) ||
+      (mergedPercent !== null && previousPercent !== null && previousPercent - mergedPercent >= 10);
 
     const bookmarkModified = typeof mergedBookmark?.LastModified === 'string' ? mergedBookmark.LastModified : undefined;
     const effectiveLastModified = maxIsoTimestamp(lastModified, existing?.lastModifiedKobo, bookmarkModified) ?? lastModified;
@@ -150,8 +160,7 @@ export class KoboReadingStateService {
         },
       });
 
-    const percent = this.extractPercent(mergedBookmark);
-    if (percent !== null) {
+    if (bookmarkChanged && mergedPercent !== null) {
       const locationSource = this.extractKoboLocationSource(mergedBookmark);
       const locationType = this.extractKoboLocationType(mergedBookmark);
       const locationValue = this.extractKoboLocationValue(mergedBookmark);
@@ -166,7 +175,7 @@ export class KoboReadingStateService {
       await this.syncPercentToInternalProgress(
         userId,
         bookId,
-        percent,
+        mergedPercent,
         this.extractProgressModifiedAt(mergedBookmark, lastModified),
         locationSource,
         locationType,
@@ -174,17 +183,24 @@ export class KoboReadingStateService {
         this.extractContentSourceProgressPercent(mergedBookmark),
         precise,
       );
-      if (twoWayProgressSync) {
-        await this.markSnapshotBookUnsynced(userId, bookId);
-      }
-      await this.autoUpdateReadStatus(userId, bookId, percent, readingThreshold, finishedThreshold, {
+    }
+
+    if (twoWayProgressSync && stateChanged && mergedPercent !== null) {
+      await this.markSnapshotBookUnsyncedForOtherDevices(userId, bookId, sourceDeviceId);
+    }
+
+    if ((bookmarkChanged || statusChanged) && mergedPercent !== null) {
+      await this.autoUpdateReadStatus(userId, bookId, mergedPercent, readingThreshold, finishedThreshold, {
         occurredOn: effectiveLastModified.slice(0, 10),
         strongRereadEvidence,
       });
+    }
+
+    if (bookmarkChanged && mergedPercent !== null) {
       this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, {
         userId,
         bookId,
-        progress: percent,
+        progress: mergedPercent,
         source: 'kobo',
       });
     }
@@ -457,7 +473,7 @@ export class KoboReadingStateService {
       });
   }
 
-  private async markSnapshotBookUnsynced(userId: number, bookId: number): Promise<void> {
+  private async markSnapshotBookUnsyncedForOtherDevices(userId: number, bookId: number, sourceDeviceId: number): Promise<void> {
     await this.db.execute(sql`
       UPDATE ${schema.koboSnapshotBooks} AS sb
       SET synced = false,
@@ -465,7 +481,9 @@ export class KoboReadingStateService {
       FROM ${schema.koboLibrarySnapshots} AS snap
       WHERE snap.id = sb.snapshot_id
         AND snap.user_id = ${userId}
+        AND snap.device_id <> ${sourceDeviceId}
         AND sb.book_id = ${bookId}
+        AND sb.synced = true
         AND sb.pending_delete = false
         AND sb.removed_by_device = false
     `);

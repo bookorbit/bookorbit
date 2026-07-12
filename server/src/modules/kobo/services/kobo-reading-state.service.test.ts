@@ -75,7 +75,7 @@ describe('KoboReadingStateService', () => {
     const db = makeDb();
     db.query.books.findFirst.mockResolvedValue(null);
 
-    await expect(makeService(db).upsertState(7, 99, {}, 1, 99, false)).resolves.toEqual({
+    await expect(makeService(db).upsertState(7, 99, {}, 1, 99, false, 70)).resolves.toEqual({
       RequestResult: 'Success',
       UpdateResults: [
         {
@@ -122,6 +122,7 @@ describe('KoboReadingStateService', () => {
       1,
       99,
       false,
+      30,
     );
 
     expect(stateInsert.values).toHaveBeenCalledWith(
@@ -182,6 +183,7 @@ describe('KoboReadingStateService', () => {
       1,
       99,
       false,
+      30,
     );
 
     expect(stateInsert.values).toHaveBeenCalledWith(
@@ -199,6 +201,105 @@ describe('KoboReadingStateService', () => {
         }),
       }),
     );
+    expect(db.select).not.toHaveBeenCalled();
+    expect(db.execute).not.toHaveBeenCalled();
+    expect(userBookStatusService.autoUpdate).not.toHaveBeenCalled();
+    expect(achievementEvents.emit).not.toHaveBeenCalled();
+  });
+
+  it('does not propagate or repeat side effects for an identical device echo', async () => {
+    const db = makeDb();
+    const stateInsert = makeInsertChain();
+    const bookmark = { LastModified: '2026-01-02T00:00:00.000Z', ProgressPercent: 42 };
+    const statistics = { LastModified: '2026-01-02T00:00:00.000Z', SpentReadingMinutes: 5 };
+    const statusInfo = { LastModified: '2026-01-02T00:00:00.000Z', Status: 'Reading' };
+    db.insert.mockReturnValue(stateInsert);
+    db.query.books.findFirst.mockResolvedValue({ id: 12 });
+    db.query.koboReadingStates.findFirst
+      .mockResolvedValueOnce({
+        entitlementId: 'entitlement-12',
+        createdAtKobo: '2026-01-01T00:00:00.000Z',
+        lastModifiedKobo: '2026-01-02T00:00:00.000Z',
+        priorityTimestamp: '2026-01-02T00:00:00.000Z',
+        currentBookmark: bookmark,
+        statistics,
+        statusInfo,
+      })
+      .mockResolvedValueOnce({
+        entitlementId: 'entitlement-12',
+        createdAtKobo: '2026-01-01T00:00:00.000Z',
+        lastModifiedKobo: '2026-01-02T00:00:00.000Z',
+        priorityTimestamp: '2026-01-02T00:00:00.000Z',
+        currentBookmark: bookmark,
+        statistics,
+        statusInfo,
+      });
+
+    await makeService(db).upsertState(
+      3,
+      12,
+      {
+        LastModified: '2026-01-02T00:00:00.000Z',
+        PriorityTimestamp: '2026-01-02T00:00:00.000Z',
+        CurrentBookmark: { ...bookmark },
+        Statistics: { ...statistics },
+        StatusInfo: { ...statusInfo },
+      },
+      1,
+      99,
+      true,
+      30,
+    );
+
+    expect(db.execute).not.toHaveBeenCalled();
+    expect(db.select).not.toHaveBeenCalled();
+    expect(progressBridge.koboBookmarkToCanonical).not.toHaveBeenCalled();
+    expect(userBookStatusService.autoUpdate).not.toHaveBeenCalled();
+    expect(achievementEvents.emit).not.toHaveBeenCalled();
+  });
+
+  it('does not propagate a stale lower-progress echo or treat it as reread evidence', async () => {
+    const db = makeDb();
+    const stateInsert = makeInsertChain();
+    const currentBookmark = { LastModified: '2026-01-02T00:00:00.000Z', ProgressPercent: 84.94 };
+    const currentStatus = { LastModified: '2026-01-02T00:00:00.000Z', Status: 'Reading', TimesStartedReading: 2 };
+    db.insert.mockReturnValue(stateInsert);
+    db.query.books.findFirst.mockResolvedValue({ id: 12 });
+    db.query.koboReadingStates.findFirst
+      .mockResolvedValueOnce({
+        entitlementId: 'entitlement-12',
+        lastModifiedKobo: '2026-01-02T00:00:00.000Z',
+        priorityTimestamp: '2026-01-02T00:00:00.000Z',
+        currentBookmark,
+        statistics: null,
+        statusInfo: currentStatus,
+      })
+      .mockResolvedValueOnce({
+        entitlementId: 'entitlement-12',
+        currentBookmark,
+        statistics: null,
+        statusInfo: currentStatus,
+      });
+
+    await makeService(db).upsertState(
+      3,
+      12,
+      {
+        LastModified: '2026-01-01T00:00:00.000Z',
+        CurrentBookmark: { LastModified: '2026-01-01T00:00:00.000Z', ProgressPercent: 21 },
+        StatusInfo: { LastModified: '2026-01-01T00:00:00.000Z', Status: 'Reading', TimesStartedReading: 1 },
+      },
+      1,
+      99,
+      true,
+      30,
+    );
+
+    expect(stateInsert.values).toHaveBeenCalledWith(expect.objectContaining({ currentBookmark, statusInfo: currentStatus }));
+    expect(db.execute).not.toHaveBeenCalled();
+    expect(db.select).not.toHaveBeenCalled();
+    expect(userBookStatusService.autoUpdate).not.toHaveBeenCalled();
+    expect(achievementEvents.emit).not.toHaveBeenCalled();
   });
 
   it('calls autoUpdate with merged percent and thresholds when bookmark has ProgressPercent', async () => {
@@ -228,6 +329,7 @@ describe('KoboReadingStateService', () => {
       1,
       99,
       true,
+      77,
     );
 
     expect(userBookStatusService.autoUpdate).toHaveBeenCalledWith(
@@ -270,6 +372,7 @@ describe('KoboReadingStateService', () => {
       1,
       99,
       true,
+      77,
     );
 
     expect(userBookStatusService.autoUpdate).not.toHaveBeenCalled();
@@ -303,6 +406,7 @@ describe('KoboReadingStateService', () => {
       1,
       99,
       false,
+      77,
     );
 
     expect(userBookStatusService.autoUpdate).toHaveBeenCalledWith(
@@ -345,7 +449,7 @@ describe('KoboReadingStateService', () => {
     userBookStatusService.autoUpdate.mockRejectedValueOnce(new Error('status update failed'));
 
     await expect(
-      makeService(db).upsertState(1, 5, { CurrentBookmark: { LastModified: '2026-01-01T00:00:00Z', ProgressPercent: 42.5 } }, 1, 99, false),
+      makeService(db).upsertState(1, 5, { CurrentBookmark: { LastModified: '2026-01-01T00:00:00Z', ProgressPercent: 42.5 } }, 1, 99, false, 77),
     ).resolves.toEqual(expect.objectContaining({ EntitlementId: 'entitlement-5' }));
 
     expect(userBookStatusService.autoUpdate).toHaveBeenCalledWith(
@@ -376,7 +480,7 @@ describe('KoboReadingStateService', () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ entitlementId: '6', currentBookmark: { ProgressPercent: 60 } });
 
-    await makeService(db).upsertState(1, 6, { CurrentBookmark: { LastModified: '2026-01-01T00:00:00.000Z', ProgressPercent: 60 } }, 1, 99, true);
+    await makeService(db).upsertState(1, 6, { CurrentBookmark: { LastModified: '2026-01-01T00:00:00.000Z', ProgressPercent: 60 } }, 1, 99, true, 77);
 
     expect(db.insert).toHaveBeenCalledTimes(1);
   });
@@ -388,7 +492,7 @@ describe('KoboReadingStateService', () => {
     db.query.books.findFirst.mockResolvedValue({ id: 7 });
     db.query.koboReadingStates.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ entitlementId: '7' });
 
-    await makeService(db).upsertState(2, 7, { Statistics: { LastModified: '2026-01-01T00:00:00Z' } }, 1, 99, false);
+    await makeService(db).upsertState(2, 7, { Statistics: { LastModified: '2026-01-01T00:00:00Z' } }, 1, 99, false, 77);
 
     expect(userBookStatusService.autoUpdate).not.toHaveBeenCalled();
   });
