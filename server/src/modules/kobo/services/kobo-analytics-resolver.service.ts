@@ -9,8 +9,7 @@ import { KoboBookAccessService } from './kobo-book-access.service';
 type Db = NodePgDatabase<typeof schema>;
 
 export type KoboAnalyticsResolveResult =
-  | { kind: 'resolved'; bookFileId: number }
-  | { kind: 'skipped'; reason: 'book_not_found' | 'book_not_accessible' | 'no_epub_file' };
+  { kind: 'resolved'; bookFileId: number } | { kind: 'skipped'; reason: 'book_not_found' | 'book_not_accessible' | 'no_epub_file' };
 
 @Injectable()
 export class KoboAnalyticsResolverService {
