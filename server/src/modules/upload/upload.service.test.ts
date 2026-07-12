@@ -4,7 +4,6 @@ vi.mock('fs/promises', async () => {
 });
 
 vi.mock('../scanner/lib/hash', () => ({ computeFileHash: vi.fn() }));
-vi.mock('../scanner/lib/walk', () => ({ clampIno: vi.fn() }));
 
 vi.mock('../metadata/lib/epub', () => ({ extractEpubMetadata: vi.fn() }));
 vi.mock('../metadata/lib/cbz-metadata', () => ({ extractCbzMetadata: vi.fn(), extractCbrMetadata: vi.fn(), extractCb7Metadata: vi.fn() }));
@@ -18,7 +17,6 @@ import { extractCbzMetadata } from '../metadata/lib/cbz-metadata';
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
 import { parsePdfFile } from '../metadata/lib/pdf-parser';
 import { computeFileHash } from '../scanner/lib/hash';
-import { clampIno } from '../scanner/lib/walk';
 
 import { UploadService } from './upload.service';
 
@@ -29,7 +27,6 @@ const mockExtractCbzMetadata = extractCbzMetadata as MockedFunction<typeof extra
 const mockParseMobiFile = parseMobiFile as MockedFunction<typeof parseMobiFile>;
 const mockParsePdfFile = parsePdfFile as MockedFunction<typeof parsePdfFile>;
 const mockComputeFileHash = computeFileHash as MockedFunction<typeof computeFileHash>;
-const mockClampIno = clampIno as MockedFunction<typeof clampIno>;
 
 function selectChain(rows: unknown[]) {
   const whereResult: PromiseLike<unknown[]> & { limit: vi.Mock } = {
@@ -125,7 +122,6 @@ describe('UploadService', () => {
     updateSet.mockReturnValue({ where: updateWhere });
     updateWhere.mockResolvedValue(undefined);
     mockComputeFileHash.mockResolvedValue('hash-abc');
-    mockClampIno.mockReturnValue(12345);
     mockStat.mockResolvedValue({ ino: 12345n, mtime: new Date('2025-01-01') } as any);
   });
 

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { bigint, check, foreignKey, index, integer, pgTable, serial, timestamp, unique, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import { bigint, check, foreignKey, index, integer, numeric, pgTable, serial, timestamp, unique, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 
 import { libraryFolders, libraries } from './libraries';
 
@@ -59,7 +59,7 @@ export const bookFiles = pgTable(
       .references(() => libraryFolders.id, { onDelete: 'cascade' }),
     absolutePath: varchar('absolute_path', { length: 4096 }).notNull(),
     relPath: varchar('rel_path', { length: 4096 }),
-    ino: bigint('ino', { mode: 'number' }).notNull(),
+    ino: numeric('ino', { precision: 20, scale: 0, mode: 'bigint' }).notNull(),
     sizeBytes: bigint('size_bytes', { mode: 'number' }),
     mtime: timestamp('mtime', { withTimezone: true }),
     fileHash: varchar('file_hash', { length: 32 }),

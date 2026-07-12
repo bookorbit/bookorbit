@@ -26,11 +26,16 @@ vi.mock('drizzle-orm', () => {
   };
 });
 
+vi.mock('../../common/utils/accent-insensitive-search.utils', () => ({
+  accentInsensitiveIlike: vi.fn((left: unknown, pattern: string) => ({ type: 'accentInsensitiveIlike', left, pattern })),
+}));
+
 import { BadRequestException } from '@nestjs/common';
-import { ilike, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 
 import { EMPTY_CONTENT_FILTER_RULES, FIELD_OPERATORS, type RuleField, type RuleOperator } from '@bookorbit/types';
 
+import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookSortBuilder } from './book-sort-builder.service';
 
@@ -173,7 +178,7 @@ describe('BookQueryBuilder', () => {
     expect(where).toMatchObject({ type: 'and' });
     expect(where.clauses).toHaveLength(3);
     expect(where.clauses[2]).toMatchObject({ type: 'and' });
-    expect(where.clauses[2].clauses[0]).toMatchObject({ type: 'ilike', pattern: '%Dune%' });
+    expect(where.clauses[2].clauses[0]).toMatchObject({ type: 'accentInsensitiveIlike', pattern: '%Dune%' });
   });
 
   it('applies content filter clauses when filters are active', () => {
@@ -381,7 +386,7 @@ describe('BookQueryBuilder', () => {
     expect(result).toHaveLength(2);
   });
 
-  it('builds one author subquery per includesAll value and uses ilike patterns', () => {
+  it('builds one accent-insensitive author subquery per includesAll value', () => {
     const { builder, db } = makeBuilder();
 
     builder.buildWhere(wrapRule({ type: 'rule', field: 'author', operator: 'includesAll', value: ['Frank', 'Herbert'] }) as never, {
@@ -390,8 +395,8 @@ describe('BookQueryBuilder', () => {
     });
 
     expect(db.select).toHaveBeenCalledTimes(2);
-    expect(ilike).toHaveBeenCalledWith(expect.anything(), '%Frank%');
-    expect(ilike).toHaveBeenCalledWith(expect.anything(), '%Herbert%');
+    expect(accentInsensitiveIlike).toHaveBeenCalledWith(expect.anything(), '%Frank%');
+    expect(accentInsensitiveIlike).toHaveBeenCalledWith(expect.anything(), '%Herbert%');
   });
 
   it('handles empty includesAny sets by generating an always-false branch', () => {
@@ -602,16 +607,26 @@ describe('field coverage smoke tests', () => {
 });
 
 describe('buildQuickSearch', () => {
-  it('produces an OR of title/series ilike and author/series/narrator exists subqueries', () => {
+  it('passes an unaccented author query through every accent-insensitive text predicate', () => {
+    const { builder } = makeBuilder();
+    vi.mocked(accentInsensitiveIlike).mockClear();
+
+    builder.buildQuickSearch('gracian');
+
+    expect(accentInsensitiveIlike).toHaveBeenCalledTimes(5);
+    expect(accentInsensitiveIlike).toHaveBeenCalledWith(expect.anything(), '%gracian%');
+  });
+
+  it('produces an OR of accent-insensitive title/series matches and author/series/narrator exists subqueries', () => {
     const { builder } = makeBuilder();
 
     const result = builder.buildQuickSearch('tolkien') as any;
 
     expect(result).toMatchObject({ type: 'or' });
     expect(result.clauses).toHaveLength(5);
-    expect(result.clauses[0]).toMatchObject({ type: 'ilike', pattern: '%tolkien%' });
+    expect(result.clauses[0]).toMatchObject({ type: 'accentInsensitiveIlike', pattern: '%tolkien%' });
     expect(result.clauses[1]).toMatchObject({ type: 'sql' });
-    expect(result.clauses[2]).toMatchObject({ type: 'ilike', pattern: '%tolkien%' });
+    expect(result.clauses[2]).toMatchObject({ type: 'accentInsensitiveIlike', pattern: '%tolkien%' });
     expect(result.clauses[3]).toMatchObject({ type: 'sql' });
     expect(result.clauses[4]).toMatchObject({ type: 'sql' });
   });
@@ -621,8 +636,8 @@ describe('buildQuickSearch', () => {
 
     const result = builder.buildQuickSearch('50% off') as any;
 
-    expect(result.clauses[0]).toMatchObject({ type: 'ilike', pattern: '%50\\% off%' });
-    expect(result.clauses[2]).toMatchObject({ type: 'ilike', pattern: '%50\\% off%' });
+    expect(result.clauses[0]).toMatchObject({ type: 'accentInsensitiveIlike', pattern: '%50\\% off%' });
+    expect(result.clauses[2]).toMatchObject({ type: 'accentInsensitiveIlike', pattern: '%50\\% off%' });
   });
 
   it('escapes underscore in q', () => {
@@ -630,7 +645,7 @@ describe('buildQuickSearch', () => {
 
     const result = builder.buildQuickSearch('book_one') as any;
 
-    expect(result.clauses[0]).toMatchObject({ type: 'ilike', pattern: '%book\\_one%' });
+    expect(result.clauses[0]).toMatchObject({ type: 'accentInsensitiveIlike', pattern: '%book\\_one%' });
   });
 
   it('calls db.select three times for author, series membership, and narrator exists subqueries', () => {
@@ -692,11 +707,11 @@ describe('buildWhere with q', () => {
 
 describe('textRuleToSql (via title)', () => {
   it.each([
-    ['contains', 'Dune', { type: 'ilike', pattern: '%Dune%' }],
+    ['contains', 'Dune', { type: 'accentInsensitiveIlike', pattern: '%Dune%' }],
     ['notContains', 'Dune', { type: 'or' }],
-    ['startsWith', 'Dune', { type: 'ilike', pattern: 'Dune%' }],
-    ['endsWith', 'Dune', { type: 'ilike', pattern: '%Dune' }],
-    ['eq', 'Dune', { type: 'ilike', pattern: 'Dune' }],
+    ['startsWith', 'Dune', { type: 'accentInsensitiveIlike', pattern: 'Dune%' }],
+    ['endsWith', 'Dune', { type: 'accentInsensitiveIlike', pattern: '%Dune' }],
+    ['eq', 'Dune', { type: 'accentInsensitiveIlike', pattern: 'Dune' }],
     ['notEq', 'Dune', { type: 'or' }],
     ['isEmpty', undefined, { type: 'or' }],
     ['isNotEmpty', undefined, { type: 'and' }],
@@ -709,22 +724,22 @@ describe('textRuleToSql (via title)', () => {
     expect(getRuleSql(where)).toMatchObject(expected);
   });
 
-  it('notContains wraps an ilike in or(isNull, not())', () => {
+  it('notContains wraps an accent-insensitive match in or(isNull, not())', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'title', operator: 'notContains', value: 'Dune' }) as never, BASE_CTX) as any;
     const clause = getRuleSql(where);
     expect(clause).toMatchObject({ type: 'or' });
     expect(clause.clauses[0]).toMatchObject({ type: 'isNull' });
-    expect(clause.clauses[1]).toMatchObject({ type: 'not', value: { type: 'ilike', pattern: '%Dune%' } });
+    expect(clause.clauses[1]).toMatchObject({ type: 'not', value: { type: 'accentInsensitiveIlike', pattern: '%Dune%' } });
   });
 
-  it('notEq wraps an exact ilike in or(isNull, not())', () => {
+  it('notEq wraps an exact accent-insensitive match in or(isNull, not())', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'title', operator: 'notEq', value: 'Dune' }) as never, BASE_CTX) as any;
     const clause = getRuleSql(where);
     expect(clause).toMatchObject({ type: 'or' });
     expect(clause.clauses[0]).toMatchObject({ type: 'isNull' });
-    expect(clause.clauses[1]).toMatchObject({ type: 'not', value: { type: 'ilike', pattern: 'Dune' } });
+    expect(clause.clauses[1]).toMatchObject({ type: 'not', value: { type: 'accentInsensitiveIlike', pattern: 'Dune' } });
   });
 });
 

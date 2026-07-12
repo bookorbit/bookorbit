@@ -9,7 +9,6 @@ import {
   eq,
   getTableColumns,
   gte,
-  ilike,
   isNotNull,
   isNull,
   lte,
@@ -22,6 +21,7 @@ import {
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
+import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
 import * as schema from '../../db/schema';
 import {
   annotationPositions,
@@ -398,8 +398,8 @@ export class AnnotationRepository {
       const pattern = `%${term}%`;
       conditions.push(
         or(
-          ilike(bookMetadata.title, pattern),
-          sql`exists (select 1 from ${bookAuthors} inner join ${authors} on ${authors.id} = ${bookAuthors.authorId} where ${bookAuthors.bookId} = ${annotations.bookId} and ${authors.name} ilike ${pattern})`,
+          accentInsensitiveIlike(bookMetadata.title, pattern),
+          sql`exists (select 1 from ${bookAuthors} inner join ${authors} on ${authors.id} = ${bookAuthors.authorId} where ${bookAuthors.bookId} = ${annotations.bookId} and ${accentInsensitiveIlike(authors.name, pattern)})`,
         )!,
       );
     }
@@ -476,7 +476,7 @@ export class AnnotationRepository {
     if (filters.chapter) conditions.push(eq(annotations.chapterTitle, filters.chapter));
     if (filters.search) {
       const pattern = `%${filters.search}%`;
-      conditions.push(or(ilike(annotations.text, pattern), ilike(annotations.note, pattern))!);
+      conditions.push(or(accentInsensitiveIlike(annotations.text, pattern), accentInsensitiveIlike(annotations.note, pattern))!);
     }
     if (filters.hasNote) conditions.push(sql`${annotations.note} is not null and ${annotations.note} <> ''`);
     if (filters.dateFrom) conditions.push(gte(annotations.createdAt, filters.dateFrom));
@@ -504,7 +504,7 @@ export class AnnotationRepository {
     }
     if (filters.search) {
       const pattern = `%${filters.search}%`;
-      conditions.push(or(ilike(annotations.text, pattern), ilike(annotations.note, pattern))!);
+      conditions.push(or(accentInsensitiveIlike(annotations.text, pattern), accentInsensitiveIlike(annotations.note, pattern))!);
     }
     if (filters.chapter) {
       conditions.push(eq(annotations.chapterTitle, filters.chapter));

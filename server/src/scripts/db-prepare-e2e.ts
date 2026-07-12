@@ -1,5 +1,7 @@
 import { Client } from 'pg';
 
+import { installPostgresExtensions } from './postgres-extensions';
+
 const DEFAULT_E2E_DATABASE_URL = 'postgres://bookorbit:bookorbit@localhost:5432/bookorbit_e2e';
 const CONNECT_RETRY_ATTEMPTS = 30;
 const CONNECT_RETRY_DELAY_MS = 1000;
@@ -65,9 +67,7 @@ async function createDatabaseIfMissing(adminClient: Client, databaseName: string
 async function resetE2EDatabase(targetClient: Client): Promise<void> {
   await targetClient.query('DROP SCHEMA IF EXISTS public CASCADE');
   await targetClient.query('CREATE SCHEMA public');
-  await targetClient.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
-  await targetClient.query('CREATE EXTENSION IF NOT EXISTS pg_trgm');
-  await targetClient.query('CREATE EXTENSION IF NOT EXISTS vector');
+  await installPostgresExtensions(targetClient);
   await targetClient.query('CREATE SCHEMA IF NOT EXISTS drizzle');
   await targetClient.query('CREATE TABLE IF NOT EXISTS drizzle.__drizzle_migrations (id serial PRIMARY KEY, hash text NOT NULL, created_at bigint)');
   await targetClient.query('DELETE FROM drizzle.__drizzle_migrations');

@@ -621,6 +621,10 @@ function formatBadgeStyle(fmt: string) {
                 {{ bookDockSummary.total }}
               </span>
             </DropdownMenuItem>
+            <DropdownMenuItem @click="navigateToAnnotations">
+              <Highlighter :size="15" class="mr-2 text-muted-foreground" />
+              Annotations
+            </DropdownMenuItem>
             <DropdownMenuItem @click="navigateToStatistics">
               <BarChart3 :size="15" class="mr-2 text-muted-foreground" />
               Statistics

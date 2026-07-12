@@ -85,15 +85,19 @@ export const bookMetadata = pgTable(
   },
   (t) => [
     index('bm_title_trgm_idx').using('gin', t.title.op('gin_trgm_ops')),
+    index('bm_title_unaccent_trgm_idx').using('gin', sql`public.bookorbit_unaccent(${t.title}) gin_trgm_ops`),
     index('bm_title_lower_idx').on(sql`lower(${t.title})`),
     index('bm_title_book_id_idx').on(t.title, t.bookId),
     index('bm_series_trgm_idx').using('gin', t.seriesName.op('gin_trgm_ops')),
+    index('bm_series_unaccent_trgm_idx').using('gin', sql`public.bookorbit_unaccent(${t.seriesName}) gin_trgm_ops`),
     index('bm_series_id_idx').on(t.seriesId),
     index('bm_series_id_index_book_id_idx').on(t.seriesId, t.seriesIndex, t.bookId),
     index('bm_series_name_lower_btrim_idx').on(sql`lower(btrim(${t.seriesName}))`),
     index('bm_publisher_trgm_idx').using('gin', t.publisher.op('gin_trgm_ops')),
+    index('bm_publisher_unaccent_trgm_idx').using('gin', sql`public.bookorbit_unaccent(${t.publisher}) gin_trgm_ops`),
     index('bm_language_idx').on(t.language),
     index('bm_language_trgm_idx').using('gin', t.language.op('gin_trgm_ops')),
+    index('bm_language_unaccent_trgm_idx').using('gin', sql`public.bookorbit_unaccent(${t.language}) gin_trgm_ops`),
     index('bm_published_date_idx').on(t.publishedDate),
     index('bm_published_year_idx').on(t.publishedYear),
     index('bm_published_date_sort_idx').on(sql`coalesce(${t.publishedDate}, make_date(${t.publishedYear}, 1, 1))`),
@@ -147,7 +151,11 @@ export const authors = pgTable(
     hasPhoto: boolean('has_photo').notNull().default(false),
     lastEnrichedAt: timestamp('last_enriched_at', { withTimezone: true }),
   },
-  (t) => [unique('authors_name_unique').on(t.name), index('authors_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops'))],
+  (t) => [
+    unique('authors_name_unique').on(t.name),
+    index('authors_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops')),
+    index('authors_name_unaccent_trgm_idx').using('gin', sql`public.bookorbit_unaccent(${t.name}) gin_trgm_ops`),
+  ],
 );
 
 export const bookAuthors = pgTable(
@@ -210,7 +218,10 @@ export const genres = pgTable(
     id: serial('id').primaryKey(),
     name: varchar('name', { length: 200 }).notNull().unique(),
   },
-  (t) => [index('genres_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops'))],
+  (t) => [
+    index('genres_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops')),
+    index('genres_name_unaccent_trgm_idx').using('gin', sql`public.bookorbit_unaccent(${t.name}) gin_trgm_ops`),
+  ],
 );
 
 export const bookGenres = pgTable(
@@ -232,7 +243,10 @@ export const tags = pgTable(
     id: serial('id').primaryKey(),
     name: varchar('name', { length: 200 }).notNull().unique(),
   },
-  (t) => [index('tags_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops'))],
+  (t) => [
+    index('tags_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops')),
+    index('tags_name_unaccent_trgm_idx').using('gin', sql`public.bookorbit_unaccent(${t.name}) gin_trgm_ops`),
+  ],
 );
 
 export const bookTags = pgTable(

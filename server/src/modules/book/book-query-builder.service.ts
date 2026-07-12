@@ -1,11 +1,12 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { AnyColumn, SQL, and, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, ne, not, or, sql } from 'drizzle-orm';
+import { AnyColumn, SQL, and, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, not, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { CommunityRatingProvider, ContentFilterRules, GroupRule, ReadStatus, Rule, SortSpec } from '@bookorbit/types';
 import { DB } from '../../db';
 import { isDateKey, resolveTimeZone, toDateKeyInTimeZone } from '../../common/utils/timezone.utils';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
+import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
 import * as schema from '../../db/schema';
 import { BookSortBuilder } from './book-sort-builder.service';
 import {
@@ -86,7 +87,7 @@ export class BookQueryBuilder {
         .select({ one: sql`1` })
         .from(bookAuthors)
         .innerJoin(authors, eq(bookAuthors.authorId, authors.id))
-        .where(and(eq(bookAuthors.bookId, books.id), ilike(authors.name, pattern))!);
+        .where(and(eq(bookAuthors.bookId, books.id), accentInsensitiveIlike(authors.name, pattern))!);
       return sql`exists (${sq})`;
     })();
 
@@ -95,7 +96,7 @@ export class BookQueryBuilder {
         .select({ one: sql`1` })
         .from(bookNarrators)
         .innerJoin(narrators, eq(bookNarrators.narratorId, narrators.id))
-        .where(and(eq(bookNarrators.bookId, books.id), ilike(narrators.name, pattern))!);
+        .where(and(eq(bookNarrators.bookId, books.id), accentInsensitiveIlike(narrators.name, pattern))!);
       return sql`exists (${sq})`;
     })();
 
@@ -104,11 +105,17 @@ export class BookQueryBuilder {
         .select({ one: sql`1` })
         .from(bookSeriesMemberships)
         .innerJoin(bookSeries, eq(bookSeries.id, bookSeriesMemberships.seriesId))
-        .where(and(eq(bookSeriesMemberships.bookId, books.id), ilike(bookSeries.name, pattern))!);
+        .where(and(eq(bookSeriesMemberships.bookId, books.id), accentInsensitiveIlike(bookSeries.name, pattern))!);
       return sql`exists (${sq})`;
     })();
 
-    return or(ilike(bookMetadata.title, pattern), existsAuthor, ilike(bookMetadata.seriesName, pattern), existsSeries, existsNarrator)!;
+    return or(
+      accentInsensitiveIlike(bookMetadata.title, pattern),
+      existsAuthor,
+      accentInsensitiveIlike(bookMetadata.seriesName, pattern),
+      existsSeries,
+      existsNarrator,
+    )!;
   }
 
   buildOrderBy(sort: SortSpec[], userId?: number): SQL[] {
@@ -198,17 +205,17 @@ export class BookQueryBuilder {
     }
     switch (operator) {
       case 'contains':
-        return ilike(col, `%${escapeLikePattern(value!)}%`);
+        return accentInsensitiveIlike(col, `%${escapeLikePattern(value!)}%`);
       case 'notContains':
-        return or(isNull(col), not(ilike(col, `%${escapeLikePattern(value!)}%`)))!;
+        return or(isNull(col), not(accentInsensitiveIlike(col, `%${escapeLikePattern(value!)}%`)))!;
       case 'startsWith':
-        return ilike(col, `${escapeLikePattern(value!)}%`);
+        return accentInsensitiveIlike(col, `${escapeLikePattern(value!)}%`);
       case 'endsWith':
-        return ilike(col, `%${escapeLikePattern(value!)}`);
+        return accentInsensitiveIlike(col, `%${escapeLikePattern(value!)}`);
       case 'eq':
-        return ilike(col, escapeLikePattern(value!));
+        return accentInsensitiveIlike(col, escapeLikePattern(value!));
       case 'notEq':
-        return or(isNull(col), not(ilike(col, escapeLikePattern(value!))))!;
+        return or(isNull(col), not(accentInsensitiveIlike(col, escapeLikePattern(value!))))!;
       case 'isEmpty':
         return or(isNull(col), eq(col, ''))!;
       case 'isNotEmpty':
@@ -296,17 +303,17 @@ export class BookQueryBuilder {
 
     switch (operator) {
       case 'contains':
-        return existsSeries(ilike(bookSeries.name, `%${escapeLikePattern(value!)}%`));
+        return existsSeries(accentInsensitiveIlike(bookSeries.name, `%${escapeLikePattern(value!)}%`));
       case 'notContains':
-        return not(existsSeries(ilike(bookSeries.name, `%${escapeLikePattern(value!)}%`)));
+        return not(existsSeries(accentInsensitiveIlike(bookSeries.name, `%${escapeLikePattern(value!)}%`)));
       case 'startsWith':
-        return existsSeries(ilike(bookSeries.name, `${escapeLikePattern(value!)}%`));
+        return existsSeries(accentInsensitiveIlike(bookSeries.name, `${escapeLikePattern(value!)}%`));
       case 'endsWith':
-        return existsSeries(ilike(bookSeries.name, `%${escapeLikePattern(value!)}`));
+        return existsSeries(accentInsensitiveIlike(bookSeries.name, `%${escapeLikePattern(value!)}`));
       case 'eq':
-        return existsSeries(ilike(bookSeries.name, escapeLikePattern(value!)));
+        return existsSeries(accentInsensitiveIlike(bookSeries.name, escapeLikePattern(value!)));
       case 'notEq':
-        return not(existsSeries(ilike(bookSeries.name, escapeLikePattern(value!))));
+        return not(existsSeries(accentInsensitiveIlike(bookSeries.name, escapeLikePattern(value!))));
       case 'isEmpty':
         return not(existsSeries());
       case 'isNotEmpty':
@@ -460,13 +467,13 @@ export class BookQueryBuilder {
     switch (operator) {
       case 'includesAny':
         if (!values?.length) return sql`1 = 0`;
-        return existsAuthor(or(...values.map((v) => ilike(authors.name, `%${v}%`)))!);
+        return existsAuthor(or(...values.map((v) => accentInsensitiveIlike(authors.name, `%${v}%`)))!);
       case 'includesAll':
         if (!values?.length) return sql`1 = 0`;
-        return and(...values.map((v) => existsAuthor(ilike(authors.name, `%${v}%`))))!;
+        return and(...values.map((v) => existsAuthor(accentInsensitiveIlike(authors.name, `%${v}%`))))!;
       case 'excludesAll':
         if (!values?.length) return sql`1 = 1`;
-        return not(existsAuthor(or(...values.map((v) => ilike(authors.name, `%${v}%`)))!));
+        return not(existsAuthor(or(...values.map((v) => accentInsensitiveIlike(authors.name, `%${v}%`)))!));
       case 'isEmpty':
         return not(existsAuthor());
       case 'isNotEmpty':

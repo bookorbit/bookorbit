@@ -88,6 +88,13 @@
       "fast-xml-builder": "^1.1.7",
       "ws": "^8.21.0"
     },
+    "packageExtensions": {
+      "@embedpdf/utils@2.14.4": {
+        "dependencies": {
+          "@embedpdf/models": "2.14.4"
+        }
+      }
+    },
     "onlyBuiltDependencies": [
       "@nestjs/core",
       "@parcel/watcher",
@@ -95,6 +102,10 @@
       "esbuild",
       "sharp",
       "unrs-resolver"
-    ]
+    ],
+    "patchedDependencies": {
+      "@embedpdf/core@2.14.4": "patches/@embedpdf__core@2.14.4.patch",
+      "@embedpdf/engines@2.14.4": "patches/@embedpdf__engines@2.14.4.patch"
+    }
   }
 }

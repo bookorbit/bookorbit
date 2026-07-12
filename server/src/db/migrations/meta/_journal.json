@@ -330,6 +330,20 @@
       "when": 1783630311448,
       "tag": "0046_kobo-device-snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1783791670862,
+      "tag": "0047_accent-insensitive-search-indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1783800042730,
+      "tag": "0048_preserve-bigint-inodes",
+      "breakpoints": true
     }
   ]
 }

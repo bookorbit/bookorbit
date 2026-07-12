@@ -154,7 +154,9 @@ function UpdateCheck:checkForUpdate()
         return
     end
     NetworkMgr:runWhenConnected(function()
-        self:doCheckForUpdate()
+        self:runInSyncCoroutine(function()
+            self:doCheckForUpdate()
+        end)
     end)
 end
 
@@ -211,7 +213,7 @@ function UpdateCheck:doCheckForUpdate()
 end
 
 function UpdateCheck:handleUpdateVersionResponse(body, interactive, prompt_allowed)
-    local server_ver = body.serverVersion or "unknown"
+    local server_ver = tostring(body.serverVersion or "unknown"):gsub("^v", "")
     local plugin_latest = body.pluginVersion
     self.settings.update_check_last_at = os.time()
 

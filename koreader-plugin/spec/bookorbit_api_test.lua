@@ -1,5 +1,7 @@
 local mock_http_body = "{}"
 local mock_http_code = 200
+local request_ran_in_subprocess = false
+local in_subprocess = false
 
 package.loaded["logger"] = {
     dbg = function() end,
@@ -64,6 +66,7 @@ package.loaded["ltn12"] = {
 
 package.loaded["socket.http"] = {
     request = function(request)
+        request_ran_in_subprocess = in_subprocess
         if mock_http_body then
             request.sink(mock_http_body)
         end
@@ -134,5 +137,43 @@ body, err, errbody = client:auth()
 assertEqual(body, nil, "HTTP error has no decoded body")
 assertEqual(err, 503, "HTTP error preserves status code")
 assertEqual(errbody, nil, "invalid HTTP error body is ignored")
+
+local wrapped = true
+local subprocess_calls = 0
+package.loaded["ui/trapper"] = {
+    isWrapped = function()
+        return wrapped
+    end,
+    dismissableRunInSubprocess = function(_, task, trap_widget)
+        assertEqual(type(trap_widget), "table", "background request uses a detached trap widget")
+        subprocess_calls = subprocess_calls + 1
+        in_subprocess = true
+        local result = task()
+        in_subprocess = false
+        return true, result
+    end,
+}
+
+local background_client = BookOrbitApi.new{
+    server_url = "https://bookorbit.example.com/api/v1",
+    username = "reader",
+    userkey = "secret",
+    background_requests = true,
+}
+
+mock_http_body = "{\"ok\":true}"
+mock_http_code = 200
+body, err = background_client:auth()
+assertEqual(body.ok, true, "background request returns decoded body")
+assertEqual(err, nil, "background request preserves success result")
+assertEqual(subprocess_calls, 1, "wrapped background request uses subprocess")
+assertEqual(request_ran_in_subprocess, true, "HTTP request runs inside subprocess task")
+
+wrapped = false
+request_ran_in_subprocess = false
+body, err = background_client:auth()
+assertEqual(body.ok, true, "unwrapped request falls back safely")
+assertEqual(subprocess_calls, 1, "unwrapped request does not start subprocess")
+assertEqual(request_ran_in_subprocess, false, "unwrapped fallback runs in current process")
 
 print("bookorbit_api_test.lua: ok")

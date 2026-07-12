@@ -31,9 +31,9 @@ const EPUB_SETTINGS_SCHEMA = z
 
 const PDF_SETTINGS_SCHEMA = z
   .object({
-    scrollMode: z.enum(['vertical', 'horizontal', 'wrapped', 'page']),
-    spread: z.enum(['none', 'odd', 'even']),
-    zoomMode: z.enum(['fit-width', 'fit-page', 'custom']),
+    scrollMode: z.enum(['vertical', 'horizontal', 'wrapped', 'page']).transform((mode) => (mode === 'wrapped' ? 'vertical' : mode)),
+    spread: z.enum(['none', 'odd', 'even', 'auto']),
+    zoomMode: z.enum(['fit-width', 'fit-page', 'automatic', 'custom']),
     customScale: z.number().min(0.25).max(4),
     rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]),
   })

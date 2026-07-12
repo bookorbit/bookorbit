@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Plus, Trash2, RefreshCw, FolderOpen, AlertTriangle, CheckCircle2, XCircle, Loader2 } from '@lucide/vue'
-import type { PrescanResult } from '@bookorbit/types'
-import { api } from '@/lib/api'
+import { computed } from 'vue'
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, FolderOpen, FolderPlus, Loader2, Plus, RefreshCw, Trash2, XCircle } from '@lucide/vue'
+import type { PrescanPathResult, PrescanResult } from '@bookorbit/types'
+import { useLibraryFolderSelection } from '../composables/useLibraryFolderSelection'
 import FolderPickerModal from './FolderPickerModal.vue'
 
 const props = defineProps<{
@@ -13,188 +13,191 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:folders': [value: string[]]
+  'update:pickerOpen': [value: boolean]
   prescan: []
 }>()
 
-const pickerOpen = ref(false)
-const manualPath = ref('')
-const testLoading = ref(false)
-const testResult = ref<'ok' | 'error' | null>(null)
+const {
+  pickerOpen,
+  manualEntryOpen,
+  manualPath,
+  manualError,
+  openPicker,
+  closePicker,
+  addBrowsedFolders,
+  removeFolder,
+  toggleManualEntry,
+  closeManualEntry,
+  clearManualError,
+  addManualFolder,
+} = useLibraryFolderSelection({
+  folders: () => props.folders,
+  updateFolders: (folders) => emit('update:folders', folders),
+  updatePickerOpen: (open) => emit('update:pickerOpen', open),
+})
 
-function onFolderSelected(path: string) {
-  pickerOpen.value = false
-  if (!path || props.folders.includes(path)) return
-  emit('update:folders', [...props.folders, path])
+const prescanByPath = computed(() => new Map(props.prescanResult?.paths.map((result) => [result.path, result]) ?? []))
+
+const validationSummary = computed(() => {
+  if (props.prescanLoading) return 'Checking accessibility and counting matching book files...'
+  if (!props.prescanResult) return 'Verify access and estimate matching book files.'
+  const accessibleCount = props.prescanResult.paths.filter((path) => path.accessible).length
+  const inaccessibleCount = props.prescanResult.paths.length - accessibleCount
+  const files = `${props.prescanResult.totalFiles.toLocaleString()} matching file${props.prescanResult.totalFiles === 1 ? '' : 's'}`
+  return inaccessibleCount > 0
+    ? `${files}. ${inaccessibleCount} folder${inaccessibleCount === 1 ? '' : 's'} could not be accessed.`
+    : `${files} across ${accessibleCount} folder${accessibleCount === 1 ? '' : 's'}.`
+})
+
+function prescanStatusFor(path: string): PrescanPathResult | null {
+  return prescanByPath.value.get(path) ?? null
 }
 
-function removeFolder(index: number) {
-  const updated = [...props.folders]
-  updated.splice(index, 1)
-  emit('update:folders', updated)
+function statusLabel(path: string): string {
+  if (props.prescanLoading) return 'Checking'
+  const status = prescanStatusFor(path)
+  if (!status) return 'Not checked'
+  if (!status.accessible) return 'Not accessible'
+  if (status.overlapLibrary) return 'Overlaps another library'
+  return `Accessible · ${status.fileCount.toLocaleString()} file${status.fileCount === 1 ? '' : 's'}`
 }
 
-function prescanStatusFor(path: string) {
-  return props.prescanResult?.paths.find((p) => p.path === path) ?? null
+function statusClass(path: string): string {
+  if (props.prescanLoading || !prescanStatusFor(path)) return 'bg-muted text-muted-foreground'
+  const status = prescanStatusFor(path)!
+  if (!status.accessible) return 'bg-destructive/10 text-destructive'
+  if (status.overlapLibrary) return 'bg-muted text-foreground'
+  return 'bg-primary/10 text-primary'
 }
 
-function onManualInput() {
-  testResult.value = null
+function statusTitle(path: string): string | undefined {
+  const overlapLibrary = prescanStatusFor(path)?.overlapLibrary
+  return overlapLibrary ? `Also used by “${overlapLibrary}”` : undefined
 }
 
-async function testPath() {
-  const trimmed = manualPath.value.trim()
-  if (!trimmed) return
-  testLoading.value = true
-  testResult.value = null
-  try {
-    const res = await api('/api/v1/libraries/prescan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paths: [trimmed] }),
-    })
-    if (res.ok) {
-      const data: PrescanResult = await res.json()
-      testResult.value = data.paths[0]?.accessible ? 'ok' : 'error'
-    } else {
-      testResult.value = 'error'
-    }
-  } catch {
-    testResult.value = 'error'
-  } finally {
-    testLoading.value = false
-  }
-}
-
-function addManual() {
-  const trimmed = manualPath.value.trim()
-  if (!trimmed || props.folders.includes(trimmed)) return
-  emit('update:folders', [...props.folders, trimmed])
-  manualPath.value = ''
-  testResult.value = null
-}
-
-function onManualKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter') {
-    e.preventDefault()
-    addManual()
-  }
+function handlePrescan() {
+  emit('prescan')
 }
 </script>
 
 <template>
-  <div class="px-6 py-6 space-y-6">
-    <div>
-      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-1">Scan folders</p>
-      <p class="text-xs text-muted-foreground mb-3">Add one or more directories to scan for books.</p>
+  <div class="space-y-4 px-6 py-6">
+    <button
+      v-if="folders.length === 0"
+      type="button"
+      class="flex min-h-24 w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/15 px-5 py-3 text-center transition-colors hover:border-primary/50 hover:bg-muted/40"
+      @click="openPicker"
+    >
+      <span class="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <FolderOpen :size="19" />
+      </span>
+      <span>
+        <span class="block text-sm font-semibold text-foreground">Browse server folders</span>
+        <span class="mt-1 block text-sm text-muted-foreground">Select one or more folders without leaving the browser.</span>
+      </span>
+    </button>
 
-      <!-- Browse button -->
-      <button
-        class="flex items-center gap-2 w-full rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground hover:text-foreground hover:border-primary/50 hover:bg-muted/40 transition-colors"
-        @click="pickerOpen = true"
-      >
-        <Plus :size="15" class="shrink-0" />
-        Browse and add a folder
-      </button>
-
-      <!-- Manual entry -->
-      <div class="mt-3">
-        <p class="text-xs text-muted-foreground mb-2">Or enter a path manually:</p>
-        <div class="flex gap-2">
-          <div class="relative flex-1">
-            <input
-              v-model="manualPath"
-              type="text"
-              placeholder="/path/to/books"
-              class="w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground font-mono placeholder:text-muted-foreground/60 placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
-              :class="testResult === 'ok' ? 'border-emerald-500' : testResult === 'error' ? 'border-destructive' : 'border-border'"
-              @input="onManualInput"
-              @keydown="onManualKeydown"
-            />
-            <span v-if="testResult === 'ok'" class="absolute right-2.5 top-1/2 -translate-y-1/2">
-              <CheckCircle2 :size="14" class="text-emerald-500" />
-            </span>
-            <span v-else-if="testResult === 'error'" class="absolute right-2.5 top-1/2 -translate-y-1/2">
-              <XCircle :size="14" class="text-destructive" />
-            </span>
-          </div>
-          <button
-            class="flex items-center gap-1.5 px-3 py-2 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 disabled:opacity-50"
-            :disabled="!manualPath.trim() || testLoading"
-            @click="testPath"
-          >
-            <Loader2 v-if="testLoading" :size="12" class="animate-spin" />
-            Test
-          </button>
-          <button
-            class="flex items-center gap-1.5 px-3 py-2 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity shrink-0 disabled:opacity-50"
-            :disabled="!manualPath.trim()"
-            @click="addManual"
-          >
-            <Plus :size="12" />
-            Add
-          </button>
+    <section v-else aria-labelledby="selected-folders-title">
+      <div class="mb-3 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <h4 id="selected-folders-title" class="text-sm font-semibold text-foreground">Selected folders</h4>
+          <span class="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{{ folders.length }}</span>
         </div>
-        <p v-if="testResult === 'error'" class="mt-1.5 text-xs text-destructive">Path is not accessible on the server.</p>
-        <p v-else-if="testResult === 'ok'" class="mt-1.5 text-xs text-emerald-600 dark:text-emerald-400">Path is accessible.</p>
+        <button
+          type="button"
+          class="flex h-9 items-center gap-2 rounded-md border border-border px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+          @click="openPicker"
+        >
+          <Plus :size="16" />
+          Add folders
+        </button>
       </div>
 
-      <!-- Folder list -->
-      <div class="mt-4 space-y-2">
-        <div v-for="(folder, index) in folders" :key="folder" class="rounded-lg border border-border bg-card px-4 py-3">
-          <div class="flex items-center gap-3">
-            <FolderOpen :size="15" class="text-muted-foreground shrink-0 mt-0.5" />
-            <span class="flex-1 text-xs text-foreground font-mono break-all">{{ folder }}</span>
+      <div class="overflow-hidden rounded-lg border border-border bg-card divide-y divide-border">
+        <div v-for="folder in folders" :key="folder" class="flex min-h-12 items-center gap-2.5 px-3 py-2">
+          <FolderOpen :size="16" class="shrink-0 text-primary" />
+          <p class="min-w-0 flex-1 truncate font-mono text-[13px] text-foreground" :title="folder">{{ folder }}</p>
+          <div class="flex shrink-0 items-center gap-2">
+            <span class="rounded-full px-2 py-0.5 text-xs font-medium" :class="statusClass(folder)" :title="statusTitle(folder)">
+              <Loader2 v-if="prescanLoading" :size="11" class="mr-1 inline animate-spin" />
+              <XCircle v-else-if="prescanStatusFor(folder) && !prescanStatusFor(folder)!.accessible" :size="11" class="mr-1 inline" />
+              <AlertTriangle v-else-if="prescanStatusFor(folder)?.overlapLibrary" :size="11" class="mr-1 inline" />
+              <CheckCircle2 v-else-if="prescanStatusFor(folder)?.accessible" :size="11" class="mr-1 inline" />
+              {{ statusLabel(folder) }}
+            </span>
             <button
-              class="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
-              @click="removeFolder(index)"
+              type="button"
+              class="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+              :aria-label="`Remove ${folder}`"
+              @click="removeFolder(folder)"
             >
-              <Trash2 :size="13" />
+              <Trash2 :size="16" />
             </button>
           </div>
-
-          <!-- Prescan result for this path -->
-          <div v-if="prescanStatusFor(folder)" class="mt-2 ml-6">
-            <div v-if="!prescanStatusFor(folder)!.accessible" class="flex items-center gap-1.5 text-xs text-destructive">
-              <XCircle :size="12" />
-              Path is not accessible
-            </div>
-            <div v-else class="flex items-center gap-3 text-xs text-muted-foreground">
-              <span class="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 :size="12" />
-                {{ prescanStatusFor(folder)!.fileCount }} book file{{ prescanStatusFor(folder)!.fileCount === 1 ? '' : 's' }} found
-              </span>
-              <span v-if="prescanStatusFor(folder)!.overlapLibrary" class="flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                <AlertTriangle :size="12" />
-                Overlaps with "{{ prescanStatusFor(folder)!.overlapLibrary }}"
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="folders.length === 0" class="rounded-lg border border-dashed border-border px-4 py-6 text-center">
-          <FolderOpen :size="22" class="text-muted-foreground/60 mx-auto mb-2" />
-          <p class="text-xs text-muted-foreground">No folders added yet</p>
         </div>
       </div>
+    </section>
 
-      <!-- Prescan button -->
-      <div class="flex items-center justify-between mt-4 pt-4 border-t border-border">
-        <div v-if="prescanResult" class="text-xs text-muted-foreground">
-          {{ prescanResult.totalFiles }} book file{{ prescanResult.totalFiles === 1 ? '' : 's' }} found - actual book count may be lower if multiple
-          formats of the same book exist
+    <div>
+      <button
+        type="button"
+        class="flex h-9 items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        :aria-expanded="manualEntryOpen"
+        @click="toggleManualEntry"
+      >
+        <FolderPlus :size="16" />
+        Enter a path manually
+        <ChevronUp v-if="manualEntryOpen" :size="15" />
+        <ChevronDown v-else :size="15" />
+      </button>
+
+      <form v-if="manualEntryOpen" class="mt-2 rounded-lg border border-border bg-muted/20 p-3" @submit.prevent="addManualFolder">
+        <label for="manual-folder-path" class="mb-2 block text-sm font-medium text-foreground">Absolute server path</label>
+        <div class="flex flex-col gap-2 sm:flex-row">
+          <input
+            id="manual-folder-path"
+            v-model="manualPath"
+            type="text"
+            placeholder="/path/to/books"
+            class="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm text-foreground placeholder:font-sans placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
+            @input="clearManualError"
+          />
+          <div class="grid grid-cols-2 gap-2 sm:flex">
+            <button
+              type="submit"
+              class="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+            >
+              Add folder
+            </button>
+            <button
+              type="button"
+              class="h-10 rounded-md border border-border px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              @click="closeManualEntry"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
-        <div v-else class="text-xs text-muted-foreground">Run a prescan to validate paths before saving.</div>
+        <p v-if="manualError" class="mt-2 text-sm text-destructive">{{ manualError }}</p>
+        <p v-else class="mt-2 text-xs text-muted-foreground">Manual paths are checked together with the rest of the selected folders.</p>
+      </form>
+    </div>
+
+    <div v-if="folders.length > 0" class="rounded-lg border border-border bg-muted/20 p-3">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p class="min-w-0 text-sm text-muted-foreground">{{ validationSummary }}</p>
         <button
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+          type="button"
+          class="flex h-10 shrink-0 items-center justify-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
           :disabled="folders.length === 0 || prescanLoading"
-          @click="emit('prescan')"
+          @click="handlePrescan"
         >
-          <RefreshCw :size="12" :class="prescanLoading ? 'animate-spin' : ''" />
-          {{ prescanLoading ? 'Scanning…' : 'Prescan' }}
+          <RefreshCw :size="16" :class="prescanLoading ? 'animate-spin' : ''" />
+          {{ prescanLoading ? 'Checking...' : prescanResult ? 'Check again' : 'Check folders' }}
         </button>
       </div>
     </div>
   </div>
 
-  <FolderPickerModal v-if="pickerOpen" @select="onFolderSelected" @close="pickerOpen = false" />
+  <FolderPickerModal v-if="pickerOpen" :selected-paths="folders" @select="addBrowsedFolders" @close="closePicker" />
 </template>

@@ -348,7 +348,7 @@ export class ScannerRepository {
     await this.db.delete(bookFiles).where(eq(bookFiles.id, id));
   }
 
-  async findBookFileWithContextByIno(ino: number, libraryId?: number) {
+  async findBookFileWithContextByIno(ino: bigint, libraryId?: number) {
     const whereClause = libraryId == null ? eq(bookFiles.ino, ino) : and(eq(bookFiles.ino, ino), eq(books.libraryId, libraryId));
     const [row] = await this.db
       .select({
@@ -366,7 +366,7 @@ export class ScannerRepository {
     return row ?? null;
   }
 
-  async findMissingBookFileWithContextByIno(ino: number) {
+  async findMissingBookFileWithContextByIno(ino: bigint) {
     const [row] = await this.db
       .select({
         file: bookFiles,

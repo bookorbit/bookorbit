@@ -25,7 +25,6 @@ import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../m
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
 import { parsePdfFile, type PdfParseWarning } from '../metadata/lib/pdf-parser';
 import { computeFileHash } from '../scanner/lib/hash';
-import { clampIno } from '../scanner/lib/walk';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -188,7 +187,7 @@ export class UploadService {
       shouldCleanupDestination = false;
 
       const fileStat = await stat(destination, { bigint: true });
-      const safeIno = clampIno(fileStat.ino);
+      const ino = fileStat.ino;
       const relPath = relative(bookRow.libraryFolderPath, destination);
 
       const [inserted] = await this.db
@@ -198,7 +197,7 @@ export class UploadService {
           libraryFolderId: bookRow.libraryFolderId,
           absolutePath: destination,
           relPath,
-          ino: safeIno,
+          ino,
           sizeBytes,
           mtime: fileStat.mtime,
           fileHash,

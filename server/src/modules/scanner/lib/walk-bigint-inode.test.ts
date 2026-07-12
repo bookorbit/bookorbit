@@ -1,9 +1,4 @@
-/**
- * Integration tests verifying that precision-unsafe inodes are clamped before matching.
- *
- * These tests mock `fs/promises.stat` to inject synthetic BigInt inode values that would
- * otherwise be lossy when converted to JavaScript numbers.
- */
+/** Integration tests for exact inode handling across scanner walk entry points. */
 
 vi.mock('fs/promises', async () => {
   const actual = await vi.importActual<typeof import('fs/promises')>('fs/promises');
@@ -112,36 +107,35 @@ function setupStatMock(fileIno: bigint): void {
 
 // ── findBookCandidates ────────────────────────────────────────────────────────
 
-describe('findBookCandidates — oversized MergerFS inode', () => {
-  it('sets ino=0 when stat returns an inode that is unsafe in JavaScript numbers', async () => {
+describe('findBookCandidates - exact MergerFS inode', () => {
+  it('preserves an inode above the JavaScript safe integer range', async () => {
     await touchFile('Book/book.epub');
     setupStatMock(UNSAFE_INO);
 
     const { candidates } = await findBookCandidates(root);
 
     expect(candidates).toHaveLength(1);
-    expect(candidates[0].files[0].ino).toBe(0);
+    expect(candidates[0].files[0].ino).toBe(UNSAFE_INO);
   });
 
-  it('sets ino=0 when stat returns an inode exceeding PostgreSQL bigint range', async () => {
+  it('preserves an unsigned inode exceeding the PostgreSQL bigint range', async () => {
     await touchFile('Book/book.epub');
     setupStatMock(OVERSIZED_INO);
 
     const { candidates } = await findBookCandidates(root);
 
     expect(candidates).toHaveLength(1);
-    expect(candidates[0].files[0].ino).toBe(0);
+    expect(candidates[0].files[0].ino).toBe(OVERSIZED_INO);
   });
 
-  it('emits a logger warning that mentions the oversized inode value', async () => {
+  it('does not warn when an unsigned 64-bit inode can be matched exactly', async () => {
     await touchFile('Book/book.epub');
     setupStatMock(OVERSIZED_INO);
 
     const warnings: string[] = [];
     await findBookCandidates(root, [], (msg) => warnings.push(msg));
 
-    expect(warnings.some((w) => w.includes(String(OVERSIZED_INO)))).toBe(true);
-    expect(warnings.some((w) => w.includes('rename detection disabled'))).toBe(true);
+    expect(warnings).toHaveLength(0);
   });
 
   it('preserves normal inodes that are within PostgreSQL bigint range', async () => {
@@ -150,16 +144,16 @@ describe('findBookCandidates — oversized MergerFS inode', () => {
 
     const { candidates } = await findBookCandidates(root);
 
-    expect(candidates[0].files[0].ino).toBe(Number(NORMAL_INO));
+    expect(candidates[0].files[0].ino).toBe(NORMAL_INO);
   });
 
-  it('sets ino=0 for the PostgreSQL bigint maximum inode because it is precision-unsafe in JS', async () => {
+  it('preserves the PostgreSQL bigint maximum inode exactly', async () => {
     await touchFile('Book/book.epub');
     setupStatMock(9223372036854775807n);
 
     const { candidates } = await findBookCandidates(root);
 
-    expect(candidates[0].files[0].ino).toBe(0);
+    expect(candidates[0].files[0].ino).toBe(9223372036854775807n);
   });
 
   it('does not emit a warning for normal inodes', async () => {
@@ -181,31 +175,40 @@ describe('findBookCandidates — oversized MergerFS inode', () => {
 
     expect(candidates).toHaveLength(2);
     for (const c of candidates) {
-      expect(c.files[0].ino).toBe(0);
+      expect(c.files[0].ino).toBe(OVERSIZED_INO);
     }
   });
 
-  it('sets ino=0 for the maximum possible unsigned 64-bit inode', async () => {
+  it('preserves the maximum possible unsigned 64-bit inode', async () => {
     await touchFile('Book/book.epub');
     setupStatMock(18446744073709551615n);
 
     const { candidates } = await findBookCandidates(root);
 
-    expect(candidates[0].files[0].ino).toBe(0);
+    expect(candidates[0].files[0].ino).toBe(18446744073709551615n);
+  });
+
+  it('preserves negative inode values reported by a mounted filesystem', async () => {
+    await touchFile('Book/book.epub');
+    setupStatMock(-8537732241968812306n);
+
+    const { candidates } = await findBookCandidates(root);
+
+    expect(candidates[0].files[0].ino).toBe(-8537732241968812306n);
   });
 });
 
 // ── findLooseFileCandidates ───────────────────────────────────────────────────
 
-describe('findLooseFileCandidates — oversized MergerFS inode', () => {
-  it('sets ino=0 for oversized inodes in book_per_file mode', async () => {
+describe('findLooseFileCandidates - exact MergerFS inode', () => {
+  it('preserves oversized inodes in book_per_file mode', async () => {
     await touchFile('book.epub');
     setupStatMock(OVERSIZED_INO);
 
     const { candidates } = await findLooseFileCandidates(root);
 
     expect(candidates).toHaveLength(1);
-    expect(candidates[0].files[0].ino).toBe(0);
+    expect(candidates[0].files[0].ino).toBe(OVERSIZED_INO);
   });
 
   it('passes normal inodes through in book_per_file mode', async () => {
@@ -214,32 +217,31 @@ describe('findLooseFileCandidates — oversized MergerFS inode', () => {
 
     const { candidates } = await findLooseFileCandidates(root);
 
-    expect(candidates[0].files[0].ino).toBe(Number(NORMAL_INO));
+    expect(candidates[0].files[0].ino).toBe(NORMAL_INO);
   });
 });
 
 // ── buildSingleBookCandidate ──────────────────────────────────────────────────
 
-describe('buildSingleBookCandidate — oversized MergerFS inode', () => {
-  it('sets ino=0 when stat returns an inode exceeding PostgreSQL bigint range', async () => {
+describe('buildSingleBookCandidate - exact MergerFS inode', () => {
+  it('preserves an inode exceeding the PostgreSQL bigint range', async () => {
     await touchFile('Book/book.epub');
     setupStatMock(OVERSIZED_INO);
 
     const result = await buildSingleBookCandidate(join(root, 'Book'), root);
 
     expect(result).not.toBeNull();
-    expect(result!.files[0].ino).toBe(0);
+    expect(result!.files[0].ino).toBe(OVERSIZED_INO);
   });
 
-  it('emits a logger warning for oversized inodes', async () => {
+  it('does not warn for an exact unsigned 64-bit inode', async () => {
     await touchFile('Book/book.epub');
     setupStatMock(OVERSIZED_INO);
 
     const warnings: string[] = [];
     await buildSingleBookCandidate(join(root, 'Book'), root, [], (msg) => warnings.push(msg));
 
-    expect(warnings.some((w) => w.includes(String(OVERSIZED_INO)))).toBe(true);
-    expect(warnings.some((w) => w.includes('rename detection disabled'))).toBe(true);
+    expect(warnings).toHaveLength(0);
   });
 
   it('passes normal inodes through unchanged', async () => {
@@ -248,7 +250,7 @@ describe('buildSingleBookCandidate — oversized MergerFS inode', () => {
 
     const result = await buildSingleBookCandidate(join(root, 'Book'), root);
 
-    expect(result!.files[0].ino).toBe(Number(NORMAL_INO));
+    expect(result!.files[0].ino).toBe(NORMAL_INO);
   });
 
   it('still returns correct folderPath and file list with oversized inodes', async () => {
@@ -261,6 +263,6 @@ describe('buildSingleBookCandidate — oversized MergerFS inode', () => {
     expect(result).not.toBeNull();
     expect(result!.folderPath).toBe(join(root, 'Book'));
     expect(result!.files).toHaveLength(2);
-    expect(result!.files.every((f) => f.ino === 0)).toBe(true);
+    expect(result!.files.every((f) => f.ino === OVERSIZED_INO)).toBe(true);
   });
 });

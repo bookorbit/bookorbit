@@ -285,4 +285,16 @@ describe('AppHeader global search', () => {
 
     expect(wrapper.text()).not.toContain('Achievements')
   })
+
+  it('navigates to annotations from the mobile overflow menu', async () => {
+    const wrapper = mountHeader()
+    const annotationsItem = wrapper.findAllComponents({ name: 'DropdownMenuItem' }).find((item) => item.text().trim() === 'Annotations')
+
+    expect(annotationsItem).toBeDefined()
+    if (!annotationsItem) throw new Error('Expected annotations overflow menu item')
+
+    await annotationsItem.trigger('click')
+
+    expect(mocks.routerPush).toHaveBeenCalledWith({ name: 'annotations' })
+  })
 })

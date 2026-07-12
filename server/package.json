@@ -27,7 +27,7 @@
     "start:debug": "nest start --debug --watch --config nest-cli.dev.json",
     "start:prod": "node dist/main",
     "db:generate": "drizzle-kit generate --name",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "tsx --env-file-if-exists=.env src/scripts/install-postgres-extensions.ts && drizzle-kit migrate",
     "e2e:db:migrate": "DATABASE_URL=postgres://bookorbit:bookorbit@localhost:5432/bookorbit_e2e pnpm db:migrate",
     "db:migrate:runtime": "node dist/scripts/migrate.js",
     "e2e:db:prepare": "tsx src/scripts/db-prepare-e2e.ts",

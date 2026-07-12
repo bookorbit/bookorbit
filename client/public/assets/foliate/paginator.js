@@ -232,6 +232,11 @@ const setStylesImportant = (el, styles) => {
   for (const [k, v] of Object.entries(styles)) style.setProperty(k, v, 'important')
 }
 
+const hasActiveTextSelection = (doc) => {
+  const selection = doc?.getSelection?.()
+  return Boolean(selection && selection.rangeCount > 0 && !selection.isCollapsed)
+}
+
 class View {
   #observer = new ResizeObserver(() => this.expand())
   #element = document.createElement('div')
@@ -854,6 +859,8 @@ export class Paginator extends HTMLElement {
       if (this.#touchScrolled) e.preventDefault()
       return
     }
+    const doc = e.currentTarget?.getSelection ? e.currentTarget : this.#view?.document
+    if (hasActiveTextSelection(doc)) return
     e.preventDefault()
     const touch = e.changedTouches[0]
     const x = touch.screenX,

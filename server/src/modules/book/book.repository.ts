@@ -6,6 +6,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { ContentFilterRules, JumpBucketsResponse, SortSpec } from '@bookorbit/types';
 import { isAudioFormat, isComicFormat } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
+import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { BookQueryBuilder } from './book-query-builder.service';
@@ -996,14 +997,14 @@ export class BookRepository {
       .selectDistinct({ bookId: bookAuthors.bookId })
       .from(bookAuthors)
       .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
-      .where(sql`${authors.name} ILIKE ${pattern}`)
+      .where(accentInsensitiveIlike(authors.name, pattern))
       .as('matched_authors');
 
     const matchedSeries = this.db
       .selectDistinct({ bookId: bookSeriesMemberships.bookId })
       .from(bookSeriesMemberships)
       .innerJoin(bookSeries, eq(bookSeries.id, bookSeriesMemberships.seriesId))
-      .where(sql`${bookSeries.name} ILIKE ${pattern}`)
+      .where(accentInsensitiveIlike(bookSeries.name, pattern))
       .as('matched_series');
 
     const contentFilterClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
@@ -1028,8 +1029,8 @@ export class BookRepository {
           inArray(books.libraryId, libraryIds),
           ne(books.status, 'processing'),
           or(
-            sql`${bookMetadata.title} ILIKE ${pattern}`,
-            sql`${bookMetadata.seriesName} ILIKE ${pattern}`,
+            accentInsensitiveIlike(bookMetadata.title, pattern),
+            accentInsensitiveIlike(bookMetadata.seriesName, pattern),
             isNotNull(matchedAuthors.bookId),
             isNotNull(matchedSeries.bookId),
           ),

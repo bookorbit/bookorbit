@@ -1,8 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, gt, ilike, inArray, isNull, notInArray, or, sum, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, isNull, notInArray, or, sum, type SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
+import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
 import * as schema from '../../db/schema';
 import { bookDockFiles, type NewBookDockFileRow, type BookDockFileRow } from '../../db/schema';
 
@@ -197,7 +198,7 @@ export class BookDockRepository {
     } else if (status) {
       conditions.push(eq(bookDockFiles.status, status));
     }
-    if (search) conditions.push(ilike(bookDockFiles.fileName, `%${search}%`));
+    if (search) conditions.push(accentInsensitiveIlike(bookDockFiles.fileName, `%${search}%`));
     if (userId !== undefined && !isSuperuser) {
       conditions.push(or(eq(bookDockFiles.uploadedBy, userId), isNull(bookDockFiles.uploadedBy))!);
     }
