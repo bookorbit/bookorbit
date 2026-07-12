@@ -25,7 +25,6 @@ import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../m
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
 import { parsePdfFile, type PdfParseWarning } from '../metadata/lib/pdf-parser';
 import { computeFileHash } from '../scanner/lib/hash';
-import { clampIno } from '../scanner/lib/walk';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -82,9 +81,21 @@ export class UploadService {
       shouldCleanupDestination = true;
       await this.storage.moveToPath(tempPath, absolutePath);
 
-      const { bookId } = await this.processor.createBookRecord(libraryId, folder.id, bookFolderPath, absolutePath, relPath, format, sizeBytes);
+      const { bookId, created } = await this.processor.createBookRecord(
+        libraryId,
+        folder.id,
+        bookFolderPath,
+        absolutePath,
+        relPath,
+        format,
+        sizeBytes,
+      );
 
-      this.processor.extractMetadataAsync(bookId, absolutePath, format);
+      if (created) {
+        this.processor.processNewBookImportAsync(bookId, libraryId, absolutePath, format);
+      } else {
+        this.processor.extractMetadataAsync(bookId, absolutePath, format);
+      }
 
       this.logger.log(
         `[${event}] [end] libraryId=${libraryId} userId=${user.id} folderId=${folder.id} bookId=${bookId} format=${format} sizeBytes=${sizeBytes} durationMs=${Date.now() - startedAt} - upload completed`,
@@ -176,7 +187,7 @@ export class UploadService {
       shouldCleanupDestination = false;
 
       const fileStat = await stat(destination, { bigint: true });
-      const safeIno = clampIno(fileStat.ino);
+      const ino = fileStat.ino;
       const relPath = relative(bookRow.libraryFolderPath, destination);
 
       const [inserted] = await this.db
@@ -186,7 +197,7 @@ export class UploadService {
           libraryFolderId: bookRow.libraryFolderId,
           absolutePath: destination,
           relPath,
-          ino: safeIno,
+          ino,
           sizeBytes,
           mtime: fileStat.mtime,
           fileHash,

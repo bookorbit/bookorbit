@@ -691,6 +691,7 @@ describe('MetadataService', () => {
       seriesIndex: 2,
       genres: ['Fantasy', 'Adventure'],
       audibleId: 'B0AUDIBLE',
+      librofmId: '9781234567890',
       durationSeconds: 1234,
       chapters: [{ title: 'Chapter 1', startMs: 0 }],
       coverBytes: null,
@@ -707,6 +708,7 @@ describe('MetadataService', () => {
         seriesIndex: 2,
         genres: ['Fantasy', 'Adventure'],
         audibleId: 'B0AUDIBLE',
+        librofmId: '9781234567890',
         audioMetadata: expect.objectContaining({
           narrators: ['Audio Narrator'],
           durationSeconds: 1234,
@@ -724,6 +726,7 @@ describe('MetadataService', () => {
         seriesName: 'Audio Series',
         seriesIndex: 2,
         audibleId: 'B0AUDIBLE',
+        librofmId: '9781234567890',
         durationSeconds: 1234,
         chapters: [{ title: 'Chapter 1', startMs: 0 }],
         updatedAt: expect.any(Date),
@@ -985,6 +988,7 @@ describe('MetadataService', () => {
       filterAutomatedBookUpdate: vi.fn().mockResolvedValue({
         dto: {
           audibleId: 'B0SIDE',
+          librofmId: '9780987654321',
           audioMetadata: {
             chapters: [{ title: 'Chapter 1', startMs: 0 }],
             narrators: ['Narrator A'],
@@ -1011,6 +1015,7 @@ describe('MetadataService', () => {
       seriesIndex: null,
       genres: [],
       audibleId: 'B0SIDE',
+      librofmId: '9780987654321',
       durationSeconds: null,
       chapters: [{ title: 'Chapter 1', startMs: 0 }],
       coverBytes: null,
@@ -1021,6 +1026,7 @@ describe('MetadataService', () => {
       70,
       expect.objectContaining({
         audibleId: 'B0SIDE',
+        librofmId: '9780987654321',
         audioMetadata: expect.objectContaining({
           chapters: [{ title: 'Chapter 1', startMs: 0 }],
           narrators: ['Narrator A'],
@@ -1030,6 +1036,12 @@ describe('MetadataService', () => {
     expect(updateSet).toHaveBeenCalledWith(
       expect.objectContaining({
         audibleId: 'B0SIDE',
+        updatedAt: expect.any(Date),
+      }),
+    );
+    expect(updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        librofmId: '9780987654321',
         updatedAt: expect.any(Date),
       }),
     );

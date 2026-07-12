@@ -130,7 +130,7 @@ docker compose -f docker-compose.dev.yml up -d --wait
 
 This starts a PostgreSQL 16 container (with the `pgvector` extension) on port 5432. The `--wait` flag blocks until the database is healthy. Data is persisted in a named Docker volume across restarts.
 
-> **Already have PostgreSQL running?** You can point `DATABASE_URL` in `server/.env` at your existing instance, but you will still need the `uuid-ossp`, `pg_trgm`, and `vector` extensions installed. Using Docker is the easiest path.
+> **Already have PostgreSQL running?** You can point `DATABASE_URL` in `server/.env` at your existing instance, but you will still need the `uuid-ossp`, `pg_trgm`, `unaccent`, and `vector` extensions installed. Using Docker is the easiest path.
 
 #### Step 5 - Apply database migrations
 

@@ -1,9 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { asc, count, desc, eq, ilike, inArray, or, type SQL } from 'drizzle-orm';
+import { asc, count, desc, eq, inArray, or, type SQL } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { CustomIconSort } from '@bookorbit/types';
 
 import { DB } from '../../db';
+import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
 import * as schema from '../../db/schema';
 import type { CustomIconRow, NewCustomIcon } from '../../db/schema';
 
@@ -117,7 +118,7 @@ export class CustomIconRepository {
     const term = q?.trim();
     if (!term) return undefined;
     const pattern = `%${escapeLike(term)}%`;
-    return or(ilike(schema.customIcons.name, pattern), ilike(schema.customIcons.slug, pattern));
+    return or(accentInsensitiveIlike(schema.customIcons.name, pattern), accentInsensitiveIlike(schema.customIcons.slug, pattern));
   }
 }
 

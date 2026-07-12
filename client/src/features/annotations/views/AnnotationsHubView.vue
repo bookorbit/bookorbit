@@ -16,6 +16,7 @@ import AnnotationBulkBar from '../components/AnnotationBulkBar.vue'
 import AnnotationPagination from '../components/AnnotationPagination.vue'
 import { ORIGIN_OPTIONS, SORT_OPTIONS, STYLE_OPTIONS } from '../lib/filter-options'
 import { sourcePill } from '../lib/pill-styles'
+import { annotationReaderRoute } from '../lib/annotation-reader-route'
 import { useAnnotationsHub } from '../composables/useAnnotationsHub'
 import { useAnnotationsUrlSync } from '../composables/useAnnotationsUrlSync'
 import { useDensity } from '../composables/useDensity'
@@ -79,11 +80,8 @@ function handleSetPage(page: number) {
 }
 
 function handleJump(annotation: AnnotationHubItem) {
-  if (!annotation.jumpFileId) return
-  const query: Record<string, string> = {}
-  if (annotation.cfi) query.cfi = annotation.cfi
-  else if (annotation.pageno != null) query.page = String(annotation.pageno)
-  void router.push({ name: 'reader', params: { bookId: annotation.bookId, fileId: annotation.jumpFileId }, query })
+  const route = annotationReaderRoute(annotation)
+  if (route) void router.push(route)
 }
 
 async function handleTrash(id: number) {

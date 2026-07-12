@@ -21,6 +21,7 @@ import {
   normalizeMetadataTextKey,
   normalizeMetadataTextKeySql,
 } from '../../common/utils/metadata-text-normalize.utils';
+import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { refreshPrimaryAuthorSortNamesForAuthors, refreshPrimaryAuthorSortNamesForBooks } from '../../db/book-author-sort-key';
@@ -169,6 +170,7 @@ export class MetadataService {
 
     const { dto: filtered } = await this.bookMetadataLockService.filterAutomatedBookUpdate(bookId, {
       audibleId: data.audibleId,
+      librofmId: data.librofmId,
       audioMetadata: {
         narrators: data.narrators,
         chapters: data.chapters && data.chapters.length > 0 ? data.chapters : null,
@@ -179,6 +181,10 @@ export class MetadataService {
 
     if (filtered.audibleId !== undefined) {
       updates.push(this.db.update(bookMetadata).set({ audibleId: filtered.audibleId, updatedAt: new Date() }).where(eq(bookMetadata.bookId, bookId)));
+    }
+
+    if (filtered.librofmId !== undefined) {
+      updates.push(this.db.update(bookMetadata).set({ librofmId: filtered.librofmId, updatedAt: new Date() }).where(eq(bookMetadata.bookId, bookId)));
     }
 
     if (filtered.audioMetadata?.chapters !== undefined) {
@@ -585,6 +591,7 @@ export class MetadataService {
       subtitle: data.subtitle,
       description: data.description,
       publisher: normalizeMetadataText(data.publisher),
+      publishedDate: data.publishedDate,
       publishedYear: data.publishedYear,
       language: data.language,
       seriesName: normalizeMetadataText(data.seriesName),
@@ -592,6 +599,7 @@ export class MetadataService {
       authors: data.authors.map((author) => author.name),
       genres: data.genres,
       audibleId: data.audibleId,
+      librofmId: data.librofmId,
       audioMetadata: {
         durationSeconds: data.durationSeconds ?? null,
         chapters: data.chapters && data.chapters.length > 0 ? data.chapters : null,
@@ -604,11 +612,22 @@ export class MetadataService {
     if (filtered.subtitle !== undefined) scalarFields.subtitle = filtered.subtitle;
     if (filtered.description !== undefined) scalarFields.description = filtered.description;
     if (filtered.publisher !== undefined) scalarFields.publisher = normalizeMetadataText(filtered.publisher);
-    if (filtered.publishedYear !== undefined) scalarFields.publishedYear = normalizePublishedYear(filtered.publishedYear);
+    const publishedDate = normalizePublishedDate(filtered.publishedDate);
+    if (publishedDate !== undefined) {
+      scalarFields.publishedDate = publishedDate;
+      if (publishedDate !== null) scalarFields.publishedYear = publishedYearFromDateKey(publishedDate);
+    }
+    if (filtered.publishedYear !== undefined && publishedDate === undefined) {
+      scalarFields.publishedDate = null;
+      scalarFields.publishedYear = normalizePublishedYear(filtered.publishedYear);
+    } else if (filtered.publishedYear !== undefined && publishedDate === null) {
+      scalarFields.publishedYear = normalizePublishedYear(filtered.publishedYear);
+    }
     if (filtered.language !== undefined) scalarFields.language = filtered.language;
     if (filtered.seriesName !== undefined) scalarFields.seriesName = normalizeMetadataText(filtered.seriesName);
     if (filtered.seriesIndex !== undefined) scalarFields.seriesIndex = filtered.seriesIndex;
     if (filtered.audibleId !== undefined) scalarFields.audibleId = filtered.audibleId;
+    if (filtered.librofmId !== undefined) scalarFields.librofmId = filtered.librofmId;
     if (filtered.audioMetadata?.durationSeconds !== undefined) scalarFields.durationSeconds = filtered.audioMetadata.durationSeconds;
     if (filtered.audioMetadata?.chapters !== undefined) scalarFields.chapters = filtered.audioMetadata.chapters;
     if (Object.keys(scalarFields).length > 0) {
@@ -644,6 +663,7 @@ export class MetadataService {
       isbn10: data.isbn10 ? data.isbn10.replace(/[^0-9Xx]/g, '') : data.isbn10,
       isbn13: data.isbn13 ? data.isbn13.replace(/[^0-9]/g, '') : data.isbn13,
       publisher: normalizeMetadataText(data.publisher),
+      publishedDate: data.publishedDate,
       publishedYear: data.publishedYear,
       language: data.language,
       seriesName: normalizeMetadataText(data.seriesName),
@@ -674,7 +694,17 @@ export class MetadataService {
     if (filtered.isbn10 !== undefined) scalarFields.isbn10 = filtered.isbn10;
     if (filtered.isbn13 !== undefined) scalarFields.isbn13 = filtered.isbn13;
     if (filtered.publisher !== undefined) scalarFields.publisher = normalizeMetadataText(filtered.publisher);
-    if (filtered.publishedYear !== undefined) scalarFields.publishedYear = normalizePublishedYear(filtered.publishedYear);
+    const publishedDate = normalizePublishedDate(filtered.publishedDate);
+    if (publishedDate !== undefined) {
+      scalarFields.publishedDate = publishedDate;
+      if (publishedDate !== null) scalarFields.publishedYear = publishedYearFromDateKey(publishedDate);
+    }
+    if (filtered.publishedYear !== undefined && publishedDate === undefined) {
+      scalarFields.publishedDate = null;
+      scalarFields.publishedYear = normalizePublishedYear(filtered.publishedYear);
+    } else if (filtered.publishedYear !== undefined && publishedDate === null) {
+      scalarFields.publishedYear = normalizePublishedYear(filtered.publishedYear);
+    }
     if (filtered.language !== undefined) scalarFields.language = filtered.language;
     if (filtered.seriesName !== undefined) scalarFields.seriesName = normalizeMetadataText(filtered.seriesName);
     if (filtered.seriesIndex !== undefined) scalarFields.seriesIndex = filtered.seriesIndex;

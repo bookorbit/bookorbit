@@ -25,6 +25,9 @@ export interface UserSettings {
   notificationPreferences?: import("./notification").NotificationPreferences;
   seriesCollapsePreferences?: import("./series-collapse").SeriesCollapsePreferences;
   dashboardConfig?: import("./dashboard").DashboardConfig;
+  achievementPreferences?: {
+    enabled?: boolean;
+  };
   timezone?: string;
 }
 

@@ -1,8 +1,9 @@
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
-import { SQL, and, count, eq, ilike, inArray, or, sql } from 'drizzle-orm';
+import { SQL, and, count, eq, inArray, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
+import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
 import * as schema from '../../db/schema';
 import {
   authors,
@@ -246,7 +247,7 @@ export class OpdsBookService {
         .select({ one: sql`1` })
         .from(bookAuthors)
         .innerJoin(authors, eq(bookAuthors.authorId, authors.id))
-        .where(and(eq(bookAuthors.bookId, books.id), ilike(authors.name, pattern))!);
+        .where(and(eq(bookAuthors.bookId, books.id), accentInsensitiveIlike(authors.name, pattern))!);
       return sql`exists (${sq})`;
     })();
 
@@ -255,10 +256,15 @@ export class OpdsBookService {
       FROM ${bookSeriesMemberships}
       INNER JOIN ${bookSeries} ON ${bookSeries.id} = ${bookSeriesMemberships.seriesId}
       WHERE ${bookSeriesMemberships.bookId} = ${books.id}
-        AND ${ilike(bookSeries.name, pattern)}
+        AND ${accentInsensitiveIlike(bookSeries.name, pattern)}
     )`;
 
-    const clauses: SQL[] = [ilike(bookMetadata.title, pattern), existsAuthor, existsSeries, ilike(bookMetadata.seriesName, pattern)];
+    const clauses: SQL[] = [
+      accentInsensitiveIlike(bookMetadata.title, pattern),
+      existsAuthor,
+      existsSeries,
+      accentInsensitiveIlike(bookMetadata.seriesName, pattern),
+    ];
     const normalizedIsbn = normalizeIsbnSearchTerm(term);
     if (normalizedIsbn) {
       clauses.push(or(eq(bookMetadata.isbn13, normalizedIsbn), eq(bookMetadata.isbn10, normalizedIsbn))!);
@@ -362,7 +368,7 @@ export class OpdsBookService {
     const where: SQL[] = [inArray(books.libraryId, accessibleIds)];
     const term = opts.q?.trim();
     if (term) {
-      where.push(ilike(authors.name, `%${term.replace(LIKE_SPECIAL_CHARS, '\\$&')}%`));
+      where.push(accentInsensitiveIlike(authors.name, `%${term.replace(LIKE_SPECIAL_CHARS, '\\$&')}%`));
     }
 
     const rows = await this.db
@@ -396,7 +402,7 @@ export class OpdsBookService {
     const where: SQL[] = [inArray(books.libraryId, accessibleIds)];
     const term = opts.q?.trim();
     if (term) {
-      where.push(ilike(bookSeries.name, `%${term.replace(LIKE_SPECIAL_CHARS, '\\$&')}%`));
+      where.push(accentInsensitiveIlike(bookSeries.name, `%${term.replace(LIKE_SPECIAL_CHARS, '\\$&')}%`));
     }
 
     const rows = await this.db

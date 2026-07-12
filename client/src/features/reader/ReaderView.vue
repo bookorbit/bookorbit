@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { useFoliate, type RelocateDetail } from './epub/composables/useFoliate'
@@ -31,7 +31,6 @@ import DictionaryPopover from './epub/components/DictionaryPopover.vue'
 import TranslationPopover from './epub/components/TranslationPopover.vue'
 import TranslationSheet from './epub/components/TranslationSheet.vue'
 import KeyboardShortcutsModal from './epub/components/KeyboardShortcutsModal.vue'
-import PdfV4ReaderView from './pdf-v4/PdfV4ReaderView.vue'
 import CbzReaderView from './cbz/CbzReaderView.vue'
 import AudiobookReaderView from './audiobook/AudiobookReaderView.vue'
 import type { ReaderState } from './epub/composables/useReaderState'
@@ -39,6 +38,8 @@ import type { FoliateLocationContext, FoliateRenderer } from './epub/composables
 import type { EpubReaderSettings } from '@bookorbit/types'
 import { findMatchingCfiRange } from './epub/utils'
 import { getFormatGroup } from '@bookorbit/types'
+
+const PdfV4ReaderView = defineAsyncComponent(() => import('./pdf-v4/PdfV4ReaderView.vue'))
 
 const route = useRoute()
 const router = useRouter()

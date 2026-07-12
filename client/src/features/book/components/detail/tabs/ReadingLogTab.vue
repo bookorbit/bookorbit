@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { BookDetail, UserBookStatus } from '@bookorbit/types'
+import { Ellipsis, RotateCcw } from '@lucide/vue'
+import { Permission, type BookDetail, type UserBookStatus } from '@bookorbit/types'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useBookReadingLog, type AddReadingSessionPayload } from '@/features/book/composables/useBookReadingLog'
+import { useResetReadingState } from '@/features/book/composables/useResetReadingState'
+import ResetReadingStateDialog from '@/features/book/components/ResetReadingStateDialog.vue'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import ReadingLogHero from './ReadingLogHero.vue'
-import ReadingLogSourceSplit from './ReadingLogSourceSplit.vue'
 import ReadingLogJourneyChart from './ReadingLogJourneyChart.vue'
 import ReadingLogHeatmap from './ReadingLogHeatmap.vue'
 import ReadingLogTable from './ReadingLogTable.vue'
@@ -29,11 +33,23 @@ const {
   hasMore,
   deleteSession,
   addSession,
+  reload,
   exportAll,
   loadMore,
   setSort,
   setFilters,
 } = useBookReadingLog(bookIdRef)
+
+const { hasPermission } = usePermissions()
+const canResetReadingState = computed(() => hasPermission(Permission.LibraryEditMetadata))
+const {
+  open: resetDialogOpen,
+  resetting: resettingReadingState,
+  error: resetReadingStateError,
+  openDialog: openResetReadingStateDialog,
+  closeDialog: closeResetReadingStateDialog,
+  resetReadingState,
+} = useResetReadingState(bookIdRef)
 
 type QuickFilter = 'all' | 'last30' | 'last90' | 'thisYear'
 const activeQuick = ref<QuickFilter>('all')
@@ -61,6 +77,12 @@ function applyQuickFilter(q: QuickFilter) {
   setFilters({ dateFrom: buildDateFrom(q), dateTo: undefined, format: selectedFormat.value })
 }
 
+function handleQuickFilterClick(event: MouseEvent) {
+  const value = (event.currentTarget as HTMLElement).dataset.quickFilter as QuickFilter | undefined
+  if (!value) return
+  applyQuickFilter(value)
+}
+
 function handleFormatChange(e: Event) {
   const fmt = (e.target as HTMLSelectElement).value || undefined
   selectedFormat.value = fmt
@@ -81,6 +103,17 @@ async function handleDeleteSession(sessionId: number) {
 
 function handleHeroSaved(readStatus: UserBookStatus) {
   emit('saved', { ...props.book, readStatus })
+}
+
+function handleOpenResetReadingState() {
+  openResetReadingStateDialog()
+}
+
+async function handleResetReadingState() {
+  const result = await resetReadingState()
+  if (!result) return
+  await reload()
+  emit('saved', { ...props.book, readStatus: result.readStatus })
 }
 
 const addDialogOpen = ref(false)
@@ -119,52 +152,70 @@ const quickFilters: { label: string; value: QuickFilter }[] = [
 </script>
 
 <template>
-  <div class="space-y-5">
+  <div class="space-y-4">
     <div v-if="error" class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive">
       {{ error }}
     </div>
 
     <ReadingLogHero :book="book" :stats="stats" :loading="loading" @saved="handleHeroSaved" @add-session="handleOpenAddSession" />
 
-    <ReadingLogSourceSplit :stats="stats" />
+    <div class="rounded-xl border border-border/80 bg-card p-2 shadow-[var(--elevation-xs)]">
+      <div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="px-2 text-xs font-medium text-muted-foreground">Show</span>
+          <div class="flex flex-wrap items-center gap-1 rounded-lg bg-muted/70 p-1" role="group" aria-label="Reading session date range">
+            <button
+              v-for="qf in quickFilters"
+              :key="qf.value"
+              :data-quick-filter="qf.value"
+              class="h-7 rounded-md px-2.5 text-xs font-medium transition-colors sm:text-sm"
+              :class="
+                activeQuick === qf.value ? 'bg-card text-foreground shadow-[var(--elevation-xs)]' : 'text-muted-foreground hover:text-foreground'
+              "
+              @click="handleQuickFilterClick"
+            >
+              {{ qf.label }}
+            </button>
+          </div>
+        </div>
 
-    <div class="flex flex-wrap items-center gap-2">
-      <button
-        v-for="qf in quickFilters"
-        :key="qf.value"
-        class="px-3 py-1.5 rounded-md text-sm font-medium border transition-colors"
-        :class="
-          activeQuick === qf.value
-            ? 'bg-primary text-primary-foreground border-primary'
-            : 'bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted'
-        "
-        @click="() => applyQuickFilter(qf.value)"
-      >
-        {{ qf.label }}
-      </button>
+        <div class="flex flex-wrap items-center gap-1.5">
+          <label v-if="hasMultipleFormats" class="sr-only" for="reading-log-format">Format</label>
+          <select
+            v-if="hasMultipleFormats"
+            id="reading-log-format"
+            class="h-8 rounded-md border border-border bg-background px-2.5 text-sm text-foreground transition-colors focus:outline-none focus:ring-1 focus:ring-primary"
+            :value="selectedFormat ?? ''"
+            @change="handleFormatChange"
+          >
+            <option value="">All formats</option>
+            <option v-for="fmt in uniqueFormats" :key="fmt" :value="fmt">{{ fmt.toUpperCase() }}</option>
+          </select>
 
-      <div class="ml-auto flex items-center gap-2">
-        <select
-          v-if="hasMultipleFormats"
-          class="px-3 py-1.5 rounded-md text-sm border border-border bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-          :value="selectedFormat ?? ''"
-          @change="handleFormatChange"
-        >
-          <option value="">All formats</option>
-          <option v-for="fmt in uniqueFormats" :key="fmt" :value="fmt">{{ fmt.toUpperCase() }}</option>
-        </select>
-
-        <ReadingLogExportMenu :book-title="bookTitle" :total="total" :export-all="exportAll" />
+          <ReadingLogExportMenu :book-title="bookTitle" :total="total" :export-all="exportAll" />
+          <DropdownMenu v-if="canResetReadingState">
+            <DropdownMenuTrigger as-child>
+              <button
+                class="inline-flex size-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="More reading log actions"
+              >
+                <Ellipsis class="size-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" class="w-52">
+              <DropdownMenuItem class="text-destructive focus:text-destructive" @click="handleOpenResetReadingState">
+                <RotateCcw class="mr-2 size-4" />
+                Reset reading state
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-4 lg:grid-cols-5 lg:items-start">
-      <div class="lg:col-span-3">
-        <ReadingLogJourneyChart :stats="stats" :loading="loading" />
-      </div>
-      <div class="lg:col-span-2">
-        <ReadingLogHeatmap :stats="stats" :loading="loading" :quick-filter="activeQuick" />
-      </div>
+    <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <ReadingLogJourneyChart :sessions="sessions" :stats="stats" :loading="loading" />
+      <ReadingLogHeatmap :stats="stats" :loading="loading" :quick-filter="activeQuick" />
     </div>
 
     <ReadingLogTable
@@ -188,6 +239,14 @@ const quickFilters: { label: string; value: QuickFilter }[] = [
       :error="addError"
       @close="handleCloseAddSession"
       @submit="handleAddSessionSubmit"
+    />
+
+    <ResetReadingStateDialog
+      :open="resetDialogOpen"
+      :resetting="resettingReadingState"
+      :error="resetReadingStateError"
+      @close="closeResetReadingStateDialog"
+      @confirm="handleResetReadingState"
     />
   </div>
 </template>

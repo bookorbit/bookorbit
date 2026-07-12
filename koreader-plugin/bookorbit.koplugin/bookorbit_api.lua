@@ -2,7 +2,8 @@
 HTTP client for the BookOrbit server.
 
 Speaks the kosync-compatible progress endpoints plus the BookOrbit plugin
-endpoints. All requests are blocking; callers keep them short and chunked.
+endpoints. Sync clients run blocking requests in a subprocess when called from
+a Trapper coroutine, keeping KOReader's UI loop responsive.
 ]]
 
 local http = require("socket.http")
@@ -70,6 +71,7 @@ function BookOrbitApi.new(opts)
         device_id = opts.device_id,
         device_model = opts.device_model,
         plugin_version = opts.plugin_version,
+        background_requests = opts.background_requests == true,
     }, BookOrbitApi)
 end
 
@@ -79,7 +81,7 @@ end
 
 -- Returns decoded_body on success, or nil, err_code, decoded_error_body.
 -- err_code is a number for HTTP errors and a string for transport errors.
-function BookOrbitApi:request(method, path, body)
+function BookOrbitApi:requestBlocking(method, path, body)
     local sink = {}
     local request = {
         url = self.server_url .. path,
@@ -125,6 +127,31 @@ function BookOrbitApi:request(method, path, body)
     end
 
     return decoded or {}
+end
+
+function BookOrbitApi:request(method, path, body)
+    if not self.background_requests then
+        return self:requestBlocking(method, path, body)
+    end
+
+    local loaded, Trapper = pcall(require, "ui/trapper")
+    if not loaded or not Trapper:isWrapped() then
+        return self:requestBlocking(method, path, body)
+    end
+
+    -- An unmounted widget lets Trapper poll without intercepting reader input.
+    local trap_widget = {}
+    local completed, result = Trapper:dismissableRunInSubprocess(function()
+        local response, err, errbody = self:requestBlocking(method, path, body)
+        return { response = response, err = err, errbody = errbody }
+    end, trap_widget)
+    trap_widget.dismiss_callback = nil
+    if not completed then
+        return nil, "background_request_interrupted"
+    end
+
+    result = result or {}
+    return result.response, result.err, result.errbody
 end
 
 function BookOrbitApi:query(path, params)

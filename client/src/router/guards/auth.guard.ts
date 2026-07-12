@@ -35,6 +35,10 @@ export function registerAuthGuard(router: Router): void {
       if (to.path !== '/') return { path: '/' }
     }
 
+    if (to.name === 'achievements' && user.value.settings.achievementPreferences?.enabled === false) {
+      return { name: 'settings-account', query: { tab: 'profile' } }
+    }
+
     return true
   })
 }

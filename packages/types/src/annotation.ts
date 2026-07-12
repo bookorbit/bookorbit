@@ -102,6 +102,7 @@ export interface AnnotationHubItem extends AnnotationItem {
   bookTitle: string | null;
   author: string | null;
   deletedAt: string | null;
+  jumpFileFormat: string | null;
 }
 
 export interface AnnotationHubStats {

@@ -11,7 +11,7 @@ interface ViewLike {
 
 type DocTarget = EventTarget & Document
 
-function makeDocTarget(): DocTarget {
+function makeDocTarget(selection: Selection | null = null): DocTarget {
   const target = new EventTarget() as DocTarget
   const frameElement = {
     getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 }) as DOMRect,
@@ -21,11 +21,20 @@ function makeDocTarget(): DocTarget {
     configurable: true,
     value: {
       frameElement,
-      getSelection: () => null,
+      getSelection: () => selection,
     },
   })
 
   return target
+}
+
+function makeTouchEvent(type: string, touches: { clientX: number; clientY: number }[], changedTouches = touches): TouchEvent {
+  const event = new Event(type, { bubbles: true, cancelable: true }) as TouchEvent
+  Object.defineProperties(event, {
+    touches: { value: touches },
+    changedTouches: { value: changedTouches },
+  })
+  return event
 }
 
 describe('useFoliateInput', () => {
@@ -98,6 +107,33 @@ describe('useFoliateInput', () => {
 
     expect(next).toHaveBeenCalledTimes(1)
     expect(prev).toHaveBeenCalledTimes(1)
+
+    input.cleanup()
+  })
+
+  it('preserves native touch gestures while adjusting an active text selection', () => {
+    vi.useFakeTimers()
+
+    const handleSelectionEnd = vi.fn<() => void>()
+    const selection = {
+      isCollapsed: false,
+      rangeCount: 1,
+    } as Selection
+    const input = useFoliateInput(() => null, undefined, handleSelectionEnd, vi.fn<() => void>())
+    const doc = makeDocTarget(selection)
+    input.attachIframeClicks(doc)
+
+    doc.dispatchEvent(makeTouchEvent('touchstart', [{ clientX: 20, clientY: 30 }]))
+    const move = makeTouchEvent('touchmove', [{ clientX: 30, clientY: 40 }])
+    const end = makeTouchEvent('touchend', [], [{ clientX: 30, clientY: 40 }])
+
+    doc.dispatchEvent(move)
+    doc.dispatchEvent(end)
+    vi.advanceTimersByTime(50)
+
+    expect(move.defaultPrevented).toBe(false)
+    expect(end.defaultPrevented).toBe(false)
+    expect(handleSelectionEnd).toHaveBeenCalledWith(doc)
 
     input.cleanup()
   })

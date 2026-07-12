@@ -82,7 +82,7 @@ export class KoboAnalyticsService {
     for (const ev of events) {
       try {
         if (ev.EventType === 'LeaveContent') {
-          await this.handleLeaveContent(ev, user, leaveContentContexts.get(ev) ?? { progressDelta: null, startedAtMs: null });
+          await this.handleLeaveContent(ev, user, device.deviceId, leaveContentContexts.get(ev) ?? { progressDelta: null, startedAtMs: null });
         } else if (ev.EventType === 'RateBook') {
           await this.handleRateBook(ev, user);
         }
@@ -134,7 +134,7 @@ export class KoboAnalyticsService {
     await this.bookService.bulkSetRating([bookId], rating, user);
   }
 
-  private async handleLeaveContent(ev: KoboAnalyticsEvent, user: RequestUser, context: LeaveContentContext): Promise<void> {
+  private async handleLeaveContent(ev: KoboAnalyticsEvent, user: RequestUser, deviceId: number, context: LeaveContentContext): Promise<void> {
     const volumeid = this.extractVolumeId(ev);
     const durationSeconds = parseKoboDurationSeconds(ev.Metrics);
     if (volumeid === null || durationSeconds === null) {
@@ -152,7 +152,7 @@ export class KoboAnalyticsService {
       return;
     }
 
-    const resolved = await this.resolver.resolveBookFileId(user.id, bookId);
+    const resolved = await this.resolver.resolveBookFileId(user.id, deviceId, bookId);
     if (resolved.kind !== 'resolved') {
       this.logger.log(`[kobo.analytics.session] [skip] bookId=${bookId} userId=${user.id} reason=${resolved.reason}`);
       return;

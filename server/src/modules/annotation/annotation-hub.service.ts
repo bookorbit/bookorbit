@@ -93,7 +93,17 @@ export class AnnotationHubService {
     if (!restored) throw new NotFoundException(`Annotation ${annotationId} not found in trash`);
     const row = await this.annotationRepo.findHubById(userId, annotationId);
     return this.toHubItem(
-      row ?? { ...restored, cfi: null, cfiStatus: null, cfiExtras: null, bookTitle: null, author: null, jumpFileId: null, pageno: null },
+      row ?? {
+        ...restored,
+        cfi: null,
+        cfiStatus: null,
+        cfiExtras: null,
+        bookTitle: null,
+        author: null,
+        jumpFileId: null,
+        jumpFileFormat: null,
+        pageno: null,
+      },
     );
   }
 
@@ -186,6 +196,7 @@ export class AnnotationHubService {
       author: row.author,
       deletedAt: row.deletedAt ? row.deletedAt.toISOString() : null,
       jumpFileId: row.jumpFileId,
+      jumpFileFormat: row.jumpFileFormat,
       pageno: row.pageno,
     };
   }

@@ -8,6 +8,7 @@ const PROVIDER_ICON_PATHS = {
   openLibrary: `${PROVIDER_ICON_BASE_PATH}/openlibrary.svg`,
   itunes: `${PROVIDER_ICON_BASE_PATH}/apple-books.svg`,
   audible: `${PROVIDER_ICON_BASE_PATH}/audible.svg`,
+  librofm: `${PROVIDER_ICON_BASE_PATH}/librofm.svg`,
   kobo: `${PROVIDER_ICON_BASE_PATH}/kobo.svg`,
   ranobedb: `${PROVIDER_ICON_BASE_PATH}/ranobedb.svg`,
   lubimyczytac: `${PROVIDER_ICON_BASE_PATH}/lubimyczytac.svg`,

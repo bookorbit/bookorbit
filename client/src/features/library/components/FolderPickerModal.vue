@@ -1,338 +1,328 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted } from 'vue'
-import { Folder, FolderOpen, FolderPlus, ChevronRight, ChevronUp, Search, X, Check, Loader2, HardDrive } from '@lucide/vue'
-import type { CreateFolderResult, PathConfig } from '@bookorbit/types'
-import { api } from '@/lib/api'
+import { computed, ref } from 'vue'
+import { Check, ChevronRight, ChevronUp, Folder, FolderOpen, FolderPlus, HardDrive, Info, Loader2, Search, X } from '@lucide/vue'
+import { RecycleScroller } from 'vue-virtual-scroller'
+import { useModal } from '@/composables/useModal'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useFolderBrowser } from '../composables/useFolderBrowser'
 
-interface DirEntry {
-  name: string
-  path: string
-}
+const props = withDefaults(
+  defineProps<{
+    selectedPaths?: string[]
+  }>(),
+  {
+    selectedPaths: () => [],
+  },
+)
 
 const emit = defineEmits<{
-  select: [path: string]
+  select: [paths: string[]]
   close: []
 }>()
 
-const browseRoot = ref('/')
-const currentPath = ref('/')
-const entries = ref<DirEntry[]>([])
-const loading = ref(false)
-const initialized = ref(false)
-const search = ref('')
-const error = ref<string | null>(null)
+const panel = ref<HTMLElement | null>(null)
+const {
+  currentPath,
+  loading,
+  search,
+  error,
+  selectedPaths,
+  selectionNotice,
+  creatingFolder,
+  newFolderName,
+  createError,
+  createLoading,
+  newFolderInput,
+  filteredEntries,
+  breadcrumbs,
+  canGoUp,
+  selectedCount,
+  navigate,
+  goUp,
+  reloadCurrent,
+  clearSearch,
+  isSelected,
+  existingPathStatus,
+  selectedPathStatus,
+  isSelectionDisabled,
+  toggleSelection,
+  toggleCurrentPath,
+  toggleNewFolder,
+  cancelNewFolder,
+  submitNewFolder,
+  onNewFolderKeydown,
+} = useFolderBrowser(() => props.selectedPaths)
 
-const filteredEntries = computed(() => {
-  const q = search.value.trim().toLowerCase()
-  return q ? entries.value.filter((e) => e.name.toLowerCase().includes(q)) : entries.value
+const addButtonLabel = computed(() => {
+  if (selectedCount.value === 0) return 'Add folders'
+  return `Add ${selectedCount.value} folder${selectedCount.value === 1 ? '' : 's'}`
 })
 
-const breadcrumbs = computed(() => {
-  const root = normalizePath(browseRoot.value)
-  const current = normalizePath(currentPath.value)
-  const crumbs = [{ label: root, path: root }]
-  if (current === root) return crumbs
+function requestClose() {
+  if (createLoading.value) return
+  emit('close')
+}
 
-  const relative = root === '/' ? current.slice(1) : current.slice(root.length + 1)
-  const parts = relative.split('/').filter(Boolean)
-  let built = root === '/' ? '' : root
-  for (const part of parts) {
-    built = built ? `${built}/${part}` : `/${part}`
-    crumbs.push({ label: part, path: built })
-  }
-  return crumbs
+function addSelectedFolders() {
+  if (selectedPaths.value.length === 0) return
+  emit('select', selectedPaths.value)
+}
+
+useModal({
+  container: panel,
+  onClose: requestClose,
+  disabled: () => createLoading.value,
 })
-
-const canGoUp = computed(() => normalizePath(currentPath.value) !== normalizePath(browseRoot.value))
-
-async function navigate(path: string) {
-  search.value = ''
-  const normalized = normalizePath(path)
-  currentPath.value = isAtOrBelowBrowseRoot(normalized) ? normalized : browseRoot.value
-}
-
-async function goUp() {
-  if (!canGoUp.value) return
-  const parts = currentPath.value.split('/').filter(Boolean)
-  parts.pop()
-  const parent = parts.length === 0 ? '/' : '/' + parts.join('/')
-  navigate(parent)
-}
-
-async function loadEntries(path: string) {
-  loading.value = true
-  error.value = null
-  try {
-    const res = await api(`/api/v1/path?path=${encodeURIComponent(path)}`)
-    if (res.ok) {
-      entries.value = await res.json()
-    } else {
-      error.value = 'Could not read directory'
-      entries.value = []
-    }
-  } catch {
-    error.value = 'Could not connect'
-    entries.value = []
-  } finally {
-    loading.value = false
-  }
-}
-
-async function loadConfig() {
-  try {
-    const res = await api('/api/v1/path/config')
-    if (res.ok) {
-      const config: PathConfig = await res.json()
-      browseRoot.value = normalizePath(config.root)
-    }
-  } catch {
-    browseRoot.value = '/'
-  } finally {
-    currentPath.value = browseRoot.value
-    await loadEntries(currentPath.value)
-    initialized.value = true
-  }
-}
-
-watch(currentPath, (p) => {
-  if (initialized.value) void loadEntries(p)
-})
-
-onMounted(() => {
-  void loadConfig()
-})
-
-function selectCurrent() {
-  emit('select', currentPath.value)
-}
-
-const creatingFolder = ref(false)
-const newFolderName = ref('')
-const createError = ref<string | null>(null)
-const createLoading = ref(false)
-const newFolderInput = ref<HTMLInputElement | null>(null)
-
-function toggleNewFolder() {
-  creatingFolder.value = !creatingFolder.value
-  newFolderName.value = ''
-  createError.value = null
-  if (creatingFolder.value) {
-    nextTick(() => newFolderInput.value?.focus())
-  }
-}
-
-function cancelNewFolder() {
-  creatingFolder.value = false
-  newFolderName.value = ''
-  createError.value = null
-}
-
-async function submitNewFolder() {
-  const name = newFolderName.value.trim()
-  if (!name || createLoading.value) return
-  if (name.includes('/') || name.includes('\\') || name === '.' || name === '..' || name.startsWith('.')) {
-    createError.value = 'Enter a single folder name without slashes or leading dots'
-    return
-  }
-  createLoading.value = true
-  createError.value = null
-  try {
-    const res = await api('/api/v1/path', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ parentPath: currentPath.value, name }),
-    })
-    if (res.ok) {
-      const created: CreateFolderResult = await res.json()
-      creatingFolder.value = false
-      newFolderName.value = ''
-      navigate(created.path)
-    } else {
-      const body = await res.json().catch(() => ({}))
-      const message = Array.isArray(body?.message) ? body.message[0] : body?.message
-      createError.value = message ?? 'Could not create folder'
-    }
-  } catch {
-    createError.value = 'Could not connect'
-  } finally {
-    createLoading.value = false
-  }
-}
-
-function onNewFolderKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter') {
-    e.preventDefault()
-    submitNewFolder()
-  } else if (e.key === 'Escape') {
-    e.preventDefault()
-    cancelNewFolder()
-  }
-}
-
-function normalizePath(path: string): string {
-  const trimmed = path.trim() || '/'
-  if (trimmed === '/') return '/'
-  return trimmed.replace(/\/+$/, '')
-}
-
-function isAtOrBelowBrowseRoot(path: string): boolean {
-  const root = normalizePath(browseRoot.value)
-  return root === '/' || path === root || path.startsWith(`${root}/`)
-}
 </script>
 
 <template>
   <Teleport to="body">
-    <div class="fixed inset-0 z-[80] flex items-center justify-center p-4">
-      <div class="absolute inset-0 bg-black/50 backdrop-blur-[2px]" @click="emit('close')" />
-
+    <div
+      class="fixed inset-0 z-[80] flex items-end justify-center bg-foreground/30 sm:items-center sm:p-4"
+      role="presentation"
+      @click.self="requestClose"
+    >
       <div
-        class="relative flex flex-col w-full max-w-lg bg-background rounded-lg shadow-2xl border border-border overflow-hidden"
-        style="height: min(80vh, 560px)"
+        ref="panel"
+        class="flex h-dvh w-full flex-col overflow-hidden bg-background shadow-2xl outline-none sm:h-[min(82dvh,700px)] sm:max-w-xl sm:rounded-lg sm:border sm:border-border"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="folder-picker-title"
+        aria-describedby="folder-picker-description"
+        tabindex="-1"
       >
-        <!-- Header -->
-        <div class="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-          <div class="flex items-center gap-2">
-            <HardDrive :size="15" class="text-primary" />
-            <span class="text-sm font-semibold text-foreground">Browse folders</span>
+        <header class="flex shrink-0 items-start justify-between gap-3 border-b border-border bg-card px-4 py-3">
+          <div class="flex min-w-0 items-start gap-2.5">
+            <HardDrive :size="18" class="mt-0.5 shrink-0 text-primary" />
+            <div class="min-w-0">
+              <h2 id="folder-picker-title" class="text-base font-semibold text-foreground">Browse server folders</h2>
+              <p id="folder-picker-description" class="text-xs text-muted-foreground">Select one or more folders for this library.</p>
+            </div>
           </div>
-          <div class="flex items-center gap-1">
-            <button
-              class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              @click="toggleNewFolder"
-            >
-              <FolderPlus :size="13" />
-              New folder
-            </button>
-            <button
-              class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              @click="emit('close')"
-            >
-              <X :size="14" />
-            </button>
-          </div>
-        </div>
+          <button
+            type="button"
+            class="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            aria-label="Close folder browser"
+            @click="requestClose"
+          >
+            <X :size="18" />
+          </button>
+        </header>
 
-        <!-- Breadcrumb -->
-        <div class="flex items-center gap-1 px-4 py-2 border-b border-border bg-muted/30 shrink-0 overflow-x-auto">
+        <nav class="flex h-9 shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-muted/25 px-3" aria-label="Current folder">
           <Tooltip>
             <TooltipTrigger as-child>
               <button
-                v-if="canGoUp"
-                class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 mr-1"
+                type="button"
+                class="mr-1 flex size-7 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-30"
+                :disabled="!canGoUp"
+                aria-label="Go to parent folder"
                 @click="goUp"
               >
-                <ChevronUp :size="13" />
+                <ChevronUp :size="14" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Go up</TooltipContent>
+            <TooltipContent>Go to parent folder</TooltipContent>
           </Tooltip>
-          <template v-for="(crumb, i) in breadcrumbs" :key="crumb.path">
-            <ChevronRight v-if="i > 0" :size="12" class="text-muted-foreground/70 shrink-0" />
+          <template v-for="(crumb, index) in breadcrumbs" :key="crumb.path">
+            <ChevronRight v-if="index > 0" :size="12" class="shrink-0 text-muted-foreground/60" />
             <button
-              class="text-xs px-1 py-0.5 rounded transition-colors shrink-0 whitespace-nowrap"
-              :class="i === breadcrumbs.length - 1 ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-muted'"
+              type="button"
+              class="shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 text-xs transition-colors"
+              :class="
+                index === breadcrumbs.length - 1
+                  ? 'bg-background font-medium text-foreground shadow-xs'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              "
               @click="navigate(crumb.path)"
             >
               {{ crumb.label }}
             </button>
           </template>
-        </div>
+        </nav>
 
-        <!-- Search -->
-        <div class="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0">
-          <Search :size="13" class="text-muted-foreground shrink-0" />
-          <input
-            v-model="search"
-            type="text"
-            placeholder="Filter folders…"
-            class="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
-          />
-          <button v-if="search" class="text-muted-foreground hover:text-foreground" @click="search = ''">
-            <X :size="12" />
+        <div class="grid shrink-0 gap-2 border-b border-border p-2 sm:grid-cols-[1fr_auto] sm:px-3">
+          <label class="flex h-9 items-center gap-2 rounded-md border border-input bg-background px-2.5 focus-within:ring-1 focus-within:ring-ring">
+            <Search :size="15" class="shrink-0 text-muted-foreground" />
+            <input
+              v-model="search"
+              type="text"
+              placeholder="Filter this folder"
+              class="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
+            />
+            <button
+              v-if="search"
+              type="button"
+              class="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="Clear folder filter"
+              @click="clearSearch"
+            >
+              <X :size="14" />
+            </button>
+          </label>
+          <button
+            type="button"
+            class="flex h-9 items-center justify-center gap-2 rounded-md border border-border px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+            @click="toggleNewFolder"
+          >
+            <FolderPlus :size="15" />
+            New folder
           </button>
         </div>
 
-        <!-- New folder -->
-        <div v-if="creatingFolder" class="px-3 py-2 border-b border-border bg-muted/20 shrink-0">
-          <div class="flex items-center gap-2">
-            <FolderPlus :size="13" class="text-primary shrink-0" />
-            <input
-              ref="newFolderInput"
-              v-model="newFolderName"
-              type="text"
-              placeholder="New folder name"
-              class="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
-              @keydown="onNewFolderKeydown"
-            />
-            <button
-              class="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity shrink-0 disabled:opacity-50"
-              :disabled="!newFolderName.trim() || createLoading"
-              @click="submitNewFolder"
+        <div v-if="creatingFolder" class="shrink-0 border-b border-border bg-muted/20 p-2 sm:px-3">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <label
+              class="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-input bg-background px-2.5 focus-within:ring-1 focus-within:ring-ring"
             >
-              <Loader2 v-if="createLoading" :size="12" class="animate-spin" />
-              Create
-            </button>
-            <button
-              class="px-2.5 py-1 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
-              @click="cancelNewFolder"
-            >
-              Cancel
-            </button>
+              <FolderPlus :size="15" class="shrink-0 text-primary" />
+              <input
+                ref="newFolderInput"
+                v-model="newFolderName"
+                type="text"
+                placeholder="New folder name"
+                class="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
+                @keydown="onNewFolderKeydown"
+              />
+            </label>
+            <div class="grid grid-cols-2 gap-2 sm:flex">
+              <button
+                type="button"
+                class="flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+                :disabled="!newFolderName.trim() || createLoading"
+                @click="submitNewFolder"
+              >
+                <Loader2 v-if="createLoading" :size="15" class="animate-spin" />
+                Create
+              </button>
+              <button
+                type="button"
+                class="h-9 rounded-md border border-border px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                @click="cancelNewFolder"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
-          <p v-if="createError" class="mt-1.5 pl-5 text-xs text-destructive">{{ createError }}</p>
+          <p v-if="createError" class="mt-2 text-sm text-destructive">{{ createError }}</p>
         </div>
 
-        <!-- Directory list -->
-        <div class="flex-1 overflow-y-auto">
-          <div v-if="loading" class="flex items-center justify-center h-full">
-            <Loader2 :size="20" class="animate-spin text-muted-foreground" />
+        <div class="min-h-0 flex-1 overflow-hidden">
+          <div v-if="loading" class="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
+            <Loader2 :size="24" class="animate-spin" />
+            <p class="text-sm">Loading folders...</p>
           </div>
 
-          <div v-else-if="error" class="flex items-center justify-center h-full">
+          <div v-else-if="error" class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+            <FolderOpen :size="30" class="text-muted-foreground/60" />
             <p class="text-sm text-muted-foreground">{{ error }}</p>
-          </div>
-
-          <div v-else-if="filteredEntries.length === 0" class="flex items-center justify-center h-full">
-            <p class="text-sm text-muted-foreground">No folders found</p>
-          </div>
-
-          <div v-else class="py-1">
-            <button
-              v-for="entry in filteredEntries"
-              :key="entry.path"
-              class="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/60 transition-colors group"
-              @click="navigate(entry.path)"
-            >
-              <Folder :size="15" class="text-primary/70 shrink-0 group-hover:hidden" />
-              <FolderOpen :size="15" class="text-primary shrink-0 hidden group-hover:block" />
-              <span class="flex-1 text-sm text-foreground text-left truncate">{{ entry.name }}</span>
-              <ChevronRight :size="13" class="text-muted-foreground/60 shrink-0" />
+            <button type="button" class="h-10 rounded-lg border border-border px-4 text-sm font-medium hover:bg-muted" @click="reloadCurrent">
+              Retry
             </button>
+          </div>
+
+          <div v-else class="flex h-full min-h-0 flex-col">
+            <label
+              class="flex h-11 shrink-0 cursor-pointer items-center gap-2.5 border-b border-border bg-muted/15 px-3 transition-colors hover:bg-muted/40"
+              :class="[isSelected(currentPath) ? 'bg-primary/10' : '', isSelectionDisabled(currentPath) ? 'cursor-not-allowed opacity-60' : '']"
+            >
+              <input
+                type="checkbox"
+                class="size-4 shrink-0 accent-primary"
+                :checked="isSelected(currentPath)"
+                :disabled="isSelectionDisabled(currentPath)"
+                @change="toggleCurrentPath"
+              />
+              <FolderOpen :size="17" class="shrink-0 text-primary" />
+              <span class="min-w-0 flex-1 truncate text-sm font-medium text-foreground">Select current folder</span>
+              <span class="max-w-40 truncate font-mono text-xs text-muted-foreground">{{ currentPath }}</span>
+              <span
+                v-if="existingPathStatus(currentPath) || selectedPathStatus(currentPath)"
+                class="shrink-0 text-xs font-medium text-muted-foreground"
+              >
+                {{ existingPathStatus(currentPath) || selectedPathStatus(currentPath) }}
+              </span>
+            </label>
+
+            <div v-if="filteredEntries.length === 0" class="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+              <Folder :size="28" class="text-muted-foreground/50" />
+              <p class="text-sm font-medium text-foreground">{{ search ? 'No matching folders' : 'This folder is empty' }}</p>
+              <p class="text-sm text-muted-foreground">
+                {{ search ? 'Try a different filter.' : 'You can select the current folder or create a new one.' }}
+              </p>
+            </div>
+
+            <RecycleScroller v-else class="min-h-0 flex-1 overflow-y-auto" :items="filteredEntries" :item-size="40" key-field="path">
+              <template #default="{ item: entry }">
+                <div class="flex h-10 items-stretch border-b border-border/60 px-1.5 sm:px-2">
+                  <label
+                    class="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded px-2 transition-colors hover:bg-muted/50"
+                    :class="isSelectionDisabled(entry.path) ? 'cursor-not-allowed opacity-60' : ''"
+                  >
+                    <input
+                      type="checkbox"
+                      class="size-4 shrink-0 accent-primary"
+                      :checked="isSelected(entry.path)"
+                      :disabled="isSelectionDisabled(entry.path)"
+                      @change="toggleSelection(entry.path)"
+                    />
+                    <Folder :size="16" class="shrink-0 text-primary/80" />
+                    <span class="min-w-0 flex-1">
+                      <span class="block truncate text-sm font-medium text-foreground">{{ entry.name }}</span>
+                      <span
+                        v-if="existingPathStatus(entry.path) || selectedPathStatus(entry.path)"
+                        class="block truncate text-xs text-muted-foreground"
+                      >
+                        {{ existingPathStatus(entry.path) || selectedPathStatus(entry.path) }}
+                      </span>
+                    </span>
+                  </label>
+                  <button
+                    type="button"
+                    class="flex size-10 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    :aria-label="`Open ${entry.name}`"
+                    @click="navigate(entry.path)"
+                  >
+                    <ChevronRight :size="16" />
+                  </button>
+                </div>
+              </template>
+            </RecycleScroller>
           </div>
         </div>
 
-        <!-- Footer -->
-        <div class="shrink-0 border-t border-border px-4 py-3 flex items-center justify-between gap-3 bg-muted/20">
-          <p class="text-xs text-muted-foreground font-mono truncate">{{ currentPath }}</p>
-          <div class="flex items-center gap-2 shrink-0">
-            <button
-              class="px-3 py-1.5 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              @click="emit('close')"
-            >
-              Cancel
-            </button>
-            <button
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
-              @click="selectCurrent"
-            >
-              <Check :size="12" />
-              Select this folder
-            </button>
+        <footer class="shrink-0 border-t border-border bg-card px-3 py-2.5">
+          <div v-if="selectionNotice" class="mb-2 flex items-start gap-2 text-xs text-muted-foreground">
+            <Info :size="14" class="shrink-0 text-primary" />
+            <span>{{ selectionNotice }}</span>
           </div>
-        </div>
+          <div class="flex items-center justify-between gap-3">
+            <p class="text-sm text-muted-foreground">{{ selectedCount }} folder{{ selectedCount === 1 ? '' : 's' }} selected</p>
+            <div class="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                class="h-9 rounded-md border border-border px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                @click="requestClose"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+                :disabled="selectedCount === 0"
+                @click="addSelectedFolders"
+              >
+                <Check :size="16" />
+                {{ addButtonLabel }}
+              </button>
+            </div>
+          </div>
+        </footer>
       </div>
     </div>
   </Teleport>
 </template>
+
+<style>
+@import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
+</style>

@@ -25,11 +25,23 @@ function onFinishPercentInput(e: Event) {
     <!-- Reading start -->
     <div>
       <div class="flex items-center justify-between mb-1">
-        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">Reading start</p>
-        <span class="text-sm font-medium text-foreground tabular-nums">{{ readingThreshold }}%</span>
+        <label for="reading-threshold" class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">Reading start</label>
+        <output for="reading-threshold" class="text-sm font-medium text-foreground tabular-nums">{{ readingThreshold }}%</output>
       </div>
-      <p class="text-xs text-muted-foreground mb-3">A book is marked as "reading" once this percentage of progress is reached.</p>
-      <input type="range" :value="readingThreshold" min="0.05" max="5" step="0.05" class="w-full accent-primary" @input="onReadingThresholdInput" />
+      <p id="reading-threshold-help" class="text-xs text-muted-foreground mb-3">
+        A book is marked as "reading" once this percentage of progress is reached.
+      </p>
+      <input
+        id="reading-threshold"
+        type="range"
+        :value="readingThreshold"
+        min="0.05"
+        max="5"
+        step="0.05"
+        class="w-full accent-primary"
+        aria-describedby="reading-threshold-help"
+        @input="onReadingThresholdInput"
+      />
       <div class="flex justify-between text-xs text-muted-foreground mt-1">
         <span>0.05%</span>
         <span>5%</span>
@@ -39,17 +51,21 @@ function onFinishPercentInput(e: Event) {
     <!-- Mark as finished -->
     <div>
       <div class="flex items-center justify-between mb-1">
-        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">Mark as finished</p>
-        <span class="text-sm font-medium text-foreground tabular-nums">{{ markAsFinishedPercentComplete }}%</span>
+        <label for="finished-threshold" class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">Mark as finished</label>
+        <output for="finished-threshold" class="text-sm font-medium text-foreground tabular-nums"> {{ markAsFinishedPercentComplete }}% </output>
       </div>
-      <p class="text-xs text-muted-foreground mb-3">A book is automatically marked as "read" when this percentage of progress is reached.</p>
+      <p id="finished-threshold-help" class="text-xs text-muted-foreground mb-3">
+        A book is automatically marked as "read" when this percentage of progress is reached.
+      </p>
       <input
+        id="finished-threshold"
         type="range"
         :value="markAsFinishedPercentComplete"
         min="90"
         max="100"
         step="1"
         class="w-full accent-primary"
+        aria-describedby="finished-threshold-help"
         @input="onFinishPercentInput"
       />
       <div class="flex justify-between text-xs text-muted-foreground mt-1">

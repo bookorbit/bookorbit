@@ -45,11 +45,11 @@ describe('router title metadata', () => {
 })
 
 describe('router redirects', () => {
-  it('redirects legacy integrations readwise tab to the Readwise settings route', () => {
-    const route = findRoute(routes, 'settings-integrations')
+  it('redirects the legacy Readwise route to the Integrations sub-tab', () => {
+    const route = findRoute(routes, 'settings-readwise')
     expect(route?.redirect).toBeTypeOf('function')
 
     const redirect = route!.redirect as (to: { query: Record<string, unknown> }) => unknown
-    expect(redirect({ query: { tab: 'readwise' } })).toEqual({ name: 'settings-readwise' })
+    expect(redirect({ query: {} })).toEqual({ name: 'settings-integrations', query: { tab: 'readwise' } })
   })
 })

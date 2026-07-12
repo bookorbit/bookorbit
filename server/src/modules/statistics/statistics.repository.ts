@@ -735,6 +735,7 @@ export class StatisticsRepository {
       ${bookMetadata.openLibraryId} is not null or
       ${bookMetadata.itunesId} is not null or
       ${bookMetadata.audibleId} is not null or
+      ${bookMetadata.librofmId} is not null or
       ${bookMetadata.koboId} is not null or
       ${bookMetadata.comicvineId} is not null or
       ${bookMetadata.ranobedbId} is not null or

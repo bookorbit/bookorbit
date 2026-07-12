@@ -12,6 +12,7 @@ export type StaticColumnId =
   | 'authors'
   | 'seriesName'
   | 'seriesIndex'
+  | 'publishedDate'
   | 'publishedYear'
   | 'language'
   | 'rating'
@@ -197,6 +198,19 @@ export const COLUMN_DEFS: ColumnDef[] = [
     pinned: null,
     accessor: (book) => book.seriesIndex,
     lockField: 'seriesIndex',
+  },
+  {
+    id: 'publishedDate',
+    header: 'Published',
+    cellType: 'date',
+    isEditable: false,
+    sortField: 'publishedDate',
+    defaultWidth: 132,
+    minWidth: 108,
+    defaultVisible: false,
+    pinned: null,
+    accessor: (book) => book.publishedDate,
+    lockField: 'publishedYear',
   },
   {
     id: 'publishedYear',

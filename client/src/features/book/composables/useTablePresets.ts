@@ -33,7 +33,19 @@ function presetsStorageKey(viewType: TableViewType): string {
 function getBuiltInPresets(allColumnIds: string[]): TablePreset[] {
   const defaultVisible = ['cover', 'title', 'authors', 'seriesName', 'seriesIndex', 'publishedYear', 'rating', 'readStatus', 'format', 'actions']
   const compactVisible = ['cover', 'title', 'authors', 'rating', 'readStatus', 'actions']
-  const metadataVisible = ['cover', 'title', 'authors', 'subtitle', 'publisher', 'language', 'publishedYear', 'pageCount', 'format', 'actions']
+  const metadataVisible = [
+    'cover',
+    'title',
+    'authors',
+    'subtitle',
+    'publisher',
+    'language',
+    'publishedDate',
+    'publishedYear',
+    'pageCount',
+    'format',
+    'actions',
+  ]
 
   const buildLayout = (visibleIds: string[]): TableLayoutState => ({
     columnOrder: allColumnIds,

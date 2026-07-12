@@ -12,6 +12,7 @@ under mutual exclusion, so sweep and snapshot never double-upload.
 
 local InfoMessage = require("ui/widget/infomessage")
 local Notification = require("ui/widget/notification")
+local Trapper = require("ui/trapper")
 local UIManager = require("ui/uimanager")
 local logger = require("logger")
 local T = require("ffi/util").template
@@ -214,12 +215,14 @@ local function step(ctx, fn)
         return fn(ctx)
     end
     UIManager:scheduleIn(STEP_DELAY, function()
-        local ok, err = pcall(fn, ctx)
-        if not ok then
-            logger.err("BookOrbit: book sync step failed:", err)
-            ctx.had_errors = true
-            finish(ctx)
-        end
+        Trapper:wrap(function()
+            local ok, err = pcall(fn, ctx)
+            if not ok then
+                logger.err("BookOrbit: book sync step failed:", err)
+                ctx.had_errors = true
+                finish(ctx)
+            end
+        end)
     end)
 end
 

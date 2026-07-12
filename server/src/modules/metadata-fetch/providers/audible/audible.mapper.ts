@@ -1,5 +1,6 @@
 import { MetadataProviderKey, type MetadataCandidate, type MetadataSeriesMembership } from '@bookorbit/types';
 
+import { parsePublishedDateKey, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
 import { stripHtml } from '../provider-utils';
 import { AudibleProduct } from './audible.types';
 
@@ -62,11 +63,8 @@ function normalizeCommunityRating(product: AudibleProduct): { communityRating?: 
 export function mapAudibleProduct(product: AudibleProduct): MetadataCandidate {
   const coverUrl = product.product_images?.[1024] ?? product.product_images?.[500];
 
-  let publishedYear: number | undefined;
-  if (product.release_date) {
-    const year = new Date(product.release_date).getFullYear();
-    if (!isNaN(year)) publishedYear = year;
-  }
+  const publishedDate = parsePublishedDateKey(product.release_date);
+  const publishedYear = publishedDate ? publishedYearFromDateKey(publishedDate) : undefined;
 
   const rawDescription = product.publisher_summary ?? product.merchandising_summary;
   const description = rawDescription ? stripHtml(rawDescription) : undefined;
@@ -88,6 +86,7 @@ export function mapAudibleProduct(product: AudibleProduct): MetadataCandidate {
     narrators: product.narrators?.map((n) => n.name) ?? [],
     description,
     publisher: product.publisher_name,
+    publishedDate,
     publishedYear,
     language: product.language,
     coverUrl,

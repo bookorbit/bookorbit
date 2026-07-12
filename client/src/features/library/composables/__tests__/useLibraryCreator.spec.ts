@@ -21,7 +21,7 @@ describe('useLibraryCreator', () => {
     creator.form.folders = ['/books']
 
     await expect(creator.save()).resolves.toBeNull()
-    expect(creator.error.value).toBe('Choose an icon')
+    expect(creator.error.value).toBe('Choose an icon.')
     expect(apiMock).not.toHaveBeenCalled()
   })
 
@@ -33,7 +33,7 @@ describe('useLibraryCreator', () => {
     creator.form.folders = ['/books']
 
     await expect(creator.save()).resolves.toBeNull()
-    expect(creator.error.value).toBe('Library name is required')
+    expect(creator.error.value).toBe('Enter a library name.')
     expect(apiMock).not.toHaveBeenCalled()
   })
 
@@ -67,6 +67,35 @@ describe('useLibraryCreator', () => {
     )
     expect(creator.prescanLoading.value).toBe(false)
     expect(creator.prescanResult.value).toEqual(result)
+  })
+
+  it('surfaces prescan connection failures', async () => {
+    const { useLibraryCreator } = await import('../useLibraryCreator')
+    const creator = useLibraryCreator()
+    apiMock.mockRejectedValue(new TypeError('network error'))
+
+    creator.form.folders = ['/books']
+    await creator.runPrescan()
+
+    expect(creator.error.value).toBe('Could not connect to the server to scan folders.')
+    expect(creator.prescanLoading.value).toBe(false)
+  })
+
+  it('validates cron expressions and file size limits before saving', async () => {
+    const { useLibraryCreator } = await import('../useLibraryCreator')
+    const creator = useLibraryCreator()
+    creator.form.name = 'Main Library'
+    creator.form.icon = 'BookOpen'
+    creator.form.folders = ['/books']
+    creator.form.autoScanCronExpression = 'not a cron'
+
+    expect(creator.validationErrors.value.schedule).toBe('Enter a valid 5-field cron expression.')
+    await expect(creator.save()).resolves.toBeNull()
+    expect(apiMock).not.toHaveBeenCalled()
+
+    creator.form.autoScanCronExpression = null
+    creator.form.fileWritePdfMaxFileSizeMb = 10_001
+    expect(creator.validationErrors.value.fileWrite).toBe('File-size limits must be whole numbers from 1 to 10,000 MB.')
   })
 
   it('uses audio write-back defaults for blank library forms', async () => {
@@ -140,9 +169,30 @@ describe('useLibraryCreator', () => {
       }),
     )
     expect(JSON.parse(apiMock.mock.calls[0]?.[1]?.body as string)).toMatchObject({
+      name: 'Audio',
       fileWriteAudioEnabled: true,
       fileWriteAudioMaxFileSizeMb: 750,
     })
+    expect(creator.loading.value).toBe(false)
+  })
+
+  it('trims user-entered values and surfaces save connection failures', async () => {
+    const { useLibraryCreator } = await import('../useLibraryCreator')
+    const creator = useLibraryCreator()
+    const saved = makeLibrary({ name: 'Main Library' })
+    apiMock.mockResolvedValueOnce(jsonResponse(saved, 201))
+    creator.form.name = '  Main Library  '
+    creator.form.icon = '  BookOpen  '
+    creator.form.folders = [' /books ', '/books']
+
+    await creator.save()
+
+    const payload = JSON.parse(apiMock.mock.calls[0]?.[1]?.body as string)
+    expect(payload).toMatchObject({ name: 'Main Library', icon: 'BookOpen', folders: ['/books'] })
+
+    apiMock.mockRejectedValueOnce(new TypeError('network error'))
+    await expect(creator.save()).resolves.toBeNull()
+    expect(creator.error.value).toBe('Could not connect to the server. Check your connection and try again.')
     expect(creator.loading.value).toBe(false)
   })
 

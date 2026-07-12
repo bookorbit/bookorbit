@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, count, desc, eq, exists, ilike, inArray, notExists, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, exists, inArray, notExists, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db';
@@ -7,6 +7,7 @@ import { refreshPrimaryAuthorSortNamesForBooks } from '../../../db/book-author-s
 import * as schema from '../../../db/schema';
 import { authors, bookAuthors, books, bookMetadata } from '../../../db/schema';
 import { buildContentFilterClauses } from '../../../common/utils/content-filter-sql.utils';
+import { accentInsensitiveIlike } from '../../../common/utils/accent-insensitive-search.utils';
 import {
   chooseCanonicalMetadataTextRow,
   normalizeMetadataText,
@@ -138,7 +139,7 @@ export class AuthorStrategy implements EntityStrategy {
   async browse(params: BrowseParams): Promise<BrowseResult> {
     const bookCountExpr = sql<number>`count(distinct ${bookAuthors.bookId})::int`;
 
-    const nameCondition = params.search ? ilike(authors.name, `%${escapeLike(params.search)}%`) : undefined;
+    const nameCondition = params.search ? accentInsensitiveIlike(authors.name, `%${escapeLike(params.search)}%`) : undefined;
 
     const cfClauses = params.contentFilters ? buildContentFilterClauses(params.contentFilters, this.db) : [];
     const libraryBookIds =

@@ -60,6 +60,7 @@ describe('audio metadata round-trip', () => {
         seriesName: 'Roundtrip Series',
         seriesIndex: 4,
         audibleId: 'B0ROUNDTRIP',
+        librofmId: '9781234567890',
       },
       { dryRun: false, fieldMask: createBookWriteFieldMask() },
     );
@@ -78,6 +79,7 @@ describe('audio metadata round-trip', () => {
     expect(tags.series).toBe('Roundtrip Series');
     expect(tags['series-part']).toBe('4');
     expect(tags.asin ?? tags.audible_asin).toBe('B0ROUNDTRIP');
+    expect(tags.librofm_isbn).toBe('9781234567890');
 
     vi.resetModules();
     const { extractAudioMetadata } = await import('../../../metadata/extractors/audio.extractor');
@@ -96,6 +98,7 @@ describe('audio metadata round-trip', () => {
         seriesIndex: 4,
         genres: ['Fantasy', 'Adventure'],
         audibleId: 'B0ROUNDTRIP',
+        librofmId: '9781234567890',
       }),
     );
     expect(extracted.authors).toEqual([{ name: 'Author One', sortName: null }]);
@@ -124,6 +127,7 @@ describe('audio metadata round-trip', () => {
         seriesName: 'Extended Series',
         seriesIndex: 7,
         audibleId: 'B0EXTENDED',
+        librofmId: '9780987654321',
       },
       { dryRun: false, fieldMask: createBookWriteFieldMask() },
     );
@@ -141,6 +145,7 @@ describe('audio metadata round-trip', () => {
     expect(tags.series).toBe('Extended Series');
     expect(tags['series-part']).toBe('7');
     expect(tags.asin ?? tags.audible_asin).toBe('B0EXTENDED');
+    expect(tags.librofm_isbn).toBe('9780987654321');
 
     vi.resetModules();
     const { extractAudioMetadata } = await import('../../../metadata/extractors/audio.extractor');
@@ -157,6 +162,7 @@ describe('audio metadata round-trip', () => {
         seriesName: 'Extended Series',
         seriesIndex: 7,
         audibleId: 'B0EXTENDED',
+        librofmId: '9780987654321',
       }),
     );
     expect(extracted.authors).toEqual([{ name: 'Author One', sortName: null }]);

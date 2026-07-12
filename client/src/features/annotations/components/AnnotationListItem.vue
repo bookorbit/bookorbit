@@ -24,6 +24,7 @@ import { RouterLink } from 'vue-router'
 import { ANNOTATION_HIGHLIGHT_COLORS, type AnnotationHubItem, type AnnotationItem } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { PILL_CLASS, sourcePill, statusPill } from '@/features/annotations/lib/pill-styles'
+import { getFormatColor } from '@/features/book/lib/format-colors'
 import HighlightNoteEditor from '@/features/book/components/detail/tabs/HighlightNoteEditor.vue'
 import AnnotationBookThumb from './AnnotationBookThumb.vue'
 import AnnotationSyncDetailPanel from './AnnotationSyncDetailPanel.vue'
@@ -85,7 +86,16 @@ const copied = ref(false)
 const pendingNote = ref<string | null | undefined>(undefined)
 
 const canEdit = computed(() => !props.trashed)
-const canJump = computed(() => props.annotation.jumpFileId != null && !props.trashed)
+const jumpFileFormat = computed(() => {
+  if (props.mode !== 'hub' || !('jumpFileFormat' in props.annotation)) return null
+  const format = props.annotation.jumpFileFormat?.trim()
+  return format ? format.toUpperCase() : null
+})
+const jumpFileFormatStyle = computed(() => {
+  const color = getFormatColor(jumpFileFormat.value)
+  return { color, borderColor: `${color}66`, backgroundColor: `${color}1a` }
+})
+const canJump = computed(() => props.annotation.jumpFileId != null && (props.mode !== 'hub' || jumpFileFormat.value != null) && !props.trashed)
 const isLong = computed(() => props.annotation.text.length > (props.density === 'compact' ? 180 : 260))
 const isApproximate = computed(() => props.annotation.cfi == null && props.annotation.origin !== 'web')
 const hasBookTitle = computed(() => 'bookTitle' in props.annotation && props.annotation.bookTitle != null)
@@ -333,6 +343,9 @@ function shouldSeparateMetadataItem(index: number): boolean {
             <span class="truncate max-w-[14rem]">{{ item }}</span>
           </template>
           <span v-if="hasMetadataBeforeSource" aria-hidden="true" class="mx-0.5 block h-1 w-1 shrink-0 rounded-full bg-muted-foreground/70" />
+          <span v-if="jumpFileFormat" :class="PILL_CLASS" :style="jumpFileFormatStyle">
+            {{ jumpFileFormat }}
+          </span>
           <span :class="[PILL_CLASS, originPill.class]">
             <Smartphone v-if="annotation.origin === 'koreader' || annotation.origin === 'kobo'" :size="10" />
             {{ originPill.label }}

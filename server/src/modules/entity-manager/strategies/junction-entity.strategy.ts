@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, NotFoundException } from '@nestjs/common';
-import { and, asc, count, desc, eq, exists, ilike, inArray, notExists, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, exists, inArray, notExists, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { PgColumn, PgTableWithColumns } from 'drizzle-orm/pg-core';
 
@@ -7,6 +7,7 @@ import { DB } from '../../../db';
 import * as schema from '../../../db/schema';
 import { books, bookMetadata } from '../../../db/schema';
 import { buildContentFilterClauses } from '../../../common/utils/content-filter-sql.utils';
+import { accentInsensitiveIlike } from '../../../common/utils/accent-insensitive-search.utils';
 import type {
   BrowseParams,
   BrowseResult,
@@ -132,7 +133,7 @@ export abstract class JunctionEntityStrategy implements EntityStrategy {
             .where(and(inArray(books.libraryId, params.libraryIds), ...cfClauses))
         : null;
 
-    const nameCondition = params.search ? (ilike(this.nameCol, `%${escapeLike(params.search)}%`) as any) : undefined;
+    const nameCondition = params.search ? (accentInsensitiveIlike(this.nameCol, `%${escapeLike(params.search)}%`) as any) : undefined;
     const joinCondition = bookSubquery
       ? and(eq(this.junctionEntityIdCol, this.entityIdCol), inArray(this.junctionBookIdCol, bookSubquery))
       : and(eq(this.junctionEntityIdCol, this.entityIdCol), sql`false`);

@@ -102,6 +102,18 @@ describe('ReaderPreferencesService', () => {
     expect(mockRepo.upsertPreference).toHaveBeenCalledWith(4, 10, { zoomMode: 'custom', customScale: 1.4 });
   });
 
+  it('accepts new PDF layout choices and normalizes legacy wrapped mode', async () => {
+    const user = makeUser({ id: 4 });
+
+    await service.upsertPreference(user, 10, { scrollMode: 'wrapped', spread: 'auto', zoomMode: 'automatic' });
+
+    expect(mockRepo.upsertPreference).toHaveBeenCalledWith(4, 10, {
+      scrollMode: 'vertical',
+      spread: 'auto',
+      zoomMode: 'automatic',
+    });
+  });
+
   it('maps cbz file format to cbx group and validates against comics settings', async () => {
     const user = makeUser();
     mockBookService.verifyFileAccess.mockResolvedValueOnce({ format: 'cbz' });

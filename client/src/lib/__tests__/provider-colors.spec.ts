@@ -13,6 +13,10 @@ describe('getProviderColor', () => {
     expect(getProviderColor('comicvine')).toBe('#ffdb0f')
   })
 
+  it('returns the Libro.fm brand color', () => {
+    expect(getProviderColor('librofm')).toBe('#62B9B6')
+  })
+
   it('returns default color for unknown provider', () => {
     const result = getProviderColor('unknown-provider')
     expect(result).toBeTruthy()
@@ -29,6 +33,7 @@ describe('getProviderColor', () => {
       'itunes',
       'audible',
       'audnexus',
+      'librofm',
       'comicvine',
       'ranobedb',
       'kobo',
@@ -56,6 +61,7 @@ describe('PROVIDER_SHORT_LABELS', () => {
       'itunes',
       'audible',
       'audnexus',
+      'librofm',
       'comicvine',
       'ranobedb',
       'kobo',

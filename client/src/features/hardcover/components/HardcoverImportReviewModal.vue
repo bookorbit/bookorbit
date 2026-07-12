@@ -252,7 +252,12 @@ function outcomeClass(row: HardcoverImportPreviewRow): string {
 }
 
 function normalizeSearch(value: string): string {
-  return value.toLowerCase().replace(/\s+/g, ' ').trim()
+  return value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 </script>
 

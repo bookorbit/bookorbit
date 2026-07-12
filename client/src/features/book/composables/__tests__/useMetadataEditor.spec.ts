@@ -23,6 +23,7 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     isbn10: null,
     isbn13: null,
     publisher: null,
+    publishedDate: null,
     publishedYear: null,
     language: null,
     pageCount: null,
@@ -237,6 +238,24 @@ describe('useMetadataEditor', () => {
     const [, req] = apiMock.mock.calls[0] as [string, RequestInit]
     expect(JSON.parse(String(req.body))).toEqual({
       metadata: { koboId: 'new-kobo-id' },
+      lockedFields: [],
+    })
+  })
+
+  it('loads and saves Libro.fm provider IDs', async () => {
+    const book = makeBook({ providerIds: { librofm: '9781111111111' } })
+    apiMock.mockResolvedValue({ ok: true, json: async () => ({ ...book, providerIds: { librofm: '9782222222222' } }) })
+
+    const { form, load, save } = useMetadataEditor()
+    load(book)
+    expect(form.librofmId).toBe('9781111111111')
+
+    form.librofmId = '9782222222222'
+    await save(book.id, [])
+
+    const [, req] = apiMock.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(String(req.body))).toEqual({
+      metadata: { librofmId: '9782222222222' },
       lockedFields: [],
     })
   })

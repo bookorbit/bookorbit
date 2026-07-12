@@ -220,6 +220,33 @@ describe('Foliate navigation', () => {
     expect(getPageScrollOffset(1, 800, true, false)).toBe(800)
   })
 
+  it('does not intercept paginated touch movement while native text selection is active', () => {
+    const paginator = new Paginator() as InstanceType<typeof Paginator> & EventTarget
+    const doc = new EventTarget() as EventTarget & Document
+    Object.defineProperty(doc, 'getSelection', {
+      value: () => ({ rangeCount: 1, isCollapsed: false }),
+    })
+
+    paginator.dispatchEvent(new CustomEvent('load', { detail: { doc } }))
+
+    const touch = { clientX: 30, clientY: 40, screenX: 30, screenY: 40 }
+    const start = new Event('touchstart', { bubbles: true, cancelable: true }) as TouchEvent
+    Object.defineProperties(start, {
+      touches: { value: [touch] },
+      changedTouches: { value: [touch] },
+    })
+    doc.dispatchEvent(start)
+
+    const move = new Event('touchmove', { bubbles: true, cancelable: true }) as TouchEvent
+    Object.defineProperties(move, {
+      touches: { value: [touch] },
+      changedTouches: { value: [touch] },
+    })
+    doc.dispatchEvent(move)
+
+    expect(move.defaultPrevented).toBe(false)
+  })
+
   it('maps physical left and right navigation using OPF RTL page progression', async () => {
     const view = new View()
     const prev = vi.fn<() => void>()

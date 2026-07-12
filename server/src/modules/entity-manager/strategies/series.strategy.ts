@@ -1,8 +1,9 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { SQL, and, asc, count, desc, eq, exists, ilike, inArray, notExists, or, sql } from 'drizzle-orm';
+import { SQL, and, asc, count, desc, eq, exists, inArray, notExists, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { buildContentFilterClauses } from '../../../common/utils/content-filter-sql.utils';
+import { accentInsensitiveIlike } from '../../../common/utils/accent-insensitive-search.utils';
 import { normalizeMetadataText, normalizeMetadataTextKey } from '../../../common/utils/metadata-text-normalize.utils';
 import { DB } from '../../../db';
 import * as schema from '../../../db/schema';
@@ -118,7 +119,7 @@ export class SeriesStrategy implements EntityStrategy {
             .from(books)
             .where(and(inArray(books.libraryId, params.libraryIds), ...filterClauses))
         : null;
-    const nameCondition = params.search ? (ilike(bookSeries.name, `%${escapeLike(params.search)}%`) as never) : undefined;
+    const nameCondition = params.search ? (accentInsensitiveIlike(bookSeries.name, `%${escapeLike(params.search)}%`) as never) : undefined;
     const joinCondition = bookSubquery
       ? and(eq(bookSeriesMemberships.seriesId, bookSeries.id), inArray(bookSeriesMemberships.bookId, bookSubquery))
       : and(eq(bookSeriesMemberships.seriesId, bookSeries.id), sql`false`);

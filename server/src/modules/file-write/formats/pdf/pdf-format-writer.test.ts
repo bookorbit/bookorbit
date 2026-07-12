@@ -127,7 +127,7 @@ describe('PdfFormatWriter', () => {
     expect(pdfDoc.setTitle).toHaveBeenCalledWith('Dune');
     expect(pdfDoc.setAuthor).toHaveBeenCalledWith('Frank Herbert');
     expect(pdfDoc.setSubject).toHaveBeenCalledWith('Sci-fi classic');
-    expect(pdfDoc.setCreationDate).toHaveBeenCalledWith(new Date(1965, 0, 1));
+    expect(pdfDoc.setCreationDate).toHaveBeenCalledWith(new Date('1965-01-01T00:00:00.000Z'));
     expect(pdfDoc.setCreator).toHaveBeenCalledWith('bookorbit');
     expect(pdfDoc.setKeywords).toHaveBeenCalledWith(['Sci-Fi', 'Classic']);
 

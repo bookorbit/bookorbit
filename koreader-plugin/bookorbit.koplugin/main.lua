@@ -20,6 +20,7 @@ local InfoMessage = require("ui/widget/infomessage")
 local NetworkMgr = require("ui/network/manager")
 local Notification = require("ui/widget/notification")
 local PluginShare = require("pluginshare")
+local Trapper = require("ui/trapper")
 local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local logger = require("logger")
@@ -35,13 +36,14 @@ local BookOrbitHighlightSummary = require("bookorbit_highlight_summary")
 local BookOrbitOpenAnnotationScheduler = require("bookorbit_open_annotation_scheduler")
 local BookOrbitState = require("bookorbit_state")
 local BookOrbitSyncCoordinator = require("bookorbit_sync_coordinator")
+local BookOrbitSyncJobRunner = require("bookorbit_sync_job_runner")
 local BookOrbitMainMenu = require("bookorbit_main_menu")
 local BookOrbitMenuPin = require("bookorbit_menu_pin")
 local BookOrbitProgressSync = require("bookorbit_progress_sync")
 local BookOrbitSweep = require("bookorbit_sweep")
 local BookOrbitUpdater = require("bookorbit_updater")
 
-local PLUGIN_VERSION = "1.2.0"
+local PLUGIN_VERSION = "1.2.1"
 
 local SYNC_STRATEGY = {
     PROMPT = 1,
@@ -55,6 +57,7 @@ local LAST_ERROR_LABELS = {
     invalid_json = _("invalid server response"),
     unsupported_server = _("server update required"),
     body_too_large = _("request too large"),
+    background_request_interrupted = _("background request interrupted"),
     partial_failure = _("partial sync failure"),
 }
 
@@ -228,7 +231,7 @@ function BookOrbit:applyProvision()
     os.remove(provision_path)
 end
 
-function BookOrbit:apiOpts()
+function BookOrbit:apiOpts(background_requests)
     return {
         server_url = self.settings.server_url,
         username = self.settings.username,
@@ -236,11 +239,19 @@ function BookOrbit:apiOpts()
         device_id = self.device_id,
         device_model = Device.model,
         plugin_version = PLUGIN_VERSION,
+        background_requests = background_requests == true,
     }
 end
 
 function BookOrbit:newClient()
-    return BookOrbitApi.new(self:apiOpts())
+    return BookOrbitApi.new(self:apiOpts(true))
+end
+
+function BookOrbit:runInSyncCoroutine(fn)
+    if Trapper:isWrapped() then
+        return fn()
+    end
+    return Trapper:wrap(fn)
 end
 
 function BookOrbit:isLoggedIn()
@@ -384,7 +395,8 @@ function BookOrbit:retryOpenBookMatch()
 end
 
 function BookOrbit:submitSyncJob(job)
-    local result = self:getSyncCoordinator():submit(job)
+    local prepared_job = BookOrbitSyncJobRunner.prepare(job)
+    local result = self:getSyncCoordinator():submit(prepared_job)
     if (result == "queued" or result == "kept") and job.interactive then
         UIManager:show(InfoMessage:new{ text = _("BookOrbit sync queued."), timeout = 2 })
     end
@@ -460,7 +472,9 @@ function BookOrbit:requestAnnotationExchange(source)
                 self:exchangeAnnotationsForOpenBook(source or "auto")
                 done()
             end
-            if NetworkMgr:willRerunWhenConnected(execute) then
+            if NetworkMgr:willRerunWhenConnected(function()
+                    self:runInSyncCoroutine(execute)
+                end) then
                 return
             end
             execute()
@@ -495,7 +509,9 @@ function BookOrbit:scheduleOpenHighlightRetry(reason, retry_count)
                     self:exchangeAnnotationsForOpenBook(reason or "annotation_retry", retry_count + 1)
                     done()
                 end
-                if NetworkMgr:willRerunWhenConnected(execute) then
+                if NetworkMgr:willRerunWhenConnected(function()
+                        self:runInSyncCoroutine(execute)
+                    end) then
                     return
                 end
                 execute()
@@ -537,7 +553,7 @@ function BookOrbit:requestSweep(interactive, source)
             async = true,
             run = function(done)
                 local started = BookOrbitSweep.run{
-                    api = self:apiOpts(),
+                    api = self:apiOpts(true),
                     interactive = interactive == true,
                     annotation_sync = self.settings.annotation_sync,
                     plugin = self,
@@ -563,7 +579,7 @@ end
 
 function BookOrbit:requestManualBookSync(snap)
     if not snap then return end
-    local api_opts = self:apiOpts()
+    local api_opts = self:apiOpts(true)
 
     self:submitSyncJob{
         family = "book_snapshot",
@@ -606,7 +622,9 @@ function BookOrbit:requestManualBookSync(snap)
                     done()
                 end
             end
-            if NetworkMgr:willRerunWhenOnline(run) then
+            if NetworkMgr:willRerunWhenOnline(function()
+                    self:runInSyncCoroutine(run)
+                end) then
                 return
             end
             run()
@@ -617,7 +635,7 @@ end
 function BookOrbit:requestBookSnapshotSync(opts)
     opts = opts or {}
     if not opts.snap then return end
-    local api_opts = self:apiOpts()
+    local api_opts = self:apiOpts(opts.synchronous ~= true)
 
     self:submitSyncJob{
         family = "book_snapshot",
@@ -649,10 +667,14 @@ function BookOrbit:requestBookSnapshotSync(opts)
             end
 
             if opts.go_online then
-                NetworkMgr:goOnlineToRun(run)
+                NetworkMgr:goOnlineToRun(function()
+                    self:runInSyncCoroutine(run)
+                end)
                 return
             end
-            if opts.ensure_networking and NetworkMgr:willRerunWhenOnline(run) then
+            if opts.ensure_networking and NetworkMgr:willRerunWhenOnline(function()
+                    self:runInSyncCoroutine(run)
+                end) then
                 return
             end
             run()
@@ -786,10 +808,12 @@ function BookOrbit:matchOpenBookForAutoSync(on_done)
         if on_done then on_done(false) end
         return
     end
-    if NetworkMgr:willRerunWhenConnected(run) then
+    if NetworkMgr:willRerunWhenConnected(function()
+            self:runInSyncCoroutine(run)
+        end) then
         return
     end
-    run()
+    self:runInSyncCoroutine(run)
 end
 
 -- Two-way annotation pull/push for the open book. Runs once per book open;

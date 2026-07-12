@@ -21,6 +21,7 @@ function makeBook(format: string | null): BookCard {
     seriesName: 'Saga',
     seriesIndex: null,
     files: format ? [{ id: 1, format, role: 'primary', sizeBytes: null }] : [],
+    publishedDate: null,
     publishedYear: null,
     language: null,
     genres: [],

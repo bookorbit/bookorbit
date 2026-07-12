@@ -41,7 +41,8 @@ onUnmounted(() => {
 watch(
   () => props.config,
   (c) => {
-    if (c) draft.value = JSON.parse(JSON.stringify(c))
+    if (!c) return
+    draft.value = JSON.parse(JSON.stringify(c)) as ProviderConfigurations
   },
   { immediate: true },
 )
@@ -187,6 +188,12 @@ const rows: RowDef[] = [
     fields: [{ key: 'domain', label: 'Region', type: 'select', options: AUDIBLE_DOMAINS }],
   },
   { key: 'audnexus', label: 'AudNexus', hint: 'Community-driven audiobook metadata. No setup required.', fields: [] },
+  {
+    key: 'librofm',
+    label: 'Libro.fm',
+    hint: 'DRM-free audiobook catalog metadata. Uses an undocumented Libro.fm endpoint and is disabled by default.',
+    fields: [],
+  },
   {
     key: 'comicvine',
     label: 'ComicVine',
@@ -360,6 +367,10 @@ function toggleProvider(row: RowDef) {
 }
 
 const draftReady = computed(() => draft.value !== null)
+const visibleRows = computed(() => {
+  if (!draft.value) return []
+  return rows.filter((row) => Object.prototype.hasOwnProperty.call(draft.value, row.key))
+})
 </script>
 
 <template>
@@ -377,7 +388,7 @@ const draftReady = computed(() => draft.value !== null)
 
     <div v-if="draft" class="divide-y divide-border">
       <div
-        v-for="row in rows"
+        v-for="row in visibleRows"
         :key="row.key"
         class="px-4 py-3.5 md:px-5 md:py-4 flex flex-col md:flex-row md:items-start gap-3 md:gap-4 bg-card transition-colors hover:bg-muted/30"
       >

@@ -67,7 +67,7 @@ function setThumbnailClickAction(action: BookThumbnailClickAction) {
         <div class="min-w-0">
           <p class="settings-label">Collapse series by default</p>
           <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:whitespace-normal md:overflow-visible">
-            Group books in the same series into a single card in library and collection views
+            Group books in the same series into a single card in library, collection, and Smart Scope views
           </p>
         </div>
         <ToggleSwitch :model-value="globalCollapseEnabled" @update:model-value="handleGlobalCollapseToggle" />

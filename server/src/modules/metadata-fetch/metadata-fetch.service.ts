@@ -92,6 +92,7 @@ export class MetadataFetchService {
       [MetadataProviderKey.OPEN_LIBRARY]: row.openLibraryId ?? undefined,
       [MetadataProviderKey.ITUNES]: row.itunesId ?? undefined,
       [MetadataProviderKey.AUDIBLE]: row.audibleId ?? undefined,
+      [MetadataProviderKey.LIBROFM]: row.librofmId ?? undefined,
       [MetadataProviderKey.KOBO]: row.koboId ?? undefined,
       [MetadataProviderKey.COMICVINE]: row.comicvineId ?? undefined,
       [MetadataProviderKey.RANOBEDB]: row.ranobedbId ?? undefined,

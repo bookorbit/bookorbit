@@ -9,6 +9,7 @@ export const PROVIDER_ID_FIELDS = [
   { provider: MetadataProviderKey.OPEN_LIBRARY, field: 'openLibraryId', label: 'OpenLibrary' },
   { provider: MetadataProviderKey.ITUNES, field: 'itunesId', label: 'iTunes' },
   { provider: MetadataProviderKey.AUDIBLE, field: 'audibleId', label: 'Audible' },
+  { provider: MetadataProviderKey.LIBROFM, field: 'librofmId', label: 'Libro.fm' },
   { provider: MetadataProviderKey.KOBO, field: 'koboId', label: 'Kobo' },
   { provider: MetadataProviderKey.COMICVINE, field: 'comicvineId', label: 'ComicVine' },
   { provider: MetadataProviderKey.RANOBEDB, field: 'ranobedbId', label: 'RanobeDB' },
@@ -21,6 +22,9 @@ export type ProviderIdFormField = ProviderIdField['field']
 
 const PROVIDER_ID_FORM_FIELDS = new Set<string>(PROVIDER_ID_FIELDS.map((field) => field.field))
 const PROVIDER_BY_FORM_FIELD = new Map<ProviderIdFormField, MetadataProviderKey>(PROVIDER_ID_FIELDS.map((field) => [field.field, field.provider]))
+const PROVIDER_ALIASES_BY_FORM_FIELD: Partial<Record<ProviderIdFormField, MetadataProviderKey[]>> = {
+  audibleId: [MetadataProviderKey.AUDIBLE, MetadataProviderKey.AUDNEXUS],
+}
 
 export function isProviderIdFormField(field: string): field is ProviderIdFormField {
   return PROVIDER_ID_FORM_FIELDS.has(field)
@@ -28,8 +32,9 @@ export function isProviderIdFormField(field: string): field is ProviderIdFormFie
 
 export function isProviderIdFieldAvailable(field: ProviderIdFormField, providers: readonly Pick<MetadataProviderInfo, 'key'>[] | null): boolean {
   if (providers === null) return true
-  const provider = PROVIDER_BY_FORM_FIELD.get(field)
-  return provider ? providers.some((item) => item.key === provider) : true
+  const providerKeys =
+    PROVIDER_ALIASES_BY_FORM_FIELD[field] ?? [PROVIDER_BY_FORM_FIELD.get(field)].filter((key): key is MetadataProviderKey => key !== undefined)
+  return providerKeys.length > 0 ? providers.some((item) => providerKeys.includes(item.key)) : true
 }
 
 export function filterProviderIdFields(providers: readonly Pick<MetadataProviderInfo, 'key'>[] | null): ProviderIdField[] {

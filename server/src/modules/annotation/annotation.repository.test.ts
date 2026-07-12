@@ -340,7 +340,7 @@ describe('AnnotationRepository', () => {
 
   describe('findHubPaginated', () => {
     it('returns hub items and total while applying the notes-only and date filters', async () => {
-      const db = makeDb([makeRow({ bookTitle: 'Book', author: 'Author', jumpFileId: 1, pageno: null })], [{ count: 1 }]);
+      const db = makeDb([makeRow({ bookTitle: 'Book', author: 'Author', jumpFileId: 1, jumpFileFormat: 'mobi', pageno: null })], [{ count: 1 }]);
       const repo = new AnnotationRepository(db as never);
 
       const result = await repo.findHubPaginated(
@@ -364,6 +364,8 @@ describe('AnnotationRepository', () => {
 
       expect(result.total).toBe(1);
       expect(result.items).toHaveLength(1);
+      expect(result.items[0].jumpFileFormat).toBe('mobi');
+      expect(db.select.mock.calls[0][0]).toHaveProperty('jumpFileFormat');
       expect(db._queries[0].where).toHaveBeenCalled();
     });
 

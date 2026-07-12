@@ -470,7 +470,9 @@ export class StorygraphSyncService {
     try {
       await this.updateStatus(userId, cookies, match.storygraphBookId, storygraphStatus);
 
-      if (book.progress != null) {
+      // StoryGraph's read transition logs the remaining pages. A subsequent progress update
+      // would create another journal entry for the full page count.
+      if (book.progress != null && storygraphStatus !== STORYGRAPH_STATUS.READ) {
         await this.updateProgress(userId, cookies, match.storygraphBookId, book.progress);
       }
 

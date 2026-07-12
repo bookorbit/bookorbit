@@ -34,7 +34,7 @@ import { usePublisherSearch, useSeriesNameSearch, useLanguageSearch } from '../.
 import InputWithSuggestions from '@/components/ui/InputWithSuggestions.vue'
 import { RATING_STARS, getRatingStarClass } from '@/features/book/lib/rating-stars'
 import { buildFileMetadataPatch } from '@/features/book/lib/file-metadata-patch'
-import { metadataRefreshEmptyMessage } from '@/features/book/lib/metadata-refresh-feedback'
+import { metadataRefreshAppliedMessage, metadataRefreshEmptyMessage } from '@/features/book/lib/metadata-refresh-feedback'
 import { filterProviderIdFields, isProviderIdFieldAvailable, isProviderIdFormField } from '@/features/book/lib/provider-id-fields'
 import { formatCommunityRatingLine } from '@/features/book/lib/community-rating'
 
@@ -55,7 +55,6 @@ const DIRECT_PATCH_FIELDS = [
   'authors',
   'genres',
   'publisher',
-  'publishedYear',
   'language',
   'pageCount',
   'seriesName',
@@ -70,6 +69,7 @@ const DIRECT_PATCH_FIELDS = [
   'openLibraryId',
   'itunesId',
   'audibleId',
+  'librofmId',
   'koboId',
   'comicvineId',
   'ranobedbId',
@@ -181,10 +181,20 @@ function setIntField(field: 'publishedYear' | 'pageCount' | 'durationSeconds', e
   const val = (e.target as HTMLInputElement).value
   if (val === '') {
     form[field] = null
+    if (field === 'publishedYear') form.publishedDate = null
     return
   }
   const n = parseInt(val, 10)
   form[field] = isNaN(n) ? null : n
+  if (field === 'publishedYear') form.publishedDate = null
+}
+
+function setPublishedDateField(e: Event) {
+  const value = (e.target as HTMLInputElement).value
+  form.publishedDate = value || null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    form.publishedYear = Number(value.slice(0, 4))
+  }
 }
 
 function isTextLikeCustomField(type: string): boolean {
@@ -399,6 +409,17 @@ function applyDirectPatchField(field: (typeof DIRECT_PATCH_FIELDS)[number], valu
   return true
 }
 
+function applyPublishedPatch(formPatch: MetadataPatch, skippedFields: BookMetadataLockField[]): number {
+  if (formPatch.publishedDate === undefined && formPatch.publishedYear === undefined) return 0
+  if (isLocked('publishedYear')) {
+    trackLockedField('publishedYear', skippedFields)
+    return 0
+  }
+  if (formPatch.publishedDate !== undefined) form.publishedDate = formPatch.publishedDate
+  if (formPatch.publishedYear !== undefined) form.publishedYear = formPatch.publishedYear
+  return 1
+}
+
 function applyComicPatch(formPatch: MetadataPatch, skippedFields: BookMetadataLockField[]): number {
   if (!formPatch.comicMetadata) return 0
   let updated = 0
@@ -465,6 +486,7 @@ function applyPatchToForm(formPatch: MetadataPatch, coverUrl: string | undefined
   const hasSeriesMembershipPatch = formPatch.seriesMemberships !== undefined
   updatedCount += applySeriesMembershipPatch(formPatch, skippedFields)
   updatedCount += applyCommunityRatingPatch(formPatch, skippedFields)
+  updatedCount += applyPublishedPatch(formPatch, skippedFields)
   for (const field of DIRECT_PATCH_FIELDS) {
     if (hasSeriesMembershipPatch && (field === 'seriesName' || field === 'seriesIndex')) continue
     if (applyDirectPatchField(field, formPatch[field], skippedFields)) updatedCount++
@@ -560,6 +582,7 @@ function buildPreviewPatch(preview: MetadataRefreshPreview): MetadataPatch {
     authors: preview.authors,
     genres: preview.genres,
     publisher: preview.publisher,
+    publishedDate: preview.publishedDate,
     publishedYear: preview.publishedYear,
     language: preview.language,
     pageCount: preview.pageCount,
@@ -575,6 +598,7 @@ function buildPreviewPatch(preview: MetadataRefreshPreview): MetadataPatch {
     openLibraryId: preview.openLibraryId,
     itunesId: preview.itunesId,
     audibleId: preview.audibleId,
+    librofmId: preview.librofmId,
     koboId: preview.koboId,
     comicvineId: preview.comicvineId,
     ranobedbId: preview.ranobedbId,
@@ -589,7 +613,10 @@ function buildPreviewPatch(preview: MetadataRefreshPreview): MetadataPatch {
 
 async function autoFill() {
   const result = await previewRefresh(props.book.id)
-  if (!result) return
+  if (!result) {
+    toast.error('Auto-fill failed')
+    return
+  }
 
   const preview = result.metadata
   if (Object.keys(preview).length === 0) {
@@ -598,7 +625,14 @@ async function autoFill() {
   }
 
   const { skippedFields, updatedCount } = applyPatchToForm(buildPreviewPatch(preview), preview.coverUrl)
-  showApplyResult(skippedFields, updatedCount)
+  if (skippedFields.length > 0) {
+    showApplyResult(skippedFields, updatedCount)
+    return
+  }
+  toast.success(metadataRefreshAppliedMessage(result.diagnostics, updatedCount), {
+    closeButton: result.diagnostics.enabledUnreferencedProviders.length > 0,
+    duration: result.diagnostics.enabledUnreferencedProviders.length > 0 ? AUTO_FILL_EMPTY_TOAST_DURATION_MS : undefined,
+  })
 }
 
 function applyFileMetadataToForm(meta: FileMetadata): number {
@@ -1059,7 +1093,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         </MetadataFieldLabel>
       </div>
 
-      <!-- Language | Year | Page Count | ISBN-13 | ISBN-10 | Duration (audio) | Abridged (audio) -->
+      <!-- Language | Published Date | Year | Page Count | ISBN-13 | ISBN-10 | Duration (audio) | Abridged (audio) -->
       <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3">
         <MetadataFieldLabel
           class="col-span-2 sm:w-32 sm:shrink-0"
@@ -1075,6 +1109,22 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
             :disabled="isLocked('language')"
             :maxlength="10"
             :class="'w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed'"
+          />
+        </MetadataFieldLabel>
+        <MetadataFieldLabel
+          class="sm:w-40 sm:shrink-0"
+          label="Published Date"
+          field="publishedYear"
+          :locked="isLocked('publishedYear')"
+          :is-updating="isUpdatingLock"
+          @toggle="handleLockToggle"
+        >
+          <input
+            :value="form.publishedDate ?? ''"
+            type="date"
+            class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="isLocked('publishedYear')"
+            @input="setPublishedDateField"
           />
         </MetadataFieldLabel>
         <MetadataFieldLabel

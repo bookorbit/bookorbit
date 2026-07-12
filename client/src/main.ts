@@ -53,3 +53,16 @@ if (needsSetup.value !== true) {
 
 app.use(router)
 app.mount('#app')
+
+function prefetchPdfReader() {
+  void Promise.all([import('./features/reader/pdf-v4/PdfV4ReaderView.vue'), import('@embedpdf/pdfium/pdfium.wasm?url')]).then(([, wasm]) => {
+    void fetch(wasm.default, { cache: 'force-cache' })
+  })
+}
+
+const idleWindow = window as Window & { requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number }
+if (idleWindow.requestIdleCallback) {
+  idleWindow.requestIdleCallback(prefetchPdfReader, { timeout: 10_000 })
+} else {
+  window.setTimeout(prefetchPdfReader, 5_000)
+}

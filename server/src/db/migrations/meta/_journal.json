@@ -309,6 +309,48 @@
       "when": 1783549738764,
       "tag": "0043_storygraph_sync_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1783575766119,
+      "tag": "0044_add_published_date",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1783630272168,
+      "tag": "0045_kobo-device-owner-key",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1783630311448,
+      "tag": "0046_kobo-device-snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1783791670862,
+      "tag": "0047_accent-insensitive-search-indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1783800042730,
+      "tag": "0048_preserve-bigint-inodes",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1783837707573,
+      "tag": "0049_add-librofm-provider-id",
+      "breakpoints": true
     }
   ]
 }

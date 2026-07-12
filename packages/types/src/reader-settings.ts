@@ -70,9 +70,9 @@ export interface EpubReaderSettings {
 }
 
 export interface PdfReaderSettings {
-  scrollMode: "vertical" | "horizontal" | "wrapped" | "page";
-  spread: "none" | "odd" | "even";
-  zoomMode: "fit-width" | "fit-page" | "custom";
+  scrollMode: "vertical" | "horizontal" | "page";
+  spread: "none" | "odd" | "even" | "auto";
+  zoomMode: "fit-width" | "fit-page" | "automatic" | "custom";
   customScale: number; // 0.25-4.0, used when zoomMode is 'custom'
   rotation: 0 | 90 | 180 | 270;
 }

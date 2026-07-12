@@ -7,6 +7,7 @@ import {
   GoodreadsApolloWork,
   GoodreadsAutocompleteItem,
 } from './goodreads.types';
+import { parsePublishedDateFromEpochMillis, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
 
 export function mapGoodreadsApolloState(state: Record<string, unknown>, bookId: string): MetadataCandidate | null {
   const book = findBook(state, bookId);
@@ -27,7 +28,8 @@ export function mapGoodreadsApolloState(state: Record<string, unknown>, bookId: 
 
   const { title, subtitle } = splitTitle(book.title);
 
-  const publishedYear = parseEpochYear(details?.publicationTime);
+  const publishedDate = parsePublishedDateFromEpochMillis(details?.publicationTime);
+  const publishedYear = publishedDate ? publishedYearFromDateKey(publishedDate) : undefined;
   const pageCount = parsePositiveInt(details?.numPages);
   const seriesIndex = parseSeriesIndex(firstSeries?.userPosition);
   const communityRating = normalizeCommunityRating(work?.stats?.averageRating);
@@ -41,6 +43,7 @@ export function mapGoodreadsApolloState(state: Record<string, unknown>, bookId: 
     authors: authorName ? [authorName] : undefined,
     description: normalize(book.description),
     publisher: normalize(details?.publisher),
+    publishedDate,
     publishedYear,
     language: normalize(details?.language?.name),
     pageCount,
@@ -187,13 +190,6 @@ function splitTitle(fullTitle: string): { title: string; subtitle?: string } {
 function normalize(value: string | undefined | null): string | undefined {
   if (!value || value === 'null') return undefined;
   return value.trim() || undefined;
-}
-
-function parseEpochYear(value: string | number | undefined): number | undefined {
-  if (value == null) return undefined;
-  const ms = typeof value === 'string' ? parseFloat(value) : value;
-  if (!ms || Number.isNaN(ms)) return undefined;
-  return new Date(ms).getFullYear();
 }
 
 function parsePositiveInt(value: string | number | undefined): number | undefined {

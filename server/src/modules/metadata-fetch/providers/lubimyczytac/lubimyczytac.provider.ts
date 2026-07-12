@@ -93,6 +93,7 @@ export class LubimyczytacProvider implements IdentifiableProvider {
       authors: data.authors?.length ? data.authors : undefined,
       description: data.description,
       publisher: data.publisher,
+      publishedDate: data.publishedDate,
       publishedYear: data.publishedYear,
       language: data.language,
       pageCount: data.pageCount,

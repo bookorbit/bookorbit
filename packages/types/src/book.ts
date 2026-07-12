@@ -30,6 +30,10 @@ export type UserBookStatus = {
   updatedAt: string;
 };
 
+export type ResetBookReadingStateResponse = {
+  readStatus: UserBookStatus;
+};
+
 export type BookFileRef = {
   id: number;
   format: string | null;
@@ -54,6 +58,7 @@ export type BookCard = {
   seriesIndex: number | null;
   seriesMemberships?: BookSeriesMembership[];
   files: BookFileRef[];
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   genres: string[];
@@ -99,11 +104,7 @@ export type AudioMetadata = {
 };
 
 export type BookFileWriteDisabledReason =
-  | "library_disabled"
-  | "no_primary_file"
-  | "format_not_supported"
-  | "format_disabled"
-  | "file_exceeds_size_limit";
+  "library_disabled" | "no_primary_file" | "format_not_supported" | "format_disabled" | "file_exceeds_size_limit";
 
 export type BookFileWriteStatus = {
   enabled: boolean;
@@ -126,6 +127,7 @@ export type BookDetail = {
   isbn10: string | null;
   isbn13: string | null;
   publisher: string | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   pageCount: number | null;
@@ -169,6 +171,7 @@ export type BookMetadataRefreshPreviewFields = {
   authors?: string[];
   genres?: string[];
   publisher?: string | null;
+  publishedDate?: string | null;
   publishedYear?: number | null;
   language?: string | null;
   pageCount?: number | null;
@@ -185,6 +188,7 @@ export type BookMetadataRefreshPreviewFields = {
   openLibraryId?: string | null;
   itunesId?: string | null;
   audibleId?: string | null;
+  librofmId?: string | null;
   koboId?: string | null;
   comicvineId?: string | null;
   ranobedbId?: string | null;
@@ -214,6 +218,8 @@ export type BookKoboReadingState = {
 };
 
 export type BookKoboSnapshotState = {
+  deviceId: number;
+  deviceName: string;
   snapshotId: number;
   snapshotUpdatedAt: string;
   inSnapshot: boolean;
@@ -229,7 +235,7 @@ export type BookKoboState = {
   eligibleForKoboSync: boolean;
   syncCollections: string[];
   readingState: BookKoboReadingState | null;
-  snapshot: BookKoboSnapshotState | null;
+  snapshots: BookKoboSnapshotState[];
 };
 
 export type BooksPage = {

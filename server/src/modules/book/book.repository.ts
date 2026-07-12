@@ -6,6 +6,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { ContentFilterRules, JumpBucketsResponse, SortSpec } from '@bookorbit/types';
 import { isAudioFormat, isComicFormat } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
+import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { BookQueryBuilder } from './book-query-builder.service';
@@ -26,6 +27,7 @@ import {
   collectionBooks,
   collections,
   genres,
+  koboDevices,
   koboLibrarySnapshots,
   koboReadingStates,
   koboSnapshotBooks,
@@ -56,6 +58,7 @@ type CollapsedRawRow = {
   series_id: number | null;
   series_name: string | null;
   series_index: number | null;
+  published_date: string | null;
   published_year: number | null;
   language: string | null;
   rating: number | null;
@@ -84,6 +87,7 @@ type PatternMetadataRow = {
   title: string | null;
   subtitle: string | null;
   publisher: string | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   seriesId: number | null;
@@ -161,6 +165,7 @@ export class BookRepository {
         seriesId: bookMetadata.seriesId,
         seriesName: bookMetadata.seriesName,
         seriesIndex: bookMetadata.seriesIndex,
+        publishedDate: bookMetadata.publishedDate,
         publishedYear: bookMetadata.publishedYear,
         language: bookMetadata.language,
         rating: userBookRatings.rating,
@@ -351,6 +356,7 @@ export class BookRepository {
       seriesName: string | null;
       seriesId: number | null;
       seriesIndex: number | null;
+      publishedDate: string | null;
       publishedYear: number | null;
       language: string | null;
       rating: number | null;
@@ -408,6 +414,7 @@ export class BookRepository {
           book_metadata.series_id,
           book_metadata.series_name,
           book_metadata.series_index,
+          book_metadata.published_date,
           book_metadata.published_year,
           book_metadata.language,
           book_metadata.cover_source,
@@ -538,6 +545,7 @@ export class BookRepository {
           base.series_id,
           base.series_name,
           base.series_index,
+          base.published_date,
           base.published_year,
           base.language,
           ubr.rating,
@@ -603,6 +611,7 @@ export class BookRepository {
       seriesId: r.series_id,
       seriesName: r.series_name,
       seriesIndex: r.series_index,
+      publishedDate: r.published_date,
       publishedYear: r.published_year,
       language: r.language,
       rating: r.rating,
@@ -672,6 +681,7 @@ export class BookRepository {
           book_metadata.series_id,
           book_metadata.series_name,
           book_metadata.series_index,
+          book_metadata.published_date,
           book_metadata.published_year,
           book_metadata.publisher,
           book_metadata.page_count,
@@ -695,6 +705,7 @@ export class BookRepository {
           base.primary_file_id,
           base.updated_at,
           base.series_index,
+          base.published_date,
           base.published_year,
           base.publisher,
           base.page_count,
@@ -947,9 +958,11 @@ export class BookRepository {
     return row ?? null;
   }
 
-  async findKoboSnapshotState(userId: number, bookId: number) {
-    const [row] = await this.db
+  async findKoboSnapshotStates(userId: number, bookId: number) {
+    return this.db
       .select({
+        deviceId: koboDevices.id,
+        deviceName: koboDevices.name,
         snapshotId: koboLibrarySnapshots.id,
         snapshotUpdatedAt: koboLibrarySnapshots.updatedAt,
         synced: koboSnapshotBooks.synced,
@@ -960,10 +973,10 @@ export class BookRepository {
         metadataHash: koboSnapshotBooks.metadataHash,
       })
       .from(koboLibrarySnapshots)
+      .innerJoin(koboDevices, and(eq(koboDevices.id, koboLibrarySnapshots.deviceId), eq(koboDevices.userId, userId)))
       .leftJoin(koboSnapshotBooks, and(eq(koboSnapshotBooks.snapshotId, koboLibrarySnapshots.id), eq(koboSnapshotBooks.bookId, bookId)))
       .where(eq(koboLibrarySnapshots.userId, userId))
-      .limit(1);
-    return row ?? null;
+      .orderBy(asc(koboDevices.createdAt), asc(koboDevices.id));
   }
 
   async findKoboSyncCollectionNamesForBook(userId: number, bookId: number): Promise<string[]> {
@@ -984,14 +997,14 @@ export class BookRepository {
       .selectDistinct({ bookId: bookAuthors.bookId })
       .from(bookAuthors)
       .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
-      .where(sql`${authors.name} ILIKE ${pattern}`)
+      .where(accentInsensitiveIlike(authors.name, pattern))
       .as('matched_authors');
 
     const matchedSeries = this.db
       .selectDistinct({ bookId: bookSeriesMemberships.bookId })
       .from(bookSeriesMemberships)
       .innerJoin(bookSeries, eq(bookSeries.id, bookSeriesMemberships.seriesId))
-      .where(sql`${bookSeries.name} ILIKE ${pattern}`)
+      .where(accentInsensitiveIlike(bookSeries.name, pattern))
       .as('matched_series');
 
     const contentFilterClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
@@ -1016,8 +1029,8 @@ export class BookRepository {
           inArray(books.libraryId, libraryIds),
           ne(books.status, 'processing'),
           or(
-            sql`${bookMetadata.title} ILIKE ${pattern}`,
-            sql`${bookMetadata.seriesName} ILIKE ${pattern}`,
+            accentInsensitiveIlike(bookMetadata.title, pattern),
+            accentInsensitiveIlike(bookMetadata.seriesName, pattern),
             isNotNull(matchedAuthors.bookId),
             isNotNull(matchedSeries.bookId),
           ),
@@ -1144,6 +1157,7 @@ export class BookRepository {
           title: bookMetadata.title,
           subtitle: bookMetadata.subtitle,
           publisher: bookMetadata.publisher,
+          publishedDate: bookMetadata.publishedDate,
           publishedYear: bookMetadata.publishedYear,
           language: bookMetadata.language,
           seriesId: bookMetadata.seriesId,

@@ -18,6 +18,47 @@ const { effective, load, update, reset } = useReaderDefaultSettings<PdfReaderSet
 onMounted(load)
 
 const showZoom = computed(() => effective.value.zoomMode === 'custom')
+
+function resetSettings() {
+  reset()
+}
+
+function selectPageLayout() {
+  update({ scrollMode: 'page' })
+}
+
+function selectVerticalLayout() {
+  update({ scrollMode: 'vertical' })
+}
+
+function selectHorizontalLayout() {
+  update({ scrollMode: 'horizontal' })
+}
+
+function selectSingleSpread() {
+  update({ spread: 'none' })
+}
+
+function selectOddSpread() {
+  update({ spread: 'odd' })
+}
+
+function selectEvenSpread() {
+  update({ spread: 'even' })
+}
+
+function selectAutoSpread() {
+  update({ spread: 'auto' })
+}
+
+function selectZoomMode(event: Event) {
+  const mode = (event.currentTarget as HTMLButtonElement).dataset.zoomMode as PdfReaderSettings['zoomMode']
+  update({ zoomMode: mode })
+}
+
+function handleCustomScale(event: Event) {
+  update({ customScale: Number((event.target as HTMLInputElement).value) })
+}
 </script>
 
 <template>
@@ -25,7 +66,7 @@ const showZoom = computed(() => effective.value.zoomMode === 'custom')
     class="[&_.settings-hint]:overflow-hidden [&_.settings-hint]:text-ellipsis [&_.settings-hint]:whitespace-nowrap md:[&_.settings-hint]:overflow-visible md:[&_.settings-hint]:whitespace-normal"
   >
     <SettingsPageHeader v-if="!props.embedded" title="PDF Reader" subtitle="Default settings applied when opening PDF files.">
-      <button class="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2" @click="reset()">
+      <button class="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2" @click="resetSettings">
         Reset to defaults
       </button>
     </SettingsPageHeader>
@@ -33,12 +74,12 @@ const showZoom = computed(() => effective.value.zoomMode === 'custom')
       <div
         class="md:hidden sticky top-11 z-10 -mx-4 mb-4 px-4 py-2 border-y border-border/70 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75"
       >
-        <button class="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2" @click="reset()">
+        <button class="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2" @click="resetSettings">
           Reset to defaults
         </button>
       </div>
       <div class="hidden md:flex justify-end mb-4">
-        <button class="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2" @click="reset()">
+        <button class="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2" @click="resetSettings">
           Reset to defaults
         </button>
       </div>
@@ -60,16 +101,25 @@ const showZoom = computed(() => effective.value.zoomMode === 'custom')
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
               :class="effective.scrollMode === 'page' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
-              @click="update({ scrollMode: 'page' })"
+              @click="selectPageLayout"
             >
               Page
             </button>
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
               :class="effective.scrollMode === 'vertical' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
-              @click="update({ scrollMode: 'vertical' })"
+              @click="selectVerticalLayout"
             >
               Scrolled
+            </button>
+            <button
+              class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
+              :class="
+                effective.scrollMode === 'horizontal' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'
+              "
+              @click="selectHorizontalLayout"
+            >
+              Horizontal
             </button>
           </div>
         </div>
@@ -86,23 +136,30 @@ const showZoom = computed(() => effective.value.zoomMode === 'custom')
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
               :class="effective.spread === 'none' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
-              @click="update({ spread: 'none' })"
+              @click="selectSingleSpread"
             >
               None
             </button>
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
               :class="effective.spread === 'odd' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
-              @click="update({ spread: 'odd' })"
+              @click="selectOddSpread"
             >
               Odd
             </button>
             <button
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
               :class="effective.spread === 'even' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
-              @click="update({ spread: 'even' })"
+              @click="selectEvenSpread"
             >
               Even
+            </button>
+            <button
+              class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
+              :class="effective.spread === 'auto' ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              @click="selectAutoSpread"
+            >
+              Auto
             </button>
           </div>
         </div>
@@ -126,16 +183,18 @@ const showZoom = computed(() => effective.value.zoomMode === 'custom')
               v-for="opt in [
                 { id: 'fit-page' as const, label: 'Fit Page' },
                 { id: 'fit-width' as const, label: 'Fit Width' },
+                { id: 'automatic' as const, label: 'Automatic' },
                 { id: 'custom' as const, label: 'Custom' },
               ]"
               :key="opt.id"
+              :data-zoom-mode="opt.id"
               class="h-8 px-3 text-xs border-2 transition-colors font-medium rounded-md"
               :class="
                 effective.zoomMode === opt.id
                   ? 'border-primary text-primary bg-primary/8'
                   : 'border-border text-muted-foreground hover:border-muted-foreground/40 hover:text-foreground'
               "
-              @click="update({ zoomMode: opt.id })"
+              @click="selectZoomMode"
             >
               {{ opt.label }}
             </button>
@@ -160,7 +219,7 @@ const showZoom = computed(() => effective.value.zoomMode === 'custom')
             step="0.05"
             class="w-full accent-primary cursor-pointer"
             :value="effective.customScale"
-            @input="update({ customScale: Number(($event.target as HTMLInputElement).value) })"
+            @input="handleCustomScale"
           />
         </div>
       </div>

@@ -203,7 +203,11 @@ function ProgressSync:updateProgress(ensure_networking, interactive, on_suspend)
         return
     end
 
-    if ensure_networking and NetworkMgr:willRerunWhenOnline(function() self:updateProgress(ensure_networking, interactive, on_suspend) end) then
+    if ensure_networking and NetworkMgr:willRerunWhenOnline(function()
+            self:runInSyncCoroutine(function()
+                self:updateProgress(ensure_networking, interactive, on_suspend)
+            end)
+        end) then
         return
     end
 
@@ -272,7 +276,11 @@ function ProgressSync:getProgress(ensure_networking, interactive)
         return
     end
 
-    if ensure_networking and NetworkMgr:willRerunWhenOnline(function() self:getProgress(ensure_networking, interactive) end) then
+    if ensure_networking and NetworkMgr:willRerunWhenOnline(function()
+            self:runInSyncCoroutine(function()
+                self:getProgress(ensure_networking, interactive)
+            end)
+        end) then
         return
     end
 

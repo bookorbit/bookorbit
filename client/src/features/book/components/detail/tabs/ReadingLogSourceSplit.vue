@@ -4,9 +4,14 @@ import { MonitorSmartphone } from '@lucide/vue'
 import type { BookReadingSessionStats, ReadingSessionSourceBucket } from '@bookorbit/types'
 import { READING_SESSION_SOURCE_BUCKET_LABELS } from '@bookorbit/types'
 
-const props = defineProps<{
-  stats: BookReadingSessionStats | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    stats: BookReadingSessionStats | null
+    embedded?: boolean
+    compact?: boolean
+  }>(),
+  { embedded: false, compact: false },
+)
 
 const BUCKET_TOKEN: Record<ReadingSessionSourceBucket, string> = {
   bookorbit: '--pill-web',
@@ -43,26 +48,60 @@ const shouldShow = computed(() => segments.value.length >= 2 && totalSeconds.val
 </script>
 
 <template>
-  <div v-if="shouldShow" class="rounded-lg border border-border bg-card p-4">
-    <p class="mb-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-      <MonitorSmartphone class="size-3.5" />
-      Where you read this book
-    </p>
-    <div class="flex h-3 w-full overflow-hidden rounded-full bg-muted">
-      <div
-        v-for="seg in segments"
-        :key="seg.bucket"
-        class="h-full"
-        :style="{ width: `${seg.widthPercent}%`, backgroundColor: `var(${seg.token})` }"
-        :title="`${seg.label}: ${seg.percent}%`"
-      />
-    </div>
-    <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
-      <div v-for="seg in segments" :key="seg.bucket" class="flex items-center gap-1.5 text-xs">
-        <span class="size-2.5 rounded-full" :style="{ backgroundColor: `var(${seg.token})` }" />
-        <span class="font-medium text-foreground">{{ seg.label }}</span>
-        <span class="text-muted-foreground">{{ seg.percent }}% · {{ formatDuration(seg.seconds) }}</span>
+  <section
+    v-if="shouldShow"
+    :class="
+      compact
+        ? 'flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-xs'
+        : embedded
+          ? 'mt-4 border-t border-border/70 pt-4'
+          : 'rounded-xl border border-border bg-card p-4 shadow-[var(--elevation-xs)]'
+    "
+  >
+    <template v-if="compact">
+      <span class="flex items-center gap-1.5 font-medium text-muted-foreground">
+        <MonitorSmartphone class="size-3.5" />
+        Sources
+      </span>
+      <div class="flex h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-muted sm:w-28">
+        <div
+          v-for="seg in segments"
+          :key="seg.bucket"
+          class="h-full"
+          :style="{ width: `${seg.widthPercent}%`, backgroundColor: `var(${seg.token})` }"
+          :title="`${seg.label}: ${seg.percent}%`"
+        />
+      </div>
+      <div class="flex flex-wrap gap-x-3 gap-y-1.5">
+        <span v-for="seg in segments" :key="seg.bucket" class="flex items-center gap-1 text-muted-foreground">
+          <span class="size-1.5 rounded-full" :style="{ backgroundColor: `var(${seg.token})` }" />
+          <span class="font-medium text-foreground">{{ seg.label }}</span>
+          {{ seg.percent }}%
+        </span>
+      </div>
+    </template>
+
+    <div v-else class="flex flex-col gap-3 md:flex-row md:items-center">
+      <p class="flex shrink-0 items-center gap-1.5 text-sm font-medium text-foreground">
+        <MonitorSmartphone class="size-4 text-muted-foreground" />
+        Reading sources
+      </p>
+      <div class="flex h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+        <div
+          v-for="seg in segments"
+          :key="seg.bucket"
+          class="h-full"
+          :style="{ width: `${seg.widthPercent}%`, backgroundColor: `var(${seg.token})` }"
+          :title="`${seg.label}: ${seg.percent}%`"
+        />
+      </div>
+      <div class="flex flex-wrap gap-x-3 gap-y-1.5 md:justify-end">
+        <div v-for="seg in segments" :key="seg.bucket" class="flex items-center gap-1.5 text-xs">
+          <span class="size-2.5 rounded-full" :style="{ backgroundColor: `var(${seg.token})` }" />
+          <span class="font-medium text-foreground">{{ seg.label }}</span>
+          <span class="text-muted-foreground">{{ seg.percent }}% · {{ formatDuration(seg.seconds) }}</span>
+        </div>
       </div>
     </div>
-  </div>
+  </section>
 </template>

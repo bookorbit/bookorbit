@@ -53,6 +53,7 @@ describe('KoboAnalyticsService', () => {
     await makeService().ingest({ Events: events }, user, device);
 
     expect(resolver.resolveBookFileId).toHaveBeenCalledTimes(3);
+    expect(resolver.resolveBookFileId).toHaveBeenCalledWith(7, 2, 1);
     expect(readingSessionService.save).toHaveBeenCalledTimes(3);
     expect(readingSessionService.save).toHaveBeenNthCalledWith(
       1,
@@ -396,7 +397,7 @@ describe('KoboAnalyticsService', () => {
     );
 
     expect(bookIdentityService.resolveBookIdByEntitlementId).toHaveBeenCalledWith(7, entitlementId);
-    expect(resolver.resolveBookFileId).toHaveBeenCalledWith(7, 9);
+    expect(resolver.resolveBookFileId).toHaveBeenCalledWith(7, 2, 9);
     expect(readingSessionService.save).toHaveBeenCalledWith(100, expect.objectContaining({ sessionId: 'uuid-volume', endProgress: 8 }), user, 'kobo');
   });
 

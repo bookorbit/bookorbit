@@ -182,6 +182,14 @@ describe('KOReader plugin update source wiring', () => {
     expect(updater).toContain('self.settings.update_dismissed_version = plugin_latest');
   });
 
+  it('renders the server version with exactly one v prefix in update dialogs', async () => {
+    const updater = await readPluginFile('bookorbit_updater.lua');
+
+    expect(updater).toContain('local server_ver = tostring(body.serverVersion or "unknown"):gsub("^v", "")');
+    expect(updater).toContain('Plugin is up to date (v%1).\\nServer: v%2');
+    expect(updater).toContain('Update available: v%1 -> v%2\\nServer: v%3');
+  });
+
   it('runs a throttled update check after successful full-library sweeps', async () => {
     const main = await readPluginFile('main.lua');
     const sweep = await readPluginFile('bookorbit_sweep.lua');

@@ -13,6 +13,7 @@ describe('buildFileMetadataPatch', () => {
       openLibraryId: 'OL123W',
       itunesId: 'itunes-1',
       audibleId: 'audible-1',
+      librofmId: '9781234567890',
       comicvineId: 'comicvine-1',
       ranobedbId: 'ranobe-1',
     })
@@ -26,6 +27,7 @@ describe('buildFileMetadataPatch', () => {
       openLibraryId: 'OL123W',
       itunesId: 'itunes-1',
       audibleId: 'audible-1',
+      librofmId: '9781234567890',
       comicvineId: 'comicvine-1',
       ranobedbId: 'ranobe-1',
     })

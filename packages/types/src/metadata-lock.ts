@@ -26,6 +26,7 @@ export const BOOK_METADATA_LOCK_FIELDS = [
   "openLibraryId",
   "itunesId",
   "audibleId",
+  "librofmId",
   "koboId",
   "comicvineId",
   "ranobedbId",

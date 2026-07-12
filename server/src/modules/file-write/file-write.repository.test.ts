@@ -102,6 +102,7 @@ describe('FileWriteRepository', () => {
       aladinId: 'al',
       itunesId: 'it',
       audibleId: 'aud',
+      librofmId: '9781234567890',
       rating: 4,
     };
 

@@ -4,7 +4,6 @@ import {
   Delete,
   Get,
   Header,
-  Headers,
   HttpCode,
   HttpStatus,
   Logger,
@@ -22,6 +21,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
+import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { KoboDevice } from './decorators/kobo-device.decorator';
 import type { KoboDeviceContext } from './guards/kobo-token.guard';
 import { KoboTokenGuard } from './guards/kobo-token.guard';
@@ -117,17 +117,21 @@ export class KoboSyncController {
   async librarySync(
     @KoboDevice() device: KoboDeviceContext,
     @CurrentUser() user: RequestUser,
-    @Headers('x-kobo-synctoken') incomingToken: string | undefined,
     @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,
   ) {
     const startedAt = Date.now();
-    this.logger.log(`librarySync: userId=${user.id} syncToken=${incomingToken ?? 'none'}`);
+    this.logger.debug(`[kobo.library_sync] [start] userId=${user.id} deviceId=${device.deviceId} - library sync started`);
     const baseUrl = buildBaseUrl(req);
     let result: { entitlements: unknown[]; hasMore: boolean; syncToken: string };
     try {
-      result = await this.syncService.getDelta(user.id, device.deviceToken, baseUrl);
+      result = await this.syncService.getDelta(user.id, device.deviceId, device.deviceToken, baseUrl);
     } catch (error: unknown) {
+      const errorClass = error instanceof Error ? error.name : 'UnknownError';
+      const errorMessage = sanitizeLogValue(error instanceof Error ? error.message : 'unknown error');
+      this.logger.error(
+        `[kobo.library_sync] [fail] userId=${user.id} deviceId=${device.deviceId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - library sync failed`,
+      );
       await this.historyService.recordFailure(
         {
           userId: user.id,
@@ -140,6 +144,9 @@ export class KoboSyncController {
       throw error;
     }
     const { entitlements, hasMore, syncToken } = result;
+    this.logger.debug(
+      `[kobo.library_sync] [end] userId=${user.id} deviceId=${device.deviceId} durationMs=${Date.now() - startedAt} entitlementCount=${entitlements.length} hasMore=${hasMore} - library sync completed`,
+    );
     await this.historyService.recordSuccess({
       userId: user.id,
       deviceId: device.deviceId,
@@ -204,7 +211,7 @@ export class KoboSyncController {
   ) {
     const id = await this.bookIdentityService.resolveBookIdByEntitlementId(user.id, bookId);
     if (id === null) return this.proxyService.forward(req, reply, device.deviceToken);
-    await this.syncService.removeBookFromSync(user.id, id);
+    await this.syncService.removeBookFromSync(user.id, device.deviceId, id);
     reply.status(HttpStatus.OK).send();
   }
 

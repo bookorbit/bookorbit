@@ -4,6 +4,7 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { InlineEntityType } from '@bookorbit/types';
 import { DB } from '../../../db';
+import { accentInsensitiveIlike } from '../../../common/utils/accent-insensitive-search.utils';
 import * as schema from '../../../db/schema';
 import { bookMetadata } from '../../../db/schema';
 import type {
@@ -102,7 +103,7 @@ export abstract class InlineEntityStrategy implements EntityStrategy {
 
     let searchFilter = sql``;
     if (params.search) {
-      searchFilter = sql` AND bm.${f} ILIKE ${'%' + escapeLike(params.search) + '%'}`;
+      searchFilter = sql` AND ${accentInsensitiveIlike(sql`bm.${f}`, '%' + escapeLike(params.search) + '%')}`;
     }
 
     const idsLiteral = sql.raw(`(${params.libraryIds.join(',')})`);

@@ -18,6 +18,7 @@ export const bookSeries = pgTable(
   (t) => [
     uniqueIndex('book_series_normalized_name_uidx').on(t.normalizedName),
     index('book_series_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops')),
+    index('book_series_name_unaccent_trgm_idx').using('gin', sql`public.bookorbit_unaccent(${t.name}) gin_trgm_ops`),
     index('book_series_name_lower_idx').on(sql`lower(${t.name})`),
   ],
 );

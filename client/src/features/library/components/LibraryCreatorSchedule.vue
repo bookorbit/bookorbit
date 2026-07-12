@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Eye } from '@lucide/vue'
+import cronstrue from 'cronstrue'
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 
 const props = defineProps<{
   watch: boolean
@@ -48,6 +50,14 @@ function selectPreset(value: string | null) {
   }
 }
 
+function handleWatchUpdate(value: boolean) {
+  emit('update:watch', value)
+}
+
+function handleCronInput(event: Event) {
+  emit('update:autoScanCronExpression', (event.target as HTMLInputElement).value || null)
+}
+
 function humanReadableCron(cron: string | null): string {
   if (!cron) return 'Auto-scan disabled'
   const map: Record<string, string> = {
@@ -57,7 +67,12 @@ function humanReadableCron(cron: string | null): string {
     '0 0 * * *': 'Daily at midnight',
     '0 0 * * 1': 'Weekly on Monday at midnight',
   }
-  return map[cron] ?? `Cron: ${cron}`
+  if (map[cron]) return map[cron]
+  try {
+    return cronstrue.toString(cron)
+  } catch {
+    return 'Enter a valid schedule to see a preview'
+  }
 }
 </script>
 
@@ -66,35 +81,25 @@ function humanReadableCron(cron: string | null): string {
     <!-- Watch folders -->
     <div>
       <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-3">File watching</p>
-      <div class="rounded-lg border border-border overflow-hidden divide-y divide-border">
-        <label class="flex items-center justify-between px-5 py-4 bg-card cursor-pointer">
+      <div class="overflow-hidden rounded-lg border border-border">
+        <div class="flex items-center justify-between gap-4 bg-card px-4 py-4 sm:px-5">
           <div>
             <p class="text-sm font-medium text-foreground">Watch folders</p>
             <p class="text-xs text-muted-foreground mt-0.5">Automatically detect new files added to library folders.</p>
           </div>
-          <button
-            role="switch"
-            :aria-checked="watch"
-            class="relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-            :class="watch ? 'bg-primary' : 'bg-muted-foreground/30'"
-            @click="emit('update:watch', !watch)"
-          >
-            <span
-              class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out"
-              :class="watch ? 'translate-x-4' : 'translate-x-0'"
-            />
-          </button>
-        </label>
+          <ToggleSwitch :model-value="watch" aria-label="Watch folders" @update:model-value="handleWatchUpdate" />
+        </div>
       </div>
     </div>
 
     <!-- Auto-scan schedule -->
     <div>
       <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-3">Auto-scan schedule</p>
-      <div class="grid grid-cols-3 gap-2 mb-4">
+      <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
         <button
           v-for="preset in PRESETS"
           :key="String(preset.value)"
+          type="button"
           class="px-3 py-2 rounded-lg border text-xs font-medium transition-colors"
           :class="
             selectedPreset === preset.value
@@ -109,17 +114,20 @@ function humanReadableCron(cron: string | null): string {
 
       <!-- Custom cron input -->
       <div v-if="isCustom || selectedPreset === '__custom__'" class="mt-2">
-        <label class="block text-xs font-medium text-muted-foreground mb-1.5">Cron expression</label>
+        <label for="library-scan-cron" class="mb-1.5 block text-xs font-medium text-muted-foreground">Cron expression</label>
         <input
+          id="library-scan-cron"
           type="text"
           :value="autoScanCronExpression ?? ''"
           placeholder="0 0 * * *"
           class="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2"
           :class="isCronValid ? 'border-border focus:ring-ring' : 'border-destructive focus:ring-destructive'"
-          @input="emit('update:autoScanCronExpression', ($event.target as HTMLInputElement).value || null)"
+          :aria-invalid="!isCronValid"
+          aria-describedby="library-scan-cron-help"
+          @input="handleCronInput"
         />
-        <p v-if="!isCronValid" class="mt-1 text-xs text-destructive">Invalid cron expression.</p>
-        <p v-else class="mt-1 text-xs text-muted-foreground">Format: minute hour day month weekday</p>
+        <p v-if="!isCronValid" id="library-scan-cron-help" class="mt-1 text-xs text-destructive">Enter a valid 5-field cron expression.</p>
+        <p v-else id="library-scan-cron-help" class="mt-1 text-xs text-muted-foreground">Format: minute hour day month weekday</p>
       </div>
 
       <!-- Human readable preview -->

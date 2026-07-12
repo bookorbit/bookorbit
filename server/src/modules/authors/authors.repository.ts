@@ -1,9 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { SQL, and, asc, desc, eq, ilike, inArray, isNull, max, or, sql } from 'drizzle-orm';
+import { SQL, and, asc, desc, eq, inArray, isNull, max, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { ContentFilterRules } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
+import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
 import { DB } from '../../db';
 import { refreshPrimaryAuthorSortNamesForAuthors, refreshPrimaryAuthorSortNamesForBooks } from '../../db/book-author-sort-key';
 import * as schema from '../../db/schema';
@@ -318,7 +319,7 @@ export class AuthorsRepository {
     }
     const query = params.q?.trim();
     if (query) {
-      clauses.push(ilike(authors.name, `%${escapeLikePattern(query)}%`));
+      clauses.push(accentInsensitiveIlike(authors.name, `%${escapeLikePattern(query)}%`));
     }
     if (params.hasPhoto !== undefined) {
       clauses.push(eq(authors.hasPhoto, params.hasPhoto));

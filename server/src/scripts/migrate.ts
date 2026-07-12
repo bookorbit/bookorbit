@@ -4,6 +4,8 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 
+import { installPostgresExtensions } from './postgres-extensions';
+
 function resolveMigrationsFolder(): string {
   const candidates = [
     join(__dirname, '..', '..', 'migrations'),
@@ -33,11 +35,7 @@ async function runMigrations() {
   });
 
   try {
-    await pool.query(`
-      CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-      CREATE EXTENSION IF NOT EXISTS "pg_trgm";
-      CREATE EXTENSION IF NOT EXISTS "vector";
-    `);
+    await installPostgresExtensions(pool);
 
     const migrationsFolder = resolveMigrationsFolder();
     await migrate(drizzle(pool), { migrationsFolder });

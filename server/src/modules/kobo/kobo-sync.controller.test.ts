@@ -196,10 +196,10 @@ describe('KoboSyncController', () => {
     };
     const reply = makeReply();
 
-    await controller.librarySync({ deviceId: 9, deviceToken: 'token-9' } as never, { id: 21 } as never, 'old-sync', req as never, reply as never);
+    await controller.librarySync({ deviceId: 9, deviceToken: 'token-9' } as never, { id: 21 } as never, req as never, reply as never);
 
     expect(settingsService.getSettings).not.toHaveBeenCalled();
-    expect(syncService.getDelta).toHaveBeenCalledWith(21, 'token-9', 'http://kobo.local:3000');
+    expect(syncService.getDelta).toHaveBeenCalledWith(21, 9, 'token-9', 'http://kobo.local:3000');
     expect(historyService.recordSuccess).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 21,
@@ -225,7 +225,7 @@ describe('KoboSyncController', () => {
     const reply = makeReply();
 
     await expect(
-      controller.librarySync({ deviceId: 10, deviceToken: 'token-10' } as never, { id: 22 } as never, undefined, req as never, reply as never),
+      controller.librarySync({ deviceId: 10, deviceToken: 'token-10' } as never, { id: 22 } as never, req as never, reply as never),
     ).rejects.toThrow('snapshot failed');
 
     expect(historyService.recordFailure).toHaveBeenCalledWith(expect.objectContaining({ userId: 22, deviceId: 10, event: 'library_sync' }), error);
@@ -327,12 +327,12 @@ describe('KoboSyncController', () => {
     readingStateService.getRawState.mockResolvedValueOnce(null).mockResolvedValueOnce({ EntitlementId: '5' });
 
     await controller.getBookMetadata('5', { id: 4 } as never, { deviceToken: 'token-5' } as never, req as never, reply as never);
-    await controller.deleteFromLibrary('5', { id: 4 } as never, { deviceToken: 'token-5' } as never, req as never, reply as never);
-    await controller.getReadingState('5', { id: 4 } as never, { deviceToken: 'token-5' } as never, req as never, reply as never);
+    await controller.deleteFromLibrary('5', { id: 4 } as never, { deviceId: 5, deviceToken: 'token-5' } as never, req as never, reply as never);
+    await controller.getReadingState('5', { id: 4 } as never, { deviceId: 5, deviceToken: 'token-5' } as never, req as never, reply as never);
     await controller.getReadingState('5', { id: 4 } as never, { deviceToken: 'token-5' } as never, req as never, reply as never);
 
     expect(syncService.getBookMetadata).toHaveBeenCalledWith(4, 5, 'token-5', 'http://localhost:3000');
-    expect(syncService.removeBookFromSync).toHaveBeenCalledWith(4, 5);
+    expect(syncService.removeBookFromSync).toHaveBeenCalledWith(4, 5, 5);
     expect(reply.status).toHaveBeenCalledWith(HttpStatus.OK);
     expect(reply.send).toHaveBeenNthCalledWith(1, [{ Title: 'Dune' }]);
     expect(reply.send).toHaveBeenNthCalledWith(2);

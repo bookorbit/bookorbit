@@ -1,0 +1,13 @@
+diff --git a/dist/vue/index.js b/dist/vue/index.js
+index e84f7ff256267d787787b779f51f69e7586fbe63..ce58323b4028f164037d3b045331572fb75b055c 100644
+--- a/dist/vue/index.js
++++ b/dist/vue/index.js
+@@ -81,7 +81,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
+         if (!plugin || !docId || !layout) return;
+         plugin.setLayoutReady(docId);
+       },
+-      { immediate: true }
++      { immediate: true, flush: "post" }
+     );
+     return (_ctx, _cache) => {
+       return scrollerLayout.value ? (openBlock(), createElementBlock("div", mergeProps({

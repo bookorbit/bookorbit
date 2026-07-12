@@ -23,6 +23,8 @@ export function flatJumpBucketExpr(field: SortField): SQL | null {
       return letterExpr(sql`${bookMetadata.title}`);
     case 'author':
       return letterExpr(sql`${books.primaryAuthorSortName}`);
+    case 'publishedDate':
+      return sql`extract(year from coalesce(${bookMetadata.publishedDate}, make_date(${bookMetadata.publishedYear}, 1, 1)))::int::text`;
     case 'publishedYear':
       return sql`${bookMetadata.publishedYear}::text`;
     default:
@@ -36,6 +38,8 @@ export function collapsedJumpBucketExpr(field: SortField): SQL | null {
       return letterExpr(sql.raw('r.sort_title'));
     case 'author':
       return letterExpr(sql.raw('r.author_sort_name'));
+    case 'publishedDate':
+      return sql.raw('extract(year from coalesce(r.published_date, make_date(r.published_year, 1, 1)))::int::text');
     case 'publishedYear':
       return sql.raw('r.published_year::text');
     default:

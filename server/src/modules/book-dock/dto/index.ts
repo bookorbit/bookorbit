@@ -7,6 +7,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -56,6 +57,7 @@ export class BookDockMetadataFieldsDto {
   @IsOptional() @IsString() isbn13?: string;
   @IsOptional() @IsString() seriesName?: string;
   @IsOptional() @IsString() coverUrl?: string;
+  @IsOptional() @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) publishedDate?: string;
   @IsOptional() @IsInt() @Min(1000) @Max(2200) publishedYear?: number;
   @IsOptional() @IsNumber() pageCount?: number;
   @IsOptional() @IsNumber() seriesIndex?: number;

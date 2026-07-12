@@ -181,7 +181,7 @@ describe('updateManual', () => {
     expect(mockAchievementEvents.emit).not.toHaveBeenCalled();
   });
 
-  it('does not seed dates or fetch boundaries for unread and want_to_read statuses', async () => {
+  it('clears existing lifecycle dates and does not fetch boundaries for unread and want_to_read statuses', async () => {
     mockRepo.findSessionBoundariesForBook.mockResolvedValue({
       firstStartedAt: new Date('2024-06-01T10:00:00.000Z'),
       lastEndedAt: new Date('2024-12-01T22:00:00.000Z'),
@@ -189,7 +189,14 @@ describe('updateManual', () => {
 
     for (const status of ['unread', 'want_to_read'] as const) {
       vi.clearAllMocks();
-      mockRepo.findOne.mockResolvedValue(makeRow({ startedAt: null, finishedAt: null, status: 'reading', source: 'auto' }));
+      mockRepo.findOne.mockResolvedValue(
+        makeRow({
+          startedAt: new Date('2024-06-01T10:00:00.000Z'),
+          finishedAt: new Date('2024-12-01T22:00:00.000Z'),
+          status: 'reading',
+          source: 'auto',
+        }),
+      );
       mockRepo.upsertState.mockResolvedValue(undefined);
       mockRepo.findSessionBoundariesForBook.mockResolvedValue({
         firstStartedAt: new Date('2024-06-01T10:00:00.000Z'),
@@ -199,6 +206,11 @@ describe('updateManual', () => {
       const result = await service.updateManual(1, 10, { status });
 
       expect(mockRepo.findSessionBoundariesForBook).not.toHaveBeenCalled();
+      expect(mockRepo.upsertState).toHaveBeenCalledWith(
+        1,
+        10,
+        expect.objectContaining({ status, source: 'manual', startedAt: null, finishedAt: null }),
+      );
       expect(result.startedAt).toBeNull();
       expect(result.finishedAt).toBeNull();
     }
@@ -314,6 +326,25 @@ describe('bulkSetManual', () => {
     expect(mockAchievementEvents.emit).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({ userId: 1, bookId: 12, previousStatus: null, newStatus: 'reading' }),
+    );
+  });
+
+  it.each(['unread', 'want_to_read'] as const)('clears lifecycle dates when bulk-setting %s', async (status) => {
+    const startedAt = new Date('2026-04-01T00:00:00.000Z');
+    const finishedAt = new Date('2026-04-12T00:00:00.000Z');
+    mockRepo.findByBookIds.mockResolvedValue([makeRow({ bookId: 10, status: 'reading', startedAt, finishedAt })]);
+
+    await service.bulkSetManual(1, [10, 11], status);
+
+    expect(mockRepo.upsertState).toHaveBeenCalledWith(
+      1,
+      10,
+      expect.objectContaining({ status, source: 'manual', startedAt: null, finishedAt: null }),
+    );
+    expect(mockRepo.upsertState).toHaveBeenCalledWith(
+      1,
+      11,
+      expect.objectContaining({ status, source: 'manual', startedAt: null, finishedAt: null }),
     );
   });
 });

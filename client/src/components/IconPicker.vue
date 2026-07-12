@@ -260,44 +260,52 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <!-- Trigger button -->
-  <button
+  <div
     ref="triggerRef"
-    type="button"
-    @click="toggle"
-    class="h-9 flex items-center justify-center gap-2 rounded-md border border-input bg-background shadow-xs text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+    class="flex h-9 items-center justify-center gap-2 rounded-md border border-input bg-background shadow-xs text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-within:ring-1 focus-within:ring-ring"
     :class="[!hideText ? 'w-full px-3' : '', hideText && modelValue ? 'w-9 px-0' : '', hideText && !modelValue ? 'px-3 whitespace-nowrap' : '']"
   >
-    <AppIcon v-if="modelValue" :icon="modelValue" :size="16" class="shrink-0" />
+    <button
+      type="button"
+      class="flex min-w-0 flex-1 items-center justify-center gap-2 focus-visible:outline-none"
+      :aria-expanded="open"
+      aria-haspopup="dialog"
+      @click="toggle"
+    >
+      <AppIcon v-if="modelValue" :icon="modelValue" :size="16" class="shrink-0" />
 
-    <template v-if="!modelValue">
-      <span v-if="!hideText" class="text-muted-foreground flex-1 text-left font-normal truncate">
-        {{ placeholder ?? 'Choose an icon...' }}
-      </span>
-      <span v-else class="text-foreground flex items-center gap-1.5">
-        <component :is="LucideIcons.Shapes" :size="14" class="text-muted-foreground" />
-        {{ placeholder ?? 'Select icon' }}
-      </span>
-      <ChevronDown
-        v-if="!hideText"
-        :size="14"
-        class="text-muted-foreground shrink-0 transition-transform duration-200"
-        :class="open ? 'rotate-180' : ''"
-      />
-    </template>
+      <template v-if="!modelValue">
+        <span v-if="!hideText" class="text-muted-foreground flex-1 text-left font-normal truncate">
+          {{ placeholder ?? 'Choose an icon...' }}
+        </span>
+        <span v-else class="text-foreground flex items-center gap-1.5">
+          <component :is="LucideIcons.Shapes" :size="14" class="text-muted-foreground" />
+          {{ placeholder ?? 'Select icon' }}
+        </span>
+        <ChevronDown
+          v-if="!hideText"
+          :size="14"
+          class="text-muted-foreground shrink-0 transition-transform duration-200"
+          :class="open ? 'rotate-180' : ''"
+        />
+      </template>
 
-    <template v-else-if="!hideText">
-      <span class="flex-1 text-left text-foreground truncate">{{ selectedLabel }}</span>
-      <button
-        type="button"
-        @click.stop="clearValue"
-        class="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition-colors shrink-0"
-      >
-        <X :size="12" />
-      </button>
-      <ChevronDown :size="14" class="text-muted-foreground shrink-0 transition-transform duration-200" :class="open ? 'rotate-180' : ''" />
-    </template>
-  </button>
+      <template v-else-if="!hideText">
+        <span class="flex-1 text-left text-foreground truncate">{{ selectedLabel }}</span>
+        <ChevronDown :size="14" class="text-muted-foreground shrink-0 transition-transform duration-200" :class="open ? 'rotate-180' : ''" />
+      </template>
+    </button>
+
+    <button
+      v-if="modelValue && !hideText"
+      type="button"
+      class="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition-colors shrink-0 focus-visible:outline-none"
+      aria-label="Clear selected icon"
+      @click="clearValue"
+    >
+      <X :size="12" />
+    </button>
+  </div>
 
   <!-- Floating panel (teleported to avoid overflow clipping) -->
   <Teleport to="body">

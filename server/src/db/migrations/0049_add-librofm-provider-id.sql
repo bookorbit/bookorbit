@@ -1,0 +1,1 @@
+ALTER TABLE "book_metadata" ADD COLUMN "librofm_id" varchar(50);

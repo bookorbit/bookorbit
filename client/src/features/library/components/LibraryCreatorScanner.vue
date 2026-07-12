@@ -46,6 +46,7 @@ function toggleAllowedFormat(fmt: string) {
   if (idx === -1) {
     current.push(fmt)
   } else {
+    if (current.length === 1) return
     current.splice(idx, 1)
   }
   emit('update:allowedFormats', current)
@@ -121,7 +122,6 @@ function onPatternKeydown(e: KeyboardEvent) {
               <span v-if="organizationMode === 'book_per_folder'" class="w-1.5 h-1.5 rounded-full bg-primary" />
             </span>
             <span class="text-sm font-semibold text-foreground">Folder as Book</span>
-            <span class="ml-auto text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">Recommended</span>
           </div>
           <p class="text-xs text-muted-foreground leading-relaxed">
             All files in a folder are grouped into one book. Works well when you keep multiple formats, like EPUB and MOBI, together.
@@ -165,6 +165,7 @@ function onPatternKeydown(e: KeyboardEvent) {
           <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">Allowed formats</p>
           <button
             v-if="allowedFormats.length > 0"
+            type="button"
             class="text-xs text-muted-foreground hover:text-foreground transition-colors"
             @click="selectAllFormats"
           >
@@ -178,18 +179,20 @@ function onPatternKeydown(e: KeyboardEvent) {
           <button
             v-for="fmt in ALL_FORMATS"
             :key="fmt"
+            type="button"
             class="px-2.75 py-1 rounded-full text-[11px] font-medium border transition-colors"
             :class="
               allowedFormats.length === 0 || allowedFormats.includes(fmt)
                 ? 'border-primary bg-primary/10 text-primary'
                 : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
             "
+            :aria-pressed="allowedFormats.length === 0 || allowedFormats.includes(fmt)"
             @click="toggleAllowedFormat(fmt)"
           >
             {{ fmt.toUpperCase() }}
           </button>
         </div>
-        <p v-if="allowedFormats.length > 0" class="mt-2 text-xs text-amber-600 dark:text-amber-400">
+        <p v-if="allowedFormats.length > 0" class="mt-2 text-xs font-medium text-foreground">
           Books in other formats already in the library will be marked as missing on the next scan.
         </p>
       </div>
@@ -209,7 +212,9 @@ function onPatternKeydown(e: KeyboardEvent) {
             @keydown="onPatternKeydown"
           />
           <button
+            type="button"
             class="flex items-center gap-1.5 px-3 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+            :disabled="!newPattern.trim()"
             @click="addPattern"
           >
             <Plus :size="13" />
@@ -224,7 +229,12 @@ function onPatternKeydown(e: KeyboardEvent) {
             class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-background border border-border text-xs font-mono text-foreground"
           >
             {{ pattern }}
-            <button class="text-muted-foreground hover:text-destructive transition-colors" @click="removePattern(i)">
+            <button
+              type="button"
+              class="text-muted-foreground hover:text-destructive transition-colors"
+              :aria-label="`Remove exclude pattern ${pattern}`"
+              @click="removePattern(i)"
+            >
               <X :size="11" />
             </button>
           </span>

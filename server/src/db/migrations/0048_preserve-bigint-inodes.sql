@@ -1,0 +1,1 @@
+ALTER TABLE "book_files" ALTER COLUMN "ino" SET DATA TYPE numeric(20, 0);

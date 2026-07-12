@@ -128,6 +128,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['@tanstack/vue-table', '@tanstack/vue-virtual'],
+    exclude: ['@embedpdf/core', '@embedpdf/core/vue'],
   },
   server: {
     host: true,

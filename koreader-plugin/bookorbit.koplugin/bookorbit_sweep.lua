@@ -15,6 +15,7 @@ local InfoMessage = require("ui/widget/infomessage")
 local Notification = require("ui/widget/notification")
 local ReadHistory = require("readhistory")
 local UIManager = require("ui/uimanager")
+local Trapper = require("ui/trapper")
 local logger = require("logger")
 local lfs = require("libs/libkoreader-lfs")
 local util = require("util")
@@ -173,12 +174,14 @@ end
 
 local function step(ctx, fn)
     UIManager:scheduleIn(STEP_DELAY, function()
-        local ok, err = pcall(fn, ctx)
-        if not ok then
-            logger.err("BookOrbit: sweep step failed:", err)
-            ctx.had_errors = true
-            finish(ctx)
-        end
+        Trapper:wrap(function()
+            local ok, err = pcall(fn, ctx)
+            if not ok then
+                logger.err("BookOrbit: sweep step failed:", err)
+                ctx.had_errors = true
+                finish(ctx)
+            end
+        end)
     end)
 end
 

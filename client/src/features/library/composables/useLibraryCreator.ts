@@ -1,4 +1,4 @@
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { api } from '@/lib/api'
 import { DEFAULT_FORMAT_PRIORITY, FORMAT_LABELS } from '@bookorbit/types'
 import type { CoverAspectRatio, Library, OrganizationMode, PrescanResult } from '@bookorbit/types'
@@ -11,6 +11,12 @@ export const METADATA_LABELS: Record<string, string> = {
   embedded: 'Embedded metadata',
   opfFile: 'OPF files',
 }
+
+export type LibraryCreatorSectionId = 'details' | 'folders' | 'scanner' | 'metadata' | 'reading' | 'schedule' | 'fileWrite' | 'access'
+
+const CRON_REGEX = /^((\*|\d+(-\d+)?(,\d+(-\d+)?)*)(\/\d+)? ){4}(\*|\d+(-\d+)?(,\d+(-\d+)?)*)(\/\d+)?$/
+const FILE_SIZE_MIN_MB = 1
+const FILE_SIZE_MAX_MB = 10_000
 
 function blankForm() {
   return {
@@ -50,6 +56,35 @@ export function useLibraryCreator() {
   const prescanLoading = ref(false)
   const prescanResult = ref<PrescanResult | null>(null)
   const error = ref<string | null>(null)
+
+  const validationErrors = computed<Partial<Record<LibraryCreatorSectionId, string>>>(() => {
+    const errors: Partial<Record<LibraryCreatorSectionId, string>> = {}
+    if (!form.name.trim()) errors.details = 'Enter a library name.'
+    else if (!form.icon?.trim()) errors.details = 'Choose an icon.'
+    if (form.folders.length === 0) errors.folders = 'Add at least one folder.'
+    if (form.autoScanCronExpression && !CRON_REGEX.test(form.autoScanCronExpression)) {
+      errors.schedule = 'Enter a valid 5-field cron expression.'
+    }
+    if (form.readingThreshold < 0.05 || form.readingThreshold > 5) {
+      errors.reading = 'Reading start must be between 0.05% and 5%.'
+    } else if (
+      !Number.isInteger(form.markAsFinishedPercentComplete) ||
+      form.markAsFinishedPercentComplete < 90 ||
+      form.markAsFinishedPercentComplete > 100
+    ) {
+      errors.reading = 'Finished progress must be a whole number between 90% and 100%.'
+    }
+    const fileSizes = [
+      form.fileWriteEpubMaxFileSizeMb,
+      form.fileWritePdfMaxFileSizeMb,
+      form.fileWriteCbxMaxFileSizeMb,
+      form.fileWriteAudioMaxFileSizeMb,
+    ]
+    if (fileSizes.some((value) => !Number.isInteger(value) || value < FILE_SIZE_MIN_MB || value > FILE_SIZE_MAX_MB)) {
+      errors.fileWrite = 'File-size limits must be whole numbers from 1 to 10,000 MB.'
+    }
+    return errors
+  })
 
   function initCreate() {
     Object.assign(form, blankForm())
@@ -96,6 +131,7 @@ export function useLibraryCreator() {
     if (form.folders.length === 0) return
     prescanLoading.value = true
     prescanResult.value = null
+    error.value = null
     try {
       const res = await api('/api/v1/libraries/prescan', {
         method: 'POST',
@@ -104,29 +140,31 @@ export function useLibraryCreator() {
       })
       if (res.ok) {
         prescanResult.value = await res.json()
+      } else {
+        error.value = await responseError(res, 'Could not scan the selected folders.')
       }
+    } catch {
+      error.value = 'Could not connect to the server to scan folders.'
     } finally {
       prescanLoading.value = false
     }
   }
 
   async function save(): Promise<Library | null> {
-    if (!form.name.trim()) {
-      error.value = 'Library name is required'
-      return null
-    }
-    if (!form.icon?.trim()) {
-      error.value = 'Choose an icon'
-      return null
-    }
-    if (form.folders.length === 0) {
-      error.value = 'At least one folder is required'
+    const firstValidationError = Object.values(validationErrors.value)[0]
+    if (firstValidationError) {
+      error.value = firstValidationError
       return null
     }
     error.value = null
     loading.value = true
     try {
-      const payload = { ...form }
+      const payload = {
+        ...form,
+        name: form.name.trim(),
+        icon: form.icon!.trim(),
+        folders: [...new Set(form.folders.map((path) => path.trim()))],
+      }
       let res: Response
       if (mode.value === 'create') {
         res = await api('/api/v1/libraries', {
@@ -142,11 +180,13 @@ export function useLibraryCreator() {
         })
       }
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        error.value = body?.message ?? 'Failed to save library'
+        error.value = await responseError(res, 'Failed to save library.')
         return null
       }
       return await res.json()
+    } catch {
+      error.value = 'Could not connect to the server. Check your connection and try again.'
+      return null
     } finally {
       loading.value = false
     }
@@ -160,9 +200,17 @@ export function useLibraryCreator() {
     prescanLoading,
     prescanResult,
     error,
+    validationErrors,
     initCreate,
     initEdit,
     runPrescan,
     save,
   }
+}
+
+async function responseError(response: Response, fallback: string): Promise<string> {
+  const body = await response.json().catch(() => null)
+  const message = body?.message
+  if (Array.isArray(message)) return message.find((entry): entry is string => typeof entry === 'string') ?? fallback
+  return typeof message === 'string' && message.trim() ? message : fallback
 }

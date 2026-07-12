@@ -121,7 +121,7 @@ function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
     findRatingByBookAndUser: vi.fn().mockResolvedValue(null),
     findCollectionsByBookId: vi.fn(),
     findKoboReadingState: vi.fn(),
-    findKoboSnapshotState: vi.fn(),
+    findKoboSnapshotStates: vi.fn(),
     findKoboSyncCollectionNamesForBook: vi.fn(),
     findFileById: vi.fn(),
     findLibraryIdByBookId: vi.fn(),
@@ -1010,6 +1010,7 @@ describe('BookService', () => {
         sources: {},
         providerIds: {
           [MetadataProviderKey.GOOGLE]: 'g-id',
+          [MetadataProviderKey.LIBROFM]: '9781234567890',
           [MetadataProviderKey.OPEN_LIBRARY]: 'ol-id',
         },
         diagnostics: makeMetadataFetchDiagnostics({ resolvedFieldCount: 1 }),
@@ -1021,9 +1022,10 @@ describe('BookService', () => {
         metadata: {
           title: 'Resolved',
           googleBooksId: 'g-id',
+          librofmId: '9781234567890',
           openLibraryId: 'ol-id',
         },
-        diagnostics: makeMetadataFetchDiagnostics({ resolvedFieldCount: 3 }),
+        diagnostics: makeMetadataFetchDiagnostics({ resolvedFieldCount: 4 }),
       });
     });
 
@@ -1158,6 +1160,7 @@ describe('BookService', () => {
         sources: {},
         providerIds: {
           [MetadataProviderKey.GOOGLE]: 'g-id',
+          [MetadataProviderKey.LIBROFM]: '9781234567890',
           [MetadataProviderKey.OPEN_LIBRARY]: 'ol-id',
         },
       });
@@ -1175,6 +1178,7 @@ describe('BookService', () => {
         {
           title: 'Resolved',
           googleBooksId: 'g-id',
+          librofmId: '9781234567890',
           openLibraryId: 'ol-id',
         },
         user,
@@ -1922,7 +1926,7 @@ describe('BookService', () => {
         eligibleForKoboSync: false,
         syncCollections: [],
         readingState: null,
-        snapshot: null,
+        snapshots: [],
       });
     });
 
@@ -1938,16 +1942,32 @@ describe('BookService', () => {
         priorityTimestamp: 'priority',
         updatedAt: new Date('2026-01-02T00:00:00.000Z'),
       });
-      bookRepo.findKoboSnapshotState.mockResolvedValue({
-        snapshotId: 99,
-        snapshotUpdatedAt: new Date('2026-01-03T00:00:00.000Z'),
-        synced: true,
-        pendingDelete: false,
-        isNew: false,
-        removedByDevice: false,
-        fileHash: 'fhash',
-        metadataHash: 'mhash',
-      });
+      bookRepo.findKoboSnapshotStates.mockResolvedValue([
+        {
+          deviceId: 99,
+          deviceName: 'Libra',
+          snapshotId: 99,
+          snapshotUpdatedAt: new Date('2026-01-03T00:00:00.000Z'),
+          synced: true,
+          pendingDelete: false,
+          isNew: false,
+          removedByDevice: false,
+          fileHash: 'fhash',
+          metadataHash: 'mhash',
+        },
+        {
+          deviceId: 100,
+          deviceName: 'Elipsa',
+          snapshotId: 100,
+          snapshotUpdatedAt: new Date('2026-01-04T00:00:00.000Z'),
+          synced: false,
+          pendingDelete: true,
+          isNew: false,
+          removedByDevice: false,
+          fileHash: null,
+          metadataHash: null,
+        },
+      ]);
       bookRepo.findKoboSyncCollectionNamesForBook.mockResolvedValue(['Favorites']);
 
       const result = await service.getKoboState(10, user);
@@ -1955,7 +1975,10 @@ describe('BookService', () => {
       expect(result.eligibleForKoboSync).toBe(true);
       expect(result.readingState?.progressPercent).toBe(100);
       expect(result.readingState?.status).toBe('Reading');
-      expect(result.snapshot?.snapshotId).toBe(99);
+      expect(result.snapshots).toEqual([
+        expect.objectContaining({ deviceId: 99, deviceName: 'Libra', snapshotId: 99, synced: true, inSnapshot: true }),
+        expect.objectContaining({ deviceId: 100, deviceName: 'Elipsa', snapshotId: 100, synced: false, pendingDelete: true, fileHash: null }),
+      ]);
     });
 
     it('ignores source-level Kobo progress in book state summaries', async () => {
@@ -1970,7 +1993,7 @@ describe('BookService', () => {
         priorityTimestamp: 'priority',
         updatedAt: new Date('2026-01-02T00:00:00.000Z'),
       });
-      bookRepo.findKoboSnapshotState.mockResolvedValue(null);
+      bookRepo.findKoboSnapshotStates.mockResolvedValue([]);
       bookRepo.findKoboSyncCollectionNamesForBook.mockResolvedValue(['Favorites']);
 
       const result = await service.getKoboState(10, user);
@@ -2652,6 +2675,21 @@ describe('BookService', () => {
 
       expect(bookRepo.findJumpBuckets).toHaveBeenCalled();
       expect(bookRepo.findJumpBucketsCollapsed).not.toHaveBeenCalled();
+    });
+
+    it('executeJumpBucketsQuery keeps collapseSeries for a series presence filter', async () => {
+      const { service, bookRepo } = makeService();
+      bookRepo.findJumpBucketsCollapsed.mockResolvedValue({ buckets: [], total: 0 });
+
+      await service.executeJumpBucketsQuery(9, undefined, {
+        sort: [{ field: 'title', dir: 'asc' }],
+        pagination: { page: 0, size: 50 },
+        collapseSeries: true,
+        filter: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'series', operator: 'isNotEmpty' }] },
+      } as never);
+
+      expect(bookRepo.findJumpBucketsCollapsed).toHaveBeenCalled();
+      expect(bookRepo.findJumpBuckets).not.toHaveBeenCalled();
     });
 
     it('queryForLibrary uses normal findCards when collapseSeries is false', async () => {
@@ -3661,6 +3699,7 @@ describe('BookService', () => {
             openLibraryId: null,
             itunesId: null,
             audibleId: null,
+            librofmId: '9781234567890',
             koboId: 'beautiful-ugly-3',
             comicvineId: null,
             ranobedbId: 'ranobe-detail',
@@ -3741,6 +3780,7 @@ describe('BookService', () => {
       expect(result.comicMetadata).toEqual(expect.objectContaining({ issueNumber: '1', teams: ['House Atreides'] }));
       expect(result.rating).toBe(5);
       expect(result.providerIds.google).toBe('g1');
+      expect(result.providerIds.librofm).toBe('9781234567890');
       expect(result.providerIds.kobo).toBe('beautiful-ugly-3');
       expect(result.providerIds.ranobedb).toBe('ranobe-detail');
       expect(result.fileWriteStatus).toEqual({
@@ -4185,7 +4225,7 @@ describe('BookService', () => {
 
     it('returns results from findCardsCollapsed when collapseSeries is true', async () => {
       const { service, bookRepo, queryBuilder } = makeService();
-      const hasSeriesFilterSpy = vi.spyOn(BookQueryBuilder, 'hasSeriesFilter').mockReturnValue(false);
+      const hasSeriesSelectionFilterSpy = vi.spyOn(BookQueryBuilder, 'hasSeriesSelectionFilter').mockReturnValue(false);
       const query: BookQuery = {
         pagination: { page: 1, size: 25 },
         sort: [{ field: 'title', dir: 'asc' }],
@@ -4196,7 +4236,7 @@ describe('BookService', () => {
 
       const result = await service.executeBooksQuery(12, 'where' as never, query);
 
-      expect(hasSeriesFilterSpy).toHaveBeenCalledWith(undefined);
+      expect(hasSeriesSelectionFilterSpy).toHaveBeenCalledWith(undefined);
       expect(bookRepo.findCardsCollapsed).toHaveBeenCalledWith({
         where: 'where',
         sort: query.sort,
@@ -4207,6 +4247,28 @@ describe('BookService', () => {
       expect(bookRepo.findCards).not.toHaveBeenCalled();
       expect(queryBuilder.buildOrderBy).not.toHaveBeenCalled();
       expect(result).toEqual({ items: [], total: 0, page: 1, size: 25 });
+    });
+
+    it('returns collapsed results when the filter only requires a series', async () => {
+      const { service, bookRepo } = makeService();
+      bookRepo.findCardsCollapsed.mockResolvedValue(emptyCardQueryResult);
+      const filter = {
+        type: 'group' as const,
+        join: 'AND' as const,
+        rules: [{ type: 'rule' as const, field: 'series' as const, operator: 'isNotEmpty' as const }],
+      };
+
+      await service.executeBooksQuery(12, 'where' as never, {
+        pagination: { page: 0, size: 50 },
+        sort: [{ field: 'title', dir: 'asc' }],
+        filter,
+        collapseSeries: true,
+      });
+
+      expect(bookRepo.findCardsCollapsed).toHaveBeenCalledWith(
+        expect.objectContaining({ where: 'where', sort: [{ field: 'title', dir: 'asc' }], userId: 12 }),
+      );
+      expect(bookRepo.findCards).not.toHaveBeenCalled();
     });
 
     it('does not call logger.warn when query completes fast', async () => {
@@ -4250,7 +4312,7 @@ describe('BookService', () => {
       const { service, bookRepo } = makeService();
       const warnSpy = vi.spyOn((service as unknown as { logger: Logger }).logger, 'warn').mockImplementation(() => undefined);
       vi.spyOn(Date, 'now').mockReturnValueOnce(0).mockReturnValueOnce(600);
-      vi.spyOn(BookQueryBuilder, 'hasSeriesFilter').mockReturnValue(false);
+      vi.spyOn(BookQueryBuilder, 'hasSeriesSelectionFilter').mockReturnValue(false);
       bookRepo.findCardsCollapsed.mockResolvedValue(emptyCardQueryResult);
 
       await service.executeBooksQuery(12, undefined, {

@@ -433,6 +433,7 @@ describe('extractAudioMetadata — misc fields', () => {
             series: 'Dune',
             'series-part': '1.5',
             asin: 'B000R34YKC',
+            librofm_isbn: '9781234567890',
           },
         },
       }),
@@ -448,6 +449,7 @@ describe('extractAudioMetadata — misc fields', () => {
     expect(result.seriesName).toBe('Dune');
     expect(result.seriesIndex).toBe(1.5);
     expect(result.audibleId).toBe('B000R34YKC');
+    expect(result.librofmId).toBe('9781234567890');
   });
 
   it('uses audible_asin when asin is absent and deduplicates semicolon-separated genres', async () => {

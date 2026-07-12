@@ -10,7 +10,7 @@ import {
   Library,
   Headphones,
   Lock,
-  MoreHorizontal,
+  MoreVertical,
   Pencil,
   RotateCcw,
   Send,
@@ -23,7 +23,7 @@ import {
 import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot } from 'reka-ui'
 import { getFormatColor } from '@/features/book/lib/format-colors'
 import { providerIconPath, providerIconPathSafe } from '@/features/book/lib/provider-icons'
-import { lubimyczytacBookUrl } from '@/features/book/lib/provider-links'
+import { libroFmAudiobookUrl, lubimyczytacBookUrl } from '@/features/book/lib/provider-links'
 import { getProviderColor, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
@@ -41,9 +41,11 @@ import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import { useMetadataLocks } from '@/features/book/composables/useMetadataLocks'
 import { usePersonalNote, PERSONAL_NOTE_MAX_LENGTH } from '@/features/book/composables/usePersonalNote'
+import { useResetReadingState } from '@/features/book/composables/useResetReadingState'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
 import MoveBooksDialog from '@/features/book/components/MoveBooksDialog.vue'
 import { toast } from 'vue-sonner'
+import ResetReadingStateDialog from '@/features/book/components/ResetReadingStateDialog.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import MetadataScoreBadge from '@/features/metadata-score/components/MetadataScoreBadge.vue'
@@ -290,6 +292,15 @@ const isRatingLocked = computed(() => isLocked('rating'))
 const canViewKobo = computed(() => hasPermission('kobo_sync'))
 const canViewKoreader = computed(() => hasPermission('koreader_sync'))
 const canEditMetadata = computed(() => hasPermission('library_edit_metadata'))
+const resetReadingStateBookId = computed(() => props.book.id)
+const {
+  open: resetReadingStateDialogOpen,
+  resetting: resettingReadingState,
+  error: resetReadingStateError,
+  openDialog: openResetReadingStateDialog,
+  closeDialog: closeResetReadingStateDialog,
+  resetReadingState,
+} = useResetReadingState(resetReadingStateBookId)
 
 const coverSeed = computed(() => props.book.title ?? props.book.folderPath.split('/').pop() ?? String(props.book.id))
 const coverPlaceholderTitle = computed(() => props.book.title ?? props.book.folderPath.split('/').pop() ?? null)
@@ -654,6 +665,15 @@ const providerLinks = computed<ProviderLink[]>(() => {
       fallback: 'Au',
     })
   }
+  if (ids.librofm) {
+    out.push({
+      key: 'librofm',
+      label: 'Libro.fm',
+      url: libroFmAudiobookUrl(ids.librofm),
+      iconUrl: providerIconPath('librofm'),
+      fallback: 'Lf',
+    })
+  }
   if (ids.kobo) {
     out.push({
       key: 'kobo',
@@ -796,13 +816,28 @@ const leftColumnProgressRows = computed<ProgressRow[]>(() => {
 const leftColumnProgressVisible = computed(() => leftColumnProgressRows.value.slice(0, 3))
 const leftColumnProgressOverflow = computed(() => Math.max(0, leftColumnProgressRows.value.length - 3))
 
+function formatKoboDeviceNames(snapshots: BookKoboState['snapshots']): string {
+  const names = snapshots.map((snapshot) => snapshot.deviceName)
+  if (names.length === 1) return names.join('')
+  if (names.length === 2) return names.join(' and ')
+  return `${snapshots.length} devices`
+}
+
 const koboAnomaly = computed(() => {
   if (!canViewKobo.value) return null
-  const snap = koboState.value?.snapshot
-  if (!snap) return null
-  if (snap.pendingDelete) return { label: 'Pending delete from device', tooltip: 'Kobo will remove it on next sync.' }
-  if (snap.removedByDevice) return { label: 'Removed by device', tooltip: 'Kobo reported this book removed.' }
-  if (snap.synced === false) return { label: 'Not synced', tooltip: 'Queued for next Kobo sync.' }
+  const snapshots = koboState.value?.snapshots ?? []
+  const pendingDelete = snapshots.filter((snapshot) => snapshot.pendingDelete)
+  if (pendingDelete.length > 0) {
+    return { label: `Pending delete on ${formatKoboDeviceNames(pendingDelete)}`, tooltip: 'Kobo will remove it on the next sync.' }
+  }
+  const removedByDevice = snapshots.filter((snapshot) => snapshot.removedByDevice)
+  if (removedByDevice.length > 0) {
+    return { label: `Removed on ${formatKoboDeviceNames(removedByDevice)}`, tooltip: 'Kobo reported this book removed.' }
+  }
+  const unsynced = snapshots.filter((snapshot) => snapshot.synced === false)
+  if (unsynced.length > 0) {
+    return { label: `Not synced on ${formatKoboDeviceNames(unsynced)}`, tooltip: 'Queued for the next Kobo sync.' }
+  }
   return null
 })
 
@@ -932,6 +967,20 @@ function handleSendFromMenu() {
   moreMenuOpen.value = false
   mobileMoreMenuOpen.value = false
   showSendDialog.value = true
+}
+
+function handleOpenResetReadingState() {
+  moreMenuOpen.value = false
+  mobileMoreMenuOpen.value = false
+  openResetReadingStateDialog()
+}
+
+async function handleResetReadingState() {
+  const result = await resetReadingState()
+  if (!result) return
+
+  await loadSupplemental()
+  emit('saved', { ...props.book, readStatus: result.readStatus })
 }
 
 function handleCoverLoad(ratio: number | null) {
@@ -1081,7 +1130,7 @@ async function loadSupplemental() {
           eligibleForKoboSync: fallbackSyncCollections.length > 0,
           syncCollections: fallbackSyncCollections,
           readingState: null,
-          snapshot: null,
+          snapshots: [],
         }
       }
     } else {
@@ -1097,7 +1146,7 @@ async function loadSupplemental() {
           eligibleForKoboSync: false,
           syncCollections: [],
           readingState: null,
-          snapshot: null,
+          snapshots: [],
         }
       : null
   } finally {
@@ -1376,24 +1425,34 @@ watch(
       >
         <Library class="size-3.5" />
       </button>
+      <button
+        v-if="hasPermission('email_send')"
+        class="flex items-center justify-center h-9 w-9 rounded-md border border-input bg-background hover:bg-muted transition-colors"
+        aria-label="Send via Email"
+        @click="handleSendFromMenu"
+      >
+        <Send class="size-3.5" />
+      </button>
       <Popover
-        v-if="hasPermission('library_delete_books') || hasPermission('email_send')"
+        v-if="canEditMetadata || hasPermission('library_delete_books')"
         :open="mobileMoreMenuOpen"
         @update:open="(v) => (mobileMoreMenuOpen = v)"
       >
         <PopoverTrigger as-child>
-          <button class="flex items-center justify-center h-9 w-9 rounded-md border border-input bg-background hover:bg-muted transition-colors">
-            <MoreHorizontal class="size-3.5" />
+          <button
+            class="flex items-center justify-center h-9 w-9 rounded-md border border-destructive/30 bg-background text-destructive hover:bg-destructive/10 transition-colors"
+          >
+            <MoreVertical class="size-3.5" />
           </button>
         </PopoverTrigger>
         <PopoverContent class="w-44 p-1" align="end">
           <button
-            v-if="hasPermission('email_send')"
-            class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm text-foreground hover:bg-muted transition-colors"
-            @click="handleSendFromMenu"
+            v-if="canEditMetadata"
+            class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm text-destructive hover:bg-destructive/10 transition-colors"
+            @click="handleOpenResetReadingState"
           >
-            <Send class="size-3.5" />
-            Send via Email
+            <RotateCcw class="size-3.5" />
+            Reset reading state
           </button>
           <button
             v-if="hasPermission('library_delete_books')"
@@ -1537,26 +1596,30 @@ watch(
             >
               <Library class="size-3.5" />
             </button>
-            <Popover
-              v-if="hasPermission('library_delete_books') || hasPermission('email_send')"
-              :open="moreMenuOpen"
-              @update:open="(v) => (moreMenuOpen = v)"
+            <button
+              v-if="hasPermission('email_send')"
+              class="flex flex-1 items-center justify-center h-9 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors"
+              aria-label="Send via Email"
+              @click="handleSendFromMenu"
             >
+              <Send class="size-3.5" />
+            </button>
+            <Popover v-if="canEditMetadata || hasPermission('library_delete_books')" :open="moreMenuOpen" @update:open="(v) => (moreMenuOpen = v)">
               <PopoverTrigger as-child>
                 <button
-                  class="flex flex-1 items-center justify-center h-9 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors"
+                  class="flex flex-1 items-center justify-center h-9 rounded-md border border-destructive/30 bg-background text-destructive hover:bg-destructive/10 transition-colors"
                 >
-                  <MoreHorizontal class="size-3.5" />
+                  <MoreVertical class="size-3.5" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent class="w-40 p-1" align="end">
+              <PopoverContent class="w-44 p-1" align="end">
                 <button
-                  v-if="hasPermission('email_send')"
-                  class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm text-foreground hover:bg-muted transition-colors"
-                  @click="handleSendFromMenu"
+                  v-if="canEditMetadata"
+                  class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                  @click="handleOpenResetReadingState"
                 >
-                  <Send class="size-3.5" />
-                  Send via Email
+                  <RotateCcw class="size-3.5" />
+                  Reset reading state
                 </button>
                 <button
                   v-if="hasPermission('library_delete_books')"
@@ -1572,7 +1635,7 @@ watch(
                   @click="handleDeleteFromMenu"
                 >
                   <Trash2 class="size-3.5" />
-                  Delete
+                  Delete book
                 </button>
               </PopoverContent>
             </Popover>
@@ -1972,7 +2035,7 @@ watch(
         </div>
         <div>
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Published</dt>
-          <dd class="text-sm text-foreground mt-0.5">{{ book.publishedYear || '-' }}</dd>
+          <dd class="text-sm text-foreground mt-0.5">{{ book.publishedDate ? formatDisplayDate(book.publishedDate) : book.publishedYear || '-' }}</dd>
         </div>
         <div>
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Language</dt>
@@ -2225,6 +2288,14 @@ watch(
     :moving="movingBook"
     @confirm="confirmMoveBook"
     @cancel="moveBookOpen = false"
+  />
+
+  <ResetReadingStateDialog
+    :open="resetReadingStateDialogOpen"
+    :resetting="resettingReadingState"
+    :error="resetReadingStateError"
+    @close="closeResetReadingStateDialog"
+    @confirm="handleResetReadingState"
   />
 
   <!-- Cover lightbox -->

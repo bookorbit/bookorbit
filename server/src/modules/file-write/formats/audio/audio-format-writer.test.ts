@@ -57,6 +57,7 @@ describe('AudioFormatWriter', () => {
         seriesName: 'Dune',
         seriesIndex: 1,
         audibleId: 'B000R34YKC',
+        librofmId: '9781234567890',
         coverBytes,
       },
       {
@@ -74,6 +75,7 @@ describe('AudioFormatWriter', () => {
           'seriesName',
           'seriesIndex',
           'audibleId',
+          'librofmId',
           'coverBytes',
         ]),
       },
@@ -95,6 +97,7 @@ describe('AudioFormatWriter', () => {
           'seriesName',
           'seriesIndex',
           'audibleId',
+          'librofmId',
           'coverBytes',
         ],
       }),
@@ -124,6 +127,7 @@ describe('AudioFormatWriter', () => {
           { key: 'series-part', value: '1' },
           { key: 'asin', value: 'B000R34YKC' },
           { key: 'audible_asin', value: 'B000R34YKC' },
+          { key: 'librofm_isbn', value: '9781234567890' },
         ]),
       }),
     );
@@ -183,6 +187,7 @@ describe('AudioFormatWriter', () => {
         seriesName: null,
         seriesIndex: null,
         audibleId: null,
+        librofmId: null,
       },
       {
         dryRun: false,
@@ -199,6 +204,7 @@ describe('AudioFormatWriter', () => {
           'seriesName',
           'seriesIndex',
           'audibleId',
+          'librofmId',
         ]),
       },
     );
@@ -217,6 +223,7 @@ describe('AudioFormatWriter', () => {
         { key: 'series', value: '' },
         { key: 'series-part', value: '' },
         { key: 'asin', value: '' },
+        { key: 'librofm_isbn', value: '' },
       ]),
     );
   });

@@ -1,29 +1,43 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, shallowRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { PDFViewer, ScrollPlugin, ScrollStrategy, SpreadMode, ZoomMode } from '@embedpdf/vue-pdf-viewer'
-import type { PDFViewerConfig, PluginRegistry, ScrollCapability, EmbedPdfContainer } from '@embedpdf/vue-pdf-viewer'
-import { getAccessToken } from '@/lib/api'
+import { EmbedPDF } from '@embedpdf/core/vue'
+import { createPluginRegistration, type PluginBatchRegistrations, type PluginRegistry } from '@embedpdf/core'
+import { usePdfiumEngine } from '@embedpdf/engines/vue'
+import pdfiumWasmUrl from '@embedpdf/pdfium/pdfium.wasm?url'
+import { LockModeType } from '@embedpdf/plugin-annotation'
+import { AnnotationPluginPackage } from '@embedpdf/plugin-annotation/vue'
+import { BookmarkPluginPackage } from '@embedpdf/plugin-bookmark/vue'
+import { DocumentManagerPlugin, DocumentManagerPluginPackage } from '@embedpdf/plugin-document-manager/vue'
+import { HistoryPluginPackage } from '@embedpdf/plugin-history/vue'
+import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager/vue'
+import { PanPluginPackage } from '@embedpdf/plugin-pan/vue'
+import { RenderPluginPackage } from '@embedpdf/plugin-render/vue'
+import { RotatePluginPackage } from '@embedpdf/plugin-rotate/vue'
+import { ScrollPluginPackage } from '@embedpdf/plugin-scroll/vue'
+import { SearchPluginPackage } from '@embedpdf/plugin-search/vue'
+import { SelectionPluginPackage } from '@embedpdf/plugin-selection/vue'
+import { SpreadPluginPackage } from '@embedpdf/plugin-spread/vue'
+import { ThumbnailPluginPackage } from '@embedpdf/plugin-thumbnail/vue'
+import { TilingPluginPackage } from '@embedpdf/plugin-tiling/vue'
+import { ViewportPluginPackage } from '@embedpdf/plugin-viewport/vue'
+import { ZoomPluginPackage } from '@embedpdf/plugin-zoom/vue'
+import { LoaderCircle } from '@lucide/vue'
+import type { PdfReaderSettings } from '@bookorbit/types'
+import { api } from '@/lib/api'
 import { useReaderProgress } from '../shared/composables/useReaderProgress'
 import { useReadingSession } from '../shared/composables/useReadingSession'
 import { useReaderSettings } from '../shared/composables/useReaderSettings'
-import { useFullscreen } from '../shared/composables/useFullscreen'
-import { useThemeStore, ACCENT_OPTIONS } from '@/stores/theme'
-import type { PdfReaderSettings } from '@bookorbit/types'
-import { getIsDark, lookupAccentHex } from './pdf-viewer-utils'
-import { ArrowLeft, Maximize, Minimize } from '@lucide/vue'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import PdfReaderContent from './components/PdfReaderContent.vue'
+import { toRotation, toScrollStrategy, toSpreadMode, toZoomLevel } from './pdf-viewer-utils'
 
 const props = defineProps<{ bookId: number; fileId: number; peekMode?: boolean }>()
 const route = useRoute()
 const router = useRouter()
 const trackingEnabled = computed(() => !props.peekMode)
 
-const themeStore = useThemeStore()
-const { isFullscreen, toggleFullscreen } = useFullscreen()
-const fullscreenLabel = computed(() => (isFullscreen.value ? 'Exit fullscreen' : 'Enter fullscreen'))
-
 const bookSettings = useReaderSettings(props.fileId, 'pdf')
+const effectiveSettings = computed(() => bookSettings.effective.value as PdfReaderSettings)
 const { onActivity, elapsedMinutes } = useReadingSession(
   props.fileId,
   () => ({
@@ -33,214 +47,262 @@ const { onActivity, elapsedMinutes } = useReadingSession(
   { trackingEnabled },
 )
 const progress = useReaderProgress(props.bookId, props.fileId, elapsedMinutes, 0, { trackingEnabled })
+const absolutePdfiumWasmUrl = new URL(pdfiumWasmUrl, window.location.href).href
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null
-let unsubPageChange: (() => void) | null = null
-let unsubLayoutReady: (() => void) | null = null
-let themeObserver: MutationObserver | null = null
-let viewerContainer: EmbedPdfContainer | null = null
-
-function buildThemeConfig() {
-  const isDark = getIsDark()
-  const accentHex = lookupAccentHex(themeStore.accent, ACCENT_OPTIONS)
-  return {
-    preference: isDark ? ('dark' as const) : ('light' as const),
-    light: { accent: { primary: accentHex } },
-    dark: { accent: { primary: accentHex } },
-  }
-}
-
-function scheduleSave(pageNumber: number, totalPages: number) {
-  currentPageNumber.value = pageNumber
-  totalPageCount.value = totalPages
-  if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(() => {
-    progress.pageNumber.value = pageNumber
-    progress.percentage.value = (pageNumber / totalPages) * 100
-    progress.save()
-  }, 2000)
-}
-
-const configReady = ref(false)
-const viewerConfig = ref<PDFViewerConfig>({})
-const currentPageNumber = ref<number | null>(null)
-const totalPageCount = ref<number | null>(null)
-
-onMounted(async () => {
-  await bookSettings.load()
-
-  const settings = bookSettings.effective.value as PdfReaderSettings
-  const token = getAccessToken()
-
-  viewerConfig.value = {
-    theme: buildThemeConfig(),
-    tabBar: 'never',
-    disabledCategories: [
-      'annotation',
-      'signature',
-      'form',
-      'document-print',
-      'export',
-      'insert',
-      'redaction',
-      'document-open',
-      'document-close',
-      'document-protect',
-      'document-export',
-    ],
-    scroll: {
-      defaultStrategy: settings.scrollMode === 'horizontal' ? ScrollStrategy.Horizontal : ScrollStrategy.Vertical,
-    },
-    spread: {
-      defaultSpreadMode: settings.spread === 'odd' ? SpreadMode.Odd : settings.spread === 'even' ? SpreadMode.Even : SpreadMode.None,
-    },
-    zoom: {
-      defaultZoomLevel:
-        settings.zoomMode === 'fit-width' ? ZoomMode.FitWidth : settings.zoomMode === 'fit-page' ? ZoomMode.FitPage : settings.customScale,
-    },
-    documentManager: {
-      initialDocuments: [
-        {
-          url: `/api/v1/books/files/${props.fileId}/serve`,
-          requestOptions: {
-            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-          },
-        },
-      ],
-    },
-  }
-
-  configReady.value = true
+const {
+  engine,
+  isLoading: engineLoading,
+  error: engineError,
+} = usePdfiumEngine({
+  wasmUrl: absolutePdfiumWasmUrl,
+  worker: true,
 })
+const plugins = shallowRef<PluginBatchRegistrations>([])
+const documentBuffer = shallowRef<ArrayBuffer | null>(null)
+const readerReady = shallowRef(false)
+const documentError = shallowRef<Error | null>(null)
+const initialPage = shallowRef(1)
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+let settingsTimer: ReturnType<typeof setTimeout> | null = null
+let documentAbortController: AbortController | null = null
+let loadSequence = 0
+let pendingPageUpdate: { pageNumber: number; totalPages: number } | null = null
+let pendingSettingsPatch: Partial<PdfReaderSettings> | null = null
 
-function handleInit(container: EmbedPdfContainer) {
-  viewerContainer = container
+function parseDeepLinkPage(): number | null {
+  const value = Array.isArray(route.query.page) ? route.query.page[0] : route.query.page
+  if (typeof value !== 'string') return null
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) && parsed >= 1 ? parsed : null
 }
 
-function handleReady(registry: PluginRegistry) {
-  setupProgressTracking(registry)
-  setupSettingsPersistence(registry)
-  setupThemeSync()
+function buildPlugins(settings: PdfReaderSettings): PluginBatchRegistrations {
+  return [
+    createPluginRegistration(DocumentManagerPluginPackage, {
+      maxDocuments: 1,
+    }),
+    createPluginRegistration(ViewportPluginPackage, { viewportGap: 12 }),
+    createPluginRegistration(ScrollPluginPackage, {
+      defaultStrategy: toScrollStrategy(settings.scrollMode),
+      defaultPageGap: 12,
+      defaultBufferSize: 3,
+    }),
+    createPluginRegistration(InteractionManagerPluginPackage),
+    createPluginRegistration(ZoomPluginPackage, {
+      defaultZoomLevel: toZoomLevel(settings),
+      minZoom: 0.25,
+      maxZoom: 4,
+    }),
+    createPluginRegistration(PanPluginPackage, { defaultMode: 'mobile' }),
+    createPluginRegistration(SpreadPluginPackage, { defaultSpreadMode: toSpreadMode(settings.spread) }),
+    createPluginRegistration(RotatePluginPackage, { defaultRotation: toRotation(settings.rotation) }),
+    createPluginRegistration(RenderPluginPackage),
+    createPluginRegistration(TilingPluginPackage, {
+      tileSize: 768,
+      overlapPx: 2.5,
+      extraRings: 0,
+    }),
+    createPluginRegistration(SelectionPluginPackage, { marquee: { enabled: false } }),
+    createPluginRegistration(SearchPluginPackage),
+    createPluginRegistration(HistoryPluginPackage),
+    createPluginRegistration(AnnotationPluginPackage, {
+      autoOpenLinks: false,
+      locked: { type: LockModeType.All },
+    }),
+    createPluginRegistration(ThumbnailPluginPackage, {
+      width: 132,
+      paddingY: 12,
+    }),
+    createPluginRegistration(BookmarkPluginPackage),
+  ]
 }
 
-async function setupProgressTracking(registry: PluginRegistry) {
-  await progress.load()
-
-  const scroll = registry.getPlugin<InstanceType<typeof ScrollPlugin>>(ScrollPlugin.id)?.provides() as ScrollCapability | undefined
-
-  if (!scroll) return
-
-  unsubLayoutReady = scroll.onLayoutReady(({ isInitial, totalPages }) => {
-    if (!isInitial) return
-    const deepLinkQuery = route?.query?.page
-    const deepLinkPage = typeof deepLinkQuery === 'string' ? Number.parseInt(deepLinkQuery, 10) : NaN
-    const initialPage = Number.isFinite(deepLinkPage) && deepLinkPage >= 1 ? deepLinkPage : (progress.pageNumber.value ?? 1)
-    currentPageNumber.value = initialPage
-    totalPageCount.value = totalPages
-    if (initialPage > 1 && initialPage <= totalPages) {
-      scroll.scrollToPage({ pageNumber: initialPage })
-    }
-  })
-
-  unsubPageChange = scroll.onPageChange(({ pageNumber, totalPages }) => {
-    onActivity()
-    scheduleSave(pageNumber, totalPages)
-  })
+function applyPendingProgress() {
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = null
+  if (!pendingPageUpdate) return false
+  const { pageNumber, totalPages } = pendingPageUpdate
+  pendingPageUpdate = null
+  progress.pageNumber.value = pageNumber
+  progress.percentage.value = totalPages > 0 ? (pageNumber / totalPages) * 100 : progress.percentage.value
+  return true
 }
 
-function setupSettingsPersistence(registry: PluginRegistry) {
-  const scroll = registry.getPlugin<InstanceType<typeof ScrollPlugin>>(ScrollPlugin.id)?.provides() as ScrollCapability | undefined
-
-  if (scroll) {
-    scroll.onStateChange((state) => {
-      const strategy = state.strategy
-      if (strategy) {
-        bookSettings.updateBookSettings({ scrollMode: strategy as PdfReaderSettings['scrollMode'] })
-      }
-    })
-  }
+function flushProgress() {
+  if (applyPendingProgress()) void progress.save()
 }
 
-function setupThemeSync() {
-  themeObserver = new MutationObserver(() => {
-    if (!viewerContainer) return
-    viewerContainer.setTheme(buildThemeConfig())
-  })
-
-  themeObserver.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ['class'],
-  })
+function handlePageChange(pageNumber: number, totalPages: number) {
+  onActivity()
+  pendingPageUpdate = { pageNumber, totalPages }
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(flushProgress, 2000)
 }
 
-async function startTrackedReading() {
+function flushSettings() {
+  if (settingsTimer) clearTimeout(settingsTimer)
+  settingsTimer = null
+  if (!pendingSettingsPatch) return
+  const patch = pendingSettingsPatch
+  pendingSettingsPatch = null
+  bookSettings.updateBookSettings(patch)
+}
+
+function handleSettingsChange(patch: Partial<PdfReaderSettings>) {
+  pendingSettingsPatch = { ...pendingSettingsPatch, ...patch }
+  if (settingsTimer) clearTimeout(settingsTimer)
+  settingsTimer = setTimeout(flushSettings, 200)
+}
+
+async function handleStartReading() {
   const query = { ...route.query }
   delete query.mode
   await router.replace({ name: 'reader', params: route.params, query })
-  await nextTick()
-  if (currentPageNumber.value !== null) {
-    progress.pageNumber.value = currentPageNumber.value
-    progress.percentage.value = totalPageCount.value ? (currentPageNumber.value / totalPageCount.value) * 100 : progress.percentage.value
-  }
+  applyPendingProgress()
   await progress.save()
   onActivity()
 }
 
-function goBack() {
+function handleBack() {
   router.back()
 }
 
+async function loadReader() {
+  const sequence = ++loadSequence
+  documentAbortController?.abort()
+  const abortController = new AbortController()
+  documentAbortController = abortController
+  documentError.value = null
+  documentBuffer.value = null
+  readerReady.value = false
+  try {
+    const [, , response] = await Promise.all([
+      bookSettings.load(),
+      progress.load(),
+      api(`/api/v1/books/files/${props.fileId}/serve`, { signal: abortController.signal }),
+    ])
+    if (!response.ok) throw new Error(`The PDF request failed with status ${response.status}.`)
+    const buffer = await response.arrayBuffer()
+    if (buffer.byteLength === 0) throw new Error('The PDF request returned an empty document.')
+    if (sequence !== loadSequence || abortController.signal.aborted) return
+    const settings = bookSettings.effective.value as PdfReaderSettings
+    initialPage.value = parseDeepLinkPage() ?? progress.pageNumber.value ?? 1
+    documentBuffer.value = buffer
+    plugins.value = buildPlugins(settings)
+    readerReady.value = true
+  } catch (error) {
+    if (sequence !== loadSequence || abortController.signal.aborted) return
+    documentError.value = error instanceof Error ? error : new Error('The PDF could not be loaded.')
+  } finally {
+    if (documentAbortController === abortController) documentAbortController = null
+  }
+}
+
+async function handleEmbedInitialized(registry: PluginRegistry) {
+  const sequence = loadSequence
+  const buffer = documentBuffer.value
+  if (!buffer) return
+
+  await registry.pluginsReady()
+  if (sequence !== loadSequence || registry.isDestroyed()) return
+
+  const documentManager = registry.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)?.provides()
+  if (!documentManager) {
+    documentError.value = new Error('The PDF document manager could not be initialized.')
+    return
+  }
+
+  let documentId: string | null = null
+  try {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const opened = await documentManager
+        .openDocumentBuffer({
+          buffer,
+          name: 'PDF',
+          rotation: toRotation(effectiveSettings.value.rotation),
+        })
+        .toPromise()
+      documentId = opened.documentId
+      const document = await opened.task.toPromise()
+      if (sequence !== loadSequence || registry.isDestroyed()) return
+      if (document.pageCount > 0) return
+
+      await documentManager.closeDocument(opened.documentId).toPromise()
+      if (sequence !== loadSequence || registry.isDestroyed()) return
+    }
+
+    documentError.value = new Error('The PDF engine opened this document without any pages.')
+  } catch (error) {
+    if (sequence !== loadSequence || registry.isDestroyed()) return
+    if (documentId && documentManager.getDocumentState(documentId)?.status === 'error') return
+    documentError.value = error instanceof Error ? error : new Error('The PDF could not be opened by the document engine.')
+  }
+}
+
+function handleRetry() {
+  if (engineError.value) {
+    window.location.reload()
+    return
+  }
+  void loadReader()
+}
+
+onMounted(loadReader)
+
 onUnmounted(() => {
-  unsubPageChange?.()
-  unsubLayoutReady?.()
-  themeObserver?.disconnect()
-  if (saveTimer) clearTimeout(saveTimer)
+  loadSequence += 1
+  documentAbortController?.abort()
+  flushProgress()
+  flushSettings()
 })
 </script>
 
 <template>
-  <div class="fixed inset-0 flex flex-col">
-    <!-- Floating reader controls -->
-    <div class="pointer-events-none absolute bottom-6 left-6 z-50 flex gap-2">
-      <Tooltip>
-        <TooltipTrigger as-child>
+  <div class="fixed inset-0 overflow-hidden bg-background text-foreground">
+    <div v-if="engineError || documentError" class="absolute inset-0 flex items-center justify-center p-6">
+      <div class="max-w-sm text-center">
+        <p class="mb-2 text-sm font-medium text-foreground">Unable to open this PDF</p>
+        <p class="text-xs text-muted-foreground">{{ (engineError || documentError)?.message }}</p>
+        <div class="mt-4 flex justify-center gap-2">
           <button
-            class="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-background/95 text-foreground shadow-lg border border-border backdrop-blur-md transition-transform hover:scale-105 active:scale-95"
-            aria-label="Go back"
-            @click="goBack"
+            class="rounded-md border border-border px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
+            @click="handleBack"
           >
-            <ArrowLeft :size="22" />
+            Go back
           </button>
-        </TooltipTrigger>
-        <TooltipContent>Go back</TooltipContent>
-      </Tooltip>
-
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <button
-            class="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-background/95 text-foreground shadow-lg border border-border backdrop-blur-md transition-transform hover:scale-105 active:scale-95"
-            :aria-label="fullscreenLabel"
-            @click="toggleFullscreen"
-          >
-            <Minimize v-if="isFullscreen" :size="22" />
-            <Maximize v-else :size="22" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>{{ fullscreenLabel }}</TooltipContent>
-      </Tooltip>
-    </div>
-
-    <div v-if="props.peekMode" class="pointer-events-none absolute left-0 right-0 top-3 z-50 flex justify-center">
-      <div class="pointer-events-auto flex h-8 items-center gap-2 rounded-md border border-primary/30 bg-background/95 px-2 text-primary shadow-sm">
-        <span class="text-xs font-medium">Peeking</span>
-        <button
-          class="h-6 rounded-sm bg-primary px-2 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90"
-          @click="startTrackedReading"
-        >
-          Start reading
-        </button>
+          <button class="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground" @click="handleRetry">Retry</button>
+        </div>
       </div>
     </div>
-    <PDFViewer v-if="configReady" :config="viewerConfig" style="flex: 1; min-height: 0" @init="handleInit" @ready="handleReady" />
+
+    <div v-else-if="engineLoading || !engine || !readerReady" class="absolute inset-0 flex items-center justify-center bg-background">
+      <div class="flex flex-col items-center gap-3 text-muted-foreground" role="status" aria-live="polite">
+        <LoaderCircle :size="30" class="animate-spin text-primary" />
+        <span class="text-sm">Preparing PDF reader</span>
+      </div>
+    </div>
+
+    <EmbedPDF v-else :engine="engine" :plugins="plugins" :on-initialized="handleEmbedInitialized">
+      <template #default="{ pluginsReady, activeDocumentId, activeDocument }">
+        <div v-if="!pluginsReady || !activeDocumentId || !activeDocument" class="absolute inset-0 flex items-center justify-center bg-background">
+          <div class="flex flex-col items-center gap-3 text-muted-foreground" role="status" aria-live="polite">
+            <LoaderCircle :size="30" class="animate-spin text-primary" />
+            <span class="text-sm">Opening PDF</span>
+          </div>
+        </div>
+        <PdfReaderContent
+          v-else
+          :document-id="activeDocumentId"
+          :initial-page="initialPage"
+          :settings="effectiveSettings"
+          :peek-mode="props.peekMode"
+          @back="handleBack"
+          @page-change="handlePageChange"
+          @retry="handleRetry"
+          @settings-change="handleSettingsChange"
+          @start-reading="handleStartReading"
+        />
+      </template>
+    </EmbedPDF>
   </div>
 </template>

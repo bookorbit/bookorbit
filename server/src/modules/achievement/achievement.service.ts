@@ -5,6 +5,7 @@ import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import type { RequestUser } from '../../common/types/request-user';
 
 import { NotificationService } from '../notification/notification.service';
+import { UserService } from '../user/user.service';
 import { AchievementRepository } from './achievement.repository';
 import {
   AchievementEventsService,
@@ -33,6 +34,7 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
     private readonly events: AchievementEventsService,
     private readonly registry: EvaluatorRegistry,
     private readonly notificationService: NotificationService,
+    private readonly userService: UserService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -122,6 +124,8 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
     const startedAt = Date.now();
 
     try {
+      if (!(await this.userService.isAchievementEnabled(userId))) return;
+
       const [earnedKeys, isSuperuser] = await Promise.all([this.repo.findUserEarnedKeys(userId), this.repo.findUserIsSuperuser(userId)]);
       const awards = await this.registry.evaluate({ userId, isSuperuser, eventName, payload }, earnedKeys);
       // Backfill is a retroactive catch-up, so it awards silently instead of flooding the user with notifications.

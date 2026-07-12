@@ -57,6 +57,7 @@ function makeBook(overrides?: Partial<BookCard>): BookCard {
     seriesName: 'The Arc',
     seriesIndex: 1,
     files: [],
+    publishedDate: null,
     publishedYear: null,
     language: null,
     genres: [],

@@ -1,5 +1,6 @@
 import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
+import { parsePublishedDateKey, parsePublishedYear, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
 import { OpenLibraryDoc, OpenLibraryTextValue, OpenLibraryWork } from './open-library.types';
 
 function extractDescription(raw: string | OpenLibraryTextValue | undefined): string | undefined {
@@ -13,10 +14,7 @@ function stripWorkPrefix(key: string): string {
 }
 
 function parseYear(dateString: string | undefined): number | undefined {
-  if (!dateString) return undefined;
-  const year = parseInt(dateString.substring(0, 4), 10);
-  if (Number.isNaN(year) || year < 1000 || year > 2200) return undefined;
-  return year;
+  return parsePublishedYear(dateString);
 }
 
 function coverUrl(coverId: number | undefined): string | undefined {
@@ -61,13 +59,15 @@ export function mapOpenLibraryDoc(raw: OpenLibraryDoc): MetadataCandidate {
 export function mapOpenLibraryWork(raw: OpenLibraryWork): MetadataCandidate {
   const providerId = stripWorkPrefix(raw.key);
   const firstCover = raw.covers?.[0];
+  const publishedDate = parsePublishedDateKey(raw.first_publish_date);
 
   return {
     provider: MetadataProviderKey.OPEN_LIBRARY,
     providerId,
     title: raw.title,
     description: extractDescription(raw.description),
-    publishedYear: parseYear(raw.first_publish_date),
+    publishedDate,
+    publishedYear: publishedDate ? publishedYearFromDateKey(publishedDate) : parseYear(raw.first_publish_date),
     genres: raw.subjects?.slice(0, 10),
     coverUrl: coverUrl(firstCover),
     sourceUrl: `https://openlibrary.org${raw.key}`,

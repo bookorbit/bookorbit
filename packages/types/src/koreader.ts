@@ -133,15 +133,7 @@ export interface TestKoreaderConnectionResult {
 }
 
 export type KoreaderCatalogSection =
-  | "libraries"
-  | "collections"
-  | "smart-scopes"
-  | "authors"
-  | "series"
-  | "search"
-  | "recent"
-  | "all-books"
-  | "continue-reading";
+  "libraries" | "collections" | "smart-scopes" | "authors" | "series" | "search" | "recent" | "all-books" | "continue-reading";
 
 export type KoreaderCatalogSort = "title" | "author" | "recently_added" | "recently_updated" | "recently_read" | "series";
 
@@ -228,6 +220,7 @@ export interface KoreaderCatalogBookDetail extends KoreaderCatalogBookListItem {
   subtitle: string | null;
   description: string | null;
   publisher: string | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   isbn10: string | null;

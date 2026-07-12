@@ -70,6 +70,7 @@ const globalStubs = {
     DialogClose: { template: '<button><slot /></button>' },
     AddToCollectionSheet: true,
     DeleteBookDialog: true,
+    ResetReadingStateDialog: true,
   },
 }
 
@@ -87,6 +88,7 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     isbn10: null,
     isbn13: null,
     publisher: null,
+    publishedDate: null,
     publishedYear: null,
     language: null,
     pageCount: null,
@@ -168,6 +170,7 @@ describe('DetailsTab - present state', () => {
           providerIds: {
             amazon: '0345415000',
             goodreads: '12345',
+            librofm: '9781234567890',
             kobo: 'beautiful-ugly-3',
             ranobedb: '1287',
           },
@@ -178,6 +181,10 @@ describe('DetailsTab - present state', () => {
 
     expect(wrapper.find('a[title="Open in Amazon"]').exists()).toBe(true)
     expect(wrapper.find('a[title="Open in Goodreads"]').exists()).toBe(true)
+    const libroFmLink = wrapper.find('a[title="Open in Libro.fm"]')
+    expect(libroFmLink.exists()).toBe(true)
+    expect(libroFmLink.attributes('href')).toBe('https://libro.fm/audiobooks/9781234567890')
+    expect(libroFmLink.find('img[alt="Libro.fm"][src="/assets/provider-icons/librofm.svg"]').exists()).toBe(true)
     const koboLink = wrapper.find('a[title="Open in Kobo"]')
     expect(koboLink.exists()).toBe(true)
     expect(koboLink.attributes('href')).toBe('https://www.kobo.com/us/en/ebook/beautiful-ugly-3')

@@ -7,6 +7,7 @@ import { api } from '@/lib/api'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { STATUS_COLORS, STATUS_ICONS, STATUS_OPTIONS, useBookStatus } from '@/features/book/composables/useBookStatus'
 import AchievementProgressRing from '@/features/achievements/components/AchievementProgressRing.vue'
+import ReadingLogSourceSplit from './ReadingLogSourceSplit.vue'
 
 const props = defineProps<{
   book: BookDetail
@@ -70,17 +71,6 @@ function formatRelative(iso: string | null): string {
   if (mo < 12) return `${mo} month${mo === 1 ? '' : 's'} ago`
   const yr = Math.floor(mo / 12)
   return `${yr} year${yr === 1 ? '' : 's'} ago`
-}
-
-function formatSessionDate(iso: string | null): string {
-  if (!iso) return 'No sessions'
-  return new Date(iso).toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 }
 
 const todayDateInput = computed(() => dateToDateKey(new Date()))
@@ -299,8 +289,6 @@ const statCells = computed(() => [
 ])
 
 const currentStatusOption = computed(() => STATUS_OPTIONS.find((o) => o.value === (localReadStatus.value ?? 'unread')))
-const firstReadLabel = computed(() => formatSessionDate(props.stats?.firstSessionAt ?? null))
-const lastReadLabel = computed(() => formatSessionDate(props.stats?.lastSessionAt ?? null))
 
 function handleAddSession() {
   emit('addSession')
@@ -308,124 +296,116 @@ function handleAddSession() {
 </script>
 
 <template>
-  <div class="rounded-lg border border-border bg-card p-4 sm:p-5">
-    <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:gap-8">
-      <div class="flex items-center gap-4">
-        <div class="relative shrink-0">
-          <AchievementProgressRing :percent="currentProgress" color="text-primary" :size="76" />
-          <span class="absolute inset-0 flex items-center justify-center text-sm font-semibold text-foreground">
+  <section class="rounded-xl border border-border bg-card px-3.5 py-3 shadow-[var(--elevation-xs)] sm:px-4" aria-label="Reading summary">
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
+      <div class="flex min-w-0 items-center gap-3">
+        <div class="relative flex size-16 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+          <AchievementProgressRing :percent="currentProgress" color="text-primary" :size="56" />
+          <span class="absolute inset-0 flex items-center justify-center text-xs font-semibold text-foreground">
             {{ progressLoaded ? progressLabel : '' }}
           </span>
         </div>
 
-        <div class="flex min-w-0 flex-col gap-1">
-          <DropdownMenu>
-            <DropdownMenuTrigger as-child>
-              <button class="flex w-fit items-center gap-1.5 rounded-md text-sm font-medium text-foreground hover:text-primary transition-colors">
-                <component :is="STATUS_ICONS[localReadStatus ?? 'unread']" class="size-4" :class="STATUS_COLORS[localReadStatus ?? 'unread']" />
-                {{ currentStatusOption?.label }}
-                <ChevronDown class="size-3.5 opacity-60" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="handleSetReadStatus(opt.value)">
-                <component :is="STATUS_ICONS[opt.value]" class="size-4 mr-2" :class="STATUS_COLORS[opt.value]" />
-                {{ opt.label }}
-                <Check v-if="localReadStatus === opt.value" class="size-3 ml-auto text-primary" />
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <DropdownMenu>
+              <DropdownMenuTrigger as-child>
+                <button class="flex w-fit items-center gap-1.5 rounded-md text-sm font-semibold text-foreground transition-colors hover:text-primary">
+                  <component :is="STATUS_ICONS[localReadStatus ?? 'unread']" class="size-4" :class="STATUS_COLORS[localReadStatus ?? 'unread']" />
+                  {{ currentStatusOption?.label }}
+                  <ChevronDown class="size-3.5 opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="handleSetReadStatus(opt.value)">
+                  <component :is="STATUS_ICONS[opt.value]" class="mr-2 size-4" :class="STATUS_COLORS[opt.value]" />
+                  {{ opt.label }}
+                  <Check v-if="localReadStatus === opt.value" class="ml-auto size-3 text-primary" />
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            <span class="flex items-center gap-1">
-              First Read
-              <span class="font-medium text-foreground">{{ firstReadLabel }}</span>
-            </span>
-            <span class="flex items-center gap-1">
-              Last Read
-              <span class="font-medium text-foreground">{{ lastReadLabel }}</span>
+            <span v-if="etaLabel" class="flex items-center gap-1 text-xs text-muted-foreground">
+              <Clock class="size-3" />
+              {{ etaLabel }}
             </span>
           </div>
 
-          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            <span class="flex items-center gap-1">
-              Date Started
+          <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span>
+              Started
               <input
                 v-if="activeDateField === 'startedAt'"
                 v-model="draftDates.startedAt"
                 type="date"
                 :max="todayDateInput"
                 :disabled="savingDates"
-                class="h-6 rounded border border-input bg-background px-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                class="ml-1 h-6 rounded border border-input bg-background px-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                 autofocus
                 @blur="handleStartedSave"
                 @keydown.enter.prevent="handleStartedSave"
                 @keydown.esc.prevent="handleStartedCancel"
               />
-              <button v-else class="font-medium text-foreground hover:text-primary transition-colors" @click="handleStartedClick">
+              <button v-else class="ml-1 font-medium text-foreground transition-colors hover:text-primary" @click="handleStartedClick">
                 {{ formatDisplayDate(savedDates.startedAt) }}
               </button>
             </span>
-            <span class="flex items-center gap-1">
-              Date Finished
+            <span v-if="savedDates.finishedAt || activeDateField === 'finishedAt' || localReadStatus === 'read' || localReadStatus === 'abandoned'">
+              Finished
               <input
                 v-if="activeDateField === 'finishedAt'"
                 v-model="draftDates.finishedAt"
                 type="date"
                 :max="todayDateInput"
                 :disabled="savingDates"
-                class="h-6 rounded border border-input bg-background px-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                class="ml-1 h-6 rounded border border-input bg-background px-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                 autofocus
                 @blur="handleFinishedSave"
                 @keydown.enter.prevent="handleFinishedSave"
                 @keydown.esc.prevent="handleFinishedCancel"
               />
-              <button v-else class="font-medium text-foreground hover:text-primary transition-colors" @click="handleFinishedClick">
-                {{ formatDisplayDate(savedDates.finishedAt) }}
+              <button v-else class="ml-1 font-medium text-foreground transition-colors hover:text-primary" @click="handleFinishedClick">
+                {{ savedDates.finishedAt ? formatDisplayDate(savedDates.finishedAt) : 'Set date' }}
               </button>
             </span>
           </div>
-
-          <p v-if="datesError" class="text-xs text-destructive">{{ datesError }}</p>
-
-          <p v-if="etaLabel" class="flex items-center gap-1 text-xs text-muted-foreground">
-            <Clock class="size-3" />
-            {{ etaLabel }}
-          </p>
+          <p v-if="datesError" class="mt-1.5 text-xs text-destructive">{{ datesError }}</p>
         </div>
       </div>
 
-      <div class="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 transition-opacity" :class="{ 'opacity-50': loading && stats !== null }">
+      <div
+        class="grid flex-1 grid-cols-2 gap-x-4 gap-y-2 border-t border-border pt-3 transition-opacity sm:grid-cols-4 lg:ml-auto lg:max-w-xl lg:border-t-0 lg:pt-0"
+        :class="{ 'opacity-50': loading && stats !== null }"
+      >
         <template v-if="stats === null && loading">
-          <div v-for="i in 4" :key="i" class="rounded-lg border border-border bg-background/40 px-3 py-2.5">
-            <div class="mb-2 h-3 w-16 rounded bg-muted animate-shimmer" />
-            <div class="h-6 w-12 rounded bg-muted animate-shimmer" />
+          <div v-for="i in 4" :key="i">
+            <div class="mb-1 h-3 w-14 rounded bg-muted animate-shimmer" />
+            <div class="h-5 w-10 rounded bg-muted animate-shimmer" />
           </div>
         </template>
         <template v-else>
-          <div v-for="cell in statCells" :key="cell.label" class="rounded-lg border border-border bg-background/40 px-3 py-2.5">
-            <p class="mb-0.5 text-[11px] text-muted-foreground">{{ cell.label }}</p>
-            <p class="flex items-center gap-1.5 text-lg font-semibold text-foreground">
+          <div v-for="cell in statCells" :key="cell.label" class="min-w-0 lg:border-l lg:border-border lg:pl-4 lg:first:border-l-0 lg:first:pl-0">
+            <p class="text-[11px] text-muted-foreground">{{ cell.label }}</p>
+            <p class="mt-0.5 flex items-center gap-1 text-base font-semibold tracking-tight text-foreground">
               {{ cell.value }}
               <span v-if="cell.withMomentum" :title="momentum.title" class="inline-flex">
-                <TrendingUp v-if="momentum.direction === 'up'" class="size-4 text-green-600" />
-                <TrendingDown v-else-if="momentum.direction === 'down'" class="size-4 text-destructive" />
-                <Minus v-else class="size-4 text-muted-foreground" />
+                <TrendingUp v-if="momentum.direction === 'up'" class="size-3.5 text-primary" />
+                <TrendingDown v-else-if="momentum.direction === 'down'" class="size-3.5 text-destructive" />
+                <Minus v-else class="size-3.5 text-muted-foreground" />
               </span>
             </p>
           </div>
         </template>
       </div>
 
-      <div class="lg:self-start">
-        <button
-          class="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          @click="handleAddSession"
-        >
-          <Plus :size="14" />
-          Add session
-        </button>
-      </div>
+      <button
+        class="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+        @click="handleAddSession"
+      >
+        <Plus class="size-3.5" />
+        Add session
+      </button>
     </div>
-  </div>
+    <ReadingLogSourceSplit :stats="stats" compact class="mt-2 border-t border-border pt-2" />
+  </section>
 </template>

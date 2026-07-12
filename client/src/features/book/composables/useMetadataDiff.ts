@@ -33,6 +33,7 @@ export type DiffFieldKey =
   | 'authors'
   | 'description'
   | 'publisher'
+  | 'publishedDate'
   | 'publishedYear'
   | 'language'
   | 'pageCount'
@@ -80,6 +81,7 @@ export interface MetadataPatch {
   subtitle?: string | null
   description?: string | null
   publisher?: string | null
+  publishedDate?: string | null
   publishedYear?: number | null
   language?: string | null
   pageCount?: number | null
@@ -102,6 +104,7 @@ export interface MetadataPatch {
   openLibraryId?: string | null
   itunesId?: string | null
   audibleId?: string | null
+  librofmId?: string | null
   koboId?: string | null
   comicvineId?: string | null
   ranobedbId?: string | null
@@ -118,7 +121,7 @@ export const FIELD_DEFS: { key: DiffFieldKey; label: string }[] = [
   { key: 'authors', label: 'Authors' },
   { key: 'description', label: 'Description' },
   { key: 'publisher', label: 'Publisher' },
-  { key: 'publishedYear', label: 'Published Year' },
+  { key: 'publishedDate', label: 'Published' },
   { key: 'language', label: 'Language' },
   { key: 'pageCount', label: 'Page Count' },
   { key: 'communityRating', label: 'Community Rating' },
@@ -169,6 +172,7 @@ export type ProviderIdPatchField =
   | 'openLibraryId'
   | 'itunesId'
   | 'audibleId'
+  | 'librofmId'
   | 'koboId'
   | 'comicvineId'
   | 'ranobedbId'
@@ -183,7 +187,8 @@ export const PROVIDER_ID_FIELD: Record<MetadataProviderKey, ProviderIdPatchField
   openLibrary: 'openLibraryId',
   itunes: 'itunesId',
   audible: 'audibleId',
-  audnexus: undefined,
+  audnexus: 'audibleId',
+  librofm: 'librofmId',
   comicvine: 'comicvineId',
   ranobedb: 'ranobedbId',
   kobo: 'koboId',
@@ -205,7 +210,8 @@ export const PROVIDER_ID_LABEL: Record<MetadataProviderKey, string> = {
   openLibrary: 'Open Library ID',
   itunes: 'iTunes ID',
   audible: 'Audible ID',
-  audnexus: 'AudNexus ID',
+  audnexus: 'Audible ID',
+  librofm: 'Libro.fm ISBN',
   comicvine: 'ComicVine ID',
   ranobedb: 'RanobeDB ID',
   kobo: 'Kobo ID',
@@ -225,6 +231,7 @@ export function getCandidateValueFrom(candidate: MetadataCandidate, key: DiffFie
   if (key === 'genres') return (candidate.genres ?? []).join(', ')
   if (key === 'narrators') return (candidate.narrators ?? []).join(', ')
   if (key === 'communityRating') return formatCommunityRatingValue(candidate.communityRating, candidate.communityRatingCount)
+  if (key === 'publishedDate') return candidate.publishedDate ?? (candidate.publishedYear != null ? String(candidate.publishedYear) : '')
   const val = candidate[key as keyof MetadataCandidate]
   return val != null ? String(val) : ''
 }
@@ -264,6 +271,7 @@ export function useMetadataDiff(
   function resolveLockField(key: DiffFieldKey): BookMetadataLockField | null {
     if (key === 'coverUrl') return 'cover'
     if (key === 'sourceUrl') return null
+    if (key === 'publishedDate') return 'publishedYear'
     return key
   }
 
@@ -278,6 +286,7 @@ export function useMetadataDiff(
       const existing = current.communityRatings?.find((r) => r.provider === ap)
       return existing ? formatCommunityRatingValue(existing.rating, existing.ratingCount) : ''
     }
+    if (key === 'publishedDate') return current.publishedDate ?? (current.publishedYear != null ? String(current.publishedYear) : '')
     const val = current[key as keyof MetadataSource]
     return val != null ? String(val) : ''
   }
@@ -384,7 +393,7 @@ export function useMetadataDiff(
       }
     }
 
-    const existingProviderId = ids?.[ap] ?? ''
+    const existingProviderId = ids?.[ap] ?? (ap === 'audnexus' ? ids?.audible : '') ?? ''
     const providerIdKey = PROVIDER_ID_FIELD[ap]
     if (providerIdKey && activeCandidate && (activeCandidate.providerId || existingProviderId)) {
       const pickedProvider = pickedSources.get(providerIdKey) ?? null
@@ -528,7 +537,8 @@ export function useMetadataDiff(
         formPatch.abridged = candidate.abridged ?? false
         continue
       }
-      if (key === 'publishedYear') {
+      if (key === 'publishedDate') {
+        formPatch.publishedDate = candidate.publishedDate ?? null
         formPatch.publishedYear = candidate.publishedYear ?? null
         continue
       }

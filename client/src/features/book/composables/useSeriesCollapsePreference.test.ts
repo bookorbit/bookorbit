@@ -49,6 +49,7 @@ describe('useSeriesCollapsePreference', () => {
       expect(getEffectivePreference({})).toBe(false)
       expect(getEffectivePreference({ libraryId: 1 })).toBe(false)
       expect(getEffectivePreference({ collectionId: 5 })).toBe(false)
+      expect(getEffectivePreference({ smartScopeId: 8 })).toBe(false)
     })
 
     it('returns false when user is null', () => {
@@ -109,6 +110,20 @@ describe('useSeriesCollapsePreference', () => {
       const { getEffectivePreference } = useSeriesCollapsePreference()
 
       expect(getEffectivePreference({ collectionId: 5, libraryId: 1 })).toBe(false)
+    })
+
+    it('returns smart scope override over the global preference', () => {
+      const user = ref(
+        makeUser({
+          seriesCollapsePreferences: { global: false, libraries: {}, collections: {}, smartScopes: { '8': true } },
+        }),
+      )
+      mockUseAuth.mockReturnValue({ user } as ReturnType<typeof useAuth>)
+
+      const { getEffectivePreference } = useSeriesCollapsePreference()
+
+      expect(getEffectivePreference({ smartScopeId: 8 })).toBe(true)
+      expect(getEffectivePreference({ smartScopeId: 99 })).toBe(false)
     })
   })
 
@@ -197,6 +212,24 @@ describe('useSeriesCollapsePreference', () => {
       )
     })
 
+    it('sets a smart scope override and calls the API', async () => {
+      const userRef = ref(makeUser({ seriesCollapsePreferences: { global: false, libraries: {}, collections: {} } }))
+      mockUseAuth.mockReturnValue({ user: userRef } as ReturnType<typeof useAuth>)
+
+      const { setPreference, prefs } = useSeriesCollapsePreference()
+
+      await setPreference({ smartScopeId: 8 }, true)
+
+      expect(prefs.value!.smartScopes).toEqual({ '8': true })
+      expect(mockApi).toHaveBeenCalledWith(
+        '/api/v1/users/me/series-collapse-preferences',
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ smartScopes: { '8': true } }),
+        }),
+      )
+    })
+
     it('initialises preferences from defaults when user has none', async () => {
       const userRef = ref(makeUser({}))
       mockUseAuth.mockReturnValue({ user: userRef } as ReturnType<typeof useAuth>)
@@ -205,7 +238,7 @@ describe('useSeriesCollapsePreference', () => {
 
       await setPreference('global', true)
 
-      expect(prefs.value).toEqual({ global: true, libraries: {}, collections: {} })
+      expect(prefs.value).toEqual({ global: true, libraries: {}, collections: {}, smartScopes: {} })
     })
 
     it('preserves existing library overrides when setting global', async () => {
