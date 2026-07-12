@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Image } from '@lucide/vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
@@ -14,7 +15,7 @@ const { t } = useI18n()
 
 const { cardOverlays, bookSpineOverlay, showSpineOnComics, bookShadowStrength, bookCoverDisplayMode } = useDisplaySettings()
 
-const OVERLAY_OPTIONS: { key: CardOverlayKey; label: string; hint: string }[] = [
+const overlayOptions = computed<{ key: CardOverlayKey; label: string; hint: string }[]>(() => [
   {
     key: 'progress-bar',
     label: t('settings.appearance.bookCovers.overlays.progressBar.label'),
@@ -37,20 +38,20 @@ const OVERLAY_OPTIONS: { key: CardOverlayKey; label: string; hint: string }[] = 
     label: t('settings.appearance.bookCovers.overlays.lockStatus.label'),
     hint: t('settings.appearance.bookCovers.overlays.lockStatus.hint'),
   },
-]
+])
 
-const BOOK_SPINE_OPTIONS: { id: BookSpineOverlay; label: string; hint: string }[] = [
+const bookSpineOptions = computed<{ id: BookSpineOverlay; label: string; hint: string }[]>(() => [
   { id: 'off', label: t('settings.appearance.bookCovers.spine.off.label'), hint: t('settings.appearance.bookCovers.spine.off.hint') },
   { id: 'subtle', label: t('settings.appearance.bookCovers.spine.subtle.label'), hint: t('settings.appearance.bookCovers.spine.subtle.hint') },
   { id: 'strong', label: t('settings.appearance.bookCovers.spine.strong.label'), hint: t('settings.appearance.bookCovers.spine.strong.hint') },
-]
+])
 
-const BOOK_SHADOW_OPTIONS: { id: BookShadowStrength; label: string; hint: string }[] = [
+const bookShadowOptions = computed<{ id: BookShadowStrength; label: string; hint: string }[]>(() => [
   { id: 'default', label: t('settings.appearance.bookCovers.shadow.default.label'), hint: t('settings.appearance.bookCovers.shadow.default.hint') },
   { id: 'strong', label: t('settings.appearance.bookCovers.shadow.strong.label'), hint: t('settings.appearance.bookCovers.shadow.strong.hint') },
-]
+])
 
-const BOOK_COVER_DISPLAY_OPTIONS: { id: BookCoverDisplayMode; label: string; hint: string }[] = [
+const bookCoverDisplayOptions = computed<{ id: BookCoverDisplayMode; label: string; hint: string }[]>(() => [
   {
     id: 'blurred-fit',
     label: t('settings.appearance.bookCovers.displayMode.blurredFit.label'),
@@ -66,7 +67,7 @@ const BOOK_COVER_DISPLAY_OPTIONS: { id: BookCoverDisplayMode; label: string; hin
     label: t('settings.appearance.bookCovers.displayMode.naturalBottom.label'),
     hint: t('settings.appearance.bookCovers.displayMode.naturalBottom.hint'),
   },
-]
+])
 
 function toggleOverlay(key: CardOverlayKey) {
   const idx = cardOverlays.value.indexOf(key)
@@ -98,7 +99,7 @@ function setBookCoverDisplayMode(mode: BookCoverDisplayMode) {
         </div>
         <div class="mt-3 grid gap-2 md:grid-cols-3">
           <button
-            v-for="opt in BOOK_COVER_DISPLAY_OPTIONS"
+            v-for="opt in bookCoverDisplayOptions"
             :key="opt.id"
             class="rounded-md border px-3 py-2 text-left transition-colors"
             :class="
@@ -123,7 +124,7 @@ function setBookCoverDisplayMode(mode: BookCoverDisplayMode) {
         </div>
         <div class="mt-3 grid gap-2 sm:grid-cols-3">
           <button
-            v-for="opt in BOOK_SPINE_OPTIONS"
+            v-for="opt in bookSpineOptions"
             :key="opt.id"
             class="rounded-md border px-3 py-2 text-left transition-colors"
             :class="
@@ -154,7 +155,7 @@ function setBookCoverDisplayMode(mode: BookCoverDisplayMode) {
         </div>
         <div class="mt-3 flex items-center gap-1 p-1 rounded-lg border border-border bg-muted/50 self-start">
           <button
-            v-for="opt in BOOK_SHADOW_OPTIONS"
+            v-for="opt in bookShadowOptions"
             :key="opt.id"
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
             :class="bookShadowStrength === opt.id ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
@@ -171,7 +172,7 @@ function setBookCoverDisplayMode(mode: BookCoverDisplayMode) {
         <p class="settings-label">{{ t('settings.appearance.bookCovers.overlays.title') }}</p>
         <p class="settings-hint">{{ t('settings.appearance.bookCovers.overlays.hint') }}</p>
       </div>
-      <div v-for="opt in OVERLAY_OPTIONS" :key="opt.key" class="flex items-center justify-between gap-3 px-4 py-3 md:px-5 md:py-3.5 bg-card">
+      <div v-for="opt in overlayOptions" :key="opt.key" class="flex items-center justify-between gap-3 px-4 py-3 md:px-5 md:py-3.5 bg-card">
         <div class="min-w-0">
           <p class="settings-label">{{ opt.label }}</p>
           <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:whitespace-normal md:overflow-visible">{{ opt.hint }}</p>

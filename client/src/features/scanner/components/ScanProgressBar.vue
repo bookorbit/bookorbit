@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 import type { ScanProgressEvent } from '@bookorbit/types'
 
 const { t } = useI18n()
@@ -18,7 +19,7 @@ const pct = computed(() => {
 const label = computed(() => {
   if (!props.progress) return ''
   const p = props.progress
-  const parts = [t('scanner.filesProgress', { processed: p.processed.toLocaleString(), total: p.total.toLocaleString() })]
+  const parts = [t('scanner.filesProgress', { processed: formatNumber(p.processed), total: formatNumber(p.total) })]
   if (p.added > 0) parts.push(t('scanner.booksFound', { count: p.added }, p.added))
   return parts.join(' · ')
 })

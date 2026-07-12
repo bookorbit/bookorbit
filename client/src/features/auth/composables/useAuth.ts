@@ -4,7 +4,7 @@ import { api, refreshAccessToken, setAccessToken, setOnAuthFailure } from '@/lib
 import router from '@/router'
 import { cancelPendingDisplaySettingsSync, initDisplaySettingsSync, loadDisplaySettingsFromServer } from '@/composables/useDisplaySettingsSync'
 import { cancelPendingThemeSync, initThemeSync, loadFromServer } from '@/composables/useThemeSync'
-import { cancelPendingLocaleSync, initLocaleSync, loadLocaleFromServer } from '@/composables/useLocaleSync'
+import { cancelPendingLocaleSync, hydrateLocalePreference, initLocaleSync } from '@/composables/useLocaleSync'
 import { useSetupStatus } from './useSetupStatus'
 import { disconnectAuthorEnrichmentSocket } from '@/features/settings/composables/useAuthorEnrichmentStatus'
 import { disconnectBookMetadataFetchSocket } from '@/features/book-metadata-fetch/composables/useBookMetadataFetchStatus'
@@ -76,7 +76,7 @@ async function me(): Promise<void> {
   user.value = await res.json()
 }
 
-async function hydrateThemeSync(options: { refreshUser?: boolean } = {}): Promise<void> {
+async function hydratePreferences(options: { refreshUser?: boolean } = {}): Promise<void> {
   if (options.refreshUser) {
     await me()
   }
@@ -84,8 +84,8 @@ async function hydrateThemeSync(options: { refreshUser?: boolean } = {}): Promis
   if (user.value?.settings?.syncThemePreferences) {
     await loadFromServer()
     await loadDisplaySettingsFromServer()
-    await loadLocaleFromServer()
   }
+  await hydrateLocalePreference()
 
   initThemeSync()
   initDisplaySettingsSync()
@@ -98,7 +98,7 @@ export function useAuth() {
     try {
       await refreshAccessToken()
       await me()
-      await hydrateThemeSync()
+      await hydratePreferences()
       startSessionRefresh()
     } catch {
       // no valid session
@@ -126,7 +126,7 @@ export function useAuth() {
     const data: AuthResponse = await res.json()
     setAccessToken(data.accessToken)
     user.value = data.user
-    await hydrateThemeSync({ refreshUser: true })
+    await hydratePreferences({ refreshUser: true })
     startSessionRefresh()
 
     if (user.value?.isDefaultPassword) {
@@ -163,7 +163,7 @@ export function useAuth() {
     const data: AuthResponse = await res.json()
     setAccessToken(data.accessToken)
     user.value = data.user
-    await hydrateThemeSync()
+    await hydratePreferences()
     startSessionRefresh()
 
     useSetupStatus().markSetupComplete()
@@ -203,7 +203,7 @@ export function useAuth() {
     const data: AuthResponse = await res.json()
     setAccessToken(data.accessToken)
     user.value = data.user
-    await hydrateThemeSync()
+    await hydratePreferences()
     startSessionRefresh()
     router.push('/')
   }

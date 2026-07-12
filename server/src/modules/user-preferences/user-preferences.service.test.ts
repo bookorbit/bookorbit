@@ -97,7 +97,7 @@ describe('UserPreferencesService', () => {
   });
 
   it('upsertLocalePreferences rejects unsupported locale', async () => {
-    await expect(service.upsertLocalePreferences(11, { locale: 'de' } as never)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.upsertLocalePreferences(11, { locale: 'unsupported' } as never)).rejects.toBeInstanceOf(BadRequestException);
     expect(repo.upsert).not.toHaveBeenCalled();
   });
 

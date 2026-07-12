@@ -161,7 +161,7 @@ watchEffect(() => {
         <TrendingUp class="size-4" />
       </div>
       <div>
-        <h2 id="progress-journey-heading" class="text-sm font-semibold text-foreground">Reading progress</h2>
+        <h2 id="progress-journey-heading" class="text-sm font-semibold text-foreground">{{ t('book.detail.readingLog.journey.title') }}</h2>
         <p class="mt-0.5 text-xs text-muted-foreground">{{ chartSubtitle }}</p>
       </div>
     </div>
@@ -169,8 +169,8 @@ watchEffect(() => {
       <VChart :theme="chartTheme" :option autoresize class="absolute inset-0" />
     </div>
     <div v-else class="flex flex-1 flex-col items-center justify-center py-10 text-center" style="min-height: 190px">
-      <p class="text-sm font-medium text-foreground">No progress data in this window.</p>
-      <p class="mt-1 text-sm text-muted-foreground">Progress will appear after a session records a reading position.</p>
+      <p class="text-sm font-medium text-foreground">{{ t('book.detail.readingLog.journey.empty') }}</p>
+      <p class="mt-1 text-sm text-muted-foreground">{{ t('book.detail.readingLog.journey.emptyHint') }}</p>
     </div>
   </section>
 </template>

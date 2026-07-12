@@ -112,7 +112,7 @@ type RowDef = {
   }
 }
 
-const rows: RowDef[] = [
+const rows = computed<RowDef[]>(() => [
   {
     key: 'google',
     label: 'Google Books',
@@ -237,7 +237,7 @@ const rows: RowDef[] = [
       blockedMessage: t('settings.metadata.providers.blocked.aladin'),
     },
   },
-]
+])
 
 const TESTABLE_PROVIDERS: MetadataProviderKey[] = [MetadataProviderKey.AMAZON, MetadataProviderKey.HARDCOVER, MetadataProviderKey.ALADIN]
 
@@ -385,7 +385,7 @@ function toggleProvider(row: RowDef) {
 const draftReady = computed(() => draft.value !== null)
 const visibleRows = computed(() => {
   if (!draft.value) return []
-  return rows.filter((row) => Object.prototype.hasOwnProperty.call(draft.value, row.key))
+  return rows.value.filter((row) => Object.prototype.hasOwnProperty.call(draft.value, row.key))
 })
 </script>
 

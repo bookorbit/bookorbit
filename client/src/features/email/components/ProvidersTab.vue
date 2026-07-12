@@ -463,8 +463,17 @@ watch(
         <ChevronUp v-if="helpOpen" :size="14" class="text-muted-foreground" />
         <ChevronDown v-else :size="14" class="text-muted-foreground" />
       </button>
-      <!-- eslint-disable-next-line vue/no-v-html -->
-      <p v-if="helpOpen" class="px-4 pb-4 text-xs text-muted-foreground" v-html="t('email.providers.notesBody')" />
+      <i18n-t v-if="helpOpen" keypath="email.providers.notesBody" tag="p" class="px-4 pb-4 text-xs text-muted-foreground">
+        <template #system>
+          <strong>{{ t('email.badge.system') }}</strong>
+        </template>
+        <template #defaultProvider>
+          <strong>{{ t('email.badge.default') }}</strong>
+        </template>
+        <template #shared>
+          <strong>{{ t('email.badge.shared') }}</strong>
+        </template>
+      </i18n-t>
     </div>
 
     <div v-if="deleteConfirm" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="deleteConfirm = null">

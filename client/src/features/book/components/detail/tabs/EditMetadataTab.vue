@@ -850,11 +850,11 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           >
             <span class="col-start-1 row-start-1 flex items-center gap-1.5" :class="{ invisible: saving }">
               <Check class="size-3.5" />
-              <span class="hidden sm:inline">Save</span>
+              <span class="hidden sm:inline">{{ t('common.save') }}</span>
             </span>
             <span class="col-start-1 row-start-1 flex items-center gap-1.5" :class="{ invisible: !saving }">
               <Loader2 class="size-3.5 animate-spin" />
-              <span class="hidden sm:inline">Saving...</span>
+              <span class="hidden sm:inline">{{ t('book.detail.editMetadata.saving') }}</span>
             </span>
           </button>
           <Popover v-if="fileWriteEnabledForBook">
@@ -1134,7 +1134,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         </MetadataFieldLabel>
         <MetadataFieldLabel
           class="sm:w-40 sm:shrink-0"
-          label="Published Date"
+          :label="t('bookDock.field.publishedDate')"
           field="publishedYear"
           :locked="isLocked('publishedYear')"
           :is-updating="isUpdatingLock"

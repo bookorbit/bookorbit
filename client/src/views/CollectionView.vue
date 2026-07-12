@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 import { AlertTriangle, CheckSquare, FileSpreadsheet, FolderOpen, Layers, Pencil, Search, SlidersHorizontal, Square, X } from '@lucide/vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
@@ -450,7 +451,7 @@ defineOptions({ name: 'CollectionView' })
                     ? 'border-primary text-primary bg-primary/10'
                     : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
                 "
-                :aria-label="collapseEnabledRef ? 'Expand series' : 'Collapse series'"
+                :aria-label="collapseEnabledRef ? t('views.bookView.expandSeries') : t('views.bookView.collapseSeries')"
                 @click="handleToggleCollapse"
               >
                 <Layers :size="14" />
@@ -464,7 +465,7 @@ defineOptions({ name: 'CollectionView' })
               <button
                 v-if="hasPermission('library_download') && !isDemoRestrictedAccount"
                 class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md border border-input text-muted-foreground bg-background transition-colors hover:text-foreground hover:bg-muted"
-                aria-label="Export metadata"
+                :aria-label="t('views.bookView.exportMetadata')"
                 @click="openMetadataExport"
               >
                 <FileSpreadsheet :size="14" />
@@ -478,7 +479,7 @@ defineOptions({ name: 'CollectionView' })
               <button
                 v-if="collection"
                 class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                aria-label="Edit collection"
+                :aria-label="t('views.collection.editCollection')"
                 @click="openCollectionEditor"
               >
                 <Pencil :size="14" />
@@ -489,7 +490,7 @@ defineOptions({ name: 'CollectionView' })
 
           <button
             class="sm:hidden flex h-8 w-8 items-center justify-center rounded-md border border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            aria-label="Show collection controls"
+            :aria-label="t('views.collection.showControlsAria')"
             @click="toggleMobileControls"
           >
             <SlidersHorizontal :size="14" />
@@ -655,7 +656,7 @@ defineOptions({ name: 'CollectionView' })
         <div v-if="effectiveViewMode === 'list'" ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
           <span v-if="loading" class="text-xs text-muted-foreground">{{ t('common.loading') }}</span>
           <span v-else-if="!hasMorePrefix && contiguousPrefix.length > 0" class="text-xs text-muted-foreground">{{
-            t('views.bookView.allBooksLoaded', { count: total.toLocaleString() })
+            t('views.bookView.allBooksLoaded', { count: formatNumber(total) })
           }}</span>
         </div>
 

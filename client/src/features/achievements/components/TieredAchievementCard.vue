@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDate } from '@/i18n/formatters'
 import { Check, CheckCircle2, Circle } from '@lucide/vue'
 import type { AchievementRarity } from '@bookorbit/types'
 import type { TieredGroup } from '../types'
@@ -111,7 +112,7 @@ function pipClass(tierRarity: AchievementRarity, earned: boolean): string {
 }
 
 function formatTierDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(undefined, {
+  return formatDate(new Date(dateStr), {
     year: 'numeric',
     month: 'short',
     day: 'numeric',

@@ -5,6 +5,7 @@ import BookCoverArtwork from './BookCoverArtwork.vue'
 import BookCoverSurface from './BookCoverSurface.vue'
 import { api } from '@/lib/api'
 import { computed, inject, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import {
   BookOpen,
@@ -37,6 +38,7 @@ import { displayPublishedDate } from '../lib/published-date'
 
 const COLLAPSED_SERIES_COVER_LIMIT = 3
 
+const { t } = useI18n()
 const router = useRouter()
 
 const props = defineProps<{
@@ -59,7 +61,7 @@ const showSendDialog = ref(false)
 const collapsedSeries = computed(() => props.book.collapsedSeries ?? null)
 const isCollapsedSeries = computed(() => collapsedSeries.value !== null)
 const canOpenSeries = computed(() => isCollapsedSeries.value && props.book.seriesId != null)
-const collapsedSeriesName = computed(() => props.book.seriesName?.trim() || props.book.title?.trim() || 'Series')
+const collapsedSeriesName = computed(() => props.book.seriesName?.trim() || props.book.title?.trim() || t('book.collapsedSeries.label'))
 const collapsedBookCount = computed(() => collapsedSeries.value?.bookCount ?? 0)
 const collapsedReadCount = computed(() => collapsedSeries.value?.readCount ?? 0)
 const collapsedCoverIds = computed(
@@ -73,7 +75,7 @@ const collapsedCoverSurfaceClass = computed(() => [
   'book-cover-surface--spine-fitted relative shrink-0 overflow-hidden rounded-sm shadow-sm',
   collapsedCoverIsStacked.value ? '-ml-8 first:ml-0 w-12 ring-1 ring-background/80' : 'w-16',
 ])
-const collapsedCountLabel = computed(() => `${collapsedBookCount.value} ${collapsedBookCount.value === 1 ? 'book' : 'books'}`)
+const collapsedCountLabel = computed(() => t('book.collapsedSeries.bookCount', { count: collapsedBookCount.value }, collapsedBookCount.value))
 const collapsedProgressPercent = computed(() => {
   if (collapsedBookCount.value <= 0) return 0
   return Math.min(100, Math.max(0, (collapsedReadCount.value / collapsedBookCount.value) * 100))
@@ -259,7 +261,9 @@ function handleRowClick(event: MouseEvent) {
     <div class="flex min-w-0 flex-1 flex-col gap-1">
       <div class="flex min-w-0 items-center gap-2">
         <span class="truncate text-sm font-semibold leading-snug text-foreground">{{ collapsedSeriesName }}</span>
-        <span class="hidden shrink-0 rounded-sm bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary sm:inline-flex"> Series </span>
+        <span class="hidden shrink-0 rounded-sm bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary sm:inline-flex">
+          {{ t('book.collapsedSeries.label') }}
+        </span>
       </div>
       <button v-if="authorLine" class="w-fit max-w-full truncate text-xs text-muted-foreground hover:underline" @click.stop="openAuthorBrowse">
         {{ authorLine }}
@@ -267,7 +271,9 @@ function handleRowClick(event: MouseEvent) {
       <div class="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
         <LibraryBig class="size-3.5 shrink-0 text-muted-foreground/70" />
         <span class="truncate">{{ collapsedCountLabel }}</span>
-        <span v-if="collapsedReadCount > 0" class="shrink-0">&middot; {{ collapsedReadCount }} read</span>
+        <span v-if="collapsedReadCount > 0" class="shrink-0">
+          &middot; {{ t('book.collapsedSeries.readCount', { count: collapsedReadCount }, collapsedReadCount) }}
+        </span>
       </div>
       <div
         v-if="collapsedReadCount > 0 && collapsedBookCount > 0"

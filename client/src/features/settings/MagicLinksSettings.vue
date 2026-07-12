@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDate as formatLocaleDate } from '@/i18n/formatters'
 import { Plus, Trash2, Copy, Check, Link, Pause, Play, Info } from '@lucide/vue'
 import { api } from '@/lib/api'
 import { copyToClipboard } from '@/lib/clipboard'
@@ -130,7 +131,7 @@ async function handleRevoke() {
 
 function formatDate(date: string | null | undefined): string {
   if (!date) return '-'
-  return new Date(date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return formatLocaleDate(new Date(date), { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function isExpired(expiresAt: string | null | undefined): boolean {
@@ -308,7 +309,9 @@ function isExpired(expiresAt: string | null | undefined): boolean {
                           <Copy v-else :size="14" />
                         </button>
                       </TooltipTrigger>
-                      <TooltipContent>{{ copiedId === token.id ? t('settings.magicLinks.copied') : t('settings.magicLinks.copyLink') }}</TooltipContent>
+                      <TooltipContent>{{
+                        copiedId === token.id ? t('settings.magicLinks.copied') : t('settings.magicLinks.copyLink')
+                      }}</TooltipContent>
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger as-child>

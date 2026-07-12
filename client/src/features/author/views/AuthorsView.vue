@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowUpDown, CheckCheck, Filter, RefreshCcw, Search, SlidersHorizontal, Trash2, X } from '@lucide/vue'
 import { toast } from 'vue-sonner'
@@ -519,7 +520,7 @@ defineOptions({ name: 'AuthorsView' })
             <button
               v-if="!isDefaultSort"
               class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-destructive hover:bg-muted"
-              aria-label="Reset sort to default"
+              :aria-label="t('common.resetSortAria')"
               @click="resetSort"
             >
               <X :size="13" />
@@ -558,7 +559,7 @@ defineOptions({ name: 'AuthorsView' })
                 ? 'border-primary text-primary bg-primary/10'
                 : 'border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
             "
-            aria-label="Show author controls"
+            :aria-label="t('author.list.showControlsAria')"
             @click="toggleMobileControls"
           >
             <SlidersHorizontal :size="14" />
@@ -709,7 +710,7 @@ defineOptions({ name: 'AuthorsView' })
         <div ref="sentinel" class="mt-4 flex h-8 items-center justify-center">
           <span v-if="loading" class="text-xs text-muted-foreground">{{ t('common.loading') }}</span>
           <span v-else-if="initialLoadComplete && !hasMore && items.length > 0" class="text-xs text-muted-foreground">
-            {{ t('author.list.allLoaded', { total: total.toLocaleString() }) }}
+            {{ t('author.list.allLoaded', { total: formatNumber(total) }) }}
           </span>
         </div>
       </main>

@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 import {
   AlertTriangle,
   Settings2,
@@ -492,7 +493,7 @@ defineOptions({ name: 'SmartScopeView' })
                 @click="toggleFilterSummary"
               >
                 <Filter :size="13" />
-                <span>Filter</span>
+                <span>{{ t('views.smartScope.filter') }}</span>
               </button>
             </TooltipTrigger>
             <TooltipContent>{{ filterExpanded ? 'Hide filter summary' : 'Show filter summary' }}</TooltipContent>
@@ -506,39 +507,41 @@ defineOptions({ name: 'SmartScopeView' })
                     ? 'border-primary text-primary bg-primary/10'
                     : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
                 "
-                :aria-label="collapseEnabledRef ? 'Expand series' : 'Collapse series'"
+                :aria-label="collapseEnabledRef ? t('views.bookView.expandSeries') : t('views.bookView.collapseSeries')"
                 @click="handleToggleCollapse"
               >
                 <Layers :size="14" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>{{ collapseEnabledRef ? 'Expand series' : 'Collapse series' }}</TooltipContent>
+            <TooltipContent>
+              {{ collapseEnabledRef ? t('views.bookView.expandSeries') : t('views.bookView.collapseSeries') }}
+            </TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger as-child>
               <button
                 v-if="hasPermission('library_download') && !isDemoRestrictedAccount"
                 class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md border border-input text-muted-foreground bg-background transition-colors hover:text-foreground hover:bg-muted"
-                aria-label="Export metadata"
+                :aria-label="t('views.bookView.exportMetadata')"
                 @click="openMetadataExport"
               >
                 <FileSpreadsheet :size="14" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Export metadata</TooltipContent>
+            <TooltipContent>{{ t('views.bookView.exportMetadata') }}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger as-child>
               <button
                 class="hidden sm:flex h-8 items-center gap-1.5 rounded-md border border-input px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                aria-label="Edit Smart Scope"
+                :aria-label="t('views.smartScope.edit')"
                 @click="openEditor"
               >
                 <Settings2 :size="13" />
-                <span>Edit</span>
+                <span>{{ t('common.edit') }}</span>
               </button>
             </TooltipTrigger>
-            <TooltipContent>Edit Smart Scope</TooltipContent>
+            <TooltipContent>{{ t('views.smartScope.edit') }}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger as-child>
@@ -560,7 +563,7 @@ defineOptions({ name: 'SmartScopeView' })
           </Tooltip>
           <button
             class="sm:hidden flex h-8 w-8 items-center justify-center rounded-md border border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            aria-label="Show Smart Scope controls"
+            :aria-label="t('views.smartScope.showControlsAria')"
             @click="toggleMobileControls"
           >
             <SlidersHorizontal :size="14" />
@@ -570,7 +573,7 @@ defineOptions({ name: 'SmartScopeView' })
           <DropdownMenuItem @click="handleToggleCollapse">
             <CheckSquare v-if="collapseEnabledRef" :size="14" class="mr-2" />
             <Square v-else :size="14" class="mr-2" />
-            Collapse series
+            {{ t('views.bookView.collapseSeries') }}
           </DropdownMenuItem>
         </template>
         <template v-if="effectiveViewMode === 'table'" #columns>
@@ -788,7 +791,7 @@ defineOptions({ name: 'SmartScopeView' })
           <div v-if="effectiveViewMode === 'list'" ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
             <span v-if="loading" class="text-xs text-muted-foreground">{{ t('common.loading') }}</span>
             <span v-else-if="!hasMorePrefix && contiguousPrefix.length > 0" class="text-xs text-muted-foreground">
-              {{ t('views.bookView.allBooksLoaded', { count: total.toLocaleString() }) }}
+              {{ t('views.bookView.allBooksLoaded', { count: formatNumber(total) }) }}
             </span>
           </div>
 

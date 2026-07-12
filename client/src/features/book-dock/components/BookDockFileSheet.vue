@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDateTime } from '@/i18n/formatters'
 import { X, BookOpen, Check, Trash2, Sparkles, ArrowLeft, Wand2, AlertCircle } from '@lucide/vue'
 import type { BookDockFile, BookDockMetadata, MetadataCandidate, MetadataSource, MetadataProviderKey } from '@bookorbit/types'
 import BookDockStatusBadge from './BookDockStatusBadge.vue'
@@ -171,7 +172,7 @@ async function onFolderChange(event: Event) {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString()
+  return formatDateTime(new Date(iso))
 }
 
 async function handleDiscard() {
@@ -448,7 +449,7 @@ onMounted(() => {
               />
             </label>
             <label>
-              <span class="text-xs font-medium text-muted-foreground">Published Date</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.publishedDate') }}</span>
               <input
                 v-model="form.publishedDate"
                 type="date"
@@ -457,7 +458,7 @@ onMounted(() => {
               />
             </label>
             <label>
-              <span class="text-xs font-medium text-muted-foreground">Year</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.year') }}</span>
               <input
                 v-model="form.publishedYear"
                 class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"

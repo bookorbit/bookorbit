@@ -1,5 +1,6 @@
 {
   "common": {
+    "resetSortAria": "Sortering terugzetten naar standaard",
     "save": "Opslaan",
     "cancel": "Annuleren",
     "delete": "Verwijderen",
@@ -19,7 +20,9 @@
       "language": {
         "title": "Taal",
         "description": "Kies de taal die in de hele interface wordt gebruikt.",
-        "label": "Interfacetaal"
+        "label": "Interfacetaal",
+        "loadError": "De geselecteerde taal kon niet worden geladen",
+        "saveError": "Opslaan van taalvoorkeur mislukt"
       },
       "pageTitle": "Weergave",
       "pageSubtitle": "Beheer thema's, omslagen, indeling en hoe je bibliotheek wordt getoond.",
@@ -356,7 +359,9 @@
         "title": "Leesvoorkeuren",
         "timezoneHint": "De tijdzone wordt gebruikt voor tijdgevoelige prestaties zoals Vroege Vogel en Nachtbraker.",
         "timezone": "Tijdzone",
-        "save": "Voorkeuren opslaan"
+        "save": "Voorkeuren opslaan",
+        "enableAchievements": "Prestaties inschakelen",
+        "enableAchievementsHint": "Houd de voortgang van prestaties bij en toon prestatiegerelateerde onderdelen. Beheer prestatiemeldingen afzonderlijk onder Meldingen."
       },
       "preferences": {
         "saveFailed": "Opslaan van voorkeuren mislukt",
@@ -2512,6 +2517,7 @@
     },
     "list": {
       "title": "Auteurs",
+      "showControlsAria": "Auteurbediening tonen",
       "searchPlaceholder": "Auteurs zoeken",
       "sortButton": "Sorteren",
       "sortBy": "Sorteren op",
@@ -2637,6 +2643,11 @@
   "book": {
     "untitled": "Naamloos",
     "unknownFormat": "onbekend",
+    "collapsedSeries": {
+      "label": "Reeks",
+      "bookCount": "geen boeken | {count} boek | {count} boeken",
+      "readCount": "{count} gelezen"
+    },
     "card": {
       "missing": "Ontbreekt"
     },
@@ -2986,6 +2997,14 @@
         "primary": "Primair",
         "peek": "Voorvertoning",
         "sendViaEmail": "Verzenden via e-mail",
+        "personalReview": {
+          "title": "Persoonlijke recensie",
+          "toggleAria": "Persoonlijke recensie in- of uitklappen",
+          "editAria": "Persoonlijke recensie bewerken",
+          "placeholder": "Privérecensie",
+          "clearAria": "Persoonlijke recensie wissen",
+          "cancelEditAria": "Bewerken van persoonlijke recensie annuleren"
+        },
         "editCover": "Omslag bewerken",
         "finished": "Voltooid",
         "resetFileProgress": "Bestandsvoortgang resetten",
@@ -3181,6 +3200,12 @@
         "writeAndRenameShort": "Schrijven en hernoemen"
       },
       "files": {
+        "title": "Boekbestanden",
+        "fileCount": "geen bestanden | {count} bestand | {count} bestanden",
+        "synced": "Gesynchroniseerd {time}",
+        "sortAria": "Bestanden sorteren",
+        "syncHistory": "Synchronisatiegeschiedenis",
+        "metadataWriteBack": "Metadata terugschrijven",
         "relative": {
           "seconds": "{value}s geleden",
           "minutes": "{value}m geleden",
@@ -3263,6 +3288,7 @@
         "paginationUnit": "markeringen"
       },
       "readingLog": {
+        "moreActionsAria": "Meer leeslogacties",
         "export": {
           "button": "Exporteren"
         },
@@ -3293,9 +3319,11 @@
           "subtitle": "{count} actieve dag · {ratio}% consistentie | {count} actieve dag · {ratio}% consistentie | {count} actieve dagen · {ratio}% consistentie",
           "minutesUnit": "min",
           "title": "Activiteit",
-          "empty": "Geen leesactiviteit in deze periode."
+          "empty": "Geen leesactiviteit in deze periode.",
+          "emptyHint": "Sessies die hier worden geregistreerd, vormen je consistentieoverzicht."
         },
         "hero": {
+          "summaryAria": "Leesoverzicht",
           "notSet": "Niet ingesteld",
           "relative": {
             "seconds": "{count}s geleden",
@@ -3342,14 +3370,18 @@
           "tooltipReading": "Lezen",
           "minutesUnit": "min",
           "title": "Voortgangsreis",
-          "empty": "Geen voortgangsgegevens in deze periode."
+          "empty": "Geen voortgangsgegevens in deze periode.",
+          "emptyHint": "Voortgang verschijnt nadat een sessie een leespositie registreert."
         },
         "sourceSplit": {
-          "title": "Waar je dit boek hebt gelezen"
+          "title": "Leesbronnen",
+          "shortTitle": "Bronnen"
         },
         "untitled": "Zonder titel",
         "addSessionFailed": "Toevoegen van sessie mislukt",
         "filters": {
+          "show": "Tonen",
+          "dateRangeAria": "Datumbereik van leessessies",
           "allTime": "Altijd",
           "last30": "Laatste 30 dagen",
           "last90": "Laatste 90 dagen",
@@ -3357,6 +3389,7 @@
           "allFormats": "Alle formaten"
         },
         "table": {
+          "title": "Sessies",
           "sourceWeb": "Web",
           "sourceManual": "Handmatig",
           "colDate": "Datum",
@@ -3368,6 +3401,7 @@
           "colEndProgress": "Eindvoortgang",
           "colEndProgressMobile": "Einde",
           "empty": "Nog geen leessessies vastgelegd.",
+          "emptyHint": "Voeg een sessie toe om de leesgeschiedenis van dit boek op te bouwen.",
           "colPace": "Tempo",
           "colSource": "Bron",
           "colFormatMobile": "Fmt",
@@ -3599,6 +3633,7 @@
       "authors": "Auteurs",
       "authorsCommaSeparated": "Auteurs (kommagescheiden)",
       "publisher": "Uitgever",
+      "publishedDate": "Publicatiedatum",
       "year": "Jaar",
       "language": "Taal",
       "isbn13": "ISBN-13",
@@ -3668,6 +3703,15 @@
       "moreFiles": "+{count} meer bestanden",
       "start": "Starten",
       "filesFinalized": "{succeeded} van {total} bestanden afgerond",
+      "checking": "Geselecteerde bestanden controleren...",
+      "readyCount": "geen bestanden gereed | {count} bestand gereed | {count} bestanden gereed",
+      "duplicateCount": "geen al in de bibliotheek | {count} al in de bibliotheek | {count} al in de bibliotheek",
+      "conflictCount": "geen bestandsnaamconflicten | {count} bestandsnaamconflict | {count} bestandsnaamconflicten",
+      "missingDestinationCount": "geen ontbrekende bestemmingen | {count} ontbrekende bestemming | {count} ontbrekende bestemmingen",
+      "blockedCount": "geen bestanden geblokkeerd | {count} bestand geblokkeerd | {count} bestanden geblokkeerd",
+      "moreDuplicates": "+{count} meer al in de bibliotheek",
+      "discardDuplicates": "Duplicaten verwijderen",
+      "failedCount": "geen bestanden mislukt | {count} bestand mislukt | {count} bestanden mislukt",
       "failedWithDuplicates": "{failed} mislukt ({count} duplicaten) | {failed} mislukt ({count} duplicaat) | {failed} mislukt ({count} duplicaten)",
       "view": "Bekijken",
       "viewExisting": "Bestaande bekijken",
@@ -3788,6 +3832,9 @@
       "noCollections": "Nog geen collecties",
       "latest": "Nieuwste {version}",
       "newReleaseNotes": "Nieuwe release-opmerkingen beschikbaar",
+      "support": "BookOrbit ondersteunen",
+      "supportShort": "Ondersteunen",
+      "supportAria": "BookOrbit ondersteunen op Ko-fi",
       "sectionHeader": {
         "add": "Toevoegen",
         "reorder": "Herschikken",
@@ -3854,6 +3901,7 @@
       }
     },
     "iconPicker": {
+      "clearSelectionAria": "Geselecteerd pictogram wissen",
       "searchLucide": "Lucide-pictogrammen zoeken...",
       "searchCustom": "Aangepaste pictogrammen zoeken...",
       "chooseIcon": "Kies een pictogram...",
@@ -4110,7 +4158,7 @@
       "toggleSharing": "Delen in-/uitschakelen",
       "removeSystemBeforeDelete": "Verwijder de systeemaanduiding voordat je verwijdert",
       "notesHeading": "Provideropmerkingen",
-      "notesBody": "De <strong>Systeem</strong>-provider (alleen superuser) wordt gebruikt voor e-mails om wachtwoorden te herstellen. De <strong>Standaard</strong>-provider wordt gebruikt bij het versturen van boeken zonder expliciet geselecteerde provider. Providers gemarkeerd als <strong>Gedeeld</strong> zijn beschikbaar voor alle gebruikers.",
+      "notesBody": "De provider {system} (alleen superuser) wordt gebruikt voor e-mails om wachtwoorden te herstellen. De provider {defaultProvider} wordt gebruikt bij het versturen van boeken zonder expliciet geselecteerde provider. Providers gemarkeerd als {shared} zijn beschikbaar voor alle gebruikers.",
       "deleteTitle": "Provider verwijderen?",
       "nameHostRequired": "Naam en host zijn verplicht",
       "created": "Provider aangemaakt",
@@ -4190,7 +4238,7 @@
       "editTemplate": "Sjabloon bewerken",
       "empty": "Nog geen sjablonen.",
       "notesHeading": "Sjabloonopmerkingen",
-      "notesBody": "Systeemsjablonen kunnen niet worden verwijderd. Beheerders kunnen ze bewerken. Gebruik variabelen zoals <code class=\"font-mono text-foreground/80\">&#123;&#123;title&#125;&#125;</code> in onderwerpen en inhoud - deze worden bij het versturen vervangen door boekgegevens.",
+      "notesBody": "Systeemsjablonen kunnen niet worden verwijderd. Beheerders kunnen ze bewerken. Gebruik variabelen zoals {variable} in onderwerpen en inhoud - deze worden bij het versturen vervangen door boekgegevens.",
       "deleteTitle": "Sjabloon verwijderen?",
       "nameSubjectRequired": "Naam en onderwerp zijn verplicht",
       "created": "Sjabloon aangemaakt",
@@ -4436,6 +4484,12 @@
       "createTitle": "Bibliotheek aanmaken",
       "editTitle": "Bewerken: {name}",
       "stepOf": "Stap {current} van {total}",
+      "unsaved": "Niet opgeslagen",
+      "required": "Verplicht",
+      "closeAria": "Bibliotheekmaker sluiten",
+      "progressAria": "Voortgang bibliotheekinstelling",
+      "sectionsAria": "Secties van bibliotheekinstellingen",
+      "loadingAria": "Bibliotheekinstellingen laden",
       "sections": {
         "details": "Details",
         "folders": "Mappen",
@@ -4471,7 +4525,15 @@
         "title": "Scanmappen",
         "description": "Voeg een of meer mappen toe om te scannen op boeken.",
         "browseAdd": "Blader en voeg een map toe",
-        "manualEntry": "Of voer handmatig een pad in:",
+        "browseTitle": "Door servermappen bladeren",
+        "browseDescription": "Selecteer een of meer mappen zonder de browser te verlaten.",
+        "selectedTitle": "Geselecteerde mappen",
+        "addFolders": "Mappen toevoegen",
+        "manualEntry": "Voer handmatig een pad in",
+        "absolutePath": "Absoluut serverpad",
+        "addFolder": "Map toevoegen",
+        "removeFolder": "{folder} verwijderen",
+        "manualCheckHint": "Handmatige paden worden samen met de overige geselecteerde mappen gecontroleerd.",
         "pathPlaceholder": "/pad/naar/boeken",
         "test": "Testen",
         "add": "Toevoegen",
@@ -4528,9 +4590,10 @@
       },
       "fileWrite": {
         "maxFileSizeMb": "Maximale bestandsgrootte (MB)",
+        "formatLimits": "Formaatlimieten",
         "rename": {
-          "title": "Bestanden hernoemen bij metadata-update",
-          "hint": "Indien ingeschakeld, wordt bij het bijwerken van titel, auteur, reeks of jaar het fysieke bestand hernoemd volgens het naampatroon van de bibliotheek."
+          "title": "Bestanden hernoemen na metadatawijzigingen",
+          "hint": "Hernoemt fysieke bestanden wanneer titel, auteur, reeks of jaar verandert, volgens het naampatroon van de bibliotheek."
         },
         "write": {
           "title": "Metadata naar bestanden schrijven",
@@ -4542,19 +4605,23 @@
         },
         "epub": {
           "title": "EPUB",
-          "hint": "Schrijft metadata naar het OPF-bestand in het EPUB-archief."
+          "hint": "Schrijft metadata naar het OPF-bestand in het EPUB-archief.",
+          "toggleAria": "EPUB-metadata schrijven"
         },
         "pdf": {
           "title": "PDF",
-          "hint": "Sluit metadata in de PDF Info-dictionary en XMP-stream in."
+          "hint": "Sluit metadata in de PDF Info-dictionary en XMP-stream in.",
+          "toggleAria": "PDF-metadata schrijven"
         },
         "cbx": {
           "title": "Striparchieven (CBX)",
-          "hint": "Schrijft ComicInfo.xml naar CBZ- en CB7-archieven."
+          "hint": "Schrijft ComicInfo.xml naar CBZ- en CB7-archieven.",
+          "toggleAria": "Metadata naar striparchieven schrijven"
         },
         "audio": {
           "title": "Audio",
-          "hint": "Sluit de opgeslagen omslag in M4B-, M4A-, MP3- en FLAC-bestanden in."
+          "hint": "Sluit de opgeslagen omslag in M4B-, M4A-, MP3- en FLAC-bestanden in.",
+          "toggleAria": "Audio-omslagen schrijven"
         }
       },
       "reading": {
@@ -4603,6 +4670,9 @@
         "selectUser": "Selecteer een gebruiker…",
         "grant": "Verlenen",
         "empty": "Er is nog geen enkele gebruiker toegang verleend.",
+        "loading": "Toegangsinstellingen laden...",
+        "userSelectAria": "Gebruiker om toegang te verlenen",
+        "levelSelectAria": "Te verlenen toegangsniveau",
         "levels": {
           "viewer": "Kijker",
           "editor": "Bewerker",
@@ -4620,12 +4690,25 @@
       }
     },
     "folderPicker": {
-      "title": "Mappen doorbladeren",
+      "title": "Door servermappen bladeren",
+      "description": "Selecteer een of meer mappen voor deze bibliotheek.",
+      "closeAria": "Mapbrowser sluiten",
+      "currentFolderAria": "Huidige map",
+      "parentFolder": "Naar bovenliggende map",
       "newFolder": "Nieuwe map",
       "goUp": "Omhoog",
       "filterPlaceholder": "Mappen filteren…",
+      "clearFilterAria": "Mapfilter wissen",
       "newFolderNamePlaceholder": "Naam van nieuwe map",
       "create": "Aanmaken",
+      "loading": "Mappen laden...",
+      "selectCurrent": "Huidige map selecteren",
+      "noMatches": "Geen overeenkomende mappen",
+      "noMatchesHint": "Probeer een ander filter.",
+      "empty": "Deze map is leeg",
+      "emptyHint": "U kunt de huidige map selecteren of een nieuwe maken.",
+      "openFolderAria": "{name} openen",
+      "selectedCount": "geen mappen geselecteerd | {count} map geselecteerd | {count} mappen geselecteerd",
       "noFolders": "Geen mappen gevonden",
       "selectFolder": "Deze map selecteren",
       "errors": {
@@ -4978,6 +5061,11 @@
   },
   "reader": {
     "retry": "Opnieuw proberen",
+    "pdf": {
+      "openError": "Deze PDF kan niet worden geopend",
+      "preparing": "PDF-lezer voorbereiden",
+      "opening": "PDF openen"
+    },
     "loadingBook": "Boek laden…",
     "failedToLoadBook": "Boek kon niet worden geladen",
     "chapterNumber": "Hoofdstuk {number}",
@@ -5248,6 +5336,7 @@
     },
     "list": {
       "title": "Reeksen",
+      "showControlsAria": "Reeksbediening tonen",
       "searchPlaceholder": "Zoek reeks of auteur",
       "sortButton": "Sorteren",
       "sortBy": "Sorteren op",
@@ -5308,6 +5397,8 @@
     }
   },
   "smartScope": {
+    "syncToKobo": "Synchroniseren met Kobo",
+    "syncToKoboHint": "Boeken die aan dit bereik voldoen, verschijnen op uw Kobo-apparaat",
     "dialog": {
       "name": "Naam",
       "namePlaceholder": "bijv. Ongelezen sci-fi",
@@ -5716,6 +5807,7 @@
       "collapseSeries": "Reeks inklappen",
       "expanded": "Uitgeklapt",
       "exportMetadata": "Metadata exporteren",
+      "showControlsAria": "Bibliotheekbediening tonen",
       "export": "Exporteren",
       "searchPlaceholder": "Zoek op titel, auteur, reeks, verteller...",
       "allBooksLoaded": "Alle {count} boeken geladen"
@@ -5729,6 +5821,7 @@
       "customize": "Dashboard aanpassen",
       "allShelvesHidden": "Alle planken zijn verborgen.",
       "greeting": {
+        "night": "Goedenacht,",
         "morning": "Goedemorgen,",
         "afternoon": "Goedemiddag,",
         "evening": "Goedenavond,",
@@ -5777,6 +5870,7 @@
       "pageTitle": "Collectie · {name}",
       "pageTitleWithId": "Collectie #{id}",
       "editCollection": "Collectie bewerken",
+      "showControlsAria": "Collectiebediening tonen",
       "loadError": "Kan deze collectie niet laden",
       "toast": {
         "removed": "Geen boeken uit collectie verwijderd | Eén boek uit collectie verwijderd | {count} boeken uit collectie verwijderd",
@@ -5822,6 +5916,8 @@
       "pageTitleWithId": "SmartScope #{id}",
       "defaultName": "Smart scope",
       "filter": "Filter",
+      "edit": "Smart Scope bewerken",
+      "showControlsAria": "Smart Scope-bediening tonen",
       "hideFilter": "Filter verbergen",
       "showFilter": "Filter tonen",
       "confirmDelete": "Bevestigen?",

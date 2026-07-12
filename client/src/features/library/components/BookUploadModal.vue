@@ -9,6 +9,7 @@ import { SUPPORTED_FORMATS, SUPPORTED_FORMATS_ACCEPT, useBookUpload, type FileUp
 import { emitLibraryUploadCompleted } from '../composables/useLibraryUploadEvents'
 import { useLibraries } from '../composables/useLibraries'
 import { api } from '@/lib/api'
+import { formatBytes } from '@/lib/formatting'
 const props = defineProps<{
   libraryId?: number
 }>()
@@ -152,12 +153,6 @@ async function handleUpload() {
     failedCount: Math.max(0, errorCountAfter - errorCountBefore),
     attemptedCount: pendingAtStart,
   })
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function fileRowClass(status: FileUploadStatus): string {

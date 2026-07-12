@@ -83,21 +83,21 @@ function humanReadableCron(cron: string | null): string {
   <div class="px-6 py-6 space-y-8">
     <!-- Watch folders -->
     <div>
-      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-3">File watching</p>
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-3">{{ t('library.creator.schedule.fileWatching') }}</p>
       <div class="overflow-hidden rounded-lg border border-border">
         <div class="flex items-center justify-between gap-4 bg-card px-4 py-4 sm:px-5">
           <div>
             <p class="text-sm font-medium text-foreground">{{ t('library.creator.schedule.watchFolders.title') }}</p>
             <p class="text-xs text-muted-foreground mt-0.5">{{ t('library.creator.schedule.watchFolders.hint') }}</p>
           </div>
-          <ToggleSwitch :model-value="watch" aria-label="Watch folders" @update:model-value="handleWatchUpdate" />
+          <ToggleSwitch :model-value="watch" :aria-label="t('library.creator.schedule.watchFolders.title')" @update:model-value="handleWatchUpdate" />
         </div>
       </div>
     </div>
 
     <!-- Auto-scan schedule -->
     <div>
-      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-3">Auto-scan schedule</p>
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-3">{{ t('library.creator.schedule.autoScanSchedule') }}</p>
       <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
         <button
           v-for="preset in presets"
@@ -117,7 +117,9 @@ function humanReadableCron(cron: string | null): string {
 
       <!-- Custom cron input -->
       <div v-if="isCustom || selectedPreset === '__custom__'" class="mt-2">
-        <label for="library-scan-cron" class="mb-1.5 block text-xs font-medium text-muted-foreground">Cron expression</label>
+        <label for="library-scan-cron" class="mb-1.5 block text-xs font-medium text-muted-foreground">
+          {{ t('library.creator.schedule.cronExpression') }}
+        </label>
         <input
           id="library-scan-cron"
           type="text"
@@ -129,8 +131,10 @@ function humanReadableCron(cron: string | null): string {
           aria-describedby="library-scan-cron-help"
           @input="handleCronInput"
         />
-        <p v-if="!isCronValid" id="library-scan-cron-help" class="mt-1 text-xs text-destructive">Enter a valid 5-field cron expression.</p>
-        <p v-else id="library-scan-cron-help" class="mt-1 text-xs text-muted-foreground">Format: minute hour day month weekday</p>
+        <p v-if="!isCronValid" id="library-scan-cron-help" class="mt-1 text-xs text-destructive">
+          {{ t('library.creator.schedule.cronInvalid') }}
+        </p>
+        <p v-else id="library-scan-cron-help" class="mt-1 text-xs text-muted-foreground">{{ t('library.creator.schedule.cronFormat') }}</p>
       </div>
 
       <!-- Human readable preview -->

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDate as formatLocaleDate } from '@/i18n/formatters'
 import { Globe, Loader2, MonitorSmartphone, RefreshCw, Tablet } from '@lucide/vue'
 import type { AnnotationPositionFormat } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -51,7 +52,7 @@ function deviceLabel(device: { source: string; deviceId: string; deviceName: str
 
 function formatDate(value: string): string {
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return Number.isNaN(date.getTime()) ? '' : formatLocaleDate(date, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function handleRetry(format: AnnotationPositionFormat) {

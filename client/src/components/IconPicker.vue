@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 import * as LucideIcons from '@lucide/vue'
 import { ChevronDown, Search, X } from '@lucide/vue'
 import { RecycleScroller } from 'vue-virtual-scroller'
@@ -305,7 +306,7 @@ onUnmounted(() => {
       v-if="modelValue && !hideText"
       type="button"
       class="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition-colors shrink-0 focus-visible:outline-none"
-      aria-label="Clear selected icon"
+      :aria-label="t('components.iconPicker.clearSelectionAria')"
       @click="clearValue"
     >
       <X :size="12" />
@@ -353,7 +354,7 @@ onUnmounted(() => {
               class="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
             />
             <div class="flex items-center gap-2 shrink-0">
-              <span class="text-[11px] text-muted-foreground/80">{{ activeCount.toLocaleString() }}</span>
+              <span class="text-[11px] text-muted-foreground/80">{{ formatNumber(activeCount) }}</span>
               <button v-if="query" type="button" class="text-muted-foreground hover:text-foreground transition-colors" @click="clearQuery">
                 <X :size="13" />
               </button>

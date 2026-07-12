@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDate as formatLocaleDate } from '@/i18n/formatters'
 import {
   AlertTriangle,
   BookOpen,
@@ -160,9 +161,7 @@ const selectedLinkSubtitle = computed(() => {
 })
 const selectedLinkLastOpen = computed(() => selectedUnmatched.value?.lastOpen ?? selectedManualLink.value?.koreaderLastOpen ?? null)
 const linkDialogTitle = computed(() =>
-  selectedManualLink.value
-    ? t('settings.reader.koreader.hashLinks.changeLinkTitle')
-    : t('settings.reader.koreader.hashLinks.linkBookTitle'),
+  selectedManualLink.value ? t('settings.reader.koreader.hashLinks.changeLinkTitle') : t('settings.reader.koreader.hashLinks.linkBookTitle'),
 )
 
 watch(unmatchedTotalPages, (totalPages) => {
@@ -185,12 +184,12 @@ function formatLastSync(dateStr: string | null): string {
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return t('settings.reader.koreader.unknown')
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(dateStr))
+  return formatLocaleDate(new Date(dateStr), { dateStyle: 'medium' })
 }
 
 function formatDateTime(dateStr: string | null | undefined): string {
   if (!dateStr) return t('settings.reader.koreader.unknown')
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(dateStr))
+  return formatLocaleDate(new Date(dateStr), { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 function formatEpochSeconds(seconds: number | null | undefined): string {
@@ -868,13 +867,16 @@ async function handleDownloadPlugin() {
                       {{ t('settings.reader.koreader.hashLinks.hash') }} <span class="font-mono text-foreground/75">{{ book.hash }}</span>
                     </p>
                     <p>
-                      {{ t('settings.reader.koreader.hashLinks.lastOpened') }} <span class="text-foreground/75">{{ formatEpochSeconds(book.lastOpen) }}</span>
+                      {{ t('settings.reader.koreader.hashLinks.lastOpened') }}
+                      <span class="text-foreground/75">{{ formatEpochSeconds(book.lastOpen) }}</span>
                     </p>
                     <p>
-                      {{ t('settings.reader.koreader.hashLinks.firstSeen') }} <span class="text-foreground/75">{{ formatDateTime(book.firstSeenAt) }}</span>
+                      {{ t('settings.reader.koreader.hashLinks.firstSeen') }}
+                      <span class="text-foreground/75">{{ formatDateTime(book.firstSeenAt) }}</span>
                     </p>
                     <p>
-                      {{ t('settings.reader.koreader.hashLinks.lastSeen') }} <span class="text-foreground/75">{{ formatDateTime(book.lastSeenAt) }}</span>
+                      {{ t('settings.reader.koreader.hashLinks.lastSeen') }}
+                      <span class="text-foreground/75">{{ formatDateTime(book.lastSeenAt) }}</span>
                     </p>
                   </div>
                 </div>
@@ -898,7 +900,13 @@ async function handleDownloadPlugin() {
               class="flex flex-col gap-3 px-4 py-3 bg-card text-xs text-muted-foreground md:flex-row md:items-center md:justify-between md:px-5"
             >
               <p>
-                {{ t('settings.reader.koreader.hashLinks.showingRange', { start: unmatchedPageStart, end: unmatchedPageEnd, total: unmatchedBooks.length }) }}
+                {{
+                  t('settings.reader.koreader.hashLinks.showingRange', {
+                    start: unmatchedPageStart,
+                    end: unmatchedPageEnd,
+                    total: unmatchedBooks.length,
+                  })
+                }}
               </p>
               <div class="flex flex-wrap items-center gap-2">
                 <button class="settings-btn-outline" :disabled="clampedUnmatchedPage <= 1" @click="handlePreviousUnmatchedPage">
@@ -955,10 +963,12 @@ async function handleDownloadPlugin() {
                     <p class="settings-hint truncate">{{ linkedBookAuthors(link) }}</p>
                     <div class="mt-2 grid gap-1 text-xs text-muted-foreground">
                       <p>
-                        {{ t('settings.reader.koreader.hashLinks.linked') }} <span class="text-foreground/75">{{ formatDateTime(link.createdAt) }}</span>
+                        {{ t('settings.reader.koreader.hashLinks.linked') }}
+                        <span class="text-foreground/75">{{ formatDateTime(link.createdAt) }}</span>
                       </p>
                       <p>
-                        {{ t('settings.reader.koreader.hashLinks.updated') }} <span class="text-foreground/75">{{ formatDateTime(link.updatedAt) }}</span>
+                        {{ t('settings.reader.koreader.hashLinks.updated') }}
+                        <span class="text-foreground/75">{{ formatDateTime(link.updatedAt) }}</span>
                       </p>
                     </div>
                   </div>
@@ -1107,7 +1117,11 @@ async function handleDownloadPlugin() {
             :disabled="unlinkingHash !== null"
             @click="handleUnlinkManualLink"
           >
-            {{ unlinkingHash === unlinkConfirmLink.hash ? t('settings.reader.koreader.hashLinks.unlinking') : t('settings.reader.koreader.hashLinks.unlink') }}
+            {{
+              unlinkingHash === unlinkConfirmLink.hash
+                ? t('settings.reader.koreader.hashLinks.unlinking')
+                : t('settings.reader.koreader.hashLinks.unlink')
+            }}
           </button>
         </div>
       </div>
@@ -1120,7 +1134,9 @@ async function handleDownloadPlugin() {
     >
       <button class="absolute inset-0 bg-black/45" @click="handleCloseRemoveDevice" />
       <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
-        <p class="text-base font-semibold text-foreground">{{ t('settings.reader.koreader.removeDeviceConfirmTitle', { device: removeDeviceConfirmTarget.device }) }}</p>
+        <p class="text-base font-semibold text-foreground">
+          {{ t('settings.reader.koreader.removeDeviceConfirmTitle', { device: removeDeviceConfirmTarget.device }) }}
+        </p>
         <p class="mt-1 text-sm text-muted-foreground">
           {{ t('settings.reader.koreader.removeDeviceConfirmBody') }}
         </p>
@@ -1136,7 +1152,9 @@ async function handleDownloadPlugin() {
             :disabled="removingDeviceId !== null"
             @click="handleRemoveDevice"
           >
-            {{ removingDeviceId === removeDeviceConfirmTarget.deviceId ? t('settings.reader.koreader.removing') : t('settings.reader.koreader.remove') }}
+            {{
+              removingDeviceId === removeDeviceConfirmTarget.deviceId ? t('settings.reader.koreader.removing') : t('settings.reader.koreader.remove')
+            }}
           </button>
         </div>
       </div>
@@ -1149,7 +1167,9 @@ async function handleDownloadPlugin() {
     >
       <button class="absolute inset-0 bg-black/45" @click="handleCloseDismiss" />
       <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
-        <p class="text-base font-semibold text-foreground">{{ t('settings.reader.koreader.hashLinks.dismissConfirmTitle', { title: unmatchedBookTitle(dismissConfirmBook) }) }}</p>
+        <p class="text-base font-semibold text-foreground">
+          {{ t('settings.reader.koreader.hashLinks.dismissConfirmTitle', { title: unmatchedBookTitle(dismissConfirmBook) }) }}
+        </p>
         <p class="mt-1 text-sm text-muted-foreground">
           {{ t('settings.reader.koreader.hashLinks.dismissConfirmBody') }}
         </p>
@@ -1168,7 +1188,11 @@ async function handleDownloadPlugin() {
             :disabled="dismissingHash !== null"
             @click="handleDismissUnmatchedBook"
           >
-            {{ dismissingHash === dismissConfirmBook.hash ? t('settings.reader.koreader.hashLinks.dismissing') : t('settings.reader.koreader.hashLinks.dismiss') }}
+            {{
+              dismissingHash === dismissConfirmBook.hash
+                ? t('settings.reader.koreader.hashLinks.dismissing')
+                : t('settings.reader.koreader.hashLinks.dismiss')
+            }}
           </button>
         </div>
       </div>
@@ -1257,11 +1281,17 @@ async function handleDownloadPlugin() {
               @click="handleChooseLinkTarget(book)"
             >
               <span class="min-w-0">
-                <span class="block text-sm font-medium text-foreground truncate">{{ book.title ?? t('settings.reader.koreader.hashLinks.untitledBook') }}</span>
+                <span class="block text-sm font-medium text-foreground truncate">{{
+                  book.title ?? t('settings.reader.koreader.hashLinks.untitledBook')
+                }}</span>
                 <span class="block text-xs text-muted-foreground truncate">{{ bookSearchSubtitle(book) }}</span>
               </span>
               <span class="shrink-0 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
-                {{ pendingLinkTarget?.id === book.id ? t('settings.reader.koreader.hashLinks.selected') : t('settings.reader.koreader.hashLinks.select') }}
+                {{
+                  pendingLinkTarget?.id === book.id
+                    ? t('settings.reader.koreader.hashLinks.selected')
+                    : t('settings.reader.koreader.hashLinks.select')
+                }}
               </span>
             </button>
             <button
@@ -1290,7 +1320,9 @@ async function handleDownloadPlugin() {
             </div>
             <div class="min-w-0 rounded-md border border-border bg-background px-3 py-2">
               <p class="text-xs font-medium text-muted-foreground">BookOrbit</p>
-              <p class="mt-1 text-sm font-medium text-foreground truncate">{{ pendingLinkTarget.title ?? t('settings.reader.koreader.hashLinks.untitledBook') }}</p>
+              <p class="mt-1 text-sm font-medium text-foreground truncate">
+                {{ pendingLinkTarget.title ?? t('settings.reader.koreader.hashLinks.untitledBook') }}
+              </p>
               <p class="text-xs text-muted-foreground truncate">{{ bookSearchSubtitle(pendingLinkTarget) }}</p>
               <p class="mt-1 text-xs text-muted-foreground">{{ t('settings.reader.koreader.hashLinks.bookId', { id: pendingLinkTarget.id }) }}</p>
             </div>
@@ -1308,7 +1340,11 @@ async function handleDownloadPlugin() {
               {{ t('settings.reader.koreader.hashLinks.chooseDifferent') }}
             </button>
             <button class="settings-btn-primary" :disabled="linkingBookId !== null" @click="handleConfirmLinkTarget">
-              {{ linkingBookId === pendingLinkTarget.id ? t('settings.reader.koreader.hashLinks.saving') : t('settings.reader.koreader.hashLinks.confirmLink') }}
+              {{
+                linkingBookId === pendingLinkTarget.id
+                  ? t('settings.reader.koreader.hashLinks.saving')
+                  : t('settings.reader.koreader.hashLinks.confirmLink')
+              }}
             </button>
           </div>
         </div>

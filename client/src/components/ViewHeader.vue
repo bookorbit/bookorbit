@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 import { CheckSquare, LayoutGrid, List, SlidersHorizontal, Square, Table2 } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -72,7 +73,7 @@ const mobileSearchOpen = ref(false)
     <div class="flex min-w-0 flex-1 items-center gap-2">
       <AppIcon v-if="icon" :icon="icon" :fallback="fallbackIcon" :size="16" class="shrink-0 text-muted-foreground" />
       <span class="truncate text-[16px] font-bold tracking-tight text-foreground/90">{{ title }}</span>
-      <span class="shrink-0 tabular-nums text-[12px] font-semibold text-primary/70">({{ total.toLocaleString() }})</span>
+      <span class="shrink-0 tabular-nums text-[12px] font-semibold text-primary/70">({{ formatNumber(total) }})</span>
     </div>
 
     <div class="flex shrink-0 items-center gap-2">

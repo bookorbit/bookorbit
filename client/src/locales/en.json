@@ -1,5 +1,6 @@
 {
   "common": {
+    "resetSortAria": "Reset sort to default",
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete",
@@ -19,7 +20,9 @@
       "language": {
         "title": "Language",
         "description": "Choose the language used across the interface.",
-        "label": "Interface language"
+        "label": "Interface language",
+        "loadError": "Failed to load the selected language",
+        "saveError": "Failed to save language preference"
       },
       "pageTitle": "Display",
       "pageSubtitle": "Control themes, covers, layout, and how your library is presented.",
@@ -356,7 +359,9 @@
         "title": "Reading Preferences",
         "timezoneHint": "Timezone is used for time-sensitive achievements like Early Bird and All-nighter.",
         "timezone": "Timezone",
-        "save": "Save preferences"
+        "save": "Save preferences",
+        "enableAchievements": "Enable achievements",
+        "enableAchievementsHint": "Track achievement progress and show achievement-related interface. Manage achievement notifications separately in Notifications."
       },
       "preferences": {
         "saveFailed": "Failed to save preferences",
@@ -2512,6 +2517,7 @@
     },
     "list": {
       "title": "Authors",
+      "showControlsAria": "Show author controls",
       "searchPlaceholder": "Search authors",
       "sortButton": "Sort",
       "sortBy": "Sort by",
@@ -2637,6 +2643,11 @@
   "book": {
     "untitled": "Untitled",
     "unknownFormat": "unknown",
+    "collapsedSeries": {
+      "label": "Series",
+      "bookCount": "no books | {count} book | {count} books",
+      "readCount": "{count} read"
+    },
     "card": {
       "missing": "Missing"
     },
@@ -2986,6 +2997,14 @@
         "primary": "Primary",
         "peek": "Peek",
         "sendViaEmail": "Send via Email",
+        "personalReview": {
+          "title": "Personal Review",
+          "toggleAria": "Toggle personal review",
+          "editAria": "Edit personal review",
+          "placeholder": "Private review",
+          "clearAria": "Clear personal review",
+          "cancelEditAria": "Cancel personal review edit"
+        },
         "editCover": "Edit cover",
         "finished": "Finished",
         "resetFileProgress": "Reset file progress",
@@ -3181,6 +3200,12 @@
         "writeAndRenameShort": "Write & Rename"
       },
       "files": {
+        "title": "Book files",
+        "fileCount": "no files | {count} file | {count} files",
+        "synced": "Synced {time}",
+        "sortAria": "Sort files",
+        "syncHistory": "Sync history",
+        "metadataWriteBack": "Metadata write-back",
         "relative": {
           "seconds": "{value}s ago",
           "minutes": "{value}m ago",
@@ -3263,6 +3288,7 @@
         "paginationUnit": "highlights"
       },
       "readingLog": {
+        "moreActionsAria": "More reading log actions",
         "export": {
           "button": "Export"
         },
@@ -3293,9 +3319,11 @@
           "subtitle": "{count} active day · {ratio}% consistency | {count} active day · {ratio}% consistency | {count} active days · {ratio}% consistency",
           "minutesUnit": "min",
           "title": "Activity",
-          "empty": "No reading activity in this window."
+          "empty": "No reading activity in this window.",
+          "emptyHint": "Sessions recorded here will build your consistency view."
         },
         "hero": {
+          "summaryAria": "Reading summary",
           "notSet": "Not set",
           "relative": {
             "seconds": "{count}s ago",
@@ -3342,14 +3370,18 @@
           "tooltipReading": "Reading",
           "minutesUnit": "min",
           "title": "Progress journey",
-          "empty": "No progress data in this window."
+          "empty": "No progress data in this window.",
+          "emptyHint": "Progress will appear after a session records a reading position."
         },
         "sourceSplit": {
-          "title": "Where you read this book"
+          "title": "Reading sources",
+          "shortTitle": "Sources"
         },
         "untitled": "Untitled",
         "addSessionFailed": "Failed to add session",
         "filters": {
+          "show": "Show",
+          "dateRangeAria": "Reading session date range",
           "allTime": "All time",
           "last30": "Last 30 days",
           "last90": "Last 90 days",
@@ -3357,6 +3389,7 @@
           "allFormats": "All formats"
         },
         "table": {
+          "title": "Sessions",
           "sourceWeb": "Web",
           "sourceManual": "Manual",
           "colDate": "Date",
@@ -3368,6 +3401,7 @@
           "colEndProgress": "End Progress",
           "colEndProgressMobile": "End",
           "empty": "No reading sessions recorded yet.",
+          "emptyHint": "Add a session to start building this book's reading history.",
           "colPace": "Pace",
           "colSource": "Source",
           "colFormatMobile": "Fmt",
@@ -3599,6 +3633,7 @@
       "authors": "Authors",
       "authorsCommaSeparated": "Authors (comma-separated)",
       "publisher": "Publisher",
+      "publishedDate": "Published Date",
       "year": "Year",
       "language": "Language",
       "isbn13": "ISBN-13",
@@ -3668,6 +3703,15 @@
       "moreFiles": "+{count} more files",
       "start": "Start",
       "filesFinalized": "{succeeded} of {total} files finalized",
+      "checking": "Checking selected files...",
+      "readyCount": "no files ready | {count} file ready | {count} files ready",
+      "duplicateCount": "none already in library | {count} already in library | {count} already in library",
+      "conflictCount": "no filename conflicts | {count} filename conflict | {count} filename conflicts",
+      "missingDestinationCount": "no missing destinations | {count} missing destination | {count} missing destinations",
+      "blockedCount": "no files blocked | {count} file blocked | {count} files blocked",
+      "moreDuplicates": "+{count} more already in library",
+      "discardDuplicates": "Discard duplicates",
+      "failedCount": "no files failed | {count} file failed | {count} files failed",
       "failedWithDuplicates": "{failed} failed ({count} duplicates) | {failed} failed ({count} duplicate) | {failed} failed ({count} duplicates)",
       "view": "View",
       "viewExisting": "View existing",
@@ -3788,6 +3832,9 @@
       "noCollections": "No collections yet",
       "latest": "Latest {version}",
       "newReleaseNotes": "New release notes available",
+      "support": "Support BookOrbit",
+      "supportShort": "Support",
+      "supportAria": "Support BookOrbit on Ko-fi",
       "sectionHeader": {
         "add": "Add",
         "reorder": "Reorder",
@@ -3854,6 +3901,7 @@
       }
     },
     "iconPicker": {
+      "clearSelectionAria": "Clear selected icon",
       "searchLucide": "Search Lucide icons...",
       "searchCustom": "Search custom icons...",
       "chooseIcon": "Choose an icon...",
@@ -4110,7 +4158,7 @@
       "toggleSharing": "Toggle sharing",
       "removeSystemBeforeDelete": "Remove the system designation before deleting",
       "notesHeading": "Provider Notes",
-      "notesBody": "The <strong>System</strong> provider (superuser only) is used for password reset emails. The <strong>Default</strong> provider is used when sending books with no explicit provider selected. Providers marked <strong>Shared</strong> are available to all users.",
+      "notesBody": "The {system} provider (superuser only) is used for password reset emails. The {defaultProvider} provider is used when sending books with no explicit provider selected. Providers marked {shared} are available to all users.",
       "deleteTitle": "Delete provider?",
       "nameHostRequired": "Name and host are required",
       "created": "Provider created",
@@ -4190,7 +4238,7 @@
       "editTemplate": "Edit template",
       "empty": "No templates yet.",
       "notesHeading": "Template Notes",
-      "notesBody": "System templates cannot be deleted. Administrators can edit them. Use variables like <code class=\"font-mono text-foreground/80\">&#123;&#123;title&#125;&#125;</code> in subjects and bodies - they are replaced with book details at send time.",
+      "notesBody": "System templates cannot be deleted. Administrators can edit them. Use variables like {variable} in subjects and bodies - they are replaced with book details at send time.",
       "deleteTitle": "Delete template?",
       "nameSubjectRequired": "Name and subject are required",
       "created": "Template created",
@@ -4436,6 +4484,12 @@
       "createTitle": "Create Library",
       "editTitle": "Edit: {name}",
       "stepOf": "Step {current} of {total}",
+      "unsaved": "Unsaved",
+      "required": "Required",
+      "closeAria": "Close library creator",
+      "progressAria": "Library setup progress",
+      "sectionsAria": "Library settings sections",
+      "loadingAria": "Loading library settings",
       "sections": {
         "details": "Details",
         "folders": "Folders",
@@ -4471,7 +4525,15 @@
         "title": "Scan folders",
         "description": "Add one or more directories to scan for books.",
         "browseAdd": "Browse and add a folder",
-        "manualEntry": "Or enter a path manually:",
+        "browseTitle": "Browse server folders",
+        "browseDescription": "Select one or more folders without leaving the browser.",
+        "selectedTitle": "Selected folders",
+        "addFolders": "Add folders",
+        "manualEntry": "Enter a path manually",
+        "absolutePath": "Absolute server path",
+        "addFolder": "Add folder",
+        "removeFolder": "Remove {folder}",
+        "manualCheckHint": "Manual paths are checked together with the rest of the selected folders.",
         "pathPlaceholder": "/path/to/books",
         "test": "Test",
         "add": "Add",
@@ -4528,9 +4590,10 @@
       },
       "fileWrite": {
         "maxFileSizeMb": "Max file size (MB)",
+        "formatLimits": "Format limits",
         "rename": {
-          "title": "Rename files on metadata update",
-          "hint": "When enabled, updating title, author, series, or year will rename the physical file using the library naming pattern."
+          "title": "Rename files after metadata changes",
+          "hint": "Renames physical files when title, author, series, or year changes, using the library naming pattern."
         },
         "write": {
           "title": "Write metadata to files",
@@ -4542,19 +4605,23 @@
         },
         "epub": {
           "title": "EPUB",
-          "hint": "Writes metadata into the OPF file inside the EPUB archive."
+          "hint": "Writes metadata into the OPF file inside the EPUB archive.",
+          "toggleAria": "Write EPUB metadata"
         },
         "pdf": {
           "title": "PDF",
-          "hint": "Embeds metadata into PDF Info dictionary and XMP stream."
+          "hint": "Embeds metadata into PDF Info dictionary and XMP stream.",
+          "toggleAria": "Write PDF metadata"
         },
         "cbx": {
           "title": "Comic archives (CBX)",
-          "hint": "Writes ComicInfo.xml into CBZ and CB7 archives."
+          "hint": "Writes ComicInfo.xml into CBZ and CB7 archives.",
+          "toggleAria": "Write comic archive metadata"
         },
         "audio": {
           "title": "Audio",
-          "hint": "Embeds the stored cover into M4B, M4A, MP3, and FLAC files."
+          "hint": "Embeds the stored cover into M4B, M4A, MP3, and FLAC files.",
+          "toggleAria": "Write audio covers"
         }
       },
       "reading": {
@@ -4603,6 +4670,9 @@
         "selectUser": "Select a user…",
         "grant": "Grant",
         "empty": "No users have been granted access yet.",
+        "loading": "Loading access settings...",
+        "userSelectAria": "User to grant access",
+        "levelSelectAria": "Access level to grant",
         "levels": {
           "viewer": "Viewer",
           "editor": "Editor",
@@ -4620,12 +4690,25 @@
       }
     },
     "folderPicker": {
-      "title": "Browse folders",
+      "title": "Browse server folders",
+      "description": "Select one or more folders for this library.",
+      "closeAria": "Close folder browser",
+      "currentFolderAria": "Current folder",
+      "parentFolder": "Go to parent folder",
       "newFolder": "New folder",
       "goUp": "Go up",
       "filterPlaceholder": "Filter folders…",
+      "clearFilterAria": "Clear folder filter",
       "newFolderNamePlaceholder": "New folder name",
       "create": "Create",
+      "loading": "Loading folders...",
+      "selectCurrent": "Select current folder",
+      "noMatches": "No matching folders",
+      "noMatchesHint": "Try a different filter.",
+      "empty": "This folder is empty",
+      "emptyHint": "You can select the current folder or create a new one.",
+      "openFolderAria": "Open {name}",
+      "selectedCount": "no folders selected | {count} folder selected | {count} folders selected",
       "noFolders": "No folders found",
       "selectFolder": "Select this folder",
       "errors": {
@@ -4978,6 +5061,11 @@
   },
   "reader": {
     "retry": "Retry",
+    "pdf": {
+      "openError": "Unable to open this PDF",
+      "preparing": "Preparing PDF reader",
+      "opening": "Opening PDF"
+    },
     "loadingBook": "Loading book…",
     "failedToLoadBook": "Failed to load book",
     "chapterNumber": "Chapter {number}",
@@ -5248,6 +5336,7 @@
     },
     "list": {
       "title": "Series",
+      "showControlsAria": "Show series controls",
       "searchPlaceholder": "Search series or author",
       "sortButton": "Sort",
       "sortBy": "Sort by",
@@ -5308,6 +5397,8 @@
     }
   },
   "smartScope": {
+    "syncToKobo": "Sync to Kobo",
+    "syncToKoboHint": "Books matching this scope will appear on your Kobo device",
     "dialog": {
       "name": "Name",
       "namePlaceholder": "e.g. Unread Sci-Fi",
@@ -5716,6 +5807,7 @@
       "collapseSeries": "Collapse series",
       "expanded": "Expanded",
       "exportMetadata": "Export metadata",
+      "showControlsAria": "Show library controls",
       "export": "Export",
       "searchPlaceholder": "Search title, author, series, narrator...",
       "allBooksLoaded": "All {count} books loaded"
@@ -5729,6 +5821,7 @@
       "customize": "Customize dashboard",
       "allShelvesHidden": "All shelves are hidden.",
       "greeting": {
+        "night": "Good night,",
         "morning": "Good morning,",
         "afternoon": "Good afternoon,",
         "evening": "Good evening,",
@@ -5777,6 +5870,7 @@
       "pageTitle": "Collection · {name}",
       "pageTitleWithId": "Collection #{id}",
       "editCollection": "Edit collection",
+      "showControlsAria": "Show collection controls",
       "loadError": "Could not load this collection",
       "toast": {
         "removed": "Removed no books from collection | Removed one book from collection | Removed {count} books from collection",
@@ -5822,6 +5916,8 @@
       "pageTitleWithId": "SmartScope #{id}",
       "defaultName": "Smart scope",
       "filter": "Filter",
+      "edit": "Edit Smart Scope",
+      "showControlsAria": "Show Smart Scope controls",
       "hideFilter": "Hide filter",
       "showFilter": "Show filter",
       "confirmDelete": "Confirm?",

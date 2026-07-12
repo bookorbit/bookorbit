@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDateTime } from '@/i18n/formatters'
 import { Eye, EyeOff, Loader2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import SettingsPageHeader from './SettingsPageHeader.vue'
@@ -1720,7 +1721,7 @@ function formatSourceCountLabel(key: string) {
                   run.state === 'running'
                     ? t('settings.admin.migration.stageLabel', { stage: run.currentStage ?? t('settings.admin.migration.stageInitializing') })
                     : run.endedAt
-                      ? t('settings.admin.migration.endedLabel', { date: new Date(run.endedAt).toLocaleString() })
+                      ? t('settings.admin.migration.endedLabel', { date: formatDateTime(new Date(run.endedAt)) })
                       : ''
                 }}
               </span>
@@ -1756,7 +1757,7 @@ function formatSourceCountLabel(key: string) {
                     <span class="inline-flex rounded-full border px-2 py-0.5 text-xs" :class="runStateClass(run.state)">{{ run.state }}</span>
                   </p>
                   <p class="text-xs text-muted-foreground">
-                    {{ run.startedAt ? new Date(run.startedAt).toLocaleString() : t('settings.admin.migration.notStarted') }}
+                    {{ run.startedAt ? formatDateTime(new Date(run.startedAt)) : t('settings.admin.migration.notStarted') }}
                     <template v-if="reportData.durationMs != null"> &middot; {{ formatDuration(reportData.durationMs) }}</template>
                   </p>
                 </div>

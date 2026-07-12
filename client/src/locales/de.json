@@ -12,14 +12,17 @@
     "next": "Weiter",
     "previous": "Vorherige",
     "yes": "Ja",
-    "no": "Nein"
+    "no": "Nein",
+    "resetSortAria": "Sortierung auf Standard zurücksetzen"
   },
   "settings": {
     "appearance": {
       "language": {
         "title": "Sprache",
         "description": "Wählen Sie die Sprache, die in der gesamten Oberfläche verwendet wird.",
-        "label": "Oberflächensprache"
+        "label": "Oberflächensprache",
+        "loadError": "Die ausgewählte Sprache konnte nicht geladen werden",
+        "saveError": "Die Spracheinstellung konnte nicht gespeichert werden"
       },
       "pageTitle": "Anzeige",
       "pageSubtitle": "Steuern Sie Themen, Cover, Layout und die Darstellung Ihrer Bibliothek.",
@@ -356,7 +359,9 @@
         "title": "Leseeinstellungen",
         "timezoneHint": "Die Zeitzone wird für zeitabhängige Erfolge wie Frühaufsteher und Nachteule verwendet.",
         "timezone": "Zeitzone",
-        "save": "Einstellungen speichern"
+        "save": "Einstellungen speichern",
+        "enableAchievements": "Erfolge aktivieren",
+        "enableAchievementsHint": "Verfolge den Fortschritt bei Erfolgen und zeige die zugehörige Benutzeroberfläche an. Benachrichtigungen für Erfolge können separat unter Benachrichtigungen verwaltet werden."
       },
       "preferences": {
         "saveFailed": "Einstellungen konnten nicht gespeichert werden",
@@ -2557,7 +2562,8 @@
         "bulkRefreshFailed": "Ausgewählte Autoren konnten nicht aktualisiert werden",
         "deleteSuccess": "{count} Autor gelöscht; {books} Bücher betroffen | {count} Autor gelöscht; {books} Bücher betroffen | {count} Autoren gelöscht; {books} Bücher betroffen",
         "deleteFailed": "Autor(en) konnte(n) nicht gelöscht werden"
-      }
+      },
+      "showControlsAria": "Autoren-Steuerelemente anzeigen"
     },
     "detail": {
       "pageTitle": "Autor",
@@ -3031,7 +3037,15 @@
         "koboNotSynced": "Nicht synchronisiert",
         "koboNotSyncedTooltip": "Für die nächste Kobo-Synchronisierung vorgemerkt.",
         "filesNotFound": "Dateien nicht gefunden",
-        "filesNotFoundDescription": "Die Datei(en) für dieses Buch können auf der Festplatte nicht mehr gefunden werden. Die Metadaten sind weiterhin verfügbar. Führen Sie einen Bibliotheks-Scan durch, um dies zu bestätigen, oder entfernen Sie den Eintrag."
+        "filesNotFoundDescription": "Die Datei(en) für dieses Buch können auf der Festplatte nicht mehr gefunden werden. Die Metadaten sind weiterhin verfügbar. Führen Sie einen Bibliotheks-Scan durch, um dies zu bestätigen, oder entfernen Sie den Eintrag.",
+        "personalReview": {
+          "title": "Persönliche Rezension",
+          "toggleAria": "Persönliche Rezension ein- oder ausblenden",
+          "editAria": "Persönliche Rezension bearbeiten",
+          "placeholder": "Private Rezension",
+          "clearAria": "Persönliche Rezension löschen",
+          "cancelEditAria": "Bearbeitung der persönlichen Rezension abbrechen"
+        }
       },
       "editMetadata": {
         "fieldCount": "keine Felder | ein Feld | {count} Felder",
@@ -3226,7 +3240,13 @@
           "title": "Datei löschen?",
           "description": "Sind Sie sicher, dass Sie \"{filename}\" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
         },
-        "deleting": "Wird gelöscht ..."
+        "deleting": "Wird gelöscht ...",
+        "title": "Buchdateien",
+        "fileCount": "keine Dateien | {count} Datei | {count} Dateien",
+        "synced": "Synchronisiert {time}",
+        "sortAria": "Dateien sortieren",
+        "syncHistory": "Synchronisierungsverlauf",
+        "metadataWriteBack": "Metadaten zurückschreiben"
       },
       "highlights": {
         "note": {
@@ -3293,7 +3313,8 @@
           "subtitle": "{count} aktiver Tag · {ratio}% Konsistenz | {count} aktiver Tag · {ratio}% Konsistenz | {count} aktive Tage · {ratio}% Konsistenz",
           "minutesUnit": "Min",
           "title": "Aktivität",
-          "empty": "Keine Leseaktivität in diesem Zeitraum."
+          "empty": "Keine Leseaktivität in diesem Zeitraum.",
+          "emptyHint": "Hier aufgezeichnete Sitzungen bilden deine Lesekontinuität ab."
         },
         "hero": {
           "notSet": "Nicht festgelegt",
@@ -3335,17 +3356,20 @@
           "lastRead": "Zuletzt gelesen",
           "dateStarted": "Startdatum",
           "dateFinished": "Enddatum",
-          "addSession": "Sitzung hinzufügen"
+          "addSession": "Sitzung hinzufügen",
+          "summaryAria": "Lesezusammenfassung"
         },
         "journey": {
           "tooltipProgress": "Fortschritt",
           "tooltipReading": "Lesen",
           "minutesUnit": "Min",
           "title": "Fortschrittsverlauf",
-          "empty": "Keine Fortschrittsdaten in diesem Zeitraum."
+          "empty": "Keine Fortschrittsdaten in diesem Zeitraum.",
+          "emptyHint": "Der Fortschritt wird angezeigt, sobald eine Sitzung eine Leseposition erfasst."
         },
         "sourceSplit": {
-          "title": "Wo Sie dieses Buch gelesen haben"
+          "title": "Wo Sie dieses Buch gelesen haben",
+          "shortTitle": "Quellen"
         },
         "untitled": "Ohne Titel",
         "addSessionFailed": "Sitzung konnte nicht hinzugefügt werden",
@@ -3354,7 +3378,9 @@
           "last30": "Letzte 30 Tage",
           "last90": "Letzte 90 Tage",
           "thisYear": "Dieses Jahr",
-          "allFormats": "Alle Formate"
+          "allFormats": "Alle Formate",
+          "show": "Anzeigen",
+          "dateRangeAria": "Datumsbereich der Lesesitzungen"
         },
         "table": {
           "sourceWeb": "Web",
@@ -3378,8 +3404,11 @@
           "confirmDeleteAria": "Löschen der Sitzung bestätigen",
           "deleteAria": "Sitzung löschen",
           "loadMore": "Mehr laden",
-          "showing": "{shown} von {total} Sitzungen werden angezeigt"
-        }
+          "showing": "{shown} von {total} Sitzungen werden angezeigt",
+          "title": "Sitzungen",
+          "emptyHint": "Füge eine Sitzung hinzu, um den Leseverlauf dieses Buches aufzubauen."
+        },
+        "moreActionsAria": "Weitere Aktionen für das Leseprotokoll"
       },
       "richDescription": {
         "linkProtocolError": "Verwenden Sie http, https oder mailto.",
@@ -3494,6 +3523,11 @@
       "text": {
         "openDetails": "Details öffnen"
       }
+    },
+    "collapsedSeries": {
+      "label": "Reihe",
+      "bookCount": "keine Bücher | {count} Buch | {count} Bücher",
+      "readCount": "{count} gelesen"
     }
   },
   "bookMetadataFetch": {
@@ -3607,7 +3641,8 @@
       "seriesIndex": "Reihen-Nr.",
       "genres": "Genres",
       "genresCommaSeparated": "Genres (durch Komma getrennt)",
-      "description": "Beschreibung"
+      "description": "Beschreibung",
+      "publishedDate": "Veröffentlichungsdatum"
     },
     "upload": {
       "nDone": "{count} abgeschlossen",
@@ -3676,7 +3711,16 @@
       "details": "Details",
       "alreadyExistsSaveAs": "Existiert bereits - speichern als:",
       "renamePlaceholder": "z. B. {name} (2)",
-      "import": "Importieren"
+      "import": "Importieren",
+      "checking": "Ausgewählte Dateien werden geprüft...",
+      "readyCount": "keine Dateien bereit | {count} Datei bereit | {count} Dateien bereit",
+      "duplicateCount": "keine bereits in der Bibliothek | {count} bereits in der Bibliothek | {count} bereits in der Bibliothek",
+      "conflictCount": "keine Dateinamenskonflikte | {count} Dateinamenskonflikt | {count} Dateinamenskonflikte",
+      "missingDestinationCount": "keine fehlenden Ziele | {count} fehlendes Ziel | {count} fehlende Ziele",
+      "blockedCount": "keine Dateien blockiert | {count} Datei blockiert | {count} Dateien blockiert",
+      "moreDuplicates": "+{count} weitere bereits in der Bibliothek",
+      "discardDuplicates": "Duplikate verwerfen",
+      "failedCount": "keine Dateien fehlgeschlagen | {count} Datei fehlgeschlagen | {count} Dateien fehlgeschlagen"
     }
   },
   "collection": {
@@ -3792,7 +3836,10 @@
         "add": "Hinzufügen",
         "reorder": "Neu anordnen",
         "doneReordering": "Anordnen abgeschlossen"
-      }
+      },
+      "support": "BookOrbit unterstützen",
+      "supportShort": "Unterstützen",
+      "supportAria": "BookOrbit auf Ko-fi unterstützen"
     },
     "selectionActionBar": {
       "setReadingStatus": "Lesestatus festlegen",
@@ -3863,7 +3910,8 @@
       "noIconsMatch": "Keine Symbole entsprechen \"{query}\"",
       "typeToSearch": "Eingeben, um alle Symbole zu durchsuchen",
       "noCustomIcons": "Keine benutzerdefinierten Symbole hochgeladen",
-      "noIconsAvailable": "Keine Symbole verfügbar"
+      "noIconsAvailable": "Keine Symbole verfügbar",
+      "clearSelectionAria": "Ausgewähltes Symbol löschen"
     },
     "entityNotFound": {
       "title": "{entity} nicht gefunden",
@@ -4110,7 +4158,7 @@
       "toggleSharing": "Freigabe umschalten",
       "removeSystemBeforeDelete": "Entfernen Sie die Systemkennzeichnung vor dem Löschen",
       "notesHeading": "Hinweise zu Anbietern",
-      "notesBody": "Der <strong>System</strong>-Anbieter (nur Superuser) wird für E-Mails zum Zurücksetzen des Passworts verwendet. Der <strong>Standard</strong>-Anbieter wird verwendet, wenn kein Anbieter explizit ausgewählt wurde. Als <strong>Geteilt</strong> markierte Anbieter stehen allen Benutzern zur Verfügung.",
+      "notesBody": "Der Anbieter {system} (nur für Superuser) wird für E-Mails zum Zurücksetzen des Passworts verwendet. Der Anbieter {defaultProvider} wird beim Senden von Büchern verwendet, wenn kein Anbieter ausdrücklich ausgewählt wurde. Mit {shared} gekennzeichnete Anbieter stehen allen Benutzern zur Verfügung.",
       "deleteTitle": "Anbieter löschen?",
       "nameHostRequired": "Name und Host sind erforderlich",
       "created": "Anbieter erstellt",
@@ -4190,7 +4238,7 @@
       "editTemplate": "Vorlage bearbeiten",
       "empty": "Noch keine Vorlagen.",
       "notesHeading": "Hinweise zu Vorlagen",
-      "notesBody": "Systemvorlagen können nicht gelöscht werden. Administratoren können sie bearbeiten. Verwenden Sie Variablen wie <code class=\"font-mono text-foreground/80\">&#123;&#123;title&#125;&#125;</code> in Betreff und Inhalt - sie werden beim Senden durch die Buchdetails ersetzt.",
+      "notesBody": "Systemvorlagen können nicht gelöscht werden. Administratoren können sie bearbeiten. Verwende Variablen wie {variable} in Betreffzeilen und Texten. Sie werden beim Senden durch Buchdetails ersetzt.",
       "deleteTitle": "Vorlage löschen?",
       "nameSubjectRequired": "Name und Betreff sind erforderlich",
       "created": "Vorlage erstellt",
@@ -4484,7 +4532,15 @@
         "totalFilesFound": "keine Buchdateien gefunden | {count} Buchdatei gefunden - die tatsächliche Buchanzahl kann geringer sein, wenn mehrere Formate desselben Buches vorhanden sind | {count} Buchdateien gefunden - die tatsächliche Buchanzahl kann geringer sein, wenn mehrere Formate desselben Buches vorhanden sind",
         "runPrescanHint": "Führen Sie einen Vorab-Scan durch, um Pfade vor dem Speichern zu überprüfen.",
         "scanning": "Wird gescannt …",
-        "prescan": "Vorab-Scan"
+        "prescan": "Vorab-Scan",
+        "browseTitle": "Serverordner durchsuchen",
+        "browseDescription": "Wähle einen oder mehrere Ordner aus, ohne den Browser zu verlassen.",
+        "selectedTitle": "Ausgewählte Ordner",
+        "addFolders": "Ordner hinzufügen",
+        "absolutePath": "Absoluter Serverpfad",
+        "addFolder": "Ordner hinzufügen",
+        "removeFolder": "{folder} entfernen",
+        "manualCheckHint": "Manuelle Pfade werden zusammen mit den übrigen ausgewählten Ordnern geprüft."
       },
       "scanner": {
         "scanMode": {
@@ -4542,20 +4598,25 @@
         },
         "epub": {
           "title": "EPUB",
-          "hint": "Schreibt Metadaten in die OPF-Datei innerhalb des EPUB-Archivs."
+          "hint": "Schreibt Metadaten in die OPF-Datei innerhalb des EPUB-Archivs.",
+          "toggleAria": "EPUB-Metadaten schreiben"
         },
         "pdf": {
           "title": "PDF",
-          "hint": "Bettet Metadaten in das PDF-Info-Dictionary und den XMP-Stream ein."
+          "hint": "Bettet Metadaten in das PDF-Info-Dictionary und den XMP-Stream ein.",
+          "toggleAria": "PDF-Metadaten schreiben"
         },
         "cbx": {
           "title": "Comic-Archive (CBX)",
-          "hint": "Schreibt ComicInfo.xml in CBZ- und CB7-Archive."
+          "hint": "Schreibt ComicInfo.xml in CBZ- und CB7-Archive.",
+          "toggleAria": "Metadaten in Comic-Archive schreiben"
         },
         "audio": {
           "title": "Audio",
-          "hint": "Bettet das gespeicherte Cover in M4B-, M4A-, MP3- und FLAC-Dateien ein."
-        }
+          "hint": "Bettet das gespeicherte Cover in M4B-, M4A-, MP3- und FLAC-Dateien ein.",
+          "toggleAria": "Audio-Cover schreiben"
+        },
+        "formatLimits": "Formatbeschränkungen"
       },
       "reading": {
         "readingStart": {
@@ -4616,8 +4677,17 @@
           "grant": "Zugriff konnte nicht gewährt werden",
           "updateLevel": "Zugriffsebene konnte nicht aktualisiert werden",
           "revoke": "Zugriff konnte nicht entzogen werden"
-        }
-      }
+        },
+        "loading": "Zugriffseinstellungen werden geladen...",
+        "userSelectAria": "Benutzer für die Zugriffsgewährung",
+        "levelSelectAria": "Zu gewährende Zugriffsebene"
+      },
+      "unsaved": "Nicht gespeichert",
+      "required": "Erforderlich",
+      "closeAria": "Bibliothekserstellung schließen",
+      "progressAria": "Fortschritt der Bibliothekseinrichtung",
+      "sectionsAria": "Abschnitte der Bibliothekseinstellungen",
+      "loadingAria": "Bibliothekseinstellungen werden geladen"
     },
     "folderPicker": {
       "title": "Ordner durchsuchen",
@@ -4633,7 +4703,20 @@
         "connect": "Verbindung nicht möglich",
         "invalidName": "Geben Sie einen einzelnen Ordnernamen ohne Schrägstriche oder führende Punkte ein",
         "createFolder": "Ordner konnte nicht erstellt werden"
-      }
+      },
+      "description": "Wähle einen oder mehrere Ordner für diese Bibliothek aus.",
+      "closeAria": "Ordnerbrowser schließen",
+      "currentFolderAria": "Aktueller Ordner",
+      "parentFolder": "Zum übergeordneten Ordner wechseln",
+      "clearFilterAria": "Ordnerfilter löschen",
+      "loading": "Ordner werden geladen...",
+      "selectCurrent": "Aktuellen Ordner auswählen",
+      "noMatches": "Keine passenden Ordner",
+      "noMatchesHint": "Versuche es mit einem anderen Filter.",
+      "empty": "Dieser Ordner ist leer",
+      "emptyHint": "Du kannst den aktuellen Ordner auswählen oder einen neuen erstellen.",
+      "openFolderAria": "{name} öffnen",
+      "selectedCount": "keine Ordner ausgewählt | {count} Ordner ausgewählt | {count} Ordner ausgewählt"
     },
     "upload": {
       "library": "Bibliothek",
@@ -5224,6 +5307,11 @@
       "playerSettings": "Playereinstellungen",
       "skipBack": "Zurückspringen",
       "skipForward": "Vorspringen"
+    },
+    "pdf": {
+      "openError": "Diese PDF-Datei kann nicht geöffnet werden",
+      "preparing": "PDF-Reader wird vorbereitet",
+      "opening": "PDF wird geöffnet"
     }
   },
   "scanner": {
@@ -5264,7 +5352,8 @@
         "bookCount": "Anzahl Bücher",
         "recentAdditions": "Kürzlich hinzugefügt",
         "readingProgress": "Lesefortschritt"
-      }
+      },
+      "showControlsAria": "Reihen-Steuerelemente anzeigen"
     },
     "detail": {
       "pageTitle": "Reihe",
@@ -5349,7 +5438,9 @@
         "noGenres": "Keine Genres",
         "epubOnly": "Nur EPUB"
       }
-    }
+    },
+    "syncToKobo": "Mit Kobo synchronisieren",
+    "syncToKoboHint": "Bücher, die diesem Bereich entsprechen, werden auf deinem Kobo-Gerät angezeigt"
   },
   "statistics": {
     "tabs": {
@@ -5718,7 +5809,8 @@
       "exportMetadata": "Metadaten exportieren",
       "export": "Exportieren",
       "searchPlaceholder": "Titel, Autor, Reihe, Sprecher suchen...",
-      "allBooksLoaded": "Alle {count} Bücher geladen"
+      "allBooksLoaded": "Alle {count} Bücher geladen",
+      "showControlsAria": "Bibliotheks-Steuerelemente anzeigen"
     },
     "notFound": {
       "title": "Seite nicht gefunden",
@@ -5732,7 +5824,8 @@
         "morning": "Guten Morgen,",
         "afternoon": "Guten Tag,",
         "evening": "Guten Abend,",
-        "fallbackName": "du"
+        "fallbackName": "du",
+        "night": "Gute Nacht,"
       }
     },
     "bookDetail": {
@@ -5787,7 +5880,8 @@
         "noSearchMatchHint": "Versuchen Sie einen anderen Suchbegriff oder löschen Sie die Suche.",
         "noBooks": "Keine Bücher in dieser Sammlung",
         "noBooksHint": "Wählen Sie Bücher aus Ihrer Bibliothek aus und fügen Sie sie hier hinzu."
-      }
+      },
+      "showControlsAria": "Sammlungs-Steuerelemente anzeigen"
     },
     "library": {
       "title": "Bibliothek",
@@ -5837,7 +5931,9 @@
         "noMatch": "Keine Bücher entsprechen diesem SmartScope",
         "noMatchHint": "Passen Sie die Filterregeln an.",
         "edit": "SmartScope bearbeiten"
-      }
+      },
+      "edit": "Smart Scope bearbeiten",
+      "showControlsAria": "Smart-Scope-Steuerelemente anzeigen"
     }
   },
   "whatsNew": {

@@ -68,7 +68,7 @@ function handleCustomScale(event: Event) {
   <div
     class="[&_.settings-hint]:overflow-hidden [&_.settings-hint]:text-ellipsis [&_.settings-hint]:whitespace-nowrap md:[&_.settings-hint]:overflow-visible md:[&_.settings-hint]:whitespace-normal"
   >
-    <SettingsPageHeader v-if="!props.embedded" title="PDF Reader" subtitle="Default settings applied when opening PDF files.">
+    <SettingsPageHeader v-if="!props.embedded" :title="t('settings.reader.pdf.title')" :subtitle="t('settings.reader.pdf.subtitle')">
       <button class="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2" @click="resetSettings">
         Reset to defaults
       </button>

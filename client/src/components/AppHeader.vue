@@ -19,9 +19,12 @@ import {
   ExternalLink,
   Sparkles,
   Highlighter,
+  Check,
+  Languages,
 } from '@lucide/vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 import { toast } from 'vue-sonner'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
@@ -55,8 +58,9 @@ import NotificationSheet from '@/features/notifications/components/NotificationS
 import { useNotifications } from '@/features/notifications/composables/useNotifications'
 import { useWhatsNew } from '@/features/whats-new/composables/useWhatsNew'
 import UserAvatar from '@/components/UserAvatar.vue'
-import { DEFAULT_FORMAT_PRIORITY } from '@bookorbit/types'
+import { DEFAULT_FORMAT_PRIORITY, LOCALE_LABELS, SUPPORTED_LOCALES, type Locale } from '@bookorbit/types'
 import { useThemeStore } from '@/stores/theme'
+import { useLocaleStore } from '@/stores/locale'
 import { getFormatColor } from '@/features/book/lib/format-colors'
 
 const { t } = useI18n()
@@ -70,6 +74,8 @@ const { summary: bookDockSummary, fetchSummary: fetchBookDockSummary, subscribe:
 const { subscribe: subscribeNotifications } = useNotifications()
 const { hasUnseen: hasUnseenWhatsNew } = useWhatsNew()
 const themeStore = useThemeStore()
+const localeStore = useLocaleStore()
+const languageOptions = SUPPORTED_LOCALES.map((id) => ({ id, label: LOCALE_LABELS[id] }))
 const documentationUrl = 'https://bookorbit.app/what-is-bookorbit.html'
 const githubRepositoryUrl = 'https://github.com/bookorbit/bookorbit'
 const githubStarPopoverOpen = ref(false)
@@ -113,6 +119,14 @@ function navigateToSettings() {
   router.push({ name: 'settings-libraries' })
 }
 
+async function selectLanguage(locale: Locale) {
+  try {
+    await localeStore.setLocale(locale)
+  } catch {
+    toast.error(t('settings.appearance.language.loadError'))
+  }
+}
+
 function navigateToWhatsNew() {
   router.push({ name: 'whats-new' })
 }
@@ -152,7 +166,7 @@ const globalSearchLoadMoreLabel = computed(() =>
     : t('components.appHeader.loadMore', { loaded: globalResults.value.length, total: globalSearchTotal.value }),
 )
 const globalSearchAllLoadedLabel = computed(() =>
-  t('components.appHeader.allMatchesShown', { count: globalSearchTotal.value.toLocaleString() }, globalSearchTotal.value),
+  t('components.appHeader.allMatchesShown', { count: formatNumber(globalSearchTotal.value) }, globalSearchTotal.value),
 )
 const globalSearchVirtualHeightStyle = computed(() => ({
   height: `${globalResults.value.length * GLOBAL_SEARCH_ROW_HEIGHT}px`,
@@ -630,7 +644,7 @@ function formatBadgeStyle(fmt: string) {
             </DropdownMenuItem>
             <DropdownMenuItem @click="navigateToAnnotations">
               <Highlighter :size="15" class="mr-2 text-muted-foreground" />
-              Annotations
+              {{ t('components.appHeader.annotations') }}
             </DropdownMenuItem>
             <DropdownMenuItem @click="navigateToStatistics">
               <BarChart3 :size="15" class="mr-2 text-muted-foreground" />
@@ -671,6 +685,20 @@ function formatBadgeStyle(fmt: string) {
                     <BackgroundPicker />
                   </div>
                 </div>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Languages :size="15" class="mr-2 text-muted-foreground" />
+                {{ t('settings.appearance.language.label') }}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent class="w-44">
+                <DropdownMenuItem v-for="option in languageOptions" :key="option.id" @click="selectLanguage(option.id)">
+                  <Check v-if="localeStore.locale === option.id" :size="14" class="mr-2" />
+                  <span v-else class="mr-2 w-3.5" />
+                  {{ option.label }}
+                </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
 
@@ -937,6 +965,34 @@ function formatBadgeStyle(fmt: string) {
               </PopoverContent>
             </Popover>
             <TooltipContent>{{ t('components.appHeader.appearance') }}</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <DropdownMenu>
+              <TooltipTrigger as-child>
+                <DropdownMenuTrigger as-child>
+                  <Button
+                    data-testid="language-control"
+                    variant="ghost"
+                    size="icon"
+                    class="h-8 w-8 border border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground transition-colors"
+                    :class="iconRadiusClass"
+                    :aria-label="t('settings.appearance.language.label')"
+                  >
+                    <Languages :size="15" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <DropdownMenuContent align="end" class="w-44">
+                <DropdownMenuLabel>{{ t('settings.appearance.language.label') }}</DropdownMenuLabel>
+                <DropdownMenuItem v-for="option in languageOptions" :key="option.id" @click="selectLanguage(option.id)">
+                  <Check v-if="localeStore.locale === option.id" :size="14" class="mr-2" />
+                  <span v-else class="mr-2 w-3.5" />
+                  {{ option.label }}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <TooltipContent>{{ t('settings.appearance.language.label') }}</TooltipContent>
           </Tooltip>
 
           <Tooltip>

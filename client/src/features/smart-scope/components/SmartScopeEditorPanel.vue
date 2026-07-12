@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 import { X, Zap } from '@lucide/vue'
 import { api } from '@/lib/api'
 import type { GroupRule, SmartScope, Rule, SortSpec } from '@bookorbit/types'
@@ -169,7 +170,7 @@ async function save() {
               :class="previewLoading ? 'border-border text-muted-foreground' : 'border-primary/30 bg-primary/8 text-primary'"
             >
               <span v-if="previewLoading" class="animate-pulse">{{ t('smartScope.editorPanel.counting') }}</span>
-              <template v-else>{{ t('smartScope.editorPanel.bookCount', { count: previewCount?.toLocaleString() }, previewCount ?? 0) }}</template>
+              <template v-else>{{ t('smartScope.editorPanel.bookCount', { count: formatNumber(previewCount ?? 0) }, previewCount ?? 0) }}</template>
             </span>
             <button
               @click="emit('close')"
@@ -203,8 +204,8 @@ async function save() {
 
             <div class="flex items-center justify-between py-1">
               <div>
-                <p class="text-sm font-medium text-foreground">Sync to Kobo</p>
-                <p class="text-xs text-muted-foreground mt-0.5">Books matching this scope will appear on your Kobo device</p>
+                <p class="text-sm font-medium text-foreground">{{ t('smartScope.syncToKobo') }}</p>
+                <p class="text-xs text-muted-foreground mt-0.5">{{ t('smartScope.syncToKoboHint') }}</p>
               </div>
               <button
                 type="button"

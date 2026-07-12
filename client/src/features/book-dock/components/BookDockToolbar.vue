@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Upload, RotateCw, Trash2, PenLine, FileText, Search, X, Wand2, RefreshCw, FolderPlus, Loader2, Pause, Play } from '@lucide/vue'
 import type { BookDockFileStatus } from '@bookorbit/types'
 import { api } from '@/lib/api'

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDateTime } from '@/i18n/formatters'
 import { Eye, EyeOff, Loader2, X, ChevronLeft, ChevronRight, Check, AlertCircle, RotateCcw } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import SearchableUserSelect from './SearchableUserSelect.vue'
@@ -1823,7 +1824,7 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                         run.state === 'running'
                           ? t('migration.run.stage', { stage: run.currentStage ?? t('migration.run.initializing') })
                           : run.endedAt
-                            ? t('migration.run.ended', { time: new Date(run.endedAt).toLocaleString() })
+                            ? t('migration.run.ended', { time: formatDateTime(new Date(run.endedAt)) })
                             : ''
                       }}
                     </span>
@@ -1858,7 +1859,7 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                           <span class="inline-flex rounded-full border px-2 py-0.5 text-xs" :class="runStateClass(run.state)">{{ run.state }}</span>
                         </p>
                         <p class="text-xs text-muted-foreground">
-                          {{ run.startedAt ? new Date(run.startedAt).toLocaleString() : t('migration.report.notStarted') }}
+                          {{ run.startedAt ? formatDateTime(new Date(run.startedAt)) : t('migration.report.notStarted') }}
                           <template v-if="reportData.durationMs != null"> &middot; {{ formatDuration(reportData.durationMs) }}</template>
                         </p>
                       </div>

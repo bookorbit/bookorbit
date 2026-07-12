@@ -121,7 +121,7 @@ function onPatternKeydown(e: KeyboardEvent) {
             >
               <span v-if="organizationMode === 'book_per_folder'" class="w-1.5 h-1.5 rounded-full bg-primary" />
             </span>
-            <span class="text-sm font-semibold text-foreground">Folder as Book</span>
+            <span class="text-sm font-semibold text-foreground">{{ t('library.creator.scanner.scanMode.folderAsBook.title') }}</span>
           </div>
           <p class="text-xs text-muted-foreground leading-relaxed">
             {{ t('library.creator.scanner.scanMode.folderAsBook.hint') }}

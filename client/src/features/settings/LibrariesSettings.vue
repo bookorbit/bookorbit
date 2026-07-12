@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDate } from '@/i18n/formatters'
+import { formatBytes } from '@/lib/formatting'
 import { useRoute, useRouter } from 'vue-router'
 import {
   FolderOpen,
@@ -224,14 +226,6 @@ async function confirmDelete() {
   }
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
-}
-
 function scanProgressLabel(libraryId: number): string {
   const p = getProgress(libraryId)
   if (!p) return ''
@@ -324,7 +318,7 @@ function coverRefreshLabel(libraryId: number): string {
                 <span v-else class="text-xs text-muted-foreground truncate min-w-0">
                   {{
                     t('settings.admin.libraries.addedDate', {
-                      date: new Date(lib.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }),
+                      date: formatDate(new Date(lib.createdAt), { year: 'numeric', month: 'short', day: 'numeric' }),
                     })
                   }}
                 </span>

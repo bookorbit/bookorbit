@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 import { TrendingUp, TrendingDown, Minus } from '@lucide/vue'
 
 import { useYearProjectionWidget } from '../../composables/useYearProjectionWidget'
@@ -49,7 +50,7 @@ const trendColors = { up: 'text-green-500', down: 'text-red-400', stable: 'text-
 
       <div class="grid w-full grid-cols-2 gap-3 text-center">
         <div class="rounded-md bg-muted/30 px-2 py-1">
-          <span class="block text-xs font-semibold tabular-nums">{{ data.projectedPages.toLocaleString() }}</span>
+          <span class="block text-xs font-semibold tabular-nums">{{ formatNumber(data.projectedPages) }}</span>
           <span class="text-[11px] text-muted-foreground">{{ t('dashboard.widgets.yearProjection.pages') }}</span>
         </div>
         <div class="rounded-md bg-muted/30 px-2 py-1">

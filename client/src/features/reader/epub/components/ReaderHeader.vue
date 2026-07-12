@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import {
   ArrowLeft,
   BookOpen,
@@ -146,7 +147,11 @@ function getFooterModeTooltip(mode: 0 | 1 | 2): string {
 
       <Tooltip>
         <TooltipTrigger as-child>
-          <button class="viewer-btn" :aria-label="isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'" @click="emit('toggleFullscreen')">
+          <button
+            class="viewer-btn"
+            :aria-label="isFullscreen ? t('reader.header.exitFullscreen') : t('reader.header.enterFullscreen')"
+            @click="emit('toggleFullscreen')"
+          >
             <Minimize v-if="isFullscreen" :size="18" />
             <Maximize v-else :size="18" />
           </button>

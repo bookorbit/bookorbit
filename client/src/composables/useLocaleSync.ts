@@ -1,6 +1,7 @@
 import { isSupportedLocale, type Locale, type LocalePreferences } from '@bookorbit/types'
 import { watch } from 'vue'
 import { toast } from 'vue-sonner'
+import { i18n } from '@/i18n'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { api, getAccessToken } from '@/lib/api'
 import { useLocaleStore } from '@/stores/locale'
@@ -10,9 +11,9 @@ let isApplyingServerPrefs = false
 let pendingSave: ReturnType<typeof setTimeout> | null = null
 let pagehideRegistered = false
 
-function isSyncEnabled(): boolean {
+function isAuthenticated(): boolean {
   const { user } = useAuth()
-  return user.value?.settings?.syncThemePreferences === true
+  return user.value !== null
 }
 
 function getCurrentPrefs(): LocalePreferences {
@@ -27,7 +28,7 @@ function sanitizeServerPrefs(raw: unknown): Locale | null {
 }
 
 function flushPendingSave(): void {
-  if (pendingSave === null || !isSyncEnabled()) return
+  if (pendingSave === null || !isAuthenticated()) return
 
   clearTimeout(pendingSave)
   pendingSave = null
@@ -47,20 +48,22 @@ function flushPendingSave(): void {
   })
 }
 
-export async function loadLocaleFromServer(): Promise<void> {
+export async function hydrateLocalePreference(): Promise<void> {
   try {
     const res = await api('/api/v1/user-preferences/locale')
     if (!res.ok) return
 
     const body = (await res.json()) as { settings: unknown }
     const locale = sanitizeServerPrefs(body.settings)
-    if (locale === null) return
+    if (locale === null) {
+      await seedLocaleToServer(getCurrentPrefs())
+      return
+    }
 
     const store = useLocaleStore()
     isApplyingServerPrefs = true
     try {
-      // Apply without persisting locally; the server copy is the source of truth while syncing.
-      await store.setLocale(locale, false)
+      await store.setLocale(locale)
     } finally {
       isApplyingServerPrefs = false
     }
@@ -82,7 +85,7 @@ export async function seedLocaleToServer(prefs: LocalePreferences): Promise<void
 }
 
 export async function saveLocaleToServer(prefs: LocalePreferences): Promise<void> {
-  if (!isSyncEnabled()) return
+  if (!isAuthenticated()) return
 
   try {
     const res = await api('/api/v1/user-preferences/locale', {
@@ -92,10 +95,10 @@ export async function saveLocaleToServer(prefs: LocalePreferences): Promise<void
     })
 
     if (!res.ok) {
-      toast.error('Failed to save language preference')
+      toast.error(i18n.global.t('settings.appearance.language.saveError'))
     }
   } catch {
-    toast.error('Failed to save language preference')
+    toast.error(i18n.global.t('settings.appearance.language.saveError'))
   }
 }
 
@@ -115,7 +118,7 @@ export function initLocaleSync(): void {
   watch(
     () => store.locale,
     () => {
-      if (isApplyingServerPrefs || !isSyncEnabled()) return
+      if (isApplyingServerPrefs || !isAuthenticated()) return
 
       if (pendingSave !== null) clearTimeout(pendingSave)
       pendingSave = setTimeout(() => {
@@ -123,6 +126,7 @@ export function initLocaleSync(): void {
         void saveLocaleToServer(getCurrentPrefs())
       }, 1500)
     },
+    { flush: 'sync' },
   )
 
   if (!pagehideRegistered && typeof window !== 'undefined') {

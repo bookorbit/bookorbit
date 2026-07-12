@@ -2,6 +2,7 @@
 import { computed, onUnmounted, provide, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 import {
   ArrowUpDown,
   Bookmark,
@@ -597,7 +598,7 @@ defineOptions({ name: 'HomeView' })
                 <button
                   v-if="!isDefaultSort"
                   @click="handleResetSort"
-                  aria-label="Reset sort to default"
+                  :aria-label="t('common.resetSortAria')"
                   class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors"
                 >
                   <X :size="13" />
@@ -616,7 +617,7 @@ defineOptions({ name: 'HomeView' })
                     ? 'border-primary text-primary bg-primary/10'
                     : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
                 "
-                :aria-label="collapseEnabledRef ? 'Expand series' : 'Collapse series'"
+                :aria-label="collapseEnabledRef ? t('views.bookView.expandSeries') : t('views.bookView.collapseSeries')"
                 @click="handleToggleCollapse"
               >
                 <Layers :size="14" />
@@ -629,7 +630,7 @@ defineOptions({ name: 'HomeView' })
               <button
                 v-if="hasPermission('library_download') && !isDemoRestrictedAccount"
                 class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md border border-input text-muted-foreground bg-background transition-colors hover:text-foreground hover:bg-muted"
-                aria-label="Export metadata"
+                :aria-label="t('views.bookView.exportMetadata')"
                 @click="openMetadataExport('all-matching')"
               >
                 <FileSpreadsheet :size="14" />
@@ -671,7 +672,7 @@ defineOptions({ name: 'HomeView' })
                 ? 'border-primary text-primary bg-primary/10'
                 : 'border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
             "
-            aria-label="Show library controls"
+            :aria-label="t('views.bookView.showControlsAria')"
             @click="toggleMobileControls"
           >
             <SlidersHorizontal :size="14" />
@@ -957,7 +958,7 @@ defineOptions({ name: 'HomeView' })
           <div v-if="effectiveViewMode === 'list'" ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
             <span v-if="loading" class="text-xs text-muted-foreground">{{ t('common.loading') }}</span>
             <span v-else-if="!hasMorePrefix && contiguousPrefix.length > 0" class="text-xs text-muted-foreground">{{
-              t('views.bookView.allBooksLoaded', { count: total.toLocaleString() })
+              t('views.bookView.allBooksLoaded', { count: formatNumber(total) })
             }}</span>
           </div>
 
@@ -992,10 +993,10 @@ defineOptions({ name: 'HomeView' })
         class="fixed bottom-16 left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-lg border border-primary/30 bg-background px-4 py-2.5 text-sm shadow-lg"
       >
         <span class="text-muted-foreground">
-          {{ t('views.library.querySelection.loadedSelected', { selected: selectedCount.toLocaleString(), total: total.toLocaleString() }) }}
+          {{ t('views.library.querySelection.loadedSelected', { selected: formatNumber(selectedCount), total: formatNumber(total) }) }}
         </span>
         <button class="font-medium text-primary underline-offset-2 hover:underline" @click="activateQuerySelection">
-          {{ t('views.library.querySelection.selectAllMatching', { total: total.toLocaleString() }) }}
+          {{ t('views.library.querySelection.selectAllMatching', { total: formatNumber(total) }) }}
         </button>
         <button class="text-muted-foreground hover:text-foreground" @click="dismissQuerySelectionBanner">
           <X :size="14" />

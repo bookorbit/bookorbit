@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDate as formatLocaleDate } from '@/i18n/formatters'
 import { RefreshCw, Search, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from '@lucide/vue'
 import { AuditAction } from '@bookorbit/types'
 import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
@@ -29,7 +30,7 @@ const activeFilterChips = computed(() => {
 })
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
+  return formatLocaleDate(new Date(iso), {
     year: 'numeric',
     month: 'short',
     day: 'numeric',

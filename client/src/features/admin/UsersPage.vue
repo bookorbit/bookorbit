@@ -476,7 +476,11 @@ function setsEqual(a: Set<number>, b: Set<number>) {
             @click="saveDefaultLibraryAccess"
           >
             <Save :size="14" />
-            {{ savingDefaultLibraryAccess ? t('adminFeature.usersPage.defaultLibraryAccess.saving') : t('adminFeature.usersPage.defaultLibraryAccess.save') }}
+            {{
+              savingDefaultLibraryAccess
+                ? t('adminFeature.usersPage.defaultLibraryAccess.saving')
+                : t('adminFeature.usersPage.defaultLibraryAccess.save')
+            }}
           </button>
         </div>
         <div v-if="libraries.length > 0" class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -492,7 +496,9 @@ function setsEqual(a: Set<number>, b: Set<number>) {
         </div>
         <p v-else class="mt-3 text-sm text-muted-foreground">{{ t('adminFeature.usersPage.defaultLibraryAccess.noLibraries') }}</p>
         <p v-if="defaultLibraryAccessError" class="mt-3 text-sm text-destructive">{{ defaultLibraryAccessError }}</p>
-        <p v-else-if="defaultLibraryAccessSaved" class="mt-3 text-sm text-muted-foreground">{{ t('adminFeature.usersPage.defaultLibraryAccess.saved') }}</p>
+        <p v-else-if="defaultLibraryAccessSaved" class="mt-3 text-sm text-muted-foreground">
+          {{ t('adminFeature.usersPage.defaultLibraryAccess.saved') }}
+        </p>
       </div>
     </section>
 

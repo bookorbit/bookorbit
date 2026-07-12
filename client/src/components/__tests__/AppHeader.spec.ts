@@ -92,6 +92,10 @@ vi.mock('@/stores/theme', () => ({
   useThemeStore: () => ({ radius: 'rounded' }),
 }))
 
+vi.mock('@/stores/locale', () => ({
+  useLocaleStore: () => ({ locale: 'en', setLocale: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined) }),
+}))
+
 vi.mock('@/components/ui/sidebar', () => ({
   SidebarTrigger: { name: 'SidebarTrigger', template: '<button type="button"><slot /></button>' },
 }))
@@ -284,6 +288,25 @@ describe('AppHeader global search', () => {
     const wrapper = mountHeader()
 
     expect(wrapper.text()).not.toContain('Achievements')
+  })
+
+  it('places the desktop language control immediately before settings', () => {
+    const wrapper = mountHeader()
+    const buttons = wrapper.findAll('button')
+    const languageIndex = buttons.findIndex((button) => button.attributes('data-testid') === 'language-control')
+    const settingsIndex = buttons.findIndex((button) => button.attributes('data-tour') === 'settings-nav')
+
+    expect(languageIndex).toBeGreaterThanOrEqual(0)
+    expect(settingsIndex).toBeGreaterThanOrEqual(0)
+    if (languageIndex < 0 || settingsIndex < 0) throw new Error('Expected desktop language and settings controls')
+
+    const desktopGroup = buttons[settingsIndex]?.element.closest('[class~="md:flex"]')
+    if (!desktopGroup) throw new Error('Expected desktop control group')
+    const controls = Array.from(desktopGroup.children)
+    const languageControlIndex = controls.findIndex((control) => control.contains(buttons[languageIndex]?.element ?? null))
+    const settingsControlIndex = controls.findIndex((control) => control.contains(buttons[settingsIndex]?.element ?? null))
+
+    expect(settingsControlIndex).toBe(languageControlIndex + 1)
   })
 
   it('navigates to annotations from the mobile overflow menu', async () => {

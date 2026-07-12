@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatNumber as formatLocaleNumber } from '@/i18n/formatters'
+import { formatBytes } from '@/lib/formatting'
 import { BarChart3, BookCheck, BookOpen, BookText, Building2, CalendarPlus, CalendarRange, Globe, Layers, Tags, Users } from '@lucide/vue'
 
 import { useStatisticsSummary } from '../composables/useStatisticsSummary'
@@ -19,14 +21,8 @@ function iconStyle(colorIndex: number) {
   return { backgroundColor: `color-mix(in oklch, ${color} 15%, transparent)`, color }
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes >= 1_073_741_824) return `${(bytes / 1_073_741_824).toFixed(1)} GB`
-  if (bytes >= 1_048_576) return `${(bytes / 1_048_576).toFixed(1)} MB`
-  return `${(bytes / 1024).toFixed(1)} KB`
-}
-
 function formatNumber(n: number): string {
-  return n.toLocaleString()
+  return formatLocaleNumber(n)
 }
 
 const publicationRange = computed(() => {

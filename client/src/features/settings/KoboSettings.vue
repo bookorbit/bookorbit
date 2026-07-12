@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDate } from '@/i18n/formatters'
 import { useRoute, useRouter } from 'vue-router'
 import { Plus, Trash2, Copy, Check, Pencil, X, Tablet, RefreshCw, History, Download, Upload, Bookmark, Info } from '@lucide/vue'
 import { toast } from 'vue-sonner'
@@ -97,7 +98,9 @@ const latestSuccessLabel = computed(() =>
 const latestFailureLabel = computed(() =>
   latestFailedActivity.value ? formatLastSeen(latestFailedActivity.value.createdAt) : t('settings.reader.kobo.activity.none'),
 )
-const recentFailureLabel = computed(() => t('settings.reader.kobo.activity.failureCount', { count: recentFailureCount.value }, recentFailureCount.value))
+const recentFailureLabel = computed(() =>
+  t('settings.reader.kobo.activity.failureCount', { count: recentFailureCount.value }, recentFailureCount.value),
+)
 const historyHeaderDetail = computed(() => {
   if (!latestHistoryEntry.value) return t('settings.reader.kobo.activity.noActivityRecorded')
   const parts = [syncHealthLabel.value, t('settings.reader.kobo.activity.lastSuccess', { time: latestSuccessLabel.value })]
@@ -135,7 +138,7 @@ function formatLastSeen(date: string | null): string {
 
 function formatDateTime(date: string | null | undefined): string {
   if (!date) return t('settings.reader.kobo.activity.unknown')
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(date))
+  return formatDate(new Date(date), { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 function buildHistoryDisplayItems(entries: KoboSyncHistoryEntry[]): HistoryDisplayItem[] {
@@ -327,9 +330,7 @@ function historyItemTitle(item: HistoryDisplayItem): string {
   const entry = item.primary
   const title = historyBookTitle(entry)
   if (isGroupedHistoryItem(item)) {
-    return title
-      ? t('settings.reader.kobo.activity.readingPositionSyncedTitle', { title })
-      : t('settings.reader.kobo.activity.readingPositionSynced')
+    return title ? t('settings.reader.kobo.activity.readingPositionSyncedTitle', { title }) : t('settings.reader.kobo.activity.readingPositionSynced')
   }
 
   const label = formatHistoryEvent(entry.event)
@@ -433,9 +434,7 @@ function historyItemTimeTitle(item: HistoryDisplayItem): string {
 }
 
 function historyItemGroupedLabel(item: HistoryDisplayItem): string {
-  return isGroupedHistoryItem(item)
-    ? t('settings.reader.kobo.activity.eventsGrouped', { count: item.entries.length }, item.entries.length)
-    : ''
+  return isGroupedHistoryItem(item) ? t('settings.reader.kobo.activity.eventsGrouped', { count: item.entries.length }, item.entries.length) : ''
 }
 
 function historyDeviceName(entry: KoboSyncHistoryEntry): string {

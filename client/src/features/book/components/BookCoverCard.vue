@@ -627,7 +627,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent>
                       <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="handleDownloadFile(file)">
-                        <span v-if="isMultiTrackAudio && isAudioFile(file)">Audiobook (ZIP)</span>
+                        <span v-if="isMultiTrackAudio && isAudioFile(file)">{{ t('book.download.audiobookZip') }}</span>
                         <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
                         <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">{{
                           t('book.file.primary')
@@ -765,7 +765,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="handleDownloadFile(file)">
-                  <span v-if="isMultiTrackAudio && isAudioFile(file)">Audiobook (ZIP)</span>
+                  <span v-if="isMultiTrackAudio && isAudioFile(file)">{{ t('book.download.audiobookZip') }}</span>
                   <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
                   <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">{{
                     t('book.file.primary')

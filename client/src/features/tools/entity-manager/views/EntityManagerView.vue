@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDateTime } from '@/i18n/formatters'
 import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Loader2, RefreshCw, Search } from '@lucide/vue'
 import type { BrowseEntityItem, DuplicateCluster } from '@bookorbit/types'
 
@@ -252,7 +253,7 @@ async function handleBulkDeleteConfirm(mode: 'soft' | 'hard' | 'inline', writeFi
           </template>
           <template v-else-if="em.duplicateScanStatus.value.state === 'done' && em.duplicateScanStatus.value.computedAt">
             <span>{{
-              t('tools.entityManager.duplicates.computedAt', { date: new Date(em.duplicateScanStatus.value.computedAt).toLocaleString() })
+              t('tools.entityManager.duplicates.computedAt', { date: formatDateTime(new Date(em.duplicateScanStatus.value.computedAt)) })
             }}</span>
             <button class="flex items-center gap-1 hover:text-foreground transition-colors" @click="handleRefreshDuplicates">
               <RefreshCw class="h-3 w-3" />

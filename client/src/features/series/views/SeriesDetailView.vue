@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeft, Pencil } from '@lucide/vue'
 import { toast } from 'vue-sonner'
@@ -671,7 +672,7 @@ defineOptions({ name: 'SeriesDetailView' })
               <section v-for="group in nonEmptyMediaGroups" :key="group.key" class="space-y-3" :data-testid="`series-media-group-${group.key}`">
                 <div class="flex items-center justify-between border-b border-border/60 pb-2">
                   <h3 class="text-sm font-semibold text-foreground">{{ group.label }}</h3>
-                  <span class="text-xs text-muted-foreground">{{ group.books.length.toLocaleString() }}</span>
+                  <span class="text-xs text-muted-foreground">{{ formatNumber(group.books.length) }}</span>
                 </div>
                 <VirtualBookGrid
                   :books="group.books"
@@ -700,7 +701,7 @@ defineOptions({ name: 'SeriesDetailView' })
           <div ref="sentinel" class="mt-4 flex h-8 items-center justify-center">
             <span v-if="loadingBooks" class="text-xs text-muted-foreground">{{ t('common.loading') }}</span>
             <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">
-              {{ t('series.detail.allBooksLoaded', { count: total.toLocaleString() }) }}
+              {{ t('series.detail.allBooksLoaded', { count: formatNumber(total) }) }}
             </span>
           </div>
         </section>

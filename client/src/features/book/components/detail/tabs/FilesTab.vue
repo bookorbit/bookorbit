@@ -3,6 +3,8 @@ import { ref, watch, computed } from 'vue'
 import { useLocalStorage } from '@vueuse/core'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { formatDate as formatLocaleDate } from '@/i18n/formatters'
+import { formatBytes } from '@/lib/formatting'
 import { BookOpen, Download, Eye, FilePlus, Files, Headphones, History, FolderOpen, ArrowUpDown, MoreVertical, Pencil, Trash2 } from '@lucide/vue'
 import type { BookDetail, BookDetailFile, WriteLogEntry } from '@bookorbit/types'
 import { Permission, READER_OPENABLE_FORMATS } from '@bookorbit/types'
@@ -43,6 +45,13 @@ const audioTrackCount = computed(() => audioTrackIndex.value.size)
 
 type SortKey = 'name' | 'format' | 'size' | 'date'
 type SortDir = 'asc' | 'desc'
+
+const sortOptions = computed<[SortKey, string][]>(() => [
+  ['name', t('book.detail.files.sort.name')],
+  ['format', t('book.detail.files.sort.format')],
+  ['size', t('book.detail.files.sort.size')],
+  ['date', t('book.detail.files.sort.date')],
+])
 
 const sortKey = ref<SortKey>('name')
 const sortDir = ref<SortDir>('asc')
@@ -90,15 +99,6 @@ const fileSummary = computed(() => {
       .map(([format, count]) => (count > 1 ? `${format} × ${count}` : format)),
   }
 })
-
-function formatBytes(bytes: number | null): string {
-  if (bytes == null) return '-'
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
-}
-
 function formatDuration(seconds: number | null | undefined): string | null {
   if (seconds == null) return null
   const h = Math.floor(seconds / 3600)
@@ -110,7 +110,7 @@ function formatDuration(seconds: number | null | undefined): string | null {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  return formatLocaleDate(new Date(iso), { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 function formatRelative(iso: string): string {
@@ -269,13 +269,13 @@ async function toggleWriteLog() {
           <Files class="size-4" />
         </div>
         <div class="min-w-0">
-          <h1 class="text-base font-semibold tracking-tight text-foreground">Book files</h1>
+          <h1 class="text-base font-semibold tracking-tight text-foreground">{{ t('book.detail.files.title') }}</h1>
           <p class="truncate text-xs text-muted-foreground">
-            {{ book.files.length }} {{ book.files.length === 1 ? 'file' : 'files' }}
+            {{ t('book.detail.files.fileCount', { count: book.files.length }, book.files.length) }}
             <span class="mx-1 opacity-40">·</span>
             {{ formatBytes(fileSummary.totalBytes) }}
             <template v-if="fileSummary.formats.length"> · {{ fileSummary.formats.join(' · ') }}</template>
-            <template v-if="book.lastWrittenAt"> · Synced {{ formatRelative(book.lastWrittenAt) }}</template>
+            <template v-if="book.lastWrittenAt"> · {{ t('book.detail.files.synced', { time: formatRelative(book.lastWrittenAt) }) }}</template>
           </p>
         </div>
       </div>
@@ -287,7 +287,7 @@ async function toggleWriteLog() {
           @click="toggleWriteLog"
         >
           <History class="size-3.5" />
-          {{ writeLogOpen ? 'Hide history' : 'Sync history' }}
+          {{ writeLogOpen ? t('book.detail.files.hideLog') : t('book.detail.files.viewSyncLog') }}
         </button>
         <button
           v-if="hasPermission(Permission.LibraryUpload)"
@@ -295,7 +295,7 @@ async function toggleWriteLog() {
           @click="openAddFileModal"
         >
           <FilePlus class="size-3.5" />
-          Add file
+          {{ t('book.detail.files.addFile') }}
         </button>
       </div>
     </section>
@@ -303,14 +303,9 @@ async function toggleWriteLog() {
     <div class="flex flex-col gap-2 border-y border-border/70 py-2.5 sm:flex-row sm:items-center sm:justify-between">
       <div class="flex min-w-0 items-center gap-2 overflow-x-auto scrollbar-none">
         <ArrowUpDown class="ml-1 size-3.5 shrink-0 text-muted-foreground" />
-        <div class="flex shrink-0 items-center rounded-lg bg-muted p-1" role="group" aria-label="Sort files">
+        <div class="flex shrink-0 items-center rounded-lg bg-muted p-1" role="group" :aria-label="t('book.detail.files.sortAria')">
           <button
-            v-for="opt in [
-              ['name', 'Name'],
-              ['format', 'Format'],
-              ['size', 'Size'],
-              ['date', 'Date'],
-            ] as [SortKey, string][]"
+            v-for="opt in sortOptions"
             :key="opt[0]"
             class="h-7 rounded-md px-2.5 text-xs font-medium transition-colors"
             :class="sortKey === opt[0] ? 'bg-card text-foreground shadow-[var(--elevation-xs)]' : 'text-muted-foreground hover:text-foreground'"
@@ -328,17 +323,17 @@ async function toggleWriteLog() {
         @click="handleTogglePaths"
       >
         <FolderOpen class="size-3.5" />
-        Paths
+        {{ showPaths ? t('book.detail.files.hidePaths') : t('book.detail.files.showPaths') }}
       </button>
     </div>
 
     <section v-if="writeLogOpen" class="border-b border-border/70 px-1 py-3">
       <div class="mb-2 flex items-center justify-between gap-2">
-        <p class="text-sm font-semibold text-foreground">Sync history</p>
-        <span class="text-xs text-muted-foreground">Metadata write-back</span>
+        <p class="text-sm font-semibold text-foreground">{{ t('book.detail.files.syncHistory') }}</p>
+        <span class="text-xs text-muted-foreground">{{ t('book.detail.files.metadataWriteBack') }}</span>
       </div>
-      <p v-if="writeLogLoading" class="text-sm text-muted-foreground">Loading...</p>
-      <p v-else-if="writeLog.length === 0" class="text-sm text-muted-foreground">No write history yet.</p>
+      <p v-if="writeLogLoading" class="text-sm text-muted-foreground">{{ t('common.loading') }}</p>
+      <p v-else-if="writeLog.length === 0" class="text-sm text-muted-foreground">{{ t('book.detail.files.noWriteHistory') }}</p>
       <div v-else class="space-y-2">
         <div v-for="entry in writeLog" :key="entry.id" class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
           <span
@@ -355,9 +350,9 @@ async function toggleWriteLog() {
           <span v-if="entry.status === 'failed' && entry.errorMessage" class="min-w-0 flex-1 basis-full truncate text-destructive sm:basis-auto">{{
             entry.errorMessage
           }}</span>
-          <span v-else-if="entry.fieldsWritten.length" class="min-w-0 flex-1 basis-full truncate text-muted-foreground sm:basis-auto"
-            >{{ entry.fieldsWritten.length }} fields</span
-          >
+          <span v-else-if="entry.fieldsWritten.length" class="min-w-0 flex-1 basis-full truncate text-muted-foreground sm:basis-auto">{{
+            t('book.detail.files.fieldsWritten', { count: entry.fieldsWritten.length }, entry.fieldsWritten.length)
+          }}</span>
         </div>
       </div>
     </section>
@@ -383,12 +378,12 @@ async function toggleWriteLog() {
             <span
               v-if="file.role === 'primary'"
               class="hidden shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary sm:inline"
-              >Primary</span
+              >{{ t('book.detail.files.primary') }}</span
             >
             <span
               v-else-if="isAudioFile(file) && audioTrackCount > 1"
               class="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline"
-              >Track {{ audioTrackIndex.get(file.id) }}</span
+              >{{ t('book.detail.files.track', { number: audioTrackIndex.get(file.id) }) }}</span
             >
           </div>
           <p v-if="showPaths" class="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{{ file.absolutePath }}</p>
@@ -404,9 +399,9 @@ async function toggleWriteLog() {
         </div>
 
         <div class="flex shrink-0 items-center gap-1.5">
-          <span v-if="file.role === 'primary'" class="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary sm:hidden"
-            >Primary</span
-          >
+          <span v-if="file.role === 'primary'" class="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary sm:hidden">{{
+            t('book.detail.files.primary')
+          }}</span>
           <span
             v-else-if="isAudioFile(file) && audioTrackCount > 1"
             class="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:hidden"
@@ -420,7 +415,7 @@ async function toggleWriteLog() {
               @click="openFile(file)"
             >
               <BookOpen class="size-3.5" />
-              Read
+              {{ t('book.detail.files.read') }}
             </button>
             <button
               v-if="isAudioFile(file)"
@@ -428,7 +423,7 @@ async function toggleWriteLog() {
               @click="openFile(file)"
             >
               <Headphones class="size-3.5" />
-              Play
+              {{ t('book.detail.files.play') }}
             </button>
             <Tooltip v-if="hasPermission('library_download')">
               <TooltipTrigger as-child>
@@ -439,7 +434,7 @@ async function toggleWriteLog() {
                   <Download class="size-3.5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Download</TooltipContent>
+              <TooltipContent>{{ t('book.detail.files.download') }}</TooltipContent>
             </Tooltip>
           </div>
 
@@ -447,7 +442,7 @@ async function toggleWriteLog() {
             <DropdownMenuTrigger as-child>
               <button
                 class="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                title="More actions"
+                :title="t('book.detail.files.moreActions')"
               >
                 <MoreVertical class="size-4" />
               </button>
@@ -455,23 +450,23 @@ async function toggleWriteLog() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem v-if="READER_OPENABLE_FORMATS.has(file.format ?? '') && !isAudioFile(file)" class="md:hidden" @click="openFile(file)">
                 <BookOpen class="mr-2 size-4" />
-                Read
+                {{ t('book.detail.files.read') }}
               </DropdownMenuItem>
               <DropdownMenuItem v-if="isAudioFile(file)" class="md:hidden" @click="openFile(file)">
                 <Headphones class="mr-2 size-4" />
-                Play
+                {{ t('book.detail.files.play') }}
               </DropdownMenuItem>
               <DropdownMenuItem v-if="READER_OPENABLE_FORMATS.has(file.format ?? '')" @click="openFile(file, 'peek')">
                 <Eye class="mr-2 size-4" />
-                Peek
+                {{ t('book.detail.files.peek') }}
               </DropdownMenuItem>
               <DropdownMenuItem v-if="hasPermission('library_download')" class="md:hidden" @click="downloadFile(file)">
                 <Download class="mr-2 size-4" />
-                Download
+                {{ t('book.detail.files.download') }}
               </DropdownMenuItem>
               <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" @click="openRenameModal(file)">
                 <Pencil class="mr-2 size-4" />
-                Rename
+                {{ t('book.detail.files.rename') }}
               </DropdownMenuItem>
               <DropdownMenuItem
                 v-if="hasPermission('library_delete_books')"
@@ -479,7 +474,7 @@ async function toggleWriteLog() {
                 @click="openDeleteModal(file)"
               >
                 <Trash2 class="mr-2 size-4" />
-                Delete
+                {{ t('common.delete') }}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -491,15 +486,15 @@ async function toggleWriteLog() {
       <div class="flex size-10 items-center justify-center text-muted-foreground">
         <Files class="size-5" />
       </div>
-      <p class="mt-3 text-sm font-semibold text-foreground">No files attached</p>
-      <p class="mt-1 text-sm text-muted-foreground">This book has no associated files yet.</p>
+      <p class="mt-3 text-sm font-semibold text-foreground">{{ t('book.detail.files.empty.title') }}</p>
+      <p class="mt-1 text-sm text-muted-foreground">{{ t('book.detail.files.empty.description') }}</p>
       <button
         v-if="hasPermission(Permission.LibraryUpload)"
         class="mt-4 inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         @click="openAddFileModal"
       >
         <FilePlus class="size-3.5" />
-        Add file
+        {{ t('book.detail.files.addFile') }}
       </button>
     </section>
 

@@ -14,6 +14,7 @@ import {
   type MetadataExportPreflight,
 } from '@/features/book/composables/useBookMetadataExport'
 import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 
 const { t } = useI18n()
 
@@ -62,8 +63,8 @@ const preflightError = ref<string | null>(null)
 const preflighting = ref(false)
 const { loading, preflight: requestPreflight, download } = useBookMetadataExport()
 
-const selectedCountLabel = computed(() => props.selectedCount.toLocaleString())
-const totalCountLabel = computed(() => props.totalCount.toLocaleString())
+const selectedCountLabel = computed(() => formatNumber(props.selectedCount))
+const totalCountLabel = computed(() => formatNumber(props.totalCount))
 const hasSelectedRows = computed(() => props.selectedBookIds.length > 0)
 const hasAllMatchingScope = computed(() => Boolean(props.allMatchingQuery))
 

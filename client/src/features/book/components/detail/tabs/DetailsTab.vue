@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDate as formatLocaleDate } from '@/i18n/formatters'
+import { formatBytes as formatFileSize } from '@/lib/formatting'
 import { useRouter } from 'vue-router'
 import {
   BookOpen,
@@ -494,7 +496,7 @@ function formatDisplayDate(dateKey: string): string {
   if (!dateKey) return '-'
   const [year, month, day] = dateKey.split('-').map(Number)
   const d = new Date(year!, month! - 1, day!)
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  return formatLocaleDate(d, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 function isEditingReadingDate(field: 'startedAt' | 'finishedAt') {
@@ -871,7 +873,7 @@ const seriesLinks = computed<SeriesDisplayLink[]>(() => {
 })
 
 function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+  return formatLocaleDate(new Date(iso), { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
 function formatPercent(value: number): string {
@@ -882,13 +884,7 @@ function formatPercent(value: number): string {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
-function formatFileSize(bytes: number | null | undefined): string {
-  if (!bytes) return '-'
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return formatLocaleDate(new Date(iso), { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 function formatBadgeStyle(fmt: string) {
@@ -1295,13 +1291,13 @@ watch(
 
           <button
             type="button"
-            aria-label="Toggle personal review"
+            :aria-label="t('book.detail.details.personalReview.toggleAria')"
             class="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-1 py-1"
             :class="{ 'text-primary hover:text-primary/80': showPersonalReview }"
             @click="togglePersonalReview"
           >
             <StickyNote class="size-3.5" />
-            <span>Personal Review</span>
+            <span>{{ t('book.detail.details.personalReview.title') }}</span>
             <span v-if="hasPersonalNote" class="size-1.5 rounded-full bg-primary" />
           </button>
         </div>
@@ -1388,7 +1384,7 @@ watch(
       <button
         v-if="hasPermission('email_send')"
         class="flex items-center justify-center h-9 w-9 rounded-md border border-input bg-background hover:bg-muted transition-colors"
-        aria-label="Send via Email"
+        :aria-label="t('book.detail.details.sendViaEmail')"
         @click="handleSendFromMenu"
       >
         <Send class="size-3.5" />
@@ -1555,7 +1551,7 @@ watch(
             <button
               v-if="hasPermission('email_send')"
               class="flex flex-1 items-center justify-center h-9 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors"
-              aria-label="Send via Email"
+              :aria-label="t('book.detail.details.sendViaEmail')"
               @click="handleSendFromMenu"
             >
               <Send class="size-3.5" />
@@ -1751,13 +1747,13 @@ watch(
 
           <button
             type="button"
-            aria-label="Toggle personal review"
+            :aria-label="t('book.detail.details.personalReview.toggleAria')"
             class="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
             :class="{ 'text-primary hover:text-primary/80': showPersonalReview }"
             @click="togglePersonalReview"
           >
             <StickyNote class="size-3.5" />
-            <span>Personal Review</span>
+            <span>{{ t('book.detail.details.personalReview.title') }}</span>
             <span v-if="hasPersonalNote" class="size-1.5 rounded-full bg-primary" />
           </button>
         </div>
@@ -1767,7 +1763,9 @@ watch(
       <div v-show="showPersonalReview" class="mt-4 p-4 border border-border/70 rounded-lg bg-card/60 shadow-sm">
         <div class="mb-3 flex items-start justify-between gap-3">
           <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Personal Review</p>
+            <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+              {{ t('book.detail.details.personalReview.title') }}
+            </p>
             <p v-if="personalNoteUpdatedLabel && !personalNoteEditing" class="mt-0.5 text-[11px] text-muted-foreground">
               Updated {{ personalNoteUpdatedLabel }}
             </p>
@@ -1777,7 +1775,7 @@ watch(
               <button
                 type="button"
                 class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                aria-label="Edit personal review"
+                :aria-label="t('book.detail.details.personalReview.editAria')"
                 @click="startPersonalNoteEdit"
               >
                 <Pencil class="size-3.5" />
@@ -1793,7 +1791,7 @@ watch(
             class="min-h-24 max-h-72 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary"
             rows="4"
             :maxlength="PERSONAL_NOTE_MAX_LENGTH"
-            placeholder="Private review"
+            :placeholder="t('book.detail.details.personalReview.placeholder')"
           />
           <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p class="text-[11px] text-muted-foreground">{{ personalNoteCharCount }}/{{ PERSONAL_NOTE_MAX_LENGTH }}</p>
@@ -1803,28 +1801,28 @@ watch(
                   <button
                     type="button"
                     class="inline-flex h-8 w-8 items-center justify-center rounded border border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                    aria-label="Clear personal review"
+                    :aria-label="t('book.detail.details.personalReview.clearAria')"
                     :disabled="!canClearPersonalNoteDraft || personalNoteSaving"
                     @click="clearPersonalNoteDraft"
                   >
                     <Trash2 class="size-3.5" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>Clear personal review</TooltipContent>
+                <TooltipContent>{{ t('book.detail.details.personalReview.clearAria') }}</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger as-child>
                   <button
                     type="button"
                     class="inline-flex h-8 w-8 items-center justify-center rounded border border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                    aria-label="Cancel personal review edit"
+                    :aria-label="t('book.detail.details.personalReview.cancelEditAria')"
                     :disabled="personalNoteSaving"
                     @click="cancelPersonalNoteEdit"
                   >
                     <X class="size-3.5" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>Cancel</TooltipContent>
+                <TooltipContent>{{ t('common.cancel') }}</TooltipContent>
               </Tooltip>
               <button
                 type="button"
@@ -1988,7 +1986,7 @@ watch(
           <dd v-else class="text-sm text-foreground mt-0.5">-</dd>
         </div>
         <div>
-          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Published</dt>
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{{ t('book.detail.details.published') }}</dt>
           <dd class="text-sm text-foreground mt-0.5">{{ book.publishedDate ? formatDisplayDate(book.publishedDate) : book.publishedYear || '-' }}</dd>
         </div>
         <div>

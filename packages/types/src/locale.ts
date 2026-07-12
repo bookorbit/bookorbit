@@ -1,4 +1,4 @@
-export const SUPPORTED_LOCALES = ["en", "nl", "de", "sl"] as const;
+export const SUPPORTED_LOCALES = ["en", "de", "nl", "sl"] as const;
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
 export const DEFAULT_LOCALE: Locale = "en";
@@ -6,9 +6,16 @@ export const DEFAULT_LOCALE: Locale = "en";
 /** Native display names for each supported locale, shown in the language picker. */
 export const LOCALE_LABELS: Record<Locale, string> = {
   en: "English",
-  nl: "Nederlands",
   de: "Deutsch",
+  nl: "Nederlands",
   sl: "Slovenščina",
+};
+
+export const LOCALE_DIRECTIONS: Record<Locale, "ltr" | "rtl"> = {
+  en: "ltr",
+  de: "ltr",
+  nl: "ltr",
+  sl: "ltr",
 };
 
 export interface LocalePreferences {

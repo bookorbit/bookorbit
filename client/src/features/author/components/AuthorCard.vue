@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 import type { AuthorSummary } from '@bookorbit/types'
 import { BookCopy, Check, ExternalLink, Loader2, MoreHorizontal, RefreshCw, Trash2 } from '@lucide/vue'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -93,7 +94,7 @@ function handleDelete() {
       <div v-if="!selectionMode" class="absolute left-1.5 top-1.5 z-10">
         <span class="inline-flex items-center gap-1 rounded border border-white/20 bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white">
           <BookCopy :size="11" />
-          {{ author.bookCount.toLocaleString() }}
+          {{ formatNumber(author.bookCount) }}
         </span>
       </div>
 
@@ -210,7 +211,7 @@ function handleDelete() {
         v-if="!selectionMode"
         class="absolute bottom-0.5 left-0.5 z-10 h-6 w-6 rounded-full border border-border bg-card shadow-sm flex items-center justify-center text-[10px] font-semibold text-foreground"
       >
-        {{ author.bookCount.toLocaleString() }}
+        {{ formatNumber(author.bookCount) }}
       </span>
 
       <DropdownMenu v-if="!selectionMode">

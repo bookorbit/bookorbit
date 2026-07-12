@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ChevronDown, ChevronUp, GripVertical } from '@lucide/vue'
 import { METADATA_LABELS, FORMAT_LABELS } from '../composables/useLibraryCreator'
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDate, formatNumber } from '@/i18n/formatters'
 import type { AuthorDetail } from '@bookorbit/types'
 import { MoreHorizontal, Pencil, RefreshCcw, Trash2, UsersRound, X } from '@lucide/vue'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -46,7 +47,7 @@ const lastAddedLabel = computed(() => {
   if (!props.author.lastAddedAt) return t('author.header.never')
   const date = new Date(props.author.lastAddedAt)
   if (Number.isNaN(date.getTime())) return t('author.header.never')
-  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  return formatDate(date, { year: 'numeric', month: 'short', day: 'numeric' })
 })
 
 const previewProviderLabel = computed(() => {
@@ -159,7 +160,7 @@ watch(resolvedBio, () => {
 
           <div class="mt-4 flex gap-3">
             <div class="rounded-lg border border-border/70 bg-background/40 px-4 py-2.5">
-              <p class="text-base font-semibold text-foreground">{{ author.bookCount.toLocaleString() }}</p>
+              <p class="text-base font-semibold text-foreground">{{ formatNumber(author.bookCount) }}</p>
               <p class="text-xs text-muted-foreground">{{ t('author.header.booksLabel') }}</p>
             </div>
             <div class="rounded-lg border border-border/70 bg-background/40 px-4 py-2.5">

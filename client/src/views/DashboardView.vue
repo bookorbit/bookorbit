@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Settings2, Sparkles } from '@lucide/vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -32,9 +33,7 @@ const enabledScrollers = computed(() =>
 )
 
 const hasNoLibraries = computed(() => !librariesLoading.value && libraries.value.length === 0)
-const greetingLabel = computed(() => {
-  return getDashboardGreetingLabel(now.value, user.value?.settings?.timezone)
-})
+const greetingText = computed(() => t(`views.dashboard.greeting.${getDashboardGreetingLabel(now.value, user.value?.settings?.timezone)}`))
 const greetingName = computed(() => {
   const fullName = user.value?.name?.trim()
   if (fullName) return fullName.split(/\s+/)[0] ?? fullName

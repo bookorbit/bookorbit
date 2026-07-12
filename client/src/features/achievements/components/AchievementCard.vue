@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDate } from '@/i18n/formatters'
 import { Check, Lock } from '@lucide/vue'
 import type { AchievementItem, AchievementRarity } from '@bookorbit/types'
 import { resolveLucideIcon } from '../utils/resolveLucideIcon'
@@ -117,7 +118,7 @@ function formatAchievementDate(dateStr: string | null): string | null {
   }
 
   return t('achievements.earnedOn', {
-    date: new Date(dateStr).toLocaleDateString(undefined, {
+    date: formatDate(new Date(dateStr), {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

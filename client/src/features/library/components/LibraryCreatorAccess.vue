@@ -137,7 +137,7 @@ onMounted(loadAccess)
         <div class="mb-4 grid grid-cols-2 gap-2 sm:flex">
           <select
             v-model="grantUserId"
-            aria-label="User to grant access"
+            :aria-label="t('library.creator.access.userSelectAria')"
             class="col-span-2 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring sm:flex-1"
             :disabled="loading || actionLoading"
           >
@@ -146,7 +146,7 @@ onMounted(loadAccess)
           </select>
           <select
             v-model="grantLevel"
-            aria-label="Access level to grant"
+            :aria-label="t('library.creator.access.levelSelectAria')"
             class="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             :disabled="loading || actionLoading"
           >
@@ -177,7 +177,9 @@ onMounted(loadAccess)
             </thead>
             <tbody class="divide-y divide-border">
               <tr v-if="loading">
-                <td colspan="3" class="px-4 py-6 text-center text-xs text-muted-foreground">Loading access settings...</td>
+                <td colspan="3" class="px-4 py-6 text-center text-xs text-muted-foreground">
+                  {{ t('library.creator.access.loading') }}
+                </td>
               </tr>
               <tr v-for="entry in accessList" :key="entry.userId" class="hover:bg-muted/20 transition-colors">
                 <td class="px-4 py-3">
@@ -210,7 +212,7 @@ onMounted(loadAccess)
                 </td>
               </tr>
               <tr v-if="!loading && accessList.length === 0">
-                <td colspan="3" class="px-4 py-6 text-center text-xs text-muted-foreground">No users have been granted access yet.</td>
+                <td colspan="3" class="px-4 py-6 text-center text-xs text-muted-foreground">{{ t('library.creator.access.empty') }}</td>
               </tr>
             </tbody>
           </table>

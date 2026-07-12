@@ -32,6 +32,7 @@ const form = reactive<EmailTemplateForm>(emptyForm())
 const formError = ref<string | null>(null)
 
 const VARIABLES = ['{{title}}', '{{authors}}', '{{senderName}}', '{{seriesName}}', '{{seriesIndex}}', '{{publishedYear}}', '{{isbn}}']
+const TITLE_VARIABLE = '{{title}}'
 
 function openCreate() {
   Object.assign(form, emptyForm())
@@ -319,8 +320,11 @@ watch(
         <ChevronUp v-if="notesOpen" :size="14" class="text-muted-foreground" />
         <ChevronDown v-else :size="14" class="text-muted-foreground" />
       </button>
-      <!-- eslint-disable-next-line vue/no-v-html -->
-      <p v-if="notesOpen" class="px-4 pb-4 text-xs text-muted-foreground" v-html="t('email.templates.notesBody')" />
+      <i18n-t v-if="notesOpen" keypath="email.templates.notesBody" tag="p" class="px-4 pb-4 text-xs text-muted-foreground">
+        <template #variable>
+          <code class="font-mono text-foreground/80">{{ TITLE_VARIABLE }}</code>
+        </template>
+      </i18n-t>
     </div>
 
     <div v-if="deleteConfirm" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="deleteConfirm = null">

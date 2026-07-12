@@ -6,6 +6,7 @@ import { Permission } from '@bookorbit/types'
 import { SUPPORTED_FORMATS_ACCEPT, useAddBookFile } from '@/features/book/composables/useAddBookFile'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useAppInfo } from '@/features/settings/composables/useAppInfo'
+import { formatBytes } from '@/lib/formatting'
 
 const props = defineProps<{
   bookId: number
@@ -91,12 +92,6 @@ function onFileInputChange(e: Event) {
 async function handleUpload() {
   if (pendingCount.value === 0 || isUploading.value) return
   await startUpload(props.bookId, { renameAfter: renameAfter.value })
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function fileRowClass(status: string): string {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDate as formatLocaleDate } from '@/i18n/formatters'
 import {
   ArchiveRestore,
   BookOpen,
@@ -154,7 +155,7 @@ watch(
 
 function formatDate(value: string): string {
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  return Number.isNaN(date.getTime()) ? '' : formatLocaleDate(date, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 function handleToggleSelect() {

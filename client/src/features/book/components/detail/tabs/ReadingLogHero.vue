@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDate } from '@/i18n/formatters'
 import { Check, ChevronDown, Clock, Minus, Plus, TrendingDown, TrendingUp } from '@lucide/vue'
 import type { BookDetail, BookReadingSessionStats, ReadStatus, UserBookStatus } from '@bookorbit/types'
 import { isAudioFormat } from '@bookorbit/types'
@@ -46,7 +47,7 @@ function formatDisplayDate(dateKey: string): string {
   if (!dateKey) return t('book.detail.readingLog.hero.notSet')
   const [year, month, day] = dateKey.split('-').map(Number)
   const d = new Date(year!, month! - 1, day!)
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  return formatDate(d, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 function formatDuration(seconds: number): string {
@@ -311,7 +312,10 @@ function handleAddSession() {
 </script>
 
 <template>
-  <section class="rounded-xl border border-border bg-card px-3.5 py-3 shadow-[var(--elevation-xs)] sm:px-4" aria-label="Reading summary">
+  <section
+    class="rounded-xl border border-border bg-card px-3.5 py-3 shadow-[var(--elevation-xs)] sm:px-4"
+    :aria-label="t('book.detail.readingLog.hero.summaryAria')"
+  >
     <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
       <div class="flex min-w-0 items-center gap-3">
         <div class="relative flex size-16 shrink-0 items-center justify-center rounded-xl bg-primary/10">

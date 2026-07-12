@@ -56,13 +56,13 @@ function setOffMode() {
   cardInfoMode.value = 'off' as CardInfoMode
 }
 
-const LABEL_FIELD_OPTIONS: { value: GridCardLabelField; label: string }[] = [
+const labelFieldOptions = computed<{ value: GridCardLabelField; label: string }[]>(() => [
   { value: 'hidden', label: t('settings.appearance.layout.labelField.hidden') },
   { value: 'book-title', label: t('settings.appearance.layout.labelField.bookTitle') },
   { value: 'series-title', label: t('settings.appearance.layout.labelField.seriesTitle') },
   { value: 'series-title-position', label: t('settings.appearance.layout.labelField.seriesTitlePosition') },
   { value: 'author', label: t('settings.appearance.layout.labelField.author') },
-]
+])
 
 function handlePrimaryLabelChange(event: Event) {
   gridCardPrimaryLabel.value = (event.target as HTMLSelectElement).value as GridCardLabelField
@@ -268,7 +268,7 @@ function handleAuthorCoverSizeInput(event: Event) {
                 class="w-full md:w-48 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-xs focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
                 @change="handlePrimaryLabelChange"
               >
-                <option v-for="opt in LABEL_FIELD_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                <option v-for="opt in labelFieldOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
               </select>
             </div>
 
@@ -282,7 +282,7 @@ function handleAuthorCoverSizeInput(event: Event) {
                 class="w-full md:w-48 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-xs focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
                 @change="handleSecondaryLabelChange"
               >
-                <option v-for="opt in LABEL_FIELD_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                <option v-for="opt in labelFieldOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
               </select>
             </div>
           </div>

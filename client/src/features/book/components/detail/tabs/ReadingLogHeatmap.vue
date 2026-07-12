@@ -211,7 +211,7 @@ watchEffect(() => {
     <div class="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
       <span class="flex items-center gap-2 text-sm font-semibold text-foreground">
         <CalendarDays class="size-4 text-muted-foreground" />
-        <span id="reading-activity-heading">Activity</span>
+        <span id="reading-activity-heading">{{ t('book.detail.readingLog.heatmap.title') }}</span>
       </span>
       <span v-if="subtitle" class="text-xs text-muted-foreground">{{ subtitle }}</span>
     </div>
@@ -219,8 +219,8 @@ watchEffect(() => {
       <VChart :option autoresize class="absolute inset-0" />
     </div>
     <div v-else class="flex flex-1 flex-col items-center justify-center py-10 text-center" style="min-height: 228px">
-      <p class="text-sm font-medium text-foreground">No reading activity in this window.</p>
-      <p class="mt-1 text-sm text-muted-foreground">Sessions recorded here will build your consistency view.</p>
+      <p class="text-sm font-medium text-foreground">{{ t('book.detail.readingLog.heatmap.empty') }}</p>
+      <p class="mt-1 text-sm text-muted-foreground">{{ t('book.detail.readingLog.heatmap.emptyHint') }}</p>
     </div>
   </section>
 </template>

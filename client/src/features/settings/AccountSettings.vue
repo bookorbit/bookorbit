@@ -32,8 +32,6 @@ const removeAvatarConfirmOpen = ref(false)
 const profileCardOpen = ref(true)
 const avatarCardOpen = ref(false)
 const isMobile = useMediaQuery('(max-width: 767px)')
-const DEMO_RESTRICTED_ACCOUNT_MESSAGE = t('settings.account.demoRestricted.cannotEdit')
-
 const formName = ref('')
 const formTimezone = ref('UTC')
 const savingTimezone = ref(false)
@@ -79,7 +77,7 @@ const canChangePassword = computed(
 
 function shouldBlockAccountEdit(): boolean {
   if (!accountEditBlocked.value) return false
-  toast.error(DEMO_RESTRICTED_ACCOUNT_MESSAGE)
+  toast.error(t('settings.account.demoRestricted.cannotEdit'))
   return true
 }
 
@@ -478,10 +476,10 @@ function closeUnlinkDialog() {
         <div class="min-w-0">
           <div class="flex items-center gap-2">
             <Trophy :size="16" class="text-muted-foreground shrink-0" />
-            <p class="text-sm font-semibold text-foreground">Enable achievements</p>
+            <p class="text-sm font-semibold text-foreground">{{ t('settings.account.readingPreferences.enableAchievements') }}</p>
           </div>
           <p class="mt-1 text-xs text-muted-foreground">
-            Track achievement progress and show achievement-related interface. Manage achievement notifications separately in Notifications.
+            {{ t('settings.account.readingPreferences.enableAchievementsHint') }}
           </p>
         </div>
         <button

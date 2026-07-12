@@ -1,7 +1,6 @@
 import type { BookCommunityRating, MetadataProviderInfo } from '@bookorbit/types'
+import { formatNumber } from '@/i18n/formatters'
 import { getProviderLabel } from './metadata-fetch'
-
-const countFormatter = new Intl.NumberFormat()
 
 export function formatCommunityRatingValue(rating: number | null | undefined, count?: number | null): string {
   if (rating == null || !Number.isFinite(rating)) return ''
@@ -9,7 +8,7 @@ export function formatCommunityRatingValue(rating: number | null | undefined, co
   const ratingText = Number.isInteger(rating) ? rating.toFixed(0) : rating.toFixed(1)
   if (count == null || !Number.isFinite(count)) return `${ratingText} / 5`
 
-  return `${ratingText} / 5 (${countFormatter.format(count)} ratings)`
+  return `${ratingText} / 5 (${formatNumber(count)} ratings)`
 }
 
 export function formatCommunityRatingLine(rating: BookCommunityRating, providers: readonly MetadataProviderInfo[] = []): string {

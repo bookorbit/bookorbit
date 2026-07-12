@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Ellipsis, RotateCcw } from '@lucide/vue'
 import { Permission, type BookDetail, type UserBookStatus } from '@bookorbit/types'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -167,8 +168,12 @@ const quickFilters = computed<{ label: string; value: QuickFilter }[]>(() => [
     <div class="rounded-xl border border-border/80 bg-card p-2 shadow-[var(--elevation-xs)]">
       <div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
         <div class="flex flex-wrap items-center gap-1.5">
-          <span class="px-2 text-xs font-medium text-muted-foreground">Show</span>
-          <div class="flex flex-wrap items-center gap-1 rounded-lg bg-muted/70 p-1" role="group" aria-label="Reading session date range">
+          <span class="px-2 text-xs font-medium text-muted-foreground">{{ t('book.detail.readingLog.filters.show') }}</span>
+          <div
+            class="flex flex-wrap items-center gap-1 rounded-lg bg-muted/70 p-1"
+            role="group"
+            :aria-label="t('book.detail.readingLog.filters.dateRangeAria')"
+          >
             <button
               v-for="qf in quickFilters"
               :key="qf.value"
@@ -185,7 +190,7 @@ const quickFilters = computed<{ label: string; value: QuickFilter }[]>(() => [
         </div>
 
         <div class="flex flex-wrap items-center gap-1.5">
-          <label v-if="hasMultipleFormats" class="sr-only" for="reading-log-format">Format</label>
+          <label v-if="hasMultipleFormats" class="sr-only" for="reading-log-format">{{ t('book.detail.readingLog.table.colFormat') }}</label>
           <select
             v-if="hasMultipleFormats"
             id="reading-log-format"
@@ -193,7 +198,7 @@ const quickFilters = computed<{ label: string; value: QuickFilter }[]>(() => [
             :value="selectedFormat ?? ''"
             @change="handleFormatChange"
           >
-            <option value="">All formats</option>
+            <option value="">{{ t('book.detail.readingLog.filters.allFormats') }}</option>
             <option v-for="fmt in uniqueFormats" :key="fmt" :value="fmt">{{ fmt.toUpperCase() }}</option>
           </select>
 
@@ -202,7 +207,7 @@ const quickFilters = computed<{ label: string; value: QuickFilter }[]>(() => [
             <DropdownMenuTrigger as-child>
               <button
                 class="inline-flex size-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                aria-label="More reading log actions"
+                :aria-label="t('book.detail.readingLog.moreActionsAria')"
               >
                 <Ellipsis class="size-4" />
               </button>

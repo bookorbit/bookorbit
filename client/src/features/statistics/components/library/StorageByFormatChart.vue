@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { HardDrive } from '@lucide/vue'
 import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
+import { formatBytes } from '@/lib/formatting'
 
 import { useStorageByFormat } from '../../composables/useStorageByFormat'
 import ChartCard from '../ChartCard.vue'
@@ -14,12 +15,6 @@ const { data, loading, error } = useStorageByFormat()
 const { md } = useBreakpoints(breakpointsTailwind)
 
 const option = shallowRef({})
-
-function formatBytes(bytes: number): string {
-  if (bytes >= 1_073_741_824) return `${(bytes / 1_073_741_824).toFixed(1)} GB`
-  if (bytes >= 1_048_576) return `${(bytes / 1_048_576).toFixed(1)} MB`
-  return `${(bytes / 1024).toFixed(1)} KB`
-}
 
 watchEffect(() => {
   if (!data.value.items.length) return

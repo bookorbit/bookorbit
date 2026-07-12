@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDate as formatLocaleDate } from '@/i18n/formatters'
 import { toast } from 'vue-sonner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Trash2, RefreshCw } from '@lucide/vue'
@@ -61,7 +62,7 @@ async function resend(entry: EmailSendLogEntry) {
 }
 
 function formatDate(date: string): string {
-  return new Date(date).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return formatLocaleDate(new Date(date), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function statusClass(status: string): string {

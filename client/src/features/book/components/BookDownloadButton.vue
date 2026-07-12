@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { getFormatColor } from '@/features/book/lib/format-colors'
 import { useBookDownload } from '@/features/book/composables/useBookDownload'
 import { useI18n } from 'vue-i18n'
+import { formatBytes as formatFileSize } from '@/lib/formatting'
 
 const { t } = useI18n()
 
@@ -37,12 +38,6 @@ const hasMultiple = computed(() => {
 function formatBadgeStyle(fmt: string) {
   const color = getFormatColor(fmt)
   return { color, borderColor: `${color}66`, backgroundColor: `${color}1a` }
-}
-
-function formatFileSize(bytes: number | null | undefined): string {
-  if (!bytes) return '-'
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function handleSingleDownload() {

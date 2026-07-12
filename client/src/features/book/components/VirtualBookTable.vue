@@ -2,6 +2,7 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
 import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
 import { useVirtualizer } from '@tanstack/vue-virtual'
+import { formatNumber } from '@/i18n/formatters'
 import { AlertTriangle, ArrowDown, ArrowUp, BookOpen, CheckCircle2, ChevronUp, Loader2, RotateCcw, X } from '@lucide/vue'
 import { useTableColumns, COLUMN_DEFS, COLUMN_DEF_MAP, LOCK_ROW_COLUMN_DEF, type ColumnDef } from '@/features/book/composables/useTableColumns'
 import { useTableCellEditor } from '@/features/book/composables/useTableCellEditor'
@@ -978,17 +979,15 @@ defineExpose({
     <div class="shrink-0 flex items-center justify-between border-t border-border/60 bg-muted/40 px-3 py-1 text-xs text-muted-foreground">
       <div class="flex items-center gap-2">
         <span v-if="selectionMode && selectedCount">
-          {{ t('book.tableView.selectedStatus', { count: selectedCount.toLocaleString() }) }}
+          {{ t('book.tableView.selectedStatus', { count: formatNumber(selectedCount) }) }}
           <span class="text-muted-foreground/60">/ </span>
         </span>
         <span v-if="filterActive" class="flex items-center gap-1 text-primary">
           <span class="h-1.5 w-1.5 rounded-full bg-primary" />
           {{ t('book.tableView.filtered') }}
         </span>
-        <span v-if="hasMore">{{
-          t('book.tableView.loadedStatus', { loaded: books.length.toLocaleString(), total: (total ?? 0).toLocaleString() })
-        }}</span>
-        <span v-else>{{ t('book.tableView.bookCount', { count: (total ?? books.length).toLocaleString() }, total ?? books.length) }}</span>
+        <span v-if="hasMore">{{ t('book.tableView.loadedStatus', { loaded: formatNumber(books.length), total: formatNumber(total ?? 0) }) }}</span>
+        <span v-else>{{ t('book.tableView.bookCount', { count: formatNumber(total ?? books.length) }, total ?? books.length) }}</span>
       </div>
       <div class="flex items-center gap-3">
         <button

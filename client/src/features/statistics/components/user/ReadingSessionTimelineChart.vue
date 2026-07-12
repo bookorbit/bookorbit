@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDate } from '@/i18n/formatters'
 import VChart from 'vue-echarts'
 import { CalendarRange } from '@lucide/vue'
 import { toast } from 'vue-sonner'
@@ -586,7 +587,7 @@ function formatDateLabel(ymd: string): string {
   if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return ymd
   const [year, month, day] = parts
   const date = new Date(year!, (month ?? 1) - 1, day ?? 1)
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return formatDate(date, { month: 'short', day: 'numeric' })
 }
 
 function formatHourLabel(minutes: number): string {

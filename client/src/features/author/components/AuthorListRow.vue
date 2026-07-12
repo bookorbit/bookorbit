@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDate, formatNumber } from '@/i18n/formatters'
 import type { AuthorSummary } from '@bookorbit/types'
 import { ArrowRight, BookCopy, Check, Clock3, Loader2 } from '@lucide/vue'
 import { toDisplayCoverUrl } from '@/features/book/lib/metadata-fetch'
@@ -22,7 +23,7 @@ const { t } = useI18n()
 const lastAddedLabel = computed(() => {
   if (!props.author.lastAddedAt) return t('author.listRow.noRecentAdditions')
   const date = new Date(props.author.lastAddedAt)
-  return Number.isNaN(date.getTime()) ? t('author.listRow.noRecentAdditions') : date.toLocaleDateString()
+  return Number.isNaN(date.getTime()) ? t('author.listRow.noRecentAdditions') : formatDate(date)
 })
 
 const imageFailed = ref(false)
@@ -86,7 +87,7 @@ function handleClick(event: MouseEvent) {
       <div class="hidden md:flex items-center gap-5 text-xs text-muted-foreground">
         <span class="inline-flex items-center gap-1.5">
           <BookCopy :size="12" />
-          {{ author.bookCount.toLocaleString() }}
+          {{ formatNumber(author.bookCount) }}
         </span>
         <span class="inline-flex items-center gap-1.5">
           <Clock3 :size="12" />

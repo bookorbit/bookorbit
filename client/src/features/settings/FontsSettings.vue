@@ -8,6 +8,7 @@ import type { UserFont } from '@bookorbit/types'
 import { useCustomFonts } from '@/features/reader/epub/composables/useCustomFonts'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import SettingsPageHeader from './SettingsPageHeader.vue'
+import { formatBytes } from '@/lib/formatting'
 
 const { t } = useI18n()
 
@@ -207,12 +208,6 @@ async function processFiles(files: File[]) {
 
 function dismissError(index: number) {
   uploadErrors.value = uploadErrors.value.filter((_, i) => i !== index)
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 </script>
 

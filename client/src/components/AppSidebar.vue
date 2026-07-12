@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 import { useRoute, useRouter } from 'vue-router'
 import * as Icons from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
@@ -286,7 +287,7 @@ onUnmounted(() => stopLibraryUploadListener())
                       v-else-if="lib.bookCount !== undefined"
                       class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/15 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-sidebar-foreground/80 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
                     >
-                      {{ lib.bookCount.toLocaleString() }}
+                      {{ formatNumber(lib.bookCount) }}
                     </span>
                     <Icons.GripVertical
                       v-if="isReorderingLibraries"
@@ -309,8 +310,8 @@ onUnmounted(() => stopLibraryUploadListener())
                         <p class="mt-0.5 text-[10px] text-sidebar-foreground/45">
                           {{
                             t('components.sidebar.scanProgress', {
-                              processed: getProgress(lib.id)!.processed.toLocaleString(),
-                              total: getProgress(lib.id)!.total.toLocaleString(),
+                              processed: formatNumber(getProgress(lib.id)!.processed),
+                              total: formatNumber(getProgress(lib.id)!.total),
                             })
                           }}
                         </p>
@@ -369,7 +370,7 @@ onUnmounted(() => stopLibraryUploadListener())
                       v-if="smartScope.bookCount != null && smartScope.bookCount > 0"
                       class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/15 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-sidebar-foreground/80 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
                     >
-                      {{ smartScope.bookCount.toLocaleString() }}
+                      {{ formatNumber(smartScope.bookCount) }}
                     </span>
                     <Icons.GripVertical
                       v-if="isReorderingSmartScopes"
@@ -434,7 +435,7 @@ onUnmounted(() => stopLibraryUploadListener())
                       v-if="collection.bookCount > 0"
                       class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/15 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-sidebar-foreground/80 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
                     >
-                      {{ collection.bookCount.toLocaleString() }}
+                      {{ formatNumber(collection.bookCount) }}
                     </span>
                     <Icons.GripVertical
                       v-if="isReorderingCollections"
@@ -463,13 +464,13 @@ onUnmounted(() => stopLibraryUploadListener())
               :href="supportUrl"
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="Support BookOrbit on Ko-fi"
+              :aria-label="t('components.sidebar.supportAria')"
               class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-sidebar-border/60 text-primary transition-colors hover:bg-primary/8 hover:text-primary/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
             >
               <Icons.Heart class="h-4 w-4 fill-primary/20" aria-hidden="true" />
             </a>
           </TooltipTrigger>
-          <TooltipContent side="right">Support BookOrbit</TooltipContent>
+          <TooltipContent side="right">{{ t('components.sidebar.support') }}</TooltipContent>
         </Tooltip>
       </div>
 
@@ -483,7 +484,11 @@ onUnmounted(() => stopLibraryUploadListener())
             class="inline-flex min-w-0 max-w-full items-center gap-1.5 transition-colors hover:text-sidebar-foreground"
           >
             <span class="truncate">{{ versionUi.currentLabel }}</span>
-            <span v-if="hasUnseenWhatsNew" class="h-1.5 w-1.5 flex-none rounded-full bg-primary" aria-label="New release notes available" />
+            <span
+              v-if="hasUnseenWhatsNew"
+              class="h-1.5 w-1.5 flex-none rounded-full bg-primary"
+              :aria-label="t('components.sidebar.newReleaseNotes')"
+            />
           </RouterLink>
 
           <span v-if="versionUi.currentLabel" class="text-sidebar-foreground/45">•</span>
@@ -492,11 +497,11 @@ onUnmounted(() => stopLibraryUploadListener())
             :href="supportUrl"
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Support BookOrbit on Ko-fi"
+            :aria-label="t('components.sidebar.supportAria')"
             class="inline-flex shrink-0 items-center gap-1.5 text-sidebar-foreground/85 transition-colors hover:text-primary"
           >
             <Icons.Heart class="h-3.5 w-3.5 fill-primary/20 text-primary" aria-hidden="true" />
-            <span>Support</span>
+            <span>{{ t('components.sidebar.supportShort') }}</span>
           </a>
 
           <span v-if="versionUi.showLatest" class="text-sidebar-foreground/45">•</span>
