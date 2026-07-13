@@ -1,6 +1,7 @@
 local scheduled = {}
 local prevent_calls = 0
 local allow_calls = 0
+local shown_widget
 
 package.loaded["ui/bidi"] = {}
 package.loaded["datastorage"] = {
@@ -38,7 +39,9 @@ package.loaded["ui/uimanager"] = {
     nextTick = function(_, callback)
         table.insert(scheduled, callback)
     end,
-    show = function() end,
+    show = function(_, widget)
+        shown_widget = widget
+    end,
     close = function() end,
     forceRePaint = function() end,
 }
@@ -211,8 +214,9 @@ local collision_ctx = {
     failed_titles = {},
 }
 local details = {
-    [1] = { id = 1, title = "First", files = { { id = 101, format = "epub", devicePath = "Shared/Book.epub" } } },
-    [2] = { id = 2, title = "Second", files = { { id = 102, format = "epub", devicePath = "Shared/Book.epub" } } },
+    [1] = { title = "First", files = { { id = 101, format = "epub", devicePath = "Shared/Book.epub" } } },
+    [2] = { title = "Second", files = { { id = 102, format = "epub", devicePath = "Shared/Book.epub" } } },
+    [3] = { title = "Third", files = { { id = 103, format = "epub", devicePath = "Shared/Book.epub" } } },
 }
 local downloaded_paths = {}
 Catalog.isOnDevice = function() return false end
@@ -237,15 +241,28 @@ Catalog.bulkShowStatus = function() end
 Catalog:bulkProcessBook(collision_ctx, { id = 1, title = "First" })
 collision_ctx.index = 2
 Catalog:bulkProcessBook(collision_ctx, { id = 2, title = "Second" })
+collision_ctx.index = 3
+Catalog:bulkProcessBook(collision_ctx, { id = 3, title = "Third" })
 
 assertEqual(downloaded_paths[1], "/downloads/Shared/Book.epub", "first collision path remains unchanged")
 assertEqual(downloaded_paths[2], "/downloads/Shared/Book [2].epub", "second collision path gains book identity")
-assertEqual(collision_ctx.counts.downloaded, 2, "both colliding books download")
-assertEqual(collision_ctx.counts.path_conflicts, 1, "collision count recorded")
-assertEqual(#collision_ctx.path_conflicts, 1, "collision detail recorded")
+assertEqual(downloaded_paths[3], "/downloads/Shared/Book [3].epub", "third collision path gains book identity")
+assertEqual(collision_ctx.counts.downloaded, 3, "all colliding books download")
+assertEqual(collision_ctx.counts.path_conflicts, 2, "collision count recorded")
+assertEqual(#collision_ctx.path_conflicts, 2, "collision details recorded")
 assertEqual(collision_ctx.path_conflicts[1].conflicting_book_id, 1, "collision owner recorded")
 assertEqual(collision_ctx.path_conflicts[1].resolved_path, "/downloads/Shared/Book [2].epub", "resolved collision path recorded")
 assertEqual(collision_ctx.destination_paths["/downloads/shared/book.epub"].book_id, 1, "original path ownership retained")
-assertEqual(collision_ctx.destination_paths["/downloads/shared/book [2].epub"].book_id, 2, "renamed path ownership recorded")
+assertEqual(collision_ctx.destination_paths["/downloads/shared/book [2].epub"].book_id, 2, "second renamed path ownership recorded")
+assertEqual(collision_ctx.destination_paths["/downloads/shared/book [3].epub"].book_id, 3, "third renamed path ownership recorded")
+
+Catalog.bulkReleaseStandby = function() end
+Catalog.refreshOnDevice = function() end
+Catalog.bookMode = function() return false end
+Catalog.dashboardMode = function() return false end
+Catalog:bulkFinish(collision_ctx)
+assertEqual(shown_widget.title:find("Renamed path conflicts: 2", 1, true) ~= nil, true, "completion summary keeps conflict count")
+assertEqual(shown_widget.title:find("Conflicting destinations were renamed with BookOrbit IDs.", 1, true) ~= nil, true, "completion summary explains renaming")
+assertEqual(shown_widget.title:find(" -> ", 1, true), nil, "completion summary omits long path mappings")
 
 print("bookorbit_catalog_bulk_download_test.lua: ok")

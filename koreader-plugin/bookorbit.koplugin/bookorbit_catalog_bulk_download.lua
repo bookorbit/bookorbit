@@ -749,11 +749,12 @@ function CatalogBulkDownload.install(Catalog)
 
         local filename = safeFilenameBase(detail)
         local filetype = string.lower(file.format or "bin")
+        local book_id = detail.id or book.id
         local local_path = self:getLocalDownloadPath(filename, filetype, file.devicePath)
         local original_path = local_path
         local owner = ctx.destination_paths[pathKey(local_path)]
-        if owner and owner.book_id ~= detail.id then
-            local identity = detail.id or file.id
+        if owner and owner.book_id ~= book_id then
+            local identity = book_id or file.id
             local candidate = appendPathIdentity(local_path, identity)
             local suffix = 2
             while ctx.destination_paths[pathKey(candidate)] or lfs.attributes(candidate) do
@@ -763,18 +764,18 @@ function CatalogBulkDownload.install(Catalog)
             local_path = candidate
             ctx.counts.path_conflicts = ctx.counts.path_conflicts + 1
             table.insert(ctx.path_conflicts, {
-                book_id = detail.id,
+                book_id = book_id,
                 title = bookTitle(detail),
                 original_path = original_path,
                 resolved_path = local_path,
                 conflicting_book_id = owner.book_id,
             })
-            logger.warn("BookOrbit: bulk destination path conflict renamed", detail.id, owner.book_id, original_path, local_path)
+            logger.warn("BookOrbit: bulk destination path conflict renamed", book_id, owner.book_id, original_path, local_path)
             self:bulkShowStatus(ctx, _("Path conflict - using unique filename"), detail, true)
         end
         if lfs.attributes(local_path) and self:bulkExistingPolicy().id == "skip" then
             ctx.counts.skipped_existing = ctx.counts.skipped_existing + 1
-            table.insert(ctx.existing_files, { book_id = detail.id, title = bookTitle(detail), path = local_path })
+            table.insert(ctx.existing_files, { book_id = book_id, title = bookTitle(detail), path = local_path })
             logger.warn("BookOrbit: existing destination skipped", detail.id, local_path)
             self:bulkShowStatus(ctx, _("File already exists - skipping"), detail, true)
             return
@@ -787,7 +788,7 @@ function CatalogBulkDownload.install(Catalog)
             return
         end
         ctx.counts.downloaded = ctx.counts.downloaded + 1
-        ctx.destination_paths[pathKey(local_path)] = { book_id = detail.id, file_id = file.id }
+        ctx.destination_paths[pathKey(local_path)] = { book_id = book_id, file_id = file.id }
         if linked then ctx.counts.linked = ctx.counts.linked + 1 end
         self:bulkShowStatus(ctx, _("Download complete"), detail, true)
     end
@@ -893,10 +894,7 @@ function CatalogBulkDownload.install(Catalog)
         end
         if #path_conflicts > 0 then
             table.insert(lines, "")
-            table.insert(lines, _("Path conflicts renamed:"))
-            for _, entry in ipairs(path_conflicts) do
-                table.insert(lines, T(_("%1 -> %2"), shortText(entry.title, 42), shortText(entry.resolved_path, 52)))
-            end
+            table.insert(lines, _("Conflicting destinations were renamed with BookOrbit IDs."))
         end
 
         if #ctx.failed_titles > 0 then
