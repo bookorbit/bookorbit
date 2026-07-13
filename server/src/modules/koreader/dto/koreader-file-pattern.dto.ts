@@ -1,12 +1,12 @@
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsString, MaxLength, MinLength, ValidateIf } from 'class-validator';
 
 class KoreaderGroupingPatternsDto {
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsString()
   @MaxLength(1000)
   seriesPattern = '';
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsString()
   @MaxLength(1000)
   standalonePattern = '';
@@ -20,7 +20,7 @@ export class UpdateKoreaderFilePatternDto {
 }
 
 export class UpdateKoreaderDeviceFilePatternDto extends KoreaderGroupingPatternsDto {
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsString()
   @MaxLength(1000)
   pattern = '';

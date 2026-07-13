@@ -457,35 +457,38 @@ export class KoreaderCatalogService {
     const title = detail.title ?? (basename(detail.folderPath) || `Book ${detail.id}`);
     const files = detail.files
       .filter((file) => file.role === 'primary' || file.role === 'content')
-      .map<KoreaderCatalogFile>((file) => ({
-        id: file.id,
-        format: this.normalizeFormat(file.format),
-        role: file.role,
-        sizeBytes: file.sizeBytes,
-        durationSeconds: file.durationSeconds,
-        downloadUrl: `${CATALOG_BASE}/files/${file.id}/download`,
-        devicePath:
-          resolveUploadPath(
-            filePattern,
-            {
-              title,
-              subtitle: detail.subtitle ?? '',
-              authors: detail.authors.map((author) => author.name).join(', '),
-              year: detail.publishedYear ? String(detail.publishedYear) : '',
-              series: detail.seriesName ?? '',
-              seriesIndex: detail.seriesIndex == null ? '' : String(detail.seriesIndex),
-              language: detail.language ?? '',
-              publisher: detail.publisher ?? '',
-              isbn: detail.isbn13 ?? detail.isbn10 ?? '',
-              originalFilename: basename(file.filename ?? title, `.${file.format ?? 'bin'}`),
-              extension: file.format ?? 'bin',
-            },
-            this.normalizeFormat(file.format),
-            { sanitizeForCrossPlatform },
-          ) ??
-          file.filename ??
-          `${title}.${file.format ?? 'bin'}`,
-      }));
+      .map<KoreaderCatalogFile>((file) => {
+        const extension = this.normalizeFormat(file.format);
+        return {
+          id: file.id,
+          format: extension,
+          role: file.role,
+          sizeBytes: file.sizeBytes,
+          durationSeconds: file.durationSeconds,
+          downloadUrl: `${CATALOG_BASE}/files/${file.id}/download`,
+          devicePath:
+            resolveUploadPath(
+              filePattern,
+              {
+                title,
+                subtitle: detail.subtitle ?? '',
+                authors: detail.authors.map((author) => author.name).join(', '),
+                year: detail.publishedYear ? String(detail.publishedYear) : '',
+                series: detail.seriesName ?? '',
+                seriesIndex: detail.seriesIndex == null ? '' : String(detail.seriesIndex),
+                language: detail.language ?? '',
+                publisher: detail.publisher ?? '',
+                isbn: detail.isbn13 ?? detail.isbn10 ?? '',
+                originalFilename: basename(file.filename ?? title, `.${extension}`),
+                extension,
+              },
+              extension,
+              { sanitizeForCrossPlatform },
+            ) ??
+            file.filename ??
+            `${title}.${extension}`,
+        };
+      });
 
     return {
       id: detail.id,
