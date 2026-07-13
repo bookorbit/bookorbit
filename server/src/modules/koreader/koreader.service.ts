@@ -17,6 +17,7 @@ const BCRYPT_ROUNDS = 12;
 const SYNC_EVENT = 'koreader.sync';
 const CREDENTIALS_EVENT = 'koreader.credentials';
 const DEVICE_REMOVE_EVENT = 'koreader.device_remove';
+const FILE_NAMING_EVENT = 'koreader.file_naming';
 const DEFAULT_DEVICE = 'KOReader';
 
 @Injectable()
@@ -246,18 +247,17 @@ export class KoreaderService {
   }
 
   async getSyncStatus(userId: number): Promise<KoreaderSyncStatus> {
-    const [credentials, devices, totalSyncedBooks, sweepRows, pluginTotals, versionInfo, deviceSettings] = await Promise.all([
+    const [credentials, devices, totalSyncedBooks, sweepRows, pluginTotals, versionInfo] = await Promise.all([
       this.getCredentials(userId),
       this.getDevices(userId),
       this.repo.getTotalSyncedBooks(userId),
       this.pluginRepo.listSweeps(userId),
       this.pluginRepo.getPluginTotals(userId),
       this.packageService.getVersionInfo(),
-      this.repo.getDeviceFileNamingPatterns(userId),
     ]);
     const lastSyncAt = devices.length > 0 ? devices[0]!.lastSyncAt : null;
     const latestPluginVersion = versionInfo.pluginVersion === 'unknown' ? null : versionInfo.pluginVersion;
-    const settingsByDevice = new Map(deviceSettings.map((setting) => [setting.deviceId, setting]));
+    const settingsByDevice = new Map(devices.map((device) => [device.deviceId, device]));
     const sweeps = sweepRows.map((row) => {
       const setting = settingsByDevice.get(row.deviceId);
       return {
@@ -301,8 +301,9 @@ export class KoreaderService {
     return (await this.repo.getKoreaderUserDefaultPattern(userId)) ?? DEFAULT_KOREADER_DEVICE_PATTERN;
   }
 
-  setKoreaderUserDefaultPattern(userId: number, pattern: string): Promise<void> {
-    return this.repo.setKoreaderUserDefaultPattern(userId, pattern);
+  async setKoreaderUserDefaultPattern(userId: number, pattern: string): Promise<void> {
+    await this.repo.setKoreaderUserDefaultPattern(userId, pattern);
+    this.logger.log(`[${FILE_NAMING_EVENT}] userId=${userId} scope=user-default - file naming pattern updated`);
   }
 
   getDeviceFileNamingPattern(userId: number, deviceId: string) {
@@ -314,11 +315,15 @@ export class KoreaderService {
     deviceId: string,
     config: { fileNamingPattern: string; seriesFileNamingPattern: string; standaloneFileNamingPattern: string },
   ): Promise<void> {
-    return this.repo.setDeviceFileNamingPattern(userId, deviceId, config);
+    return this.repo.setDeviceFileNamingPattern(userId, deviceId, config).then(() => {
+      this.logger.log(`[${FILE_NAMING_EVENT}] userId=${userId} deviceId=${deviceId} scope=device - file naming pattern updated`);
+    });
   }
 
   clearDeviceFileNamingPattern(userId: number, deviceId: string): Promise<void> {
-    return this.repo.clearDeviceFileNamingPattern(userId, deviceId);
+    return this.repo.clearDeviceFileNamingPattern(userId, deviceId).then(() => {
+      this.logger.log(`[${FILE_NAMING_EVENT}] userId=${userId} deviceId=${deviceId} scope=device - file naming pattern cleared`);
+    });
   }
 
   async removeDevice(userId: number, deviceId: string): Promise<void> {

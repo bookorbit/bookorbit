@@ -63,6 +63,8 @@ describe('KoreaderService', () => {
     getDeviceFileNamingPatterns: ReturnType<typeof vi.fn>;
     getKoreaderUserDefaultPattern: ReturnType<typeof vi.fn>;
     setKoreaderUserDefaultPattern: ReturnType<typeof vi.fn>;
+    setDeviceFileNamingPattern: ReturnType<typeof vi.fn>;
+    clearDeviceFileNamingPattern: ReturnType<typeof vi.fn>;
     findBookFileIdByBookId: ReturnType<typeof vi.fn>;
     getBookProgressForDashboard: ReturnType<typeof vi.fn>;
     getChapters: ReturnType<typeof vi.fn>;
@@ -129,6 +131,8 @@ describe('KoreaderService', () => {
       getDeviceFileNamingPatterns: vi.fn().mockResolvedValue([]),
       getKoreaderUserDefaultPattern: vi.fn(),
       setKoreaderUserDefaultPattern: vi.fn().mockResolvedValue(undefined),
+      setDeviceFileNamingPattern: vi.fn().mockResolvedValue(undefined),
+      clearDeviceFileNamingPattern: vi.fn().mockResolvedValue(undefined),
       findBookFileIdByBookId: vi.fn(),
       getBookProgressForDashboard: vi.fn(),
       getChapters: vi.fn(),
@@ -618,6 +622,7 @@ describe('KoreaderService', () => {
       expect(mockPluginRepo.listSweeps).toHaveBeenCalledWith(7);
       expect(mockPluginRepo.getPluginTotals).toHaveBeenCalledWith(7);
       expect(mockPackageService.getVersionInfo).toHaveBeenCalledTimes(1);
+      expect(mockRepo.getDeviceFileNamingPatterns).not.toHaveBeenCalled();
     });
 
     it('marks only devices with older comparable plugin versions as updateable', async () => {
@@ -735,6 +740,13 @@ describe('KoreaderService', () => {
       expect(mockRepo.setKoreaderUserDefaultPattern).toHaveBeenNthCalledWith(1, 7, '{title}');
       expect(mockRepo.setKoreaderUserDefaultPattern).toHaveBeenNthCalledWith(2, 8, '{authors}/{title}');
     });
+    it('logs successful user-default pattern mutations without logging the pattern', async () => {
+      const logSpy = vi.spyOn(Logger.prototype, 'log');
+
+      await service.setKoreaderUserDefaultPattern(7, '{title}');
+
+      expect(logSpy).toHaveBeenCalledWith('[koreader.file_naming] userId=7 scope=user-default - file naming pattern updated');
+    });
   });
 
   describe('getDevices', () => {
@@ -780,6 +792,31 @@ describe('KoreaderService', () => {
     });
   });
 
+  describe('device file naming patterns', () => {
+    const config = {
+      fileNamingPattern: '{title}',
+      seriesFileNamingPattern: '{series}/{title}',
+      standaloneFileNamingPattern: 'Standalone/{title}',
+    };
+
+    it('logs successful device pattern updates', async () => {
+      const logSpy = vi.spyOn(Logger.prototype, 'log');
+
+      await service.setDeviceFileNamingPattern(7, 'device-1', config);
+
+      expect(mockRepo.setDeviceFileNamingPattern).toHaveBeenCalledWith(7, 'device-1', config);
+      expect(logSpy).toHaveBeenCalledWith('[koreader.file_naming] userId=7 deviceId=device-1 scope=device - file naming pattern updated');
+    });
+
+    it('logs successful device pattern clears', async () => {
+      const logSpy = vi.spyOn(Logger.prototype, 'log');
+
+      await service.clearDeviceFileNamingPattern(7, 'device-1');
+
+      expect(mockRepo.clearDeviceFileNamingPattern).toHaveBeenCalledWith(7, 'device-1');
+      expect(logSpy).toHaveBeenCalledWith('[koreader.file_naming] userId=7 deviceId=device-1 scope=device - file naming pattern cleared');
+    });
+  });
   describe('removeDevice', () => {
     it('delegates deletion to the repository when rows were removed', async () => {
       mockRepo.removeDevice.mockResolvedValue(3);
