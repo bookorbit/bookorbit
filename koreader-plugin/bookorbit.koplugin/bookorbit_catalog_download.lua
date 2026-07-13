@@ -27,6 +27,17 @@ local safeFilenameBase = CatalogUtil.safeFilenameBase
 
 local CatalogDownload = {}
 
+local function sanitizeDevicePath(device_path)
+    local normalized = tostring(device_path or ""):gsub("\\", "/"):gsub("^/+", "")
+    local segments = {}
+    for segment in normalized:gmatch("[^/]+") do
+        if segment == ".." then return nil end
+        if segment ~= "." then table.insert(segments, segment) end
+    end
+    if #segments == 0 then return nil end
+    return table.concat(segments, "/")
+end
+
 function CatalogDownload.install(Catalog)
     function Catalog:showFileChoices(detail)
         local files = self:supportedFiles(detail)
@@ -79,8 +90,8 @@ function CatalogDownload.install(Catalog)
 
     function Catalog:getLocalDownloadPath(filename, filetype, device_path)
         local download_dir = self:getCurrentDownloadDir()
-        if device_path and device_path ~= "" then
-            local relative = device_path:gsub("\\", "/"):gsub("^/+", "")
+        local relative = sanitizeDevicePath(device_path)
+        if relative then
             local parent = relative:match("^(.*)/[^/]+$")
             if parent and parent ~= "" then util.makePath(download_dir .. "/" .. parent) end
             return (download_dir ~= "/" and download_dir or "") .. "/" .. relative

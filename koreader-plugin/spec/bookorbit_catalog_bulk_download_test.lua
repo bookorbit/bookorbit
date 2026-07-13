@@ -22,6 +22,9 @@ package.loaded["ui/widget/infomessage"] = {
         return opts or {}
     end,
 }
+package.loaded["ui/widget/confirmbox"] = package.loaded["ui/widget/infomessage"]
+package.loaded["ui/widget/inputdialog"] = package.loaded["ui/widget/infomessage"]
+package.loaded["ui/widget/notification"] = package.loaded["ui/widget/infomessage"]
 package.loaded["ui/uimanager"] = {
     preventStandby = function()
         prevent_calls = prevent_calls + 1
@@ -53,6 +56,16 @@ package.loaded["ffi/util"] = {
         return text
     end,
 }
+local made_paths = {}
+package.loaded["util"] = {
+    makePath = function(path)
+        table.insert(made_paths, path)
+    end,
+    getSafeFilename = function(filename)
+        return filename
+    end,
+}
+package.loaded["bookorbit_state"] = {}
 package.loaded["gettext"] = function(text)
     return text
 end
@@ -77,14 +90,31 @@ package.loaded["bookorbit_catalog_util"] = {
 package.path = "koreader-plugin/bookorbit.koplugin/?.lua;" .. package.path
 
 local BulkDownload = require("bookorbit_catalog_bulk_download")
+local CatalogDownload = require("bookorbit_catalog_download")
 local Catalog = {}
 BulkDownload.install(Catalog)
+CatalogDownload.install(Catalog)
+local realBulkProcessBook = Catalog.bulkProcessBook
 
 local function assertEqual(actual, expected, label)
     if actual ~= expected then
         error(string.format("%s: expected %s, got %s", label, tostring(expected), tostring(actual)))
     end
 end
+
+G_reader_settings = {
+    readSetting = function(_, key)
+        if key == "download_dir" then return "/downloads" end
+        return nil
+    end,
+}
+
+assertEqual(Catalog:getLocalDownloadPath("fallback", "epub", "Series/Book.epub"), "/downloads/Series/Book.epub", "valid device path")
+assertEqual(made_paths[1], "/downloads/Series", "valid device parent created")
+assertEqual(Catalog:getLocalDownloadPath("fallback", "epub", "./Series//Book.epub"), "/downloads/Series/Book.epub", "dot segments normalized")
+assertEqual(Catalog:getLocalDownloadPath("fallback", "epub", "../outside.epub"), "/downloads/fallback.epub", "parent traversal falls back")
+assertEqual(Catalog:getLocalDownloadPath("fallback", "epub", "Series\\..\\..\\outside.epub"), "/downloads/fallback.epub", "mixed separator traversal falls back")
+assertEqual(#made_paths, 2, "traversal paths do not create directories")
 
 Catalog.settings = {}
 Catalog:initBulkDownloadState()
@@ -161,5 +191,61 @@ table.remove(scheduled, 1)()
 assertEqual(#processed, 1, "cancel prevents the second book from starting")
 assertEqual(cancel_ctx.cancelled, true, "cancel marks the run as stopped")
 assertEqual(Catalog.bulk_running, false, "cancel finishes the bulk run")
+
+Catalog.bulkProcessBook = realBulkProcessBook
+local collision_ctx = {
+    index = 1,
+    counts = {
+        downloaded = 0,
+        linked = 0,
+        skipped_on_device = 0,
+        skipped_unsupported = 0,
+        skipped_existing = 0,
+        path_conflicts = 0,
+        failed = 0,
+    },
+    destination_paths = {},
+    path_conflicts = {},
+    existing_files = {},
+    failed_books = {},
+    failed_titles = {},
+}
+local details = {
+    [1] = { id = 1, title = "First", files = { { id = 101, format = "epub", devicePath = "Shared/Book.epub" } } },
+    [2] = { id = 2, title = "Second", files = { { id = 102, format = "epub", devicePath = "Shared/Book.epub" } } },
+}
+local downloaded_paths = {}
+Catalog.isOnDevice = function() return false end
+Catalog.bulkSupportedFormatHint = function() return true end
+Catalog.client = {
+    catalogBook = function(_, id)
+        return details[id]
+    end,
+}
+Catalog.bulkChooseFile = function(_, detail)
+    return detail.files[1]
+end
+Catalog.bulkExistingPolicy = function()
+    return { id = "skip" }
+end
+Catalog.bulkDownloadFile = function(_, _, _, _, local_path)
+    table.insert(downloaded_paths, local_path)
+    return true, false
+end
+Catalog.bulkShowStatus = function() end
+
+Catalog:bulkProcessBook(collision_ctx, { id = 1, title = "First" })
+collision_ctx.index = 2
+Catalog:bulkProcessBook(collision_ctx, { id = 2, title = "Second" })
+
+assertEqual(downloaded_paths[1], "/downloads/Shared/Book.epub", "first collision path remains unchanged")
+assertEqual(downloaded_paths[2], "/downloads/Shared/Book [2].epub", "second collision path gains book identity")
+assertEqual(collision_ctx.counts.downloaded, 2, "both colliding books download")
+assertEqual(collision_ctx.counts.path_conflicts, 1, "collision count recorded")
+assertEqual(#collision_ctx.path_conflicts, 1, "collision detail recorded")
+assertEqual(collision_ctx.path_conflicts[1].conflicting_book_id, 1, "collision owner recorded")
+assertEqual(collision_ctx.path_conflicts[1].resolved_path, "/downloads/Shared/Book [2].epub", "resolved collision path recorded")
+assertEqual(collision_ctx.destination_paths["/downloads/shared/book.epub"].book_id, 1, "original path ownership retained")
+assertEqual(collision_ctx.destination_paths["/downloads/shared/book [2].epub"].book_id, 2, "renamed path ownership recorded")
 
 print("bookorbit_catalog_bulk_download_test.lua: ok")
