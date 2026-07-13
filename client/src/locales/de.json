@@ -11,11 +11,71 @@
     "back": "Zurück",
     "next": "Weiter",
     "previous": "Vorherige",
+    "retry": "Erneut versuchen",
     "yes": "Ja",
     "no": "Nein",
     "resetSortAria": "Sortierung auf Standard zurücksetzen"
   },
   "settings": {
+    "privacySharing": {
+      "title": "Datenschutz & Freigabe",
+      "subtitle": "Legen Sie fest, ob Administratoren eine personenbezogene Zusammenfassung Ihrer Leseaktivität sehen dürfen.",
+      "levelLegend": "Freigabestufe für Leseeinblicke",
+      "current": "Aktuelle Einstellung",
+      "levels": {
+        "private": { "title": "Privat", "description": "Nur Sie können Ihre Lesestatistiken sehen." },
+        "summary": {
+          "title": "Zusammenfassung teilen",
+          "description": "Teilen Sie zusammengefasste Gewohnheiten ohne Buchtitel, Autoren, Reihen oder Sprecher."
+        },
+        "detailed": {
+          "title": "Detaillierte Einblicke teilen",
+          "description": "Teilen Sie zusätzlich aktuelle und meistgelesene Bücher, Autoren, Reihen, Genres und Sprecher."
+        }
+      },
+      "fields": {
+        "frequency": "Lesehäufigkeit und aktive Tage",
+        "completion": "Zusammengefasste begonnene und abgeschlossene Bücher",
+        "formats": "Formatverteilung",
+        "genres": "Grobe Genreverteilung",
+        "trend": "Zusammengefasster Lesetrend",
+        "books": "Aktuelle, kürzlich und meistgelesene Buchtitel",
+        "authors": "Beliebteste Autoren",
+        "series": "Beliebteste Reihen",
+        "narrators": "Beliebteste Sprecher"
+      },
+      "confirm": {
+        "shareTitle": "{level} aktivieren?",
+        "shareDescription": "Administratoren mit Berechtigung können die folgenden Informationen sehen.",
+        "stopTitle": "Freigabe von Leseeinblicken beenden?",
+        "stopDescription": "Der Administratorzugriff wird sofort gesperrt. Vorhandene Zugriffsaufzeichnungen bleiben erhalten.",
+        "recordedNotice": "Jeder Aufruf durch einen Administrator wird aufgezeichnet und in Ihrem Zugriffsverlauf angezeigt."
+      },
+      "preview": {
+        "title": "Geteiltes Profil in der Vorschau",
+        "description": "Sehen Sie, welche Informationen autorisierten Administratoren derzeit zur Verfügung stehen.",
+        "action": "Vorschau laden",
+        "readingTime": "Lesezeit",
+        "activeDays": "Aktive Tage",
+        "started": "Begonnene Bücher",
+        "completed": "Abgeschlossene Bücher",
+        "topBooks": "Meistgelesene Bücher"
+      },
+      "history": {
+        "title": "Profilzugriffsverlauf",
+        "description": "Kürzliche Administratoraufrufe Ihres geteilten Leseprofils.",
+        "empty": "Kein Administrator hat Ihr geteiltes Leseprofil angesehen.",
+        "paginationLabel": "Seiten des Profilzugriffsverlaufs"
+      },
+      "durationMinutes": "{count} Minute | {count} Minuten",
+      "durationHours": "{count} Stunden",
+      "unknownTitle": "Buch ohne Titel",
+      "errors": {
+        "load": "Freigabeeinstellungen konnten nicht geladen werden.",
+        "save": "Freigabeeinstellungen konnten nicht aktualisiert werden.",
+        "preview": "Die Vorschau des geteilten Profils konnte nicht geladen werden."
+      }
+    },
     "appearance": {
       "language": {
         "title": "Sprache",
@@ -327,6 +387,7 @@
       "subtitleAll": "Verwalten Sie Ihr Profil und Ihre Benachrichtigungseinstellungen.",
       "tabs": {
         "profile": "Profil",
+        "privacy": "Datenschutz & Freigabe",
         "notifications": "Benachrichtigungen",
         "restrictions": "Einschränkungen"
       },
@@ -444,7 +505,7 @@
       "paused": "Pausiert",
       "deletedUser": "Gelöschter Benutzer",
       "expiredPrefix": "Abgelaufen ",
-      "never": "Nie",
+      "never": "Keine Aktivität erfasst",
       "noExpiry": "Kein Ablauf",
       "expired": "Abgelaufen",
       "expiresOn": "Läuft ab am {date}",
@@ -980,6 +1041,7 @@
       },
       "tabs": {
         "users": "Benutzer",
+        "account-activity": "Kontoaktivität",
         "magic-links": "Magic Links",
         "oidc": "OIDC / SSO"
       }
@@ -2083,6 +2145,103 @@
     }
   },
   "adminFeature": {
+    "accountActivity": {
+      "title": "Kontoaktivität",
+      "subtitle": "Prüfen Sie die Authentifizierungsaktivität von Konten, ohne den Leseverlauf offenzulegen.",
+      "privacyNotice": "Diese Seite zeigt nur Anmeldungen und Authentifizierungserneuerungen. Leseverlauf, Buchfortschritt und Bibliotheksaktivität werden nicht verwendet.",
+      "privacyLabel": "Informationen zum Datenschutz bei Kontoaktivitäten",
+      "never": "Nie",
+      "openInsightsFor": "Geteilte Leseeinblicke für {name} öffnen",
+      "permissionLabel": "Benutzeraktivität anzeigen",
+      "states": { "recent": "Kürzlich aktiv", "dormant": "Inaktiv", "never": "Keine Aktivität erfasst", "disabled": "Deaktiviert" },
+      "filters": {
+        "search": "Konten durchsuchen",
+        "searchPlaceholder": "Name oder Benutzername suchen",
+        "state": "Aktivitätsstatus",
+        "allStates": "Alle Aktivitätsstatus",
+        "provisioning": "Authentifizierungsmethode",
+        "allMethods": "Alle Authentifizierungsmethoden",
+        "sort": "Konten sortieren",
+        "mostRecent": "Zuletzt aktiv",
+        "leastRecent": "Am längsten inaktiv",
+        "lastLogin": "Neueste Anmeldung",
+        "newest": "Neueste Konten",
+        "oldest": "Älteste Konten",
+        "name": "Name",
+        "apply": "Anwenden",
+        "clear": "Löschen"
+      },
+      "methods": { "local": "Lokal", "manual": "Von Administrator erstellt", "oidc": "OIDC / SSO", "shared": "Geteilter Magic Link" },
+      "columns": {
+        "user": "Benutzer",
+        "state": "Kontostatus",
+        "lastLogin": "Letzte Anmeldung",
+        "lastAuthenticated": "Letzte Authentifizierung",
+        "created": "Erstellt",
+        "readingInsights": "Leseeinblicke"
+      },
+      "sharing": { "private": "Nicht geteilt", "summary": "Zusammenfassung geteilt", "detailed": "Details geteilt" },
+      "empty": { "title": "Keine Konten gefunden", "description": "Ändern oder löschen Sie die aktuellen Filter." },
+      "pagination": { "label": "Seiten der Kontoaktivität", "page": "Seite {page} von {totalPages}" },
+      "errors": { "load": "Kontoaktivität konnte nicht geladen werden." }
+    },
+    "sharedInsights": {
+      "title": "Geteilte Leseeinblicke",
+      "subtitle": "Leseinformationen, die dieser Benutzer freiwillig geteilt hat.",
+      "auditNotice": "Der Zugriff auf dieses Profil wird aufgezeichnet und ist für den Benutzer sichtbar.",
+      "period": "Berichtszeitraum",
+      "periodDays": "Letzte {count} Tage",
+      "durationMinutes": "{count} Minute | {count} Minuten",
+      "durationHours": "{count} Stunden",
+      "metrics": {
+        "sessions": "Sitzungen",
+        "readingTime": "Lesezeit",
+        "activeDays": "Aktive Tage",
+        "started": "Begonnene Bücher",
+        "completed": "Abgeschlossene Bücher"
+      },
+      "trend": "Täglicher Lesetrend",
+      "emptyTitle": "Keine Leseaktivität in diesem Zeitraum",
+      "noData": "Für diesen Zeitraum sind keine Lesedaten erfasst.",
+      "sessionCount": "{count} Sitzung | {count} Sitzungen",
+      "sourceNames": { "web": "Web-Reader", "koreader": "KOReader", "manual": "Manuell", "kobo": "Kobo", "unknown": "Unbekannt" },
+      "formats": "Formate",
+      "genres": "Genres",
+      "broadGenres": {
+        "science_fiction": "Science-Fiction",
+        "fantasy": "Fantasy",
+        "mystery_thriller": "Krimi & Thriller",
+        "romance": "Romantik",
+        "horror": "Horror",
+        "history_biography": "Geschichte & Biografie",
+        "science_technology": "Wissenschaft & Technik",
+        "business_economics": "Wirtschaft & Ökonomie",
+        "self_development": "Persönliche Entwicklung",
+        "society_culture": "Gesellschaft & Kultur",
+        "children_young_adult": "Kinder & Jugendliche",
+        "comics_graphic_novels": "Comics & Graphic Novels",
+        "poetry": "Lyrik",
+        "other": "Sonstiges"
+      },
+      "sources": "Datenquellen",
+      "topBooks": "Meistgelesene Bücher",
+      "recentBooks": "Kürzlich gelesen",
+      "unknownTitle": "Buch ohne Titel",
+      "top": {
+        "authors": "Beliebteste Autoren",
+        "genres": "Beliebteste Genres",
+        "series": "Beliebteste Reihen",
+        "narrators": "Beliebteste Sprecher"
+      },
+      "errors": {
+        "READING_INSIGHTS_PRIVATE": "Dieser Benutzer teilt keine Leseeinblicke.",
+        "READING_INSIGHTS_SUMMARY_ONLY": "Dieser Benutzer teilt nur eine Zusammenfassung.",
+        "READING_INSIGHTS_VIEW_SESSION_REQUIRED": "Eine Profilansichtssitzung ist erforderlich.",
+        "READING_INSIGHTS_VIEW_SESSION_INVALID": "Diese Profilansicht ist abgelaufen oder nicht mehr gültig.",
+        "LOAD_FAILED": "Geteilte Leseeinblicke konnten nicht geladen werden.",
+        "cleared": "Es werden keine zuvor geladenen Profilinformationen angezeigt."
+      }
+    },
     "resetLink": {
       "title": "Link zum Zurücksetzen des Passworts",
       "description": "Teilen Sie diesen Link mit dem Benutzer. Er läuft in 15 Minuten ab.",
@@ -2121,6 +2280,7 @@
         "devicesAccess": "Geräte & Zugriff",
         "email": "E-Mail",
         "administration": "Verwaltung",
+        "notifications": "Benachrichtigungen",
         "restrictions": "Einschränkungen"
       },
       "superuserTarget": "Superuser-Ziel",
@@ -6030,6 +6190,7 @@
     },
     "admin": {
       "users": "Benutzer",
+      "account-activity": "Kontoaktivität",
       "magic-links": "Magic Links",
       "oidc": "OIDC / SSO"
     },
@@ -6041,6 +6202,7 @@
     },
     "account": {
       "profile": "Konto",
+      "privacy": "Datenschutz und Freigabe",
       "notifications": "Benachrichtigungen",
       "restrictions": "Inhaltsbeschränkungen"
     }

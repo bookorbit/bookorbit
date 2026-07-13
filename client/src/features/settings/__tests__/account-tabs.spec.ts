@@ -3,12 +3,12 @@ import { ACCOUNT_TABS, normalizeAccountTab } from '../lib/account-tabs'
 
 describe('account-tabs', () => {
   describe('ACCOUNT_TABS', () => {
-    it('contains exactly profile, notifications, and restrictions', () => {
-      expect(ACCOUNT_TABS).toEqual(['profile', 'notifications', 'restrictions'])
+    it('contains the account settings tabs in display order', () => {
+      expect(ACCOUNT_TABS).toEqual(['profile', 'privacy', 'notifications', 'restrictions'])
     })
 
-    it('has length 3', () => {
-      expect(ACCOUNT_TABS.length).toBe(3)
+    it('has length 4', () => {
+      expect(ACCOUNT_TABS.length).toBe(4)
     })
   })
 
@@ -39,6 +39,10 @@ describe('account-tabs', () => {
 
     it('returns notifications when given "notifications"', () => {
       expect(normalizeAccountTab('notifications')).toBe('notifications')
+    })
+
+    it('returns privacy when given "privacy"', () => {
+      expect(normalizeAccountTab('privacy')).toBe('privacy')
     })
 
     it('returns restrictions when given "restrictions"', () => {

@@ -31,4 +31,5 @@ export * from './achievements';
 export * from './hardcover';
 export * from './readwise';
 export * from './storygraph';
+export * from './shared-reading-insights';
 export * from './user-preferences';

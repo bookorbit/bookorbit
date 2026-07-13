@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RouteLocationMatched, RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { i18n, setI18nLocale } from '@/i18n'
 import { registerRouteTitleHook, resolveRouteTitle } from '@/router/title-resolver'
+import router from '@/router'
 
 function routeWithMeta(title: string | ((route: RouteLocationNormalizedLoaded) => string) | undefined): RouteLocationNormalizedLoaded {
   return {
@@ -28,6 +29,12 @@ describe('resolveRouteTitle', () => {
 
   it('falls back to app title when route title is missing', () => {
     expect(resolveRouteTitle(routeWithMeta(undefined))).toBe('BookOrbit')
+  })
+
+  it('resolves the account activity admin tab title', () => {
+    const route = router.resolve('/settings/admin?tab=account-activity')
+
+    expect(resolveRouteTitle(route as unknown as RouteLocationNormalizedLoaded)).toBe('Account Activity · BookOrbit')
   })
 
   it('refreshes the current route title when the locale changes', async () => {

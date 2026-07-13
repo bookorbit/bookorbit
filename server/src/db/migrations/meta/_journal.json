@@ -358,6 +358,13 @@
       "when": 1783874453297,
       "tag": "0050_reading-attempts",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1783916699394,
+      "tag": "0051_add_account_activity_and_shared_insights",
+      "breakpoints": true
     }
   ]
 }

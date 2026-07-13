@@ -12,10 +12,70 @@
     "back": "Terug",
     "next": "Volgende",
     "previous": "Vorige",
+    "retry": "Opnieuw proberen",
     "yes": "Ja",
     "no": "Nee"
   },
   "settings": {
+    "privacySharing": {
+      "title": "Privacy & delen",
+      "subtitle": "Bepaal of beheerders een herkenbare samenvatting van je leesactiviteit mogen zien.",
+      "levelLegend": "Deelniveau voor leesinzichten",
+      "current": "Huidige instelling",
+      "levels": {
+        "private": { "title": "Privé", "description": "Alleen jij kunt je leesstatistieken zien." },
+        "summary": {
+          "title": "Samenvatting delen",
+          "description": "Deel samengevoegde gewoonten zonder boektitels, auteurs, reeksen of vertellers."
+        },
+        "detailed": {
+          "title": "Gedetailleerde inzichten delen",
+          "description": "Deel ook recente en meest gelezen boeken, auteurs, reeksen, genres en vertellers."
+        }
+      },
+      "fields": {
+        "frequency": "Leesfrequentie en actieve dagen",
+        "completion": "Totaal gestarte en voltooide boeken",
+        "formats": "Verdeling van formaten",
+        "genres": "Globale genreverdeling",
+        "trend": "Samengevoegde leestrend",
+        "books": "Huidige, recente en meest gelezen boektitels",
+        "authors": "Populairste auteurs",
+        "series": "Populairste reeksen",
+        "narrators": "Populairste vertellers"
+      },
+      "confirm": {
+        "shareTitle": "{level} inschakelen?",
+        "shareDescription": "Beheerders met toestemming kunnen de volgende informatie zien.",
+        "stopTitle": "Stoppen met het delen van leesinzichten?",
+        "stopDescription": "Toegang voor beheerders wordt onmiddellijk geblokkeerd. Bestaande toegangsregistraties blijven bewaard.",
+        "recordedNotice": "Elke profielweergave door een beheerder wordt geregistreerd en verschijnt in je toegangsgeschiedenis."
+      },
+      "preview": {
+        "title": "Voorbeeld van je gedeelde profiel",
+        "description": "Bekijk welke informatie momenteel beschikbaar is voor bevoegde beheerders.",
+        "action": "Voorbeeld laden",
+        "readingTime": "Leestijd",
+        "activeDays": "Actieve dagen",
+        "started": "Gestarte boeken",
+        "completed": "Voltooide boeken",
+        "topBooks": "Meest gelezen boeken"
+      },
+      "history": {
+        "title": "Geschiedenis van profieltoegang",
+        "description": "Recente beheerderweergaven van je gedeelde leesprofiel.",
+        "empty": "Geen beheerder heeft je gedeelde leesprofiel bekeken.",
+        "paginationLabel": "Pagina's met profieltoegangsgeschiedenis"
+      },
+      "durationMinutes": "{count} minuut | {count} minuten",
+      "durationHours": "{count} uur",
+      "unknownTitle": "Boek zonder titel",
+      "errors": {
+        "load": "Deelinstellingen konden niet worden geladen.",
+        "save": "Deelinstellingen konden niet worden bijgewerkt.",
+        "preview": "Het voorbeeld van het gedeelde profiel kon niet worden geladen."
+      }
+    },
     "appearance": {
       "language": {
         "title": "Taal",
@@ -327,6 +387,7 @@
       "subtitleAll": "Beheer je profiel en meldingsvoorkeuren.",
       "tabs": {
         "profile": "Profiel",
+        "privacy": "Privacy & delen",
         "notifications": "Meldingen",
         "restrictions": "Beperkingen"
       },
@@ -444,7 +505,7 @@
       "paused": "Gepauzeerd",
       "deletedUser": "Verwijderde gebruiker",
       "expiredPrefix": "Verlopen ",
-      "never": "Nooit",
+      "never": "Geen activiteit vastgelegd",
       "noExpiry": "Geen vervaldatum",
       "expired": "Verlopen",
       "expiresOn": "Verloopt {date}",
@@ -980,6 +1041,7 @@
       },
       "tabs": {
         "users": "Gebruikers",
+        "account-activity": "Accountactiviteit",
         "magic-links": "Magische links",
         "oidc": "OIDC / SSO"
       }
@@ -2083,6 +2145,103 @@
     }
   },
   "adminFeature": {
+    "accountActivity": {
+      "title": "Accountactiviteit",
+      "subtitle": "Bekijk authenticatieactiviteit zonder leesgeschiedenis openbaar te maken.",
+      "privacyNotice": "Deze pagina toont alleen aanmeldingen en authenticatievernieuwingen. Leesgeschiedenis, boekvoortgang en bibliotheekactiviteit worden niet gebruikt.",
+      "privacyLabel": "Over privacy van accountactiviteit",
+      "never": "Nooit",
+      "openInsightsFor": "Gedeelde leesinzichten voor {name} openen",
+      "permissionLabel": "Gebruikersactiviteit bekijken",
+      "states": { "recent": "Onlangs actief", "dormant": "Inactief", "never": "Geen activiteit vastgelegd", "disabled": "Uitgeschakeld" },
+      "filters": {
+        "search": "Accounts zoeken",
+        "searchPlaceholder": "Zoek op naam of gebruikersnaam",
+        "state": "Activiteitsstatus",
+        "allStates": "Alle activiteitsstatussen",
+        "provisioning": "Authenticatiemethode",
+        "allMethods": "Alle authenticatiemethoden",
+        "sort": "Accounts sorteren",
+        "mostRecent": "Meest recent actief",
+        "leastRecent": "Minst recent actief",
+        "lastLogin": "Meest recente aanmelding",
+        "newest": "Nieuwste accounts",
+        "oldest": "Oudste accounts",
+        "name": "Naam",
+        "apply": "Toepassen",
+        "clear": "Wissen"
+      },
+      "methods": { "local": "Lokaal", "manual": "Aangemaakt door beheerder", "oidc": "OIDC / SSO", "shared": "Gedeelde magische link" },
+      "columns": {
+        "user": "Gebruiker",
+        "state": "Accountstatus",
+        "lastLogin": "Laatste aanmelding",
+        "lastAuthenticated": "Laatst geauthenticeerd",
+        "created": "Aangemaakt",
+        "readingInsights": "Leesinzichten"
+      },
+      "sharing": { "private": "Niet gedeeld", "summary": "Samenvatting gedeeld", "detailed": "Details gedeeld" },
+      "empty": { "title": "Geen accounts gevonden", "description": "Wijzig of wis de huidige filters." },
+      "pagination": { "label": "Pagina's met accountactiviteit", "page": "Pagina {page} van {totalPages}" },
+      "errors": { "load": "Accountactiviteit kon niet worden geladen." }
+    },
+    "sharedInsights": {
+      "title": "Gedeelde leesinzichten",
+      "subtitle": "Leesinformatie die deze gebruiker vrijwillig heeft gedeeld.",
+      "auditNotice": "Toegang tot dit profiel wordt geregistreerd en is zichtbaar voor de gebruiker.",
+      "period": "Rapportageperiode",
+      "periodDays": "Afgelopen {count} dagen",
+      "durationMinutes": "{count} minuut | {count} minuten",
+      "durationHours": "{count} uur",
+      "metrics": {
+        "sessions": "Sessies",
+        "readingTime": "Leestijd",
+        "activeDays": "Actieve dagen",
+        "started": "Gestarte boeken",
+        "completed": "Voltooide boeken"
+      },
+      "trend": "Dagelijkse leestrend",
+      "emptyTitle": "Geen leesactiviteit in deze periode",
+      "noData": "Er zijn geen leesgegevens vastgelegd voor deze periode.",
+      "sessionCount": "{count} sessie | {count} sessies",
+      "sourceNames": { "web": "Weblezer", "koreader": "KOReader", "manual": "Handmatig", "kobo": "Kobo", "unknown": "Onbekend" },
+      "formats": "Formaten",
+      "genres": "Genres",
+      "broadGenres": {
+        "science_fiction": "Sciencefiction",
+        "fantasy": "Fantasy",
+        "mystery_thriller": "Mysterie & thriller",
+        "romance": "Romantiek",
+        "horror": "Horror",
+        "history_biography": "Geschiedenis & biografie",
+        "science_technology": "Wetenschap & technologie",
+        "business_economics": "Bedrijf & economie",
+        "self_development": "Persoonlijke ontwikkeling",
+        "society_culture": "Maatschappij & cultuur",
+        "children_young_adult": "Kinderen & jongeren",
+        "comics_graphic_novels": "Strips & beeldromans",
+        "poetry": "Poëzie",
+        "other": "Overig"
+      },
+      "sources": "Gegevensbronnen",
+      "topBooks": "Meest gelezen boeken",
+      "recentBooks": "Recent gelezen",
+      "unknownTitle": "Boek zonder titel",
+      "top": {
+        "authors": "Populairste auteurs",
+        "genres": "Populairste genres",
+        "series": "Populairste reeksen",
+        "narrators": "Populairste vertellers"
+      },
+      "errors": {
+        "READING_INSIGHTS_PRIVATE": "Deze gebruiker deelt geen leesinzichten.",
+        "READING_INSIGHTS_SUMMARY_ONLY": "Deze gebruiker deelt alleen een samenvatting.",
+        "READING_INSIGHTS_VIEW_SESSION_REQUIRED": "Een profielweergavesessie is vereist.",
+        "READING_INSIGHTS_VIEW_SESSION_INVALID": "Deze profielweergave is verlopen of niet meer geldig.",
+        "LOAD_FAILED": "Gedeelde leesinzichten konden niet worden geladen.",
+        "cleared": "Eerder geladen profielinformatie wordt niet weergegeven."
+      }
+    },
     "resetLink": {
       "title": "Wachtwoordherstellink",
       "description": "Deel deze link met de gebruiker. Deze verloopt over 15 minuten.",
@@ -2121,6 +2280,7 @@
         "devicesAccess": "Apparaten & toegang",
         "email": "E-mail",
         "administration": "Beheer",
+        "notifications": "Meldingen",
         "restrictions": "Beperkingen"
       },
       "superuserTarget": "Supergebruiker",
@@ -6030,6 +6190,7 @@
     },
     "admin": {
       "users": "Gebruikers",
+      "account-activity": "Accountactiviteit",
       "magic-links": "Magische links",
       "oidc": "OIDC / SSO"
     },
@@ -6041,6 +6202,7 @@
     },
     "account": {
       "profile": "Account",
+      "privacy": "Privacy en delen",
       "notifications": "Meldingen",
       "restrictions": "Inhoudsbeperkingen"
     }

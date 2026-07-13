@@ -1,12 +1,12 @@
 {
-  "totalRoutes": 354,
+  "totalRoutes": 367,
   "byPermission": {
-    "(none)": 161,
+    "(none)": 164,
     "Permission.ManageMetadataConfig": 32,
     "Permission.EmailSend": 30,
     "Permission.LibraryEditMetadata": 31,
     "Permission.BookDockAccess": 17,
-    "Permission.ManageAppSettings": 23,
+    "Permission.ManageAppSettings": 22,
     "Permission.ManageLibraries": 14,
     "Permission.ManageUsers": 10,
     "Permission.ManageEmail": 8,
@@ -16,13 +16,27 @@
     "Permission.KoreaderSync": 8,
     "Permission.OpdsAccess": 4,
     "Permission.ViewAuditLog": 1,
+    "Permission.ViewUserActivity": 6,
     "Permission.LibraryDeleteBooks": 1,
     "Permission.LibraryDownload": 1,
-    "Permission.LibraryUpload": 1
+    "Permission.LibraryUpload": 1,
+    "Permission.ManageIcons": 1,
+    "Permission.HardcoverSync": 1,
+    "Permission.ReadwiseSync": 1,
+    "Permission.StorygraphSync": 1
   },
   "byLibraryAccess": {
     "'viewer'": 3,
     "'editor'": 1
   },
-  "routeChunks": ["routes-01.json", "routes-02.json", "routes-03.json", "routes-04.json", "routes-05.json", "routes-06.json", "routes-07.json"]
+  "routeChunks": [
+    "routes-01.json",
+    "routes-02.json",
+    "routes-03.json",
+    "routes-04.json",
+    "routes-05.json",
+    "routes-06.json",
+    "routes-07.json",
+    "routes-08.json"
+  ]
 }

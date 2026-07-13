@@ -11,11 +11,68 @@
     "back": "Nazaj",
     "next": "Naprej",
     "previous": "Prejšnji",
+    "retry": "Poskusi znova",
     "yes": "Da",
     "no": "Ne",
     "resetSortAria": "Ponastavi razvrščanje na privzeto"
   },
   "settings": {
+    "privacySharing": {
+      "title": "Zasebnost in deljenje",
+      "subtitle": "Določite, ali lahko skrbniki vidijo prepoznavni povzetek vaše bralne dejavnosti.",
+      "levelLegend": "Raven deljenja bralnih vpogledov",
+      "current": "Trenutna nastavitev",
+      "levels": {
+        "private": { "title": "Zasebno", "description": "Samo vi lahko vidite svojo bralno statistiko." },
+        "summary": { "title": "Deli povzetek", "description": "Delite združene navade brez naslovov knjig, avtorjev, zbirk ali pripovedovalcev." },
+        "detailed": {
+          "title": "Deli podrobne vpoglede",
+          "description": "Delite tudi nedavne in najbolj brane knjige, avtorje, zbirke, žanre in pripovedovalce."
+        }
+      },
+      "fields": {
+        "frequency": "Pogostost branja in aktivni dnevi",
+        "completion": "Skupno število začetih in dokončanih knjig",
+        "formats": "Porazdelitev formatov",
+        "genres": "Splošna porazdelitev žanrov",
+        "trend": "Združeni trend branja",
+        "books": "Trenutni, nedavni in najbolj brani naslovi knjig",
+        "authors": "Najbolj brani avtorji",
+        "series": "Najbolj brane zbirke",
+        "narrators": "Najbolj poslušani pripovedovalci"
+      },
+      "confirm": {
+        "shareTitle": "Omogočim {level}?",
+        "shareDescription": "Skrbniki z dovoljenjem bodo lahko videli naslednje podatke.",
+        "stopTitle": "Prenehate deliti bralne vpoglede?",
+        "stopDescription": "Dostop skrbnikov bo takoj onemogočen. Obstoječi zapisi dostopa ostanejo v zgodovini.",
+        "recordedNotice": "Vsak ogled profila s strani skrbnika se zabeleži in prikaže v vaši zgodovini dostopov."
+      },
+      "preview": {
+        "title": "Predogled deljenega profila",
+        "description": "Oglejte si podatke, ki so trenutno na voljo pooblaščenim skrbnikom.",
+        "action": "Naloži predogled",
+        "readingTime": "Čas branja",
+        "activeDays": "Aktivni dnevi",
+        "started": "Začete knjige",
+        "completed": "Dokončane knjige",
+        "topBooks": "Najbolj brane knjige"
+      },
+      "history": {
+        "title": "Zgodovina dostopov do profila",
+        "description": "Nedavni skrbniški ogledi vašega deljenega bralnega profila.",
+        "empty": "Noben skrbnik si še ni ogledal vašega deljenega bralnega profila.",
+        "paginationLabel": "Strani zgodovine dostopov do profila"
+      },
+      "durationMinutes": "{count} minuta | {count} minuti | {count} minute | {count} minut",
+      "durationHours": "{count} ur",
+      "unknownTitle": "Knjiga brez naslova",
+      "errors": {
+        "load": "Nastavitev deljenja ni bilo mogoče naložiti.",
+        "save": "Nastavitev deljenja ni bilo mogoče posodobiti.",
+        "preview": "Predogleda deljenega profila ni bilo mogoče naložiti."
+      }
+    },
     "appearance": {
       "language": {
         "title": "Jezik",
@@ -327,6 +384,7 @@
       "subtitleAll": "Upravljajte nastavitve profila in obvestil.",
       "tabs": {
         "profile": "Profil",
+        "privacy": "Zasebnost in deljenje",
         "notifications": "Obvestila",
         "restrictions": "Omejitve"
       },
@@ -444,7 +502,7 @@
       "paused": "Ustavljeno",
       "deletedUser": "Izbrisan uporabnik",
       "expiredPrefix": "Poteklo ",
-      "never": "Nikoli",
+      "never": "Ni zabeležene dejavnosti",
       "noExpiry": "Brez izteka",
       "expired": "Poteklo",
       "expiresOn": "Poteče {date}",
@@ -980,6 +1038,7 @@
       },
       "tabs": {
         "users": "Uporabniki",
+        "account-activity": "Dejavnost računov",
         "magic-links": "Čarobne povezave",
         "oidc": "OIDC / SSO"
       }
@@ -2083,6 +2142,103 @@
     }
   },
   "adminFeature": {
+    "accountActivity": {
+      "title": "Dejavnost računov",
+      "subtitle": "Preglejte dejavnost preverjanja pristnosti brez razkrivanja zgodovine branja.",
+      "privacyNotice": "Ta stran prikazuje samo prijave in osvežitve preverjanja pristnosti. Ne uporablja zgodovine branja, napredka knjig ali dejavnosti knjižnice.",
+      "privacyLabel": "O zasebnosti dejavnosti računov",
+      "never": "Nikoli",
+      "openInsightsFor": "Odpri deljene bralne vpoglede za {name}",
+      "permissionLabel": "Ogled dejavnosti uporabnikov",
+      "states": { "recent": "Nedavno aktiven", "dormant": "Nedejaven", "never": "Ni zabeležene dejavnosti", "disabled": "Onemogočen" },
+      "filters": {
+        "search": "Iskanje računov",
+        "searchPlaceholder": "Išči po imenu ali uporabniškem imenu",
+        "state": "Stanje dejavnosti",
+        "allStates": "Vsa stanja dejavnosti",
+        "provisioning": "Način preverjanja pristnosti",
+        "allMethods": "Vsi načini preverjanja pristnosti",
+        "sort": "Razvrsti račune",
+        "mostRecent": "Nazadnje aktivni",
+        "leastRecent": "Najdlje neaktivni",
+        "lastLogin": "Najnovejša prijava",
+        "newest": "Najnovejši računi",
+        "oldest": "Najstarejši računi",
+        "name": "Ime",
+        "apply": "Uporabi",
+        "clear": "Počisti"
+      },
+      "methods": { "local": "Lokalno", "manual": "Ustvaril skrbnik", "oidc": "OIDC / SSO", "shared": "Deljena čarobna povezava" },
+      "columns": {
+        "user": "Uporabnik",
+        "state": "Stanje računa",
+        "lastLogin": "Zadnja prijava",
+        "lastAuthenticated": "Zadnje preverjanje pristnosti",
+        "created": "Ustvarjeno",
+        "readingInsights": "Bralni vpogledi"
+      },
+      "sharing": { "private": "Ni deljeno", "summary": "Deljen povzetek", "detailed": "Deljene podrobnosti" },
+      "empty": { "title": "Ni najdenih računov", "description": "Spremenite ali počistite trenutne filtre." },
+      "pagination": { "label": "Strani dejavnosti računov", "page": "Stran {page} od {totalPages}" },
+      "errors": { "load": "Dejavnosti računov ni bilo mogoče naložiti." }
+    },
+    "sharedInsights": {
+      "title": "Deljeni bralni vpogledi",
+      "subtitle": "Bralni podatki, ki jih je ta uporabnik prostovoljno delil.",
+      "auditNotice": "Dostop do tega profila se zabeleži in je viden uporabniku.",
+      "period": "Obdobje poročila",
+      "periodDays": "Zadnjih {count} dni",
+      "durationMinutes": "{count} minuta | {count} minuti | {count} minute | {count} minut",
+      "durationHours": "{count} ur",
+      "metrics": {
+        "sessions": "Seje",
+        "readingTime": "Čas branja",
+        "activeDays": "Aktivni dnevi",
+        "started": "Začete knjige",
+        "completed": "Dokončane knjige"
+      },
+      "trend": "Dnevni bralni trend",
+      "emptyTitle": "V tem obdobju ni bralne dejavnosti",
+      "noData": "Za to obdobje ni zabeleženih podatkov o branju.",
+      "sessionCount": "{count} seja | {count} seji | {count} seje | {count} sej",
+      "sourceNames": { "web": "Spletni bralnik", "koreader": "KOReader", "manual": "Ročno", "kobo": "Kobo", "unknown": "Neznano" },
+      "formats": "Formati",
+      "genres": "Žanri",
+      "broadGenres": {
+        "science_fiction": "Znanstvena fantastika",
+        "fantasy": "Fantazija",
+        "mystery_thriller": "Skrivnost & triler",
+        "romance": "Romantika",
+        "horror": "Grozljivka",
+        "history_biography": "Zgodovina & biografija",
+        "science_technology": "Znanost & tehnologija",
+        "business_economics": "Poslovanje & ekonomija",
+        "self_development": "Osebni razvoj",
+        "society_culture": "Družba & kultura",
+        "children_young_adult": "Otroci & mladina",
+        "comics_graphic_novels": "Stripi & risoromani",
+        "poetry": "Poezija",
+        "other": "Drugo"
+      },
+      "sources": "Viri podatkov",
+      "topBooks": "Najbolj brane knjige",
+      "recentBooks": "Nedavno brano",
+      "unknownTitle": "Knjiga brez naslova",
+      "top": {
+        "authors": "Najbolj brani avtorji",
+        "genres": "Najbolj brani žanri",
+        "series": "Najbolj brane zbirke",
+        "narrators": "Najbolj poslušani pripovedovalci"
+      },
+      "errors": {
+        "READING_INSIGHTS_PRIVATE": "Ta uporabnik ne deli bralnih vpogledov.",
+        "READING_INSIGHTS_SUMMARY_ONLY": "Ta uporabnik deli samo povzetek.",
+        "READING_INSIGHTS_VIEW_SESSION_REQUIRED": "Potrebna je seja ogleda profila.",
+        "READING_INSIGHTS_VIEW_SESSION_INVALID": "Ta ogled profila je potekel ali ni več veljaven.",
+        "LOAD_FAILED": "Deljenih bralnih vpogledov ni bilo mogoče naložiti.",
+        "cleared": "Predhodno naloženi podatki profila niso prikazani."
+      }
+    },
     "resetLink": {
       "title": "Povezava za ponastavitev gesla",
       "description": "To povezavo delite z uporabnikom. Poteče čez 15 minut.",
@@ -2121,6 +2277,7 @@
         "devicesAccess": "Naprave in dostop",
         "email": "E-pošta",
         "administration": "Administracija",
+        "notifications": "Obvestila",
         "restrictions": "Omejitve"
       },
       "superuserTarget": "Cilj superuporabnika",
@@ -6030,6 +6187,7 @@
     },
     "admin": {
       "users": "Uporabniki",
+      "account-activity": "Dejavnost računa",
       "magic-links": "Čarobne povezave",
       "oidc": "OIDC / SSO"
     },
@@ -6041,6 +6199,7 @@
     },
     "account": {
       "profile": "Račun",
+      "privacy": "Zasebnost in deljenje",
       "notifications": "Obvestila",
       "restrictions": "Omejitve vsebine"
     }

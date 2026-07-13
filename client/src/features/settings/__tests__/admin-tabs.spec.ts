@@ -3,12 +3,12 @@ import { ADMIN_TABS, ADMIN_TAB_INFO, normalizeAdminTab } from '../lib/admin-tabs
 
 describe('admin-tabs', () => {
   describe('ADMIN_TABS', () => {
-    it('contains exactly users, oidc, and magic-links', () => {
-      expect(ADMIN_TABS).toEqual(['users', 'oidc', 'magic-links'])
+    it('contains exactly users, account activity, oidc, and magic-links', () => {
+      expect(ADMIN_TABS).toEqual(['users', 'account-activity', 'oidc', 'magic-links'])
     })
 
-    it('has length 3', () => {
-      expect(ADMIN_TABS.length).toBe(3)
+    it('has length 4', () => {
+      expect(ADMIN_TABS.length).toBe(4)
     })
   })
 
@@ -32,6 +32,11 @@ describe('admin-tabs', () => {
 
     it('oidc entry has manage_app_settings permission', () => {
       expect(ADMIN_TAB_INFO.oidc.permission).toBe('manage_app_settings')
+    })
+
+    it('account activity entry has view_user_activity permission', () => {
+      expect(ADMIN_TAB_INFO['account-activity'].permission).toBe('view_user_activity')
+      expect(ADMIN_TAB_INFO['account-activity'].titleKey).toBe('titles.admin.account-activity')
     })
 
     it('magic-links entry is superuser-only', () => {
@@ -66,6 +71,10 @@ describe('admin-tabs', () => {
 
     it('returns oidc when given "oidc"', () => {
       expect(normalizeAdminTab('oidc')).toBe('oidc')
+    })
+
+    it('returns account-activity when requested', () => {
+      expect(normalizeAdminTab('account-activity')).toBe('account-activity')
     })
 
     it('returns magic-links when given "magic-links"', () => {

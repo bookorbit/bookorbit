@@ -1,4 +1,4 @@
-export const ACCOUNT_TABS = ['profile', 'notifications', 'restrictions'] as const
+export const ACCOUNT_TABS = ['profile', 'privacy', 'notifications', 'restrictions'] as const
 
 export type AccountTab = (typeof ACCOUNT_TABS)[number]
 

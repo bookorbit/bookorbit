@@ -61,7 +61,20 @@ const PERMISSION_GROUPS: { id: string; label: string; permissions: Permission[] 
   {
     id: 'administration',
     label: 'Administration',
-    permissions: [Permission.ManageLibraries, Permission.ManageMetadataConfig, Permission.ManageAppSettings, Permission.ManageUsers],
+    permissions: [
+      Permission.ManageLibraries,
+      Permission.ManageMetadataConfig,
+      Permission.ManageIcons,
+      Permission.ManageAppSettings,
+      Permission.ManageUsers,
+      Permission.ViewUserActivity,
+      Permission.ViewAuditLog,
+    ],
+  },
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    permissions: [Permission.NotificationAccess],
   },
   {
     id: 'restrictions',
@@ -73,6 +86,11 @@ const PERMISSION_GROUPS: { id: string; label: string; permissions: Permission[] 
 const permissionGroups = computed(() =>
   PERMISSION_GROUPS.map((group) => ({ ...group, label: t(`adminFeature.userForm.permissionGroups.${group.id}`) })),
 )
+
+function permissionLabel(permission: Permission): string {
+  if (permission === Permission.ViewUserActivity) return t('adminFeature.accountActivity.permissionLabel')
+  return PERMISSION_LABELS[permission] ?? permission
+}
 
 const name = ref('')
 const username = ref('')
@@ -456,7 +474,7 @@ async function handleSubmit() {
                       @change="togglePermission(permName)"
                       class="mt-0.5 h-4 w-4 rounded border-input"
                     />
-                    <span class="text-sm text-foreground leading-tight">{{ PERMISSION_LABELS[permName] ?? permName }}</span>
+                    <span class="text-sm text-foreground leading-tight">{{ permissionLabel(permName) }}</span>
                   </label>
                 </div>
               </div>

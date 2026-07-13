@@ -12,10 +12,64 @@
     "back": "Back",
     "next": "Next",
     "previous": "Previous",
+    "retry": "Retry",
     "yes": "Yes",
     "no": "No"
   },
   "settings": {
+    "privacySharing": {
+      "title": "Privacy & Sharing",
+      "subtitle": "Control whether administrators can see an identifiable summary of your reading activity.",
+      "levelLegend": "Reading insights sharing level",
+      "current": "Current setting",
+      "levels": {
+        "private": { "title": "Private", "description": "Only you can see your reading statistics." },
+        "summary": { "title": "Share summary", "description": "Share aggregate habits without book titles, authors, series, or narrators." },
+        "detailed": { "title": "Share detailed insights", "description": "Also share recent and top books, authors, series, genres, and narrators." }
+      },
+      "fields": {
+        "frequency": "Reading frequency and active days",
+        "completion": "Aggregate books started and completed",
+        "formats": "Format distribution",
+        "genres": "Broad genre distribution",
+        "trend": "Aggregate reading trend",
+        "books": "Current, recent, and most-read book titles",
+        "authors": "Top authors",
+        "series": "Top series",
+        "narrators": "Top narrators"
+      },
+      "confirm": {
+        "shareTitle": "Enable {level}?",
+        "shareDescription": "Administrators with permission will be able to see the following information.",
+        "stopTitle": "Stop sharing reading insights?",
+        "stopDescription": "Administrator access will be blocked immediately. Existing access records remain in your history.",
+        "recordedNotice": "Each administrator profile view is recorded and appears in your access history."
+      },
+      "preview": {
+        "title": "Preview your shared profile",
+        "description": "See the information currently available to authorized administrators.",
+        "action": "Load preview",
+        "readingTime": "Reading time",
+        "activeDays": "Active days",
+        "started": "Books started",
+        "completed": "Books completed",
+        "topBooks": "Top books"
+      },
+      "history": {
+        "title": "Profile access history",
+        "description": "Recent administrator views of your shared reading profile.",
+        "empty": "No administrator has viewed your shared reading profile.",
+        "paginationLabel": "Profile access history pages"
+      },
+      "durationMinutes": "{count} minute | {count} minutes",
+      "durationHours": "{count} hours",
+      "unknownTitle": "Untitled book",
+      "errors": {
+        "load": "Failed to load sharing settings.",
+        "save": "Failed to update sharing settings.",
+        "preview": "Failed to load the shared-profile preview."
+      }
+    },
     "appearance": {
       "language": {
         "title": "Language",
@@ -327,6 +381,7 @@
       "subtitleAll": "Manage your profile and notification preferences.",
       "tabs": {
         "profile": "Profile",
+        "privacy": "Privacy & Sharing",
         "notifications": "Notifications",
         "restrictions": "Restrictions"
       },
@@ -444,7 +499,7 @@
       "paused": "Paused",
       "deletedUser": "Deleted user",
       "expiredPrefix": "Expired ",
-      "never": "Never",
+      "never": "No recorded activity",
       "noExpiry": "No expiry",
       "expired": "Expired",
       "expiresOn": "Expires {date}",
@@ -980,6 +1035,7 @@
       },
       "tabs": {
         "users": "Users",
+        "account-activity": "Account Activity",
         "magic-links": "Magic Links",
         "oidc": "OIDC / SSO"
       }
@@ -2083,6 +2139,98 @@
     }
   },
   "adminFeature": {
+    "accountActivity": {
+      "title": "Account Activity",
+      "subtitle": "Review account authentication activity without exposing reading history.",
+      "privacyNotice": "This page reports sign-ins and authentication refreshes only. It does not use reading history, book progress, or library activity.",
+      "privacyLabel": "About account activity privacy",
+      "never": "Never",
+      "openInsightsFor": "Open shared reading insights for {name}",
+      "permissionLabel": "View user activity",
+      "states": { "recent": "Recently active", "dormant": "Dormant", "never": "No recorded activity", "disabled": "Disabled" },
+      "filters": {
+        "search": "Search accounts",
+        "searchPlaceholder": "Search name or username",
+        "state": "Activity state",
+        "allStates": "All activity states",
+        "provisioning": "Authentication method",
+        "allMethods": "All authentication methods",
+        "sort": "Sort accounts",
+        "mostRecent": "Most recently active",
+        "leastRecent": "Least recently active",
+        "lastLogin": "Most recent login",
+        "newest": "Newest accounts",
+        "oldest": "Oldest accounts",
+        "name": "Name",
+        "apply": "Apply",
+        "clear": "Clear"
+      },
+      "methods": { "local": "Local", "manual": "Administrator-created", "oidc": "OIDC / SSO", "shared": "Shared magic link" },
+      "columns": {
+        "user": "User",
+        "state": "Account state",
+        "lastLogin": "Last login",
+        "lastAuthenticated": "Last authenticated",
+        "created": "Created",
+        "readingInsights": "Reading insights"
+      },
+      "sharing": { "private": "Not shared", "summary": "Summary shared", "detailed": "Detailed shared" },
+      "empty": { "title": "No accounts found", "description": "Try changing or clearing the current filters." },
+      "pagination": { "label": "Account activity pages", "page": "Page {page} of {totalPages}" },
+      "errors": { "load": "Failed to load account activity." }
+    },
+    "sharedInsights": {
+      "title": "Shared reading insights",
+      "subtitle": "Reading information this user voluntarily chose to share.",
+      "auditNotice": "Access to this profile is recorded and visible to the user.",
+      "period": "Reporting period",
+      "periodDays": "Last {count} days",
+      "durationMinutes": "{count} minute | {count} minutes",
+      "durationHours": "{count} hours",
+      "metrics": {
+        "sessions": "Sessions",
+        "readingTime": "Reading time",
+        "activeDays": "Active days",
+        "started": "Books started",
+        "completed": "Books completed"
+      },
+      "trend": "Daily reading trend",
+      "emptyTitle": "No reading activity in this period",
+      "noData": "No recorded reading data for this period.",
+      "sessionCount": "{count} session | {count} sessions",
+      "sourceNames": { "web": "Web reader", "koreader": "KOReader", "manual": "Manual", "kobo": "Kobo", "unknown": "Unknown" },
+      "formats": "Formats",
+      "genres": "Genres",
+      "broadGenres": {
+        "science_fiction": "Science fiction",
+        "fantasy": "Fantasy",
+        "mystery_thriller": "Mystery & thriller",
+        "romance": "Romance",
+        "horror": "Horror",
+        "history_biography": "History & biography",
+        "science_technology": "Science & technology",
+        "business_economics": "Business & economics",
+        "self_development": "Self-development",
+        "society_culture": "Society & culture",
+        "children_young_adult": "Children & young adult",
+        "comics_graphic_novels": "Comics & graphic novels",
+        "poetry": "Poetry",
+        "other": "Other"
+      },
+      "sources": "Data sources",
+      "topBooks": "Most-read books",
+      "recentBooks": "Recently read",
+      "unknownTitle": "Untitled book",
+      "top": { "authors": "Top authors", "genres": "Top genres", "series": "Top series", "narrators": "Top narrators" },
+      "errors": {
+        "READING_INSIGHTS_PRIVATE": "This user is not sharing reading insights.",
+        "READING_INSIGHTS_SUMMARY_ONLY": "This user shares summary insights only.",
+        "READING_INSIGHTS_VIEW_SESSION_REQUIRED": "A profile view session is required.",
+        "READING_INSIGHTS_VIEW_SESSION_INVALID": "This profile view expired or is no longer valid.",
+        "LOAD_FAILED": "Shared reading insights could not be loaded.",
+        "cleared": "No previously loaded profile information is being displayed."
+      }
+    },
     "resetLink": {
       "title": "Password Reset Link",
       "description": "Share this link with the user. It expires in 15 minutes.",
@@ -2121,6 +2269,7 @@
         "devicesAccess": "Devices & Access",
         "email": "Email",
         "administration": "Administration",
+        "notifications": "Notifications",
         "restrictions": "Restrictions"
       },
       "superuserTarget": "Superuser Target",
@@ -6030,6 +6179,7 @@
     },
     "admin": {
       "users": "Users",
+      "account-activity": "Account Activity",
       "magic-links": "Magic Links",
       "oidc": "OIDC / SSO"
     },
@@ -6041,6 +6191,7 @@
     },
     "account": {
       "profile": "Account",
+      "privacy": "Privacy & Sharing",
       "notifications": "Notifications",
       "restrictions": "Content Restrictions"
     }

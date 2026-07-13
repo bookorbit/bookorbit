@@ -2,7 +2,7 @@ import { createRouter, createWebHistory, type RouteLocationNormalizedLoaded, typ
 import { normalizeEmailTab } from '@/features/email/lib/email-tabs'
 import { normalizeMetadataTab } from '@/features/settings/lib/metadata-tabs'
 import { normalizeReaderTab } from '@/features/settings/lib/reader-tabs'
-import { normalizeAdminTab } from '@/features/settings/lib/admin-tabs'
+import { ADMIN_TAB_INFO, normalizeAdminTab } from '@/features/settings/lib/admin-tabs'
 import { normalizeSystemTab } from '@/features/settings/lib/system-tabs'
 import { normalizeAccountTab } from '@/features/settings/lib/account-tabs'
 import { normalizeAppearanceTab } from '@/features/settings/lib/appearance-tabs'
@@ -54,7 +54,7 @@ function resolveMetadataTitle(to: RouteLocationNormalizedLoaded): string {
 
 function resolveAdminTitle(to: RouteLocationNormalizedLoaded): string {
   const tab = normalizeAdminTab(to.query.tab)
-  return t(`titles.admin.${tab}`)
+  return t(ADMIN_TAB_INFO[tab].titleKey)
 }
 
 function resolveSystemTitle(to: RouteLocationNormalizedLoaded): string {
@@ -206,6 +206,13 @@ export const routes: RouteRecordRaw[] = [
             path: 'admin/users',
             name: 'settings-admin-users',
             redirect: () => ({ name: 'settings-admin', query: { tab: 'users' } }),
+          },
+          {
+            path: 'admin/account-activity/:userId/insights',
+            name: 'settings-admin-shared-insights',
+            component: () => import('@/features/admin/SharedReadingInsightsPage.vue'),
+            props: (route) => ({ userId: Number(route.params.userId) }),
+            meta: { maxWidth: 'max-w-6xl', title: resolveAdminTitle },
           },
           {
             path: 'admin/metadata',

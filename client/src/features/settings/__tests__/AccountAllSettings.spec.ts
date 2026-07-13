@@ -27,6 +27,7 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
 }))
 
 vi.mock('../AccountSettings.vue', () => ({ default: { template: '<div data-testid="account-settings" />' } }))
+vi.mock('../PrivacySharingSettings.vue', () => ({ default: { template: '<div data-testid="privacy-sharing-settings" />' } }))
 vi.mock('@/features/notifications/components/NotificationPreferences.vue', () => ({
   default: { template: '<div data-testid="notification-preferences" />' },
 }))
@@ -44,10 +45,11 @@ describe('AccountAllSettings', () => {
   })
 
   describe('non-demo user', () => {
-    it('sees both Profile and Notifications tabs', () => {
+    it('sees Profile, Privacy, and Notifications tabs', () => {
       const wrapper = mountComponent()
       const labels = wrapper.findAll('button').map((b) => b.text())
       expect(labels).toContain('Profile')
+      expect(labels).toContain('Privacy & Sharing')
       expect(labels).toContain('Notifications')
     })
 
@@ -73,6 +75,12 @@ describe('AccountAllSettings', () => {
       expect(wrapper.find('[data-testid="account-settings"]').exists()).toBe(true)
     })
 
+    it('shows PrivacySharingSettings when tab=privacy', () => {
+      const wrapper = mountComponent('privacy')
+      expect(wrapper.find('[data-testid="privacy-sharing-settings"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="account-settings"]').exists()).toBe(false)
+    })
+
     it('falls back to profile for unknown tab', () => {
       const wrapper = mountComponent('unknown')
       expect(wrapper.find('[data-testid="account-settings"]').exists()).toBe(true)
@@ -80,10 +88,11 @@ describe('AccountAllSettings', () => {
   })
 
   describe('demo-restricted user', () => {
-    it('sees only Profile tab (no Notifications)', () => {
+    it('keeps Privacy available while hiding Notifications', () => {
       const wrapper = mountComponent(undefined, true)
       const labels = wrapper.findAll('button').map((b) => b.text())
       expect(labels).toContain('Profile')
+      expect(labels).toContain('Privacy & Sharing')
       expect(labels).not.toContain('Notifications')
     })
 

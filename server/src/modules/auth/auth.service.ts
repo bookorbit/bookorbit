@@ -346,10 +346,14 @@ export class AuthService {
           throw new ConcurrentRotationError();
         }
         await tx.insert(schema.refreshTokens).values({ userId: row.userId, tokenHash: refreshTokenHash, expiresAt: refreshExpiresAt });
+        await tx
+          .update(schema.users)
+          .set({ lastAuthenticatedAt: rotatedAt, updatedAt: sql`${schema.users.updatedAt}` })
+          .where(eq(schema.users.id, row.userId));
       });
     } catch (err) {
       if (err instanceof ConcurrentRotationError) {
-        // rowCount=0 only proves "someone else changed this row first" — it could be a
+        // rowCount=0 only proves "someone else changed this row first" - it could be a
         // concurrent rotation OR a concurrent logout/security revoke. Re-fetch and only
         // accept the race as benign if the revoke came from rotation. Otherwise the user
         // (or admin) explicitly killed this session and we must NOT resurrect it.
@@ -629,8 +633,15 @@ export class AuthService {
 
   private async issueTokenPair(userId: number, tokenVersion: number) {
     const pair = this.createTokenPair(userId, tokenVersion);
+    const authenticatedAt = new Date();
 
-    await this.db.insert(schema.refreshTokens).values({ userId, tokenHash: pair.refreshTokenHash, expiresAt: pair.refreshExpiresAt });
+    await this.db.transaction(async (tx) => {
+      await tx.insert(schema.refreshTokens).values({ userId, tokenHash: pair.refreshTokenHash, expiresAt: pair.refreshExpiresAt });
+      await tx
+        .update(schema.users)
+        .set({ lastLoginAt: authenticatedAt, lastAuthenticatedAt: authenticatedAt, updatedAt: sql`${schema.users.updatedAt}` })
+        .where(eq(schema.users.id, userId));
+    });
 
     return pair;
   }
@@ -704,6 +715,10 @@ export class AuthService {
   private async issueAccessOnlyForRefreshReuse(userId: number, reply: FastifyReply) {
     const userForToken = await this.assertUserCanRefresh(userId, reply);
     const accessToken = this.jwtService.sign({ sub: userId, ver: userForToken.tokenVersion });
+    await this.db
+      .update(schema.users)
+      .set({ lastAuthenticatedAt: new Date(), updatedAt: sql`${schema.users.updatedAt}` })
+      .where(eq(schema.users.id, userId));
     this.setAccessCookie(reply, accessToken);
     this.logger.log(`[auth.refresh] [end] userId=${userId} reason="rotation-race" - access-only refresh issued`);
     return { accessToken };
