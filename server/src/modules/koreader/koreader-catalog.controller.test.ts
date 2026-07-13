@@ -33,12 +33,13 @@ describe('KoreaderCatalogController', () => {
     const reply = { send: vi.fn() } as never;
     const query = { page: 1, size: 20 } as never;
     const sectionQuery = { page: 1 } as never;
+    const bookDetailQuery = { deviceId: 'device-1' };
 
     expect(controller.root()).toEqual({ sections: [] });
     await expect(controller.dashboard(user)).resolves.toEqual(expect.objectContaining({ generatedAt: '2026-06-26T00:00:00.000Z' }));
     await expect(controller.sections(user, 'libraries', sectionQuery)).resolves.toEqual({ section: 'libraries', items: [] });
     await expect(controller.books(user, query)).resolves.toEqual(expect.objectContaining({ total: 0 }));
-    await expect(controller.bookDetail(user, 10)).resolves.toEqual({ id: 10 });
+    await expect(controller.bookDetail(user, 10, bookDetailQuery)).resolves.toEqual({ id: 10 });
     await expect(controller.setReadStatus(user, 10, { status: 'reading' } as never)).resolves.toEqual({ readStatus: 'reading' });
     await expect(controller.setRating(user, 10, { rating: 4 } as never)).resolves.toEqual({ rating: 4 });
     await controller.thumbnail(user, 10, reply, '"etag"');
@@ -47,7 +48,7 @@ describe('KoreaderCatalogController', () => {
     expect(catalogService.getDashboard).toHaveBeenCalledWith(user);
     expect(catalogService.getSectionEntries).toHaveBeenCalledWith(user, 'libraries', sectionQuery);
     expect(catalogService.getBooksPage).toHaveBeenCalledWith(user, query);
-    expect(catalogService.getBookDetail).toHaveBeenCalledWith(user, 10);
+    expect(catalogService.getBookDetail).toHaveBeenCalledWith(user, 10, 'device-1');
     expect(catalogService.setReadStatus).toHaveBeenCalledWith(user, 10, 'reading');
     expect(catalogService.setRating).toHaveBeenCalledWith(user, 10, 4);
     expect(catalogService.streamThumbnail).toHaveBeenCalledWith(user, 10, reply, '"etag"');

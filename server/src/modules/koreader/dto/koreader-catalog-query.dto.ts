@@ -134,6 +134,13 @@ export class KoreaderCatalogSectionQueryDto {
   q?: string;
 }
 
+export class KoreaderCatalogBookDetailQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  deviceId?: string;
+}
+
 export class KoreaderCatalogSetReadStatusDto {
   @IsIn(KOREADER_CATALOG_SETTABLE_READ_STATUSES)
   status!: KoreaderCatalogSettableReadStatus;
