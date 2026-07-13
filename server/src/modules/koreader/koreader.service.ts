@@ -302,28 +302,65 @@ export class KoreaderService {
   }
 
   async setKoreaderUserDefaultPattern(userId: number, pattern: string): Promise<void> {
-    await this.repo.setKoreaderUserDefaultPattern(userId, pattern);
-    this.logger.log(`[${FILE_NAMING_EVENT}] userId=${userId} scope=user-default - file naming pattern updated`);
+    const startedAt = Date.now();
+    this.logger.log(`[${FILE_NAMING_EVENT}] [start] userId=${userId} scope=user-default - file naming pattern update started`);
+
+    try {
+      await this.repo.setKoreaderUserDefaultPattern(userId, pattern);
+      this.logger.log(
+        `[${FILE_NAMING_EVENT}] [end] userId=${userId} scope=user-default durationMs=${Date.now() - startedAt} - file naming pattern updated`,
+      );
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.name : 'UnknownError';
+      this.logger.error(
+        `[${FILE_NAMING_EVENT}] [fail] userId=${userId} scope=user-default durationMs=${Date.now() - startedAt} errorClass=${errorClass} - file naming pattern update failed`,
+      );
+      throw error;
+    }
   }
 
   getDeviceFileNamingPattern(userId: number, deviceId: string) {
     return this.repo.getDeviceFileNamingPattern(userId, deviceId);
   }
 
-  setDeviceFileNamingPattern(
+  async setDeviceFileNamingPattern(
     userId: number,
     deviceId: string,
     config: { fileNamingPattern: string; seriesFileNamingPattern: string; standaloneFileNamingPattern: string },
   ): Promise<void> {
-    return this.repo.setDeviceFileNamingPattern(userId, deviceId, config).then(() => {
-      this.logger.log(`[${FILE_NAMING_EVENT}] userId=${userId} deviceId=${deviceId} scope=device - file naming pattern updated`);
-    });
+    const startedAt = Date.now();
+    this.logger.log(`[${FILE_NAMING_EVENT}] [start] userId=${userId} deviceId=${deviceId} scope=device - file naming pattern update started`);
+
+    try {
+      await this.repo.setDeviceFileNamingPattern(userId, deviceId, config);
+      this.logger.log(
+        `[${FILE_NAMING_EVENT}] [end] userId=${userId} deviceId=${deviceId} scope=device durationMs=${Date.now() - startedAt} - file naming pattern updated`,
+      );
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.name : 'UnknownError';
+      this.logger.error(
+        `[${FILE_NAMING_EVENT}] [fail] userId=${userId} deviceId=${deviceId} scope=device durationMs=${Date.now() - startedAt} errorClass=${errorClass} - file naming pattern update failed`,
+      );
+      throw error;
+    }
   }
 
-  clearDeviceFileNamingPattern(userId: number, deviceId: string): Promise<void> {
-    return this.repo.clearDeviceFileNamingPattern(userId, deviceId).then(() => {
-      this.logger.log(`[${FILE_NAMING_EVENT}] userId=${userId} deviceId=${deviceId} scope=device - file naming pattern cleared`);
-    });
+  async clearDeviceFileNamingPattern(userId: number, deviceId: string): Promise<void> {
+    const startedAt = Date.now();
+    this.logger.log(`[${FILE_NAMING_EVENT}] [start] userId=${userId} deviceId=${deviceId} scope=device - file naming pattern clear started`);
+
+    try {
+      await this.repo.clearDeviceFileNamingPattern(userId, deviceId);
+      this.logger.log(
+        `[${FILE_NAMING_EVENT}] [end] userId=${userId} deviceId=${deviceId} scope=device durationMs=${Date.now() - startedAt} - file naming pattern cleared`,
+      );
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.name : 'UnknownError';
+      this.logger.error(
+        `[${FILE_NAMING_EVENT}] [fail] userId=${userId} deviceId=${deviceId} scope=device durationMs=${Date.now() - startedAt} errorClass=${errorClass} - file naming pattern clear failed`,
+      );
+      throw error;
+    }
   }
 
   async removeDevice(userId: number, deviceId: string): Promise<void> {

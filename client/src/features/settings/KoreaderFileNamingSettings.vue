@@ -1,180 +1,99 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, watch } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { KoreaderDeviceSweepInfo } from '@bookorbit/types'
-import { DEFAULT_KOREADER_DEVICE_PATTERN, EXAMPLE_PATTERN_METADATA, resolveUploadPath } from '@bookorbit/types'
+import { DEFAULT_KOREADER_DEVICE_PATTERN } from '@bookorbit/types'
 import { CircleHelp, RotateCcw, Save, Smartphone } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { useKoreaderSync } from '@/features/koreader/composables/useKoreaderSync'
+import { useKoreaderFileNamingDrafts } from '@/features/koreader/composables/useKoreaderFileNamingDrafts'
 
-interface OrganizationDraft {
-  pattern: string
-  seriesPattern: string
-  standalonePattern: string
-}
-
-const props = defineProps<{
-  devices: KoreaderDeviceSweepInfo[]
-}>()
-
+const props = defineProps<{ devices: KoreaderDeviceSweepInfo[] }>()
+const { t } = useI18n()
 const { fileNamingPattern, fetchFileNamingPattern, saveFileNamingPattern, saveDeviceFileNamingPattern, clearDeviceFileNamingPattern } =
   useKoreaderSync()
-
-const drafts = reactive<Record<string, OrganizationDraft>>({})
-const savedDrafts = reactive<Record<string, OrganizationDraft>>({})
-const saving = reactive<Record<string, boolean>>({})
 const devices = computed(() => props.devices)
-const seriesMetadata = { ...EXAMPLE_PATTERN_METADATA }
-const standaloneMetadata = { ...EXAMPLE_PATTERN_METADATA, series: '', seriesIndex: '' }
-
-function preview(pattern: string, fallback: string, metadata = EXAMPLE_PATTERN_METADATA) {
-  return (
-    resolveUploadPath(pattern.trim() || fallback, metadata, 'epub', {
-      sanitizeForCrossPlatform: true,
-    }) ?? ''
-  )
-}
-
-const effectiveAccountDefaultPattern = computed(() => fileNamingPattern.value.trim() || DEFAULT_KOREADER_DEVICE_PATTERN)
-const defaultPreview = computed(() => preview(fileNamingPattern.value, DEFAULT_KOREADER_DEVICE_PATTERN))
-
-function emptyDraft(): OrganizationDraft {
-  return { pattern: '', seriesPattern: '', standalonePattern: '' }
-}
-
-function savedDeviceDraft(device: KoreaderDeviceSweepInfo): OrganizationDraft {
-  return {
-    pattern: device.fileNamingPattern ?? '',
-    seriesPattern: device.seriesFileNamingPattern ?? '',
-    standalonePattern: device.standaloneFileNamingPattern ?? '',
-  }
-}
-
-function displayDeviceDraft(saved: OrganizationDraft): OrganizationDraft {
-  return {
-    pattern: saved.pattern || effectiveAccountDefaultPattern.value,
-    seriesPattern: saved.seriesPattern,
-    standalonePattern: saved.standalonePattern,
-  }
-}
-
-function normalizedDeviceDraft(deviceId: string): OrganizationDraft {
-  const draft = drafts[deviceId] ?? emptyDraft()
-  const pattern = draft.pattern.trim()
-  return {
-    pattern: pattern === effectiveAccountDefaultPattern.value.trim() ? '' : pattern,
-    seriesPattern: draft.seriesPattern.trim(),
-    standalonePattern: draft.standalonePattern.trim(),
-  }
-}
-
-function isSameDraft(left: OrganizationDraft, right: OrganizationDraft): boolean {
-  return left.pattern === right.pattern && left.seriesPattern === right.seriesPattern && left.standalonePattern === right.standalonePattern
-}
-
-function hasSavedOverride(deviceId: string): boolean {
-  const saved = savedDrafts[deviceId] ?? emptyDraft()
-  return Boolean(saved.pattern || saved.seriesPattern || saved.standalonePattern)
-}
-
-function hasUnsavedChanges(deviceId: string): boolean {
-  return !isSameDraft(normalizedDeviceDraft(deviceId), savedDrafts[deviceId] ?? emptyDraft())
-}
-
-function deviceDefaultPattern(deviceId: string): string {
-  return normalizedDeviceDraft(deviceId).pattern || effectiveAccountDefaultPattern.value
-}
-
-function deviceDefaultPreview(deviceId: string): string {
-  return preview(normalizedDeviceDraft(deviceId).pattern, effectiveAccountDefaultPattern.value)
-}
-
-function deviceSeriesPreview(deviceId: string): string {
-  return preview(drafts[deviceId]?.seriesPattern ?? '', deviceDefaultPattern(deviceId), seriesMetadata)
-}
-
-function deviceStandalonePreview(deviceId: string): string {
-  return preview(drafts[deviceId]?.standalonePattern ?? '', deviceDefaultPattern(deviceId), standaloneMetadata)
-}
-
-watch(
-  devices,
-  (rows) => {
-    for (const device of rows) {
-      const hadDraft = Boolean(drafts[device.deviceId])
-      const wasDirty = hadDraft && hasUnsavedChanges(device.deviceId)
-      const saved = savedDeviceDraft(device)
-      savedDrafts[device.deviceId] = saved
-      if (!hadDraft || !wasDirty) drafts[device.deviceId] = displayDeviceDraft(saved)
-    }
-  },
-  { immediate: true },
-)
-
-watch(effectiveAccountDefaultPattern, (pattern, previousPattern) => {
-  for (const device of devices.value) {
-    const draft = drafts[device.deviceId]
-    const stillShowingPreviousAccountDefault =
-      !draft || (draft.pattern.trim() === previousPattern.trim() && !draft.seriesPattern.trim() && !draft.standalonePattern.trim())
-    if (!hasSavedOverride(device.deviceId) && stillShowingPreviousAccountDefault) {
-      drafts[device.deviceId] = { pattern, seriesPattern: '', standalonePattern: '' }
-    }
-  }
-})
+const saving = reactive<Record<string, boolean>>({})
+const savingAccountDefault = ref(false)
+const savedAccountDefaultPattern = ref('')
+const hasUnsavedAccountDefault = computed(() => fileNamingPattern.value.trim() !== savedAccountDefaultPattern.value)
+const {
+  drafts,
+  effectiveAccountDefaultPattern,
+  defaultPreview,
+  normalizedDeviceDraft,
+  hasSavedOverride,
+  hasUnsavedChanges,
+  deviceDefaultPreview,
+  deviceSeriesPreview,
+  deviceStandalonePreview,
+  markSaved,
+  clearSaved,
+} = useKoreaderFileNamingDrafts(devices, fileNamingPattern)
 
 onMounted(async () => {
   try {
     await fetchFileNamingPattern()
+    savedAccountDefaultPattern.value = fileNamingPattern.value.trim()
   } catch (error) {
-    toast.error(error instanceof Error ? error.message : 'Failed to load file organization settings')
+    toast.error(error instanceof Error ? error.message : t('settings.reader.koreader.fileNaming.loadFailed'))
   }
 })
 
 async function saveAccountDefault() {
+  if (savingAccountDefault.value) return
+
   if (!fileNamingPattern.value.trim()) {
-    toast.error('Enter a default book path pattern before saving.')
+    toast.error(t('settings.reader.koreader.fileNaming.accountRequired'))
     return
   }
 
+  const pattern = fileNamingPattern.value.trim()
+  savingAccountDefault.value = true
   try {
-    await saveFileNamingPattern({ pattern: fileNamingPattern.value.trim() })
-    toast.success('Account default KOReader pattern saved')
+    await saveFileNamingPattern({ pattern })
+    savedAccountDefaultPattern.value = pattern
+    toast.success(t('settings.reader.koreader.fileNaming.accountSaved'))
   } catch (error) {
-    toast.error(error instanceof Error ? error.message : 'Failed to save file organization settings')
+    toast.error(error instanceof Error ? error.message : t('settings.reader.koreader.fileNaming.accountSaveFailed'))
+  } finally {
+    savingAccountDefault.value = false
   }
 }
 
 async function saveDevice(deviceId: string) {
+  if (saving[deviceId]) return
+
   const config = normalizedDeviceDraft(deviceId)
   saving[deviceId] = true
   try {
     if (!config.pattern && !config.seriesPattern && !config.standalonePattern) {
       await clearDeviceFileNamingPattern(deviceId)
-      savedDrafts[deviceId] = emptyDraft()
-      drafts[deviceId] = displayDeviceDraft(emptyDraft())
-      toast.success('Device now uses the account default KOReader pattern')
+      clearSaved(deviceId)
+      toast.success(t('settings.reader.koreader.fileNaming.deviceUsesAccount'))
       return
     }
 
     await saveDeviceFileNamingPattern(deviceId, config)
-    savedDrafts[deviceId] = { ...config }
-    drafts[deviceId] = displayDeviceDraft(config)
-    toast.success('Device organization override saved')
+    markSaved(deviceId, config)
+    toast.success(t('settings.reader.koreader.fileNaming.deviceSaved'))
   } catch (error) {
-    toast.error(error instanceof Error ? error.message : 'Failed to save device override')
+    toast.error(error instanceof Error ? error.message : t('settings.reader.koreader.fileNaming.deviceSaveFailed'))
   } finally {
     saving[deviceId] = false
   }
 }
 
 async function resetDevice(deviceId: string) {
+  if (saving[deviceId]) return
+
   saving[deviceId] = true
   try {
     await clearDeviceFileNamingPattern(deviceId)
-    savedDrafts[deviceId] = emptyDraft()
-    drafts[deviceId] = displayDeviceDraft(emptyDraft())
-    toast.success('Device now uses the account default KOReader pattern')
+    clearSaved(deviceId)
+    toast.success(t('settings.reader.koreader.fileNaming.deviceUsesAccount'))
   } catch (error) {
-    toast.error(error instanceof Error ? error.message : 'Failed to reset device override')
+    toast.error(error instanceof Error ? error.message : t('settings.reader.koreader.fileNaming.deviceResetFailed'))
   } finally {
     saving[deviceId] = false
   }
@@ -185,23 +104,18 @@ async function resetDevice(deviceId: string) {
   <div class="space-y-5">
     <section class="rounded-lg border border-border bg-card p-5 shadow-xs">
       <div class="mb-4">
-        <h2 class="text-base font-semibold text-foreground">Account default KOReader pattern</h2>
+        <h2 class="text-base font-semibold text-foreground">{{ t('settings.reader.koreader.fileNaming.accountTitle') }}</h2>
         <p class="mt-1 text-sm text-muted-foreground">
-          Sets the default relative folder and filename used by BookOrbit plugin downloads for your KOReader account. Device-specific rules can
-          override it below.
+          {{ t('settings.reader.koreader.fileNaming.accountDescription') }}
         </p>
       </div>
       <div class="space-y-3">
         <div>
           <div class="flex items-center gap-1.5">
-            <p class="settings-label">Default book path pattern</p>
-            <CircleHelp
-              :size="14"
-              class="text-muted-foreground"
-              title="Your account default for KOReader plugin downloads unless a device has a custom rule."
-            />
+            <p class="settings-label">{{ t('settings.reader.koreader.fileNaming.defaultPattern') }}</p>
+            <CircleHelp :size="14" class="text-muted-foreground" :title="t('settings.reader.koreader.fileNaming.accountHelp')" />
           </div>
-          <p class="settings-hint">Used by your KOReader devices that do not have a custom override.</p>
+          <p class="settings-hint">{{ t('settings.reader.koreader.fileNaming.accountHint') }}</p>
         </div>
         <textarea
           v-model="fileNamingPattern"
@@ -210,27 +124,32 @@ async function resetDevice(deviceId: string) {
           :placeholder="DEFAULT_KOREADER_DEVICE_PATTERN"
         />
         <div class="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/40 border border-border/50 font-mono text-xs">
-          <span class="text-muted-foreground shrink-0 uppercase tracking-wider font-semibold text-[10px]">Preview:</span>
+          <span class="text-muted-foreground shrink-0 uppercase tracking-wider font-semibold text-[10px]"
+            >{{ t('settings.reader.koreader.fileNaming.preview') }}:</span
+          >
           <span class="text-foreground break-all">{{ defaultPreview }}</span>
         </div>
       </div>
       <div class="mt-4 flex justify-end">
-        <button class="settings-btn-primary inline-flex items-center gap-2" :disabled="!fileNamingPattern.trim()" @click="saveAccountDefault">
-          <Save :size="15" /> Save account default
+        <button
+          class="settings-btn-primary inline-flex items-center gap-2"
+          :disabled="savingAccountDefault || !fileNamingPattern.trim() || !hasUnsavedAccountDefault"
+          @click="saveAccountDefault"
+        >
+          <Save :size="15" /> {{ t('common.save') }}
         </button>
       </div>
     </section>
 
     <section class="rounded-lg border border-border bg-card p-5 shadow-xs">
       <div class="mb-4">
-        <h2 class="text-base font-semibold text-foreground">KOReader device overrides</h2>
+        <h2 class="text-base font-semibold text-foreground">{{ t('settings.reader.koreader.fileNaming.deviceTitle') }}</h2>
         <p class="mt-1 text-sm text-muted-foreground">
-          Customize any combination of default, series, and standalone paths. Empty device-specific rows inherit the device default, which itself can
-          inherit the account default KOReader pattern.
+          {{ t('settings.reader.koreader.fileNaming.deviceDescription') }}
         </p>
       </div>
       <div v-if="devices.length === 0" class="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-        Devices appear here after they sync with BookOrbit.
+        {{ t('settings.reader.koreader.fileNaming.noDevices') }}
       </div>
       <div v-else class="space-y-3">
         <div v-for="device in devices" :key="device.deviceId" class="rounded-md border border-border bg-background/40 p-4 space-y-5">
@@ -243,18 +162,16 @@ async function resetDevice(deviceId: string) {
               </div>
             </div>
             <span class="text-xs text-muted-foreground">{{
-              hasSavedOverride(device.deviceId) ? 'Custom organization' : 'Using account default'
+              hasSavedOverride(device.deviceId)
+                ? t('settings.reader.koreader.fileNaming.customOrganization')
+                : t('settings.reader.koreader.fileNaming.usingAccountDefault')
             }}</span>
           </div>
 
           <div class="space-y-2">
             <div class="flex items-center gap-1.5">
-              <p class="settings-label">Default book path pattern</p>
-              <CircleHelp
-                :size="14"
-                class="text-muted-foreground"
-                title="Fallback for this device. Leave it equal to the account default to inherit future changes automatically."
-              />
+              <p class="settings-label">{{ t('settings.reader.koreader.fileNaming.defaultPattern') }}</p>
+              <CircleHelp :size="14" class="text-muted-foreground" :title="t('settings.reader.koreader.fileNaming.deviceDefaultHelp')" />
             </div>
             <textarea
               v-model="drafts[device.deviceId]!.pattern"
@@ -263,49 +180,47 @@ async function resetDevice(deviceId: string) {
               :placeholder="effectiveAccountDefaultPattern"
             />
             <div class="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/40 border border-border/50 font-mono text-xs">
-              <span class="text-muted-foreground shrink-0 uppercase tracking-wider font-semibold text-[10px]">Preview:</span>
+              <span class="text-muted-foreground shrink-0 uppercase tracking-wider font-semibold text-[10px]"
+                >{{ t('settings.reader.koreader.fileNaming.preview') }}:</span
+              >
               <span class="text-foreground break-all">{{ deviceDefaultPreview(device.deviceId) }}</span>
             </div>
           </div>
 
           <div class="space-y-2">
             <div class="flex items-center gap-1.5">
-              <p class="settings-label">Books in a series</p>
-              <CircleHelp
-                :size="14"
-                class="text-muted-foreground"
-                title="Optional path used only for books with series metadata. Leave empty to use this device's default path pattern."
-              />
+              <p class="settings-label">{{ t('settings.reader.koreader.fileNaming.seriesBooks') }}</p>
+              <CircleHelp :size="14" class="text-muted-foreground" :title="t('settings.reader.koreader.fileNaming.seriesHelp')" />
             </div>
             <textarea
               v-model="drafts[device.deviceId]!.seriesPattern"
               rows="3"
               class="input-field w-full min-h-24 resize-y font-mono bg-background"
-              placeholder="Leave empty to use this device's default pattern"
+              :placeholder="t('settings.reader.koreader.fileNaming.inheritPlaceholder')"
             />
             <div class="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/40 border border-border/50 font-mono text-xs">
-              <span class="text-muted-foreground shrink-0 uppercase tracking-wider font-semibold text-[10px]">Preview:</span>
+              <span class="text-muted-foreground shrink-0 uppercase tracking-wider font-semibold text-[10px]"
+                >{{ t('settings.reader.koreader.fileNaming.preview') }}:</span
+              >
               <span class="text-foreground break-all">{{ deviceSeriesPreview(device.deviceId) }}</span>
             </div>
           </div>
 
           <div class="space-y-2">
             <div class="flex items-center gap-1.5">
-              <p class="settings-label">Books without a series</p>
-              <CircleHelp
-                :size="14"
-                class="text-muted-foreground"
-                title="Optional path used only for books without series metadata. Leave empty to use this device's default path pattern."
-              />
+              <p class="settings-label">{{ t('settings.reader.koreader.fileNaming.standaloneBooks') }}</p>
+              <CircleHelp :size="14" class="text-muted-foreground" :title="t('settings.reader.koreader.fileNaming.standaloneHelp')" />
             </div>
             <textarea
               v-model="drafts[device.deviceId]!.standalonePattern"
               rows="3"
               class="input-field w-full min-h-24 resize-y font-mono bg-background"
-              placeholder="Leave empty to use this device's default pattern"
+              :placeholder="t('settings.reader.koreader.fileNaming.inheritPlaceholder')"
             />
             <div class="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/40 border border-border/50 font-mono text-xs">
-              <span class="text-muted-foreground shrink-0 uppercase tracking-wider font-semibold text-[10px]">Preview:</span>
+              <span class="text-muted-foreground shrink-0 uppercase tracking-wider font-semibold text-[10px]"
+                >{{ t('settings.reader.koreader.fileNaming.preview') }}:</span
+              >
               <span class="text-foreground break-all">{{ deviceStandalonePreview(device.deviceId) }}</span>
             </div>
           </div>
@@ -316,14 +231,14 @@ async function resetDevice(deviceId: string) {
               :disabled="saving[device.deviceId] || (!hasSavedOverride(device.deviceId) && !hasUnsavedChanges(device.deviceId))"
               @click="resetDevice(device.deviceId)"
             >
-              <RotateCcw :size="14" /> Use account default
+              <RotateCcw :size="14" /> {{ t('settings.reader.koreader.fileNaming.useAccount') }}
             </button>
             <button
               class="settings-btn-primary inline-flex items-center gap-2"
               :disabled="saving[device.deviceId] || !hasUnsavedChanges(device.deviceId)"
               @click="saveDevice(device.deviceId)"
             >
-              <Save :size="14" /> Save override
+              <Save :size="14" /> {{ t('settings.reader.koreader.fileNaming.saveOverride') }}
             </button>
           </div>
         </div>

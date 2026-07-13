@@ -740,12 +740,34 @@ describe('KoreaderService', () => {
       expect(mockRepo.setKoreaderUserDefaultPattern).toHaveBeenNthCalledWith(1, 7, '{title}');
       expect(mockRepo.setKoreaderUserDefaultPattern).toHaveBeenNthCalledWith(2, 8, '{authors}/{title}');
     });
-    it('logs successful user-default pattern mutations without logging the pattern', async () => {
+    it('logs start and end for user-default pattern mutations without logging the pattern', async () => {
       const logSpy = vi.spyOn(Logger.prototype, 'log');
 
       await service.setKoreaderUserDefaultPattern(7, '{title}');
 
-      expect(logSpy).toHaveBeenCalledWith('[koreader.file_naming] userId=7 scope=user-default - file naming pattern updated');
+      expect(logSpy).toHaveBeenNthCalledWith(1, '[koreader.file_naming] [start] userId=7 scope=user-default - file naming pattern update started');
+      expect(logSpy).toHaveBeenNthCalledWith(
+        2,
+        expect.stringMatching(/^\[koreader\.file_naming\] \[end\] userId=7 scope=user-default durationMs=\d+ - file naming pattern updated$/),
+      );
+      expect(logSpy.mock.calls.flat().join(' ')).not.toContain('{title}');
+    });
+
+    it('logs failures and rethrows the original user-default mutation error', async () => {
+      const error = new Error('database unavailable');
+      mockRepo.setKoreaderUserDefaultPattern.mockRejectedValueOnce(error);
+      const logSpy = vi.spyOn(Logger.prototype, 'log');
+      const errorSpy = vi.spyOn(Logger.prototype, 'error');
+
+      await expect(service.setKoreaderUserDefaultPattern(7, '{authors}/{title}')).rejects.toBe(error);
+
+      expect(logSpy).toHaveBeenCalledWith('[koreader.file_naming] [start] userId=7 scope=user-default - file naming pattern update started');
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /^\[koreader\.file_naming\] \[fail\] userId=7 scope=user-default durationMs=\d+ errorClass=Error - file naming pattern update failed$/,
+        ),
+      );
+      expect([...logSpy.mock.calls, ...errorSpy.mock.calls].flat().join(' ')).not.toContain('{authors}/{title}');
     });
   });
 
@@ -799,22 +821,82 @@ describe('KoreaderService', () => {
       standaloneFileNamingPattern: 'Standalone/{title}',
     };
 
-    it('logs successful device pattern updates', async () => {
+    it('logs start and end for device pattern updates without logging pattern contents', async () => {
       const logSpy = vi.spyOn(Logger.prototype, 'log');
 
       await service.setDeviceFileNamingPattern(7, 'device-1', config);
 
       expect(mockRepo.setDeviceFileNamingPattern).toHaveBeenCalledWith(7, 'device-1', config);
-      expect(logSpy).toHaveBeenCalledWith('[koreader.file_naming] userId=7 deviceId=device-1 scope=device - file naming pattern updated');
+      expect(logSpy).toHaveBeenNthCalledWith(
+        1,
+        '[koreader.file_naming] [start] userId=7 deviceId=device-1 scope=device - file naming pattern update started',
+      );
+      expect(logSpy).toHaveBeenNthCalledWith(
+        2,
+        expect.stringMatching(
+          /^\[koreader\.file_naming\] \[end\] userId=7 deviceId=device-1 scope=device durationMs=\d+ - file naming pattern updated$/,
+        ),
+      );
+      expect(logSpy.mock.calls.flat().join(' ')).not.toContain(config.fileNamingPattern);
+      expect(logSpy.mock.calls.flat().join(' ')).not.toContain(config.seriesFileNamingPattern);
+      expect(logSpy.mock.calls.flat().join(' ')).not.toContain(config.standaloneFileNamingPattern);
     });
 
-    it('logs successful device pattern clears', async () => {
+    it('logs failures and rethrows the original device pattern update error', async () => {
+      const error = new TypeError('invalid update');
+      mockRepo.setDeviceFileNamingPattern.mockRejectedValueOnce(error);
+      const logSpy = vi.spyOn(Logger.prototype, 'log');
+      const errorSpy = vi.spyOn(Logger.prototype, 'error');
+
+      await expect(service.setDeviceFileNamingPattern(7, 'device-1', config)).rejects.toBe(error);
+
+      expect(logSpy).toHaveBeenCalledWith(
+        '[koreader.file_naming] [start] userId=7 deviceId=device-1 scope=device - file naming pattern update started',
+      );
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /^\[koreader\.file_naming\] \[fail\] userId=7 deviceId=device-1 scope=device durationMs=\d+ errorClass=TypeError - file naming pattern update failed$/,
+        ),
+      );
+      expect([...logSpy.mock.calls, ...errorSpy.mock.calls].flat().join(' ')).not.toContain(config.fileNamingPattern);
+      expect([...logSpy.mock.calls, ...errorSpy.mock.calls].flat().join(' ')).not.toContain(config.seriesFileNamingPattern);
+      expect([...logSpy.mock.calls, ...errorSpy.mock.calls].flat().join(' ')).not.toContain(config.standaloneFileNamingPattern);
+    });
+
+    it('logs start and end for device pattern clears', async () => {
       const logSpy = vi.spyOn(Logger.prototype, 'log');
 
       await service.clearDeviceFileNamingPattern(7, 'device-1');
 
       expect(mockRepo.clearDeviceFileNamingPattern).toHaveBeenCalledWith(7, 'device-1');
-      expect(logSpy).toHaveBeenCalledWith('[koreader.file_naming] userId=7 deviceId=device-1 scope=device - file naming pattern cleared');
+      expect(logSpy).toHaveBeenNthCalledWith(
+        1,
+        '[koreader.file_naming] [start] userId=7 deviceId=device-1 scope=device - file naming pattern clear started',
+      );
+      expect(logSpy).toHaveBeenNthCalledWith(
+        2,
+        expect.stringMatching(
+          /^\[koreader\.file_naming\] \[end\] userId=7 deviceId=device-1 scope=device durationMs=\d+ - file naming pattern cleared$/,
+        ),
+      );
+    });
+
+    it('logs failures and rethrows the original device pattern clear error', async () => {
+      const error = new Error('delete failed');
+      mockRepo.clearDeviceFileNamingPattern.mockRejectedValueOnce(error);
+      const logSpy = vi.spyOn(Logger.prototype, 'log');
+      const errorSpy = vi.spyOn(Logger.prototype, 'error');
+
+      await expect(service.clearDeviceFileNamingPattern(7, 'device-1')).rejects.toBe(error);
+
+      expect(logSpy).toHaveBeenCalledWith(
+        '[koreader.file_naming] [start] userId=7 deviceId=device-1 scope=device - file naming pattern clear started',
+      );
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /^\[koreader\.file_naming\] \[fail\] userId=7 deviceId=device-1 scope=device durationMs=\d+ errorClass=Error - file naming pattern clear failed$/,
+        ),
+      );
     });
   });
   describe('removeDevice', () => {

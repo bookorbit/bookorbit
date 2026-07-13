@@ -24,6 +24,12 @@ const unmatchedLoading = ref(false)
 const manualLinksLoading = ref(false)
 const fileNamingPattern = ref('')
 
+async function responseErrorMessage(response: Response, fallback: string): Promise<string> {
+  const body = await response.json().catch(() => ({}))
+  const message = Array.isArray(body.message) ? body.message.join('. ') : body.message
+  return typeof message === 'string' && message.length > 0 ? message : fallback
+}
+
 export function useKoreaderSync() {
   async function fetchSyncStatus(silent = false): Promise<void> {
     if (!silent) loading.value = true
@@ -195,7 +201,7 @@ export function useKoreaderSync() {
 
   async function fetchFileNamingPattern(): Promise<void> {
     const res = await api('/api/v1/koreader/file-naming-pattern')
-    if (!res.ok) throw new Error('Failed to fetch KOReader file naming pattern')
+    if (!res.ok) throw new Error(await responseErrorMessage(res, 'Failed to fetch KOReader file naming pattern'))
     const body = await res.json()
     fileNamingPattern.value = body.pattern
   }
@@ -206,7 +212,7 @@ export function useKoreaderSync() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config),
     })
-    if (!res.ok) throw new Error('Failed to save KOReader file naming pattern')
+    if (!res.ok) throw new Error(await responseErrorMessage(res, 'Failed to save KOReader file naming pattern'))
     fileNamingPattern.value = config.pattern
   }
 
@@ -219,11 +225,7 @@ export function useKoreaderSync() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config),
     })
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}))
-      const message = Array.isArray(body.message) ? body.message.join('. ') : body.message
-      throw new Error(message || 'Failed to save device file naming pattern')
-    }
+    if (!res.ok) throw new Error(await responseErrorMessage(res, 'Failed to save device file naming pattern'))
     await fetchSyncStatus(true)
   }
 
