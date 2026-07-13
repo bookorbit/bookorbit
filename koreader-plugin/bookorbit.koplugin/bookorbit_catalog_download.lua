@@ -77,8 +77,14 @@ function CatalogDownload.install(Catalog)
         return G_reader_settings:readSetting("download_dir") or G_reader_settings:readSetting("lastdir")
     end
 
-    function Catalog:getLocalDownloadPath(filename, filetype)
+    function Catalog:getLocalDownloadPath(filename, filetype, device_path)
         local download_dir = self:getCurrentDownloadDir()
+        if device_path and device_path ~= "" then
+            local relative = device_path:gsub("\\", "/"):gsub("^/+", "")
+            local parent = relative:match("^(.*)/[^/]+$")
+            if parent and parent ~= "" then util.makePath(download_dir .. "/" .. parent) end
+            return (download_dir ~= "/" and download_dir or "") .. "/" .. relative
+        end
         filename = filename .. "." .. string.lower(filetype or "bin")
         filename = util.getSafeFilename(filename, download_dir)
         return (download_dir ~= "/" and download_dir or "") .. "/" .. filename
@@ -87,7 +93,7 @@ function CatalogDownload.install(Catalog)
     function Catalog:downloadDefaultFile(detail, file)
         local filename = safeFilenameBase(detail)
         local filetype = string.lower(file.format or "bin")
-        local local_path = self:getLocalDownloadPath(filename, filetype)
+        local local_path = self:getLocalDownloadPath(filename, filetype, file.devicePath)
         self:checkDownloadFile(local_path, detail, file)
     end
 
@@ -142,7 +148,7 @@ function CatalogDownload.install(Catalog)
                         text = _("Download"),
                         callback = function()
                             UIManager:close(dialog)
-                            local local_path = self:getLocalDownloadPath(filename, filetype)
+                            local local_path = self:getLocalDownloadPath(filename, filetype, file.devicePath)
                             self:checkDownloadFile(local_path, detail, file)
                         end,
                     },
@@ -291,7 +297,7 @@ function CatalogDownload.install(Catalog)
 
         local state = BookOrbitState.open()
         state:rememberFile(local_path, digest)
-        for index, match in ipairs(body.matches or {}) do
+        for _, match in ipairs(body.matches or {}) do
             if match.hash == digest then
                 state:setMatched(digest, match.bookFileId, match.bookId, local_path)
                 state:flush()

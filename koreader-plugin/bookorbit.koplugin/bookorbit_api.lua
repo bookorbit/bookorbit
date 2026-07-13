@@ -336,7 +336,7 @@ function BookOrbitApi:catalogBooks(params)
 end
 
 function BookOrbitApi:catalogBook(book_id)
-    return self:request("GET", "/koreader/plugin/catalog/books/" .. tostring(book_id))
+    return self:request("GET", self:query("/koreader/plugin/catalog/books/" .. tostring(book_id), { deviceId = self.device_id }))
 end
 
 function BookOrbitApi:downloadCatalogFile(file_id, local_path, progress_cb)

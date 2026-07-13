@@ -31,6 +31,8 @@ import {
   KoreaderSaveProgressDto,
   LinkKoreaderUnmatchedBookDto,
   TestConnectionDto,
+  UpdateKoreaderDeviceFilePatternDto,
+  UpdateKoreaderFilePatternDto,
   UpdateKoreaderManualHashLinkDto,
   UpdateKoreaderUserDto,
 } from './dto';
@@ -112,6 +114,41 @@ export class KoreaderController {
   @Get('devices')
   async getDevices(@CurrentUser() user: RequestUser) {
     return this.koreaderService.getDevices(user.id);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Get('file-naming-pattern')
+  async getFileNamingPattern(@CurrentUser() user: RequestUser) {
+    return { pattern: await this.koreaderService.getKoreaderUserDefaultPattern(user.id) };
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Put('file-naming-pattern')
+  async setFileNamingPattern(@CurrentUser() user: RequestUser, @Body() dto: UpdateKoreaderFilePatternDto) {
+    await this.koreaderService.setKoreaderUserDefaultPattern(user.id, dto.pattern);
+    return dto;
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Put('devices/:deviceId/file-naming-pattern')
+  async setDeviceFileNamingPattern(
+    @CurrentUser() user: RequestUser,
+    @Param('deviceId') deviceId: string,
+    @Body() dto: UpdateKoreaderDeviceFilePatternDto,
+  ) {
+    await this.koreaderService.setDeviceFileNamingPattern(user.id, deviceId, {
+      fileNamingPattern: dto.pattern,
+      seriesFileNamingPattern: dto.seriesPattern,
+      standaloneFileNamingPattern: dto.standalonePattern,
+    });
+    return dto;
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Delete('devices/:deviceId/file-naming-pattern')
+  async clearDeviceFileNamingPattern(@CurrentUser() user: RequestUser, @Param('deviceId') deviceId: string) {
+    await this.koreaderService.clearDeviceFileNamingPattern(user.id, deviceId);
+    return { success: true };
   }
 
   @RequirePermission(Permission.KoreaderSync)

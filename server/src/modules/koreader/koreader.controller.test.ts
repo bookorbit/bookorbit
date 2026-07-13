@@ -17,6 +17,8 @@ function makeController() {
     getCredentials: vi.fn().mockResolvedValue({ username: 'reader', syncEnabled: true, createdAt: '2026-01-01' }),
     getSyncStatus: vi.fn().mockResolvedValue({ credentials: null }),
     getDevices: vi.fn().mockResolvedValue([]),
+    getKoreaderUserDefaultPattern: vi.fn().mockResolvedValue('{authors}/{title}'),
+    setKoreaderUserDefaultPattern: vi.fn().mockResolvedValue(undefined),
     removeDevice: vi.fn().mockResolvedValue(undefined),
     getBookProgress: vi.fn().mockResolvedValue(null),
     testConnection: vi.fn().mockResolvedValue(true),
@@ -113,6 +115,17 @@ describe('KoreaderController', () => {
 
     await expect(controller.getBookProgress(user, 10)).resolves.toBeNull();
     expect(koreaderService.getBookProgress).toHaveBeenCalledWith(7, 10);
+  });
+
+  it('scopes KOReader default pattern reads and writes to the authenticated user', async () => {
+    const { controller, koreaderService } = makeController();
+    const user = { id: 7 } as never;
+
+    await expect(controller.getFileNamingPattern(user)).resolves.toEqual({ pattern: '{authors}/{title}' });
+    expect(koreaderService.getKoreaderUserDefaultPattern).toHaveBeenCalledWith(7);
+
+    await expect(controller.setFileNamingPattern(user, { pattern: '{title}' } as never)).resolves.toEqual({ pattern: '{title}' });
+    expect(koreaderService.setKoreaderUserDefaultPattern).toHaveBeenCalledWith(7, '{title}');
   });
 
   it('forwards device removal requests to the service', async () => {

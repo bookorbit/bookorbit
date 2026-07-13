@@ -6,6 +6,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from '@nes
 import type { ConfigType } from '@nestjs/config';
 import type { FastifyReply } from 'fastify';
 
+import { DEFAULT_KOREADER_DEVICE_PATTERN, resolveUploadPath } from '@bookorbit/types';
 import type {
   KoreaderCatalogBookDetail,
   KoreaderCatalogBookListItem,
@@ -41,6 +42,8 @@ import { OpdsBookEntry, OpdsBookService } from '../opds/opds-book.service';
 import { RecommendationService } from '../recommendation/recommendation.service';
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import { KoreaderCatalogBooksQueryDto } from './dto/koreader-catalog-query.dto';
+import { AppSettingsService } from '../app-settings/app-settings.service';
+import { KoreaderRepository } from './koreader.repository';
 
 type OpdsSortOrder = Parameters<OpdsBookService['getBooksPage']>[1];
 type BookProgressRow = Awaited<ReturnType<BookReadService['findProgressByBook']>>[number];
@@ -123,6 +126,8 @@ export class KoreaderCatalogService {
     private readonly userBookStatusService: UserBookStatusService,
     private readonly dashboardWidgetService: DashboardWidgetService,
     private readonly recommendationService: RecommendationService,
+    private readonly appSettingsService: AppSettingsService,
+    private readonly koreaderRepository: KoreaderRepository,
     @Inject(storageConfig.KEY) private readonly storage: ConfigType<typeof storageConfig>,
   ) {}
 
@@ -226,10 +231,23 @@ export class KoreaderCatalogService {
     return { rating: normalized };
   }
 
-  async getBookDetail(user: RequestUser, bookId: number): Promise<KoreaderCatalogBookDetail> {
-    const [detail, relatedSections] = await Promise.all([this.bookService.getDetail(bookId, user), this.buildRelatedSections(user, bookId)]);
-    const progress = await this.findBestProgress(user.id, detail.id);
-    return this.mapBookDetail(detail, progress, relatedSections);
+  async getBookDetail(user: RequestUser, bookId: number, deviceId?: string): Promise<KoreaderCatalogBookDetail> {
+    const [detail, relatedSections, userDefaultPattern, sanitizeForCrossPlatform] = await Promise.all([
+      this.bookService.getDetail(bookId, user),
+      this.buildRelatedSections(user, bookId),
+      this.koreaderRepository.getKoreaderUserDefaultPattern(user.id),
+      this.appSettingsService.isCrossPlatformPathSanitizationEnabled(),
+    ]);
+    const [progress, deviceOrganization] = await Promise.all([
+      this.findBestProgress(user.id, detail.id),
+      deviceId ? this.koreaderRepository.getDeviceFileNamingPattern(user.id, deviceId) : Promise.resolve(null),
+    ]);
+    const effectiveDefaultPattern = deviceOrganization?.fileNamingPattern?.trim() || userDefaultPattern?.trim() || DEFAULT_KOREADER_DEVICE_PATTERN;
+    const groupedPattern = detail.seriesName
+      ? deviceOrganization?.seriesFileNamingPattern?.trim() || ''
+      : deviceOrganization?.standaloneFileNamingPattern?.trim() || '';
+    const selectedPattern = groupedPattern.trim() || effectiveDefaultPattern;
+    return this.mapBookDetail(detail, progress, relatedSections, selectedPattern, sanitizeForCrossPlatform);
   }
 
   async streamThumbnail(user: RequestUser, bookId: number, reply: FastifyReply, ifNoneMatch?: string): Promise<void> {
@@ -433,6 +451,8 @@ export class KoreaderCatalogService {
     detail: BookDetailDto,
     progress: KoreaderCatalogProgress | null,
     relatedSections: KoreaderCatalogRelatedSection[] = [],
+    filePattern = DEFAULT_KOREADER_DEVICE_PATTERN,
+    sanitizeForCrossPlatform = true,
   ): KoreaderCatalogBookDetail {
     const title = detail.title ?? (basename(detail.folderPath) || `Book ${detail.id}`);
     const files = detail.files
@@ -444,6 +464,27 @@ export class KoreaderCatalogService {
         sizeBytes: file.sizeBytes,
         durationSeconds: file.durationSeconds,
         downloadUrl: `${CATALOG_BASE}/files/${file.id}/download`,
+        devicePath:
+          resolveUploadPath(
+            filePattern,
+            {
+              title,
+              subtitle: detail.subtitle ?? '',
+              authors: detail.authors.map((author) => author.name).join(', '),
+              year: detail.publishedYear ? String(detail.publishedYear) : '',
+              series: detail.seriesName ?? '',
+              seriesIndex: detail.seriesIndex == null ? '' : String(detail.seriesIndex),
+              language: detail.language ?? '',
+              publisher: detail.publisher ?? '',
+              isbn: detail.isbn13 ?? detail.isbn10 ?? '',
+              originalFilename: basename(file.filename ?? title, `.${file.format ?? 'bin'}`),
+              extension: file.format ?? 'bin',
+            },
+            this.normalizeFormat(file.format),
+            { sanitizeForCrossPlatform },
+          ) ??
+          file.filename ??
+          `${title}.${file.format ?? 'bin'}`,
       }));
 
     return {

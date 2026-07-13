@@ -42,6 +42,20 @@ export const koreaderUsers = pgTable(
 export type KoreaderUser = typeof koreaderUsers.$inferSelect;
 export type NewKoreaderUser = typeof koreaderUsers.$inferInsert;
 
+export const koreaderUserSettings = pgTable('koreader_user_settings', {
+  userId: integer('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  defaultFileNamingPattern: text('default_file_naming_pattern').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => new Date()),
+});
+
+export type KoreaderUserSetting = typeof koreaderUserSettings.$inferSelect;
+export type NewKoreaderUserSetting = typeof koreaderUserSettings.$inferInsert;
+
 export const koreaderDeviceProgress = pgTable(
   'koreader_device_progress',
   {
@@ -81,6 +95,27 @@ export const koreaderDeviceProgress = pgTable(
 
 export type KoreaderDeviceProgress = typeof koreaderDeviceProgress.$inferSelect;
 export type NewKoreaderDeviceProgress = typeof koreaderDeviceProgress.$inferInsert;
+
+export const koreaderDeviceSettings = pgTable(
+  'koreader_device_settings',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    deviceId: varchar('device_id', { length: 100 }).notNull(),
+    fileNamingPattern: text('file_naming_pattern').notNull(),
+    seriesFileNamingPattern: text('series_file_naming_pattern'),
+    standaloneFileNamingPattern: text('standalone_file_naming_pattern'),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.deviceId] }), index('koreader_device_settings_user_id_idx').on(t.userId)],
+);
+
+export type KoreaderDeviceSetting = typeof koreaderDeviceSettings.$inferSelect;
+export type NewKoreaderDeviceSetting = typeof koreaderDeviceSettings.$inferInsert;
 
 export const bookFileHashHistory = pgTable(
   'book_file_hash_history',

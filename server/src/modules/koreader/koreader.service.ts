@@ -2,7 +2,7 @@ import { ConflictException, Injectable, Logger, NotFoundException } from '@nestj
 import { hash as bcryptHash } from 'bcryptjs';
 import { createHash } from 'crypto';
 
-import type { KoreaderBookSyncInfo, KoreaderDeviceInfo, KoreaderSyncStatus } from '@bookorbit/types';
+import { DEFAULT_KOREADER_DEVICE_PATTERN, type KoreaderBookSyncInfo, type KoreaderDeviceInfo, type KoreaderSyncStatus } from '@bookorbit/types';
 import { isSemverNewer } from '../../common/utils/semver.utils';
 import { KoreaderRepository } from './koreader.repository';
 import { KoreaderChapterService } from './koreader-chapter.service';
@@ -246,40 +246,79 @@ export class KoreaderService {
   }
 
   async getSyncStatus(userId: number): Promise<KoreaderSyncStatus> {
-    const [credentials, devices, totalSyncedBooks, sweepRows, pluginTotals, versionInfo] = await Promise.all([
+    const [credentials, devices, totalSyncedBooks, sweepRows, pluginTotals, versionInfo, deviceSettings] = await Promise.all([
       this.getCredentials(userId),
       this.getDevices(userId),
       this.repo.getTotalSyncedBooks(userId),
       this.pluginRepo.listSweeps(userId),
       this.pluginRepo.getPluginTotals(userId),
       this.packageService.getVersionInfo(),
+      this.repo.getDeviceFileNamingPatterns(userId),
     ]);
     const lastSyncAt = devices.length > 0 ? devices[0]!.lastSyncAt : null;
     const latestPluginVersion = versionInfo.pluginVersion === 'unknown' ? null : versionInfo.pluginVersion;
-    const sweeps = sweepRows.map((row) => ({
-      deviceId: row.deviceId,
-      deviceModel: row.deviceModel,
-      pluginVersion: row.pluginVersion,
-      latestPluginVersion,
-      updateAvailable: isSemverNewer(latestPluginVersion, row.pluginVersion),
-      lastSweepAt: row.lastSweepAt.toISOString(),
-      lastSweepBooksMatched: row.lastSweepBooksMatched,
-      lastSweepPageStats: row.lastSweepPageStats,
-      lastSweepAnnotations: row.lastSweepAnnotations,
-    }));
+    const settingsByDevice = new Map(deviceSettings.map((setting) => [setting.deviceId, setting]));
+    const sweeps = sweepRows.map((row) => {
+      const setting = settingsByDevice.get(row.deviceId);
+      return {
+        deviceId: row.deviceId,
+        deviceModel: row.deviceModel,
+        pluginVersion: row.pluginVersion,
+        latestPluginVersion,
+        updateAvailable: isSemverNewer(latestPluginVersion, row.pluginVersion),
+        lastSweepAt: row.lastSweepAt.toISOString(),
+        lastSweepBooksMatched: row.lastSweepBooksMatched,
+        lastSweepPageStats: row.lastSweepPageStats,
+        lastSweepAnnotations: row.lastSweepAnnotations,
+        fileNamingPattern: setting?.fileNamingPattern ?? null,
+        seriesFileNamingPattern: setting?.seriesFileNamingPattern ?? null,
+        standaloneFileNamingPattern: setting?.standaloneFileNamingPattern ?? null,
+      };
+    });
     const pluginUpdateAvailable = sweeps.some((sweep) => sweep.updateAvailable === true);
 
     return { credentials, devices, totalSyncedBooks, lastSyncAt, latestPluginVersion, pluginUpdateAvailable, sweeps, pluginTotals };
   }
 
   async getDevices(userId: number): Promise<KoreaderDeviceInfo[]> {
-    const rows = await this.repo.getDevicesList(userId);
-    return rows.map((r) => ({
-      device: r.device,
-      deviceId: r.deviceId,
-      lastSyncAt: r.lastSyncAt.toISOString(),
-      lastBookTitle: r.lastBookTitle,
-    }));
+    const [rows, settings] = await Promise.all([this.repo.getDevicesList(userId), this.repo.getDeviceFileNamingPatterns(userId)]);
+    const settingsByDevice = new Map(settings.map((setting) => [setting.deviceId, setting]));
+    return rows.map((r) => {
+      const setting = settingsByDevice.get(r.deviceId);
+      return {
+        device: r.device,
+        deviceId: r.deviceId,
+        lastSyncAt: r.lastSyncAt.toISOString(),
+        lastBookTitle: r.lastBookTitle,
+        fileNamingPattern: setting?.fileNamingPattern ?? null,
+        seriesFileNamingPattern: setting?.seriesFileNamingPattern ?? null,
+        standaloneFileNamingPattern: setting?.standaloneFileNamingPattern ?? null,
+      };
+    });
+  }
+
+  async getKoreaderUserDefaultPattern(userId: number): Promise<string> {
+    return (await this.repo.getKoreaderUserDefaultPattern(userId)) ?? DEFAULT_KOREADER_DEVICE_PATTERN;
+  }
+
+  setKoreaderUserDefaultPattern(userId: number, pattern: string): Promise<void> {
+    return this.repo.setKoreaderUserDefaultPattern(userId, pattern);
+  }
+
+  getDeviceFileNamingPattern(userId: number, deviceId: string) {
+    return this.repo.getDeviceFileNamingPattern(userId, deviceId);
+  }
+
+  setDeviceFileNamingPattern(
+    userId: number,
+    deviceId: string,
+    config: { fileNamingPattern: string; seriesFileNamingPattern: string; standaloneFileNamingPattern: string },
+  ): Promise<void> {
+    return this.repo.setDeviceFileNamingPattern(userId, deviceId, config);
+  }
+
+  clearDeviceFileNamingPattern(userId: number, deviceId: string): Promise<void> {
+    return this.repo.clearDeviceFileNamingPattern(userId, deviceId);
   }
 
   async removeDevice(userId: number, deviceId: string): Promise<void> {

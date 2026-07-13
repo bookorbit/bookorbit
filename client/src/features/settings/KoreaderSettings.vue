@@ -27,6 +27,7 @@ import {
 import { toast } from 'vue-sonner'
 import type { BookCard, KoreaderDeviceInfo, KoreaderManualHashLink, KoreaderUnmatchedBook } from '@bookorbit/types'
 import SettingsPageHeader from './SettingsPageHeader.vue'
+import KoreaderFileNamingSettings from './KoreaderFileNamingSettings.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import { copyToClipboard } from '@/lib/clipboard'
 import { useKoreaderSync } from '@/features/koreader/composables/useKoreaderSync'
@@ -34,6 +35,8 @@ import { useGlobalSearch } from '@/features/book/composables/useGlobalSearch'
 
 const { t } = useI18n()
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+type Tab = 'settings' | 'file-naming'
+const activeTab = ref<Tab>('settings')
 
 const {
   credentials,
@@ -539,6 +542,15 @@ async function handleDownloadPlugin() {
     :title="t('settings.reader.koreader.title')"
     :subtitle="t('settings.reader.koreader.subtitle')"
   />
+  <div v-if="!props.embedded" class="mb-5 flex border-b border-border">
+    <button class="px-4 py-2 text-sm font-medium border-b-2 transition-colors" :class="activeTab === 'settings' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'" @click="activeTab = 'settings'">
+      Sync Settings
+    </button>
+    <button class="px-4 py-2 text-sm font-medium border-b-2 transition-colors" :class="activeTab === 'file-naming' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'" @click="activeTab = 'file-naming'">
+      File Naming
+    </button>
+  </div>
+
   <div v-if="!props.embedded" class="md:hidden px-1">
     <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ t('settings.reader.koreader.title') }}</h1>
     <p
@@ -548,7 +560,8 @@ async function handleDownloadPlugin() {
     </p>
   </div>
 
-  <div v-if="loading" class="mt-5 md:mt-0 border border-border rounded-lg px-5 py-8 bg-card text-sm text-muted-foreground shadow-xs">
+  <div v-show="activeTab === 'settings' || props.embedded">
+    <div v-if="loading" class="mt-5 md:mt-0 border border-border rounded-lg px-5 py-8 bg-card text-sm text-muted-foreground shadow-xs">
     {{ t('settings.reader.koreader.loadingSettings') }}
   </div>
   <div v-else-if="error" class="border border-destructive/30 rounded-lg px-5 py-4 bg-card text-sm text-destructive shadow-xs">{{ error }}</div>
@@ -1351,4 +1364,7 @@ async function handleDownloadPlugin() {
       </div>
     </div>
   </template>
+  </div>
+
+  <KoreaderFileNamingSettings v-if="!props.embedded" v-show="activeTab === 'file-naming'" :devices="syncStatus?.sweeps ?? []" />
 </template>

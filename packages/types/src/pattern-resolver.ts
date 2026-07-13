@@ -3,6 +3,8 @@ export const DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE =
 export const DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER =
   "<{authors:first}|Unknown Author>/<{series}/><{seriesIndex}. ><{title}|{originalFilename}>< ({year})>/<{seriesIndex}. ><{title}|{originalFilename}>< ({year})>";
 export const DEFAULT_DOWNLOAD_PATTERN = "{originalFilename}";
+export const DEFAULT_KOREADER_DEVICE_PATTERN =
+  "<Series/{series}/|Standalone/{authors:first} - ><{seriesIndex:fixed2} - >{title}";
 
 export const EXAMPLE_PATTERN_METADATA: Record<string, string> = {
   title: "Neuromancer",
@@ -91,6 +93,10 @@ export function applyModifier(value: string, modifier: string, fieldName: string
       return value.toUpperCase();
     case "lower":
       return value.toLowerCase();
+    case "fixed2": {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric.toFixed(2).padStart(5, "0") : value;
+    }
     default:
       return value;
   }
@@ -158,7 +164,7 @@ function sanitizeResolutionValues(values: Record<string, string>, options: Requi
 
   const sanitized: Record<string, string> = {};
   for (const [key, value] of Object.entries(values)) {
-    sanitized[key] = sanitizePathSegmentValue(value, options.replacementCharacter);
+    sanitized[key] = value.trim() ? sanitizePathSegmentValue(value, options.replacementCharacter) : "";
   }
 
   return sanitized;

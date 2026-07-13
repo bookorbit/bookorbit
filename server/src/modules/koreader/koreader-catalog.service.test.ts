@@ -7,8 +7,10 @@ vi.mock('fs/promises', () => ({
 }));
 
 import { createReadStream } from 'fs';
+import { join } from 'path';
 import { stat } from 'fs/promises';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { DEFAULT_KOREADER_DEVICE_PATTERN } from '@bookorbit/types';
 import type { MockedFunction } from 'vitest';
 
 import { makeUser } from '../../common/test-utils/make-user';
@@ -205,6 +207,11 @@ function makeService() {
     userBookStatusService as never,
     dashboardWidgetService as never,
     recommendationService as never,
+    { isCrossPlatformPathSanitizationEnabled: vi.fn().mockResolvedValue(true) } as never,
+    {
+      getKoreaderUserDefaultPattern: vi.fn().mockResolvedValue(DEFAULT_KOREADER_DEVICE_PATTERN),
+      getDeviceFileNamingPattern: vi.fn().mockResolvedValue(null),
+    } as never,
     { appDataPath: '/data', bookDockPath: '/data/book-dock' },
   );
 
@@ -501,6 +508,7 @@ describe('KoreaderCatalogService', () => {
             sizeBytes: 1234,
             durationSeconds: null,
             downloadUrl: '/api/v1/koreader/plugin/catalog/files/100/download',
+            devicePath: 'Series/Dune/01.00 - Dune.epub',
           },
         ],
         relatedSections: [
@@ -556,7 +564,7 @@ describe('KoreaderCatalogService', () => {
     expect(bookService.verifyBookAccess).toHaveBeenCalledWith(10, expect.objectContaining({ id: 1 }));
     expect(reply.header).toHaveBeenCalledWith('ETag', '"5000"');
     expect(reply.type).toHaveBeenCalledWith('image/jpeg');
-    expect(mockCreateReadStream).toHaveBeenCalledWith('/data/covers/10/thumbnail.jpg');
+    expect(mockCreateReadStream).toHaveBeenCalledWith(join('/data', 'covers', '10', 'thumbnail.jpg'));
 
     const cachedReply = makeReply();
     await service.streamThumbnail(makeUser(), 10, cachedReply as never, '"5000"');

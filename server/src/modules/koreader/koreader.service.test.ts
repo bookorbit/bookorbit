@@ -60,6 +60,9 @@ describe('KoreaderService', () => {
     getReadingProgress: ReturnType<typeof vi.fn>;
     getTotalSyncedBooks: ReturnType<typeof vi.fn>;
     getDevicesList: ReturnType<typeof vi.fn>;
+    getDeviceFileNamingPatterns: ReturnType<typeof vi.fn>;
+    getKoreaderUserDefaultPattern: ReturnType<typeof vi.fn>;
+    setKoreaderUserDefaultPattern: ReturnType<typeof vi.fn>;
     findBookFileIdByBookId: ReturnType<typeof vi.fn>;
     getBookProgressForDashboard: ReturnType<typeof vi.fn>;
     getChapters: ReturnType<typeof vi.fn>;
@@ -123,6 +126,9 @@ describe('KoreaderService', () => {
       getReadingProgress: vi.fn(),
       getTotalSyncedBooks: vi.fn(),
       getDevicesList: vi.fn(),
+      getDeviceFileNamingPatterns: vi.fn().mockResolvedValue([]),
+      getKoreaderUserDefaultPattern: vi.fn(),
+      setKoreaderUserDefaultPattern: vi.fn().mockResolvedValue(undefined),
       findBookFileIdByBookId: vi.fn(),
       getBookProgressForDashboard: vi.fn(),
       getChapters: vi.fn(),
@@ -702,6 +708,35 @@ describe('KoreaderService', () => {
     });
   });
 
+  describe('KOReader user default file pattern', () => {
+    it('returns the saved pattern for the requested user', async () => {
+      mockRepo.getKoreaderUserDefaultPattern.mockResolvedValue('{authors}/{title}');
+
+      await expect(service.getKoreaderUserDefaultPattern(7)).resolves.toBe('{authors}/{title}');
+      expect(mockRepo.getKoreaderUserDefaultPattern).toHaveBeenCalledWith(7);
+    });
+
+    it('falls back independently for users without a saved pattern', async () => {
+      mockRepo.getKoreaderUserDefaultPattern.mockResolvedValue(null);
+
+      const userSevenPattern = await service.getKoreaderUserDefaultPattern(7);
+      const userEightPattern = await service.getKoreaderUserDefaultPattern(8);
+
+      expect(userSevenPattern).toBeDefined();
+      expect(userEightPattern).toBe(userSevenPattern);
+      expect(mockRepo.getKoreaderUserDefaultPattern).toHaveBeenNthCalledWith(1, 7);
+      expect(mockRepo.getKoreaderUserDefaultPattern).toHaveBeenNthCalledWith(2, 8);
+    });
+
+    it('stores each authenticated user pattern using that user id', async () => {
+      await service.setKoreaderUserDefaultPattern(7, '{title}');
+      await service.setKoreaderUserDefaultPattern(8, '{authors}/{title}');
+
+      expect(mockRepo.setKoreaderUserDefaultPattern).toHaveBeenNthCalledWith(1, 7, '{title}');
+      expect(mockRepo.setKoreaderUserDefaultPattern).toHaveBeenNthCalledWith(2, 8, '{authors}/{title}');
+    });
+  });
+
   describe('getDevices', () => {
     it('maps repository rows to device DTOs', async () => {
       mockRepo.getDevicesList.mockResolvedValue([
@@ -710,6 +745,9 @@ describe('KoreaderService', () => {
           deviceId: 'device-1',
           lastSyncAt: new Date('2026-02-01T10:00:00.000Z'),
           lastBookTitle: 'Project Hail Mary',
+          fileNamingPattern: null,
+          seriesFileNamingPattern: null,
+          standaloneFileNamingPattern: null,
         },
         {
           device: 'KOReader',
@@ -725,12 +763,18 @@ describe('KoreaderService', () => {
           deviceId: 'device-1',
           lastSyncAt: '2026-02-01T10:00:00.000Z',
           lastBookTitle: 'Project Hail Mary',
+          fileNamingPattern: null,
+          seriesFileNamingPattern: null,
+          standaloneFileNamingPattern: null,
         },
         {
           device: 'KOReader',
           deviceId: 'device-2',
           lastSyncAt: '2026-02-01T11:00:00.000Z',
           lastBookTitle: null,
+          fileNamingPattern: null,
+          seriesFileNamingPattern: null,
+          standaloneFileNamingPattern: null,
         },
       ]);
     });

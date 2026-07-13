@@ -51,8 +51,8 @@ export class KoreaderCatalogController {
 
   @Get('books/:bookId')
   @Header('Cache-Control', 'private, max-age=30')
-  bookDetail(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number) {
-    return this.catalogService.getBookDetail(user, bookId);
+  bookDetail(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number, @Query('deviceId') deviceId?: string) {
+    return this.catalogService.getBookDetail(user, bookId, deviceId);
   }
 
   @Put('books/:bookId/read-status')
