@@ -522,7 +522,9 @@ export class StorygraphSyncService {
   }
 
   private async updateStatus(userId: number, cookies: StorygraphCookies, storygraphBookId: string, status: string): Promise<void> {
-    const { csrf } = await this.fetchBookPage(userId, cookies, storygraphBookId);
+    const { html, csrf } = await this.fetchBookPage(userId, cookies, storygraphBookId);
+    const currentStatus = this.extractCurrentStatus(html);
+    if (this.statusesMatch(currentStatus, status)) return;
 
     const response = await this.client.post(userId, cookies, `/update-status.js?book_id=${storygraphBookId}&status=${status}`, {}, csrf);
 
@@ -541,6 +543,20 @@ export class StorygraphSyncService {
     }
 
     throw new Error(`status_update_failed:${response.status}`);
+  }
+
+  private extractCurrentStatus(html: string): string | null {
+    const $ = cheerio.load(html);
+    const label = $('.read-status-label').first().text().trim();
+    return label ? label.toLowerCase().replace(/\s+/g, '-') : null;
+  }
+
+  private statusesMatch(currentStatus: string | null, requestedStatus: string): boolean {
+    if (currentStatus === requestedStatus) return true;
+    return (
+      (currentStatus === STORYGRAPH_STATUS.CURRENTLY_READING || currentStatus === STORYGRAPH_STATUS.REREADING) &&
+      (requestedStatus === STORYGRAPH_STATUS.CURRENTLY_READING || requestedStatus === STORYGRAPH_STATUS.REREADING)
+    );
   }
 
   private async updateProgress(userId: number, cookies: StorygraphCookies, storygraphBookId: string, progress: number): Promise<void> {
