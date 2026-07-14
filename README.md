@@ -9,11 +9,11 @@ A self-hosted library management and reading platform for ebooks, PDFs, audioboo
 [![CI](https://github.com/bookorbit/bookorbit/actions/workflows/ci.yml/badge.svg)](https://github.com/bookorbit/bookorbit/actions/workflows/ci.yml)
 [![Release](https://github.com/bookorbit/bookorbit/actions/workflows/release.yml/badge.svg)](https://github.com/bookorbit/bookorbit/actions/workflows/release.yml)
 [![Server Coverage](https://codecov.io/gh/bookorbit/bookorbit/graph/badge.svg?token=F6TADEFCUV&flag=server)](https://codecov.io/gh/bookorbit/bookorbit)
+[![Crowdin](https://badges.crowdin.net/bookorbit/localized.svg)](https://crowdin.com/project/bookorbit)
 
 [![Website](https://img.shields.io/badge/Website-bookorbit.app-blue?style=flat-square&logo=googlechrome&logoColor=white&color=4169E1)](https://bookorbit.app)
 [![Demo](https://img.shields.io/badge/Demo-live-brightgreen?style=flat-square&logo=rocket&logoColor=white&color=40a829)](https://demo.bookorbit.app/magic?token=2d92cb900e184cf0eb8b11f72cffc6011673d1016e1b300d750eb3d76abc1572)
 [![GHCR Pulls](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fghcr-badge.elias.eu.org%2Fapi%2Fbookorbit%2Fbookorbit%2Fbookorbit&query=downloadCount&label=Docker%20Pulls&logo=docker&style=flat-square&color=2496ed)](https://github.com/bookorbit/bookorbit/pkgs/container/bookorbit)
-[![Discussions](https://img.shields.io/badge/Discussions-GitHub-333?style=flat-square&logo=github&logoColor=white)](https://github.com/bookorbit/bookorbit/discussions)
 [![Contributing](https://img.shields.io/badge/Contributing-guide-orange?style=flat-square&logo=handshake&logoColor=white)](https://github.com/bookorbit/bookorbit/blob/main/docs/CONTRIBUTING.md)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg?style=flat-square&color=B461B3)](LICENSE)
 
@@ -128,6 +128,19 @@ The download is pre-configured with your server URL and credentials; no manual e
 Full documentation is at **[bookorbit.app](https://bookorbit.app/what-is-bookorbit.html)** - covering libraries, metadata, readers, Kobo sync, OPDS, users and permissions, OIDC setup, and more.
 
 For local development, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). To contribute, see [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for the full workflow: branch naming, test expectations, PR checklist, and commit format.
+
+---
+
+## Translations
+
+BookOrbit is available in English, German, Dutch, Brazilian Portuguese, and Slovenian. Translations are managed through [Crowdin](https://crowdin.com/project/bookorbit).
+
+[![German translation](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fbadges.awesome-crowdin.com%2Fstats-17791545-912891.json&query=%24.progress.0.data.translationProgress&label=German&logo=crowdin&color=blue&style=flat-square)](https://crowdin.com/project/bookorbit)
+[![Dutch translation](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fbadges.awesome-crowdin.com%2Fstats-17791545-912891.json&query=%24.progress.2.data.translationProgress&label=Dutch&logo=crowdin&color=blue&style=flat-square)](https://crowdin.com/project/bookorbit)
+[![Brazilian Portuguese translation](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fbadges.awesome-crowdin.com%2Fstats-17791545-912891.json&query=%24.progress.3.data.translationProgress&label=Portuguese%20%28Brazil%29&logo=crowdin&color=blue&style=flat-square)](https://crowdin.com/project/bookorbit)
+[![Slovenian translation](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fbadges.awesome-crowdin.com%2Fstats-17791545-912891.json&query=%24.progress.4.data.translationProgress&label=Slovenian&logo=crowdin&color=blue&style=flat-square)](https://crowdin.com/project/bookorbit)
+
+[Help improve BookOrbit translations on Crowdin](https://crowdin.com/project/bookorbit).
 
 ---
 
