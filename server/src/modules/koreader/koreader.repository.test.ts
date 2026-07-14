@@ -29,6 +29,8 @@ function makeDb() {
     query: {
       users: { findFirst: vi.fn() },
       koreaderUsers: { findFirst: vi.fn() },
+      koreaderUserSettings: { findFirst: vi.fn() },
+      koreaderDeviceSettings: { findFirst: vi.fn() },
     },
   };
 }
@@ -691,6 +693,71 @@ describe('KoreaderRepository', () => {
 
       const conflictArg = onConflictDoUpdate.mock.calls[0]?.[0] as { set?: Record<string, unknown> } | undefined;
       expect(conflictArg?.set?.['updatedAt']).toBeDefined();
+    });
+  });
+
+  describe('file naming settings', () => {
+    it('reads the saved account pattern and falls back to null', async () => {
+      db.query.koreaderUserSettings.findFirst
+        .mockResolvedValueOnce({ defaultFileNamingPattern: '{authors}/{title}' })
+        .mockResolvedValueOnce(undefined);
+
+      await expect(repo.getKoreaderUserDefaultPattern(7)).resolves.toBe('{authors}/{title}');
+      await expect(repo.getKoreaderUserDefaultPattern(7)).resolves.toBeNull();
+    });
+
+    it('upserts the account-level pattern', async () => {
+      const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+      const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
+      db.insert.mockReturnValue({ values });
+
+      await repo.setKoreaderUserDefaultPattern(7, '{title}');
+
+      expect(values).toHaveBeenCalledWith({ userId: 7, defaultFileNamingPattern: '{title}' });
+      expect(onConflictDoUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          set: expect.objectContaining({ defaultFileNamingPattern: '{title}', updatedAt: expect.any(Date) }),
+        }),
+      );
+    });
+
+    it('reads device settings and returns null when no override exists', async () => {
+      const settings = {
+        userId: 7,
+        deviceId: 'device-1',
+        fileNamingPattern: '{title}',
+        seriesFileNamingPattern: '{series}/{title}',
+        standaloneFileNamingPattern: 'Standalone/{title}',
+      };
+      db.select.mockReturnValue(makeQueryChain([settings]));
+      db.query.koreaderDeviceSettings.findFirst.mockResolvedValueOnce(settings).mockResolvedValueOnce(undefined);
+
+      await expect(repo.getDeviceFileNamingPatterns(7)).resolves.toEqual([settings]);
+      await expect(repo.getDeviceFileNamingPattern(7, 'device-1')).resolves.toBe(settings);
+      await expect(repo.getDeviceFileNamingPattern(7, 'missing')).resolves.toBeNull();
+    });
+
+    it('upserts and clears a device-specific override', async () => {
+      const config = {
+        fileNamingPattern: '{title}',
+        seriesFileNamingPattern: '{series}/{title}',
+        standaloneFileNamingPattern: 'Standalone/{title}',
+      };
+      const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+      const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
+      db.insert.mockReturnValue({ values });
+      const where = vi.fn().mockResolvedValue(undefined);
+      db.delete.mockReturnValue({ where });
+
+      await repo.setDeviceFileNamingPattern(7, 'device-1', config);
+      await repo.clearDeviceFileNamingPattern(7, 'device-1');
+
+      expect(values).toHaveBeenCalledWith({ userId: 7, deviceId: 'device-1', ...config });
+      expect(onConflictDoUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ set: expect.objectContaining({ ...config, updatedAt: expect.any(Date) }) }),
+      );
+      expect(db.delete).toHaveBeenCalledTimes(1);
+      expect(where).toHaveBeenCalledTimes(1);
     });
   });
 });

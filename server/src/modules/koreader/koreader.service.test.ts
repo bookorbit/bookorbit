@@ -61,6 +61,7 @@ describe('KoreaderService', () => {
     getTotalSyncedBooks: ReturnType<typeof vi.fn>;
     getDevicesList: ReturnType<typeof vi.fn>;
     getDeviceFileNamingPatterns: ReturnType<typeof vi.fn>;
+    getDeviceFileNamingPattern: ReturnType<typeof vi.fn>;
     getKoreaderUserDefaultPattern: ReturnType<typeof vi.fn>;
     setKoreaderUserDefaultPattern: ReturnType<typeof vi.fn>;
     setDeviceFileNamingPattern: ReturnType<typeof vi.fn>;
@@ -129,6 +130,7 @@ describe('KoreaderService', () => {
       getTotalSyncedBooks: vi.fn(),
       getDevicesList: vi.fn(),
       getDeviceFileNamingPatterns: vi.fn().mockResolvedValue([]),
+      getDeviceFileNamingPattern: vi.fn().mockResolvedValue(null),
       getKoreaderUserDefaultPattern: vi.fn(),
       setKoreaderUserDefaultPattern: vi.fn().mockResolvedValue(undefined),
       setDeviceFileNamingPattern: vi.fn().mockResolvedValue(undefined),
@@ -820,6 +822,14 @@ describe('KoreaderService', () => {
       seriesFileNamingPattern: '{series}/{title}',
       standaloneFileNamingPattern: 'Standalone/{title}',
     };
+
+    it('delegates device pattern reads to the repository', async () => {
+      const setting = { deviceId: 'device-1', fileNamingPattern: '{title}' };
+      mockRepo.getDeviceFileNamingPattern.mockResolvedValueOnce(setting);
+
+      await expect(service.getDeviceFileNamingPattern(7, 'device-1')).resolves.toBe(setting);
+      expect(mockRepo.getDeviceFileNamingPattern).toHaveBeenCalledWith(7, 'device-1');
+    });
 
     it('logs start and end for device pattern updates without logging pattern contents', async () => {
       const logSpy = vi.spyOn(Logger.prototype, 'log');
