@@ -23,7 +23,10 @@
       "levelLegend": "Nível de compartilhamento de insights de leitura",
       "current": "Configuração atual",
       "levels": {
-        "private": { "title": "Privado", "description": "Apenas você pode ver suas estatísticas de leitura." },
+        "private": {
+          "title": "Privado",
+          "description": "Apenas você pode ver suas estatísticas de leitura."
+        },
         "summary": {
           "title": "Compartilhar resumo",
           "description": "Compartilhar hábitos agregados sem títulos de livros, autores, séries ou narradores."
@@ -2214,7 +2217,12 @@
         "apply": "Aplicar",
         "clear": "Limpar"
       },
-      "methods": { "local": "Local", "manual": "Criado pelo administrador", "oidc": "OIDC / SSO", "shared": "Link mágico compartilhado" },
+      "methods": {
+        "local": "Local",
+        "manual": "Criado pelo administrador",
+        "oidc": "OIDC / SSO",
+        "shared": "Link mágico compartilhado"
+      },
       "columns": {
         "user": "Usuário",
         "state": "Estado da conta",
@@ -2223,10 +2231,22 @@
         "created": "Criada",
         "readingInsights": "Insights de leitura"
       },
-      "sharing": { "private": "Não compartilhado", "summary": "Resumo compartilhado", "detailed": "Detalhes compartilhados" },
-      "empty": { "title": "Nenhuma conta encontrada", "description": "Tente alterar ou limpar os filtros atuais." },
-      "pagination": { "label": "Páginas da atividade da conta", "page": "Página {page} de {totalPages}" },
-      "errors": { "load": "Falha ao carregar a atividade da conta." }
+      "sharing": {
+        "private": "Não compartilhado",
+        "summary": "Resumo compartilhado",
+        "detailed": "Detalhes compartilhados"
+      },
+      "empty": {
+        "title": "Nenhuma conta encontrada",
+        "description": "Tente alterar ou limpar os filtros atuais."
+      },
+      "pagination": {
+        "label": "Páginas da atividade da conta",
+        "page": "Página {page} de {totalPages}"
+      },
+      "errors": {
+        "load": "Falha ao carregar a atividade da conta."
+      }
     },
     "sharedInsights": {
       "title": "Insights de leitura compartilhados",
@@ -2247,7 +2267,13 @@
       "emptyTitle": "Nenhuma atividade de leitura neste período",
       "noData": "Nenhum dado de leitura registrado para este período.",
       "sessionCount": "{count} sessão | {count} sessões",
-      "sourceNames": { "web": "Leitor web", "koreader": "KOReader", "manual": "Manual", "kobo": "Kobo", "unknown": "Desconhecido" },
+      "sourceNames": {
+        "web": "Leitor web",
+        "koreader": "KOReader",
+        "manual": "Manual",
+        "kobo": "Kobo",
+        "unknown": "Desconhecido"
+      },
       "formats": "Formatos",
       "genres": "Gêneros",
       "broadGenres": {
@@ -2270,7 +2296,12 @@
       "topBooks": "Livros mais lidos",
       "recentBooks": "Lidos recentemente",
       "unknownTitle": "Livro sem título",
-      "top": { "authors": "Principais autores", "genres": "Principais gêneros", "series": "Principais séries", "narrators": "Principais narradores" },
+      "top": {
+        "authors": "Principais autores",
+        "genres": "Principais gêneros",
+        "series": "Principais séries",
+        "narrators": "Principais narradores"
+      },
       "errors": {
         "READING_INSIGHTS_PRIVATE": "Este usuário não está compartilhando insights de leitura.",
         "READING_INSIGHTS_SUMMARY_ONLY": "Este usuário compartilha apenas insights resumidos.",
