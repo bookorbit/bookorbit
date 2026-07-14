@@ -190,4 +190,38 @@ describe('KoreaderFileNamingSettings', () => {
     await flushPromises()
     expect(toastError).toHaveBeenCalledWith('device reset failed')
   })
+
+  it('validates an empty account pattern and updates account and standalone drafts through their inputs', async () => {
+    const devices = [
+      {
+        deviceId: 'device-1',
+        deviceModel: 'Kobo Libra 2',
+        pluginVersion: null,
+        latestPluginVersion: null,
+        updateAvailable: null,
+        lastSweepAt: '2026-07-01T00:00:00.000Z',
+        lastSweepBooksMatched: 0,
+        lastSweepPageStats: 0,
+        lastSweepAnnotations: 0,
+        fileNamingPattern: null,
+        seriesFileNamingPattern: null,
+        standaloneFileNamingPattern: null,
+      },
+    ]
+    const wrapper = mount(KoreaderFileNamingSettings, {
+      props: { devices },
+      global: { plugins: [i18n] },
+    })
+    await flushPromises()
+
+    const textareas = wrapper.findAll('textarea')
+    await textareas[0]!.setValue('')
+    await (wrapper.vm as unknown as { saveAccountDefault: () => Promise<void> }).saveAccountDefault()
+    expect(toastError).toHaveBeenCalledWith('Enter a default book path pattern before saving.')
+
+    await textareas[0]!.setValue('Account/{title}')
+    await textareas[3]!.setValue('Standalone/{title}')
+    expect((textareas[0]!.element as HTMLTextAreaElement).value).toBe('Account/{title}')
+    expect((textareas[3]!.element as HTMLTextAreaElement).value).toBe('Standalone/{title}')
+  })
 })

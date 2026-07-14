@@ -59,6 +59,10 @@ vi.mock('../SettingsPageHeader.vue', () => ({
   default: { template: '<div />' },
 }))
 
+vi.mock('../KoreaderFileNamingSettings.vue', () => ({
+  default: { template: '<div data-testid="file-naming-settings" />' },
+}))
+
 function makeCredentials(overrides: Partial<KoreaderCredentials> = {}): KoreaderCredentials {
   return {
     username: 'reader-user',
@@ -212,6 +216,18 @@ describe('KoreaderSettings', () => {
     searchMock.hasMore.value = false
     searchMock.loadMore.mockClear()
     searchMock.clear.mockClear()
+  })
+
+  it('switches between sync and file naming tabs outside embedded mode', async () => {
+    const wrapper = mount(KoreaderSettings)
+    await flushPromises()
+
+    const fileNamingTab = buttonByText(wrapper, 'File Naming')!
+    const syncTab = buttonByText(wrapper, 'Sync Settings')!
+    await fileNamingTab.trigger('click')
+    expect(fileNamingTab.classes()).toContain('border-primary')
+    await syncTab.trigger('click')
+    expect(syncTab.classes()).toContain('border-primary')
   })
 
   it('shows loading state', () => {
@@ -398,6 +414,9 @@ describe('KoreaderSettings', () => {
 
     await buttonByText(wrapper, 'Link')!.trigger('click')
     expect(wrapper.text()).toContain('Link KOReader book')
+    const searchInput = wrapper.find('input[type="search"]')
+    await searchInput.setValue('BookOrbit')
+    expect((searchInput.element as HTMLInputElement).value).toBe('BookOrbit')
     expect(wrapper.text()).toContain('BookOrbit Title')
 
     const bookResult = wrapper.findAll('button').find((button) => button.text().includes('BookOrbit Title'))!
