@@ -648,4 +648,47 @@ describe('useKoreaderSync', () => {
 
     await expect(saveFileNamingPattern({ pattern: '{title}' })).rejects.toThrow('Failed to save KOReader file naming pattern')
   })
+
+  it('fetches and saves the account file naming pattern', async () => {
+    apiMock.mockResolvedValueOnce(makeResponse({ pattern: 'pattern-a' })).mockResolvedValueOnce(makeResponse({ success: true }))
+
+    const { useKoreaderSync } = await import('../useKoreaderSync')
+    const { fileNamingPattern, fetchFileNamingPattern, saveFileNamingPattern } = useKoreaderSync()
+
+    await fetchFileNamingPattern()
+    expect(fileNamingPattern.value).toBe('pattern-a')
+    await saveFileNamingPattern({ pattern: 'pattern-b' })
+    expect(fileNamingPattern.value).toBe('pattern-b')
+  })
+
+  it('saves and clears device file naming patterns', async () => {
+    const refreshedStatus = makeSyncStatus()
+    apiMock
+      .mockResolvedValueOnce(makeResponse({ success: true }))
+      .mockResolvedValueOnce(makeResponse(refreshedStatus))
+      .mockResolvedValueOnce(makeResponse({ success: true }))
+      .mockResolvedValueOnce(makeResponse(refreshedStatus))
+
+    const { useKoreaderSync } = await import('../useKoreaderSync')
+    const { syncStatus, saveDeviceFileNamingPattern, clearDeviceFileNamingPattern } = useKoreaderSync()
+
+    await saveDeviceFileNamingPattern('device/one', { pattern: 'device-pattern', seriesPattern: '', standalonePattern: '' })
+    expect(syncStatus.value).toEqual(refreshedStatus)
+    await clearDeviceFileNamingPattern('device/one')
+    expect(syncStatus.value).toEqual(refreshedStatus)
+  })
+
+  it('reports device file naming save and reset failures', async () => {
+    apiMock
+      .mockResolvedValueOnce(makeResponse({ message: 'invalid device pattern' }, { ok: false, status: 400 }))
+      .mockResolvedValueOnce(makeResponse({}, { ok: false, status: 500 }))
+
+    const { useKoreaderSync } = await import('../useKoreaderSync')
+    const { saveDeviceFileNamingPattern, clearDeviceFileNamingPattern } = useKoreaderSync()
+
+    await expect(saveDeviceFileNamingPattern('device-1', { pattern: 'bad', seriesPattern: '', standalonePattern: '' })).rejects.toThrow(
+      'invalid device pattern',
+    )
+    await expect(clearDeviceFileNamingPattern('device-1')).rejects.toThrow('Failed to reset device file naming pattern')
+  })
 })
