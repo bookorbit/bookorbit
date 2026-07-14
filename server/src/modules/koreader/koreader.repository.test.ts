@@ -548,6 +548,7 @@ describe('KoreaderRepository', () => {
         .mockResolvedValueOnce([{ deviceId: 'device-1' }]) // device sweeps
         .mockResolvedValueOnce([{ id: 5 }]) // page stats
         .mockResolvedValueOnce([{ hash: 'a'.repeat(32) }]) // unmatched-book device links
+        .mockResolvedValueOnce([]) // device settings
         .mockResolvedValueOnce([{ hash: 'a'.repeat(32) }]); // orphaned unmatched books cleanup
       const txDeleteBuilder = { where: vi.fn().mockReturnValue({ returning }) };
       const txSelectBuilder = { from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue('SUBQUERY') }) };
@@ -557,9 +558,9 @@ describe('KoreaderRepository', () => {
       await expect(repo.removeDevice(42, 'device-1')).resolves.toBe(6);
 
       expect(db.transaction).toHaveBeenCalledTimes(1);
-      expect(tx.delete).toHaveBeenCalledTimes(5);
-      expect(txDeleteBuilder.where).toHaveBeenCalledTimes(5);
-      expect(returning).toHaveBeenCalledTimes(5);
+      expect(tx.delete).toHaveBeenCalledTimes(6);
+      expect(txDeleteBuilder.where).toHaveBeenCalledTimes(6);
+      expect(returning).toHaveBeenCalledTimes(6);
       expect(tx.select).toHaveBeenCalledTimes(1);
     });
 
@@ -569,14 +570,15 @@ describe('KoreaderRepository', () => {
         .mockResolvedValueOnce([{ id: 1 }])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([]); // no unmatched-book device links removed
+        .mockResolvedValueOnce([]) // no unmatched-book device links removed
+        .mockResolvedValueOnce([]); // no device settings removed
       const txDeleteBuilder = { where: vi.fn().mockReturnValue({ returning }) };
       const tx = { delete: vi.fn().mockReturnValue(txDeleteBuilder), select: vi.fn() };
       db.transaction.mockImplementation(async (handler: (client: typeof tx) => Promise<number>) => handler(tx));
 
       await expect(repo.removeDevice(42, 'device-1')).resolves.toBe(1);
 
-      expect(tx.delete).toHaveBeenCalledTimes(4);
+      expect(tx.delete).toHaveBeenCalledTimes(5);
       expect(tx.select).not.toHaveBeenCalled();
     });
 
