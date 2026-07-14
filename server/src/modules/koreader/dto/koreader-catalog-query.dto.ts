@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsIn, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 
 import type {
   KoreaderCatalogReadStatusFilter,
@@ -7,6 +7,7 @@ import type {
   KoreaderCatalogSort,
   KoreaderCatalogSortOrder,
 } from '@bookorbit/types';
+import { KOREADER_DEVICE_ID_REGEX } from './koreader-device-param.dto';
 
 export const KOREADER_CATALOG_SORTS = [
   'title',
@@ -137,7 +138,8 @@ export class KoreaderCatalogSectionQueryDto {
 export class KoreaderCatalogBookDetailQueryDto {
   @IsOptional()
   @IsString()
-  @MaxLength(255)
+  @MaxLength(100)
+  @Matches(KOREADER_DEVICE_ID_REGEX)
   deviceId?: string;
 }
 

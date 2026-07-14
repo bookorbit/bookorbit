@@ -1651,6 +1651,7 @@
         "modFirst": "Alleen eerste waarde",
         "modSort": "Achternaam, voornaam-notatie",
         "modInitial": "Alleen eerste letter",
+        "modFixed2": "Twee decimalen",
         "folderOnlyPrefix": "Beëindig een patroon met",
         "folderOnlySuffix": "om alleen een map op te geven. De oorspronkelijke bestandsnaam blijft daarbinnen behouden.",
         "conditionalLogic": "Voorwaardelijke logica",

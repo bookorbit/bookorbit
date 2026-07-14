@@ -1648,6 +1648,7 @@
         "modFirst": "Samo prva vrednost",
         "modSort": "Format Priimek, Ime",
         "modInitial": "Samo prva črka",
+        "modFixed2": "Dve decimalni mesti",
         "folderOnlyPrefix": "Vzorec zaključite s",
         "folderOnlySuffix": "za določitev samo mape. Izvirno ime datoteke bo ohranjeno znotraj nje.",
         "conditionalLogic": "Pogojna logika",

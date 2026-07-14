@@ -7,14 +7,21 @@ import KoreaderFileNamingSettings from '../KoreaderFileNamingSettings.vue'
 const fileNamingPattern = ref('{authors}/{title}')
 const fetchFileNamingPattern = vi.fn<() => Promise<void>>()
 const saveFileNamingPattern = vi.fn<(payload: { pattern: string }) => Promise<void>>()
-const saveDeviceFileNamingPattern = vi.fn<() => Promise<void>>()
-const clearDeviceFileNamingPattern = vi.fn<() => Promise<void>>()
-const { toastSuccess, toastError } = vi.hoisted(() => ({
+const saveDeviceFileNamingPattern =
+  vi.fn<(deviceId: string, config: { pattern: string; seriesPattern: string; standalonePattern: string }) => Promise<void>>()
+const clearDeviceFileNamingPattern = vi.fn<(deviceId: string) => Promise<void>>()
+const { MockKoreaderFileNamingRequestError, toastSuccess, toastError } = vi.hoisted(() => ({
+  MockKoreaderFileNamingRequestError: class extends Error {
+    constructor(readonly code: string) {
+      super(code)
+    }
+  },
   toastSuccess: vi.fn<() => void>(),
-  toastError: vi.fn<() => void>(),
+  toastError: vi.fn<(message: string) => void>(),
 }))
 
 vi.mock('@/features/koreader/composables/useKoreaderSync', () => ({
+  KoreaderFileNamingRequestError: MockKoreaderFileNamingRequestError,
   useKoreaderSync: () => ({
     fileNamingPattern,
     fetchFileNamingPattern,
@@ -26,6 +33,12 @@ vi.mock('@/features/koreader/composables/useKoreaderSync', () => ({
 
 vi.mock('vue-sonner', () => ({
   toast: { success: toastSuccess, error: toastError },
+}))
+
+vi.mock('@/components/ui/tooltip', () => ({
+  Tooltip: { template: '<div data-testid="tooltip"><slot /></div>' },
+  TooltipContent: { template: '<div data-testid="tooltip-content"><slot /></div>' },
+  TooltipTrigger: { template: '<div><slot /></div>' },
 }))
 
 function deferredPromise() {
@@ -41,11 +54,18 @@ describe('KoreaderFileNamingSettings', () => {
     vi.clearAllMocks()
     fileNamingPattern.value = '{authors}/{title}'
     fetchFileNamingPattern.mockResolvedValue(undefined)
+    saveFileNamingPattern.mockImplementation(async ({ pattern }) => {
+      fileNamingPattern.value = pattern
+    })
   })
 
   it('disables account save until the pattern changes and prevents duplicate pending saves', async () => {
     const pending = deferredPromise()
-    saveFileNamingPattern.mockReturnValue(pending.promise)
+    saveFileNamingPattern.mockImplementation(({ pattern }) =>
+      pending.promise.then(() => {
+        fileNamingPattern.value = pattern
+      }),
+    )
     const wrapper = mount(KoreaderFileNamingSettings, {
       props: { devices: [] },
       global: { plugins: [i18n] },
@@ -57,8 +77,7 @@ describe('KoreaderFileNamingSettings', () => {
     expect(saveButton).toBeDefined()
     expect(saveButton!.attributes('disabled')).toBeDefined()
 
-    fileNamingPattern.value = 'LiveTest/{authors}/{title}'
-    await wrapper.vm.$nextTick()
+    await wrapper.find('textarea').setValue('LiveTest/{authors}/{title}')
     expect(saveButton!.attributes('disabled')).toBeUndefined()
 
     void saveButton!.trigger('click')
@@ -79,23 +98,22 @@ describe('KoreaderFileNamingSettings', () => {
   })
 
   it('reports account-pattern load and save failures', async () => {
-    fetchFileNamingPattern.mockRejectedValueOnce(new Error('load failed'))
+    fetchFileNamingPattern.mockRejectedValueOnce(new MockKoreaderFileNamingRequestError('load'))
     const wrapper = mount(KoreaderFileNamingSettings, {
       props: { devices: [] },
       global: { plugins: [i18n] },
     })
     await flushPromises()
-    expect(toastError).toHaveBeenCalledWith('load failed')
+    expect(toastError).toHaveBeenCalledWith('Failed to load file organization settings')
 
-    saveFileNamingPattern.mockRejectedValueOnce(new Error('save failed'))
-    fileNamingPattern.value = 'Changed/{title}'
-    await wrapper.vm.$nextTick()
+    saveFileNamingPattern.mockRejectedValueOnce(new MockKoreaderFileNamingRequestError('account-save'))
+    await wrapper.find('textarea').setValue('Changed/{title}')
     const saveButton = wrapper.findAll('button').find((button) => button.text().trim() === 'Save')!
     await saveButton.trigger('click')
     await flushPromises()
 
     expect(saveFileNamingPattern).toHaveBeenCalledWith({ pattern: 'Changed/{title}' })
-    expect(toastError).toHaveBeenCalledWith('save failed')
+    expect(toastError).toHaveBeenCalledWith('Failed to save file organization settings')
   })
 
   it('saves, clears, and resets device overrides', async () => {
@@ -167,8 +185,8 @@ describe('KoreaderFileNamingSettings', () => {
         standaloneFileNamingPattern: null,
       },
     ]
-    saveDeviceFileNamingPattern.mockRejectedValueOnce(new Error('device save failed'))
-    clearDeviceFileNamingPattern.mockRejectedValueOnce(new Error('device reset failed'))
+    saveDeviceFileNamingPattern.mockRejectedValueOnce(new MockKoreaderFileNamingRequestError('device-save'))
+    clearDeviceFileNamingPattern.mockRejectedValueOnce(new MockKoreaderFileNamingRequestError('device-reset'))
     const wrapper = mount(KoreaderFileNamingSettings, {
       props: { devices },
       global: { plugins: [i18n] },
@@ -181,14 +199,119 @@ describe('KoreaderFileNamingSettings', () => {
       .find((button) => button.text().includes('Save override'))!
       .trigger('click')
     await flushPromises()
-    expect(toastError).toHaveBeenCalledWith('device save failed')
+    expect(toastError).toHaveBeenCalledWith('Failed to save device override')
 
     await wrapper
       .findAll('button')
       .find((button) => button.text().includes('Use account'))!
       .trigger('click')
     await flushPromises()
-    expect(toastError).toHaveBeenCalledWith('device reset failed')
+    expect(toastError).toHaveBeenCalledWith('Failed to reset device override')
+  })
+
+  it('keeps device inheritance tied to the persisted account pattern while the account draft is dirty', async () => {
+    const devices = [
+      {
+        deviceId: 'device-1',
+        deviceModel: 'Kobo Libra 2',
+        pluginVersion: null,
+        latestPluginVersion: null,
+        updateAvailable: null,
+        lastSweepAt: '2026-07-01T00:00:00.000Z',
+        lastSweepBooksMatched: 0,
+        lastSweepPageStats: 0,
+        lastSweepAnnotations: 0,
+        fileNamingPattern: null,
+        seriesFileNamingPattern: null,
+        standaloneFileNamingPattern: null,
+      },
+    ]
+    const wrapper = mount(KoreaderFileNamingSettings, {
+      props: { devices },
+      global: { plugins: [i18n] },
+    })
+    await flushPromises()
+
+    const textareas = wrapper.findAll('textarea')
+    await textareas[0]!.setValue('Unsaved/{title}')
+    await textareas[2]!.setValue('Series/{series}/{title}')
+
+    expect((textareas[1]!.element as HTMLTextAreaElement).value).toBe('{authors}/{title}')
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Save override'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(saveDeviceFileNamingPattern).toHaveBeenCalledWith('device-1', {
+      pattern: '',
+      seriesPattern: 'Series/{series}/{title}',
+      standalonePattern: '',
+    })
+  })
+
+  it('provides a programmatic label for every file naming field', async () => {
+    const devices = [
+      {
+        deviceId: 'device-1',
+        deviceModel: 'Kobo Libra 2',
+        pluginVersion: null,
+        latestPluginVersion: null,
+        updateAvailable: null,
+        lastSweepAt: '2026-07-01T00:00:00.000Z',
+        lastSweepBooksMatched: 0,
+        lastSweepPageStats: 0,
+        lastSweepAnnotations: 0,
+        fileNamingPattern: null,
+        seriesFileNamingPattern: null,
+        standaloneFileNamingPattern: null,
+      },
+    ]
+    const wrapper = mount(KoreaderFileNamingSettings, {
+      props: { devices },
+      global: { plugins: [i18n] },
+    })
+    await flushPromises()
+
+    for (const textarea of wrapper.findAll('textarea')) {
+      const id = textarea.attributes('id')
+      expect(id).toBeTruthy()
+      expect(wrapper.find('label[for="' + id + '"]').exists()).toBe(true)
+    }
+  })
+
+  it('provides visible tooltip triggers for every file naming help message', async () => {
+    const devices = [
+      {
+        deviceId: 'device-1',
+        deviceModel: 'Kobo Libra 2',
+        pluginVersion: null,
+        latestPluginVersion: null,
+        updateAvailable: null,
+        lastSweepAt: '2026-07-01T00:00:00.000Z',
+        lastSweepBooksMatched: 0,
+        lastSweepPageStats: 0,
+        lastSweepAnnotations: 0,
+        fileNamingPattern: null,
+        seriesFileNamingPattern: null,
+        standaloneFileNamingPattern: null,
+      },
+    ]
+    const wrapper = mount(KoreaderFileNamingSettings, {
+      props: { devices },
+      global: { plugins: [i18n] },
+    })
+    await flushPromises()
+
+    const helpButtons = wrapper.findAll('button[aria-label]')
+    expect(helpButtons).toHaveLength(4)
+    expect(helpButtons.map((button) => button.attributes('aria-label'))).toEqual([
+      'Your account default for KOReader plugin downloads unless a device has a custom rule.',
+      'Fallback for this device. Leave it equal to the account default to inherit future changes automatically.',
+      "Optional path used only for books with series metadata. Leave empty to use this device's default path pattern.",
+      "Optional path used only for books without series metadata. Leave empty to use this device's default path pattern.",
+    ])
   })
 
   it('validates an empty account pattern and updates account and standalone drafts through their inputs', async () => {

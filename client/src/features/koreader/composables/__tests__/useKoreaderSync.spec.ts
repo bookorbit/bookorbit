@@ -613,40 +613,40 @@ describe('useKoreaderSync', () => {
     await expect(removeDevice('device-1')).rejects.toThrow('Failed to remove KOReader device')
   })
 
-  it('fetchFileNamingPattern surfaces array validation messages', async () => {
+  it('fetchFileNamingPattern returns a stable localized-error code for validation failures', async () => {
     apiMock.mockResolvedValueOnce(makeResponse({ message: ['Pattern is invalid', 'Pattern is too long'] }, { ok: false, status: 400 }))
 
-    const { useKoreaderSync } = await import('../useKoreaderSync')
+    const { KoreaderFileNamingRequestError, useKoreaderSync } = await import('../useKoreaderSync')
     const { fetchFileNamingPattern } = useKoreaderSync()
 
-    await expect(fetchFileNamingPattern()).rejects.toThrow('Pattern is invalid. Pattern is too long')
+    await expect(fetchFileNamingPattern()).rejects.toEqual(new KoreaderFileNamingRequestError('load'))
   })
 
-  it('fetchFileNamingPattern keeps the generic fallback for non-JSON errors', async () => {
+  it('fetchFileNamingPattern returns the same stable code for non-JSON errors', async () => {
     apiMock.mockResolvedValueOnce(makeInvalidJsonResponse())
 
-    const { useKoreaderSync } = await import('../useKoreaderSync')
+    const { KoreaderFileNamingRequestError, useKoreaderSync } = await import('../useKoreaderSync')
     const { fetchFileNamingPattern } = useKoreaderSync()
 
-    await expect(fetchFileNamingPattern()).rejects.toThrow('Failed to fetch KOReader file naming pattern')
+    await expect(fetchFileNamingPattern()).rejects.toEqual(new KoreaderFileNamingRequestError('load'))
   })
 
-  it('saveFileNamingPattern surfaces string validation messages', async () => {
+  it('saveFileNamingPattern returns a stable localized-error code for validation failures', async () => {
     apiMock.mockResolvedValueOnce(makeResponse({ message: 'Pattern contains an unsupported token' }, { ok: false, status: 400 }))
 
-    const { useKoreaderSync } = await import('../useKoreaderSync')
+    const { KoreaderFileNamingRequestError, useKoreaderSync } = await import('../useKoreaderSync')
     const { saveFileNamingPattern } = useKoreaderSync()
 
-    await expect(saveFileNamingPattern({ pattern: '{unknown}' })).rejects.toThrow('Pattern contains an unsupported token')
+    await expect(saveFileNamingPattern({ pattern: '{unknown}' })).rejects.toEqual(new KoreaderFileNamingRequestError('account-save'))
   })
 
-  it('saveFileNamingPattern keeps the generic fallback for non-JSON errors', async () => {
+  it('saveFileNamingPattern returns the same stable code for non-JSON errors', async () => {
     apiMock.mockResolvedValueOnce(makeInvalidJsonResponse())
 
-    const { useKoreaderSync } = await import('../useKoreaderSync')
+    const { KoreaderFileNamingRequestError, useKoreaderSync } = await import('../useKoreaderSync')
     const { saveFileNamingPattern } = useKoreaderSync()
 
-    await expect(saveFileNamingPattern({ pattern: '{title}' })).rejects.toThrow('Failed to save KOReader file naming pattern')
+    await expect(saveFileNamingPattern({ pattern: '{title}' })).rejects.toEqual(new KoreaderFileNamingRequestError('account-save'))
   })
 
   it('fetches and saves the account file naming pattern', async () => {
@@ -672,9 +672,9 @@ describe('useKoreaderSync', () => {
     const { useKoreaderSync } = await import('../useKoreaderSync')
     const { syncStatus, saveDeviceFileNamingPattern, clearDeviceFileNamingPattern } = useKoreaderSync()
 
-    await saveDeviceFileNamingPattern('device/one', { pattern: 'device-pattern', seriesPattern: '', standalonePattern: '' })
+    await saveDeviceFileNamingPattern('device-one', { pattern: 'device-pattern', seriesPattern: '', standalonePattern: '' })
     expect(syncStatus.value).toEqual(refreshedStatus)
-    await clearDeviceFileNamingPattern('device/one')
+    await clearDeviceFileNamingPattern('device-one')
     expect(syncStatus.value).toEqual(refreshedStatus)
   })
 
@@ -683,12 +683,12 @@ describe('useKoreaderSync', () => {
       .mockResolvedValueOnce(makeResponse({ message: 'invalid device pattern' }, { ok: false, status: 400 }))
       .mockResolvedValueOnce(makeResponse({}, { ok: false, status: 500 }))
 
-    const { useKoreaderSync } = await import('../useKoreaderSync')
+    const { KoreaderFileNamingRequestError, useKoreaderSync } = await import('../useKoreaderSync')
     const { saveDeviceFileNamingPattern, clearDeviceFileNamingPattern } = useKoreaderSync()
 
-    await expect(saveDeviceFileNamingPattern('device-1', { pattern: 'bad', seriesPattern: '', standalonePattern: '' })).rejects.toThrow(
-      'invalid device pattern',
+    await expect(saveDeviceFileNamingPattern('device-1', { pattern: 'bad', seriesPattern: '', standalonePattern: '' })).rejects.toEqual(
+      new KoreaderFileNamingRequestError('device-save'),
     )
-    await expect(clearDeviceFileNamingPattern('device-1')).rejects.toThrow('Failed to reset device file naming pattern')
+    await expect(clearDeviceFileNamingPattern('device-1')).rejects.toEqual(new KoreaderFileNamingRequestError('device-reset'))
   })
 })

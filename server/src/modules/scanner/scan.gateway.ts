@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
@@ -8,6 +8,7 @@ import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import type {
   BookMissingEvent,
   BookMovedEvent,
+  BookProgressChangedEvent,
   BookRestoredEvent,
   BookTransferredEvent,
   CoverRefreshedEvent,
@@ -16,21 +17,38 @@ import type {
   ScanProgressEvent,
 } from '@bookorbit/types';
 import { AuthService } from '../auth/auth.service';
+import {
+  ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED,
+  AchievementEventsService,
+  type BookProgressChangedPayload,
+} from '../achievement/achievement-events.service';
 import { ScanJobStore } from './scan-job-store.service';
 
 @WebSocketGateway({ namespace: '/scan', cors: { credentials: true } })
-export class ScanGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+export class ScanGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, OnModuleInit, OnModuleDestroy {
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(ScanGateway.name);
   private readonly clientOrigin: string;
+  private readonly handleBookProgressChanged = (payload: BookProgressChangedPayload): void => {
+    this.emitBookProgressChanged(payload);
+  };
 
   constructor(
     private readonly jwtService: JwtService,
     private readonly authService: AuthService,
     private readonly scanJobStore: ScanJobStore,
+    private readonly achievementEvents: AchievementEventsService,
     config: ConfigService,
   ) {
     this.clientOrigin = config.get<string>('app.appUrl') ?? 'http://localhost:5173';
+  }
+
+  onModuleInit(): void {
+    this.achievementEvents.on(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, this.handleBookProgressChanged);
+  }
+
+  onModuleDestroy(): void {
+    this.achievementEvents.removeListener(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, this.handleBookProgressChanged);
   }
 
   afterInit(server: Server): void {
@@ -50,6 +68,7 @@ export class ScanGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       const user = await this.authService.validateUser(payload.sub, payload.ver);
       if (!user) throw new Error('User not found or token revoked');
       (client.data as Record<string, unknown>).user = user;
+      await client.join(`user:${user.id}`);
       this.logger.debug(`[scanner.ws_connection] [start] userId=${user.id} socketId=${client.id} - websocket connected`);
     } catch (err) {
       this.logger.warn(
@@ -117,6 +136,15 @@ export class ScanGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       `[scanner.ws_emit] [book:transferred] fromLibraryId=${event.fromLibraryId} toLibraryId=${event.toLibraryId} bookCount=${event.bookIds.length}`,
     );
     this.server?.to([`library:${event.fromLibraryId}`, `library:${event.toLibraryId}`]).emit('book:transferred', event);
+  }
+
+  emitBookProgressChanged(payload: BookProgressChangedPayload): void {
+    const event: BookProgressChangedEvent = {
+      bookId: payload.bookId,
+      progress: payload.progress,
+      source: payload.source,
+    };
+    this.server?.to(`user:${payload.userId}`).emit('book:progress-changed', event);
   }
 
   emitBooksAdded(event: ScanBooksAddedEvent): void {

@@ -1,11 +1,23 @@
 import { nextTick, ref } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BookCard, BooksPage, GroupRule, JumpBucket } from '@bookorbit/types'
 
 const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<unknown>>()
+const bookEventsMock = vi.hoisted(() => ({
+  progressChangedCallback: null as (() => void) | null,
+}))
 
 vi.mock('@/lib/api', () => ({
   api: (url: string, init?: RequestInit) => fetchMock(url, init),
+}))
+
+vi.mock('../useBookEvents', () => ({
+  useBookEvents: () => ({
+    onBookProgressChanged: (callback: () => void) => {
+      bookEventsMock.progressChangedCallback = callback
+      return () => undefined
+    },
+  }),
 }))
 
 import { BOOK_WINDOW_BLOCK_SIZE } from '../useBookWindow'
@@ -99,6 +111,11 @@ function listRequests(): number[] {
 describe('useBookViewWindow', () => {
   beforeEach(() => {
     fetchMock.mockReset()
+    bookEventsMock.progressChangedCallback = null
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('loads the first block on creation and exposes window state', async () => {
@@ -109,6 +126,24 @@ describe('useBookViewWindow', () => {
     expect(win.total.value).toBe(250)
     expect(win.contiguousPrefix.value).toHaveLength(100)
     expect(win.hasMorePrefix.value).toBe(true)
+  })
+
+  it('debounces external progress events and reloads the current book window', async () => {
+    vi.useFakeTimers()
+    mockApi(250)
+    setup()
+    await flush()
+    fetchMock.mockClear()
+
+    bookEventsMock.progressChangedCallback?.()
+    bookEventsMock.progressChangedCallback?.()
+    bookEventsMock.progressChangedCallback?.()
+    await vi.advanceTimersByTimeAsync(249)
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(1)
+    await flush()
+    expect(listRequests()).toEqual([0])
   })
 
   it('does not fetch when the scope id is invalid', async () => {

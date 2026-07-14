@@ -43,6 +43,12 @@ export interface BookTransferredEvent {
   bookIds: number[];
 }
 
+export interface BookProgressChangedEvent {
+  bookId: number;
+  progress: number;
+  source: "koreader" | "kobo" | "web_reader";
+}
+
 export interface ScanBooksAddedEvent {
   libraryId: number;
   books: import("./book").BookCard[];

@@ -514,7 +514,7 @@ describe('KoreaderCatalogService', () => {
             sizeBytes: 1234,
             durationSeconds: null,
             downloadUrl: '/api/v1/koreader/plugin/catalog/files/100/download',
-            devicePath: 'Series/Dune/01.00 - Dune.epub',
+            devicePath: 'Series/Dune/1.00 - Dune.epub',
           },
         ],
         relatedSections: [

@@ -43,7 +43,7 @@ import { RecommendationService } from '../recommendation/recommendation.service'
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import { KoreaderCatalogBooksQueryDto } from './dto/koreader-catalog-query.dto';
 import { AppSettingsService } from '../app-settings/app-settings.service';
-import { KoreaderRepository } from './koreader.repository';
+import { KoreaderService } from './koreader.service';
 
 type OpdsSortOrder = Parameters<OpdsBookService['getBooksPage']>[1];
 type BookProgressRow = Awaited<ReturnType<BookReadService['findProgressByBook']>>[number];
@@ -127,7 +127,7 @@ export class KoreaderCatalogService {
     private readonly dashboardWidgetService: DashboardWidgetService,
     private readonly recommendationService: RecommendationService,
     private readonly appSettingsService: AppSettingsService,
-    private readonly koreaderRepository: KoreaderRepository,
+    private readonly koreaderService: KoreaderService,
     @Inject(storageConfig.KEY) private readonly storage: ConfigType<typeof storageConfig>,
   ) {}
 
@@ -235,12 +235,12 @@ export class KoreaderCatalogService {
     const [detail, relatedSections, userDefaultPattern, sanitizeForCrossPlatform] = await Promise.all([
       this.bookService.getDetail(bookId, user),
       this.buildRelatedSections(user, bookId),
-      this.koreaderRepository.getKoreaderUserDefaultPattern(user.id),
+      this.koreaderService.getKoreaderUserDefaultPattern(user.id),
       this.appSettingsService.isCrossPlatformPathSanitizationEnabled(),
     ]);
     const [progress, deviceOrganization] = await Promise.all([
       this.findBestProgress(user.id, detail.id),
-      deviceId ? this.koreaderRepository.getDeviceFileNamingPattern(user.id, deviceId) : Promise.resolve(null),
+      deviceId ? this.koreaderService.getDeviceFileNamingPattern(user.id, deviceId) : Promise.resolve(null),
     ]);
     const effectiveDefaultPattern = deviceOrganization?.fileNamingPattern?.trim() || userDefaultPattern?.trim() || DEFAULT_KOREADER_DEVICE_PATTERN;
     const groupedPattern = detail.seriesName

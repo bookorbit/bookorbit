@@ -3,6 +3,8 @@ import { hash as bcryptHash } from 'bcryptjs';
 import { createHash } from 'crypto';
 
 import { DEFAULT_KOREADER_DEVICE_PATTERN, type KoreaderBookSyncInfo, type KoreaderDeviceInfo, type KoreaderSyncStatus } from '@bookorbit/types';
+import { StatsCache } from '../../common/cache/stats-cache';
+import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { isSemverNewer } from '../../common/utils/semver.utils';
 import { KoreaderRepository } from './koreader.repository';
 import { KoreaderChapterService } from './koreader-chapter.service';
@@ -19,10 +21,13 @@ const CREDENTIALS_EVENT = 'koreader.credentials';
 const DEVICE_REMOVE_EVENT = 'koreader.device_remove';
 const FILE_NAMING_EVENT = 'koreader.file_naming';
 const DEFAULT_DEVICE = 'KOReader';
+const FILE_NAMING_CACHE_TTL_MS = 30_000;
+const FILE_NAMING_CACHE_MAX_ENTRIES = 5_000;
 
 @Injectable()
 export class KoreaderService {
   private readonly logger = new Logger(KoreaderService.name);
+  private readonly fileNamingCache = new StatsCache({ ttlMs: FILE_NAMING_CACHE_TTL_MS, maxEntries: FILE_NAMING_CACHE_MAX_ENTRIES });
 
   constructor(
     private readonly repo: KoreaderRepository,
@@ -247,17 +252,19 @@ export class KoreaderService {
   }
 
   async getSyncStatus(userId: number): Promise<KoreaderSyncStatus> {
-    const [credentials, devices, totalSyncedBooks, sweepRows, pluginTotals, versionInfo] = await Promise.all([
+    const [credentials, deviceRows, deviceSettings, totalSyncedBooks, sweepRows, pluginTotals, versionInfo] = await Promise.all([
       this.getCredentials(userId),
-      this.getDevices(userId),
+      this.repo.getDevicesList(userId),
+      this.repo.getDeviceFileNamingPatterns(userId),
       this.repo.getTotalSyncedBooks(userId),
       this.pluginRepo.listSweeps(userId),
       this.pluginRepo.getPluginTotals(userId),
       this.packageService.getVersionInfo(),
     ]);
+    const devices = this.mapDevices(deviceRows, deviceSettings);
     const lastSyncAt = devices.length > 0 ? devices[0]!.lastSyncAt : null;
     const latestPluginVersion = versionInfo.pluginVersion === 'unknown' ? null : versionInfo.pluginVersion;
-    const settingsByDevice = new Map(devices.map((device) => [device.deviceId, device]));
+    const settingsByDevice = new Map(deviceSettings.map((setting) => [setting.deviceId, setting]));
     const sweeps = sweepRows.map((row) => {
       const setting = settingsByDevice.get(row.deviceId);
       return {
@@ -282,6 +289,13 @@ export class KoreaderService {
 
   async getDevices(userId: number): Promise<KoreaderDeviceInfo[]> {
     const [rows, settings] = await Promise.all([this.repo.getDevicesList(userId), this.repo.getDeviceFileNamingPatterns(userId)]);
+    return this.mapDevices(rows, settings);
+  }
+
+  private mapDevices(
+    rows: Awaited<ReturnType<KoreaderRepository['getDevicesList']>>,
+    settings: Awaited<ReturnType<KoreaderRepository['getDeviceFileNamingPatterns']>>,
+  ): KoreaderDeviceInfo[] {
     const settingsByDevice = new Map(settings.map((setting) => [setting.deviceId, setting]));
     return rows.map((r) => {
       const setting = settingsByDevice.get(r.deviceId);
@@ -298,7 +312,9 @@ export class KoreaderService {
   }
 
   async getKoreaderUserDefaultPattern(userId: number): Promise<string> {
-    return (await this.repo.getKoreaderUserDefaultPattern(userId)) ?? DEFAULT_KOREADER_DEVICE_PATTERN;
+    return this.fileNamingCache.get(this.fileNamingCacheScope(userId), 'user-default', async () => {
+      return (await this.repo.getKoreaderUserDefaultPattern(userId)) ?? DEFAULT_KOREADER_DEVICE_PATTERN;
+    });
   }
 
   async setKoreaderUserDefaultPattern(userId: number, pattern: string): Promise<void> {
@@ -307,6 +323,7 @@ export class KoreaderService {
 
     try {
       await this.repo.setKoreaderUserDefaultPattern(userId, pattern);
+      this.fileNamingCache.clearForScope(this.fileNamingCacheScope(userId));
       this.logger.log(
         `[${FILE_NAMING_EVENT}] [end] userId=${userId} scope=user-default durationMs=${Date.now() - startedAt} - file naming pattern updated`,
       );
@@ -320,7 +337,9 @@ export class KoreaderService {
   }
 
   getDeviceFileNamingPattern(userId: number, deviceId: string) {
-    return this.repo.getDeviceFileNamingPattern(userId, deviceId);
+    return this.fileNamingCache.get(this.fileNamingCacheScope(userId), `device:${deviceId}`, () => {
+      return this.repo.getDeviceFileNamingPattern(userId, deviceId);
+    });
   }
 
   async setDeviceFileNamingPattern(
@@ -329,17 +348,19 @@ export class KoreaderService {
     config: { fileNamingPattern: string; seriesFileNamingPattern: string; standaloneFileNamingPattern: string },
   ): Promise<void> {
     const startedAt = Date.now();
-    this.logger.log(`[${FILE_NAMING_EVENT}] [start] userId=${userId} deviceId=${deviceId} scope=device - file naming pattern update started`);
+    const safeDeviceId = sanitizeLogValue(deviceId);
+    this.logger.log(`[${FILE_NAMING_EVENT}] [start] userId=${userId} deviceId="${safeDeviceId}" scope=device - file naming pattern update started`);
 
     try {
       await this.repo.setDeviceFileNamingPattern(userId, deviceId, config);
+      this.fileNamingCache.clearForScope(this.fileNamingCacheScope(userId));
       this.logger.log(
-        `[${FILE_NAMING_EVENT}] [end] userId=${userId} deviceId=${deviceId} scope=device durationMs=${Date.now() - startedAt} - file naming pattern updated`,
+        `[${FILE_NAMING_EVENT}] [end] userId=${userId} deviceId="${safeDeviceId}" scope=device durationMs=${Date.now() - startedAt} - file naming pattern updated`,
       );
     } catch (error) {
       const errorClass = error instanceof Error ? error.name : 'UnknownError';
       this.logger.error(
-        `[${FILE_NAMING_EVENT}] [fail] userId=${userId} deviceId=${deviceId} scope=device durationMs=${Date.now() - startedAt} errorClass=${errorClass} - file naming pattern update failed`,
+        `[${FILE_NAMING_EVENT}] [fail] userId=${userId} deviceId="${safeDeviceId}" scope=device durationMs=${Date.now() - startedAt} errorClass=${errorClass} - file naming pattern update failed`,
       );
       throw error;
     }
@@ -347,17 +368,19 @@ export class KoreaderService {
 
   async clearDeviceFileNamingPattern(userId: number, deviceId: string): Promise<void> {
     const startedAt = Date.now();
-    this.logger.log(`[${FILE_NAMING_EVENT}] [start] userId=${userId} deviceId=${deviceId} scope=device - file naming pattern clear started`);
+    const safeDeviceId = sanitizeLogValue(deviceId);
+    this.logger.log(`[${FILE_NAMING_EVENT}] [start] userId=${userId} deviceId="${safeDeviceId}" scope=device - file naming pattern clear started`);
 
     try {
       await this.repo.clearDeviceFileNamingPattern(userId, deviceId);
+      this.fileNamingCache.clearForScope(this.fileNamingCacheScope(userId));
       this.logger.log(
-        `[${FILE_NAMING_EVENT}] [end] userId=${userId} deviceId=${deviceId} scope=device durationMs=${Date.now() - startedAt} - file naming pattern cleared`,
+        `[${FILE_NAMING_EVENT}] [end] userId=${userId} deviceId="${safeDeviceId}" scope=device durationMs=${Date.now() - startedAt} - file naming pattern cleared`,
       );
     } catch (error) {
       const errorClass = error instanceof Error ? error.name : 'UnknownError';
       this.logger.error(
-        `[${FILE_NAMING_EVENT}] [fail] userId=${userId} deviceId=${deviceId} scope=device durationMs=${Date.now() - startedAt} errorClass=${errorClass} - file naming pattern clear failed`,
+        `[${FILE_NAMING_EVENT}] [fail] userId=${userId} deviceId="${safeDeviceId}" scope=device durationMs=${Date.now() - startedAt} errorClass=${errorClass} - file naming pattern clear failed`,
       );
       throw error;
     }
@@ -365,20 +388,27 @@ export class KoreaderService {
 
   async removeDevice(userId: number, deviceId: string): Promise<void> {
     const startedAt = Date.now();
-    this.logger.log(`[${DEVICE_REMOVE_EVENT}] [start] userId=${userId} deviceId=${deviceId} - remove device started`);
+    const safeDeviceId = sanitizeLogValue(deviceId);
+    this.logger.log(`[${DEVICE_REMOVE_EVENT}] [start] userId=${userId} deviceId="${safeDeviceId}" - remove device started`);
 
     const deletedRows = await this.repo.removeDevice(userId, deviceId);
 
     if (deletedRows === 0) {
       this.logger.warn(
-        `[${DEVICE_REMOVE_EVENT}] [fail] userId=${userId} deviceId=${deviceId} durationMs=${Date.now() - startedAt} errorClass=NotFoundException error="device not found" - remove device failed`,
+        `[${DEVICE_REMOVE_EVENT}] [fail] userId=${userId} deviceId="${safeDeviceId}" durationMs=${Date.now() - startedAt} errorClass=NotFoundException error="device not found" - remove device failed`,
       );
       throw new NotFoundException('KOReader device not found');
     }
 
+    this.fileNamingCache.clearForScope(this.fileNamingCacheScope(userId));
+
     this.logger.log(
-      `[${DEVICE_REMOVE_EVENT}] [end] userId=${userId} deviceId=${deviceId} durationMs=${Date.now() - startedAt} deletedRows=${deletedRows} - remove device completed`,
+      `[${DEVICE_REMOVE_EVENT}] [end] userId=${userId} deviceId="${safeDeviceId}" durationMs=${Date.now() - startedAt} deletedRows=${deletedRows} - remove device completed`,
     );
+  }
+
+  private fileNamingCacheScope(userId: number): string {
+    return `koreader-file-naming:${userId}`;
   }
 
   async getBookProgress(userId: number, bookId: number): Promise<KoreaderBookSyncInfo | null> {

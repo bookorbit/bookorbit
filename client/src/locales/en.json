@@ -1645,6 +1645,7 @@
         "modFirst": "First value only",
         "modSort": "Last, First format",
         "modInitial": "First letter only",
+        "modFixed2": "Two decimal places",
         "folderOnlyPrefix": "End a pattern with",
         "folderOnlySuffix": "to specify a folder only. The original filename will be preserved inside it.",
         "conditionalLogic": "Conditional Logic",

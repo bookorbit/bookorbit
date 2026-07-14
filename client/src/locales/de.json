@@ -1651,6 +1651,7 @@
         "modFirst": "Nur erster Wert",
         "modSort": "Format \"Nachname, Vorname\"",
         "modInitial": "Nur Anfangsbuchstabe",
+        "modFixed2": "Zwei Dezimalstellen",
         "folderOnlyPrefix": "Beenden Sie ein Muster mit",
         "folderOnlySuffix": "um nur einen Ordner anzugeben. Der ursprüngliche Dateiname bleibt darin erhalten.",
         "conditionalLogic": "Bedingte Logik",

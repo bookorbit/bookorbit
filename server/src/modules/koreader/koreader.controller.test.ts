@@ -135,22 +135,22 @@ describe('KoreaderController', () => {
     const user = { id: 7 } as never;
     const dto = { pattern: '{title}', seriesPattern: '{series}/{title}', standalonePattern: 'Standalone/{title}' } as never;
 
-    await expect(controller.setDeviceFileNamingPattern(user, 'device/one', dto)).resolves.toBe(dto);
-    expect(koreaderService.setDeviceFileNamingPattern).toHaveBeenCalledWith(7, 'device/one', {
+    await expect(controller.setDeviceFileNamingPattern(user, { deviceId: 'device-one' }, dto)).resolves.toBe(dto);
+    expect(koreaderService.setDeviceFileNamingPattern).toHaveBeenCalledWith(7, 'device-one', {
       fileNamingPattern: '{title}',
       seriesFileNamingPattern: '{series}/{title}',
       standaloneFileNamingPattern: 'Standalone/{title}',
     });
 
-    await expect(controller.clearDeviceFileNamingPattern(user, 'device/one')).resolves.toEqual({ success: true });
-    expect(koreaderService.clearDeviceFileNamingPattern).toHaveBeenCalledWith(7, 'device/one');
+    await expect(controller.clearDeviceFileNamingPattern(user, { deviceId: 'device-one' })).resolves.toEqual({ success: true });
+    expect(koreaderService.clearDeviceFileNamingPattern).toHaveBeenCalledWith(7, 'device-one');
   });
 
   it('forwards device removal requests to the service', async () => {
     const { controller, koreaderService } = makeController();
     const user = { id: 7 } as never;
 
-    await expect(controller.removeDevice(user, 'device-1')).resolves.toEqual({ success: true });
+    await expect(controller.removeDevice(user, { deviceId: 'device-1' })).resolves.toEqual({ success: true });
     expect(koreaderService.removeDevice).toHaveBeenCalledWith(7, 'device-1');
   });
 

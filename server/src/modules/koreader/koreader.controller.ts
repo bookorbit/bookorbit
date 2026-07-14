@@ -28,6 +28,7 @@ import { KoreaderService } from './koreader.service';
 import {
   CreateKoreaderUserDto,
   DownloadPluginPackageDto,
+  KoreaderDeviceParamDto,
   KoreaderSaveProgressDto,
   LinkKoreaderUnmatchedBookDto,
   TestConnectionDto,
@@ -133,10 +134,10 @@ export class KoreaderController {
   @Put('devices/:deviceId/file-naming-pattern')
   async setDeviceFileNamingPattern(
     @CurrentUser() user: RequestUser,
-    @Param('deviceId') deviceId: string,
+    @Param() params: KoreaderDeviceParamDto,
     @Body() dto: UpdateKoreaderDeviceFilePatternDto,
   ) {
-    await this.koreaderService.setDeviceFileNamingPattern(user.id, deviceId, {
+    await this.koreaderService.setDeviceFileNamingPattern(user.id, params.deviceId, {
       fileNamingPattern: dto.pattern,
       seriesFileNamingPattern: dto.seriesPattern,
       standaloneFileNamingPattern: dto.standalonePattern,
@@ -146,15 +147,15 @@ export class KoreaderController {
 
   @RequirePermission(Permission.KoreaderSync)
   @Delete('devices/:deviceId/file-naming-pattern')
-  async clearDeviceFileNamingPattern(@CurrentUser() user: RequestUser, @Param('deviceId') deviceId: string) {
-    await this.koreaderService.clearDeviceFileNamingPattern(user.id, deviceId);
+  async clearDeviceFileNamingPattern(@CurrentUser() user: RequestUser, @Param() params: KoreaderDeviceParamDto) {
+    await this.koreaderService.clearDeviceFileNamingPattern(user.id, params.deviceId);
     return { success: true };
   }
 
   @RequirePermission(Permission.KoreaderSync)
   @Delete('devices/:deviceId')
-  async removeDevice(@CurrentUser() user: RequestUser, @Param('deviceId') deviceId: string) {
-    await this.koreaderService.removeDevice(user.id, deviceId);
+  async removeDevice(@CurrentUser() user: RequestUser, @Param() params: KoreaderDeviceParamDto) {
+    await this.koreaderService.removeDevice(user.id, params.deviceId);
     return { success: true };
   }
 

@@ -1,5 +1,6 @@
 import { computed, ref, type Ref } from 'vue'
 import { jumpBucketKindForSort, type GroupRule, type JumpBucket, type SortSpec } from '@bookorbit/types'
+import { useBookProgressRefresh } from './useBookProgressRefresh'
 import { BOOK_WINDOW_BLOCK_SIZE, useBookWindow, type BookWindowQuery } from './useBookWindow'
 import { useJumpBuckets } from './useJumpBuckets'
 import { useJumpRailGutter } from './useJumpRailGutter'
@@ -60,6 +61,11 @@ export function useBookViewWindow(options: {
     query,
     enabled: railEligible,
     firstVisibleIndex,
+  })
+
+  useBookProgressRefresh(() => {
+    window.reset()
+    return bucketsApi.refresh()
   })
 
   const railVisible = computed(() => railEligible.value && bucketsApi.buckets.value.length >= 2)

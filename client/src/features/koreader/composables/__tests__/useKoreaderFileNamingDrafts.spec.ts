@@ -49,7 +49,7 @@ describe('useKoreaderFileNamingDrafts', () => {
     expect(state.hasUnsavedChanges('device-1')).toBe(false)
   })
 
-  it('updates clean inherited drafts when the account default changes without overwriting dirty drafts', async () => {
+  it('updates inherited defaults without overwriting dirty specialized patterns', async () => {
     const devices = ref([device(), device({ deviceId: 'device-2', deviceModel: 'Kobo Sage' })])
     const accountPattern = ref('{authors}/{title}')
     const state = useKoreaderFileNamingDrafts(devices, accountPattern)
@@ -60,9 +60,25 @@ describe('useKoreaderFileNamingDrafts', () => {
 
     expect(state.drafts['device-1']?.pattern).toBe('Books/{title}')
     expect(state.drafts['device-2']).toEqual({
-      pattern: '{authors}/{title}',
+      pattern: 'Books/{title}',
       seriesPattern: '{series}/{title}',
       standalonePattern: '',
     })
+  })
+
+  it('updates an inherited default when the device has a saved specialized override', async () => {
+    const devices = ref([device({ seriesFileNamingPattern: '{series}/{title}' })])
+    const accountPattern = ref('{authors}/{title}')
+    const state = useKoreaderFileNamingDrafts(devices, accountPattern)
+
+    accountPattern.value = 'Books/{title}'
+    await nextTick()
+
+    expect(state.drafts['device-1']).toEqual({
+      pattern: 'Books/{title}',
+      seriesPattern: '{series}/{title}',
+      standalonePattern: '',
+    })
+    expect(state.normalizedDeviceDraft('device-1').pattern).toBe('')
   })
 })

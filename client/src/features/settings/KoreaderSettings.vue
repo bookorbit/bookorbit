@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import { formatDate as formatLocaleDate } from '@/i18n/formatters'
 import {
   AlertTriangle,
@@ -36,14 +37,41 @@ import { useGlobalSearch } from '@/features/book/composables/useGlobalSearch'
 const { t } = useI18n()
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 type Tab = 'settings' | 'file-naming'
-const activeTab = ref<Tab>('settings')
+const route = props.embedded ? null : useRoute()
+const router = props.embedded ? null : useRouter()
+
+function normalizeTab(value: unknown): Tab {
+  return value === 'file-naming' ? 'file-naming' : 'settings'
+}
+
+const activeTab = ref<Tab>(normalizeTab(route?.query.tab))
+
+if (route && router) {
+  if (route.query.tab !== activeTab.value) {
+    void router.replace({ name: 'settings-koreader', query: { ...route.query, tab: activeTab.value } })
+  }
+
+  watch(
+    () => route.query.tab,
+    (value) => {
+      activeTab.value = normalizeTab(value)
+    },
+  )
+}
+
+function selectTab(tab: Tab): void {
+  activeTab.value = tab
+  if (route && router) {
+    void router.replace({ name: 'settings-koreader', query: { ...route.query, tab } })
+  }
+}
 
 function showSettingsTab(): void {
-  activeTab.value = 'settings'
+  selectTab('settings')
 }
 
 function showFileNamingTab(): void {
-  activeTab.value = 'file-naming'
+  selectTab('file-naming')
 }
 
 const {
@@ -550,17 +578,31 @@ async function handleDownloadPlugin() {
     :title="t('settings.reader.koreader.title')"
     :subtitle="t('settings.reader.koreader.subtitle')"
   />
-  <div v-if="!props.embedded" class="mb-5 flex border-b border-border">
+  <div v-if="!props.embedded" class="mb-5 flex border-b border-border" role="group" :aria-label="t('settings.reader.koreader.title')">
     <button
-      class="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
-      :class="activeTab === 'settings' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
+      id="koreader-sync-tab"
+      class="px-4 py-2 text-sm border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      :class="
+        activeTab === 'settings'
+          ? 'border-primary text-foreground font-semibold'
+          : 'border-transparent text-muted-foreground hover:text-foreground font-medium'
+      "
+      :aria-pressed="activeTab === 'settings'"
+      aria-controls="koreader-sync-panel"
       @click="showSettingsTab"
     >
       {{ t('settings.reader.koreader.tabs.sync') }}
     </button>
     <button
-      class="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
-      :class="activeTab === 'file-naming' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
+      id="koreader-file-naming-tab"
+      class="px-4 py-2 text-sm border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      :class="
+        activeTab === 'file-naming'
+          ? 'border-primary text-foreground font-semibold'
+          : 'border-transparent text-muted-foreground hover:text-foreground font-medium'
+      "
+      :aria-pressed="activeTab === 'file-naming'"
+      aria-controls="koreader-file-naming-panel"
       @click="showFileNamingTab"
     >
       {{ t('settings.reader.koreader.tabs.fileNaming') }}
@@ -576,7 +618,11 @@ async function handleDownloadPlugin() {
     </p>
   </div>
 
-  <div v-show="activeTab === 'settings' || props.embedded">
+  <div
+    id="koreader-sync-panel"
+    v-show="activeTab === 'settings' || props.embedded"
+    :aria-labelledby="props.embedded ? undefined : 'koreader-sync-tab'"
+  >
     <div v-if="loading" class="mt-5 md:mt-0 border border-border rounded-lg px-5 py-8 bg-card text-sm text-muted-foreground shadow-xs">
       {{ t('settings.reader.koreader.loadingSettings') }}
     </div>
@@ -1389,5 +1435,7 @@ async function handleDownloadPlugin() {
     </template>
   </div>
 
-  <KoreaderFileNamingSettings v-if="!props.embedded" v-show="activeTab === 'file-naming'" :devices="syncStatus?.sweeps ?? []" />
+  <div v-if="!props.embedded" id="koreader-file-naming-panel" v-show="activeTab === 'file-naming'" aria-labelledby="koreader-file-naming-tab">
+    <KoreaderFileNamingSettings :devices="syncStatus?.sweeps ?? []" />
+  </div>
 </template>

@@ -106,10 +106,10 @@ export function useKoreaderFileNamingDrafts(devices: Ref<KoreaderDeviceSweepInfo
   watch(effectiveAccountDefaultPattern, (pattern, previousPattern) => {
     for (const device of devices.value) {
       const draft = drafts[device.deviceId]
-      const stillShowingPreviousAccountDefault =
-        !draft || (draft.pattern.trim() === previousPattern.trim() && !draft.seriesPattern.trim() && !draft.standalonePattern.trim())
-      if (!hasSavedOverride(device.deviceId) && stillShowingPreviousAccountDefault)
-        drafts[device.deviceId] = { pattern, seriesPattern: '', standalonePattern: '' }
+      const saved = savedDrafts[device.deviceId] ?? emptyDraft()
+      if (!saved.pattern && (!draft || draft.pattern.trim() === previousPattern.trim())) {
+        drafts[device.deviceId] = { ...(draft ?? emptyDraft()), pattern }
+      }
     }
   })
 

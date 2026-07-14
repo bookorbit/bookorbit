@@ -488,6 +488,21 @@ describe('AppSettingsService', () => {
       expect(await service.isCrossPlatformPathSanitizationEnabled()).toBe(false);
     });
 
+    it('caches cross-platform path sanitization reads and invalidates after updates', async () => {
+      repo.findByKey
+        .mockResolvedValueOnce({ key: 'cross_platform_path_sanitization_enabled', value: 'true' } as never)
+        .mockResolvedValueOnce({ key: 'cross_platform_path_sanitization_enabled', value: 'false' } as never);
+
+      await expect(service.isCrossPlatformPathSanitizationEnabled()).resolves.toBe(true);
+      await expect(service.isCrossPlatformPathSanitizationEnabled()).resolves.toBe(true);
+      expect(repo.findByKey).toHaveBeenCalledTimes(1);
+
+      await service.setCrossPlatformPathSanitizationEnabled(false);
+
+      await expect(service.isCrossPlatformPathSanitizationEnabled()).resolves.toBe(false);
+      expect(repo.findByKey).toHaveBeenCalledTimes(2);
+    });
+
     it('upserts false when setCrossPlatformPathSanitizationEnabled is called with false', async () => {
       await service.setCrossPlatformPathSanitizationEnabled(false);
       expect(repo.upsert).toHaveBeenCalledWith('cross_platform_path_sanitization_enabled', 'false');
