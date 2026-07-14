@@ -76,6 +76,7 @@ const MODIFIERS = computed(() => [
   { key: ':first', description: t('settings.reader.fileNaming.modFirst') },
   { key: ':sort', description: t('settings.reader.fileNaming.modSort') },
   { key: ':initial', description: t('settings.reader.fileNaming.modInitial') },
+  { key: ':fixed2', description: 'Two decimal places' },
   { key: ':upper', description: 'UPPERCASE' },
   { key: ':lower', description: 'lowercase' },
 ])
