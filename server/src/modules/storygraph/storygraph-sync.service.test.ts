@@ -229,20 +229,24 @@ describe('StorygraphSyncService', () => {
       );
     });
 
-    it('updates progress without resetting an existing StoryGraph reading attempt', async () => {
+    it.each([
+      ['rereading', 'reading'],
+      ['currently reading', 'reading'],
+      ['currently reading', 'rereading'],
+    ])('updates progress without resetting a %s StoryGraph attempt for local status %s', async (currentStatus, localStatus) => {
       mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
-      mockRepo.findSyncableBook.mockResolvedValue(readingBook);
+      mockRepo.findSyncableBook.mockResolvedValue({ ...readingBook, status: localStatus });
       mockRepo.findBookState.mockResolvedValue({
         storygraphBookId: 'abc-123',
         matchMethod: 'isbn',
         lastSyncedAt: new Date('2026-07-01T00:00:00Z'),
-        lastSyncedStatus: 'reading',
+        lastSyncedStatus: localStatus,
         lastSyncedProgress: 10,
       });
       mockMatchService.matchBook.mockResolvedValue({ storygraphBookId: 'abc-123', matchMethod: 'isbn' });
       mockClient.get.mockResolvedValue({
         status: 200,
-        html: '<button class="read-status-label">rereading</button><input name="read_status[book_num_of_pages]" value="288">',
+        html: `<button class="read-status-label">${currentStatus}</button><input name="read_status[book_num_of_pages]" value="288">`,
         redirectedToSignIn: false,
       });
 
