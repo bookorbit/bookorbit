@@ -23,7 +23,10 @@
       "levelLegend": "Deelniveau voor leesinzichten",
       "current": "Huidige instelling",
       "levels": {
-        "private": { "title": "Privé", "description": "Alleen jij kunt je leesstatistieken zien." },
+        "private": {
+          "title": "Privé",
+          "description": "Alleen jij kunt je leesstatistieken zien."
+        },
         "summary": {
           "title": "Samenvatting delen",
           "description": "Deel samengevoegde gewoonten zonder boektitels, auteurs, reeksen of vertellers."
@@ -834,7 +837,7 @@
         "passwordSavedPlaceholder": "Opgeslagen - laat ongewijzigd",
         "passwordEmptyPlaceholder": "Geen wachtwoord ingesteld",
         "database": "Database",
-        "mediaRootPath": "Media Root Path",
+        "mediaRootPath": "Media-hoofdpad",
         "pathOk": "Pad OK",
         "pathIssue": "Padprobleem",
         "testPath": "Pad testen",
@@ -2191,7 +2194,12 @@
       "never": "Nooit",
       "openInsightsFor": "Gedeelde leesinzichten voor {name} openen",
       "permissionLabel": "Gebruikersactiviteit bekijken",
-      "states": { "recent": "Onlangs actief", "dormant": "Inactief", "never": "Geen activiteit vastgelegd", "disabled": "Uitgeschakeld" },
+      "states": {
+        "recent": "Onlangs actief",
+        "dormant": "Inactief",
+        "never": "Geen activiteit vastgelegd",
+        "disabled": "Uitgeschakeld"
+      },
       "filters": {
         "search": "Accounts zoeken",
         "searchPlaceholder": "Zoek op naam of gebruikersnaam",
@@ -2209,7 +2217,12 @@
         "apply": "Toepassen",
         "clear": "Wissen"
       },
-      "methods": { "local": "Lokaal", "manual": "Aangemaakt door beheerder", "oidc": "OIDC / SSO", "shared": "Gedeelde magische link" },
+      "methods": {
+        "local": "Lokaal",
+        "manual": "Aangemaakt door beheerder",
+        "oidc": "OIDC / SSO",
+        "shared": "Gedeelde magische link"
+      },
       "columns": {
         "user": "Gebruiker",
         "state": "Accountstatus",
@@ -2218,10 +2231,22 @@
         "created": "Aangemaakt",
         "readingInsights": "Leesinzichten"
       },
-      "sharing": { "private": "Niet gedeeld", "summary": "Samenvatting gedeeld", "detailed": "Details gedeeld" },
-      "empty": { "title": "Geen accounts gevonden", "description": "Wijzig of wis de huidige filters." },
-      "pagination": { "label": "Pagina's met accountactiviteit", "page": "Pagina {page} van {totalPages}" },
-      "errors": { "load": "Accountactiviteit kon niet worden geladen." }
+      "sharing": {
+        "private": "Niet gedeeld",
+        "summary": "Samenvatting gedeeld",
+        "detailed": "Details gedeeld"
+      },
+      "empty": {
+        "title": "Geen accounts gevonden",
+        "description": "Wijzig of wis de huidige filters."
+      },
+      "pagination": {
+        "label": "Pagina's met accountactiviteit",
+        "page": "Pagina {page} van {totalPages}"
+      },
+      "errors": {
+        "load": "Accountactiviteit kon niet worden geladen."
+      }
     },
     "sharedInsights": {
       "title": "Gedeelde leesinzichten",
@@ -2242,7 +2267,13 @@
       "emptyTitle": "Geen leesactiviteit in deze periode",
       "noData": "Er zijn geen leesgegevens vastgelegd voor deze periode.",
       "sessionCount": "{count} sessie | {count} sessies",
-      "sourceNames": { "web": "Weblezer", "koreader": "KOReader", "manual": "Handmatig", "kobo": "Kobo", "unknown": "Onbekend" },
+      "sourceNames": {
+        "web": "Weblezer",
+        "koreader": "KOReader",
+        "manual": "Handmatig",
+        "kobo": "Kobo",
+        "unknown": "Onbekend"
+      },
       "formats": "Formaten",
       "genres": "Genres",
       "broadGenres": {
