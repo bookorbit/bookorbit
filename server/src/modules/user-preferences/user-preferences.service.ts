@@ -85,6 +85,7 @@ const SHELFMARK_PREFERENCES_SCHEMA = z
   .object({
     enabled: z.boolean(),
     url: z.string(),
+    externalUrl: z.string().optional(),
   })
   .strict();
 
@@ -204,7 +205,18 @@ export class UserPreferencesService {
     return {
       enabled: stored.enabled ?? false,
       url: stored.url ?? '',
+      externalUrl: stored.externalUrl,
     };
+  }
+
+  async testShelfmarkConnection(url: string): Promise<{ ok: boolean; status?: number; error?: string }> {
+    const testUrl = url.replace(/\/+$/, '') + '/api/health';
+    try {
+      const res = await fetch(testUrl, { signal: AbortSignal.timeout(5000) });
+      return { ok: res.ok, status: res.status };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
   }
 
   async upsertShelfmarkPreferences(userId: number, data: Record<string, unknown>): Promise<void> {

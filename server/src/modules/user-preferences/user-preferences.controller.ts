@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Put } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Put } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
@@ -49,6 +49,11 @@ export class UserPreferencesController {
   async getShelfmarkPreferences(@CurrentUser() user: RequestUser) {
     const settings = await this.userPreferencesService.getShelfmarkPreferences(user.id);
     return { settings };
+  }
+
+  @Post('shelfmark/test')
+  async testShelfmarkConnection(@Body() body: { url: string }) {
+    return this.userPreferencesService.testShelfmarkConnection(body.url);
   }
 
   @Put('shelfmark')

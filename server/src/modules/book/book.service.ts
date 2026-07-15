@@ -1024,11 +1024,11 @@ export class BookService {
       if (shelfmarkPref?.enabled && shelfmarkPref.url) {
         try {
           const externalBooks = await this.searchExternalProviders(query.q);
-          const newExternalBooks = await this.filterExistingExternalBooks(externalBooks, shelfmarkPref.url);
+          const newExternalBooks = await this.filterExistingExternalBooks(externalBooks, shelfmarkPref.url, shelfmarkPref.externalUrl);
           localBooks.items.push(...newExternalBooks);
           localBooks.total += newExternalBooks.length;
         } catch (err) {
-          this.logger.warn(`Shelfmark integration search failed: ${err}`);
+          this.logger.warn(`Shelfmark integration search failed: ${String(err)}`);
         }
       }
     }
@@ -1039,9 +1039,7 @@ export class BookService {
   async searchExternalProviders(queryText: string): Promise<MetadataCandidate[]> {
     const config = await this.providerConfigService.getConfig();
     const registeredProviders = this.providerRegistry.all();
-    const enabledProviderKeys = registeredProviders
-      .filter((provider) => config[provider.key]?.enabled !== false)
-      .map((provider) => provider.key);
+    const enabledProviderKeys = registeredProviders.filter((provider) => config[provider.key]?.enabled !== false).map((provider) => provider.key);
 
     if (enabledProviderKeys.length === 0) return [];
 
@@ -1073,9 +1071,9 @@ export class BookService {
     });
   }
 
-  async filterExistingExternalBooks(candidates: MetadataCandidate[], shelfmarkUrl: string): Promise<BookCard[]> {
+  async filterExistingExternalBooks(candidates: MetadataCandidate[], shelfmarkUrl: string, externalUrl?: string): Promise<BookCard[]> {
     const results: BookCard[] = [];
-    const baseUrl = shelfmarkUrl.replace(/\/+$/, '');
+    const linkBaseUrl = (externalUrl || shelfmarkUrl).replace(/\/+$/, '');
     let count = -1;
 
     for (const candidate of candidates) {
@@ -1110,8 +1108,8 @@ export class BookService {
           tags: [],
           customMetadata: [],
           doesNotExistLocally: true,
-          shelfmarkUrl: `${baseUrl}/search?q=${encodeURIComponent(
-            candidate.title + (candidate.authors && candidate.authors.length ? ' ' + candidate.authors.join(' ') : '')
+          shelfmarkUrl: `${linkBaseUrl}/search?q=${encodeURIComponent(
+            candidate.title + (candidate.authors && candidate.authors.length ? ' ' + candidate.authors.join(' ') : ''),
           )}`,
         };
         results.push(bookCard);
