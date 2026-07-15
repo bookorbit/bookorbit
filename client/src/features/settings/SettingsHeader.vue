@@ -54,6 +54,8 @@ const sections = computed<Section[]>(() => {
     result.push({ label: 'Hardcover', routeName: 'settings-hardcover' })
   }
 
+  result.push({ label: 'Shelfmark', routeName: 'settings-shelfmark' })
+
   if (su || perms.includes('manage_users') || perms.includes('manage_app_settings')) {
     result.push({ label: 'Admin', routeName: 'settings-admin' })
   }

@@ -44,4 +44,16 @@ export class UserPreferencesController {
   async upsertWhatsNewPreferences(@Body() dto: UpsertUserPreferenceDto, @CurrentUser() user: RequestUser) {
     await this.userPreferencesService.upsertWhatsNewPreferences(user.id, dto.settings);
   }
+
+  @Get('shelfmark')
+  async getShelfmarkPreferences(@CurrentUser() user: RequestUser) {
+    const settings = await this.userPreferencesService.getShelfmarkPreferences(user.id);
+    return { settings };
+  }
+
+  @Put('shelfmark')
+  @HttpCode(204)
+  async upsertShelfmarkPreferences(@Body() dto: UpsertUserPreferenceDto, @CurrentUser() user: RequestUser) {
+    await this.userPreferencesService.upsertShelfmarkPreferences(user.id, dto.settings);
+  }
 }

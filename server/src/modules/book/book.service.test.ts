@@ -239,6 +239,19 @@ function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
     findByBookIds: vi.fn().mockResolvedValue(new Map()),
   };
 
+  const userPreferencesService = {
+    getShelfmarkPreferences: vi.fn().mockResolvedValue({ enabled: false, url: '' }),
+  };
+  const providerConfigService = {
+    getConfig: vi.fn().mockResolvedValue({}),
+  };
+  const providerRegistry = {
+    all: vi.fn().mockReturnValue([]),
+  };
+  const metadataFetchService = {
+    search: vi.fn(),
+  };
+
   bookRepo.withTransaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => callback({}));
 
   const service = new BookService(
@@ -255,6 +268,10 @@ function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
     comicMetadataService as never,
     customMetadataService as never,
     (overrides.bookMetadataLockService ?? bookMetadataLockService) as never,
+    userPreferencesService as never,
+    providerConfigService as never,
+    providerRegistry as never,
+    metadataFetchService as never,
     embedder as never,
     fileWriteService as never,
     fileRenameService as never,
@@ -280,6 +297,10 @@ function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
     comicMetadataService,
     customMetadataService,
     bookMetadataLockService,
+    userPreferencesService,
+    providerConfigService,
+    providerRegistry,
+    metadataFetchService,
   };
 }
 
@@ -4230,6 +4251,10 @@ describe('BookService', () => {
         comicMetadataService,
         customMetadataService,
         bookMetadataLockService,
+        userPreferencesService,
+        providerConfigService,
+        providerRegistry,
+        metadataFetchService,
         embedder,
         fileRenameService,
         achievementEvents,
@@ -4251,6 +4276,10 @@ describe('BookService', () => {
         comicMetadataService as never,
         customMetadataService as never,
         bookMetadataLockService as never,
+        userPreferencesService as never,
+        providerConfigService as never,
+        providerRegistry as never,
+        metadataFetchService as never,
         embedder as never,
         null as never,
         fileRenameService as never,
@@ -4278,6 +4307,10 @@ describe('BookService', () => {
         comicMetadataService,
         customMetadataService,
         bookMetadataLockService,
+        userPreferencesService,
+        providerConfigService,
+        providerRegistry,
+        metadataFetchService,
         embedder,
         fileWriteService,
         achievementEvents,
@@ -4299,6 +4332,10 @@ describe('BookService', () => {
         comicMetadataService as never,
         customMetadataService as never,
         bookMetadataLockService as never,
+        userPreferencesService as never,
+        providerConfigService as never,
+        providerRegistry as never,
+        metadataFetchService as never,
         embedder as never,
         fileWriteService as never,
         null as never,

@@ -19,6 +19,7 @@ import {
   ExternalLink,
   Sparkles,
   Highlighter,
+  CloudDownload,
 } from '@lucide/vue'
 import { useRouter, useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -228,6 +229,10 @@ function closeGithubStarPopover() {
 function navigateToResult(result: GlobalSearchResult) {
   clearSearch()
   mobileSearchOpen.value = false
+  if (result.doesNotExistLocally && result.shelfmarkUrl) {
+    window.open(result.shelfmarkUrl, '_blank')
+    return
+  }
   router.push({ name: 'book-detail', params: { bookId: result.id } })
 }
 
@@ -392,7 +397,11 @@ function formatBadgeStyle(fmt: string) {
                   selectedIndex === row.index ? 'bg-accent' : 'hover:bg-accent/60',
                 ]"
               >
+                <div v-if="row.result.doesNotExistLocally" class="h-16 w-12 rounded shrink-0 bg-muted/40 flex items-center justify-center text-muted-foreground border border-dashed">
+                  <CloudDownload :size="18" />
+                </div>
                 <BookCoverImage
+                  v-else
                   :book-id="row.result.id"
                   type="thumbnail"
                   :version="row.result.updatedAt"
@@ -406,7 +415,10 @@ function formatBadgeStyle(fmt: string) {
                       <span v-else>{{ seg.text }}</span>
                     </template>
                   </p>
-                  <p v-if="row.result.authors.length" class="text-xs text-muted-foreground truncate mt-0.5">
+                  <p v-if="row.result.doesNotExistLocally" class="text-xs text-amber-600 dark:text-amber-400 font-medium truncate mt-0.5">
+                    Not in Library • Search Shelfmark
+                  </p>
+                  <p v-else-if="row.result.authors.length" class="text-xs text-muted-foreground truncate mt-0.5">
                     <template v-for="seg in highlightSegments(row.result.authors.join(', '), globalSearchQuery)" :key="seg.text + seg.match">
                       <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
                       <span v-else>{{ seg.text }}</span>
@@ -419,15 +431,20 @@ function formatBadgeStyle(fmt: string) {
                     </template>
                   </p>
                 </div>
-                <div v-if="resultFormats(row.result).length" class="flex shrink-0 gap-1">
-                  <span
-                    v-for="fmt in resultFormats(row.result)"
-                    :key="fmt"
-                    :class="['text-[9px] font-semibold px-1 py-0.5 rounded border uppercase']"
-                    :style="formatBadgeStyle(fmt)"
-                  >
-                    {{ fmt }}
+                <div class="flex shrink-0 gap-1">
+                  <span v-if="row.result.doesNotExistLocally" class="text-[9px] font-semibold px-1.5 py-0.5 rounded border border-amber-500/35 bg-amber-500/10 text-amber-600 dark:text-amber-400 uppercase">
+                    Shelfmark
                   </span>
+                  <template v-else-if="resultFormats(row.result).length">
+                    <span
+                      v-for="fmt in resultFormats(row.result)"
+                      :key="fmt"
+                      :class="['text-[9px] font-semibold px-1 py-0.5 rounded border uppercase']"
+                      :style="formatBadgeStyle(fmt)"
+                    >
+                      {{ fmt }}
+                    </span>
+                  </template>
                 </div>
               </button>
             </div>
@@ -515,7 +532,11 @@ function formatBadgeStyle(fmt: string) {
                   selectedIndex === row.index ? 'bg-accent' : 'hover:bg-accent/60',
                 ]"
               >
+                <div v-if="row.result.doesNotExistLocally" class="h-16 w-12 rounded shrink-0 bg-muted/40 flex items-center justify-center text-muted-foreground border border-dashed">
+                  <CloudDownload :size="18" />
+                </div>
                 <BookCoverImage
+                  v-else
                   :book-id="row.result.id"
                   type="thumbnail"
                   :version="row.result.updatedAt"
@@ -529,7 +550,10 @@ function formatBadgeStyle(fmt: string) {
                       <span v-else>{{ seg.text }}</span>
                     </template>
                   </p>
-                  <p v-if="row.result.authors.length" class="text-xs text-muted-foreground truncate mt-0.5">
+                  <p v-if="row.result.doesNotExistLocally" class="text-xs text-amber-600 dark:text-amber-400 font-medium truncate mt-0.5">
+                    Not in Library • Search Shelfmark
+                  </p>
+                  <p v-else-if="row.result.authors.length" class="text-xs text-muted-foreground truncate mt-0.5">
                     <template v-for="seg in highlightSegments(row.result.authors.join(', '), globalSearchQuery)" :key="seg.text + seg.match">
                       <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
                       <span v-else>{{ seg.text }}</span>
@@ -542,15 +566,20 @@ function formatBadgeStyle(fmt: string) {
                     </template>
                   </p>
                 </div>
-                <div v-if="resultFormats(row.result).length" class="flex shrink-0 gap-1">
-                  <span
-                    v-for="fmt in resultFormats(row.result)"
-                    :key="fmt"
-                    :class="['text-[9px] font-semibold px-1 py-0.5 rounded border uppercase']"
-                    :style="formatBadgeStyle(fmt)"
-                  >
-                    {{ fmt }}
+                <div class="flex shrink-0 gap-1">
+                  <span v-if="row.result.doesNotExistLocally" class="text-[9px] font-semibold px-1.5 py-0.5 rounded border border-amber-500/35 bg-amber-500/10 text-amber-600 dark:text-amber-400 uppercase">
+                    Shelfmark
                   </span>
+                  <template v-else-if="resultFormats(row.result).length">
+                    <span
+                      v-for="fmt in resultFormats(row.result)"
+                      :key="fmt"
+                      :class="['text-[9px] font-semibold px-1 py-0.5 rounded border uppercase']"
+                      :style="formatBadgeStyle(fmt)"
+                    >
+                      {{ fmt }}
+                    </span>
+                  </template>
                 </div>
               </button>
             </div>

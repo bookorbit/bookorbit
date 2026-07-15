@@ -35,6 +35,8 @@ import {
   isAudioFormat,
   jumpBucketKindForSort,
   resolveUploadPath,
+  type BookCard,
+  type MetadataCandidate,
 } from '@bookorbit/types';
 import type {
   AudiobookChapter,
@@ -70,6 +72,10 @@ import { FileRenameService, RENAME_RELEVANT_FIELDS } from '../file-write/file-re
 import { FileWriteService } from '../file-write/file-write.service';
 import { NarratorService } from '../narrator/narrator.service';
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
+import { UserPreferencesService } from '../user-preferences/user-preferences.service';
+import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
+import { ProviderRegistry } from '../metadata-fetch/provider-registry';
+import { MetadataFetchService } from '../metadata-fetch/metadata-fetch.service';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED } from '../achievement/achievement-events.service';
 import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
 import { BookQueryBuilder } from './book-query-builder.service';
@@ -242,6 +248,10 @@ export class BookService {
     private readonly comicMetadataService: ComicMetadataRepository,
     private readonly customMetadataService: CustomMetadataService,
     private readonly bookMetadataLockService: BookMetadataLockService,
+    private readonly userPreferencesService: UserPreferencesService,
+    private readonly providerConfigService: ProviderConfigService,
+    private readonly providerRegistry: ProviderRegistry,
+    private readonly metadataFetchService: MetadataFetchService,
     @Optional() private readonly embedder: BookEmbedderService,
     @Optional() private readonly fileWriteService: FileWriteService,
     @Optional() private readonly fileRenameService: FileRenameService,
@@ -1007,7 +1017,107 @@ export class BookService {
       timeZone,
       contentFilters: this.isSuperuser(user) ? undefined : user.contentFilters,
     });
-    return this.executeBooksQuery(user.id, where, query);
+    const localBooks = await this.executeBooksQuery(user.id, where, query);
+
+    if (query.q && query.q.trim().length >= 2) {
+      const shelfmarkPref = await this.userPreferencesService.getShelfmarkPreferences(user.id);
+      if (shelfmarkPref?.enabled && shelfmarkPref.url) {
+        try {
+          const externalBooks = await this.searchExternalProviders(query.q);
+          const newExternalBooks = await this.filterExistingExternalBooks(externalBooks, shelfmarkPref.url);
+          localBooks.items.push(...newExternalBooks);
+          localBooks.total += newExternalBooks.length;
+        } catch (err) {
+          this.logger.warn(`Shelfmark integration search failed: ${err}`);
+        }
+      }
+    }
+
+    return localBooks;
+  }
+
+  async searchExternalProviders(queryText: string): Promise<MetadataCandidate[]> {
+    const config = await this.providerConfigService.getConfig();
+    const registeredProviders = this.providerRegistry.all();
+    const enabledProviderKeys = registeredProviders
+      .filter((provider) => config[provider.key]?.enabled !== false)
+      .map((provider) => provider.key);
+
+    if (enabledProviderKeys.length === 0) return [];
+
+    const params: MetadataSearchParams = {
+      title: queryText,
+      isAudiobook: false,
+    };
+
+    return new Promise<MetadataCandidate[]>((resolve) => {
+      const results: MetadataCandidate[] = [];
+      const subscription = this.metadataFetchService.search(params, enabledProviderKeys).subscribe({
+        next: (candidate) => {
+          if (results.length < 20) {
+            results.push(candidate);
+          }
+        },
+        error: () => {
+          resolve(results);
+        },
+        complete: () => {
+          resolve(results);
+        },
+      });
+
+      setTimeout(() => {
+        subscription.unsubscribe();
+        resolve(results);
+      }, 1500);
+    });
+  }
+
+  async filterExistingExternalBooks(candidates: MetadataCandidate[], shelfmarkUrl: string): Promise<BookCard[]> {
+    const results: BookCard[] = [];
+    const baseUrl = shelfmarkUrl.replace(/\/+$/, '');
+    let count = -1;
+
+    for (const candidate of candidates) {
+      const exists = await this.bookRepo.checkCandidateExists(candidate);
+      if (!exists) {
+        const bookCard: BookCard = {
+          id: count--,
+          status: 'placeholder',
+          title: candidate.title,
+          authors: candidate.authors || [],
+          seriesId: null,
+          seriesName: null,
+          seriesIndex: null,
+          files: [],
+          publishedYear: candidate.publishedYear || null,
+          language: candidate.language || null,
+          genres: candidate.genres || [],
+          rating: null,
+          readingProgress: null,
+          readStatus: null,
+          addedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          metadataScore: null,
+          hasCover: false,
+          hasMetadataLocks: false,
+          lockedFields: [],
+          subtitle: candidate.subtitle || null,
+          publisher: candidate.publisher || null,
+          pageCount: candidate.pageCount || null,
+          isbn13: candidate.isbn13 || null,
+          narrators: candidate.narrators || [],
+          tags: [],
+          customMetadata: [],
+          doesNotExistLocally: true,
+          shelfmarkUrl: `${baseUrl}/search?q=${encodeURIComponent(
+            candidate.title + (candidate.authors && candidate.authors.length ? ' ' + candidate.authors.join(' ') : '')
+          )}`,
+        };
+        results.push(bookCard);
+      }
+    }
+    return results;
   }
 
   async executeBooksQuery(userId: number, where: SQL | undefined, query: BookQuery): Promise<BooksPage> {

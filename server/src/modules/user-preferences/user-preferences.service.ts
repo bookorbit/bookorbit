@@ -18,6 +18,7 @@ import {
   type DisplayPreferences,
   type ThemePreferences,
   type WhatsNewPreferences,
+  type ShelfmarkPreferences,
 } from '@bookorbit/types';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
@@ -79,6 +80,13 @@ const WHATS_NEW_PREFERENCES_SCHEMA = z
   .strict();
 
 const WHATS_NEW_DEFAULTS: WhatsNewPreferences = { lastSeenVersion: null, popupEnabled: true };
+
+const SHELFMARK_PREFERENCES_SCHEMA = z
+  .object({
+    enabled: z.boolean(),
+    url: z.string(),
+  })
+  .strict();
 
 @Injectable()
 export class UserPreferencesService {
@@ -184,6 +192,43 @@ export class UserPreferencesService {
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
       this.logger.error(
         `[user_preferences.upsert_display] [fail] userId=${userId} durationMs=${durationMs} errorClass=${errorClass} error="${error}" - upsert display preferences failed`,
+      );
+      throw err;
+    }
+  }
+
+  async getShelfmarkPreferences(userId: number): Promise<ShelfmarkPreferences> {
+    const row = await this.repo.findByCategory(userId, 'shelfmark');
+    if (!row) return { enabled: false, url: '' };
+    const stored = row.data as Partial<ShelfmarkPreferences>;
+    return {
+      enabled: stored.enabled ?? false,
+      url: stored.url ?? '',
+    };
+  }
+
+  async upsertShelfmarkPreferences(userId: number, data: Record<string, unknown>): Promise<void> {
+    const start = Date.now();
+    this.logger.log(`[user_preferences.upsert_shelfmark] [start] userId=${userId} - upsert shelfmark preferences started`);
+
+    const result = SHELFMARK_PREFERENCES_SCHEMA.safeParse(data);
+    if (!result.success) {
+      const firstIssue = result.error.issues[0];
+      const issuePath = firstIssue?.path.length ? firstIssue.path.join('.') : 'settings';
+      const issueMessage = firstIssue?.message ?? 'Invalid settings payload';
+      throw new BadRequestException(`Invalid shelfmark preferences at "${issuePath}": ${issueMessage}`);
+    }
+
+    try {
+      await this.repo.upsert(userId, 'shelfmark', result.data);
+      const durationMs = Date.now() - start;
+      this.logger.log(`[user_preferences.upsert_shelfmark] [end] userId=${userId} durationMs=${durationMs} - upsert shelfmark preferences completed`);
+    } catch (err) {
+      const durationMs = Date.now() - start;
+      const errorClass = err instanceof Error ? err.constructor.name : 'UnknownError';
+      const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.error(
+        `[user_preferences.upsert_shelfmark] [fail] userId=${userId} durationMs=${durationMs} errorClass=${errorClass} error="${error}" - upsert shelfmark preferences failed`,
       );
       throw err;
     }
