@@ -9,5 +9,6 @@ import { UserPreferencesService } from './user-preferences.service';
   imports: [DbModule],
   controllers: [UserPreferencesController],
   providers: [UserPreferencesService, UserPreferencesRepository],
+  exports: [UserPreferencesService],
 })
 export class UserPreferencesModule {}

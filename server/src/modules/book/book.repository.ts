@@ -3,8 +3,8 @@ import { SQL, and, asc, count, eq, inArray, isNotNull, ne, or, sql } from 'drizz
 import { SUPPORTED_BOOK_FORMATS } from '../upload/upload-validator.service';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import type { ContentFilterRules, JumpBucketsResponse, SortSpec } from '@bookorbit/types';
-import { isAudioFormat, isComicFormat } from '@bookorbit/types';
+import type { ContentFilterRules, JumpBucketsResponse, SortSpec, MetadataCandidate } from '@bookorbit/types';
+import { isAudioFormat, isComicFormat, MetadataProviderKey } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
@@ -834,6 +834,56 @@ export class BookRepository {
       .where(and(eq(books.id, bookId), ...filterClauses))
       .limit(1);
     return !!row;
+  }
+
+  async checkCandidateExists(candidate: MetadataCandidate): Promise<boolean> {
+    const conditions: SQL[] = [];
+    if (candidate.isbn13) {
+      conditions.push(eq(schema.bookMetadata.isbn13, candidate.isbn13));
+    }
+    if (candidate.isbn10) {
+      conditions.push(eq(schema.bookMetadata.isbn10, candidate.isbn10));
+    }
+
+    const providerField = this.getProviderField(candidate.provider);
+    if (providerField && candidate.providerId) {
+      conditions.push(eq((schema.bookMetadata as any)[providerField], candidate.providerId));
+    }
+
+    if (conditions.length === 0) {
+      const rows = await this.db
+        .select({ bookId: schema.bookMetadata.bookId })
+        .from(schema.bookMetadata)
+        .where(sql`lower(${schema.bookMetadata.title}) = lower(${candidate.title})`)
+        .limit(1);
+      return rows.length > 0;
+    }
+
+    const rows = await this.db
+      .select({ bookId: schema.bookMetadata.bookId })
+      .from(schema.bookMetadata)
+      .where(or(...conditions))
+      .limit(1);
+
+    return rows.length > 0;
+  }
+
+  private getProviderField(provider: MetadataProviderKey): string | null {
+    switch (provider) {
+      case MetadataProviderKey.GOOGLE: return 'googleBooksId';
+      case MetadataProviderKey.GOODREADS: return 'goodreadsId';
+      case MetadataProviderKey.AMAZON: return 'amazonId';
+      case MetadataProviderKey.HARDCOVER: return 'hardcoverId';
+      case MetadataProviderKey.OPEN_LIBRARY: return 'openLibraryId';
+      case MetadataProviderKey.ITUNES: return 'itunesId';
+      case MetadataProviderKey.KOBO: return 'koboId';
+      case MetadataProviderKey.AUDIBLE: return 'audibleId';
+      case MetadataProviderKey.COMICVINE: return 'comicvineId';
+      case MetadataProviderKey.RANOBEDB: return 'ranobedbId';
+      case MetadataProviderKey.ALADIN: return 'aladinId';
+      case MetadataProviderKey.LUBIMYCZYTAC: return 'lubimyczytacId';
+      default: return null;
+    }
   }
 
   async findFileById(fileId: number) {
