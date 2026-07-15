@@ -233,7 +233,8 @@ describe('StorygraphSyncService', () => {
       ['rereading', 'reading'],
       ['currently reading', 'reading'],
       ['currently reading', 'rereading'],
-    ])('updates progress without resetting a %s StoryGraph attempt for local status %s', async (currentStatus, localStatus) => {
+      ['rereading', 'rereading'],
+    ] as const)('updates progress without resetting a %s StoryGraph attempt for local status %s', async (currentStatus, localStatus) => {
       mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
       mockRepo.findSyncableBook.mockResolvedValue({ ...readingBook, status: localStatus });
       mockRepo.findBookState.mockResolvedValue({
