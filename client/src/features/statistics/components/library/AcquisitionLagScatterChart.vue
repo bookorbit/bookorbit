@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { CalendarRange } from '@lucide/vue'
 
 import type { AcquisitionLagPoint } from '@bookorbit/types'
 import { useAcquisitionLagScatter } from '../../composables/useAcquisitionLagScatter'
 import ChartCard from '../ChartCard.vue'
+
+const { t } = useI18n()
 
 const { data, loading, error } = useAcquisitionLagScatter()
 const option = shallowRef({})
@@ -79,7 +82,7 @@ watchEffect(() => {
 
 <template>
   <ChartCard
-    title="Acquisition Lag"
+    :title="t('statistics.charts.acquisitionLag.title')"
     :icon="CalendarRange"
     :color-index="6"
     :loading

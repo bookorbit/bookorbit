@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ArrowDown, ArrowUp, Columns3, EyeOff, Filter, Pin, PinOff, X } from '@lucide/vue'
 import type { ColumnDef } from '@/features/book/composables/useTableColumns'
 
@@ -23,6 +24,8 @@ const emit = defineEmits<{
   'quick-filter': [key: string]
   close: []
 }>()
+
+const { t } = useI18n()
 
 const menuRef = ref<HTMLElement | null>(null)
 
@@ -101,7 +104,7 @@ onUnmounted(() => {
           @click="handleAction(() => emit('sort-asc'))"
         >
           <ArrowUp :size="14" />
-          Sort Ascending
+          {{ t('book.table.header.sortAscending') }}
         </button>
         <button
           class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
@@ -109,7 +112,7 @@ onUnmounted(() => {
           @click="handleAction(() => emit('sort-desc'))"
         >
           <ArrowDown :size="14" />
-          Sort Descending
+          {{ t('book.table.header.sortDescending') }}
         </button>
         <button
           v-if="sortDir"
@@ -117,7 +120,7 @@ onUnmounted(() => {
           @click="handleAction(() => emit('clear-sort'))"
         >
           <X :size="14" />
-          Clear Sort
+          {{ t('book.table.header.clearSort') }}
         </button>
         <div class="my-1 h-px bg-border" />
       </template>
@@ -141,7 +144,7 @@ onUnmounted(() => {
         @click="handleAction(() => emit('hide-column'))"
       >
         <EyeOff :size="14" />
-        Hide Column
+        {{ t('book.table.header.hideColumn') }}
       </button>
 
       <template v-if="column.pinned === null">
@@ -150,14 +153,14 @@ onUnmounted(() => {
           @click="handleAction(() => emit('pin-left'))"
         >
           <Pin :size="14" />
-          Pin Left
+          {{ t('book.table.header.pinLeft') }}
         </button>
         <button
           class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
           @click="handleAction(() => emit('pin-right'))"
         >
           <Pin :size="14" class="rotate-90" />
-          Pin Right
+          {{ t('book.table.header.pinRight') }}
         </button>
       </template>
       <button
@@ -166,7 +169,7 @@ onUnmounted(() => {
         @click="handleAction(() => emit('unpin'))"
       >
         <PinOff :size="14" />
-        Unpin Column
+        {{ t('book.table.header.unpinColumn') }}
       </button>
 
       <div class="my-1 h-px bg-border" />
@@ -176,14 +179,14 @@ onUnmounted(() => {
         @click="handleAction(() => emit('auto-fit'))"
       >
         <Columns3 :size="14" />
-        Auto-Fit Width
+        {{ t('book.table.header.autoFitWidth') }}
       </button>
       <button
         class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
         @click="handleAction(() => emit('auto-fit-all'))"
       >
         <Columns3 :size="14" />
-        Auto-Fit All Columns
+        {{ t('book.table.header.autoFitAllColumns') }}
       </button>
     </div>
   </Teleport>

@@ -1,4 +1,15 @@
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnApplicationBootstrap,
+  OnModuleDestroy,
+  OnModuleInit,
+  Optional,
+} from '@nestjs/common';
 import { basename, dirname, extname, join, resolve } from 'path';
 import { access as fsAccess, readFile, stat, unlink } from 'fs/promises';
 import { and, eq, inArray, or, sql } from 'drizzle-orm';
@@ -7,15 +18,23 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type {
   AudiobookChapter,
   BookDockAutoFinalizeMetadataMode,
+  BookDockDiscardDuplicatesResult,
   BookDockFinalizeFileResult,
+  BookDockFinalizePreviewItem,
+  BookDockFinalizePreviewResult,
+  BookDockFinalizePreviewStatus,
   BookDockFinalizeResult,
   BookDockMetadata,
+  ComicMetadataFields,
+  MetadataSeriesMembership,
 } from '@bookorbit/types';
-import { NotificationType, resolveUploadPath } from '@bookorbit/types';
+import { MetadataProviderKey, NotificationType, resolveUploadPath } from '@bookorbit/types';
+import { BookReadService } from '../book/book-read.service';
 import { NotificationService } from '../notification/notification.service';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
 import { formatSeriesIndex } from '../../common/utils/series-index-format.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -29,10 +48,13 @@ import { UploadValidatorService } from '../upload/upload-validator.service';
 import { BookDockRepository } from './book-dock.repository';
 import { BookDockEventsService, BOOK_DOCK_FILE_INGESTED } from './book-dock-events.service';
 import { BookDockGateway } from './book-dock.gateway';
+import { BookDockProcessingStateService } from './book-dock-processing-state.service';
 import { BookDockWorkQueue } from './book-dock-work-queue';
 import type { BookDockFileRow } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
+type LibraryRow = typeof libraries.$inferSelect;
+type LibraryFolderRow = typeof libraryFolders.$inferSelect;
 
 type FinalizeOverrideEntry = {
   libraryId?: number;
@@ -42,12 +64,14 @@ type FinalizeOverrideEntry = {
 };
 
 const BATCH_SIZE = 100;
+const PREVIEW_ITEM_LIMIT = 200;
 const AUTO_FINALIZE_QUEUE_CONCURRENCY = 1;
 const MIN_PUBLISHED_YEAR = 1000;
 const MAX_PUBLISHED_YEAR = 2200;
 const PUBLISHED_YEAR_RANGE_CONSTRAINT = 'book_metadata_published_year_range_chk';
 const INVALID_PUBLISHED_YEAR_MESSAGE = `Invalid metadata: published year must be between ${MIN_PUBLISHED_YEAR} and ${MAX_PUBLISHED_YEAR}.`;
 const INVALID_METADATA_MESSAGE = 'Invalid metadata values for this file. Review metadata fields and try again.';
+const METADATA_PROVIDER_KEYS = new Set<MetadataProviderKey>(Object.values(MetadataProviderKey));
 
 type NormalizedFinalizeMetadata = {
   title: string | null;
@@ -56,6 +80,7 @@ type NormalizedFinalizeMetadata = {
   isbn10: string | null;
   isbn13: string | null;
   publisher: string | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   pageCount: number | null;
@@ -64,10 +89,41 @@ type NormalizedFinalizeMetadata = {
   authors: string[];
   genres: string[];
   coverUrl: string | null;
+  googleBooksId: string | null;
+  goodreadsId: string | null;
+  amazonId: string | null;
+  hardcoverId: string | null;
+  hardcoverEditionId: string | null;
+  openLibraryId: string | null;
+  itunesId: string | null;
+  audibleId: string | null;
+  librofmId: string | null;
+  koboId: string | null;
+  comicvineId: string | null;
+  ranobedbId: string | null;
+  lubimyczytacId: string | null;
+  aladinId: string | null;
+  seriesMemberships: MetadataSeriesMembership[] | undefined;
+  communityRatings: Array<{ provider: MetadataProviderKey; rating: number; ratingCount: number | null }> | undefined;
+  comicMetadata: ComicMetadataFields | undefined;
+};
+
+type FinalizeCandidateAnalysis = {
+  fileId: number;
+  fileName: string;
+  row: BookDockFileRow;
+  status: BookDockFinalizePreviewStatus;
+  message?: string;
+  existingBookId?: number;
+  newName?: string;
+  library?: LibraryRow;
+  folder?: LibraryFolderRow;
+  format?: string;
+  destPath?: string;
 };
 
 @Injectable()
-export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
+export class BookDockFinalizeService implements OnModuleInit, OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(BookDockFinalizeService.name);
   private readonly autoFinalizeQueue: BookDockWorkQueue;
 
@@ -77,12 +133,14 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
     private readonly libraryService: LibraryService,
     private readonly appSettings: AppSettingsService,
     private readonly metadataService: MetadataService,
+    private readonly bookReadService: BookReadService,
     private readonly validator: UploadValidatorService,
     private readonly storage: UploadStorageService,
     private readonly processor: UploadProcessorService,
     private readonly events: BookDockEventsService,
     private readonly gateway: BookDockGateway,
     private readonly notificationService: NotificationService,
+    private readonly processingState: BookDockProcessingStateService,
     @Optional() private readonly seriesIdentity?: SeriesIdentityService,
     @Optional() private readonly seriesMemberships?: SeriesMembershipService,
   ) {
@@ -97,6 +155,12 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
     this.events.on(BOOK_DOCK_FILE_INGESTED, (fileId: number) => {
       this.enqueueAutoFinalize(fileId);
     });
+  }
+
+  async onApplicationBootstrap(): Promise<void> {
+    if (await this.processingState.isPaused()) {
+      this.autoFinalizeQueue.pause();
+    }
   }
 
   onModuleDestroy(): void {
@@ -149,7 +213,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
     } else {
       for (let i = 0; i < ids.length; i += BATCH_SIZE) {
         const batch = ids.slice(i, i + BATCH_SIZE);
-        const rows = await this.repo.findByIds(batch);
+        const rows = await this.repo.findByIds(batch, userId, isSuperuser);
         const rowById = new Map(rows.map((row) => [row.id, row]));
         const duplicateLookup = await this.buildDuplicateLookup(rows, defaultLibraryId, overrideMap);
 
@@ -199,58 +263,12 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
     duplicateLookup?: Map<string, number>,
   ): Promise<BookDockFinalizeFileResult> {
     try {
-      const override = overrideMap.get(row.id);
-      const libraryId = override?.libraryId ?? row.targetLibraryId ?? defaultLibraryId ?? null;
-      const folderId = override?.folderId ?? row.targetFolderId ?? defaultFolderId ?? null;
+      const analysis = await this.analyzeFinalizeCandidate(row, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser, duplicateLookup);
+      if (analysis.status !== 'ready') return this.analysisToFileResult(analysis);
 
-      if (libraryId === null || folderId === null) {
-        return {
-          fileId: row.id,
-          fileName: row.fileName,
-          success: false,
-          message: 'Destination is not set for this file',
-        };
-      }
-
-      const library = await this.findLibraryOrFail(libraryId);
-      await this.libraryService.verifyUserAccess(userId, libraryId, isSuperuser);
-
-      const folder = await this.findFolderOrFail(folderId, libraryId);
-      const format = row.format ?? extname(row.fileName).toLowerCase().slice(1);
-      this.validator.validateFormat(row.fileName, library.allowedFormats);
-
-      const patternDestPath = await this.resolveDestination(library, folder.path, row, format);
-      let destPath = patternDestPath;
-      if (override?.targetFileName) {
-        const stem = format ? override.targetFileName.replace(new RegExp(`\\.${format}$`, 'i'), '') : override.targetFileName;
-        const safeFileName = this.validator.sanitizeFilename(format ? `${stem}.${format}` : stem);
-        const candidate = join(dirname(patternDestPath), safeFileName);
-        if (resolve(dirname(candidate)) !== resolve(dirname(patternDestPath))) {
-          return { fileId: row.id, fileName: row.fileName, success: false, message: 'Invalid file name' };
-        }
-        destPath = candidate;
-      }
-
-      const exists = await fsAccess(destPath)
-        .then(() => true)
-        .catch(() => false);
-      if (exists) {
-        return { fileId: row.id, fileName: row.fileName, success: false, message: 'A file with this name already exists at the target location' };
-      }
-
-      if (!override?.skipDuplicateCheck && !override?.targetFileName) {
-        const meta = normalizeFinalizeMetadata(row.selectedMetadata ?? row.embeddedMetadata ?? {});
-        const existingBookId = await this.findDuplicate(libraryId, meta, duplicateLookup);
-        if (existingBookId !== null) {
-          return {
-            fileId: row.id,
-            fileName: row.fileName,
-            success: false,
-            isDuplicate: true,
-            existingBookId,
-            message: `Duplicate: this book already exists in the library`,
-          };
-        }
+      const { destPath, folder, library, format } = analysis;
+      if (!destPath || !folder || !library || !format) {
+        return { fileId: row.id, fileName: row.fileName, success: false, message: 'Finalization target could not be resolved' };
       }
 
       await this.storage.moveToPath(row.absolutePath, destPath);
@@ -260,7 +278,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
         const { size } = await stat(destPath);
         const bookFolderPath = library.organizationMode === 'book_per_file' ? destPath : dirname(destPath);
         ({ bookId } = await this.processor.createBookRecord(
-          libraryId,
+          library.id,
           folder.id,
           bookFolderPath,
           destPath,
@@ -285,7 +303,268 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async previewFinalize(
+    userId: number,
+    isSuperuser: boolean,
+    fileIds: number[] | undefined,
+    selectAll: boolean | undefined,
+    excludedIds: number[] | undefined,
+    defaultLibraryId: number | undefined,
+    defaultFolderId: number | undefined,
+    overrides?: Array<{ fileId: number } & FinalizeOverrideEntry>,
+    status?: string,
+    search?: string,
+  ): Promise<BookDockFinalizePreviewResult> {
+    const summary = createFinalizePreviewSummary();
+    const overrideMap = new Map((overrides ?? []).map((o) => [o.fileId, o]));
+
+    await this.processFinalizeSelection(userId, isSuperuser, fileIds, selectAll, excludedIds, status, search, async (rows, missingIds) => {
+      const duplicateLookup = await this.buildDuplicateLookup(rows, defaultLibraryId, overrideMap);
+      for (const row of rows) {
+        const analysis = await this.analyzeFinalizeCandidate(
+          row,
+          defaultLibraryId,
+          defaultFolderId,
+          overrideMap,
+          userId,
+          isSuperuser,
+          duplicateLookup,
+        );
+        addFinalizePreviewAnalysis(summary, analysis);
+      }
+      for (const fileId of missingIds) {
+        addFinalizePreviewItem(summary, {
+          fileId,
+          fileName: `book-dock-file-${fileId}`,
+          status: 'error',
+          message: 'Book Dock file not found',
+        });
+      }
+    });
+
+    return summary;
+  }
+
+  async discardDuplicateCandidates(
+    userId: number,
+    isSuperuser: boolean,
+    fileIds: number[] | undefined,
+    selectAll: boolean | undefined,
+    excludedIds: number[] | undefined,
+    defaultLibraryId: number | undefined,
+    defaultFolderId: number | undefined,
+    overrides?: Array<{ fileId: number } & FinalizeOverrideEntry>,
+    status?: string,
+    search?: string,
+  ): Promise<BookDockDiscardDuplicatesResult> {
+    const startedAt = Date.now();
+    this.logger.log(`[book_dock.discard_duplicates] [start] userId=${userId} selectAll=${selectAll === true} - duplicate discard started`);
+
+    const overrideMap = new Map((overrides ?? []).map((o) => [o.fileId, o]));
+    let total = 0;
+    let discarded = 0;
+    const discardedFileIds: number[] = [];
+
+    try {
+      await this.processFinalizeSelection(userId, isSuperuser, fileIds, selectAll, excludedIds, status, search, async (rows, missingIds) => {
+        total += rows.length + missingIds.length;
+        const duplicateLookup = await this.buildDuplicateLookup(rows, defaultLibraryId, overrideMap);
+        const duplicateRows: BookDockFileRow[] = [];
+
+        for (const row of rows) {
+          const analysis = await this.analyzeFinalizeCandidate(
+            row,
+            defaultLibraryId,
+            defaultFolderId,
+            overrideMap,
+            userId,
+            isSuperuser,
+            duplicateLookup,
+          );
+          if (analysis.status === 'duplicate') duplicateRows.push(row);
+        }
+
+        if (duplicateRows.length === 0) return;
+
+        for (const row of duplicateRows) {
+          await this.cleanupDiscardedBookDockFile(row);
+          discardedFileIds.push(row.id);
+        }
+        await this.repo.deleteByIds(duplicateRows.map((row) => row.id));
+        discarded += duplicateRows.length;
+      });
+
+      await this.emitSummary();
+      const result = { total, discarded, skipped: total - discarded, discardedFileIds: selectAll ? [] : discardedFileIds };
+      this.logger.log(
+        `[book_dock.discard_duplicates] [end] userId=${userId} durationMs=${Date.now() - startedAt} total=${total} discarded=${discarded} skipped=${result.skipped} - duplicate discard completed`,
+      );
+      return result;
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.name : 'Error';
+      const errorMessage = sanitizeLogValue(error instanceof Error ? error.message : String(error));
+      this.logger.warn(
+        `[book_dock.discard_duplicates] [fail] userId=${userId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - duplicate discard failed`,
+      );
+      throw error;
+    }
+  }
+
+  private async analyzeFinalizeCandidate(
+    row: BookDockFileRow,
+    defaultLibraryId: number | undefined,
+    defaultFolderId: number | undefined,
+    overrideMap: Map<number, FinalizeOverrideEntry>,
+    userId: number,
+    isSuperuser: boolean,
+    duplicateLookup?: Map<string, number>,
+  ): Promise<FinalizeCandidateAnalysis> {
+    try {
+      const override = overrideMap.get(row.id);
+      const libraryId = override?.libraryId ?? row.targetLibraryId ?? defaultLibraryId ?? null;
+      const folderId = override?.folderId ?? row.targetFolderId ?? defaultFolderId ?? null;
+
+      if (libraryId === null || folderId === null) {
+        return {
+          fileId: row.id,
+          fileName: row.fileName,
+          row,
+          status: 'missing_destination',
+          message: 'Destination is not set for this file',
+        };
+      }
+
+      const library = await this.findLibraryOrFail(libraryId);
+      await this.libraryService.verifyUserAccess(userId, libraryId, isSuperuser);
+
+      const folder = await this.findFolderOrFail(folderId, libraryId);
+      const format = row.format ?? extname(row.fileName).toLowerCase().slice(1);
+      this.validator.validateFormat(row.fileName, library.allowedFormats);
+
+      const patternDestPath = await this.resolveDestination(library, folder.path, row, format);
+      let destPath = patternDestPath;
+      if (override?.targetFileName) {
+        const stem = format ? override.targetFileName.replace(new RegExp(`\\.${format}$`, 'i'), '') : override.targetFileName;
+        const safeFileName = this.validator.sanitizeFilename(format ? `${stem}.${format}` : stem);
+        const candidate = join(dirname(patternDestPath), safeFileName);
+        if (resolve(dirname(candidate)) !== resolve(dirname(patternDestPath))) {
+          return { fileId: row.id, fileName: row.fileName, row, status: 'invalid_target', message: 'Invalid file name' };
+        }
+        destPath = candidate;
+      }
+
+      const newName = destPath.substring(folder.path.length + 1);
+
+      if (!override?.skipDuplicateCheck) {
+        const meta = normalizeFinalizeMetadata(row.selectedMetadata ?? row.embeddedMetadata ?? {});
+        const existingBookId = await this.findDuplicate(libraryId, meta, duplicateLookup);
+        if (existingBookId !== null) {
+          return {
+            fileId: row.id,
+            fileName: row.fileName,
+            row,
+            status: 'duplicate',
+            existingBookId,
+            newName,
+            message: 'Duplicate: this book already exists in the library',
+          };
+        }
+      }
+
+      const exists = await fsAccess(destPath)
+        .then(() => true)
+        .catch(() => false);
+      if (exists) {
+        return {
+          fileId: row.id,
+          fileName: row.fileName,
+          row,
+          status: 'destination_conflict',
+          newName,
+          message: 'A file with this name already exists at the target location',
+        };
+      }
+
+      return { fileId: row.id, fileName: row.fileName, row, status: 'ready', newName, library, folder, format, destPath };
+    } catch (error) {
+      return {
+        fileId: row.id,
+        fileName: row.fileName,
+        row,
+        status: classifyFinalizePreviewError(error),
+        message: resolveFinalizeErrorMessage(error),
+      };
+    }
+  }
+
+  private analysisToFileResult(analysis: FinalizeCandidateAnalysis): BookDockFinalizeFileResult {
+    if (analysis.status === 'duplicate') {
+      return {
+        fileId: analysis.fileId,
+        fileName: analysis.fileName,
+        newName: analysis.newName,
+        success: false,
+        isDuplicate: true,
+        existingBookId: analysis.existingBookId,
+        message: analysis.message,
+      };
+    }
+
+    return {
+      fileId: analysis.fileId,
+      fileName: analysis.fileName,
+      newName: analysis.newName,
+      success: false,
+      message: analysis.message,
+    };
+  }
+
+  private async processFinalizeSelection(
+    userId: number,
+    isSuperuser: boolean,
+    fileIds: number[] | undefined,
+    selectAll: boolean | undefined,
+    excludedIds: number[] | undefined,
+    status: string | undefined,
+    search: string | undefined,
+    processBatch: (rows: BookDockFileRow[], missingIds: number[]) => Promise<void>,
+  ): Promise<void> {
+    if (selectAll) {
+      let afterId: number | undefined;
+      while (true) {
+        const rows = await this.repo.findSelectionBatch({
+          limit: BATCH_SIZE,
+          afterId,
+          excludedIds,
+          status,
+          search,
+          userId,
+          isSuperuser,
+        });
+        if (rows.length === 0) break;
+
+        await processBatch(rows, []);
+        afterId = rows[rows.length - 1]?.id;
+      }
+      return;
+    }
+
+    const ids = dedupeIds(fileIds ?? []);
+    for (let index = 0; index < ids.length; index += BATCH_SIZE) {
+      const batch = ids.slice(index, index + BATCH_SIZE);
+      const rows = await this.repo.findByIds(batch, userId, isSuperuser);
+      const rowById = new Map(rows.map((row) => [row.id, row]));
+      const missingIds = batch.filter((id) => !rowById.has(id));
+      await processBatch(rows, missingIds);
+    }
+  }
+
   async triggerAutoFinalize(fileId: number): Promise<void> {
+    if (await this.processingState.isPaused()) {
+      this.autoFinalizeQueue.pause();
+      return;
+    }
+
     const settings = await this.appSettings.getAutoFinalizeSettings();
     if (!settings.enabled || settings.libraryId === null || settings.folderId === null) return;
 
@@ -321,7 +600,46 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
   }
 
   private enqueueAutoFinalize(fileId: number): void {
+    if (this.processingState.getCachedPaused()) this.autoFinalizeQueue.pause();
     this.autoFinalizeQueue.enqueue(fileId);
+  }
+
+  pauseProcessing(): void {
+    this.autoFinalizeQueue.pause();
+  }
+
+  async resumeProcessing(): Promise<void> {
+    if (await this.processingState.isPaused()) return;
+    this.autoFinalizeQueue.resume();
+  }
+
+  async requeueAutoFinalizeCandidates(): Promise<number> {
+    if (await this.processingState.isPaused()) return 0;
+
+    const settings = await this.appSettings.getAutoFinalizeSettings();
+    if (!settings.enabled || settings.libraryId === null || settings.folderId === null) return 0;
+
+    let queued = 0;
+    let afterId: number | undefined;
+    while (!(await this.processingState.isPaused())) {
+      const rows = await this.repo.findSelectionBatch({
+        limit: BATCH_SIZE,
+        afterId,
+        status: 'ready',
+        userId: 0,
+        isSuperuser: true,
+      });
+      if (rows.length === 0) break;
+
+      for (const row of rows) {
+        if (shouldAutoFinalize(row, settings.metadataMode, settings.threshold) && this.autoFinalizeQueue.enqueue(row.id)) {
+          queued++;
+        }
+      }
+      afterId = rows[rows.length - 1]?.id;
+    }
+
+    return queued;
   }
 
   private logAutoFinalizeQueueFailure(fileId: number, err: unknown): void {
@@ -337,13 +655,15 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
     selectAll: boolean | undefined,
     excludedIds: number[] | undefined,
     defaultLibraryId: number | undefined,
+    userId: number | undefined,
+    isSuperuser: boolean | undefined,
     status?: string,
     search?: string,
   ): Promise<{ fileId: number; fileName: string; newName: string }[]> {
-    const ids = selectAll ? await this.repo.findAllIds(excludedIds, status, search) : (fileIds ?? []);
+    const ids = selectAll ? await this.repo.findAllIds(excludedIds, status, search, userId, isSuperuser) : (fileIds ?? []);
     if (!ids.length) return [];
 
-    const rows = await this.repo.findByIds(ids);
+    const rows = await this.repo.findByIds(ids, userId, isSuperuser);
     const appPatternFile = await this.appSettings.getUploadPattern();
     const appPatternFolder = await this.appSettings.getUploadPatternBookPerFolder();
     const sanitizeForCrossPlatform = await this.appSettings.isCrossPlatformPathSanitizationEnabled();
@@ -601,7 +921,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
 
   private async applyMetadata(bookId: number, row: BookDockFileRow): Promise<void> {
     const meta = normalizeFinalizeMetadata(row.selectedMetadata ?? row.embeddedMetadata);
-    const audio = resolveAudioFinalizeFields(row.embeddedMetadata ?? row.selectedMetadata);
+    const audio = resolveAudioFinalizeFields(row.embeddedMetadata, row.selectedMetadata);
     let selectedCoverApplied = false;
 
     const selectedCoverUrl = meta.coverUrl;
@@ -625,11 +945,26 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
       isbn10: meta.isbn10 ?? null,
       isbn13: meta.isbn13 ?? null,
       publisher: meta.publisher ?? null,
+      publishedDate: meta.publishedDate ?? null,
       publishedYear: meta.publishedYear ?? null,
       language: meta.language ?? null,
       seriesName: meta.seriesName ?? null,
       seriesIndex: meta.seriesIndex ?? null,
       pageCount: meta.pageCount ?? null,
+      googleBooksId: meta.googleBooksId,
+      goodreadsId: meta.goodreadsId,
+      amazonId: meta.amazonId,
+      hardcoverId: meta.hardcoverId,
+      hardcoverEditionId: meta.hardcoverEditionId,
+      openLibraryId: meta.openLibraryId,
+      itunesId: meta.itunesId,
+      audibleId: meta.audibleId,
+      librofmId: meta.librofmId,
+      koboId: meta.koboId,
+      comicvineId: meta.comicvineId,
+      ranobedbId: meta.ranobedbId,
+      lubimyczytacId: meta.lubimyczytacId,
+      aladinId: meta.aladinId,
       updatedAt: new Date(),
     };
     const patch = (await this.seriesIdentity?.resolveMetadataPatch(scalarFields)) ?? scalarFields;
@@ -638,7 +973,19 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
       .update(bookMetadata)
       .set({ ...patch, ...buildAudioMetadataPatch(audio) })
       .where(eq(bookMetadata.bookId, bookId));
-    await this.seriesMemberships?.syncPrimaryFromMetadata(bookId);
+    if (meta.seriesMemberships !== undefined) {
+      await this.seriesMemberships?.replaceForBook(bookId, meta.seriesMemberships);
+    } else {
+      await this.seriesMemberships?.syncPrimaryFromMetadata(bookId);
+    }
+
+    if (meta.communityRatings !== undefined) {
+      await this.bookReadService.replaceCommunityRatings(bookId, meta.communityRatings);
+    }
+
+    if (meta.comicMetadata) {
+      await this.metadataService.upsertComicMetadata(bookId, meta.comicMetadata);
+    }
 
     if (meta.authors.length > 0) {
       await this.metadataService.replaceAuthors(
@@ -668,6 +1015,15 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
     await this.repo.deleteById(row.id);
   }
 
+  private async cleanupDiscardedBookDockFile(row: BookDockFileRow): Promise<void> {
+    await safeUnlink(row.absolutePath);
+    if (row.coverPath) {
+      await safeUnlink(row.coverPath);
+      const thumbPath = row.coverPath.replace(/\.\w+$/, '_thumb.jpg');
+      await safeUnlink(thumbPath);
+    }
+  }
+
   private async findLibraryOrFail(libraryId: number) {
     const [library] = await this.db.select().from(libraries).where(eq(libraries.id, libraryId)).limit(1);
     if (!library) throw new NotFoundException('Library not found');
@@ -682,7 +1038,8 @@ export class BookDockFinalizeService implements OnModuleInit, OnModuleDestroy {
 
   private async emitSummary(): Promise<void> {
     const summary = await this.repo.countsByStatus();
-    this.gateway.emitSummary(summary);
+    const paused = await this.processingState.isPaused();
+    this.gateway.emitSummary({ ...summary, paused });
   }
 }
 
@@ -692,6 +1049,57 @@ async function safeUnlink(path: string): Promise<void> {
   } catch {
     // file may already be deleted
   }
+}
+
+function createFinalizePreviewSummary(): BookDockFinalizePreviewResult {
+  return {
+    total: 0,
+    ready: 0,
+    duplicates: 0,
+    destinationConflicts: 0,
+    missingDestination: 0,
+    blocked: 0,
+    truncated: false,
+    itemLimit: PREVIEW_ITEM_LIMIT,
+    items: [],
+  };
+}
+
+function addFinalizePreviewAnalysis(summary: BookDockFinalizePreviewResult, analysis: FinalizeCandidateAnalysis): void {
+  addFinalizePreviewItem(summary, {
+    fileId: analysis.fileId,
+    fileName: analysis.fileName,
+    newName: analysis.newName,
+    status: analysis.status,
+    existingBookId: analysis.existingBookId,
+    message: analysis.message,
+  });
+}
+
+function addFinalizePreviewItem(summary: BookDockFinalizePreviewResult, item: BookDockFinalizePreviewItem): void {
+  summary.total++;
+  if (item.status === 'ready') summary.ready++;
+  else if (item.status === 'duplicate') summary.duplicates++;
+  else if (item.status === 'destination_conflict') summary.destinationConflicts++;
+  else if (item.status === 'missing_destination') summary.missingDestination++;
+  else summary.blocked++;
+
+  if (summary.items.length < PREVIEW_ITEM_LIMIT) {
+    summary.items.push(item);
+  } else {
+    summary.truncated = true;
+  }
+}
+
+function classifyFinalizePreviewError(error: unknown): BookDockFinalizePreviewStatus {
+  if (error instanceof ForbiddenException) return 'access_denied';
+  if (error instanceof NotFoundException) return 'invalid_target';
+  if (error instanceof BadRequestException) {
+    const message = error.message.toLowerCase();
+    if (message.includes('file type') || message.includes('does not allow')) return 'invalid_format';
+    return 'invalid_target';
+  }
+  return 'error';
 }
 
 function normalizeText(value: unknown, maxLength?: number): string | null {
@@ -766,6 +1174,7 @@ function normalizeDuplicateAuthors(value: string[] | null | undefined): string[]
 }
 
 function normalizeFinalizeMetadata(meta: BookDockMetadata | null | undefined): NormalizedFinalizeMetadata {
+  const publishedDate = normalizePublishedDate(meta?.publishedDate) ?? null;
   return {
     title: normalizeText(meta?.title, 1000),
     subtitle: normalizeText(meta?.subtitle, 1000),
@@ -773,7 +1182,8 @@ function normalizeFinalizeMetadata(meta: BookDockMetadata | null | undefined): N
     isbn10: normalizeIsbn(meta?.isbn10, 10),
     isbn13: normalizeIsbn(meta?.isbn13, 13),
     publisher: normalizeText(meta?.publisher, 500),
-    publishedYear: normalizePublishedYear(meta?.publishedYear),
+    publishedDate,
+    publishedYear: publishedDate ? publishedYearFromDateKey(publishedDate) : normalizePublishedYear(meta?.publishedYear),
     language: normalizeLanguage(meta?.language),
     pageCount: normalizeInteger(meta?.pageCount),
     seriesName: normalizeText(meta?.seriesName, 500),
@@ -781,28 +1191,106 @@ function normalizeFinalizeMetadata(meta: BookDockMetadata | null | undefined): N
     authors: normalizeStringArray(meta?.authors, 500),
     genres: normalizeStringArray(meta?.genres, 200),
     coverUrl: normalizeText(meta?.coverUrl),
+    googleBooksId: normalizeText(meta?.googleBooksId, 50),
+    goodreadsId: normalizeText(meta?.goodreadsId, 50),
+    amazonId: normalizeText(meta?.amazonId, 20),
+    hardcoverId: normalizeText(meta?.hardcoverId, 255),
+    hardcoverEditionId: normalizeText(meta?.hardcoverEditionId, 50),
+    openLibraryId: normalizeText(meta?.openLibraryId, 50),
+    itunesId: normalizeText(meta?.itunesId, 50),
+    audibleId: normalizeText(meta?.audibleId, 20),
+    librofmId: normalizeText(meta?.librofmId, 50),
+    koboId: normalizeText(meta?.koboId, 255),
+    comicvineId: normalizeText(meta?.comicvineId, 50),
+    ranobedbId: normalizeText(meta?.ranobedbId, 50),
+    lubimyczytacId: normalizeText(meta?.lubimyczytacId, 512),
+    aladinId: normalizeText(meta?.aladinId, 20),
+    seriesMemberships: normalizeSeriesMemberships(meta?.seriesMemberships),
+    communityRatings: normalizeCommunityRatings(meta?.communityRatings),
+    comicMetadata: normalizeComicMetadata(meta?.comicMetadata),
   };
+}
+
+function normalizeSeriesMemberships(value: BookDockMetadata['seriesMemberships']): MetadataSeriesMembership[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) return [];
+
+  const memberships: MetadataSeriesMembership[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    const seriesName = normalizeText(item?.seriesName, 500);
+    if (!seriesName) continue;
+    const key = seriesName.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    memberships.push({ seriesName, seriesIndex: normalizeReal(item.seriesIndex) });
+  }
+  return memberships;
+}
+
+function normalizeCommunityRatings(
+  value: BookDockMetadata['communityRatings'],
+): Array<{ provider: MetadataProviderKey; rating: number; ratingCount: number | null }> | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) return [];
+
+  const ratings = new Map<MetadataProviderKey, { provider: MetadataProviderKey; rating: number; ratingCount: number | null }>();
+  for (const item of value) {
+    if (!item || !METADATA_PROVIDER_KEYS.has(item.provider)) continue;
+    if (!Number.isFinite(item.rating) || item.rating < 0 || item.rating > 5) continue;
+    const ratingCount = Number.isInteger(item.ratingCount) && item.ratingCount! >= 0 ? item.ratingCount! : null;
+    ratings.set(item.provider, { provider: item.provider, rating: item.rating, ratingCount });
+  }
+  return [...ratings.values()];
+}
+
+function normalizeComicMetadata(value: BookDockMetadata['comicMetadata']): ComicMetadataFields | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+
+  const comic: ComicMetadataFields = {};
+  const issueNumber = normalizeText(value.issueNumber, 50);
+  const volumeName = normalizeText(value.volumeName, 500);
+  if (issueNumber !== null) comic.issueNumber = issueNumber;
+  if (volumeName !== null) comic.volumeName = volumeName;
+
+  const arrayFields = ['pencillers', 'inkers', 'colorists', 'letterers', 'coverArtists', 'characters', 'teams', 'locations', 'storyArcs'] as const;
+  for (const field of arrayFields) {
+    const normalized = normalizeStringArray(value[field], 500);
+    if (normalized.length > 0) comic[field] = normalized;
+  }
+
+  return Object.keys(comic).length > 0 ? comic : undefined;
 }
 
 type AudioFinalizeFields = {
   durationSeconds: number | null;
   chapters: AudiobookChapter[] | null;
   narrators: string[];
+  abridged: boolean | null;
 };
 
-function resolveAudioFinalizeFields(meta: BookDockMetadata | null | undefined): AudioFinalizeFields {
+function resolveAudioFinalizeFields(
+  embedded: BookDockMetadata | null | undefined,
+  selected: BookDockMetadata | null | undefined,
+): AudioFinalizeFields {
   return {
-    durationSeconds: normalizeDurationSeconds(meta?.durationSeconds),
-    chapters: normalizeChapters(meta?.chapters),
-    narrators: normalizeStringArray(meta?.narrators, 500),
+    durationSeconds: normalizeDurationSeconds(selected?.durationSeconds !== undefined ? selected.durationSeconds : embedded?.durationSeconds),
+    chapters: normalizeChapters(selected?.chapters !== undefined ? selected.chapters : embedded?.chapters),
+    narrators: normalizeStringArray(selected?.narrators !== undefined ? selected.narrators : embedded?.narrators, 500),
+    abridged: normalizeAbridged(selected?.abridged !== undefined ? selected.abridged : embedded?.abridged),
   };
 }
 
-function buildAudioMetadataPatch(audio: AudioFinalizeFields): { durationSeconds?: number; chapters?: AudiobookChapter[] } {
-  const patch: { durationSeconds?: number; chapters?: AudiobookChapter[] } = {};
+function buildAudioMetadataPatch(audio: AudioFinalizeFields): { durationSeconds?: number; chapters?: AudiobookChapter[]; abridged?: boolean } {
+  const patch: { durationSeconds?: number; chapters?: AudiobookChapter[]; abridged?: boolean } = {};
   if (audio.durationSeconds !== null) patch.durationSeconds = audio.durationSeconds;
   if (audio.chapters !== null) patch.chapters = audio.chapters;
+  if (audio.abridged !== null) patch.abridged = audio.abridged;
   return patch;
+}
+
+function normalizeAbridged(value: unknown): boolean | null {
+  return typeof value === 'boolean' ? value : null;
 }
 
 function normalizeDurationSeconds(value: unknown): number | null {

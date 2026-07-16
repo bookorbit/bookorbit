@@ -1,0 +1,19 @@
+CREATE INDEX "annotation_positions_book_file_id_idx" ON "annotation_positions" USING btree ("book_file_id");--> statement-breakpoint
+CREATE INDEX "annotations_book_id_idx" ON "annotations" USING btree ("book_id");--> statement-breakpoint
+CREATE INDEX "audiobook_progress_book_id_idx" ON "audiobook_progress" USING btree ("book_id");--> statement-breakpoint
+CREATE INDEX "audiobook_progress_current_file_id_idx" ON "audiobook_progress" USING btree ("current_file_id");--> statement-breakpoint
+CREATE INDEX "bookmarks_book_id_idx" ON "bookmarks" USING btree ("book_id");--> statement-breakpoint
+CREATE INDEX "reader_preferences_book_file_id_idx" ON "reader_preferences" USING btree ("book_file_id");--> statement-breakpoint
+CREATE INDEX "reading_attempts_book_id_idx" ON "reading_attempts" USING btree ("book_id");--> statement-breakpoint
+CREATE INDEX "reading_sessions_book_id_idx" ON "reading_sessions" USING btree ("book_id");--> statement-breakpoint
+CREATE INDEX "user_reading_daily_stats_library_id_idx" ON "user_reading_daily_stats" USING btree ("library_id");--> statement-breakpoint
+CREATE INDEX "kobo_snapshot_books_book_id_idx" ON "kobo_snapshot_books" USING btree ("book_id");--> statement-breakpoint
+CREATE INDEX "kobo_reading_states_book_id_idx" ON "kobo_reading_states" USING btree ("book_id");--> statement-breakpoint
+CREATE INDEX "kobo_device_snapshot_books_book_id_idx" ON "kobo_device_snapshot_books" USING btree ("book_id");--> statement-breakpoint
+CREATE INDEX "book_dock_files_target_library_id_idx" ON "book_dock_files" USING btree ("target_library_id");--> statement-breakpoint
+CREATE INDEX "file_write_log_book_file_id_idx" ON "file_write_log" USING btree ("book_file_id");--> statement-breakpoint
+CREATE INDEX "email_send_log_book_id_idx" ON "email_send_log" USING btree ("book_id");--> statement-breakpoint
+CREATE INDEX "email_send_log_book_file_id_idx" ON "email_send_log" USING btree ("book_file_id");--> statement-breakpoint
+CREATE INDEX "koreader_page_stats_book_file_id_idx" ON "koreader_page_stats" USING btree ("book_file_id");--> statement-breakpoint
+CREATE INDEX "hardcover_book_state_book_id_idx" ON "hardcover_book_state" USING btree ("book_id");--> statement-breakpoint
+CREATE INDEX "storygraph_book_state_book_id_idx" ON "storygraph_book_state" USING btree ("book_id");

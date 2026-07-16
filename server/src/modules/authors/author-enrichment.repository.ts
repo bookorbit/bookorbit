@@ -59,7 +59,7 @@ export class AuthorEnrichmentRepository {
           nextAttemptAt: now,
           updatedAt: now,
         },
-        setWhere: sql`${authorEnrichmentQueue.status} <> 'processing'`,
+        setWhere: eq(authorEnrichmentQueue.status, 'failed'),
       })
       .returning({ authorId: authorEnrichmentQueue.authorId });
 

@@ -5,3 +5,7 @@ export function lubimyczytacBookUrl(id: string): string {
   const path = value.includes('/') ? value : `${value}/-`
   return `https://lubimyczytac.pl/ksiazka/${path.split('/').map(encodeURIComponent).join('/')}`
 }
+
+export function libroFmAudiobookUrl(id: string): string {
+  return `https://libro.fm/audiobooks/${encodeURIComponent(String(id).trim())}`
+}

@@ -43,6 +43,7 @@ export class BookDetailDto {
   isbn10: string | null;
   isbn13: string | null;
   publisher: string | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   pageCount: number | null;
@@ -51,6 +52,8 @@ export class BookDetailDto {
   seriesIndex: number | null;
   seriesMemberships: BookSeriesMembership[];
   rating: number | null;
+  personalNote: string | null;
+  personalNoteUpdatedAt: Date | null;
   communityRatings: BookCommunityRating[];
   coverSource: 'extracted' | 'custom' | null;
   hardcoverEditionId: string | null;

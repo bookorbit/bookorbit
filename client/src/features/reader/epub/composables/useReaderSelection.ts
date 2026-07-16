@@ -24,8 +24,8 @@ export function useReaderSelection() {
     visible.value = false
   }
 
-  function openNoteDialog() {
-    noteText.value = ''
+  function openNoteDialog(initialNote = '') {
+    noteText.value = initialNote
     showNoteDialog.value = true
     dismiss()
   }

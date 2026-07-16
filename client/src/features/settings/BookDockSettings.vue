@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Loader2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import type { BookDockAutoFinalizeMetadataMode } from '@bookorbit/types'
@@ -9,6 +10,7 @@ import { api } from '@/lib/api'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useAppInfo } from './composables/useAppInfo'
 
+const { t } = useI18n()
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 const autoFetch = ref(true)
 const autoFinalizeEnabled = ref(false)
@@ -54,7 +56,7 @@ async function saveSetting(key: string, value: string) {
     body: JSON.stringify({ value }),
   })
   if (!res.ok) {
-    toast.error('Failed to save setting')
+    toast.error(t('settings.reader.bookDock.saveSettingFailed'))
   }
 }
 
@@ -70,9 +72,9 @@ async function toggle() {
     })
     if (res.ok) {
       autoFetch.value = newVal
-      toast.success(newVal ? 'Auto-fetch enabled' : 'Auto-fetch disabled')
+      toast.success(newVal ? t('settings.reader.bookDock.autoFetchEnabled') : t('settings.reader.bookDock.autoFetchDisabled'))
     } else {
-      toast.error('Failed to update setting')
+      toast.error(t('settings.reader.bookDock.updateSettingFailed'))
     }
   } finally {
     saving.value = false
@@ -91,9 +93,9 @@ async function toggleAutoFinalize() {
     })
     if (res.ok) {
       autoFinalizeEnabled.value = newVal
-      toast.success(newVal ? 'Auto-finalize enabled' : 'Auto-finalize disabled')
+      toast.success(newVal ? t('settings.reader.bookDock.autoFinalizeEnabled') : t('settings.reader.bookDock.autoFinalizeDisabled'))
     } else {
-      toast.error('Failed to update setting')
+      toast.error(t('settings.reader.bookDock.updateSettingFailed'))
     }
   } finally {
     saving.value = false
@@ -109,26 +111,26 @@ async function onLibraryChange(event: Event) {
     saveSetting('book_dock_auto_finalize_library_id', String(id)),
     saveSetting('book_dock_auto_finalize_folder_id', String(autoFinalizeFolderId.value ?? '')),
   ])
-  toast.success('Destination library updated')
+  toast.success(t('settings.reader.bookDock.destinationLibraryUpdated'))
 }
 
 async function onFolderChange(event: Event) {
   autoFinalizeFolderId.value = Number((event.target as HTMLSelectElement).value)
   await saveSetting('book_dock_auto_finalize_folder_id', String(autoFinalizeFolderId.value))
-  toast.success('Destination folder updated')
+  toast.success(t('settings.reader.bookDock.destinationFolderUpdated'))
 }
 
 async function onThresholdChange() {
   if (!isThresholdApplicable.value) return
   await saveSetting('book_dock_auto_finalize_threshold', String(autoFinalizeThreshold.value))
-  toast.success('Confidence threshold updated')
+  toast.success(t('settings.reader.bookDock.confidenceThresholdUpdated'))
 }
 
 async function onMetadataModeChange(event: Event) {
   const value = (event.target as HTMLSelectElement).value as BookDockAutoFinalizeMetadataMode
   autoFinalizeMetadataMode.value = value
   await saveSetting('book_dock_auto_finalize_metadata_mode', value)
-  toast.success('Metadata mode updated')
+  toast.success(t('settings.reader.bookDock.metadataModeUpdated'))
 }
 </script>
 
@@ -136,15 +138,15 @@ async function onMetadataModeChange(event: Event) {
   <SettingsPageHeader
     v-if="!props.embedded"
     class="hidden md:flex"
-    title="Book Dock"
-    subtitle="Configure how files are processed when they enter Book Dock."
+    :title="t('settings.reader.bookDock.title')"
+    :subtitle="t('settings.reader.bookDock.subtitle')"
   />
   <div v-if="!props.embedded" class="md:hidden px-1">
-    <h1 class="text-xl font-semibold tracking-tight text-foreground">Book Dock</h1>
+    <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ t('settings.reader.bookDock.title') }}</h1>
     <p
       class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
     >
-      Configure how files are processed when they enter Book Dock.
+      {{ t('settings.reader.bookDock.subtitle') }}
     </p>
   </div>
 
@@ -154,13 +156,12 @@ async function onMetadataModeChange(event: Event) {
 
   <div v-else class="mt-5 md:mt-0 space-y-6">
     <div>
-      <p class="settings-group-label">Drop folder</p>
+      <p class="settings-group-label">{{ t('settings.reader.bookDock.dropFolder') }}</p>
       <div class="mt-4 border border-border rounded-lg overflow-hidden shadow-xs">
         <div class="px-4 py-3.5 bg-card md:px-5 md:py-4">
-          <p class="settings-label">Container path</p>
+          <p class="settings-label">{{ t('settings.reader.bookDock.containerPath') }}</p>
           <p class="settings-hint mb-2">
-            Copy or move book files into this folder and they will be automatically picked up and processed by Book Dock. Subdirectories are
-            supported.
+            {{ t('settings.reader.bookDock.containerPathHint') }}
           </p>
           <code
             v-if="bookDockPath"
@@ -169,20 +170,22 @@ async function onMetadataModeChange(event: Event) {
             >{{ bookDockPath }}</code
           >
           <p class="settings-hint mt-2">
-            To change this path, set <code class="text-xs font-mono">BOOK_DOCK_PATH</code> in your <code class="text-xs font-mono">.env</code> file.
+            {{ t('settings.reader.bookDock.changePathPrefix') }} <code class="text-xs font-mono">BOOK_DOCK_PATH</code>
+            {{ t('settings.reader.bookDock.changePathMiddle') }} <code class="text-xs font-mono">.env</code>
+            {{ t('settings.reader.bookDock.changePathSuffix') }}
           </p>
         </div>
       </div>
     </div>
 
-    <p class="settings-group-label">Metadata</p>
+    <p class="settings-group-label">{{ t('settings.reader.bookDock.metadata') }}</p>
 
     <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
       <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
         <div class="min-w-0">
-          <p class="settings-label">Auto-fetch metadata from providers</p>
+          <p class="settings-label">{{ t('settings.reader.bookDock.autoFetch') }}</p>
           <p class="settings-hint">
-            Automatically fetch metadata from configured providers (Google Books, iTunes, Open Library, etc.) after a file is added to Book Dock.
+            {{ t('settings.reader.bookDock.autoFetchHint') }}
           </p>
         </div>
         <ToggleSwitch :model-value="autoFetch" :disabled="saving" class="self-start md:self-auto md:ml-4" @update:model-value="() => toggle()" />
@@ -190,12 +193,12 @@ async function onMetadataModeChange(event: Event) {
     </div>
 
     <div class="mt-6 space-y-4">
-      <p class="settings-group-label">Auto-finalize</p>
+      <p class="settings-group-label">{{ t('settings.reader.bookDock.autoFinalize') }}</p>
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
         <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
           <div class="min-w-0">
-            <p class="settings-label">Enable auto-finalize</p>
-            <p class="settings-hint">Files with a metadata confidence score at or above the threshold will be finalized automatically.</p>
+            <p class="settings-label">{{ t('settings.reader.bookDock.enableAutoFinalize') }}</p>
+            <p class="settings-hint">{{ t('settings.reader.bookDock.enableAutoFinalizeHint') }}</p>
           </div>
           <ToggleSwitch
             :model-value="autoFinalizeEnabled"
@@ -208,8 +211,8 @@ async function onMetadataModeChange(event: Event) {
         <div v-if="autoFinalizeEnabled" class="px-4 py-3.5 bg-card space-y-4 md:px-5 md:py-4">
           <label class="block">
             <span class="text-xs font-medium text-muted-foreground">
-              Confidence threshold: {{ autoFinalizeThreshold }}%
-              <span v-if="!isThresholdApplicable"> (ignored in Embedded only mode)</span>
+              {{ t('settings.reader.bookDock.confidenceThreshold', { value: autoFinalizeThreshold }) }}
+              <span v-if="!isThresholdApplicable"> {{ t('settings.reader.bookDock.thresholdIgnored') }}</span>
             </span>
             <input
               v-model.number="autoFinalizeThreshold"
@@ -228,26 +231,26 @@ async function onMetadataModeChange(event: Event) {
           </label>
 
           <label class="block">
-            <span class="text-xs font-medium text-muted-foreground">Destination library</span>
+            <span class="text-xs font-medium text-muted-foreground">{{ t('settings.reader.bookDock.destinationLibrary') }}</span>
             <select class="select-field mt-1 w-full" :value="autoFinalizeLibraryId ?? ''" @change="onLibraryChange">
-              <option value="" disabled>Select a library...</option>
+              <option value="" disabled>{{ t('settings.reader.bookDock.selectLibrary') }}</option>
               <option v-for="lib in libraries" :key="lib.id" :value="lib.id">{{ lib.name }}</option>
             </select>
           </label>
 
           <label class="block">
-            <span class="text-xs font-medium text-muted-foreground">Metadata mode</span>
+            <span class="text-xs font-medium text-muted-foreground">{{ t('settings.reader.bookDock.metadataMode') }}</span>
             <select class="select-field mt-1 w-full" :value="autoFinalizeMetadataMode" @change="onMetadataModeChange">
-              <option value="safe_merge">Safe merge (recommended)</option>
-              <option value="fetched_only">Fetched only</option>
-              <option value="embedded_only">Embedded only</option>
+              <option value="safe_merge">{{ t('settings.reader.bookDock.metadataModeSafeMerge') }}</option>
+              <option value="fetched_only">{{ t('settings.reader.bookDock.metadataModeFetchedOnly') }}</option>
+              <option value="embedded_only">{{ t('settings.reader.bookDock.metadataModeEmbeddedOnly') }}</option>
             </select>
           </label>
 
           <label class="block">
-            <span class="text-xs font-medium text-muted-foreground">Destination folder</span>
+            <span class="text-xs font-medium text-muted-foreground">{{ t('settings.reader.bookDock.destinationFolder') }}</span>
             <select class="select-field mt-1 w-full" :value="autoFinalizeFolderId ?? ''" @change="onFolderChange">
-              <option value="" disabled>Select a folder...</option>
+              <option value="" disabled>{{ t('settings.reader.bookDock.selectFolder') }}</option>
               <option v-for="folder in autoFinalizeFolders" :key="folder.id" :value="folder.id">{{ folder.path }}</option>
             </select>
           </label>

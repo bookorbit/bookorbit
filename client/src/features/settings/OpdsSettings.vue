@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Plus, Trash2, Copy, Rss, ChevronDown, ChevronUp } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
@@ -10,6 +11,7 @@ import { usePermissions } from '@/features/auth/composables/usePermissions'
 import type { OpdsUser, OpdsSortOrder } from '@bookorbit/types'
 import { useMediaQuery } from '@vueuse/core'
 
+const { t } = useI18n()
 const { hasPermission } = usePermissions()
 const canManageSettings = computed(() => hasPermission('manage_app_settings'))
 
@@ -31,18 +33,18 @@ const isMobile = useMediaQuery('(max-width: 767px)')
 
 const opdsUrl = computed(() => `${window.location.origin}/api/v1/opds`)
 
-const sortOrderOptions: { label: string; value: OpdsSortOrder }[] = [
-  { label: 'Recently Added', value: 'recent' },
-  { label: 'Title (A-Z)', value: 'title_asc' },
-  { label: 'Title (Z-A)', value: 'title_desc' },
-  { label: 'Author (A-Z)', value: 'author_asc' },
-  { label: 'Author (Z-A)', value: 'author_desc' },
-  { label: 'Series (A-Z)', value: 'series_asc' },
-  { label: 'Series (Z-A)', value: 'series_desc' },
-]
+const sortOrderOptions = computed<{ label: string; value: OpdsSortOrder }[]>(() => [
+  { label: t('settings.reader.opds.sortRecent'), value: 'recent' },
+  { label: t('settings.reader.opds.sortTitleAsc'), value: 'title_asc' },
+  { label: t('settings.reader.opds.sortTitleDesc'), value: 'title_desc' },
+  { label: t('settings.reader.opds.sortAuthorAsc'), value: 'author_asc' },
+  { label: t('settings.reader.opds.sortAuthorDesc'), value: 'author_desc' },
+  { label: t('settings.reader.opds.sortSeriesAsc'), value: 'series_asc' },
+  { label: t('settings.reader.opds.sortSeriesDesc'), value: 'series_desc' },
+])
 
 function sortOrderLabel(value: OpdsSortOrder): string {
-  return sortOrderOptions.find((o) => o.value === value)?.label ?? value
+  return sortOrderOptions.value.find((o) => o.value === value)?.label ?? value
 }
 
 onMounted(async () => {
@@ -57,7 +59,7 @@ onMounted(async () => {
       opdsUsers.value = await usersRes.json()
     }
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Failed to load'
+    error.value = e instanceof Error ? e.message : t('settings.reader.opds.loadFailed')
   } finally {
     loading.value = false
   }
@@ -73,21 +75,21 @@ async function toggleOpds() {
     })
     if (res.ok) {
       opdsEnabled.value = newVal
-      toast.success(`OPDS server ${newVal ? 'enabled' : 'disabled'}`)
+      toast.success(newVal ? t('settings.reader.opds.serverEnabled') : t('settings.reader.opds.serverDisabled'))
     } else {
-      toast.error('Failed to update OPDS settings')
+      toast.error(t('settings.reader.opds.updateSettingsFailed'))
     }
   } catch {
-    toast.error('Failed to update OPDS settings')
+    toast.error(t('settings.reader.opds.updateSettingsFailed'))
   }
 }
 
 async function copyUrl() {
   const copied = await copyToClipboard(opdsUrl.value)
   if (copied) {
-    toast.success('OPDS URL copied to clipboard')
+    toast.success(t('settings.reader.opds.urlCopied'))
   } else {
-    toast.error('Failed to copy OPDS URL')
+    toast.error(t('settings.reader.opds.urlCopyFailed'))
   }
 }
 
@@ -102,8 +104,8 @@ async function createUser() {
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      createError.value = data.message ?? 'Failed to create OPDS user'
-      toast.error(createError.value ?? 'Failed to create OPDS user')
+      createError.value = data.message ?? t('settings.reader.opds.createUserFailed')
+      toast.error(createError.value ?? t('settings.reader.opds.createUserFailed'))
       return
     }
     const user = await res.json()
@@ -112,9 +114,9 @@ async function createUser() {
     createUsername.value = ''
     createPassword.value = ''
     createSortOrder.value = 'recent'
-    toast.success(`OPDS user "${user.username}" created`)
+    toast.success(t('settings.reader.opds.userCreated', { username: user.username }))
   } catch {
-    toast.error('Failed to create OPDS user')
+    toast.error(t('settings.reader.opds.createUserFailed'))
   } finally {
     creating.value = false
   }
@@ -131,12 +133,12 @@ async function updateSortOrder(user: OpdsUser, sortOrder: OpdsSortOrder) {
       const updated = await res.json()
       const idx = opdsUsers.value.findIndex((u) => u.id === user.id)
       if (idx >= 0) opdsUsers.value[idx] = updated
-      toast.success(`Sort order updated for "${user.username}"`)
+      toast.success(t('settings.reader.opds.sortOrderUpdated', { username: user.username }))
     } else {
-      toast.error('Failed to update sort order')
+      toast.error(t('settings.reader.opds.updateSortFailed'))
     }
   } catch {
-    toast.error('Failed to update sort order')
+    toast.error(t('settings.reader.opds.updateSortFailed'))
   }
 }
 
@@ -150,12 +152,12 @@ async function deleteUser(user: OpdsUser) {
     const res = await api(`/api/v1/opds-users/${user.id}`, { method: 'DELETE' })
     if (res.ok) {
       opdsUsers.value = opdsUsers.value.filter((u) => u.id !== user.id)
-      toast.success(`OPDS user "${user.username}" deleted`)
+      toast.success(t('settings.reader.opds.userDeleted', { username: user.username }))
     } else {
-      toast.error('Failed to delete OPDS user')
+      toast.error(t('settings.reader.opds.deleteUserFailed'))
     }
   } catch {
-    toast.error('Failed to delete OPDS user')
+    toast.error(t('settings.reader.opds.deleteUserFailed'))
   }
 }
 
@@ -183,9 +185,9 @@ function userDetailsOpen(id: number) {
 async function copyValue(value: string, label: string) {
   const copied = await copyToClipboard(value)
   if (copied) {
-    toast.success(`${label} copied`)
+    toast.success(t('settings.reader.opds.labelCopied', { label }))
   } else {
-    toast.error(`Failed to copy ${label.toLowerCase()}`)
+    toast.error(t('settings.reader.opds.copyLabelFailed', { label: label.toLowerCase() }))
   }
 }
 
@@ -199,31 +201,27 @@ watch(
 </script>
 
 <template>
-  <SettingsPageHeader
-    class="hidden md:flex"
-    title="OPDS"
-    subtitle="Connect OPDS-compatible reading apps like KOReader or Thorium Reader to your library."
-  />
+  <SettingsPageHeader class="hidden md:flex" :title="t('settings.reader.opds.title')" :subtitle="t('settings.reader.opds.subtitle')" />
   <div class="md:hidden px-1">
-    <h1 class="text-xl font-semibold tracking-tight text-foreground">OPDS</h1>
+    <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ t('settings.reader.opds.title') }}</h1>
     <p
       class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
     >
-      Connect OPDS-compatible reading apps like KOReader or Thorium Reader to your library.
+      {{ t('settings.reader.opds.subtitle') }}
     </p>
   </div>
 
-  <div v-if="loading" class="mt-5 md:mt-0 text-sm text-muted-foreground">Loading...</div>
+  <div v-if="loading" class="mt-5 md:mt-0 text-sm text-muted-foreground">{{ t('common.loading') }}</div>
   <div v-else-if="error" class="text-sm text-destructive">{{ error }}</div>
   <template v-else>
     <!-- Server Toggle -->
     <div v-if="canManageSettings" class="mb-6">
-      <p class="settings-group-label">Server</p>
+      <p class="settings-group-label">{{ t('settings.reader.opds.server') }}</p>
       <div class="border border-border rounded-lg overflow-hidden shadow-xs">
         <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
           <div class="min-w-0">
-            <p class="settings-label">OPDS Catalog Server</p>
-            <p class="settings-hint">Allow OPDS clients to browse and download books</p>
+            <p class="settings-label">{{ t('settings.reader.opds.catalogServer') }}</p>
+            <p class="settings-hint">{{ t('settings.reader.opds.catalogServerHint') }}</p>
           </div>
           <ToggleSwitch :model-value="opdsEnabled" class="self-start md:self-auto" @update:model-value="toggleOpds()" />
         </div>
@@ -232,7 +230,7 @@ watch(
 
     <!-- Endpoint URL -->
     <div v-if="opdsEnabled" class="mb-6">
-      <p class="settings-group-label">Endpoint</p>
+      <p class="settings-group-label">{{ t('settings.reader.opds.endpoint') }}</p>
       <div class="border border-border rounded-lg overflow-hidden shadow-xs">
         <div class="flex flex-col md:flex-row md:items-center gap-2 px-4 py-3.5 md:px-5 md:py-4 bg-card">
           <Rss :size="14" class="text-muted-foreground shrink-0" />
@@ -242,7 +240,7 @@ watch(
             @click="copyUrl()"
           >
             <Copy :size="12" />
-            Copy
+            {{ t('settings.reader.opds.copy') }}
           </button>
         </div>
       </div>
@@ -251,18 +249,18 @@ watch(
     <!-- OPDS Users -->
     <div v-if="opdsEnabled" class="mb-6">
       <div class="hidden md:flex items-center justify-between mb-3">
-        <p class="settings-group-label mb-0">OPDS Accounts</p>
+        <p class="settings-group-label mb-0">{{ t('settings.reader.opds.accounts') }}</p>
         <button
           v-if="!showCreateForm"
           class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
           @click="showCreateForm = true"
         >
           <Plus :size="12" />
-          Add
+          {{ t('settings.reader.opds.add') }}
         </button>
       </div>
       <div class="md:hidden flex items-center justify-between mb-2">
-        <p class="settings-group-label mb-0">OPDS Accounts</p>
+        <p class="settings-group-label mb-0">{{ t('settings.reader.opds.accounts') }}</p>
       </div>
       <div v-if="!showCreateForm" class="md:hidden sticky top-0 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2 mb-3">
         <button
@@ -270,22 +268,22 @@ watch(
           @click="showCreateForm = true"
         >
           <Plus :size="13" />
-          Add account
+          {{ t('settings.reader.opds.addAccount') }}
         </button>
       </div>
 
       <!-- Create form -->
       <div v-if="showCreateForm" class="border border-border rounded-lg p-4 md:p-5 bg-card mb-4 space-y-4 shadow-xs">
         <div>
-          <label class="block text-xs font-medium text-muted-foreground mb-1.5">Username</label>
-          <input v-model="createUsername" type="text" placeholder="e.g. koreader" class="input-field w-full" />
+          <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('settings.reader.opds.username') }}</label>
+          <input v-model="createUsername" type="text" :placeholder="t('settings.reader.opds.usernamePlaceholder')" class="input-field w-full" />
         </div>
         <div>
-          <label class="block text-xs font-medium text-muted-foreground mb-1.5">Password</label>
-          <input v-model="createPassword" type="password" placeholder="Min 8 characters" class="input-field w-full" />
+          <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('settings.reader.opds.password') }}</label>
+          <input v-model="createPassword" type="password" :placeholder="t('settings.reader.opds.passwordPlaceholder')" class="input-field w-full" />
         </div>
         <div>
-          <label class="block text-xs font-medium text-muted-foreground mb-1.5">Default Sort</label>
+          <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('settings.reader.opds.defaultSort') }}</label>
           <select v-model="createSortOrder" class="select-field w-full">
             <option v-for="opt in sortOrderOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select>
@@ -297,13 +295,13 @@ watch(
             :disabled="creating || !createUsername || !createPassword"
             @click="createUser()"
           >
-            {{ creating ? 'Creating...' : 'Create' }}
+            {{ creating ? t('settings.reader.opds.creating') : t('settings.reader.opds.create') }}
           </button>
           <button
             class="px-4 py-2 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
             @click="cancelCreate()"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
         </div>
         <div class="md:hidden sticky bottom-2 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
@@ -313,13 +311,13 @@ watch(
               :disabled="creating || !createUsername || !createPassword"
               @click="createUser()"
             >
-              {{ creating ? 'Creating...' : 'Create' }}
+              {{ creating ? t('settings.reader.opds.creating') : t('settings.reader.opds.create') }}
             </button>
             <button
               class="rounded-md border border-border px-3 min-h-10 text-sm text-foreground hover:bg-muted transition-colors"
               @click="cancelCreate()"
             >
-              Cancel
+              {{ t('common.cancel') }}
             </button>
           </div>
         </div>
@@ -327,7 +325,7 @@ watch(
 
       <!-- Users list -->
       <div v-if="opdsUsers.length === 0 && !showCreateForm" class="border border-border rounded-lg px-5 py-8 bg-card text-center shadow-xs">
-        <p class="text-sm text-muted-foreground">No OPDS accounts yet. Create one to start using OPDS clients.</p>
+        <p class="text-sm text-muted-foreground">{{ t('settings.reader.opds.noAccounts') }}</p>
       </div>
       <div v-else-if="opdsUsers.length > 0" class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
         <div v-for="user in opdsUsers" :key="user.id" class="px-4 py-3.5 bg-card space-y-3 md:flex md:items-center md:gap-3 md:space-y-0 md:px-5">
@@ -352,19 +350,21 @@ watch(
           </div>
           <div class="md:hidden flex items-center gap-3 text-xs">
             <button class="text-primary hover:underline" @click="toggleUserDetails(user.id)">
-              {{ userDetailsOpen(user.id) ? 'Hide details' : 'Show details' }}
+              {{ userDetailsOpen(user.id) ? t('settings.reader.opds.hideDetails') : t('settings.reader.opds.showDetails') }}
             </button>
-            <button class="text-muted-foreground hover:text-foreground" @click="copyValue(user.username, 'Username')">Copy username</button>
-            <button class="text-destructive hover:underline" @click="requestDeleteUser(user)">Delete</button>
+            <button class="text-muted-foreground hover:text-foreground" @click="copyValue(user.username, t('settings.reader.opds.usernameLabel'))">
+              {{ t('settings.reader.opds.copyUsername') }}
+            </button>
+            <button class="text-destructive hover:underline" @click="requestDeleteUser(user)">{{ t('common.delete') }}</button>
           </div>
           <div
             v-if="userDetailsOpen(user.id)"
             class="md:hidden rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground"
           >
             <div class="grid grid-cols-[4.5rem_1fr] gap-y-1.5 gap-x-2">
-              <span class="text-muted-foreground/80">Username</span>
+              <span class="text-muted-foreground/80">{{ t('settings.reader.opds.usernameLabel') }}</span>
               <span class="font-mono text-foreground/90 break-all">{{ user.username }}</span>
-              <span class="text-muted-foreground/80">Sort</span>
+              <span class="text-muted-foreground/80">{{ t('settings.reader.opds.sortLabel') }}</span>
               <span class="text-foreground/90">{{ sortOrderLabel(user.sortOrder) }}</span>
             </div>
           </div>
@@ -374,12 +374,12 @@ watch(
 
     <div v-if="opdsEnabled" class="border border-border rounded-lg bg-card/50 shadow-xs">
       <button class="w-full flex items-center justify-between gap-2 p-4 text-left" @click="helpOpen = !helpOpen">
-        <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">OPDS Notes</p>
+        <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{{ t('settings.reader.opds.notes') }}</p>
         <ChevronUp v-if="helpOpen" :size="14" class="text-muted-foreground" />
         <ChevronDown v-else :size="14" class="text-muted-foreground" />
       </button>
       <p v-if="helpOpen" class="px-4 pb-4 text-xs text-muted-foreground">
-        Use OPDS accounts in reader apps. Keep credentials private and rotate passwords if shared accidentally.
+        {{ t('settings.reader.opds.notesBody') }}
       </p>
     </div>
 
@@ -390,20 +390,20 @@ watch(
     >
       <button class="absolute inset-0 bg-black/45" @click="deleteConfirmUser = null" />
       <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
-        <p class="text-base font-semibold text-foreground">Delete OPDS account?</p>
-        <p class="mt-1 text-sm text-muted-foreground">Delete "{{ deleteConfirmUser.username }}". This action cannot be undone.</p>
+        <p class="text-base font-semibold text-foreground">{{ t('settings.reader.opds.deleteConfirmTitle') }}</p>
+        <p class="mt-1 text-sm text-muted-foreground">{{ t('settings.reader.opds.deleteConfirmBody', { username: deleteConfirmUser.username }) }}</p>
         <div class="mt-4 flex items-center justify-end gap-2">
           <button
             class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
             @click="deleteConfirmUser = null"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
           <button
             class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
             @click="confirmDeleteUser"
           >
-            Delete
+            {{ t('common.delete') }}
           </button>
         </div>
       </div>

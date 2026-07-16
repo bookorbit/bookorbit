@@ -1,21 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { READER_TABS, READER_TAB_LABELS, READER_TAB_TITLE_LABELS, normalizeReaderTab } from '../reader-tabs'
+import { READER_TABS, normalizeReaderTab } from '../reader-tabs'
 
 describe('reader-tabs', () => {
   it('includes fonts tab in READER_TABS', () => {
     expect(READER_TABS).toContain('fonts')
-  })
-
-  it('has labels for all tabs', () => {
-    for (const tab of READER_TABS) {
-      expect(READER_TAB_LABELS[tab]).toBeTruthy()
-      expect(READER_TAB_TITLE_LABELS[tab]).toBeTruthy()
-    }
-  })
-
-  it('fonts tab has correct labels', () => {
-    expect(READER_TAB_LABELS['fonts']).toBe('Fonts')
-    expect(READER_TAB_TITLE_LABELS['fonts']).toBe('Reader Fonts')
   })
 
   describe('normalizeReaderTab', () => {

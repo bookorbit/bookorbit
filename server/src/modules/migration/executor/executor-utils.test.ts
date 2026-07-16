@@ -116,16 +116,33 @@ describe('migration executor utils', () => {
     expect(patch).toEqual({ koboId: 'kobo-book-slug' });
   });
 
-  it('builds contributor values with truncation and defaulted sort name', () => {
+  it('normalizes publisher and series metadata text in migration patches', () => {
+    const patch = buildMetadataPatch({
+      title: null,
+      subtitle: null,
+      isbn10: null,
+      isbn13: null,
+      description: null,
+      publisher: '  Tor\t Books  ',
+      publishedYear: null,
+      language: null,
+      seriesName: ' Dune   Chronicles ',
+      presentFields: ['publisher', 'seriesName'],
+    });
+
+    expect(patch).toEqual({ publisher: 'Tor Books', seriesName: 'Dune Chronicles' });
+  });
+
+  it('builds contributor values with truncation, normalization, and defaulted sort name', () => {
     const values = buildContributorValues({
-      name: 'Name',
+      name: '  Name\t Value  ',
       sortName: null,
       description: 'Bio',
     });
 
     expect(values).toEqual({
-      name: 'Name',
-      sortName: 'Name',
+      name: 'Name Value',
+      sortName: 'Name Value',
       description: 'Bio',
     });
   });
@@ -133,7 +150,7 @@ describe('migration executor utils', () => {
   it('derives source contributors from structured data then falls back to parsed legacy names', () => {
     const structured = getSourceContributors(
       [
-        { name: ' B ', sortName: 'Bee', description: null, displayOrder: 2 },
+        { name: ' B\t Value ', sortName: 'Bee  Value', description: null, displayOrder: 2 },
         { name: 'A', sortName: null, description: 'Bio', displayOrder: 1 },
         { name: 'a', sortName: null, description: null, displayOrder: 3 },
       ],
@@ -142,12 +159,12 @@ describe('migration executor utils', () => {
 
     expect(structured).toEqual([
       { name: 'A', sortName: null, description: 'Bio' },
-      { name: 'B', sortName: 'Bee', description: null },
+      { name: 'B Value', sortName: 'Bee Value', description: null },
     ]);
 
-    const legacy = getSourceContributors(undefined, '["Ann", "Bob", "ann"]');
+    const legacy = getSourceContributors(undefined, '["Ann  Marie", "Bob", "ann marie"]');
     expect(legacy).toEqual([
-      { name: 'Ann', sortName: 'Ann', description: null },
+      { name: 'Ann Marie', sortName: 'Ann Marie', description: null },
       { name: 'Bob', sortName: 'Bob', description: null },
     ]);
   });

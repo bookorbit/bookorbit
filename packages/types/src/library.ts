@@ -104,3 +104,7 @@ export interface LibraryAccessEntry {
   name: string;
   accessLevel: AccessLevel;
 }
+
+export interface DefaultLibraryAccessConfig {
+  libraryIds: number[];
+}

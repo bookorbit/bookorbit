@@ -5,6 +5,7 @@ import { MetadataProviderKey, ProviderConfigurations, ProviderConnectionTestResu
 
 import { stripBearerPrefix, toBearerAuthorization } from '../../common/utils/bearer-token.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { amazonOrigin, normalizeAmazonDomain, normalizeAudibleDomain } from '../../common/utils/metadata-provider-hosts.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 
@@ -41,6 +42,7 @@ const DEFAULT_CONFIG: ProviderConfigurations = {
   itunes: { enabled: true, coverResolution: 'high' },
   audible: { enabled: false, domain: 'com' },
   audnexus: { enabled: false },
+  librofm: { enabled: false },
   comicvine: { enabled: false, apiKey: '' },
   ranobedb: { enabled: false },
   kobo: { enabled: false, country: 'us', language: 'en' },
@@ -144,6 +146,7 @@ const PROVIDER_LABELS: Record<MetadataProviderKey, string> = {
   [MetadataProviderKey.ITUNES]: 'iTunes',
   [MetadataProviderKey.AUDIBLE]: 'Audible',
   [MetadataProviderKey.AUDNEXUS]: 'AudNexus',
+  [MetadataProviderKey.LIBROFM]: 'Libro.fm',
   [MetadataProviderKey.COMICVINE]: 'ComicVine',
   [MetadataProviderKey.RANOBEDB]: 'RanobeDB',
   [MetadataProviderKey.KOBO]: 'Kobo',
@@ -196,6 +199,7 @@ export class ProviderConfigService {
       itunes: { ...DEFAULT_CONFIG.itunes },
       audible: { ...DEFAULT_CONFIG.audible },
       audnexus: { ...DEFAULT_CONFIG.audnexus },
+      librofm: { ...DEFAULT_CONFIG.librofm },
       comicvine: { ...DEFAULT_CONFIG.comicvine },
       ranobedb: { ...DEFAULT_CONFIG.ranobedb },
       kobo: { ...DEFAULT_CONFIG.kobo },
@@ -215,6 +219,7 @@ export class ProviderConfigService {
       itunes: mergeITunesConfig(base.itunes, next.itunes),
       audible: mergeAudibleConfig(base.audible, next.audible),
       audnexus: mergeSimpleConfig(base.audnexus, next.audnexus),
+      librofm: mergeSimpleConfig(base.librofm, next.librofm),
       comicvine: mergeComicVineConfig(base.comicvine, next.comicvine),
       ranobedb: mergeSimpleConfig(base.ranobedb, next.ranobedb),
       kobo: mergeKoboConfig(base.kobo, next.kobo),
@@ -270,7 +275,7 @@ export class ProviderConfigService {
       google: { ...config.google, apiKey: googleApiKey },
       amazon: {
         ...config.amazon,
-        domain: this.normalizeDomain(config.amazon.domain, DEFAULT_CONFIG.amazon.domain),
+        domain: normalizeAmazonDomain(config.amazon.domain),
         cookie: this.normalizeAmazonCookie(config.amazon.cookie),
       },
       hardcover: {
@@ -279,7 +284,7 @@ export class ProviderConfigService {
       },
       audible: {
         ...config.audible,
-        domain: this.normalizeDomain(config.audible.domain, DEFAULT_CONFIG.audible.domain),
+        domain: this.normalizeAudibleConfigDomain(config.audible.domain),
       },
       comicvine: {
         ...config.comicvine,
@@ -303,11 +308,6 @@ export class ProviderConfigService {
     };
   }
 
-  private normalizeDomain(value: string, fallback: string): string {
-    const normalized = value.trim().toLowerCase();
-    return normalized || fallback;
-  }
-
   private normalizeAmazonCookie(cookie: string): string {
     const normalized = cookie.trim();
     if (!normalized) return '';
@@ -315,6 +315,13 @@ export class ProviderConfigService {
       return normalized.slice('cookie:'.length).trim();
     }
     return normalized;
+  }
+
+  private normalizeAudibleConfigDomain(value: string): string {
+    const normalized = value.trim().toLowerCase();
+    const suffix = normalizeAudibleDomain(normalized);
+    if (normalized === suffix || normalized === `audible.${suffix}`) return normalized;
+    return DEFAULT_CONFIG.audible.domain;
   }
 
   private normalizeKoboPathSegment(value: string, fallback: string): string {
@@ -432,6 +439,13 @@ export class ProviderConfigService {
         configured: true,
       },
       {
+        key: MetadataProviderKey.LIBROFM,
+        label: PROVIDER_LABELS[MetadataProviderKey.LIBROFM],
+        enabled: cfg.librofm.enabled,
+        configured: true,
+        hint: 'Uses an undocumented Libro.fm catalog endpoint',
+      },
+      {
         key: MetadataProviderKey.COMICVINE,
         label: PROVIDER_LABELS[MetadataProviderKey.COMICVINE],
         enabled: cfg.comicvine.enabled,
@@ -506,9 +520,11 @@ export class ProviderConfigService {
   }
 
   private async testAmazonProvider(config: ProviderConfigurations['amazon']): Promise<ProviderConnectionTestResult> {
-    const domain = this.normalizeDomain(config.domain, DEFAULT_CONFIG.amazon.domain);
+    const domain = normalizeAmazonDomain(config.domain);
     const cookie = this.normalizeAmazonCookie(config.cookie);
-    const url = `https://www.${domain}/s?k=${encodeURIComponent(AMAZON_TEST_QUERY)}&i=stripbooks`;
+    const url = new URL('/s', amazonOrigin(domain));
+    url.searchParams.set('k', AMAZON_TEST_QUERY);
+    url.searchParams.set('i', 'stripbooks');
     const headers: HeadersInit = cookie ? { ...AMAZON_TEST_HEADERS, cookie } : AMAZON_TEST_HEADERS;
     const response = await fetch(url, { method: 'GET', headers, signal: AbortSignal.timeout(PROVIDER_TEST_TIMEOUT_MS) });
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Search, X } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -12,9 +13,10 @@ const props = withDefaults(
   }>(),
   {
     searchQuery: '',
-    placeholder: 'Search title, author, series, narrator...',
   },
 )
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
@@ -54,8 +56,8 @@ function handleKeydown(event: KeyboardEvent) {
   <Sheet :open="open" @update:open="emit('update:open', $event)">
     <SheetContent side="top">
       <SheetHeader>
-        <SheetTitle>Search</SheetTitle>
-        <SheetDescription class="sr-only">Search items by title, author, series, or narrator.</SheetDescription>
+        <SheetTitle>{{ t('common.search') }}</SheetTitle>
+        <SheetDescription class="sr-only">{{ t('components.viewHeader.mobileSearch.description') }}</SheetDescription>
       </SheetHeader>
       <div class="space-y-3 px-4 pb-6">
         <div class="flex h-9 items-center rounded-md border border-input bg-background px-2.5">
@@ -66,7 +68,7 @@ function handleKeydown(event: KeyboardEvent) {
             @input="handleInput"
             @keydown="handleKeydown"
             type="search"
-            :placeholder="placeholder"
+            :placeholder="props.placeholder ?? t('components.viewHeader.searchPlaceholder')"
             class="view-header-mobile-search-input h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/85"
           />
           <button
@@ -77,7 +79,7 @@ function handleKeydown(event: KeyboardEvent) {
             <X :size="12" />
           </button>
         </div>
-        <Button variant="outline" size="sm" class="w-full" @click="close">Done</Button>
+        <Button variant="outline" size="sm" class="w-full" @click="close">{{ t('components.viewHeader.mobileSearch.done') }}</Button>
       </div>
     </SheetContent>
   </Sheet>

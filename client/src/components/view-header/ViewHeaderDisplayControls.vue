@@ -1,12 +1,17 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { Circle, Square } from '@lucide/vue'
 import type { BookViewMode } from '@/composables/useDisplaySettings'
+
+const { t } = useI18n()
 
 withDefaults(
   defineProps<{
     viewMode: BookViewMode
     coverSize: number
     gridGap: number
+    showJumpRailToggle?: boolean
+    showJumpRails?: boolean
     coverShape?: 'square' | 'circle'
     coverSizeMin?: number
     coverSizeMax?: number
@@ -28,18 +33,23 @@ withDefaults(
 const emit = defineEmits<{
   'update:coverSize': [value: number]
   'update:gridGap': [value: number]
+  'update:showJumpRails': [value: boolean]
   'update:coverShape': [value: 'square' | 'circle']
 }>()
+
+function handleShowJumpRailsChange(event: Event) {
+  emit('update:showJumpRails', (event.target as HTMLInputElement).checked)
+}
 </script>
 
 <template>
   <div class="space-y-4">
-    <p class="text-xs font-semibold text-foreground uppercase tracking-wider">Display</p>
+    <p class="text-xs font-semibold text-foreground uppercase tracking-wider">{{ t('components.viewHeader.displayControls.display') }}</p>
 
     <template v-if="viewMode !== 'table'">
       <div class="space-y-1.5">
         <div class="flex items-center justify-between">
-          <span class="text-xs text-muted-foreground">Cover size</span>
+          <span class="text-xs text-muted-foreground">{{ t('components.viewHeader.displayControls.coverSize') }}</span>
           <span class="text-xs font-medium tabular-nums text-foreground">{{ coverSize }}px</span>
         </div>
         <input
@@ -55,7 +65,7 @@ const emit = defineEmits<{
 
       <div class="space-y-1.5">
         <div class="flex items-center justify-between">
-          <span class="text-xs text-muted-foreground">Grid gap</span>
+          <span class="text-xs text-muted-foreground">{{ t('components.viewHeader.displayControls.gridGap') }}</span>
           <span class="text-xs font-medium tabular-nums text-foreground">{{ gridGap }}px</span>
         </div>
         <input
@@ -68,16 +78,26 @@ const emit = defineEmits<{
           class="w-full accent-primary cursor-pointer"
         />
       </div>
+
+      <label v-if="showJumpRailToggle && viewMode === 'grid'" class="flex cursor-pointer items-center justify-between gap-3 pt-1">
+        <span class="text-xs text-muted-foreground">{{ t('components.viewHeader.displayControls.showJumpRails') }}</span>
+        <input
+          type="checkbox"
+          :checked="showJumpRails"
+          class="size-4 shrink-0 cursor-pointer rounded border-input accent-primary"
+          @change="handleShowJumpRailsChange"
+        />
+      </label>
     </template>
 
     <template v-else>
       <slot name="columns">
-        <p class="text-xs text-muted-foreground">Use the column visibility panel in the table header to show or hide columns.</p>
+        <p class="text-xs text-muted-foreground">{{ t('components.viewHeader.displayControls.columnsHint') }}</p>
       </slot>
     </template>
 
     <div v-if="coverShape !== undefined && viewMode !== 'table'" class="space-y-1.5">
-      <span class="text-xs text-muted-foreground">Cover shape</span>
+      <span class="text-xs text-muted-foreground">{{ t('components.viewHeader.displayControls.coverShape') }}</span>
       <div class="mt-1.5 flex items-center gap-1">
         <button
           class="flex flex-1 items-center justify-center gap-1.5 rounded-md border py-1.5 text-xs font-medium transition-colors"
@@ -88,7 +108,7 @@ const emit = defineEmits<{
           "
           @click="emit('update:coverShape', 'circle')"
         >
-          <Circle :size="12" /> Circle
+          <Circle :size="12" /> {{ t('components.viewHeader.displayControls.circle') }}
         </button>
 
         <button
@@ -100,7 +120,7 @@ const emit = defineEmits<{
           "
           @click="emit('update:coverShape', 'square')"
         >
-          <Square :size="12" /> Square
+          <Square :size="12" /> {{ t('components.viewHeader.displayControls.square') }}
         </button>
       </div>
     </div>

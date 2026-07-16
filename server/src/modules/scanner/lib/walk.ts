@@ -3,25 +3,10 @@ import { basename, dirname, join, relative } from 'path';
 
 import { classifyFile, isPrimaryFormat, isAudioFormat, type FileRole } from './classify';
 
-const JS_NUMBER_MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
-
-/**
- * Convert a raw filesystem inode (bigint from stat with { bigint: true }) to a number
- * that can be matched safely in JavaScript.
- *
- * Any inode above Number.MAX_SAFE_INTEGER cannot be represented exactly as a JS number,
- * so we clamp it to 0. Value 0 is the existing sentinel meaning "rename detection
- * disabled for this file".
- */
-export function clampIno(ino: bigint): number {
-  if (ino < 0n || ino > JS_NUMBER_MAX_SAFE_INTEGER) return 0;
-  return Number(ino);
-}
-
 export interface FileStat {
   absolutePath: string;
   relPath: string; // relative to library folder root
-  ino: number;
+  ino: bigint;
   sizeBytes: number;
   mtime: Date;
   format: string | null;
@@ -110,11 +95,9 @@ async function statFilesIntoAcc(
   for (const entry of statResults) {
     if (!entry) continue;
     const { full, s } = entry;
-    const ino = clampIno(s.ino);
+    const ino = s.ino;
     if (s.ino === 0n) {
       logger?.(`File has inode 0 (likely network mount), rename detection disabled: ${full}`);
-    } else if (ino === 0) {
-      logger?.(`File inode cannot be represented safely for matching (inode ${s.ino}), rename detection disabled: ${full}`);
     }
     if (!acc.has(dir)) acc.set(dir, []);
     const { format, role } = classifyFile(full);
@@ -455,14 +438,10 @@ export async function buildSingleBookCandidate(
       const s = await stat(full, { bigint: true }).catch(() => null);
       if (!s) return null;
       const { format, role } = classifyFile(full);
-      const ino = clampIno(s.ino);
-      if (s.ino !== 0n && ino === 0) {
-        logger?.(`File inode cannot be represented safely for matching (inode ${s.ino}), rename detection disabled: ${full}`);
-      }
       return {
         absolutePath: full,
         relPath: relative(libraryFolderPath, full),
-        ino,
+        ino: s.ino,
         sizeBytes: Number(s.size),
         mtime: s.mtime,
         format,

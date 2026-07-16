@@ -1,0 +1,65 @@
+diff --git a/dist/vue/index.js b/dist/vue/index.js
+index 0794dffc1ec042f66f9eb36192f46df2615ebb06..fc83b348e33658d615e178c638b69167eb0d905e 100644
+--- a/dist/vue/index.js
++++ b/dist/vue/index.js
+@@ -270,6 +270,8 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
+     const coreState = ref(null);
+     const isInit = ref(true);
+     const pluginsOk = ref(false);
++    let pendingRegistry = null;
++    let unsubscribe = null;
+     const activeDocumentId = computed(() => {
+       var _a;
+       return ((_a = coreState.value) == null ? void 0 : _a.activeDocumentId) ?? null;
+@@ -302,6 +304,11 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
+       documents,
+       documentStates
+     });
++    onBeforeUnmount(() => {
++      unsubscribe == null ? void 0 : unsubscribe();
++      pendingRegistry == null ? void 0 : pendingRegistry.destroy();
++      registry.value == null ? void 0 : registry.value.destroy();
++    });
+     onMounted(async () => {
+       var _a, _b;
+       const finalConfig = {
+@@ -309,6 +316,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
+         logger: ((_a = props.config) == null ? void 0 : _a.logger) ?? props.logger
+       };
+       const reg = new PluginRegistry(props.engine, finalConfig);
++      pendingRegistry = reg;
+       reg.registerPluginBatch(props.plugins);
+       await reg.initialize();
+       if (reg.isDestroyed()) {
+@@ -316,28 +324,24 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
+       }
+       const store = reg.getStore();
+       coreState.value = store.getState().core;
+-      const unsubscribe = store.subscribe((action, newState, oldState) => {
++      unsubscribe = store.subscribe((action, newState, oldState) => {
+         if (store.isCoreAction(action) && newState.core !== oldState.core) {
+           coreState.value = newState.core;
+         }
+       });
+       await ((_b = props.onInitialized) == null ? void 0 : _b.call(props, reg));
+       if (reg.isDestroyed()) {
+-        unsubscribe();
++        unsubscribe == null ? void 0 : unsubscribe();
+         return;
+       }
+       registry.value = reg;
++      pendingRegistry = null;
+       isInit.value = false;
+       reg.pluginsReady().then(() => {
+         if (!reg.isDestroyed()) {
+           pluginsOk.value = true;
+         }
+       });
+-      onBeforeUnmount(() => {
+-        var _a2;
+-        unsubscribe();
+-        (_a2 = registry.value) == null ? void 0 : _a2.destroy();
+-      });
+     });
+     return (_ctx, _cache) => {
+       return pluginsOk.value && __props.autoMountDomElements ? (openBlock(), createBlock(_sfc_main$1, {

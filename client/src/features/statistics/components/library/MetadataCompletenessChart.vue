@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { ListChecks } from '@lucide/vue'
 
 import { useMetadataCompleteness } from '../../composables/useMetadataCompleteness'
 import ChartCard from '../ChartCard.vue'
+
+const { t } = useI18n()
 
 const { data, loading, error } = useMetadataCompleteness()
 const option = shallowRef({})
@@ -52,7 +55,14 @@ watchEffect(() => {
 </script>
 
 <template>
-  <ChartCard title="Metadata Completeness" :icon="ListChecks" :color-index="7" :loading :error :empty="!data.items.length">
+  <ChartCard
+    :title="t('statistics.charts.metadataCompleteness.title')"
+    :icon="ListChecks"
+    :color-index="7"
+    :loading
+    :error
+    :empty="!data.items.length"
+  >
     <VChart :option autoresize style="height: 100%" />
   </ChartCard>
 </template>

@@ -20,7 +20,7 @@ import { FileWriteService } from '../file-write/file-write.service';
 import { LibraryService } from '../library/library.service';
 import { EntityManagerRepository } from './entity-manager.repository';
 import { DuplicateComputeService } from './duplicate-compute.service';
-import type { EntityStrategy, RawCandidatePair } from './strategies/entity-strategy.interface';
+import type { EntityBookScope, EntityStrategy, RawCandidatePair } from './strategies/entity-strategy.interface';
 import { AuthorStrategy } from './strategies/author.strategy';
 import { GenreStrategy } from './strategies/genre.strategy';
 import { TagStrategy } from './strategies/tag.strategy';
@@ -89,23 +89,26 @@ export class EntityManagerService {
     try {
       const strategy = this.getStrategy(entityType);
       const similarity = minSimilarity ?? DEFAULT_MIN_SIMILARITY;
+      const allLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+      if (libraryId && !allLibraryIds.includes(libraryId)) throw new BadRequestException('Library not accessible');
 
-      if (libraryId) {
-        const allLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
-        if (!allLibraryIds.includes(libraryId)) throw new BadRequestException('Library not accessible');
-      }
+      const libraryIds = libraryId ? [libraryId] : allLibraryIds;
+      const bookScope: EntityBookScope = {
+        libraryIds,
+        contentFilters: user.isSuperuser ? undefined : user.contentFilters,
+      };
 
       let rawPairs: RawCandidatePair[];
 
-      if (strategy.isInline) {
-        const allLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
-        const libraryIds = libraryId ? allLibraryIds.filter((id) => id === libraryId) : allLibraryIds;
-        rawPairs = await strategy.findCandidatePairs(libraryIds, similarity);
+      if (libraryIds.length === 0) {
+        rawPairs = [];
+      } else if (strategy.isInline) {
+        rawPairs = await strategy.findCandidatePairs(libraryIds, similarity, bookScope.contentFilters);
 
         const dismissedSet = await this.repo.getInlineDismissedPairSet(entityType);
         rawPairs = rawPairs.filter((pair) => !dismissedSet.has(`${pair.idA}:${pair.idB}`));
       } else {
-        const storedPairs = await this.duplicateCompute.readCandidatePairs(entityType, similarity);
+        const storedPairs = await this.duplicateCompute.readCandidatePairs(entityType, similarity, bookScope);
 
         if (storedPairs.length === 0) {
           const status = await this.duplicateCompute.getStatus(entityType);
@@ -135,7 +138,7 @@ export class EntityManagerService {
       const offset = (clampedPage - 1) * pageSize;
       const pageSlice = ranked.slice(offset, offset + pageSize);
 
-      const enrichedClusters = await this.enrichClusterSlice(strategy, pageSlice, rawPairs);
+      const enrichedClusters = await this.enrichClusterSlice(strategy, pageSlice, rawPairs, bookScope);
 
       this.logger.log(
         `[${event}] [end] userId=${user.id} entityType=${entityType} durationMs=${Date.now() - startedAt} total=${total} page=${clampedPage} clusters=${enrichedClusters.length} - duplicate scan completed`,
@@ -392,7 +395,8 @@ export class EntityManagerService {
         throw new BadRequestException('Split requires at least 2 new names');
       }
 
-      const result = await strategy.split({ entityId, newNames });
+      const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+      const result = await strategy.split({ entityId, newNames, libraryIds });
 
       await this.repo.deleteDismissedPairsForEntity(entityType, entityId);
 
@@ -491,12 +495,22 @@ export class EntityManagerService {
     return result;
   }
 
-  async getEntityInfo(entityType: EntityType, entityId: number | string): Promise<EntityInfo> {
+  async getEntityInfo(entityType: EntityType, user: RequestUser, entityId: number | string): Promise<EntityInfo> {
     const strategy = this.getStrategy(entityType);
     const entity = await strategy.findEntityById(entityId);
     if (!entity) throw new NotFoundException(`${entityType} not found`);
 
-    const [bookCount, bookTitles] = await Promise.all([strategy.getBookCount(entityId), strategy.getBookTitles(entityId, BOOK_TITLES_LIMIT)]);
+    const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const bookScope: EntityBookScope = {
+      libraryIds,
+      contentFilters: user.isSuperuser ? undefined : user.contentFilters,
+    };
+    const [globalBookCount, bookCount, bookTitles] = await Promise.all([
+      strategy.getBookCount(entityId),
+      strategy.getBookCount(entityId, bookScope),
+      strategy.getBookTitles(entityId, BOOK_TITLES_LIMIT, bookScope),
+    ]);
+    if (globalBookCount > 0 && bookCount === 0) throw new NotFoundException(`${entityType} not found`);
 
     return { id: entity.id, name: entity.name, bookCount, bookTitles };
   }
@@ -607,6 +621,7 @@ export class EntityManagerService {
     strategy: EntityStrategy,
     rankedSlice: Array<{ memberIds: Set<string>; avgSimilarity: number }>,
     pairs: RawCandidatePair[],
+    bookScope: EntityBookScope,
   ): Promise<DuplicateCluster[]> {
     const enriched: DuplicateCluster[] = [];
     let clusterIndex = 0;
@@ -617,8 +632,8 @@ export class EntityManagerService {
           const parsedId = strategy.isInline ? id : Number(id);
           const [entity, bookCount, bookTitles] = await Promise.all([
             strategy.findEntityById(parsedId),
-            strategy.getBookCount(parsedId),
-            strategy.getBookTitles(parsedId, BOOK_TITLES_LIMIT),
+            strategy.getBookCount(parsedId, bookScope),
+            strategy.getBookTitles(parsedId, BOOK_TITLES_LIMIT, bookScope),
           ]);
           return entity
             ? { id: entity.id, name: entity.name, bookCount, bookTitles, sortName: (entity as any).sortName, hasPhoto: (entity as any).hasPhoto }

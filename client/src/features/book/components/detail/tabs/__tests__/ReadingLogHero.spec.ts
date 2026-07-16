@@ -86,12 +86,15 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     isbn10: null,
     isbn13: null,
     publisher: null,
+    publishedDate: null,
     publishedYear: null,
     language: null,
     pageCount: null,
     seriesName: null,
     seriesIndex: null,
     rating: null,
+    personalNote: null,
+    personalNoteUpdatedAt: null,
     coverSource: null,
     providerIds: {},
     authors: [],
@@ -160,11 +163,9 @@ describe('ReadingLogHero', () => {
     const wrapper = mountHero()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('First Read')
-    expect(wrapper.text()).toContain('Last Read')
-    expect(wrapper.text()).toContain('Date Started')
+    expect(wrapper.text()).toContain('Started')
     expect(wrapper.text()).toContain('Apr 1, 2026')
-    expect(wrapper.text()).toContain('Date Finished')
+    expect(wrapper.text()).toContain('Finished')
     expect(wrapper.text()).toContain('Apr 20, 2026')
   })
 
@@ -462,11 +463,10 @@ describe('ReadingLogHero', () => {
     expect(unchanged.find('[title="Unchanged vs previous 7 days"]').exists()).toBe(true)
   })
 
-  it('renders empty and loading states without session dates', async () => {
+  it('renders empty and loading states without lifecycle dates', async () => {
     const emptyWrapper = mountHero(makeBook({ readStatus: null }), makeStats({ firstSessionAt: null, lastSessionAt: null }))
     await flushPromises()
 
-    expect(emptyWrapper.text()).toContain('No sessions')
     expect(emptyWrapper.text()).toContain('Not set')
 
     const loadingWrapper = mount(ReadingLogHero as Component, {
@@ -474,7 +474,7 @@ describe('ReadingLogHero', () => {
     })
     await flushPromises()
 
-    expect(loadingWrapper.text()).toContain('Add session')
+    expect(loadingWrapper.findAll('.animate-shimmer').length).toBeGreaterThan(0)
   })
 
   it('normalizes invalid lifecycle dates to empty display values', async () => {

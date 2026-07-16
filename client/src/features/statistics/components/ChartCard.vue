@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { AlertCircle, GripVertical } from '@lucide/vue'
 import { Skeleton } from '@/components/ui/skeleton'
 import ChartEmptyState from './ChartEmptyState.vue'
@@ -16,6 +17,8 @@ const props = defineProps<{
   unknownCount?: number
   error?: boolean
 }>()
+
+const { t } = useI18n()
 
 const ICON_HUE_OFFSETS = [0, 45, 90, 135, 180, 225, 270, 315, 337]
 
@@ -53,18 +56,22 @@ const iconStyle = computed(() => {
 
         <div v-else-if="error" class="text-muted-foreground flex h-full flex-col items-center justify-center gap-2">
           <AlertCircle class="size-6" />
-          <p class="text-sm">Failed to load data</p>
+          <p class="text-sm">{{ t('statistics.card.loadError') }}</p>
         </div>
 
         <div v-else-if="empty" class="h-full">
-          <ChartEmptyState :icon="icon" :title="emptyTitle ?? 'No data yet'" :description="emptyDescription ?? 'No data available for this chart'" />
+          <ChartEmptyState
+            :icon="icon"
+            :title="emptyTitle ?? t('statistics.card.emptyTitle')"
+            :description="emptyDescription ?? t('statistics.card.emptyDescription')"
+          />
         </div>
 
         <slot v-else />
       </div>
 
       <p v-if="!loading && !error && unknownCount && unknownCount > 0" class="text-muted-foreground mt-2 text-xs">
-        {{ unknownCount }} {{ unknownCount === 1 ? 'book has' : 'books have' }} no data for this field
+        {{ t('statistics.card.unknownField', { count: unknownCount }, unknownCount) }}
       </p>
     </div>
   </div>

@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Loader2, RotateCcw, Save, Settings, Trash2 } from '@lucide/vue'
 import type { FieldPreference, MetadataFetchPreferences, MetadataField, ProviderStatus } from '@bookorbit/types'
 import FieldPreferenceTable from './FieldPreferenceTable.vue'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   preferences: MetadataFetchPreferences | null
@@ -61,12 +64,12 @@ function toggleSaveProviderIds() {
 
 function handleClearAll() {
   if (!draft.value) return
-  if (!confirm('Remove all active providers from every field? This will be saved immediately and cannot be undone.')) return
+  if (!confirm(t('settings.metadata.fieldRules.global.clearAllConfirm'))) return
   emit('clearAll', draft.value)
 }
 
 function handleResetToDefault() {
-  if (!confirm('Reset all global field rules to system defaults? This will overwrite your current configuration.')) return
+  if (!confirm(t('settings.metadata.fieldRules.global.resetConfirm'))) return
   emit('resetToDefault')
 }
 </script>
@@ -75,8 +78,8 @@ function handleResetToDefault() {
   <div class="border border-border rounded-lg bg-card overflow-hidden shadow-xs">
     <div class="px-4 py-3.5 md:px-5 md:py-4 border-b border-border flex flex-col md:flex-row md:items-center justify-between gap-4 bg-muted/30">
       <div>
-        <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">Global Defaults</span>
-        <p class="settings-hint">Default rules applied to every library. Override per-library below.</p>
+        <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">{{ t('settings.metadata.fieldRules.global.title') }}</span>
+        <p class="settings-hint">{{ t('settings.metadata.fieldRules.global.hint') }}</p>
       </div>
       <div class="hidden md:flex items-center gap-2 flex-wrap">
         <button
@@ -85,7 +88,7 @@ function handleResetToDefault() {
           @click="handleClearAll"
         >
           <Trash2 :size="13" />
-          <span>Clear All Providers</span>
+          <span>{{ t('settings.metadata.fieldRules.clearAllProviders') }}</span>
         </button>
         <button
           class="settings-btn h-8 px-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-foreground hover:border-border/80 hover:bg-muted/50 transition-colors disabled:opacity-40"
@@ -93,12 +96,12 @@ function handleResetToDefault() {
           @click="handleResetToDefault"
         >
           <RotateCcw :size="13" />
-          <span>Reset to Default</span>
+          <span>{{ t('settings.metadata.fieldRules.resetToDefault') }}</span>
         </button>
         <button class="settings-btn-primary h-8 px-3" :disabled="saving || !draft" @click="save">
           <Loader2 v-if="saving" :size="14" class="animate-spin" />
           <Save v-else :size="14" />
-          <span>Save Defaults</span>
+          <span>{{ t('settings.metadata.fieldRules.global.saveDefaults') }}</span>
         </button>
       </div>
     </div>
@@ -110,7 +113,7 @@ function handleResetToDefault() {
           @click="handleClearAll"
         >
           <Trash2 :size="13" />
-          <span>Clear All</span>
+          <span>{{ t('settings.metadata.fieldRules.clearAll') }}</span>
         </button>
         <button
           class="settings-btn h-8 px-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-foreground hover:border-border/80 hover:bg-muted/50 transition-colors disabled:opacity-40"
@@ -118,12 +121,12 @@ function handleResetToDefault() {
           @click="handleResetToDefault"
         >
           <RotateCcw :size="13" />
-          <span>Reset</span>
+          <span>{{ t('settings.metadata.fieldRules.reset') }}</span>
         </button>
         <button class="settings-btn-primary h-8 px-3 justify-center ml-auto" :disabled="saving || !draft" @click="save">
           <Loader2 v-if="saving" :size="14" class="animate-spin" />
           <Save v-else :size="14" />
-          <span>Save Defaults</span>
+          <span>{{ t('settings.metadata.fieldRules.global.saveDefaults') }}</span>
         </button>
       </div>
     </div>
@@ -135,7 +138,7 @@ function handleResetToDefault() {
       <div class="border-t border-border px-6 py-6 bg-muted/5 space-y-5">
         <div class="flex items-center gap-2">
           <Settings :size="16" class="text-muted-foreground" />
-          <h4 class="settings-group-label !mb-0">Advanced Fetch Behavior</h4>
+          <h4 class="settings-group-label !mb-0">{{ t('settings.metadata.fieldRules.advanced.title') }}</h4>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -153,9 +156,9 @@ function handleResetToDefault() {
                 />
               </div>
               <div class="space-y-1">
-                <span class="text-sm font-medium text-foreground">Combine genres from all selected providers</span>
+                <span class="text-sm font-medium text-foreground">{{ t('settings.metadata.fieldRules.advanced.combineGenres.label') }}</span>
                 <p class="text-xs text-muted-foreground">
-                  Collect and deduplicate genres from every provider assigned to the Genres field, rather than stopping at the first result.
+                  {{ t('settings.metadata.fieldRules.advanced.combineGenres.hint') }}
                 </p>
               </div>
             </label>
@@ -175,10 +178,9 @@ function handleResetToDefault() {
                 />
               </div>
               <div class="space-y-1">
-                <span class="text-sm font-medium text-foreground">Store provider IDs on books</span>
+                <span class="text-sm font-medium text-foreground">{{ t('settings.metadata.fieldRules.advanced.storeProviderIds.label') }}</span>
                 <p class="text-xs text-muted-foreground">
-                  When fetching metadata, save the returned provider IDs (ISBN, ASIN, Goodreads ID, etc.) on the book record for more accurate future
-                  lookups.
+                  {{ t('settings.metadata.fieldRules.advanced.storeProviderIds.hint') }}
                 </p>
               </div>
             </label>

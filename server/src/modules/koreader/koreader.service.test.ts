@@ -60,10 +60,17 @@ describe('KoreaderService', () => {
     getReadingProgress: ReturnType<typeof vi.fn>;
     getTotalSyncedBooks: ReturnType<typeof vi.fn>;
     getDevicesList: ReturnType<typeof vi.fn>;
+    getDeviceFileNamingPatterns: ReturnType<typeof vi.fn>;
+    getDeviceFileNamingPattern: ReturnType<typeof vi.fn>;
+    getKoreaderUserDefaultPattern: ReturnType<typeof vi.fn>;
+    setKoreaderUserDefaultPattern: ReturnType<typeof vi.fn>;
+    setDeviceFileNamingPattern: ReturnType<typeof vi.fn>;
+    clearDeviceFileNamingPattern: ReturnType<typeof vi.fn>;
     findBookFileIdByBookId: ReturnType<typeof vi.fn>;
     getBookProgressForDashboard: ReturnType<typeof vi.fn>;
     getChapters: ReturnType<typeof vi.fn>;
     getLastFileWriteTime: ReturnType<typeof vi.fn>;
+    removeDevice: ReturnType<typeof vi.fn>;
   };
   let mockChapterService: {
     parseChapterIndexFromProgress: ReturnType<typeof vi.fn>;
@@ -121,11 +128,18 @@ describe('KoreaderService', () => {
       getLatestDeviceProgress: vi.fn(),
       getReadingProgress: vi.fn(),
       getTotalSyncedBooks: vi.fn(),
-      getDevicesList: vi.fn(),
+      getDevicesList: vi.fn().mockResolvedValue([]),
+      getDeviceFileNamingPatterns: vi.fn().mockResolvedValue([]),
+      getDeviceFileNamingPattern: vi.fn().mockResolvedValue(null),
+      getKoreaderUserDefaultPattern: vi.fn(),
+      setKoreaderUserDefaultPattern: vi.fn().mockResolvedValue(undefined),
+      setDeviceFileNamingPattern: vi.fn().mockResolvedValue(undefined),
+      clearDeviceFileNamingPattern: vi.fn().mockResolvedValue(undefined),
       findBookFileIdByBookId: vi.fn(),
       getBookProgressForDashboard: vi.fn(),
       getChapters: vi.fn(),
       getLastFileWriteTime: vi.fn(),
+      removeDevice: vi.fn(),
     };
 
     mockChapterService = {
@@ -162,6 +176,7 @@ describe('KoreaderService', () => {
         failedPositions: 0,
         pageStatEvents: 0,
         annotations: 0,
+        unmatchedBooks: 0,
       }),
     };
 
@@ -348,7 +363,7 @@ describe('KoreaderService', () => {
         timestamp: 1700000000,
       });
 
-      expect(mockRepo.resolveBookFileByHash).toHaveBeenCalledWith('abcdef1234567890fedcba', [1, 2]);
+      expect(mockRepo.resolveBookFileByHash).toHaveBeenCalledWith('abcdef1234567890fedcba', [1, 2], 12);
       expect(mockChapterService.parseChapterIndexFromProgress).toHaveBeenCalledWith('/body/DocFragment[7]');
       expect(mockChapterExtractor.extractAndStoreChapters).toHaveBeenCalledWith(44);
       expect(mockRepo.upsertDeviceProgress).toHaveBeenCalledWith({
@@ -363,7 +378,12 @@ describe('KoreaderService', () => {
       });
       expect(mockRepo.upsertReadingProgress).toHaveBeenCalledWith(44, 12, 50, null, '/body/DocFragment[7]');
       expect(mockBookService.syncKoboReadingStateForExternalProgress).toHaveBeenCalledWith(12, 44, 50);
-      expect(mockBookService.autoUpdateReadStatusForProgress).toHaveBeenCalledWith(12, { id: 44, bookId: 55, libraryId: 3 }, 50);
+      expect(mockBookService.autoUpdateReadStatusForProgress).toHaveBeenCalledWith(
+        12,
+        { id: 44, bookId: 55, libraryId: 3 },
+        50,
+        expect.objectContaining({ origin: 'koreader', strongRereadEvidence: false }),
+      );
       expect(mockAchievementEvents.emit).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, {
         userId: 12,
         bookId: 55,
@@ -407,7 +427,7 @@ describe('KoreaderService', () => {
         }),
       ).rejects.toThrow(NotFoundException);
 
-      expect(mockRepo.resolveBookFileByHash).toHaveBeenCalledWith('no-access-document', []);
+      expect(mockRepo.resolveBookFileByHash).toHaveBeenCalledWith('no-access-document', [], 12);
     });
 
     it('uses the default device and generated device id when the payload leaves them empty', async () => {
@@ -567,16 +587,27 @@ describe('KoreaderService', () => {
         syncEnabled: true,
         createdAt: '2026-01-01T00:00:00.000Z',
       };
+      const deviceRows = [
+        {
+          device: 'Kobo Libra',
+          deviceId: 'device-1',
+          lastSyncAt: new Date('2026-02-01T10:00:00.000Z'),
+          lastBookTitle: null,
+        },
+      ];
       const devices = [
         {
           device: 'Kobo Libra',
           deviceId: 'device-1',
           lastSyncAt: '2026-02-01T10:00:00.000Z',
           lastBookTitle: null,
+          fileNamingPattern: null,
+          seriesFileNamingPattern: null,
+          standaloneFileNamingPattern: null,
         },
       ];
       const getCredentialsSpy = vi.spyOn(service, 'getCredentials').mockResolvedValue(credentials);
-      const getDevicesSpy = vi.spyOn(service, 'getDevices').mockResolvedValue(devices);
+      mockRepo.getDevicesList.mockResolvedValue(deviceRows);
       mockRepo.getTotalSyncedBooks.mockResolvedValue(14);
 
       await expect(service.getSyncStatus(7)).resolves.toEqual({
@@ -587,11 +618,20 @@ describe('KoreaderService', () => {
         latestPluginVersion: null,
         pluginUpdateAvailable: false,
         sweeps: [],
-        pluginTotals: { matchedBooks: 0, trashedAnnotations: 0, pendingDeletes: 0, failedPositions: 0, pageStatEvents: 0, annotations: 0 },
+        pluginTotals: {
+          matchedBooks: 0,
+          trashedAnnotations: 0,
+          pendingDeletes: 0,
+          failedPositions: 0,
+          pageStatEvents: 0,
+          annotations: 0,
+          unmatchedBooks: 0,
+        },
       });
 
       expect(getCredentialsSpy).toHaveBeenCalledWith(7);
-      expect(getDevicesSpy).toHaveBeenCalledWith(7);
+      expect(mockRepo.getDevicesList).toHaveBeenCalledWith(7);
+      expect(mockRepo.getDeviceFileNamingPatterns).toHaveBeenCalledWith(7);
       expect(mockRepo.getTotalSyncedBooks).toHaveBeenCalledWith(7);
       expect(mockPluginRepo.listSweeps).toHaveBeenCalledWith(7);
       expect(mockPluginRepo.getPluginTotals).toHaveBeenCalledWith(7);
@@ -600,7 +640,6 @@ describe('KoreaderService', () => {
 
     it('marks only devices with older comparable plugin versions as updateable', async () => {
       vi.spyOn(service, 'getCredentials').mockResolvedValue(null);
-      vi.spyOn(service, 'getDevices').mockResolvedValue([]);
       mockRepo.getTotalSyncedBooks.mockResolvedValue(0);
       mockPackageService.getVersionInfo.mockResolvedValue({ pluginVersion: '0.5.0', serverVersion: '1.0.0' });
       mockPluginRepo.listSweeps.mockResolvedValue([
@@ -658,7 +697,6 @@ describe('KoreaderService', () => {
 
     it('keeps plugin update state unknown when the server cannot report a plugin version', async () => {
       vi.spyOn(service, 'getCredentials').mockResolvedValue(null);
-      vi.spyOn(service, 'getDevices').mockResolvedValue([]);
       mockRepo.getTotalSyncedBooks.mockResolvedValue(0);
       mockPackageService.getVersionInfo.mockResolvedValue({ pluginVersion: 'unknown', serverVersion: '1.0.0' });
       mockPluginRepo.listSweeps.mockResolvedValue([
@@ -684,6 +722,113 @@ describe('KoreaderService', () => {
         }),
       );
     });
+
+    it('preserves settings for a swept device without progress rows', async () => {
+      vi.spyOn(service, 'getCredentials').mockResolvedValue(null);
+      mockRepo.getDeviceFileNamingPatterns.mockResolvedValue([
+        {
+          deviceId: 'sweep-only',
+          fileNamingPattern: 'Device/{title}',
+          seriesFileNamingPattern: 'Series/{series}/{title}',
+          standaloneFileNamingPattern: null,
+        },
+      ]);
+      mockRepo.getTotalSyncedBooks.mockResolvedValue(0);
+      mockPluginRepo.listSweeps.mockResolvedValue([
+        {
+          deviceId: 'sweep-only',
+          deviceModel: 'Kobo Libra 2',
+          pluginVersion: '1.3.0',
+          lastSweepAt: new Date('2026-02-01T10:00:00.000Z'),
+          lastSweepBooksMatched: 0,
+          lastSweepPageStats: 0,
+          lastSweepAnnotations: 0,
+        },
+      ]);
+
+      const result = await service.getSyncStatus(7);
+
+      expect(result.devices).toEqual([]);
+      expect(result.sweeps[0]).toEqual(
+        expect.objectContaining({
+          deviceId: 'sweep-only',
+          fileNamingPattern: 'Device/{title}',
+          seriesFileNamingPattern: 'Series/{series}/{title}',
+          standaloneFileNamingPattern: null,
+        }),
+      );
+    });
+  });
+
+  describe('KOReader user default file pattern', () => {
+    it('returns the saved pattern for the requested user', async () => {
+      mockRepo.getKoreaderUserDefaultPattern.mockResolvedValue('{authors}/{title}');
+
+      await expect(service.getKoreaderUserDefaultPattern(7)).resolves.toBe('{authors}/{title}');
+      expect(mockRepo.getKoreaderUserDefaultPattern).toHaveBeenCalledWith(7);
+    });
+
+    it('caches repeated reads and invalidates the cache after an update', async () => {
+      mockRepo.getKoreaderUserDefaultPattern.mockResolvedValueOnce('{authors}/{title}').mockResolvedValueOnce('Books/{title}');
+
+      await expect(service.getKoreaderUserDefaultPattern(7)).resolves.toBe('{authors}/{title}');
+      await expect(service.getKoreaderUserDefaultPattern(7)).resolves.toBe('{authors}/{title}');
+      expect(mockRepo.getKoreaderUserDefaultPattern).toHaveBeenCalledTimes(1);
+
+      await service.setKoreaderUserDefaultPattern(7, 'Books/{title}');
+
+      await expect(service.getKoreaderUserDefaultPattern(7)).resolves.toBe('Books/{title}');
+      expect(mockRepo.getKoreaderUserDefaultPattern).toHaveBeenCalledTimes(2);
+    });
+
+    it('falls back independently for users without a saved pattern', async () => {
+      mockRepo.getKoreaderUserDefaultPattern.mockResolvedValue(null);
+
+      const userSevenPattern = await service.getKoreaderUserDefaultPattern(7);
+      const userEightPattern = await service.getKoreaderUserDefaultPattern(8);
+
+      expect(userSevenPattern).toBeDefined();
+      expect(userEightPattern).toBe(userSevenPattern);
+      expect(mockRepo.getKoreaderUserDefaultPattern).toHaveBeenNthCalledWith(1, 7);
+      expect(mockRepo.getKoreaderUserDefaultPattern).toHaveBeenNthCalledWith(2, 8);
+    });
+
+    it('stores each authenticated user pattern using that user id', async () => {
+      await service.setKoreaderUserDefaultPattern(7, '{title}');
+      await service.setKoreaderUserDefaultPattern(8, '{authors}/{title}');
+
+      expect(mockRepo.setKoreaderUserDefaultPattern).toHaveBeenNthCalledWith(1, 7, '{title}');
+      expect(mockRepo.setKoreaderUserDefaultPattern).toHaveBeenNthCalledWith(2, 8, '{authors}/{title}');
+    });
+    it('logs start and end for user-default pattern mutations without logging the pattern', async () => {
+      const logSpy = vi.spyOn(Logger.prototype, 'log');
+
+      await service.setKoreaderUserDefaultPattern(7, '{title}');
+
+      expect(logSpy).toHaveBeenNthCalledWith(1, '[koreader.file_naming] [start] userId=7 scope=user-default - file naming pattern update started');
+      expect(logSpy).toHaveBeenNthCalledWith(
+        2,
+        expect.stringMatching(/^\[koreader\.file_naming\] \[end\] userId=7 scope=user-default durationMs=\d+ - file naming pattern updated$/),
+      );
+      expect(logSpy.mock.calls.flat().join(' ')).not.toContain('{title}');
+    });
+
+    it('logs failures and rethrows the original user-default mutation error', async () => {
+      const error = new Error('database unavailable');
+      mockRepo.setKoreaderUserDefaultPattern.mockRejectedValueOnce(error);
+      const logSpy = vi.spyOn(Logger.prototype, 'log');
+      const errorSpy = vi.spyOn(Logger.prototype, 'error');
+
+      await expect(service.setKoreaderUserDefaultPattern(7, '{authors}/{title}')).rejects.toBe(error);
+
+      expect(logSpy).toHaveBeenCalledWith('[koreader.file_naming] [start] userId=7 scope=user-default - file naming pattern update started');
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /^\[koreader\.file_naming\] \[fail\] userId=7 scope=user-default durationMs=\d+ errorClass=Error - file naming pattern update failed$/,
+        ),
+      );
+      expect([...logSpy.mock.calls, ...errorSpy.mock.calls].flat().join(' ')).not.toContain('{authors}/{title}');
+    });
   });
 
   describe('getDevices', () => {
@@ -694,12 +839,23 @@ describe('KoreaderService', () => {
           deviceId: 'device-1',
           lastSyncAt: new Date('2026-02-01T10:00:00.000Z'),
           lastBookTitle: 'Project Hail Mary',
+          fileNamingPattern: null,
+          seriesFileNamingPattern: null,
+          standaloneFileNamingPattern: null,
         },
         {
           device: 'KOReader',
           deviceId: 'device-2',
           lastSyncAt: new Date('2026-02-01T11:00:00.000Z'),
           lastBookTitle: null,
+        },
+      ]);
+      mockRepo.getDeviceFileNamingPatterns.mockResolvedValue([
+        {
+          deviceId: 'device-1',
+          fileNamingPattern: 'Device/{title}',
+          seriesFileNamingPattern: 'Series/{title}',
+          standaloneFileNamingPattern: null,
         },
       ]);
 
@@ -709,14 +865,132 @@ describe('KoreaderService', () => {
           deviceId: 'device-1',
           lastSyncAt: '2026-02-01T10:00:00.000Z',
           lastBookTitle: 'Project Hail Mary',
+          fileNamingPattern: 'Device/{title}',
+          seriesFileNamingPattern: 'Series/{title}',
+          standaloneFileNamingPattern: null,
         },
         {
           device: 'KOReader',
           deviceId: 'device-2',
           lastSyncAt: '2026-02-01T11:00:00.000Z',
           lastBookTitle: null,
+          fileNamingPattern: null,
+          seriesFileNamingPattern: null,
+          standaloneFileNamingPattern: null,
         },
       ]);
+    });
+  });
+
+  describe('device file naming patterns', () => {
+    const config = {
+      fileNamingPattern: '{title}',
+      seriesFileNamingPattern: '{series}/{title}',
+      standaloneFileNamingPattern: 'Standalone/{title}',
+    };
+
+    it('delegates device pattern reads to the repository', async () => {
+      const setting = { deviceId: 'device-1', fileNamingPattern: '{title}' };
+      mockRepo.getDeviceFileNamingPattern.mockResolvedValueOnce(setting);
+
+      await expect(service.getDeviceFileNamingPattern(7, 'device-1')).resolves.toBe(setting);
+      await expect(service.getDeviceFileNamingPattern(7, 'device-1')).resolves.toBe(setting);
+      expect(mockRepo.getDeviceFileNamingPattern).toHaveBeenCalledWith(7, 'device-1');
+      expect(mockRepo.getDeviceFileNamingPattern).toHaveBeenCalledTimes(1);
+    });
+
+    it('logs start and end for device pattern updates without logging pattern contents', async () => {
+      const logSpy = vi.spyOn(Logger.prototype, 'log');
+
+      await service.setDeviceFileNamingPattern(7, 'device-1', config);
+
+      expect(mockRepo.setDeviceFileNamingPattern).toHaveBeenCalledWith(7, 'device-1', config);
+      expect(logSpy).toHaveBeenNthCalledWith(
+        1,
+        '[koreader.file_naming] [start] userId=7 deviceId="device-1" scope=device - file naming pattern update started',
+      );
+      expect(logSpy).toHaveBeenNthCalledWith(
+        2,
+        expect.stringMatching(
+          /^\[koreader\.file_naming\] \[end\] userId=7 deviceId="device-1" scope=device durationMs=\d+ - file naming pattern updated$/,
+        ),
+      );
+      expect(logSpy.mock.calls.flat().join(' ')).not.toContain(config.fileNamingPattern);
+      expect(logSpy.mock.calls.flat().join(' ')).not.toContain(config.seriesFileNamingPattern);
+      expect(logSpy.mock.calls.flat().join(' ')).not.toContain(config.standaloneFileNamingPattern);
+    });
+
+    it('logs failures and rethrows the original device pattern update error', async () => {
+      const error = new TypeError('invalid update');
+      mockRepo.setDeviceFileNamingPattern.mockRejectedValueOnce(error);
+      const logSpy = vi.spyOn(Logger.prototype, 'log');
+      const errorSpy = vi.spyOn(Logger.prototype, 'error');
+
+      await expect(service.setDeviceFileNamingPattern(7, 'device-1', config)).rejects.toBe(error);
+
+      expect(logSpy).toHaveBeenCalledWith(
+        '[koreader.file_naming] [start] userId=7 deviceId="device-1" scope=device - file naming pattern update started',
+      );
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /^\[koreader\.file_naming\] \[fail\] userId=7 deviceId="device-1" scope=device durationMs=\d+ errorClass=TypeError - file naming pattern update failed$/,
+        ),
+      );
+      expect([...logSpy.mock.calls, ...errorSpy.mock.calls].flat().join(' ')).not.toContain(config.fileNamingPattern);
+      expect([...logSpy.mock.calls, ...errorSpy.mock.calls].flat().join(' ')).not.toContain(config.seriesFileNamingPattern);
+      expect([...logSpy.mock.calls, ...errorSpy.mock.calls].flat().join(' ')).not.toContain(config.standaloneFileNamingPattern);
+    });
+
+    it('logs start and end for device pattern clears', async () => {
+      const logSpy = vi.spyOn(Logger.prototype, 'log');
+
+      await service.clearDeviceFileNamingPattern(7, 'device-1');
+
+      expect(mockRepo.clearDeviceFileNamingPattern).toHaveBeenCalledWith(7, 'device-1');
+      expect(logSpy).toHaveBeenNthCalledWith(
+        1,
+        '[koreader.file_naming] [start] userId=7 deviceId="device-1" scope=device - file naming pattern clear started',
+      );
+      expect(logSpy).toHaveBeenNthCalledWith(
+        2,
+        expect.stringMatching(
+          /^\[koreader\.file_naming\] \[end\] userId=7 deviceId="device-1" scope=device durationMs=\d+ - file naming pattern cleared$/,
+        ),
+      );
+    });
+
+    it('logs failures and rethrows the original device pattern clear error', async () => {
+      const error = new Error('delete failed');
+      mockRepo.clearDeviceFileNamingPattern.mockRejectedValueOnce(error);
+      const logSpy = vi.spyOn(Logger.prototype, 'log');
+      const errorSpy = vi.spyOn(Logger.prototype, 'error');
+
+      await expect(service.clearDeviceFileNamingPattern(7, 'device-1')).rejects.toBe(error);
+
+      expect(logSpy).toHaveBeenCalledWith(
+        '[koreader.file_naming] [start] userId=7 deviceId="device-1" scope=device - file naming pattern clear started',
+      );
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /^\[koreader\.file_naming\] \[fail\] userId=7 deviceId="device-1" scope=device durationMs=\d+ errorClass=Error - file naming pattern clear failed$/,
+        ),
+      );
+    });
+  });
+  describe('removeDevice', () => {
+    it('delegates deletion to the repository when rows were removed', async () => {
+      mockRepo.removeDevice.mockResolvedValue(3);
+
+      await service.removeDevice(7, 'device-1');
+
+      expect(mockRepo.removeDevice).toHaveBeenCalledWith(7, 'device-1');
+    });
+
+    it('throws NotFoundException when no rows matched the given device', async () => {
+      mockRepo.removeDevice.mockResolvedValue(0);
+
+      await expect(service.removeDevice(7, 'missing-device')).rejects.toThrow(NotFoundException);
+      expect(mockRepo.removeDevice).toHaveBeenCalledWith(7, 'missing-device');
     });
   });
 

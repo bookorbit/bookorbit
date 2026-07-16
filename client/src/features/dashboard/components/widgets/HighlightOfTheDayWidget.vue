@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Highlighter, ExternalLink } from '@lucide/vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
@@ -8,6 +9,7 @@ import BookCoverSurface from '@/features/book/components/BookCoverSurface.vue'
 import { useHighlightOfTheDayWidget } from '../../composables/useHighlightOfTheDayWidget'
 
 const { data, loading, error } = useHighlightOfTheDayWidget()
+const { t } = useI18n()
 const router = useRouter()
 const { coverUrl } = useCoverVersions()
 
@@ -21,7 +23,7 @@ function goToBook() {
   <div class="flex h-full flex-col p-3">
     <div class="mb-2 flex items-center gap-2 self-start">
       <Highlighter :size="16" class="text-primary/90" />
-      <span class="text-[15px] font-semibold text-foreground">Highlight of the Day</span>
+      <span class="text-[15px] font-semibold text-foreground">{{ t('dashboard.widgets.highlightOfTheDay.title') }}</span>
     </div>
 
     <!-- Loading -->
@@ -31,14 +33,16 @@ function goToBook() {
     </div>
 
     <!-- Error -->
-    <div v-else-if="error" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">Failed to load</div>
+    <div v-else-if="error" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+      {{ t('dashboard.common.failedToLoad') }}
+    </div>
 
     <!-- Empty -->
     <div v-else-if="!data" class="flex flex-1 flex-col items-center justify-center gap-2">
       <div class="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
         <Highlighter :size="16" class="text-muted-foreground/60" />
       </div>
-      <p class="text-center text-xs text-muted-foreground">Highlight passages while reading to see them here</p>
+      <p class="text-center text-xs text-muted-foreground">{{ t('dashboard.widgets.highlightOfTheDay.empty') }}</p>
     </div>
 
     <!-- Quote -->
@@ -57,12 +61,12 @@ function goToBook() {
             :author-line="null"
             :is-audio="false"
             :seed="data.bookTitle ?? String(data.bookId)"
-            :alt="data.bookTitle ?? 'Cover'"
+            :alt="data.bookTitle ?? t('dashboard.common.cover')"
             frame-aspect-ratio="2/3"
           />
         </BookCoverSurface>
         <div class="min-w-0 flex-1">
-          <p class="truncate text-[12px] font-medium leading-tight">{{ data.bookTitle ?? 'Untitled' }}</p>
+          <p class="truncate text-[12px] font-medium leading-tight">{{ data.bookTitle ?? t('dashboard.common.untitled') }}</p>
           <p v-if="data.chapterTitle" class="truncate text-[11px] text-muted-foreground">{{ data.chapterTitle }}</p>
         </div>
         <ExternalLink :size="14" class="mr-1 shrink-0 text-muted-foreground/50" />

@@ -62,6 +62,7 @@ const displayRefs = {
 
 const themeStore = {
   theme: 'dark',
+  resolvedTheme: 'dark',
   accent: 'blue',
   radius: 'rounded',
   background: 'vinyl',
@@ -113,6 +114,10 @@ vi.mock('@/stores/theme', () => ({
   RADIUS_OPTIONS: [{ id: 'rounded', label: 'Rounded', className: 'rounded-lg' }],
   BACKGROUND_OPTIONS: [{ id: 'vinyl', label: 'Vinyl', cssClass: 'bg-muted' }],
   useThemeStore: () => themeStore,
+}))
+
+vi.mock('@/stores/locale', () => ({
+  useLocaleStore: () => ({ locale: ref('en'), setLocale: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined) }),
 }))
 
 vi.mock('@/composables/useDisplaySettings', () => ({
@@ -192,6 +197,16 @@ describe('AppearanceSettings', () => {
       'Layout',
       'Behavior',
     ])
+  })
+
+  it('offers system as a color scheme preference', async () => {
+    const wrapper = mountComponent()
+    const systemButton = wrapper.findAll('button').find((button) => button.text().includes('System'))
+
+    expect(systemButton).toBeDefined()
+    await systemButton!.trigger('click')
+
+    expect(themeStore.setTheme).toHaveBeenCalledWith('system')
   })
 
   it('switches tabs through the appearance query param', async () => {

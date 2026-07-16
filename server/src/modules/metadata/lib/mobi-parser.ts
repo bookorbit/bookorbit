@@ -1,5 +1,7 @@
 import { readFile } from 'fs/promises';
 
+import { htmlToPlainText } from '../../../common/utils/html-to-text.utils';
+
 // ── PalmDB / MOBI binary offsets ──────────────────────────────────────────────
 //
 // PalmDB header (file start):
@@ -108,10 +110,6 @@ function exthUint32(records: ExthRecord[], type: number): number | null {
   return rec.data.readUInt32BE(0);
 }
 
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, '').trim();
-}
-
 export function parseMobiBuffer(buf: Buffer): MobiParsed {
   const recordOffsets = readRecords(buf);
   if (recordOffsets.length === 0) throw new Error('No records in PalmDB');
@@ -146,7 +144,7 @@ export function parseMobiBuffer(buf: Buffer): MobiParsed {
   const authors = exthStrings(exthRecords, EXTH.AUTHOR);
   const publisher = exthString(exthRecords, EXTH.PUBLISHER);
   const rawDescription = exthString(exthRecords, EXTH.DESCRIPTION);
-  const description = rawDescription ? stripHtml(rawDescription) : null;
+  const description = rawDescription ? htmlToPlainText(rawDescription) : null;
   const isbn = exthString(exthRecords, EXTH.ISBN);
   const tags = exthStrings(exthRecords, EXTH.SUBJECT);
   const publishedDate = exthString(exthRecords, EXTH.PUBLISHED_DATE);

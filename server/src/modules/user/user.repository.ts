@@ -185,6 +185,11 @@ export class UserRepository {
     };
   }
 
+  async findSettingsById(id: number): Promise<Record<string, unknown> | null> {
+    const [user] = await this.db.select({ settings: schema.users.settings }).from(schema.users).where(eq(schema.users.id, id)).limit(1);
+    return user ? ((user.settings ?? {}) as Record<string, unknown>) : null;
+  }
+
   async create(data: typeof schema.users.$inferInsert) {
     const [user] = await this.db.insert(schema.users).values(data).returning();
     return user;

@@ -1,5 +1,5 @@
 import { Permission, AuditAction, AuditResource } from '@bookorbit/types';
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
+import { Body, Controller, DefaultValuePipe, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -10,6 +10,7 @@ import { RenameDeviceDto } from './dto/rename-device.dto';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { KoboDeviceService } from './services/kobo-device.service';
 import { KoboSettingsService } from './services/kobo-settings.service';
+import { KoboSyncHistoryService } from './services/kobo-sync-history.service';
 
 @Controller('kobo')
 @RequirePermission(Permission.KoboSync)
@@ -17,6 +18,7 @@ export class KoboUserController {
   constructor(
     private readonly deviceService: KoboDeviceService,
     private readonly settingsService: KoboSettingsService,
+    private readonly historyService: KoboSyncHistoryService,
   ) {}
 
   @Get('devices')
@@ -66,5 +68,10 @@ export class KoboUserController {
   @Patch('settings')
   updateSettings(@Body() dto: UpdateSettingsDto, @CurrentUser() user: RequestUser) {
     return this.settingsService.updateSettings(user.id, dto);
+  }
+
+  @Get('history')
+  listHistory(@CurrentUser() user: RequestUser, @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number) {
+    return this.historyService.listForUser(user.id, limit);
   }
 }

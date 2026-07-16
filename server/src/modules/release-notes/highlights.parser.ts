@@ -1,5 +1,6 @@
 import type { ReleaseHighlight, ReleaseMedia } from '@bookorbit/types';
 
+import { htmlToPlainText } from '../../common/utils/html-to-text.utils';
 import { MAX_HIGHLIGHTS_PER_RELEASE, MAX_MEDIA_PER_HIGHLIGHT } from './release-notes.constants';
 
 const HEADING_RE = /^#{1,6}\s+/;
@@ -18,14 +19,29 @@ const MEDIA_LINK_RE = /!?\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
 const IMAGE_MD_RE = /!\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
 // GitHub's web editor inserts dropped images as `<img ... src="...">` (and video sources similarly).
 const HTML_MEDIA_SRC_RE = /<(?:img|video|source)\b[^>]*?\bsrc=["']([^"']+)["']/gi;
-const HTML_TAG_RE = /<[^>]+>/g;
 const BARE_URL_RE = /https?:\/\/[^\s)"'<>\]]+/g;
 const VIDEO_EXT_RE = /\.(mp4|webm|mov|m4v|ogv|ogg)(?:[?#].*)?$/i;
 const LEADING_SEP_RE = /^\s*[-:–—]\s*/;
 
 /** Strip HTML comments but preserve standalone `<!-- icon: X -->` markers so the parser can read the icon. */
 function stripHtmlComments(text: string): string {
-  return text.replace(/<!--[\s\S]*?-->/g, (m) => (ICON_COMMENT_ONLY_RE.test(m.trim()) ? m : ''));
+  let result = '';
+  let cursor = 0;
+
+  while (cursor < text.length) {
+    const start = text.indexOf('<!--', cursor);
+    if (start < 0) return result + text.slice(cursor);
+    result += text.slice(cursor, start);
+
+    const end = text.indexOf('-->', start + 4);
+    if (end < 0) return result;
+
+    const comment = text.slice(start, end + 3);
+    if (ICON_COMMENT_ONLY_RE.test(comment.trim())) result += comment;
+    cursor = end + 3;
+  }
+
+  return result;
 }
 
 function isHighlightsHeading(line: string): boolean {
@@ -130,7 +146,7 @@ export function parseHighlightEntries(body: string | null | undefined): ParsedHi
     const iconComment = combined.match(ICON_COMMENT_RE);
     if (iconComment) icon = iconComment[1];
 
-    let text = entry.text.replace(HTML_TAG_RE, '').replace(MEDIA_LINK_RE, '').replace(BARE_URL_RE, '').trim();
+    let text = htmlToPlainText(entry.text).replace(MEDIA_LINK_RE, '').replace(BARE_URL_RE, '').trim();
 
     const tokenMatch = text.match(ICON_TOKEN_RE);
     if (tokenMatch) {

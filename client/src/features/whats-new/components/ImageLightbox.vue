@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ChevronLeft, ChevronRight, X } from '@lucide/vue'
 import { useModal } from '@/composables/useModal'
 import { registerLightbox } from '../lib/lightbox-state'
@@ -8,6 +9,8 @@ const props = withDefaults(defineProps<{ images: string[]; startIndex?: number; 
   startIndex: 0,
 })
 const emit = defineEmits<{ close: [] }>()
+
+const { t } = useI18n()
 
 const current = ref(props.startIndex)
 const panel = ref<HTMLElement | null>(null)
@@ -50,13 +53,13 @@ onUnmounted(() => {
       class="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-4 motion-safe:animate-in motion-safe:fade-in"
       role="dialog"
       aria-modal="true"
-      aria-label="Image viewer"
+      :aria-label="t('whatsNew.imageViewer')"
       @click.self="handleClose"
     >
       <button
         type="button"
         class="absolute right-4 top-4 text-white/80 transition-colors hover:text-white"
-        aria-label="Close image"
+        :aria-label="t('whatsNew.closeImage')"
         @click="handleClose"
       >
         <X :size="24" />
@@ -66,7 +69,7 @@ onUnmounted(() => {
         v-if="images.length > 1"
         type="button"
         class="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
-        aria-label="Previous image"
+        :aria-label="t('whatsNew.previousImage')"
         @click="prev"
       >
         <ChevronLeft :size="28" />
@@ -78,7 +81,7 @@ onUnmounted(() => {
         v-if="images.length > 1"
         type="button"
         class="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
-        aria-label="Next image"
+        :aria-label="t('whatsNew.nextImage')"
         @click="next"
       >
         <ChevronRight :size="28" />

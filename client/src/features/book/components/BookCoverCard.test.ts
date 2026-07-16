@@ -73,8 +73,10 @@ vi.mock('@/composables/useDisplaySettings', () => ({
   }),
 }))
 
-const mockDownloadFile = vi.fn<() => void>()
-const mockExportBooks = vi.fn<() => void>()
+type ExportScope = 'primary' | 'all' | 'audio'
+
+const mockDownloadFile = vi.fn<(fileId: number) => void>()
+const mockExportBooks = vi.fn<(bookIds: number[], allFormats: boolean, scopeOverride?: ExportScope) => void>()
 vi.mock('@/features/book/composables/useBookDownload', () => ({
   useBookDownload: () => ({ downloadFile: mockDownloadFile, exportBooks: mockExportBooks }),
 }))
@@ -141,6 +143,7 @@ function makeBook(overrides: Partial<BookCard> = {}): BookCard {
     seriesName: null,
     seriesIndex: null,
     files: [makeFile()],
+    publishedDate: null,
     publishedYear: 1965,
     language: 'en',
     genres: ['Science Fiction'],
@@ -579,6 +582,49 @@ describe('BookCoverCard', () => {
     it('does not render dropdown in selection mode', () => {
       const wrapper = mountCard({ selectionMode: true })
       expect(wrapper.find('[data-testid="dropdown-menu"]').exists()).toBe(false)
+    })
+
+    it('downloads a pure multi-track audiobook as an audio ZIP', async () => {
+      const book = makeBook({
+        id: 42,
+        files: [makeFile({ id: 10, format: 'mp3', role: 'primary' }), makeFile({ id: 11, format: 'mp3', role: 'secondary' })],
+      })
+      const wrapper = mountCard({ book })
+      const downloadItem = wrapper.findAll('[data-testid="dropdown-item"]').find((item) => item.text().trim() === 'Download')
+
+      expect(downloadItem).toBeDefined()
+      await downloadItem!.trigger('click')
+
+      expect(mockExportBooks).toHaveBeenCalledWith([42], false, 'audio')
+      expect(mockDownloadFile).not.toHaveBeenCalled()
+    })
+
+    it('downloads the audio entry in a mixed multi-track audiobook as a ZIP while keeping ebook files single-file', async () => {
+      const book = makeBook({
+        id: 77,
+        files: [
+          makeFile({ id: 20, format: 'mp3', role: 'primary' }),
+          makeFile({ id: 21, format: 'mp3', role: 'secondary' }),
+          makeFile({ id: 22, format: 'epub', role: 'secondary' }),
+        ],
+      })
+      const wrapper = mountCard({ book })
+      const audioZipItem = wrapper.findAll('[data-testid="dropdown-item"]').find((item) => item.text().trim() === 'Audiobook (ZIP)')
+
+      expect(audioZipItem).toBeDefined()
+      await audioZipItem!.trigger('click')
+      expect(mockExportBooks).toHaveBeenCalledWith([77], false, 'audio')
+      expect(mockDownloadFile).not.toHaveBeenCalled()
+
+      mockExportBooks.mockClear()
+      mockDownloadFile.mockClear()
+
+      const epubItems = wrapper.findAll('[data-testid="dropdown-item"]').filter((item) => item.text().trim() === 'EPUB')
+      expect(epubItems).toHaveLength(2)
+      await epubItems[1]!.trigger('click')
+
+      expect(mockDownloadFile).toHaveBeenCalledWith(22)
+      expect(mockExportBooks).not.toHaveBeenCalled()
     })
   })
 

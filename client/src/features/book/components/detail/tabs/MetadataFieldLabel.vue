@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Loader2, Lock, LockOpen } from '@lucide/vue'
 import type { BookMetadataLockField } from '@bookorbit/types'
 
@@ -13,6 +14,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ toggle: [field: BookMetadataLockField] }>()
 
+const { t } = useI18n()
 const loading = computed(() => props.isUpdating?.(props.field) ?? false)
 
 function handleToggle() {
@@ -29,8 +31,8 @@ function handleToggle() {
         type="button"
         class="absolute right-2 z-10 inline-flex size-6 cursor-pointer items-center justify-center rounded-md border border-input bg-background/95 text-muted-foreground shadow-sm transition-[colors,opacity] hover:text-foreground hover:bg-muted disabled:cursor-not-allowed"
         :class="[multiline ? 'top-1' : 'top-1/2 -translate-y-1/2', loading ? 'opacity-60' : 'opacity-100']"
-        :aria-label="locked ? `Unlock ${label}` : `Lock ${label}`"
-        :title="locked ? `Unlock ${label}` : `Lock ${label}`"
+        :aria-label="locked ? t('book.detail.editMetadata.unlockField', { field: label }) : t('book.detail.editMetadata.lockField', { field: label })"
+        :title="locked ? t('book.detail.editMetadata.unlockField', { field: label }) : t('book.detail.editMetadata.lockField', { field: label })"
         :disabled="loading"
         @click="handleToggle"
       >

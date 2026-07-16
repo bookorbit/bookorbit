@@ -39,8 +39,11 @@ function makeService(bookDockPath = '/data/book-dock') {
   const gateway = {
     emitSummary: vi.fn(),
   };
-  const service = new BookDockWatcherService(config as never, ingestService as never, repo as never, gateway as never);
-  return { service, ingestService, repo, gateway };
+  const processingState = {
+    isPaused: vi.fn().mockResolvedValue(false),
+  };
+  const service = new BookDockWatcherService(config as never, ingestService as never, repo as never, gateway as never, processingState as never);
+  return { service, ingestService, repo, gateway, processingState };
 }
 
 function makeReadyWatcher(overrides: { close?: ReturnType<typeof vi.fn> } = {}) {
@@ -113,7 +116,19 @@ describe('BookDockWatcherService', () => {
 
     expect(waitForStability).toHaveBeenCalledWith('/data/book-dock/book.epub');
     expect(ingestService.ingestFromWatchedFolder).toHaveBeenCalledWith('/data/book-dock/book.epub');
-    expect(gateway.emitSummary).toHaveBeenCalledWith({ pending: 1, ready: 2, error: 0, total: 3 });
+    expect(gateway.emitSummary).toHaveBeenCalledWith({ pending: 1, ready: 2, error: 0, total: 3, paused: false });
+  });
+
+  it('rescan skips discovery while paused and emits current summary', async () => {
+    const { service, processingState, ingestService, gateway } = makeService();
+    const walkSpy = vi.spyOn(service as any, 'walkAndIngest').mockResolvedValue(undefined);
+    processingState.isPaused.mockResolvedValue(true);
+
+    await service.rescan();
+
+    expect(walkSpy).not.toHaveBeenCalled();
+    expect(ingestService.ingestFromWatchedFolder).not.toHaveBeenCalled();
+    expect(gateway.emitSummary).toHaveBeenCalledWith({ pending: 1, ready: 2, error: 0, total: 3, paused: true });
   });
 
   it('process(delete) removes db row and cover files before emitting summary', async () => {
@@ -125,7 +140,18 @@ describe('BookDockWatcherService', () => {
     expect(unlink).toHaveBeenCalledWith('/data/book-dock/covers/12.jpg');
     expect(unlink).toHaveBeenCalledWith('/data/book-dock/covers/12_thumb.jpg');
     expect(repo.deleteById).toHaveBeenCalledWith(12);
-    expect(gateway.emitSummary).toHaveBeenCalledWith({ pending: 1, ready: 2, error: 0, total: 3 });
+    expect(gateway.emitSummary).toHaveBeenCalledWith({ pending: 1, ready: 2, error: 0, total: 3, paused: false });
+  });
+
+  it('process(create) skips stability and ingest while paused', async () => {
+    const { service, ingestService, processingState } = makeService();
+    processingState.isPaused.mockResolvedValue(true);
+    vi.mocked(isPrimaryFormat).mockReturnValue(true);
+
+    await (service as any).process('create', '/data/book-dock/book.epub');
+
+    expect(waitForStability).not.toHaveBeenCalled();
+    expect(ingestService.ingestFromWatchedFolder).not.toHaveBeenCalled();
   });
 
   it('walkAndIngest skips covers folder and ingests supported files recursively', async () => {

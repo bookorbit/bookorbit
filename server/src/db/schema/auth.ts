@@ -19,6 +19,7 @@ import { genres, tags } from './metadata';
 import { libraries } from './libraries';
 
 export const userAvatarSourceEnum = pgEnum('user_avatar_source', ['none', 'external', 'uploaded']);
+export const readingInsightsSharingLevelEnum = pgEnum('reading_insights_sharing_level', ['private', 'summary', 'detailed']);
 
 export const users = pgTable(
   'users',
@@ -41,6 +42,10 @@ export const users = pgTable(
     avatarSource: userAvatarSourceEnum('avatar_source').notNull().default('none'),
     avatarVersion: integer('avatar_version').notNull().default(0),
     provisioningMethod: varchar('provisioning_method', { length: 20 }).notNull().default('local'),
+    lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+    lastAuthenticatedAt: timestamp('last_authenticated_at', { withTimezone: true }),
+    readingInsightsSharingLevel: readingInsightsSharingLevelEnum('reading_insights_sharing_level').notNull().default('private'),
+    readingInsightsConsentedAt: timestamp('reading_insights_consented_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
@@ -59,6 +64,11 @@ export const users = pgTable(
     check('users_token_version_nonnegative_chk', sql`${t.tokenVersion} >= 0`),
     check('users_failed_login_attempts_nonnegative_chk', sql`${t.failedLoginAttempts} >= 0`),
     check('users_avatar_version_nonnegative_chk', sql`${t.avatarVersion} >= 0`),
+    check(
+      'users_reading_insights_consent_chk',
+      sql`(${t.readingInsightsSharingLevel} = 'private' and ${t.readingInsightsConsentedAt} is null) or (${t.readingInsightsSharingLevel} <> 'private' and ${t.readingInsightsConsentedAt} is not null)`,
+    ),
+    index('users_last_authenticated_at_idx').on(t.lastAuthenticatedAt),
   ],
 );
 

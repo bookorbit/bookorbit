@@ -15,6 +15,7 @@ import { OpenLibraryProvider } from './providers/open-library/open-library.provi
 import { ITunesProvider } from './providers/itunes/itunes.provider';
 import { AudibleProvider } from './providers/audible/audible.provider';
 import { AudnexusProvider } from './providers/audnexus/audnexus.provider';
+import { LibroFmProvider } from './providers/librofm/librofm.provider';
 import { HardcoverProvider } from './providers/hardcover/hardcover.provider';
 import { ComicVineProvider } from './providers/comicvine/comicvine.provider';
 import { KoboProvider } from './providers/kobo/kobo.provider';
@@ -35,6 +36,7 @@ describe('MetadataFetchModule', () => {
         ITunesProvider,
         AudibleProvider,
         AudnexusProvider,
+        LibroFmProvider,
         HardcoverProvider,
         ComicVineProvider,
         RanobeDbProvider,
@@ -62,6 +64,7 @@ describe('MetadataFetchModule', () => {
       ITunesProvider,
       AudibleProvider,
       AudnexusProvider,
+      LibroFmProvider,
       HardcoverProvider,
       ComicVineProvider,
       RanobeDbProvider,

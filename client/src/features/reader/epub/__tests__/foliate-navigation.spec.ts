@@ -45,6 +45,14 @@ describe('Foliate navigation', () => {
   let getKoreaderDocFragmentIndex: (sections: { id: string }[], index: number) => number | null
   let getKoboSpanValue: (range: Range | null) => string | null
   let getPageProgressionRtl: (bookDir: string | null | undefined, contentRtl: boolean) => boolean
+  let usesNegativePageScroll: (vertical: boolean, pageProgressionRtl: boolean) => boolean
+  let getPageScrollOffset: (page: number, size: number, vertical: boolean, pageProgressionRtl: boolean) => number
+  let normalizeStylesheetForReader: (data: string, width?: number, height?: number) => string
+  let FixedLayout: new () => HTMLElement & {
+    open: (book: { rendition: { layout: string; spread: string }; sections: { load: () => Promise<string> }[] }) => void
+    goTo: (target: { index: number }) => Promise<void>
+    getContents: () => { index?: number; doc?: Document }[]
+  }
   let Paginator: new () => {
     sections: { load: () => Promise<string | null> }[]
     goTo: (target: { index: number }) => Promise<void>
@@ -54,6 +62,7 @@ describe('Foliate navigation', () => {
     installBrowserGlobals()
 
     const viewModulePath = '../../../../../public/assets/foliate/view.js'
+    const fixedLayoutModulePath = '../../../../../public/assets/foliate/fixed-layout.js'
     const paginatorModulePath = '../../../../../public/assets/foliate/paginator.js'
     ;({ View, getKoreaderProgress, getKoreaderDocFragmentIndex, getKoboSpanValue } = (await import(viewModulePath)) as {
       View: typeof View
@@ -61,9 +70,15 @@ describe('Foliate navigation', () => {
       getKoreaderDocFragmentIndex: typeof getKoreaderDocFragmentIndex
       getKoboSpanValue: typeof getKoboSpanValue
     })
-    ;({ Paginator, getPageProgressionRtl } = (await import(paginatorModulePath)) as {
+    ;({ FixedLayout } = (await import(fixedLayoutModulePath)) as { FixedLayout: typeof FixedLayout })
+    ;({ Paginator, getPageProgressionRtl, usesNegativePageScroll, getPageScrollOffset, normalizeStylesheetForReader } = (await import(
+      paginatorModulePath
+    )) as {
       Paginator: typeof Paginator
       getPageProgressionRtl: typeof getPageProgressionRtl
+      usesNegativePageScroll: typeof usesNegativePageScroll
+      getPageScrollOffset: typeof getPageScrollOffset
+      normalizeStylesheetForReader: typeof normalizeStylesheetForReader
     })
   })
 
@@ -117,11 +132,119 @@ describe('Foliate navigation', () => {
     await expect(paginator.goTo({ index: 0 })).rejects.toThrow('Failed to load section 0')
   })
 
+  it('reports fixed-layout frame indexes for navigation success checks', async () => {
+    const originalCreateElement = document.createElement.bind(document)
+    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+      const element = originalCreateElement(tagName)
+      if (tagName === 'iframe') {
+        const frameDoc = document.implementation.createHTMLDocument('fixed-layout-frame')
+        frameDoc.head.innerHTML = '<meta name="viewport" content="width=100,height=200">'
+        Object.defineProperty(element, 'contentDocument', { configurable: true, value: frameDoc })
+        Object.defineProperty(element, 'src', {
+          configurable: true,
+          get() {
+            return this.getAttribute('src') ?? ''
+          },
+          set(value) {
+            this.setAttribute('src', value)
+            queueMicrotask(() => this.dispatchEvent(new window.Event('load')))
+          },
+        })
+      }
+      return element
+    })
+
+    const fixedLayout = new FixedLayout()
+    document.body.append(fixedLayout)
+
+    try {
+      fixedLayout.open({
+        rendition: { layout: 'pre-paginated', spread: 'none' },
+        sections: [
+          { load: vi.fn<() => Promise<string>>().mockResolvedValue('section-0.xhtml') },
+          { load: vi.fn<() => Promise<string>>().mockResolvedValue('section-1.xhtml') },
+        ],
+      })
+
+      await fixedLayout.goTo({ index: 0 })
+
+      const contents = fixedLayout.getContents()
+      expect(contents).toHaveLength(1)
+      expect(contents[0]).toMatchObject({ index: 0 })
+      expect(contents[0]?.doc?.documentElement).toBeTruthy()
+    } finally {
+      fixedLayout.remove()
+      createElementSpy.mockRestore()
+    }
+  })
+
   it('uses explicit OPF page progression before content direction', () => {
     expect(getPageProgressionRtl('rtl', false)).toBe(true)
     expect(getPageProgressionRtl('ltr', true)).toBe(false)
     expect(getPageProgressionRtl('default', true)).toBe(true)
     expect(getPageProgressionRtl(undefined, false)).toBe(false)
+  })
+
+  it('normalizes legacy vertical writing CSS used by Japanese EPUBs', () => {
+    const css = `
+      .vrtl {
+        -webkit-writing-mode: vertical-rl;
+        -epub-text-orientation: upright;
+        -webkit-line-break: strict;
+      }
+      .page {
+        width: 50vw;
+        height: 25vh;
+        page-break-after: always;
+      }
+    `
+
+    const normalized = normalizeStylesheetForReader(css, 1200, 800)
+
+    expect(normalized).toContain('writing-mode: vertical-rl;')
+    expect(normalized).toContain('text-orientation: upright;')
+    expect(normalized).toContain('line-break: strict;')
+    expect(normalized).toContain('width: 600px;')
+    expect(normalized).toContain('height: 200px;')
+    expect(normalized).toContain('-webkit-column-break-after: always;')
+    expect(normalized).not.toContain('-webkit-writing-mode')
+    expect(normalized).not.toContain('-epub-text-orientation')
+    expect(normalized).not.toContain('-webkit-line-break')
+  })
+
+  it('uses positive page scroll offsets for vertical RTL paginated EPUBs', () => {
+    expect(usesNegativePageScroll(false, true)).toBe(true)
+    expect(usesNegativePageScroll(true, true)).toBe(false)
+    expect(getPageScrollOffset(1, 800, false, true)).toBe(-800)
+    expect(getPageScrollOffset(1, 800, true, true)).toBe(800)
+    expect(getPageScrollOffset(1, 800, true, false)).toBe(800)
+  })
+
+  it('does not intercept paginated touch movement while native text selection is active', () => {
+    const paginator = new Paginator() as InstanceType<typeof Paginator> & EventTarget
+    const doc = new EventTarget() as EventTarget & Document
+    Object.defineProperty(doc, 'getSelection', {
+      value: () => ({ rangeCount: 1, isCollapsed: false }),
+    })
+
+    paginator.dispatchEvent(new CustomEvent('load', { detail: { doc } }))
+
+    const touch = { clientX: 30, clientY: 40, screenX: 30, screenY: 40 }
+    const start = new Event('touchstart', { bubbles: true, cancelable: true }) as TouchEvent
+    Object.defineProperties(start, {
+      touches: { value: [touch] },
+      changedTouches: { value: [touch] },
+    })
+    doc.dispatchEvent(start)
+
+    const move = new Event('touchmove', { bubbles: true, cancelable: true }) as TouchEvent
+    Object.defineProperties(move, {
+      touches: { value: [touch] },
+      changedTouches: { value: [touch] },
+    })
+    doc.dispatchEvent(move)
+
+    expect(move.defaultPrevented).toBe(false)
   })
 
   it('maps physical left and right navigation using OPF RTL page progression', async () => {

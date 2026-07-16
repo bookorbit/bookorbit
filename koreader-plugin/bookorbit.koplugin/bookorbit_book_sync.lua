@@ -12,6 +12,7 @@ under mutual exclusion, so sweep and snapshot never double-upload.
 
 local InfoMessage = require("ui/widget/infomessage")
 local Notification = require("ui/widget/notification")
+local Trapper = require("ui/trapper")
 local UIManager = require("ui/uimanager")
 local logger = require("logger")
 local T = require("ffi/util").template
@@ -19,6 +20,7 @@ local _ = require("gettext")
 
 local BookOrbitAnnotations = require("bookorbit_annotations")
 local BookOrbitApi = require("bookorbit_api")
+local BookOrbitHighlightSummary = require("bookorbit_highlight_summary")
 local BookOrbitSidecar = require("bookorbit_sidecar")
 local BookOrbitState = require("bookorbit_state")
 local BookOrbitStatsReader = require("bookorbit_stats_reader")
@@ -31,6 +33,15 @@ local ANN_BATCH_TOTAL = 50
 local BookOrbitBookSync = {
     running = false,
 }
+
+local function titleFromFile(file)
+    if not file or file == "" then return nil end
+    local name = file:gsub(".*/", "")
+    if name == "" then return nil end
+    local title = name:gsub("%.[^%.]+$", "")
+    if title == "" then return name end
+    return title
+end
 
 function BookOrbitBookSync.isRunning()
     return BookOrbitBookSync.running
@@ -55,19 +66,29 @@ function BookOrbitBookSync.capture(plugin)
     end
 
     local file = ui.document.file
+    local ts = os.time()
+    local metadata = BookOrbitStatsReader.getBook(digest) or {}
+    local stats_ambiguous = metadata.metadata_ambiguous == true
     return {
         digest = digest,
         file = file,
+        title = stats_ambiguous and titleFromFile(file) or (metadata.title or titleFromFile(file)),
+        authors = stats_ambiguous and nil or metadata.authors,
+        last_open = metadata.last_open or ts,
+        metadata_ambiguous = false,
+        stats_metadata_ambiguous = stats_ambiguous,
         percentage = plugin:getLastPercent(),
         progress = plugin:getLastProgress(),
         status = summary.status,
         status_modified = summary.status_modified,
         rating = summary.rating,
+        review_note = summary.review_note,
+        review_modified = summary.status_modified,
         annotations = annotations,
         ann_count = #annotations,
         ann_max_datetime = ann_max,
         mtime_at_capture = file and BookOrbitSidecar.sidecarMtime(file) or nil,
-        ts = os.time(),
+        ts = ts,
     }
 end
 
@@ -80,6 +101,15 @@ end
 -- timeouts, which the synchronous suspend path cannot afford.
 local function isTransportError(err)
     return type(err) ~= "number"
+end
+
+local function applyLibraryVersion(ctx, version)
+    if not version then return end
+    local known = ctx.state.global.libraryVersion
+    if known and version ~= known then
+        ctx.state.global.needsFullRecheck = true
+    end
+    ctx.state.global.libraryVersion = version
 end
 
 local function isUnmatched(body, md5)
@@ -105,6 +135,28 @@ local function finish(ctx, err)
 
     ctx.state:flush()
 
+    if ctx.plugin and ctx.plugin.recordSyncError then
+        if err == "auth" or err == "network" then
+            ctx.plugin:recordSyncError("book_sync", err)
+        elseif not err and ctx.had_errors then
+            ctx.plugin:recordSyncError("book_sync", "partial_failure")
+        elseif not err and ctx.plugin.recordSyncSuccess then
+            ctx.plugin:recordSyncSuccess(
+                "book_sync",
+                T(_("%1 reading events, %2 highlights uploaded"),
+                    ctx.counts.page_stats, ctx.counts.annotations))
+        end
+    end
+
+    if ctx.plugin and ctx.plugin.recordHighlightSync and ctx.highlight_summary
+            and BookOrbitHighlightSummary.hasCounts(ctx.highlight_summary) then
+        local highlight_err = ctx.highlight_unsupported and "unsupported_server" or nil
+        if ctx.had_errors and not highlight_err then
+            highlight_err = "partial_failure"
+        end
+        ctx.plugin:recordHighlightSync(ctx.highlight_summary, highlight_err)
+    end
+
     if err == "auth" then
         if ctx.interactive then
             UIManager:show(InfoMessage:new{ text = _("BookOrbit sync: login failed. Check your credentials."), timeout = 4 })
@@ -123,16 +175,31 @@ local function finish(ctx, err)
         logger.dbg("BookOrbit: book sync skipped, book unmatched:", ctx.snap.digest)
     else
         if ctx.interactive then
-            local text = T(_("BookOrbit: book synced. %1 reading events, %2 highlights up, %3 applied."),
-                ctx.counts.page_stats, ctx.counts.annotations, ctx.counts.ann_applied or 0)
+            local text = T(_("BookOrbit: book synced. %1 reading events."), ctx.counts.page_stats)
+            if ctx.highlight_summary and BookOrbitHighlightSummary.hasCounts(ctx.highlight_summary) then
+                text = text .. "\n" .. BookOrbitHighlightSummary.message(ctx.highlight_summary)
+            else
+                text = text .. "\n" .. T(_("Highlights synced: %1 uploaded, %2 applied, %3 deleted."),
+                    ctx.counts.annotations, ctx.counts.ann_applied or 0, ctx.counts.ann_deleted or 0)
+            end
+            if ctx.highlight_unsupported then
+                text = text .. "\n" .. _("BookOrbit server needs an update for two-way highlights.")
+            end
+            if ctx.highlight_disabled_reported then
+                text = text .. "\n" .. _("Two-way highlight sync is disabled.")
+            end
+            if ctx.skip_progress then
+                text = text .. "\n" .. _("Progress was not changed.")
+            end
             if ctx.had_errors then
                 text = text .. "\n" .. _("Some uploads failed and will retry on the next sync.")
             end
             UIManager:show(InfoMessage:new{ text = text, timeout = 4 })
         end
         logger.info(string.format(
-            "BookOrbit: book sync done reason=%s pageStats=%d annotations=%d applied=%d errors=%s",
-            ctx.reason, ctx.counts.page_stats, ctx.counts.annotations, ctx.counts.ann_applied or 0, tostring(ctx.had_errors)))
+            "BookOrbit: book sync done reason=%s pageStats=%d annotations=%d applied=%d deleted=%d errors=%s",
+            ctx.reason, ctx.counts.page_stats, ctx.counts.annotations,
+            ctx.counts.ann_applied or 0, ctx.counts.ann_deleted or 0, tostring(ctx.had_errors)))
     end
 
     if ctx.on_finish then
@@ -148,12 +215,14 @@ local function step(ctx, fn)
         return fn(ctx)
     end
     UIManager:scheduleIn(STEP_DELAY, function()
-        local ok, err = pcall(fn, ctx)
-        if not ok then
-            logger.err("BookOrbit: book sync step failed:", err)
-            ctx.had_errors = true
-            finish(ctx)
-        end
+        Trapper:wrap(function()
+            local ok, err = pcall(fn, ctx)
+            if not ok then
+                logger.err("BookOrbit: book sync step failed:", err)
+                ctx.had_errors = true
+                finish(ctx)
+            end
+        end)
     end)
 end
 
@@ -161,14 +230,19 @@ local stepMatch, stepStats, stepAnnotations, stepAnnotationsLegacy, stepState, s
 
 stepMatch = function(ctx)
     local book = ctx.state:getBook(ctx.snap.digest)
-    if book then
-        if ctx.snap.file and not book.file then
-            book.file = ctx.snap.file
-        end
-        return step(ctx, stepStats)
+    if book and ctx.snap.file and not book.file then
+        book.file = ctx.snap.file
     end
 
-    local body, err = ctx.client:matchCheck({ ctx.snap.digest })
+    local body, err = ctx.client:matchCheck({ ctx.snap.digest }, {
+        [ctx.snap.digest] = {
+            title = ctx.snap.title,
+            authors = ctx.snap.authors,
+            last_open = ctx.snap.last_open,
+            source = "current_file",
+            metadata_ambiguous = ctx.snap.metadata_ambiguous,
+        },
+    })
     if not body then
         if isAuthError(err) then return finish(ctx, "auth") end
         return finish(ctx, "network")
@@ -177,9 +251,12 @@ stepMatch = function(ctx)
     for _, match in ipairs(body.matches or {}) do
         if match.hash == ctx.snap.digest then
             ctx.state:setMatched(match.hash, match.bookFileId, match.bookId, ctx.snap.file)
+            applyLibraryVersion(ctx, body.libraryVersion)
             return step(ctx, stepStats)
         end
     end
+
+    applyLibraryVersion(ctx, body.libraryVersion)
 
     ctx.state:setUnmatched(ctx.snap.digest)
     return finish(ctx, "unmatched")
@@ -188,6 +265,10 @@ end
 stepStats = function(ctx)
     local book = ctx.state:getBook(ctx.snap.digest)
     if not book then return finish(ctx, "unmatched") end
+
+    if ctx.snap.stats_metadata_ambiguous then
+        return step(ctx, stepAnnotations)
+    end
 
     if ctx.stat_ids == nil then
         ctx.stat_ids = BookOrbitStatsReader.getBookIds(ctx.snap.digest)
@@ -237,6 +318,9 @@ stepAnnotations = function(ctx)
         elseif ctx.reason == "manual" and ctx.plugin and ctx.plugin.ui and ctx.plugin.ui.document then
             apply_mode = "live"
         end
+    elseif ctx.interactive then
+        ctx.highlight_disabled_reported = true
+        ctx.highlight_summary = BookOrbitHighlightSummary.add(ctx.highlight_summary, nil, { skipped = 1 })
     end
 
     local result, err = BookOrbitAnnotations.exchangeBook({
@@ -257,15 +341,22 @@ stepAnnotations = function(ctx)
         end
         if err == "unmatched" then return finish(ctx, "unmatched") end
         if err == "unsupported_server" then
+            ctx.highlight_unsupported = true
+            ctx.highlight_summary = BookOrbitHighlightSummary.add(ctx.highlight_summary, nil, { skipped = 1 })
             return step(ctx, stepAnnotationsLegacy)
         end
         ctx.had_errors = true
+        ctx.highlight_summary = BookOrbitHighlightSummary.add(ctx.highlight_summary, { had_errors = true })
         return step(ctx, stepState)
     end
 
     if result.had_errors then ctx.had_errors = true end
     ctx.counts.annotations = ctx.counts.annotations + result.uploaded
     ctx.counts.ann_applied = (ctx.counts.ann_applied or 0) + result.applied
+    ctx.counts.ann_deleted = (ctx.counts.ann_deleted or 0) + result.deleted
+    ctx.highlight_summary = BookOrbitHighlightSummary.add(ctx.highlight_summary, result, {
+        closed_book = apply_mode == "sidecar",
+    })
     if not result.had_errors then
         book.annCount = ctx.snap.ann_count
     end
@@ -308,6 +399,7 @@ stepAnnotationsLegacy = function(ctx)
         ctx.had_errors = true
         ctx.ann_failed = true
         ctx.ann_delta = {}
+        ctx.highlight_summary = BookOrbitHighlightSummary.add(ctx.highlight_summary, { had_errors = true })
         if isTransportError(err) then return finish(ctx, "network") end
         logger.dbg("BookOrbit: book sync annotations upload failed:", err)
         return step(ctx, stepState)
@@ -318,6 +410,7 @@ stepAnnotationsLegacy = function(ctx)
     end
 
     ctx.counts.annotations = ctx.counts.annotations + #chunk
+    ctx.highlight_summary = BookOrbitHighlightSummary.add(ctx.highlight_summary, { uploaded = #chunk })
     return step(ctx, stepAnnotationsLegacy)
 end
 
@@ -325,24 +418,17 @@ stepState = function(ctx)
     local book = ctx.state:getBook(ctx.snap.digest)
     if not book then return finish(ctx, "unmatched") end
 
-    if ctx.snap.status == nil and ctx.snap.rating == nil then
-        return step(ctx, stepProgress)
-    end
-    local status_changed = ctx.snap.status ~= nil
-        and (ctx.snap.status_modified or "") ~= (book.statusSyncedModified or "")
-    local rating_changed = (ctx.snap.rating or 0) ~= (book.ratingSynced or 0)
-    if not status_changed and not rating_changed then
+    local payload = BookOrbitSidecar.buildStatePayload(ctx.snap.digest, book, {
+        status = ctx.snap.status,
+        status_modified = ctx.snap.status_modified,
+        rating = ctx.snap.rating,
+        review_note = ctx.snap.review_note,
+    }, true)
+    if not payload then
         return step(ctx, stepProgress)
     end
 
-    local body, err = ctx.client:uploadBookStates({
-        {
-            hash = ctx.snap.digest,
-            status = ctx.snap.status,
-            statusModified = ctx.snap.status_modified,
-            rating = ctx.snap.rating,
-        },
-    })
+    local body, err = ctx.client:uploadBookStates({ payload })
     if not body then
         if isAuthError(err) then return finish(ctx, "auth") end
         ctx.had_errors = true
@@ -356,14 +442,32 @@ stepState = function(ctx)
     end
 
     -- A server-kept tie still counts as synced: the device value was considered.
-    book.statusSyncedModified = ctx.snap.status_modified or book.statusSyncedModified
-    book.ratingSynced = ctx.snap.rating or book.ratingSynced
+    book.statusSyncedModified = payload.statusModified or book.statusSyncedModified
+    local result = body.results and body.results[1] or nil
+    local server_state = BookOrbitSidecar.stateFromServerResult(result)
+    if server_state then
+        if ctx.reason == "close" and ctx.snap.file then
+            BookOrbitSidecar.applyServerStateSidecar(ctx.snap.file, server_state)
+        else
+            BookOrbitSidecar.applyServerStateLive(ctx.plugin and ctx.plugin.ui or nil, server_state)
+        end
+        BookOrbitSidecar.rememberServerState(book, server_state)
+    else
+        BookOrbitSidecar.rememberUploadedState(book, {
+            rating = ctx.snap.rating,
+            review_note = ctx.snap.review_note,
+        }, payload)
+    end
     return step(ctx, stepProgress)
 end
 
 stepProgress = function(ctx)
     local book = ctx.state:getBook(ctx.snap.digest)
     if not book then return finish(ctx, "unmatched") end
+
+    if ctx.skip_progress then
+        return finish(ctx)
+    end
 
     local pct = ctx.snap.percentage
     if type(pct) ~= "number" then
@@ -397,18 +501,18 @@ function BookOrbitBookSync.run(opts)
         if opts.interactive then
             UIManager:show(InfoMessage:new{ text = _("BookOrbit sync is already running."), timeout = 2 })
         end
-        return
+        return false
     end
 
     local snap = opts.snap
-    if not snap then return end
+    if not snap then return false end
 
     local client = BookOrbitApi.new(opts.api)
     if not client:isConfigured() then
         if opts.interactive then
             UIManager:show(InfoMessage:new{ text = _("Please configure the BookOrbit server and login first."), timeout = 3 })
         end
-        return
+        return false
     end
 
     BookOrbitBookSync.running = true
@@ -423,8 +527,13 @@ function BookOrbitBookSync.run(opts)
         annotation_sync = opts.annotation_sync ~= false,
         plugin = opts.plugin,
         on_finish = opts.on_finish,
-        counts = { page_stats = 0, annotations = 0, ann_applied = 0 },
+        counts = { page_stats = 0, annotations = 0, ann_applied = 0, ann_deleted = 0 },
+        highlight_summary = BookOrbitHighlightSummary.normalize{
+            event = "book_sync",
+            reason = opts.reason or "manual",
+        },
         had_errors = false,
+        skip_progress = opts.skip_progress == true,
     }
 
     ctx.state:rememberFile(snap.file, snap.digest)
@@ -440,6 +549,7 @@ function BookOrbitBookSync.run(opts)
     else
         step(ctx, stepMatch)
     end
+    return true
 end
 
 return BookOrbitBookSync

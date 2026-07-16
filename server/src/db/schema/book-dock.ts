@@ -33,6 +33,7 @@ export const bookDockFiles = pgTable(
   },
   (t) => [
     index('book_dock_files_status_idx').on(t.status),
+    index('book_dock_files_target_library_id_idx').on(t.targetLibraryId),
     index('book_dock_files_uploaded_by_idx').on(t.uploadedBy),
     check('book_dock_files_status_chk', sql`${t.status} in ('pending', 'extracting', 'fetching', 'ready', 'error')`),
     check('book_dock_files_confidence_range_chk', sql`${t.confidence} is null or (${t.confidence} >= 0 and ${t.confidence} <= 100)`),

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+
+const { t } = useI18n()
 
 const props = defineProps<{ value: number | null }>()
 
@@ -24,7 +27,7 @@ const barColor = computed(() => {
         <span class="w-14 shrink-0 text-right text-sm font-medium tabular-nums text-muted-foreground">{{ displayPct }}</span>
       </div>
     </TooltipTrigger>
-    <TooltipContent>{{ displayPct }} complete</TooltipContent>
+    <TooltipContent>{{ t('book.table.progress.complete', { percent: displayPct }) }}</TooltipContent>
   </Tooltip>
   <span v-else class="text-xs text-muted-foreground/40">-</span>
 </template>

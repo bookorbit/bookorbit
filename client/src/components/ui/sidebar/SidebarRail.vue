@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
 import { onBeforeUnmount, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { cn } from '@/lib/utils'
 import { useSidebar } from './utils'
 
@@ -9,6 +10,7 @@ const props = defineProps<{
 }>()
 
 const { toggleSidebar, setWidth, widthPx, state } = useSidebar()
+const { t } = useI18n()
 
 const DRAG_THRESHOLD_PX = 3
 
@@ -88,7 +90,7 @@ onBeforeUnmount(() => {
   <button
     data-sidebar="rail"
     data-slot="sidebar-rail"
-    aria-label="Toggle Sidebar"
+    :aria-label="t('components.ui.sidebar.toggle')"
     :tabindex="-1"
     :class="
       cn(

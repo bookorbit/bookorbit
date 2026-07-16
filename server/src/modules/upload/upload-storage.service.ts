@@ -8,12 +8,16 @@ import { pipeline } from 'stream/promises';
 import { randomUUID } from 'crypto';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 
+import { AppSettingsService } from '../app-settings/app-settings.service';
+
 // Hard ceiling applied at the multipart level. The service enforces a lower configurable limit.
 export const MAX_UPLOAD_BYTES = 500 * 1024 * 1024; // 500 MB
 
 @Injectable()
 export class UploadStorageService {
   private readonly logger = new Logger(UploadStorageService.name);
+
+  constructor(private readonly appSettings: AppSettingsService) {}
 
   /**
    * Streams the multipart file to a temp path on disk.
@@ -31,7 +35,8 @@ export class UploadStorageService {
 
     if ((source as Readable & { truncated?: boolean }).truncated) {
       await this.cleanup(tempPath);
-      throw new PayloadTooLargeException(`File exceeds the ${MAX_UPLOAD_BYTES / 1024 / 1024} MB upload limit`);
+      const limitMb = await this.appSettings.getMaxUploadSizeMb();
+      throw new PayloadTooLargeException(`File exceeds the ${limitMb} MB upload limit`);
     }
 
     const { size } = await stat(tempPath);

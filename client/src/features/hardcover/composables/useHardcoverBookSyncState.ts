@@ -1,11 +1,12 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import type { HardcoverBookSyncEffectiveReason, HardcoverBookSyncState } from '@bookorbit/types'
+import { formatDate } from '@/i18n/formatters'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { fetchHardcoverBookSyncState, startHardcoverBookSync, updateHardcoverBookSyncState } from '../api/hardcover.api'
 import { useHardcoverSettings } from './useHardcoverSettings'
 
 function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+  return formatDate(new Date(iso), { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
 function resolveReasonLabel(reason: HardcoverBookSyncEffectiveReason | null | undefined): string | null {

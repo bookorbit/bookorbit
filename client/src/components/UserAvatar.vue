@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = withDefaults(
   defineProps<{
@@ -47,7 +50,7 @@ watch(
     <img
       v-if="src && !imageFailed"
       :src="src"
-      :alt="props.name ? `${props.name} profile picture` : 'Profile picture'"
+      :alt="props.name ? t('components.userAvatar.profilePictureOf', { name: props.name }) : t('components.userAvatar.profilePicture')"
       class="h-full w-full object-cover"
       @error="imageFailed = true"
     />

@@ -148,6 +148,54 @@ describe('MetadataFetchPipeline', () => {
     expect(fetchService.search).toHaveBeenCalledWith({ title: 'Query' }, [MetadataProviderKey.KOBO]);
   });
 
+  it('enables audiobook search when Field Rules select an audiobook provider', async () => {
+    const global = createPreferences((fields) => {
+      fields.title = {
+        enabled: true,
+        providers: [MetadataProviderKey.LIBROFM],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+    });
+
+    providerConfig.getConfig.mockResolvedValue(
+      makeProviderConfig({
+        librofm: { enabled: true },
+      }),
+    );
+    preferencesService.getGlobal.mockResolvedValue(global);
+    resolver.resolve.mockReturnValue(global);
+    resolver.withForwardCompatibility.mockReturnValue(global);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.LIBROFM }] as never);
+    fetchService.search.mockReturnValue(
+      of(
+        candidate(MetadataProviderKey.LIBROFM, '9798217174331', {
+          title: 'Yesteryear: A GMA Book Club Pick',
+          authors: ['Caro Claire Burke'],
+        }),
+      ),
+    );
+
+    await pipeline.run(
+      {
+        title: 'Yesteryear',
+        author: 'Caro Claire Burke',
+        isbn: '9780593804223',
+        isAudiobook: false,
+      },
+      {},
+    );
+
+    expect(fetchService.search).toHaveBeenCalledWith(
+      {
+        title: 'Yesteryear',
+        author: 'Caro Claire Burke',
+        isbn: '9780593804223',
+        isAudiobook: true,
+      },
+      [MetadataProviderKey.LIBROFM],
+    );
+  });
+
   it('returns diagnostics when field rules only reference disabled providers', async () => {
     const global = createPreferences();
 
@@ -370,6 +418,138 @@ describe('MetadataFetchPipeline', () => {
     expect(sources.coverUrl).toBe(MetadataProviderKey.OPEN_LIBRARY);
   });
 
+  it('does not replace an existing cover when the field rule is fillMissing', async () => {
+    const prefs = createPreferences((fields) => {
+      fields.cover = {
+        enabled: true,
+        providers: [MetadataProviderKey.OPEN_LIBRARY],
+        mergeStrategy: 'fillMissing',
+      };
+    });
+
+    preferencesService.getGlobal.mockResolvedValue(prefs);
+    resolver.resolve.mockReturnValue(prefs);
+    resolver.withForwardCompatibility.mockReturnValue(prefs);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.OPEN_LIBRARY }] as never);
+    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { coverUrl: 'https://img.example/cover.jpg' })));
+
+    const { resolved, sources } = await pipeline.runWithSources({ title: 'Query' }, { cover: 'extracted' });
+
+    expect(resolved.coverUrl).toBeUndefined();
+    expect(sources.coverUrl).toBeUndefined();
+  });
+
+  it('preserves imported metadata while filling missing values during event-import enrichment', async () => {
+    const prefs = createPreferences((fields) => {
+      fields.title = {
+        enabled: true,
+        providers: [MetadataProviderKey.GOOGLE],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+      fields.authors = {
+        enabled: true,
+        providers: [MetadataProviderKey.GOOGLE],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+      fields.description = {
+        enabled: true,
+        providers: [MetadataProviderKey.GOOGLE],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+      fields.genres = {
+        enabled: true,
+        providers: [MetadataProviderKey.GOOGLE],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+      fields.cover = {
+        enabled: true,
+        providers: [MetadataProviderKey.GOOGLE],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+    });
+
+    preferencesService.getGlobal.mockResolvedValue(prefs);
+    resolver.resolve.mockReturnValue(prefs);
+    resolver.withForwardCompatibility.mockReturnValue(prefs);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }] as never);
+    fetchService.search.mockReturnValue(
+      of(
+        candidate(MetadataProviderKey.GOOGLE, 'g1', {
+          title: 'Provider Title',
+          authors: ['Provider Author'],
+          description: 'Provider Description',
+          genres: ['Provider Genre'],
+          coverUrl: 'https://img.example/provider-cover.jpg',
+        }),
+      ),
+    );
+
+    const { resolved } = await pipeline.runWithSources(
+      { title: 'File Title' },
+      {
+        title: 'File Title',
+        authors: ['File Author'],
+        description: null,
+        genres: ['File Genre'],
+        cover: 'extracted',
+      },
+      undefined,
+      { preserveExisting: true },
+    );
+
+    expect(resolved).toMatchObject({ description: 'Provider Description' });
+    expect(resolved.title).toBeUndefined();
+    expect(resolved.authors).toBeUndefined();
+    expect(resolved.genres).toBeUndefined();
+    expect(resolved.coverUrl).toBeUndefined();
+  });
+
+  it('preserves populated ComicInfo fields while filling missing comic metadata during event-import enrichment', async () => {
+    const prefs = createPreferences((fields) => {
+      fields.title = {
+        enabled: true,
+        providers: [MetadataProviderKey.COMICVINE],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+      fields.seriesName = {
+        enabled: true,
+        providers: [MetadataProviderKey.COMICVINE],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+    });
+
+    preferencesService.getGlobal.mockResolvedValue(prefs);
+    resolver.resolve.mockReturnValue(prefs);
+    resolver.withForwardCompatibility.mockReturnValue(prefs);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.COMICVINE }] as never);
+    fetchService.search.mockReturnValue(
+      of(
+        candidate(MetadataProviderKey.COMICVINE, 'cv1', {
+          comicMetadata: {
+            issueNumber: '99',
+            volumeName: 'Provider Volume',
+            pencillers: ['Provider Penciller'],
+          },
+        }),
+      ),
+    );
+
+    const { resolved } = await pipeline.runWithSources(
+      { title: 'Akira' },
+      {
+        comicMetadata: {
+          issueNumber: '28',
+          volumeName: null,
+          pencillers: ['Katsuhiro Otomo'],
+        },
+      },
+      undefined,
+      { preserveExisting: true },
+    );
+
+    expect(resolved.comicMetadata).toEqual({ volumeName: 'Provider Volume' });
+  });
+
   it('passes through comic metadata from the preferred provider', async () => {
     const prefs = createPreferences((fields) => {
       fields.title = {
@@ -524,6 +704,37 @@ describe('MetadataFetchPipeline', () => {
     expect(providerIds).toEqual({ [MetadataProviderKey.GOOGLE]: 'g1' });
   });
 
+  it('stores an AudNexus ASIN as the Audible provider id', async () => {
+    const prefs = createPreferences((fields) => {
+      fields.title = {
+        enabled: true,
+        providers: [MetadataProviderKey.AUDNEXUS],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+    });
+    prefs.options = {
+      genres: { mode: 'firstProvider', blocklist: [] },
+      saveProviderIds: true,
+    };
+
+    preferencesService.getGlobal.mockResolvedValue(prefs);
+    resolver.resolve.mockReturnValue(prefs);
+    resolver.withForwardCompatibility.mockReturnValue(prefs);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.AUDNEXUS }] as never);
+    fetchService.search.mockReturnValue(
+      of(
+        candidate(MetadataProviderKey.AUDNEXUS, 'B0TEST12345', {
+          audibleId: 'B0TEST12345',
+          title: 'Fetched Audiobook',
+        }),
+      ),
+    );
+
+    const { providerIds } = await pipeline.runWithSources({ title: 'Query', isAudiobook: true }, {});
+
+    expect(providerIds).toEqual({ [MetadataProviderKey.AUDIBLE]: 'B0TEST12345' });
+  });
+
   it('passes through Hardcover edition id with provider ids when saveProviderIds is enabled', async () => {
     const prefs = createPreferences((fields) => {
       fields.title = {
@@ -651,8 +862,9 @@ describe('MetadataFetchPipeline', () => {
           seriesName: 'Sword of Truth',
           seriesIndex: 11,
           seriesMemberships: [
-            { seriesName: 'Sword of Truth', seriesIndex: 11 },
-            { seriesName: 'Chainfire Trilogy', seriesIndex: 3 },
+            { seriesName: '  Sword   of Truth ', seriesIndex: 11 },
+            { seriesName: 'sword of truth', seriesIndex: 12 },
+            { seriesName: 'Chainfire\tTrilogy', seriesIndex: 3 },
           ],
         }),
       ),

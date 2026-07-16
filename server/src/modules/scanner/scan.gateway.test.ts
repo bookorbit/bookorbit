@@ -1,14 +1,16 @@
 import type { BookMissingEvent, BookTransferredEvent, CoverRefreshedEvent, ScanProgressEvent } from '@bookorbit/types';
 
+import { ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, AchievementEventsService } from '../achievement/achievement-events.service';
 import { ScanGateway } from './scan.gateway';
 
 function makeGateway() {
   const jwtService = { verify: vi.fn() };
   const authService = { validateUser: vi.fn() };
   const scanJobStore = { get: vi.fn(), isRunning: vi.fn() };
+  const achievementEvents = new AchievementEventsService();
   const configService = { get: vi.fn().mockReturnValue('http://localhost:5173') };
-  const gateway = new ScanGateway(jwtService as any, authService as any, scanJobStore as any, configService as any);
-  return { gateway, jwtService, authService, scanJobStore };
+  const gateway = new ScanGateway(jwtService as any, authService as any, scanJobStore as any, achievementEvents, configService as any);
+  return { gateway, jwtService, authService, scanJobStore, achievementEvents };
 }
 
 function mockServer() {
@@ -94,11 +96,13 @@ describe('handleConnection', () => {
     jwtService.verify.mockReturnValue({ sub: 42, ver: 3 });
     authService.validateUser.mockResolvedValue({ id: 42, username: 'reader' });
     const disconnect = vi.fn();
+    const join = vi.fn().mockResolvedValue(undefined);
     const client = {
       id: 'sock-1',
       handshake: { auth: { token: 'valid' } },
       data: {},
       disconnect,
+      join,
     } as any;
 
     await gateway.handleConnection(client);
@@ -106,6 +110,7 @@ describe('handleConnection', () => {
     expect(jwtService.verify).toHaveBeenCalledWith('valid', { algorithms: ['HS256'] });
     expect(authService.validateUser).toHaveBeenCalledWith(42, 3);
     expect(client.data.user).toEqual({ id: 42, username: 'reader' });
+    expect(join).toHaveBeenCalledWith('user:42');
     expect(disconnect).not.toHaveBeenCalled();
   });
 
@@ -125,6 +130,41 @@ describe('handleConnection', () => {
     await gateway.handleConnection(client);
 
     expect(disconnect).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('book progress events', () => {
+  it('forwards progress changes only to the affected user room and removes its listener on destroy', () => {
+    const { gateway, achievementEvents } = makeGateway();
+    const { server, to, emit } = mockServer();
+    gateway['server'] = server as any;
+    gateway.onModuleInit();
+
+    achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, {
+      userId: 42,
+      bookId: 142,
+      bookFileId: 165,
+      progress: 61.02,
+      source: 'koreader',
+    });
+
+    expect(to).toHaveBeenCalledWith('user:42');
+    expect(emit).toHaveBeenCalledWith('book:progress-changed', {
+      bookId: 142,
+      progress: 61.02,
+      source: 'koreader',
+    });
+
+    gateway.onModuleDestroy();
+    to.mockClear();
+    achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, {
+      userId: 42,
+      bookId: 142,
+      progress: 70,
+      source: 'koreader',
+    });
+
+    expect(to).not.toHaveBeenCalled();
   });
 });
 

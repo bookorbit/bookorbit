@@ -5,16 +5,12 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db/db.module';
 import * as schema from '../../../db/schema';
-import { KoboSyncService } from './kobo-sync.service';
 
 type Db = NodePgDatabase<typeof schema>;
 
 @Injectable()
 export class KoboDeviceService {
-  constructor(
-    @Inject(DB) private readonly db: Db,
-    private readonly syncService: KoboSyncService,
-  ) {}
+  constructor(@Inject(DB) private readonly db: Db) {}
 
   async listDevices(userId: number) {
     const rows = await this.db
@@ -31,18 +27,8 @@ export class KoboDeviceService {
   }
 
   async createDevice(userId: number, name: string) {
-    const [existingDevice] = await this.db
-      .select({ id: schema.koboDevices.id })
-      .from(schema.koboDevices)
-      .where(eq(schema.koboDevices.userId, userId))
-      .limit(1);
-
     const token = randomUUID().replace(/-/g, '');
     const [device] = await this.db.insert(schema.koboDevices).values({ userId, name, token }).returning();
-
-    if (existingDevice) {
-      await this.syncService.invalidateSnapshot(userId);
-    }
 
     return {
       id: device.id,
@@ -85,6 +71,5 @@ export class KoboDeviceService {
     if (!device) throw new NotFoundException('Device not found');
 
     await this.db.delete(schema.koboDevices).where(and(eq(schema.koboDevices.id, deviceId), eq(schema.koboDevices.userId, userId)));
-    await this.syncService.invalidateSnapshot(userId);
   }
 }

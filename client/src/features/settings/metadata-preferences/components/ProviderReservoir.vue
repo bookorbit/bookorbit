@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { VueDraggable } from 'vue-draggable-plus'
 import { GripVertical } from '@lucide/vue'
 import type { MetadataProviderKey, ProviderStatus } from '@bookorbit/types'
 import { providerChipStyle, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
 import { PROVIDER_DND_GROUP, createProviderDragItem, type ProviderDragItem } from '../lib/provider-drag'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   statuses: ProviderStatus[]
@@ -30,9 +33,9 @@ function cloneProvider(item: ReservoirProviderItem): ProviderDragItem {
 
 function providerTitle(provider: ReservoirProviderItem) {
   const status = props.statuses.find((item) => item.key === provider.key)
-  if (!status?.enabled) return `${provider.label} - disabled`
-  if (!status?.configured) return `${provider.label} - not configured`
-  return `Drag to assign ${provider.label} to a field`
+  if (!status?.enabled) return t('settings.metadata.fieldRules.reservoir.disabled', { provider: provider.label })
+  if (!status?.configured) return t('settings.metadata.fieldRules.reservoir.notConfigured', { provider: provider.label })
+  return t('settings.metadata.fieldRules.reservoir.dragToAssign', { provider: provider.label })
 }
 </script>
 

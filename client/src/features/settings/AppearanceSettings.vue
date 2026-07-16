@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { ACCENT_PASTEL, ACCENT_VIVID, BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import AppearanceBehaviorSettings from './AppearanceBehaviorSettings.vue'
@@ -8,17 +9,19 @@ import AppearanceIconsSettings from './AppearanceIconsSettings.vue'
 import AppearanceLayoutSettings from './AppearanceLayoutSettings.vue'
 import AppearanceThemeSettings from './AppearanceThemeSettings.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
-import { APPEARANCE_TAB_LABELS, APPEARANCE_TABS, normalizeAppearanceTab, type AppearanceTab as Tab } from './lib/appearance-tabs'
+import { APPEARANCE_TABS, normalizeAppearanceTab, type AppearanceTab as Tab } from './lib/appearance-tabs'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const themeStore = useThemeStore()
 
 const activeTab = ref<Tab>(normalizeAppearanceTab(route.query.tab))
-const tabs: { id: Tab; label: string }[] = APPEARANCE_TABS.map((id) => ({ id, label: APPEARANCE_TAB_LABELS[id] }))
+const tabs = computed(() => APPEARANCE_TABS.map((id) => ({ id, label: t(`settings.appearance.tabs.${id}`) })))
 
 const accentLabel = computed(() => [...ACCENT_VIVID, ...ACCENT_PASTEL].find((opt) => opt.id === themeStore.accent)?.label ?? themeStore.accent)
 const backgroundLabel = computed(() => BACKGROUND_OPTIONS.find((opt) => opt.id === themeStore.background)?.label ?? themeStore.background)
+const themeLabel = computed(() => t(`settings.appearance.themeMode.${themeStore.theme}`))
 
 function syncTabFromRoute(value: unknown) {
   const normalized = normalizeAppearanceTab(value)
@@ -44,12 +47,18 @@ function selectTab(tab: Tab) {
 </script>
 
 <template>
-  <SettingsPageHeader title="Display" subtitle="Control themes, covers, layout, and how your library is presented." />
+  <SettingsPageHeader :title="t('settings.appearance.pageTitle')" :subtitle="t('settings.appearance.pageSubtitle')" />
   <div
     class="md:hidden sticky top-0 z-20 -mx-4 mb-4 px-4 py-2 border-y border-border/70 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75"
   >
     <p class="text-[11px] font-medium text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
-      Theme: {{ themeStore.theme === 'dark' ? 'Dark' : 'Light' }} • Accent: {{ accentLabel }} • Background: {{ backgroundLabel }}
+      {{
+        t('settings.appearance.mobileSummary', {
+          theme: themeLabel,
+          accent: accentLabel,
+          background: backgroundLabel,
+        })
+      }}
     </p>
   </div>
 

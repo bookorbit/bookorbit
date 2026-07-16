@@ -60,6 +60,7 @@ describe('audio metadata round-trip', () => {
         seriesName: 'Roundtrip Series',
         seriesIndex: 4,
         audibleId: 'B0ROUNDTRIP',
+        librofmId: '9781234567890',
       },
       { dryRun: false, fieldMask: createBookWriteFieldMask() },
     );
@@ -78,6 +79,7 @@ describe('audio metadata round-trip', () => {
     expect(tags.series).toBe('Roundtrip Series');
     expect(tags['series-part']).toBe('4');
     expect(tags.asin ?? tags.audible_asin).toBe('B0ROUNDTRIP');
+    expect(tags.librofm_isbn).toBe('9781234567890');
 
     vi.resetModules();
     const { extractAudioMetadata } = await import('../../../metadata/extractors/audio.extractor');
@@ -96,6 +98,7 @@ describe('audio metadata round-trip', () => {
         seriesIndex: 4,
         genres: ['Fantasy', 'Adventure'],
         audibleId: 'B0ROUNDTRIP',
+        librofmId: '9781234567890',
       }),
     );
     expect(extracted.authors).toEqual([{ name: 'Author One', sortName: null }]);
@@ -124,6 +127,7 @@ describe('audio metadata round-trip', () => {
         seriesName: 'Extended Series',
         seriesIndex: 7,
         audibleId: 'B0EXTENDED',
+        librofmId: '9780987654321',
       },
       { dryRun: false, fieldMask: createBookWriteFieldMask() },
     );
@@ -141,6 +145,7 @@ describe('audio metadata round-trip', () => {
     expect(tags.series).toBe('Extended Series');
     expect(tags['series-part']).toBe('7');
     expect(tags.asin ?? tags.audible_asin).toBe('B0EXTENDED');
+    expect(tags.librofm_isbn).toBe('9780987654321');
 
     vi.resetModules();
     const { extractAudioMetadata } = await import('../../../metadata/extractors/audio.extractor');
@@ -157,6 +162,7 @@ describe('audio metadata round-trip', () => {
         seriesName: 'Extended Series',
         seriesIndex: 7,
         audibleId: 'B0EXTENDED',
+        librofmId: '9780987654321',
       }),
     );
     expect(extracted.authors).toEqual([{ name: 'Author One', sortName: null }]);
@@ -165,7 +171,7 @@ describe('audio metadata round-trip', () => {
   it.each([
     ['m4b', M4bAudioFormatWriter],
     ['m4a', M4aAudioFormatWriter],
-  ] as const)('writes cover art that remains extractable from %s files', async (format, Writer) => {
+  ] as const)('round-trips series metadata while replacing and preserving cover art for %s files', async (format, Writer) => {
     const filePath = join(tempDir, `fixture.${format}`);
     const coverPath = join(tempDir, 'cover.jpg');
     await generateAudioFixture(filePath, 'aac');
@@ -176,6 +182,8 @@ describe('audio metadata round-trip', () => {
       filePath,
       {
         title: 'Covered Title',
+        seriesName: 'Covered Series',
+        seriesIndex: 2.5,
         coverBytes: await readFile(coverPath),
       },
       { dryRun: false, fieldMask: createBookWriteFieldMask() },
@@ -185,18 +193,38 @@ describe('audio metadata round-trip', () => {
     const coverStream = streams.find((stream) => stream.codec_type === 'video');
     expect(coverStream).toEqual(expect.objectContaining({ codec_name: 'mjpeg' }));
     expect(coverStream?.disposition?.attached_pic).toBe(1);
+    const coveredTags = await probeFormatTags(filePath);
+    expect(coveredTags.show).toBe('Covered Series');
+    expect(coveredTags.episode_id).toBe('2.5');
 
     vi.resetModules();
     const { extractAudioMetadata } = await import('../../../metadata/extractors/audio.extractor');
     const extracted = await extractAudioMetadata(filePath);
     expect(extracted.coverBytes?.length).toBeGreaterThan(0);
+    expect(extracted.seriesName).toBe('Covered Series');
+    expect(extracted.seriesIndex).toBe(2.5);
 
-    await writer.write(filePath, { title: 'Retitled Covered Book' }, { dryRun: false, fieldMask: new Set(['title']) });
+    await writer.write(
+      filePath,
+      { title: 'Retitled Covered Book', seriesName: 'Preserved Cover Series', seriesIndex: 3.5 },
+      { dryRun: false, fieldMask: new Set(['title', 'seriesName', 'seriesIndex']) },
+    );
 
     const streamsAfterTextOnlyWrite = await probeStreams(filePath);
     const preservedCoverStream = streamsAfterTextOnlyWrite.find((stream) => stream.codec_type === 'video');
     expect(preservedCoverStream).toEqual(expect.objectContaining({ codec_name: 'mjpeg' }));
     expect(preservedCoverStream?.disposition?.attached_pic).toBe(1);
+    const extractedAfterTextOnlyWrite = await extractAudioMetadata(filePath);
+    expect(extractedAfterTextOnlyWrite.coverBytes?.length).toBeGreaterThan(0);
+    expect(extractedAfterTextOnlyWrite.seriesName).toBe('Preserved Cover Series');
+    expect(extractedAfterTextOnlyWrite.seriesIndex).toBe(3.5);
+
+    await writer.write(filePath, { seriesName: null, seriesIndex: null }, { dryRun: false, fieldMask: new Set(['seriesName', 'seriesIndex']) });
+
+    const extractedAfterClear = await extractAudioMetadata(filePath);
+    expect(extractedAfterClear.coverBytes?.length).toBeGreaterThan(0);
+    expect(extractedAfterClear.seriesName).toBeNull();
+    expect(extractedAfterClear.seriesIndex).toBeNull();
   });
 
   async function generateAudioFixture(filePath: string, codec = 'libmp3lame'): Promise<void> {

@@ -2,7 +2,9 @@ import { ConflictException, Injectable, Logger, NotFoundException } from '@nestj
 import { hash as bcryptHash } from 'bcryptjs';
 import { createHash } from 'crypto';
 
-import type { KoreaderBookSyncInfo, KoreaderDeviceInfo, KoreaderSyncStatus } from '@bookorbit/types';
+import { DEFAULT_KOREADER_DEVICE_PATTERN, type KoreaderBookSyncInfo, type KoreaderDeviceInfo, type KoreaderSyncStatus } from '@bookorbit/types';
+import { StatsCache } from '../../common/cache/stats-cache';
+import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { isSemverNewer } from '../../common/utils/semver.utils';
 import { KoreaderRepository } from './koreader.repository';
 import { KoreaderChapterService } from './koreader-chapter.service';
@@ -16,11 +18,16 @@ import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED } fro
 const BCRYPT_ROUNDS = 12;
 const SYNC_EVENT = 'koreader.sync';
 const CREDENTIALS_EVENT = 'koreader.credentials';
+const DEVICE_REMOVE_EVENT = 'koreader.device_remove';
+const FILE_NAMING_EVENT = 'koreader.file_naming';
 const DEFAULT_DEVICE = 'KOReader';
+const FILE_NAMING_CACHE_TTL_MS = 30_000;
+const FILE_NAMING_CACHE_MAX_ENTRIES = 5_000;
 
 @Injectable()
 export class KoreaderService {
   private readonly logger = new Logger(KoreaderService.name);
+  private readonly fileNamingCache = new StatsCache({ ttlMs: FILE_NAMING_CACHE_TTL_MS, maxEntries: FILE_NAMING_CACHE_MAX_ENTRIES });
 
   constructor(
     private readonly repo: KoreaderRepository,
@@ -116,7 +123,7 @@ export class KoreaderService {
     this.logger.debug(`[${SYNC_EVENT}] [start] userId=${userId} document=${data.document.slice(0, 16)} device=${device} - save progress started`);
 
     const accessibleLibraryIds = await this.repo.getAccessibleLibraryIds(userId);
-    const bookFile = await this.repo.resolveBookFileByHash(data.document, accessibleLibraryIds);
+    const bookFile = await this.repo.resolveBookFileByHash(data.document, accessibleLibraryIds, userId);
 
     if (!bookFile) {
       this.logger.debug(
@@ -148,6 +155,8 @@ export class KoreaderService {
   ) {
     const chapterIndex = this.chapterService.parseChapterIndexFromProgress(data.progress ?? null);
 
+    const previousDeviceProgress = await this.repo.getLatestDeviceProgress(bookFile.id, userId);
+
     this.chapterExtractor.extractAndStoreChapters(bookFile.id).catch(() => {});
 
     await this.repo.upsertDeviceProgress({
@@ -167,7 +176,13 @@ export class KoreaderService {
     const cfi = data.progress ? await this.convertProgressToCfi(bookFile.id, data.progress) : null;
     await this.repo.upsertReadingProgress(bookFile.id, userId, bookorbitPercentage, cfi, data.progress ?? null);
     await this.bookService.syncKoboReadingStateForExternalProgress(userId, bookFile.id, bookorbitPercentage).catch(() => undefined);
-    await this.bookService.autoUpdateReadStatusForProgress(userId, bookFile, bookorbitPercentage);
+    const previousPercentage = previousDeviceProgress?.percentage != null ? toBookorbitPercentage(previousDeviceProgress.percentage) : null;
+    const strongRereadEvidence = previousPercentage !== null && previousPercentage - bookorbitPercentage >= 10;
+    await this.bookService.autoUpdateReadStatusForProgress(userId, bookFile, bookorbitPercentage, {
+      origin: 'koreader',
+      occurredOn: data.timestamp ? new Date(data.timestamp * 1000).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+      strongRereadEvidence,
+    });
     this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, {
       userId,
       bookId: bookFile.bookId,
@@ -188,7 +203,7 @@ export class KoreaderService {
 
   async getProgress(userId: number, documentHash: string) {
     const accessibleLibraryIds = await this.repo.getAccessibleLibraryIds(userId);
-    const bookFile = await this.repo.resolveBookFileByHash(documentHash, accessibleLibraryIds);
+    const bookFile = await this.repo.resolveBookFileByHash(documentHash, accessibleLibraryIds, userId);
 
     if (!bookFile) return null;
 
@@ -237,40 +252,163 @@ export class KoreaderService {
   }
 
   async getSyncStatus(userId: number): Promise<KoreaderSyncStatus> {
-    const [credentials, devices, totalSyncedBooks, sweepRows, pluginTotals, versionInfo] = await Promise.all([
+    const [credentials, deviceRows, deviceSettings, totalSyncedBooks, sweepRows, pluginTotals, versionInfo] = await Promise.all([
       this.getCredentials(userId),
-      this.getDevices(userId),
+      this.repo.getDevicesList(userId),
+      this.repo.getDeviceFileNamingPatterns(userId),
       this.repo.getTotalSyncedBooks(userId),
       this.pluginRepo.listSweeps(userId),
       this.pluginRepo.getPluginTotals(userId),
       this.packageService.getVersionInfo(),
     ]);
+    const devices = this.mapDevices(deviceRows, deviceSettings);
     const lastSyncAt = devices.length > 0 ? devices[0]!.lastSyncAt : null;
     const latestPluginVersion = versionInfo.pluginVersion === 'unknown' ? null : versionInfo.pluginVersion;
-    const sweeps = sweepRows.map((row) => ({
-      deviceId: row.deviceId,
-      deviceModel: row.deviceModel,
-      pluginVersion: row.pluginVersion,
-      latestPluginVersion,
-      updateAvailable: isSemverNewer(latestPluginVersion, row.pluginVersion),
-      lastSweepAt: row.lastSweepAt.toISOString(),
-      lastSweepBooksMatched: row.lastSweepBooksMatched,
-      lastSweepPageStats: row.lastSweepPageStats,
-      lastSweepAnnotations: row.lastSweepAnnotations,
-    }));
+    const settingsByDevice = new Map(deviceSettings.map((setting) => [setting.deviceId, setting]));
+    const sweeps = sweepRows.map((row) => {
+      const setting = settingsByDevice.get(row.deviceId);
+      return {
+        deviceId: row.deviceId,
+        deviceModel: row.deviceModel,
+        pluginVersion: row.pluginVersion,
+        latestPluginVersion,
+        updateAvailable: isSemverNewer(latestPluginVersion, row.pluginVersion),
+        lastSweepAt: row.lastSweepAt.toISOString(),
+        lastSweepBooksMatched: row.lastSweepBooksMatched,
+        lastSweepPageStats: row.lastSweepPageStats,
+        lastSweepAnnotations: row.lastSweepAnnotations,
+        fileNamingPattern: setting?.fileNamingPattern ?? null,
+        seriesFileNamingPattern: setting?.seriesFileNamingPattern ?? null,
+        standaloneFileNamingPattern: setting?.standaloneFileNamingPattern ?? null,
+      };
+    });
     const pluginUpdateAvailable = sweeps.some((sweep) => sweep.updateAvailable === true);
 
     return { credentials, devices, totalSyncedBooks, lastSyncAt, latestPluginVersion, pluginUpdateAvailable, sweeps, pluginTotals };
   }
 
   async getDevices(userId: number): Promise<KoreaderDeviceInfo[]> {
-    const rows = await this.repo.getDevicesList(userId);
-    return rows.map((r) => ({
-      device: r.device,
-      deviceId: r.deviceId,
-      lastSyncAt: r.lastSyncAt.toISOString(),
-      lastBookTitle: r.lastBookTitle,
-    }));
+    const [rows, settings] = await Promise.all([this.repo.getDevicesList(userId), this.repo.getDeviceFileNamingPatterns(userId)]);
+    return this.mapDevices(rows, settings);
+  }
+
+  private mapDevices(
+    rows: Awaited<ReturnType<KoreaderRepository['getDevicesList']>>,
+    settings: Awaited<ReturnType<KoreaderRepository['getDeviceFileNamingPatterns']>>,
+  ): KoreaderDeviceInfo[] {
+    const settingsByDevice = new Map(settings.map((setting) => [setting.deviceId, setting]));
+    return rows.map((r) => {
+      const setting = settingsByDevice.get(r.deviceId);
+      return {
+        device: r.device,
+        deviceId: r.deviceId,
+        lastSyncAt: r.lastSyncAt.toISOString(),
+        lastBookTitle: r.lastBookTitle,
+        fileNamingPattern: setting?.fileNamingPattern ?? null,
+        seriesFileNamingPattern: setting?.seriesFileNamingPattern ?? null,
+        standaloneFileNamingPattern: setting?.standaloneFileNamingPattern ?? null,
+      };
+    });
+  }
+
+  async getKoreaderUserDefaultPattern(userId: number): Promise<string> {
+    return this.fileNamingCache.get(this.fileNamingCacheScope(userId), 'user-default', async () => {
+      return (await this.repo.getKoreaderUserDefaultPattern(userId)) ?? DEFAULT_KOREADER_DEVICE_PATTERN;
+    });
+  }
+
+  async setKoreaderUserDefaultPattern(userId: number, pattern: string): Promise<void> {
+    const startedAt = Date.now();
+    this.logger.log(`[${FILE_NAMING_EVENT}] [start] userId=${userId} scope=user-default - file naming pattern update started`);
+
+    try {
+      await this.repo.setKoreaderUserDefaultPattern(userId, pattern);
+      this.fileNamingCache.clearForScope(this.fileNamingCacheScope(userId));
+      this.logger.log(
+        `[${FILE_NAMING_EVENT}] [end] userId=${userId} scope=user-default durationMs=${Date.now() - startedAt} - file naming pattern updated`,
+      );
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.name : 'UnknownError';
+      this.logger.error(
+        `[${FILE_NAMING_EVENT}] [fail] userId=${userId} scope=user-default durationMs=${Date.now() - startedAt} errorClass=${errorClass} - file naming pattern update failed`,
+      );
+      throw error;
+    }
+  }
+
+  getDeviceFileNamingPattern(userId: number, deviceId: string) {
+    return this.fileNamingCache.get(this.fileNamingCacheScope(userId), `device:${deviceId}`, () => {
+      return this.repo.getDeviceFileNamingPattern(userId, deviceId);
+    });
+  }
+
+  async setDeviceFileNamingPattern(
+    userId: number,
+    deviceId: string,
+    config: { fileNamingPattern: string; seriesFileNamingPattern: string; standaloneFileNamingPattern: string },
+  ): Promise<void> {
+    const startedAt = Date.now();
+    const safeDeviceId = sanitizeLogValue(deviceId);
+    this.logger.log(`[${FILE_NAMING_EVENT}] [start] userId=${userId} deviceId="${safeDeviceId}" scope=device - file naming pattern update started`);
+
+    try {
+      await this.repo.setDeviceFileNamingPattern(userId, deviceId, config);
+      this.fileNamingCache.clearForScope(this.fileNamingCacheScope(userId));
+      this.logger.log(
+        `[${FILE_NAMING_EVENT}] [end] userId=${userId} deviceId="${safeDeviceId}" scope=device durationMs=${Date.now() - startedAt} - file naming pattern updated`,
+      );
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.name : 'UnknownError';
+      this.logger.error(
+        `[${FILE_NAMING_EVENT}] [fail] userId=${userId} deviceId="${safeDeviceId}" scope=device durationMs=${Date.now() - startedAt} errorClass=${errorClass} - file naming pattern update failed`,
+      );
+      throw error;
+    }
+  }
+
+  async clearDeviceFileNamingPattern(userId: number, deviceId: string): Promise<void> {
+    const startedAt = Date.now();
+    const safeDeviceId = sanitizeLogValue(deviceId);
+    this.logger.log(`[${FILE_NAMING_EVENT}] [start] userId=${userId} deviceId="${safeDeviceId}" scope=device - file naming pattern clear started`);
+
+    try {
+      await this.repo.clearDeviceFileNamingPattern(userId, deviceId);
+      this.fileNamingCache.clearForScope(this.fileNamingCacheScope(userId));
+      this.logger.log(
+        `[${FILE_NAMING_EVENT}] [end] userId=${userId} deviceId="${safeDeviceId}" scope=device durationMs=${Date.now() - startedAt} - file naming pattern cleared`,
+      );
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.name : 'UnknownError';
+      this.logger.error(
+        `[${FILE_NAMING_EVENT}] [fail] userId=${userId} deviceId="${safeDeviceId}" scope=device durationMs=${Date.now() - startedAt} errorClass=${errorClass} - file naming pattern clear failed`,
+      );
+      throw error;
+    }
+  }
+
+  async removeDevice(userId: number, deviceId: string): Promise<void> {
+    const startedAt = Date.now();
+    const safeDeviceId = sanitizeLogValue(deviceId);
+    this.logger.log(`[${DEVICE_REMOVE_EVENT}] [start] userId=${userId} deviceId="${safeDeviceId}" - remove device started`);
+
+    const deletedRows = await this.repo.removeDevice(userId, deviceId);
+
+    if (deletedRows === 0) {
+      this.logger.warn(
+        `[${DEVICE_REMOVE_EVENT}] [fail] userId=${userId} deviceId="${safeDeviceId}" durationMs=${Date.now() - startedAt} errorClass=NotFoundException error="device not found" - remove device failed`,
+      );
+      throw new NotFoundException('KOReader device not found');
+    }
+
+    this.fileNamingCache.clearForScope(this.fileNamingCacheScope(userId));
+
+    this.logger.log(
+      `[${DEVICE_REMOVE_EVENT}] [end] userId=${userId} deviceId="${safeDeviceId}" durationMs=${Date.now() - startedAt} deletedRows=${deletedRows} - remove device completed`,
+    );
+  }
+
+  private fileNamingCacheScope(userId: number): string {
+    return `koreader-file-naming:${userId}`;
   }
 
   async getBookProgress(userId: number, bookId: number): Promise<KoreaderBookSyncInfo | null> {

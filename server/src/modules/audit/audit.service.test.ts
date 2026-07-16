@@ -34,6 +34,7 @@ function makeService() {
   const auditRepository = {
     insert: vi.fn().mockResolvedValue(undefined),
     findAll: vi.fn(),
+    findReadingInsightsAccess: vi.fn(),
     deleteOlderThan: vi.fn().mockResolvedValue(undefined),
   };
   const appSettings = {
@@ -147,6 +148,24 @@ describe('AuditService', () => {
 
     expect(auditRepository.findAll).toHaveBeenCalledWith(query);
     expect(result).toEqual({ data: [{ id: 1 }], total: 1 });
+  });
+
+  it('writes critical audit records synchronously', async () => {
+    const { service, auditRepository } = makeService();
+    const payload = makePayload({ action: AuditAction.ReadingInsightsProfileView });
+
+    await service.record(payload);
+
+    expect(auditRepository.insert).toHaveBeenCalledWith(expect.objectContaining({ action: AuditAction.ReadingInsightsProfileView }));
+  });
+
+  it('scopes reading-insights access history to the subject user', async () => {
+    const { service, auditRepository } = makeService();
+    auditRepository.findReadingInsightsAccess.mockResolvedValue({ items: [], total: 0 });
+
+    await service.getReadingInsightsAccess(12, 2, 20);
+
+    expect(auditRepository.findReadingInsightsAccess).toHaveBeenCalledWith(12, 2, 20);
   });
 
   it('returns default retention days when setting is missing or invalid', async () => {

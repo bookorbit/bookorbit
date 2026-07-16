@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { formatNumber } from '@/i18n/formatters'
 import type { SeriesSummary } from '@bookorbit/types'
 import { BookCopy } from '@lucide/vue'
 import { bookCoverStyle } from '@/features/book/lib/book-cover'
@@ -136,7 +137,7 @@ const coverStyles = computed(() => {
             class="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/88 px-2 py-1 text-[11px] font-medium text-foreground shadow-sm backdrop-blur"
           >
             <BookCopy :size="12" class="text-muted-foreground" />
-            {{ series.bookCount.toLocaleString() }}
+            {{ formatNumber(series.bookCount) }}
           </span>
         </div>
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { Waypoints } from '@lucide/vue'
 
@@ -9,13 +10,10 @@ import ChartCard from '../ChartCard.vue'
 import ChartEmptyState from '../ChartEmptyState.vue'
 
 type FunnelMode = 'percent' | 'counts' | 'dropoff'
-const MODE_LABELS: Record<FunnelMode, string> = {
-  percent: 'Percent',
-  counts: 'Counts',
-  dropoff: 'Drop-off',
-}
 
 const MIN_STARTED = 10
+
+const { t } = useI18n()
 
 const { data, loading, error } = useUserProgressFunnel()
 const option = shallowRef({})
@@ -77,7 +75,12 @@ const lowConfidence = computed(() => startedCount.value > 0 && startedCount.valu
 const isFlatFunnel = computed(() => stages.value.every((stage) => stage.count === startedCount.value))
 const showFlatState = computed(() => !isEmpty.value && !lowConfidence.value && isFlatFunnel.value)
 
-const selectedModeLabel = computed(() => MODE_LABELS[mode.value])
+const MODE_LABEL_KEYS: Record<FunnelMode, string> = {
+  percent: 'statistics.charts.progressFunnel.modePercent',
+  counts: 'statistics.charts.progressFunnel.modeCounts',
+  dropoff: 'statistics.charts.progressFunnel.modeDropoff',
+}
+const selectedModeLabel = computed(() => t(MODE_LABEL_KEYS[mode.value]))
 
 watchEffect(() => {
   option.value = {}
@@ -179,7 +182,7 @@ watchEffect(() => {
 </script>
 
 <template>
-  <ChartCard title="Progress Funnel" :icon="Waypoints" :color-index="10" :loading :error :empty="isEmpty">
+  <ChartCard :title="t('statistics.charts.progressFunnel.title')" :icon="Waypoints" :color-index="10" :loading :error :empty="isEmpty">
     <template #controls>
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
@@ -188,9 +191,9 @@ watchEffect(() => {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" class="text-xs">
-          <DropdownMenuItem @click="mode = 'percent'">Percent</DropdownMenuItem>
-          <DropdownMenuItem @click="mode = 'counts'">Counts</DropdownMenuItem>
-          <DropdownMenuItem @click="mode = 'dropoff'">Drop-off</DropdownMenuItem>
+          <DropdownMenuItem @click="mode = 'percent'">{{ t('statistics.charts.progressFunnel.modePercent') }}</DropdownMenuItem>
+          <DropdownMenuItem @click="mode = 'counts'">{{ t('statistics.charts.progressFunnel.modeCounts') }}</DropdownMenuItem>
+          <DropdownMenuItem @click="mode = 'dropoff'">{{ t('statistics.charts.progressFunnel.modeDropoff') }}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </template>
@@ -198,19 +201,19 @@ watchEffect(() => {
     <ChartEmptyState
       v-if="lowConfidence"
       :icon="Waypoints"
-      title="Not enough data yet"
-      :description="`Need at least ${MIN_STARTED} started books for this chart.`"
+      :title="t('statistics.empty.notEnoughData')"
+      :description="t('statistics.charts.progressFunnel.notEnoughData', { count: MIN_STARTED })"
     />
     <ChartEmptyState
       v-else-if="showFlatState"
       :icon="Waypoints"
-      title="No drop-off observed"
-      description="Every started book progressed through all funnel stages in this period."
+      :title="t('statistics.charts.progressFunnel.noDropOffTitle')"
+      :description="t('statistics.charts.progressFunnel.noDropOffDescription')"
     />
     <div v-else class="flex h-full min-h-0 flex-col gap-2.5">
       <div class="flex flex-wrap gap-1.5 text-xs">
         <span class="border-border bg-muted/20 rounded-md border px-2 py-1">
-          Started {{ current.started }}
+          {{ t('statistics.charts.progressFunnel.started', { count: current.started }) }}
           <span v-if="comparisonSummary" class="text-muted-foreground">
             ({{ comparisonSummary.startedDelta >= 0 ? '+' : '' }}{{ comparisonSummary.startedDelta }})
           </span>

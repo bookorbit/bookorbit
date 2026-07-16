@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile, chmod } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-import { findBookCandidates, buildSingleBookCandidate, findLooseFileCandidates, clampIno, BookCandidate } from './walk';
+import { findBookCandidates, buildSingleBookCandidate, findLooseFileCandidates, BookCandidate } from './walk';
 
 let suiteRoot: string;
 let root: string;
@@ -737,11 +737,11 @@ describe('findLooseFileCandidates — FileStat fields', () => {
     expect(candidates[0].files[0].mtime).toBeInstanceOf(Date);
   });
 
-  it('candidate file has a numeric inode', async () => {
+  it('candidate file has a bigint inode', async () => {
     await file('book.epub');
 
     const { candidates } = await findLooseFileCandidates(root);
-    expect(typeof candidates[0].files[0].ino).toBe('number');
+    expect(typeof candidates[0].files[0].ino).toBe('bigint');
   });
 });
 
@@ -949,46 +949,5 @@ describe('incremental scan — findLooseFileCandidates', () => {
     // Author/ dir is unchanged - no candidates
     expect(second.candidates).toHaveLength(0);
     expect(second.unchangedDirs.size).toBeGreaterThan(0);
-  });
-});
-
-// ── clampIno ─────────────────────────────────────────────────────────────────
-
-describe('clampIno', () => {
-  it('passes through zero unchanged', () => {
-    expect(clampIno(0n)).toBe(0);
-  });
-
-  it('passes through typical small filesystem inodes', () => {
-    expect(clampIno(1n)).toBe(1);
-    expect(clampIno(12345n)).toBe(12345);
-    expect(clampIno(1000000n)).toBe(1000000);
-  });
-
-  it('passes through the maximum safe JS integer', () => {
-    expect(clampIno(BigInt(Number.MAX_SAFE_INTEGER))).toBe(Number.MAX_SAFE_INTEGER);
-  });
-
-  it('clamps values one above the maximum safe JS integer to 0', () => {
-    expect(clampIno(BigInt(Number.MAX_SAFE_INTEGER) + 1n)).toBe(0);
-  });
-
-  it('clamps in-range 64-bit inodes that are precision-unsafe in JavaScript', () => {
-    // Exact inode reported in issue #84 on Unraid shfs
-    expect(clampIno(651896050678335552n)).toBe(0);
-  });
-
-  it('clamps the exact MergerFS inode from the bug report to 0', () => {
-    // 17237992710316634000 is the unsigned 64-bit inode reported in the MergerFS issue
-    expect(clampIno(17237992710316634000n)).toBe(0);
-  });
-
-  it('clamps the maximum unsigned 64-bit inode (2^64 - 1) to 0', () => {
-    expect(clampIno(18446744073709551615n)).toBe(0);
-  });
-
-  it('returns a number type', () => {
-    expect(typeof clampIno(1n)).toBe('number');
-    expect(typeof clampIno(17237992710316634000n)).toBe('number');
   });
 });

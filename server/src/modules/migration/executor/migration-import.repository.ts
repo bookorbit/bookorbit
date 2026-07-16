@@ -201,9 +201,13 @@ export class MigrationImportRepository {
     const targetUserIds = uniqueNumbers(userIds);
     const targetBookIds = uniqueNumbers(bookIds);
     if (targetUserIds.length === 0 || targetBookIds.length === 0) return;
-    await this.db
-      .delete(schema.userBookStatus)
-      .where(and(inArray(schema.userBookStatus.userId, targetUserIds), inArray(schema.userBookStatus.bookId, targetBookIds)));
+    for (const userBatch of chunk(targetUserIds, BATCH_CHUNK_SIZE)) {
+      for (const bookBatch of chunk(targetBookIds, BATCH_CHUNK_SIZE)) {
+        await this.db
+          .delete(schema.userBookStatus)
+          .where(and(inArray(schema.userBookStatus.userId, userBatch), inArray(schema.userBookStatus.bookId, bookBatch)));
+      }
+    }
   }
 
   async upsertUserBookStatus(values: typeof schema.userBookStatus.$inferInsert): Promise<void> {
@@ -220,9 +224,13 @@ export class MigrationImportRepository {
     const targetUserIds = uniqueNumbers(userIds);
     const targetBookIds = uniqueNumbers(bookIds);
     if (targetUserIds.length === 0 || targetBookIds.length === 0) return;
-    await this.db
-      .delete(schema.userBookRatings)
-      .where(and(inArray(schema.userBookRatings.userId, targetUserIds), inArray(schema.userBookRatings.bookId, targetBookIds)));
+    for (const userBatch of chunk(targetUserIds, BATCH_CHUNK_SIZE)) {
+      for (const bookBatch of chunk(targetBookIds, BATCH_CHUNK_SIZE)) {
+        await this.db
+          .delete(schema.userBookRatings)
+          .where(and(inArray(schema.userBookRatings.userId, userBatch), inArray(schema.userBookRatings.bookId, bookBatch)));
+      }
+    }
   }
 
   // --- Reading progress ---
@@ -231,9 +239,13 @@ export class MigrationImportRepository {
     const targetUserIds = uniqueNumbers(userIds);
     const targetFileIds = uniqueNumbers(fileIds);
     if (targetUserIds.length === 0 || targetFileIds.length === 0) return;
-    await this.db
-      .delete(schema.readingProgress)
-      .where(and(inArray(schema.readingProgress.userId, targetUserIds), inArray(schema.readingProgress.bookFileId, targetFileIds)));
+    for (const userBatch of chunk(targetUserIds, BATCH_CHUNK_SIZE)) {
+      for (const fileBatch of chunk(targetFileIds, BATCH_CHUNK_SIZE)) {
+        await this.db
+          .delete(schema.readingProgress)
+          .where(and(inArray(schema.readingProgress.userId, userBatch), inArray(schema.readingProgress.bookFileId, fileBatch)));
+      }
+    }
   }
 
   async upsertReadingProgress(values: typeof schema.readingProgress.$inferInsert): Promise<void> {
@@ -252,9 +264,13 @@ export class MigrationImportRepository {
     const targetUserIds = uniqueNumbers(userIds);
     const targetBookIds = uniqueNumbers(bookIds);
     if (targetUserIds.length === 0 || targetBookIds.length === 0) return;
-    await this.db
-      .delete(schema.audiobookProgress)
-      .where(and(inArray(schema.audiobookProgress.userId, targetUserIds), inArray(schema.audiobookProgress.bookId, targetBookIds)));
+    for (const userBatch of chunk(targetUserIds, BATCH_CHUNK_SIZE)) {
+      for (const bookBatch of chunk(targetBookIds, BATCH_CHUNK_SIZE)) {
+        await this.db
+          .delete(schema.audiobookProgress)
+          .where(and(inArray(schema.audiobookProgress.userId, userBatch), inArray(schema.audiobookProgress.bookId, bookBatch)));
+      }
+    }
   }
 
   async upsertAudiobookProgress(values: typeof schema.audiobookProgress.$inferInsert): Promise<void> {
@@ -273,9 +289,11 @@ export class MigrationImportRepository {
     const targetUserIds = uniqueNumbers(userIds);
     const targetBookIds = uniqueNumbers(bookIds);
     if (targetUserIds.length === 0 || targetBookIds.length === 0) return;
-    await this.db
-      .delete(schema.bookmarks)
-      .where(and(inArray(schema.bookmarks.userId, targetUserIds), inArray(schema.bookmarks.bookId, targetBookIds)));
+    for (const userBatch of chunk(targetUserIds, BATCH_CHUNK_SIZE)) {
+      for (const bookBatch of chunk(targetBookIds, BATCH_CHUNK_SIZE)) {
+        await this.db.delete(schema.bookmarks).where(and(inArray(schema.bookmarks.userId, userBatch), inArray(schema.bookmarks.bookId, bookBatch)));
+      }
+    }
   }
 
   async insertBookmark(values: typeof schema.bookmarks.$inferInsert): Promise<void> {
@@ -289,15 +307,15 @@ export class MigrationImportRepository {
     const targetBookIds = uniqueNumbers(bookIds);
     if (targetUserIds.length === 0 || targetBookIds.length === 0) return;
     // Only web-origin rows are replaced by an import; device-synced annotations stay.
-    await this.db
-      .delete(schema.annotations)
-      .where(
-        and(
-          inArray(schema.annotations.userId, targetUserIds),
-          inArray(schema.annotations.bookId, targetBookIds),
-          eq(schema.annotations.origin, 'web'),
-        ),
-      );
+    for (const userBatch of chunk(targetUserIds, BATCH_CHUNK_SIZE)) {
+      for (const bookBatch of chunk(targetBookIds, BATCH_CHUNK_SIZE)) {
+        await this.db
+          .delete(schema.annotations)
+          .where(
+            and(inArray(schema.annotations.userId, userBatch), inArray(schema.annotations.bookId, bookBatch), eq(schema.annotations.origin, 'web')),
+          );
+      }
+    }
   }
 
   async insertAnnotation(values: typeof schema.annotations.$inferInsert & { cfi: string }): Promise<void> {
@@ -312,8 +330,13 @@ export class MigrationImportRepository {
   // --- Collections ---
 
   async fetchExistingCollections(userIds: number[]): Promise<Array<typeof schema.collections.$inferSelect>> {
-    if (userIds.length === 0) return [];
-    return this.db.select().from(schema.collections).where(inArray(schema.collections.userId, userIds));
+    const targetUserIds = uniqueNumbers(userIds);
+    if (targetUserIds.length === 0) return [];
+    const collections: Array<typeof schema.collections.$inferSelect> = [];
+    for (const userBatch of chunk(targetUserIds, BATCH_CHUNK_SIZE)) {
+      collections.push(...(await this.db.select().from(schema.collections).where(inArray(schema.collections.userId, userBatch))));
+    }
+    return collections;
   }
 
   async insertCollection(values: typeof schema.collections.$inferInsert): Promise<{ id: number }> {
@@ -560,21 +583,36 @@ export class MigrationImportRepository {
     const targetBookIds = uniqueNumbers(params.bookIds);
     if (targetUserIds.length === 0 || targetBookIds.length === 0) return;
 
-    const existing = await this.db
-      .select({
-        id: schema.readingSessions.id,
-        userId: schema.readingSessions.userId,
-        bookId: schema.readingSessions.bookId,
-        sessionId: schema.readingSessions.sessionId,
-        startedAt: schema.readingSessions.startedAt,
-        endedAt: schema.readingSessions.endedAt,
-        durationSeconds: schema.readingSessions.durationSeconds,
-        progressDelta: schema.readingSessions.progressDelta,
-        libraryId: schema.books.libraryId,
-      })
-      .from(schema.readingSessions)
-      .innerJoin(schema.books, eq(schema.books.id, schema.readingSessions.bookId))
-      .where(and(inArray(schema.readingSessions.userId, targetUserIds), like(schema.readingSessions.sessionId, `${params.sessionIdPrefix}%`)));
+    const existing: Array<{
+      id: number;
+      userId: number;
+      bookId: number;
+      sessionId: string;
+      startedAt: Date;
+      endedAt: Date;
+      durationSeconds: number;
+      progressDelta: number | null;
+      libraryId: number;
+    }> = [];
+    for (const userBatch of chunk(targetUserIds, BATCH_CHUNK_SIZE)) {
+      existing.push(
+        ...(await this.db
+          .select({
+            id: schema.readingSessions.id,
+            userId: schema.readingSessions.userId,
+            bookId: schema.readingSessions.bookId,
+            sessionId: schema.readingSessions.sessionId,
+            startedAt: schema.readingSessions.startedAt,
+            endedAt: schema.readingSessions.endedAt,
+            durationSeconds: schema.readingSessions.durationSeconds,
+            progressDelta: schema.readingSessions.progressDelta,
+            libraryId: schema.books.libraryId,
+          })
+          .from(schema.readingSessions)
+          .innerJoin(schema.books, eq(schema.books.id, schema.readingSessions.bookId))
+          .where(and(inArray(schema.readingSessions.userId, userBatch), like(schema.readingSessions.sessionId, `${params.sessionIdPrefix}%`)))),
+      );
+    }
 
     const desiredKeys = new Set(params.items.map((item) => `${item.userId}:${item.sessionId}`));
     const targetBookIdSet = new Set(targetBookIds);
@@ -711,21 +749,23 @@ export class MigrationImportRepository {
 
     const { isAudioFormat } = await import('@bookorbit/types');
 
-    const rows = await this.db
-      .select({
-        bookId: schema.books.id,
-        primaryFileId: schema.books.primaryFileId,
-        primaryFileFormat: schema.bookFiles.format,
-      })
-      .from(schema.books)
-      .leftJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.books.primaryFileId))
-      .where(inArray(schema.books.id, bookIds));
+    for (const batch of chunk(uniqueNumbers(bookIds), BATCH_CHUNK_SIZE)) {
+      const rows = await this.db
+        .select({
+          bookId: schema.books.id,
+          primaryFileId: schema.books.primaryFileId,
+          primaryFileFormat: schema.bookFiles.format,
+        })
+        .from(schema.books)
+        .leftJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.books.primaryFileId))
+        .where(inArray(schema.books.id, batch));
 
-    for (const row of rows) {
-      if (!row.primaryFileId) continue;
-      primaryFilesByBookId.set(row.bookId, row.primaryFileId);
-      if (row.primaryFileFormat && isAudioFormat(row.primaryFileFormat)) {
-        audiobookPrimaryFilesByBookId.set(row.bookId, row.primaryFileId);
+      for (const row of rows) {
+        if (!row.primaryFileId) continue;
+        primaryFilesByBookId.set(row.bookId, row.primaryFileId);
+        if (row.primaryFileFormat && isAudioFormat(row.primaryFileFormat)) {
+          audiobookPrimaryFilesByBookId.set(row.bookId, row.primaryFileId);
+        }
       }
     }
 
@@ -736,23 +776,26 @@ export class MigrationImportRepository {
     bookIds: number[],
   ): Promise<Map<number, Array<{ id: number; hash: string | null; absolutePath: string; format: string | null }>>> {
     const result = new Map<number, Array<{ id: number; hash: string | null; absolutePath: string; format: string | null }>>();
-    if (bookIds.length === 0) return result;
+    const targetBookIds = uniqueNumbers(bookIds);
+    if (targetBookIds.length === 0) return result;
 
-    const rows = await this.db
-      .select({
-        id: schema.bookFiles.id,
-        bookId: schema.bookFiles.bookId,
-        hash: schema.bookFiles.fileHash,
-        absolutePath: schema.bookFiles.absolutePath,
-        format: schema.bookFiles.format,
-      })
-      .from(schema.bookFiles)
-      .where(inArray(schema.bookFiles.bookId, bookIds));
+    for (const batch of chunk(targetBookIds, BATCH_CHUNK_SIZE)) {
+      const rows = await this.db
+        .select({
+          id: schema.bookFiles.id,
+          bookId: schema.bookFiles.bookId,
+          hash: schema.bookFiles.fileHash,
+          absolutePath: schema.bookFiles.absolutePath,
+          format: schema.bookFiles.format,
+        })
+        .from(schema.bookFiles)
+        .where(inArray(schema.bookFiles.bookId, batch));
 
-    for (const row of rows) {
-      const files = result.get(row.bookId) ?? [];
-      files.push({ id: row.id, hash: row.hash, absolutePath: row.absolutePath, format: row.format });
-      result.set(row.bookId, files);
+      for (const row of rows) {
+        const files = result.get(row.bookId) ?? [];
+        files.push({ id: row.id, hash: row.hash, absolutePath: row.absolutePath, format: row.format });
+        result.set(row.bookId, files);
+      }
     }
 
     return result;
@@ -760,15 +803,18 @@ export class MigrationImportRepository {
 
   async fetchLibraryIdsByBookIds(bookIds: number[]): Promise<Map<number, number>> {
     const result = new Map<number, number>();
-    if (bookIds.length === 0) return result;
+    const targetBookIds = uniqueNumbers(bookIds);
+    if (targetBookIds.length === 0) return result;
 
-    const rows = await this.db
-      .select({ id: schema.books.id, libraryId: schema.books.libraryId })
-      .from(schema.books)
-      .where(inArray(schema.books.id, bookIds));
+    for (const batch of chunk(targetBookIds, BATCH_CHUNK_SIZE)) {
+      const rows = await this.db
+        .select({ id: schema.books.id, libraryId: schema.books.libraryId })
+        .from(schema.books)
+        .where(inArray(schema.books.id, batch));
 
-    for (const row of rows) {
-      result.set(row.id, row.libraryId);
+      for (const row of rows) {
+        result.set(row.id, row.libraryId);
+      }
     }
 
     return result;
@@ -779,13 +825,15 @@ export class MigrationImportRepository {
     const targetUserIds = uniqueNumbers(userIds);
     if (targetUserIds.length === 0) return result;
 
-    const rows = await this.db
-      .select({ id: schema.users.id, settings: schema.users.settings })
-      .from(schema.users)
-      .where(inArray(schema.users.id, targetUserIds));
+    for (const userBatch of chunk(targetUserIds, BATCH_CHUNK_SIZE)) {
+      const rows = await this.db
+        .select({ id: schema.users.id, settings: schema.users.settings })
+        .from(schema.users)
+        .where(inArray(schema.users.id, userBatch));
 
-    for (const row of rows) {
-      result.set(row.id, resolveTimeZone((row.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC'));
+      for (const row of rows) {
+        result.set(row.id, resolveTimeZone((row.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC'));
+      }
     }
     return result;
   }
@@ -796,15 +844,17 @@ export class MigrationImportRepository {
 
     await this.lockReadingDailyStats(userId, libraryId);
 
-    await this.db
-      .delete(schema.userReadingDailyStats)
-      .where(
-        and(
-          eq(schema.userReadingDailyStats.userId, userId),
-          eq(schema.userReadingDailyStats.libraryId, libraryId),
-          inArray(schema.userReadingDailyStats.day, affectedDays),
-        ),
-      );
+    for (const dayBatch of chunk(affectedDays, BATCH_CHUNK_SIZE)) {
+      await this.db
+        .delete(schema.userReadingDailyStats)
+        .where(
+          and(
+            eq(schema.userReadingDailyStats.userId, userId),
+            eq(schema.userReadingDailyStats.libraryId, libraryId),
+            inArray(schema.userReadingDailyStats.day, dayBatch),
+          ),
+        );
+    }
 
     const range = getDayRangeForDateKeys(affectedDays, timeZone);
     if (!range) return;
@@ -848,27 +898,29 @@ export class MigrationImportRepository {
     if (segments.length === 0) return;
 
     const now = new Date();
-    await this.db
-      .insert(schema.userReadingDailyStats)
-      .values(
-        segments.map((segment) => ({
-          userId,
-          libraryId,
-          day: segment.day,
-          readingSeconds: segment.readingSeconds,
-          progressDelta: segment.progressDelta,
-          sessionsCount: segment.sessionsCount,
-          updatedAt: now,
-        })),
-      )
-      .onConflictDoUpdate({
-        target: [schema.userReadingDailyStats.userId, schema.userReadingDailyStats.libraryId, schema.userReadingDailyStats.day],
-        set: {
-          readingSeconds: sql`excluded.reading_seconds`,
-          progressDelta: sql`excluded.progress_delta`,
-          sessionsCount: sql`excluded.sessions_count`,
-          updatedAt: now,
-        },
-      });
+    for (const batch of chunk(segments, BATCH_CHUNK_SIZE)) {
+      await this.db
+        .insert(schema.userReadingDailyStats)
+        .values(
+          batch.map((segment) => ({
+            userId,
+            libraryId,
+            day: segment.day,
+            readingSeconds: segment.readingSeconds,
+            progressDelta: segment.progressDelta,
+            sessionsCount: segment.sessionsCount,
+            updatedAt: now,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [schema.userReadingDailyStats.userId, schema.userReadingDailyStats.libraryId, schema.userReadingDailyStats.day],
+          set: {
+            readingSeconds: sql`excluded.reading_seconds`,
+            progressDelta: sql`excluded.progress_delta`,
+            sessionsCount: sql`excluded.sessions_count`,
+            updatedAt: now,
+          },
+        });
+    }
   }
 }

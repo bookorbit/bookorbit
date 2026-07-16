@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { FieldPreferenceOverrides } from '@bookorbit/types'
 import { Info } from '@lucide/vue'
 import { useLibraries } from '@/features/library/composables/useLibraries'
@@ -8,6 +9,7 @@ import LibraryPreferencePanel from './components/LibraryPreferencePanel.vue'
 import { useProviderConfig } from './composables/useProviderConfig'
 import { useMetadataPreferences } from './composables/useMetadataPreferences'
 
+const { t } = useI18n()
 const { statuses, fetchConfig } = useProviderConfig()
 const {
   globalPrefs,
@@ -54,18 +56,24 @@ async function onResetLibrary(libraryId: number) {
     <div class="p-4 rounded-lg bg-primary/5 border border-primary/10 max-w-6xl shadow-xs">
       <div class="flex items-start gap-3 mb-3">
         <Info :size="18" class="text-primary shrink-0 mt-0.5" />
-        <p class="text-sm font-medium text-foreground">How Field Rules Work</p>
+        <p class="text-sm font-medium text-foreground">{{ t('settings.metadata.fieldRules.howItWorks.title') }}</p>
       </div>
       <div class="grid sm:grid-cols-2 gap-x-8 gap-y-4 text-xs leading-relaxed text-muted-foreground ml-7">
         <div>
-          <p class="font-semibold text-foreground mb-1">Priority Order</p>
-          <p>Drag providers in the list to reorder them. The top-most provider that returns a result will be the primary source for that field.</p>
+          <p class="font-semibold text-foreground mb-1">{{ t('settings.metadata.fieldRules.howItWorks.priorityOrder.title') }}</p>
+          <p>{{ t('settings.metadata.fieldRules.howItWorks.priorityOrder.body') }}</p>
         </div>
         <div>
-          <p class="font-semibold text-foreground mb-1">Merge Strategy</p>
+          <p class="font-semibold text-foreground mb-1">{{ t('settings.metadata.fieldRules.howItWorks.mergeStrategy.title') }}</p>
           <ul class="space-y-1">
-            <li><span class="text-foreground">Fill missing:</span> Only write if current value is empty.</li>
-            <li><span class="text-foreground">Overwrite:</span> Replace whenever a provider has data.</li>
+            <li>
+              <span class="text-foreground">{{ t('settings.metadata.fieldRules.howItWorks.mergeStrategy.fillMissingTerm') }}</span>
+              {{ t('settings.metadata.fieldRules.howItWorks.mergeStrategy.fillMissingBody') }}
+            </li>
+            <li>
+              <span class="text-foreground">{{ t('settings.metadata.fieldRules.howItWorks.mergeStrategy.overwriteTerm') }}</span>
+              {{ t('settings.metadata.fieldRules.howItWorks.mergeStrategy.overwriteBody') }}
+            </li>
           </ul>
         </div>
       </div>
@@ -82,8 +90,8 @@ async function onResetLibrary(libraryId: number) {
 
     <div v-if="libraries.length" class="space-y-4">
       <div class="px-1">
-        <p class="text-sm font-medium text-foreground">Library Overrides</p>
-        <p class="settings-hint">Expand a library to customize individual fields. Fields not overridden inherit global defaults.</p>
+        <p class="text-sm font-medium text-foreground">{{ t('settings.metadata.fieldRules.libraryOverrides.title') }}</p>
+        <p class="settings-hint">{{ t('settings.metadata.fieldRules.libraryOverrides.hint') }}</p>
       </div>
       <div class="space-y-3">
         <LibraryPreferencePanel

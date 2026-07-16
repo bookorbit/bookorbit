@@ -18,6 +18,9 @@ import {
   type BulkEditableScalarField,
   type BulkEditableField,
 } from '@/features/book/composables/useBookBulkActions'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 type UIArrayMode = ArrayMode | 'clear'
 
@@ -41,12 +44,12 @@ type FieldKey = BulkEditableField
 
 const FIELD_LABELS = BULK_EDITABLE_FIELD_LABELS
 
-const MODE_LABELS: Record<UIArrayMode, string> = {
-  add: 'Add',
-  remove: 'Remove',
-  replace: 'Replace',
-  clear: 'Clear',
-}
+const MODE_LABELS = computed<Record<UIArrayMode, string>>(() => ({
+  add: t('book.bulkEdit.mode.add'),
+  remove: t('book.bulkEdit.mode.remove'),
+  replace: t('book.bulkEdit.mode.replace'),
+  clear: t('book.bulkEdit.mode.clear'),
+}))
 
 const { search: searchAuthors } = useAuthorSearch()
 const { search: searchGenres } = useGenreSearch()
@@ -108,7 +111,7 @@ const yearError = computed(() => {
   if (!enabledFields.publishedYear) return null
   const raw = scalarValues.publishedYear.trim()
   if (!raw) return null
-  if (!/^\d+$/.test(raw)) return 'Enter a valid year (numbers only)'
+  if (!/^\d+$/.test(raw)) return t('book.bulkEdit.invalidYear')
   return null
 })
 
@@ -205,7 +208,7 @@ watch(
       <div class="relative z-10 w-full max-w-lg mx-4 max-h-[90vh] bg-card border border-border rounded-lg shadow-2xl flex flex-col">
         <!-- Header -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-          <h2 class="text-base font-semibold text-foreground">Edit metadata - {{ bookCount }} book{{ bookCount === 1 ? '' : 's' }}</h2>
+          <h2 class="text-base font-semibold text-foreground">{{ t('book.bulkEdit.title', { count: bookCount }, bookCount) }}</h2>
           <button
             type="button"
             class="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -218,7 +221,7 @@ watch(
 
         <!-- Scrollable body -->
         <div class="overflow-y-auto px-6 py-4 space-y-4 min-h-0">
-          <p class="text-sm text-muted-foreground">Toggle fields to edit, then configure values. Only toggled fields will be changed.</p>
+          <p class="text-sm text-muted-foreground">{{ t('book.bulkEdit.instructions') }}</p>
 
           <!-- Array fields -->
           <div v-for="key in ARRAY_FIELDS" :key="key" class="space-y-2">
@@ -266,13 +269,13 @@ watch(
               </div>
 
               <p v-if="arrayModes[key] === 'clear'" class="text-xs text-destructive">
-                This will remove all {{ FIELD_LABELS[key].toLowerCase() }} from the selected books.
+                {{ t('book.bulkEdit.clearWarning', { field: FIELD_LABELS[key].toLowerCase() }) }}
               </p>
               <ChipInput
                 v-else
                 v-model="arrayValues[key]"
                 :search-fn="SEARCH_FNS[key]"
-                :placeholder="`Search ${FIELD_LABELS[key].toLowerCase()}...`"
+                :placeholder="t('book.bulkEdit.searchPlaceholder', { field: FIELD_LABELS[key].toLowerCase() })"
               />
             </div>
           </div>
@@ -313,7 +316,7 @@ watch(
                 v-else-if="SUGGESTION_FNS[key]"
                 :model-value="scalarValues[key] || null"
                 :search-fn="SUGGESTION_FNS[key]!"
-                :placeholder="`Enter ${FIELD_LABELS[key].toLowerCase()}`"
+                :placeholder="t('book.bulkEdit.enterPlaceholder', { field: FIELD_LABELS[key].toLowerCase() })"
                 class="w-full h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                 @update:model-value="scalarValues[key] = $event ?? ''"
               />
@@ -322,13 +325,17 @@ watch(
                 v-model="scalarValues[key]"
                 type="text"
                 :inputmode="key === 'publishedYear' ? 'numeric' : undefined"
-                :placeholder="key === 'publishedYear' ? 'e.g. 2024' : `Enter ${FIELD_LABELS[key].toLowerCase()}`"
+                :placeholder="
+                  key === 'publishedYear'
+                    ? t('book.bulkEdit.yearPlaceholder')
+                    : t('book.bulkEdit.enterPlaceholder', { field: FIELD_LABELS[key].toLowerCase() })
+                "
                 class="w-full h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
               />
               <p v-if="key === 'publishedYear' && yearError" class="text-xs text-destructive mt-1">
                 {{ yearError }}
               </p>
-              <p v-else class="text-xs text-muted-foreground mt-1">Leave empty to clear this field on all selected books.</p>
+              <p v-else class="text-xs text-muted-foreground mt-1">{{ t('book.bulkEdit.leaveEmptyHint') }}</p>
             </div>
           </div>
         </div>
@@ -341,7 +348,7 @@ watch(
             :disabled="submitting"
             @click="handleClose"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
           <button
             type="button"
@@ -353,7 +360,7 @@ watch(
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
-            {{ submitting ? 'Applying...' : 'Apply' }}
+            {{ submitting ? t('book.bulkEdit.applying') : t('book.bulkEdit.apply') }}
           </button>
         </div>
       </div>

@@ -76,12 +76,15 @@ function makeDetail(overrides: Partial<BookDetail> = {}): BookDetail {
     isbn10: null,
     isbn13: null,
     publisher: null,
+    publishedDate: null,
     publishedYear: null,
     language: null,
     pageCount: null,
     seriesName: null,
     seriesIndex: null,
     rating: null,
+    personalNote: null,
+    personalNoteUpdatedAt: null,
     communityRatings: [],
     coverSource: null,
     hardcoverEditionId: null,
@@ -222,6 +225,20 @@ describe('BookQuickView', () => {
     expect(ranobedbLink.exists()).toBe(true)
     expect(ranobedbLink.attributes('href')).toBe('https://ranobedb.org/book/1287')
     expect(ranobedbLink.find('img[alt="RanobeDB"][src="/assets/provider-icons/ranobedb.svg"]').exists()).toBe(true)
+  })
+
+  it('renders Libro.fm provider icon link', () => {
+    detailRef.value = makeDetail({ providerIds: { librofm: '9781234567890' } })
+
+    const wrapper = mount(BookQuickView, {
+      props: { open: true, bookId: 42 },
+      global: globalStubs,
+    })
+
+    const libroFmLink = wrapper.find('a[title="Open in Libro.fm"]')
+    expect(libroFmLink.exists()).toBe(true)
+    expect(libroFmLink.attributes('href')).toBe('https://libro.fm/audiobooks/9781234567890')
+    expect(libroFmLink.find('img[alt="Libro.fm"][src="/assets/provider-icons/librofm.svg"]').exists()).toBe(true)
   })
 
   it('shrinks natural-bottom quick-view cover to the loaded cover ratio', async () => {

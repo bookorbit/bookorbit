@@ -98,7 +98,7 @@ export class KoreaderAnnotationExchangeService {
 
       const accessibleLibraryIds = await this.koreaderRepo.getAccessibleLibraryIds(user.id);
       const hashes = [...new Set(dto.books.map((book) => book.hash.toLowerCase()))];
-      const matches = await this.koreaderRepo.resolveBookFilesByHashes(hashes, accessibleLibraryIds);
+      const matches = await this.koreaderRepo.resolveBookFilesByHashes(hashes, accessibleLibraryIds, user.id);
       const deviceClockOffsetMs = this.deviceClockOffsetMs(dto.deviceTime);
 
       const results: ExchangeBookResult[] = [];
@@ -135,7 +135,7 @@ export class KoreaderAnnotationExchangeService {
     try {
       const accessibleLibraryIds = await this.koreaderRepo.getAccessibleLibraryIds(user.id);
       const hashes = [...new Set(dto.books.map((book) => book.hash.toLowerCase()))];
-      const matches = await this.koreaderRepo.resolveBookFilesByHashes(hashes, accessibleLibraryIds);
+      const matches = await this.koreaderRepo.resolveBookFilesByHashes(hashes, accessibleLibraryIds, user.id);
 
       const results: { hash: string; acked: number }[] = [];
       const unmatched: string[] = [];

@@ -1,7 +1,15 @@
 import { computed, shallowRef, watch, type Ref } from 'vue'
 import { api } from '@/lib/api'
-import { jumpBucketKindForSort, type BookQuery, type JumpBucket, type JumpBucketsResponse } from '@bookorbit/types'
+import {
+  jumpBucketKindForSort,
+  type JumpBucket,
+  type JumpBucketsQuery,
+  type JumpBucketsResponse,
+  type TemporalJumpBucketGranularity,
+} from '@bookorbit/types'
 import type { BookWindowQuery } from './useBookWindow'
+
+const MAX_CACHE_ENTRIES = 50
 
 /**
  * Fetches the jump buckets for the current query and derives the active
@@ -15,20 +23,23 @@ export function useJumpBuckets(options: {
   query: Ref<BookWindowQuery>
   enabled: Ref<boolean>
   firstVisibleIndex: Ref<number>
+  maxBuckets: Ref<number>
 }) {
   const buckets = shallowRef<JumpBucket[]>([])
+  const granularity = shallowRef<TemporalJumpBucketGranularity | null>(null)
   const loading = shallowRef(false)
-  const cache = new Map<string, JumpBucket[]>()
+  const cache = new Map<string, Pick<JumpBucketsResponse, 'buckets' | 'granularity'>>()
   let generation = 0
 
   const kind = computed(() => jumpBucketKindForSort(options.query.value.sort))
-  const cacheKey = computed(() => `${options.endpoint.value ?? ''}|${JSON.stringify(options.query.value)}`)
+  const cacheKey = computed(() => `${options.endpoint.value ?? ''}|${options.maxBuckets.value}|${JSON.stringify(options.query.value)}`)
 
   async function fetchBuckets() {
     const gen = ++generation
     const endpoint = options.endpoint.value
     if (!endpoint || !options.enabled.value || !kind.value) {
       buckets.value = []
+      granularity.value = null
       loading.value = false
       return
     }
@@ -36,14 +47,21 @@ export function useJumpBuckets(options: {
     const key = cacheKey.value
     const cached = cache.get(key)
     if (cached) {
-      buckets.value = cached
+      cache.delete(key)
+      cache.set(key, cached)
+      buckets.value = cached.buckets
+      granularity.value = cached.granularity
       loading.value = false
       return
     }
 
     loading.value = true
     try {
-      const body: BookQuery = { ...options.query.value, pagination: { page: 0, size: 50 } }
+      const body: JumpBucketsQuery = {
+        ...options.query.value,
+        pagination: { page: 0, size: 50 },
+        maxBuckets: options.maxBuckets.value,
+      }
       const res = await api(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -53,10 +71,18 @@ export function useJumpBuckets(options: {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data: JumpBucketsResponse = await res.json()
       if (gen !== generation) return
-      cache.set(key, data.buckets)
+      cache.set(key, { buckets: data.buckets, granularity: data.granularity })
+      if (cache.size > MAX_CACHE_ENTRIES) {
+        const oldestKey = cache.keys().next().value
+        if (oldestKey !== undefined) cache.delete(oldestKey)
+      }
       buckets.value = data.buckets
+      granularity.value = data.granularity
     } catch {
-      if (gen === generation) buckets.value = []
+      if (gen === generation) {
+        buckets.value = []
+        granularity.value = null
+      }
     } finally {
       if (gen === generation) loading.value = false
     }
@@ -80,5 +106,5 @@ export function useJumpBuckets(options: {
 
   watch([cacheKey, options.enabled], fetchBuckets, { immediate: true })
 
-  return { buckets, kind, loading, activeBucket, refresh }
+  return { buckets, kind, granularity, loading, activeBucket, refresh }
 }

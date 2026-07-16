@@ -19,6 +19,7 @@ import { GetBooksDto } from './get-books.dto';
 import { SaveProgressDto } from './save-progress.dto';
 import { SearchBooksDto } from './search-books.dto';
 import { UpdateBookMetadataDto } from './update-book-metadata.dto';
+import { UpdatePersonalNoteDto } from './update-personal-note.dto';
 import { UpdateRatingDto } from './update-rating.dto';
 import { UpsertAudioProgressDto } from './upsert-audio-progress.dto';
 
@@ -158,6 +159,7 @@ describe('Book DTO validation', () => {
       (
         await errorsFor(UpdateBookMetadataDto, {
           title: 'Dune',
+          publishedDate: '1965-08-01',
           publishedYear: 1965,
           rating: 5,
           authors: ['Frank Herbert'],
@@ -188,6 +190,10 @@ describe('Book DTO validation', () => {
     expect((await errorsFor(UpdateBookMetadataDto, { publishedYear: 0 })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookMetadataDto, { publishedYear: 999 })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookMetadataDto, { publishedYear: 2201 })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { publishedDate: null })).length).toBe(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { publishedDate: '1965-08-01' })).length).toBe(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { publishedDate: '1965' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { publishedDate: '1965-8-1' })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookMetadataDto, { authors: ['ok', 1] })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookMetadataDto, { language: 'a'.repeat(101) })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookMetadataDto, { isbn10: '12345678901' })).length).toBeGreaterThan(0);
@@ -197,6 +203,12 @@ describe('Book DTO validation', () => {
     expect((await errorsFor(UpdateBookMetadataDto, { aladinId: '12345' })).length).toBe(0);
     expect((await errorsFor(UpdateBookMetadataDto, { aladinId: null })).length).toBe(0);
     expect((await errorsFor(UpdateBookMetadataDto, { aladinId: 'a'.repeat(21) })).length).toBeGreaterThan(0);
+  });
+
+  it('accepts librofmId and enforces its length bound', async () => {
+    expect((await errorsFor(UpdateBookMetadataDto, { librofmId: '9781234567890' })).length).toBe(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { librofmId: null })).length).toBe(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { librofmId: 'a'.repeat(51) })).length).toBeGreaterThan(0);
   });
 
   it('normalizes a zero page count to null and validates other page count values', async () => {
@@ -277,6 +289,12 @@ describe('Book DTO validation', () => {
     expect((await errorsFor(UpdateRatingDto, { rating: 3 })).length).toBe(0);
     expect((await errorsFor(UpdateRatingDto, { rating: 0 })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateRatingDto, { rating: 6 })).length).toBeGreaterThan(0);
+  });
+
+  it('validates personal note updates', async () => {
+    expect((await errorsFor(UpdatePersonalNoteDto, { note: 'My private review' })).length).toBe(0);
+    expect((await errorsFor(UpdatePersonalNoteDto, { note: null })).length).toBe(0);
+    expect((await errorsFor(UpdatePersonalNoteDto, { note: 'a'.repeat(10001) })).length).toBeGreaterThan(0);
   });
 
   it('validates audiobook progress bounds for percentage and position', async () => {

@@ -1,6 +1,7 @@
 const LEFT_ZONE = 0.3
 const RIGHT_ZONE = 0.7
 const DOUBLE_CLICK_MS = 300
+const ANNOTATION_CLICK_SUPPRESSION_MS = DOUBLE_CLICK_MS + 100
 const SWIPE_THRESHOLD = 50
 
 export function useFoliateInput(
@@ -14,6 +15,7 @@ export function useFoliateInput(
   let lastClickTime = 0
   let lastClickZone: 'left' | 'middle' | 'right' | null = null
   let isNavigating = false
+  let suppressClickNavigationUntil = 0
   let touchStartX = 0
   let touchStartY = 0
   let touchStartTime = 0
@@ -51,6 +53,16 @@ export function useFoliateInput(
     getViewEl()?.next?.()
   }
 
+  function suppressNextTapNavigation() {
+    suppressClickNavigationUntil = Date.now() + ANNOTATION_CLICK_SUPPRESSION_MS
+    lastClickTime = 0
+    lastClickZone = null
+  }
+
+  function isTapNavigationSuppressed() {
+    return Date.now() < suppressClickNavigationUntil
+  }
+
   function handleTouchStart(e: TouchEvent) {
     if (e.touches.length !== 1) return
     const touch = e.touches[0]!
@@ -71,7 +83,6 @@ export function useFoliateInput(
     const selection = doc.defaultView?.getSelection()
     if (selection && !selection.isCollapsed && selection.rangeCount > 0) {
       isTextSelectionInProgress = true
-      e.preventDefault()
       return
     }
     if (deltaX > 10 && deltaX > deltaY && !isTextSelectionInProgress) return
@@ -87,7 +98,6 @@ export function useFoliateInput(
 
     if (hasSelection) {
       isTextSelectionInProgress = false
-      e.preventDefault()
       setTimeout(() => handleSelectionEnd(doc), 50)
       return
     }
@@ -174,8 +184,8 @@ export function useFoliateInput(
     )
 
     doc.addEventListener('touchstart', (e: TouchEvent) => handleTouchStart(e), { passive: true })
-    doc.addEventListener('touchmove', (e: TouchEvent) => handleTouchMove(e, doc), { passive: false })
-    doc.addEventListener('touchend', (e: TouchEvent) => handleTouchEnd(e, doc), { passive: false })
+    doc.addEventListener('touchmove', (e: TouchEvent) => handleTouchMove(e, doc), { passive: true })
+    doc.addEventListener('touchend', (e: TouchEvent) => handleTouchEnd(e, doc), { passive: true })
 
     doc.addEventListener('selectionchange', () => handleSelectionChange(doc))
   }
@@ -183,6 +193,7 @@ export function useFoliateInput(
   function handleWindowMessage(e: MessageEvent) {
     if (e.origin !== window.location.origin) return
     if (e.data?.type !== 'foliate-click') return
+    if (isTapNavigationSuppressed()) return
     const view = getViewEl()
     if (!view) return
 
@@ -213,6 +224,7 @@ export function useFoliateInput(
     lastClickZone = currentZone
 
     setTimeout(() => {
+      if (isTapNavigationSuppressed()) return
       if (Date.now() - lastClickTime < DOUBLE_CLICK_MS) return
       if (!longHoldTimeout) return
       if (isNavigating) return
@@ -267,5 +279,5 @@ export function useFoliateInput(
     document.removeEventListener('keydown', handleKeydown)
   }
 
-  return { attachIframeClicks, cleanup }
+  return { attachIframeClicks, suppressNextTapNavigation, cleanup }
 }

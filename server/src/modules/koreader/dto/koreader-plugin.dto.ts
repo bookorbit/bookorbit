@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
+  IsBoolean,
   IsArray,
   IsIn,
   IsInt,
@@ -14,6 +15,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { KOREADER_DEVICE_ID_REGEX } from './koreader-device-param.dto';
 
 const MD5_HEX = /^[0-9a-f]{32}$/i;
 const DEVICE_DATETIME = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
@@ -21,7 +23,7 @@ const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 export class PluginDeviceDto {
   @IsString()
-  @Matches(/^[A-Za-z0-9-]{1,100}$/)
+  @Matches(KOREADER_DEVICE_ID_REGEX)
   deviceId!: string;
 
   @IsString()
@@ -42,6 +44,35 @@ export class PluginDeviceDto {
   deviceTime?: string;
 }
 
+export class MatchCheckBookDto {
+  @IsString()
+  @Matches(MD5_HEX)
+  hash!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  authors?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  lastOpen?: number;
+
+  @IsOptional()
+  @IsIn(['current_file', 'file', 'statistics'])
+  source?: 'current_file' | 'file' | 'statistics';
+
+  @IsOptional()
+  @IsBoolean()
+  metadataAmbiguous?: boolean;
+}
+
 export class MatchCheckDto extends PluginDeviceDto {
   @IsArray()
   @ArrayMinSize(1)
@@ -49,6 +80,13 @@ export class MatchCheckDto extends PluginDeviceDto {
   @IsString({ each: true })
   @Matches(MD5_HEX, { each: true })
   hashes!: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(500)
+  @ValidateNested({ each: true })
+  @Type(() => MatchCheckBookDto)
+  books?: MatchCheckBookDto[];
 }
 
 export class PageStatEventDto {
@@ -181,7 +219,25 @@ export class BookStateDto {
   @IsInt()
   @Min(1)
   @Max(5)
-  rating?: number;
+  rating?: number | null;
+
+  @IsOptional()
+  @IsBoolean()
+  ratingCleared?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10000)
+  reviewNote?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  reviewCleared?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @Matches(DATE_ONLY)
+  reviewModified?: string;
 }
 
 export class BookStatesUploadDto extends PluginDeviceDto {

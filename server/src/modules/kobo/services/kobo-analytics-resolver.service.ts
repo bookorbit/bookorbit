@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db/db.module';
@@ -9,8 +9,7 @@ import { KoboBookAccessService } from './kobo-book-access.service';
 type Db = NodePgDatabase<typeof schema>;
 
 export type KoboAnalyticsResolveResult =
-  | { kind: 'resolved'; bookFileId: number }
-  | { kind: 'skipped'; reason: 'book_not_found' | 'book_not_accessible' | 'no_epub_file' };
+  { kind: 'resolved'; bookFileId: number } | { kind: 'skipped'; reason: 'book_not_found' | 'book_not_accessible' | 'no_epub_file' };
 
 @Injectable()
 export class KoboAnalyticsResolverService {
@@ -19,7 +18,7 @@ export class KoboAnalyticsResolverService {
     private readonly bookAccessService: KoboBookAccessService,
   ) {}
 
-  async resolveBookFileId(userId: number, bookId: number): Promise<KoboAnalyticsResolveResult> {
+  async resolveBookFileId(userId: number, deviceId: number, bookId: number): Promise<KoboAnalyticsResolveResult> {
     try {
       await this.bookAccessService.assertBookAccessible(userId, bookId);
     } catch {
@@ -36,8 +35,13 @@ export class KoboAnalyticsResolverService {
       .select({ fileHash: schema.koboSnapshotBooks.fileHash })
       .from(schema.koboSnapshotBooks)
       .innerJoin(schema.koboLibrarySnapshots, eq(schema.koboLibrarySnapshots.id, schema.koboSnapshotBooks.snapshotId))
-      .where(and(eq(schema.koboLibrarySnapshots.userId, userId), eq(schema.koboSnapshotBooks.bookId, bookId)))
-      .orderBy(desc(schema.koboLibrarySnapshots.id))
+      .where(
+        and(
+          eq(schema.koboLibrarySnapshots.userId, userId),
+          eq(schema.koboLibrarySnapshots.deviceId, deviceId),
+          eq(schema.koboSnapshotBooks.bookId, bookId),
+        ),
+      )
       .limit(1);
 
     const snapHash = snap[0]?.fileHash ?? null;

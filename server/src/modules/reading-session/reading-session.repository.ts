@@ -84,7 +84,19 @@ export class ReadingSessionRepository {
     return this.db.transaction(async (tx): Promise<SaveReadingSessionResult> => {
       const inserted = await tx
         .insert(readingSessions)
-        .values({ userId, bookFileId, bookId, sessionId, source, startedAt, endedAt, durationSeconds, progressDelta, endProgress })
+        .values({
+          userId,
+          bookFileId,
+          bookId,
+          attemptId: sql`(select id from reading_attempts where user_id = ${userId} and book_id = ${bookId} and outcome is null and deleted_at is null limit 1)`,
+          sessionId,
+          source,
+          startedAt,
+          endedAt,
+          durationSeconds,
+          progressDelta,
+          endProgress,
+        })
         .onConflictDoNothing({ target: [readingSessions.userId, readingSessions.sessionId] })
         .returning({ id: readingSessions.id });
 
@@ -104,7 +116,19 @@ export class ReadingSessionRepository {
     return this.db.transaction(async (tx) => {
       const [inserted] = await tx
         .insert(readingSessions)
-        .values({ userId, bookId, bookFileId, sessionId, source: 'manual', startedAt, endedAt, durationSeconds, progressDelta, endProgress })
+        .values({
+          userId,
+          bookId,
+          bookFileId,
+          attemptId: sql`(select id from reading_attempts where user_id = ${userId} and book_id = ${bookId} and outcome is null and deleted_at is null limit 1)`,
+          sessionId,
+          source: 'manual',
+          startedAt,
+          endedAt,
+          durationSeconds,
+          progressDelta,
+          endProgress,
+        })
         .returning({ id: readingSessions.id });
 
       await this.upsertDailyStats(tx, { userId, libraryId, startedAt, endedAt, durationSeconds, progressDelta, timeZone });

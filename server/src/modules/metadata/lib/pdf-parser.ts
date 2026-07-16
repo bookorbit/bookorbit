@@ -5,6 +5,7 @@ import { BOOKORBIT_NS_PREFIX } from '../../../common/bookorbit-ns';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import { parsePdfFileInWorker } from './pdf-parse-worker-runner';
 import { extractPdfCover } from './pdf-cover';
+import { extractPopplerPdfMetadata, type PopplerPdfMetadata } from './pdf-poppler-metadata';
 import { extractXmpXml, parseXmp, type XmpParsed } from './pdf-xmp-reader';
 
 export interface PdfParsed {
@@ -13,6 +14,7 @@ export interface PdfParsed {
   authors: { name: string; sortName: string | null }[];
   description: string | null;
   publisher: string | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   genres: string[];
@@ -38,7 +40,7 @@ export interface PdfParsed {
 }
 
 export interface PdfParseWarning {
-  code: 'buffered-large-pdf' | 'cover-extraction-failed' | 'parse-failed';
+  code: 'buffered-large-pdf' | 'cover-extraction-failed' | 'encrypted-metadata-fallback-failed' | 'parse-failed';
   absolutePath: string;
   errorClass?: string;
   errorMessage?: string;
@@ -65,6 +67,15 @@ function splitCommaList(value: string | null): string[] {
     .split(/[,;]/)
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+function splitAuthorList(value: string | null): { name: string; sortName: string | null }[] {
+  if (!value) return [];
+  return value
+    .split(/[,;]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((name) => ({ name, sortName: null }));
 }
 
 function createWarning(code: PdfParseWarning['code'], absolutePath: string, error: unknown): PdfParseWarning {
@@ -106,28 +117,32 @@ export async function parsePdfFile(absolutePath: string, options: PdfParseOption
 }
 
 export async function parsePdfBuffer(absolutePath: string, buf: Buffer, options: PdfParseOptions = {}): Promise<PdfParsed | null> {
-  const doc = await PDFDocument.load(buf, { ignoreEncryption: true });
+  const doc = await PDFDocument.load(buf, { ignoreEncryption: true, updateMetadata: false });
+  const isEncrypted = doc.isEncrypted === true;
+  let popplerMetadata: PopplerPdfMetadata | null = null;
+
+  if (isEncrypted) {
+    try {
+      popplerMetadata = await extractPopplerPdfMetadata(absolutePath);
+    } catch (error) {
+      options.onWarning?.(createWarning('encrypted-metadata-fallback-failed', absolutePath, error));
+    }
+  }
 
   // XMP is the authoritative source; Info Dictionary is fallback-only.
-  const xmpXml = extractXmpXml(doc);
+  const xmpXml = popplerMetadata?.xmpXml ?? (isEncrypted ? null : extractXmpXml(doc));
   const xmp: XmpParsed | null = xmpXml ? parseXmp(xmpXml) : null;
   const hasXmp = xmp !== null;
 
-  const infoTitle = clean(doc.getTitle());
-  const infoAuthorRaw = clean(doc.getAuthor());
-  const infoCreator = clean(doc.getCreator());
-  const infoProducer = clean(doc.getProducer());
-  const infoSubject = clean(doc.getSubject());
-  const infoKeywords = splitCommaList(clean(doc.getKeywords()));
+  const canTrustPdfLibInfo = !isEncrypted || popplerMetadata !== null;
+  const infoTitle = popplerMetadata ? popplerMetadata.title : canTrustPdfLibInfo ? clean(doc.getTitle()) : null;
+  const infoAuthorRaw = popplerMetadata ? popplerMetadata.author : canTrustPdfLibInfo ? clean(doc.getAuthor()) : null;
+  const infoCreator = popplerMetadata ? popplerMetadata.creator : canTrustPdfLibInfo ? clean(doc.getCreator()) : null;
+  const infoProducer = popplerMetadata ? popplerMetadata.producer : canTrustPdfLibInfo ? clean(doc.getProducer()) : null;
+  const infoSubject = popplerMetadata ? popplerMetadata.subject : canTrustPdfLibInfo ? clean(doc.getSubject()) : null;
+  const infoKeywords = splitCommaList(popplerMetadata ? popplerMetadata.keywords : canTrustPdfLibInfo ? clean(doc.getKeywords()) : null);
   const isBookorbitInfo = infoCreator === BOOKORBIT_NS_PREFIX;
-
-  const infoAuthors = infoAuthorRaw
-    ? infoAuthorRaw
-        .split(/[,;]/)
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .map((name) => ({ name, sortName: null }))
-    : [];
+  const infoAuthors = splitAuthorList(infoAuthorRaw);
 
   let coverBuffer: Buffer | null = null;
   if (options.extractCover === true) {
@@ -144,6 +159,7 @@ export async function parsePdfBuffer(absolutePath: string, buf: Buffer, options:
     authors: hasXmp ? xmp.authors : infoAuthors,
     description: hasXmp ? xmp.description : infoSubject,
     publisher: hasXmp ? (xmp.publisher ?? null) : isBookorbitInfo ? infoProducer : null,
+    publishedDate: xmp?.publishedDate ?? null,
     publishedYear: xmp?.publishedYear ?? null,
     language: xmp?.language ?? null,
     genres: xmp?.genres?.length ? xmp.genres : [],
@@ -154,7 +170,9 @@ export async function parsePdfBuffer(absolutePath: string, buf: Buffer, options:
     seriesName: xmp?.seriesName ?? null,
     seriesIndex: xmp?.seriesIndex ?? null,
     rating: xmp?.rating ?? null,
-    pageCount: hasXmp ? (xmp.pageCount ?? (isBookorbitInfo ? null : doc.getPageCount())) : doc.getPageCount(),
+    pageCount: hasXmp
+      ? (xmp.pageCount ?? (isBookorbitInfo ? null : (popplerMetadata?.pageCount ?? doc.getPageCount())))
+      : (popplerMetadata?.pageCount ?? doc.getPageCount()),
     googleBooksId: xmp?.googleBooksId ?? null,
     goodreadsId: xmp?.goodreadsId ?? null,
     amazonId: xmp?.amazonId ?? null,

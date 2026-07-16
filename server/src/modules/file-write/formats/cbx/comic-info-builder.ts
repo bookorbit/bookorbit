@@ -2,6 +2,7 @@ import { XMLParser, XMLBuilder } from 'fast-xml-parser';
 
 import type { BookWritePayload, BookWritePayloadKey } from '../../interfaces/book-write-payload.interface';
 import { COMIC_INFO_MANAGED_NOTES_KEYS, COMIC_INFO_PROVIDER_ID_KEYS, COMIC_INFO_PROVIDER_WEB_URL_BUILDERS } from '../../file-write.constants';
+import { htmlToPlainText } from '../../../../common/utils/html-to-text.utils';
 
 type ComicInfoObject = Record<string, unknown>;
 
@@ -36,12 +37,12 @@ export function buildComicInfoXml(existingXml: string | null, payload: BookWrite
   const info: ComicInfoObject = existingXml ? parseComicInfoXml(existingXml) : {};
 
   setComicInfoField(info, fieldMask, 'title', 'Title', payload.title);
-  setComicInfoField(info, fieldMask, 'description', 'Summary', payload.description, stripHtml);
+  setComicInfoField(info, fieldMask, 'description', 'Summary', payload.description, htmlToPlainText);
   setComicInfoField(info, fieldMask, 'publisher', 'Publisher', payload.publisher);
   setComicInfoField(info, fieldMask, 'seriesName', 'Series', payload.seriesName);
   setIssueNumberField(info, fieldMask, payload);
   setComicInfoField(info, fieldMask, 'comicVolumeName', 'Volume', payload.comicVolumeName);
-  setComicInfoField(info, fieldMask, 'publishedYear', 'Year', payload.publishedYear);
+  setComicInfoPublicationDate(info, fieldMask, payload);
   setComicInfoField(info, fieldMask, 'pageCount', 'PageCount', payload.pageCount);
   setComicInfoField(info, fieldMask, 'language', 'LanguageISO', payload.language);
   setComicInfoField(info, fieldMask, 'authors', 'Writer', payload.authors?.length ? payload.authors.map((a) => a.name).join(', ') : null);
@@ -89,24 +90,32 @@ export function buildComicInfoXml(existingXml: string | null, payload: BookWrite
   return `<?xml version="1.0" encoding="UTF-8"?>\n${xmlBody}`;
 }
 
-function stripHtml(html: string): string {
-  return html
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-}
-
 function formatSeriesIndex(val: number): string {
   return val % 1 === 0 ? String(Math.trunc(val)) : String(val);
 }
 
 function formatRating(val: number): string {
   return Math.min(5.0, Math.max(0.0, val / 2.0)).toFixed(1);
+}
+
+function setComicInfoPublicationDate(info: ComicInfoObject, fieldMask: Set<BookWritePayloadKey>, payload: BookWritePayload): void {
+  const shouldWrite = fieldMask.has('publishedDate') || fieldMask.has('publishedYear');
+  if (!shouldWrite) return;
+  if (payload.publishedDate) {
+    info['Year'] = Number(payload.publishedDate.slice(0, 4));
+    info['Month'] = Number(payload.publishedDate.slice(5, 7));
+    info['Day'] = Number(payload.publishedDate.slice(8, 10));
+    return;
+  }
+  if (payload.publishedYear != null) {
+    info['Year'] = payload.publishedYear;
+    delete info['Month'];
+    delete info['Day'];
+    return;
+  }
+  delete info['Year'];
+  delete info['Month'];
+  delete info['Day'];
 }
 
 function setIssueNumberField(info: ComicInfoObject, fieldMask: Set<BookWritePayloadKey>, payload: BookWritePayload): void {

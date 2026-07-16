@@ -11,6 +11,7 @@ import { MetadataModule } from '../metadata/metadata.module';
 import { MetadataFetchModule } from '../metadata-fetch/metadata-fetch.module';
 import { MetadataScoreModule } from '../metadata-score/metadata-score.module';
 import { NarratorModule } from '../narrator/narrator.module';
+import { UserBookNoteModule } from '../user-book-note/user-book-note.module';
 import { UserBookStatusModule } from '../user-book-status/user-book-status.module';
 import { UserPreferencesModule } from '../user-preferences/user-preferences.module';
 import { MetadataPreferencesModule } from '../metadata-preferences/metadata-preferences.module';
@@ -21,6 +22,7 @@ import { BookController } from './book.controller';
 import { BookRepository } from './book.repository';
 import { BookService } from './book.service';
 import { BookAuthorSortKeyBackfillService } from './book-author-sort-key-backfill.service';
+import { ReadingAttemptController } from './reading-attempt.controller';
 
 @Module({
   imports: [
@@ -34,12 +36,13 @@ import { BookAuthorSortKeyBackfillService } from './book-author-sort-key-backfil
     AppSettingsModule,
     MetadataScoreModule,
     NarratorModule,
+    UserBookNoteModule,
     UserBookStatusModule,
     AchievementModule,
     UserPreferencesModule,
     MetadataPreferencesModule,
   ],
-  controllers: [BookController],
+  controllers: [BookController, ReadingAttemptController],
   providers: [BookService, BookRepository, BookReadService, BookSortBuilder, BookQueryBuilder, BookAuthorSortKeyBackfillService],
   exports: [BookService, BookReadService, BookQueryBuilder],
 })

@@ -171,27 +171,39 @@ export class UserStatisticsRepository {
     isSuperuser: boolean,
     filterLibraryIds?: number[],
     days = 365,
+    timeZone = 'UTC',
   ): Promise<{ hour: number; format: string; source: ReadingSessionSource | null; readingSeconds: number; eventsCount: number }[]> {
     const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
     const libraryFilter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
     const since = this.sinceDateForDays(days);
-    const hourExpr = sql<number>`extract(hour from ${readingSessions.startedAt})::int`;
+    const resolvedTimeZone = resolveTimeZone(timeZone, 'UTC');
+    const hourExpr = sql<number>`extract(hour from (${readingSessions.startedAt} AT TIME ZONE ${resolvedTimeZone}))::int`;
     const formatExpr = sql<string>`upper(coalesce(${bookFiles.format}, 'UNKNOWN'))`;
 
-    return this.db
+    const sessionBuckets = this.db
       .select({
-        hour: hourExpr,
-        format: formatExpr,
+        hour: hourExpr.as('hour'),
+        format: formatExpr.as('format'),
         source: readingSessions.source,
-        readingSeconds: sql<number>`coalesce(sum(${readingSessions.durationSeconds}), 0)::int`,
-        eventsCount: sql<number>`count(*)::int`,
+        durationSeconds: readingSessions.durationSeconds,
       })
       .from(readingSessions)
       .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
       .innerJoin(books, eq(books.id, readingSessions.bookId))
       .where(and(eq(readingSessions.userId, userId), gte(readingSessions.startedAt, since), libraryFilter))
-      .groupBy(hourExpr, formatExpr, readingSessions.source)
-      .orderBy(hourExpr);
+      .as('session_buckets');
+
+    return this.db
+      .select({
+        hour: sessionBuckets.hour,
+        format: sessionBuckets.format,
+        source: sessionBuckets.source,
+        readingSeconds: sql<number>`coalesce(sum(${sessionBuckets.durationSeconds}), 0)::int`,
+        eventsCount: sql<number>`count(*)::int`,
+      })
+      .from(sessionBuckets)
+      .groupBy(sessionBuckets.hour, sessionBuckets.format, sessionBuckets.source)
+      .orderBy(sessionBuckets.hour);
   }
 
   async getSessionTimelineItems(

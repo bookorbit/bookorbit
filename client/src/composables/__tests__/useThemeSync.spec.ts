@@ -94,6 +94,17 @@ describe('useThemeSync', () => {
     expect(themeStore.brightness).toBe(72)
   })
 
+  it('loadFromServer applies a synchronized system theme selection', async () => {
+    apiMock.mockResolvedValueOnce(
+      mockJsonResponse({ settings: { theme: 'system', accent: 'blue', radius: 'rounded', background: 'vinyl', brightness: 35 } }),
+    )
+
+    const { loadFromServer } = await import('../useThemeSync')
+    await loadFromServer()
+
+    expect(themeStore.theme).toBe('system')
+  })
+
   it('loadFromServer no-ops when server settings are null', async () => {
     apiMock.mockResolvedValueOnce(mockJsonResponse({ settings: null }))
 

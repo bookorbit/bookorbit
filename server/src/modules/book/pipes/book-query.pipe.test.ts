@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 
-import { BookQueryPipe } from './book-query.pipe';
+import { BookQueryPipe, JumpBucketsQueryPipe } from './book-query.pipe';
 
 describe('BookQueryPipe', () => {
   let pipe: BookQueryPipe;
@@ -153,5 +153,23 @@ describe('BookQueryPipe', () => {
 
   it('rejects a pagination window that exceeds the raised offset cap', () => {
     expect(() => pipe.transform({ pagination: { page: 6000, size: 200 } })).toThrow(BadRequestException);
+  });
+});
+
+describe('JumpBucketsQueryPipe', () => {
+  const pipe = new JumpBucketsQueryPipe();
+
+  it('defaults to a bounded bucket count', () => {
+    expect(pipe.transform({}).maxBuckets).toBe(32);
+  });
+
+  it('accepts bucket counts within the supported range', () => {
+    expect(pipe.transform({ maxBuckets: 8 }).maxBuckets).toBe(8);
+    expect(pipe.transform({ maxBuckets: 64 }).maxBuckets).toBe(64);
+  });
+
+  it('rejects bucket counts outside the supported range', () => {
+    expect(() => pipe.transform({ maxBuckets: 7 })).toThrow(BadRequestException);
+    expect(() => pipe.transform({ maxBuckets: 65 })).toThrow(BadRequestException);
   });
 });

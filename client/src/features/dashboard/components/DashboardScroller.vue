@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, useAttrs } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Aperture, BookMarked, BookmarkPlus, ChevronLeft, ChevronRight, Headphones, ListOrdered, RefreshCw, Shuffle, Sparkles } from '@lucide/vue'
 
 import { isAudioFormat, type BookCard, type CoverAspectRatio, type ScrollerType } from '@bookorbit/types'
@@ -22,6 +23,7 @@ const props = defineProps<{
 }>()
 
 const attrs = useAttrs()
+const { t } = useI18n()
 
 const { books, loading, error, refresh } = useDashboardScroller(props.type, props.limit, props.smartScopeId)
 
@@ -133,10 +135,10 @@ function coverAspectRatio(book: BookCard): CoverAspectRatio {
 
     <!-- Error -->
     <div v-else-if="error" class="flex items-center gap-2.5 px-5 pb-4 pt-1 text-sm text-muted-foreground">
-      <span>Failed to load.</span>
+      <span>{{ t('dashboard.scroller.failedToLoad') }}</span>
       <button class="flex items-center gap-1.5 text-xs text-primary hover:underline" @click="refresh">
         <RefreshCw :size="12" />
-        Retry
+        {{ t('dashboard.common.retry') }}
       </button>
     </div>
 
@@ -146,13 +148,13 @@ function coverAspectRatio(book: BookCard): CoverAspectRatio {
         <component :is="typeIcon" :size="20" class="text-muted-foreground/60" />
       </div>
       <p class="text-sm text-muted-foreground">
-        <template v-if="type === 'continue-reading'">No books in progress yet. Start reading one to see it here.</template>
-        <template v-else-if="type === 'continue-listening'">No audiobooks in progress yet. Start listening to one to see it here.</template>
-        <template v-else-if="type === 'want-to-read'">No books marked want to read yet.</template>
-        <template v-else-if="type === 'up-next-in-series'">No next-in-series picks yet. Finish a volume to surface the next one.</template>
-        <template v-else-if="type === 'recently-added'">No books in your library yet.</template>
-        <template v-else-if="type === 'smart-scope'">No books match this smartScope.</template>
-        <template v-else>No books found.</template>
+        <template v-if="type === 'continue-reading'">{{ t('dashboard.scroller.empty.continueReading') }}</template>
+        <template v-else-if="type === 'continue-listening'">{{ t('dashboard.scroller.empty.continueListening') }}</template>
+        <template v-else-if="type === 'want-to-read'">{{ t('dashboard.scroller.empty.wantToRead') }}</template>
+        <template v-else-if="type === 'up-next-in-series'">{{ t('dashboard.scroller.empty.upNextInSeries') }}</template>
+        <template v-else-if="type === 'recently-added'">{{ t('dashboard.scroller.empty.recentlyAdded') }}</template>
+        <template v-else-if="type === 'smart-scope'">{{ t('dashboard.scroller.empty.smartScope') }}</template>
+        <template v-else>{{ t('dashboard.scroller.empty.default') }}</template>
       </p>
     </div>
 

@@ -1,4 +1,5 @@
 import * as schema from '../../../db/schema';
+import { normalizeMetadataText, normalizeMetadataTextKey } from '../../../common/utils/metadata-text-normalize.utils';
 import { applyPathMappings } from '../planner/matching.service';
 import type { PlannerResult } from '../planner/planner.types';
 
@@ -99,11 +100,11 @@ export function buildMetadataPatch(sourceBook: {
     isbn10: field('isbn10', truncateNullableText(sourceBook.isbn10, 10)),
     isbn13: field('isbn13', truncateNullableText(sourceBook.isbn13, 13)),
     description: field('description', sourceBook.description),
-    publisher: field('publisher', truncateNullableText(sourceBook.publisher, 500)),
+    publisher: field('publisher', truncateNullableMetadataText(sourceBook.publisher, 500)),
     publishedYear: field('publishedYear', sanitizeBoundedInteger(sourceBook.publishedYear, 1000, 2200)),
     language: field('language', truncateNullableText(sourceBook.language, 100)),
     pageCount: field('pageCount', sanitizeNonNegativeInteger(sourceBook.pageCount)),
-    seriesName: field('seriesName', truncateNullableText(sourceBook.seriesName, 500)),
+    seriesName: field('seriesName', truncateNullableMetadataText(sourceBook.seriesName, 500)),
     seriesIndex: field('seriesIndex', sourceBook.seriesIndex),
     rating: field('rating', sanitizeBoundedInteger(sourceBook.rating, 1, 10)),
     googleBooksId: field('googleBooksId', truncateNullableText(sourceBook.googleBooksId, 50)),
@@ -137,9 +138,11 @@ export function buildContributorValues(contributor: {
   sortName?: string | null;
   description?: string | null;
 }): typeof schema.authors.$inferInsert {
+  const name = normalizeMetadataText(contributor.name) ?? '';
+  const sortName = normalizeMetadataText(contributor.sortName ?? contributor.name) ?? name;
   return pruneUndefined({
-    name: truncateText(contributor.name, 500),
-    sortName: truncateText(contributor.sortName ?? contributor.name, 500),
+    name: truncateText(name, 500),
+    sortName: truncateText(sortName, 500),
     description: contributor.description ?? undefined,
   });
 }
@@ -150,9 +153,13 @@ export function getSourceContributors(
 ): Array<{ name: string; sortName: string | null; description: string | null }> {
   const structured =
     contributors
-      ?.filter((c) => c.name.trim().length > 0)
+      ?.filter((c) => normalizeMetadataText(c.name) !== null)
       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
-      .map((c) => ({ name: c.name.trim(), sortName: c.sortName ?? null, description: c.description ?? null })) ?? [];
+      .map((c) => ({
+        name: normalizeMetadataText(c.name)!,
+        sortName: normalizeMetadataText(c.sortName),
+        description: c.description ?? null,
+      })) ?? [];
   if (structured.length > 0) return dedupeContributors(structured);
   return parseAuthorNames(legacyValue).map((name) => ({ name, sortName: name, description: null }));
 }
@@ -180,9 +187,9 @@ function parseAuthorNames(value: string | null): string[] {
   const seen = new Set<string>();
   const names: string[] = [];
   for (const rawName of rawNames) {
-    const name = rawName.trim();
-    if (!name) continue;
-    const key = name.toLowerCase();
+    const name = normalizeMetadataText(rawName);
+    const key = normalizeMetadataTextKey(name);
+    if (!name || !key) continue;
     if (seen.has(key)) continue;
     seen.add(key);
     names.push(name);
@@ -238,6 +245,11 @@ export function truncateText(value: string, maxLength: number): string {
 export function truncateNullableText(value: string | null | undefined, maxLength: number): string | null | undefined {
   if (value == null) return value;
   return truncateText(value, maxLength);
+}
+
+function truncateNullableMetadataText(value: string | null | undefined, maxLength: number): string | null | undefined {
+  if (value === undefined) return undefined;
+  return normalizeMetadataText(value)?.slice(0, maxLength) ?? null;
 }
 
 export function normalizeReadStatus(

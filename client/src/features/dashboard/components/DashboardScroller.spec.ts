@@ -86,6 +86,7 @@ function makeBook(id: number, format: string): BookCard {
     seriesName: null,
     seriesIndex: null,
     files: [{ id, format, role: 'content', sizeBytes: 123 }],
+    publishedDate: null,
     publishedYear: null,
     language: null,
     genres: [],

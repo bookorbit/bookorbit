@@ -29,6 +29,29 @@ describe('MigrationRepository', () => {
     expect(select).not.toHaveBeenCalled();
   });
 
+  it('deduplicates title lookups and queries in chunks of 500', async () => {
+    const where = vi
+      .fn()
+      .mockResolvedValueOnce([{ bookId: 1, title: 'Dune' }])
+      .mockResolvedValueOnce([{ bookId: 501, title: 'Messiah' }])
+      .mockResolvedValueOnce([{ bookId: 1001, title: null }]);
+    const from = vi.fn().mockReturnValue({ where });
+    const select = vi.fn().mockReturnValue({ from });
+
+    const repo = new MigrationRepository({ select } as never);
+    const ids = Array.from({ length: 1001 }, (_, index) => index + 1);
+    ids.push(1, Number.NaN);
+
+    await expect(repo.findBookTitlesByIds(ids)).resolves.toEqual(
+      new Map([
+        [1, 'Dune'],
+        [501, 'Messiah'],
+        [1001, null],
+      ]),
+    );
+    expect(where).toHaveBeenCalledTimes(3);
+  });
+
   it('purges run state and removes all plan artifacts when there are no completed runs', async () => {
     const deleteWhere = vi.fn().mockResolvedValue(undefined);
     const deleteFn = vi.fn().mockReturnValue({ where: deleteWhere });

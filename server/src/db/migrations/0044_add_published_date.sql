@@ -1,0 +1,4 @@
+ALTER TABLE "book_metadata" ADD COLUMN "published_date" date;--> statement-breakpoint
+CREATE INDEX "bm_published_date_idx" ON "book_metadata" USING btree ("published_date");--> statement-breakpoint
+CREATE INDEX "bm_published_date_sort_idx" ON "book_metadata" USING btree (coalesce("published_date", make_date("published_year", 1, 1)));--> statement-breakpoint
+ALTER TABLE "book_metadata" ADD CONSTRAINT "book_metadata_published_date_range_chk" CHECK ("book_metadata"."published_date" is null or (extract(year from "book_metadata"."published_date") >= 1000 and extract(year from "book_metadata"."published_date") <= 2200));

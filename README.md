@@ -9,11 +9,11 @@ A self-hosted library management and reading platform for ebooks, PDFs, audioboo
 [![CI](https://github.com/bookorbit/bookorbit/actions/workflows/ci.yml/badge.svg)](https://github.com/bookorbit/bookorbit/actions/workflows/ci.yml)
 [![Release](https://github.com/bookorbit/bookorbit/actions/workflows/release.yml/badge.svg)](https://github.com/bookorbit/bookorbit/actions/workflows/release.yml)
 [![Server Coverage](https://codecov.io/gh/bookorbit/bookorbit/graph/badge.svg?token=F6TADEFCUV&flag=server)](https://codecov.io/gh/bookorbit/bookorbit)
+[![Crowdin](https://badges.crowdin.net/bookorbit/localized.svg)](https://crowdin.com/project/bookorbit)
 
 [![Website](https://img.shields.io/badge/Website-bookorbit.app-blue?style=flat-square&logo=googlechrome&logoColor=white&color=4169E1)](https://bookorbit.app)
 [![Demo](https://img.shields.io/badge/Demo-live-brightgreen?style=flat-square&logo=rocket&logoColor=white&color=40a829)](https://demo.bookorbit.app/magic?token=2d92cb900e184cf0eb8b11f72cffc6011673d1016e1b300d750eb3d76abc1572)
 [![GHCR Pulls](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fghcr-badge.elias.eu.org%2Fapi%2Fbookorbit%2Fbookorbit%2Fbookorbit&query=downloadCount&label=Docker%20Pulls&logo=docker&style=flat-square&color=2496ed)](https://github.com/bookorbit/bookorbit/pkgs/container/bookorbit)
-[![Discussions](https://img.shields.io/badge/Discussions-GitHub-333?style=flat-square&logo=github&logoColor=white)](https://github.com/bookorbit/bookorbit/discussions)
 [![Contributing](https://img.shields.io/badge/Contributing-guide-orange?style=flat-square&logo=handshake&logoColor=white)](https://github.com/bookorbit/bookorbit/blob/main/docs/CONTRIBUTING.md)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg?style=flat-square&color=B461B3)](LICENSE)
 
@@ -57,6 +57,7 @@ _Experience the interface, built-in readers, and dashboard first-hand._
 - **KOReader Plugin**: Native on-device catalog browser with search, download, and status/rating management, alongside full progress and annotation sync.
 - **Annotations & Highlights**: Highlights from the web reader, KOReader, and Kobo merge into a unified searchable hub - filterable by color, style, and source, exportable as Markdown, CSV, or JSON.
 - **Hardcover Sync**: Automatically pushes status, progress, reading dates, and ratings to Hardcover on configurable triggers. Pull read history back from Hardcover to backfill blank BookOrbit entries.
+- **Readwise Sync**: Automatically pushes new highlights and notes to Readwise as you create them, from both the web reader and synced devices, with book covers matched by ISBN.
 - **Achievements & Reading Goals**: Yearly goals, daily streaks, monthly challenges, and 50+ achievements across five categories. Reading DNA profiles your reading style from your actual session history.
 - **Reading Statistics**: Track your daily reading time, view heatmaps, maintain streaks, and monitor library health.
 
@@ -94,6 +95,8 @@ JWT_SECRET=                # signs login tokens          - openssl rand -hex 32
 SETUP_BOOTSTRAP_TOKEN=     # one-time setup wizard token - openssl rand -hex 16
 ```
 
+Optionally set `LIBRARY_BROWSE_ROOT=/books` to start the library folder picker at `/books` instead of `/`.
+
 Then start:
 
 ```bash
@@ -128,11 +131,25 @@ For local development, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). To contri
 
 ---
 
+## Translations
+
+BookOrbit is available in English, German, Dutch, Brazilian Portuguese, and Slovenian. Translations are managed through [Crowdin](https://crowdin.com/project/bookorbit).
+
+[![German translation](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fbadges.awesome-crowdin.com%2Fstats-17791545-912891.json&query=%24.progress.0.data.translationProgress&label=German&logo=crowdin&color=blue&style=flat-square)](https://crowdin.com/project/bookorbit)
+[![Dutch translation](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fbadges.awesome-crowdin.com%2Fstats-17791545-912891.json&query=%24.progress.2.data.translationProgress&label=Dutch&logo=crowdin&color=blue&style=flat-square)](https://crowdin.com/project/bookorbit)
+[![Brazilian Portuguese translation](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fbadges.awesome-crowdin.com%2Fstats-17791545-912891.json&query=%24.progress.3.data.translationProgress&label=Portuguese%20%28Brazil%29&logo=crowdin&color=blue&style=flat-square)](https://crowdin.com/project/bookorbit)
+[![Slovenian translation](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fbadges.awesome-crowdin.com%2Fstats-17791545-912891.json&query=%24.progress.4.data.translationProgress&label=Slovenian&logo=crowdin&color=blue&style=flat-square)](https://crowdin.com/project/bookorbit)
+
+[Help improve BookOrbit translations on Crowdin](https://crowdin.com/project/bookorbit).
+
+---
+
 ## Support
 
 - **Questions and discussion:** [GitHub Discussions](https://github.com/bookorbit/bookorbit/discussions)
 - **Bug reports:** [GitHub Issues](https://github.com/bookorbit/bookorbit/issues/new?template=bug_report.yml)
 - **Feature requests:** [GitHub Issues](https://github.com/bookorbit/bookorbit/issues/new?template=feature_request.yml)
+- **Security vulnerabilities:** Follow the private reporting process in the [Security Policy](.github/SECURITY.md).
 
 ---
 

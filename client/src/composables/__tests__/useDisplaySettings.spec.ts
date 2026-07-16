@@ -12,6 +12,7 @@ function resetDisplaySettings() {
   settings.squareGridGap.value = 28
   settings.viewMode.value = 'grid'
   settings.cardOverlays.value = ['progress-bar', 'format', 'rating', 'read-status', 'series-position']
+  settings.showJumpRails.value = true
   settings.smartScopeFilterExpanded.value = true
   settings.authorCoverSize.value = 120
   settings.authorCoverShape.value = 'circle'
@@ -44,6 +45,7 @@ describe('useDisplaySettings preferences helpers', () => {
       coverSizeScope: 'per-view',
       viewMode: 'grid',
       cardOverlays: ['format', 'rating'],
+      showJumpRails: true,
       bookSpineOverlay: 'strong',
       bookCoverDisplayMode: 'natural-bottom',
       thumbnailClickAction: 'reader',
@@ -56,6 +58,7 @@ describe('useDisplaySettings preferences helpers', () => {
       squareCoverSize: 'large',
       coverSizeScope: 'synced',
       cardOverlays: ['format', 'unknown', 'format', 'lock-status'],
+      showJumpRails: false,
       bookCoverDisplayMode: 'fill-crop',
       thumbnailClickAction: 'details',
       tableDensity: 'huge',
@@ -66,6 +69,7 @@ describe('useDisplaySettings preferences helpers', () => {
       portraitCoverSize: 400,
       coverSizeScope: 'synced',
       cardOverlays: ['format', 'lock-status'],
+      showJumpRails: false,
       bookCoverDisplayMode: 'fill-crop',
       thumbnailClickAction: 'details',
     })
@@ -77,6 +81,7 @@ describe('useDisplaySettings preferences helpers', () => {
       gridGap: 120,
       viewMode: 'table',
       authorCoverShape: 'square',
+      showJumpRails: false,
       tableZebraStriping: true,
       bookShadowStrength: 'strong',
       bookCoverDisplayMode: 'natural-bottom',
@@ -88,6 +93,7 @@ describe('useDisplaySettings preferences helpers', () => {
     expect(settings.gridGap.value).toBe(80)
     expect(settings.viewMode.value).toBe('table')
     expect(settings.authorCoverShape.value).toBe('square')
+    expect(settings.showJumpRails.value).toBe(false)
     expect(settings.tableZebraStriping.value).toBe(true)
     expect(settings.tableDensity.value).toBe('comfortable')
     expect(settings.bookShadowStrength.value).toBe('strong')
@@ -98,6 +104,12 @@ describe('useDisplaySettings preferences helpers', () => {
   it('ignores non-object payloads', () => {
     expect(sanitizeDisplayPreferences(null)).toEqual({})
     expect(sanitizeDisplayPreferences('bad')).toEqual({})
+  })
+
+  it('sanitizes only boolean showJumpRails values', () => {
+    expect(sanitizeDisplayPreferences({ showJumpRails: true })).toEqual({ showJumpRails: true })
+    expect(sanitizeDisplayPreferences({ showJumpRails: false })).toEqual({ showJumpRails: false })
+    expect(sanitizeDisplayPreferences({ showJumpRails: 'false' })).toEqual({})
   })
 
   it('includes seriesCardCoverMode in snapshot', () => {

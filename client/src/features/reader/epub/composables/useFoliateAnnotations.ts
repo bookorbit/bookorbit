@@ -111,6 +111,14 @@ export function useFoliateAnnotations() {
     ;(view as any)?.deleteAnnotation?.({ value: cfi })
   }
 
+  function redrawAnnotation(view: unknown, cfi: string, color: string, style: string) {
+    annotationStyleMap.set(cfi, { color, style })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(view as any)?.deleteAnnotation?.({ value: cfi })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(view as any)?.addAnnotation?.({ value: cfi })
+  }
+
   function reAddAll(view: unknown) {
     setTimeout(() => {
       for (const [cfi] of annotationStyleMap) {
@@ -128,5 +136,14 @@ export function useFoliateAnnotations() {
     draw(getDrawFunction(stored.style), { color: stored.color })
   }
 
-  return { annotationStyleMap, getDrawFunction, addAnnotation, addAnnotations, deleteAnnotation, reAddAll, handleDrawAnnotationEvent }
+  return {
+    annotationStyleMap,
+    getDrawFunction,
+    addAnnotation,
+    addAnnotations,
+    deleteAnnotation,
+    redrawAnnotation,
+    reAddAll,
+    handleDrawAnnotationEvent,
+  }
 }

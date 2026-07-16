@@ -457,13 +457,13 @@ describe('CollectionService', () => {
       libraryService.findAccessibleLibraryIds.mockResolvedValue([100]);
       collectionRepo.buildMembershipWhere.mockReturnValue('membership-where');
       queryBuilder.buildWhere.mockReturnValue('filter-where');
-      bookService.executeJumpBucketsQuery.mockResolvedValue({ buckets: [], total: 0 });
+      bookService.executeJumpBucketsQuery.mockResolvedValue({ buckets: [], total: 0, kind: 'letter', granularity: null });
 
       const query = { sort: [{ field: 'title', dir: 'asc' as const }], pagination: { page: 0, size: 50 } };
       await service.queryJumpBuckets(10, makeUser(), query as never);
 
       expect(collectionRepo.buildMembershipWhere).toHaveBeenCalledWith(10);
-      expect(bookService.executeJumpBucketsQuery).toHaveBeenCalledWith(1, expect.anything(), query);
+      expect(bookService.executeJumpBucketsQuery).toHaveBeenCalledWith(1, expect.anything(), query, 'UTC');
     });
 
     it('queryJumpBuckets propagates ownership errors before delegating', async () => {

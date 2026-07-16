@@ -1,37 +1,41 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { formatDate as formatLocaleDate } from '@/i18n/formatters'
 import { Globe, Loader2, MonitorSmartphone, RefreshCw, Tablet } from '@lucide/vue'
 import type { AnnotationPositionFormat } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAnnotationSyncDetail } from '../composables/useAnnotationSyncDetail'
 
+const { t } = useI18n()
+
 const props = defineProps<{ annotationId: number }>()
 
 const { detail, loading, retrying, error, load, retry } = useAnnotationSyncDetail()
 
-const FORMAT_LABELS: Record<AnnotationPositionFormat, string> = {
-  cfi: 'Web reader',
-  xpointer: 'KOReader',
-  pdf: 'PDF',
-  kobo_span: 'Kobo',
-}
+const FORMAT_LABELS = computed<Record<AnnotationPositionFormat, string>>(() => ({
+  cfi: t('annotations.sync.format.webReader'),
+  xpointer: t('annotations.sync.format.koreader'),
+  pdf: t('annotations.sync.format.pdf'),
+  kobo_span: t('annotations.sync.format.kobo'),
+}))
 
-const STATUS_LABELS: Record<string, string> = {
-  exact: 'Exact',
-  repaired: 'Repaired',
-  failed: 'Failed',
-  pending: 'Pending',
-}
+const STATUS_LABELS = computed<Record<string, string>>(() => ({
+  exact: t('annotations.sync.status.exact'),
+  repaired: t('annotations.sync.status.repaired'),
+  failed: t('annotations.sync.status.failed'),
+  pending: t('annotations.sync.status.pending'),
+}))
 
 const positions = computed(() => detail.value?.positions ?? [])
 const devices = computed(() => detail.value?.devices ?? [])
 
 function formatLabel(format: AnnotationPositionFormat): string {
-  return FORMAT_LABELS[format] ?? format
+  return FORMAT_LABELS.value[format] ?? format
 }
 
 function statusLabel(status: string): string {
-  return STATUS_LABELS[status] ?? status
+  return STATUS_LABELS.value[status] ?? status
 }
 
 function statusClass(status: string): string {
@@ -48,7 +52,7 @@ function deviceLabel(device: { source: string; deviceId: string; deviceName: str
 
 function formatDate(value: string): string {
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return Number.isNaN(date.getTime()) ? '' : formatLocaleDate(date, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function handleRetry(format: AnnotationPositionFormat) {
@@ -64,13 +68,13 @@ onMounted(() => {
   <div class="mt-2 rounded-md border border-border bg-background p-2.5 text-xs">
     <div v-if="loading" class="flex items-center gap-2 text-muted-foreground">
       <Loader2 :size="13" class="animate-spin" />
-      Loading sync detail
+      {{ t('annotations.sync.loading') }}
     </div>
 
     <div v-else-if="error" class="text-destructive">{{ error }}</div>
 
     <template v-else-if="detail">
-      <p class="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Positions</p>
+      <p class="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{{ t('annotations.sync.positions') }}</p>
       <ul class="flex flex-col gap-1">
         <li v-for="position in positions" :key="position.format" class="flex flex-wrap items-center gap-2">
           <span class="w-24 shrink-0 text-muted-foreground">{{ formatLabel(position.format) }}</span>
@@ -90,13 +94,13 @@ onMounted(() => {
                 <RefreshCw v-else :size="12" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Retry conversion</TooltipContent>
+            <TooltipContent>{{ t('annotations.sync.retryConversion') }}</TooltipContent>
           </Tooltip>
         </li>
-        <li v-if="positions.length === 0" class="text-muted-foreground">No stored positions.</li>
+        <li v-if="positions.length === 0" class="text-muted-foreground">{{ t('annotations.sync.noStoredPositions') }}</li>
       </ul>
 
-      <p class="mb-1.5 mt-3 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Devices</p>
+      <p class="mb-1.5 mt-3 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{{ t('annotations.sync.devices') }}</p>
       <ul class="flex flex-col gap-1">
         <li v-for="device in devices" :key="`${device.source}-${device.deviceId}`" class="flex flex-wrap items-center gap-2">
           <span class="inline-flex w-40 shrink-0 items-center gap-1.5 truncate text-foreground">
@@ -108,13 +112,13 @@ onMounted(() => {
             class="inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium"
             :class="device.upToDate ? 'border-primary/30 bg-primary/10 text-primary' : 'border-border bg-muted text-muted-foreground'"
           >
-            {{ device.upToDate ? 'Up to date' : `Pending v${detail.version}` }}
+            {{ device.upToDate ? t('annotations.sync.upToDate') : t('annotations.sync.pendingVersion', { version: detail.version }) }}
           </span>
-          <span class="text-muted-foreground">synced {{ formatDate(device.lastSyncedAt) }}</span>
+          <span class="text-muted-foreground">{{ t('annotations.sync.syncedAt', { date: formatDate(device.lastSyncedAt) }) }}</span>
         </li>
         <li v-if="devices.length === 0" class="flex items-center gap-1.5 text-muted-foreground">
           <Globe :size="12" />
-          Not synced to any device yet.
+          {{ t('annotations.sync.notSynced') }}
         </li>
       </ul>
     </template>

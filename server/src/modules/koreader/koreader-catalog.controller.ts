@@ -7,6 +7,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { KoreaderAuthGuard } from './koreader-auth.guard';
 import { KoreaderCatalogService } from './koreader-catalog.service';
 import {
+  KoreaderCatalogBookDetailQueryDto,
   KoreaderCatalogBooksQueryDto,
   KoreaderCatalogSectionQueryDto,
   KoreaderCatalogSetRatingDto,
@@ -51,8 +52,8 @@ export class KoreaderCatalogController {
 
   @Get('books/:bookId')
   @Header('Cache-Control', 'private, max-age=30')
-  bookDetail(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number) {
-    return this.catalogService.getBookDetail(user, bookId);
+  bookDetail(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number, @Query() query: KoreaderCatalogBookDetailQueryDto) {
+    return this.catalogService.getBookDetail(user, bookId, query.deviceId);
   }
 
   @Put('books/:bookId/read-status')

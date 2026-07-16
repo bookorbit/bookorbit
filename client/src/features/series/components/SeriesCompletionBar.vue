@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   readCount: number
@@ -28,6 +31,8 @@ const fillClass = computed(() => (props.flush ? 'rounded-none' : 'rounded-full')
     <div class="w-full overflow-hidden" :class="trackClass">
       <div class="h-full transition-all duration-300" :class="[barColorClass, fillClass]" :style="{ width: `${percentage}%` }" />
     </div>
-    <p v-if="!compact" class="mt-1 text-xs text-muted-foreground">{{ readCount }} of {{ totalCount }} read ({{ percentage }}%)</p>
+    <p v-if="!compact" class="mt-1 text-xs text-muted-foreground">
+      {{ t('series.completion.readOfTotal', { read: readCount, total: totalCount, percentage }) }}
+    </p>
   </div>
 </template>

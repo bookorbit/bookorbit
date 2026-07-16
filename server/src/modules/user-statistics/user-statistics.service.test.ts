@@ -102,7 +102,7 @@ describe('UserStatisticsService', () => {
     const service = new UserStatisticsService(repo as any);
     const result = await service.getPeakReadingHours({ id: 123, isSuperuser: false } as any, { libraryIds: [] });
 
-    expect(repo.getPeakReadingHours).toHaveBeenCalledWith(123, false, [], 365);
+    expect(repo.getPeakReadingHours).toHaveBeenCalledWith(123, false, [], 365, 'UTC');
     expect(result).toHaveLength(24);
     expect(result[8]).toEqual(
       expect.objectContaining({ hour: 8, readingSeconds: 600, eventsCount: 3, bySource: { bookorbit: 400, koreader: 0, kobo: 200 } }),
@@ -113,6 +113,20 @@ describe('UserStatisticsService', () => {
     expect(result[0]).toEqual(
       expect.objectContaining({ hour: 0, readingSeconds: 0, eventsCount: 0, bySource: { bookorbit: 0, koreader: 0, kobo: 0 } }),
     );
+  });
+
+  it('passes the resolved user timezone to peak reading hours', async () => {
+    const repo = {
+      getPeakReadingHours: vi.fn().mockResolvedValue([]),
+    };
+
+    const service = new UserStatisticsService(repo as any);
+    await service.getPeakReadingHours({ id: 123, isSuperuser: false, settings: { timezone: 'Australia/Brisbane' } } as any, {
+      days: 30,
+      libraryIds: [2],
+    });
+
+    expect(repo.getPeakReadingHours).toHaveBeenCalledWith(123, false, [2], 30, 'Australia/Brisbane');
   });
 
   it('returns all weekday buckets for favorite reading days', async () => {

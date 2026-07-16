@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Lock, LockOpen } from '@lucide/vue'
 import { FORMAT_TO_GROUP, type BookCard } from '@bookorbit/types'
 import BookTableCoverCell from './BookTableCoverCell.vue'
@@ -55,6 +56,8 @@ const emit = defineEmits<{
   'update:book': [updated: BookCard]
 }>()
 
+const { t } = useI18n()
+
 function asString(v: unknown): string | null {
   return v as string | null
 }
@@ -87,7 +90,7 @@ const isComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GR
     <button
       class="flex h-6 w-6 items-center justify-center rounded transition-colors hover:bg-muted"
       :class="lockStateClass"
-      :aria-label="isFullyLocked ? 'Unlock all fields' : 'Lock all fields'"
+      :aria-label="isFullyLocked ? t('book.table.locks.unlockAll') : t('book.table.locks.lockAll')"
       @click.stop="isFullyLocked ? emit('unlockAll') : emit('lockAll')"
     >
       <Lock v-if="lockedFieldCount > 0" :size="13" />

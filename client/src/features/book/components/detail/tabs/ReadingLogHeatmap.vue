@@ -1,19 +1,51 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { CalendarDays } from '@lucide/vue'
 import type { BookReadingSessionStats } from '@bookorbit/types'
 import { useThemeStore } from '@/stores/theme'
 import { buildHeatmapPalette } from '@/lib/heatmap-palette'
 
-const props = defineProps<{
-  stats: BookReadingSessionStats | null
-  loading: boolean
-  quickFilter: 'all' | 'last30' | 'last90' | 'thisYear'
-}>()
+const props = withDefaults(
+  defineProps<{
+    stats: BookReadingSessionStats | null
+    loading: boolean
+    quickFilter: 'all' | 'last30' | 'last90' | 'thisYear'
+    embedded?: boolean
+  }>(),
+  { embedded: false },
+)
+
+const { t } = useI18n()
 
 const DAY_MS = 24 * 60 * 60 * 1000
-const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+const dayLabels = computed(
+  () =>
+    [
+      t('book.detail.readingLog.weekdays.sun'),
+      t('book.detail.readingLog.weekdays.mon'),
+      t('book.detail.readingLog.weekdays.tue'),
+      t('book.detail.readingLog.weekdays.wed'),
+      t('book.detail.readingLog.weekdays.thu'),
+      t('book.detail.readingLog.weekdays.fri'),
+      t('book.detail.readingLog.weekdays.sat'),
+    ] as const,
+)
+const monthLabels = computed(() => [
+  t('book.detail.readingLog.months.jan'),
+  t('book.detail.readingLog.months.feb'),
+  t('book.detail.readingLog.months.mar'),
+  t('book.detail.readingLog.months.apr'),
+  t('book.detail.readingLog.months.may'),
+  t('book.detail.readingLog.months.jun'),
+  t('book.detail.readingLog.months.jul'),
+  t('book.detail.readingLog.months.aug'),
+  t('book.detail.readingLog.months.sep'),
+  t('book.detail.readingLog.months.oct'),
+  t('book.detail.readingLog.months.nov'),
+  t('book.detail.readingLog.months.dec'),
+])
 
 const themeStore = useThemeStore()
 const option = shallowRef({})
@@ -30,16 +62,21 @@ function parseDayKeyToUtcStart(dayKey: string): number | null {
 
 const todayUtcStart = computed(() => toUtcDayStart(new Date()))
 
-const consistencyWindowDays = computed(() => {
-  if (props.quickFilter === 'last30') return 30
-  if (props.quickFilter === 'last90') return 90
-  if (props.quickFilter === 'thisYear') {
-    const jan1 = Date.UTC(new Date().getUTCFullYear(), 0, 1)
-    return Math.floor((todayUtcStart.value - jan1) / DAY_MS) + 1
-  }
-  if (!props.stats?.firstSessionAt) return 0
-  const firstDay = toUtcDayStart(new Date(props.stats.firstSessionAt))
-  return Math.max(1, Math.floor((todayUtcStart.value - firstDay) / DAY_MS) + 1)
+const rangeStart = computed(() => {
+  const rangeEnd = todayUtcStart.value
+  if (props.quickFilter === 'last30') return rangeEnd - 29 * DAY_MS
+  if (props.quickFilter === 'last90') return rangeEnd - 89 * DAY_MS
+  if (props.quickFilter === 'thisYear') return Date.UTC(new Date().getUTCFullYear(), 0, 1)
+  return rangeEnd - 364 * DAY_MS
+})
+
+const consistencyWindowDays = computed(() => Math.floor((todayUtcStart.value - rangeStart.value) / DAY_MS) + 1)
+
+const rangeLabel = computed(() => {
+  if (props.quickFilter === 'last30') return 'last 30 days'
+  if (props.quickFilter === 'last90') return 'last 90 days'
+  if (props.quickFilter === 'thisYear') return 'this year'
+  return 'last 12 months'
 })
 
 const activeDays = computed(() => {
@@ -59,7 +96,7 @@ const subtitle = computed(() => {
   if (consistencyWindowDays.value <= 0) return ''
   const ratio = Math.round((activeDays.value / consistencyWindowDays.value) * 100)
   const dayWord = activeDays.value === 1 ? 'day' : 'days'
-  return `${activeDays.value} active ${dayWord} · ${ratio}% consistency`
+  return `${activeDays.value} active ${dayWord} · ${ratio}% of ${rangeLabel.value}`
 })
 
 const hasData = computed(() => (props.stats?.dailySummary ?? []).some((row) => row.totalMinutes > 0))
@@ -81,18 +118,18 @@ watchEffect(() => {
   option.value = {}
   if (!hasData.value) return
 
-  const palette = buildHeatmapPalette({ theme: themeStore.theme, profile: 'github' })
+  const palette = buildHeatmapPalette({ theme: themeStore.resolvedTheme, profile: 'github' })
   // Touching accent makes this effect re-run when the palette source changes.
   void themeStore.accent
 
   const rangeEnd = todayUtcStart.value
-  const rangeStart = rangeEnd - 364 * DAY_MS
-  const rangeStartKey = new Date(rangeStart).toISOString().slice(0, 10)
+  const rangeStartValue = rangeStart.value
+  const rangeStartKey = new Date(rangeStartValue).toISOString().slice(0, 10)
   const rangeEndKey = new Date(rangeEnd).toISOString().slice(0, 10)
 
   const byDay = new Map((props.stats?.dailySummary ?? []).map((row) => [row.day, row.totalMinutes]))
   const values: Array<readonly [string, number]> = []
-  for (let cursor = rangeStart; cursor <= rangeEnd; cursor += DAY_MS) {
+  for (let cursor = rangeStartValue; cursor <= rangeEnd; cursor += DAY_MS) {
     const day = new Date(cursor).toISOString().slice(0, 10)
     values.push([day, byDay.get(day) ?? 0] as const)
   }
@@ -106,7 +143,7 @@ watchEffect(() => {
       textStyle: { color: palette.tooltipText, fontSize: 12 },
       formatter: (params: { value: [string, number] }) => {
         const [day, minutes] = params.value
-        return `${day}<br/><strong>${minutes}</strong> min`
+        return `${day}<br/><strong>${minutes}</strong> ${t('book.detail.readingLog.heatmap.minutesUnit')}`
       },
     },
     visualMap: {
@@ -137,7 +174,7 @@ watchEffect(() => {
         fontSize: 9,
         color: palette.axisColor,
         margin: 6,
-        nameMap: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+        nameMap: monthLabels.value,
       },
       dayLabel: {
         show: true,
@@ -145,7 +182,7 @@ watchEffect(() => {
         fontSize: 8,
         color: palette.axisColor,
         margin: 6,
-        nameMap: DAY_LABELS,
+        nameMap: dayLabels.value,
       },
       itemStyle: {
         color: 'transparent',
@@ -167,19 +204,23 @@ watchEffect(() => {
 </script>
 
 <template>
-  <div class="flex h-full flex-col rounded-lg border border-border bg-card p-3 sm:p-4">
-    <div class="mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-      <span class="flex items-center gap-2 text-sm font-medium text-foreground">
+  <section
+    :class="['flex h-full flex-col', embedded ? '' : 'rounded-xl border border-border bg-card p-4 shadow-[var(--elevation-xs)]']"
+    aria-labelledby="reading-activity-heading"
+  >
+    <div class="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+      <span class="flex items-center gap-2 text-sm font-semibold text-foreground">
         <CalendarDays class="size-4 text-muted-foreground" />
-        Activity
+        <span id="reading-activity-heading">{{ t('book.detail.readingLog.heatmap.title') }}</span>
       </span>
       <span v-if="subtitle" class="text-xs text-muted-foreground">{{ subtitle }}</span>
     </div>
-    <div v-if="hasData" class="relative min-h-0 flex-1 transition-opacity" :class="{ 'opacity-50': loading }" style="min-height: 220px">
+    <div v-if="hasData" class="relative min-h-0 flex-1 transition-opacity" :class="{ 'opacity-50': loading }" style="min-height: 228px">
       <VChart :option autoresize class="absolute inset-0" />
     </div>
-    <div v-else class="flex flex-1 items-center justify-center py-12 text-sm text-muted-foreground" style="min-height: 220px">
-      No reading activity in this window.
+    <div v-else class="flex flex-1 flex-col items-center justify-center py-10 text-center" style="min-height: 228px">
+      <p class="text-sm font-medium text-foreground">{{ t('book.detail.readingLog.heatmap.empty') }}</p>
+      <p class="mt-1 text-sm text-muted-foreground">{{ t('book.detail.readingLog.heatmap.emptyHint') }}</p>
     </div>
-  </div>
+  </section>
 </template>

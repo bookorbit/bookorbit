@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { Lock, LockOpen } from '@lucide/vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+
+const { t } = useI18n()
 
 defineProps<{
   isLocked: boolean
@@ -22,7 +25,7 @@ defineEmits<{
         <button
           type="button"
           :aria-pressed="isLocked"
-          :aria-label="isLocked ? 'Unlock field' : 'Lock field'"
+          :aria-label="isLocked ? t('book.table.locks.unlockField') : t('book.table.locks.lockField')"
           class="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm transition-colors"
           :class="
             isLocked
@@ -36,7 +39,7 @@ defineEmits<{
         </button>
       </TooltipTrigger>
       <TooltipContent>
-        {{ isLocked ? 'Click to unlock' : 'Click to lock' }}
+        {{ isLocked ? t('book.table.locks.clickToUnlock') : t('book.table.locks.clickToLock') }}
       </TooltipContent>
     </Tooltip>
   </div>

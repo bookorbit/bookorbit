@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ArrowLeft, Loader2, Pencil, X } from '@lucide/vue'
 import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
 import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
@@ -21,6 +22,7 @@ const emit = defineEmits<{
   'update:book': [bookId: number, hasCover: boolean]
 }>()
 
+const { t } = useI18n()
 const { md } = useBreakpoints(breakpointsTailwind)
 const isEditEnabled = computed(() => !props.readOnly && md.value)
 
@@ -84,7 +86,7 @@ async function handleToggleCoverLock() {
         @escape-key-down="handleOpenChange(false)"
       >
         <DialogDescription class="sr-only">
-          {{ mode === 'view' ? 'Book cover preview' : 'Edit book cover' }}
+          {{ mode === 'view' ? t('book.table.cover.previewDescription') : t('book.table.cover.editDescription') }}
         </DialogDescription>
 
         <!-- Header -->
@@ -98,7 +100,7 @@ async function handleToggleCoverLock() {
               <ArrowLeft :size="15" />
             </button>
             <DialogTitle class="truncate text-sm font-semibold text-foreground">
-              {{ mode === 'view' ? book?.title : 'Edit cover' }}
+              {{ mode === 'view' ? book?.title : t('book.table.cover.editTitle') }}
             </DialogTitle>
           </div>
           <DialogClose
@@ -136,7 +138,7 @@ async function handleToggleCoverLock() {
               @click="switchToEdit"
             >
               <Pencil :size="14" />
-              Edit Cover
+              {{ t('book.table.cover.editCover') }}
             </button>
           </template>
 

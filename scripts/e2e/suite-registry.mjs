@@ -9,11 +9,7 @@ export const E2E_GLOBAL_CHANGE_PATHS = Object.freeze([
   "docker/**",
 ]);
 
-const SHARED_DB_AND_HELPER_PATHS = Object.freeze([
-  "server/src/db/schema/**",
-  "scripts/e2e/**",
-  "scripts/db/**",
-]);
+const SHARED_DB_AND_HELPER_PATHS = Object.freeze(["server/src/db/schema/**", "scripts/e2e/**", "scripts/db/**"]);
 
 const SHARED_AUTH_TYPE_PATHS = Object.freeze(["packages/types/src/auth.ts", "packages/types/src/permissions.ts"]);
 
@@ -126,22 +122,22 @@ export const E2E_SUITES = Object.freeze({
       ...SHARED_DB_AND_HELPER_PATHS,
     ],
   },
-  "book-bucket-ingest-finalize": {
-    id: "book-bucket-ingest-finalize",
-    name: "Book Bucket Ingest Finalize",
+  "book-dock-ingest-finalize": {
+    id: "book-dock-ingest-finalize",
+    name: "Book Dock Ingest Finalize",
     timeout: 45,
     lane: "full",
-    description: "Book Bucket ingest and finalize suite",
-    vitestTarget: "test/book-bucket-ingest-finalize.e2e-spec.ts",
-    junitOutput: `${TEST_RESULTS_DIR}/book-bucket-ingest-finalize-e2e-junit.xml`,
+    description: "Book Dock ingest and finalize suite",
+    vitestTarget: "test/book-dock-ingest-finalize.e2e-spec.ts",
+    junitOutput: `${TEST_RESULTS_DIR}/book-dock-ingest-finalize-e2e-junit.xml`,
     prepareDedicatedDatabase: true,
     useDedicatedDatabase: true,
     changedPaths: [
-      "server/src/modules/book-bucket/**",
+      "server/src/modules/book-dock/**",
       "server/src/modules/upload/**",
       "server/src/modules/metadata/**",
-      "server/test/book-bucket-ingest-finalize.e2e-spec.ts",
-      "server/test/e2e/book-bucket/**",
+      "server/test/book-dock-ingest-finalize.e2e-spec.ts",
+      "server/test/e2e/book-dock/**",
       ...SHARED_DB_AND_HELPER_PATHS,
     ],
   },
@@ -442,6 +438,24 @@ export const E2E_SUITES = Object.freeze({
       ...SHARED_DB_AND_HELPER_PATHS,
     ],
   },
+  "koreader-file-naming": {
+    id: "koreader-file-naming",
+    name: "KOReader File Naming",
+    timeout: 30,
+    lane: "full",
+    description: "KOReader file naming persistence and authorization suite",
+    vitestTarget: "test/koreader-file-naming.e2e-spec.ts",
+    junitOutput: `${TEST_RESULTS_DIR}/koreader-file-naming-e2e-junit.xml`,
+    prepareDedicatedDatabase: true,
+    useDedicatedDatabase: true,
+    changedPaths: [
+      "server/src/modules/koreader/**",
+      "server/test/koreader-file-naming.e2e-spec.ts",
+      "packages/types/src/pattern-resolver.ts",
+      ...SHARED_AUTH_TYPE_PATHS,
+      ...SHARED_DB_AND_HELPER_PATHS,
+    ],
+  },
   "annotations-hub": {
     id: "annotations-hub",
     name: "Annotations Hub",
@@ -478,6 +492,25 @@ export const E2E_SUITES = Object.freeze({
       "server/test/kobo-annotation-sync.e2e-spec.ts",
       "server/test/e2e/reader-state-isolation/**",
       "packages/types/src/kobo.ts",
+      ...SHARED_DB_AND_HELPER_PATHS,
+    ],
+  },
+  "kobo-multi-device-sync": {
+    id: "kobo-multi-device-sync",
+    name: "Kobo Multi-Device Sync",
+    timeout: 60,
+    lane: "full",
+    description: "Kobo device-owned library snapshot suite",
+    vitestTarget: "test/kobo-multi-device-sync.e2e-spec.ts",
+    junitOutput: `${TEST_RESULTS_DIR}/kobo-multi-device-sync-e2e-junit.xml`,
+    prepareDedicatedDatabase: true,
+    useDedicatedDatabase: true,
+    changedPaths: [
+      "server/src/modules/kobo/**",
+      "server/src/modules/book/**",
+      "server/test/kobo-multi-device-sync.e2e-spec.ts",
+      "server/test/e2e/reader-state-isolation/**",
+      "packages/types/src/book.ts",
       ...SHARED_DB_AND_HELPER_PATHS,
     ],
   },

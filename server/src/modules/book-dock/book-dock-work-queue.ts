@@ -32,6 +32,7 @@ export class BookDockWorkQueue {
   private nextDrainNotBeforeMs = 0;
   private activeCount = 0;
   private stopped = false;
+  private paused = false;
 
   constructor(
     private readonly concurrency: number,
@@ -40,12 +41,28 @@ export class BookDockWorkQueue {
     private readonly options: BookDockWorkQueueOptions = {},
   ) {}
 
-  enqueue(fileId: number, priority?: BookDockWorkPriority): void {
-    if (this.stopped || !Number.isInteger(fileId) || fileId < 1) return;
-    if (this.queued.has(fileId) || this.running.has(fileId)) return;
+  enqueue(fileId: number, priority?: BookDockWorkPriority): boolean {
+    if (this.stopped || !Number.isInteger(fileId) || fileId < 1) return false;
+    if (this.queued.has(fileId) || this.running.has(fileId)) return false;
 
     this.queued.add(fileId);
     this.pending.push({ fileId, priority: priority ?? { primary: fileId, secondary: fileId } });
+    this.scheduleDrain({ includeDrainDelay: true });
+    return true;
+  }
+
+  pause(): void {
+    if (this.stopped) return;
+    this.paused = true;
+    if (this.drainTimer) {
+      clearTimeout(this.drainTimer);
+      this.drainTimer = null;
+    }
+  }
+
+  resume(): void {
+    if (this.stopped || !this.paused) return;
+    this.paused = false;
     this.scheduleDrain({ includeDrainDelay: true });
   }
 
@@ -66,7 +83,7 @@ export class BookDockWorkQueue {
   }
 
   private scheduleDrain({ includeDrainDelay }: { includeDrainDelay: boolean }): void {
-    if (this.stopped || this.pending.length === 0 || this.activeCount >= this.concurrency) return;
+    if (this.stopped || this.paused || this.pending.length === 0 || this.activeCount >= this.concurrency) return;
 
     const drainDelayMs = includeDrainDelay && this.activeCount === 0 ? (this.options.drainDelayMs ?? 0) : 0;
     const delayMs = Math.max(drainDelayMs, this.nextDrainNotBeforeMs - Date.now());
@@ -83,7 +100,7 @@ export class BookDockWorkQueue {
   }
 
   private drain(): void {
-    while (!this.stopped && this.activeCount < this.concurrency && this.pending.length > 0) {
+    while (!this.stopped && !this.paused && this.activeCount < this.concurrency && this.pending.length > 0) {
       const { fileId } = this.takeNextPending();
       this.queued.delete(fileId);
       this.running.add(fileId);

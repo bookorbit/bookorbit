@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { RefreshCw, Save, RotateCcw } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import type { MetadataScoreWeights, MetadataScoreField } from '@bookorbit/types'
@@ -7,6 +8,7 @@ import { DEFAULT_METADATA_SCORE_WEIGHTS, METADATA_SCORE_FIELDS, METADATA_SCORE_G
 import { api } from '@/lib/api'
 import { useMetadataScoreWeights } from '@/features/metadata-score/composables/useMetadataScoreWeights'
 
+const { t } = useI18n()
 const { resetFetchCache } = useMetadataScoreWeights()
 
 const weights = reactive<MetadataScoreWeights>({ ...DEFAULT_METADATA_SCORE_WEIGHTS })
@@ -55,12 +57,12 @@ async function saveWeights() {
     })
     if (res.ok) {
       resetFetchCache()
-      toast.success('Score weights saved. Recalculating library scores...')
+      toast.success(t('settings.admin.scoreWeights.savedRecalculating'))
     } else {
-      toast.error('Failed to save score weights')
+      toast.error(t('settings.admin.scoreWeights.saveFailed'))
     }
   } catch {
-    toast.error('Failed to save score weights')
+    toast.error(t('settings.admin.scoreWeights.saveFailed'))
   } finally {
     saving.value = false
   }
@@ -72,12 +74,12 @@ async function recalculateAll() {
   try {
     const res = await api('/api/v1/metadata-score/recalculate', { method: 'POST' })
     if (res.ok) {
-      toast.success('Score recalculation started in the background')
+      toast.success(t('settings.admin.scoreWeights.recalcStarted'))
     } else {
-      toast.error('Recalculation failed')
+      toast.error(t('settings.admin.scoreWeights.recalcFailed'))
     }
   } catch {
-    toast.error('Recalculation failed')
+    toast.error(t('settings.admin.scoreWeights.recalcFailed'))
   } finally {
     recalculating.value = false
   }
@@ -95,7 +97,7 @@ function handleResetClick() {
   resetConfirmTimer = null
   resetConfirming.value = false
   Object.assign(weights, DEFAULT_METADATA_SCORE_WEIGHTS)
-  toast.success('Weights reset to defaults. Save to apply.')
+  toast.success(t('settings.admin.scoreWeights.resetToDefaults'))
 }
 </script>
 
@@ -103,9 +105,9 @@ function handleResetClick() {
   <div class="mb-4">
     <div class="md:flex md:items-start md:justify-between md:gap-4">
       <div>
-        <p class="settings-group-label !mb-0">Score Weights</p>
+        <p class="settings-group-label !mb-0">{{ t('settings.admin.scoreWeights.groupLabel') }}</p>
         <p class="settings-hint mt-0.5">
-          Assign a weight to each field. Total weight:
+          {{ t('settings.admin.scoreWeights.assignHintPrefix') }}
           <span class="font-medium text-foreground">{{ totalWeight }}</span
           >.
         </p>
@@ -118,15 +120,15 @@ function handleResetClick() {
           @click="handleResetClick"
         >
           <RotateCcw class="size-3.5" />
-          {{ resetConfirming ? 'Are you sure?' : 'Reset to defaults' }}
+          {{ resetConfirming ? t('settings.admin.scoreWeights.areYouSure') : t('settings.admin.scoreWeights.resetToDefaultsButton') }}
         </button>
         <button type="button" class="settings-btn-outline" :disabled="recalculating" @click="recalculateAll">
           <RefreshCw class="size-3.5" :class="{ 'animate-spin': recalculating }" />
-          Recalculate all
+          {{ t('settings.admin.scoreWeights.recalculateAll') }}
         </button>
         <button type="button" class="settings-btn-primary" :disabled="saving" @click="saveWeights">
           <Save class="size-3.5" />
-          Save
+          {{ t('common.save') }}
         </button>
       </div>
     </div>
@@ -142,15 +144,15 @@ function handleResetClick() {
         @click="handleResetClick"
       >
         <RotateCcw class="size-3.5" />
-        {{ resetConfirming ? 'Confirm reset' : 'Reset' }}
+        {{ resetConfirming ? t('settings.admin.scoreWeights.confirmReset') : t('settings.admin.scoreWeights.reset') }}
       </button>
       <button type="button" class="settings-btn-outline" :disabled="recalculating" @click="recalculateAll">
         <RefreshCw class="size-3.5" :class="{ 'animate-spin': recalculating }" />
-        Recalculate
+        {{ t('settings.admin.scoreWeights.recalculate') }}
       </button>
       <button type="button" class="settings-btn-primary flex-1 justify-center" :disabled="saving" @click="saveWeights">
         <Save class="size-3.5" />
-        Save
+        {{ t('common.save') }}
       </button>
     </div>
   </div>
@@ -159,7 +161,7 @@ function handleResetClick() {
     <div v-for="group in groups" :key="group.group" class="px-5 py-4 bg-card">
       <div class="flex items-center justify-between mb-3">
         <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{{ group.label }}</p>
-        <span class="text-xs text-muted-foreground">subtotal: {{ groupTotal(group) }}</span>
+        <span class="text-xs text-muted-foreground">{{ t('settings.admin.scoreWeights.subtotal', { count: groupTotal(group) }) }}</span>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2.5">
         <div v-for="entry in group.fields" :key="entry.field" class="flex items-start md:items-center gap-2">

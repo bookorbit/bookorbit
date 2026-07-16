@@ -13,8 +13,14 @@ import {
   styleFromDrawer,
 } from './annotation-style-map';
 import { AnnotationSyncRepository, type DbTx } from './annotation-sync.repository';
+import {
+  ACHIEVEMENT_EVENT_ANNOTATION_CREATED,
+  AchievementEventsService,
+  type AnnotationCreatedPayload,
+} from '../achievement/achievement-events.service';
 
 const INGEST_EVENT = 'annotation.sync_ingest';
+const INGEST_EMIT_EVENT = 'annotation.sync_event';
 
 export interface IncomingDeviceAnnotation {
   /**
@@ -75,7 +81,10 @@ function siblingFormatsOf(posFormat: IncomingDeviceAnnotation['posFormat']): Ann
 export class AnnotationSyncService {
   private readonly logger = new Logger(AnnotationSyncService.name);
 
-  constructor(private readonly syncRepo: AnnotationSyncRepository) {}
+  constructor(
+    private readonly syncRepo: AnnotationSyncRepository,
+    private readonly achievementEvents: AchievementEventsService,
+  ) {}
 
   /**
    * Ingests a batch of device annotations for one book. Identity is the external key
@@ -85,13 +94,19 @@ export class AnnotationSyncService {
   async ingestDeviceAnnotations(params: IngestParams): Promise<IngestResult> {
     const startedAtMs = Date.now();
     const result: IngestResult = { created: 0, updated: 0, moved: 0, unchanged: 0, skippedDeleted: 0 };
+    const createdIds: number[] = [];
 
     try {
       await this.syncRepo.transaction(async (tx) => {
         for (const incoming of this.dedupeByKey(params.annotations)) {
-          await this.ingestOne(params, incoming, result, tx);
+          await this.ingestOne(params, incoming, result, createdIds, tx);
         }
       });
+      // Emit only after the tx commits so listeners (e.g. Readwise flush that queries
+      // rows with id > watermark) see the committed, visible rows.
+      for (const annotationId of createdIds) {
+        this.emitCreatedAnnotation(params.userId, params.bookId, annotationId);
+      }
       this.logger.log(
         `[${INGEST_EVENT}] [end] userId=${params.userId} bookId=${params.bookId} deviceId=${params.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} created=${result.created} updated=${result.updated} moved=${result.moved} unchanged=${result.unchanged} skippedDeleted=${result.skippedDeleted} - device annotations ingested`,
       );
@@ -113,7 +128,29 @@ export class AnnotationSyncService {
     return [...byKey.values()];
   }
 
-  private async ingestOne(params: IngestParams, incoming: IncomingDeviceAnnotation, result: IngestResult, tx: DbTx): Promise<void> {
+  private emitCreatedAnnotation(userId: number, bookId: number, annotationId: number): void {
+    const startedAtMs = Date.now();
+    try {
+      this.achievementEvents.emit(ACHIEVEMENT_EVENT_ANNOTATION_CREATED, {
+        userId,
+        bookId,
+        annotationId,
+      } satisfies AnnotationCreatedPayload);
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.constructor.name : 'UnknownError';
+      this.logger.warn(
+        `[${INGEST_EMIT_EVENT}] [fail] userId=${userId} bookId=${bookId} annotationId=${annotationId} durationMs=${Date.now() - startedAtMs} errorClass=${errorClass} error="${sanitizeLogValue(error instanceof Error ? error.message : 'unknown error')}" - created annotation event dispatch failed`,
+      );
+    }
+  }
+
+  private async ingestOne(
+    params: IngestParams,
+    incoming: IncomingDeviceAnnotation,
+    result: IngestResult,
+    createdIds: number[],
+    tx: DbTx,
+  ): Promise<void> {
     const { userId, source, deviceId, bookId, bookFileId } = params;
     const key = keyOf(incoming);
 
@@ -237,7 +274,7 @@ export class AnnotationSyncService {
       return;
     }
 
-    await this.syncRepo.createCanonical(
+    const createdRow = await this.syncRepo.createCanonical(
       {
         userId,
         bookId,
@@ -268,6 +305,7 @@ export class AnnotationSyncService {
       },
       tx,
     );
+    createdIds.push(createdRow.id);
     result.created += 1;
   }
 

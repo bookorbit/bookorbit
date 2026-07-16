@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ACHIEVEMENT_EVENT_ANNOTATION_CREATED, AchievementEventsService } from '../achievement/achievement-events.service';
 import type { AnnotationSyncRepository } from './annotation-sync.repository';
 import { AnnotationSyncService, buildAnnotationKey, type IncomingDeviceAnnotation } from './annotation-sync.service';
 
@@ -119,8 +120,8 @@ function makeRepo(): RepoMock {
   } as unknown as RepoMock;
 }
 
-function makeService(repo: RepoMock) {
-  return new AnnotationSyncService(repo as unknown as AnnotationSyncRepository);
+function makeService(repo: RepoMock, achievementEvents: AchievementEventsService) {
+  return new AnnotationSyncService(repo as unknown as AnnotationSyncRepository, achievementEvents);
 }
 
 function ingest(service: AnnotationSyncService, annotations: IncomingDeviceAnnotation[]) {
@@ -137,13 +138,17 @@ function ingest(service: AnnotationSyncService, annotations: IncomingDeviceAnnot
 describe('AnnotationSyncService', () => {
   let repo: RepoMock;
   let service: AnnotationSyncService;
+  let achievementEvents: AchievementEventsService;
+  let emitSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     repo = makeRepo();
-    service = makeService(repo);
+    achievementEvents = new AchievementEventsService();
+    emitSpy = vi.spyOn(achievementEvents, 'emit');
+    service = makeService(repo, achievementEvents);
   });
 
   describe('buildAnnotationKey', () => {
@@ -192,6 +197,92 @@ describe('AnnotationSyncService', () => {
       expect(repo.createCanonical).toHaveBeenCalledTimes(1);
       const [annotation] = repo.createCanonical.mock.calls[0] as [Record<string, unknown>];
       expect(annotation.note).toBe('second');
+    });
+  });
+
+  describe('annotation.created event emission', () => {
+    it('emits ACHIEVEMENT_EVENT_ANNOTATION_CREATED once with the created row payload', async () => {
+      const result = await ingest(service, [makeIncoming()]);
+
+      expect(result.created).toBe(1);
+      expect(emitSpy).toHaveBeenCalledTimes(1);
+      expect(emitSpy).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_ANNOTATION_CREATED, {
+        userId: USER_ID,
+        bookId: BOOK_ID,
+        annotationId: 100,
+      });
+    });
+
+    it('emits exactly once for a batch mixing one created and one unchanged annotation', async () => {
+      const unchangedKey = buildAnnotationKey('2026-06-01 21:14:03', '/body/DocFragment[8]/body/p[12]/text().0');
+      // The default makeIncoming key resolves to an existing device state (unchanged);
+      // the second annotation has a fresh key and is genuinely created.
+      repo.findStateByDeviceKey.mockImplementation(((_u: unknown, _s: unknown, _d: unknown, _b: unknown, key: string) =>
+        Promise.resolve(key === unchangedKey ? makeStateRow() : null)) as never);
+      repo.findAnnotationById.mockResolvedValue(makeAnnotationRow());
+      repo.findDevicePosition.mockResolvedValue(makePositionRow());
+
+      const created = makeIncoming({ datetime: '2026-06-02 09:00:00', pos0: '/body/DocFragment[9]/body/p[3]/text().0' });
+      const result = await ingest(service, [makeIncoming(), created]);
+
+      expect(result).toMatchObject({ created: 1, unchanged: 1 });
+      expect(emitSpy).toHaveBeenCalledTimes(1);
+      expect(emitSpy).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_ANNOTATION_CREATED, {
+        userId: USER_ID,
+        bookId: BOOK_ID,
+        annotationId: 100,
+      });
+    });
+
+    it('does not emit for non-create outcomes', async () => {
+      repo.findStateByDeviceKey.mockResolvedValue(makeStateRow());
+      repo.findAnnotationById.mockResolvedValue(makeAnnotationRow());
+      repo.findDevicePosition.mockResolvedValue(makePositionRow());
+
+      const result = await ingest(service, [makeIncoming()]);
+
+      expect(result.unchanged).toBe(1);
+      expect(emitSpy).not.toHaveBeenCalled();
+    });
+
+    it('emits only after the transaction commits, never inside the tx callback', async () => {
+      let emitCallsAtTxResolve = -1;
+      repo.transaction.mockImplementation((async (fn: (tx: unknown) => Promise<unknown>) => {
+        const r = await fn(TX);
+        // Snapshot emit count at the moment the tx body finishes but before the service
+        // runs its post-commit emit loop.
+        emitCallsAtTxResolve = emitSpy.mock.calls.length;
+        return r;
+      }) as never);
+
+      await ingest(service, [makeIncoming()]);
+
+      expect(emitCallsAtTxResolve).toBe(0);
+      expect(emitSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not fail ingest or skip later emits when a post-commit listener throws', async () => {
+      const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      let nextId = 100;
+      repo.createCanonical.mockImplementation(((annotation: Record<string, unknown>) =>
+        Promise.resolve(makeAnnotationRow({ ...annotation, id: nextId++ }))) as never);
+      emitSpy.mockImplementationOnce(() => {
+        throw new Error('listener failed');
+      });
+
+      const result = await ingest(service, [
+        makeIncoming(),
+        makeIncoming({ datetime: '2026-06-02 09:00:00', pos0: '/body/DocFragment[9]/body/p[3]/text().0' }),
+      ]);
+
+      expect(result.created).toBe(2);
+      expect(emitSpy).toHaveBeenCalledTimes(2);
+      expect(emitSpy).toHaveBeenNthCalledWith(2, ACHIEVEMENT_EVENT_ANNOTATION_CREATED, {
+        userId: USER_ID,
+        bookId: BOOK_ID,
+        annotationId: 101,
+      });
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[annotation.sync_event] [fail]'));
     });
   });
 

@@ -2,6 +2,7 @@ import { onMounted, ref } from 'vue'
 
 import type { BookCard, ScrollerType } from '@bookorbit/types'
 import { api } from '@/lib/api'
+import { useBookProgressRefresh } from '@/features/book/composables/useBookProgressRefresh'
 
 export function useDashboardScroller(type: ScrollerType, limit = 20, smartScopeId?: number) {
   const books = ref<BookCard[]>([])
@@ -24,6 +25,7 @@ export function useDashboardScroller(type: ScrollerType, limit = 20, smartScopeI
     }
   }
 
+  useBookProgressRefresh(load)
   onMounted(load)
   return { books, loading, error, refresh: load }
 }

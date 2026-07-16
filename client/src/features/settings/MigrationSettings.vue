@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { formatDateTime } from '@/i18n/formatters'
 import { Eye, EyeOff, Loader2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import SettingsPageHeader from './SettingsPageHeader.vue'
@@ -39,6 +41,8 @@ import {
 } from '@/features/migration/lib/migration-api'
 import { useMigrationPolling } from '@/features/migration/composables/useMigrationPolling'
 import { useMigrationProgress } from '@/features/migration/composables/useMigrationProgress'
+
+const { t } = useI18n()
 
 const { subscribeRun, unsubscribeRun, getProgress: getSocketProgress, progressMap: socketProgressMap } = useMigrationProgress()
 
@@ -129,18 +133,18 @@ const mediaRootPathHint = computed(() => {
   if (!path) {
     return {
       className: 'text-amber-600',
-      text: 'Required for migrating book covers.',
+      text: t('settings.admin.migration.mediaPathRequired'),
     }
   }
   if (!path.startsWith('/')) {
     return {
       className: 'text-amber-600',
-      text: 'Use an absolute path (for example: /books). Relative paths are not supported.',
+      text: t('settings.admin.migration.mediaPathAbsolute'),
     }
   }
   return {
     className: 'text-muted-foreground',
-    text: 'Cover import path configured. Use Test Connection to verify access and Booklore images folder structure.',
+    text: t('settings.admin.migration.mediaPathConfigured'),
   }
 })
 
@@ -160,15 +164,15 @@ const preflight = computed(() => {
     dryRunFresh = currentPlan.profileId === currentProfile.id && planCreated >= profileUpdated && planCreated >= sourceValidatedAt
   }
 
-  if (!currentSource) issues.push('Save source connection settings')
-  else if (!sourceValidated) issues.push('Validate source connection')
-  if (!currentProfile) issues.push('Save user and path mappings')
-  else if (!pathMappingsValidated) issues.push('Save path mappings to validate them')
-  if (!dryRunFresh) issues.push('Run a fresh dry-run')
+  if (!currentSource) issues.push(t('settings.admin.migration.issueSaveSource'))
+  else if (!sourceValidated) issues.push(t('settings.admin.migration.issueValidateSource'))
+  if (!currentProfile) issues.push(t('settings.admin.migration.issueSaveMappings'))
+  else if (!pathMappingsValidated) issues.push(t('settings.admin.migration.issueSavePathMappings'))
+  if (!dryRunFresh) issues.push(t('settings.admin.migration.issueFreshDryRun'))
   else if ((currentPlan?.summary?.duplicateBookMatches ?? 0) > 0 || currentPlan?.summary?.status === 'blocked') {
-    issues.push('Resolve duplicate target book matches in the dry-run')
+    issues.push(t('settings.admin.migration.issueResolveDuplicates'))
   }
-  if (hasActiveRun.value) issues.push('Wait for active run to finish')
+  if (hasActiveRun.value) issues.push(t('settings.admin.migration.issueWaitActiveRun'))
 
   return { sourceValidated, pathMappingsValidated, dryRunFresh, ready: issues.length === 0, issues }
 })
@@ -192,11 +196,14 @@ const stepStatus = computed(() => {
 const stepperSteps = computed<StepDefinition[]>(() => {
   const s = stepStatus.value
   return [
-    { label: 'Source Connection', status: s.source === 'done' ? 'done' : s.source === 'saved' ? 'saved' : 'pending' },
-    { label: 'User & Path Mapping', status: s.mappings },
-    { label: 'Dry-Run', status: s.dryRun },
-    { label: 'Run Migration', status: s.migration },
-    { label: 'Report', status: run.value ? 'done' : 'pending' },
+    {
+      label: t('settings.admin.migration.stepSourceConnection'),
+      status: s.source === 'done' ? 'done' : s.source === 'saved' ? 'saved' : 'pending',
+    },
+    { label: t('settings.admin.migration.stepUserPathMapping'), status: s.mappings },
+    { label: t('settings.admin.migration.stepDryRun'), status: s.dryRun },
+    { label: t('settings.admin.migration.stepRunMigration'), status: s.migration },
+    { label: t('settings.admin.migration.stepReport'), status: run.value ? 'done' : 'pending' },
   ]
 })
 
@@ -254,33 +261,49 @@ function goToSetup() {
   currentStep.value = 0
 }
 
-const stepTitles = ['Source Connection', 'User & Path Mapping', 'Dry Run', 'Run Migration', 'Migration Report']
-const stepSubtitles = [
-  'Configure the database connection to your source Booklore instance.',
-  'Map source users to target users and translate file paths.',
-  'Preview what will be imported before running the live migration.',
-  'Start the live import and monitor its progress.',
-  'Review what was imported and export a detailed report.',
-]
-const continueLabels = ['Continue to Mappings', 'Continue to Dry Run', 'Continue to Migration', 'View Report', '']
+const stepTitles = computed(() => [
+  t('settings.admin.migration.stepSourceConnection'),
+  t('settings.admin.migration.stepUserPathMapping'),
+  t('settings.admin.migration.stepDryRunTitle'),
+  t('settings.admin.migration.stepRunMigration'),
+  t('settings.admin.migration.stepReportTitle'),
+])
+const stepSubtitles = computed(() => [
+  t('settings.admin.migration.subtitleSource'),
+  t('settings.admin.migration.subtitleMappings'),
+  t('settings.admin.migration.subtitleDryRun'),
+  t('settings.admin.migration.subtitleRun'),
+  t('settings.admin.migration.subtitleReport'),
+])
+const continueLabels = computed(() => [
+  t('settings.admin.migration.continueToMappings'),
+  t('settings.admin.migration.continueToDryRun'),
+  t('settings.admin.migration.continueToMigration'),
+  t('settings.admin.migration.viewReport'),
+  '',
+])
 
-const currentStepTitle = computed(() => stepTitles[currentStep.value] ?? '')
-const currentStepSubtitle = computed(() => stepSubtitles[currentStep.value] ?? '')
-const continueLabel = computed(() => continueLabels[currentStep.value] ?? '')
+const currentStepTitle = computed(() => stepTitles.value[currentStep.value] ?? '')
+const currentStepSubtitle = computed(() => stepSubtitles.value[currentStep.value] ?? '')
+const continueLabel = computed(() => continueLabels.value[currentStep.value] ?? '')
 
 const currentStepBadge = computed((): { label: string; cls: string } | null => {
   const s = stepStatus.value
   const n = currentStep.value
   if (n === 0) {
-    if (s.source === 'done') return { label: 'Validated', cls: 'text-emerald-700 bg-emerald-500/10 border-emerald-500/20' }
-    if (s.source === 'saved') return { label: 'Saved', cls: 'text-amber-700 bg-amber-500/10 border-amber-500/20' }
+    if (s.source === 'done')
+      return { label: t('settings.admin.migration.badgeValidated'), cls: 'text-emerald-700 bg-emerald-500/10 border-emerald-500/20' }
+    if (s.source === 'saved') return { label: t('settings.admin.migration.badgeSaved'), cls: 'text-amber-700 bg-amber-500/10 border-amber-500/20' }
   }
-  if (n === 1 && s.mappings === 'done') return { label: 'Saved', cls: 'text-emerald-700 bg-emerald-500/10 border-emerald-500/20' }
-  if (n === 2 && s.dryRun === 'done') return { label: 'Up to date', cls: 'text-emerald-700 bg-emerald-500/10 border-emerald-500/20' }
+  if (n === 1 && s.mappings === 'done')
+    return { label: t('settings.admin.migration.badgeSaved'), cls: 'text-emerald-700 bg-emerald-500/10 border-emerald-500/20' }
+  if (n === 2 && s.dryRun === 'done')
+    return { label: t('settings.admin.migration.badgeUpToDate'), cls: 'text-emerald-700 bg-emerald-500/10 border-emerald-500/20' }
   if (n === 3) {
-    if (s.migration === 'done') return { label: 'Completed', cls: 'text-emerald-700 bg-emerald-500/10 border-emerald-500/20' }
-    if (s.migration === 'running') return { label: 'Running', cls: 'text-sky-700 bg-sky-500/10 border-sky-500/20' }
-    if (s.migration === 'failed') return { label: 'Failed', cls: 'text-red-700 bg-red-500/10 border-red-500/20' }
+    if (s.migration === 'done')
+      return { label: t('settings.admin.migration.badgeCompleted'), cls: 'text-emerald-700 bg-emerald-500/10 border-emerald-500/20' }
+    if (s.migration === 'running') return { label: t('settings.admin.migration.badgeRunning'), cls: 'text-sky-700 bg-sky-500/10 border-sky-500/20' }
+    if (s.migration === 'failed') return { label: t('settings.admin.migration.badgeFailed'), cls: 'text-red-700 bg-red-500/10 border-red-500/20' }
   }
   return null
 })
@@ -332,16 +355,16 @@ function sourceBookLabel(dup: DuplicateBookMatch, sourceId: string): string {
   const candidate = dup.sourceCandidates?.find((row) => row.sourceBookId === sourceId)
   const title = candidate?.title?.trim()
   if (title) return title
-  return `Source record ID #${sourceId}`
+  return t('settings.admin.migration.sourceRecordId', { id: sourceId })
 }
 
 function sourceBookSecondary(dup: DuplicateBookMatch, sourceId: string): string | null {
   const candidate = dup.sourceCandidates?.find((row) => row.sourceBookId === sourceId)
   const author = candidate?.author?.trim()
-  if (author) return `by ${author} (ID: ${sourceId})`
+  if (author) return t('settings.admin.migration.byAuthorWithId', { author, id: sourceId })
   const filePath = candidate?.filePath?.trim()
-  if (filePath) return `${filePath} (ID: ${sourceId})`
-  return `Booklore source ID: ${sourceId}`
+  if (filePath) return t('settings.admin.migration.filePathWithId', { path: filePath, id: sourceId })
+  return t('settings.admin.migration.bookloreSourceId', { id: sourceId })
 }
 
 function recommendedSourceBookId(dup: DuplicateBookMatch): string | null {
@@ -371,7 +394,7 @@ function isRecommendedSourceBook(dup: DuplicateBookMatch, sourceId: string): boo
 }
 
 function targetBookLabel(targetBookId: number): string {
-  return duplicateTargetBookLabels.value.get(targetBookId) ?? `Library book #${targetBookId}`
+  return duplicateTargetBookLabels.value.get(targetBookId) ?? t('settings.admin.migration.libraryBookNum', { id: targetBookId })
 }
 
 function pruneDuplicateResolutions() {
@@ -411,11 +434,11 @@ async function loadDuplicateTargetBookLabels() {
     missingTargetIds.map(async (targetBookId) => {
       try {
         const response = await api(`/api/v1/books/${targetBookId}`)
-        if (!response.ok) return [targetBookId, `Library book #${targetBookId}`] as const
+        if (!response.ok) return [targetBookId, t('settings.admin.migration.libraryBookNum', { id: targetBookId })] as const
         const payload = asRecord(await response.json())
-        return [targetBookId, asString(payload.title) ?? `Library book #${targetBookId}`] as const
+        return [targetBookId, asString(payload.title) ?? t('settings.admin.migration.libraryBookNum', { id: targetBookId })] as const
       } catch {
-        return [targetBookId, `Library book #${targetBookId}`] as const
+        return [targetBookId, t('settings.admin.migration.libraryBookNum', { id: targetBookId })] as const
       }
     }),
   )
@@ -473,7 +496,7 @@ const migrationProgress = computed(() => {
   if (!currentRun || currentRun.state !== 'running') return null
 
   const currentStage = currentRun.currentStage ?? 'init'
-  if (currentStage === 'completed') return { percent: 100, label: 'Completed' }
+  if (currentStage === 'completed') return { percent: 100, label: t('settings.admin.migration.stageCompleted') }
 
   const stageIdx = STAGE_NAMES.indexOf(currentStage as (typeof STAGE_NAMES)[number])
   const completedStages = stageIdx >= 0 ? stageIdx : 0
@@ -481,10 +504,10 @@ const migrationProgress = computed(() => {
   const percent = Math.min(Math.round(completedStages * stageWeight + stageWeight * 0.5), 99)
 
   const stageLabels: Record<string, string> = {
-    init: 'Initializing',
-    shared_overlays: 'Importing metadata',
-    book_covers: 'Importing covers',
-    user_state: 'Importing user data',
+    init: t('settings.admin.migration.stageInit'),
+    shared_overlays: t('settings.admin.migration.stageSharedOverlays'),
+    book_covers: t('settings.admin.migration.stageBookCovers'),
+    user_state: t('settings.admin.migration.stageUserState'),
   }
 
   return { percent, label: stageLabels[currentStage] ?? currentStage }
@@ -549,7 +572,7 @@ async function initialize() {
     await Promise.all([loadSupportedTypes(), loadTargetUsers(), loadTargetLibraryFolders()])
     await refreshWorkflowState()
   } catch (error) {
-    toast.error(getErrorMessage(error, 'Failed to initialize migration settings'))
+    toast.error(getErrorMessage(error, t('settings.admin.migration.errorInitialize')))
   } finally {
     loading.value = false
   }
@@ -560,7 +583,7 @@ async function loadSupportedTypes() {
     supportedTypes.value = await listSupportedSourceTypes()
   } catch (error) {
     supportedTypes.value = []
-    toast.error(getErrorMessage(error, 'Failed to load supported migration source types'))
+    toast.error(getErrorMessage(error, t('settings.admin.migration.errorLoadSourceTypes')))
   }
 }
 
@@ -570,7 +593,7 @@ async function loadTargetUsers() {
     targetUsers.value = await listTargetUsers()
   } catch (error) {
     targetUsers.value = []
-    toast.error(getErrorMessage(error, 'Failed to load target users'))
+    toast.error(getErrorMessage(error, t('settings.admin.migration.errorLoadTargetUsers')))
   } finally {
     busy.loadingTargetUsers = false
   }
@@ -581,7 +604,7 @@ async function loadTargetLibraryFolders() {
     targetLibraryFolders.value = await listTargetLibraryFolders()
   } catch (error) {
     targetLibraryFolders.value = []
-    toast.error(getErrorMessage(error, 'Failed to load target library folders'))
+    toast.error(getErrorMessage(error, t('settings.admin.migration.errorLoadLibraryFolders')))
   }
 }
 
@@ -653,14 +676,14 @@ async function hydrateUserMappingsFromSuggestions(showSuccessToast: boolean) {
 
     if (showSuccessToast) {
       if (userMappings.value.length === 0) {
-        toast.warning('No source users were returned')
+        toast.warning(t('settings.admin.migration.noSourceUsersReturned'))
       } else {
-        toast.success('User mapping suggestions loaded')
+        toast.success(t('settings.admin.migration.userMappingSuggestionsLoaded'))
       }
     }
   } catch (error) {
     if (showSuccessToast) {
-      toast.error(getErrorMessage(error, 'Failed to load user mapping suggestions'))
+      toast.error(getErrorMessage(error, t('settings.admin.migration.errorLoadSuggestions')))
     }
   } finally {
     busy.loadingSuggestions = false
@@ -693,7 +716,7 @@ function extractMediaPathWarnings(result: Record<string, unknown>): string[] {
 
 async function onTestSource() {
   if (!hasValidSourceDraft()) {
-    toast.error('Host, user, database, and source name are required')
+    toast.error(t('settings.admin.migration.requiredFields'))
     return
   }
 
@@ -705,15 +728,17 @@ async function onTestSource() {
     if (result.ok === true) {
       if (warnings.length > 0) {
         const mediaPathWarning = warnings.find((warning) => /mediarootpath/i.test(warning))
-        const highlightedWarning = mediaPathWarning ?? warnings[0] ?? 'Connection test passed with warnings'
+        const highlightedWarning = mediaPathWarning ?? warnings[0] ?? t('settings.admin.migration.connectionTestPassedWithWarnings')
         toast.warning(
-          warnings.length === 1 ? highlightedWarning : `Connection test passed with ${warnings.length} warning(s). First: ${highlightedWarning}`,
+          warnings.length === 1
+            ? highlightedWarning
+            : t('settings.admin.migration.connectionTestPassedWithCount', { count: warnings.length, first: highlightedWarning }),
         )
       } else {
-        toast.success('Connection test passed')
+        toast.success(t('settings.admin.migration.connectionTestPassed'))
       }
     } else {
-      toast.warning(`Connection ok, but ${missing} required table(s) are missing`)
+      toast.warning(t('settings.admin.migration.connectionOkMissingTables', { count: missing }))
     }
   } catch (error) {
     toast.error(friendlyConnectionError(error))
@@ -724,24 +749,24 @@ async function onTestSource() {
 
 async function onTestMediaPath() {
   if (hasActiveRun.value) {
-    toast.error('Cannot test media path while a run is active')
+    toast.error(t('settings.admin.migration.cannotTestMediaPathActiveRun'))
     return
   }
   if (!hasValidSourceDraft()) {
-    toast.error('Host, user, database, and source name are required')
+    toast.error(t('settings.admin.migration.requiredFields'))
     return
   }
   const mediaRootPath = sourceDraft.mediaRootPath.trim()
   if (!mediaRootPath) {
     mediaPathTestState.value = 'fail'
-    const message = 'Media Root Path is required for cover import.'
+    const message = t('settings.admin.migration.mediaRootPathRequiredCover')
     mediaPathTestMessage.value = message
     toast.error(message)
     return
   }
   if (!mediaRootPath.startsWith('/')) {
     mediaPathTestState.value = 'fail'
-    const message = 'Use an absolute path (for example: /books).'
+    const message = t('settings.admin.migration.useAbsolutePath')
     mediaPathTestMessage.value = message
     toast.error(message)
     return
@@ -753,16 +778,16 @@ async function onTestMediaPath() {
     const mediaWarnings = extractMediaPathWarnings(result)
     if (result.ok === true && mediaWarnings.length === 0) {
       mediaPathTestState.value = 'pass'
-      mediaPathTestMessage.value = 'Media path verified.'
-      toast.success('Media path is valid and readable')
+      mediaPathTestMessage.value = t('settings.admin.migration.mediaPathVerified')
+      toast.success(t('settings.admin.migration.mediaPathValidReadable'))
     } else if (mediaWarnings.length > 0) {
       mediaPathTestState.value = 'fail'
-      const message = mediaWarnings[0] ?? 'Media path validation failed.'
+      const message = mediaWarnings[0] ?? t('settings.admin.migration.mediaPathValidationFailed')
       mediaPathTestMessage.value = message
       toast.warning(message)
     } else {
       mediaPathTestState.value = 'fail'
-      const message = 'Connection test failed before media path validation could complete.'
+      const message = t('settings.admin.migration.connectionFailedBeforeMediaPath')
       mediaPathTestMessage.value = message
       toast.warning(message)
     }
@@ -778,11 +803,11 @@ async function onTestMediaPath() {
 
 async function onSaveAndValidate() {
   if (hasActiveRun.value) {
-    toast.error('Cannot modify source while a run is active')
+    toast.error(t('settings.admin.migration.cannotModifySourceActiveRun'))
     return
   }
   if (!hasValidSourceDraft()) {
-    toast.error('Host, user, database, and source name are required')
+    toast.error(t('settings.admin.migration.requiredFields'))
     return
   }
 
@@ -801,10 +826,14 @@ async function onSaveAndValidate() {
       const warnings = Array.isArray(result.warnings) ? (result.warnings as unknown[]).filter((w): w is string => typeof w === 'string') : []
       await refreshWorkflowState()
       await autoLoadPathPrefixes()
-      toast.success(warnings.length > 0 ? `Source saved and validated with ${warnings.length} warning(s)` : 'Source saved and validated')
+      toast.success(
+        warnings.length > 0
+          ? t('settings.admin.migration.sourceSavedValidatedWarnings', { count: warnings.length })
+          : t('settings.admin.migration.sourceSavedValidated'),
+      )
     }
   } catch (error) {
-    toast.error(getErrorMessage(error, 'Failed to save or validate source'))
+    toast.error(getErrorMessage(error, t('settings.admin.migration.errorSaveValidateSource')))
   } finally {
     busy.savingSource = false
   }
@@ -854,22 +883,22 @@ function cleanedUserMappings() {
 
 async function onSaveMappings() {
   if (hasActiveRun.value) {
-    toast.error('Cannot save mappings while a run is active')
+    toast.error(t('settings.admin.migration.cannotSaveMappingsActiveRun'))
     return
   }
   const currentSource = source.value
   if (!currentSource) {
-    toast.error('Save source first')
+    toast.error(t('settings.admin.migration.saveSourceFirst'))
     return
   }
 
   const mappings = cleanedUserMappings()
   if (mappings.length === 0) {
-    toast.error('Map at least one source user to a target user')
+    toast.error(t('settings.admin.migration.mapAtLeastOneUser'))
     return
   }
   if (mappings.length !== userMappings.value.length) {
-    toast.error('Map every source user before saving')
+    toast.error(t('settings.admin.migration.mapEveryUser'))
     return
   }
 
@@ -880,7 +909,7 @@ async function onSaveMappings() {
       try {
         pathValidation.value = await validatePathMappings(currentSource.id, { pathMappings: cleanedPaths, sampleLimit: 10 })
       } catch (pathError) {
-        toast.warning(getErrorMessage(pathError, 'Path validation failed, but profile will still be saved'))
+        toast.warning(getErrorMessage(pathError, t('settings.admin.migration.pathValidationFailedProfileSaved')))
       }
     }
 
@@ -898,9 +927,9 @@ async function onSaveMappings() {
       },
     })
     await refreshWorkflowState()
-    toast.success('Mappings saved')
+    toast.success(t('settings.admin.migration.mappingsSaved'))
   } catch (error) {
-    toast.error(getErrorMessage(error, 'Failed to save mappings'))
+    toast.error(getErrorMessage(error, t('settings.admin.migration.errorSaveMappings')))
   } finally {
     busy.savingProfile = false
   }
@@ -908,12 +937,12 @@ async function onSaveMappings() {
 
 async function onRunDryRun() {
   if (hasActiveRun.value) {
-    toast.error('Cannot run dry-run while a run is active')
+    toast.error(t('settings.admin.migration.cannotRunDryRunActiveRun'))
     return
   }
   const currentProfile = profile.value
   if (!currentProfile) {
-    toast.error('Save mappings first')
+    toast.error(t('settings.admin.migration.saveMappingsFirst'))
     return
   }
 
@@ -923,9 +952,9 @@ async function onRunDryRun() {
     await refreshWorkflowState()
     const matched = artifact.summary?.matchedBooks ?? 0
     const unresolved = artifact.summary?.unresolvedBooks ?? 0
-    toast.success(`Dry-run completed: ${matched} matched, ${unresolved} unresolved`)
+    toast.success(t('settings.admin.migration.dryRunCompleted', { matched, unresolved }))
   } catch (error) {
-    toast.error(getErrorMessage(error, 'Dry-run failed'))
+    toast.error(getErrorMessage(error, t('settings.admin.migration.dryRunFailed')))
   } finally {
     busy.dryRun = false
   }
@@ -944,7 +973,7 @@ async function onResolveDuplicates() {
 
   const unresolved = matches.filter((m) => !duplicateResolutions.value.has(m.targetBookId))
   if (unresolved.length > 0) {
-    toast.error(`Select a source book for all ${unresolved.length} duplicate groups`)
+    toast.error(t('settings.admin.migration.selectSourceForAllGroups', { count: unresolved.length }))
     return
   }
 
@@ -957,9 +986,9 @@ async function onResolveDuplicates() {
     await resolveDuplicateMatches(currentPlan.id, resolutions)
     duplicateResolutions.value = new Map()
     await refreshWorkflowState()
-    toast.success('Duplicate matches resolved')
+    toast.success(t('settings.admin.migration.duplicatesResolved'))
   } catch (error) {
-    toast.error(getErrorMessage(error, 'Failed to resolve duplicates'))
+    toast.error(getErrorMessage(error, t('settings.admin.migration.errorResolveDuplicates')))
   } finally {
     busy.resolvingDuplicates = false
   }
@@ -969,12 +998,12 @@ const confirmingMigrationStart = ref(false)
 
 async function onStartMigration() {
   if (!preflight.value.ready) {
-    toast.error(preflight.value.issues[0] ?? 'Migration preflight not ready')
+    toast.error(preflight.value.issues[0] ?? t('settings.admin.migration.preflightNotReady'))
     return
   }
   const currentPlan = plan.value
   if (!currentPlan) {
-    toast.error('Run dry-run first')
+    toast.error(t('settings.admin.migration.runDryRunFirst'))
     return
   }
 
@@ -989,9 +1018,9 @@ async function onStartMigration() {
     await startLiveRun({ planArtifactId: currentPlan.id })
     await refreshWorkflowState()
     await refreshRunProgress()
-    toast.success('Migration run started')
+    toast.success(t('settings.admin.migration.runStarted'))
   } catch (error) {
-    toast.error(getErrorMessage(error, 'Failed to start migration'))
+    toast.error(getErrorMessage(error, t('settings.admin.migration.errorStartMigration')))
   } finally {
     busy.startingRun = false
   }
@@ -1008,9 +1037,9 @@ async function onCancelRun() {
   try {
     await cancelRun(currentRun.id)
     await refreshWorkflowState()
-    toast.success('Migration run cancelled')
+    toast.success(t('settings.admin.migration.runCancelled'))
   } catch (error) {
-    toast.error(getErrorMessage(error, 'Failed to cancel migration'))
+    toast.error(getErrorMessage(error, t('settings.admin.migration.errorCancelMigration')))
   } finally {
     busy.cancellingRun = false
   }
@@ -1023,9 +1052,9 @@ async function onRetryRun() {
   try {
     await retryRun(currentRun.id)
     await refreshWorkflowState()
-    toast.success('Migration run retried - resuming from last completed stage')
+    toast.success(t('settings.admin.migration.runRetried'))
   } catch (error) {
-    toast.error(getErrorMessage(error, 'Failed to retry migration'))
+    toast.error(getErrorMessage(error, t('settings.admin.migration.errorRetryMigration')))
   } finally {
     busy.retryingRun = false
   }
@@ -1042,7 +1071,7 @@ async function refreshRunProgress() {
       await refreshWorkflowState()
     }
   } catch (error) {
-    toast.error(getErrorMessage(error, 'Failed to load run progress'))
+    toast.error(getErrorMessage(error, t('settings.admin.migration.errorLoadRunProgress')))
   } finally {
     busy.loadingProgress = false
   }
@@ -1051,16 +1080,16 @@ async function refreshRunProgress() {
 async function onRefreshReport() {
   const currentRun = run.value
   if (!currentRun) {
-    toast.error('Start migration first')
+    toast.error(t('settings.admin.migration.startMigrationFirst'))
     return
   }
 
   busy.loadingReport = true
   try {
     runReport.value = await getRunReport(currentRun.id)
-    toast.success('Run report refreshed')
+    toast.success(t('settings.admin.migration.reportRefreshed'))
   } catch (error) {
-    toast.error(getErrorMessage(error, 'Failed to load run report'))
+    toast.error(getErrorMessage(error, t('settings.admin.migration.errorLoadReport')))
   } finally {
     busy.loadingReport = false
   }
@@ -1081,7 +1110,7 @@ function onTogglePassword() {
 async function exportReport(format: 'json' | 'csv') {
   const currentRun = run.value
   if (!currentRun) {
-    toast.error('Start migration first')
+    toast.error(t('settings.admin.migration.startMigrationFirst'))
     return
   }
 
@@ -1089,9 +1118,9 @@ async function exportReport(format: 'json' | 'csv') {
   try {
     const exported = await exportRunReport(currentRun.id, format)
     downloadTextFile(exported.fileName, exported.content, exported.contentType)
-    toast.success(`Report exported as ${format.toUpperCase()}`)
+    toast.success(t('settings.admin.migration.reportExported', { format: format.toUpperCase() }))
   } catch (error) {
-    toast.error(getErrorMessage(error, 'Failed to export migration report'))
+    toast.error(getErrorMessage(error, t('settings.admin.migration.errorExportReport')))
   } finally {
     busy.exporting = false
   }
@@ -1122,24 +1151,24 @@ function formatDuration(ms: number): string {
 }
 
 function friendlyUnresolvedReason(reason: string | null): string {
-  if (reason === 'no_title_author_match') return 'No matching book found by title or author'
-  if (reason === 'no_file_path_match') return 'File path did not match any book in this library'
-  if (reason === 'no_file_hash_match') return 'File hash did not match any book in this library'
-  if (reason === 'no_isbn_match') return 'ISBN did not match any book in this library'
-  if (reason === 'insufficient_source_data') return 'Not enough metadata to attempt matching'
-  if (reason === 'ambiguous_isbn_match') return 'Multiple books matched the same ISBN'
-  if (reason === 'ambiguous_file_hash_match') return 'Multiple books matched the same file hash'
-  if (reason === 'ambiguous_file_path_match') return 'Multiple books matched the same file path'
-  if (reason === 'ambiguous_title_author_match') return 'Multiple books matched the same title and author'
-  return reason ?? 'Could not determine reason'
+  if (reason === 'no_title_author_match') return t('settings.admin.migration.reasonNoTitleAuthorMatch')
+  if (reason === 'no_file_path_match') return t('settings.admin.migration.reasonNoFilePathMatch')
+  if (reason === 'no_file_hash_match') return t('settings.admin.migration.reasonNoFileHashMatch')
+  if (reason === 'no_isbn_match') return t('settings.admin.migration.reasonNoIsbnMatch')
+  if (reason === 'insufficient_source_data') return t('settings.admin.migration.reasonInsufficientSourceData')
+  if (reason === 'ambiguous_isbn_match') return t('settings.admin.migration.reasonAmbiguousIsbnMatch')
+  if (reason === 'ambiguous_file_hash_match') return t('settings.admin.migration.reasonAmbiguousFileHashMatch')
+  if (reason === 'ambiguous_file_path_match') return t('settings.admin.migration.reasonAmbiguousFilePathMatch')
+  if (reason === 'ambiguous_title_author_match') return t('settings.admin.migration.reasonAmbiguousTitleAuthorMatch')
+  return reason ?? t('settings.admin.migration.reasonUnknown')
 }
 
 function friendlyMatchStrategy(strategy: string | null): string {
-  if (strategy === 'isbn') return 'Matched by ISBN'
-  if (strategy === 'file_hash') return 'Matched by file hash'
-  if (strategy === 'path_mapping') return 'Matched by mapped file path'
-  if (strategy === 'title_author') return 'Matched by title and author'
-  return strategy ?? 'Match strategy unavailable'
+  if (strategy === 'isbn') return t('settings.admin.migration.strategyIsbn')
+  if (strategy === 'file_hash') return t('settings.admin.migration.strategyFileHash')
+  if (strategy === 'path_mapping') return t('settings.admin.migration.strategyPathMapping')
+  if (strategy === 'title_author') return t('settings.admin.migration.strategyTitleAuthor')
+  return strategy ?? t('settings.admin.migration.strategyUnavailable')
 }
 
 function describeUserPreviewCounts(counts: {
@@ -1149,7 +1178,13 @@ function describeUserPreviewCounts(counts: {
   annotations: number
   shelves: number
 }): string {
-  return `${counts.statuses} statuses, ${counts.fileProgress} progress entries, ${counts.bookmarks} bookmarks, ${counts.annotations} annotations, ${counts.shelves} collection entries`
+  return t('settings.admin.migration.userPreviewCounts', {
+    statuses: counts.statuses,
+    progress: counts.fileProgress,
+    bookmarks: counts.bookmarks,
+    annotations: counts.annotations,
+    collections: counts.shelves,
+  })
 }
 
 function extractPlanUnresolvedBooks(planPayload: unknown): ReportUnresolvedBook[] {
@@ -1173,11 +1208,11 @@ function extractPlanUnresolvedBooks(planPayload: unknown): ReportUnresolvedBook[
 
 function friendlyConnectionError(error: unknown): string {
   const msg = error instanceof Error ? error.message : String(error)
-  if (/ECONNREFUSED|ENOTFOUND|connect ETIMEDOUT/i.test(msg)) return 'Could not reach the database server. Check the host and port.'
-  if (/Access denied|authentication failed/i.test(msg)) return 'Authentication failed. Check the username and password.'
-  if (/Unknown database/i.test(msg)) return 'Database not found. Check the database name.'
-  if (/ETIMEDOUT|timeout/i.test(msg)) return 'Connection timed out. Check host and firewall settings.'
-  return msg || 'Connection test failed'
+  if (/ECONNREFUSED|ENOTFOUND|connect ETIMEDOUT/i.test(msg)) return t('settings.admin.migration.connErrorUnreachable')
+  if (/Access denied|authentication failed/i.test(msg)) return t('settings.admin.migration.connErrorAuth')
+  if (/Unknown database/i.test(msg)) return t('settings.admin.migration.connErrorUnknownDatabase')
+  if (/ETIMEDOUT|timeout/i.test(msg)) return t('settings.admin.migration.connErrorTimeout')
+  return msg || t('settings.admin.migration.connErrorGeneric')
 }
 
 function runStateClass(state: string) {
@@ -1244,10 +1279,7 @@ function formatSourceCountLabel(key: string) {
 </script>
 
 <template>
-  <SettingsPageHeader
-    title="Migration"
-    subtitle="One-time Booklore import: connect source, map users, dry-run, start migration, and export a report."
-  />
+  <SettingsPageHeader :title="t('settings.admin.migration.title')" :subtitle="t('settings.admin.migration.subtitle')" />
 
   <div v-if="loading" class="flex items-center justify-center py-16">
     <Loader2 class="size-5 animate-spin text-muted-foreground" />
@@ -1256,7 +1288,7 @@ function formatSourceCountLabel(key: string) {
   <div v-else class="flex gap-10 items-start">
     <!-- Sidebar stepper (desktop) -->
     <aside class="hidden lg:block w-44 shrink-0 pt-1">
-      <p class="settings-group-label mb-2">Progress</p>
+      <p class="settings-group-label mb-2">{{ t('settings.admin.migration.progress') }}</p>
       <MigrationStepper :steps="stepperSteps" :active-index="currentStep" @step-click="onStepClick" />
     </aside>
 
@@ -1294,35 +1326,37 @@ function formatSourceCountLabel(key: string) {
           <div v-if="currentStep === 0" class="space-y-3">
             <div class="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
               <label class="block">
-                <span class="settings-hint">Source Type</span>
+                <span class="settings-hint">{{ t('settings.admin.migration.sourceType') }}</span>
                 <select v-model="sourceDraft.type" class="select-field mt-1 w-full" :disabled="hasActiveRun">
                   <option v-for="type in supportedTypes" :key="type" :value="type">{{ type }}</option>
                 </select>
               </label>
               <label class="block">
-                <span class="settings-hint">Source Name</span>
+                <span class="settings-hint">{{ t('settings.admin.migration.sourceName') }}</span>
                 <input v-model="sourceDraft.name" class="input-field mt-1 w-full" placeholder="Booklore Import" :disabled="hasActiveRun" />
               </label>
               <label class="block">
-                <span class="settings-hint">Host</span>
+                <span class="settings-hint">{{ t('settings.admin.migration.host') }}</span>
                 <input v-model="sourceDraft.host" class="input-field mt-1 w-full" placeholder="127.0.0.1" :disabled="hasActiveRun" />
               </label>
               <label class="block">
-                <span class="settings-hint">Port</span>
+                <span class="settings-hint">{{ t('settings.admin.migration.port') }}</span>
                 <input v-model.number="sourceDraft.port" class="input-field mt-1 w-full" type="number" min="1" max="65535" :disabled="hasActiveRun" />
               </label>
               <label class="block">
-                <span class="settings-hint">User</span>
+                <span class="settings-hint">{{ t('settings.admin.migration.user') }}</span>
                 <input v-model="sourceDraft.user" class="input-field mt-1 w-full" placeholder="booklore" :disabled="hasActiveRun" />
               </label>
               <label class="block">
-                <span class="settings-hint">Password</span>
+                <span class="settings-hint">{{ t('settings.admin.migration.password') }}</span>
                 <div class="relative mt-1">
                   <input
                     v-model="sourceDraft.password"
                     class="input-field w-full pr-9"
                     :type="showPassword ? 'text' : 'password'"
-                    :placeholder="source ? 'Saved - leave unchanged' : 'No password set'"
+                    :placeholder="
+                      source ? t('settings.admin.migration.passwordSavedPlaceholder') : t('settings.admin.migration.passwordEmptyPlaceholder')
+                    "
                     :disabled="hasActiveRun"
                   />
                   <button
@@ -1337,11 +1371,11 @@ function formatSourceCountLabel(key: string) {
                 </div>
               </label>
               <label class="block">
-                <span class="settings-hint">Database</span>
+                <span class="settings-hint">{{ t('settings.admin.migration.database') }}</span>
                 <input v-model="sourceDraft.database" class="input-field mt-1 w-full" placeholder="booklore" :disabled="hasActiveRun" />
               </label>
               <label class="block md:col-span-2 xl:col-span-2">
-                <span class="settings-hint">Media Root Path</span>
+                <span class="settings-hint">{{ t('settings.admin.migration.mediaRootPath') }}</span>
                 <div class="mt-1 flex items-center gap-2">
                   <input v-model="sourceDraft.mediaRootPath" class="input-field w-full" placeholder="/data/booklore/media" :disabled="hasActiveRun" />
                   <button
@@ -1359,7 +1393,13 @@ function formatSourceCountLabel(key: string) {
                   >
                     <Loader2 v-if="busy.testingMediaPath" class="size-3.5 animate-spin" />
                     <span v-else>
-                      {{ mediaPathTestState === 'pass' ? 'Path OK' : mediaPathTestState === 'fail' ? 'Path Issue' : 'Test Path' }}
+                      {{
+                        mediaPathTestState === 'pass'
+                          ? t('settings.admin.migration.pathOk')
+                          : mediaPathTestState === 'fail'
+                            ? t('settings.admin.migration.pathIssue')
+                            : t('settings.admin.migration.testPath')
+                      }}
                     </span>
                   </button>
                 </div>
@@ -1371,7 +1411,7 @@ function formatSourceCountLabel(key: string) {
               <div class="flex items-center">
                 <label class="flex h-9 cursor-pointer items-center gap-2">
                   <input v-model="sourceDraft.ssl" type="checkbox" class="size-4 rounded border-border" :disabled="hasActiveRun" />
-                  <span class="settings-hint">Use TLS/SSL</span>
+                  <span class="settings-hint">{{ t('settings.admin.migration.useTls') }}</span>
                 </label>
               </div>
             </div>
@@ -1379,11 +1419,11 @@ function formatSourceCountLabel(key: string) {
             <div class="flex flex-wrap gap-2">
               <button class="settings-btn-outline" :disabled="busy.testingSource || hasActiveRun" @click="onTestSource">
                 <Loader2 v-if="busy.testingSource" class="size-3.5 animate-spin" />
-                Test Connection
+                {{ t('settings.admin.migration.testConnection') }}
               </button>
               <button class="settings-btn-primary" :disabled="busy.savingSource || hasActiveRun" @click="onSaveAndValidate">
                 <Loader2 v-if="busy.savingSource" class="size-3.5 animate-spin" />
-                Save &amp; Validate
+                {{ t('settings.admin.migration.saveAndValidate') }}
               </button>
             </div>
 
@@ -1391,15 +1431,19 @@ function formatSourceCountLabel(key: string) {
               v-if="sourceValidationWarnings.length > 0"
               class="rounded border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-700 space-y-1"
             >
-              <p class="font-medium">Source validated with warnings</p>
+              <p class="font-medium">{{ t('settings.admin.migration.sourceValidatedWithWarnings') }}</p>
               <p v-for="warn in sourceValidationWarnings" :key="warn">{{ warn }}</p>
             </div>
 
             <div v-if="sourceCapabilities" class="rounded border border-border bg-muted/40 p-3 text-xs space-y-2">
-              <p class="font-medium text-foreground">Last validation snapshot</p>
-              <p class="text-muted-foreground">Source version: {{ sourceCapabilities.sourceVersion ?? 'Unknown' }}</p>
+              <p class="font-medium text-foreground">{{ t('settings.admin.migration.lastValidationSnapshot') }}</p>
+              <p class="text-muted-foreground">
+                {{
+                  t('settings.admin.migration.sourceVersion', { version: sourceCapabilities.sourceVersion ?? t('settings.admin.migration.unknown') })
+                }}
+              </p>
               <p v-if="sourceCapabilities.missingTables.length > 0" class="text-amber-600">
-                Missing required tables: {{ sourceCapabilities.missingTables.join(', ') }}
+                {{ t('settings.admin.migration.missingRequiredTables', { tables: sourceCapabilities.missingTables.join(', ') }) }}
               </p>
               <div v-if="sourceRowCounts.length > 0" class="grid gap-1 text-muted-foreground sm:grid-cols-2 xl:grid-cols-3">
                 <p v-for="[key, count] in sourceRowCounts" :key="key">{{ formatSourceCountLabel(key) }}: {{ count }}</p>
@@ -1410,7 +1454,7 @@ function formatSourceCountLabel(key: string) {
           <!-- Step 1: User & Path Mapping -->
           <div v-else-if="currentStep === 1" class="space-y-5">
             <div class="flex items-center gap-2">
-              <p class="text-xs text-muted-foreground">User suggestions load automatically after source validation.</p>
+              <p class="text-xs text-muted-foreground">{{ t('settings.admin.migration.suggestionsAutoLoad') }}</p>
               <button
                 v-if="source"
                 class="text-xs text-primary underline-offset-2 hover:underline disabled:opacity-50"
@@ -1418,7 +1462,7 @@ function formatSourceCountLabel(key: string) {
                 @click="onReloadSuggestions"
               >
                 <Loader2 v-if="busy.loadingSuggestions || busy.loadingTargetUsers" class="size-3 animate-spin inline" />
-                Refresh
+                {{ t('settings.admin.migration.refresh') }}
               </button>
             </div>
 
@@ -1426,8 +1470,8 @@ function formatSourceCountLabel(key: string) {
               <table class="w-full text-sm">
                 <thead class="bg-muted/40 text-left">
                   <tr>
-                    <th class="px-3 py-2 font-medium">Source User</th>
-                    <th class="px-3 py-2 font-medium">Target User</th>
+                    <th class="px-3 py-2 font-medium">{{ t('settings.admin.migration.sourceUser') }}</th>
+                    <th class="px-3 py-2 font-medium">{{ t('settings.admin.migration.targetUser') }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1441,63 +1485,74 @@ function formatSourceCountLabel(key: string) {
                     </td>
                   </tr>
                   <tr v-if="userMappings.length === 0" class="border-t border-border">
-                    <td colspan="2" class="px-3 py-4 text-sm text-muted-foreground">No source users loaded yet.</td>
+                    <td colspan="2" class="px-3 py-4 text-sm text-muted-foreground">{{ t('settings.admin.migration.noSourceUsersLoaded') }}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
             <p v-if="!busy.loadingTargetUsers && targetUsers.length === 0" class="text-xs text-amber-600">
-              No active target users found. Create or re-enable a BookOrbit user before mapping.
+              {{ t('settings.admin.migration.noActiveTargetUsers') }}
             </p>
 
             <div class="space-y-2">
               <div class="flex items-center justify-between">
-                <p class="settings-hint">Path Prefix Mappings</p>
-                <button class="settings-btn-outline" :disabled="hasActiveRun" @click="addPathMapping">Add Mapping</button>
+                <p class="settings-hint">{{ t('settings.admin.migration.pathPrefixMappings') }}</p>
+                <button class="settings-btn-outline" :disabled="hasActiveRun" @click="addPathMapping">
+                  {{ t('settings.admin.migration.addMapping') }}
+                </button>
               </div>
               <p class="text-xs text-muted-foreground">
-                Path mappings translate source file paths to target paths so books can be matched by file location. For example, if your Booklore
-                library stored files under <code class="font-mono">/books/Large</code> and the same files now live under
-                <code class="font-mono">/srv/bookorbit/books/Large</code>, add that mapping here. Books are also matched by ISBN, file hash, and
-                title/author regardless of path mappings - path mapping is only one of four strategies and does not limit which source books are
-                included in the migration.
+                {{ t('settings.admin.migration.pathMappingsHelp1') }} <code class="font-mono">/books/Large</code>
+                {{ t('settings.admin.migration.pathMappingsHelp2') }} <code class="font-mono">/srv/bookorbit/books/Large</code
+                >{{ t('settings.admin.migration.pathMappingsHelp3') }}
               </p>
 
               <div v-for="(row, index) in pathMappings" :key="index" class="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center">
                 <select v-model="row.sourcePrefix" class="select-field w-full min-w-0" :disabled="hasActiveRun">
                   <option value="">
-                    {{ sourcePathPrefixes.length === 0 ? 'No prefixes found - validate source first' : 'Select source prefix...' }}
+                    {{
+                      sourcePathPrefixes.length === 0
+                        ? t('settings.admin.migration.noPrefixesFound')
+                        : t('settings.admin.migration.selectSourcePrefix')
+                    }}
                   </option>
                   <option v-for="prefix in sourcePathPrefixes" :key="prefix" :value="prefix">{{ prefix }}</option>
                 </select>
 
                 <select v-model="row.targetPrefix" class="select-field w-full min-w-0" :disabled="hasActiveRun">
-                  <option value="">Select target folder...</option>
+                  <option value="">{{ t('settings.admin.migration.selectTargetFolder') }}</option>
                   <option v-for="folder in targetLibraryFolders" :key="folder.path" :value="folder.path">
                     {{ folder.libraryName }} - {{ folder.path }}
                   </option>
                 </select>
 
-                <button class="settings-btn-outline" :disabled="hasActiveRun" @click="removePathMapping(index)">Remove</button>
+                <button class="settings-btn-outline" :disabled="hasActiveRun" @click="removePathMapping(index)">
+                  {{ t('settings.admin.migration.remove') }}
+                </button>
               </div>
             </div>
 
             <div v-if="pathValidation" class="rounded border border-border bg-muted/40 p-3 text-xs space-y-1">
-              <p class="font-medium text-foreground">Path validation</p>
+              <p class="font-medium text-foreground">{{ t('settings.admin.migration.pathValidation') }}</p>
               <p class="text-muted-foreground">
-                {{ pathValidation.summary.mappedByPrefix }} of {{ pathValidation.summary.booksWithFilePath }} source books have a mapped path
+                {{
+                  t('settings.admin.migration.pathValidationMapped', {
+                    mapped: pathValidation.summary.mappedByPrefix,
+                    total: pathValidation.summary.booksWithFilePath,
+                  })
+                }}
               </p>
               <p v-if="pathValidation.summary.unmatchedTargetPaths > 0" class="text-amber-600">
-                {{ pathValidation.summary.unmatchedTargetPaths }} mapped paths not found on disk - those books will fall back to ISBN / title matching
+                {{ t('settings.admin.migration.pathValidationUnmatched', { count: pathValidation.summary.unmatchedTargetPaths }) }}
               </p>
               <p v-else-if="pathValidation.summary.matchedTargetPaths > 0" class="text-emerald-600">
-                All {{ pathValidation.summary.matchedTargetPaths }} mapped paths found on disk
+                {{ t('settings.admin.migration.pathValidationAllMatched', { count: pathValidation.summary.matchedTargetPaths }) }}
               </p>
             </div>
 
             <button class="settings-btn-primary" :disabled="busy.savingProfile || source == null || hasActiveRun" @click="onSaveMappings">
               <Loader2 v-if="busy.savingProfile" class="size-3.5 animate-spin" />
-              Save Mappings
+              {{ t('settings.admin.migration.saveMappings') }}
             </button>
           </div>
 
@@ -1505,38 +1560,39 @@ function formatSourceCountLabel(key: string) {
           <div v-else-if="currentStep === 2" class="space-y-5">
             <button class="settings-btn-primary" :disabled="busy.dryRun || profile == null || hasActiveRun" @click="onRunDryRun">
               <Loader2 v-if="busy.dryRun" class="size-3.5 animate-spin" />
-              Run Dry-Run
+              {{ t('settings.admin.migration.runDryRun') }}
             </button>
 
             <div v-if="plan" class="rounded border border-border bg-muted/30 p-3 space-y-2 text-sm">
               <p>
-                Matched: <span class="font-medium">{{ plan.summary?.matchedBooks ?? 0 }}</span> · Unresolved:
-                <span class="font-medium">{{ plan.summary?.unresolvedBooks ?? 0 }}</span> · Duplicate matches:
+                {{ t('settings.admin.migration.matched') }} <span class="font-medium">{{ plan.summary?.matchedBooks ?? 0 }}</span> ·
+                {{ t('settings.admin.migration.unresolved') }}
+                <span class="font-medium">{{ plan.summary?.unresolvedBooks ?? 0 }}</span> · {{ t('settings.admin.migration.duplicateMatches') }}
                 <span class="font-medium" :class="(plan.summary?.duplicateBookMatches ?? 0) > 0 ? 'text-red-600' : ''">
                   {{ plan.summary?.duplicateBookMatches ?? 0 }}
                 </span>
               </p>
               <div v-if="unresolvedSummary.length > 0" class="space-y-1 text-xs text-muted-foreground">
-                <p class="font-medium text-foreground">Unresolved summary</p>
+                <p class="font-medium text-foreground">{{ t('settings.admin.migration.unresolvedSummary') }}</p>
                 <p v-for="[reason, count] in unresolvedSummary" :key="reason">{{ friendlyUnresolvedReason(reason) }}: {{ count }}</p>
               </div>
 
               <div v-if="duplicateMatches.length > 0" class="space-y-3 border-t border-border pt-3">
                 <div class="space-y-1">
-                  <p class="font-medium text-red-600">Resolve duplicate target matches</p>
+                  <p class="font-medium text-red-600">{{ t('settings.admin.migration.resolveDuplicateMatches') }}</p>
                   <p class="text-xs text-muted-foreground">
-                    For each target book, choose one source book to keep. Recommended choices are preselected when there is a single strongest match.
+                    {{ t('settings.admin.migration.resolveDuplicateHint') }}
                   </p>
                   <p class="text-xs text-muted-foreground">
-                    Remaining groups:
+                    {{ t('settings.admin.migration.remainingGroups') }}
                     <span class="font-medium text-foreground">{{ duplicateGroupsRemaining }}</span>
-                    of {{ duplicateMatches.length }}
+                    {{ t('settings.admin.migration.ofCount', { count: duplicateMatches.length }) }}
                   </p>
                 </div>
                 <div class="space-y-3">
                   <div v-for="dup in duplicateMatches" :key="dup.targetBookId" class="rounded border border-border bg-background p-3 space-y-2">
                     <p class="text-xs font-medium text-foreground">{{ targetBookLabel(dup.targetBookId) }}</p>
-                    <p class="text-[11px] text-muted-foreground">Target book #{{ dup.targetBookId }}</p>
+                    <p class="text-[11px] text-muted-foreground">{{ t('settings.admin.migration.targetBookNum', { id: dup.targetBookId }) }}</p>
                     <div class="space-y-1">
                       <label
                         v-for="sourceId in dup.sourceBookIds"
@@ -1562,7 +1618,7 @@ function formatSourceCountLabel(key: string) {
                             v-if="isRecommendedSourceBook(dup, sourceId)"
                             class="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700"
                           >
-                            Recommended
+                            {{ t('settings.admin.migration.recommended') }}
                           </span>
                         </div>
                         <span class="text-muted-foreground text-[11px] whitespace-nowrap">{{
@@ -1578,7 +1634,7 @@ function formatSourceCountLabel(key: string) {
                   @click="onResolveDuplicates"
                 >
                   <Loader2 v-if="busy.resolvingDuplicates" class="size-3.5 animate-spin" />
-                  Resolve {{ duplicateMatches.length }} duplicate{{ duplicateMatches.length === 1 ? '' : 's' }}
+                  {{ t('settings.admin.migration.resolveDuplicatesButton', { count: duplicateMatches.length }, duplicateMatches.length) }}
                 </button>
               </div>
             </div>
@@ -1587,66 +1643,66 @@ function formatSourceCountLabel(key: string) {
           <!-- Step 3: Run Migration -->
           <div v-else-if="currentStep === 3" class="space-y-5">
             <div class="rounded border border-border bg-muted/20 p-3 text-xs space-y-1.5">
-              <p class="font-medium text-foreground">Preflight checks</p>
-              <p v-if="preflight.ready" class="text-emerald-600">All checks passed - ready to migrate</p>
+              <p class="font-medium text-foreground">{{ t('settings.admin.migration.preflightChecks') }}</p>
+              <p v-if="preflight.ready" class="text-emerald-600">{{ t('settings.admin.migration.allChecksPassed') }}</p>
               <template v-else>
                 <div v-if="preflight.sourceValidated" class="flex items-center gap-1.5 text-emerald-600">
                   <span class="size-1.5 rounded-full bg-emerald-500 flex-none" />
-                  Source validated
+                  {{ t('settings.admin.migration.checkSourceValidated') }}
                 </div>
                 <div v-else class="flex items-center gap-1.5 text-muted-foreground">
                   <span class="size-1.5 rounded-full bg-muted-foreground/40 flex-none" />
-                  {{ !source ? 'Save and validate source connection' : 'Validate source connection' }}
+                  {{ !source ? t('settings.admin.migration.checkSaveValidateSource') : t('settings.admin.migration.checkValidateSource') }}
                 </div>
                 <div v-if="profile" class="flex items-center gap-1.5 text-emerald-600">
                   <span class="size-1.5 rounded-full bg-emerald-500 flex-none" />
-                  Mappings saved
+                  {{ t('settings.admin.migration.checkMappingsSaved') }}
                 </div>
                 <div v-else class="flex items-center gap-1.5 text-muted-foreground">
                   <span class="size-1.5 rounded-full bg-muted-foreground/40 flex-none" />
-                  Save user and path mappings
+                  {{ t('settings.admin.migration.checkSaveMappings') }}
                 </div>
                 <div v-if="profile && preflight.pathMappingsValidated" class="flex items-center gap-1.5 text-emerald-600">
                   <span class="size-1.5 rounded-full bg-emerald-500 flex-none" />
-                  Path mappings validated
+                  {{ t('settings.admin.migration.checkPathMappingsValidated') }}
                 </div>
                 <div v-else-if="profile" class="flex items-center gap-1.5 text-muted-foreground">
                   <span class="size-1.5 rounded-full bg-muted-foreground/40 flex-none" />
-                  Save path mappings to validate them
+                  {{ t('settings.admin.migration.checkSavePathMappings') }}
                 </div>
                 <div v-if="preflight.dryRunFresh" class="flex items-center gap-1.5 text-emerald-600">
                   <span class="size-1.5 rounded-full bg-emerald-500 flex-none" />
-                  Dry-run is up to date
+                  {{ t('settings.admin.migration.checkDryRunUpToDate') }}
                 </div>
                 <div v-else class="flex items-center gap-1.5 text-muted-foreground">
                   <span class="size-1.5 rounded-full bg-muted-foreground/40 flex-none" />
-                  Run a fresh dry-run
+                  {{ t('settings.admin.migration.checkFreshDryRun') }}
                 </div>
               </template>
             </div>
 
             <div class="flex flex-wrap gap-2">
               <template v-if="confirmingMigrationStart">
-                <span class="text-xs text-amber-600 self-center">This will start the live migration. Are you sure?</span>
+                <span class="text-xs text-amber-600 self-center">{{ t('settings.admin.migration.startConfirmPrompt') }}</span>
                 <button class="settings-btn-primary" :disabled="busy.startingRun" @click="onStartMigration">
                   <Loader2 v-if="busy.startingRun" class="size-3.5 animate-spin" />
-                  Confirm Start
+                  {{ t('settings.admin.migration.confirmStart') }}
                 </button>
-                <button class="settings-btn-outline" @click="onCancelMigrationStart">Cancel</button>
+                <button class="settings-btn-outline" @click="onCancelMigrationStart">{{ t('common.cancel') }}</button>
               </template>
               <template v-else>
                 <button class="settings-btn-primary" :disabled="busy.startingRun || !preflight.ready" @click="onStartMigration">
                   <Loader2 v-if="busy.startingRun" class="size-3.5 animate-spin" />
-                  Start Migration
+                  {{ t('settings.admin.migration.startMigration') }}
                 </button>
               </template>
               <button v-if="run?.state === 'running'" class="settings-btn-outline text-red-600" :disabled="busy.cancellingRun" @click="onCancelRun">
                 <Loader2 v-if="busy.cancellingRun" class="size-3.5 animate-spin" />
-                Cancel Run
+                {{ t('settings.admin.migration.cancelRun') }}
               </button>
               <button class="settings-btn-outline" :disabled="busy.loadingProgress || run == null" @click="refreshRunProgress">
                 <Loader2 v-if="busy.loadingProgress" class="size-3.5 animate-spin" />
-                Refresh Status
+                {{ t('settings.admin.migration.refreshStatus') }}
               </button>
             </div>
 
@@ -1654,8 +1710,8 @@ function formatSourceCountLabel(key: string) {
               v-if="pollingError"
               class="rounded border border-amber-500/20 bg-amber-500/10 px-3 py-2 flex items-center gap-2 text-xs text-amber-700"
             >
-              <span>Status polling stopped due to an error.</span>
-              <button class="underline font-medium" @click="onRetryPolling">Retry</button>
+              <span>{{ t('settings.admin.migration.statusPollingStopped') }}</span>
+              <button class="underline font-medium" @click="onRetryPolling">{{ t('settings.admin.migration.retry') }}</button>
             </div>
 
             <div v-if="run" class="rounded border border-border bg-muted/30 px-4 py-3.5 flex items-center gap-3 text-xs">
@@ -1663,14 +1719,14 @@ function formatSourceCountLabel(key: string) {
               <span class="text-muted-foreground">
                 {{
                   run.state === 'running'
-                    ? `Stage: ${run.currentStage ?? 'initializing'}`
+                    ? t('settings.admin.migration.stageLabel', { stage: run.currentStage ?? t('settings.admin.migration.stageInitializing') })
                     : run.endedAt
-                      ? `Ended ${new Date(run.endedAt).toLocaleString()}`
+                      ? t('settings.admin.migration.endedLabel', { date: formatDateTime(new Date(run.endedAt)) })
                       : ''
                 }}
               </span>
               <button v-if="run.state !== 'running'" class="text-xs text-primary underline-offset-2 hover:underline ml-auto" @click="goNext">
-                View Report
+                {{ t('settings.admin.migration.viewReport') }}
               </button>
             </div>
 
@@ -1690,40 +1746,44 @@ function formatSourceCountLabel(key: string) {
 
           <!-- Step 4: Migration Report -->
           <div v-else-if="currentStep === 4" class="space-y-5">
-            <p v-if="!run" class="text-sm text-muted-foreground">No migration run yet. Complete the steps above to start.</p>
+            <p v-if="!run" class="text-sm text-muted-foreground">{{ t('settings.admin.migration.noRunYet') }}</p>
 
             <template v-else>
               <!-- Run header -->
               <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="space-y-0.5">
                   <p class="flex items-center gap-2 text-sm font-medium">
-                    Run #{{ run.id }}
+                    {{ t('settings.admin.migration.runNum', { id: run.id }) }}
                     <span class="inline-flex rounded-full border px-2 py-0.5 text-xs" :class="runStateClass(run.state)">{{ run.state }}</span>
                   </p>
                   <p class="text-xs text-muted-foreground">
-                    {{ run.startedAt ? new Date(run.startedAt).toLocaleString() : 'Not started' }}
+                    {{ run.startedAt ? formatDateTime(new Date(run.startedAt)) : t('settings.admin.migration.notStarted') }}
                     <template v-if="reportData.durationMs != null"> &middot; {{ formatDuration(reportData.durationMs) }}</template>
                   </p>
                 </div>
                 <div class="flex flex-wrap gap-2">
                   <button class="settings-btn-outline" :disabled="busy.loadingReport" @click="onRefreshReport">
                     <Loader2 v-if="busy.loadingReport" class="size-3.5 animate-spin" />
-                    {{ runReport ? 'Reload Report' : 'Load Full Report' }}
+                    {{ runReport ? t('settings.admin.migration.reloadReport') : t('settings.admin.migration.loadFullReport') }}
                   </button>
-                  <button class="settings-btn-outline" :disabled="busy.exporting" @click="onExportJson">Export JSON</button>
-                  <button class="settings-btn-outline" :disabled="busy.exporting" @click="onExportCsv">Export CSV</button>
+                  <button class="settings-btn-outline" :disabled="busy.exporting" @click="onExportJson">
+                    {{ t('settings.admin.migration.exportJson') }}
+                  </button>
+                  <button class="settings-btn-outline" :disabled="busy.exporting" @click="onExportCsv">
+                    {{ t('settings.admin.migration.exportCsv') }}
+                  </button>
                 </div>
               </div>
 
               <!-- Error (if failed) -->
               <div v-if="run.errorMessage" class="rounded border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-700 space-y-2">
                 <div class="space-y-0.5">
-                  <p class="font-medium">Migration failed</p>
+                  <p class="font-medium">{{ t('settings.admin.migration.migrationFailed') }}</p>
                   <p>{{ run.errorMessage }}</p>
                 </div>
                 <button v-if="run.state === 'failed'" class="settings-btn-outline text-xs" :disabled="busy.retryingRun" @click="onRetryRun">
                   <Loader2 v-if="busy.retryingRun" class="size-3.5 animate-spin" />
-                  Retry from last completed stage
+                  {{ t('settings.admin.migration.retryFromLastStage') }}
                 </button>
               </div>
 
@@ -1732,37 +1792,37 @@ function formatSourceCountLabel(key: string) {
                 <div class="grid gap-3 sm:grid-cols-2">
                   <!-- Books card -->
                   <div class="rounded border border-border p-3 space-y-2">
-                    <p class="text-sm font-semibold">Books</p>
+                    <p class="text-sm font-semibold">{{ t('settings.admin.migration.booksCard') }}</p>
                     <div class="space-y-1.5 text-xs">
                       <div class="flex justify-between">
-                        <span class="text-muted-foreground">Metadata overlays applied</span>
+                        <span class="text-muted-foreground">{{ t('settings.admin.migration.metadataOverlaysApplied') }}</span>
                         <span class="font-medium">{{ reportData.bookMetadata?.imported ?? 0 }}</span>
                       </div>
                       <div class="flex justify-between">
-                        <span class="text-muted-foreground">Author mappings replaced</span>
+                        <span class="text-muted-foreground">{{ t('settings.admin.migration.authorMappingsReplaced') }}</span>
                         <span class="font-medium">{{ reportData.bookAuthors?.imported ?? 0 }}</span>
                       </div>
                       <div class="flex justify-between">
-                        <span class="text-muted-foreground">Narrator mappings replaced</span>
+                        <span class="text-muted-foreground">{{ t('settings.admin.migration.narratorMappingsReplaced') }}</span>
                         <span class="font-medium">{{ reportData.bookNarrators?.imported ?? 0 }}</span>
                       </div>
                       <div class="flex justify-between">
-                        <span class="text-muted-foreground">Genre mappings replaced</span>
+                        <span class="text-muted-foreground">{{ t('settings.admin.migration.genreMappingsReplaced') }}</span>
                         <span class="font-medium">{{ reportData.bookGenres?.imported ?? 0 }}</span>
                       </div>
                       <div class="flex justify-between">
-                        <span class="text-muted-foreground">Tag mappings replaced</span>
+                        <span class="text-muted-foreground">{{ t('settings.admin.migration.tagMappingsReplaced') }}</span>
                         <span class="font-medium">{{ reportData.bookTags?.imported ?? 0 }}</span>
                       </div>
                       <div class="flex justify-between" :class="reportData.coversSkippedAll ? 'text-amber-600' : ''">
-                        <span>Covers imported</span>
+                        <span>{{ t('settings.admin.migration.coversImported') }}</span>
                         <span class="font-medium">{{ reportData.bookCovers?.imported ?? 0 }}</span>
                       </div>
                       <p v-if="reportData.coversSkippedAll" class="text-amber-600 leading-tight">
-                        Cover import was skipped - media root path is not configured on the source
+                        {{ t('settings.admin.migration.coverImportSkipped') }}
                       </p>
                       <div v-if="reportData.unresolvedBooks.length > 0" class="flex justify-between text-amber-600">
-                        <span>Could not match</span>
+                        <span>{{ t('settings.admin.migration.couldNotMatch') }}</span>
                         <span class="font-medium">{{ reportData.unresolvedBooks.length }}</span>
                       </div>
                     </div>
@@ -1770,30 +1830,30 @@ function formatSourceCountLabel(key: string) {
 
                   <!-- User data card -->
                   <div class="rounded border border-border p-3 space-y-2">
-                    <p class="text-sm font-semibold">User Data</p>
+                    <p class="text-sm font-semibold">{{ t('settings.admin.migration.userDataCard') }}</p>
                     <div class="space-y-1.5 text-xs">
                       <div class="flex justify-between">
-                        <span class="text-muted-foreground">Reading statuses</span>
+                        <span class="text-muted-foreground">{{ t('settings.admin.migration.readingStatuses') }}</span>
                         <span class="font-medium">{{ reportData.userBookStatus?.imported ?? 0 }}</span>
                       </div>
                       <div class="flex justify-between">
-                        <span class="text-muted-foreground">Reading progress entries</span>
+                        <span class="text-muted-foreground">{{ t('settings.admin.migration.readingProgressEntries') }}</span>
                         <span class="font-medium">{{ reportData.readingProgress?.imported ?? 0 }}</span>
                       </div>
                       <div class="flex justify-between">
-                        <span class="text-muted-foreground">Audiobook progress entries</span>
+                        <span class="text-muted-foreground">{{ t('settings.admin.migration.audiobookProgressEntries') }}</span>
                         <span class="font-medium">{{ reportData.audiobookProgress?.imported ?? 0 }}</span>
                       </div>
                       <div class="flex justify-between">
-                        <span class="text-muted-foreground">Bookmarks</span>
+                        <span class="text-muted-foreground">{{ t('settings.admin.migration.bookmarksLabel') }}</span>
                         <span class="font-medium">{{ reportData.bookmarks?.imported ?? 0 }}</span>
                       </div>
                       <div class="flex justify-between">
-                        <span class="text-muted-foreground">Annotations</span>
+                        <span class="text-muted-foreground">{{ t('settings.admin.migration.annotationsLabel') }}</span>
                         <span class="font-medium">{{ reportData.annotations?.imported ?? 0 }}</span>
                       </div>
                       <div class="flex justify-between">
-                        <span class="text-muted-foreground">Collection entries</span>
+                        <span class="text-muted-foreground">{{ t('settings.admin.migration.collectionEntries') }}</span>
                         <span class="font-medium">{{ reportData.collections?.imported ?? 0 }}</span>
                       </div>
                     </div>
@@ -1801,7 +1861,7 @@ function formatSourceCountLabel(key: string) {
                 </div>
 
                 <p v-if="!runReport && (run.state === 'completed' || run.state === 'failed')" class="text-xs text-muted-foreground">
-                  Click "Load Full Report" to include the dry-run match summary in the exported report.
+                  {{ t('settings.admin.migration.loadFullReportHint') }}
                 </p>
               </template>
 
@@ -1811,14 +1871,16 @@ function formatSourceCountLabel(key: string) {
                   v-if="run.state === 'completed' && reportData.unresolvedBooks.length === 0 && reportData.coverFailureCount === 0"
                   class="rounded border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-emerald-700"
                 >
-                  Migration completed with no unresolved books or failures.
+                  {{ t('settings.admin.migration.completedNoIssues') }}
                 </div>
 
                 <div v-if="reportData.matchedBooks.length > 0" class="space-y-2">
                   <div>
-                    <p class="text-sm font-semibold">Matched books ({{ reportData.matchedBooks.length }})</p>
+                    <p class="text-sm font-semibold">
+                      {{ t('settings.admin.migration.matchedBooksHeading', { count: reportData.matchedBooks.length }) }}
+                    </p>
                     <p class="text-xs text-muted-foreground mt-0.5">
-                      These dry-run matches were used to decide which library books received imported data.
+                      {{ t('settings.admin.migration.matchedBooksHint') }}
                     </p>
                   </div>
                   <div class="space-y-1.5 max-h-56 overflow-y-auto">
@@ -1827,10 +1889,13 @@ function formatSourceCountLabel(key: string) {
                       :key="`${book.sourceBookId}-${book.targetBookId}`"
                       class="rounded border border-border px-3 py-2 text-xs"
                     >
-                      <p class="font-medium text-foreground">{{ book.sourceTitle || `Source book ${book.sourceBookId}` }}</p>
+                      <p class="font-medium text-foreground">
+                        {{ book.sourceTitle || t('settings.admin.migration.sourceBookFallback', { id: book.sourceBookId }) }}
+                      </p>
                       <p v-if="book.sourceAuthor" class="text-muted-foreground mt-0.5">{{ book.sourceAuthor }}</p>
                       <p class="text-muted-foreground mt-0.5">
-                        {{ friendlyMatchStrategy(book.strategy) }} - {{ book.targetTitle || `Library book ${book.targetBookId}` }}
+                        {{ friendlyMatchStrategy(book.strategy) }} -
+                        {{ book.targetTitle || t('settings.admin.migration.libraryBookFallback', { id: book.targetBookId }) }}
                       </p>
                     </div>
                   </div>
@@ -1838,9 +1903,11 @@ function formatSourceCountLabel(key: string) {
 
                 <div v-if="reportData.unresolvedBooks.length > 0" class="space-y-2">
                   <div>
-                    <p class="text-sm font-semibold text-amber-600">Unresolved books ({{ reportData.unresolvedBooks.length }})</p>
+                    <p class="text-sm font-semibold text-amber-600">
+                      {{ t('settings.admin.migration.unresolvedBooksHeading', { count: reportData.unresolvedBooks.length }) }}
+                    </p>
                     <p class="text-xs text-muted-foreground mt-0.5">
-                      These books exist in the source but could not be matched to any book in your library.
+                      {{ t('settings.admin.migration.unresolvedBooksHint') }}
                     </p>
                   </div>
                   <div class="space-y-1.5 max-h-64 overflow-y-auto">
@@ -1849,7 +1916,9 @@ function formatSourceCountLabel(key: string) {
                       :key="book.sourceBookId"
                       class="rounded border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs"
                     >
-                      <p class="font-medium text-foreground">{{ book.title || `Source book ${book.sourceBookId}` }}</p>
+                      <p class="font-medium text-foreground">
+                        {{ book.title || t('settings.admin.migration.sourceBookFallback', { id: book.sourceBookId }) }}
+                      </p>
                       <p v-if="book.author" class="text-muted-foreground mt-0.5">{{ book.author }}</p>
                       <p class="text-muted-foreground mt-0.5">{{ friendlyUnresolvedReason(book.reason) }}</p>
                     </div>
@@ -1858,8 +1927,10 @@ function formatSourceCountLabel(key: string) {
 
                 <div v-if="reportData.userPreview.length > 0" class="space-y-2">
                   <div>
-                    <p class="text-sm font-semibold">Mapped users ({{ reportData.userPreview.length }})</p>
-                    <p class="text-xs text-muted-foreground mt-0.5">Per-user totals come from the dry-run preview cached with the migration plan.</p>
+                    <p class="text-sm font-semibold">
+                      {{ t('settings.admin.migration.mappedUsersHeading', { count: reportData.userPreview.length }) }}
+                    </p>
+                    <p class="text-xs text-muted-foreground mt-0.5">{{ t('settings.admin.migration.mappedUsersHint') }}</p>
                   </div>
                   <div class="space-y-1.5">
                     <div
@@ -1874,7 +1945,7 @@ function formatSourceCountLabel(key: string) {
                 </div>
 
                 <div v-if="reportData.coverFailureCount > 0" class="rounded border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-red-700">
-                  {{ reportData.coverFailureCount }} cover import(s) failed. Detailed failure rows are not stored.
+                  {{ t('settings.admin.migration.coverImportsFailed', { count: reportData.coverFailureCount }) }}
                 </div>
               </template>
             </template>
@@ -1883,10 +1954,10 @@ function formatSourceCountLabel(key: string) {
 
         <!-- Card footer -->
         <div class="px-6 py-4 border-t border-border bg-muted/30 flex items-center justify-between">
-          <button v-if="currentStep > 0" class="settings-btn-outline" @click="goPrev">Back</button>
+          <button v-if="currentStep > 0" class="settings-btn-outline" @click="goPrev">{{ t('common.back') }}</button>
           <div v-else />
           <button v-if="currentStep < 4" class="settings-btn-primary" @click="goNext">{{ continueLabel }}</button>
-          <button v-else class="settings-btn-outline" @click="goToSetup">Back to Setup</button>
+          <button v-else class="settings-btn-outline" @click="goToSetup">{{ t('settings.admin.migration.backToSetup') }}</button>
         </div>
       </div>
     </div>

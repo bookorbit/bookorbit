@@ -16,13 +16,17 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateMeSettingsDto } from './dto/update-me-settings.dto';
 import { UpdateSeriesCollapsePreferencesDto } from './dto/update-series-collapse-preferences.dto';
 import { UserRepository } from './user.repository';
+import { AppSettingsService } from '../app-settings/app-settings.service';
 
 @Injectable()
 export class UserService {
+  private readonly achievementEnabledCache = new Map<number, { enabled: boolean; expiresAt: number }>();
+
   constructor(
     private readonly userRepo: UserRepository,
     private readonly config: ConfigService,
     private readonly contentFilterRepo: ContentFilterRepository,
+    private readonly appSettingsService: AppSettingsService,
   ) {}
 
   findByUsername(username: string) {
@@ -53,8 +57,10 @@ export class UserService {
     return this.userRepo.findPasswordHashById(userId);
   }
 
-  createOidcUser(data: Parameters<UserRepository['createOidcUser']>[0]) {
-    return this.userRepo.createOidcUser(data);
+  async createOidcUser(data: Parameters<UserRepository['createOidcUser']>[0]) {
+    const user = await this.userRepo.createOidcUser(data);
+    await this.assignConfiguredDefaultLibraries(user.id);
+    return user;
   }
 
   generatePasswordResetToken(userId: number): Promise<string> {
@@ -107,7 +113,7 @@ export class UserService {
       await this.userRepo.setPermissions(user.id, permissionNames);
     }
 
-    const libraryIds = this.uniqueIds(dto.libraryIds ?? []);
+    const libraryIds = await this.resolveNewUserLibraryIds(dto.libraryIds);
     if (libraryIds.length > 0) {
       await this.assertKnownLibraryIds(libraryIds);
       await this.userRepo.assignViewerLibraries(user.id, libraryIds);
@@ -143,7 +149,7 @@ export class UserService {
       await this.userRepo.setPermissions(user.id, permissionNames);
     }
 
-    const libraryIds = this.uniqueIds(dto.libraryIds ?? []);
+    const libraryIds = await this.resolveNewUserLibraryIds(dto.libraryIds);
     if (libraryIds.length > 0) {
       await this.assertKnownLibraryIds(libraryIds);
       await this.userRepo.assignViewerLibraries(user.id, libraryIds);
@@ -189,7 +195,18 @@ export class UserService {
   async updateMySettings(userId: number, dto: UpdateMeSettingsDto) {
     const user = await this.userRepo.update(userId, { settings: dto.settings });
     if (!user) throw new NotFoundException('User not found');
+    this.updateAchievementEnabledCache(userId, dto.settings);
     return user;
+  }
+
+  async isAchievementEnabled(userId: number): Promise<boolean> {
+    const cached = this.achievementEnabledCache.get(userId);
+    if (cached && cached.expiresAt > Date.now()) return cached.enabled;
+
+    const settings = await this.userRepo.findSettingsById(userId);
+    const enabled = settings !== null && this.readAchievementEnabled(settings);
+    this.cacheAchievementEnabled(userId, enabled);
+    return enabled;
   }
 
   async updateReaderStorageMode(userId: number, sync: boolean) {
@@ -202,6 +219,26 @@ export class UserService {
     const user = await this.userRepo.update(userId, { settings: { syncThemePreferences: sync } });
     if (!user) throw new NotFoundException('User not found');
     return user;
+  }
+
+  private updateAchievementEnabledCache(userId: number, settings: Record<string, unknown>): void {
+    const preferences = settings['achievementPreferences'];
+    if (!preferences || typeof preferences !== 'object' || Array.isArray(preferences)) {
+      this.achievementEnabledCache.delete(userId);
+      return;
+    }
+
+    this.cacheAchievementEnabled(userId, this.readAchievementEnabled(settings));
+  }
+
+  private cacheAchievementEnabled(userId: number, enabled: boolean): void {
+    this.achievementEnabledCache.set(userId, { enabled, expiresAt: Date.now() + 60_000 });
+  }
+
+  private readAchievementEnabled(settings: Record<string, unknown>): boolean {
+    const preferences = settings['achievementPreferences'];
+    if (!preferences || typeof preferences !== 'object' || Array.isArray(preferences)) return true;
+    return (preferences as Record<string, unknown>)['enabled'] !== false;
   }
 
   async deleteUser(id: number, requestingUser: RequestUser) {
@@ -300,6 +337,17 @@ export class UserService {
     return Array.from(new Set(ids));
   }
 
+  private async resolveNewUserLibraryIds(libraryIds: number[] | undefined): Promise<number[]> {
+    if (libraryIds !== undefined) return this.uniqueIds(libraryIds);
+    return this.appSettingsService.getDefaultLibraryAccessLibraryIds();
+  }
+
+  private async assignConfiguredDefaultLibraries(userId: number): Promise<void> {
+    const libraryIds = await this.appSettingsService.getDefaultLibraryAccessLibraryIds();
+    if (libraryIds.length === 0) return;
+    await this.userRepo.assignViewerLibraries(userId, libraryIds);
+  }
+
   private async assertEmailAvailable(email: string, targetUserId: number): Promise<void> {
     const existing = await this.userRepo.findByEmail(email);
     if (existing && existing.id !== targetUserId) {
@@ -320,11 +368,17 @@ export class UserService {
   async updateSeriesCollapsePreferences(userId: number, dto: UpdateSeriesCollapsePreferencesDto): Promise<void> {
     const existing = await this.userRepo.findByIdWithPermissions(userId);
     if (!existing) throw new NotFoundException('User not found');
-    const currentPrefs = (existing.settings as UserSettings)?.seriesCollapsePreferences ?? { global: false, libraries: {}, collections: {} };
+    const currentPrefs = (existing.settings as UserSettings)?.seriesCollapsePreferences ?? {
+      global: false,
+      libraries: {},
+      collections: {},
+      smartScopes: {},
+    };
     const merged = {
       global: dto.global !== undefined ? dto.global : currentPrefs.global,
       libraries: { ...currentPrefs.libraries, ...(dto.libraries ?? {}) },
       collections: { ...currentPrefs.collections, ...(dto.collections ?? {}) },
+      smartScopes: { ...(currentPrefs.smartScopes ?? {}), ...(dto.smartScopes ?? {}) },
     };
 
     // Remove entries set to null (deletion of overrides)
@@ -333,6 +387,9 @@ export class UserService {
     }
     for (const [k, v] of Object.entries(merged.collections)) {
       if (v === null) delete merged.collections[k];
+    }
+    for (const [k, v] of Object.entries(merged.smartScopes)) {
+      if (v === null) delete merged.smartScopes[k];
     }
 
     await this.userRepo.update(userId, { settings: { seriesCollapsePreferences: merged } });

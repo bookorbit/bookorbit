@@ -28,10 +28,12 @@ export const authConfig = registerAs('auth', () => ({
 export const storageConfig = registerAs('storage', () => {
   const appDataPath = resolve(process.env.APP_DATA_PATH ?? '/data');
   const bookDockPath = process.env.BOOK_DOCK_PATH?.trim();
+  const libraryBrowseRoot = process.env.LIBRARY_BROWSE_ROOT?.trim();
 
   return {
     appDataPath,
     bookDockPath: resolve(bookDockPath || join(appDataPath, 'book-dock')),
+    libraryBrowseRoot: resolve(libraryBrowseRoot || '/'),
   };
 });
 

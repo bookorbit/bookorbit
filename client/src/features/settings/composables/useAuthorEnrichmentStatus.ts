@@ -13,6 +13,7 @@ const status = ref<AuthorEnrichmentStatusEvent>({
   paused: false,
   sessionTotal: 0,
   sessionDone: 0,
+  sessionFailed: 0,
   currentItemName: null,
 })
 const socketConnected = ref(true)
@@ -66,6 +67,7 @@ export function disconnectAuthorEnrichmentSocket() {
     paused: false,
     sessionTotal: 0,
     sessionDone: 0,
+    sessionFailed: 0,
     currentItemName: null,
   }
   socketConnected.value = true

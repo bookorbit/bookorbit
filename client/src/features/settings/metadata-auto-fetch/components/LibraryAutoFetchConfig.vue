@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ChevronDown, ChevronUp, Save } from '@lucide/vue'
 import type { BookMetadataFetchConfig, BookMetadataFetchLibraryConfig, Library } from '@bookorbit/types'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
@@ -15,6 +16,7 @@ const props = defineProps<{
   globalConfig: BookMetadataFetchConfig
 }>()
 
+const { t } = useI18n()
 const { fetchLibraryConfig, saveLibraryConfig } = useBookMetadataFetchConfig()
 const { triggerForLibrary } = useBookMetadataFetchActions()
 const { status } = useBookMetadataFetchStatus()
@@ -37,21 +39,26 @@ const statusLabel = computed<string | null>(() => {
   if (triggerResult.value) return triggerResult.value
   const remaining = status.value.queued + status.value.processing
   if (remaining > 0) {
-    return status.value.paused ? `${remaining} in queue - paused` : `${remaining} remaining`
+    return status.value.paused
+      ? t('settings.metadata.autoFetch.status.inQueuePaused', { count: remaining })
+      : t('settings.metadata.autoFetch.status.remaining', { count: remaining })
   }
   if (eligibleCount.value !== null) {
-    return countLoading.value ? null : `~${eligibleCount.value} eligible`
+    return countLoading.value ? null : t('settings.metadata.autoFetch.status.eligible', { count: eligibleCount.value })
   }
   return null
 })
 const activeConditionSummary = computed(() => {
   const c = displayConfig.value.conditions
   const parts: string[] = []
-  if (c.neverFetched.enabled) parts.push('Never fetched')
-  if (c.scoreThreshold.enabled) parts.push(`Score < ${c.scoreThreshold.threshold}`)
+  if (c.neverFetched.enabled) parts.push(t('settings.metadata.autoFetch.conditions.neverFetched.summary'))
+  if (c.scoreThreshold.enabled)
+    parts.push(t('settings.metadata.autoFetch.conditions.scoreThreshold.summary', { threshold: c.scoreThreshold.threshold }))
   if (c.missingFields.enabled && c.missingFields.fields.length > 0)
-    parts.push(`Missing ${c.missingFields.fields.length} field${c.missingFields.fields.length === 1 ? '' : 's'}`)
-  return parts.length > 0 ? parts.join(' • ') : 'No conditions enabled'
+    parts.push(
+      t('settings.metadata.autoFetch.conditions.missingFields.summary', { count: c.missingFields.fields.length }, c.missingFields.fields.length),
+    )
+  return parts.length > 0 ? parts.join(' • ') : t('settings.metadata.autoFetch.conditions.noneEnabled')
 })
 
 const lastRunLabel = computed(() => {
@@ -62,14 +69,16 @@ const lastRunLabel = computed(() => {
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
   const diffMins = Math.floor(diffMs / (1000 * 60))
   let when: string
-  if (diffMins < 2) when = 'just now'
-  else if (diffMins < 60) when = `${diffMins}m ago`
-  else if (diffHours < 24) when = `${diffHours}h ago`
-  else if (diffDays === 1) when = 'yesterday'
-  else when = `${diffDays} days ago`
+  if (diffMins < 2) when = t('settings.metadata.autoFetch.lastRun.justNow')
+  else if (diffMins < 60) when = t('settings.metadata.autoFetch.lastRun.minutesAgo', { count: diffMins })
+  else if (diffHours < 24) when = t('settings.metadata.autoFetch.lastRun.hoursAgo', { count: diffHours })
+  else if (diffDays === 1) when = t('settings.metadata.autoFetch.lastRun.yesterday')
+  else when = t('settings.metadata.autoFetch.lastRun.daysAgo', { count: diffDays })
   const queued = libraryData.value.lastQueuedCount
-  if (queued === null) return `Last run: ${when}`
-  return queued > 0 ? `Last run: ${when} - queued ${queued} books` : `Last run: ${when} - no eligible books`
+  if (queued === null) return t('settings.metadata.autoFetch.lastRun.label', { when })
+  return queued > 0
+    ? t('settings.metadata.autoFetch.lastRun.labelQueued', { when, count: queued })
+    : t('settings.metadata.autoFetch.lastRun.labelNoneEligible', { when })
 })
 
 onMounted(async () => {
@@ -114,7 +123,8 @@ async function handleTrigger() {
   triggerResult.value = null
   try {
     const { queued } = await triggerForLibrary(props.library.id)
-    triggerResult.value = queued > 0 ? `Queued ${queued} books` : 'No eligible books found'
+    triggerResult.value =
+      queued > 0 ? t('settings.metadata.autoFetch.trigger.queued', { count: queued }, queued) : t('settings.metadata.autoFetch.trigger.noneFound')
     invalidateEligibleCountPreviews()
     if (libraryData.value) {
       libraryData.value.lastRunAt = new Date().toISOString()
@@ -167,27 +177,27 @@ function cloneConfigOnly(config: BookMetadataFetchConfig): BookMetadataFetchConf
         <p class="settings-label">{{ props.library.name }}</p>
         <p v-if="lastRunLabel" class="text-xs text-muted-foreground mt-0.5">{{ lastRunLabel }}</p>
         <p class="text-xs text-muted-foreground mt-1 line-clamp-1">
-          {{ inheriting ? 'Inheriting global defaults' : activeConditionSummary }}
+          {{ inheriting ? t('settings.metadata.autoFetch.library.inheritingGlobal') : activeConditionSummary }}
         </p>
       </div>
       <div class="flex items-center gap-2 self-start">
-        <span class="text-xs text-muted-foreground">Inherit from global</span>
+        <span class="text-xs text-muted-foreground">{{ t('settings.metadata.autoFetch.library.inheritFromGlobal') }}</span>
         <ToggleSwitch :model-value="inheriting" @update:model-value="handleInheritToggle" @click.stop />
         <ChevronUp v-if="cardOpen" :size="15" class="text-muted-foreground md:hidden ml-1" />
         <ChevronDown v-else :size="15" class="text-muted-foreground md:hidden ml-1" />
       </div>
     </button>
 
-    <div v-if="loading && cardOpen" class="px-4 py-3.5 md:px-5 md:py-4 bg-card text-xs text-muted-foreground">Loading...</div>
+    <div v-if="loading && cardOpen" class="px-4 py-3.5 md:px-5 md:py-4 bg-card text-xs text-muted-foreground">{{ t('common.loading') }}</div>
 
     <template v-else-if="cardOpen">
       <div v-if="inheriting" class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
-        <p class="text-xs text-muted-foreground italic">Using global defaults.</p>
+        <p class="text-xs text-muted-foreground italic">{{ t('settings.metadata.autoFetch.library.usingGlobalDefaults') }}</p>
       </div>
 
       <div v-else class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
         <button class="w-full flex items-center justify-between gap-2 text-left" @click="conditionsOpen = !conditionsOpen">
-          <p class="settings-label">Eligibility conditions</p>
+          <p class="settings-label">{{ t('settings.metadata.autoFetch.conditions.title') }}</p>
           <ChevronUp v-if="conditionsOpen" :size="15" class="text-muted-foreground shrink-0" />
           <ChevronDown v-else :size="15" class="text-muted-foreground shrink-0" />
         </button>
@@ -198,10 +208,10 @@ function cloneConfigOnly(config: BookMetadataFetchConfig): BookMetadataFetchConf
       <div class="hidden md:flex items-center gap-2 md:gap-3 flex-wrap px-4 py-3.5 md:px-5 md:py-4 bg-card">
         <button v-if="!inheriting" :disabled="saving" class="settings-btn-primary" @click="handleSave">
           <Save class="size-3.5" />
-          {{ saving ? 'Saving...' : 'Save override' }}
+          {{ saving ? t('settings.metadata.autoFetch.saving') : t('settings.metadata.autoFetch.library.saveOverride') }}
         </button>
         <button :disabled="triggering" class="settings-btn-outline" @click="handleTrigger">
-          {{ triggering ? 'Running...' : 'Run now' }}
+          {{ triggering ? t('settings.metadata.autoFetch.running') : t('settings.metadata.autoFetch.runNow') }}
         </button>
         <span v-if="statusLabel" class="text-xs text-muted-foreground">{{ statusLabel }}</span>
       </div>
@@ -210,10 +220,10 @@ function cloneConfigOnly(config: BookMetadataFetchConfig): BookMetadataFetchConf
         <div class="flex items-center gap-2 flex-wrap">
           <button v-if="!inheriting" :disabled="saving" class="settings-btn-primary h-9 px-3 justify-center" @click="handleSave">
             <Save class="size-3.5" />
-            {{ saving ? 'Saving...' : 'Save override' }}
+            {{ saving ? t('settings.metadata.autoFetch.saving') : t('settings.metadata.autoFetch.library.saveOverride') }}
           </button>
           <button :disabled="triggering" class="settings-btn-outline h-9 px-3" @click="handleTrigger">
-            {{ triggering ? 'Running...' : 'Run now' }}
+            {{ triggering ? t('settings.metadata.autoFetch.running') : t('settings.metadata.autoFetch.runNow') }}
           </button>
           <span v-if="statusLabel" class="text-xs text-muted-foreground">{{ statusLabel }}</span>
         </div>

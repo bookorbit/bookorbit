@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { watch, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import { useAuthorBooks } from '@/features/book/composables/useAuthorBooks'
 import BookCarousel from '@/features/book/components/detail/BookCarousel.vue'
@@ -9,6 +10,7 @@ const props = defineProps<{
   authorCount: number
 }>()
 
+const { t } = useI18n()
 const { authorBooks, loading, fetch } = useAuthorBooks()
 
 watch(
@@ -17,7 +19,7 @@ watch(
   { immediate: true },
 )
 
-const headerText = computed(() => (props.authorCount > 1 ? 'Also by these authors' : 'Also by this author'))
+const headerText = computed(() => (props.authorCount > 1 ? t('book.detail.authorBooks.alsoByAuthors') : t('book.detail.authorBooks.alsoByAuthor')))
 
 const bookIds = computed(() => authorBooks.value.map((b) => b.id))
 

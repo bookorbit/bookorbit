@@ -3,6 +3,7 @@ export const CORE_BOOK_FILE_WRITE_FIELDS = [
   "subtitle",
   "description",
   "publisher",
+  "publishedDate",
   "publishedYear",
   "language",
   "pageCount",
@@ -49,6 +50,7 @@ export const BOOK_FILE_WRITE_FIELDS = [
   ...COMIC_BOOK_FILE_WRITE_FIELDS,
   "itunesId",
   "audibleId",
+  "librofmId",
   "narrators",
   "coverBytes",
 ] as const;
@@ -60,6 +62,7 @@ export const BOOK_FILE_WRITE_FIELD_LABELS = {
   subtitle: "Subtitle",
   description: "Description",
   publisher: "Publisher",
+  publishedDate: "Published date",
   publishedYear: "Published year",
   language: "Language",
   pageCount: "Page count",
@@ -94,6 +97,7 @@ export const BOOK_FILE_WRITE_FIELD_LABELS = {
   comicStoryArcs: "Story arcs",
   itunesId: "iTunes ID",
   audibleId: "Audible ID",
+  librofmId: "Libro.fm ISBN",
   narrators: "Narrators",
   coverBytes: "Cover",
 } as const satisfies Record<BookFileWriteField, string>;
@@ -122,6 +126,7 @@ export const AUDIO_BOOK_FILE_WRITE_FIELDS = [
   "subtitle",
   "authors",
   "narrators",
+  "publishedDate",
   "publishedYear",
   "publisher",
   "description",
@@ -130,6 +135,7 @@ export const AUDIO_BOOK_FILE_WRITE_FIELDS = [
   "seriesName",
   "seriesIndex",
   "audibleId",
+  "librofmId",
   "coverBytes",
 ] as const satisfies readonly BookFileWriteField[];
 

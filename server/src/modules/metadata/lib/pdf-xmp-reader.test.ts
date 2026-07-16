@@ -163,6 +163,19 @@ describe('parseXmp', () => {
       expect(r?.tags).toEqual(['favorites', 'to-read']);
     });
 
+    it('parses pdf:Keywords as tags when bookorbit tags are absent', () => {
+      const xml = `<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+    <rdf:Description rdf:about="" xmlns:pdf="http://ns.adobe.com/pdf/1.3/">
+      <pdf:Keywords>Magazine, Travel</pdf:Keywords>
+    </rdf:Description>
+  </rdf:RDF>
+</x:xmpmeta>`;
+      const r = parseXmp(xml);
+      expect(r?.tags).toEqual(['Magazine', 'Travel']);
+    });
+
     it('parses bookorbit:rating', () => {
       const r = parseXmp(xmpDoc('<bookorbit:rating>4.5</bookorbit:rating>'));
       expect(r?.rating).toBe(4.5);

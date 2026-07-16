@@ -63,6 +63,7 @@ export type AuthorEnrichmentStatusEvent = AuthorEnrichmentStatus & {
   paused: boolean;
   sessionTotal: number;
   sessionDone: number;
+  sessionFailed: number;
   currentItemName: string | null;
 };
 

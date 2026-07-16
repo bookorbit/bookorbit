@@ -16,11 +16,7 @@ export function normalizeDescriptionHtml(content: string | null | undefined): st
 }
 
 function hasVisibleDescriptionText(content: string): boolean {
-  const text = content
-    .replace(/<br\s*\/?>/gi, '')
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/gi, ' ')
-    .trim()
-
-  return text.length > 0
+  const template = document.createElement('template')
+  template.innerHTML = content
+  return (template.content.textContent ?? '').trim().length > 0
 }

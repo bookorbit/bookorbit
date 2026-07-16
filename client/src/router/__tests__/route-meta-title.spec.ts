@@ -18,6 +18,15 @@ function walkRoutes(records: RouteRecordRaw[], visit: (route: RouteRecordRaw, fu
   }
 }
 
+function findRoute(records: RouteRecordRaw[], name: string): RouteRecordRaw | undefined {
+  for (const record of records) {
+    if (record.name === name) return record
+    const child = record.children ? findRoute(record.children, name) : undefined
+    if (child) return child
+  }
+  return undefined
+}
+
 describe('router title metadata', () => {
   it('requires meta.title on all named non-redirect routes', () => {
     const missing: MissingRoute[] = []
@@ -32,5 +41,15 @@ describe('router title metadata', () => {
     })
 
     expect(missing).toEqual([])
+  })
+})
+
+describe('router redirects', () => {
+  it('redirects the legacy Readwise route to the Integrations sub-tab', () => {
+    const route = findRoute(routes, 'settings-readwise')
+    expect(route?.redirect).toBeTypeOf('function')
+
+    const redirect = route!.redirect as (to: { query: Record<string, unknown> }) => unknown
+    expect(redirect({ query: {} })).toEqual({ name: 'settings-integrations', query: { tab: 'readwise' } })
   })
 })

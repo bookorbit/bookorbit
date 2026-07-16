@@ -130,6 +130,30 @@ describe('CoverSearchDrawer', () => {
     })
   })
 
+  describe('audiobookcovers source option', () => {
+    it('is hidden from the source dropdown for regular books', () => {
+      const wrapper = mountDrawer({ isAudiobook: false })
+      const options = wrapper.findAll('option').map((option) => option.element.value)
+      expect(options).not.toContain('audiobookcovers')
+    })
+
+    it('is shown in the source dropdown for audiobooks', () => {
+      const wrapper = mountDrawer({ isAudiobook: true })
+      const options = wrapper.findAll('option').map((option) => option.element.value)
+      expect(options).toContain('audiobookcovers')
+    })
+
+    it('resets the selected provider away from audiobookcovers when audiobook is unchecked', async () => {
+      const wrapper = mountDrawer({ isAudiobook: true })
+      await wrapper.find('select').setValue('audiobookcovers')
+
+      await wrapper.find('input[type="checkbox"]').trigger('change')
+
+      const select = wrapper.find('select').element as HTMLSelectElement
+      expect(select.value).toBe('duckduckgo')
+    })
+  })
+
   describe('aspect ratio', () => {
     it('uses portrait aspect class for regular books', () => {
       const wrapper = mountDrawer({ isAudiobook: false })

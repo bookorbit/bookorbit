@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { Library } from '@bookorbit/types'
+
+const { t } = useI18n()
 
 const props = defineProps<{ modelValue: number[]; libraries: Library[] }>()
 const emit = defineEmits<{ 'update:modelValue': [number[]] }>()
@@ -37,17 +40,21 @@ function toggleAll() {
 <template>
   <div class="space-y-2">
     <div class="flex items-center justify-between gap-3">
-      <p class="text-xs font-bold text-muted-foreground uppercase tracking-widest">Enabled Libraries</p>
+      <p class="text-xs font-bold text-muted-foreground uppercase tracking-widest">{{ t('settings.metadata.customFields.enabledLibraries') }}</p>
       <div v-if="libraries.length > 0" class="flex items-center gap-2 text-xs">
-        <span class="text-muted-foreground tabular-nums">{{ selectedCount }} of {{ libraries.length }}</span>
-        <button type="button" class="text-primary hover:underline disabled:opacity-40" :disabled="allSelected" @click="selectAll">Select all</button>
+        <span class="text-muted-foreground tabular-nums">{{
+          t('settings.metadata.customFields.countOf', { selected: selectedCount, total: libraries.length })
+        }}</span>
+        <button type="button" class="text-primary hover:underline disabled:opacity-40" :disabled="allSelected" @click="selectAll">
+          {{ t('settings.metadata.customFields.selectAll') }}
+        </button>
         <span class="text-border">|</span>
         <button type="button" class="text-primary hover:underline disabled:opacity-40" :disabled="selectedCount === 0" @click="clearAll">
-          Clear
+          {{ t('settings.metadata.customFields.clear') }}
         </button>
       </div>
     </div>
-    <p v-if="libraries.length === 0" class="text-xs text-muted-foreground italic">No libraries available yet.</p>
+    <p v-if="libraries.length === 0" class="text-xs text-muted-foreground italic">{{ t('settings.metadata.customFields.noLibraries') }}</p>
     <div v-else class="flex flex-wrap gap-2">
       <button
         type="button"
@@ -60,7 +67,7 @@ function toggleAll() {
         "
         @click="toggleAll"
       >
-        All libraries
+        {{ t('settings.metadata.customFields.allLibraries') }}
       </button>
       <button
         v-for="library in libraries"

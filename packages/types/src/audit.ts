@@ -28,6 +28,8 @@ export enum AuditAction {
   UserSuperuserEnable = "user.superuser.enable",
   UserSuperuserDisable = "user.superuser.disable",
   UserContentFiltersSet = "user.content_filters.set",
+  ReadingInsightsSharingUpdate = "reading_insights.sharing.update",
+  ReadingInsightsProfileView = "reading_insights.profile.view",
 
   LibraryCreate = "library.create",
   LibraryUpdate = "library.update",
@@ -53,6 +55,7 @@ export enum AuditAction {
   BookBulkUpdateTags = "book.bulk.update_tags",
   BookBulkSetMetadataLock = "book.bulk.set_metadata_lock",
   BookBulkEditMetadata = "book.bulk.edit_metadata",
+  BookReadingStateReset = "book.reading_state.reset",
 
   BookWriteAndRename = "book.write_and_rename",
 
@@ -134,6 +137,7 @@ export enum AuditResource {
   Series = "series",
   OidcIdentity = "oidc_identity",
   MagicLinkToken = "magic_link_token",
+  ReadingInsightsProfile = "reading_insights_profile",
 }
 
 export interface AuditLogEntry {

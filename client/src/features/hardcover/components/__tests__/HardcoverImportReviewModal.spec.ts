@@ -139,6 +139,15 @@ describe('HardcoverImportReviewModal', () => {
     expect(wrapper.text()).toContain('No rows match the current filters.')
   })
 
+  it('matches accented book metadata with an unaccented search term', async () => {
+    const wrapper = mountModal(makePreview([makeRow({ localTitle: 'El Criticón', localAuthors: ['Baltasar Gracián'] })]))
+
+    await wrapper.get('input[type="search"]').setValue('gracian')
+
+    expect(wrapper.text()).toContain('El Criticón')
+    expect(wrapper.text()).not.toContain('No rows match the current filters.')
+  })
+
   it('supports bulk selection controls across the current page', async () => {
     const wrapper = mountModal(
       makePreview([

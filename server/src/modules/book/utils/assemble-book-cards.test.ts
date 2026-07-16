@@ -9,6 +9,7 @@ function makeBookRow(id: number, overrides?: Partial<Parameters<typeof assembleB
     title: `Book ${id}`,
     seriesName: null,
     seriesIndex: null,
+    publishedDate: null,
     publishedYear: null,
     language: null,
     rating: null,
@@ -213,12 +214,15 @@ describe('assembleBookCards', () => {
   });
 
   it('includes all optional metadata fields', () => {
-    const rows = [makeBookRow(1, { seriesName: 'Dune', seriesIndex: 1, publishedYear: 1965, language: 'en', rating: 5 })];
+    const rows = [
+      makeBookRow(1, { seriesName: 'Dune', seriesIndex: 1, publishedDate: '1965-08-01', publishedYear: 1965, language: 'en', rating: 5 }),
+    ];
 
     const [card] = assembleBookCards(rows, [], [], [], []);
 
     expect(card.seriesName).toBe('Dune');
     expect(card.seriesIndex).toBe(1);
+    expect(card.publishedDate).toBe('1965-08-01');
     expect(card.publishedYear).toBe(1965);
     expect(card.language).toBe('en');
     expect(card.rating).toBe(5);
@@ -230,6 +234,7 @@ describe('assembleBookCards', () => {
 
     expect(card.seriesName).toBeNull();
     expect(card.seriesIndex).toBeNull();
+    expect(card.publishedDate).toBeNull();
     expect(card.publishedYear).toBeNull();
     expect(card.language).toBeNull();
     expect(card.rating).toBeNull();

@@ -1,4 +1,4 @@
-import { boolean, integer, pgTable, real, serial, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, pgTable, real, serial, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
 import { books } from './books';
 import { users } from './auth';
@@ -55,7 +55,7 @@ export const hardcoverBookState = pgTable(
       .notNull()
       .$onUpdateFn(() => new Date()),
   },
-  (t) => [unique('hardcover_book_state_user_book_uidx').on(t.userId, t.bookId)],
+  (t) => [unique('hardcover_book_state_user_book_uidx').on(t.userId, t.bookId), index('hardcover_book_state_book_id_idx').on(t.bookId)],
 );
 
 export type HardcoverUserSetting = typeof hardcoverUserSettings.$inferSelect;

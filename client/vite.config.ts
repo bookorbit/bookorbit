@@ -5,6 +5,7 @@ import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -12,6 +13,9 @@ export default defineConfig({
     vue(),
     vueDevTools(),
     tailwindcss(),
+    VueI18nPlugin({
+      include: [fileURLToPath(new URL('./src/locales/**', import.meta.url))],
+    }),
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
@@ -79,6 +83,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        globIgnores: ['**/assets/foliate/**'],
         navigateFallback: 'index.html',
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
@@ -127,6 +132,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['@tanstack/vue-table', '@tanstack/vue-virtual'],
+    exclude: ['@embedpdf/core', '@embedpdf/core/vue'],
   },
   server: {
     host: true,

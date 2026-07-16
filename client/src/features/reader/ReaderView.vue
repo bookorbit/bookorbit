@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { useFoliate, type RelocateDetail } from './epub/composables/useFoliate'
@@ -11,11 +12,14 @@ import { useReaderSettings } from './shared/composables/useReaderSettings'
 import { useCustomFonts } from './epub/composables/useCustomFonts'
 import { useVisibility } from './shared/composables/useVisibility'
 import { useWakeLock } from './shared/composables/useWakeLock'
+import { useFullscreen } from './shared/composables/useFullscreen'
 import { useBookmarks } from './epub/composables/useBookmarks'
 import { useAnnotations } from './epub/composables/useAnnotations'
+import { useReaderAnnotationActions } from './epub/composables/useReaderAnnotationActions'
 import { useToc } from './epub/composables/useToc'
 import { useSearch, type FoliateView } from './epub/composables/useSearch'
 import { useReaderSelection } from './epub/composables/useReaderSelection'
+import { useReaderSidebarPin } from './epub/composables/useReaderSidebarPin'
 import { useReaderKeyboardShortcuts } from './epub/composables/useReaderKeyboardShortcuts'
 import ReaderHeader from './epub/components/ReaderHeader.vue'
 import ReaderFooter from './epub/components/ReaderFooter.vue'
@@ -28,15 +32,17 @@ import DictionaryPopover from './epub/components/DictionaryPopover.vue'
 import TranslationPopover from './epub/components/TranslationPopover.vue'
 import TranslationSheet from './epub/components/TranslationSheet.vue'
 import KeyboardShortcutsModal from './epub/components/KeyboardShortcutsModal.vue'
-import PdfV4ReaderView from './pdf-v4/PdfV4ReaderView.vue'
 import CbzReaderView from './cbz/CbzReaderView.vue'
 import AudiobookReaderView from './audiobook/AudiobookReaderView.vue'
 import type { ReaderState } from './epub/composables/useReaderState'
 import type { FoliateLocationContext, FoliateRenderer } from './epub/composables/useFoliate'
 import type { EpubReaderSettings } from '@bookorbit/types'
-import { cfiRangesOverlap } from './epub/utils'
+import { findMatchingCfiRange } from './epub/utils'
 import { getFormatGroup } from '@bookorbit/types'
 
+const PdfV4ReaderView = defineAsyncComponent(() => import('./pdf-v4/PdfV4ReaderView.vue'))
+
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const bookId = Number(route.params.bookId)
@@ -56,7 +62,6 @@ const showSidebar = ref(false)
 const showSettings = ref(false)
 const showSearch = ref(false)
 const searchInitialQuery = ref('')
-const isFullscreen = ref(false)
 const sectionFractions = ref<number[]>([])
 const sidebarLocationMetaByCfi = ref<Record<string, { chapterTitle: string | null; percentage: number | null }>>({})
 let sidebarLocationResolveSeq = 0
@@ -105,6 +110,7 @@ const { cfi, chapterTitle, sectionIndex, totalSections, fraction, locationTotal,
 
 const visibility = useVisibility()
 const { headerVisible, footerVisible, handleMiddleTap, setVisibilityLock } = visibility
+const { toggleFullscreen } = useFullscreen()
 
 useWakeLock()
 
@@ -118,6 +124,7 @@ const search = useSearch()
 const { results: searchResults, isSearching, search: doSearch, clear: clearSearch } = search
 
 const selection = useReaderSelection()
+const { isSidebarPinned, toggleSidebarPinned, shouldCloseAfterNavigation } = useReaderSidebarPin(fileId)
 
 function closeAnyPanel() {
   if (showSearch.value) {
@@ -239,6 +246,7 @@ const {
   addAnnotation,
   addAnnotations,
   deleteAnnotation,
+  redrawAnnotation,
   setTextSelectedHandler,
   setAnnotationClickHandler,
   view: foliateView,
@@ -246,9 +254,18 @@ const {
   isFixedLayout,
 } = useFoliate(() => containerRef.value, onRelocateHandler, onApplyStylesHandler, onMiddleTapHandler)
 
+const { handleHighlight, handleOpenNoteDialog, handleSaveNote } = useReaderAnnotationActions({
+  bookId,
+  fileId,
+  chapterTitle,
+  annotations,
+  selection,
+  addAnnotation,
+  redrawAnnotation,
+})
+
 function handleTextSelected(detail: SelectionDetail) {
-  const selCfi = detail.cfi
-  const match = selCfi ? (annotations.annotations.value.find((a) => a.cfi != null && cfiRangesOverlap(selCfi, a.cfi)) ?? null) : null
+  const match = findMatchingCfiRange(annotations.annotations.value, detail.cfi)
   selection.show(detail, match?.id ?? null)
 }
 
@@ -262,12 +279,6 @@ setTextSelectedHandler(handleTextSelected)
 setAnnotationClickHandler(handleAnnotationClick)
 
 onMounted(async () => {
-  const onFullscreenChange = () => {
-    isFullscreen.value = !!document.fullscreenElement
-  }
-  document.addEventListener('fullscreenchange', onFullscreenChange)
-  onUnmounted(() => document.removeEventListener('fullscreenchange', onFullscreenChange))
-
   // Specialized readers own their own progress/settings/loading lifecycle.
   if (isAudioFormat || isPdfFormat || isComicFormat) return
 
@@ -310,14 +321,14 @@ onMounted(async () => {
     try {
       await goTo(deepLinkCfi)
     } catch {
-      toast.error('Could not open the linked highlight position')
+      toast.error(t('reader.toast.linkedHighlightError'))
     }
   }
 
   if (hadProgress) {
     const pct = Math.round(progress.percentage.value)
-    const label = chapterTitle.value || `Chapter ${sectionIndex.value + 1}`
-    toast.info(`Resumed at ${pct}% - ${label}`, { duration: 2500 })
+    const label = chapterTitle.value || t('reader.chapterNumber', { number: sectionIndex.value + 1 })
+    toast.info(t('reader.toast.resumed', { pct, label }), { duration: 2500 })
   }
 })
 
@@ -368,14 +379,6 @@ async function applyUpdate(partial: Partial<ReaderState>) {
   }
 }
 
-function toggleFullscreen() {
-  if (document.fullscreenElement) {
-    document.exitFullscreen?.()
-  } else {
-    document.documentElement.requestFullscreen?.()
-  }
-}
-
 watch(
   () => footerMode.value,
   (mode) => {
@@ -403,30 +406,6 @@ watch(
     if (renderer && shouldApplyStyles.value) applyToRenderer(renderer, isFixedLayout.value ? { flow: 'paginated' } : undefined)
   },
 )
-
-async function handleHighlight(color: string, style: string, note?: string) {
-  const annotationCfi = selection.cfi.value
-  if (!selection.text.value || !annotationCfi) return
-  const created = await annotations.create(bookId, {
-    cfi: annotationCfi,
-    bookFileId: fileId,
-    text: selection.text.value,
-    color,
-    style,
-    note: note ?? null,
-    chapterTitle: chapterTitle.value || null,
-  })
-  if (created?.cfi) {
-    addAnnotation(created.cfi, created.color, created.style)
-  }
-  selection.dismiss()
-}
-
-async function handleSaveNote(note: string) {
-  await handleHighlight('#FACC15', 'highlight', note)
-  selection.showNoteDialog.value = false
-  selection.noteText.value = ''
-}
 
 function handleDeleteAnnotation(id: number) {
   const ann = annotations.annotations.value.find((a) => a.id === id)
@@ -523,6 +502,12 @@ function navigateSearch(cfiTarget: string) {
   goTo(cfiTarget)
 }
 
+function closeSidebarAfterNavigation() {
+  if (shouldCloseAfterNavigation()) {
+    showSidebar.value = false
+  }
+}
+
 async function navigateFromSidebar(cfiTarget: string) {
   const goToPromise = goTo(cfiTarget)
   if (!goToPromise) return
@@ -530,7 +515,7 @@ async function navigateFromSidebar(cfiTarget: string) {
     .then(() => true)
     .catch(() => false)
   if (!navigated) return
-  showSidebar.value = false
+  closeSidebarAfterNavigation()
 }
 
 function navigateAnnotationChapterFromSidebar(chapterIndex: number) {
@@ -538,14 +523,14 @@ function navigateAnnotationChapterFromSidebar(chapterIndex: number) {
   if (!goToPromise) return
   void Promise.resolve(goToPromise)
     .then(() => {
-      showSidebar.value = false
+      closeSidebarAfterNavigation()
     })
     .catch(() => undefined)
 }
 
 function navigateChapterFromSidebar(href: string) {
   goTo(href)
-  showSidebar.value = false
+  closeSidebarAfterNavigation()
 }
 
 function closeSearch() {
@@ -614,13 +599,13 @@ watch(
       <div v-if="loading" class="absolute inset-0 flex items-center justify-center z-10 bg-background">
         <div class="flex flex-col items-center gap-3">
           <div class="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-          <p class="text-sm text-muted-foreground">Loading book…</p>
+          <p class="text-sm text-muted-foreground">{{ t('reader.loadingBook') }}</p>
         </div>
       </div>
 
       <div v-if="error && !loading" class="absolute inset-0 flex items-center justify-center z-10 p-8 bg-background">
         <div class="text-center max-w-sm">
-          <p class="text-sm font-medium mb-2 text-foreground">Failed to load book</p>
+          <p class="text-sm font-medium mb-2 text-foreground">{{ t('reader.failedToLoadBook') }}</p>
           <p class="text-xs text-muted-foreground">{{ error }}</p>
         </div>
       </div>
@@ -652,7 +637,9 @@ watch(
       :locationMetaByCfi="sidebarLocationMetaByCfi"
       :activeHref="activeHref"
       :expandedHrefs="expandedHrefs"
+      :pinned="isSidebarPinned"
       @close="showSidebar = false"
+      @togglePinned="toggleSidebarPinned"
       @navigateChapter="navigateChapterFromSidebar"
       @navigateBookmark="navigateFromSidebar"
       @navigateAnnotation="navigateFromSidebar"
@@ -693,7 +680,7 @@ watch(
       @search="() => openSearchWithText(selection.text.value)"
       @translate="handleTranslate"
       @define="handleDefine"
-      @note="selection.openNoteDialog()"
+      @note="handleOpenNoteDialog"
       @deleteAnnotation="handleDeleteAnnotation"
       @dismiss="selection.dismiss()"
     />

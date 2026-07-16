@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, count, desc, eq, exists, ilike, inArray, notExists, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, exists, inArray, notExists, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db';
@@ -7,6 +7,13 @@ import { refreshPrimaryAuthorSortNamesForBooks } from '../../../db/book-author-s
 import * as schema from '../../../db/schema';
 import { authors, bookAuthors, books, bookMetadata } from '../../../db/schema';
 import { buildContentFilterClauses } from '../../../common/utils/content-filter-sql.utils';
+import { accentInsensitiveIlike } from '../../../common/utils/accent-insensitive-search.utils';
+import {
+  chooseCanonicalMetadataTextRow,
+  normalizeMetadataText,
+  normalizeMetadataTextKey,
+  normalizeMetadataTextKeySql,
+} from '../../../common/utils/metadata-text-normalize.utils';
 import { AuthorImageStorageService } from '../../authors/author-image-storage.service';
 import { AuthorsRepository } from '../../authors/authors.repository';
 import { AuthorEnrichmentOrchestratorService } from '../../authors/author-enrichment-orchestrator.service';
@@ -23,11 +30,14 @@ import type {
   StrategyMergeResult,
   StrategyRenameResult,
   StrategySplitResult,
+  EntityBookScope,
 } from './entity-strategy.interface';
+import { assertEntityRelationsWithinLibraries, buildEntityBookScopeClauses } from './entity-book-scope';
 
 type Db = NodePgDatabase<typeof schema>;
 
 const AUTHOR_ENRICHMENT_REASONS = { AUTHOR_MERGE_TARGET: 'author_merge_target' as const };
+const NORMALIZED_AUTHOR_NAME_SQL = normalizeMetadataTextKeySql(authors.name);
 
 function escapeLike(s: string): string {
   return s.replace(/[%_\\]/g, '\\$&');
@@ -131,7 +141,7 @@ export class AuthorStrategy implements EntityStrategy {
   async browse(params: BrowseParams): Promise<BrowseResult> {
     const bookCountExpr = sql<number>`count(distinct ${bookAuthors.bookId})::int`;
 
-    const nameCondition = params.search ? ilike(authors.name, `%${escapeLike(params.search)}%`) : undefined;
+    const nameCondition = params.search ? accentInsensitiveIlike(authors.name, `%${escapeLike(params.search)}%`) : undefined;
 
     const cfClauses = params.contentFilters ? buildContentFilterClauses(params.contentFilters, this.db) : [];
     const libraryBookIds =
@@ -208,6 +218,8 @@ export class AuthorStrategy implements EntityStrategy {
     const sourceIds = input.sourceIds as number[];
     const fieldsResolved: string[] = [];
 
+    await this.assertMutationScope([targetId, ...sourceIds], input.libraryIds ?? []);
+
     const targetAuthor = await this.db
       .select({ id: authors.id, sortName: authors.sortName, description: authors.description, hasPhoto: authors.hasPhoto })
       .from(authors)
@@ -268,26 +280,38 @@ export class AuthorStrategy implements EntityStrategy {
 
   async rename(input: RenameInput): Promise<StrategyRenameResult> {
     const entityId = input.entityId as number;
+    await this.assertMutationScope([entityId], input.libraryIds);
     const [entity] = await this.db.select({ name: authors.name }).from(authors).where(eq(authors.id, entityId)).limit(1);
     if (!entity) throw new NotFoundException('Author not found');
 
     const oldName = entity.name;
-    const trimmed = input.newName.trim();
-    if (!trimmed) throw new BadRequestException('Name cannot be empty');
+    const displayName = normalizeMetadataText(input.newName);
+    const normalizedName = normalizeMetadataTextKey(displayName);
+    if (!displayName || !normalizedName) throw new BadRequestException('Name cannot be empty');
 
-    const [existing] = await this.db.select({ id: authors.id }).from(authors).where(eq(authors.name, trimmed)).limit(1);
-    if (existing && existing.id !== entityId) {
-      const mergeResult = await this.merge({ targetId: existing.id, sourceIds: [entityId], userId: input.userId });
-      return { oldName, affectedBookIds: mergeResult.affectedBookIds, wasImplicitMerge: true, mergedEntityId: existing.id };
+    const existingRows = await this.db
+      .select({ id: authors.id, name: authors.name })
+      .from(authors)
+      .where(eq(NORMALIZED_AUTHOR_NAME_SQL, normalizedName));
+    const mergeTarget = this.selectPreferredAuthorMatch(existingRows, entityId, displayName);
+    if (mergeTarget) {
+      const mergeResult = await this.merge({
+        targetId: mergeTarget.id,
+        sourceIds: [entityId],
+        userId: input.userId,
+        libraryIds: input.libraryIds ?? [],
+      });
+      return { oldName, affectedBookIds: mergeResult.affectedBookIds, wasImplicitMerge: true, mergedEntityId: mergeTarget.id };
     }
 
-    await this.authorsRepo.updateAuthorById(entityId, { name: trimmed });
+    await this.authorsRepo.updateAuthorById(entityId, { name: displayName });
     const affectedBookIds = await this.findAffectedBookIds([entityId]);
     return { oldName, affectedBookIds, wasImplicitMerge: false };
   }
 
   async deleteEntity(input: DeleteInput): Promise<StrategyDeleteResult> {
     const entityId = input.entityId as number;
+    await this.assertMutationScope([entityId], input.libraryIds);
     const [entity] = await this.db.select({ name: authors.name }).from(authors).where(eq(authors.id, entityId)).limit(1);
     if (!entity) throw new NotFoundException('Author not found');
 
@@ -305,6 +329,7 @@ export class AuthorStrategy implements EntityStrategy {
   }
 
   async split(input: SplitInput): Promise<StrategySplitResult> {
+    await this.assertMutationScope([input.entityId], input.libraryIds ?? []);
     const [entity] = await this.db.select({ name: authors.name }).from(authors).where(eq(authors.id, input.entityId)).limit(1);
     if (!entity) throw new NotFoundException('Author not found');
 
@@ -312,16 +337,27 @@ export class AuthorStrategy implements EntityStrategy {
     const newEntities: { id: number; name: string }[] = [];
 
     await this.db.transaction(async (tx) => {
+      const seenNewNames = new Set<string>();
       for (const name of input.newNames) {
-        const trimmed = name.trim();
-        const [existing] = await tx.select({ id: authors.id }).from(authors).where(eq(authors.name, trimmed)).limit(1);
+        const displayName = normalizeMetadataText(name);
+        const normalizedName = normalizeMetadataTextKey(displayName);
+        if (!displayName || !normalizedName) continue;
+        if (seenNewNames.has(normalizedName)) continue;
+        seenNewNames.add(normalizedName);
+
+        const existingRows = await tx
+          .select({ id: authors.id, name: authors.name })
+          .from(authors)
+          .where(eq(NORMALIZED_AUTHOR_NAME_SQL, normalizedName));
+        const existing = this.selectPreferredAuthorMatch(existingRows, input.entityId as number, displayName);
         if (existing) {
-          newEntities.push({ id: existing.id, name: trimmed });
+          newEntities.push({ id: existing.id, name: existing.name });
         } else {
-          const [inserted] = await tx.insert(authors).values({ name: trimmed }).returning({ id: authors.id });
-          newEntities.push({ id: inserted!.id, name: trimmed });
+          const [inserted] = await tx.insert(authors).values({ name: displayName }).returning({ id: authors.id });
+          newEntities.push({ id: inserted!.id, name: displayName });
         }
       }
+      if (newEntities.length === 0) throw new BadRequestException('At least one name is required');
 
       const bookRows = await tx
         .select({ bookId: bookAuthors.bookId, displayOrder: bookAuthors.displayOrder })
@@ -347,6 +383,18 @@ export class AuthorStrategy implements EntityStrategy {
     return { originalName: entity.name, newEntities, affectedBookIds };
   }
 
+  private selectPreferredAuthorMatch(
+    rows: { id: number; name: string }[],
+    excludedAuthorId: number,
+    displayName: string,
+  ): { id: number; name: string } | null {
+    return chooseCanonicalMetadataTextRow(rows, { desiredName: displayName, excludedId: excludedAuthorId });
+  }
+
+  private assertMutationScope(entityIds: number[], libraryIds: number[]): Promise<void> {
+    return assertEntityRelationsWithinLibraries(this.db, 'book_authors', 'author_id', entityIds, libraryIds);
+  }
+
   async findAffectedBookIds(ids: (number | string)[]): Promise<number[]> {
     const numericIds = ids as number[];
     if (numericIds.length === 0) return [];
@@ -354,7 +402,16 @@ export class AuthorStrategy implements EntityStrategy {
     return rows.map((r) => r.bookId);
   }
 
-  async getBookCount(id: number | string): Promise<number> {
+  async getBookCount(id: number | string, scope?: EntityBookScope): Promise<number> {
+    if (scope) {
+      const [row] = await this.db
+        .select({ count: count() })
+        .from(bookAuthors)
+        .innerJoin(books, eq(books.id, bookAuthors.bookId))
+        .where(and(eq(bookAuthors.authorId, id as number), ...buildEntityBookScopeClauses(this.db, scope)));
+      return row?.count ?? 0;
+    }
+
     const [row] = await this.db
       .select({ count: count() })
       .from(bookAuthors)
@@ -362,13 +419,13 @@ export class AuthorStrategy implements EntityStrategy {
     return row?.count ?? 0;
   }
 
-  async getBookTitles(id: number | string, limit: number): Promise<string[]> {
+  async getBookTitles(id: number | string, limit: number, scope?: EntityBookScope): Promise<string[]> {
     const rows = await this.db
       .select({ title: sql<string>`COALESCE(${bookMetadata.title}, 'Untitled')` })
       .from(bookAuthors)
       .innerJoin(books, eq(books.id, bookAuthors.bookId))
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-      .where(eq(bookAuthors.authorId, id as number))
+      .where(and(eq(bookAuthors.authorId, id as number), ...(scope ? buildEntityBookScopeClauses(this.db, scope) : [])))
       .orderBy(asc(bookMetadata.title))
       .limit(limit);
     return rows.map((r) => r.title);

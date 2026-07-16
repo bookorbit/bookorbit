@@ -4,9 +4,11 @@ import {
   DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE,
   DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER,
   EXAMPLE_PATTERN_METADATA,
+  MAX_PATH_SEGMENT_BYTES,
   replacePlaceholders,
   resolveDownloadFilename,
   resolveUploadPath,
+  sanitizePathSegment,
   validatePattern,
 } from '@bookorbit/types';
 
@@ -31,6 +33,12 @@ const DECIMAL_INDEX: Record<string, string> = {
   ...FULL,
   seriesIndex: '01.5',
 };
+
+describe('sanitizePathSegment', () => {
+  it('removes a large trailing run of dots and spaces in linear time', () => {
+    expect(sanitizePathSegment(`book${'. '.repeat(100_000)}`)).toBe('book');
+  });
+});
 
 // ── applyModifier ─────────────────────────────────────────────────────────────
 
@@ -288,6 +296,14 @@ describe('replacePlaceholders', () => {
 
 // ── resolveUploadPath ─────────────────────────────────────────────────────────
 
+describe('KOReader device pattern', () => {
+  it('routes series and standalone books into separate folders', () => {
+    const pattern = '<Series/{series}/|Standalone/{authors:first} - ><{seriesIndex:fixed2} - >{title}';
+    expect(resolveUploadPath(pattern, FULL, 'epub')).toBe('Series/Sprawl/1.00 - Neuromancer.epub');
+    expect(resolveUploadPath(pattern, { ...FULL, series: '', seriesIndex: '' }, 'epub')).toBe('Standalone/William Gibson - Neuromancer.epub');
+  });
+});
+
 describe('resolveUploadPath', () => {
   describe('extension handling', () => {
     it('appends the extension when the resolved path has none', () => {
@@ -478,6 +494,74 @@ describe('cross-platform sanitization option', () => {
     });
     expect(result).toContain('/');
     expect(result).not.toMatch(/[:"]/);
+  });
+
+  it('keeps empty values empty so optional blocks are omitted during sanitization', () => {
+    const pattern =
+      '<{authors:first}|Unknown Author>/<{series}/><{seriesIndex:fixed2} - ><{title}|{originalFilename}>< ({year})>/<{seriesIndex:fixed2} - ><{title}|{originalFilename}>< ({year})> - <{authors:first}|Unknown Author>';
+    const values = { ...FULL, series: '', seriesIndex: '' };
+
+    expect(resolveUploadPath(pattern, values, 'epub', { sanitizeForCrossPlatform: true })).toBe(
+      'William Gibson/Neuromancer (1984)/Neuromancer (1984) - William Gibson.epub',
+    );
+  });
+
+  it('omits an empty optional series segment instead of replacing it with an underscore', () => {
+    expect(resolveUploadPath('<{series}/>{title}', { ...FULL, series: '' }, 'epub', { sanitizeForCrossPlatform: true })).toBe('Neuromancer.epub');
+  });
+
+  it('omits an empty optional series index prefix instead of replacing it with an underscore', () => {
+    expect(resolveUploadPath('<{seriesIndex:fixed2} - >{title}', { ...FULL, seriesIndex: '' }, 'epub', { sanitizeForCrossPlatform: true })).toBe(
+      'Neuromancer.epub',
+    );
+  });
+});
+
+describe('path segment byte limits', () => {
+  function expectSegmentsWithinLimit(path: string) {
+    for (const segment of path.split('/').filter(Boolean)) {
+      expect(Buffer.byteLength(segment, 'utf8')).toBeLessThanOrEqual(MAX_PATH_SEGMENT_BYTES);
+    }
+  }
+
+  it('truncates long generated upload path segments and preserves the file extension', () => {
+    const result = resolveUploadPath('{authors}/{title}', { ...FULL, authors: 'A'.repeat(300), title: 'B'.repeat(300) }, 'epub');
+
+    expect(result).not.toBeNull();
+    expectSegmentsWithinLimit(result!);
+    expect(result!.split('/')).toHaveLength(2);
+    expect(result!.endsWith('.epub')).toBe(true);
+    expect(result).toContain('~');
+  });
+
+  it('truncates download filenames before the filesystem segment limit', () => {
+    const result = resolveDownloadFilename('{title}', { ...FULL, title: 'Long Title '.repeat(40) }, 'epub');
+
+    expect(result).not.toBeNull();
+    expect(Buffer.byteLength(result!, 'utf8')).toBeLessThanOrEqual(MAX_PATH_SEGMENT_BYTES);
+    expect(result!.endsWith('.epub')).toBe(true);
+    expect(result).toContain('~');
+  });
+
+  it('does not split multibyte characters while truncating', () => {
+    const result = resolveDownloadFilename('{title}', { ...FULL, title: 'é'.repeat(200) }, 'epub');
+
+    expect(result).not.toBeNull();
+    expect(Buffer.byteLength(result!, 'utf8')).toBeLessThanOrEqual(MAX_PATH_SEGMENT_BYTES);
+    expect(result!.endsWith('.epub')).toBe(true);
+
+    const [stem] = result!.split('~');
+    expect([...stem].every((char) => char === 'é')).toBe(true);
+  });
+
+  it('uses a deterministic suffix so distinct long values do not collapse to the same filename', () => {
+    const prefix = 'Same prefix '.repeat(30);
+    const first = resolveDownloadFilename('{title}', { ...FULL, title: `${prefix}one` }, 'epub');
+    const second = resolveDownloadFilename('{title}', { ...FULL, title: `${prefix}two` }, 'epub');
+
+    expect(first).not.toBe(second);
+    expect(Buffer.byteLength(first!, 'utf8')).toBeLessThanOrEqual(MAX_PATH_SEGMENT_BYTES);
+    expect(Buffer.byteLength(second!, 'utf8')).toBeLessThanOrEqual(MAX_PATH_SEGMENT_BYTES);
   });
 });
 

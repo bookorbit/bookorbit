@@ -26,7 +26,7 @@ describe('LibraryCreatorFileWrite', () => {
   it('emits rename toggle updates and hides file-write detail controls when disabled', async () => {
     const wrapper = mountComponent()
 
-    expect(wrapper.text()).toContain('Rename files on metadata update')
+    expect(wrapper.text()).toContain('Rename files after metadata changes')
     expect(wrapper.text()).not.toContain('Include cover image')
 
     const renameSwitch = wrapper.findAll('[role="switch"]')[0]

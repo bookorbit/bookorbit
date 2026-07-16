@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { BookOpen, FileText, Wand2, Pencil, X, ArrowRight } from '@lucide/vue'
 import type { BookDockFile, BookDockMetadata } from '@bookorbit/types'
 import {
@@ -21,6 +22,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { toDisplayCoverUrl } from '@/features/book/lib/metadata-fetch'
 
+const { t } = useI18n()
+
 const props = withDefaults(
   defineProps<{
     items: BookDockFile[]
@@ -33,9 +36,11 @@ const props = withDefaults(
   }>(),
   {
     namePreviewByFileId: () => ({}),
-    emptyMessage: 'Upload files or drop them in the Book Dock folder',
+    emptyMessage: undefined,
   },
 )
+
+const resolvedEmptyMessage = computed(() => props.emptyMessage ?? t('bookDock.fileList.emptyMessageDefault'))
 
 const emit = defineEmits<{
   select: [number, boolean]
@@ -177,18 +182,18 @@ function joinTargetPath(folderPath: string, fileName: string): string {
 function targetSummary(file: BookDockFile): string {
   const lib = file.targetLibraryId != null ? libraries.value.find((l) => l.id === file.targetLibraryId) : null
   const folder = file.targetFolderId != null ? lib?.folders.find((f) => f.id === file.targetFolderId) : null
-  const libLabel = lib?.name ?? (file.targetLibraryId != null ? 'Unknown library' : 'Unassigned')
+  const libLabel = lib?.name ?? (file.targetLibraryId != null ? t('bookDock.fileList.unknownLibrary') : t('bookDock.fileList.unassigned'))
   const previewName = props.namePreviewByFileId?.[file.id] ?? file.fileName
 
   if (lib && folder?.path) {
-    return `Target: ${libLabel} · ${joinTargetPath(folder.path, previewName)}`
+    return t('bookDock.fileList.targetPath', { library: libLabel, path: joinTargetPath(folder.path, previewName) })
   }
 
   if (file.targetLibraryId == null || file.targetFolderId == null) {
-    return 'Target: Unassigned'
+    return t('bookDock.fileList.targetUnassigned')
   }
 
-  return `Target: ${libLabel} · Unknown destination path`
+  return t('bookDock.fileList.targetUnknownPath', { library: libLabel })
 }
 </script>
 
@@ -210,21 +215,21 @@ function targetSummary(file: BookDockFile): string {
       <div class="size-12 rounded-full bg-muted flex items-center justify-center">
         <FileText class="size-6" />
       </div>
-      <p class="text-sm font-medium text-foreground">No files in Book Dock</p>
-      <p class="text-xs">{{ emptyMessage }}</p>
+      <p class="text-sm font-medium text-foreground">{{ t('bookDock.fileList.emptyTitle') }}</p>
+      <p class="text-xs">{{ resolvedEmptyMessage }}</p>
     </div>
 
     <div v-else class="divide-y divide-border">
       <div class="flex items-center gap-3 px-4 py-2 bg-muted/30 border-b border-border">
         <input type="checkbox" :checked="selectAll" class="size-3.5 rounded border-input accent-primary" @change="$emit('selectAll')" />
-        <span class="text-xs font-medium text-muted-foreground w-12 text-center shrink-0">Current</span>
-        <span class="text-xs font-medium text-muted-foreground w-12 text-center shrink-0">New</span>
-        <span class="text-xs font-medium text-muted-foreground flex-1">File</span>
-        <span class="text-xs font-medium text-muted-foreground w-16 text-right hidden sm:block">Size</span>
-        <span class="text-xs font-medium text-muted-foreground w-12 text-center hidden sm:block">Format</span>
-        <span class="text-xs font-medium text-muted-foreground w-14 text-center hidden sm:block">Match</span>
-        <span class="text-xs font-medium text-muted-foreground w-7 text-center hidden sm:block">Apply</span>
-        <span class="text-xs font-medium text-muted-foreground w-16 text-center">Status</span>
+        <span class="text-xs font-medium text-muted-foreground w-12 text-center shrink-0">{{ t('bookDock.fileList.colCurrent') }}</span>
+        <span class="text-xs font-medium text-muted-foreground w-12 text-center shrink-0">{{ t('bookDock.fileList.colNew') }}</span>
+        <span class="text-xs font-medium text-muted-foreground flex-1">{{ t('bookDock.fileList.colFile') }}</span>
+        <span class="text-xs font-medium text-muted-foreground w-16 text-right hidden sm:block">{{ t('bookDock.fileList.colSize') }}</span>
+        <span class="text-xs font-medium text-muted-foreground w-12 text-center hidden sm:block">{{ t('bookDock.fileList.colFormat') }}</span>
+        <span class="text-xs font-medium text-muted-foreground w-14 text-center hidden sm:block">{{ t('bookDock.fileList.colMatch') }}</span>
+        <span class="text-xs font-medium text-muted-foreground w-7 text-center hidden sm:block">{{ t('bookDock.fileList.colApply') }}</span>
+        <span class="text-xs font-medium text-muted-foreground w-16 text-center">{{ t('bookDock.fileList.colStatus') }}</span>
       </div>
 
       <button
@@ -247,7 +252,13 @@ function targetSummary(file: BookDockFile): string {
               <div class="w-12 shrink-0 flex justify-center">
                 <div
                   class="relative w-8 h-12 rounded-md bg-muted flex items-center justify-center overflow-hidden cursor-zoom-in ring-1 ring-border"
-                  @click.stop="openCoverLightbox(currentCoverUrl(file), `${displayTitle(file)} current cover`, currentCoverLightboxFallback())"
+                  @click.stop="
+                    openCoverLightbox(
+                      currentCoverUrl(file),
+                      t('bookDock.fileList.currentCoverAlt', { title: displayTitle(file) }),
+                      currentCoverLightboxFallback(),
+                    )
+                  "
                 >
                   <img
                     :src="currentCoverUrl(file)"
@@ -264,7 +275,7 @@ function targetSummary(file: BookDockFile): string {
                 <div
                   v-if="newCoverUrl(file)"
                   class="relative w-8 h-12 rounded-md bg-amber-500/5 border border-amber-500/30 flex items-center justify-center overflow-hidden cursor-zoom-in"
-                  @click.stop="openCoverLightbox(newCoverUrl(file)!, `${displayTitle(file)} new cover`)"
+                  @click.stop="openCoverLightbox(newCoverUrl(file)!, t('bookDock.fileList.newCoverAlt', { title: displayTitle(file) }))"
                 >
                   <img
                     :src="newCoverUrl(file)!"
@@ -308,7 +319,7 @@ function targetSummary(file: BookDockFile): string {
                     <img :src="currentCoverUrl(file)" alt="" class="size-full object-cover" @error="onCurrentCoverError" />
                     <BookOpen class="size-5 text-muted-foreground absolute" />
                   </div>
-                  <span class="text-[10px] font-medium text-muted-foreground">Current</span>
+                  <span class="text-[10px] font-medium text-muted-foreground">{{ t('bookDock.fileList.colCurrent') }}</span>
                 </div>
                 <template v-if="newCoverUrl(file)">
                   <ArrowRight class="size-4 text-muted-foreground shrink-0" />
@@ -318,7 +329,7 @@ function targetSummary(file: BookDockFile): string {
                     >
                       <img :src="newCoverUrl(file)!" alt="" class="size-full object-cover" @error="onFetchedCoverError" />
                     </div>
-                    <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400">New</span>
+                    <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400">{{ t('bookDock.fileList.colNew') }}</span>
                   </div>
                 </template>
               </div>
@@ -367,7 +378,7 @@ function targetSummary(file: BookDockFile): string {
                   <Wand2 class="size-3.5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Apply fetched metadata</TooltipContent>
+              <TooltipContent>{{ t('bookDock.fileList.applyFetchedMetadata') }}</TooltipContent>
             </Tooltip>
           </div>
 
@@ -386,8 +397,8 @@ function targetSummary(file: BookDockFile): string {
         <DialogContent
           class="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 max-w-[90vw] max-h-[90vh] outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
         >
-          <DialogTitle class="sr-only">{{ coverLightbox?.title ?? 'Cover preview' }}</DialogTitle>
-          <DialogDescription class="sr-only">Enlarged cover image preview dialog.</DialogDescription>
+          <DialogTitle class="sr-only">{{ coverLightbox?.title ?? t('bookDock.fileList.coverPreview') }}</DialogTitle>
+          <DialogDescription class="sr-only">{{ t('bookDock.fileList.coverPreviewDescription') }}</DialogDescription>
           <img
             v-if="coverLightbox"
             :src="coverLightbox.src"

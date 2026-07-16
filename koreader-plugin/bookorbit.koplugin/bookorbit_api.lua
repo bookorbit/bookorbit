@@ -2,7 +2,8 @@
 HTTP client for the BookOrbit server.
 
 Speaks the kosync-compatible progress endpoints plus the BookOrbit plugin
-endpoints. All requests are blocking; callers keep them short and chunked.
+endpoints. Sync clients run blocking requests in a subprocess when called from
+a Trapper coroutine, keeping KOReader's UI loop responsive.
 ]]
 
 local http = require("socket.http")
@@ -31,8 +32,22 @@ local function scrubNulls(value)
     return value
 end
 
+local function decodeResponse(parts)
+    local raw = table.concat(parts or {})
+    if raw == "" then
+        return {}
+    end
+    local ok, decoded, decode_err = pcall(rapidjson.decode, raw)
+    if not ok or decoded == nil then
+        logger.dbg("BookOrbit: invalid JSON response:", ok and decode_err or decoded)
+        return nil, "invalid_json"
+    end
+    return scrubNulls(decoded) or {}
+end
+
 local BookOrbitApi = {}
 BookOrbitApi.__index = BookOrbitApi
+BookOrbitApi.decodeResponse = decodeResponse
 
 -- Normalizes a user-entered server address to the API base, e.g.
 -- "https://books.example.com/" -> "https://books.example.com/api/v1".
@@ -56,6 +71,7 @@ function BookOrbitApi.new(opts)
         device_id = opts.device_id,
         device_model = opts.device_model,
         plugin_version = opts.plugin_version,
+        background_requests = opts.background_requests == true,
     }, BookOrbitApi)
 end
 
@@ -65,7 +81,7 @@ end
 
 -- Returns decoded_body on success, or nil, err_code, decoded_error_body.
 -- err_code is a number for HTTP errors and a string for transport errors.
-function BookOrbitApi:request(method, path, body)
+function BookOrbitApi:requestBlocking(method, path, body)
     local sink = {}
     local request = {
         url = self.server_url .. path,
@@ -100,16 +116,42 @@ function BookOrbitApi:request(method, path, body)
         return nil, tostring(status or code or "network_error")
     end
 
-    local decoded = nil
-    if sink[1] then
-        decoded = scrubNulls(rapidjson.decode(table.concat(sink)))
-    end
+    local decoded, decode_err = decodeResponse(sink)
 
     if code < 200 or code >= 300 then
         return nil, code, decoded
     end
 
+    if decode_err then
+        return nil, decode_err
+    end
+
     return decoded or {}
+end
+
+function BookOrbitApi:request(method, path, body)
+    if not self.background_requests then
+        return self:requestBlocking(method, path, body)
+    end
+
+    local loaded, Trapper = pcall(require, "ui/trapper")
+    if not loaded or not Trapper:isWrapped() then
+        return self:requestBlocking(method, path, body)
+    end
+
+    -- An unmounted widget lets Trapper poll without intercepting reader input.
+    local trap_widget = {}
+    local completed, result = Trapper:dismissableRunInSubprocess(function()
+        local response, err, errbody = self:requestBlocking(method, path, body)
+        return { response = response, err = err, errbody = errbody }
+    end, trap_widget)
+    trap_widget.dismiss_callback = nil
+    if not completed then
+        return nil, "background_request_interrupted"
+    end
+
+    result = result or {}
+    return result.response, result.err, result.errbody
 end
 
 function BookOrbitApi:query(path, params)
@@ -210,8 +252,23 @@ end
 
 -- BookOrbit plugin endpoints (camelCase wire format)
 
-function BookOrbitApi:matchCheck(hashes)
-    return self:request("POST", "/koreader/plugin/match-check", self:withDevice({ hashes = hashes }))
+function BookOrbitApi:matchCheck(hashes, candidates)
+    local payload = { hashes = hashes }
+    if candidates then
+        payload.books = {}
+        for _, hash in ipairs(hashes) do
+            local cand = candidates[hash] or {}
+            table.insert(payload.books, {
+                hash = hash,
+                title = cand.title,
+                authors = cand.authors,
+                lastOpen = cand.last_open,
+                source = cand.source,
+                metadataAmbiguous = cand.metadata_ambiguous,
+            })
+        end
+    end
+    return self:request("POST", "/koreader/plugin/match-check", self:withDevice(payload))
 end
 
 function BookOrbitApi:uploadPageStats(books)
@@ -279,7 +336,7 @@ function BookOrbitApi:catalogBooks(params)
 end
 
 function BookOrbitApi:catalogBook(book_id)
-    return self:request("GET", "/koreader/plugin/catalog/books/" .. tostring(book_id))
+    return self:request("GET", self:query("/koreader/plugin/catalog/books/" .. tostring(book_id), { deviceId = self.device_id }))
 end
 
 function BookOrbitApi:downloadCatalogFile(file_id, local_path, progress_cb)

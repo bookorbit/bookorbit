@@ -42,7 +42,7 @@ export function formatReleaseDate(date: string | null): string {
   if (!date) return ''
   const parsed = new Date(date)
   if (Number.isNaN(parsed.getTime())) return ''
-  return new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' }).format(parsed)
+  return formatDate(parsed, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 export function shouldShowPopup(opts: {
@@ -56,3 +56,4 @@ export function shouldShowPopup(opts: {
   if (!opts.hasUnseen || !opts.popupEnabled || opts.dismissedThisSession) return false
   return opts.routeName !== 'reader'
 }
+import { formatDate } from '@/i18n/formatters'

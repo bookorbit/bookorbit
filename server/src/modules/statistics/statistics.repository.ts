@@ -650,7 +650,7 @@ export class StatisticsRepository {
       totalAuthors: authorsRow.count,
       totalSeries: seriesRow.count,
       totalPublishers: publishersRow.count,
-      totalStorageBytes: storageRow.total,
+      totalStorageBytes: Number(storageRow.total),
       totalGenres: genresRow.count,
       totalLanguages: languagesRow.count,
       publicationYearMin: pubRangeRow.minYear,
@@ -735,6 +735,7 @@ export class StatisticsRepository {
       ${bookMetadata.openLibraryId} is not null or
       ${bookMetadata.itunesId} is not null or
       ${bookMetadata.audibleId} is not null or
+      ${bookMetadata.librofmId} is not null or
       ${bookMetadata.koboId} is not null or
       ${bookMetadata.comicvineId} is not null or
       ${bookMetadata.ranobedbId} is not null or

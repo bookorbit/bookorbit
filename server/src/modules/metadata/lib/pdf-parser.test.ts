@@ -18,6 +18,10 @@ vi.mock('./pdf-cover', () => ({
   extractPdfCover: vi.fn(),
 }));
 
+vi.mock('./pdf-poppler-metadata', () => ({
+  extractPopplerPdfMetadata: vi.fn(),
+}));
+
 vi.mock('./pdf-parse-worker-runner', () => ({
   parsePdfFileInWorker: vi.fn(),
 }));
@@ -27,6 +31,7 @@ import type { MockedFunction } from 'vitest';
 import { PDFDocument } from 'pdf-lib';
 
 import { extractPdfCover } from './pdf-cover';
+import { extractPopplerPdfMetadata } from './pdf-poppler-metadata';
 import { parsePdfFile, PDF_BUFFER_WARNING_BYTES, type PdfParsed } from './pdf-parser';
 import { parsePdfFileInWorker } from './pdf-parse-worker-runner';
 import { extractXmpXml, parseXmp } from './pdf-xmp-reader';
@@ -37,6 +42,7 @@ const mockPdfLoad = PDFDocument.load as MockedFunction<typeof PDFDocument.load>;
 const mockExtractXmpXml = extractXmpXml as MockedFunction<typeof extractXmpXml>;
 const mockParseXmp = parseXmp as MockedFunction<typeof parseXmp>;
 const mockExtractPdfCover = extractPdfCover as MockedFunction<typeof extractPdfCover>;
+const mockExtractPopplerPdfMetadata = extractPopplerPdfMetadata as MockedFunction<typeof extractPopplerPdfMetadata>;
 const mockParsePdfFileInWorker = parsePdfFileInWorker as MockedFunction<typeof parsePdfFileInWorker>;
 
 function makePdfDoc(overrides: Partial<Record<string, unknown>> = {}) {
@@ -95,6 +101,7 @@ describe('parsePdfFile', () => {
     mockExtractXmpXml.mockReturnValue(null);
     mockParseXmp.mockReturnValue(null);
     mockExtractPdfCover.mockResolvedValue(Buffer.from([0xff, 0xd8, 0xff]));
+    mockExtractPopplerPdfMetadata.mockResolvedValue(null);
     mockParsePdfFileInWorker.mockResolvedValue({ parsed: makeParsed(), warnings: [] });
   });
 
@@ -155,6 +162,135 @@ describe('parsePdfFile', () => {
         description: 'Info Subject',
         tags: ['tag1', 'tag2'],
         coverBuffer: null,
+      }),
+    );
+  });
+
+  it('uses Poppler XMP metadata for encrypted PDFs instead of encrypted pdf-lib strings', async () => {
+    mockPdfLoad.mockResolvedValue(
+      makePdfDoc({
+        isEncrypted: true,
+        getTitle: () => 'hfá\u0012G²\u0017Ã$ÎŁe',
+        getAuthor: () => 'hfá\u0012G²',
+        getKeywords: () => 'ihè\u00171Wü"',
+      }) as never,
+    );
+    mockExtractPopplerPdfMetadata.mockResolvedValue({
+      title: 'Lonely Planet - Southern Italy',
+      author: 'Lonely Planet',
+      subject: null,
+      keywords: 'Magazine',
+      creator: 'Adobe InDesign CS6 (Windows)',
+      producer: 'Adobe PDF Library 10.0.1',
+      pageCount: 299,
+      xmpXml: '<xmp/>',
+    });
+    mockParseXmp.mockReturnValue({
+      title: 'Lonely Planet - Southern Italy',
+      subtitle: null,
+      description: null,
+      publisher: null,
+      publishedYear: 2015,
+      language: 'en',
+      authors: [{ name: 'Lonely Planet', sortName: null }],
+      genres: [],
+      tags: ['Magazine'],
+      isbn10: null,
+      isbn13: null,
+      seriesName: null,
+      seriesIndex: null,
+      rating: null,
+      pageCount: null,
+      googleBooksId: null,
+      goodreadsId: null,
+      amazonId: null,
+      hardcoverId: null,
+      hardcoverEditionId: null,
+      openLibraryId: null,
+      ranobedbId: null,
+      itunesId: null,
+    });
+
+    const parsed = await parsePdfFile('/books/southern-italy.pdf');
+
+    expect(mockExtractPopplerPdfMetadata).toHaveBeenCalledWith('/books/southern-italy.pdf');
+    expect(mockExtractXmpXml).not.toHaveBeenCalled();
+    expect(parsed).toEqual(
+      expect.objectContaining({
+        title: 'Lonely Planet - Southern Italy',
+        authors: [{ name: 'Lonely Planet', sortName: null }],
+        tags: ['Magazine'],
+        publishedYear: 2015,
+        language: 'en',
+        pageCount: 299,
+      }),
+    );
+  });
+
+  it('uses Poppler Info metadata for encrypted PDFs when decrypted XMP is absent', async () => {
+    mockPdfLoad.mockResolvedValue(
+      makePdfDoc({
+        isEncrypted: true,
+        getTitle: () => 'o\u0001ÍžÐ_<ÐK',
+        getAuthor: () => 'o\u0001ÍžÐ',
+        getKeywords: () => 'n\u000fÄıÆOrå',
+      }) as never,
+    );
+    mockExtractPopplerPdfMetadata.mockResolvedValue({
+      title: 'Lonely Planet - Greece',
+      author: 'Lonely Planet',
+      subject: 'Travel guide',
+      keywords: 'Magazine',
+      creator: 'Adobe InDesign CS6 (Windows)',
+      producer: 'Adobe PDF Library 10.0.1',
+      pageCount: 755,
+      xmpXml: null,
+    });
+
+    const parsed = await parsePdfFile('/books/greece.pdf');
+
+    expect(mockExtractXmpXml).not.toHaveBeenCalled();
+    expect(parsed).toEqual(
+      expect.objectContaining({
+        title: 'Lonely Planet - Greece',
+        authors: [{ name: 'Lonely Planet', sortName: null }],
+        description: 'Travel guide',
+        tags: ['Magazine'],
+        pageCount: 755,
+      }),
+    );
+  });
+
+  it('does not persist encrypted pdf-lib metadata when the encrypted fallback fails', async () => {
+    mockPdfLoad.mockResolvedValue(
+      makePdfDoc({
+        isEncrypted: true,
+        getTitle: () => 'hfá\u0012G²\u0017Ã$ÎŁe',
+        getAuthor: () => 'hfá\u0012G²',
+        getKeywords: () => 'ihè\u00171Wü"',
+      }) as never,
+    );
+    mockExtractPopplerPdfMetadata.mockRejectedValue(new Error('pdfinfo missing'));
+    const onWarning = vi.fn();
+
+    const parsed = await parsePdfFile('/books/encrypted.pdf', { onWarning });
+
+    expect(mockExtractXmpXml).not.toHaveBeenCalled();
+    expect(parsed).toEqual(
+      expect.objectContaining({
+        title: null,
+        authors: [],
+        description: null,
+        tags: [],
+        pageCount: 123,
+      }),
+    );
+    expect(onWarning).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'encrypted-metadata-fallback-failed',
+        absolutePath: '/books/encrypted.pdf',
+        errorClass: 'Error',
+        errorMessage: 'pdfinfo missing',
       }),
     );
   });

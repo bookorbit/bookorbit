@@ -1,8 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, ilike, inArray, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db';
+import { accentInsensitiveIlike } from '../../../common/utils/accent-insensitive-search.utils';
 import * as schema from '../../../db/schema';
 import type { SourceBook } from '../adapters/source-adapter.types';
 import type { PathMapping, PlannedBookMatch, PlannedUnresolvedBook, UnresolvedReasonCode } from './planner.types';
@@ -267,13 +268,18 @@ export class MatchingService {
       return exactResult;
     }
 
-    const approxClauses = normalizedAuthors.map((author) => ilike(schema.authors.name, `%${escapeLike(author)}%`));
+    const approxClauses = normalizedAuthors.map((author) => accentInsensitiveIlike(schema.authors.name, `%${escapeLike(author)}%`));
     const approxRows = await this.db
       .selectDistinct({ bookId: schema.bookMetadata.bookId })
       .from(schema.bookMetadata)
       .innerJoin(schema.bookAuthors, eq(schema.bookAuthors.bookId, schema.bookMetadata.bookId))
       .innerJoin(schema.authors, eq(schema.authors.id, schema.bookAuthors.authorId))
-      .where(and(sql`lower(${schema.bookMetadata.title}) = lower(${normalizedTitle})`, or(...approxClauses)!))
+      .where(
+        and(
+          sql`lower(public.bookorbit_unaccent(${schema.bookMetadata.title})) = lower(public.bookorbit_unaccent(${normalizedTitle}))`,
+          or(...approxClauses)!,
+        ),
+      )
       .limit(2);
     const approxResult = toLookupResult(approxRows);
     if (approxResult.kind !== 'none') {

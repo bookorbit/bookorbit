@@ -50,7 +50,7 @@ describe('ReadingLogSourceSplit', () => {
 
     expect(wrapper.find('div').exists()).toBe(true)
     const text = wrapper.text()
-    expect(text).toContain('Where you read this book')
+    expect(text).toContain('Reading sources')
     expect(text).toContain('BookOrbit')
     expect(text).toContain('KOReader')
     expect(text).toContain('Kobo')

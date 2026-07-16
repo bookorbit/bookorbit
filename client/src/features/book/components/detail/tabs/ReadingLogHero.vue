@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { formatDate } from '@/i18n/formatters'
 import { Check, ChevronDown, Clock, Minus, Plus, TrendingDown, TrendingUp } from '@lucide/vue'
 import type { BookDetail, BookReadingSessionStats, ReadStatus, UserBookStatus } from '@bookorbit/types'
 import { isAudioFormat } from '@bookorbit/types'
@@ -7,6 +9,7 @@ import { api } from '@/lib/api'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { STATUS_COLORS, STATUS_ICONS, STATUS_OPTIONS, useBookStatus } from '@/features/book/composables/useBookStatus'
 import AchievementProgressRing from '@/features/achievements/components/AchievementProgressRing.vue'
+import ReadingLogSourceSplit from './ReadingLogSourceSplit.vue'
 
 const props = defineProps<{
   book: BookDetail
@@ -19,6 +22,7 @@ const emit = defineEmits<{
   addSession: []
 }>()
 
+const { t } = useI18n()
 const { setStatus, updateStatus } = useBookStatus()
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -40,10 +44,10 @@ function toDateInputValue(value: string | null | undefined): string {
 }
 
 function formatDisplayDate(dateKey: string): string {
-  if (!dateKey) return 'Not set'
+  if (!dateKey) return t('book.detail.readingLog.hero.notSet')
   const [year, month, day] = dateKey.split('-').map(Number)
   const d = new Date(year!, month! - 1, day!)
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  return formatDate(d, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 function formatDuration(seconds: number): string {
@@ -59,28 +63,17 @@ function formatRelative(iso: string | null): string {
   if (!iso) return '-'
   const diff = Date.now() - new Date(iso).getTime()
   const s = Math.floor(diff / 1000)
-  if (s < 60) return `${s}s ago`
+  if (s < 60) return t('book.detail.readingLog.hero.relative.seconds', { count: s })
   const m = Math.floor(s / 60)
-  if (m < 60) return `${m}m ago`
+  if (m < 60) return t('book.detail.readingLog.hero.relative.minutes', { count: m })
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
+  if (h < 24) return t('book.detail.readingLog.hero.relative.hours', { count: h })
   const d = Math.floor(h / 24)
-  if (d < 30) return `${d}d ago`
+  if (d < 30) return t('book.detail.readingLog.hero.relative.days', { count: d })
   const mo = Math.floor(d / 30)
-  if (mo < 12) return `${mo} month${mo === 1 ? '' : 's'} ago`
+  if (mo < 12) return t('book.detail.readingLog.hero.relative.months', { count: mo }, mo)
   const yr = Math.floor(mo / 12)
-  return `${yr} year${yr === 1 ? '' : 's'} ago`
-}
-
-function formatSessionDate(iso: string | null): string {
-  if (!iso) return 'No sessions'
-  return new Date(iso).toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return t('book.detail.readingLog.hero.relative.years', { count: yr }, yr)
 }
 
 const todayDateInput = computed(() => dateToDateKey(new Date()))
@@ -113,9 +106,10 @@ watch(
 )
 
 function validateDates(values: { startedAt: string; finishedAt: string }): string | null {
-  if (values.startedAt && values.startedAt > todayDateInput.value) return 'Start date cannot be in the future.'
-  if (values.finishedAt && values.finishedAt > todayDateInput.value) return 'Finish date cannot be in the future.'
-  if (values.startedAt && values.finishedAt && values.finishedAt < values.startedAt) return 'Finish date must be on or after the start date.'
+  if (values.startedAt && values.startedAt > todayDateInput.value) return t('book.detail.readingLog.hero.dateErrors.startFuture')
+  if (values.finishedAt && values.finishedAt > todayDateInput.value) return t('book.detail.readingLog.hero.dateErrors.finishFuture')
+  if (values.startedAt && values.finishedAt && values.finishedAt < values.startedAt)
+    return t('book.detail.readingLog.hero.dateErrors.finishBeforeStart')
   return null
 }
 
@@ -170,7 +164,7 @@ async function saveDateField(field: 'startedAt' | 'finishedAt') {
     applyReadStatusUpdate(updated)
     activeDateField.value = null
   } catch {
-    datesError.value = 'Failed to save reading dates.'
+    datesError.value = t('book.detail.readingLog.hero.dateErrors.saveFailed')
   } finally {
     savingDates.value = false
   }
@@ -256,13 +250,13 @@ const etaLabel = computed(() => {
   if (remaining <= 0) return null
   const totalMinutes = (remaining / pace) * 60
   if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return null
-  if (totalMinutes > 99 * 60) return '99h+ to finish'
+  if (totalMinutes > 99 * 60) return t('book.detail.readingLog.hero.eta.max')
   const rounded = Math.max(5, Math.round(totalMinutes / 5) * 5)
   const h = Math.floor(rounded / 60)
   const m = rounded % 60
-  if (h <= 0) return `~${m}m to finish`
-  if (m === 0) return `~${h}h to finish`
-  return `~${h}h ${m}m to finish`
+  if (h <= 0) return t('book.detail.readingLog.hero.eta.minutes', { m })
+  if (m === 0) return t('book.detail.readingLog.hero.eta.hours', { h })
+  return t('book.detail.readingLog.hero.eta.hoursMinutes', { h, m })
 })
 
 function toUtcDayStart(date: Date): number {
@@ -283,24 +277,34 @@ const momentum = computed(() => {
     last7 += map.get(toUtcDayKey(todayStart - offset * DAY_MS)) ?? 0
     prev7 += map.get(toUtcDayKey(todayStart - (offset + 7) * DAY_MS)) ?? 0
   }
-  if (last7 === 0 && prev7 === 0) return { direction: 'flat' as const, title: 'No activity in the last two weeks' }
-  if (prev7 <= 0) return { direction: 'up' as const, title: 'New activity this week' }
+  if (last7 === 0 && prev7 === 0) return { direction: 'flat' as const, title: t('book.detail.readingLog.hero.momentum.none') }
+  if (prev7 <= 0) return { direction: 'up' as const, title: t('book.detail.readingLog.hero.momentum.new') }
   const pct = Math.round(((last7 - prev7) / prev7) * 100)
-  if (pct > 0) return { direction: 'up' as const, title: `+${pct}% vs previous 7 days` }
-  if (pct < 0) return { direction: 'down' as const, title: `${pct}% vs previous 7 days` }
-  return { direction: 'flat' as const, title: 'Unchanged vs previous 7 days' }
+  if (pct > 0) return { direction: 'up' as const, title: t('book.detail.readingLog.hero.momentum.up', { pct }) }
+  if (pct < 0) return { direction: 'down' as const, title: t('book.detail.readingLog.hero.momentum.down', { pct }) }
+  return { direction: 'flat' as const, title: t('book.detail.readingLog.hero.momentum.flat') }
 })
 
 const statCells = computed(() => [
-  { label: 'Total Time', value: props.stats ? formatDuration(props.stats.totalSeconds) : '0s', withMomentum: true },
-  { label: 'Sessions', value: String(props.stats?.totalSessions ?? 0), withMomentum: false },
-  { label: 'Avg Session', value: props.stats ? formatDuration(props.stats.avgDurationSeconds) : '0s', withMomentum: false },
-  { label: 'Last Read', value: props.stats ? formatRelative(props.stats.lastSessionAt) : '-', withMomentum: false },
+  {
+    label: t('book.detail.readingLog.hero.stats.totalTime'),
+    value: props.stats ? formatDuration(props.stats.totalSeconds) : '0s',
+    withMomentum: true,
+  },
+  { label: t('book.detail.readingLog.hero.stats.sessions'), value: String(props.stats?.totalSessions ?? 0), withMomentum: false },
+  {
+    label: t('book.detail.readingLog.hero.stats.avgSession'),
+    value: props.stats ? formatDuration(props.stats.avgDurationSeconds) : '0s',
+    withMomentum: false,
+  },
+  {
+    label: t('book.detail.readingLog.hero.stats.lastRead'),
+    value: props.stats ? formatRelative(props.stats.lastSessionAt) : '-',
+    withMomentum: false,
+  },
 ])
 
 const currentStatusOption = computed(() => STATUS_OPTIONS.find((o) => o.value === (localReadStatus.value ?? 'unread')))
-const firstReadLabel = computed(() => formatSessionDate(props.stats?.firstSessionAt ?? null))
-const lastReadLabel = computed(() => formatSessionDate(props.stats?.lastSessionAt ?? null))
 
 function handleAddSession() {
   emit('addSession')
@@ -308,124 +312,119 @@ function handleAddSession() {
 </script>
 
 <template>
-  <div class="rounded-lg border border-border bg-card p-4 sm:p-5">
-    <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:gap-8">
-      <div class="flex items-center gap-4">
-        <div class="relative shrink-0">
-          <AchievementProgressRing :percent="currentProgress" color="text-primary" :size="76" />
-          <span class="absolute inset-0 flex items-center justify-center text-sm font-semibold text-foreground">
+  <section
+    class="rounded-xl border border-border bg-card px-3.5 py-3 shadow-[var(--elevation-xs)] sm:px-4"
+    :aria-label="t('book.detail.readingLog.hero.summaryAria')"
+  >
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
+      <div class="flex min-w-0 items-center gap-3">
+        <div class="relative flex size-16 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+          <AchievementProgressRing :percent="currentProgress" color="text-primary" :size="56" />
+          <span class="absolute inset-0 flex items-center justify-center text-xs font-semibold text-foreground">
             {{ progressLoaded ? progressLabel : '' }}
           </span>
         </div>
 
-        <div class="flex min-w-0 flex-col gap-1">
-          <DropdownMenu>
-            <DropdownMenuTrigger as-child>
-              <button class="flex w-fit items-center gap-1.5 rounded-md text-sm font-medium text-foreground hover:text-primary transition-colors">
-                <component :is="STATUS_ICONS[localReadStatus ?? 'unread']" class="size-4" :class="STATUS_COLORS[localReadStatus ?? 'unread']" />
-                {{ currentStatusOption?.label }}
-                <ChevronDown class="size-3.5 opacity-60" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="handleSetReadStatus(opt.value)">
-                <component :is="STATUS_ICONS[opt.value]" class="size-4 mr-2" :class="STATUS_COLORS[opt.value]" />
-                {{ opt.label }}
-                <Check v-if="localReadStatus === opt.value" class="size-3 ml-auto text-primary" />
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <DropdownMenu>
+              <DropdownMenuTrigger as-child>
+                <button class="flex w-fit items-center gap-1.5 rounded-md text-sm font-semibold text-foreground transition-colors hover:text-primary">
+                  <component :is="STATUS_ICONS[localReadStatus ?? 'unread']" class="size-4" :class="STATUS_COLORS[localReadStatus ?? 'unread']" />
+                  {{ currentStatusOption?.label }}
+                  <ChevronDown class="size-3.5 opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="handleSetReadStatus(opt.value)">
+                  <component :is="STATUS_ICONS[opt.value]" class="mr-2 size-4" :class="STATUS_COLORS[opt.value]" />
+                  {{ opt.label }}
+                  <Check v-if="localReadStatus === opt.value" class="ml-auto size-3 text-primary" />
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            <span class="flex items-center gap-1">
-              First Read
-              <span class="font-medium text-foreground">{{ firstReadLabel }}</span>
-            </span>
-            <span class="flex items-center gap-1">
-              Last Read
-              <span class="font-medium text-foreground">{{ lastReadLabel }}</span>
+            <span v-if="etaLabel" class="flex items-center gap-1 text-xs text-muted-foreground">
+              <Clock class="size-3" />
+              {{ etaLabel }}
             </span>
           </div>
 
-          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            <span class="flex items-center gap-1">
-              Date Started
+          <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span>
+              Started
               <input
                 v-if="activeDateField === 'startedAt'"
                 v-model="draftDates.startedAt"
                 type="date"
                 :max="todayDateInput"
                 :disabled="savingDates"
-                class="h-6 rounded border border-input bg-background px-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                class="ml-1 h-6 rounded border border-input bg-background px-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                 autofocus
                 @blur="handleStartedSave"
                 @keydown.enter.prevent="handleStartedSave"
                 @keydown.esc.prevent="handleStartedCancel"
               />
-              <button v-else class="font-medium text-foreground hover:text-primary transition-colors" @click="handleStartedClick">
+              <button v-else class="ml-1 font-medium text-foreground transition-colors hover:text-primary" @click="handleStartedClick">
                 {{ formatDisplayDate(savedDates.startedAt) }}
               </button>
             </span>
-            <span class="flex items-center gap-1">
-              Date Finished
+            <span v-if="savedDates.finishedAt || activeDateField === 'finishedAt' || localReadStatus === 'read' || localReadStatus === 'abandoned'">
+              Finished
               <input
                 v-if="activeDateField === 'finishedAt'"
                 v-model="draftDates.finishedAt"
                 type="date"
                 :max="todayDateInput"
                 :disabled="savingDates"
-                class="h-6 rounded border border-input bg-background px-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                class="ml-1 h-6 rounded border border-input bg-background px-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                 autofocus
                 @blur="handleFinishedSave"
                 @keydown.enter.prevent="handleFinishedSave"
                 @keydown.esc.prevent="handleFinishedCancel"
               />
-              <button v-else class="font-medium text-foreground hover:text-primary transition-colors" @click="handleFinishedClick">
-                {{ formatDisplayDate(savedDates.finishedAt) }}
+              <button v-else class="ml-1 font-medium text-foreground transition-colors hover:text-primary" @click="handleFinishedClick">
+                {{ savedDates.finishedAt ? formatDisplayDate(savedDates.finishedAt) : 'Set date' }}
               </button>
             </span>
           </div>
-
-          <p v-if="datesError" class="text-xs text-destructive">{{ datesError }}</p>
-
-          <p v-if="etaLabel" class="flex items-center gap-1 text-xs text-muted-foreground">
-            <Clock class="size-3" />
-            {{ etaLabel }}
-          </p>
+          <p v-if="datesError" class="mt-1.5 text-xs text-destructive">{{ datesError }}</p>
         </div>
       </div>
 
-      <div class="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 transition-opacity" :class="{ 'opacity-50': loading && stats !== null }">
+      <div
+        class="grid flex-1 grid-cols-2 gap-x-4 gap-y-2 border-t border-border pt-3 transition-opacity sm:grid-cols-4 lg:ml-auto lg:max-w-xl lg:border-t-0 lg:pt-0"
+        :class="{ 'opacity-50': loading && stats !== null }"
+      >
         <template v-if="stats === null && loading">
-          <div v-for="i in 4" :key="i" class="rounded-lg border border-border bg-background/40 px-3 py-2.5">
-            <div class="mb-2 h-3 w-16 rounded bg-muted animate-shimmer" />
-            <div class="h-6 w-12 rounded bg-muted animate-shimmer" />
+          <div v-for="i in 4" :key="i">
+            <div class="mb-1 h-3 w-14 rounded bg-muted animate-shimmer" />
+            <div class="h-5 w-10 rounded bg-muted animate-shimmer" />
           </div>
         </template>
         <template v-else>
-          <div v-for="cell in statCells" :key="cell.label" class="rounded-lg border border-border bg-background/40 px-3 py-2.5">
-            <p class="mb-0.5 text-[11px] text-muted-foreground">{{ cell.label }}</p>
-            <p class="flex items-center gap-1.5 text-lg font-semibold text-foreground">
+          <div v-for="cell in statCells" :key="cell.label" class="min-w-0 lg:border-l lg:border-border lg:pl-4 lg:first:border-l-0 lg:first:pl-0">
+            <p class="text-[11px] text-muted-foreground">{{ cell.label }}</p>
+            <p class="mt-0.5 flex items-center gap-1 text-base font-semibold tracking-tight text-foreground">
               {{ cell.value }}
               <span v-if="cell.withMomentum" :title="momentum.title" class="inline-flex">
-                <TrendingUp v-if="momentum.direction === 'up'" class="size-4 text-green-600" />
-                <TrendingDown v-else-if="momentum.direction === 'down'" class="size-4 text-destructive" />
-                <Minus v-else class="size-4 text-muted-foreground" />
+                <TrendingUp v-if="momentum.direction === 'up'" class="size-3.5 text-primary" />
+                <TrendingDown v-else-if="momentum.direction === 'down'" class="size-3.5 text-destructive" />
+                <Minus v-else class="size-3.5 text-muted-foreground" />
               </span>
             </p>
           </div>
         </template>
       </div>
 
-      <div class="lg:self-start">
-        <button
-          class="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          @click="handleAddSession"
-        >
-          <Plus :size="14" />
-          Add session
-        </button>
-      </div>
+      <button
+        class="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+        @click="handleAddSession"
+      >
+        <Plus class="size-3.5" />
+        Add session
+      </button>
     </div>
-  </div>
+    <ReadingLogSourceSplit :stats="stats" compact class="mt-2 border-t border-border pt-2" />
+  </section>
 </template>

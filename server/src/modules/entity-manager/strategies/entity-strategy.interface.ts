@@ -1,4 +1,9 @@
-import type { BrowseEntityBookCountFilter, BrowseEntitySortBy, BrowseEntitySortOrder, EntityType } from '@bookorbit/types';
+import type { BrowseEntityBookCountFilter, BrowseEntitySortBy, BrowseEntitySortOrder, ContentFilterRules, EntityType } from '@bookorbit/types';
+
+export interface EntityBookScope {
+  libraryIds: number[];
+  contentFilters?: ContentFilterRules;
+}
 
 export interface RawCandidatePair {
   idA: number | string;
@@ -69,6 +74,7 @@ export interface StrategyDeleteResult {
 export interface SplitInput {
   entityId: number;
   newNames: string[];
+  libraryIds?: number[];
 }
 
 export interface StrategySplitResult {
@@ -81,7 +87,7 @@ export interface EntityStrategy {
   readonly entityType: EntityType;
   readonly isInline: boolean;
 
-  findCandidatePairs(libraryIds: number[], minSimilarity: number): Promise<RawCandidatePair[]>;
+  findCandidatePairs(libraryIds: number[], minSimilarity: number, contentFilters?: ContentFilterRules): Promise<RawCandidatePair[]>;
 
   getAllEntityIds?(): Promise<number[]>;
 
@@ -95,7 +101,7 @@ export interface EntityStrategy {
   split(input: SplitInput): Promise<StrategySplitResult>;
 
   findAffectedBookIds(ids: (number | string)[]): Promise<number[]>;
-  getBookCount(id: number | string): Promise<number>;
-  getBookTitles(id: number | string, limit: number): Promise<string[]>;
+  getBookCount(id: number | string, scope?: EntityBookScope): Promise<number>;
+  getBookTitles(id: number | string, limit: number, scope?: EntityBookScope): Promise<string[]>;
   findEntityById(id: number | string): Promise<{ id: number | string; name: string } | null>;
 }

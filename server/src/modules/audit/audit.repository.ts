@@ -58,4 +58,28 @@ export class AuditRepository {
   async deleteOlderThan(before: Date): Promise<void> {
     await this.db.delete(schema.auditLog).where(lte(schema.auditLog.createdAt, before));
   }
+
+  async findReadingInsightsAccess(subjectUserId: number, page: number, pageSize: number) {
+    const where = and(
+      eq(schema.auditLog.action, AuditAction.ReadingInsightsProfileView),
+      eq(schema.auditLog.resource, AuditResource.ReadingInsightsProfile),
+      eq(schema.auditLog.resourceId, subjectUserId),
+    );
+    const [items, [{ total }]] = await Promise.all([
+      this.db
+        .select({
+          id: schema.auditLog.id,
+          viewerUsername: schema.auditLog.actorUsername,
+          meta: schema.auditLog.meta,
+          viewedAt: schema.auditLog.createdAt,
+        })
+        .from(schema.auditLog)
+        .where(where)
+        .orderBy(desc(schema.auditLog.createdAt), desc(schema.auditLog.id))
+        .limit(pageSize)
+        .offset((page - 1) * pageSize),
+      this.db.select({ total: count() }).from(schema.auditLog).where(where),
+    ]);
+    return { items, total: Number(total) };
+  }
 }

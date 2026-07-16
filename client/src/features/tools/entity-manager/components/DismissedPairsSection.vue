@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { RotateCcw } from '@lucide/vue'
+import { useI18n } from 'vue-i18n'
 import type { DismissedPairInfo } from '@bookorbit/types'
+
+const { t } = useI18n()
 
 defineProps<{
   pairs: DismissedPairInfo[]
@@ -18,8 +21,8 @@ function handleUndismiss(pair: DismissedPairInfo): void {
 
 <template>
   <div class="space-y-2">
-    <div v-if="loading" class="text-center py-4 text-sm text-muted-foreground">Loading dismissed pairs...</div>
-    <div v-else-if="pairs.length === 0" class="text-center py-4 text-sm text-muted-foreground">No dismissed pairs</div>
+    <div v-if="loading" class="text-center py-4 text-sm text-muted-foreground">{{ t('tools.entityManager.dismissed.loading') }}</div>
+    <div v-else-if="pairs.length === 0" class="text-center py-4 text-sm text-muted-foreground">{{ t('tools.entityManager.dismissed.empty') }}</div>
     <div v-else class="divide-y divide-border border border-border rounded-lg overflow-hidden">
       <div
         v-for="pair in pairs"
@@ -34,11 +37,11 @@ function handleUndismiss(pair: DismissedPairInfo): void {
         </div>
         <button
           class="inline-flex items-center gap-1 h-7 px-2 text-xs rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
-          title="Restore this pair"
+          :title="t('tools.entityManager.dismissed.restoreTitle')"
           @click="handleUndismiss(pair)"
         >
           <RotateCcw class="h-3.5 w-3.5" />
-          Restore
+          {{ t('tools.entityManager.dismissed.restore') }}
         </button>
       </div>
     </div>

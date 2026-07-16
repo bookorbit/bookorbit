@@ -85,7 +85,7 @@ export class FixedLayout extends HTMLElement {
     iframe.setAttribute('scrolling', 'no')
     iframe.setAttribute('part', 'filter')
     this.#root.append(element)
-    if (!src) return { blank: true, element, iframe }
+    if (!src) return { index, blank: true, element, iframe }
     return new Promise((resolve) => {
       iframe.addEventListener(
         'load',
@@ -93,13 +93,24 @@ export class FixedLayout extends HTMLElement {
           const doc = iframe.contentDocument
           this.dispatchEvent(new CustomEvent('load', { detail: { doc, index } }))
           const { width, height } = getViewport(doc, this.defaultViewport)
-          resolve({
+          const frame = {
+            index,
             element,
             iframe,
             width: parseFloat(width),
             height: parseFloat(height),
             onZoom,
-          })
+          }
+          this.dispatchEvent(
+            new CustomEvent('create-overlayer', {
+              detail: {
+                doc,
+                index,
+                attach: (overlayer) => (frame.overlayer = overlayer),
+              },
+            }),
+          )
+          resolve(frame)
         },
         { once: true },
       )
@@ -301,10 +312,14 @@ export class FixedLayout extends HTMLElement {
     if (!s) return this.goToSpread(this.#index - 1, this.rtl ? 'left' : 'right', 'page')
   }
   getContents() {
-    return Array.from(this.#root.querySelectorAll('iframe'), (frame) => ({
-      doc: frame.contentDocument,
-      // TODO: index, overlayer
-    }))
+    const frames = this.#center ? [this.#center] : [this.#left, this.#right]
+    return frames
+      .filter((frame) => frame && !frame.blank && typeof frame.index === 'number' && frame.index >= 0 && frame.iframe?.contentDocument)
+      .map((frame) => ({
+        index: frame.index,
+        overlayer: frame.overlayer,
+        doc: frame.iframe.contentDocument,
+      }))
   }
   destroy() {
     this.#observer.unobserve(this)

@@ -8,12 +8,16 @@ import { KoboDevice } from './decorators/kobo-device.decorator';
 import type { KoboDeviceContext } from './guards/kobo-token.guard';
 import { KoboTokenGuard } from './guards/kobo-token.guard';
 import { KoboAnnotationExchangeService } from './services/kobo-annotation-exchange.service';
+import { KoboSyncHistoryService } from './services/kobo-sync-history.service';
 
 @Controller(['kobo/:deviceToken', ''])
 @Public()
 @UseGuards(KoboTokenGuard)
 export class KoboReadingServicesController {
-  constructor(private readonly exchangeService: KoboAnnotationExchangeService) {}
+  constructor(
+    private readonly exchangeService: KoboAnnotationExchangeService,
+    private readonly historyService: KoboSyncHistoryService,
+  ) {}
 
   @Get('api/v3/content/:contentId/annotations')
   async getAnnotations(
@@ -23,7 +27,33 @@ export class KoboReadingServicesController {
     @KoboDevice() device: KoboDeviceContext,
     @Res() reply: FastifyReply,
   ) {
-    const result = await this.exchangeService.getContentAnnotations(user.id, contentId, device.deviceId, ifNoneMatch);
+    const startedAt = Date.now();
+    let result: Awaited<ReturnType<KoboAnnotationExchangeService['getContentAnnotations']>>;
+    try {
+      result = await this.exchangeService.getContentAnnotations(user.id, contentId, device.deviceId, ifNoneMatch);
+      await this.historyService.recordSuccess({
+        userId: user.id,
+        deviceId: device.deviceId,
+        event: 'annotations_pull',
+        durationMs: Date.now() - startedAt,
+        counts: await this.historyService.countsForBook(user.id, result.bookId, {
+          served: result.servedCount,
+          tombstones: result.tombstoneCount,
+          notModified: result.notModified,
+        }),
+      });
+    } catch (error: unknown) {
+      await this.historyService.recordFailure(
+        {
+          userId: user.id,
+          deviceId: device.deviceId,
+          event: 'annotations_pull',
+          durationMs: Date.now() - startedAt,
+        },
+        error,
+      );
+      throw error;
+    }
     reply.header('ETag', result.etag);
 
     // This Kobo firmware never echoes our ETag back (it always sends If-None-Match: W/"0" and drives
@@ -50,7 +80,34 @@ export class KoboReadingServicesController {
     @CurrentUser() user: RequestUser,
     @KoboDevice() device: KoboDeviceContext,
   ) {
-    await this.exchangeService.patchContentAnnotations(user.id, contentId, body, device.deviceId);
+    const startedAt = Date.now();
+    try {
+      const result = await this.exchangeService.patchContentAnnotations(user.id, contentId, body, device.deviceId);
+      await this.historyService.recordSuccess({
+        userId: user.id,
+        deviceId: device.deviceId,
+        event: 'annotations_push',
+        durationMs: Date.now() - startedAt,
+        counts: await this.historyService.countsForBook(user.id, result.bookId, {
+          created: result.created,
+          updated: result.updated,
+          unchanged: result.unchanged,
+          deleted: result.deleted,
+          kepubReady: result.kepubReady,
+        }),
+      });
+    } catch (error: unknown) {
+      await this.historyService.recordFailure(
+        {
+          userId: user.id,
+          deviceId: device.deviceId,
+          event: 'annotations_push',
+          durationMs: Date.now() - startedAt,
+        },
+        error,
+      );
+      throw error;
+    }
   }
 
   @Post('api/v3/content/checkforchanges')

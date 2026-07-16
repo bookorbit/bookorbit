@@ -8,9 +8,9 @@ import ToolsHeader from '../components/ToolsHeader.vue'
     <main class="flex-1 overflow-hidden">
       <div class="h-full md:px-6 px-4 pt-6 pb-4">
         <router-view v-slot="{ Component, route: childRoute }">
-          <div :key="childRoute.path" class="h-full">
-            <component :is="Component" />
-          </div>
+          <KeepAlive :max="3">
+            <component :is="Component" :key="childRoute.name ?? childRoute.path" />
+          </KeepAlive>
         </router-view>
       </div>
     </main>

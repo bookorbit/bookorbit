@@ -8,6 +8,7 @@ FROM base AS client-builder
 WORKDIR /app
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY patches/ ./patches/
 COPY packages/types/package.json ./packages/types/
 COPY client/package.json ./client/
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
@@ -22,6 +23,7 @@ FROM base AS server-builder
 WORKDIR /app
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY patches/ ./patches/
 COPY packages/types/package.json ./packages/types/
 COPY server/package.json ./server/
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
@@ -32,7 +34,7 @@ COPY server/ ./server/
 RUN pnpm --filter server run build
 
 # pnpm deploy prunes to prod deps; dist/ is gitignored so copy it in after.
-RUN pnpm --filter server deploy --prod --legacy /deploy
+RUN pnpm --config.allow-unused-patches=true --filter server deploy --prod --legacy /deploy
 RUN cp -r /app/server/dist /deploy/dist
 RUN mkdir -p /deploy/migrations && cp -r /app/server/src/db/migrations/. /deploy/migrations/
 
@@ -63,7 +65,7 @@ COPY --from=server-builder --chown=node:node /app/server/entrypoint.sh ./entrypo
 COPY --chown=node:node server/bin/kepubify/ ./bin/kepubify/
 COPY --chown=node:node koreader-plugin/bookorbit.koplugin/ ./koreader-plugin/bookorbit.koplugin/
 
-RUN chmod +x /app/entrypoint.sh /app/bin/kepubify/* && mkdir -p /books /data/covers /data/book-bucket /tmp && chown -R node:node /data /tmp
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh /app/bin/kepubify/* && mkdir -p /books /data/covers /data/book-bucket /tmp && chown -R node:node /data /tmp
 
 EXPOSE 3000
 

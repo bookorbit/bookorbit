@@ -27,6 +27,7 @@ import { KoboProxyService } from './services/kobo-proxy.service';
 import { KoboBookIdentityService } from './services/kobo-book-identity.service';
 import { KoboReadingStateService } from './services/kobo-reading-state.service';
 import { KoboSettingsService } from './services/kobo-settings.service';
+import { KoboSyncHistoryService } from './services/kobo-sync-history.service';
 import { KoboSyncService } from './services/kobo-sync.service';
 import { KoboThumbnailService } from './services/kobo-thumbnail.service';
 import { KoboAnalyticsResolverService } from './services/kobo-analytics-resolver.service';
@@ -58,6 +59,7 @@ import { KoboAnalyticsService } from './services/kobo-analytics.service';
     KoboAnnotationMaterializerService,
     KoboAnnotationExchangeService,
     KoboReadingStateService,
+    KoboSyncHistoryService,
     KoboThumbnailService,
     KoboDownloadService,
     KoboProxyService,

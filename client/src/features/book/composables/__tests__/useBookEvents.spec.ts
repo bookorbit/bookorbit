@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vite
 import { defineComponent } from 'vue'
 import { mount } from '@vue/test-utils'
 import { toast } from 'vue-sonner'
-import type { BookTransferredEvent } from '@bookorbit/types'
+import type { BookProgressChangedEvent, BookTransferredEvent } from '@bookorbit/types'
 
 // ── Hoisted mocks ─────────────────────────────────────────────────────────────
 // vi.mock factories are hoisted before any const/let, so all references inside
@@ -225,5 +225,22 @@ describe('onBookTransferred', () => {
     mockSocket.emit('book:transferred', { fromLibraryId: 1, toLibraryId: 2, bookIds: [77] })
 
     expect(cb).not.toHaveBeenCalled()
+  })
+})
+
+describe('onBookProgressChanged', () => {
+  it('fires the callback with the progress event and supports cleanup', () => {
+    const { onBookProgressChanged } = useBookEvents()
+    const cb = vi.fn<(event: BookProgressChangedEvent) => void>()
+    const cleanup = onBookProgressChanged(cb)
+    const event: BookProgressChangedEvent = { bookId: 142, progress: 61.02, source: 'koreader' }
+
+    mockSocket.emit('book:progress-changed', event)
+
+    expect(cb).toHaveBeenCalledExactlyOnceWith(event)
+
+    cleanup()
+    mockSocket.emit('book:progress-changed', event)
+    expect(cb).toHaveBeenCalledOnce()
   })
 })

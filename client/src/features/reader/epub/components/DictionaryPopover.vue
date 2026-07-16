@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Volume2, RefreshCw } from '@lucide/vue'
 import type { DictionaryResult } from '@bookorbit/types'
 import { useDictionary } from '../composables/useDictionary'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   word: string
@@ -129,15 +132,15 @@ watch([loading, result, notFound, hasError], async () => {
         <!-- Not found -->
         <div v-else-if="notFound" class="p-3">
           <p class="text-sm font-medium text-foreground mb-0.5">{{ word }}</p>
-          <p class="text-xs text-muted-foreground">No definition found</p>
+          <p class="text-xs text-muted-foreground">{{ t('reader.dictionary.noDefinition') }}</p>
         </div>
 
         <!-- Error -->
         <div v-else-if="hasError" class="p-3">
-          <p class="text-sm text-destructive mb-2">Could not load definition</p>
+          <p class="text-sm text-destructive mb-2">{{ t('reader.dictionary.loadError') }}</p>
           <button class="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors" @click="handleRetry">
             <RefreshCw :size="12" />
-            Retry
+            {{ t('reader.retry') }}
           </button>
         </div>
 
