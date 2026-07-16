@@ -1171,6 +1171,7 @@ export class BookService {
           shelfmarkUrl: `${linkBaseUrl}/search?q=${encodeURIComponent(
             candidate.title + (candidate.authors && candidate.authors.length ? ' ' + candidate.authors.join(' ') : ''),
           )}`,
+          coverUrl: candidate.coverUrl || undefined,
         };
         results.push(bookCard);
       }

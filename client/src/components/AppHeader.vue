@@ -420,7 +420,13 @@ function formatBadgeStyle(fmt: string) {
                   selectedIndex === row.index ? 'bg-accent' : 'hover:bg-accent/60',
                 ]"
               >
-                <div v-if="row.result.doesNotExistLocally" class="h-16 w-12 rounded shrink-0 bg-muted/40 flex items-center justify-center text-muted-foreground border border-dashed">
+                <img
+                  v-if="row.result.doesNotExistLocally && row.result.coverUrl"
+                  :src="row.result.coverUrl"
+                  class="h-16 w-12 object-cover rounded shrink-0 bg-muted border border-border/40"
+                  :alt="row.result.title ?? ''"
+                />
+                <div v-else-if="row.result.doesNotExistLocally" class="h-16 w-12 rounded shrink-0 bg-muted/40 flex items-center justify-center text-muted-foreground border border-dashed">
                   <CloudDownload :size="18" />
                 </div>
                 <BookCoverImage
@@ -561,7 +567,13 @@ function formatBadgeStyle(fmt: string) {
                   selectedIndex === row.index ? 'bg-accent' : 'hover:bg-accent/60',
                 ]"
               >
-                <div v-if="row.result.doesNotExistLocally" class="h-16 w-12 rounded shrink-0 bg-muted/40 flex items-center justify-center text-muted-foreground border border-dashed">
+                <img
+                  v-if="row.result.doesNotExistLocally && row.result.coverUrl"
+                  :src="row.result.coverUrl"
+                  class="h-16 w-12 object-cover rounded shrink-0 bg-muted border border-border/40"
+                  :alt="row.result.title ?? ''"
+                />
+                <div v-else-if="row.result.doesNotExistLocally" class="h-16 w-12 rounded shrink-0 bg-muted/40 flex items-center justify-center text-muted-foreground border border-dashed">
                   <CloudDownload :size="18" />
                 </div>
                 <BookCoverImage
