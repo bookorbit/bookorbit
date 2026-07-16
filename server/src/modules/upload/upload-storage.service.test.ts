@@ -29,7 +29,10 @@ describe('UploadStorageService', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    service = new UploadStorageService();
+    const mockAppSettings = {
+      getMaxUploadSizeMb: vi.fn().mockResolvedValue(500),
+    } as any;
+    service = new UploadStorageService(mockAppSettings);
     mockMkdir.mockResolvedValue(undefined);
     mockRename.mockResolvedValue(undefined);
     mockCopyFile.mockResolvedValue(undefined);

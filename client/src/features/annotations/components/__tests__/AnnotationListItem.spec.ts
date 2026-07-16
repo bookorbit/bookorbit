@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import type { VueWrapper } from '@vue/test-utils'
-import type { AnnotationItem } from '@bookorbit/types'
+import type { AnnotationHubItem, AnnotationItem } from '@bookorbit/types'
 import AnnotationListItem from '../AnnotationListItem.vue'
 
 const stubs = {
@@ -36,6 +36,17 @@ function makeAnnotation(overrides: Partial<AnnotationItem> = {}): AnnotationItem
   }
 }
 
+function makeHubAnnotation(overrides: Partial<AnnotationHubItem> = {}): AnnotationHubItem {
+  return {
+    ...makeAnnotation(),
+    bookTitle: 'A Book',
+    author: 'An Author',
+    deletedAt: null,
+    jumpFileFormat: 'mobi',
+    ...overrides,
+  }
+}
+
 function mountItem(props: Record<string, unknown> = {}) {
   return mount(AnnotationListItem, { props: { annotation: makeAnnotation(), ...props }, global: { stubs } })
 }
@@ -45,6 +56,13 @@ function iconButton(wrapper: VueWrapper, iconClass: string) {
 }
 
 describe('AnnotationListItem', () => {
+  it('shows the jump file format on hub annotations', () => {
+    const wrapper = mountItem({ annotation: makeHubAnnotation(), mode: 'hub' })
+    const pill = wrapper.findAll('span').find((span) => span.text() === 'MOBI')
+
+    expect(pill?.attributes('style')).toContain('color: rgb(99, 102, 241)')
+  })
+
   it('renders the quote and the note', () => {
     const wrapper = mountItem()
     expect(wrapper.text()).toContain('a short highlight')
@@ -82,7 +100,7 @@ describe('AnnotationListItem', () => {
   })
 
   it('emits jump when a reader location is available', async () => {
-    const wrapper = mountItem({ mode: 'hub' })
+    const wrapper = mountItem({ annotation: makeHubAnnotation(), mode: 'hub' })
     await iconButton(wrapper, 'lucide-book-open')!.trigger('click')
     expect(wrapper.emitted('jump')).toBeTruthy()
   })

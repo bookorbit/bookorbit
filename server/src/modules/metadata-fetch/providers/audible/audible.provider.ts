@@ -3,6 +3,7 @@ import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
+import { audibleApiOrigin } from '../../../../common/utils/metadata-provider-hosts.utils';
 import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
@@ -31,7 +32,7 @@ export class AudibleProvider implements IdentifiableProvider {
     const query = this.buildQuery(params);
     if (!query) return [];
 
-    const url = new URL(`https://api.audible.${normalizedDomain}/1.0/catalog/products`);
+    const url = new URL('/1.0/catalog/products', audibleApiOrigin(normalizedDomain));
     url.searchParams.set('num_results', '10');
     url.searchParams.set('keywords', query);
     url.searchParams.set('response_groups', 'product_desc,media,product_attrs,series,product_plan_details,category_ladders,rating');
@@ -71,7 +72,7 @@ export class AudibleProvider implements IdentifiableProvider {
     if (!enabled) return null;
     const normalizedDomain = normalizeAudibleDomain(domain);
 
-    const url = new URL(`https://api.audible.${normalizedDomain}/1.0/catalog/products/${providerId}`);
+    const url = new URL(`/1.0/catalog/products/${encodeURIComponent(providerId)}`, audibleApiOrigin(normalizedDomain));
     url.searchParams.set('response_groups', 'product_desc,media,product_attrs,series,product_plan_details,category_ladders,rating');
     const requestUrl = url.toString();
     const startedAt = Date.now();

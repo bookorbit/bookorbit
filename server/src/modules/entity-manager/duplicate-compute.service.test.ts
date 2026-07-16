@@ -1,5 +1,15 @@
 import { DuplicateComputeService } from './duplicate-compute.service';
 
+const scope = { libraryIds: [3, 8] };
+
+function flattenSql(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.map(flattenSql).join(' ');
+  if (!value || typeof value !== 'object') return '';
+  const record = value as Record<string, unknown>;
+  return [flattenSql(record.value), flattenSql(record.queryChunks)].join(' ');
+}
+
 function makeService() {
   const where = vi.fn().mockResolvedValue([]);
   const from = vi.fn().mockReturnValue({ where });
@@ -130,15 +140,49 @@ describe('DuplicateComputeService', () => {
       const { service, db } = makeService();
       db.execute.mockResolvedValue({ rows: [{ idA: 1, idB: 2, simScore: 0.9 }] });
 
-      await expect(service.readCandidatePairs('author', 0.7)).resolves.toEqual([{ idA: 1, idB: 2, simScore: 0.9 }]);
+      await expect(service.readCandidatePairs('author', 0.7, scope)).resolves.toEqual([{ idA: 1, idB: 2, simScore: 0.9 }]);
       expect(db.execute).toHaveBeenCalledTimes(1);
+
+      const query = flattenSql(db.execute.mock.calls[0]![0]).replace(/\s+/g, ' ');
+      expect(query).toContain('book_authors');
+      expect(query.match(/scoped_relation/g)?.length).toBeGreaterThanOrEqual(4);
     });
 
     it('returns an empty array when no rows exist', async () => {
       const { service, db } = makeService();
       db.execute.mockResolvedValue({ rows: [] });
 
-      await expect(service.readCandidatePairs('author', 0.7)).resolves.toEqual([]);
+      await expect(service.readCandidatePairs('author', 0.7, scope)).resolves.toEqual([]);
+    });
+
+    it.each([
+      ['author', 'book_authors'],
+      ['genre', 'book_genres'],
+      ['tag', 'book_tags'],
+      ['narrator', 'book_narrators'],
+      ['series', 'book_series_memberships'],
+    ] as const)('scopes %s candidates through %s', async (entityType, relationTable) => {
+      const { service, db } = makeService();
+
+      await service.readCandidatePairs(entityType, 0.7, scope);
+
+      expect(flattenSql(db.execute.mock.calls[0]![0])).toContain(relationTable);
+    });
+
+    it('returns no candidates without querying when no libraries are accessible', async () => {
+      const { service, db } = makeService();
+
+      await expect(service.readCandidatePairs('author', 0.7, { libraryIds: [] })).resolves.toEqual([]);
+
+      expect(db.execute).not.toHaveBeenCalled();
+    });
+
+    it('does not serve inline entity types from the global candidate cache', async () => {
+      const { service, db } = makeService();
+
+      await expect(service.readCandidatePairs('publisher', 0.7, scope)).resolves.toEqual([]);
+
+      expect(db.execute).not.toHaveBeenCalled();
     });
   });
 });

@@ -2,7 +2,7 @@
 
 Everything you need to work in this codebase: architecture, setup, workflows, conventions, and commands.
 
-For the contribution process (issues, PRs, review), see [CONTRIBUTING.md](CONTRIBUTING.md). For test architecture and E2E suite details, see [TESTING.md](TESTING.md).
+For the contribution process (issues, PRs, review), see [CONTRIBUTING.md](CONTRIBUTING.md). For localization and Crowdin workflow details, see [LOCALIZATION.md](LOCALIZATION.md). For test architecture and E2E suite details, see [TESTING.md](TESTING.md).
 
 ---
 
@@ -130,7 +130,7 @@ docker compose -f docker-compose.dev.yml up -d --wait
 
 This starts a PostgreSQL 16 container (with the `pgvector` extension) on port 5432. The `--wait` flag blocks until the database is healthy. Data is persisted in a named Docker volume across restarts.
 
-> **Already have PostgreSQL running?** You can point `DATABASE_URL` in `server/.env` at your existing instance, but you will still need the `uuid-ossp`, `pg_trgm`, and `vector` extensions installed. Using Docker is the easiest path.
+> **Already have PostgreSQL running?** You can point `DATABASE_URL` in `server/.env` at your existing instance, but you will still need the `uuid-ossp`, `pg_trgm`, `unaccent`, and `vector` extensions installed. Using Docker is the easiest path.
 
 #### Step 5 - Apply database migrations
 
@@ -224,15 +224,16 @@ pnpm --filter @bookorbit/types dev
 
 These are the variables you are most likely to need during development. See `server/.env.example` for the full list with comments.
 
-| Variable          | Purpose                            | Default (dev)                                             |
-| ----------------- | ---------------------------------- | --------------------------------------------------------- |
-| `DATABASE_URL`    | PostgreSQL connection string       | `postgres://bookorbit:bookorbit@localhost:5432/bookorbit` |
-| `PORT`            | Server listen port                 | `3000`                                                    |
-| `NODE_ENV`        | Runtime mode                       | `development`                                             |
-| `JWT_SECRET`      | Signing key for auth tokens        | `change-me-in-production`                                 |
-| `APP_DATA_PATH`   | Storage for covers, avatars, cache | `../local/data`                                           |
-| `APP_URL`         | Base URL for email links           | `http://localhost:5173`                                   |
-| `SWAGGER_ENABLED` | Serve Swagger UI and OpenAPI JSON  | `false`                                                   |
+| Variable              | Purpose                            | Default (dev)                                             |
+| --------------------- | ---------------------------------- | --------------------------------------------------------- |
+| `DATABASE_URL`        | PostgreSQL connection string       | `postgres://bookorbit:bookorbit@localhost:5432/bookorbit` |
+| `PORT`                | Server listen port                 | `3000`                                                    |
+| `NODE_ENV`            | Runtime mode                       | `development`                                             |
+| `JWT_SECRET`          | Signing key for auth tokens        | `change-me-in-production`                                 |
+| `APP_DATA_PATH`       | Storage for covers, avatars, cache | `../local/data`                                           |
+| `LIBRARY_BROWSE_ROOT` | Library folder picker root         | `/`                                                       |
+| `APP_URL`             | Base URL for email links           | `http://localhost:5173`                                   |
+| `SWAGGER_ENABLED`     | Serve Swagger UI and OpenAPI JSON  | `false`                                                   |
 
 ---
 

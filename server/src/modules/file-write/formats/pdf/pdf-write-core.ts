@@ -65,8 +65,9 @@ function applyInfoDict(pdfDoc: PDFDocument, payload: BookWritePayload, fieldMask
   if (fieldMask.has('description') && payload.description != null) {
     pdfDoc.setSubject(payload.description);
   }
-  if (fieldMask.has('publishedYear') && payload.publishedYear != null) {
-    pdfDoc.setCreationDate(new Date(payload.publishedYear, 0, 1));
+  const publicationDate = resolvePublicationDate(payload, fieldMask);
+  if (publicationDate != null) {
+    pdfDoc.setCreationDate(new Date(`${publicationDate}T00:00:00.000Z`));
   }
 
   pdfDoc.setCreator(BOOKORBIT_NS_PREFIX);
@@ -77,6 +78,15 @@ function applyInfoDict(pdfDoc: PDFDocument, payload: BookWritePayload, fieldMask
   if (keywords.length) {
     pdfDoc.setKeywords(keywords);
   }
+}
+
+function resolvePublicationDate(payload: BookWritePayload, fieldMask: Set<BookWritePayloadKey>): string | null {
+  if (fieldMask.has('publishedDate') && payload.publishedDate != null) return payload.publishedDate;
+  if (fieldMask.has('publishedYear')) {
+    if (payload.publishedDate != null) return payload.publishedDate;
+    if (payload.publishedYear != null) return `${payload.publishedYear}-01-01`;
+  }
+  return null;
 }
 
 function embedXmp(pdfDoc: PDFDocument, xmpXml: string): void {

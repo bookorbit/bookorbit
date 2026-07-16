@@ -21,6 +21,8 @@ function makeService(): jest.Mocked<AppSettingsService> {
     setDownloadPattern: vi.fn(),
     isCrossPlatformPathSanitizationEnabled: vi.fn(),
     setCrossPlatformPathSanitizationEnabled: vi.fn(),
+    getDefaultLibraryAccess: vi.fn(),
+    setDefaultLibraryAccess: vi.fn(),
     getAutoFinalizeSettings: vi.fn(),
     getMetadataScoreWeights: vi.fn(),
     setMetadataScoreWeights: vi.fn(),
@@ -135,6 +137,20 @@ describe('AppSettingsController', () => {
       const result = await controller.setCrossPlatformPathSanitization({ enabled: true });
       expect(service.setCrossPlatformPathSanitizationEnabled).toHaveBeenCalledWith(true);
       expect(result).toEqual({ enabled: true });
+    });
+  });
+
+  describe('getDefaultLibraryAccess / setDefaultLibraryAccess', () => {
+    it('getDefaultLibraryAccess returns configured IDs from service', async () => {
+      service.getDefaultLibraryAccess.mockResolvedValue({ libraryIds: [1, 2] });
+      expect(await controller.getDefaultLibraryAccess()).toEqual({ libraryIds: [1, 2] });
+    });
+
+    it('setDefaultLibraryAccess delegates to service', async () => {
+      service.setDefaultLibraryAccess.mockResolvedValue({ libraryIds: [3] });
+      const result = await controller.setDefaultLibraryAccess({ libraryIds: [3] });
+      expect(service.setDefaultLibraryAccess).toHaveBeenCalledWith({ libraryIds: [3] });
+      expect(result).toEqual({ libraryIds: [3] });
     });
   });
 

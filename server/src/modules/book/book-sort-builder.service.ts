@@ -10,7 +10,6 @@ const SORT_FIELD_MAP: Partial<Record<SortField, AnyColumn>> = {
   seriesIndex: bookMetadata.seriesIndex,
   addedAt: books.addedAt,
   updatedAt: books.updatedAt,
-  publishedYear: bookMetadata.publishedYear,
   pageCount: bookMetadata.pageCount,
   publisher: bookMetadata.publisher,
   language: bookMetadata.language,
@@ -86,6 +85,12 @@ export class BookSortBuilder {
         result.push(
           sql`COALESCE((SELECT ubs.status FROM user_book_status ubs WHERE ubs.book_id = books.id AND ubs.user_id = ${userId}), 'unread') ${sql.raw(D)} NULLS LAST`,
         );
+        break;
+      case 'publishedDate':
+        result.push(sql`coalesce(${bookMetadata.publishedDate}, make_date(${bookMetadata.publishedYear}, 1, 1)) ${sql.raw(D)} NULLS LAST`);
+        break;
+      case 'publishedYear':
+        result.push(sql`${bookMetadata.publishedYear} ${sql.raw(D)} NULLS LAST`);
         break;
       case 'format':
         result.push(sql.raw(`(SELECT bf.format FROM book_files bf WHERE bf.id = books.primary_file_id) ${D} NULLS LAST`));

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { formatDate, formatNumber } from '@/i18n/formatters'
 import type { AuthorDetail } from '@bookorbit/types'
 import { MoreHorizontal, Pencil, RefreshCcw, Trash2, UsersRound, X } from '@lucide/vue'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -24,6 +26,8 @@ const emit = defineEmits<{
   delete: []
 }>()
 
+const { t } = useI18n()
+
 const initials = computed(() => {
   const parts = props.author.name.trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return '?'
@@ -40,10 +44,10 @@ const resolvedBio = computed(() => {
 const usesPreviewBio = computed(() => !props.author.description?.trim() && !!props.previewDescription?.trim())
 
 const lastAddedLabel = computed(() => {
-  if (!props.author.lastAddedAt) return 'Never'
+  if (!props.author.lastAddedAt) return t('author.header.never')
   const date = new Date(props.author.lastAddedAt)
-  if (Number.isNaN(date.getTime())) return 'Never'
-  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  if (Number.isNaN(date.getTime())) return t('author.header.never')
+  return formatDate(date, { year: 'numeric', month: 'short', day: 'numeric' })
 })
 
 const previewProviderLabel = computed(() => {
@@ -76,7 +80,12 @@ watch(resolvedBio, () => {
           :class="canOpenImageLightbox ? 'cursor-zoom-in' : ''"
           @click="canOpenImageLightbox && (imageLightboxOpen = true)"
         >
-          <img v-if="displayImageUrl" :src="displayImageUrl" :alt="`${author.name} portrait`" class="h-full w-full object-cover" />
+          <img
+            v-if="displayImageUrl"
+            :src="displayImageUrl"
+            :alt="t('author.header.portraitAlt', { name: author.name })"
+            class="h-full w-full object-cover"
+          />
           <div
             v-else
             class="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5 text-3xl font-semibold text-primary"
@@ -98,27 +107,27 @@ watch(resolvedBio, () => {
                   class="mt-0.5 inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-muted px-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/70"
                 >
                   <MoreHorizontal :size="14" />
-                  Actions
+                  {{ t('author.header.actions') }}
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" class="w-44">
                 <DropdownMenuItem v-if="canUpdate" @click="emit('edit')">
                   <Pencil class="mr-2 h-4 w-4" />
-                  Edit Author
+                  {{ t('author.header.editAuthor') }}
                 </DropdownMenuItem>
                 <DropdownMenuItem v-if="canMerge" @click="emit('merge')">
                   <UsersRound class="mr-2 h-4 w-4" />
-                  Merge Authors
+                  {{ t('author.header.mergeAuthors') }}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator v-if="canUpdate" />
                 <DropdownMenuItem v-if="canUpdate" :disabled="refreshing" @click="emit('refresh')">
                   <RefreshCcw class="mr-2 h-4 w-4" :class="refreshing ? 'animate-spin' : ''" />
-                  {{ refreshing ? 'Refreshing...' : 'Refresh Metadata' }}
+                  {{ refreshing ? t('author.header.refreshing') : t('author.header.refreshMetadata') }}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator v-if="canDelete && (canUpdate || canMerge)" />
                 <DropdownMenuItem v-if="canDelete" class="text-destructive focus:text-destructive" @click="emit('delete')">
                   <Trash2 class="mr-2 h-4 w-4" />
-                  Delete Author
+                  {{ t('author.header.deleteAuthor') }}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -140,23 +149,23 @@ watch(resolvedBio, () => {
               class="mt-1 text-xs font-medium text-primary transition-colors hover:text-primary/80"
               @click="bioExpanded = !bioExpanded"
             >
-              {{ bioExpanded ? 'Show less' : 'Show more' }}
+              {{ bioExpanded ? t('author.header.showLess') : t('author.header.showMore') }}
             </button>
-            <p v-else-if="loadingPreview" class="text-sm text-muted-foreground">Looking up author metadata...</p>
-            <p v-else class="text-sm text-muted-foreground">No biography available. Use the menu to refresh metadata.</p>
+            <p v-else-if="loadingPreview" class="text-sm text-muted-foreground">{{ t('author.header.lookingUpMetadata') }}</p>
+            <p v-else class="text-sm text-muted-foreground">{{ t('author.header.noBiography') }}</p>
             <p v-if="usesPreviewBio && previewProviderLabel" class="mt-1.5 text-xs text-muted-foreground">
-              Preview from {{ previewProviderLabel }}. Save metadata to persist it.
+              {{ t('author.header.previewFrom', { provider: previewProviderLabel }) }}
             </p>
           </div>
 
           <div class="mt-4 flex gap-3">
             <div class="rounded-lg border border-border/70 bg-background/40 px-4 py-2.5">
-              <p class="text-base font-semibold text-foreground">{{ author.bookCount.toLocaleString() }}</p>
-              <p class="text-xs text-muted-foreground">Books</p>
+              <p class="text-base font-semibold text-foreground">{{ formatNumber(author.bookCount) }}</p>
+              <p class="text-xs text-muted-foreground">{{ t('author.header.booksLabel') }}</p>
             </div>
             <div class="rounded-lg border border-border/70 bg-background/40 px-4 py-2.5">
               <p class="text-base font-semibold text-foreground">{{ lastAddedLabel }}</p>
-              <p class="text-xs text-muted-foreground">Last Added</p>
+              <p class="text-xs text-muted-foreground">{{ t('author.header.lastAdded') }}</p>
             </div>
           </div>
         </div>

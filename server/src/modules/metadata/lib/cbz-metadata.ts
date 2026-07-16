@@ -3,6 +3,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { createExtractorFromData, UnrarError } from 'node-unrar-js';
 import { extractCbzZipEntry, isSupportedCbzZipCompression, readCbzZipIndex } from '../../../common/cbz-zip-reader';
 import { getSevenZip } from '../../../common/sevenzip';
+import { parsePublishedDateKey, parsePublishedYear } from '../../../common/utils/published-date.utils';
 import { cleanupSevenZipArtifacts, createSevenZipTempId, type SevenZipInstance } from './sevenzip-vfs';
 
 export interface ParsedCbzComicMetadata {
@@ -26,6 +27,7 @@ export interface ParsedCbzMetadata {
   seriesIndex: number | null;
   description: string | null;
   publisher: string | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   pageCount: number | null;
@@ -135,7 +137,14 @@ function parseComicInfoXml(xmlBuf: Buffer): ParsedCbzMetadata | null {
     };
 
     const writers = splitDelimited(str('Writer'));
-    const year = num('Year');
+    const rawYear = num('Year');
+    const year = rawYear !== null ? (parsePublishedYear(Math.floor(rawYear)) ?? null) : null;
+    const month = num('Month');
+    const day = num('Day');
+    const publishedDate =
+      year !== null && month !== null && day !== null
+        ? (parsePublishedDateKey(`${year}-${String(Math.floor(month)).padStart(2, '0')}-${String(Math.floor(day)).padStart(2, '0')}`) ?? null)
+        : null;
     const managedNotes = parseProjectxManagedNotes(str('Notes'));
     const providerIdsFromWeb = parseProviderIdsFromWebUrl(str('Web'));
 
@@ -174,7 +183,8 @@ function parseComicInfoXml(xmlBuf: Buffer): ParsedCbzMetadata | null {
       seriesIndex: num('Number'),
       description: str('Summary') ?? str('Description'),
       publisher: str('Publisher'),
-      publishedYear: year != null ? Math.floor(year) : null,
+      publishedDate,
+      publishedYear: year,
       language: str('LanguageISO'),
       pageCount: num('PageCount'),
       rating: parseCbxRating(str('CommunityRating')),
@@ -227,6 +237,15 @@ function parseComicBookInfoJson(comment: string): ParsedCbzMetadata | null {
 
     const tags = ((cbi['tags'] as string[]) ?? []).filter(Boolean);
 
+    const publicationYear = parsePublishedYear(cbi['publicationYear']) ?? null;
+    const publicationMonth = Number(cbi['publicationMonth']);
+    const publicationDay = Number(cbi['publicationDay']);
+    const publishedDate =
+      publicationYear !== null && Number.isInteger(publicationMonth) && Number.isInteger(publicationDay)
+        ? (parsePublishedDateKey(`${publicationYear}-${String(publicationMonth).padStart(2, '0')}-${String(publicationDay).padStart(2, '0')}`) ??
+          null)
+        : null;
+
     return {
       title: (cbi['title'] as string) ?? null,
       subtitle: null,
@@ -234,7 +253,8 @@ function parseComicBookInfoJson(comment: string): ParsedCbzMetadata | null {
       seriesIndex: cbi['issue'] != null ? (Number.isFinite(Number(cbi['issue'])) ? Number(cbi['issue']) : null) : null,
       description: (cbi['comments'] as string) ?? null,
       publisher: (cbi['publisher'] as string) ?? null,
-      publishedYear: (cbi['publicationYear'] as number) ?? null,
+      publishedDate,
+      publishedYear: publicationYear,
       language: null,
       pageCount: null,
       rating: null,

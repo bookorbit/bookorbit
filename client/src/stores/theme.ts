@@ -1,6 +1,16 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
-import { BACKGROUND_IDS, type Background, ACCENT_IDS, type Accent, RADIUS_IDS, type Radius, THEME_IDS, type Theme } from '@bookorbit/types'
+import { computed, onScopeDispose, ref, watch } from 'vue'
+import {
+  BACKGROUND_IDS,
+  type Background,
+  ACCENT_IDS,
+  type Accent,
+  RADIUS_IDS,
+  type Radius,
+  THEME_IDS,
+  type ResolvedTheme,
+  type Theme,
+} from '@bookorbit/types'
 import { storage } from '@/services/storage'
 
 export { ACCENT_VIVID, ACCENT_PASTEL, ACCENT_OPTIONS } from '@/lib/theme-accent-meta'
@@ -46,8 +56,12 @@ export const BACKGROUND_OPTIONS: { id: Background; label: string; cssClass: stri
 const DEFAULT_SURFACE_BRIGHTNESS = 35
 
 export const useThemeStore = defineStore('theme', () => {
-  const storedTheme = storage.get<Theme>('theme', 'dark')
-  const theme = ref<Theme>(THEME_IDS.includes(storedTheme) ? storedTheme : 'dark')
+  const colorSchemeQuery = window.matchMedia?.('(prefers-color-scheme: dark)')
+  const systemTheme = ref<ResolvedTheme>(colorSchemeQuery?.matches ? 'dark' : 'light')
+
+  const storedTheme = storage.get<Theme>('theme', 'system')
+  const theme = ref<Theme>(THEME_IDS.includes(storedTheme) ? storedTheme : 'system')
+  const resolvedTheme = computed<ResolvedTheme>(() => (theme.value === 'system' ? systemTheme.value : theme.value))
 
   const storedAccent = storage.get<Accent>('accent', 'blue')
   const accent = ref<Accent>(ACCENT_IDS.includes(storedAccent) ? storedAccent : 'blue')
@@ -60,8 +74,12 @@ export const useThemeStore = defineStore('theme', () => {
 
   const brightness = ref<number>(storage.get<number>('brightness', DEFAULT_SURFACE_BRIGHTNESS))
 
-  function applyTheme(t: Theme) {
+  function applyTheme(t: ResolvedTheme) {
     document.documentElement.classList.toggle('dark', t === 'dark')
+  }
+
+  function handleColorSchemeChange(event: MediaQueryListEvent) {
+    systemTheme.value = event.matches ? 'dark' : 'light'
   }
 
   function applyAccent(a: Accent) {
@@ -84,7 +102,7 @@ export const useThemeStore = defineStore('theme', () => {
   }
 
   function toggleTheme() {
-    setTheme(theme.value === 'dark' ? 'light' : 'dark')
+    setTheme(resolvedTheme.value === 'dark' ? 'light' : 'dark')
   }
 
   function setAccent(a: Accent) {
@@ -112,10 +130,19 @@ export const useThemeStore = defineStore('theme', () => {
     brightness.value = Math.min(100, Math.max(0, b))
   }
 
+  colorSchemeQuery?.addEventListener('change', handleColorSchemeChange)
+  onScopeDispose(() => colorSchemeQuery?.removeEventListener('change', handleColorSchemeChange))
+
+  watch(
+    resolvedTheme,
+    (t) => {
+      applyTheme(t)
+    },
+    { immediate: true },
+  )
   watch(
     theme,
     (t) => {
-      applyTheme(t)
       storage.set('theme', t)
     },
     { immediate: true },
@@ -153,5 +180,5 @@ export const useThemeStore = defineStore('theme', () => {
     { immediate: true },
   )
 
-  return { theme, accent, radius, background, brightness, setTheme, toggleTheme, setAccent, setRadius, setBackground, setBrightness }
+  return { theme, resolvedTheme, accent, radius, background, brightness, setTheme, toggleTheme, setAccent, setRadius, setBackground, setBrightness }
 })

@@ -13,9 +13,11 @@ import {
   GRID_CARD_LABEL_FIELDS,
   RADIUS_IDS,
   SERIES_CARD_COVER_MODES,
+  SUPPORTED_LOCALES,
   TABLE_DENSITIES,
   THEME_IDS,
   type DisplayPreferences,
+  type LocalePreferences,
   type ThemePreferences,
   type WhatsNewPreferences,
   type ShelfmarkPreferences,
@@ -46,6 +48,7 @@ const DISPLAY_PREFERENCES_SCHEMA = z
     squareGridGap: z.number().int().min(1).max(80),
     viewMode: z.enum(BOOK_VIEW_MODES),
     cardOverlays: z.array(z.enum(CARD_OVERLAY_KEYS)),
+    showJumpRails: z.boolean().default(true),
     smartScopeFilterExpanded: z.boolean(),
     authorCoverSize: z.number().int().min(100).max(400),
     authorCoverShape: z.enum(AUTHOR_COVER_SHAPES),
@@ -71,6 +74,12 @@ const DISPLAY_PREFERENCES_SCHEMA = z
       });
     }
   });
+
+const LOCALE_PREFERENCES_SCHEMA = z
+  .object({
+    locale: z.enum(SUPPORTED_LOCALES),
+  })
+  .strict();
 
 const WHATS_NEW_PREFERENCES_SCHEMA = z
   .object({
@@ -129,6 +138,38 @@ export class UserPreferencesService {
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
       this.logger.error(
         `[user_preferences.upsert_whats_new] [fail] userId=${userId} durationMs=${durationMs} errorClass=${errorClass} error="${error}" - upsert whats-new preferences failed`,
+      );
+      throw err;
+    }
+  }
+
+  async getLocalePreferences(userId: number): Promise<LocalePreferences | null> {
+    const row = await this.repo.findByCategory(userId, 'locale');
+    return row ? (row.data as LocalePreferences) : null;
+  }
+
+  async upsertLocalePreferences(userId: number, data: Record<string, unknown>): Promise<void> {
+    const start = Date.now();
+    this.logger.log(`[user_preferences.upsert_locale] [start] userId=${userId} - upsert locale preferences started`);
+
+    const result = LOCALE_PREFERENCES_SCHEMA.safeParse(data);
+    if (!result.success) {
+      const firstIssue = result.error.issues[0];
+      const issuePath = firstIssue?.path.length ? firstIssue.path.join('.') : 'settings';
+      const issueMessage = firstIssue?.message ?? 'Invalid settings payload';
+      throw new BadRequestException(`Invalid locale preferences at "${issuePath}": ${issueMessage}`);
+    }
+
+    try {
+      await this.repo.upsert(userId, 'locale', result.data);
+      const durationMs = Date.now() - start;
+      this.logger.log(`[user_preferences.upsert_locale] [end] userId=${userId} durationMs=${durationMs} - upsert locale preferences completed`);
+    } catch (err) {
+      const durationMs = Date.now() - start;
+      const errorClass = err instanceof Error ? err.constructor.name : 'UnknownError';
+      const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.error(
+        `[user_preferences.upsert_locale] [fail] userId=${userId} durationMs=${durationMs} errorClass=${errorClass} error="${error}" - upsert locale preferences failed`,
       );
       throw err;
     }

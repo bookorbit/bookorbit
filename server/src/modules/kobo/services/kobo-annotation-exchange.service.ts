@@ -29,10 +29,22 @@ export interface ServedAckPlan {
 }
 
 export interface KoboContentAnnotationsResult {
+  bookId: number;
   etag: string;
   notModified: boolean;
+  servedCount: number;
+  tombstoneCount: number;
   response?: KoboReadingServiceAnnotationsResponse;
   servedAck: ServedAckPlan;
+}
+
+export interface KoboPatchAnnotationsResult {
+  bookId: number;
+  created: number;
+  updated: number;
+  unchanged: number;
+  deleted: number;
+  kepubReady: boolean;
 }
 
 @Injectable()
@@ -124,11 +136,16 @@ export class KoboAnnotationExchangeService {
       `[${GET_EVENT}] [end] userId=${userId} bookId=${bookId} deviceId=${deviceId} durationMs=${Date.now() - startedAtMs} served=${served.length} tombstones=${servedAck.tombstoneStateIds.length} skippedNoLocation=${skippedNoLocation} notModified=${notModified} - kobo annotations served`,
     );
 
-    if (notModified) return { etag, notModified: true, servedAck };
+    if (notModified) {
+      return { bookId, etag, notModified: true, servedAck, servedCount: served.length, tombstoneCount: servedAck.tombstoneStateIds.length };
+    }
     return {
+      bookId,
       etag,
       notModified: false,
       servedAck,
+      servedCount: served.length,
+      tombstoneCount: servedAck.tombstoneStateIds.length,
       response: {
         annotations: served.map((row) => toKoboReadingServiceAnnotation(row)),
         nextPageOffsetToken: null,
@@ -147,13 +164,13 @@ export class KoboAnnotationExchangeService {
     });
   }
 
-  async patchContentAnnotations(userId: number, contentId: string, body: unknown, deviceId: number): Promise<void> {
+  async patchContentAnnotations(userId: number, contentId: string, body: unknown, deviceId: number): Promise<KoboPatchAnnotationsResult> {
     const startedAtMs = Date.now();
     const bookId = await this.resolveBookIdByContentId(userId, contentId);
     if (bookId === null) throw new NotFoundException(`Kobo content ${contentId} not found`);
 
     const operations = extractKoboAnnotationOperations(body);
-    if (operations.length === 0) return;
+    if (operations.length === 0) return { bookId, created: 0, updated: 0, unchanged: 0, deleted: 0, kepubReady: false };
 
     const upserts = operations.filter((operation): operation is IncomingUpsert => operation.kind === 'upsert');
     const deletes = operations.filter((operation) => operation.kind === 'delete');
@@ -193,6 +210,7 @@ export class KoboAnnotationExchangeService {
     this.logger.log(
       `[${PATCH_EVENT}] [end] userId=${userId} bookId=${bookId} deviceId=${deviceId} durationMs=${Date.now() - startedAtMs} created=${result.created} updated=${result.updated} unchanged=${result.unchanged} deleted=${deletedCount} kepubReady=${kepub.ok} - kobo annotation operations applied`,
     );
+    return { bookId, created: result.created, updated: result.updated, unchanged: result.unchanged, deleted: deletedCount, kepubReady: kepub.ok };
   }
 
   async getChangedContentIds(userId: number, deviceId: number): Promise<string[]> {

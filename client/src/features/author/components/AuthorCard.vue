@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 import type { AuthorSummary } from '@bookorbit/types'
 import { BookCopy, Check, ExternalLink, Loader2, MoreHorizontal, RefreshCw, Trash2 } from '@lucide/vue'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -23,6 +25,8 @@ const emit = defineEmits<{
   refresh: [authorId: number]
   delete: [authorId: number]
 }>()
+
+const { t } = useI18n()
 
 const initial = computed(() => props.author.name.trim().charAt(0).toUpperCase() || '?')
 const fallbackStyle = computed(() => bookCoverStyle(props.author.name || String(props.author.id)))
@@ -76,7 +80,7 @@ function handleDelete() {
       <img
         v-if="hasImage"
         :src="imageSrc"
-        :alt="`${author.name} portrait`"
+        :alt="t('author.card.portraitAlt', { name: author.name })"
         class="absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ease-out"
         loading="lazy"
         decoding="async"
@@ -90,7 +94,7 @@ function handleDelete() {
       <div v-if="!selectionMode" class="absolute left-1.5 top-1.5 z-10">
         <span class="inline-flex items-center gap-1 rounded border border-white/20 bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white">
           <BookCopy :size="11" />
-          {{ author.bookCount.toLocaleString() }}
+          {{ formatNumber(author.bookCount) }}
         </span>
       </div>
 
@@ -126,12 +130,12 @@ function handleDelete() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem @click="emit('open', author.id)">
                 <ExternalLink class="mr-2 h-4 w-4" />
-                View Author Details
+                {{ t('author.card.viewDetails') }}
               </DropdownMenuItem>
               <DropdownMenuItem :disabled="!canRefresh || refreshing" @click="handleRefresh">
                 <Loader2 v-if="refreshing" class="mr-2 h-4 w-4 animate-spin" />
                 <RefreshCw v-else class="mr-2 h-4 w-4" />
-                Refresh Metadata
+                {{ t('author.card.refreshMetadata') }}
               </DropdownMenuItem>
               <DropdownMenuItem
                 :disabled="!canDelete || deleting"
@@ -140,7 +144,7 @@ function handleDelete() {
               >
                 <Loader2 v-if="deleting" class="mr-2 h-4 w-4 animate-spin" />
                 <Trash2 v-else class="mr-2 h-4 w-4" />
-                Delete Author
+                {{ t('author.card.deleteAuthor') }}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -174,7 +178,7 @@ function handleDelete() {
         <img
           v-if="hasImage"
           :src="imageSrc"
-          :alt="`${author.name} portrait`"
+          :alt="t('author.card.portraitAlt', { name: author.name })"
           class="absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ease-out"
           loading="lazy"
           decoding="async"
@@ -207,7 +211,7 @@ function handleDelete() {
         v-if="!selectionMode"
         class="absolute bottom-0.5 left-0.5 z-10 h-6 w-6 rounded-full border border-border bg-card shadow-sm flex items-center justify-center text-[10px] font-semibold text-foreground"
       >
-        {{ author.bookCount.toLocaleString() }}
+        {{ formatNumber(author.bookCount) }}
       </span>
 
       <DropdownMenu v-if="!selectionMode">
@@ -222,12 +226,12 @@ function handleDelete() {
         <DropdownMenuContent align="end">
           <DropdownMenuItem @click="emit('open', author.id)">
             <ExternalLink class="mr-2 h-4 w-4" />
-            View Author Details
+            {{ t('author.card.viewDetails') }}
           </DropdownMenuItem>
           <DropdownMenuItem :disabled="!canRefresh || refreshing" @click="handleRefresh">
             <Loader2 v-if="refreshing" class="mr-2 h-4 w-4 animate-spin" />
             <RefreshCw v-else class="mr-2 h-4 w-4" />
-            Refresh Metadata
+            {{ t('author.card.refreshMetadata') }}
           </DropdownMenuItem>
           <DropdownMenuItem
             :disabled="!canDelete || deleting"
@@ -236,7 +240,7 @@ function handleDelete() {
           >
             <Loader2 v-if="deleting" class="mr-2 h-4 w-4 animate-spin" />
             <Trash2 v-else class="mr-2 h-4 w-4" />
-            Delete Author
+            {{ t('author.card.deleteAuthor') }}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

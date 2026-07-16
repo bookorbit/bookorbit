@@ -3,6 +3,7 @@ import {
   bigint,
   boolean,
   check,
+  foreignKey,
   index,
   integer,
   pgTable,
@@ -40,6 +41,20 @@ export const koreaderUsers = pgTable(
 
 export type KoreaderUser = typeof koreaderUsers.$inferSelect;
 export type NewKoreaderUser = typeof koreaderUsers.$inferInsert;
+
+export const koreaderUserSettings = pgTable('koreader_user_settings', {
+  userId: integer('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  defaultFileNamingPattern: text('default_file_naming_pattern').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => new Date()),
+});
+
+export type KoreaderUserSetting = typeof koreaderUserSettings.$inferSelect;
+export type NewKoreaderUserSetting = typeof koreaderUserSettings.$inferInsert;
 
 export const koreaderDeviceProgress = pgTable(
   'koreader_device_progress',
@@ -81,6 +96,27 @@ export const koreaderDeviceProgress = pgTable(
 export type KoreaderDeviceProgress = typeof koreaderDeviceProgress.$inferSelect;
 export type NewKoreaderDeviceProgress = typeof koreaderDeviceProgress.$inferInsert;
 
+export const koreaderDeviceSettings = pgTable(
+  'koreader_device_settings',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    deviceId: varchar('device_id', { length: 100 }).notNull(),
+    fileNamingPattern: text('file_naming_pattern').notNull(),
+    seriesFileNamingPattern: text('series_file_naming_pattern'),
+    standaloneFileNamingPattern: text('standalone_file_naming_pattern'),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.deviceId] }), index('koreader_device_settings_user_id_idx').on(t.userId)],
+);
+
+export type KoreaderDeviceSetting = typeof koreaderDeviceSettings.$inferSelect;
+export type NewKoreaderDeviceSetting = typeof koreaderDeviceSettings.$inferInsert;
+
 export const bookFileHashHistory = pgTable(
   'book_file_hash_history',
   {
@@ -101,6 +137,91 @@ export const bookFileHashHistory = pgTable(
 
 export type BookFileHashHistory = typeof bookFileHashHistory.$inferSelect;
 export type NewBookFileHashHistory = typeof bookFileHashHistory.$inferInsert;
+
+export const koreaderBookHashLinks = pgTable(
+  'koreader_book_hash_links',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    hash: varchar('hash', { length: 32 }).notNull(),
+    bookFileId: integer('book_file_id')
+      .notNull()
+      .references(() => bookFiles.id, { onDelete: 'cascade' }),
+    koreaderTitle: varchar('koreader_title', { length: 500 }),
+    koreaderAuthors: text('koreader_authors'),
+    koreaderLastOpen: bigint('koreader_last_open', { mode: 'number' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [
+    uniqueIndex('koreader_book_hash_links_user_hash_uidx').on(t.userId, t.hash),
+    index('koreader_book_hash_links_user_updated_idx').on(t.userId, sql`${t.updatedAt} desc`),
+    index('koreader_book_hash_links_book_file_id_idx').on(t.bookFileId),
+    check('koreader_book_hash_links_hash_chk', sql`${t.hash} ~ '^[0-9a-f]{32}$'`),
+  ],
+);
+
+export type KoreaderBookHashLink = typeof koreaderBookHashLinks.$inferSelect;
+export type NewKoreaderBookHashLink = typeof koreaderBookHashLinks.$inferInsert;
+
+export const koreaderUnmatchedBooks = pgTable(
+  'koreader_unmatched_books',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    hash: varchar('hash', { length: 32 }).notNull(),
+    title: varchar('title', { length: 500 }),
+    authors: text('authors'),
+    lastOpen: bigint('last_open', { mode: 'number' }),
+    source: varchar('source', { length: 20 }).notNull().default('statistics'),
+    metadataAmbiguous: boolean('metadata_ambiguous').notNull().default(false),
+    firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).defaultNow().notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.hash] }),
+    index('koreader_unmatched_books_user_seen_idx').on(t.userId, sql`${t.lastSeenAt} desc`),
+    check('koreader_unmatched_books_hash_chk', sql`${t.hash} ~ '^[0-9a-f]{32}$'`),
+    check('koreader_unmatched_books_source_chk', sql`${t.source} in ('current_file', 'file', 'statistics')`),
+  ],
+);
+
+export type KoreaderUnmatchedBook = typeof koreaderUnmatchedBooks.$inferSelect;
+export type NewKoreaderUnmatchedBook = typeof koreaderUnmatchedBooks.$inferInsert;
+
+// Tracks which devices have reported a given unmatched hash. Modeled as a proper many-to-many
+// join (rather than a single "last device" column) so a hash shared across multiple devices
+// isn't incorrectly dropped when only one of those devices is removed.
+export const koreaderUnmatchedBookDevices = pgTable(
+  'koreader_unmatched_book_devices',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    hash: varchar('hash', { length: 32 }).notNull(),
+    deviceId: varchar('device_id', { length: 100 }).notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.hash, t.deviceId] }),
+    index('koreader_unmatched_book_devices_user_device_idx').on(t.userId, t.deviceId),
+    foreignKey({
+      columns: [t.userId, t.hash],
+      foreignColumns: [koreaderUnmatchedBooks.userId, koreaderUnmatchedBooks.hash],
+      name: 'koreader_unmatched_book_devices_user_hash_fk',
+    }).onDelete('cascade'),
+    check('koreader_unmatched_book_devices_hash_chk', sql`${t.hash} ~ '^[0-9a-f]{32}$'`),
+  ],
+);
+
+export type KoreaderUnmatchedBookDevice = typeof koreaderUnmatchedBookDevices.$inferSelect;
+export type NewKoreaderUnmatchedBookDevice = typeof koreaderUnmatchedBookDevices.$inferInsert;
 
 export const bookFileChapters = pgTable(
   'book_file_chapters',
@@ -145,6 +266,7 @@ export const koreaderPageStats = pgTable(
     uniqueIndex('kps_user_file_device_page_start_uidx').on(t.userId, t.bookFileId, t.deviceId, t.page, t.startTime),
     index('kps_user_file_device_start_idx').on(t.userId, t.bookFileId, t.deviceId, t.startTime),
     index('kps_user_id_idx').on(t.userId),
+    index('koreader_page_stats_book_file_id_idx').on(t.bookFileId),
     check('koreader_page_stats_duration_nonnegative_chk', sql`${t.durationSeconds} >= 0`),
     check('koreader_page_stats_page_nonnegative_chk', sql`${t.page} >= 0`),
     check('koreader_page_stats_total_pages_positive_chk', sql`${t.totalPages} > 0`),

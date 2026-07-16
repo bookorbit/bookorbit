@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import type { OidcCallbackResponse } from '@bookorbit/types'
 import { OidcErrorCode } from '@bookorbit/types'
@@ -7,18 +8,20 @@ import { setAccessToken } from '@/lib/api'
 import { useAuth } from './composables/useAuth'
 import { useOidc, OidcLoginError } from './composables/useOidc'
 
-const OIDC_ERROR_MESSAGES: Record<string, string> = {
-  [OidcErrorCode.STATE_EXPIRED]: 'Your login session expired. Please try signing in again.',
-  [OidcErrorCode.TOKEN_EXCHANGE_FAILED]: 'Could not complete sign-in with your provider. Please try again or contact your administrator.',
-  [OidcErrorCode.USER_NOT_PROVISIONED]: 'Your account has not been set up. Contact your administrator for access.',
-  [OidcErrorCode.USER_INACTIVE]: 'Your account has been deactivated. Contact your administrator.',
-  [OidcErrorCode.PROVIDER_ERROR]: 'Your identity provider returned an error. Please try again.',
+const { t } = useI18n()
+
+const OIDC_ERROR_MESSAGE_KEYS: Record<string, string> = {
+  [OidcErrorCode.STATE_EXPIRED]: 'auth.oidc.errors.stateExpired',
+  [OidcErrorCode.TOKEN_EXCHANGE_FAILED]: 'auth.oidc.errors.tokenExchangeFailed',
+  [OidcErrorCode.USER_NOT_PROVISIONED]: 'auth.oidc.errors.userNotProvisioned',
+  [OidcErrorCode.USER_INACTIVE]: 'auth.oidc.errors.userInactive',
+  [OidcErrorCode.PROVIDER_ERROR]: 'auth.oidc.errors.providerError',
 }
 
-const PROVIDER_ERROR_DESCRIPTIONS: Record<string, string> = {
-  access_denied: 'Access was denied by the identity provider.',
-  login_required: 'Authentication is required. Please sign in again.',
-  interaction_required: 'Additional user interaction is required.',
+const PROVIDER_ERROR_DESCRIPTION_KEYS: Record<string, string> = {
+  access_denied: 'auth.oidc.providerErrors.accessDenied',
+  login_required: 'auth.oidc.providerErrors.loginRequired',
+  interaction_required: 'auth.oidc.providerErrors.interactionRequired',
 }
 
 const router = useRouter()
@@ -34,12 +37,13 @@ onMounted(async () => {
 
   if (errorParam) {
     const description = params.get('error_description')
-    error.value = PROVIDER_ERROR_DESCRIPTIONS[errorParam] ?? description ?? 'Your identity provider returned an error. Please try again.'
+    const descriptionKey = PROVIDER_ERROR_DESCRIPTION_KEYS[errorParam]
+    error.value = descriptionKey ? t(descriptionKey) : (description ?? t('auth.oidc.errors.providerError'))
     return
   }
 
   if (!code || !state) {
-    error.value = 'Missing code or state parameter'
+    error.value = t('auth.oidc.errors.missingCodeOrState')
     return
   }
 
@@ -67,10 +71,11 @@ onMounted(async () => {
       return
     }
   } catch (err) {
-    if (err instanceof OidcLoginError && err.errorCode && OIDC_ERROR_MESSAGES[err.errorCode]) {
-      error.value = OIDC_ERROR_MESSAGES[err.errorCode] ?? null
+    const messageKey = err instanceof OidcLoginError && err.errorCode ? OIDC_ERROR_MESSAGE_KEYS[err.errorCode] : undefined
+    if (messageKey) {
+      error.value = t(messageKey)
     } else {
-      error.value = err instanceof Error ? err.message : 'OIDC login failed'
+      error.value = err instanceof Error ? err.message : t('auth.oidc.loginFailed')
     }
   }
 })
@@ -85,12 +90,12 @@ onMounted(async () => {
         <div class="flex justify-center">
           <div class="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
-        <p class="text-sm text-muted-foreground">Completing sign in...</p>
+        <p class="text-sm text-muted-foreground">{{ t('auth.oidc.completingSignIn') }}</p>
       </div>
 
       <div v-else class="space-y-4">
         <p class="text-sm text-destructive">{{ error }}</p>
-        <RouterLink to="/login" class="text-sm text-primary hover:underline">Try again</RouterLink>
+        <RouterLink to="/login" class="text-sm text-primary hover:underline">{{ t('auth.oidc.tryAgain') }}</RouterLink>
       </div>
     </div>
   </div>

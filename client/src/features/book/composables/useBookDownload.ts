@@ -39,7 +39,7 @@ export function useBookDownload() {
         scope,
       })
       toast.dismiss(toastId)
-      triggerBrowserDownload(`/api/v1/books/export/download?${params.toString()}`, 'books.zip')
+      triggerBrowserDownload(`/api/v1/books/export/download?${params.toString()}`)
     } catch {
       toast.dismiss(toastId)
       toast.error('Export failed')

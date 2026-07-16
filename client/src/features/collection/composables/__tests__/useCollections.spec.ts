@@ -111,4 +111,30 @@ describe('useCollections', () => {
 
     await expect(removeBooksFromCollection(1, { bookIds: [9] })).rejects.toThrow('Failed to remove books from collection')
   })
+
+  it('resets cached collections so the next fetch reloads them', async () => {
+    const first = makeCollection({ id: 1, name: 'Owner Collection' })
+    const second = makeCollection({ id: 2, name: 'Next User Collection' })
+    apiMock.mockResolvedValueOnce(makeResponse([first])).mockResolvedValueOnce(makeResponse([second]))
+
+    const { resetCollections, useCollections } = await import('../useCollections')
+    const { collections, loaded, fetchCollections } = useCollections()
+
+    await fetchCollections()
+    await fetchCollections()
+    expect(apiMock).toHaveBeenCalledTimes(1)
+    expect(collections.value).toEqual([first])
+    expect(loaded.value).toBe(true)
+
+    resetCollections()
+
+    expect(collections.value).toEqual([])
+    expect(loaded.value).toBe(false)
+
+    await fetchCollections()
+
+    expect(apiMock).toHaveBeenCalledTimes(2)
+    expect(collections.value).toEqual([second])
+    expect(loaded.value).toBe(true)
+  })
 })

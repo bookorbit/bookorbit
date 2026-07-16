@@ -2,7 +2,10 @@
 import { ref, watch, computed } from 'vue'
 import { useLocalStorage } from '@vueuse/core'
 import { useRouter } from 'vue-router'
-import { BookOpen, Download, Eye, FilePlus, Files, Headphones, History, FolderOpen, ArrowUpDown, MoreVertical } from '@lucide/vue'
+import { useI18n } from 'vue-i18n'
+import { formatDate as formatLocaleDate } from '@/i18n/formatters'
+import { formatBytes } from '@/lib/formatting'
+import { BookOpen, Download, Eye, FilePlus, Files, Headphones, History, FolderOpen, ArrowUpDown, MoreVertical, Pencil, Trash2 } from '@lucide/vue'
 import type { BookDetail, BookDetailFile, WriteLogEntry } from '@bookorbit/types'
 import { Permission, READER_OPENABLE_FORMATS } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -15,6 +18,7 @@ import AddBookFileModal from './AddBookFileModal.vue'
 
 const props = defineProps<{ book: BookDetail }>()
 const emit = defineEmits<{ refetch: [] }>()
+const { t } = useI18n()
 const router = useRouter()
 
 const { downloadFile: downloadBookFile } = useBookDownload()
@@ -41,6 +45,13 @@ const audioTrackCount = computed(() => audioTrackIndex.value.size)
 
 type SortKey = 'name' | 'format' | 'size' | 'date'
 type SortDir = 'asc' | 'desc'
+
+const sortOptions = computed<[SortKey, string][]>(() => [
+  ['name', t('book.detail.files.sort.name')],
+  ['format', t('book.detail.files.sort.format')],
+  ['size', t('book.detail.files.sort.size')],
+  ['date', t('book.detail.files.sort.date')],
+])
 
 const sortKey = ref<SortKey>('name')
 const sortDir = ref<SortDir>('asc')
@@ -71,14 +82,23 @@ const sortedFiles = computed(() => {
   })
 })
 
-function formatBytes(bytes: number | null): string {
-  if (bytes == null) return '-'
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
-}
+const fileSummary = computed(() => {
+  const formats = new Map<string, number>()
+  let totalBytes = 0
 
+  for (const file of props.book.files) {
+    if (file.sizeBytes != null) totalBytes += file.sizeBytes
+    const format = file.format?.toUpperCase() ?? 'Unknown'
+    formats.set(format, (formats.get(format) ?? 0) + 1)
+  }
+
+  return {
+    totalBytes,
+    formats: [...formats.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([format, count]) => (count > 1 ? `${format} × ${count}` : format)),
+  }
+})
 function formatDuration(seconds: number | null | undefined): string | null {
   if (seconds == null) return null
   const h = Math.floor(seconds / 3600)
@@ -90,19 +110,19 @@ function formatDuration(seconds: number | null | undefined): string | null {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  return formatLocaleDate(new Date(iso), { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 function formatRelative(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
   const s = Math.floor(diff / 1000)
-  if (s < 60) return `${s}s ago`
+  if (s < 60) return t('book.detail.files.relative.seconds', { value: s })
   const m = Math.floor(s / 60)
-  if (m < 60) return `${m}m ago`
+  if (m < 60) return t('book.detail.files.relative.minutes', { value: m })
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
+  if (h < 24) return t('book.detail.files.relative.hours', { value: h })
   const d = Math.floor(h / 24)
-  return `${d}d ago`
+  return t('book.detail.files.relative.days', { value: d })
 }
 
 function openFile(file: BookDetailFile, mode?: 'peek') {
@@ -140,8 +160,16 @@ const deletingFile = ref(false)
 
 const addFileModalOpen = ref(false)
 
+function handleTogglePaths() {
+  showPaths.value = !showPaths.value
+}
+
 function openAddFileModal() {
   addFileModalOpen.value = true
+}
+
+function closeAddFileModal() {
+  addFileModalOpen.value = false
 }
 
 function onFilesAdded() {
@@ -154,6 +182,11 @@ function openRenameModal(file: BookDetailFile) {
   renameInput.value = file.filename ?? ''
 }
 
+function closeRenameModal() {
+  if (renaming.value) return
+  renameFileTarget.value = null
+}
+
 async function submitRename() {
   if (!renameFileTarget.value || renaming.value || !renameInput.value.trim()) return
   renaming.value = true
@@ -163,7 +196,7 @@ async function submitRename() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ filename: renameInput.value.trim() }),
     })
-    if (!res.ok) throw new Error('Failed to rename file')
+    if (!res.ok) throw new Error(t('book.detail.files.renameFailed'))
     renameFileTarget.value = null
     emit('refetch')
   } catch (err) {
@@ -178,6 +211,11 @@ function openDeleteModal(file: BookDetailFile) {
   deleteFileTarget.value = file
 }
 
+function closeDeleteModal() {
+  if (deletingFile.value) return
+  deleteFileTarget.value = null
+}
+
 async function confirmDelete() {
   if (!deleteFileTarget.value || deletingFile.value) return
   deletingFile.value = true
@@ -185,7 +223,7 @@ async function confirmDelete() {
     const res = await api(`/api/v1/books/files/${deleteFileTarget.value.id}`, {
       method: 'DELETE',
     })
-    if (!res.ok) throw new Error('Failed to delete file')
+    if (!res.ok) throw new Error(t('book.detail.files.deleteFailed'))
     emit('refetch')
   } catch (err) {
     alert(err instanceof Error ? err.message : String(err))
@@ -224,320 +262,300 @@ async function toggleWriteLog() {
 </script>
 
 <template>
-  <div class="max-w-8xl space-y-3">
-    <!-- header strip -->
-    <div
-      class="sticky top-0 z-20 -mx-4 border-b border-border/70 bg-card/95 px-4 pb-3 pt-2 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] backdrop-blur supports-[backdrop-filter]:bg-card/85 sm:static sm:mx-0 sm:border-b-0 sm:bg-transparent sm:px-0 sm:py-1 sm:backdrop-blur-none"
-    >
-      <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div class="flex items-center gap-2">
-          <button
-            v-if="hasPermission(Permission.LibraryUpload)"
-            class="flex items-center gap-1.5 h-8 md:h-6 px-2.5 md:px-2 rounded-md text-sm md:text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
-            @click="openAddFileModal"
-          >
-            <FilePlus class="size-4 md:size-3" />
-            Add File
-          </button>
-          <p v-if="book.lastWrittenAt" class="text-sm md:text-xs font-medium text-muted-foreground/90 truncate">
-            Last synced: {{ formatRelative(book.lastWrittenAt) }}
+  <div class="space-y-0">
+    <section class="flex flex-col gap-3 px-1 pb-4 pt-1 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex min-w-0 items-center gap-3">
+        <div class="flex size-10 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/10 text-primary">
+          <Files class="size-4" />
+        </div>
+        <div class="min-w-0">
+          <h1 class="text-base font-semibold tracking-tight text-foreground">{{ t('book.detail.files.title') }}</h1>
+          <p class="truncate text-xs text-muted-foreground">
+            {{ t('book.detail.files.fileCount', { count: book.files.length }, book.files.length) }}
+            <span class="mx-1 opacity-40">·</span>
+            {{ formatBytes(fileSummary.totalBytes) }}
+            <template v-if="fileSummary.formats.length"> · {{ fileSummary.formats.join(' · ') }}</template>
+            <template v-if="book.lastWrittenAt"> · {{ t('book.detail.files.synced', { time: formatRelative(book.lastWrittenAt) }) }}</template>
           </p>
         </div>
-        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none pb-1 -mb-1 sm:overflow-visible sm:pb-0 sm:mb-0">
-          <div class="flex items-center gap-1.5 whitespace-nowrap">
-            <ArrowUpDown class="size-4 md:size-3 text-muted-foreground" />
-            <span class="text-sm md:text-xs font-medium text-muted-foreground">Sort:</span>
-            <button
-              v-for="opt in [
-                ['name', 'Name'],
-                ['format', 'Format'],
-                ['size', 'Size'],
-                ['date', 'Date'],
-              ] as [SortKey, string][]"
-              :key="opt[0]"
-              class="h-8 md:h-6 px-2.5 md:px-1.5 rounded-md md:rounded text-sm md:text-xs transition-colors whitespace-nowrap"
-              :class="sortKey === opt[0] ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:text-foreground'"
-              @click="toggleSort(opt[0])"
-            >
-              {{ opt[1] }}{{ sortKey === opt[0] ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '' }}
-            </button>
-          </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button
+          v-if="book.lastWrittenAt"
+          class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          @click="toggleWriteLog"
+        >
+          <History class="size-3.5" />
+          {{ writeLogOpen ? t('book.detail.files.hideLog') : t('book.detail.files.viewSyncLog') }}
+        </button>
+        <button
+          v-if="hasPermission(Permission.LibraryUpload)"
+          class="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          @click="openAddFileModal"
+        >
+          <FilePlus class="size-3.5" />
+          {{ t('book.detail.files.addFile') }}
+        </button>
+      </div>
+    </section>
+
+    <div class="flex flex-col gap-2 border-y border-border/70 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex min-w-0 items-center gap-2 overflow-x-auto scrollbar-none">
+        <ArrowUpDown class="ml-1 size-3.5 shrink-0 text-muted-foreground" />
+        <div class="flex shrink-0 items-center rounded-lg bg-muted p-1" role="group" :aria-label="t('book.detail.files.sortAria')">
           <button
-            class="flex items-center gap-1.5 h-8 md:h-auto px-2 md:px-0 rounded-md md:rounded-none text-sm md:text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/70 md:hover:bg-transparent transition-colors whitespace-nowrap"
-            @click="showPaths = !showPaths"
+            v-for="opt in sortOptions"
+            :key="opt[0]"
+            class="h-7 rounded-md px-2.5 text-xs font-medium transition-colors"
+            :class="sortKey === opt[0] ? 'bg-card text-foreground shadow-[var(--elevation-xs)]' : 'text-muted-foreground hover:text-foreground'"
+            @click="toggleSort(opt[0])"
           >
-            <FolderOpen class="size-4 md:size-3" />
-            {{ showPaths ? 'Hide paths' : 'Show paths' }}
-          </button>
-          <button
-            v-if="book.lastWrittenAt"
-            class="flex items-center gap-1.5 h-8 md:h-auto px-2 md:px-0 rounded-md md:rounded-none text-sm md:text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/70 md:hover:bg-transparent transition-colors whitespace-nowrap"
-            @click="toggleWriteLog"
-          >
-            <History class="size-4 md:size-3" />
-            {{ writeLogOpen ? 'Hide log' : 'View sync log' }}
+            {{ opt[1] }}{{ sortKey === opt[0] ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '' }}
           </button>
         </div>
       </div>
-    </div>
 
-    <!-- Inline sync log -->
-    <div v-if="writeLogOpen" class="rounded-lg border border-border bg-muted/30 px-4 py-3 space-y-1.5">
-      <p v-if="writeLogLoading" class="text-sm md:text-xs text-muted-foreground">Loading...</p>
-      <p v-else-if="writeLog.length === 0" class="text-sm md:text-xs text-muted-foreground">No write history yet.</p>
-      <div v-for="entry in writeLog" :key="entry.id" class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm md:text-xs">
-        <span
-          class="shrink-0 font-medium"
-          :class="{
-            'text-green-600 dark:text-green-400': entry.status === 'success',
-            'text-destructive': entry.status === 'failed',
-            'text-muted-foreground': entry.status === 'skipped',
-          }"
-          >{{ entry.status }}</span
-        >
-        <span class="text-muted-foreground/90">{{ formatRelative(entry.writtenAt) }}</span>
-        <span class="text-muted-foreground font-mono uppercase">{{ entry.format }}</span>
-        <span v-if="entry.status === 'failed' && entry.errorMessage" class="min-w-0 flex-1 basis-full sm:basis-auto text-destructive truncate">{{
-          entry.errorMessage
-        }}</span>
-        <span v-else-if="entry.fieldsWritten.length" class="min-w-0 flex-1 basis-full sm:basis-auto text-muted-foreground truncate"
-          >{{ entry.fieldsWritten.length }} fields</span
-        >
-      </div>
-    </div>
-
-    <!-- File list -->
-    <div
-      v-for="file in sortedFiles"
-      :key="file.id"
-      class="min-h-14 flex items-center gap-3 md:gap-4 px-4 py-3 md:py-2.5 rounded-lg md:rounded-lg bg-card/90 border border-border/80 hover:bg-muted/30 transition-colors"
-    >
-      <div
-        class="relative shrink-0 w-10 h-12 flex items-end justify-center pb-1.5"
-        :style="fileIconStyle(file.format)"
-        style="clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 0 100%); border-radius: 3px 0 3px 3px"
+      <button
+        class="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md px-2.5 text-sm font-medium transition-colors"
+        :class="showPaths ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
+        :aria-pressed="showPaths"
+        @click="handleTogglePaths"
       >
-        <!-- corner fold — clipped to a triangle by the parent clip-path -->
-        <div class="absolute top-0 right-0 w-[9px] h-[9px] bg-current opacity-25"></div>
-        <!-- document lines -->
-        <div class="absolute left-1.5 right-1.5 top-3.5 flex flex-col gap-[3px]">
-          <div class="h-px bg-current opacity-20 rounded-full"></div>
-          <div class="h-px bg-current opacity-20 rounded-full w-3/4"></div>
-          <div class="h-px bg-current opacity-20 rounded-full w-1/2"></div>
+        <FolderOpen class="size-3.5" />
+        {{ showPaths ? t('book.detail.files.hidePaths') : t('book.detail.files.showPaths') }}
+      </button>
+    </div>
+
+    <section v-if="writeLogOpen" class="border-b border-border/70 px-1 py-3">
+      <div class="mb-2 flex items-center justify-between gap-2">
+        <p class="text-sm font-semibold text-foreground">{{ t('book.detail.files.syncHistory') }}</p>
+        <span class="text-xs text-muted-foreground">{{ t('book.detail.files.metadataWriteBack') }}</span>
+      </div>
+      <p v-if="writeLogLoading" class="text-sm text-muted-foreground">{{ t('common.loading') }}</p>
+      <p v-else-if="writeLog.length === 0" class="text-sm text-muted-foreground">{{ t('book.detail.files.noWriteHistory') }}</p>
+      <div v-else class="space-y-2">
+        <div v-for="entry in writeLog" :key="entry.id" class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+          <span
+            class="font-medium"
+            :class="{
+              'text-primary': entry.status === 'success',
+              'text-destructive': entry.status === 'failed',
+              'text-muted-foreground': entry.status === 'skipped',
+            }"
+            >{{ entry.status }}</span
+          >
+          <span class="text-muted-foreground">{{ formatRelative(entry.writtenAt) }}</span>
+          <span class="font-mono uppercase text-muted-foreground">{{ entry.format }}</span>
+          <span v-if="entry.status === 'failed' && entry.errorMessage" class="min-w-0 flex-1 basis-full truncate text-destructive sm:basis-auto">{{
+            entry.errorMessage
+          }}</span>
+          <span v-else-if="entry.fieldsWritten.length" class="min-w-0 flex-1 basis-full truncate text-muted-foreground sm:basis-auto">{{
+            t('book.detail.files.fieldsWritten', { count: entry.fieldsWritten.length }, entry.fieldsWritten.length)
+          }}</span>
         </div>
-        <span class="text-[9px] font-bold uppercase tracking-wide leading-none">
-          {{ file.format ?? '?' }}
-        </span>
       </div>
+    </section>
 
-      <div class="min-w-0 flex-1">
-        <p class="text-base md:text-sm leading-tight font-semibold md:font-medium truncate text-foreground/90">{{ file.filename ?? '-' }}</p>
-        <p v-if="showPaths" class="text-xs md:text-[11px] font-mono text-muted-foreground/90 truncate mt-1">
-          {{ file.absolutePath }}
-        </p>
-        <p class="text-sm md:text-xs text-muted-foreground/90 mt-1.5">
-          {{ formatBytes(file.sizeBytes) }}
-          <span class="mx-1 opacity-40">·</span>
-          {{ formatDate(file.createdAt) }}
-          <template v-if="formatDuration(file.durationSeconds)">
+    <section v-if="sortedFiles.length" class="divide-y divide-border pt-1">
+      <div v-for="file in sortedFiles" :key="file.id" class="flex items-center gap-3 px-1 py-3 transition-colors hover:bg-muted/30 sm:px-2">
+        <div
+          class="relative flex h-10 w-8 shrink-0 items-end justify-center pb-1"
+          :style="fileIconStyle(file.format)"
+          style="clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%); border-radius: 3px 0 3px 3px"
+        >
+          <div class="absolute right-0 top-0 h-2 w-2 bg-current opacity-25" />
+          <div class="absolute left-1 right-1 top-3 flex flex-col gap-[2px]">
+            <div class="h-px rounded-full bg-current opacity-20" />
+            <div class="h-px w-3/4 rounded-full bg-current opacity-20" />
+          </div>
+          <span class="text-[8px] font-bold uppercase tracking-wide leading-none">{{ file.format ?? '?' }}</span>
+        </div>
+
+        <div class="min-w-0 flex-1">
+          <div class="flex min-w-0 items-center gap-2">
+            <p class="min-w-0 truncate text-sm font-medium text-foreground">{{ file.filename ?? '-' }}</p>
+            <span
+              v-if="file.role === 'primary'"
+              class="hidden shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary sm:inline"
+              >{{ t('book.detail.files.primary') }}</span
+            >
+            <span
+              v-else-if="isAudioFile(file) && audioTrackCount > 1"
+              class="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline"
+              >{{ t('book.detail.files.track', { number: audioTrackIndex.get(file.id) }) }}</span
+            >
+          </div>
+          <p v-if="showPaths" class="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{{ file.absolutePath }}</p>
+          <p class="mt-0.5 text-xs text-muted-foreground">
+            {{ formatBytes(file.sizeBytes) }}
             <span class="mx-1 opacity-40">·</span>
-            {{ formatDuration(file.durationSeconds) }}
-          </template>
-        </p>
-      </div>
+            {{ formatDate(file.createdAt) }}
+            <template v-if="formatDuration(file.durationSeconds)">
+              <span class="mx-1 opacity-40">·</span>
+              {{ formatDuration(file.durationSeconds) }}
+            </template>
+          </p>
+        </div>
 
-      <div class="flex items-center gap-2 shrink-0">
-        <span
-          v-if="isAudioFile(file) && audioTrackCount > 1"
-          class="text-xs md:text-[11px] font-semibold md:font-medium px-2.5 md:px-2 py-1 md:py-0.5 rounded-md md:rounded bg-muted text-muted-foreground"
-          >Track {{ audioTrackIndex.get(file.id) }}</span
-        >
-        <span
-          v-else-if="file.role === 'primary'"
-          class="text-xs md:text-[11px] font-semibold md:font-medium px-2.5 md:px-2 py-1 md:py-0.5 rounded-md md:rounded bg-primary/10 text-primary"
-          >Primary</span
-        >
+        <div class="flex shrink-0 items-center gap-1.5">
+          <span v-if="file.role === 'primary'" class="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary sm:hidden">{{
+            t('book.detail.files.primary')
+          }}</span>
+          <span
+            v-else-if="isAudioFile(file) && audioTrackCount > 1"
+            class="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:hidden"
+            >{{ audioTrackIndex.get(file.id) }}</span
+          >
 
-        <!-- Desktop actions -->
-        <div class="hidden md:flex items-center gap-2">
-          <button
-            v-if="READER_OPENABLE_FORMATS.has(file.format ?? '') && !isAudioFile(file)"
-            class="flex items-center gap-1.5 h-7 px-2.5 rounded border border-input bg-background text-xs font-medium hover:bg-muted transition-colors"
-            @click="openFile(file)"
-          >
-            <BookOpen class="size-3.5" />
-            Read
-          </button>
-          <button
-            v-if="isAudioFile(file)"
-            class="flex items-center gap-1.5 h-7 px-2.5 rounded border border-input bg-background text-xs font-medium hover:bg-muted transition-colors"
-            @click="openFile(file)"
-          >
-            <Headphones class="size-3.5" />
-            Play
-          </button>
-          <button
-            v-if="READER_OPENABLE_FORMATS.has(file.format ?? '')"
-            class="flex items-center gap-1.5 h-7 px-2.5 rounded border border-input bg-background text-xs font-medium hover:bg-muted transition-colors"
-            @click="openFile(file, 'peek')"
-          >
-            <Eye class="size-3.5" />
-            Peek
-          </button>
-          <Tooltip v-if="hasPermission('library_download')">
-            <TooltipTrigger as-child>
-              <button
-                class="flex items-center justify-center h-7 w-7 rounded border border-input bg-background hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                @click="downloadFile(file)"
-              >
-                <Download class="size-3.5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>Download</TooltipContent>
-          </Tooltip>
+          <div class="hidden items-center gap-1.5 md:flex">
+            <button
+              v-if="READER_OPENABLE_FORMATS.has(file.format ?? '') && !isAudioFile(file)"
+              class="inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+              @click="openFile(file)"
+            >
+              <BookOpen class="size-3.5" />
+              {{ t('book.detail.files.read') }}
+            </button>
+            <button
+              v-if="isAudioFile(file)"
+              class="inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+              @click="openFile(file)"
+            >
+              <Headphones class="size-3.5" />
+              {{ t('book.detail.files.play') }}
+            </button>
+            <Tooltip v-if="hasPermission('library_download')">
+              <TooltipTrigger as-child>
+                <button
+                  class="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  @click="downloadFile(file)"
+                >
+                  <Download class="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>{{ t('book.detail.files.download') }}</TooltipContent>
+            </Tooltip>
+          </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
               <button
-                class="flex items-center justify-center h-7 w-7 rounded border border-input bg-background hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                title="More actions"
+                class="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                :title="t('book.detail.files.moreActions')"
               >
-                <MoreVertical class="size-3.5" />
+                <MoreVertical class="size-4" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" @click="openRenameModal(file)"> Rename </DropdownMenuItem>
-
+              <DropdownMenuItem v-if="READER_OPENABLE_FORMATS.has(file.format ?? '') && !isAudioFile(file)" class="md:hidden" @click="openFile(file)">
+                <BookOpen class="mr-2 size-4" />
+                {{ t('book.detail.files.read') }}
+              </DropdownMenuItem>
+              <DropdownMenuItem v-if="isAudioFile(file)" class="md:hidden" @click="openFile(file)">
+                <Headphones class="mr-2 size-4" />
+                {{ t('book.detail.files.play') }}
+              </DropdownMenuItem>
+              <DropdownMenuItem v-if="READER_OPENABLE_FORMATS.has(file.format ?? '')" @click="openFile(file, 'peek')">
+                <Eye class="mr-2 size-4" />
+                {{ t('book.detail.files.peek') }}
+              </DropdownMenuItem>
+              <DropdownMenuItem v-if="hasPermission('library_download')" class="md:hidden" @click="downloadFile(file)">
+                <Download class="mr-2 size-4" />
+                {{ t('book.detail.files.download') }}
+              </DropdownMenuItem>
+              <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" @click="openRenameModal(file)">
+                <Pencil class="mr-2 size-4" />
+                {{ t('book.detail.files.rename') }}
+              </DropdownMenuItem>
               <DropdownMenuItem
                 v-if="hasPermission('library_delete_books')"
                 class="text-destructive focus:text-destructive"
                 @click="openDeleteModal(file)"
               >
-                Delete
+                <Trash2 class="mr-2 size-4" />
+                {{ t('common.delete') }}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-
-        <!-- Mobile actions -->
-        <DropdownMenu>
-          <DropdownMenuTrigger as-child>
-            <button
-              class="flex md:hidden items-center justify-center h-11 w-11 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              title="More actions"
-            >
-              <MoreVertical class="size-4" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem v-if="READER_OPENABLE_FORMATS.has(file.format ?? '') && !isAudioFile(file)" @click="openFile(file)">
-              <BookOpen class="mr-2 size-4" />
-              Read
-            </DropdownMenuItem>
-            <DropdownMenuItem v-if="isAudioFile(file)" @click="openFile(file)">
-              <Headphones class="mr-2 size-4" />
-              Play
-            </DropdownMenuItem>
-            <DropdownMenuItem v-if="READER_OPENABLE_FORMATS.has(file.format ?? '')" @click="openFile(file, 'peek')">
-              <Eye class="mr-2 size-4" />
-              Peek
-            </DropdownMenuItem>
-            <DropdownMenuItem v-if="hasPermission('library_download')" @click="downloadFile(file)">
-              <Download class="mr-2 size-4" />
-              Download
-            </DropdownMenuItem>
-            <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" @click="openRenameModal(file)">
-              <Pencil class="mr-2 size-4" />
-              Rename
-            </DropdownMenuItem>
-
-            <DropdownMenuItem
-              v-if="hasPermission('library_delete_books')"
-              class="text-destructive focus:text-destructive"
-              @click="openDeleteModal(file)"
-            >
-              <Trash2 class="mr-2 size-4" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
-    </div>
+    </section>
 
-    <div v-if="book.files.length === 0" class="flex flex-col items-center justify-center py-20 text-center">
-      <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-muted mb-3">
-        <Files class="size-5 text-muted-foreground/70" />
+    <section v-else class="flex flex-col items-center justify-center px-4 py-16 text-center">
+      <div class="flex size-10 items-center justify-center text-muted-foreground">
+        <Files class="size-5" />
       </div>
-      <p class="text-base md:text-sm font-semibold md:font-medium">No files attached</p>
-      <p class="text-sm md:text-xs text-muted-foreground/90 mt-1">This book has no associated files.</p>
-    </div>
+      <p class="mt-3 text-sm font-semibold text-foreground">{{ t('book.detail.files.empty.title') }}</p>
+      <p class="mt-1 text-sm text-muted-foreground">{{ t('book.detail.files.empty.description') }}</p>
+      <button
+        v-if="hasPermission(Permission.LibraryUpload)"
+        class="mt-4 inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+        @click="openAddFileModal"
+      >
+        <FilePlus class="size-3.5" />
+        {{ t('book.detail.files.addFile') }}
+      </button>
+    </section>
 
     <!-- Rename Modal -->
-    <div
-      v-if="renameFileTarget"
-      class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4"
-      @click.self="renameFileTarget = null"
-    >
-      <button class="absolute inset-0 bg-black/45" @click="renameFileTarget = null" />
+    <div v-if="renameFileTarget" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="closeRenameModal">
+      <button class="absolute inset-0 bg-black/45" @click="closeRenameModal" />
       <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
-        <p class="text-base font-semibold text-foreground">Rename File</p>
-        <p class="mt-1 text-sm text-muted-foreground">Rename the physical file on disk.</p>
+        <p class="text-base font-semibold text-foreground">{{ t('book.detail.files.renameModal.title') }}</p>
+        <p class="mt-1 text-sm text-muted-foreground">{{ t('book.detail.files.renameModal.description') }}</p>
         <div class="mt-4">
           <input
             v-model="renameInput"
             class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
-            placeholder="New filename"
+            :placeholder="t('book.detail.files.renameModal.placeholder')"
             @keyup.enter="submitRename"
           />
         </div>
         <div class="mt-4 flex items-center justify-end gap-2">
           <button
             class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-            @click="renameFileTarget = null"
+            @click="closeRenameModal"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
           <button
             class="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
             :disabled="renaming"
             @click="submitRename"
           >
-            {{ renaming ? 'Saving...' : 'Save' }}
+            {{ renaming ? t('book.detail.files.saving') : t('common.save') }}
           </button>
         </div>
       </div>
     </div>
 
     <!-- Delete Modal -->
-    <div
-      v-if="deleteFileTarget"
-      class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4"
-      @click.self="deleteFileTarget = null"
-    >
-      <button class="absolute inset-0 bg-black/45" @click="deleteFileTarget = null" />
+    <div v-if="deleteFileTarget" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="closeDeleteModal">
+      <button class="absolute inset-0 bg-black/45" @click="closeDeleteModal" />
       <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
-        <p class="text-base font-semibold text-foreground">Delete file?</p>
+        <p class="text-base font-semibold text-foreground">{{ t('book.detail.files.deleteModal.title') }}</p>
         <p class="mt-1 text-sm text-muted-foreground">
-          Are you sure you want to delete "{{ deleteFileTarget.filename }}"? This action cannot be undone.
+          {{ t('book.detail.files.deleteModal.description', { filename: deleteFileTarget.filename }) }}
         </p>
         <div class="mt-4 flex items-center justify-end gap-2">
           <button
             class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-            @click="deleteFileTarget = null"
+            @click="closeDeleteModal"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
           <button
             class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 transition-colors"
             :disabled="deletingFile"
             @click="confirmDelete"
           >
-            {{ deletingFile ? 'Deleting...' : 'Delete' }}
+            {{ deletingFile ? t('book.detail.files.deleting') : t('common.delete') }}
           </button>
         </div>
       </div>
     </div>
   </div>
 
-  <AddBookFileModal v-if="addFileModalOpen" :book-id="book.id" @close="addFileModalOpen = false" @uploaded="onFilesAdded" />
+  <AddBookFileModal v-if="addFileModalOpen" :book-id="book.id" @close="closeAddFileModal" @uploaded="onFilesAdded" />
 </template>

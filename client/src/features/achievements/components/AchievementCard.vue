@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { formatDate } from '@/i18n/formatters'
 import { Check, Lock } from '@lucide/vue'
 import type { AchievementItem, AchievementRarity } from '@bookorbit/types'
 import { resolveLucideIcon } from '../utils/resolveLucideIcon'
@@ -8,16 +10,18 @@ const props = defineProps<{
   achievement: AchievementItem
 }>()
 
+const { t } = useI18n()
+
 const isExpanded = ref(false)
 
 const isHiddenAndLocked = computed<boolean>(() => props.achievement.hidden && !props.achievement.earned)
 
-const rarityLabel: Record<AchievementRarity, string> = {
-  common: 'Common',
-  rare: 'Rare',
-  epic: 'Epic',
-  legendary: 'Legendary',
-}
+const rarityLabel = computed<Record<AchievementRarity, string>>(() => ({
+  common: t('achievements.rarity.common'),
+  rare: t('achievements.rarity.rare'),
+  epic: t('achievements.rarity.epic'),
+  legendary: t('achievements.rarity.legendary'),
+}))
 
 const rarityPillClass: Record<AchievementRarity, string> = {
   common: 'bg-blue-500/15 text-blue-700 dark:text-blue-300',
@@ -113,14 +117,13 @@ function formatAchievementDate(dateStr: string | null): string | null {
     return null
   }
 
-  return (
-    'Earned ' +
-    new Date(dateStr).toLocaleDateString(undefined, {
+  return t('achievements.earnedOn', {
+    date: formatDate(new Date(dateStr), {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
-    })
-  )
+    }),
+  })
 }
 
 function handleClick(): void {
@@ -143,7 +146,7 @@ function handleClick(): void {
       <div :class="['min-w-0 flex-1', achievement.earned ? 'pr-6' : '']">
         <div class="flex items-start justify-between gap-2">
           <span :class="['text-sm font-semibold leading-tight', isLocked ? 'text-current' : 'text-foreground']">
-            {{ isHiddenAndLocked ? 'Secret Achievement' : achievement.name }}
+            {{ isHiddenAndLocked ? t('achievements.secretAchievement') : achievement.name }}
           </span>
           <span v-if="!isHiddenAndLocked" :class="['shrink-0 rounded-full px-2 py-0.5 text-xs font-medium', rarityClass(achievement.rarity)]">
             {{ rarityLabel[achievement.rarity] }}
@@ -169,7 +172,7 @@ function handleClick(): void {
       <p v-if="earnedDate" class="text-muted-foreground mt-5 text-xs">{{ earnedDate }}</p>
 
       <div v-if="isExpanded && achievement.earned" class="border-border mt-3 border-t pt-3">
-        <p v-if="contextBookTitle" class="text-muted-foreground text-xs">While reading &ldquo;{{ contextBookTitle }}&rdquo;</p>
+        <p v-if="contextBookTitle" class="text-muted-foreground text-xs">{{ t('achievements.whileReading', { title: contextBookTitle }) }}</p>
         <p class="text-muted-foreground mt-1 text-xs">{{ achievement.description }}</p>
       </div>
     </template>

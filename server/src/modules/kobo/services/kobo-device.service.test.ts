@@ -44,16 +44,9 @@ function makeDb() {
 }
 
 describe('KoboDeviceService', () => {
-  const syncService = { invalidateSnapshot: vi.fn() };
-
   function makeService(db: ReturnType<typeof makeDb>) {
-    return new KoboDeviceService(db as never, syncService as never);
+    return new KoboDeviceService(db as never);
   }
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    syncService.invalidateSnapshot.mockResolvedValue(undefined);
-  });
 
   it('lists devices for user ordered by creation time', async () => {
     const db = makeDb();
@@ -66,7 +59,6 @@ describe('KoboDeviceService', () => {
 
   it('creates a device with hyphen-free token and returns persisted fields', async () => {
     const db = makeDb();
-    db.select.mockReturnValueOnce(makeSelectChain([], []));
     db.insertReturning.mockResolvedValueOnce([
       {
         id: 22,
@@ -92,26 +84,7 @@ describe('KoboDeviceService', () => {
         token: expect.stringMatching(/^[0-9a-f]+$/i),
       }),
     );
-    expect(syncService.invalidateSnapshot).not.toHaveBeenCalled();
-  });
-
-  it('invalidates the user snapshot when adding another device', async () => {
-    const db = makeDb();
-    db.select.mockReturnValueOnce(makeSelectChain([], [{ id: 3 }]));
-    db.insertReturning.mockResolvedValueOnce([
-      {
-        id: 22,
-        name: 'Libra',
-        token: 'server-generated-token',
-        lastSeenAt: null,
-        createdAt: new Date('2026-01-01T00:00:00.000Z'),
-      },
-    ]);
-    const service = makeService(db);
-
-    await service.createDevice(8, 'Libra');
-
-    expect(syncService.invalidateSnapshot).toHaveBeenCalledWith(8);
+    expect(db.select).not.toHaveBeenCalled();
   });
 
   it('renames existing devices and throws when device is missing', async () => {
@@ -135,14 +108,11 @@ describe('KoboDeviceService', () => {
     const service = makeService(db);
 
     await expect(service.revokeDevice(8, 111)).rejects.toThrow(NotFoundException);
-    expect(syncService.invalidateSnapshot).not.toHaveBeenCalled();
     expect(db.delete).not.toHaveBeenCalled();
     expect(db.deleteWhere).not.toHaveBeenCalled();
 
     await expect(service.revokeDevice(8, 7)).resolves.toBeUndefined();
     expect(db.delete).toHaveBeenCalledTimes(1);
     expect(db.deleteWhere).toHaveBeenCalledTimes(1);
-    expect(syncService.invalidateSnapshot).toHaveBeenCalledTimes(1);
-    expect(syncService.invalidateSnapshot).toHaveBeenCalledWith(8);
   });
 });

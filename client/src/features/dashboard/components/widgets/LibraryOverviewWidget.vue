@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { BookCopy, HardDrive, Library, Users } from '@lucide/vue'
 import { useRouter } from 'vue-router'
 import type { RouteLocationRaw } from 'vue-router'
@@ -8,6 +9,7 @@ import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useLibraryOverviewWidget } from '../../composables/useLibraryOverviewWidget'
 
 const { data, loading, error } = useLibraryOverviewWidget()
+const { t } = useI18n()
 const router = useRouter()
 const { libraries } = useLibraries()
 
@@ -32,14 +34,14 @@ const stats = computed<Stat[]>(() => {
   const firstLibraryId = libraries.value[0]?.id ?? null
   return [
     {
-      label: 'Books',
+      label: t('dashboard.widgets.libraryOverview.stats.books'),
       value: data.value.totalBooks,
       icon: Library,
       route: firstLibraryId ? { name: 'library', params: { id: firstLibraryId } } : null,
     },
-    { label: 'Authors', value: data.value.totalAuthors, icon: Users, route: { name: 'authors' } },
-    { label: 'Series', value: data.value.totalSeries, icon: BookCopy, route: { name: 'series' } },
-    { label: 'Storage', value: formatStorage(data.value.totalStorageBytes), icon: HardDrive, route: null },
+    { label: t('dashboard.widgets.libraryOverview.stats.authors'), value: data.value.totalAuthors, icon: Users, route: { name: 'authors' } },
+    { label: t('dashboard.widgets.libraryOverview.stats.series'), value: data.value.totalSeries, icon: BookCopy, route: { name: 'series' } },
+    { label: t('dashboard.widgets.libraryOverview.stats.storage'), value: formatStorage(data.value.totalStorageBytes), icon: HardDrive, route: null },
   ]
 })
 
@@ -52,7 +54,7 @@ function navigate(route: StatRoute) {
   <div class="flex h-full flex-col p-3">
     <div class="mb-2 flex items-center gap-2 self-start">
       <Library :size="16" class="text-primary/90" />
-      <span class="text-[15px] font-semibold text-foreground">Library Overview</span>
+      <span class="text-[15px] font-semibold text-foreground">{{ t('dashboard.widgets.libraryOverview.title') }}</span>
     </div>
 
     <!-- Loading -->
@@ -64,14 +66,16 @@ function navigate(route: StatRoute) {
     </div>
 
     <!-- Error -->
-    <div v-else-if="error" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">Failed to load</div>
+    <div v-else-if="error" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+      {{ t('dashboard.common.failedToLoad') }}
+    </div>
 
     <!-- Empty -->
     <div v-else-if="!data || data.totalBooks === 0" class="flex flex-1 flex-col items-center justify-center gap-2">
       <div class="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
         <Library :size="16" class="text-muted-foreground/60" />
       </div>
-      <p class="text-center text-xs text-muted-foreground">Your library is empty. Add some books to get started.</p>
+      <p class="text-center text-xs text-muted-foreground">{{ t('dashboard.widgets.libraryOverview.empty') }}</p>
     </div>
 
     <!-- Stats grid -->
@@ -96,7 +100,9 @@ function navigate(route: StatRoute) {
 
       <!-- Added this year callout -->
       <div v-if="data.booksAddedThisYear > 0" class="shrink-0 rounded-md border border-primary/20 bg-primary/5 px-2 py-1 text-center">
-        <span class="text-[11px] font-medium leading-none text-primary">+{{ data.booksAddedThisYear }} added this year</span>
+        <span class="text-[11px] font-medium leading-none text-primary">{{
+          t('dashboard.widgets.libraryOverview.addedThisYear', { count: data.booksAddedThisYear })
+        }}</span>
       </div>
     </div>
   </div>

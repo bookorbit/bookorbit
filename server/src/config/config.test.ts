@@ -20,6 +20,7 @@ function resetEnv(): void {
   delete process.env.SETUP_BOOTSTRAP_TOKEN;
   delete process.env.APP_DATA_PATH;
   delete process.env.BOOK_DOCK_PATH;
+  delete process.env.LIBRARY_BROWSE_ROOT;
   delete process.env.FILE_WRITE_DEBOUNCE_MS;
   delete process.env.FILE_WRITE_MAX_CONCURRENT_WRITES;
   delete process.env.EMAIL_ENCRYPTION_KEY;
@@ -100,11 +101,13 @@ describe('config', () => {
     process.env.APP_DATA_PATH = './tmp/bookorbit-data';
     expect(storageConfig().appDataPath).toBe(resolve('./tmp/bookorbit-data'));
     expect(storageConfig().bookDockPath).toBe(resolve('./tmp/bookorbit-data/book-dock'));
+    expect(storageConfig().libraryBrowseRoot).toBe(resolve('/'));
   });
 
   it('falls back storage path to /data when APP_DATA_PATH is not set', () => {
     expect(storageConfig().appDataPath).toBe(resolve('/data'));
     expect(storageConfig().bookDockPath).toBe(resolve('/data/book-dock'));
+    expect(storageConfig().libraryBrowseRoot).toBe(resolve('/'));
   });
 
   it('uses BOOK_DOCK_PATH as the Book Dock storage path when provided', () => {
@@ -112,6 +115,18 @@ describe('config', () => {
     process.env.BOOK_DOCK_PATH = '/books/bookdrop';
 
     expect(storageConfig().bookDockPath).toBe(resolve('/books/bookdrop'));
+  });
+
+  it('uses LIBRARY_BROWSE_ROOT as the library folder picker root when provided', () => {
+    process.env.LIBRARY_BROWSE_ROOT = '/books';
+
+    expect(storageConfig().libraryBrowseRoot).toBe(resolve('/books'));
+  });
+
+  it('ignores blank LIBRARY_BROWSE_ROOT values from compose defaults', () => {
+    process.env.LIBRARY_BROWSE_ROOT = '';
+
+    expect(storageConfig().libraryBrowseRoot).toBe(resolve('/'));
   });
 
   it('ignores blank BOOK_DOCK_PATH values from compose defaults', () => {

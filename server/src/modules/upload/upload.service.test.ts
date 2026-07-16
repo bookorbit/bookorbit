@@ -4,7 +4,6 @@ vi.mock('fs/promises', async () => {
 });
 
 vi.mock('../scanner/lib/hash', () => ({ computeFileHash: vi.fn() }));
-vi.mock('../scanner/lib/walk', () => ({ clampIno: vi.fn() }));
 
 vi.mock('../metadata/lib/epub', () => ({ extractEpubMetadata: vi.fn() }));
 vi.mock('../metadata/lib/cbz-metadata', () => ({ extractCbzMetadata: vi.fn(), extractCbrMetadata: vi.fn(), extractCb7Metadata: vi.fn() }));
@@ -18,7 +17,6 @@ import { extractCbzMetadata } from '../metadata/lib/cbz-metadata';
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
 import { parsePdfFile } from '../metadata/lib/pdf-parser';
 import { computeFileHash } from '../scanner/lib/hash';
-import { clampIno } from '../scanner/lib/walk';
 
 import { UploadService } from './upload.service';
 
@@ -29,7 +27,6 @@ const mockExtractCbzMetadata = extractCbzMetadata as MockedFunction<typeof extra
 const mockParseMobiFile = parseMobiFile as MockedFunction<typeof parseMobiFile>;
 const mockParsePdfFile = parsePdfFile as MockedFunction<typeof parsePdfFile>;
 const mockComputeFileHash = computeFileHash as MockedFunction<typeof computeFileHash>;
-const mockClampIno = clampIno as MockedFunction<typeof clampIno>;
 
 function selectChain(rows: unknown[]) {
   const whereResult: PromiseLike<unknown[]> & { limit: vi.Mock } = {
@@ -69,6 +66,7 @@ describe('UploadService', () => {
   };
   const processor = {
     createBookRecord: vi.fn(),
+    processNewBookImportAsync: vi.fn(),
     extractMetadataAsync: vi.fn(),
     extractAudioDurationAsync: vi.fn(),
   };
@@ -100,7 +98,7 @@ describe('UploadService', () => {
     storage.streamToTemp.mockResolvedValue({ tempPath: '/tmp/upload.bin', sizeBytes: 456 });
     storage.moveToPath.mockResolvedValue(undefined);
     storage.cleanup.mockResolvedValue(undefined);
-    processor.createBookRecord.mockResolvedValue({ bookId: 99 });
+    processor.createBookRecord.mockResolvedValue({ bookId: 99, created: true });
     libraryService.verifyUserAccess.mockResolvedValue(undefined);
     appSettings.getUploadPattern.mockResolvedValue(null);
     appSettings.getUploadPatternBookPerFolder.mockResolvedValue(null);
@@ -124,11 +122,10 @@ describe('UploadService', () => {
     updateSet.mockReturnValue({ where: updateWhere });
     updateWhere.mockResolvedValue(undefined);
     mockComputeFileHash.mockResolvedValue('hash-abc');
-    mockClampIno.mockReturnValue(12345);
     mockStat.mockResolvedValue({ ino: 12345n, mtime: new Date('2025-01-01') } as any);
   });
 
-  it('uploads successfully and kicks off async metadata extraction', async () => {
+  it('uploads successfully and processes a new-book import after the record is created', async () => {
     db.select
       .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: '{authors:first}/{title}.{extension}' }]))
       .mockReturnValueOnce(selectChain([{ id: 2, libraryId: 1, path: '/library' }]));
@@ -161,7 +158,19 @@ describe('UploadService', () => {
       'epub',
       456,
     );
-    expect(processor.extractMetadataAsync).toHaveBeenCalledWith(99, '/library/Frank Herbert/Dune.epub', 'epub');
+    expect(processor.processNewBookImportAsync).toHaveBeenCalledWith(99, 1, '/library/Frank Herbert/Dune.epub', 'epub');
+  });
+
+  it('only extracts metadata when an upload adds a file to an existing book', async () => {
+    processor.createBookRecord.mockResolvedValue({ bookId: 99, created: false });
+    db.select
+      .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: null }]))
+      .mockReturnValueOnce(selectChain([{ id: 2, libraryId: 1, path: '/library' }]));
+
+    await service.upload(1, 2, 'raw.epub', {} as any, user);
+
+    expect(processor.extractMetadataAsync).toHaveBeenCalledWith(99, '/library/book/book.epub', 'epub');
+    expect(processor.processNewBookImportAsync).not.toHaveBeenCalled();
   });
 
   it('sanitizes generated destination path tokens when cross-platform mode is enabled', async () => {

@@ -222,6 +222,64 @@ describe('BookDockWorkQueue', () => {
     }
   });
 
+  it('pause keeps pending work queued until resume', async () => {
+    vi.useFakeTimers();
+    try {
+      const handler = vi.fn().mockResolvedValue(undefined);
+      const queue = new BookDockWorkQueue(1, handler, vi.fn(), { drainDelayMs: 100 });
+
+      queue.pause();
+      expect(queue.enqueue(1)).toBe(true);
+      await vi.advanceTimersByTimeAsync(500);
+      expect(handler).not.toHaveBeenCalled();
+
+      queue.resume();
+      await vi.advanceTimersByTimeAsync(100);
+      await queue.waitForIdle();
+
+      expect(handler).toHaveBeenCalledWith(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('pause prevents the next queued job from starting after the current job finishes', async () => {
+    let releaseFirst!: () => void;
+    let firstStarted!: () => void;
+    const firstDone = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const firstStart = new Promise<void>((resolve) => {
+      firstStarted = resolve;
+    });
+    const handled: number[] = [];
+    const queue = new BookDockWorkQueue(
+      1,
+      async (fileId) => {
+        handled.push(fileId);
+        if (fileId === 1) {
+          firstStarted();
+          await firstDone;
+        }
+      },
+      vi.fn(),
+    );
+
+    queue.enqueue(1);
+    queue.enqueue(2);
+    await firstStart;
+    queue.pause();
+    releaseFirst();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(handled).toEqual([1]);
+
+    queue.resume();
+    await queue.waitForIdle();
+    expect(handled).toEqual([1, 2]);
+  });
+
   it('stop resolves pre-registered idle waiters when no jobs are running', async () => {
     vi.useFakeTimers();
     try {

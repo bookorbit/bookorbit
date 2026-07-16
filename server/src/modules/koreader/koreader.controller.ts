@@ -22,14 +22,27 @@ import { Public } from '../../common/decorators/public.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { KoreaderAuthGuard } from './koreader-auth.guard';
+import { KoreaderHashLinkService } from './koreader-hash-link.service';
 import { KoreaderPackageService } from './koreader-package.service';
 import { KoreaderService } from './koreader.service';
-import { CreateKoreaderUserDto, DownloadPluginPackageDto, KoreaderSaveProgressDto, TestConnectionDto, UpdateKoreaderUserDto } from './dto';
+import {
+  CreateKoreaderUserDto,
+  DownloadPluginPackageDto,
+  KoreaderDeviceParamDto,
+  KoreaderSaveProgressDto,
+  LinkKoreaderUnmatchedBookDto,
+  TestConnectionDto,
+  UpdateKoreaderDeviceFilePatternDto,
+  UpdateKoreaderFilePatternDto,
+  UpdateKoreaderManualHashLinkDto,
+  UpdateKoreaderUserDto,
+} from './dto';
 
 @Controller('koreader')
 export class KoreaderController {
   constructor(
     private readonly koreaderService: KoreaderService,
+    private readonly hashLinkService: KoreaderHashLinkService,
     private readonly packageService: KoreaderPackageService,
   ) {}
 
@@ -102,6 +115,90 @@ export class KoreaderController {
   @Get('devices')
   async getDevices(@CurrentUser() user: RequestUser) {
     return this.koreaderService.getDevices(user.id);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Get('file-naming-pattern')
+  async getFileNamingPattern(@CurrentUser() user: RequestUser) {
+    return { pattern: await this.koreaderService.getKoreaderUserDefaultPattern(user.id) };
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Put('file-naming-pattern')
+  async setFileNamingPattern(@CurrentUser() user: RequestUser, @Body() dto: UpdateKoreaderFilePatternDto) {
+    await this.koreaderService.setKoreaderUserDefaultPattern(user.id, dto.pattern);
+    return dto;
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Put('devices/:deviceId/file-naming-pattern')
+  async setDeviceFileNamingPattern(
+    @CurrentUser() user: RequestUser,
+    @Param() params: KoreaderDeviceParamDto,
+    @Body() dto: UpdateKoreaderDeviceFilePatternDto,
+  ) {
+    await this.koreaderService.setDeviceFileNamingPattern(user.id, params.deviceId, {
+      fileNamingPattern: dto.pattern,
+      seriesFileNamingPattern: dto.seriesPattern,
+      standaloneFileNamingPattern: dto.standalonePattern,
+    });
+    return dto;
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Delete('devices/:deviceId/file-naming-pattern')
+  async clearDeviceFileNamingPattern(@CurrentUser() user: RequestUser, @Param() params: KoreaderDeviceParamDto) {
+    await this.koreaderService.clearDeviceFileNamingPattern(user.id, params.deviceId);
+    return { success: true };
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Delete('devices/:deviceId')
+  async removeDevice(@CurrentUser() user: RequestUser, @Param() params: KoreaderDeviceParamDto) {
+    await this.koreaderService.removeDevice(user.id, params.deviceId);
+    return { success: true };
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Get('unmatched-books')
+  listUnmatchedBooks(@CurrentUser() user: RequestUser) {
+    return this.hashLinkService.listUnmatchedBooks(user);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Post('unmatched-books/:hash/link')
+  linkUnmatchedBook(@CurrentUser() user: RequestUser, @Param('hash') hash: string, @Body() dto: LinkKoreaderUnmatchedBookDto) {
+    return this.hashLinkService.linkUnmatchedBook(user, hash, dto.bookId);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Delete('unmatched-books/:hash')
+  dismissUnmatchedBook(@CurrentUser() user: RequestUser, @Param('hash') hash: string) {
+    return this.hashLinkService.dismissUnmatchedBook(user, hash);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Delete('unmatched-books')
+  dismissAllUnmatchedBooks(@CurrentUser() user: RequestUser) {
+    return this.hashLinkService.dismissAllUnmatchedBooks(user);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Get('hash-links')
+  listManualHashLinks(@CurrentUser() user: RequestUser) {
+    return this.hashLinkService.listManualHashLinks(user);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Patch('hash-links/:hash')
+  relinkManualHashLink(@CurrentUser() user: RequestUser, @Param('hash') hash: string, @Body() dto: UpdateKoreaderManualHashLinkDto) {
+    return this.hashLinkService.relinkManualHashLink(user, hash, dto.bookId);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Delete('hash-links/:hash')
+  unlinkManualHashLink(@CurrentUser() user: RequestUser, @Param('hash') hash: string) {
+    return this.hashLinkService.unlinkManualHashLink(user, hash);
   }
 
   @RequirePermission(Permission.KoreaderSync)

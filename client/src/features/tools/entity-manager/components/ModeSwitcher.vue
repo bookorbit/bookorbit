@@ -1,13 +1,18 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
 type Mode = 'duplicates' | 'browse'
 
 defineProps<{ modelValue: Mode }>()
 const emit = defineEmits<{ 'update:modelValue': [value: Mode] }>()
 
-const modes: { value: Mode; label: string }[] = [
-  { value: 'browse', label: 'Browse & Manage' },
-  { value: 'duplicates', label: 'Find Duplicates' },
-]
+const { t } = useI18n()
+
+const modes = computed<{ value: Mode; label: string }[]>(() => [
+  { value: 'browse', label: t('tools.entityManager.modes.browse') },
+  { value: 'duplicates', label: t('tools.entityManager.modes.duplicates') },
+])
 
 function handleSelect(value: Mode): void {
   emit('update:modelValue', value)

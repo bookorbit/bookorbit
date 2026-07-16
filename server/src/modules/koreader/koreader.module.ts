@@ -2,12 +2,15 @@ import { Module } from '@nestjs/common';
 
 import { CommonModule } from '../../common/common.module';
 import { AchievementModule } from '../achievement/achievement.module';
+import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { AnnotationModule } from '../annotation/annotation.module';
 import { BookModule } from '../book/book.module';
 import { DashboardModule } from '../dashboard/dashboard.module';
 import { OpdsModule } from '../opds/opds.module';
 import { PositionConverterModule } from '../position-converter/position-converter.module';
+import { RecommendationModule } from '../recommendation/recommendation.module';
 import { UserModule } from '../user/user.module';
+import { UserBookNoteModule } from '../user-book-note/user-book-note.module';
 import { UserBookStatusModule } from '../user-book-status/user-book-status.module';
 import { KoreaderAnnotationExchangeService } from './koreader-annotation-exchange.service';
 import { KoreaderAuthGuard } from './koreader-auth.guard';
@@ -17,6 +20,7 @@ import { KoreaderPackageService } from './koreader-package.service';
 import { KoreaderChapterExtractorService } from './koreader-chapter-extractor.service';
 import { KoreaderChapterService } from './koreader-chapter.service';
 import { KoreaderController } from './koreader.controller';
+import { KoreaderHashLinkService } from './koreader-hash-link.service';
 import { KoreaderPluginAnnotationService } from './koreader-plugin-annotation.service';
 import { KoreaderPluginController } from './koreader-plugin.controller';
 import { KoreaderPluginRepository } from './koreader-plugin.repository';
@@ -29,17 +33,21 @@ import { KoreaderStatsService } from './koreader-stats.service';
   imports: [
     CommonModule,
     UserModule,
+    UserBookNoteModule,
     UserBookStatusModule,
     AchievementModule,
+    AppSettingsModule,
     AnnotationModule,
     BookModule,
     DashboardModule,
     OpdsModule,
     PositionConverterModule,
+    RecommendationModule,
   ],
   controllers: [KoreaderController, KoreaderPluginController, KoreaderCatalogController],
   providers: [
     KoreaderService,
+    KoreaderHashLinkService,
     KoreaderRepository,
     KoreaderAuthGuard,
     KoreaderCatalogService,

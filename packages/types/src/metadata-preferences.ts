@@ -131,6 +131,7 @@ export interface ProviderConfigurations {
   itunes: ITunesProviderConfig;
   audible: AudibleProviderConfig;
   audnexus: AudnexusProviderConfig;
+  librofm: SimpleProviderConfig;
   comicvine: ComicVineProviderConfig;
   ranobedb: SimpleProviderConfig;
   kobo: KoboProviderConfig;

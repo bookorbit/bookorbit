@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/api', () => ({
-  api: vi.fn<() => Promise<Response>>(),
+  api: vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(),
+  getAccessToken: vi.fn<() => string | null>(),
 }))
 
 vi.mock('../useFoliateAnnotations', () => ({
@@ -10,6 +11,7 @@ vi.mock('../useFoliateAnnotations', () => ({
     addAnnotation: vi.fn<() => void>(),
     addAnnotations: vi.fn<() => void>(),
     deleteAnnotation: vi.fn<() => void>(),
+    redrawAnnotation: vi.fn<() => void>(),
     reAddAll: vi.fn<() => void>(),
     handleDrawAnnotationEvent: vi.fn<() => void>(),
   }),
@@ -23,14 +25,17 @@ vi.mock('../useFoliateSelection', () => ({
   }),
 }))
 
-vi.mock('../useFoliateInput', () => ({
-  useFoliateInput: () => ({
-    cleanup: vi.fn<() => void>(),
-    attachIframeClicks: vi.fn<() => void>(),
-  }),
+const inputMock = vi.hoisted(() => ({
+  cleanup: vi.fn<() => void>(),
+  attachIframeClicks: vi.fn<() => void>(),
+  suppressNextTapNavigation: vi.fn<() => void>(),
 }))
 
-import { api } from '@/lib/api'
+vi.mock('../useFoliateInput', () => ({
+  useFoliateInput: () => inputMock,
+}))
+
+import { api, getAccessToken } from '@/lib/api'
 import { useFoliate } from '../useFoliate'
 
 describe('useFoliate.open', () => {
@@ -39,8 +44,13 @@ describe('useFoliate.open', () => {
   let mockGoTo: ReturnType<typeof vi.fn>
   let mockGoToFraction: ReturnType<typeof vi.fn>
   let includeGoToFraction: boolean
+  let viewEl: HTMLElement | null
 
   beforeEach(() => {
+    inputMock.cleanup.mockReset()
+    inputMock.attachIframeClicks.mockReset()
+    inputMock.suppressNextTapNavigation.mockReset()
+
     container = document.createElement('div')
     document.body.appendChild(container)
 
@@ -48,11 +58,13 @@ describe('useFoliate.open', () => {
     mockGoTo = vi.fn<(target?: unknown) => Promise<unknown>>().mockResolvedValue({ index: 0 })
     mockGoToFraction = vi.fn<(fraction?: unknown) => Promise<void>>().mockResolvedValue(undefined)
     includeGoToFraction = true
+    viewEl = null
 
     const originalCreateElement = document.createElement.bind(document)
     vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
       if (tag === 'foliate-view') {
         const el = originalCreateElement('div')
+        viewEl = el
         const view = {
           open: mockOpen,
           goTo: mockGoTo,
@@ -75,6 +87,7 @@ describe('useFoliate.open', () => {
       ok: true,
       json: vi.fn<() => Promise<unknown>>().mockResolvedValue({}),
     } as unknown as Response)
+    vi.mocked(getAccessToken).mockReturnValue('reader-token')
     ;(window as { makeStreamingBook?: unknown }).makeStreamingBook = vi
       .fn<(...args: unknown[]) => Promise<unknown>>()
       .mockResolvedValue({ type: 'book' })
@@ -101,7 +114,22 @@ describe('useFoliate.open', () => {
     await foliate.open(1, 2, 'epub', null, undefined)
 
     const makeStreamingBook = (window as unknown as { makeStreamingBook: ReturnType<typeof vi.fn> }).makeStreamingBook
-    expect(makeStreamingBook).toHaveBeenCalledWith(1, '/api/v1/epub', {}, api, null, 2)
+    expect(makeStreamingBook).toHaveBeenCalledWith(1, '/api/v1/epub', {}, expect.any(Function), null, 2)
+    const fetchFile = makeStreamingBook.mock.calls[0]![3] as (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+    await fetchFile('/api/v1/epub/1/file/chapter.xhtml')
+    expect(api).toHaveBeenCalledWith('/api/v1/epub/1/file/chapter.xhtml', undefined)
+  })
+
+  it('passes a token-stringable fetcher for old cached Foliate assets', async () => {
+    const foliate = useFoliate(() => container)
+
+    await foliate.open(1, 2, 'epub', null, undefined)
+
+    const makeStreamingBook = (window as unknown as { makeStreamingBook: ReturnType<typeof vi.fn> }).makeStreamingBook
+    const fetchFile = makeStreamingBook.mock.calls[0]![3] as { toString: () => string; [Symbol.toPrimitive]: () => string }
+    expect(String(fetchFile)).toBe('reader-token')
+    vi.mocked(getAccessToken).mockReturnValue('fresh-reader-token')
+    expect(`${fetchFile}`).toBe('fresh-reader-token')
   })
 
   it('forces fixed-layout EPUB spreads off before opening when requested', async () => {
@@ -238,5 +266,18 @@ describe('useFoliate.open', () => {
 
     expect(mockGoTo).toHaveBeenCalledWith('epubcfi(/6/4!)')
     expect(mockGoToFraction).not.toHaveBeenCalled()
+  })
+
+  it('suppresses tap navigation when an annotation is shown', async () => {
+    const foliate = useFoliate(() => container)
+    const onAnnotationClick = vi.fn<(cfi: string, popupPosition: { x: number; y: number; showBelow: boolean }) => void>()
+    foliate.setAnnotationClickHandler(onAnnotationClick)
+
+    await foliate.open(1, 1, 'epub', null, undefined)
+    viewEl?.dispatchEvent(new CustomEvent('show-annotation', { detail: { value: 'epubcfi(/6/4)' } }))
+
+    expect(inputMock.suppressNextTapNavigation).toHaveBeenCalledTimes(1)
+    expect(onAnnotationClick).toHaveBeenCalledWith('epubcfi(/6/4)', expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }))
+    expect(inputMock.suppressNextTapNavigation.mock.invocationCallOrder[0]!).toBeLessThan(onAnnotationClick.mock.invocationCallOrder[0]!)
   })
 })

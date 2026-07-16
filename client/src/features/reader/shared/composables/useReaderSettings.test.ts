@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
-import { CBX_READER_DEFAULTS, READER_GROUP_DEFAULTS } from '@bookorbit/types'
+import { CBX_READER_DEFAULTS, READER_GROUP_DEFAULTS, type PdfReaderSettings } from '@bookorbit/types'
 
 const apiMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<unknown>>())
 vi.mock('@/lib/api', () => ({ api: apiMock }))
@@ -105,6 +105,47 @@ describe('useReaderSettings - load() with invalid localStorage value', () => {
     expect(s.bookDelta.value).toBeNull()
     expect(s.isCustomized.value).toBe(false)
     expect(localStorage.getItem(`reader:book:${BOOK_FILE_ID}`)).toBeNull()
+  })
+})
+
+describe('useReaderSettings - PDF validation', () => {
+  it('keeps valid PDF settings and removes values that can break reader layout', async () => {
+    localStorage.setItem(
+      `reader:book:${BOOK_FILE_ID}`,
+      JSON.stringify({
+        scrollMode: 'horizontal',
+        spread: 'odd',
+        zoomMode: 'custom',
+        customScale: 40,
+        rotation: 45,
+      }),
+    )
+
+    const settings = useReaderSettings(BOOK_FILE_ID, 'pdf')
+    await settings.load()
+
+    expect(settings.bookDelta.value).toEqual({
+      scrollMode: 'horizontal',
+      spread: 'odd',
+      zoomMode: 'custom',
+    })
+    const effective = settings.effective.value as PdfReaderSettings
+    expect(effective.customScale).toBe(1)
+    expect(effective.rotation).toBe(0)
+  })
+
+  it('migrates wrapped mode and retains new read-only layout choices', async () => {
+    localStorage.setItem(`reader:book:${BOOK_FILE_ID}`, JSON.stringify({ scrollMode: 'wrapped', spread: 'auto', zoomMode: 'automatic' }))
+
+    const settings = useReaderSettings(BOOK_FILE_ID, 'pdf')
+    await settings.load()
+
+    expect(settings.bookDelta.value).toEqual({ scrollMode: 'vertical', spread: 'auto', zoomMode: 'automatic' })
+    expect(JSON.parse(localStorage.getItem(`reader:book:${BOOK_FILE_ID}`) ?? '{}')).toEqual({
+      scrollMode: 'vertical',
+      spread: 'auto',
+      zoomMode: 'automatic',
+    })
   })
 })
 

@@ -1,0 +1,21 @@
+diff --git a/dist/lib/pdfium/web/worker-engine.js b/dist/lib/pdfium/web/worker-engine.js
+index 1c40ef8dd3aa8050f3a23242d23258dbd04b3604..b81a6a9b879ecb4016a8ee1ad7da552f0ae5a13e 100644
+--- a/dist/lib/pdfium/web/worker-engine.js
++++ b/dist/lib/pdfium/web/worker-engine.js
+@@ -10,6 +10,16 @@ const _RemoteExecutor = class _RemoteExecutor {
+     this.requestCounter = 0;
+     this.handleMessage = (event) => {
+       const response = event.data;
++      if (response.type === "wasmError") {
++        const message = typeof response.error === "string" ? response.error : "Unknown worker initialization error";
++        this.logger.error(LOG_SOURCE$1, LOG_CATEGORY$1, "Worker initialization failed:", message);
++        this.readyTask.reject({
++          code: PdfErrorCode.Initialization,
++          message
++        });
++        this.pendingRequests.delete(_RemoteExecutor.READY_TASK_ID);
++        return;
++      }
+       if (response.type === "ready") {
+         this.logger.debug(LOG_SOURCE$1, LOG_CATEGORY$1, "Worker is ready");
+         this.readyTask.resolve(true);

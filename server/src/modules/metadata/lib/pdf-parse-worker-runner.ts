@@ -15,8 +15,7 @@ export interface PdfParseWorkerResult {
 }
 
 export type PdfParseWorkerMessage =
-  | { type: 'result'; result: PdfParseWorkerResult }
-  | { type: 'error'; errorClass: string; errorMessage: string; stack?: string };
+  { type: 'result'; result: PdfParseWorkerResult } | { type: 'error'; errorClass: string; errorMessage: string; stack?: string };
 
 interface PdfWorkerProcess {
   once(event: 'message', listener: (message: unknown) => void): this;

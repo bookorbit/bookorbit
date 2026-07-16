@@ -20,7 +20,7 @@ export class AudioFormatWriter implements FormatWriter {
 
   async write(filePath: string, payload: BookWritePayload, options: FormatWriteOptions): Promise<WriteResult> {
     const start = Date.now();
-    const metadata = buildAudioMetadataArgs(payload, options);
+    const metadata = buildAudioMetadataArgs(payload, options, this.format);
     const fieldsWritten = resolveFieldsWritten(payload, options, metadata);
 
     if (fieldsWritten.length === 0) {
@@ -67,8 +67,9 @@ export class FlacAudioFormatWriter extends AudioFormatWriter {
   }
 }
 
-function buildAudioMetadataArgs(payload: BookWritePayload, options: FormatWriteOptions): AudioMetadataArg[] {
+function buildAudioMetadataArgs(payload: BookWritePayload, options: FormatWriteOptions, format?: string): AudioMetadataArg[] {
   const metadata: AudioMetadataArg[] = [];
+  const isMp4Audio = format === FORMAT_M4B || format === FORMAT_M4A;
 
   if (canWriteField(payload, options, 'title')) {
     pushFormatMetadata(metadata, 'album', textValue(payload.title));
@@ -94,9 +95,12 @@ function buildAudioMetadataArgs(payload: BookWritePayload, options: FormatWriteO
   }
 
   if (canWriteField(payload, options, 'publishedYear')) {
+    const date = payload.publishedDate ?? (payload.publishedYear == null ? '' : String(payload.publishedYear));
     const year = payload.publishedYear == null ? '' : String(payload.publishedYear);
-    pushFormatMetadata(metadata, 'date', year);
+    pushFormatMetadata(metadata, 'date', date);
     pushFormatMetadata(metadata, 'year', year);
+  } else if (canWriteField(payload, options, 'publishedDate')) {
+    pushFormatMetadata(metadata, 'date', payload.publishedDate ?? '');
   }
 
   if (canWriteField(payload, options, 'publisher')) {
@@ -120,17 +124,25 @@ function buildAudioMetadataArgs(payload: BookWritePayload, options: FormatWriteO
   }
 
   if (canWriteField(payload, options, 'seriesName')) {
-    pushFormatMetadata(metadata, 'series', textValue(payload.seriesName));
+    const seriesName = textValue(payload.seriesName);
+    pushFormatMetadata(metadata, 'series', seriesName);
+    if (isMp4Audio) pushFormatMetadata(metadata, 'show', seriesName);
   }
 
   if (canWriteField(payload, options, 'seriesIndex')) {
-    pushFormatMetadata(metadata, 'series-part', payload.seriesIndex == null ? '' : String(payload.seriesIndex));
+    const seriesIndex = payload.seriesIndex == null ? '' : String(payload.seriesIndex);
+    pushFormatMetadata(metadata, 'series-part', seriesIndex);
+    if (isMp4Audio) pushFormatMetadata(metadata, 'episode_id', seriesIndex);
   }
 
   if (canWriteField(payload, options, 'audibleId')) {
     const audibleId = textValue(payload.audibleId);
     pushFormatMetadata(metadata, 'asin', audibleId);
     pushFormatMetadata(metadata, 'audible_asin', audibleId);
+  }
+
+  if (canWriteField(payload, options, 'librofmId')) {
+    pushFormatMetadata(metadata, 'librofm_isbn', textValue(payload.librofmId));
   }
 
   return metadata;

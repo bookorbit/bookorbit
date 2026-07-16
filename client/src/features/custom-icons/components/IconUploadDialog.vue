@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { AlertTriangle, FileWarning, Loader2, UploadCloud, X } from '@lucide/vue'
 import { DialogClose, DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
 import { toast } from 'vue-sonner'
@@ -10,6 +11,7 @@ import { useCustomIcons } from '@/features/custom-icons/composables/useCustomIco
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ 'update:open': [value: boolean]; uploaded: [] }>()
 
+const { t } = useI18n()
 const { stageIcons, uploadStagedIcons } = useCustomIcons()
 
 interface StagedEntry {
@@ -34,9 +36,9 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 let entrySeq = 0
 
 function entryError(entry: StagedEntry): string | null {
-  if (!entry.ok) return entry.error ?? 'Invalid SVG'
+  if (!entry.ok) return entry.error ?? t('customIcons.invalidSvg')
   if (entry.skip) return null
-  if (!entry.name.trim()) return 'Name is required'
+  if (!entry.name.trim()) return t('customIcons.nameRequired')
   return null
 }
 
@@ -91,16 +93,16 @@ async function handleDrop(event: DragEvent) {
 async function addFiles(files: File[]) {
   const svgFiles = files.filter((file) => file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg'))
   if (svgFiles.length === 0) {
-    if (files.length > 0) toast.error('Only SVG files are supported')
+    if (files.length > 0) toast.error(t('customIcons.onlySvgSupported'))
     return
   }
   const room = CUSTOM_ICON_MAX_UPLOAD_FILES - entries.value.length
   if (room <= 0) {
-    toast.error(`You can stage at most ${CUSTOM_ICON_MAX_UPLOAD_FILES} icons at once`)
+    toast.error(t('customIcons.maxStaged', { max: CUSTOM_ICON_MAX_UPLOAD_FILES }))
     return
   }
   const accepted = svgFiles.slice(0, room)
-  if (svgFiles.length > room) toast.warning(`Only ${room} more icon${room === 1 ? '' : 's'} can be staged`)
+  if (svgFiles.length > room) toast.warning(t('customIcons.onlyMoreCanStage', { count: room }, room))
 
   staging.value = true
   try {
@@ -123,7 +125,7 @@ async function addFiles(files: File[]) {
       })
     })
   } catch (err) {
-    toast.error(err instanceof Error ? err.message : 'Failed to read SVG files')
+    toast.error(err instanceof Error ? err.message : t('customIcons.readFailed'))
   } finally {
     staging.value = false
   }
@@ -148,17 +150,17 @@ async function confirmUpload() {
     const failed = items.length - created
     if (created > 0) emit('uploaded')
     if (created > 0 && failed === 0) {
-      toast.success(`Uploaded ${created} icon${created === 1 ? '' : 's'}`)
+      toast.success(t('customIcons.uploadedCount', { count: created }, created))
       closeDialog()
     } else if (created > 0) {
-      toast.warning(`Uploaded ${created}, ${failed} failed`)
+      toast.warning(t('customIcons.uploadedPartial', { created, failed }))
       applyServerErrors(items)
     } else {
-      toast.error('No icons uploaded')
+      toast.error(t('customIcons.noIconsUploaded'))
       applyServerErrors(items)
     }
   } catch (err) {
-    toast.error(err instanceof Error ? err.message : 'Failed to upload icons')
+    toast.error(err instanceof Error ? err.message : t('customIcons.uploadFailed'))
   } finally {
     uploading.value = false
   }
@@ -171,7 +173,7 @@ function applyServerErrors(items: { filename: string; status: string; error?: st
   for (const entry of entries.value) {
     if (failedByName.has(entry.file.name)) {
       entry.ok = false
-      entry.error = failedByName.get(entry.file.name) ?? 'Upload failed'
+      entry.error = failedByName.get(entry.file.name) ?? t('customIcons.uploadFailedEntry')
     }
   }
 }
@@ -187,8 +189,8 @@ function applyServerErrors(items: { filename: string; status: string; error?: st
       >
         <div class="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
-            <DialogTitle class="text-sm font-semibold text-foreground">Upload custom icons</DialogTitle>
-            <DialogDescription class="text-xs text-muted-foreground">Review names before adding them to your library.</DialogDescription>
+            <DialogTitle class="text-sm font-semibold text-foreground">{{ t('customIcons.dialogTitle') }}</DialogTitle>
+            <DialogDescription class="text-xs text-muted-foreground">{{ t('customIcons.dialogDescription') }}</DialogDescription>
           </div>
           <DialogClose
             class="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -214,8 +216,8 @@ function applyServerErrors(items: { filename: string; status: string; error?: st
               <Loader2 v-if="staging" :size="18" class="animate-spin" />
               <UploadCloud v-else :size="18" />
             </span>
-            <span class="text-sm font-medium text-foreground">{{ staging ? 'Reading files...' : 'Drop SVG files or click to browse' }}</span>
-            <span class="text-xs text-muted-foreground">Up to {{ CUSTOM_ICON_MAX_UPLOAD_FILES }} files, 128 KB each</span>
+            <span class="text-sm font-medium text-foreground">{{ staging ? t('customIcons.readingFiles') : t('customIcons.dropPrompt') }}</span>
+            <span class="text-xs text-muted-foreground">{{ t('customIcons.fileLimit', { max: CUSTOM_ICON_MAX_UPLOAD_FILES }) }}</span>
           </button>
 
           <div v-if="entries.length > 0" class="space-y-2">
@@ -257,7 +259,7 @@ function applyServerErrors(items: { filename: string; status: string; error?: st
                         v-model="entry.name"
                         :disabled="entry.skip"
                         :maxlength="CUSTOM_ICON_NAME_MAX_LENGTH"
-                        placeholder="Name"
+                        :placeholder="t('customIcons.namePlaceholder')"
                         class="h-8 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-60"
                       />
                     </div>
@@ -272,21 +274,21 @@ function applyServerErrors(items: { filename: string; status: string; error?: st
                         class="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 font-medium text-amber-600 dark:text-amber-400"
                       >
                         <AlertTriangle :size="11" />
-                        Identical to "{{ entry.duplicateOfName ?? entry.duplicateOfSlug }}"
+                        {{ t('customIcons.identicalTo', { name: entry.duplicateOfName ?? entry.duplicateOfSlug }) }}
                       </span>
                       <button
                         type="button"
                         class="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
                         @click="toggleSkip(entry)"
                       >
-                        {{ entry.skip ? 'Upload anyway' : 'Skip this one' }}
+                        {{ entry.skip ? t('customIcons.uploadAnyway') : t('customIcons.skipThisOne') }}
                       </button>
                     </div>
                   </template>
 
                   <p v-else class="flex items-center gap-1 text-xs text-destructive">
                     <AlertTriangle :size="12" />
-                    {{ entry.error ?? 'Invalid SVG file' }}
+                    {{ entry.error ?? t('customIcons.invalidSvgFile') }}
                   </p>
                 </div>
               </div>
@@ -296,14 +298,20 @@ function applyServerErrors(items: { filename: string; status: string; error?: st
 
         <div class="flex items-center justify-between gap-3 border-t border-border px-4 py-3">
           <p class="text-xs text-muted-foreground">
-            <span v-if="uploadableCount > 0">{{ uploadableCount }} ready to upload</span>
-            <span v-else>No icons staged yet</span>
+            <span v-if="uploadableCount > 0">{{ t('customIcons.readyToUpload', { count: uploadableCount }) }}</span>
+            <span v-else>{{ t('customIcons.noIconsStaged') }}</span>
           </p>
           <div class="flex items-center gap-2">
-            <Button type="button" variant="outline" size="sm" class="h-9" @click="closeDialog">Cancel</Button>
+            <Button type="button" variant="outline" size="sm" class="h-9" @click="closeDialog">{{ t('common.cancel') }}</Button>
             <Button type="button" size="sm" class="h-9" :disabled="!canConfirm" @click="confirmUpload">
               <Loader2 v-if="uploading" :size="14" class="animate-spin" />
-              {{ uploading ? 'Uploading...' : uploadableCount > 0 ? `Upload ${uploadableCount}` : 'Upload' }}
+              {{
+                uploading
+                  ? t('customIcons.uploading')
+                  : uploadableCount > 0
+                    ? t('customIcons.uploadCount', { count: uploadableCount })
+                    : t('customIcons.upload')
+              }}
             </Button>
           </div>
         </div>

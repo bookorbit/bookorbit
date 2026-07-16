@@ -36,15 +36,15 @@ describe('useReaderSelection', () => {
     expect(selection.overlappingAnnotationId.value).toBe(42)
   })
 
-  it('dismisses popup and opens note dialog with clean note body', () => {
+  it('dismisses popup and opens note dialog with provided note body', () => {
     const selection = useReaderSelection()
     selection.visible.value = true
     selection.noteText.value = 'old note'
 
-    selection.openNoteDialog()
+    selection.openNoteDialog('existing note')
 
     expect(selection.showNoteDialog.value).toBe(true)
-    expect(selection.noteText.value).toBe('')
+    expect(selection.noteText.value).toBe('existing note')
     expect(selection.visible.value).toBe(false)
 
     selection.dismiss()

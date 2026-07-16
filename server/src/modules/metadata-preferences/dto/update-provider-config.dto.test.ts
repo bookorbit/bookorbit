@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
+import { ValidationPipe } from '@nestjs/common';
 
 import { UpdateProviderConfigDto } from './update-provider-config.dto';
 
@@ -17,6 +18,7 @@ describe('UpdateProviderConfigDto', () => {
       amazon: { cookie: 'session-cookie' },
       hardcover: { apiKey: 'hardcover-key' },
       itunes: { coverResolution: 'standard' },
+      librofm: { enabled: true },
       aladin: { ttbKey: 'ttb-test-key' },
     });
 
@@ -27,6 +29,14 @@ describe('UpdateProviderConfigDto', () => {
     const { errors } = await validateInput({});
 
     expect(errors).toHaveLength(0);
+  });
+
+  it('accepts Libro.fm through the production whitelist validation path', async () => {
+    const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
+
+    await expect(
+      pipe.transform({ librofm: { enabled: true } }, { type: 'body', metatype: UpdateProviderConfigDto, data: undefined }),
+    ).resolves.toMatchObject({ librofm: { enabled: true } });
   });
 
   it('rejects invalid nested property types', async () => {

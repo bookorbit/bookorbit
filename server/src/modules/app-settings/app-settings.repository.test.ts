@@ -80,6 +80,19 @@ describe('AppSettingsRepository', () => {
     });
   });
 
+  describe('findExistingLibraryIds', () => {
+    it('returns matching library IDs', async () => {
+      db.where.mockResolvedValue([{ id: 2 }, { id: 4 }]);
+
+      await expect(repo.findExistingLibraryIds([2, 4])).resolves.toEqual([2, 4]);
+    });
+
+    it('returns empty array without querying when no IDs are provided', async () => {
+      await expect(repo.findExistingLibraryIds([])).resolves.toEqual([]);
+      expect(db.select).not.toHaveBeenCalled();
+    });
+  });
+
   describe('updateByKey', () => {
     it('returns updated setting when key exists', async () => {
       const setting = { key: 'allow_registration', value: 'false' };

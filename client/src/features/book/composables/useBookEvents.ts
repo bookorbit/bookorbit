@@ -1,15 +1,17 @@
 import { toast } from 'vue-sonner'
 import { getCurrentInstance, onUnmounted } from 'vue'
-import type { BookMissingEvent, BookMovedEvent, BookRestoredEvent, BookTransferredEvent } from '@bookorbit/types'
+import type { BookMissingEvent, BookMovedEvent, BookProgressChangedEvent, BookRestoredEvent, BookTransferredEvent } from '@bookorbit/types'
 import { getSocket } from '@/features/scanner/composables/useScanProgress'
 
 type BookIdsCallback = (bookIds: number[]) => void
 type BookTransferredCallback = (event: BookTransferredEvent) => void
+type BookProgressChangedCallback = (event: BookProgressChangedEvent) => void
 
 const missingCallbacks = new Set<BookIdsCallback>()
 const restoredCallbacks = new Set<BookIdsCallback>()
 const movedCallbacks = new Set<BookIdsCallback>()
 const transferredCallbacks = new Set<BookTransferredCallback>()
+const progressChangedCallbacks = new Set<BookProgressChangedCallback>()
 
 let pendingMissingCount = 0
 let pendingRestoredCount = 0
@@ -74,6 +76,10 @@ function ensureInitialized() {
   socket.on('book:transferred', (event: BookTransferredEvent) => {
     for (const cb of transferredCallbacks) cb(event)
   })
+
+  socket.on('book:progress-changed', (event: BookProgressChangedEvent) => {
+    for (const cb of progressChangedCallbacks) cb(event)
+  })
 }
 
 function registerCallback<T extends (...args: never[]) => void>(callbacks: Set<T>, cb: T): () => void {
@@ -102,5 +108,9 @@ export function useBookEvents() {
     return registerCallback(transferredCallbacks, cb)
   }
 
-  return { onBookMissing, onBookRestored, onBookMoved, onBookTransferred }
+  function onBookProgressChanged(cb: BookProgressChangedCallback): () => void {
+    return registerCallback(progressChangedCallbacks, cb)
+  }
+
+  return { onBookMissing, onBookRestored, onBookMoved, onBookTransferred, onBookProgressChanged }
 }

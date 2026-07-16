@@ -1,5 +1,5 @@
 import { onUnmounted, ref } from 'vue'
-import { api } from '@/lib/api'
+import { api, getAccessToken } from '@/lib/api'
 import { useFoliateAnnotations } from './useFoliateAnnotations'
 import { useFoliateSelection } from './useFoliateSelection'
 import { useFoliateInput } from './useFoliateInput'
@@ -39,6 +39,11 @@ export interface EpubOpenOptions {
   fixedLayoutSpread?: EpubReaderSettings['fixedLayoutSpread']
 }
 
+type FoliateFetchFile = ((input: RequestInfo | URL, init?: RequestInit) => Promise<Response>) & {
+  toString: () => string
+  [Symbol.toPrimitive]: () => string
+}
+
 function isResolvedNavigation(value: unknown): boolean {
   return Boolean(value && typeof value === 'object' && typeof (value as { index?: unknown }).index === 'number')
 }
@@ -57,6 +62,14 @@ function applyEpubOpenOptions(book: unknown, options: EpubOpenOptions | undefine
     ...epubBook.rendition,
     spread: 'none',
   }
+}
+
+function makeFoliateFetchFile(): FoliateFetchFile {
+  const fetchFile = ((input: RequestInfo | URL, init?: RequestInit) => api(input, init)) as FoliateFetchFile
+  const currentToken = () => getAccessToken() ?? ''
+  fetchFile.toString = currentToken
+  fetchFile[Symbol.toPrimitive] = currentToken
+  return fetchFile
 }
 
 export function useFoliate(
@@ -160,6 +173,8 @@ export function useFoliate(
         const detail = (e as CustomEvent).detail
         if (!detail?.value || !onAnnotationClick) return
 
+        input.suppressNextTapNavigation()
+
         const range = detail.range as Range | undefined
         let x = window.innerWidth / 2
         let selectionTop = 0
@@ -241,7 +256,7 @@ export function useFoliate(
             ) => Promise<unknown>)
           | undefined
         if (!makeStreamingBook) throw new Error('makeStreamingBook not available')
-        const book = await makeStreamingBook(bookId, '/api/v1/epub', bookInfo, api, null, fileId)
+        const book = await makeStreamingBook(bookId, '/api/v1/epub', bookInfo, makeFoliateFetchFile(), null, fileId)
         applyEpubOpenOptions(book, options)
         shouldRestoreByFraction = isFixedLayoutBook(book)
         isFixedLayout.value = shouldRestoreByFraction
@@ -364,6 +379,7 @@ export function useFoliate(
     addAnnotation: (cfi: string, color = '#FACC15', style = 'highlight') => annotations.addAnnotation(viewRef.value, cfi, color, style),
     addAnnotations: (anns: { cfi: string; color: string; style: string }[]) => annotations.addAnnotations(viewRef.value, anns),
     deleteAnnotation: (cfi: string) => annotations.deleteAnnotation(viewRef.value, cfi),
+    redrawAnnotation: (cfi: string, color: string, style: string) => annotations.redrawAnnotation(viewRef.value, cfi, color, style),
     setTextSelectedHandler: selection.setHandler,
     setAnnotationClickHandler,
   }

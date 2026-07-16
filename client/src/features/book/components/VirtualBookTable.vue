@@ -2,6 +2,7 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
 import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
 import { useVirtualizer } from '@tanstack/vue-virtual'
+import { formatNumber } from '@/i18n/formatters'
 import { AlertTriangle, ArrowDown, ArrowUp, BookOpen, CheckCircle2, ChevronUp, Loader2, RotateCcw, X } from '@lucide/vue'
 import { useTableColumns, COLUMN_DEFS, COLUMN_DEF_MAP, LOCK_ROW_COLUMN_DEF, type ColumnDef } from '@/features/book/composables/useTableColumns'
 import { useTableCellEditor } from '@/features/book/composables/useTableCellEditor'
@@ -40,6 +41,9 @@ import { useNarratorSearch } from '@/features/book/composables/useNarratorSearch
 import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useActiveCustomFields } from '@/features/book/composables/useActiveCustomFields'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = withDefaults(
   defineProps<{
@@ -185,8 +189,8 @@ const rowPaddingClass = computed(() => {
 })
 
 function getTextCellOpenLinkLabel(colId: string): string | null {
-  if (colId === 'title') return 'Open book details'
-  if (colId === 'seriesName') return 'Open series'
+  if (colId === 'title') return t('book.tableView.openBookDetails')
+  if (colId === 'seriesName') return t('book.tableView.openSeries')
   return null
 }
 
@@ -216,7 +220,7 @@ function isCellChanged(bookId: number, colId: string): boolean {
 }
 
 function getRowFeedbackMessage(bookId: number): string {
-  return getRowFeedback(bookId)?.message ?? 'Metadata refresh failed'
+  return getRowFeedback(bookId)?.message ?? t('book.tableView.metadataRefreshFailed')
 }
 
 async function retryMetadataRefresh(book: BookCard) {
@@ -670,14 +674,14 @@ defineExpose({
   <div class="relative flex-1 min-h-0 flex flex-col overflow-hidden rounded-md border border-border">
     <!-- Screen-reader live region for dynamic announcements -->
     <div aria-live="polite" aria-atomic="true" class="sr-only">
-      <span v-if="selectionMode && selectedCount != null && selectedCount > 0"
-        >{{ selectedCount }} {{ selectedCount === 1 ? 'book' : 'books' }} selected</span
-      >
-      <span v-if="loading && initialized">Loading more books</span>
+      <span v-if="selectionMode && selectedCount != null && selectedCount > 0">{{
+        t('book.tableView.booksSelected', { count: selectedCount }, selectedCount)
+      }}</span>
+      <span v-if="loading && initialized">{{ t('book.tableView.loadingMoreBooks') }}</span>
     </div>
     <!-- Sort strip: visible when multiple sorts are active -->
     <div v-if="activeSorts.length > 1" class="shrink-0 flex items-center gap-1.5 border-b border-border/60 bg-muted/30 px-3 py-1">
-      <span class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground shrink-0">Sort</span>
+      <span class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground shrink-0">{{ t('book.tableView.sort') }}</span>
       <div class="flex flex-wrap items-center gap-1">
         <span
           v-for="(s, idx) in activeSorts"
@@ -698,14 +702,16 @@ defineExpose({
     <div v-if="metadataInFlight" class="shrink-0 flex items-center justify-between border-b border-border/60 bg-primary/5 px-3 py-1">
       <div class="flex items-center gap-1.5 text-xs font-medium text-primary">
         <Loader2 :size="12" class="animate-spin" />
-        <span>Refreshing metadata {{ metadataInFlight.processed }} / {{ metadataInFlight.total }}</span>
+        <span>{{ t('book.tableView.refreshingMetadata', { processed: metadataInFlight.processed, total: metadataInFlight.total }) }}</span>
       </div>
-      <span v-if="metadataFailed > 0" class="text-xs font-medium text-amber-700 dark:text-amber-400">{{ metadataFailed }} failed</span>
-      <span v-else class="text-xs text-muted-foreground">{{ metadataRemaining }} remaining</span>
+      <span v-if="metadataFailed > 0" class="text-xs font-medium text-amber-700 dark:text-amber-400">{{
+        t('book.tableView.failedCount', { count: metadataFailed })
+      }}</span>
+      <span v-else class="text-xs text-muted-foreground">{{ t('book.tableView.remainingCount', { count: metadataRemaining }) }}</span>
     </div>
 
     <div v-if="isReadOnly" class="shrink-0 border-b border-border/60 bg-amber-500/8 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-300">
-      Table editing is disabled on smaller screens. Switch to list or grid for quicker actions.
+      {{ t('book.tableView.readOnlyNotice') }}
     </div>
 
     <div ref="scrollContainerRef" class="relative flex-1 min-h-0 overflow-auto" tabindex="0" @keydown="handleKeydownWithShortcuts">
@@ -904,21 +910,21 @@ defineExpose({
                       class="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/12 px-1.5 py-0.5 text-[10px] font-medium text-primary"
                     >
                       <Loader2 :size="10" class="animate-spin" />
-                      Fetching...
+                      {{ t('book.tableView.fetching') }}
                     </span>
                     <span
                       v-else-if="getRowFeedback(rowBook(vItem.index).id)?.state === 'success'"
                       class="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/12 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300"
                     >
                       <CheckCircle2 :size="10" />
-                      Updated
+                      {{ t('book.tableView.updated') }}
                     </span>
                     <span
                       v-else
                       class="inline-flex items-center gap-1 rounded-full border border-destructive/40 bg-destructive/10 px-1 py-0.5 text-[10px] font-medium text-destructive"
                     >
                       <AlertTriangle :size="10" />
-                      Failed
+                      {{ t('book.tableView.failed') }}
                       <button
                         class="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full hover:bg-destructive/20"
                         :title="getRowFeedbackMessage(rowBook(vItem.index).id)"
@@ -949,7 +955,7 @@ defineExpose({
       class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 text-muted-foreground"
     >
       <BookOpen :size="36" class="opacity-30" />
-      <p class="text-sm">No books to display</p>
+      <p class="text-sm">{{ t('book.tableView.noBooks') }}</p>
     </div>
 
     <!-- Scroll to top FAB -->
@@ -962,7 +968,7 @@ defineExpose({
       <button
         v-if="showScrollTop"
         class="absolute bottom-10 right-4 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md hover:bg-primary/90 transition-colors"
-        aria-label="Scroll to top"
+        :aria-label="t('book.tableView.scrollToTop')"
         @click="scrollToTop"
       >
         <ChevronUp :size="16" />
@@ -973,29 +979,29 @@ defineExpose({
     <div class="shrink-0 flex items-center justify-between border-t border-border/60 bg-muted/40 px-3 py-1 text-xs text-muted-foreground">
       <div class="flex items-center gap-2">
         <span v-if="selectionMode && selectedCount">
-          {{ selectedCount.toLocaleString() }} selected
+          {{ t('book.tableView.selectedStatus', { count: formatNumber(selectedCount) }) }}
           <span class="text-muted-foreground/60">/ </span>
         </span>
         <span v-if="filterActive" class="flex items-center gap-1 text-primary">
           <span class="h-1.5 w-1.5 rounded-full bg-primary" />
-          Filtered
+          {{ t('book.tableView.filtered') }}
         </span>
-        <span v-if="hasMore">{{ books.length.toLocaleString() }} of {{ (total ?? 0).toLocaleString() }} loaded</span>
-        <span v-else>{{ (total ?? books.length).toLocaleString() }} {{ (total ?? books.length) === 1 ? 'book' : 'books' }}</span>
+        <span v-if="hasMore">{{ t('book.tableView.loadedStatus', { loaded: formatNumber(books.length), total: formatNumber(total ?? 0) }) }}</span>
+        <span v-else>{{ t('book.tableView.bookCount', { count: formatNumber(total ?? books.length) }, total ?? books.length) }}</span>
       </div>
       <div class="flex items-center gap-3">
         <button
           class="inline-flex h-5 w-5 items-center justify-center rounded border border-border/70 bg-background text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          title="Keyboard shortcuts (?)"
-          aria-label="Show table keyboard shortcuts"
+          :title="t('book.tableView.keyboardShortcutsTitle')"
+          :aria-label="t('book.tableView.showKeyboardShortcuts')"
           @click="shortcutOverlayOpen = true"
         >
           ?
         </button>
-        <span class="hidden lg:inline text-[11px] text-muted-foreground/80">Copy cell: Ctrl/Cmd+C · Copy row: Ctrl/Cmd+Shift+C</span>
+        <span class="hidden lg:inline text-[11px] text-muted-foreground/80">{{ t('book.tableView.copyHint') }}</span>
         <span v-if="loading" class="flex items-center gap-1">
           <Loader2 :size="11" class="animate-spin" />
-          Loading...
+          {{ t('common.loading') }}
         </span>
       </div>
     </div>

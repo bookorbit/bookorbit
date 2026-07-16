@@ -13,6 +13,10 @@ import {
   type MetadataExportViewType,
   type MetadataExportPreflight,
 } from '@/features/book/composables/useBookMetadataExport'
+import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
+
+const { t } = useI18n()
 
 const props = withDefaults(
   defineProps<{
@@ -59,8 +63,8 @@ const preflightError = ref<string | null>(null)
 const preflighting = ref(false)
 const { loading, preflight: requestPreflight, download } = useBookMetadataExport()
 
-const selectedCountLabel = computed(() => props.selectedCount.toLocaleString())
-const totalCountLabel = computed(() => props.totalCount.toLocaleString())
+const selectedCountLabel = computed(() => formatNumber(props.selectedCount))
+const totalCountLabel = computed(() => formatNumber(props.totalCount))
 const hasSelectedRows = computed(() => props.selectedBookIds.length > 0)
 const hasAllMatchingScope = computed(() => Boolean(props.allMatchingQuery))
 
@@ -70,8 +74,8 @@ const canRun = computed(() => {
 })
 
 const scopeSummary = computed(() => {
-  if (scope.value === 'selected') return `${selectedCountLabel.value} selected row${props.selectedCount === 1 ? '' : 's'}`
-  return `${totalCountLabel.value} matching row${props.totalCount === 1 ? '' : 's'}`
+  if (scope.value === 'selected') return t('book.export.selectedRowsSummary', { count: selectedCountLabel.value }, props.selectedCount)
+  return t('book.export.matchingRowsSummary', { count: totalCountLabel.value }, props.totalCount)
 })
 
 const sizeHintClass = computed(() => {
@@ -146,7 +150,7 @@ async function refreshPreflight() {
   try {
     preflight.value = await requestPreflight(request)
   } catch (error) {
-    preflightError.value = error instanceof Error ? error.message : 'Failed to prepare export'
+    preflightError.value = error instanceof Error ? error.message : t('book.export.prepareFailed')
   } finally {
     preflighting.value = false
   }
@@ -162,10 +166,10 @@ async function runExport() {
 
   try {
     await download(request)
-    toast.success(`Metadata export started: ${preflight.value.fileName}`)
+    toast.success(t('book.export.exportStarted', { fileName: preflight.value.fileName }))
     closeDialog()
   } catch (error) {
-    toast.error(error instanceof Error ? error.message : 'Metadata export failed')
+    toast.error(error instanceof Error ? error.message : t('book.export.exportFailed'))
   }
 }
 
@@ -214,7 +218,7 @@ watch(
         <div class="flex items-center justify-between border-b border-border px-5 py-4">
           <div class="flex items-center gap-2">
             <FileSpreadsheet :size="16" class="text-primary" />
-            <h2 class="text-base font-semibold text-foreground">Export Metadata</h2>
+            <h2 class="text-base font-semibold text-foreground">{{ t('book.export.title') }}</h2>
           </div>
           <button class="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" @click="closeDialog">
             <X :size="14" />
@@ -223,7 +227,7 @@ watch(
 
         <div class="space-y-5 px-5 py-4">
           <section class="space-y-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Scope</p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t('book.export.scope') }}</p>
             <div class="grid gap-2 sm:grid-cols-2">
               <button
                 class="rounded-md border px-3 py-2 text-left text-sm transition-colors"
@@ -233,8 +237,8 @@ watch(
                 :disabled="!hasSelectedRows"
                 @click="scope = 'selected'"
               >
-                <p class="font-medium">Selected rows</p>
-                <p class="text-xs text-muted-foreground">{{ selectedCountLabel }} currently selected</p>
+                <p class="font-medium">{{ t('book.export.selectedRows') }}</p>
+                <p class="text-xs text-muted-foreground">{{ t('book.export.currentlySelected', { count: selectedCountLabel }) }}</p>
               </button>
               <button
                 class="rounded-md border px-3 py-2 text-left text-sm transition-colors"
@@ -246,14 +250,14 @@ watch(
                 :disabled="!hasAllMatchingScope"
                 @click="scope = 'all-matching'"
               >
-                <p class="font-medium">All matching rows</p>
-                <p class="text-xs text-muted-foreground">{{ totalCountLabel }} rows in current result</p>
+                <p class="font-medium">{{ t('book.export.allMatchingRows') }}</p>
+                <p class="text-xs text-muted-foreground">{{ t('book.export.rowsInResult', { count: totalCountLabel }) }}</p>
               </button>
             </div>
           </section>
 
           <section class="space-y-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Format</p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t('book.export.format') }}</p>
             <div class="grid gap-2 sm:grid-cols-2">
               <button
                 class="rounded-md border px-3 py-2 text-left text-sm transition-colors"
@@ -265,7 +269,7 @@ watch(
                 @click="settings.format = 'csv'"
               >
                 <p class="flex items-center gap-1.5 font-medium"><FileSpreadsheet :size="14" /> CSV</p>
-                <p class="text-xs text-muted-foreground">Spreadsheet-friendly, UTF-8 BOM included</p>
+                <p class="text-xs text-muted-foreground">{{ t('book.export.csvDescription') }}</p>
               </button>
               <button
                 class="rounded-md border px-3 py-2 text-left text-sm transition-colors"
@@ -277,56 +281,56 @@ watch(
                 @click="settings.format = 'json'"
               >
                 <p class="flex items-center gap-1.5 font-medium"><FileJson2 :size="14" /> JSON</p>
-                <p class="text-xs text-muted-foreground">Structured export with metadata context</p>
+                <p class="text-xs text-muted-foreground">{{ t('book.export.jsonDescription') }}</p>
               </button>
             </div>
           </section>
 
           <section class="space-y-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Columns</p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t('book.export.columns') }}</p>
             <div class="flex flex-wrap items-center gap-4 text-sm">
               <label class="inline-flex items-center gap-2">
                 <input type="radio" class="accent-primary" value="canonical" v-model="settings.columnsMode" />
-                Stable canonical schema
+                {{ t('book.export.canonicalSchema') }}
               </label>
               <label class="inline-flex items-center gap-2">
                 <input type="radio" class="accent-primary" value="visible" v-model="settings.columnsMode" />
-                Current visible columns
+                {{ t('book.export.visibleColumns') }}
               </label>
             </div>
           </section>
 
           <section class="space-y-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Options</p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ t('book.export.options') }}</p>
             <div class="grid gap-2 text-sm sm:grid-cols-2">
               <label class="inline-flex items-center gap-2">
                 <input v-model="settings.includePersonalData" type="checkbox" class="accent-primary" />
-                Include personal reading data
+                {{ t('book.export.includePersonalData') }}
               </label>
               <label class="inline-flex items-center gap-2">
                 <input v-model="settings.includeFilePaths" type="checkbox" class="accent-primary" />
-                Include file paths (advanced)
+                {{ t('book.export.includeFilePaths') }}
               </label>
               <label class="inline-flex items-center gap-2">
                 <input v-model="settings.includeContextMeta" type="checkbox" class="accent-primary" />
-                Include context metadata
+                {{ t('book.export.includeContextMeta') }}
               </label>
             </div>
           </section>
 
           <section class="rounded-md border border-border/70 bg-muted/30 p-3 text-sm">
-            <p class="font-medium text-foreground">Preflight</p>
-            <p class="mt-1 text-muted-foreground">Scope: {{ scopeSummary }}</p>
+            <p class="font-medium text-foreground">{{ t('book.export.preflight') }}</p>
+            <p class="mt-1 text-muted-foreground">{{ t('book.export.scopeLabel', { summary: scopeSummary }) }}</p>
             <p v-if="preflighting" class="mt-1 inline-flex items-center gap-2 text-muted-foreground">
-              <Loader2 :size="14" class="animate-spin" /> Calculating export size...
+              <Loader2 :size="14" class="animate-spin" /> {{ t('book.export.calculatingSize') }}
             </p>
             <template v-else-if="preflight">
               <p class="mt-1 text-muted-foreground">
-                Estimated size:
+                {{ t('book.export.estimatedSize') }}
                 <span :class="sizeHintClass">{{ (preflight.estimatedBytes / 1024 / 1024).toFixed(2) }} MB</span>
                 ({{ preflight.sizeCategory }})
               </p>
-              <p class="mt-1 text-muted-foreground">File: {{ preflight.fileName }}</p>
+              <p class="mt-1 text-muted-foreground">{{ t('book.export.fileLabel', { fileName: preflight.fileName }) }}</p>
             </template>
             <p v-else-if="preflightError" class="mt-1 text-destructive">{{ preflightError }}</p>
           </section>
@@ -338,7 +342,7 @@ watch(
             :disabled="loading"
             @click="closeDialog"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
           <button
             class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
@@ -347,7 +351,7 @@ watch(
           >
             <Loader2 v-if="loading" :size="14" class="animate-spin" />
             <Download v-else :size="14" />
-            Export
+            {{ t('book.export.exportAction') }}
           </button>
         </div>
       </div>

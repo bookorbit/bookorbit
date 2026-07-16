@@ -11,6 +11,9 @@ export interface KoreaderDeviceInfo {
   deviceId: string;
   lastSyncAt: string;
   lastBookTitle: string | null;
+  fileNamingPattern?: string | null;
+  seriesFileNamingPattern?: string | null;
+  standaloneFileNamingPattern?: string | null;
 }
 
 export interface KoreaderBookProgress {
@@ -32,6 +35,9 @@ export interface KoreaderDeviceSweepInfo {
   lastSweepBooksMatched: number;
   lastSweepPageStats: number;
   lastSweepAnnotations: number;
+  fileNamingPattern?: string | null;
+  seriesFileNamingPattern?: string | null;
+  standaloneFileNamingPattern?: string | null;
 }
 
 export interface KoreaderPluginTotals {
@@ -41,6 +47,7 @@ export interface KoreaderPluginTotals {
   failedPositions: number;
   pageStatEvents: number;
   annotations: number;
+  unmatchedBooks: number;
 }
 
 export interface KoreaderSyncStatus {
@@ -66,6 +73,54 @@ export interface KoreaderBookSyncInfo {
   fileModifiedSinceLastSync: boolean;
 }
 
+export interface KoreaderUnmatchedBook {
+  hash: string;
+  title: string | null;
+  authors: string | null;
+  lastOpen: number | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+}
+
+export interface KoreaderManualHashLink {
+  hash: string;
+  bookId: number;
+  bookFileId: number;
+  bookTitle: string | null;
+  bookAuthors: string[];
+  koreaderTitle: string | null;
+  koreaderAuthors: string | null;
+  koreaderLastOpen: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LinkKoreaderUnmatchedBookPayload {
+  bookId: number;
+}
+
+export interface LinkKoreaderUnmatchedBookResult {
+  hash: string;
+  bookId: number;
+  bookFileId: number;
+}
+
+export interface DismissKoreaderUnmatchedBookResult {
+  hash: string;
+}
+
+export interface DismissAllKoreaderUnmatchedBooksResult {
+  count: number;
+}
+
+export interface UpdateKoreaderManualHashLinkPayload {
+  bookId: number;
+}
+
+export interface UnlinkKoreaderManualHashLinkResult {
+  hash: string;
+}
+
 export interface CreateKoreaderCredentialsPayload {
   username: string;
   password: string;
@@ -84,15 +139,7 @@ export interface TestKoreaderConnectionResult {
 }
 
 export type KoreaderCatalogSection =
-  | "libraries"
-  | "collections"
-  | "smart-scopes"
-  | "authors"
-  | "series"
-  | "search"
-  | "recent"
-  | "all-books"
-  | "continue-reading";
+  "libraries" | "collections" | "smart-scopes" | "authors" | "series" | "search" | "recent" | "all-books" | "continue-reading";
 
 export type KoreaderCatalogSort = "title" | "author" | "recently_added" | "recently_updated" | "recently_read" | "series";
 
@@ -128,6 +175,7 @@ export interface KoreaderCatalogFile {
   sizeBytes: number | null;
   durationSeconds: number | null;
   downloadUrl: string;
+  devicePath: string;
 }
 
 export interface KoreaderCatalogProgress {
@@ -154,10 +202,32 @@ export interface KoreaderCatalogBookListItem {
   updatedAt: string;
 }
 
+export type KoreaderCatalogRelatedSectionId = "series" | "author" | "similar";
+
+export interface KoreaderCatalogRelatedBook {
+  id: number;
+  title: string | null;
+  authors: string[];
+  seriesIndex: number | null;
+  hasCover: boolean;
+  thumbnailUrl: string | null;
+  detailUrl: string;
+  updatedAt: string | null;
+  isAudiobook?: boolean;
+  isComic?: boolean;
+}
+
+export interface KoreaderCatalogRelatedSection {
+  id: KoreaderCatalogRelatedSectionId;
+  title: string;
+  books: KoreaderCatalogRelatedBook[];
+}
+
 export interface KoreaderCatalogBookDetail extends KoreaderCatalogBookListItem {
   subtitle: string | null;
   description: string | null;
   publisher: string | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   isbn10: string | null;
@@ -171,6 +241,7 @@ export interface KoreaderCatalogBookDetail extends KoreaderCatalogBookListItem {
   tags: string[];
   progress: KoreaderCatalogProgress | null;
   files: KoreaderCatalogFile[];
+  relatedSections: KoreaderCatalogRelatedSection[];
 }
 
 export interface KoreaderCatalogPage<T> {
@@ -201,6 +272,9 @@ export interface KoreaderCatalogSectionResponse {
 
 export interface KoreaderCatalogDashboardResponse {
   generatedAt: string;
+  username: string;
+  displayName: string;
+  totalBooks: number;
   sections: KoreaderCatalogEntry[];
   continueReading: KoreaderCatalogBookListItem[];
   discover: KoreaderCatalogBookListItem[];

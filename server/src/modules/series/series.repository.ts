@@ -1,9 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { SQL, and, asc, count, desc, eq, ilike, inArray, isNotNull, sql } from 'drizzle-orm';
+import { SQL, and, asc, count, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { ContentFilterRules } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
+import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { authors, bookAuthors, bookMetadata, books, bookSeries, bookSeriesMemberships, userBookStatus } from '../../db/schema';
@@ -47,7 +48,7 @@ export class SeriesRepository {
     return sql`${books.id} IN (
       SELECT ${bookAuthors.bookId} FROM ${bookAuthors}
       INNER JOIN ${authors} ON ${authors.id} = ${bookAuthors.authorId}
-      WHERE ${ilike(authors.name, pattern)}
+      WHERE ${accentInsensitiveIlike(authors.name, pattern)}
     )`;
   }
 
@@ -71,7 +72,7 @@ export class SeriesRepository {
     if (params.q) {
       const qPattern = `%${this.escapeLikePattern(params.q)}%`;
       const authorNameMatch = this.buildAuthorNameMatchCondition(qPattern);
-      conditions.push(sql`(${ilike(bookSeries.name, qPattern)} OR ${authorNameMatch})`);
+      conditions.push(sql`(${accentInsensitiveIlike(bookSeries.name, qPattern)} OR ${authorNameMatch})`);
     }
 
     if (params.author) {

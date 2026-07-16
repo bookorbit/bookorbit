@@ -7,6 +7,16 @@ const loaded = ref(false)
 const loading = ref(false)
 const error = ref<string | null>(null)
 let fetchPromise: Promise<void> | null = null
+let requestGeneration = 0
+
+export function resetCollections(): void {
+  requestGeneration += 1
+  collections.value = []
+  loaded.value = false
+  loading.value = false
+  error.value = null
+  fetchPromise = null
+}
 
 export function useCollections() {
   async function fetchCollections(): Promise<void> {
@@ -14,20 +24,26 @@ export function useCollections() {
     if (fetchPromise) return fetchPromise
     loading.value = true
     error.value = null
+    const generation = requestGeneration
     fetchPromise = api('/api/v1/collections')
       .then(async (res) => {
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}`)
         }
-        collections.value = await res.json()
+        const nextCollections: Collection[] = await res.json()
+        if (generation !== requestGeneration) return
+        collections.value = nextCollections
         loaded.value = true
       })
       .catch((e: unknown) => {
+        if (generation !== requestGeneration) return
         error.value = e instanceof Error ? e.message : 'Failed to load collections'
       })
       .finally(() => {
-        loading.value = false
-        fetchPromise = null
+        if (generation === requestGeneration) {
+          loading.value = false
+          fetchPromise = null
+        }
       })
     return fetchPromise
   }

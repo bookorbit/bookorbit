@@ -46,11 +46,14 @@ export class AppInfoService implements OnApplicationBootstrap {
       }
     }
 
+    const maxUploadSizeMb = await this.appSettingsService.getMaxUploadSizeMb();
+
     return {
       version,
       updateAvailable: this.updateAvailable,
       latestVersion: this.latestVersion,
       bookDockPath,
+      maxUploadSizeMb,
     };
   }
 

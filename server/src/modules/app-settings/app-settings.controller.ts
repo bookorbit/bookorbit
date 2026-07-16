@@ -9,6 +9,7 @@ import { OidcProviderService } from './oidc-provider.service';
 import { UpdateAppSettingDto } from './dto/update-app-setting.dto';
 import { UpdateFilePatternDto } from './dto/update-file-pattern.dto';
 import { UpdateBooleanSettingDto } from './dto/update-boolean-setting.dto';
+import { UpdateDefaultLibraryAccessDto } from './dto/update-default-library-access.dto';
 import { CreateOidcProviderDto } from './dto/create-oidc-provider.dto';
 import { UpdateOidcProviderDto } from './dto/update-oidc-provider.dto';
 import { CreateGroupMappingDto } from './dto/create-group-mapping.dto';
@@ -96,6 +97,24 @@ export class AppSettingsController {
   async setCrossPlatformPathSanitization(@Body() dto: UpdateBooleanSettingDto) {
     await this.appSettingsService.setCrossPlatformPathSanitizationEnabled(dto.enabled);
     return { enabled: dto.enabled };
+  }
+
+  @Get('default-library-access')
+  @RequirePermission(Permission.ManageUsers)
+  getDefaultLibraryAccess() {
+    return this.appSettingsService.getDefaultLibraryAccess();
+  }
+
+  @Put('default-library-access')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(Permission.ManageUsers)
+  @Auditable({
+    action: AuditAction.AppSettingsUpdate,
+    resource: AuditResource.AppSettings,
+    description: 'Updated default library access',
+  })
+  setDefaultLibraryAccess(@Body() dto: UpdateDefaultLibraryAccessDto) {
+    return this.appSettingsService.setDefaultLibraryAccess({ libraryIds: dto.libraryIds });
   }
 
   // --- OIDC Provider CRUD ---

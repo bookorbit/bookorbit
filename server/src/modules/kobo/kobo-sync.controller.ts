@@ -4,7 +4,6 @@ import {
   Delete,
   Get,
   Header,
-  Headers,
   HttpCode,
   HttpStatus,
   Logger,
@@ -22,6 +21,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
+import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { KoboDevice } from './decorators/kobo-device.decorator';
 import type { KoboDeviceContext } from './guards/kobo-token.guard';
 import { KoboTokenGuard } from './guards/kobo-token.guard';
@@ -31,9 +31,14 @@ import { KoboReadingStateService } from './services/kobo-reading-state.service';
 import { KoboProxyService } from './services/kobo-proxy.service';
 import { KOBO_STORE_RESOURCES } from './kobo-store-resources';
 import { KoboBookIdentityService } from './services/kobo-book-identity.service';
+import { KoboSyncHistoryService } from './services/kobo-sync-history.service';
 
 function readHeaderValue(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function isBookOrbitTag(tagId: string): boolean {
+  return tagId.startsWith('col-') || tagId.startsWith('ss-');
 }
 
 function buildBaseUrl(req: FastifyRequest): string {
@@ -85,6 +90,7 @@ export class KoboSyncController {
     private readonly readingStateService: KoboReadingStateService,
     private readonly proxyService: KoboProxyService,
     private readonly bookIdentityService: KoboBookIdentityService,
+    private readonly historyService: KoboSyncHistoryService,
   ) {}
 
   @Get('v1/initialization')
@@ -100,6 +106,8 @@ export class KoboSyncController {
         image_url_template: `${baseUrl}/api/v1/kobo/${t}/v1/books/{ImageId}/thumbnail/{Width}/{Height}/false/image.jpg`,
         image_url_quality_template: `${baseUrl}/api/v1/kobo/${t}/v1/books/{ImageId}/thumbnail/{Width}/{Height}/{Quality}/{IsGreyscale}/image.jpg`,
         library_sync: `${baseUrl}/api/v1/kobo/${t}/v1/library/sync`,
+        get_tests_request: `${baseUrl}/api/v1/kobo/${t}/v1/analytics/gettests`,
+        post_analytics_event: `${baseUrl}/api/v1/kobo/${t}/v1/analytics/event`,
         reading_services_host: readingServicesBaseUrl,
       },
     };
@@ -109,13 +117,43 @@ export class KoboSyncController {
   async librarySync(
     @KoboDevice() device: KoboDeviceContext,
     @CurrentUser() user: RequestUser,
-    @Headers('x-kobo-synctoken') incomingToken: string | undefined,
     @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,
   ) {
-    this.logger.log(`librarySync: userId=${user.id} syncToken=${incomingToken ?? 'none'}`);
+    const startedAt = Date.now();
+    this.logger.debug(`[kobo.library_sync] [start] userId=${user.id} deviceId=${device.deviceId} - library sync started`);
     const baseUrl = buildBaseUrl(req);
-    const { entitlements, hasMore, syncToken } = await this.syncService.getDelta(user.id, device.deviceToken, baseUrl);
+    let result: { entitlements: unknown[]; hasMore: boolean; syncToken: string };
+    try {
+      result = await this.syncService.getDelta(user.id, device.deviceId, device.deviceToken, baseUrl);
+    } catch (error: unknown) {
+      const errorClass = error instanceof Error ? error.name : 'UnknownError';
+      const errorMessage = sanitizeLogValue(error instanceof Error ? error.message : 'unknown error');
+      this.logger.error(
+        `[kobo.library_sync] [fail] userId=${user.id} deviceId=${device.deviceId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - library sync failed`,
+      );
+      await this.historyService.recordFailure(
+        {
+          userId: user.id,
+          deviceId: device.deviceId,
+          event: 'library_sync',
+          durationMs: Date.now() - startedAt,
+        },
+        error,
+      );
+      throw error;
+    }
+    const { entitlements, hasMore, syncToken } = result;
+    this.logger.debug(
+      `[kobo.library_sync] [end] userId=${user.id} deviceId=${device.deviceId} durationMs=${Date.now() - startedAt} entitlementCount=${entitlements.length} hasMore=${hasMore} - library sync completed`,
+    );
+    await this.historyService.recordSuccess({
+      userId: user.id,
+      deviceId: device.deviceId,
+      event: 'library_sync',
+      durationMs: Date.now() - startedAt,
+      counts: { entitlements: entitlements.length, hasMore },
+    });
     reply.header('x-kobo-sync', hasMore ? 'continue' : '');
     reply.header('x-kobo-synctoken', syncToken);
     reply.send(entitlements);
@@ -129,14 +167,21 @@ export class KoboSyncController {
     @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,
   ) {
-    if (!tagId.startsWith('col-')) return this.proxyService.forward(req, reply, device.deviceToken);
+    if (!isBookOrbitTag(tagId)) return this.proxyService.forward(req, reply, device.deviceToken);
     reply.status(HttpStatus.OK).send({ RequestResult: 'Success' });
   }
 
   @Post('v1/library/tags/:tagId/items')
   @HttpCode(HttpStatus.OK)
   async addTagItems(@Param('tagId') tagId: string, @KoboDevice() device: KoboDeviceContext, @Req() req: FastifyRequest, @Res() reply: FastifyReply) {
-    if (!tagId.startsWith('col-')) return this.proxyService.forward(req, reply, device.deviceToken);
+    if (!isBookOrbitTag(tagId)) return this.proxyService.forward(req, reply, device.deviceToken);
+    reply.status(HttpStatus.OK).send({ RequestResult: 'Success' });
+  }
+
+  @Delete('v1/library/tags/:tagId')
+  @HttpCode(HttpStatus.OK)
+  async deleteTag(@Param('tagId') tagId: string, @KoboDevice() device: KoboDeviceContext, @Req() req: FastifyRequest, @Res() reply: FastifyReply) {
+    if (!isBookOrbitTag(tagId)) return this.proxyService.forward(req, reply, device.deviceToken);
     reply.status(HttpStatus.OK).send({ RequestResult: 'Success' });
   }
 
@@ -166,7 +211,7 @@ export class KoboSyncController {
   ) {
     const id = await this.bookIdentityService.resolveBookIdByEntitlementId(user.id, bookId);
     if (id === null) return this.proxyService.forward(req, reply, device.deviceToken);
-    await this.syncService.removeBookFromSync(user.id, id);
+    await this.syncService.removeBookFromSync(user.id, device.deviceId, id);
     reply.status(HttpStatus.OK).send();
   }
 
@@ -196,17 +241,39 @@ export class KoboSyncController {
   ) {
     const id = await this.bookIdentityService.resolveBookIdByEntitlementId(user.id, bookId);
     if (id === null) return this.proxyService.forward(req, reply, device.deviceToken);
-    const settings = await this.settingsService.getSettings(user.id);
-    const states = body.ReadingStates as Record<string, unknown>[] | undefined;
-    const statePayload = states?.[0] ?? body;
-    const result = await this.readingStateService.upsertState(
-      user.id,
-      id,
-      statePayload,
-      settings.readingThreshold,
-      settings.finishedThreshold,
-      settings.twoWayProgressSync,
-    );
-    reply.send(result);
+    const startedAt = Date.now();
+    try {
+      const settings = await this.settingsService.getSettings(user.id);
+      const states = body.ReadingStates as Record<string, unknown>[] | undefined;
+      const statePayload = states?.[0] ?? body;
+      const result = await this.readingStateService.upsertState(
+        user.id,
+        id,
+        statePayload,
+        settings.readingThreshold,
+        settings.finishedThreshold,
+        settings.twoWayProgressSync,
+        device.deviceId,
+      );
+      await this.historyService.recordSuccess({
+        userId: user.id,
+        deviceId: device.deviceId,
+        event: 'progress_update',
+        durationMs: Date.now() - startedAt,
+        counts: await this.historyService.countsForBook(user.id, id, { progressUpdates: 1, twoWayProgressSync: settings.twoWayProgressSync }),
+      });
+      reply.send(result);
+    } catch (error: unknown) {
+      await this.historyService.recordFailure(
+        {
+          userId: user.id,
+          deviceId: device.deviceId,
+          event: 'progress_update',
+          durationMs: Date.now() - startedAt,
+        },
+        error,
+      );
+      throw error;
+    }
   }
 }

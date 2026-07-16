@@ -1,9 +1,9 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 
 import { TagStrategy } from './tag.strategy';
 
 function makeStrategy(db: Record<string, unknown> = {}) {
-  return new TagStrategy(db as never);
+  return new TagStrategy({ execute: vi.fn().mockResolvedValue({ rows: [] }), ...db } as never);
 }
 
 function makeSelectChain(rows: unknown[]) {
@@ -223,6 +223,16 @@ describe('TagStrategy (JunctionEntityStrategy)', () => {
   });
 
   describe('merge', () => {
+    it('rejects merging entities that are used outside the accessible libraries', async () => {
+      const execute = vi.fn().mockResolvedValue({ rows: [{ '?column?': 1 }] });
+      const strategy = makeStrategy({ execute });
+      vi.spyOn(strategy, 'findEntityById');
+
+      await expect(strategy.merge({ targetId: 5, sourceIds: [1], userId: 1, libraryIds: [2] })).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(strategy.findEntityById).not.toHaveBeenCalled();
+    });
+
     it('throws NotFoundException when target entity is not found', async () => {
       const { select } = makeSelectChain([]);
       const strategy = makeStrategy({ select });

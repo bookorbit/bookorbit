@@ -16,6 +16,7 @@ function makeSmartScope(overrides: Partial<SmartScope> = {}): SmartScope {
     filter: null,
     defaultSort: [],
     isPublic: false,
+    syncToKobo: false,
     displayOrder: 0,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -64,5 +65,51 @@ describe('useSmartScopes', () => {
 
     expect(smartScopes.value).toEqual([updated])
     expect(smartScopes.value).not.toBe(previous)
+  })
+
+  it('resets cached smartScopes so the next fetch reloads them', async () => {
+    const first = makeSmartScope({ id: 1, name: 'Owner Scope' })
+    const second = makeSmartScope({ id: 2, userId: 4, name: 'Next User Scope' })
+    apiMock.mockResolvedValueOnce(makeResponse([first])).mockResolvedValueOnce(makeResponse([second]))
+
+    const { resetSmartScopes, useSmartScopes } = await import('../useSmartScopes')
+    const { smartScopes, loaded, fetchSmartScopes } = useSmartScopes()
+
+    await fetchSmartScopes()
+    await fetchSmartScopes()
+    expect(apiMock).toHaveBeenCalledTimes(1)
+    expect(smartScopes.value).toEqual([first])
+    expect(loaded.value).toBe(true)
+
+    resetSmartScopes()
+
+    expect(smartScopes.value).toEqual([])
+    expect(loaded.value).toBe(false)
+
+    await fetchSmartScopes()
+
+    expect(apiMock).toHaveBeenCalledTimes(2)
+    expect(smartScopes.value).toEqual([second])
+    expect(loaded.value).toBe(true)
+  })
+
+  it('ignores an in-flight fetch after smartScopes are reset', async () => {
+    const stale = makeSmartScope({ id: 1, name: 'Stale Scope' })
+    let resolveFetch!: (response: Response) => void
+    apiMock.mockReturnValueOnce(new Promise<Response>((resolve) => (resolveFetch = resolve)))
+
+    const { resetSmartScopes, useSmartScopes } = await import('../useSmartScopes')
+    const { smartScopes, loaded, loading, fetchSmartScopes } = useSmartScopes()
+
+    const fetchPromise = fetchSmartScopes()
+    expect(loading.value).toBe(true)
+
+    resetSmartScopes()
+    resolveFetch(makeResponse([stale]))
+    await fetchPromise
+
+    expect(smartScopes.value).toEqual([])
+    expect(loaded.value).toBe(false)
+    expect(loading.value).toBe(false)
   })
 })

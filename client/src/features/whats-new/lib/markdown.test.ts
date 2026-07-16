@@ -27,6 +27,17 @@ describe('renderChangelogMarkdown', () => {
     expect(html).not.toContain('javascript:')
   })
 
+  it('escapes quotes in markdown link destinations before creating attributes', () => {
+    const html = renderChangelogMarkdown('[safe](https://example.com/"onmouseover="alert(1))')
+    const template = document.createElement('template')
+    template.innerHTML = html
+    const anchor = template.content.querySelector('a')
+
+    expect(anchor).not.toBeNull()
+    expect(anchor!.getAttribute('onmouseover')).toBeNull()
+    expect(anchor!.getAttributeNames().sort()).toEqual(['href', 'rel', 'target'])
+  })
+
   it('returns empty string for empty input', () => {
     expect(renderChangelogMarkdown(null)).toBe('')
     expect(renderChangelogMarkdown('')).toBe('')

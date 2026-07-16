@@ -1,10 +1,10 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { access, mkdir, readdir, rename as fsRename, rmdir } from 'fs/promises';
-import { basename, dirname, extname, join, relative } from 'path';
+import { access, lstat, mkdir, readdir, realpath, rename as fsRename, rmdir } from 'fs/promises';
+import { basename, dirname, extname, isAbsolute, join, relative, sep } from 'path';
 
 import type { FileRenameResult } from '@bookorbit/types';
-import { NotificationType, resolveUploadPath } from '@bookorbit/types';
+import { isAudioFormat, NotificationType, resolveUploadPath, sanitizePathSegment } from '@bookorbit/types';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { NotificationService } from '../notification/notification.service';
@@ -18,6 +18,8 @@ const FILE_RENAME_ROLLBACK_EVENT = 'file.rename_rollback';
 const DEFAULT_RENAME_DEBOUNCE_MS = 3_000;
 
 export const RENAME_RELEVANT_FIELDS = new Set(['title', 'authors', 'seriesName', 'seriesIndex', 'publishedYear'] as const);
+
+type RenameBookFile = Awaited<ReturnType<FileRenameRepository['findAllBookFiles']>>[number];
 
 @Injectable()
 export class FileRenameService implements OnModuleDestroy {
@@ -114,22 +116,18 @@ export class FileRenameService implements OnModuleDestroy {
     }
 
     const currentAbsolutePath = data.file.absolutePath;
-    const newAbsolutePath = join(data.libraryFolderPath, resolvedRelPath);
+    const baseNewAbsolutePath = join(data.libraryFolderPath, resolvedRelPath);
     const currentFolderPath = data.bookFolderPath;
-    const newFolderPath = dirname(newAbsolutePath);
+    const baseNewFolderPath = dirname(baseNewAbsolutePath);
     const isBookPerFolder = data.organizationMode === 'book_per_folder';
 
     const allFiles = await this.renameRepo.findAllBookFiles(bookId);
     const fileTargets = new Map<number, string>();
-    const usedPaths = new Set<string>();
     const bookHasOwnFolder = isBookPerFolder && currentFolderPath !== currentAbsolutePath;
-
-    let hasInternalCollision = false;
 
     for (const file of allFiles) {
       if (file.id === data.file.id) {
-        fileTargets.set(file.id, newAbsolutePath);
-        usedPaths.add(newAbsolutePath.toLowerCase());
+        fileTargets.set(file.id, baseNewAbsolutePath);
       } else if (file.role === 'content') {
         const fileExt = extname(file.absolutePath);
         const fileFormat = (file.format ?? fileExt.slice(1)).toLowerCase();
@@ -143,43 +141,40 @@ export class FileRenameService implements OnModuleDestroy {
           if (isBookPerFolder) {
             const relToOldFolder = bookHasOwnFolder ? relative(currentFolderPath, file.absolutePath) : basename(file.absolutePath);
             const oldSubDir = dirname(relToOldFolder);
-            targetAbs = join(newFolderPath, oldSubDir, basename(resolvedAbs));
+            targetAbs = join(baseNewFolderPath, oldSubDir, basename(resolvedAbs));
           } else {
             targetAbs = resolvedAbs;
           }
         } else {
           const relToOldFolder = bookHasOwnFolder ? relative(currentFolderPath, file.absolutePath) : basename(file.absolutePath);
-          targetAbs = join(isBookPerFolder ? newFolderPath : dirname(newAbsolutePath), relToOldFolder);
+          targetAbs = join(isBookPerFolder ? baseNewFolderPath : dirname(baseNewAbsolutePath), relToOldFolder);
         }
 
-        if (usedPaths.has(targetAbs.toLowerCase())) {
-          hasInternalCollision = true;
-        }
-        usedPaths.add(targetAbs.toLowerCase());
         fileTargets.set(file.id, targetAbs);
       } else {
         const relToOldFolder = bookHasOwnFolder ? relative(currentFolderPath, file.absolutePath) : basename(file.absolutePath);
-        const targetAbs = join(isBookPerFolder ? newFolderPath : dirname(newAbsolutePath), relToOldFolder);
+        const targetAbs = join(isBookPerFolder ? baseNewFolderPath : dirname(baseNewAbsolutePath), relToOldFolder);
 
-        if (usedPaths.has(targetAbs.toLowerCase())) {
-          hasInternalCollision = true;
-        }
-        usedPaths.add(targetAbs.toLowerCase());
         fileTargets.set(file.id, targetAbs);
       }
     }
 
-    if (hasInternalCollision) {
+    this.applyMultiTrackAudioPartSuffixes(fileTargets, allFiles, data.file.id);
+
+    if (this.hasInternalCollision(fileTargets)) {
       fileTargets.clear();
-      fileTargets.set(data.file.id, newAbsolutePath);
+      fileTargets.set(data.file.id, baseNewAbsolutePath);
       for (const file of allFiles) {
         if (file.id !== data.file.id) {
           const relToOldFolder = bookHasOwnFolder ? relative(currentFolderPath, file.absolutePath) : basename(file.absolutePath);
-          const targetDir = isBookPerFolder ? newFolderPath : dirname(newAbsolutePath);
+          const targetDir = isBookPerFolder ? baseNewFolderPath : dirname(baseNewAbsolutePath);
           fileTargets.set(file.id, join(targetDir, relToOldFolder));
         }
       }
     }
+
+    const newAbsolutePath = fileTargets.get(data.file.id) ?? baseNewAbsolutePath;
+    const newFolderPath = dirname(newAbsolutePath);
 
     let pathUnchanged = newAbsolutePath === currentAbsolutePath;
     if (pathUnchanged) {
@@ -199,29 +194,37 @@ export class FileRenameService implements OnModuleDestroy {
 
     const nestedFolderMove = bookHasOwnFolder && newFolderPath !== currentFolderPath && this.foldersAreNested(currentFolderPath, newFolderPath);
     const renamingFolder = bookHasOwnFolder && newFolderPath !== currentFolderPath && !nestedFolderMove;
+    let moveIntoExistingFolder = false;
+    let mergeTargetBookId: number | null = null;
 
     if (renamingFolder) {
       if (await this.pathExists(newFolderPath)) {
-        const reason = 'target folder already exists on disk';
-        this.logger.warn(
-          `[${FILE_RENAME_EVENT}] [end] bookId=${bookId} userId=${userId} durationMs=${Date.now() - startedAt} status=skipped reason="${sanitizeLogValue(reason)}" newPath="${sanitizeLogValue(newAbsolutePath)}" - rename skipped: target already exists on disk`,
-        );
-        await this.notifyFailure(userId, bookId, `File rename skipped: ${reason}.`, suppressNotification);
-        return { status: 'skipped', reason, oldPath: currentAbsolutePath, newPath: newAbsolutePath, durationMs: Date.now() - startedAt };
-      }
-    } else {
-      for (const file of allFiles) {
-        const targetPath = fileTargets.get(file.id)!;
-        if (targetPath !== file.absolutePath) {
-          if (await this.pathExists(targetPath)) {
+        const sameFolder = await this.pathsReferToSameSource(currentFolderPath, newFolderPath, data.libraryFolderPath, sanitizeForCrossPlatform);
+        if (!sameFolder) {
+          moveIntoExistingFolder = true;
+          const targetBook = await this.renameRepo.findBookByExactFolderPath(data.libraryId, newFolderPath);
+          if (targetBook && targetBook.id !== bookId) mergeTargetBookId = targetBook.id;
+
+          const existingTargetPath = await this.findExistingTargetFilePath(allFiles, fileTargets, data.libraryFolderPath, sanitizeForCrossPlatform);
+          if (existingTargetPath) {
             const reason = 'target path already exists on disk';
             this.logger.warn(
-              `[${FILE_RENAME_EVENT}] [end] bookId=${bookId} userId=${userId} durationMs=${Date.now() - startedAt} status=skipped reason="${sanitizeLogValue(reason)}" newPath="${sanitizeLogValue(newAbsolutePath)}" - rename skipped: target already exists on disk`,
+              `[${FILE_RENAME_EVENT}] [end] bookId=${bookId} userId=${userId} durationMs=${Date.now() - startedAt} status=skipped reason="${sanitizeLogValue(reason)}" newPath="${sanitizeLogValue(existingTargetPath)}" - rename skipped: target already exists on disk`,
             );
             await this.notifyFailure(userId, bookId, `File rename skipped: ${reason}.`, suppressNotification);
             return { status: 'skipped', reason, oldPath: currentAbsolutePath, newPath: newAbsolutePath, durationMs: Date.now() - startedAt };
           }
         }
+      }
+    } else {
+      const existingTargetPath = await this.findExistingTargetFilePath(allFiles, fileTargets, data.libraryFolderPath, sanitizeForCrossPlatform);
+      if (existingTargetPath) {
+        const reason = 'target path already exists on disk';
+        this.logger.warn(
+          `[${FILE_RENAME_EVENT}] [end] bookId=${bookId} userId=${userId} durationMs=${Date.now() - startedAt} status=skipped reason="${sanitizeLogValue(reason)}" newPath="${sanitizeLogValue(newAbsolutePath)}" - rename skipped: target already exists on disk`,
+        );
+        await this.notifyFailure(userId, bookId, `File rename skipped: ${reason}.`, suppressNotification);
+        return { status: 'skipped', reason, oldPath: currentAbsolutePath, newPath: newAbsolutePath, durationMs: Date.now() - startedAt };
       }
     }
 
@@ -247,10 +250,24 @@ export class FileRenameService implements OnModuleDestroy {
 
     try {
       if (bookHasOwnFolder && newFolderPath !== currentFolderPath) {
-        await this.renameBookWithFolder(bookId, data, currentFolderPath, newFolderPath, fileTargets);
+        if (mergeTargetBookId !== null) {
+          await this.mergeBookIntoExistingFolder(
+            bookId,
+            data,
+            currentFolderPath,
+            newFolderPath,
+            fileTargets,
+            mergeTargetBookId,
+            sanitizeForCrossPlatform,
+          );
+        } else if (moveIntoExistingFolder) {
+          await this.renameBookIntoExistingFolder(bookId, data, currentFolderPath, newFolderPath, fileTargets, sanitizeForCrossPlatform);
+        } else {
+          await this.renameBookWithFolder(bookId, data, currentFolderPath, newFolderPath, fileTargets, sanitizeForCrossPlatform);
+        }
       } else {
         const nextBookFolderPath = isBookPerFolder ? newFolderPath : newAbsolutePath;
-        await this.renameBookFilesOnly(bookId, data, fileTargets, nextBookFolderPath);
+        await this.renameBookFilesOnly(bookId, data, fileTargets, nextBookFolderPath, sanitizeForCrossPlatform);
       }
     } catch (err) {
       const errorClass = err instanceof Error ? err.name : 'Error';
@@ -275,6 +292,7 @@ export class FileRenameService implements OnModuleDestroy {
     data: BookRenameData,
     fileTargets: Map<number, string>,
     nextBookFolderPath: string,
+    sanitizeForCrossPlatform: boolean,
   ): Promise<void> {
     const allFiles = await this.renameRepo.findAllBookFiles(bookId);
     const updates: BookFilePathUpdate[] = allFiles.map((file) => {
@@ -294,8 +312,10 @@ export class FileRenameService implements OnModuleDestroy {
         const newPath = fileTargets.get(file.id)!;
         if (newPath !== file.absolutePath) {
           await mkdir(dirname(newPath), { recursive: true });
-          await this.lockService.withLock(file.absolutePath, () => fsRename(file.absolutePath, newPath));
-          moved.push({ from: file.absolutePath, to: newPath });
+          const movedFrom = await this.lockService.withLock(file.absolutePath, () =>
+            this.renamePath(file.absolutePath, newPath, data.libraryFolderPath, sanitizeForCrossPlatform),
+          );
+          moved.push({ from: movedFrom, to: newPath });
         }
       }
     } catch (error) {
@@ -330,6 +350,7 @@ export class FileRenameService implements OnModuleDestroy {
     oldFolderPath: string,
     newFolderPath: string,
     fileTargets: Map<number, string>,
+    sanitizeForCrossPlatform: boolean,
   ): Promise<void> {
     const allFiles = await this.renameRepo.findAllBookFiles(bookId);
     const newUpdates = allFiles.map((file) => ({
@@ -342,12 +363,24 @@ export class FileRenameService implements OnModuleDestroy {
     await this.renameRepo.applyFolderRename(bookId, newUpdates, newFolderPath);
 
     if (this.foldersAreNested(oldFolderPath, newFolderPath)) {
-      await this.moveBookFilesIndividually(bookId, allFiles, oldFolderPath, newFolderPath, fileTargets, oldUpdates);
+      await this.moveBookFilesIndividually(
+        bookId,
+        allFiles,
+        oldFolderPath,
+        newFolderPath,
+        fileTargets,
+        oldUpdates,
+        data.libraryFolderPath,
+        sanitizeForCrossPlatform,
+      );
     } else {
       let folderRenamed = false;
+      let renamedFromFolderPath = oldFolderPath;
       try {
         await mkdir(dirname(newFolderPath), { recursive: true });
-        await this.lockService.withLock(oldFolderPath, () => fsRename(oldFolderPath, newFolderPath));
+        renamedFromFolderPath = await this.lockService.withLock(oldFolderPath, () =>
+          this.renamePath(oldFolderPath, newFolderPath, data.libraryFolderPath, sanitizeForCrossPlatform),
+        );
         folderRenamed = true;
 
         const movedFilesInside: Array<{ from: string; to: string }> = [];
@@ -357,8 +390,10 @@ export class FileRenameService implements OnModuleDestroy {
             const intendedPath = fileTargets.get(file.id)!;
             if (currentPathAfterFolderRename !== intendedPath) {
               await mkdir(dirname(intendedPath), { recursive: true });
-              await this.lockService.withLock(currentPathAfterFolderRename, () => fsRename(currentPathAfterFolderRename, intendedPath));
-              movedFilesInside.push({ from: currentPathAfterFolderRename, to: intendedPath });
+              const movedFrom = await this.lockService.withLock(currentPathAfterFolderRename, () =>
+                this.renamePath(currentPathAfterFolderRename, intendedPath, data.libraryFolderPath, sanitizeForCrossPlatform),
+              );
+              movedFilesInside.push({ from: movedFrom, to: intendedPath });
             }
           }
         } catch (innerError) {
@@ -374,10 +409,99 @@ export class FileRenameService implements OnModuleDestroy {
       } catch (error) {
         await this.rollbackFolderRename(bookId, oldUpdates, oldFolderPath, error);
         if (folderRenamed) {
-          await this.rollbackFolderMove(bookId, newFolderPath, oldFolderPath, error);
+          await this.rollbackFolderMove(bookId, newFolderPath, renamedFromFolderPath, error);
         }
         throw error;
       }
+    }
+
+    await this.tryRemoveEmptyDir(oldFolderPath);
+    await this.tryRemoveEmptyDir(dirname(oldFolderPath));
+  }
+
+  private async renameBookIntoExistingFolder(
+    bookId: number,
+    data: BookRenameData,
+    oldFolderPath: string,
+    newFolderPath: string,
+    fileTargets: Map<number, string>,
+    sanitizeForCrossPlatform: boolean,
+  ): Promise<void> {
+    const allFiles = await this.renameRepo.findAllBookFiles(bookId);
+    const newUpdates = allFiles.map((file) => ({
+      id: file.id,
+      absolutePath: fileTargets.get(file.id)!,
+      relPath: relative(data.libraryFolderPath, fileTargets.get(file.id)!),
+    }));
+    const oldUpdates = allFiles.map((file) => ({ id: file.id, absolutePath: file.absolutePath, relPath: file.relPath }) satisfies BookFilePathUpdate);
+
+    await this.renameRepo.applyFolderRename(bookId, newUpdates, newFolderPath);
+    await this.moveBookFilesIndividually(
+      bookId,
+      allFiles,
+      oldFolderPath,
+      newFolderPath,
+      fileTargets,
+      oldUpdates,
+      data.libraryFolderPath,
+      sanitizeForCrossPlatform,
+    );
+
+    await this.tryRemoveEmptyDir(oldFolderPath);
+    await this.tryRemoveEmptyDir(dirname(oldFolderPath));
+  }
+
+  private async mergeBookIntoExistingFolder(
+    bookId: number,
+    data: BookRenameData,
+    oldFolderPath: string,
+    newFolderPath: string,
+    fileTargets: Map<number, string>,
+    targetBookId: number,
+    sanitizeForCrossPlatform: boolean,
+  ): Promise<void> {
+    const allFiles = await this.renameRepo.findAllBookFiles(bookId);
+    const updates = allFiles.map((file) => ({
+      id: file.id,
+      absolutePath: fileTargets.get(file.id)!,
+      relPath: relative(data.libraryFolderPath, fileTargets.get(file.id)!),
+    }));
+
+    const movedFiles: Array<{ from: string; to: string }> = [];
+    try {
+      await mkdir(newFolderPath, { recursive: true });
+
+      for (const file of allFiles) {
+        const newFilePath = fileTargets.get(file.id)!;
+        const newFileDir = dirname(newFilePath);
+        if (newFileDir !== newFolderPath) {
+          await mkdir(newFileDir, { recursive: true });
+        }
+
+        if (file.absolutePath !== newFilePath) {
+          const movedFrom = await this.lockService.withLock(file.absolutePath, () =>
+            this.renamePath(file.absolutePath, newFilePath, data.libraryFolderPath, sanitizeForCrossPlatform),
+          );
+          movedFiles.push({ from: movedFrom, to: newFilePath });
+        }
+      }
+
+      await this.renameRepo.applyExistingFolderMerge({
+        sourceBookId: bookId,
+        targetBookId,
+        updates,
+        fallbackPrimaryFileId: data.file.id,
+      });
+    } catch (error) {
+      for (const { from, to } of [...movedFiles].reverse()) {
+        try {
+          await mkdir(dirname(from), { recursive: true });
+          await fsRename(to, from);
+        } catch (rollbackError) {
+          this.logRollbackFailure(bookId, error, rollbackError);
+        }
+      }
+      throw error;
     }
 
     await this.tryRemoveEmptyDir(oldFolderPath);
@@ -391,6 +515,8 @@ export class FileRenameService implements OnModuleDestroy {
     newFolderPath: string,
     fileTargets: Map<number, string>,
     oldUpdates: BookFilePathUpdate[],
+    libraryFolderPath: string,
+    sanitizeForCrossPlatform: boolean,
   ): Promise<void> {
     const movedFiles: Array<{ from: string; to: string }> = [];
 
@@ -406,8 +532,10 @@ export class FileRenameService implements OnModuleDestroy {
         }
 
         if (file.absolutePath !== newFilePath) {
-          await this.lockService.withLock(file.absolutePath, () => fsRename(file.absolutePath, newFilePath));
-          movedFiles.push({ from: file.absolutePath, to: newFilePath });
+          const movedFrom = await this.lockService.withLock(file.absolutePath, () =>
+            this.renamePath(file.absolutePath, newFilePath, libraryFolderPath, sanitizeForCrossPlatform),
+          );
+          movedFiles.push({ from: movedFrom, to: newFilePath });
         }
       }
     } catch (error) {
@@ -422,6 +550,58 @@ export class FileRenameService implements OnModuleDestroy {
       await this.rollbackFolderRename(bookId, oldUpdates, oldFolderPath, error);
       throw error;
     }
+  }
+
+  private applyMultiTrackAudioPartSuffixes(fileTargets: Map<number, string>, allFiles: RenameBookFile[], primaryFileId: number): void {
+    const audioFiles = allFiles.filter((file) => this.isAudioContentFile(file, primaryFileId));
+    if (audioFiles.length < 2) return;
+
+    const audioFilesByTarget = new Map<string, RenameBookFile[]>();
+    for (const file of audioFiles) {
+      const targetPath = fileTargets.get(file.id);
+      if (!targetPath) continue;
+
+      const key = targetPath.toLowerCase();
+      const existing = audioFilesByTarget.get(key);
+      if (existing) {
+        existing.push(file);
+      } else {
+        audioFilesByTarget.set(key, [file]);
+      }
+    }
+
+    const collidingGroups = [...audioFilesByTarget.values()].filter((group) => group.length > 1);
+    if (collidingGroups.length === 0) return;
+
+    const trackNumbersByFileId = new Map<number, number>();
+    [...audioFiles].sort(compareAudioTrackFiles).forEach((file, index) => {
+      trackNumbersByFileId.set(file.id, index + 1);
+    });
+
+    for (const group of collidingGroups) {
+      for (const file of group) {
+        const targetPath = fileTargets.get(file.id);
+        const trackNumber = trackNumbersByFileId.get(file.id);
+        if (!targetPath || !trackNumber) continue;
+
+        fileTargets.set(file.id, appendPartSuffix(targetPath, trackNumber));
+      }
+    }
+  }
+
+  private isAudioContentFile(file: RenameBookFile, primaryFileId: number): boolean {
+    const format = (file.format ?? extname(file.absolutePath).slice(1)).toLowerCase();
+    return Boolean(format && isAudioFormat(format) && (file.role === 'content' || file.id === primaryFileId));
+  }
+
+  private hasInternalCollision(fileTargets: Map<number, string>): boolean {
+    const seen = new Set<string>();
+    for (const targetPath of fileTargets.values()) {
+      const key = targetPath.toLowerCase();
+      if (seen.has(key)) return true;
+      seen.add(key);
+    }
+    return false;
   }
 
   private foldersAreNested(pathA: string, pathB: string): boolean {
@@ -463,6 +643,76 @@ export class FileRenameService implements OnModuleDestroy {
     } catch {
       return false;
     }
+  }
+
+  private async findExistingTargetFilePath(
+    allFiles: RenameBookFile[],
+    fileTargets: Map<number, string>,
+    libraryFolderPath: string,
+    sanitizeForCrossPlatform: boolean,
+  ): Promise<string | null> {
+    for (const file of allFiles) {
+      const targetPath = fileTargets.get(file.id)!;
+      if (
+        targetPath !== file.absolutePath &&
+        (await this.pathExists(targetPath)) &&
+        !(await this.pathsReferToSameSource(file.absolutePath, targetPath, libraryFolderPath, sanitizeForCrossPlatform))
+      ) {
+        return targetPath;
+      }
+    }
+    return null;
+  }
+
+  private async pathsReferToSameEntry(firstPath: string, secondPath: string): Promise<boolean> {
+    try {
+      const [first, second, resolvedFirst, resolvedSecond] = await Promise.all([
+        lstat(firstPath),
+        lstat(secondPath),
+        realpath(firstPath),
+        realpath(secondPath),
+      ]);
+      return first.dev === second.dev && first.ino === second.ino && resolvedFirst === resolvedSecond;
+    } catch {
+      return false;
+    }
+  }
+
+  private async pathsReferToSameSource(
+    sourcePath: string,
+    targetPath: string,
+    libraryFolderPath: string,
+    sanitizeForCrossPlatform: boolean,
+  ): Promise<boolean> {
+    if (await this.pathsReferToSameEntry(sourcePath, targetPath)) return true;
+    if (!sanitizeForCrossPlatform) return false;
+
+    const sanitizedSourcePath = this.buildSanitizedSourcePath(sourcePath, libraryFolderPath);
+    return sanitizedSourcePath !== null && (await this.pathsReferToSameEntry(sanitizedSourcePath, targetPath));
+  }
+
+  private async renamePath(sourcePath: string, targetPath: string, libraryFolderPath: string, sanitizeForCrossPlatform: boolean): Promise<string> {
+    try {
+      await fsRename(sourcePath, targetPath);
+      return sourcePath;
+    } catch (error) {
+      if (!sanitizeForCrossPlatform || !isMissingPathError(error)) throw error;
+
+      const sanitizedSourcePath = this.buildSanitizedSourcePath(sourcePath, libraryFolderPath);
+      if (sanitizedSourcePath !== targetPath || !(await this.pathExists(sanitizedSourcePath))) throw error;
+
+      return sanitizedSourcePath;
+    }
+  }
+
+  private buildSanitizedSourcePath(sourcePath: string, libraryFolderPath: string): string | null {
+    const relativeSourcePath = relative(libraryFolderPath, sourcePath);
+    if (!relativeSourcePath || relativeSourcePath === '..' || relativeSourcePath.startsWith(`..${sep}`) || isAbsolute(relativeSourcePath)) {
+      return null;
+    }
+
+    const sanitizedSourcePath = join(libraryFolderPath, ...relativeSourcePath.split(sep).map((segment) => sanitizePathSegment(segment)));
+    return sanitizedSourcePath === sourcePath ? null : sanitizedSourcePath;
   }
 
   private async tryRemoveEmptyDir(dirPath: string): Promise<void> {
@@ -517,4 +767,20 @@ function resolvePositiveInteger(value: unknown, fallback: number): number {
   const numeric = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(numeric) || numeric < 1) return fallback;
   return Math.floor(numeric);
+}
+
+function isMissingPathError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && 'code' in error && error.code === 'ENOENT';
+}
+
+function compareAudioTrackFiles(a: RenameBookFile, b: RenameBookFile): number {
+  const aSortOrder = a.sortOrder ?? Number.MAX_SAFE_INTEGER;
+  const bSortOrder = b.sortOrder ?? Number.MAX_SAFE_INTEGER;
+  return aSortOrder - bSortOrder || a.id - b.id;
+}
+
+function appendPartSuffix(targetPath: string, trackNumber: number): string {
+  const extension = extname(targetPath);
+  const stem = basename(targetPath, extension);
+  return join(dirname(targetPath), `${stem}-Part${String(trackNumber).padStart(2, '0')}${extension}`);
 }

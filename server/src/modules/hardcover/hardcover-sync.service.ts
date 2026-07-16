@@ -265,6 +265,15 @@ export class HardcoverSyncService {
 
     const syncOverride = resolveHardcoverBookSyncOverrideForToggle(settings.bookSyncMode, payload.syncEnabled);
     const state = await this.repo.setBookSyncOverride(userId, bookId, syncOverride);
+
+    if (payload.syncEnabled) {
+      void this.syncBook(userId, bookId).catch((err) => {
+        this.logger.error(
+          `[hardcover.sync_book_on_enable] [fail] userId=${userId} bookId=${bookId} errorClass=${err?.constructor?.name ?? 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - immediate sync on enable failed`,
+        );
+      });
+    }
+
     return this.toBookSyncState(bookId, book, settings, state);
   }
 
@@ -388,6 +397,10 @@ export class HardcoverSyncService {
       let progressSynced = true;
 
       if (startDate || endDate || book.progress != null) {
+        if (book.progress != null && !match.editionPages) {
+          throw new Error('missing_edition_pages');
+        }
+
         const progressPages = book.progress != null && match.editionPages ? Math.round((book.progress / 100) * match.editionPages) : undefined;
         progressSynced = book.progress == null || progressPages != null;
 
@@ -417,6 +430,28 @@ export class HardcoverSyncService {
             `[hardcover.sync_progress] [end] userId=${userId} bookId=${book.bookId} hardcoverBookId=${match.hardcoverBookId} hardcoverReadId=${hardcoverReadId} durationMs=${Date.now() - startedAt} progress=${book.progress} progressPages=${progressPages} - progress sent to Hardcover`,
           );
         }
+      }
+
+      const localAttempts = typeof this.repo.findReadingAttempts === 'function' ? await this.repo.findReadingAttempts(userId, book.bookId) : [];
+      const primaryAttempt = [...localAttempts].reverse().find((attempt) => {
+        const attemptStarted = attempt.startedOn ?? null;
+        const attemptEnded = attempt.outcome === 'completed' ? (attempt.endedOn ?? null) : null;
+        return attemptStarted === startDate && attemptEnded === endDate;
+      });
+      if (hardcoverReadId != null && primaryAttempt) {
+        await this.repo.linkReadingAttempt(userId, primaryAttempt.id, hardcoverReadId);
+      }
+      for (const attempt of localAttempts) {
+        if (attempt.id === primaryAttempt?.id || attempt.outcome === 'skimmed' || attempt.outcome === 'abandoned') continue;
+        const existingReadId = attempt.externalProvider === 'hardcover' && attempt.externalId ? Number(attempt.externalId) : null;
+        const readId = await this.upsertUserBookRead(userId, token, {
+          userBookId,
+          existingReadId: Number.isInteger(existingReadId) ? existingReadId : null,
+          startedAt: attempt.startedOn,
+          finishedAt: attempt.outcome === 'completed' ? attempt.endedOn : null,
+          editionId: match.hardcoverEditionId ?? undefined,
+        });
+        if (readId != null) await this.repo.linkReadingAttempt(userId, attempt.id, readId);
       }
 
       await this.repo.upsertBookState({
@@ -605,6 +640,7 @@ export class HardcoverSyncService {
 
   private hasChanges(book: BookSyncData, state: Awaited<ReturnType<HardcoverRepository['findBookState']>>): boolean {
     if (!state?.lastSyncedAt) return true;
+    if (book.attemptsUpdatedAt && book.attemptsUpdatedAt > state.lastSyncedAt) return true;
     if (book.hardcoverMetadataId && state.syncError === 'no_match') return true;
     const metadataHardcoverId = this.parseNumericHardcoverMetadataId(book.hardcoverMetadataId);
     if (metadataHardcoverId !== null && metadataHardcoverId !== state.hardcoverBookId) return true;

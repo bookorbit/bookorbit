@@ -7,6 +7,7 @@ describe('resolveCollapsePreference', () => {
     expect(resolveCollapsePreference(undefined, {})).toBe(false);
     expect(resolveCollapsePreference(undefined, { libraryId: 1 })).toBe(false);
     expect(resolveCollapsePreference(undefined, { collectionId: 5 })).toBe(false);
+    expect(resolveCollapsePreference(undefined, { smartScopeId: 8 })).toBe(false);
   });
 
   it('returns global value when no context is provided', () => {
@@ -35,6 +36,12 @@ describe('resolveCollapsePreference', () => {
   it('returns collection override when present', () => {
     const prefs: SeriesCollapsePreferences = { global: false, libraries: {}, collections: { '7': true } };
     expect(resolveCollapsePreference(prefs, { collectionId: 7 })).toBe(true);
+  });
+
+  it('returns smart scope override when present', () => {
+    const prefs: SeriesCollapsePreferences = { global: false, libraries: {}, collections: {}, smartScopes: { '8': true } };
+    expect(resolveCollapsePreference(prefs, { smartScopeId: 8 })).toBe(true);
+    expect(resolveCollapsePreference(prefs, { smartScopeId: 9 })).toBe(false);
   });
 
   it('prefers collection override over library override', () => {

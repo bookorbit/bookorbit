@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { ChevronDown, ChevronUp, Plus, Pencil, Trash2, Star, Share2, Wifi, Server, AlertTriangle } from '@lucide/vue'
 import { Permission } from '@bookorbit/types'
@@ -9,6 +10,7 @@ import { useAuth } from '@/features/auth/composables/useAuth'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useMediaQuery } from '@vueuse/core'
 
+const { t } = useI18n()
 const {
   providers,
   createProvider,
@@ -83,7 +85,7 @@ function cancelForm() {
 
 async function submitForm() {
   if (!form.name.trim() || !form.host.trim()) {
-    formError.value = 'Name and host are required'
+    formError.value = t('email.providers.nameHostRequired')
     return
   }
   saving.value = true
@@ -93,14 +95,14 @@ async function submitForm() {
       const payload: Partial<EmailProviderForm> = { ...form }
       if (!payload.password) delete payload.password
       await updateProvider(editingId.value, payload)
-      toast.success('Provider updated')
+      toast.success(t('email.providers.updated'))
     } else {
       await createProvider(form)
-      toast.success('Provider created')
+      toast.success(t('email.providers.created'))
     }
     cancelForm()
   } catch (e) {
-    formError.value = e instanceof Error ? e.message : 'Failed to save'
+    formError.value = e instanceof Error ? e.message : t('email.saveFailed')
   } finally {
     saving.value = false
   }
@@ -109,27 +111,27 @@ async function submitForm() {
 async function remove(p: EmailProvider) {
   try {
     await deleteProvider(p.id)
-    toast.success(`"${p.name}" deleted`)
+    toast.success(t('email.providers.deleted', { name: p.name }))
   } catch (e) {
-    toast.error(e instanceof Error ? e.message : 'Failed to delete')
+    toast.error(e instanceof Error ? e.message : t('email.deleteFailed'))
   }
 }
 
 async function setDefault(p: EmailProvider) {
   try {
     await setDefaultProvider(p.id)
-    toast.success(`"${p.name}" set as default`)
+    toast.success(t('email.providers.setDefaultSuccess', { name: p.name }))
   } catch {
-    toast.error('Failed to set default')
+    toast.error(t('email.setDefaultFailed'))
   }
 }
 
 async function toggleShare(p: EmailProvider) {
   try {
     await toggleSharedProvider(p.id)
-    toast.success(p.isShared ? 'Provider unshared' : 'Provider shared with all users')
+    toast.success(p.isShared ? t('email.providers.unshared') : t('email.providers.sharedWithAll'))
   } catch (e) {
-    toast.error(e instanceof Error ? e.message : 'Failed to update sharing')
+    toast.error(e instanceof Error ? e.message : t('email.providers.updateSharingFailed'))
   }
 }
 
@@ -137,13 +139,13 @@ async function setSystem(p: EmailProvider) {
   try {
     if (p.isSystemProvider) {
       await clearSystemProvider()
-      toast.success(`"${p.name}" removed as system mail provider`)
+      toast.success(t('email.providers.systemRemoved', { name: p.name }))
     } else {
       await setSystemProvider(p.id)
-      toast.success(`"${p.name}" set as system mail provider`)
+      toast.success(t('email.providers.systemSet', { name: p.name }))
     }
   } catch (e) {
-    toast.error(e instanceof Error ? e.message : 'Failed to update system provider')
+    toast.error(e instanceof Error ? e.message : t('email.providers.updateSystemFailed'))
   }
 }
 
@@ -152,12 +154,12 @@ async function test(p: EmailProvider) {
   try {
     const result = await testProvider(p.id)
     if (result.success) {
-      toast.success('Connection successful')
+      toast.success(t('email.providers.connectionSuccess'))
     } else {
-      toast.error(result.error ?? 'Connection failed')
+      toast.error(result.error ?? t('email.providers.connectionFailed'))
     }
   } catch (e) {
-    toast.error(e instanceof Error ? e.message : 'Test failed')
+    toast.error(e instanceof Error ? e.message : t('email.providers.testFailed'))
   } finally {
     testing.value = null
   }
@@ -186,18 +188,18 @@ watch(
 <template>
   <div class="space-y-4">
     <div class="hidden md:flex items-center justify-between">
-      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">SMTP Providers</p>
+      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{{ t('email.providers.heading') }}</p>
       <button
         v-if="canManageEmail && !showForm"
         class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
         @click="openCreate()"
       >
         <Plus :size="12" />
-        Add provider
+        {{ t('email.providers.add') }}
       </button>
     </div>
     <div class="md:hidden flex items-center justify-between">
-      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">SMTP Providers</p>
+      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{{ t('email.providers.heading') }}</p>
     </div>
     <div
       v-if="canManageEmail && !showForm"
@@ -208,25 +210,25 @@ watch(
         @click="openCreate()"
       >
         <Plus :size="13" />
-        Add provider
+        {{ t('email.providers.add') }}
       </button>
     </div>
 
     <!-- Add/Edit form -->
     <div v-if="canManageEmail && showForm" class="border border-border rounded-lg p-4 md:p-5 bg-card space-y-4">
-      <p class="text-sm font-semibold text-foreground">{{ editingId ? 'Edit Provider' : 'New Provider' }}</p>
+      <p class="text-sm font-semibold text-foreground">{{ editingId ? t('email.providers.editTitle') : t('email.providers.newTitle') }}</p>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div class="col-span-2">
-          <label class="block text-xs font-medium text-muted-foreground mb-1.5">Name</label>
+          <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('email.providers.name') }}</label>
           <input
             v-model="form.name"
             type="text"
-            placeholder="e.g. Gmail"
+            :placeholder="t('email.providers.namePlaceholder')"
             class="w-full h-9 px-3 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
         <div>
-          <label class="block text-xs font-medium text-muted-foreground mb-1.5">Host</label>
+          <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('email.providers.host') }}</label>
           <input
             v-model="form.host"
             type="text"
@@ -235,7 +237,7 @@ watch(
           />
         </div>
         <div>
-          <label class="block text-xs font-medium text-muted-foreground mb-1.5">Port</label>
+          <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('email.providers.port') }}</label>
           <input
             v-model.number="form.port"
             type="number"
@@ -243,7 +245,7 @@ watch(
           />
         </div>
         <div>
-          <label class="block text-xs font-medium text-muted-foreground mb-1.5">Username</label>
+          <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('email.providers.username') }}</label>
           <input
             v-model="form.username"
             type="text"
@@ -253,7 +255,7 @@ watch(
         </div>
         <div>
           <label class="block text-xs font-medium text-muted-foreground mb-1.5">
-            Password{{ editingId ? ' (leave blank to keep current)' : '' }}
+            {{ editingId ? t('email.providers.passwordEdit') : t('email.providers.password') }}
           </label>
           <input
             v-model="form.password"
@@ -263,16 +265,16 @@ watch(
           />
         </div>
         <div>
-          <label class="block text-xs font-medium text-muted-foreground mb-1.5">From Name</label>
+          <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('email.providers.fromName') }}</label>
           <input
             v-model="form.fromName"
             type="text"
-            placeholder="My Library"
+            :placeholder="t('email.providers.fromNamePlaceholder')"
             class="w-full h-9 px-3 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
         <div>
-          <label class="block text-xs font-medium text-muted-foreground mb-1.5">From Address</label>
+          <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('email.providers.fromAddress') }}</label>
           <input
             v-model="form.fromAddress"
             type="email"
@@ -285,7 +287,7 @@ watch(
       <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
         <label class="flex items-center gap-2 cursor-pointer">
           <input v-model="form.auth" type="checkbox" class="rounded border-border" />
-          <span class="text-xs text-foreground">Authentication</span>
+          <span class="text-xs text-foreground">{{ t('email.providers.authentication') }}</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer">
           <input v-model="form.ssl" type="checkbox" class="rounded border-border" />
@@ -297,14 +299,14 @@ watch(
         </label>
         <label class="flex items-center gap-2 cursor-pointer">
           <input v-model="form.tlsRejectUnauthorized" type="checkbox" class="rounded border-border" />
-          <span class="text-xs text-foreground">Verify TLS certificate</span>
+          <span class="text-xs text-foreground">{{ t('email.providers.verifyTls') }}</span>
         </label>
       </div>
 
       <div v-if="!form.tlsRejectUnauthorized" class="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
         <AlertTriangle :size="14" class="mt-0.5 shrink-0 text-amber-500" />
         <p class="text-xs text-amber-700 dark:text-amber-400">
-          TLS verification is disabled. The server's certificate will not be validated - use only for trusted internal servers.
+          {{ t('email.providers.tlsWarning') }}
         </p>
       </div>
 
@@ -316,25 +318,25 @@ watch(
           :disabled="saving"
           @click="submitForm()"
         >
-          {{ saving ? 'Saving...' : editingId ? 'Update' : 'Create' }}
+          {{ saving ? t('email.saving') : editingId ? t('email.update') : t('email.create') }}
         </button>
         <button
           class="px-4 py-2 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
           @click="cancelForm()"
         >
-          Cancel
+          {{ t('common.cancel') }}
         </button>
       </div>
       <div class="md:hidden sticky bottom-2 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
         <div class="flex items-center gap-2">
           <button class="settings-btn-primary flex-1 min-h-10 justify-center" :disabled="saving" @click="submitForm()">
-            {{ saving ? 'Saving...' : editingId ? 'Update' : 'Create' }}
+            {{ saving ? t('email.saving') : editingId ? t('email.update') : t('email.create') }}
           </button>
           <button
             class="rounded-md border border-border px-3 min-h-10 text-sm text-foreground hover:bg-muted transition-colors"
             @click="cancelForm()"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
         </div>
       </div>
@@ -343,11 +345,7 @@ watch(
     <!-- Empty state -->
     <div v-if="providers.length === 0 && !showForm" class="border border-border rounded-lg px-5 py-8 bg-card text-center">
       <p class="text-sm text-muted-foreground">
-        {{
-          canManageEmail
-            ? 'No providers yet. Add an SMTP provider to start sending emails.'
-            : 'No providers available. Ask an administrator to add one.'
-        }}
+        {{ canManageEmail ? t('email.providers.emptyManage') : t('email.providers.emptyReadonly') }}
       </p>
     </div>
 
@@ -357,14 +355,20 @@ watch(
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
             <span class="text-sm font-medium text-foreground">{{ p.name }}</span>
-            <span v-if="p.isDefault" class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary/15 text-primary">Default</span>
-            <span v-if="p.isShared" class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Shared</span>
-            <span v-if="p.isSystemProvider" class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400"
-              >System</span
+            <span v-if="p.isDefault" class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary/15 text-primary">{{
+              t('email.badge.default')
+            }}</span>
+            <span v-if="p.isShared" class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{{
+              t('email.badge.shared')
+            }}</span>
+            <span
+              v-if="p.isSystemProvider"
+              class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400"
+              >{{ t('email.badge.system') }}</span
             >
           </div>
           <p class="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-            {{ p.host }}:{{ p.port }} · {{ p.fromAddress || p.username || 'no from address' }}
+            {{ p.host }}:{{ p.port }} · {{ p.fromAddress || p.username || t('email.providers.noFromAddress') }}
           </p>
         </div>
 
@@ -379,7 +383,9 @@ watch(
                 <Server :size="13" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>{{ p.isSystemProvider ? 'Remove as system mail provider' : 'Set as system mail provider' }}</TooltipContent>
+            <TooltipContent>{{
+              p.isSystemProvider ? t('email.providers.removeSystemTooltip') : t('email.providers.setSystemTooltip')
+            }}</TooltipContent>
           </Tooltip>
           <Tooltip v-if="canManageEmail">
             <TooltipTrigger as-child>
@@ -391,7 +397,7 @@ watch(
                 <Wifi :size="13" :class="testing === p.id ? 'animate-pulse' : ''" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Test connection</TooltipContent>
+            <TooltipContent>{{ t('email.providers.testTooltip') }}</TooltipContent>
           </Tooltip>
           <Tooltip v-if="p.userId === user?.id">
             <TooltipTrigger as-child>
@@ -403,7 +409,7 @@ watch(
                 <Star :size="13" :class="p.isDefault ? 'fill-primary' : ''" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Set as default</TooltipContent>
+            <TooltipContent>{{ t('email.setAsDefault') }}</TooltipContent>
           </Tooltip>
           <Tooltip v-if="canManageEmail && (!p.isShared || p.userId !== null)">
             <TooltipTrigger as-child>
@@ -415,7 +421,7 @@ watch(
                 <Share2 :size="13" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Toggle sharing</TooltipContent>
+            <TooltipContent>{{ t('email.providers.toggleSharing') }}</TooltipContent>
           </Tooltip>
           <Tooltip v-if="canManageEmail">
             <TooltipTrigger as-child>
@@ -426,7 +432,7 @@ watch(
                 <Pencil :size="13" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Edit</TooltipContent>
+            <TooltipContent>{{ t('common.edit') }}</TooltipContent>
           </Tooltip>
           <Tooltip v-if="canManageEmail && p.userId !== null">
             <TooltipTrigger as-child>
@@ -444,7 +450,7 @@ watch(
               </button>
             </TooltipTrigger>
             <TooltipContent>
-              {{ p.isSystemProvider ? 'Remove the system designation before deleting' : 'Delete' }}
+              {{ p.isSystemProvider ? t('email.providers.removeSystemBeforeDelete') : t('common.delete') }}
             </TooltipContent>
           </Tooltip>
         </div>
@@ -453,33 +459,40 @@ watch(
 
     <div class="border border-border rounded-lg bg-card/50">
       <button class="w-full flex items-center justify-between gap-2 p-4 text-left" @click="helpOpen = !helpOpen">
-        <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Provider Notes</p>
+        <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{{ t('email.providers.notesHeading') }}</p>
         <ChevronUp v-if="helpOpen" :size="14" class="text-muted-foreground" />
         <ChevronDown v-else :size="14" class="text-muted-foreground" />
       </button>
-      <p v-if="helpOpen" class="px-4 pb-4 text-xs text-muted-foreground">
-        The <strong>System</strong> provider (superuser only) is used for password reset emails. The <strong>Default</strong> provider is used when
-        sending books with no explicit provider selected. Providers marked <strong>Shared</strong> are available to all users.
-      </p>
+      <i18n-t v-if="helpOpen" keypath="email.providers.notesBody" tag="p" class="px-4 pb-4 text-xs text-muted-foreground">
+        <template #system>
+          <strong>{{ t('email.badge.system') }}</strong>
+        </template>
+        <template #defaultProvider>
+          <strong>{{ t('email.badge.default') }}</strong>
+        </template>
+        <template #shared>
+          <strong>{{ t('email.badge.shared') }}</strong>
+        </template>
+      </i18n-t>
     </div>
 
     <div v-if="deleteConfirm" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="deleteConfirm = null">
       <button class="absolute inset-0 bg-black/45" @click="deleteConfirm = null" />
       <div class="relative w-full rounded-t-xl border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
-        <p class="text-base font-semibold text-foreground">Delete provider?</p>
-        <p class="mt-1 text-sm text-muted-foreground">Delete "{{ deleteConfirm.name }}". This action cannot be undone.</p>
+        <p class="text-base font-semibold text-foreground">{{ t('email.providers.deleteTitle') }}</p>
+        <p class="mt-1 text-sm text-muted-foreground">{{ t('email.deleteConfirm', { name: deleteConfirm.name }) }}</p>
         <div class="mt-4 flex items-center justify-end gap-2">
           <button
             class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
             @click="deleteConfirm = null"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
           <button
             class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
             @click="confirmRemove"
           >
-            Delete
+            {{ t('common.delete') }}
           </button>
         </div>
       </div>

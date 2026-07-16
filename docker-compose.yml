@@ -27,6 +27,7 @@ services:
       PGID: ${PGID:-1000}
       NODE_MAX_OLD_SPACE_SIZE: ${NODE_MAX_OLD_SPACE_SIZE:-auto}
       BOOK_DOCK_PATH: ${BOOK_DOCK_PATH:-}
+      LIBRARY_BROWSE_ROOT: ${LIBRARY_BROWSE_ROOT:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -62,7 +63,7 @@ services:
 
   postgres:
     container_name: bookorbit-db
-    image: pgvector/pgvector:pg16@sha256:7d400e340efb42f4d8c9c12c6427adb253f726881a9985d2a471bf0eed824dff
+    image: pgvector/pgvector:pg18
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER?required}

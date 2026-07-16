@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, NotFoundException } from '@nestjs/common';
-import { and, asc, count, desc, eq, exists, ilike, inArray, notExists, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, exists, inArray, notExists, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { PgColumn, PgTableWithColumns } from 'drizzle-orm/pg-core';
 
@@ -7,6 +7,7 @@ import { DB } from '../../../db';
 import * as schema from '../../../db/schema';
 import { books, bookMetadata } from '../../../db/schema';
 import { buildContentFilterClauses } from '../../../common/utils/content-filter-sql.utils';
+import { accentInsensitiveIlike } from '../../../common/utils/accent-insensitive-search.utils';
 import type {
   BrowseParams,
   BrowseResult,
@@ -20,7 +21,9 @@ import type {
   StrategyMergeResult,
   StrategyRenameResult,
   StrategySplitResult,
+  EntityBookScope,
 } from './entity-strategy.interface';
+import { assertEntityRelationsWithinLibraries, buildEntityBookScopeClauses } from './entity-book-scope';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -132,7 +135,7 @@ export abstract class JunctionEntityStrategy implements EntityStrategy {
             .where(and(inArray(books.libraryId, params.libraryIds), ...cfClauses))
         : null;
 
-    const nameCondition = params.search ? (ilike(this.nameCol, `%${escapeLike(params.search)}%`) as any) : undefined;
+    const nameCondition = params.search ? (accentInsensitiveIlike(this.nameCol, `%${escapeLike(params.search)}%`) as any) : undefined;
     const joinCondition = bookSubquery
       ? and(eq(this.junctionEntityIdCol, this.entityIdCol), inArray(this.junctionBookIdCol, bookSubquery))
       : and(eq(this.junctionEntityIdCol, this.entityIdCol), sql`false`);
@@ -193,6 +196,8 @@ export abstract class JunctionEntityStrategy implements EntityStrategy {
     const targetId = input.targetId as number;
     const sourceIds = input.sourceIds as number[];
 
+    await this.assertMutationScope([targetId, ...sourceIds], input.libraryIds ?? []);
+
     const target = await this.findEntityById(targetId);
     if (!target) throw new NotFoundException(`${this.entityType} not found`);
 
@@ -220,6 +225,7 @@ export abstract class JunctionEntityStrategy implements EntityStrategy {
 
   async rename(input: RenameInput): Promise<StrategyRenameResult> {
     const entityId = input.entityId as number;
+    await this.assertMutationScope([entityId], input.libraryIds);
     const [entity] = await this.db.select({ name: this.nameCol }).from(this.entityTable).where(eq(this.entityIdCol, entityId)).limit(1);
     if (!entity) throw new NotFoundException(`${this.entityType} not found`);
 
@@ -230,7 +236,7 @@ export abstract class JunctionEntityStrategy implements EntityStrategy {
     const [existing] = await this.db.select({ id: this.entityIdCol }).from(this.entityTable).where(eq(this.nameCol, trimmed)).limit(1);
     if (existing && (existing as any).id !== entityId) {
       const existingId = (existing as any).id as number;
-      const mergeResult = await this.merge({ targetId: existingId, sourceIds: [entityId], userId: input.userId });
+      const mergeResult = await this.merge({ targetId: existingId, sourceIds: [entityId], userId: input.userId, libraryIds: input.libraryIds ?? [] });
       return { oldName, affectedBookIds: mergeResult.affectedBookIds, wasImplicitMerge: true, mergedEntityId: existingId };
     }
 
@@ -241,6 +247,7 @@ export abstract class JunctionEntityStrategy implements EntityStrategy {
 
   async deleteEntity(input: DeleteInput): Promise<StrategyDeleteResult> {
     const entityId = input.entityId as number;
+    await this.assertMutationScope([entityId], input.libraryIds);
     const [entity] = await this.db.select({ name: this.nameCol }).from(this.entityTable).where(eq(this.entityIdCol, entityId)).limit(1);
     if (!entity) throw new NotFoundException(`${this.entityType} not found`);
 
@@ -263,6 +270,7 @@ export abstract class JunctionEntityStrategy implements EntityStrategy {
   }
 
   async split(input: SplitInput): Promise<StrategySplitResult> {
+    await this.assertMutationScope([input.entityId], input.libraryIds ?? []);
     const [entity] = await this.db.select({ name: this.nameCol }).from(this.entityTable).where(eq(this.entityIdCol, input.entityId)).limit(1);
     if (!entity) throw new NotFoundException(`${this.entityType} not found`);
 
@@ -312,7 +320,16 @@ export abstract class JunctionEntityStrategy implements EntityStrategy {
     return rows.map((r: any) => r.bookId);
   }
 
-  async getBookCount(id: number | string): Promise<number> {
+  async getBookCount(id: number | string, scope?: EntityBookScope): Promise<number> {
+    if (scope) {
+      const [row] = await this.db
+        .select({ count: count() })
+        .from(this.junctionTable)
+        .innerJoin(books, eq(books.id, this.junctionBookIdCol))
+        .where(and(eq(this.junctionEntityIdCol, id as number), ...buildEntityBookScopeClauses(this.db, scope)));
+      return row?.count ?? 0;
+    }
+
     const [row] = await this.db
       .select({ count: count() })
       .from(this.junctionTable)
@@ -320,13 +337,13 @@ export abstract class JunctionEntityStrategy implements EntityStrategy {
     return row?.count ?? 0;
   }
 
-  async getBookTitles(id: number | string, limit: number): Promise<string[]> {
+  async getBookTitles(id: number | string, limit: number, scope?: EntityBookScope): Promise<string[]> {
     const rows = await this.db
       .select({ title: sql<string>`COALESCE(${bookMetadata.title}, 'Untitled')` })
       .from(this.junctionTable)
       .innerJoin(books, eq(books.id, this.junctionBookIdCol))
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-      .where(eq(this.junctionEntityIdCol, id as number))
+      .where(and(eq(this.junctionEntityIdCol, id as number), ...(scope ? buildEntityBookScopeClauses(this.db, scope) : [])))
       .orderBy(asc(bookMetadata.title))
       .limit(limit);
     return rows.map((r) => r.title);
@@ -343,4 +360,8 @@ export abstract class JunctionEntityStrategy implements EntityStrategy {
   }
 
   protected abstract buildJunctionRow(bookId: number, entityId: number): Record<string, unknown>;
+
+  private assertMutationScope(entityIds: number[], libraryIds: number[]): Promise<void> {
+    return assertEntityRelationsWithinLibraries(this.db, this.rawJunctionTable, this.rawEntityIdCol, entityIds, libraryIds);
+  }
 }

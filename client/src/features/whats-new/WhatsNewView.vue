@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { ChevronDown, ExternalLink, Search, Sparkles } from '@lucide/vue'
 import type { ReleaseNote, ReleaseNotesResponse } from '@bookorbit/types'
@@ -9,6 +10,7 @@ import { formatReleaseDate } from './lib/whats-new.logic'
 import { renderChangelogMarkdown } from './lib/markdown'
 import HighlightItem from './components/HighlightItem.vue'
 
+const { t } = useI18n()
 const { version, markArchiveSeen } = useWhatsNew()
 
 const releases = ref<ReleaseNote[]>([])
@@ -46,7 +48,7 @@ async function loadFirst(): Promise<void> {
   try {
     await loadPage(1)
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Failed to load releases'
+    error.value = e instanceof Error ? e.message : t('whatsNew.loadFailed')
   } finally {
     loading.value = false
   }
@@ -58,7 +60,7 @@ async function loadMore(): Promise<void> {
     await loadPage(page.value + 1)
   } catch {
     // Keep the releases already loaded; surface the failure so the button isn't a no-op.
-    toast.error('Could not load more releases. Please try again.')
+    toast.error(t('whatsNew.loadMoreFailed'))
   } finally {
     loadingMore.value = false
   }
@@ -130,15 +132,15 @@ onUnmounted(() => {
         <Sparkles :size="20" />
       </span>
       <div>
-        <h1 class="text-xl font-semibold tracking-tight text-foreground">What's New</h1>
-        <p class="text-sm text-muted-foreground">Everything that's shipped, newest first.</p>
+        <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ t('whatsNew.title') }}</h1>
+        <p class="text-sm text-muted-foreground">{{ t('whatsNew.subtitle') }}</p>
       </div>
     </header>
 
     <div class="lg:flex lg:gap-6">
       <nav v-if="!loading && !error && filtered.length" class="hidden w-48 shrink-0 lg:order-last lg:block">
         <div class="sticky top-2 space-y-1">
-          <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Versions</p>
+          <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{{ t('whatsNew.versions') }}</p>
           <a
             v-for="release in filtered"
             :key="release.version"
@@ -152,7 +154,7 @@ onUnmounted(() => {
             "
           >
             <span class="truncate">{{ release.version }}</span>
-            <span v-if="isCurrent(release)" class="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-label="Current version" />
+            <span v-if="isCurrent(release)" class="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" :aria-label="t('whatsNew.currentVersion')" />
           </a>
         </div>
       </nav>
@@ -163,7 +165,7 @@ onUnmounted(() => {
           <input
             v-model="search"
             type="search"
-            placeholder="Search releases…"
+            :placeholder="t('whatsNew.searchPlaceholder')"
             class="w-full rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
         </div>
@@ -173,18 +175,18 @@ onUnmounted(() => {
         </div>
 
         <div v-else-if="error" class="rounded-lg border border-border bg-card p-6 text-center">
-          <p class="text-sm text-muted-foreground">Couldn't load releases. Check your connection and try again.</p>
+          <p class="text-sm text-muted-foreground">{{ t('whatsNew.loadErrorHint') }}</p>
           <button
             type="button"
             class="mt-3 rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
             @click="retry"
           >
-            Retry
+            {{ t('whatsNew.retry') }}
           </button>
         </div>
 
         <div v-else-if="filtered.length === 0" class="rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground">
-          No releases found.
+          {{ t('whatsNew.noReleasesFound') }}
         </div>
 
         <div v-else class="space-y-4">
@@ -196,7 +198,9 @@ onUnmounted(() => {
           >
             <div class="flex flex-wrap items-center gap-2">
               <h2 class="text-base font-semibold text-foreground">{{ release.version }}</h2>
-              <span v-if="isCurrent(release)" class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">You're here</span>
+              <span v-if="isCurrent(release)" class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{{
+                t('whatsNew.youreHere')
+              }}</span>
               <span v-if="formatReleaseDate(release.date)" class="text-xs text-muted-foreground">{{ formatReleaseDate(release.date) }}</span>
             </div>
 
@@ -208,7 +212,7 @@ onUnmounted(() => {
               </ul>
             </template>
 
-            <p v-else class="mt-3 text-sm text-muted-foreground">No highlights for this release.</p>
+            <p v-else class="mt-3 text-sm text-muted-foreground">{{ t('whatsNew.noHighlights') }}</p>
 
             <div class="mt-4 flex flex-wrap items-center gap-4">
               <button
@@ -222,7 +226,7 @@ onUnmounted(() => {
                   class="transition-transform motion-reduce:transition-none"
                   :class="isChangelogOpen(release) ? 'rotate-180' : ''"
                 />
-                {{ isChangelogOpen(release) ? 'Hide' : 'Show' }} full changelog
+                {{ isChangelogOpen(release) ? t('whatsNew.hideChangelog') : t('whatsNew.showChangelog') }}
               </button>
               <a
                 :href="release.changelogUrl"
@@ -230,7 +234,7 @@ onUnmounted(() => {
                 rel="noopener noreferrer"
                 class="inline-flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:text-primary/85"
               >
-                Open on GitHub
+                {{ t('whatsNew.openOnGitHub') }}
                 <ExternalLink :size="12" />
               </a>
             </div>
@@ -250,7 +254,7 @@ onUnmounted(() => {
               class="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
               @click="loadMore"
             >
-              {{ loadingMore ? 'Loading…' : 'Load more' }}
+              {{ loadingMore ? t('whatsNew.loadingMore') : t('whatsNew.loadMore') }}
             </button>
           </div>
         </div>

@@ -29,6 +29,7 @@ describe('MetadataFetchController', () => {
     { key: MetadataProviderKey.OPEN_LIBRARY, label: 'OpenLibrary', identifiable: false },
     { key: MetadataProviderKey.AUDIBLE, label: 'Audible', identifiable: true },
     { key: MetadataProviderKey.AUDNEXUS, label: 'AudNexus', identifiable: false },
+    { key: MetadataProviderKey.LIBROFM, label: 'Libro.fm', identifiable: true },
     { key: MetadataProviderKey.KOBO, label: 'Kobo', identifiable: true },
   ];
 
@@ -243,6 +244,16 @@ describe('MetadataFetchController', () => {
     );
   });
 
+  it('infers audiobook search when Libro.fm is requested', async () => {
+    providerConfig.getConfig.mockResolvedValue(makeProviderConfig({ librofm: { enabled: true } }));
+    service.search.mockReturnValue(of({ provider: MetadataProviderKey.LIBROFM, providerId: '9781427201438', title: 'Dune' }));
+
+    const stream = await controller.stream({ title: 'Dune', providers: [MetadataProviderKey.LIBROFM] }, user);
+    await firstValueFrom(stream.pipe(toArray()));
+
+    expect(service.search).toHaveBeenCalledWith(expect.objectContaining({ title: 'Dune', isAudiobook: true }), [MetadataProviderKey.LIBROFM]);
+  });
+
   it('infers audiobook search when the effective provider set is only audiobook providers', async () => {
     service.getStoredProviderContext.mockResolvedValue({ libraryId: 5, providerIds: {} });
     pipeline.getEffectiveProviderKeys.mockResolvedValue([MetadataProviderKey.AUDIBLE]);
@@ -291,6 +302,26 @@ describe('MetadataFetchController', () => {
         MetadataProviderKey.AUDNEXUS,
         MetadataProviderKey.KOBO,
       ],
+    );
+  });
+
+  it('infers audiobook search from stored Libro.fm ids when providers are not specified', async () => {
+    service.getStoredProviderContext.mockResolvedValue({
+      libraryId: 8,
+      providerIds: { [MetadataProviderKey.LIBROFM]: '9781234567890' },
+    });
+    pipeline.getEffectiveProviderKeys.mockResolvedValue([MetadataProviderKey.GOOGLE, MetadataProviderKey.LIBROFM]);
+    service.search.mockReturnValue(of({ provider: MetadataProviderKey.LIBROFM, providerId: '9781234567890', title: 'Audio Result' }));
+
+    const stream = await controller.stream({ bookId: 44, title: 'Audio Result' }, user);
+    await firstValueFrom(stream.pipe(toArray()));
+
+    expect(service.search).toHaveBeenCalledWith(
+      expect.objectContaining({
+        existingProviderIds: { [MetadataProviderKey.LIBROFM]: '9781234567890' },
+        isAudiobook: true,
+      }),
+      [MetadataProviderKey.GOOGLE, MetadataProviderKey.LIBROFM],
     );
   });
 
@@ -378,6 +409,7 @@ function makeProviderConfig(overrides: Partial<ProviderConfigurations> = {}): Pr
     itunes: { enabled: false, coverResolution: 'high', ...overrides.itunes },
     audible: { enabled: true, domain: 'com', ...overrides.audible },
     audnexus: { enabled: true, ...overrides.audnexus },
+    librofm: { enabled: false, ...overrides.librofm },
     comicvine: { enabled: false, apiKey: '', ...overrides.comicvine },
     ranobedb: { enabled: false, ...overrides.ranobedb },
     kobo: { enabled: true, country: 'us', language: 'en', ...overrides.kobo },

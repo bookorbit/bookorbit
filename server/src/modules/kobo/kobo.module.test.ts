@@ -22,6 +22,7 @@ import { KoboProgressBridgeService } from './services/kobo-progress-bridge.servi
 import { KoboProxyService } from './services/kobo-proxy.service';
 import { KoboReadingStateService } from './services/kobo-reading-state.service';
 import { KoboSettingsService } from './services/kobo-settings.service';
+import { KoboSyncHistoryService } from './services/kobo-sync-history.service';
 import { KoboSyncService } from './services/kobo-sync.service';
 import { KoboThumbnailService } from './services/kobo-thumbnail.service';
 import { KoboAnalyticsResolverService } from './services/kobo-analytics-resolver.service';
@@ -56,6 +57,7 @@ describe('KoboModule', () => {
       KoboAnnotationMaterializerService,
       KoboAnnotationExchangeService,
       KoboReadingStateService,
+      KoboSyncHistoryService,
       KoboThumbnailService,
       KoboDownloadService,
       KoboProxyService,

@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ShieldAlert } from '@lucide/vue'
 import { api } from '@/lib/api'
 import type { ContentFilterRulesWithNames } from '@bookorbit/types'
+
+const { t } = useI18n()
 
 const filters = ref<ContentFilterRulesWithNames | null>(null)
 const loading = ref(true)
@@ -20,7 +23,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>
+  <div v-if="loading" class="text-sm text-muted-foreground">{{ t('common.loading') }}</div>
 
   <template v-else-if="filters">
     <div
@@ -28,21 +31,21 @@ onMounted(async () => {
       class="rounded-lg border border-border bg-muted/30 px-5 py-8 text-center"
     >
       <ShieldAlert :size="32" class="mx-auto mb-3 text-muted-foreground/60" />
-      <p class="text-sm font-medium text-foreground">No content restrictions</p>
-      <p class="mt-1 text-xs text-muted-foreground">Your account has full access to all content within your assigned libraries.</p>
+      <p class="text-sm font-medium text-foreground">{{ t('settings.account.restrictions.none.title') }}</p>
+      <p class="mt-1 text-xs text-muted-foreground">{{ t('settings.account.restrictions.none.description') }}</p>
     </div>
 
     <div v-else class="space-y-5">
       <div class="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 flex gap-3">
         <ShieldAlert :size="18" class="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
         <p class="text-sm text-amber-700 dark:text-amber-300">
-          Your account has content restrictions applied by an administrator. Some books may not be visible to you.
+          {{ t('settings.account.restrictions.banner') }}
         </p>
       </div>
 
       <div v-if="filters.includeTags?.length" class="space-y-2">
-        <p class="text-sm font-medium text-foreground">Allowed tags</p>
-        <p class="text-xs text-muted-foreground">Only books that have at least one of these tags are shown to you.</p>
+        <p class="text-sm font-medium text-foreground">{{ t('settings.account.restrictions.allowedTags.title') }}</p>
+        <p class="text-xs text-muted-foreground">{{ t('settings.account.restrictions.allowedTags.description') }}</p>
         <div class="flex flex-wrap gap-2">
           <span
             v-for="tag in filters.includeTags"
@@ -55,8 +58,8 @@ onMounted(async () => {
       </div>
 
       <div v-if="filters.excludeTags?.length" class="space-y-2">
-        <p class="text-sm font-medium text-foreground">Blocked tags</p>
-        <p class="text-xs text-muted-foreground">Books with any of these tags are hidden from you.</p>
+        <p class="text-sm font-medium text-foreground">{{ t('settings.account.restrictions.blockedTags.title') }}</p>
+        <p class="text-xs text-muted-foreground">{{ t('settings.account.restrictions.blockedTags.description') }}</p>
         <div class="flex flex-wrap gap-2">
           <span
             v-for="tag in filters.excludeTags"
@@ -69,8 +72,8 @@ onMounted(async () => {
       </div>
 
       <div v-if="filters.includeGenres?.length" class="space-y-2">
-        <p class="text-sm font-medium text-foreground">Allowed genres</p>
-        <p class="text-xs text-muted-foreground">Only books that have at least one of these genres are shown to you.</p>
+        <p class="text-sm font-medium text-foreground">{{ t('settings.account.restrictions.allowedGenres.title') }}</p>
+        <p class="text-xs text-muted-foreground">{{ t('settings.account.restrictions.allowedGenres.description') }}</p>
         <div class="flex flex-wrap gap-2">
           <span
             v-for="genre in filters.includeGenres"
@@ -83,8 +86,8 @@ onMounted(async () => {
       </div>
 
       <div v-if="filters.excludeGenres?.length" class="space-y-2">
-        <p class="text-sm font-medium text-foreground">Blocked genres</p>
-        <p class="text-xs text-muted-foreground">Books with any of these genres are hidden from you.</p>
+        <p class="text-sm font-medium text-foreground">{{ t('settings.account.restrictions.blockedGenres.title') }}</p>
+        <p class="text-xs text-muted-foreground">{{ t('settings.account.restrictions.blockedGenres.description') }}</p>
         <div class="flex flex-wrap gap-2">
           <span
             v-for="genre in filters.excludeGenres"

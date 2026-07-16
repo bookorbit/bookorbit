@@ -27,6 +27,17 @@ local safeFilenameBase = CatalogUtil.safeFilenameBase
 
 local CatalogDownload = {}
 
+local function sanitizeDevicePath(device_path)
+    local normalized = tostring(device_path or ""):gsub("\\", "/"):gsub("^/+", "")
+    local segments = {}
+    for segment in normalized:gmatch("[^/]+") do
+        if segment == ".." then return nil end
+        if segment ~= "." then table.insert(segments, segment) end
+    end
+    if #segments == 0 then return nil end
+    return table.concat(segments, "/")
+end
+
 function CatalogDownload.install(Catalog)
     function Catalog:showFileChoices(detail)
         local files = self:supportedFiles(detail)
@@ -49,7 +60,7 @@ function CatalogDownload.install(Catalog)
         local buttons = {}
         local open_tpl = _("Open - %1")
         local download_tpl = _("Download - %1")
-        for _, file in ipairs(files) do
+        for index, file in ipairs(files) do
             local path = self:onDeviceFilePath(file)
             local label = self:fileLabel(file, false)
             table.insert(buttons, {
@@ -77,8 +88,14 @@ function CatalogDownload.install(Catalog)
         return G_reader_settings:readSetting("download_dir") or G_reader_settings:readSetting("lastdir")
     end
 
-    function Catalog:getLocalDownloadPath(filename, filetype)
+    function Catalog:getLocalDownloadPath(filename, filetype, device_path)
         local download_dir = self:getCurrentDownloadDir()
+        local relative = sanitizeDevicePath(device_path)
+        if relative then
+            local parent = relative:match("^(.*)/[^/]+$")
+            if parent and parent ~= "" then util.makePath(download_dir .. "/" .. parent) end
+            return (download_dir ~= "/" and download_dir or "") .. "/" .. relative
+        end
         filename = filename .. "." .. string.lower(filetype or "bin")
         filename = util.getSafeFilename(filename, download_dir)
         return (download_dir ~= "/" and download_dir or "") .. "/" .. filename
@@ -87,7 +104,7 @@ function CatalogDownload.install(Catalog)
     function Catalog:downloadDefaultFile(detail, file)
         local filename = safeFilenameBase(detail)
         local filetype = string.lower(file.format or "bin")
-        local local_path = self:getLocalDownloadPath(filename, filetype)
+        local local_path = self:getLocalDownloadPath(filename, filetype, file.devicePath)
         self:checkDownloadFile(local_path, detail, file)
     end
 
@@ -105,7 +122,7 @@ function CatalogDownload.install(Catalog)
 
         local dialog
         local buttons = {}
-        for _, file in ipairs(files) do
+        for index, file in ipairs(files) do
             local label = self:fileLabel(file, false)
             table.insert(buttons, {
                 {
@@ -142,7 +159,7 @@ function CatalogDownload.install(Catalog)
                         text = _("Download"),
                         callback = function()
                             UIManager:close(dialog)
-                            local local_path = self:getLocalDownloadPath(filename, filetype)
+                            local local_path = self:getLocalDownloadPath(filename, filetype, file.devicePath)
                             self:checkDownloadFile(local_path, detail, file)
                         end,
                     },
@@ -156,7 +173,8 @@ function CatalogDownload.install(Catalog)
                             require("ui/downloadmgr"):new{
                                 onConfirm = function(path)
                                     logger.dbg("BookOrbit: download folder set to", path)
-                                    if self._manager and self._manager.ui and self._manager.ui.folder_shortcuts then
+                                    if self._manager and self._manager.ui and self._manager.ui.folder_shortcuts
+                                        and self._manager.ui.folder_shortcuts.updateShortcut then
                                         self._manager.ui.folder_shortcuts:updateShortcut("download_dir", path)
                                     end
                                     G_reader_settings:saveSetting("download_dir", path)
@@ -225,8 +243,9 @@ function CatalogDownload.install(Catalog)
     end
 
     function Catalog:downloadFile(local_path, detail, file)
+        local filename = local_path:match("[^/]+$") or safeFilenameBase(detail)
         local total = file.sizeBytes
-        local info = InfoMessage:new{ text = _("Downloading...") }
+        local info = InfoMessage:new{ text = T(_("Downloading:\n%1"), filename) }
         UIManager:show(info)
         UIManager:forceRePaint()
 
@@ -237,11 +256,11 @@ function CatalogDownload.install(Catalog)
                 local pct = math.min(100, math.floor(received / total * 100))
                 bucket = math.floor(pct / 5)
                 if bucket == last_bucket then return end
-                text = T(_("Downloading... %1"), pct .. "%")
+                text = T(_("Downloading:\n%1\n\n%2"), filename, pct .. "%")
             else
                 bucket = math.floor(received / (256 * 1024))
                 if bucket == last_bucket then return end
-                text = T(_("Downloading... %1"), formatBytes(received))
+                text = T(_("Downloading:\n%1\n\n%2"), filename, formatBytes(received))
             end
             last_bucket = bucket
             UIManager:close(info)
@@ -281,7 +300,7 @@ function CatalogDownload.install(Catalog)
             return false
         end
 
-        local body, err = self.client:matchCheck({ digest })
+        local body, err = self.client:matchCheck({ digest }, { [digest] = { source = "file" } })
         if not body then
             logger.warn("BookOrbit: downloaded file match-check failed", err)
             return false

@@ -1,7 +1,7 @@
 /** A single allowlisted (GitHub-hosted) media item attached to a highlight. */
 export interface ReleaseMedia {
   url: string;
-  type: 'image' | 'video';
+  type: "image" | "video";
 }
 
 export interface ReleaseHighlight {

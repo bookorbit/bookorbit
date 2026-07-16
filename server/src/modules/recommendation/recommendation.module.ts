@@ -11,5 +11,6 @@ import { RecommendationService } from './recommendation.service';
   imports: [BookModule, LibraryModule, EmbeddingModule],
   controllers: [RecommendationController],
   providers: [RecommendationService, RecommendationRepository],
+  exports: [RecommendationService],
 })
 export class RecommendationModule {}

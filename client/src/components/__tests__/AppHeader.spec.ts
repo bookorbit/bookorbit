@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   loadingMore: null as unknown as Ref<boolean>,
   settled: null as unknown as Ref<boolean>,
   hasMore: null as unknown as Ref<boolean>,
+  user: null as unknown as Ref<{ provisioningMethod: string; settings?: { achievementPreferences?: { enabled?: boolean } } }>,
   loadMore: vi.fn<() => Promise<void>>(),
   clearGlobalSearch: vi.fn<() => void>(),
 }))
@@ -39,10 +40,9 @@ vi.mock('@/features/book/composables/useGlobalSearch', () => ({
 }))
 
 vi.mock('@/features/auth/composables/useAuth', async () => {
-  const { ref: vueRef } = await import('vue')
   return {
     useAuth: () => ({
-      user: vueRef({ provisioningMethod: 'password' }),
+      user: mocks.user,
       logout: vi.fn<() => void>(),
     }),
   }
@@ -70,7 +70,7 @@ vi.mock('@/features/book-dock/composables/useBookDockSummary', async () => {
   const { ref: vueRef } = await import('vue')
   return {
     useBookDockSummary: () => ({
-      summary: vueRef({ total: 0 }),
+      summary: vueRef({ pending: 0, ready: 0, error: 0, total: 0, paused: false }),
       fetchSummary: vi.fn<() => void>(),
       subscribe: vi.fn<() => void>(),
     }),
@@ -90,6 +90,10 @@ vi.mock('@/features/whats-new/composables/useWhatsNew', async () => {
 
 vi.mock('@/stores/theme', () => ({
   useThemeStore: () => ({ radius: 'rounded' }),
+}))
+
+vi.mock('@/stores/locale', () => ({
+  useLocaleStore: () => ({ locale: 'en', setLocale: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined) }),
 }))
 
 vi.mock('@/components/ui/sidebar', () => ({
@@ -150,6 +154,7 @@ function makeResult(id: number, title = 'Prey'): GlobalSearchResult {
     seriesName: null,
     seriesIndex: null,
     files: [{ id: id * 10, format: 'epub', role: 'primary', sizeBytes: null }],
+    publishedDate: null,
     publishedYear: null,
     language: null,
     genres: [],
@@ -194,6 +199,7 @@ describe('AppHeader global search', () => {
     mocks.loadingMore = ref(false)
     mocks.settled = ref(true)
     mocks.hasMore = ref(true)
+    mocks.user = ref({ provisioningMethod: 'password', settings: {} })
   })
 
   it('does not leave the dropdown for a separate search route on Enter when no result is selected', async () => {
@@ -274,5 +280,44 @@ describe('AppHeader global search', () => {
 
     expect(wrapper.text()).not.toContain('Prey 1')
     expect(wrapper.text()).toContain('Prey 60')
+  })
+
+  it('hides achievement entry points when achievements are disabled', () => {
+    mocks.user = ref({ provisioningMethod: 'password', settings: { achievementPreferences: { enabled: false } } })
+
+    const wrapper = mountHeader()
+
+    expect(wrapper.text()).not.toContain('Achievements')
+  })
+
+  it('places the desktop language control immediately before settings', () => {
+    const wrapper = mountHeader()
+    const buttons = wrapper.findAll('button')
+    const languageIndex = buttons.findIndex((button) => button.attributes('data-testid') === 'language-control')
+    const settingsIndex = buttons.findIndex((button) => button.attributes('data-tour') === 'settings-nav')
+
+    expect(languageIndex).toBeGreaterThanOrEqual(0)
+    expect(settingsIndex).toBeGreaterThanOrEqual(0)
+    if (languageIndex < 0 || settingsIndex < 0) throw new Error('Expected desktop language and settings controls')
+
+    const desktopGroup = buttons[settingsIndex]?.element.closest('[class~="md:flex"]')
+    if (!desktopGroup) throw new Error('Expected desktop control group')
+    const controls = Array.from(desktopGroup.children)
+    const languageControlIndex = controls.findIndex((control) => control.contains(buttons[languageIndex]?.element ?? null))
+    const settingsControlIndex = controls.findIndex((control) => control.contains(buttons[settingsIndex]?.element ?? null))
+
+    expect(settingsControlIndex).toBe(languageControlIndex + 1)
+  })
+
+  it('navigates to annotations from the mobile overflow menu', async () => {
+    const wrapper = mountHeader()
+    const annotationsItem = wrapper.findAllComponents({ name: 'DropdownMenuItem' }).find((item) => item.text().trim() === 'Annotations')
+
+    expect(annotationsItem).toBeDefined()
+    if (!annotationsItem) throw new Error('Expected annotations overflow menu item')
+
+    await annotationsItem.trigger('click')
+
+    expect(mocks.routerPush).toHaveBeenCalledWith({ name: 'annotations' })
   })
 })

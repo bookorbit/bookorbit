@@ -5,7 +5,6 @@ import { dirname, join, relative } from 'path';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 
 import { classifyFile, DEFAULT_FORMAT_PRIORITY } from './lib/classify';
-import { clampIno } from './lib/walk';
 import { ScannerRepository } from './scanner.repository';
 
 export type FileEventResult =
@@ -156,8 +155,8 @@ export class FileEventProcessorService {
     // for the wrong book), check if the inode belongs to a file already tracked by a
     // book at this folder path. This handles atomic-save patterns where an editor writes
     // a new inode for the same logical file.
-    const ino = clampIno(fileStat.ino);
-    if (ino !== 0) {
+    const ino = fileStat.ino;
+    if (ino !== 0n) {
       const folderPath = dirname(absolutePath);
       const ownBook =
         (await this.scannerRepo.findMissingBookByFolderPath(folderPath, scopeLibraryId)) ??
@@ -315,8 +314,8 @@ export class FileEventProcessorService {
   }
 
   private async detectMovedFile(newAbsolutePath: string, fileStat: FsStat, scopeLibraryId?: number): Promise<FileEventResult> {
-    const ino = clampIno(fileStat.ino);
-    if (ino === 0) return { type: 'noop' };
+    const ino = fileStat.ino;
+    if (ino === 0n) return { type: 'noop' };
 
     const match = await this.scannerRepo.findBookFileWithContextByIno(ino, scopeLibraryId);
     if (!match || match.file.absolutePath === newAbsolutePath) return { type: 'noop' };
@@ -372,8 +371,8 @@ export class FileEventProcessorService {
     return { type: 'book-moved', libraryId: rowLibraryId, bookIds: [file.bookId] };
   }
 
-  private statToFileInfo(s: FsStat): { ino: number; sizeBytes: number; mtime: Date } {
-    return { ino: clampIno(s.ino), sizeBytes: Number(s.size), mtime: s.mtime };
+  private statToFileInfo(s: FsStat): { ino: bigint; sizeBytes: number; mtime: Date } {
+    return { ino: s.ino, sizeBytes: Number(s.size), mtime: s.mtime };
   }
 
   private async pathIsFile(path: string): Promise<boolean> {

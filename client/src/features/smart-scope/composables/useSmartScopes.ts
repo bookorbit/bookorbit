@@ -7,6 +7,16 @@ const loaded = ref(false)
 const loading = ref(false)
 const error = ref<string | null>(null)
 let fetchPromise: Promise<void> | null = null
+let requestGeneration = 0
+
+export function resetSmartScopes(): void {
+  requestGeneration += 1
+  smartScopes.value = []
+  loaded.value = false
+  loading.value = false
+  error.value = null
+  fetchPromise = null
+}
 
 export function useSmartScopes() {
   async function fetchSmartScopes() {
@@ -14,20 +24,26 @@ export function useSmartScopes() {
     if (fetchPromise) return fetchPromise
     loading.value = true
     error.value = null
+    const generation = requestGeneration
     fetchPromise = api('/api/v1/smart-scopes')
       .then(async (res) => {
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}`)
         }
-        smartScopes.value = await res.json()
+        const nextSmartScopes: SmartScope[] = await res.json()
+        if (generation !== requestGeneration) return
+        smartScopes.value = nextSmartScopes
         loaded.value = true
       })
       .catch((e: unknown) => {
+        if (generation !== requestGeneration) return
         error.value = e instanceof Error ? e.message : 'Failed to load smart scopes'
       })
       .finally(() => {
-        loading.value = false
-        fetchPromise = null
+        if (generation === requestGeneration) {
+          loading.value = false
+          fetchPromise = null
+        }
       })
     return fetchPromise
   }
@@ -35,17 +51,23 @@ export function useSmartScopes() {
   async function refreshSmartScopes() {
     loading.value = true
     error.value = null
+    const generation = requestGeneration
     try {
       const res = await api('/api/v1/smart-scopes')
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`)
       }
-      smartScopes.value = await res.json()
+      const nextSmartScopes: SmartScope[] = await res.json()
+      if (generation !== requestGeneration) return
+      smartScopes.value = nextSmartScopes
       loaded.value = true
     } catch (e: unknown) {
+      if (generation !== requestGeneration) return
       error.value = e instanceof Error ? e.message : 'Failed to load smart scopes'
     } finally {
-      loading.value = false
+      if (generation === requestGeneration) {
+        loading.value = false
+      }
     }
   }
 

@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { Loader2, Trash2 } from '@lucide/vue'
+import { useI18n } from 'vue-i18n'
 
 defineProps<{ open: boolean; deleting: boolean }>()
 const emit = defineEmits<{ confirm: []; cancel: [] }>()
+
+const { t } = useI18n()
 </script>
 
 <template>
@@ -15,9 +18,9 @@ const emit = defineEmits<{ confirm: []; cancel: [] }>()
             <Trash2 class="text-destructive" :size="18" />
           </div>
           <div>
-            <h2 class="text-base font-semibold text-foreground">Delete book?</h2>
+            <h2 class="text-base font-semibold text-foreground">{{ t('book.deleteDialog.title') }}</h2>
             <p class="text-sm text-muted-foreground mt-1">
-              This will permanently delete the book and all its metadata, files, reading progress, and bookmarks. This cannot be undone.
+              {{ t('book.deleteDialog.description') }}
             </p>
           </div>
         </div>
@@ -27,7 +30,7 @@ const emit = defineEmits<{ confirm: []; cancel: [] }>()
             :disabled="deleting"
             @click="emit('cancel')"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
           <button
             class="h-9 px-4 rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors flex items-center gap-2 disabled:opacity-50"
@@ -35,7 +38,7 @@ const emit = defineEmits<{ confirm: []; cancel: [] }>()
             @click="emit('confirm')"
           >
             <Loader2 v-if="deleting" class="animate-spin" :size="14" />
-            Delete
+            {{ t('common.delete') }}
           </button>
         </div>
       </div>

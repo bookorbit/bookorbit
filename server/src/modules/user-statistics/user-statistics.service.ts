@@ -218,9 +218,10 @@ export class UserStatisticsService {
 
   async getPeakReadingHours(user: RequestUser, query: UserDailyReadingQueryDto): Promise<UserPeakHourStat[]> {
     const days = query.days ?? BEHAVIOR_DEFAULT_DAYS;
-    const key = this.buildUserCacheKey('peak-hours', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
+    const timeZone = resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
+    const key = this.buildUserCacheKey('peak-hours', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days, timeZone });
     return this.cache.get(String(user.id), key, async () => {
-      const rows = await this.repo.getPeakReadingHours(user.id, user.isSuperuser, query.libraryIds, days);
+      const rows = await this.repo.getPeakReadingHours(user.id, user.isSuperuser, query.libraryIds, days, timeZone);
 
       const byHour = new Map<
         number,

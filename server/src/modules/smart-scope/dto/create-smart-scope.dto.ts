@@ -40,4 +40,8 @@ export class CreateSmartScopeDto {
   @IsOptional()
   @IsBoolean()
   isPublic?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  syncToKobo?: boolean;
 }

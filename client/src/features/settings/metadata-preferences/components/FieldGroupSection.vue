@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ChevronDown, ChevronRight } from '@lucide/vue'
 import type { FieldPreference, MetadataField, ProviderStatus } from '@bookorbit/types'
 import FieldRow from './FieldRow.vue'
+
+const { t } = useI18n()
 
 const props = withDefaults(
   defineProps<{
@@ -29,9 +32,9 @@ const open = ref(props.defaultOpen)
 const summary = computed(() => {
   const enabled = props.fields.filter((field) => props.preferences[field]?.enabled).length
   const overrides = props.overriddenFields ? props.fields.filter((field) => props.overriddenFields?.has(field)).length : 0
-  const base = `${props.fields.length} fields · ${enabled} enabled`
+  const base = t('settings.metadata.fieldRules.groupSummary.base', { fields: props.fields.length, enabled })
   if (!props.overriddenFields) return base
-  return `${base} · ${overrides} overrides`
+  return t('settings.metadata.fieldRules.groupSummary.withOverrides', { base, overrides })
 })
 </script>
 

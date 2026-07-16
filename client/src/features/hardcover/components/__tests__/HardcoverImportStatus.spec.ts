@@ -303,6 +303,6 @@ describe('HardcoverImportStatus', () => {
       .trigger('click')
     await flushPromises()
 
-    expect(mockToast.success).toHaveBeenCalledWith('2 read statuses imported, 0 progress updates')
+    expect(mockToast.success).toHaveBeenCalledWith('2 read statuses imported, no progress updates')
   })
 })

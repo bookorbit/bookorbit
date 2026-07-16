@@ -90,7 +90,7 @@ describe('UserStateImporter', () => {
           ],
           readingSessions: [
             {
-              sourceSessionId: 'session-1',
+              sourceSessionId: 'session-'.repeat(20),
               sourceUserId: 'u1',
               sourceBookId: 'b-source',
               bookType: 'EPUB',
@@ -173,7 +173,7 @@ describe('UserStateImporter', () => {
           userId: 10,
           bookId: 200,
           bookFileId: 500,
-          sessionId: 'booklore:rs:session-1',
+          sessionId: expect.stringMatching(/^booklore:rs:[A-Za-z0-9_-]{43}$/),
           durationSeconds: 1800,
           progressDelta: 12.35,
           endProgress: 100,

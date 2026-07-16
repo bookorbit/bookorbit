@@ -1,0 +1,1 @@
+ALTER TABLE "kobo_devices" ADD CONSTRAINT "kobo_devices_id_user_id_unique" UNIQUE("id","user_id");

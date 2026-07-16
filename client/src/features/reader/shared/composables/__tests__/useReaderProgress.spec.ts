@@ -217,6 +217,48 @@ describe('useReaderProgress', () => {
     vi.useRealTimers()
   })
 
+  it('omits non-string kobo location source from saved progress', async () => {
+    vi.useFakeTimers()
+    try {
+      const progress = useReaderProgress(1, 1, elapsedMinutes)
+
+      progress.onRelocate(
+        makeDetail({
+          cfi: 'epubcfi(/6/38!/4,/488/2/1:604,/512/2/1:89)',
+          fraction: 0.69604585363819,
+          source: 18,
+          koboLocationType: null,
+          koboLocationValue: null,
+          contentSourceProgressPercent: 87.5,
+          koreaderProgress: '/body/DocFragment[19]/body/p[222]/font/text().604',
+        } as never),
+      )
+
+      vi.clearAllTimers()
+      await progress.save()
+
+      const saveCall = apiMock.mock.calls.find(
+        (c: unknown[]) => typeof c[0] === 'string' && (c[0] as string).includes('/progress') && (c[1] as { method?: string })?.method === 'POST',
+      )
+      if (!saveCall) throw new Error('Expected progress save call')
+      const saveBody = JSON.parse((saveCall[1] as { body: string }).body)
+
+      expect(saveBody).toEqual(
+        expect.objectContaining({
+          cfi: 'epubcfi(/6/38!/4,/488/2/1:604,/512/2/1:89)',
+          percentage: 69.604585363819,
+          koboLocationSource: null,
+          koboLocationType: null,
+          koboLocationValue: null,
+          koboContentSourceProgressPercent: 87.5,
+          koreaderProgress: '/body/DocFragment[19]/body/p[222]/font/text().604',
+        }),
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('keeps relocate state in memory without loading or saving when tracking is disabled', async () => {
     vi.useFakeTimers()
     const trackingEnabled = ref(false)

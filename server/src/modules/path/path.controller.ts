@@ -1,3 +1,4 @@
+import type { PathConfig } from '@bookorbit/types';
 import { Permission } from '@bookorbit/types';
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 
@@ -9,10 +10,16 @@ import { PathService } from './path.service';
 export class PathController {
   constructor(private readonly pathService: PathService) {}
 
+  @Get('config')
+  @RequirePermission(Permission.ManageLibraries)
+  getConfig(): PathConfig {
+    return this.pathService.getConfig();
+  }
+
   @Get()
   @RequirePermission(Permission.ManageLibraries)
-  listDirectories(@Query('path') path: string) {
-    return this.pathService.listDirectories(path || '/');
+  listDirectories(@Query('path') path?: string) {
+    return this.pathService.listDirectories(path);
   }
 
   @Post()

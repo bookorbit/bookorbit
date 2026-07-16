@@ -99,6 +99,7 @@ export function useMetadataSearch() {
     'amazon',
     'audible',
     'audnexus',
+    'librofm',
     'goodreads',
     'hardcover',
     'google',

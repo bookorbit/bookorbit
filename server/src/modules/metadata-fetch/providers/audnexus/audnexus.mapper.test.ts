@@ -64,7 +64,7 @@ describe('mapAudNexusBook — basic fields', () => {
 
   it('strips HTML from summary when description is absent', () => {
     const result = mapAudNexusBook(makeBook({ summary: '<p>A lone <b>astronaut</b>.</p>' }));
-    expect(result.description).toBe('A lone astronaut .');
+    expect(result.description).toBe('A lone astronaut.');
   });
 
   it('maps publisherName', () => {

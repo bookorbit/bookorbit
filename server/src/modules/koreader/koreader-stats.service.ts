@@ -54,7 +54,7 @@ export class KoreaderStatsService {
       const accessibleLibraryIds = await this.koreaderRepo.getAccessibleLibraryIds(user.id);
       const timeZone = resolveTimeZone((user.settings as unknown as UserSettings | undefined)?.timezone, 'UTC');
       const hashes = [...new Set(dto.books.map((book) => book.hash.toLowerCase()))];
-      const matches = await this.koreaderRepo.resolveBookFilesByHashes(hashes, accessibleLibraryIds);
+      const matches = await this.koreaderRepo.resolveBookFilesByHashes(hashes, accessibleLibraryIds, user.id);
 
       const results: PageStatsBookResult[] = [];
       const unmatched: string[] = [];

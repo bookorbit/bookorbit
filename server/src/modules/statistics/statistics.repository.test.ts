@@ -33,6 +33,20 @@ function makeDb(selectQueue: unknown[] = [], executeQueue: unknown[] = []) {
   };
 }
 
+function makeSummaryDb(totalStorageBytes: string) {
+  return makeDb([
+    [{ count: 12 }],
+    [{ count: 8 }],
+    [{ count: 4 }],
+    [{ count: 3 }],
+    [{ total: totalStorageBytes }],
+    [{ count: 6 }],
+    [{ count: 5 }],
+    [{ minYear: 1950, maxYear: 2020 }],
+    [{ count: 2 }],
+  ]);
+}
+
 describe('StatisticsRepository', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -52,6 +66,29 @@ describe('StatisticsRepository', () => {
     expect((repo as any).libraryFilter(null)).toBeUndefined();
     expect((repo as any).libraryFilter([])).toBeDefined();
     expect((repo as any).libraryFilter([1])).toBeDefined();
+  });
+
+  it.each([
+    ['6442450944', 6_442_450_944],
+    ['0', 0],
+  ])('normalizes PostgreSQL bigint storage total %s to the numeric API contract', async (databaseTotal, expectedTotal) => {
+    const repo = new StatisticsRepository(makeSummaryDb(databaseTotal) as never);
+
+    const summary = await repo.getSummary(1, true);
+
+    expect(summary).toEqual({
+      totalBooks: 12,
+      totalAuthors: 8,
+      totalSeries: 4,
+      totalPublishers: 3,
+      totalStorageBytes: expectedTotal,
+      totalGenres: 6,
+      totalLanguages: 5,
+      publicationYearMin: 1950,
+      publicationYearMax: 2020,
+      booksAddedThisYear: 2,
+    });
+    expect(typeof summary.totalStorageBytes).toBe('number');
   });
 
   it('executes all public statistic queries with expected return shaping', async () => {

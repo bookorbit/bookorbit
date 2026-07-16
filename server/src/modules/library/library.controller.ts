@@ -2,13 +2,13 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPip
 import type { FastifyReply } from 'fastify';
 
 import { Permission, AuditAction, AuditResource } from '@bookorbit/types';
-import type { BookQuery, BulkRenameProgressEvent, LibraryFileSyncProgressEvent } from '@bookorbit/types';
+import type { BookQuery, BulkRenameProgressEvent, JumpBucketsQuery, LibraryFileSyncProgressEvent } from '@bookorbit/types';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequireLibraryAccess } from '../../common/decorators/require-library-access.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';
-import { BookQueryPipe } from '../book/pipes/book-query.pipe';
+import { BookQueryPipe, JumpBucketsQueryPipe } from '../book/pipes/book-query.pipe';
 import { BookService } from '../book/book.service';
 import { BulkRenamePreviewQueryDto } from './dto/bulk-rename-preview-query.dto';
 import { CreateLibraryDto } from './dto/create-library.dto';
@@ -47,7 +47,11 @@ export class LibraryController {
 
   @Post(':id/books/jump-buckets')
   @RequireLibraryAccess('viewer')
-  queryJumpBuckets(@Param('id', ParseIntPipe) libraryId: number, @Body(BookQueryPipe) query: BookQuery, @CurrentUser() user: RequestUser) {
+  queryJumpBuckets(
+    @Param('id', ParseIntPipe) libraryId: number,
+    @Body(JumpBucketsQueryPipe) query: JumpBucketsQuery,
+    @CurrentUser() user: RequestUser,
+  ) {
     return this.bookService.queryJumpBucketsForLibrary(user, libraryId, query);
   }
 

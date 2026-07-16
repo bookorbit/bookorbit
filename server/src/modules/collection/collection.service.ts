@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { and, type SQL } from 'drizzle-orm';
 
-import type { BookQuery, BooksPage, JumpBucketsResponse } from '@bookorbit/types';
+import type { BookQuery, BooksPage, JumpBucketsQuery, JumpBucketsResponse } from '@bookorbit/types';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import type { RequestUser } from '../../common/types/request-user';
@@ -247,9 +247,10 @@ export class CollectionService {
     }
   }
 
-  async queryJumpBuckets(id: number, user: RequestUser, query: BookQuery): Promise<JumpBucketsResponse> {
+  async queryJumpBuckets(id: number, user: RequestUser, query: JumpBucketsQuery): Promise<JumpBucketsResponse> {
     const where = await this.buildBooksWhere(id, user, query);
-    return this.bookService.executeJumpBucketsQuery(user.id, where, query);
+    const timeZone = resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
+    return this.bookService.executeJumpBucketsQuery(user.id, where, query, timeZone);
   }
 
   private async buildBooksWhere(id: number, user: RequestUser, query: BookQuery): Promise<SQL | undefined> {

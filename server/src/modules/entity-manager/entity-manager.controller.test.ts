@@ -182,16 +182,16 @@ describe('EntityManagerController', () => {
   describe('getEntityInfo', () => {
     it('handles numeric entity ID', async () => {
       const { controller, service } = makeController();
-      await controller.getEntityInfo('author', '42');
+      await controller.getEntityInfo('author', '42', mockUser);
 
-      expect(service.getEntityInfo).toHaveBeenCalledWith('author', 42);
+      expect(service.getEntityInfo).toHaveBeenCalledWith('author', mockUser, 42);
     });
 
     it('handles string entity ID for inline types', async () => {
       const { controller, service } = makeController();
-      await controller.getEntityInfo('publisher', 'Test Publisher');
+      await controller.getEntityInfo('publisher', 'Test Publisher', mockUser);
 
-      expect(service.getEntityInfo).toHaveBeenCalledWith('publisher', 'Test Publisher');
+      expect(service.getEntityInfo).toHaveBeenCalledWith('publisher', mockUser, 'Test Publisher');
     });
   });
 });

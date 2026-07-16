@@ -17,6 +17,7 @@ describe('provider ID fields', () => {
       'openLibraryId',
       'itunesId',
       'audibleId',
+      'librofmId',
       'koboId',
       'comicvineId',
       'ranobedbId',
@@ -28,11 +29,12 @@ describe('provider ID fields', () => {
   it('filters provider ID fields to the effective provider set', () => {
     const fields = filterProviderIdFields([
       provider(MetadataProviderKey.HARDCOVER),
+      provider(MetadataProviderKey.LIBROFM),
       provider(MetadataProviderKey.KOBO),
       provider(MetadataProviderKey.COMICVINE),
     ])
 
-    expect(fields.map((field) => field.field)).toEqual(['hardcoverId', 'hardcoverEditionId', 'koboId', 'comicvineId'])
+    expect(fields.map((field) => field.field)).toEqual(['hardcoverId', 'hardcoverEditionId', 'librofmId', 'koboId', 'comicvineId'])
   })
 
   it('reports provider ID field availability by mapped provider key', () => {
@@ -44,5 +46,12 @@ describe('provider ID fields', () => {
     expect(isProviderIdFieldAvailable('futureProviderId' as ProviderIdFormField, providers)).toBe(true)
     expect(isProviderIdFormField('googleBooksId')).toBe(true)
     expect(isProviderIdFormField('title')).toBe(false)
+  })
+
+  it('shows the Audible ID field when AudNexus is enabled', () => {
+    const providers = [provider(MetadataProviderKey.AUDNEXUS)]
+
+    expect(isProviderIdFieldAvailable('audibleId', providers)).toBe(true)
+    expect(filterProviderIdFields(providers).map((field) => field.field)).toEqual(['audibleId'])
   })
 })

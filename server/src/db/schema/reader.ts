@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { check, date, index, integer, jsonb, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
-import type { ReadStatus, ReadStatusSource, ReadingSessionSource } from '@bookorbit/types';
+import type { ReadStatus, ReadStatusSource, ReadingAttemptOrigin, ReadingAttemptOutcome, ReadingSessionSource } from '@bookorbit/types';
 
 import { bookFiles, books } from './books';
 import { libraries } from './libraries';
@@ -17,7 +17,7 @@ export const userBookStatus = pgTable(
       .references(() => books.id, { onDelete: 'cascade' }),
     // 'unread' | 'want_to_read' | 'reading' | 'on_hold' | 'rereading' | 'read' | 'skimmed' | 'abandoned'
     status: varchar('status', { length: 20 }).$type<ReadStatus>().notNull().default('unread'),
-    // 'auto' (derived from progress) | 'manual' (user-set; never auto-overridden)
+    // 'auto' (derived from progress) | 'manual' (user-set/imported; protected from progress updates except want_to_read)
     source: varchar('source', { length: 10 }).$type<ReadStatusSource>().notNull().default('auto'),
     startedAt: timestamp('started_at', { withTimezone: true }),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
@@ -43,6 +43,49 @@ export const userBookStatus = pgTable(
 export type UserBookStatusRow = typeof userBookStatus.$inferSelect;
 export type NewUserBookStatus = typeof userBookStatus.$inferInsert;
 
+export const readingAttempts = pgTable(
+  'reading_attempts',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bookId: integer('book_id')
+      .notNull()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    startedOn: date('started_on', { mode: 'string' }),
+    endedOn: date('ended_on', { mode: 'string' }),
+    outcome: varchar('outcome', { length: 20 }).$type<ReadingAttemptOutcome>(),
+    origin: varchar('origin', { length: 20 }).$type<ReadingAttemptOrigin>().notNull(),
+    externalProvider: varchar('external_provider', { length: 40 }),
+    externalId: varchar('external_id', { length: 255 }),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [
+    index('reading_attempts_user_book_idx').on(t.userId, t.bookId, t.id),
+    index('reading_attempts_book_id_idx').on(t.bookId),
+    index('reading_attempts_user_outcome_ended_idx').on(t.userId, t.outcome, t.endedOn),
+    uniqueIndex('reading_attempts_one_active_uidx')
+      .on(t.userId, t.bookId)
+      .where(sql`${t.outcome} is null and ${t.deletedAt} is null`),
+    uniqueIndex('reading_attempts_external_uidx')
+      .on(t.userId, t.externalProvider, t.externalId)
+      .where(sql`${t.externalProvider} is not null and ${t.externalId} is not null`),
+    check('reading_attempts_outcome_chk', sql`${t.outcome} is null or ${t.outcome} in ('completed', 'skimmed', 'abandoned')`),
+    check('reading_attempts_origin_chk', sql`${t.origin} in ('manual', 'bookorbit', 'kobo', 'koreader', 'hardcover', 'migration')`),
+    check('reading_attempts_end_after_start_chk', sql`${t.endedOn} is null or ${t.startedOn} is null or ${t.endedOn} >= ${t.startedOn}`),
+    check('reading_attempts_closed_has_outcome_chk', sql`${t.endedOn} is null or ${t.outcome} is not null`),
+  ],
+);
+
+export type ReadingAttemptRow = typeof readingAttempts.$inferSelect;
+export type NewReadingAttempt = typeof readingAttempts.$inferInsert;
+
 export const userBookRatings = pgTable(
   'user_book_ratings',
   {
@@ -52,7 +95,7 @@ export const userBookRatings = pgTable(
     bookId: integer('book_id')
       .notNull()
       .references(() => books.id, { onDelete: 'cascade' }),
-    rating: integer('rating').notNull(),
+    rating: integer('rating'),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow()
@@ -63,12 +106,39 @@ export const userBookRatings = pgTable(
     index('ubr_user_id_idx').on(t.userId),
     index('ubr_book_id_idx').on(t.bookId),
     index('ubr_book_user_rating_idx').on(t.bookId, t.userId),
-    check('user_book_ratings_rating_range_chk', sql`${t.rating} >= 1 and ${t.rating} <= 5`),
+    check('user_book_ratings_rating_range_chk', sql`${t.rating} is null or (${t.rating} >= 1 and ${t.rating} <= 5)`),
   ],
 );
 
 export type UserBookRatingRow = typeof userBookRatings.$inferSelect;
 export type NewUserBookRating = typeof userBookRatings.$inferInsert;
+
+export const userBookNotes = pgTable(
+  'user_book_notes',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bookId: integer('book_id')
+      .notNull()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    note: text('note'),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.bookId] }),
+    index('ubn_user_id_idx').on(t.userId),
+    index('ubn_book_id_idx').on(t.bookId),
+    index('ubn_book_user_idx').on(t.bookId, t.userId),
+    check('user_book_notes_note_length_chk', sql`${t.note} is null or char_length(${t.note}) <= 10000`),
+  ],
+);
+
+export type UserBookNoteRow = typeof userBookNotes.$inferSelect;
+export type NewUserBookNote = typeof userBookNotes.$inferInsert;
 
 export const readingProgress = pgTable(
   'reading_progress',
@@ -129,6 +199,7 @@ export const readingSessions = pgTable(
     bookId: integer('book_id')
       .notNull()
       .references(() => books.id, { onDelete: 'cascade' }),
+    attemptId: integer('attempt_id').references(() => readingAttempts.id, { onDelete: 'set null' }),
     // Client-generated UUID; used for idempotent retries.
     sessionId: varchar('session_id', { length: 64 }).notNull(),
     // 'web' (browser reader) | 'koreader' (page-stats derivation) | 'manual' (user-entered) | 'kobo' (future)
@@ -147,6 +218,8 @@ export const readingSessions = pgTable(
     index('rs_book_file_started_at_idx').on(t.bookFileId, t.startedAt),
     index('rs_user_book_file_idx').on(t.userId, t.bookFileId),
     index('rs_user_book_started_at_idx').on(t.userId, t.bookId, t.startedAt),
+    index('reading_sessions_book_id_idx').on(t.bookId),
+    index('rs_attempt_started_at_idx').on(t.attemptId, t.startedAt),
     check('reading_sessions_source_chk', sql`${t.source} in ('web', 'koreader', 'manual', 'kobo')`),
     check('reading_sessions_duration_seconds_nonnegative_chk', sql`${t.durationSeconds} >= 0`),
     check('reading_sessions_end_progress_range_chk', sql`${t.endProgress} is null or (${t.endProgress} >= 0 and ${t.endProgress} <= 100)`),
@@ -178,6 +251,7 @@ export const userReadingDailyStats = pgTable(
   (t) => [
     primaryKey({ columns: [t.userId, t.libraryId, t.day] }),
     index('urds_user_day_idx').on(t.userId, t.day),
+    index('user_reading_daily_stats_library_id_idx').on(t.libraryId),
     check('user_reading_daily_stats_reading_seconds_nonnegative_chk', sql`${t.readingSeconds} >= 0`),
     check('user_reading_daily_stats_sessions_count_nonnegative_chk', sql`${t.sessionsCount} >= 0`),
   ],
@@ -208,6 +282,8 @@ export const audiobookProgress = pgTable(
   (t) => [
     primaryKey({ columns: [t.userId, t.bookId] }),
     index('abp_user_id_idx').on(t.userId),
+    index('audiobook_progress_book_id_idx').on(t.bookId),
+    index('audiobook_progress_current_file_id_idx').on(t.currentFileId),
     check('audiobook_progress_percentage_range_chk', sql`${t.percentage} >= 0 and ${t.percentage} <= 100`),
     check('audiobook_progress_position_seconds_nonnegative_chk', sql`${t.positionSeconds} >= 0`),
   ],
@@ -235,6 +311,7 @@ export const bookmarks = pgTable(
   },
   (t) => [
     index('bookmarks_user_book_idx').on(t.userId, t.bookId),
+    index('bookmarks_book_id_idx').on(t.bookId),
     uniqueIndex('bookmarks_user_book_cfi_uidx')
       .on(t.userId, t.bookId, t.cfi)
       .where(sql`${t.cfi} is not null`),
@@ -279,7 +356,9 @@ export const annotations = pgTable(
   },
   (t) => [
     index('annotations_user_id_idx').on(t.userId),
+    index('annotations_user_id_id_idx').on(t.userId, t.id),
     index('annotations_user_book_idx').on(t.userId, t.bookId),
+    index('annotations_book_id_idx').on(t.bookId),
     index('annotations_user_book_active_idx')
       .on(t.userId, t.bookId)
       .where(sql`${t.deletedAt} is null`),
@@ -319,6 +398,7 @@ export const annotationPositions = pgTable(
   (t) => [
     uniqueIndex('annotation_positions_annotation_format_uidx').on(t.annotationId, t.format),
     index('annotation_positions_user_idx').on(t.userId),
+    index('annotation_positions_book_file_id_idx').on(t.bookFileId),
     index('annotation_positions_format_status_idx').on(t.format, t.status),
     check('annotation_positions_format_chk', sql`${t.format} in ('cfi', 'xpointer', 'pdf', 'kobo_span')`),
     check('annotation_positions_status_chk', sql`${t.status} in ('exact', 'repaired', 'failed', 'pending')`),
@@ -407,7 +487,7 @@ export const readerPreferences = pgTable(
       .defaultNow()
       .$onUpdateFn(() => new Date()),
   },
-  (t) => [uniqueIndex('rp_user_file_idx').on(t.userId, t.bookFileId)],
+  (t) => [uniqueIndex('rp_user_file_idx').on(t.userId, t.bookFileId), index('reader_preferences_book_file_id_idx').on(t.bookFileId)],
 );
 
 export type ReaderPreference = typeof readerPreferences.$inferSelect;

@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { getAccessToken } from '@/lib/api'
 import type { AddBookFileResult } from '@bookorbit/types'
+import { useAppInfo } from '@/features/settings/composables/useAppInfo'
 
 export const SUPPORTED_FORMATS = ['epub', 'kepub', 'pdf', 'mobi', 'azw3', 'cbz', 'cbr', 'cb7', 'fb2', 'm4b', 'm4a', 'mp3', 'opus', 'ogg', 'flac']
 export const SUPPORTED_FORMATS_ACCEPT = SUPPORTED_FORMATS.map((f) => `.${f}`).join(',')
@@ -25,8 +26,10 @@ function validateFile(file: File): string | null {
   if (!SUPPORTED_FORMATS.includes(ext)) {
     return `Unsupported type .${ext}. Allowed: ${SUPPORTED_FORMATS.join(', ')}`
   }
-  if (file.size > MAX_FILE_BYTES) {
-    return `File exceeds the 500 MB limit`
+  const { maxUploadSizeMb } = useAppInfo()
+  const limitBytes = maxUploadSizeMb.value * 1024 * 1024
+  if (file.size > limitBytes) {
+    return `File exceeds the ${maxUploadSizeMb.value} MB limit`
   }
   return null
 }

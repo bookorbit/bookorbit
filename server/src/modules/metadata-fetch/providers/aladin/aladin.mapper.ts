@@ -1,4 +1,6 @@
 import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
+import { parsePublishedDateKey, parsePublishedYear, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
+import { htmlToPlainText } from '../../../../common/utils/html-to-text.utils';
 import { AladinItem } from './aladin.types';
 
 function parseAuthors(authorString: string): string[] {
@@ -10,9 +12,7 @@ function parseAuthors(authorString: string): string[] {
 }
 
 function parseYear(pubDate: string): number | undefined {
-  if (!pubDate) return undefined;
-  const match = pubDate.match(/^(\d{4})/);
-  return match ? parseInt(match[1], 10) : undefined;
+  return parsePublishedYear(pubDate);
 }
 
 function parsePageCount(subInfo?: AladinItem['subInfo']): number | undefined {
@@ -23,7 +23,7 @@ function parsePageCount(subInfo?: AladinItem['subInfo']): number | undefined {
 function parseDescription(description: string, fullDescription?: string): string | undefined {
   const desc = fullDescription ?? description;
   if (!desc) return undefined;
-  return desc.replace(/<[^>]*>/g, '').trim();
+  return htmlToPlainText(desc) || undefined;
 }
 
 function parseGenres(categoryIdList?: AladinItem['categoryIdList']): string[] | undefined {
@@ -43,7 +43,8 @@ function parseItemId(link: string): string | undefined {
 export function mapAladinItem(item: AladinItem): MetadataCandidate {
   const authors = parseAuthors(item.author);
   const genres = parseGenres(item.categoryIdList);
-  const publishedYear = parseYear(item.pubDate);
+  const publishedDate = parsePublishedDateKey(item.pubDate);
+  const publishedYear = publishedDate ? publishedYearFromDateKey(publishedDate) : parseYear(item.pubDate);
   const pageCount = parsePageCount(item.subInfo);
   const itemId = parseItemId(item.link);
 
@@ -55,6 +56,7 @@ export function mapAladinItem(item: AladinItem): MetadataCandidate {
     authors: authors.length > 0 ? authors : undefined,
     description: parseDescription(item.description, item.fullDescription),
     publisher: item.publisher || undefined,
+    publishedDate,
     publishedYear,
     language: 'ko',
     pageCount,

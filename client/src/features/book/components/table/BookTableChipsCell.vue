@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 import ChipInput from '@/components/ui/ChipInput.vue'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -19,6 +20,8 @@ const emit = defineEmits<{
   cancel: []
   navigate: [direction: 'next' | 'prev']
 }>()
+
+const { t } = useI18n()
 
 const defaultSearchFn = () => Promise.resolve([])
 
@@ -113,7 +116,7 @@ function handleChipAction(chip: string) {
         :style="{ minWidth: 'max(240px, var(--reka-popover-trigger-width))', maxWidth: 'min(400px, 90vw)' }"
         @keydown="handleKeydown"
       >
-        <ChipInput v-model="draft" :search-fn="searchFn ?? defaultSearchFn" placeholder="Add..." />
+        <ChipInput v-model="draft" :search-fn="searchFn ?? defaultSearchFn" :placeholder="t('book.table.chips.addPlaceholder')" />
       </PopoverContent>
     </Popover>
   </div>

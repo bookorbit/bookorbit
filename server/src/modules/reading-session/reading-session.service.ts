@@ -35,7 +35,7 @@ export class ReadingSessionService {
     );
 
     try {
-      await this.bookService.verifyFileAccess(fileId, user);
+      const file = await this.bookService.verifyFileAccess(fileId, user);
 
       const startedAt = new Date(dto.startedAt);
       const endedAt = new Date(dto.endedAt);
@@ -70,6 +70,14 @@ export class ReadingSessionService {
       );
 
       if (result.kind === 'saved') {
+        const meaningfulActivity = durationSeconds >= 300 || (dto.progressDelta ?? 0) >= 1;
+        if (meaningfulActivity && file && dto.endProgress != null) {
+          await this.bookService.autoUpdateReadStatusForProgress(user.id, file, dto.endProgress, {
+            origin: source === 'koreader' ? 'koreader' : 'bookorbit',
+            occurredOn: endedAt.toISOString().slice(0, 10),
+            meaningfulActivity: true,
+          });
+        }
         this.achievementEvents.emit(ACHIEVEMENT_EVENT_READING_SESSION_SAVED, {
           userId: user.id,
           bookFileId: fileId,

@@ -47,7 +47,7 @@ import {
   PreviewNamesDto,
   SelectionSummaryDto,
 } from './dto/index';
-import { MAX_UPLOAD_BYTES } from '../upload/upload-storage.service';
+import { AppSettingsService } from '../app-settings/app-settings.service';
 
 @Controller('book-dock')
 @RequirePermission(Permission.BookDockAccess)
@@ -58,6 +58,7 @@ export class BookDockController {
     private readonly finalizeService: BookDockFinalizeService,
     private readonly watcherService: BookDockWatcherService,
     private readonly repo: BookDockRepository,
+    private readonly appSettings: AppSettingsService,
   ) {}
 
   @Get('files')
@@ -77,6 +78,18 @@ export class BookDockController {
   @Get('summary')
   getSummary(@CurrentUser() user: RequestUser) {
     return this.service.getSummary(user.id, user.isSuperuser);
+  }
+
+  @Post('pause')
+  @HttpCode(HttpStatus.OK)
+  pause() {
+    return this.service.pauseProcessing();
+  }
+
+  @Post('resume')
+  @HttpCode(HttpStatus.OK)
+  resume() {
+    return this.service.resumeProcessing();
   }
 
   @Get('statistics')
@@ -109,7 +122,8 @@ export class BookDockController {
   @Post('upload')
   @HttpCode(HttpStatus.CREATED)
   async upload(@CurrentUser() user: RequestUser, @Req() req: MultipartRequest) {
-    const data = await req.file({ limits: { fileSize: MAX_UPLOAD_BYTES } });
+    const limitMb = await this.appSettings.getMaxUploadSizeMb();
+    const data = await req.file({ limits: { fileSize: limitMb * 1024 * 1024 } });
     if (!data) throw new BadRequestException('No file provided');
 
     const fileId = await this.ingestService.ingestUpload(data.filename, data.file as unknown as Readable, user.id);
@@ -181,8 +195,51 @@ export class BookDockController {
   }
 
   @Post('files/preview-names')
-  previewNames(@Body() dto: PreviewNamesDto) {
-    return this.finalizeService.previewNames(dto.fileIds, dto.selectAll, dto.excludedIds, dto.defaultLibraryId, dto.status, dto.search);
+  previewNames(@CurrentUser() user: RequestUser, @Body() dto: PreviewNamesDto) {
+    return this.finalizeService.previewNames(
+      dto.fileIds,
+      dto.selectAll,
+      dto.excludedIds,
+      dto.defaultLibraryId,
+      user.id,
+      user.isSuperuser,
+      dto.status,
+      dto.search,
+    );
+  }
+
+  @Post('finalize/preview')
+  @HttpCode(HttpStatus.OK)
+  previewFinalize(@CurrentUser() user: RequestUser, @Body() dto: FinalizeBookDockDto) {
+    return this.finalizeService.previewFinalize(
+      user.id,
+      user.isSuperuser,
+      dto.fileIds,
+      dto.selectAll,
+      dto.excludedIds,
+      dto.defaultLibraryId,
+      dto.defaultFolderId,
+      dto.overrides,
+      dto.status,
+      dto.search,
+    );
+  }
+
+  @Post('finalize/discard-duplicates')
+  @HttpCode(HttpStatus.OK)
+  discardFinalizeDuplicates(@CurrentUser() user: RequestUser, @Body() dto: FinalizeBookDockDto) {
+    return this.finalizeService.discardDuplicateCandidates(
+      user.id,
+      user.isSuperuser,
+      dto.fileIds,
+      dto.selectAll,
+      dto.excludedIds,
+      dto.defaultLibraryId,
+      dto.defaultFolderId,
+      dto.overrides,
+      dto.status,
+      dto.search,
+    );
   }
 
   @Post('finalize')

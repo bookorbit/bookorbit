@@ -3,7 +3,7 @@ export function stripFragment(href: string): string {
 }
 
 export function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  return formatLocaleDate(new Date(dateStr), { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function getCfiBody(cfi: string): string | null {
@@ -126,3 +126,16 @@ export function cfiRangesOverlap(a: string, b: string): boolean {
   if (ra.spineStep !== rb.spineStep) return false
   return ra.startKey <= rb.endKey && ra.endKey >= rb.startKey
 }
+
+export function cfiRangesMatch(a: string, b: string): boolean {
+  const ra = parseCfiRange(a)
+  const rb = parseCfiRange(b)
+  if (!ra || !rb) return false
+  return ra.spineStep === rb.spineStep && ra.startKey === rb.startKey && ra.endKey === rb.endKey
+}
+
+export function findMatchingCfiRange<T extends { cfi: string | null | undefined }>(items: T[], selectedCfi: string | null | undefined): T | null {
+  if (!selectedCfi) return null
+  return items.find((item) => item.cfi != null && cfiRangesMatch(selectedCfi, item.cfi)) ?? null
+}
+import { formatDate as formatLocaleDate } from '@/i18n/formatters'

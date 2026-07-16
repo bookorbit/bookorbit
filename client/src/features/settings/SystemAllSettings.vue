@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import FileNamingSettings from './FileNamingSettings.vue'
@@ -9,6 +10,7 @@ import AuditLogPage from '@/features/audit/AuditLogPage.vue'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { SYSTEM_TAB_INFO, SYSTEM_TABS, normalizeSystemTab, type SystemTab as Tab } from './lib/system-tabs'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const { isSuperuser, userPermissions } = usePermissions()
@@ -18,7 +20,7 @@ const availableTabs = computed(() =>
     const perm = SYSTEM_TAB_INFO[id].permission
     if (id === 'audit-log') return isSuperuser.value
     return isSuperuser.value || (perm !== null && userPermissions.value.includes(perm))
-  }).map((id) => ({ id, label: SYSTEM_TAB_INFO[id].navLabel })),
+  }).map((id) => ({ id, label: t(`settings.system.tabs.${id}`) })),
 )
 
 function resolveTab(raw: unknown): Tab {
@@ -62,7 +64,7 @@ function selectTab(tab: Tab) {
 </script>
 
 <template>
-  <SettingsPageHeader title="System" subtitle="File organization, ingestion, and maintenance settings." />
+  <SettingsPageHeader :title="t('settings.admin.system.title')" :subtitle="t('settings.admin.system.subtitle')" />
 
   <div
     :class="[

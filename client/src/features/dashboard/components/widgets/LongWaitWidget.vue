@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Clock, Play } from '@lucide/vue'
 import { useRouter } from 'vue-router'
 import { FORMAT_TO_GROUP } from '@bookorbit/types'
@@ -10,6 +11,7 @@ import BookCoverSurface from '@/features/book/components/BookCoverSurface.vue'
 import { useLongWaitWidget } from '../../composables/useLongWaitWidget'
 
 const { data, loading, error } = useLongWaitWidget()
+const { t } = useI18n()
 const router = useRouter()
 const { coverUrl } = useCoverVersions()
 
@@ -41,7 +43,7 @@ function startReading() {
   <div class="flex h-full flex-col p-3">
     <div class="mb-3 flex items-center gap-2 self-start">
       <Clock :size="16" class="text-primary/90" />
-      <span class="text-[15px] font-semibold text-foreground">The Long Wait</span>
+      <span class="text-[15px] font-semibold text-foreground">{{ t('dashboard.widgets.longWait.title') }}</span>
     </div>
 
     <!-- Loading -->
@@ -51,14 +53,16 @@ function startReading() {
     </div>
 
     <!-- Error -->
-    <div v-else-if="error" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">Failed to load</div>
+    <div v-else-if="error" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+      {{ t('dashboard.common.failedToLoad') }}
+    </div>
 
     <!-- Empty -->
     <div v-else-if="!data" class="flex flex-1 flex-col items-center justify-center gap-2">
       <div class="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
         <Clock :size="16" class="text-muted-foreground/60" />
       </div>
-      <p class="text-center text-xs text-muted-foreground">No books waiting. You've started everything!</p>
+      <p class="text-center text-xs text-muted-foreground">{{ t('dashboard.widgets.longWait.empty') }}</p>
     </div>
 
     <!-- Long wait book -->
@@ -79,7 +83,7 @@ function startReading() {
             :author-line="null"
             :is-audio="false"
             :seed="data.title ?? String(data.bookId)"
-            :alt="data.title ?? 'Cover'"
+            :alt="data.title ?? t('dashboard.common.cover')"
             frame-aspect-ratio="3/4"
             :is-comic="isComic"
           />
@@ -87,13 +91,13 @@ function startReading() {
 
         <div class="min-w-0 text-left">
           <button class="block cursor-pointer truncate text-xs font-semibold leading-tight hover:underline" @click="goToBook">
-            {{ data.title ?? 'Untitled' }}
+            {{ data.title ?? t('dashboard.common.untitled') }}
           </button>
           <p class="mt-2 text-2xl font-bold leading-none tabular-nums text-primary">{{ data.waitingDays }}</p>
-          <p class="text-[11px] text-muted-foreground">days waiting</p>
+          <p class="text-[11px] text-muted-foreground">{{ t('dashboard.widgets.longWait.daysWaiting') }}</p>
 
           <div class="mt-2 flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground">
-            <span v-if="data.pageCount" class="shrink-0">{{ data.pageCount }} pages</span>
+            <span v-if="data.pageCount" class="shrink-0">{{ t('dashboard.widgets.longWait.pages', { count: data.pageCount }, data.pageCount) }}</span>
             <span v-if="data.pageCount && data.genre" class="shrink-0">&middot;</span>
             <span v-if="data.genre" class="truncate">{{ data.genre }}</span>
           </div>
@@ -106,7 +110,7 @@ function startReading() {
         @click="startReading"
       >
         <Play :size="12" class="translate-x-px" />
-        Start Reading
+        {{ t('dashboard.widgets.longWait.startReading') }}
       </button>
     </div>
   </div>

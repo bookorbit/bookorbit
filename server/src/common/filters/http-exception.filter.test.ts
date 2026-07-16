@@ -41,6 +41,15 @@ describe('GlobalExceptionFilter', () => {
     );
   });
 
+  it('preserves stable application error codes', () => {
+    const filter = new GlobalExceptionFilter();
+    const { host, send } = makeHost();
+
+    filter.catch(new HttpException({ message: 'sharing disabled', errorCode: 'READING_INSIGHTS_PRIVATE' }, HttpStatus.FORBIDDEN), host);
+
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ errorCode: 'READING_INSIGHTS_PRIVATE' }));
+  });
+
   it('falls back to statusCode/message fields on non-HttpException values', () => {
     const filter = new GlobalExceptionFilter();
     const { host, status, send } = makeHost();

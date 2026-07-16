@@ -1,8 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, ilike, isNotNull } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
+import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
 import * as schema from '../../db/schema';
 import { authors, bookMetadata, bookSeries, collections, genres, narrators, tags } from '../../db/schema';
 
@@ -56,7 +57,7 @@ export class CatalogService {
     return this.db
       .select({ name: collections.name })
       .from(collections)
-      .where(and(eq(collections.userId, userId), ilike(collections.name, pattern)))
+      .where(and(eq(collections.userId, userId), accentInsensitiveIlike(collections.name, pattern)))
       .orderBy(collections.name)
       .limit(COLLECTION_SEARCH_LIMIT);
   }
@@ -65,7 +66,12 @@ export class CatalogService {
     const pattern = this.toContainsPattern(q);
     if (!pattern) return Promise.resolve([]);
 
-    return this.db.select({ name: table.name }).from(table).where(ilike(table.name, pattern)).orderBy(table.name).limit(DEFAULT_SEARCH_LIMIT);
+    return this.db
+      .select({ name: table.name })
+      .from(table)
+      .where(accentInsensitiveIlike(table.name, pattern))
+      .orderBy(table.name)
+      .limit(DEFAULT_SEARCH_LIMIT);
   }
 
   private searchByNameWithId(q: string, table: NamedTableWithId): Promise<SearchResultWithId[]> {
@@ -75,7 +81,7 @@ export class CatalogService {
     return this.db
       .select({ id: table.id, name: table.name })
       .from(table)
-      .where(ilike(table.name, pattern))
+      .where(accentInsensitiveIlike(table.name, pattern))
       .orderBy(table.name)
       .limit(DEFAULT_SEARCH_LIMIT);
   }
@@ -87,7 +93,7 @@ export class CatalogService {
     const rows = await this.db
       .selectDistinct({ name: column })
       .from(bookMetadata)
-      .where(and(isNotNull(column), ilike(column, pattern)))
+      .where(and(isNotNull(column), accentInsensitiveIlike(column, pattern)))
       .orderBy(column)
       .limit(DEFAULT_SEARCH_LIMIT);
 

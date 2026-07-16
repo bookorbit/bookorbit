@@ -72,6 +72,17 @@ describe('BookSortBuilder', () => {
     expect(raw).toHaveBeenCalledWith(expect.stringContaining('SELECT bf.format FROM book_files'));
   });
 
+  it('builds publishedDate sort with published year fallback', () => {
+    const raw = (sql as unknown as { raw: vi.Mock }).raw;
+
+    const result = service.build([{ field: 'publishedDate', dir: 'asc' }]);
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({ type: 'sql', text: expect.stringContaining('coalesce(') });
+    expect(result[0]?.text).toContain('make_date(');
+    expect(raw).toHaveBeenCalledWith('ASC');
+  });
+
   it('builds random sort with md5 hash expression', () => {
     const raw = (sql as unknown as { raw: vi.Mock }).raw;
     vi.useFakeTimers();

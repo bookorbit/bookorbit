@@ -36,6 +36,7 @@ describe('ReaderSidebar', () => {
       locationMetaByCfi: {},
       activeHref: '',
       expandedHrefs: new Set<string>(),
+      pinned: false,
     }
   }
 
@@ -87,6 +88,41 @@ describe('ReaderSidebar', () => {
 
     expect(wrapper.find('[data-reader-active-row="chapter"]').text()).toContain('Chapter 18')
     expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center', inline: 'nearest' })
+  })
+
+  it('shows pin state and emits togglePinned from the sidebar header', async () => {
+    const wrapper = mount(ReaderSidebar, {
+      props: makeBaseProps(),
+      global,
+    })
+
+    await wrapper.get('button[aria-label="Pin sidebar"]').trigger('click')
+
+    expect(wrapper.emitted('togglePinned')).toHaveLength(1)
+
+    await wrapper.setProps({ pinned: true })
+
+    const pinButton = wrapper.get('button[aria-label="Unpin sidebar"]')
+    expect(pinButton.attributes('aria-pressed')).toBe('true')
+
+    await pinButton.trigger('click')
+    expect(wrapper.emitted('togglePinned')).toHaveLength(2)
+  })
+
+  it('only closes from the backdrop while unpinned', async () => {
+    const wrapper = mount(ReaderSidebar, {
+      props: makeBaseProps(),
+      global,
+    })
+
+    await wrapper.find('[data-reader-sidebar-backdrop]').trigger('click')
+    expect(wrapper.emitted('close')).toHaveLength(1)
+
+    await wrapper.setProps({ pinned: true })
+    expect(wrapper.find('[data-reader-sidebar-backdrop]').exists()).toBe(false)
+
+    await wrapper.get('button[aria-label="Close sidebar"]').trigger('click')
+    expect(wrapper.emitted('close')).toHaveLength(2)
   })
 
   it('navigates and deletes bookmark/annotation entries from sidebar tabs', async () => {
@@ -155,7 +191,7 @@ describe('ReaderSidebar', () => {
 
     const tabButtons = wrapper.findAll('button')
 
-    const bookmarksTab = tabButtons.find((btn) => btn.text().includes('Bookmarks'))
+    const bookmarksTab = tabButtons.find((btn) => btn.text().includes('Marks'))
     await bookmarksTab?.trigger('click')
 
     expect(wrapper.text()).toContain('Chapter 1 - 12%')
@@ -169,7 +205,7 @@ describe('ReaderSidebar', () => {
     await bookmarkDelete?.trigger('click')
     expect(wrapper.emitted('deleteBookmark')?.[0]).toEqual([1])
 
-    const highlightsTab = wrapper.findAll('button').find((btn) => btn.text().includes('Highlights'))
+    const highlightsTab = wrapper.findAll('button').find((btn) => btn.text().includes('Notes'))
     await highlightsTab?.trigger('click')
 
     expect(wrapper.text()).toContain('Chapter 3 - 45%')
@@ -228,7 +264,7 @@ describe('ReaderSidebar', () => {
       global,
     })
 
-    const highlightsTab = wrapper.findAll('button').find((btn) => btn.text().includes('Highlights'))
+    const highlightsTab = wrapper.findAll('button').find((btn) => btn.text().includes('Notes'))
     await highlightsTab?.trigger('click')
 
     const searchInput = wrapper.find('input[placeholder="Search highlights..."]')
@@ -273,7 +309,7 @@ describe('ReaderSidebar', () => {
       global,
     })
 
-    const bookmarksTab = wrapper.findAll('button').find((btn) => btn.text().includes('Bookmarks'))
+    const bookmarksTab = wrapper.findAll('button').find((btn) => btn.text().includes('Marks'))
     await bookmarksTab?.trigger('click')
 
     expect(wrapper.text()).toContain('Location unavailable')
@@ -319,7 +355,7 @@ describe('ReaderSidebar', () => {
       global,
     })
 
-    const highlightsTab = wrapper.findAll('button').find((btn) => btn.text().includes('Highlights'))
+    const highlightsTab = wrapper.findAll('button').find((btn) => btn.text().includes('Notes'))
     await highlightsTab?.trigger('click')
     expect(wrapper.text()).toContain('Custom (#ABC123)')
 

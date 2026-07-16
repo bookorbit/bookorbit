@@ -103,7 +103,7 @@ describe('AuthorEnrichmentGateway', () => {
     authService.validateUser.mockResolvedValue(user);
     queueRepo.getStatusSummary.mockResolvedValue({ queued: 3, processing: 1, rateLimited: 0, failed: 0, done: 2, total: 6 });
     enrichmentConfig.isPaused.mockResolvedValue(true);
-    session.getSnapshot.mockReturnValue({ sessionTotal: 6, sessionDone: 2, currentItemName: 'Alice' });
+    session.getSnapshot.mockReturnValue({ sessionTotal: 6, sessionDone: 2, sessionFailed: 1, currentItemName: 'Alice' });
     const client = {
       id: 'sock-2',
       handshake: { auth: { token: 'jwt' } },
@@ -124,6 +124,7 @@ describe('AuthorEnrichmentGateway', () => {
       paused: true,
       sessionTotal: 6,
       sessionDone: 2,
+      sessionFailed: 1,
       currentItemName: 'Alice',
     });
     expect(client.disconnect).not.toHaveBeenCalled();

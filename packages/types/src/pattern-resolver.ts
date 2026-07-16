@@ -1,7 +1,9 @@
-export const DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE = "<{authors:first}|Unknown Author>/<{series}/><{seriesIndex}. ><{title}|{originalFilename}>< ({year})>";
+export const DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE =
+  "<{authors:first}|Unknown Author>/<{series}/><{seriesIndex}. ><{title}|{originalFilename}>< ({year})>";
 export const DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER =
   "<{authors:first}|Unknown Author>/<{series}/><{seriesIndex}. ><{title}|{originalFilename}>< ({year})>/<{seriesIndex}. ><{title}|{originalFilename}>< ({year})>";
 export const DEFAULT_DOWNLOAD_PATTERN = "{originalFilename}";
+export const DEFAULT_KOREADER_DEVICE_PATTERN = "<Series/{series}/|Standalone/{authors:first} - ><{seriesIndex:fixed2} - >{title}";
 
 export const EXAMPLE_PATTERN_METADATA: Record<string, string> = {
   title: "Neuromancer",
@@ -36,6 +38,8 @@ export type PathResolverOptions = {
   sanitizeForCrossPlatform?: boolean;
   replacementCharacter?: "_" | "-";
 };
+
+export const MAX_PATH_SEGMENT_BYTES = 255;
 
 const MODIFIER_PLACEHOLDER_REGEX = /\{([^}:]+)(?::([^}]+))?}/g;
 const WINDOWS_RESERVED_NAMES = new Set([
@@ -88,6 +92,10 @@ export function applyModifier(value: string, modifier: string, fieldName: string
       return value.toUpperCase();
     case "lower":
       return value.toLowerCase();
+    case "fixed2": {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric.toFixed(2) : value;
+    }
     default:
       return value;
   }
@@ -133,11 +141,8 @@ function normalizeResolverOptions(options?: PathResolverOptions): Required<PathR
   };
 }
 
-function sanitizePathSegmentValue(value: string, replacementCharacter: "_" | "-"): string {
-  let sanitized = value
-    .replace(INVALID_SEGMENT_CHARS_REGEX, replacementCharacter)
-    .trim()
-    .replace(/[. ]+$/g, "");
+export function sanitizePathSegment(value: string, replacementCharacter: "_" | "-" = "_"): string {
+  let sanitized = stripTrailingDotsAndSpaces(value.replace(INVALID_SEGMENT_CHARS_REGEX, replacementCharacter).trim());
   if (!sanitized || sanitized === "." || sanitized === "..") {
     sanitized = replacementCharacter;
   }
@@ -150,12 +155,18 @@ function sanitizePathSegmentValue(value: string, replacementCharacter: "_" | "-"
   return sanitized;
 }
 
+function stripTrailingDotsAndSpaces(value: string): string {
+  let end = value.length;
+  while (end > 0 && (value[end - 1] === "." || value[end - 1] === " ")) end -= 1;
+  return end === value.length ? value : value.slice(0, end);
+}
+
 function sanitizeResolutionValues(values: Record<string, string>, options: Required<PathResolverOptions>): Record<string, string> {
   if (!options.sanitizeForCrossPlatform) return values;
 
   const sanitized: Record<string, string> = {};
   for (const [key, value] of Object.entries(values)) {
-    sanitized[key] = sanitizePathSegmentValue(value, options.replacementCharacter);
+    sanitized[key] = value.trim() ? sanitizePathSegment(value, options.replacementCharacter) : "";
   }
 
   return sanitized;
@@ -183,6 +194,63 @@ function ensurePathLastSegmentExtension(path: string, dotExt: string): string {
   return segments.join("/");
 }
 
+function utf8ByteLength(value: string): number {
+  let bytes = 0;
+  for (const char of value) {
+    const codePoint = char.codePointAt(0) ?? 0;
+    if (codePoint <= 0x7f) bytes += 1;
+    else if (codePoint <= 0x7ff) bytes += 2;
+    else if (codePoint <= 0xffff) bytes += 3;
+    else bytes += 4;
+  }
+  return bytes;
+}
+
+function truncateUtf8(value: string, maxBytes: number): string {
+  let bytes = 0;
+  let result = "";
+
+  for (const char of value) {
+    const charBytes = utf8ByteLength(char);
+    if (bytes + charBytes > maxBytes) break;
+    result += char;
+    bytes += charBytes;
+  }
+
+  return result;
+}
+
+function hashSegment(value: string): string {
+  let hash = 0x811c9dc5;
+  for (const char of value) {
+    hash = Math.imul(hash ^ (char.codePointAt(0) ?? 0), 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
+function truncatePathSegment(segment: string, suffixToPreserve = ""): string {
+  if (!segment || utf8ByteLength(segment) <= MAX_PATH_SEGMENT_BYTES) return segment;
+
+  const preservedSuffix =
+    suffixToPreserve && segment.toLowerCase().endsWith(suffixToPreserve.toLowerCase()) ? segment.slice(-suffixToPreserve.length) : "";
+  const stem = preservedSuffix ? segment.slice(0, -preservedSuffix.length) : segment;
+  const truncationSuffix = `~${hashSegment(segment)}`;
+  const suffixBytes = utf8ByteLength(truncationSuffix) + utf8ByteLength(preservedSuffix);
+  const stemBudget = MAX_PATH_SEGMENT_BYTES - suffixBytes;
+
+  if (stemBudget <= 0) {
+    return truncateUtf8(segment, MAX_PATH_SEGMENT_BYTES);
+  }
+
+  return `${truncateUtf8(stem, stemBudget)}${truncationSuffix}${preservedSuffix}`;
+}
+
+function limitPathSegmentBytes(path: string, dotExt: string): string {
+  const segments = path.split("/");
+  const lastIdx = segments.length - 1;
+  return segments.map((segment, index) => truncatePathSegment(segment, index === lastIdx ? dotExt : "")).join("/");
+}
+
 /**
  * Resolves a file naming pattern to a relative path (no leading slash).
  * - Pattern ending with '/' → folder path; original filename is used as the file stem.
@@ -200,10 +268,10 @@ export function resolveUploadPath(pattern: string, values: Record<string, string
 
   if (resolved.endsWith("/")) {
     const filename = ensureTrailingExtension(resolvedValues["originalFilename"] ?? "upload", dotExt);
-    return resolved + filename;
+    return limitPathSegmentBytes(resolved + filename, dotExt);
   }
 
-  return ensurePathLastSegmentExtension(resolved, dotExt);
+  return limitPathSegmentBytes(ensurePathLastSegmentExtension(resolved, dotExt), dotExt);
 }
 
 /**
@@ -225,5 +293,5 @@ export function resolveDownloadFilename(pattern: string, values: Record<string, 
   stem = stem.trim();
   if (!stem) return null;
 
-  return ensureTrailingExtension(stem, dotExt);
+  return truncatePathSegment(ensureTrailingExtension(stem, dotExt), dotExt);
 }

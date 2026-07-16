@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MetadataProviderKey, type BookDetail, type MetadataFetchDiagnostics } from '@bookorbit/types'
-import { metadataRefreshEmptyMessage } from '../metadata-refresh-feedback'
+import { metadataRefreshAppliedMessage, metadataRefreshEmptyMessage } from '../metadata-refresh-feedback'
 
 function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
   return {
@@ -17,12 +17,15 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     isbn10: null,
     isbn13: null,
     publisher: null,
+    publishedDate: null,
     publishedYear: null,
     language: null,
     pageCount: null,
     seriesName: null,
     seriesIndex: null,
     rating: null,
+    personalNote: null,
+    personalNoteUpdatedAt: null,
     communityRatings: [],
     coverSource: null,
     hardcoverEditionId: null,
@@ -100,6 +103,22 @@ describe('metadataRefreshEmptyMessage', () => {
 
     expect(message).toBe(
       'Metadata providers responded, but Field Rules did not produce any fields to apply. Check fill/overwrite rules, genre blocklist, or selected providers.',
+    )
+  })
+})
+
+describe('metadataRefreshAppliedMessage', () => {
+  it('reports matched and enabled unreferenced providers', () => {
+    const message = metadataRefreshAppliedMessage(
+      diagnostics({
+        candidateProviders: [MetadataProviderKey.GOOGLE, MetadataProviderKey.LIBROFM],
+        enabledUnreferencedProviders: [MetadataProviderKey.AUDNEXUS],
+      }),
+      3,
+    )
+
+    expect(message).toBe(
+      'Auto-filled 3 fields. Matched Google Books or Libro.fm. Not queried because they are not selected in Field Rules: AudNexus.',
     )
   })
 })

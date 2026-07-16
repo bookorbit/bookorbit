@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { Maximize2, Minimize2, Search, SlidersHorizontal } from '@lucide/vue'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -7,6 +8,8 @@ import { Button } from '@/components/ui/button'
 import AnnotationFilterChips from './AnnotationFilterChips.vue'
 import type { ActiveFilterChip } from '../lib/filter-chips'
 import type { AnnotationDensity } from '../composables/useDensity'
+
+const { t } = useI18n()
 
 defineProps<{
   sortOptions: { value: string; label: string }[]
@@ -42,7 +45,7 @@ function handleClearFilters() {
         <input
           v-model="search"
           type="search"
-          :placeholder="searchPlaceholder ?? 'Search text and notes'"
+          :placeholder="searchPlaceholder ?? t('annotations.toolbar.searchPlaceholder')"
           class="w-full h-9 pl-8 pr-3 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
         />
       </div>
@@ -54,7 +57,7 @@ function handleClearFilters() {
           <PopoverTrigger as-child>
             <Button variant="outline" size="sm" class="gap-1.5">
               <SlidersHorizontal :size="14" />
-              Filters
+              {{ t('annotations.toolbar.filters') }}
               <Badge v-if="filterCount > 0" variant="secondary" class="ml-0.5 h-5 min-w-5 justify-center px-1">{{ filterCount }}</Badge>
             </Button>
           </PopoverTrigger>
@@ -68,13 +71,13 @@ function handleClearFilters() {
           <SheetTrigger as-child>
             <Button variant="outline" size="sm" class="gap-1.5">
               <SlidersHorizontal :size="14" />
-              Filters
+              {{ t('annotations.toolbar.filters') }}
               <Badge v-if="filterCount > 0" variant="secondary" class="ml-0.5 h-5 min-w-5 justify-center px-1">{{ filterCount }}</Badge>
             </Button>
           </SheetTrigger>
           <SheetContent side="bottom" class="max-h-[85vh] overflow-y-auto">
             <SheetHeader>
-              <SheetTitle>Filters</SheetTitle>
+              <SheetTitle>{{ t('annotations.toolbar.filters') }}</SheetTitle>
             </SheetHeader>
             <div class="px-4 pb-6">
               <slot name="filters" />
@@ -83,13 +86,17 @@ function handleClearFilters() {
         </Sheet>
       </div>
 
-      <select v-model="sortKey" aria-label="Sort order" class="h-9 px-2 rounded-md border border-border bg-background text-sm">
+      <select
+        v-model="sortKey"
+        :aria-label="t('annotations.toolbar.sortOrder')"
+        class="h-9 px-2 rounded-md border border-border bg-background text-sm"
+      >
         <option v-for="option in sortOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
       </select>
       <button
         type="button"
-        :aria-label="density === 'comfortable' ? 'Switch to compact view' : 'Switch to comfortable view'"
-        :title="density === 'comfortable' ? 'Compact view' : 'Comfortable view'"
+        :aria-label="density === 'comfortable' ? t('annotations.toolbar.switchToCompact') : t('annotations.toolbar.switchToComfortable')"
+        :title="density === 'comfortable' ? t('annotations.toolbar.compactView') : t('annotations.toolbar.comfortableView')"
         class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         @click="toggleDensity"
       >

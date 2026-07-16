@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED, type AchievementEventsService } from '../achievement/achievement-events.service';
+import type { UserBookNoteService } from '../user-book-note/user-book-note.service';
 import type { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import type { BookStatesUploadDto, BulkProgressDto, MatchCheckDto, SweepCompleteDto } from './dto';
 import type { KoreaderPluginRepository } from './koreader-plugin.repository';
@@ -26,6 +27,8 @@ describe('KoreaderPluginService', () => {
   let koreaderRepo: {
     getAccessibleLibraryIds: ReturnType<typeof vi.fn>;
     resolveBookFilesByHashes: ReturnType<typeof vi.fn>;
+    upsertUnmatchedBooks: ReturnType<typeof vi.fn>;
+    clearUnmatchedBooks: ReturnType<typeof vi.fn>;
     getAllDeviceProgress: ReturnType<typeof vi.fn>;
     getReadingProgress: ReturnType<typeof vi.fn>;
   };
@@ -36,9 +39,16 @@ describe('KoreaderPluginService', () => {
     listSweeps: ReturnType<typeof vi.fn>;
     getPluginTotals: ReturnType<typeof vi.fn>;
     getLibraryMaxFileTimestamp: ReturnType<typeof vi.fn>;
+    getHashLinkVersion: ReturnType<typeof vi.fn>;
   };
   let koreaderService: { applyProgressForResolvedFile: ReturnType<typeof vi.fn> };
   let userBookStatusService: { findOne: ReturnType<typeof vi.fn>; setManual: ReturnType<typeof vi.fn> };
+  let userBookNoteService: {
+    findOne: ReturnType<typeof vi.fn>;
+    findRow: ReturnType<typeof vi.fn>;
+    setNote: ReturnType<typeof vi.fn>;
+    normalizeNote: (value: string | null | undefined) => string | null;
+  };
   let achievementEvents: { emit: ReturnType<typeof vi.fn> };
   let service: KoreaderPluginService;
 
@@ -50,19 +60,31 @@ describe('KoreaderPluginService', () => {
     koreaderRepo = {
       getAccessibleLibraryIds: vi.fn().mockResolvedValue([1]),
       resolveBookFilesByHashes: vi.fn().mockResolvedValue(new Map([[HASH_A, { bookFileId: 10, bookId: 20, libraryId: 1 }]])),
+      upsertUnmatchedBooks: vi.fn().mockResolvedValue(undefined),
+      clearUnmatchedBooks: vi.fn().mockResolvedValue(undefined),
       getAllDeviceProgress: vi.fn().mockResolvedValue([]),
       getReadingProgress: vi.fn().mockResolvedValue(null),
     };
     pluginRepo = {
       getRating: vi.fn().mockResolvedValue(null),
-      upsertRating: vi.fn().mockResolvedValue(undefined),
+      upsertRating: vi.fn().mockResolvedValue({ rating: null, updatedAt: new Date('2026-01-01T00:00:00.000Z') }),
       upsertSweep: vi.fn().mockResolvedValue(new Date('2026-06-09T10:00:00.000Z')),
       listSweeps: vi.fn().mockResolvedValue([]),
-      getPluginTotals: vi.fn().mockResolvedValue({ matchedBooks: 0, pageStatEvents: 0, annotations: 0 }),
+      getPluginTotals: vi.fn().mockResolvedValue({ matchedBooks: 0, pageStatEvents: 0, annotations: 0, unmatchedBooks: 0 }),
       getLibraryMaxFileTimestamp: vi.fn().mockResolvedValue(new Date('2026-06-01T00:00:00.000Z')),
+      getHashLinkVersion: vi.fn().mockResolvedValue({ count: 0, maxTs: null }),
     };
     koreaderService = { applyProgressForResolvedFile: vi.fn().mockResolvedValue(undefined) };
     userBookStatusService = { findOne: vi.fn().mockResolvedValue(null), setManual: vi.fn().mockResolvedValue(undefined) };
+    userBookNoteService = {
+      findOne: vi.fn().mockResolvedValue(null),
+      findRow: vi.fn().mockResolvedValue(null),
+      setNote: vi.fn().mockResolvedValue({ note: null, updatedAt: '2026-06-01T00:00:00.000Z' }),
+      normalizeNote: (value) => {
+        const trimmed = value?.trim();
+        return trimmed ? trimmed : null;
+      },
+    };
     achievementEvents = { emit: vi.fn() };
 
     service = new KoreaderPluginService(
@@ -70,6 +92,7 @@ describe('KoreaderPluginService', () => {
       pluginRepo as unknown as KoreaderPluginRepository,
       koreaderService as unknown as KoreaderService,
       userBookStatusService as unknown as UserBookStatusService,
+      userBookNoteService as unknown as UserBookNoteService,
       achievementEvents as unknown as AchievementEventsService,
     );
   });
@@ -80,9 +103,68 @@ describe('KoreaderPluginService', () => {
 
       const result = await service.matchCheck(makeUser(), dto);
 
-      expect(koreaderRepo.resolveBookFilesByHashes).toHaveBeenCalledWith([HASH_A, HASH_B], [1]);
+      expect(koreaderRepo.resolveBookFilesByHashes).toHaveBeenCalledWith([HASH_A, HASH_B], [1], 7);
+      expect(koreaderRepo.clearUnmatchedBooks).toHaveBeenCalledWith(7, [HASH_A]);
+      expect(koreaderRepo.upsertUnmatchedBooks).toHaveBeenCalledWith(7, [{ hash: HASH_B, source: 'statistics' }], DEVICE_ID);
       expect(result.matches).toEqual([{ hash: HASH_A, bookId: 20, bookFileId: 10 }]);
       expect(result.libraryVersion).toMatch(/^[0-9a-f]{16}$/);
+    });
+
+    it('persists unmatched candidate metadata from the device statistics database', async () => {
+      const dto = {
+        ...deviceFields(),
+        hashes: [HASH_A, HASH_B],
+        books: [
+          { hash: HASH_A, title: 'Matched title', authors: 'Matched author', lastOpen: 100 },
+          { hash: HASH_B.toUpperCase(), title: 'Unmatched title', authors: 'Author One', lastOpen: 200 },
+        ],
+      } as MatchCheckDto;
+
+      await service.matchCheck(makeUser(), dto);
+
+      expect(koreaderRepo.upsertUnmatchedBooks).toHaveBeenCalledWith(
+        7,
+        [{ hash: HASH_B, title: 'Unmatched title', authors: 'Author One', lastOpen: 200, source: 'statistics', metadataAmbiguous: false }],
+        DEVICE_ID,
+      );
+    });
+
+    it('keeps the strongest unmatched source and ambiguity flag for duplicate candidate metadata', async () => {
+      const dto = {
+        ...deviceFields(),
+        hashes: [HASH_B],
+        books: [
+          { hash: HASH_B, title: 'Stats title', lastOpen: 100, source: 'statistics' },
+          { hash: HASH_B, title: 'File title', authors: 'File author', lastOpen: 200, source: 'file', metadataAmbiguous: true },
+        ],
+      } as MatchCheckDto;
+
+      await service.matchCheck(makeUser(), dto);
+
+      expect(koreaderRepo.upsertUnmatchedBooks).toHaveBeenCalledWith(
+        7,
+        [{ hash: HASH_B, title: 'File title', authors: 'File author', lastOpen: 200, source: 'file', metadataAmbiguous: true }],
+        DEVICE_ID,
+      );
+    });
+
+    it('does not overwrite stronger unmatched metadata with a weaker later candidate', async () => {
+      const dto = {
+        ...deviceFields(),
+        hashes: [HASH_B],
+        books: [
+          { hash: HASH_B, title: 'Open file title', authors: 'Open file author', lastOpen: 200, source: 'current_file', metadataAmbiguous: false },
+          { hash: HASH_B, title: 'Stats title', authors: 'Stats author', lastOpen: 300, source: 'statistics', metadataAmbiguous: true },
+        ],
+      } as MatchCheckDto;
+
+      await service.matchCheck(makeUser(), dto);
+
+      expect(koreaderRepo.upsertUnmatchedBooks).toHaveBeenCalledWith(
+        7,
+        [{ hash: HASH_B, title: 'Open file title', authors: 'Open file author', lastOpen: 300, source: 'current_file', metadataAmbiguous: false }],
+        DEVICE_ID,
+      );
     });
 
     it('changes the library version token when the accessible library set changes', async () => {
@@ -90,6 +172,28 @@ describe('KoreaderPluginService', () => {
 
       const first = await service.matchCheck(makeUser(), dto);
       koreaderRepo.getAccessibleLibraryIds.mockResolvedValue([1, 2]);
+      const second = await service.matchCheck(makeUser(), dto);
+
+      expect(second.libraryVersion).not.toBe(first.libraryVersion);
+    });
+
+    it('changes the library version token when manual hash links change', async () => {
+      const dto = { ...deviceFields(), hashes: [HASH_A] } as MatchCheckDto;
+
+      const first = await service.matchCheck(makeUser(), dto);
+      pluginRepo.getHashLinkVersion.mockResolvedValue({ count: 1, maxTs: new Date('2026-06-02T00:00:00.000Z') });
+      const second = await service.matchCheck(makeUser(), dto);
+
+      expect(second.libraryVersion).not.toBe(first.libraryVersion);
+    });
+
+    it('changes the library version token when a manual hash link count changes without a newer timestamp', async () => {
+      const dto = { ...deviceFields(), hashes: [HASH_A] } as MatchCheckDto;
+      const maxTs = new Date('2026-06-02T00:00:00.000Z');
+      pluginRepo.getHashLinkVersion.mockResolvedValue({ count: 2, maxTs });
+
+      const first = await service.matchCheck(makeUser(), dto);
+      pluginRepo.getHashLinkVersion.mockResolvedValue({ count: 1, maxTs });
       const second = await service.matchCheck(makeUser(), dto);
 
       expect(second.libraryVersion).not.toBe(first.libraryVersion);
@@ -111,7 +215,7 @@ describe('KoreaderPluginService', () => {
       const result = await service.uploadBookStates(makeUser(), statesDto([{ hash: HASH_A, status: 'complete', statusModified: '2026-06-01' }]));
 
       expect(userBookStatusService.setManual).toHaveBeenCalledWith(7, 20, 'read');
-      expect(result.results[0]).toEqual({ hash: HASH_A, statusApplied: true, ratingApplied: false });
+      expect(result.results[0]).toMatchObject({ hash: HASH_A, statusApplied: true, ratingApplied: false, reviewApplied: false });
     });
 
     it('treats an identical status as applied without writing', async () => {
@@ -167,6 +271,66 @@ describe('KoreaderPluginService', () => {
       await service.uploadBookStates(makeUser(), statesDto([{ hash: HASH_A, rating: 5, statusModified: '2026-06-02' }]));
 
       expect(pluginRepo.upsertRating).toHaveBeenCalledWith(7, 20, 5);
+    });
+
+    it('clears a rating when the device clear is newer', async () => {
+      pluginRepo.getRating.mockResolvedValueOnce({ rating: 2, updatedAt: new Date('2026-06-01T08:00:00.000Z') });
+      pluginRepo.upsertRating.mockResolvedValueOnce({ rating: null, updatedAt: new Date('2026-06-02T08:00:00.000Z') });
+
+      const result = await service.uploadBookStates(makeUser(), statesDto([{ hash: HASH_A, ratingCleared: true, statusModified: '2026-06-02' }]));
+
+      expect(pluginRepo.upsertRating).toHaveBeenCalledWith(7, 20, null);
+      expect(result.results[0]).toMatchObject({ rating: null, ratingSet: false, ratingUpdatedAt: '2026-06-02T08:00:00.000Z' });
+    });
+
+    it('applies a review note when none exists and returns canonical personal state', async () => {
+      userBookNoteService.setNote.mockResolvedValue({ note: 'Loved it.', updatedAt: '2026-06-03T12:00:00.000Z' });
+
+      const result = await service.uploadBookStates(
+        makeUser(),
+        statesDto([{ hash: HASH_A, reviewNote: ' Loved it. ', reviewModified: '2026-06-03' }]),
+      );
+
+      expect(userBookNoteService.setNote).toHaveBeenCalledWith(7, 20, 'Loved it.');
+      expect(result.results[0]).toMatchObject({
+        reviewApplied: true,
+        reviewNote: 'Loved it.',
+        reviewNoteSet: true,
+        reviewUpdatedAt: '2026-06-03T12:00:00.000Z',
+      });
+    });
+
+    it('keeps the server review on a same-day tie', async () => {
+      userBookNoteService.findRow.mockResolvedValue({ note: 'Server note', updatedAt: new Date('2026-06-05T08:00:00.000Z') });
+
+      const result = await service.uploadBookStates(
+        makeUser(),
+        statesDto([{ hash: HASH_A, reviewNote: 'Device note', reviewModified: '2026-06-05' }]),
+      );
+
+      expect(userBookNoteService.setNote).not.toHaveBeenCalled();
+      expect(result.results[0]).toMatchObject({ reviewApplied: false, reviewNote: 'Server note' });
+    });
+
+    it('clears a review when the device clear is newer', async () => {
+      userBookNoteService.findRow.mockResolvedValue({ note: 'Server note', updatedAt: new Date('2026-06-01T08:00:00.000Z') });
+      userBookNoteService.setNote.mockResolvedValue({ note: null, updatedAt: '2026-06-02T08:00:00.000Z' });
+
+      const result = await service.uploadBookStates(makeUser(), statesDto([{ hash: HASH_A, reviewCleared: true, reviewModified: '2026-06-02' }]));
+
+      expect(userBookNoteService.setNote).toHaveBeenCalledWith(7, 20, null);
+      expect(result.results[0]).toMatchObject({ reviewApplied: true, reviewNote: null, reviewNoteSet: false });
+    });
+
+    it('does not re-query canonical rating/review state when the device already supplied them', async () => {
+      pluginRepo.getRating.mockResolvedValue({ rating: 2, updatedAt: new Date('2026-06-01T08:00:00.000Z') });
+      userBookNoteService.findRow.mockResolvedValue({ note: 'Existing', updatedAt: new Date('2026-06-01T08:00:00.000Z') });
+
+      await service.uploadBookStates(makeUser(), statesDto([{ hash: HASH_A, rating: 2, reviewNote: 'Existing', reviewModified: '2026-06-01' }]));
+
+      expect(pluginRepo.getRating).toHaveBeenCalledTimes(1);
+      expect(userBookNoteService.findRow).toHaveBeenCalledTimes(1);
+      expect(userBookNoteService.findOne).not.toHaveBeenCalled();
     });
   });
 

@@ -32,4 +32,8 @@ export class UpdateSeriesCollapsePreferencesDto {
   @IsOptional()
   @IsBooleanOrNullRecord()
   collections?: Record<string, boolean | null>;
+
+  @IsOptional()
+  @IsBooleanOrNullRecord()
+  smartScopes?: Record<string, boolean | null>;
 }

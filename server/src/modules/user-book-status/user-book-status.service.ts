@@ -1,9 +1,10 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Optional } from '@nestjs/common';
 import type { ReadStatus, UserBookStatus } from '@bookorbit/types';
 import { UserBookStatusRepository } from './user-book-status.repository';
 import type { UserBookStatusRow } from '../../db/schema';
 import { isReadStatus, isReadStatusSource } from './user-book-status.constants';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED } from '../achievement/achievement-events.service';
+import { ReadingAttemptService } from './reading-attempt.service';
 
 const DEFAULT_FINISH_THRESHOLD = 98;
 const READING_THRESHOLD = 0.25;
@@ -16,27 +17,68 @@ type ManualStatusPatch = {
   finishedAt?: Date | null;
 };
 
+export type AutoReadingActivity = {
+  occurredOn?: string;
+  origin?: 'bookorbit' | 'kobo' | 'koreader';
+  strongRereadEvidence?: boolean;
+  meaningfulActivity?: boolean;
+};
+
 @Injectable()
 export class UserBookStatusService {
   constructor(
     private readonly repo: UserBookStatusRepository,
     private readonly achievementEvents: AchievementEventsService,
+    @Optional() private readonly attempts?: ReadingAttemptService,
   ) {}
 
   async setManual(userId: number, bookId: number, status: ReadStatus): Promise<void> {
     await this.updateManual(userId, bookId, { status });
   }
 
-  async updateManual(userId: number, bookId: number, patch: ManualStatusPatch): Promise<UserBookStatus> {
+  async updateManual(
+    userId: number,
+    bookId: number,
+    patch: ManualStatusPatch,
+    dateKeys?: { startedOn?: string | null; endedOn?: string | null },
+  ): Promise<UserBookStatus> {
     const existing = await this.repo.findOne(userId, bookId);
     const now = new Date();
     const hasStatus = Object.prototype.hasOwnProperty.call(patch, 'status');
     const hasStartedAt = Object.prototype.hasOwnProperty.call(patch, 'startedAt');
     const hasFinishedAt = Object.prototype.hasOwnProperty.call(patch, 'finishedAt');
 
+    if (this.attempts) {
+      const nextStatus = patch.status ?? existing?.status ?? 'unread';
+      const today = new Date().toISOString().slice(0, 10);
+      const updated = await this.attempts.applyManualStatus(
+        userId,
+        bookId,
+        nextStatus,
+        hasStartedAt ? (dateKeys?.startedOn ?? patch.startedAt?.toISOString().slice(0, 10) ?? null) : undefined,
+        hasFinishedAt ? (dateKeys?.endedOn ?? patch.finishedAt?.toISOString().slice(0, 10) ?? null) : undefined,
+        today,
+      );
+      const previousStatus = existing?.status ?? null;
+      if (hasStatus && updated.status !== previousStatus) {
+        this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, {
+          userId,
+          bookId,
+          newStatus: updated.status,
+          previousStatus,
+        });
+      }
+      return updated;
+    }
+
     const nextStatus = patch.status ?? existing?.status ?? 'unread';
     let nextStartedAt = hasStartedAt ? (patch.startedAt ?? null) : (existing?.startedAt ?? null);
     let nextFinishedAt = hasFinishedAt ? (patch.finishedAt ?? null) : (existing?.finishedAt ?? null);
+
+    if (nextStatus === 'unread' || nextStatus === 'want_to_read') {
+      nextStartedAt = null;
+      nextFinishedAt = null;
+    }
 
     // When dates were not explicitly provided and would be null, seed from session history.
     // Explicit null patches (user clearing a date) are preserved as-is.
@@ -87,17 +129,26 @@ export class UserBookStatusService {
 
   async bulkSetManual(userId: number, bookIds: number[], status: ReadStatus): Promise<void> {
     if (bookIds.length === 0) return;
+    if (this.attempts) {
+      const batchSize = 50;
+      for (let offset = 0; offset < bookIds.length; offset += batchSize) {
+        const batch = bookIds.slice(offset, offset + batchSize);
+        await Promise.all(batch.map((bookId) => this.updateManual(userId, bookId, { status })));
+      }
+      return;
+    }
     const now = new Date();
     const existing = await this.repo.findByBookIds(userId, bookIds);
     const existingMap = new Map(existing.map((row) => [row.bookId, row]));
     await Promise.all(
       bookIds.map((bookId) => {
         const current = existingMap.get(bookId) ?? null;
+        const clearsLifecycle = status === 'unread' || status === 'want_to_read';
         return this.repo.upsertState(userId, bookId, {
           status,
           source: 'manual',
-          startedAt: current?.startedAt ?? null,
-          finishedAt: current?.finishedAt ?? null,
+          startedAt: clearsLifecycle ? null : (current?.startedAt ?? null),
+          finishedAt: clearsLifecycle ? null : (current?.finishedAt ?? null),
           updatedAt: now,
         });
       }),
@@ -121,15 +172,38 @@ export class UserBookStatusService {
     percentage: number,
     readingThreshold?: number | null,
     finishThreshold?: number | null,
+    activity: AutoReadingActivity = {},
   ): Promise<void> {
     const existing = await this.repo.findOne(userId, bookId);
-
-    if (existing?.source === 'manual') return;
 
     const normalizedPercentage = this.normalizePercentage(percentage);
     const { readThreshold, finishThreshold: normalizedFinishThreshold } = this.normalizeThresholds(readingThreshold, finishThreshold);
     const derived: ReadStatus =
       normalizedPercentage >= normalizedFinishThreshold ? 'read' : normalizedPercentage >= readThreshold ? 'reading' : 'unread';
+
+    if (this.attempts) {
+      const updated = await this.attempts.recordActivity({
+        userId,
+        bookId,
+        occurredOn: activity.occurredOn ?? new Date().toISOString().slice(0, 10),
+        origin: activity.origin ?? 'bookorbit',
+        progress: normalizedPercentage,
+        finishThreshold: normalizedFinishThreshold,
+        strongRereadEvidence: activity.strongRereadEvidence === true,
+        meaningfulActivity: activity.meaningfulActivity === true,
+      });
+      if (updated && updated.status !== (existing?.status ?? null)) {
+        this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, {
+          userId,
+          bookId,
+          newStatus: updated.status,
+          previousStatus: existing?.status ?? null,
+        });
+      }
+      return;
+    }
+
+    if (existing?.source === 'manual' && (existing.status !== 'want_to_read' || derived === 'unread')) return;
 
     if (!existing && derived === 'unread') return;
     if (existing?.status === derived) return;

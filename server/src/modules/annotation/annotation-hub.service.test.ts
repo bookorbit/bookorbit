@@ -24,6 +24,7 @@ function makeHubRow(overrides: Record<string, unknown> = {}) {
     bookTitle: 'A Book',
     author: 'An Author',
     jumpFileId: 9,
+    jumpFileFormat: 'fb2',
     pageno: null,
     ...overrides,
   };
@@ -158,7 +159,15 @@ describe('AnnotationHubService', () => {
       expect(result.total).toBe(1);
       expect(result.page).toBe(1);
       expect(result.pageSize).toBe(25);
-      expect(result.items[0]).toMatchObject({ id: 1, bookId: 5, note: 'a note', chapterIndex: 2, positionStatus: 'exact' });
+      expect(result.items[0]).toMatchObject({
+        id: 1,
+        bookId: 5,
+        note: 'a note',
+        chapterIndex: 2,
+        positionStatus: 'exact',
+        jumpFileId: 9,
+        jumpFileFormat: 'fb2',
+      });
       expect(result.stats.books).toBe(1);
       expect(result.stats.withNotes).toBe(1);
       expect(result.stats.originBreakdown).toEqual([{ origin: 'web', count: 1 }]);

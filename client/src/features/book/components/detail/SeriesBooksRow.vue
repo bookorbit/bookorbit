@@ -27,7 +27,11 @@ defineExpose({ bookIds })
     <BookCarousel :books="seriesBooks" :loading="loading" :current-book-id="bookId" :show-series-index="true">
       <template #header>
         <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-          More in the <span class="italic">{{ seriesName }}</span> series
+          <i18n-t keypath="book.detail.series.moreInSeries" scope="global">
+            <template #series>
+              <span class="italic">{{ seriesName }}</span>
+            </template>
+          </i18n-t>
         </p>
       </template>
     </BookCarousel>

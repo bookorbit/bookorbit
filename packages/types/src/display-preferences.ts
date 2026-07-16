@@ -43,6 +43,7 @@ export interface DisplayPreferences {
   squareGridGap: number;
   viewMode: BookViewMode;
   cardOverlays: CardOverlayKey[];
+  showJumpRails: boolean;
   smartScopeFilterExpanded: boolean;
   authorCoverSize: number;
   authorCoverShape: AuthorCoverShape;

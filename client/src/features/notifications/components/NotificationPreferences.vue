@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { Save } from '@lucide/vue'
 import { NOTIFICATION_CATEGORIES, NOTIFICATION_CATEGORY_LABELS, type NotificationCategory, type NotificationPreferences } from '@bookorbit/types'
@@ -9,6 +10,8 @@ import { api } from '@/lib/api'
 import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
 
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+
+const { t } = useI18n()
 
 const { user, me } = useAuth()
 const { popupEnabled, setPopupEnabled, loadPrefs } = useWhatsNew()
@@ -23,7 +26,7 @@ async function handleWhatsNewToggle() {
   try {
     await setPopupEnabled(!popupEnabled.value)
   } catch {
-    toast.error('Failed to save preference')
+    toast.error(t('notifications.preferences.savePreferenceFailed'))
   }
 }
 
@@ -74,15 +77,15 @@ async function handleSave() {
     if (!res.ok) {
       const payload = (await res.json().catch(() => null)) as { message?: string | string[] } | null
       const message = Array.isArray(payload?.message)
-        ? (payload.message[0] ?? 'Failed to save preferences')
-        : (payload?.message ?? 'Failed to save preferences')
+        ? (payload.message[0] ?? t('notifications.preferences.saveFailed'))
+        : (payload?.message ?? t('notifications.preferences.saveFailed'))
       toast.error(message)
       return
     }
 
     await me()
     loadFromUser()
-    toast.success('Notification preferences saved')
+    toast.success(t('notifications.preferences.saved'))
   } finally {
     saving.value = false
   }
@@ -93,15 +96,15 @@ async function handleSave() {
   <SettingsPageHeader
     v-if="!props.embedded"
     class="hidden md:flex"
-    title="Notifications"
-    subtitle="Choose which notification categories you want to receive."
+    :title="t('notifications.preferences.title')"
+    :subtitle="t('notifications.preferences.subtitle')"
   />
   <div v-if="!props.embedded" class="md:hidden px-1">
-    <h1 class="text-xl font-semibold tracking-tight text-foreground">Notifications</h1>
+    <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ t('notifications.preferences.title') }}</h1>
     <p
       class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
     >
-      Choose which notification categories you want to receive.
+      {{ t('notifications.preferences.subtitle') }}
     </p>
   </div>
 
@@ -131,18 +134,18 @@ async function handleSave() {
       <div class="flex items-center gap-2 pt-2 border-t border-border">
         <button class="settings-btn-primary" :disabled="!hasChanges || saving" @click="handleSave">
           <Save :size="14" />
-          {{ saving ? 'Saving...' : 'Save' }}
+          {{ saving ? t('notifications.preferences.saving') : t('common.save') }}
         </button>
-        <span v-if="hasChanges" class="text-xs text-muted-foreground">Unsaved changes</span>
+        <span v-if="hasChanges" class="text-xs text-muted-foreground">{{ t('notifications.preferences.unsavedChanges') }}</span>
       </div>
     </section>
 
     <section class="rounded-lg border border-border bg-card p-4 md:p-5 shadow-xs">
       <div class="flex items-center justify-between gap-4 py-1.5">
         <div class="min-w-0">
-          <p class="text-sm text-foreground">Show "What's New" after updates</p>
+          <p class="text-sm text-foreground">{{ t('notifications.preferences.whatsNewToggle') }}</p>
           <p class="text-xs text-muted-foreground">
-            A popup highlighting new features after the app updates. The archive stays available either way.
+            {{ t('notifications.preferences.whatsNewToggleHint') }}
           </p>
         </div>
         <button

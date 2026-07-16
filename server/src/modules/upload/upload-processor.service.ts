@@ -11,7 +11,6 @@ import { bookFiles, bookMetadata, books } from '../../db/schema';
 import { BookMetadataFetchOrchestratorService } from '../book-metadata-fetch/book-metadata-fetch-orchestrator.service';
 import { MetadataService } from '../metadata/metadata.service';
 import { computeFileHash } from '../scanner/lib/hash';
-import { clampIno } from '../scanner/lib/walk';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -52,11 +51,11 @@ export class UploadProcessorService {
     relPath: string,
     format: string,
     sizeBytes: number,
-  ): Promise<{ bookId: number }> {
+  ): Promise<{ bookId: number; created: boolean }> {
     const [fileStat, fileHash] = await Promise.all([stat(absolutePath, { bigint: true }), computeFileHash(absolutePath)]);
-    const safeIno = clampIno(fileStat.ino);
+    const ino = fileStat.ino;
 
-    const { bookId } = await this.db.transaction(async (tx) => {
+    const result = await this.db.transaction(async (tx) => {
       const [existingBook] = await tx
         .select({ id: books.id })
         .from(books)
@@ -69,7 +68,7 @@ export class UploadProcessorService {
           libraryFolderId,
           absolutePath,
           relPath,
-          ino: safeIno,
+          ino,
           sizeBytes,
           mtime: fileStat.mtime,
           fileHash,
@@ -81,11 +80,11 @@ export class UploadProcessorService {
           .values(fileValues)
           .onConflictDoUpdate({
             target: bookFiles.absolutePath,
-            set: { bookId: existingBook.id, libraryFolderId, relPath, ino: safeIno, sizeBytes, mtime: fileStat.mtime, fileHash, format },
+            set: { bookId: existingBook.id, libraryFolderId, relPath, ino, sizeBytes, mtime: fileStat.mtime, fileHash, format },
           })
           .returning({ id: bookFiles.id });
         if (!file) throw new InternalServerErrorException('Failed to create book file');
-        return { bookId: existingBook.id };
+        return { bookId: existingBook.id, created: false };
       }
 
       const [book] = await tx.insert(books).values({ libraryId, libraryFolderId, folderPath, status: 'present' }).returning({ id: books.id });
@@ -101,7 +100,7 @@ export class UploadProcessorService {
           libraryFolderId,
           absolutePath,
           relPath,
-          ino: safeIno,
+          ino,
           sizeBytes,
           mtime: fileStat.mtime,
           fileHash,
@@ -113,20 +112,14 @@ export class UploadProcessorService {
 
       await tx.update(books).set({ primaryFileId: file.id }).where(eq(books.id, book.id));
 
-      return { bookId: book.id };
+      return { bookId: book.id, created: true };
     });
 
-    const event = 'upload.schedule_metadata_fetch';
-    const startedAt = Date.now();
-    this.autoFetchOrchestrator?.scheduleIfEligible(bookId, libraryId, 'event_import').catch((err: Error) => {
-      const errorClass = err.name ?? 'Error';
-      const errorMessage = sanitizeLogValue(err.message);
-      this.logger.warn(
-        `[${event}] [fail] libraryId=${libraryId} bookId=${bookId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - metadata fetch scheduling failed`,
-      );
-    });
+    return result;
+  }
 
-    return { bookId };
+  processNewBookImportAsync(bookId: number, libraryId: number, absolutePath: string, format: string): void {
+    void this.runNewBookImport(bookId, libraryId, absolutePath, format);
   }
 
   /**
@@ -157,6 +150,36 @@ export class UploadProcessorService {
       const errorMessage = sanitizeLogValue(error.message);
       this.logger.warn(
         `[${event}] [fail] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - metadata extraction failed`,
+      );
+    }
+  }
+
+  private async runNewBookImport(bookId: number, libraryId: number, absolutePath: string, format: string): Promise<void> {
+    const event = 'upload.process_new_book_import';
+    const startedAt = Date.now();
+    this.logger.debug(`[${event}] [start] libraryId=${libraryId} bookId=${bookId} format=${format} - new book import processing started`);
+
+    if (METADATA_FORMATS.has(format)) {
+      await this.runMetadataExtraction(bookId, absolutePath, format, 'upload.extract_metadata', startedAt);
+    }
+
+    if (!this.autoFetchOrchestrator) {
+      this.logger.debug(
+        `[${event}] [end] libraryId=${libraryId} bookId=${bookId} durationMs=${Date.now() - startedAt} scheduled=false - new book import processing completed`,
+      );
+      return;
+    }
+
+    try {
+      const queued = await this.autoFetchOrchestrator.scheduleImportedBooksIfEligible(libraryId, [bookId]);
+      this.logger.debug(
+        `[${event}] [end] libraryId=${libraryId} bookId=${bookId} durationMs=${Date.now() - startedAt} scheduled=true queued=${queued} - new book import processing completed`,
+      );
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.warn(
+        `[${event}] [fail] libraryId=${libraryId} bookId=${bookId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - metadata fetch scheduling failed`,
       );
     }
   }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import ReaderSettings from './ReaderSettings.vue'
@@ -8,8 +9,9 @@ import PdfSettings from './PdfSettings.vue'
 import ComicsSettings from './ComicsSettings.vue'
 import AudioSettings from './AudioSettings.vue'
 import FontsSettings from './FontsSettings.vue'
-import { READER_TAB_LABELS, READER_TABS, normalizeReaderTab, type ReaderTab as Tab } from './lib/reader-tabs'
+import { READER_TABS, normalizeReaderTab, type ReaderTab as Tab } from './lib/reader-tabs'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
@@ -26,9 +28,11 @@ watch(
   },
 )
 
-const tabs: { id: Tab; label: string }[] = READER_TABS.slice()
-  .sort((a, b) => (a === 'general' ? 1 : b === 'general' ? -1 : 0))
-  .map((id) => ({ id, label: READER_TAB_LABELS[id] }))
+const tabs = computed(() =>
+  READER_TABS.slice()
+    .sort((a, b) => (a === 'general' ? 1 : b === 'general' ? -1 : 0))
+    .map((id) => ({ id, label: t(`settings.reader.tabs.${id}`) })),
+)
 
 function selectTab(tab: Tab) {
   activeTab.value = tab
@@ -37,7 +41,7 @@ function selectTab(tab: Tab) {
 </script>
 
 <template>
-  <SettingsPageHeader title="Reader" subtitle="Configure defaults for all reading modes in one place." />
+  <SettingsPageHeader :title="t('settings.reader.all.title')" :subtitle="t('settings.reader.all.subtitle')" />
 
   <div
     class="flex gap-1 mb-5 md:mb-6 border-b border-border overflow-x-auto md:overflow-visible md:static sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 snap-x"

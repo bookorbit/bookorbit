@@ -11,13 +11,14 @@ vi.mock('drizzle-orm', () => {
     asc: vi.fn((value: unknown) => ({ op: 'asc', value })),
     count: vi.fn(() => ({ op: 'count' })),
     eq: vi.fn((left: unknown, right: unknown) => ({ op: 'eq', left, right })),
+    inArray: vi.fn((left: unknown, values: unknown[]) => ({ op: 'inArray', left, values })),
     isNull: vi.fn((value: unknown) => ({ op: 'isNull', value })),
     or: vi.fn((...clauses: unknown[]) => ({ op: 'or', clauses })),
     sql: sqlFn,
   };
 });
 
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { BookMetadataFetchConfig } from '@bookorbit/types';
 
 import { bookMetadata, bookMetadataFetchQueue, bookNarrators, books } from '../../db/schema';
@@ -263,6 +264,32 @@ describe('BookMetadataFetchQueueRepository', () => {
 
     await expect(repo.scheduleEligibleBooksInBatches(config, 'manual_trigger', undefined, 0)).resolves.toBe(0);
     expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('schedules only the imported, eligible book ids in bounded batches', async () => {
+    const { db, selectBuilder } = makeDb();
+    selectBuilder.where.mockResolvedValueOnce([{ bookId: 2 }, { bookId: 3 }]).mockResolvedValueOnce([{ bookId: 7 }]);
+    const repo = new BookMetadataFetchQueueRepository(db as never);
+    vi.spyOn(repo, 'upsertSchedule').mockResolvedValueOnce(2).mockResolvedValueOnce(1);
+    const config = baseConfig();
+    config.conditions.neverFetched.enabled = true;
+
+    await expect(repo.scheduleEligibleBookIdsInBatches(config, 'event_import', 5, [2, 3, 3, 7, -1], 2)).resolves.toBe(3);
+
+    expect(repo.upsertSchedule).toHaveBeenNthCalledWith(1, [2, 3], 'event_import');
+    expect(repo.upsertSchedule).toHaveBeenNthCalledWith(2, [7], 'event_import');
+    expect(inArray).toHaveBeenCalledWith(bookMetadata.bookId, [2, 3]);
+    expect(inArray).toHaveBeenCalledWith(bookMetadata.bookId, [7]);
+  });
+
+  it('defers a processing row until import completion', async () => {
+    const { db, updateBuilder } = makeDb();
+    const repo = new BookMetadataFetchQueueRepository(db as never);
+
+    await expect(repo.deferProcessing(18)).resolves.toBeUndefined();
+
+    expect(updateBuilder.set).toHaveBeenCalledWith(expect.objectContaining({ status: 'queued' }));
+    expect(and).toHaveBeenCalledWith(expect.objectContaining({ op: 'eq' }), expect.objectContaining({ op: 'eq', right: 'processing' }));
   });
 
   it('getFailedItems maps nullable fields and returns total count', async () => {

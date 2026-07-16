@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { AlertTriangle } from '@lucide/vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 defineProps<{
   open: boolean
@@ -29,21 +32,26 @@ function handleCancel(): void {
             <AlertTriangle class="w-5 h-5 text-amber-600 dark:text-amber-400" />
           </div>
           <div>
-            <h3 class="text-lg font-semibold text-foreground">Confirm Bulk Rename</h3>
+            <h3 class="text-lg font-semibold text-foreground">{{ t('tools.bulkRename.confirmDialog.title') }}</h3>
             <p class="mt-1 text-sm text-muted-foreground">
-              This will rename <strong>{{ renameCount }}</strong> book{{ renameCount === 1 ? '' : 's' }} on disk. Files with collisions or errors will
-              be skipped. This action cannot be undone.
+              <i18n-t keypath="tools.bulkRename.confirmDialog.body" :plural="renameCount">
+                <template #count>
+                  <strong>{{ renameCount }}</strong>
+                </template>
+              </i18n-t>
             </p>
           </div>
         </div>
 
         <div class="flex justify-end gap-2">
-          <button class="px-4 py-2 text-sm font-medium rounded-md border hover:bg-muted transition-colors" @click="handleCancel">Cancel</button>
+          <button class="px-4 py-2 text-sm font-medium rounded-md border hover:bg-muted transition-colors" @click="handleCancel">
+            {{ t('common.cancel') }}
+          </button>
           <button
             class="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
             @click="handleConfirm"
           >
-            Rename {{ renameCount }} book{{ renameCount === 1 ? '' : 's' }}
+            {{ t('tools.bulkRename.confirmDialog.renameButton', { count: renameCount }, renameCount) }}
           </button>
         </div>
       </div>

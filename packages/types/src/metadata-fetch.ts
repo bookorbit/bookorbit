@@ -9,6 +9,7 @@ export const MetadataProviderKey = {
   ITUNES: "itunes",
   AUDIBLE: "audible",
   AUDNEXUS: "audnexus",
+  LIBROFM: "librofm",
   COMICVINE: "comicvine",
   RANOBEDB: "ranobedb",
   KOBO: "kobo",
@@ -66,6 +67,7 @@ export interface MetadataCandidate {
   authors?: string[];
   description?: string;
   publisher?: string;
+  publishedDate?: string;
   publishedYear?: number;
   language?: string;
   pageCount?: number;
@@ -126,6 +128,7 @@ export interface MetadataSource {
   subtitle: string | null;
   description: string | null;
   publisher: string | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   pageCount: number | null;

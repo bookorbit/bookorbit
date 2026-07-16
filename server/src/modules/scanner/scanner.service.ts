@@ -23,15 +23,7 @@ import { readdir, stat } from 'fs/promises';
 import { classifyFile, DEFAULT_FORMAT_PRIORITY, FileRole, isAudioFormat } from './lib/classify';
 import { computeFileHash } from './lib/hash';
 import { waitForStability } from './lib/stability';
-import {
-  BookCandidate,
-  FileStat,
-  findBookCandidates,
-  findLooseFileCandidates,
-  buildSingleBookCandidate,
-  clampIno,
-  type WalkResult,
-} from './lib/walk';
+import { BookCandidate, FileStat, findBookCandidates, findLooseFileCandidates, buildSingleBookCandidate, type WalkResult } from './lib/walk';
 import { ScannerRepository } from './scanner.repository';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
 import { LIBRARY_METADATA_PRECEDENCE_DEFAULT } from '../library/library.constants';
@@ -46,7 +38,7 @@ interface BookEntry {
 interface FileByPathEntry {
   id: number;
   bookId: number;
-  ino: number;
+  ino: bigint;
   sizeBytes: number | null;
   mtime: Date | null;
   fileHash: string | null;
@@ -65,7 +57,7 @@ interface ScanLookupMaps {
   bookByFolderPath: Map<string, BookEntry>;
   booksByParentDir: Map<string, BookEntry[]>;
   fileByPath: Map<string, FileByPathEntry>;
-  fileByIno: Map<number, FileByInoEntry>;
+  fileByIno: Map<bigint, FileByInoEntry>;
   fileIdsByBookId: Map<number, Set<number>>;
 }
 
@@ -138,6 +130,19 @@ interface ProcessedFileResult {
   reassigned: boolean;
   changed: boolean;
   fileId: number | null;
+}
+
+interface UpsertBookResult extends BookEntry {
+  created: boolean;
+}
+
+interface ProcessCandidateResult {
+  bookId: number;
+  added: number;
+  updated: number;
+  retainedFileIds: Set<number>;
+  becameVisible: boolean;
+  created: boolean;
 }
 
 function normalizeOrganizationMode(mode: string | null | undefined): OrganizationMode {
@@ -235,7 +240,7 @@ export class ScannerService implements OnApplicationBootstrap {
       id: number;
       bookId: number;
       absolutePath: string;
-      ino: number;
+      ino: bigint;
       sizeBytes: number | null;
       mtime: Date | null;
       fileHash: string | null;
@@ -264,9 +269,9 @@ export class ScannerService implements OnApplicationBootstrap {
       ]),
     );
 
-    const fileByIno = new Map<number, FileByInoEntry>(
+    const fileByIno = new Map<bigint, FileByInoEntry>(
       knownFiles
-        .filter((f) => f.ino !== 0)
+        .filter((f) => f.ino !== 0n)
         .map((f) => [f.ino, { id: f.id, bookId: f.bookId, absolutePath: f.absolutePath, sizeBytes: f.sizeBytes, mtime: f.mtime }]),
     );
 
@@ -858,6 +863,7 @@ export class ScannerService implements OnApplicationBootstrap {
     const totals = { added: 0, updated: 0 };
     const allRetainedFileIds = new Set<number>();
     const seenBookIds = new Set<number>();
+    const importedBookIds: number[] = [];
     const candidateFolderPaths = new Set(candidates.map((candidate) => candidate.folderPath));
     for (const candidate of candidates) {
       const result = await this.processCandidate(
@@ -872,6 +878,7 @@ export class ScannerService implements OnApplicationBootstrap {
       );
       this.emitTargetedScanResult(libraryId, result);
       seenBookIds.add(result.bookId);
+      if (result.created) importedBookIds.push(result.bookId);
       for (const fid of result.retainedFileIds) allRetainedFileIds.add(fid);
       totals.added += result.added;
       totals.updated += result.updated;
@@ -882,6 +889,7 @@ export class ScannerService implements OnApplicationBootstrap {
       await this.pruneMissingBookFiles(bookId, allRetainedFileIds, maps.fileIdsByBookId, maps.fileByPath, maps.fileByIno, pruneCounts);
     }
     totals.updated += pruneCounts.updated;
+    await this.scheduleImportedBookMetadataFetch(libraryId, importedBookIds);
 
     this.logger.log(
       `[${event}] [end] libraryId=${libraryId} path="${sanitizeLogValue(dirPath)}" durationMs=${Date.now() - startedAt} candidateCount=${candidates.length} skippedDirCount=${skippedDirs.size} added=${totals.added} updated=${totals.updated} - targeted directory scan completed`,
@@ -953,7 +961,7 @@ export class ScannerService implements OnApplicationBootstrap {
         {
           absolutePath: filePath,
           relPath: relative(libraryFolder.path, filePath),
-          ino: clampIno(fileStat.ino),
+          ino: fileStat.ino,
           sizeBytes: Number(fileStat.size),
           mtime: fileStat.mtime,
           format,
@@ -978,6 +986,7 @@ export class ScannerService implements OnApplicationBootstrap {
       updated: 0,
     });
     this.emitTargetedScanResult(libraryId, result);
+    await this.scheduleImportedBookMetadataFetch(libraryId, result.created ? [result.bookId] : []);
     this.logger.log(
       `[${event}] [end] libraryId=${libraryId} path="${sanitizeLogValue(filePath)}" durationMs=${Date.now() - startedAt} added=${result.added} updated=${result.updated} scanScope=file - targeted book scan completed`,
     );
@@ -1021,7 +1030,7 @@ export class ScannerService implements OnApplicationBootstrap {
         {
           absolutePath: filePath,
           relPath: relative(libraryFolder.path, filePath),
-          ino: clampIno(fileStat.ino),
+          ino: fileStat.ino,
           sizeBytes: Number(fileStat.size),
           mtime: fileStat.mtime,
           format,
@@ -1046,6 +1055,7 @@ export class ScannerService implements OnApplicationBootstrap {
       updated: 0,
     });
     this.emitTargetedScanResult(libraryId, result);
+    await this.scheduleImportedBookMetadataFetch(libraryId, result.created ? [result.bookId] : []);
     this.logger.log(
       `[${event}] [end] libraryId=${libraryId} path="${sanitizeLogValue(filePath)}" durationMs=${Date.now() - startedAt} added=${result.added} updated=${result.updated} scanScope=root_file - targeted book scan completed`,
     );
@@ -1134,6 +1144,7 @@ export class ScannerService implements OnApplicationBootstrap {
       updated: 0,
     });
     this.emitTargetedScanResult(libraryId, result);
+    await this.scheduleImportedBookMetadataFetch(libraryId, result.created ? [result.bookId] : []);
     this.logger.log(
       `[${event}] [end] libraryId=${libraryId} path="${sanitizeLogValue(filePath)}" durationMs=${Date.now() - startedAt} scanScope=folder folder="${sanitizeLogValue(basename(resolvedBookFolder))}" added=${result.added} updated=${result.updated} - targeted book scan completed`,
     );
@@ -1325,6 +1336,7 @@ export class ScannerService implements OnApplicationBootstrap {
 
       const seenBookIds = new Set<number>();
       const allRetainedFileIds = new Set<number>();
+      const importedBookIds: number[] = [];
       const candidateFolderPaths = new Set(candidates.map((candidate) => candidate.folderPath));
 
       for (const candidate of candidates) {
@@ -1339,6 +1351,7 @@ export class ScannerService implements OnApplicationBootstrap {
           candidateFolderPaths,
         );
         seenBookIds.add(result.bookId);
+        if (result.created) importedBookIds.push(result.bookId);
         for (const fid of result.retainedFileIds) allRetainedFileIds.add(fid);
         counts.addedCount += result.added;
         counts.updatedCount += result.updated;
@@ -1390,6 +1403,8 @@ export class ScannerService implements OnApplicationBootstrap {
         this.bufferBooksUnavailableNotification(libraryId, missingIds);
       }
 
+      await this.scheduleImportedBookMetadataFetch(libraryId, importedBookIds);
+
       this.logger.log(
         `[${event}] [end] libraryId=${libraryId} jobId=${jobId} libraryFolderId=${libraryFolderId} durationMs=${Date.now() - startedAt} addedCount=${counts.addedCount} updatedCount=${counts.updatedCount} missingCount=${counts.missingCount} - folder candidate scan completed`,
       );
@@ -1413,7 +1428,7 @@ export class ScannerService implements OnApplicationBootstrap {
     metadataPrecedence: string[],
     isFirstScan: boolean,
     candidateFolderPaths: Set<string>,
-  ): Promise<{ bookId: number; added: number; updated: number; retainedFileIds: Set<number>; becameVisible: boolean }> {
+  ): Promise<ProcessCandidateResult> {
     const { bookByFolderPath, booksByParentDir, fileByPath, fileByIno } = maps;
     const counts = { added: 0, updated: 0 };
     const fileCounts: ScanCounts = { addedCount: 0, updatedCount: 0, missingCount: 0 };
@@ -1565,7 +1580,7 @@ export class ScannerService implements OnApplicationBootstrap {
     }
 
     const becameVisible = await this.scannerRepo.promoteProcessingBookToPresent(book.id);
-    return { bookId: book.id, ...counts, retainedFileIds, becameVisible };
+    return { bookId: book.id, ...counts, retainedFileIds, becameVisible, created: book.created };
   }
 
   private buildMetadataExtractionSources(
@@ -1640,16 +1655,16 @@ export class ScannerService implements OnApplicationBootstrap {
     bookByFolderPath: Map<string, BookEntry>,
     booksByParentDir: Map<string, BookEntry[]>,
     fileByPath: Map<string, FileByPathEntry>,
-    fileByIno: Map<number, FileByInoEntry>,
+    fileByIno: Map<bigint, FileByInoEntry>,
     counts: ScanCounts,
     candidateFolderPaths: Set<string>,
-  ) {
+  ): Promise<UpsertBookResult> {
     const existing = bookByFolderPath.get(candidate.folderPath);
     const candidateOwnedBookIds = new Set<number>();
     for (const file of candidate.files) {
       const byPath = fileByPath.get(file.absolutePath);
       if (byPath) candidateOwnedBookIds.add(byPath.bookId);
-      if (file.ino !== 0) {
+      if (file.ino !== 0n) {
         const byIno = fileByIno.get(file.ino);
         if (byIno) candidateOwnedBookIds.add(byIno.bookId);
       }
@@ -1682,14 +1697,22 @@ export class ScannerService implements OnApplicationBootstrap {
         this.logger.log(
           `[scanner.upsert_book] [end] libraryId=${libraryId} bookId=${survivor.id} folder="${sanitizeLogValue(candidate.folderPath)}" mergedCount=${virtualChildren.length} action=merge_stem_split - stem-split books merged`,
         );
-        return { ...survivor, folderPath: candidate.folderPath };
+        return { ...survivor, folderPath: candidate.folderPath, created: false };
       }
 
-      const movedInLibrary = await this.tryReuseMovedBookInLibrary(candidate, libraryId, bookByFolderPath, fileByPath, fileByIno, counts);
-      if (movedInLibrary) return movedInLibrary;
+      const movedInLibrary = await this.tryReuseMovedBookInLibrary(
+        candidate,
+        libraryId,
+        bookByFolderPath,
+        fileByPath,
+        fileByIno,
+        counts,
+        candidateFolderPaths,
+      );
+      if (movedInLibrary) return { ...movedInLibrary, created: false };
 
       const transferred = await this.tryTransferMissingBook(candidate, libraryId, libraryFolderId, bookByFolderPath, counts);
-      if (transferred) return transferred;
+      if (transferred) return { ...transferred, created: false };
 
       const book = await this.scannerRepo.createBook({
         libraryId,
@@ -1698,16 +1721,9 @@ export class ScannerService implements OnApplicationBootstrap {
         status: 'processing',
       });
       counts.addedCount++;
-      this.autoFetchOrchestrator
-        ?.scheduleIfEligible(book.id, libraryId, 'event_import')
-        .catch((err: Error) =>
-          this.logger.warn(
-            `[scanner.upsert_book] [fail] libraryId=${libraryId} bookId=${book.id} action=schedule_metadata_fetch errorClass=${err.name} error="${sanitizeLogValue(err.message)}" - metadata fetch schedule failed`,
-          ),
-        );
       const entry = { id: book.id, status: book.status, folderPath: book.folderPath, primaryFileId: book.primaryFileId ?? null };
       bookByFolderPath.set(candidate.folderPath, entry);
-      return entry;
+      return { ...entry, created: true };
     }
 
     if (existing.status === 'missing') {
@@ -1733,7 +1749,28 @@ export class ScannerService implements OnApplicationBootstrap {
       );
     }
 
-    return existing;
+    return { ...existing, created: false };
+  }
+
+  private async scheduleImportedBookMetadataFetch(libraryId: number, bookIds: readonly number[]): Promise<void> {
+    const ids = [...new Set(bookIds)].filter((bookId) => Number.isInteger(bookId) && bookId > 0);
+    if (ids.length === 0 || !this.autoFetchOrchestrator) return;
+
+    const event = 'scanner.schedule_metadata_fetch';
+    const startedAt = Date.now();
+    this.logger.debug(`[${event}] [start] libraryId=${libraryId} bookCount=${ids.length} - metadata fetch scheduling started`);
+    try {
+      const queued = await this.autoFetchOrchestrator.scheduleImportedBooksIfEligible(libraryId, ids);
+      this.logger.debug(
+        `[${event}] [end] libraryId=${libraryId} durationMs=${Date.now() - startedAt} bookCount=${ids.length} queued=${queued} - metadata fetch scheduling completed`,
+      );
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.warn(
+        `[${event}] [fail] libraryId=${libraryId} durationMs=${Date.now() - startedAt} bookCount=${ids.length} errorClass=${errorClass} error="${errorMessage}" - metadata fetch scheduling failed`,
+      );
+    }
   }
 
   private async tryReuseMovedBookInLibrary(
@@ -1741,8 +1778,9 @@ export class ScannerService implements OnApplicationBootstrap {
     libraryId: number,
     bookByFolderPath: Map<string, BookEntry>,
     fileByPath: Map<string, FileByPathEntry>,
-    fileByIno: Map<number, FileByInoEntry>,
+    fileByIno: Map<bigint, FileByInoEntry>,
     counts: ScanCounts,
+    candidateFolderPaths: Set<string>,
   ): Promise<BookEntry | null> {
     const contentFiles = candidate.files.filter((file) => {
       const role = file.role ?? classifyFile(file.absolutePath).role;
@@ -1754,7 +1792,7 @@ export class ScannerService implements OnApplicationBootstrap {
     let sourceBookId: number | null = null;
 
     for (const file of contentFiles) {
-      if (file.ino === 0) continue;
+      if (file.ino === 0n) continue;
       const byIno = fileByIno.get(file.ino);
       if (!byIno || byIno.absolutePath === file.absolutePath) continue;
       sourceBookId = byIno.bookId;
@@ -1771,7 +1809,7 @@ export class ScannerService implements OnApplicationBootstrap {
           if (code === 'ENOENT' || code === 'EACCES') continue;
           throw err;
         }
-        const byHash = this.findLocalFileByHash(fileHash, file.absolutePath, fileByPath);
+        const byHash = this.findLocalFileByHash(fileHash, file.absolutePath, file.sizeBytes, fileByPath);
         if (!byHash) continue;
         sourceBookId = byHash.bookId;
         break;
@@ -1783,6 +1821,7 @@ export class ScannerService implements OnApplicationBootstrap {
     const sourceBook = this.findBookEntryById(bookByFolderPath, sourceBookId);
     if (!sourceBook) return null;
     if (sourceBook.folderPath === candidate.folderPath) return sourceBook;
+    if (candidateFolderPaths.has(sourceBook.folderPath) || (await this.pathExists(sourceBook.folderPath))) return null;
 
     await this.scannerRepo.updateBookFolderPath(sourceBook.id, candidate.folderPath);
 
@@ -1815,12 +1854,27 @@ export class ScannerService implements OnApplicationBootstrap {
     return null;
   }
 
-  private findLocalFileByHash(fileHash: string, absolutePath: string, fileByPath: Map<string, FileByPathEntry>): FileByPathEntry | null {
+  private findLocalFileByHash(
+    fileHash: string,
+    absolutePath: string,
+    sizeBytes: number,
+    fileByPath: Map<string, FileByPathEntry>,
+  ): FileByPathEntry | null {
     for (const [path, entry] of fileByPath) {
       if (path === absolutePath) continue;
-      if (entry.fileHash === fileHash) return entry;
+      if (entry.fileHash === fileHash && entry.sizeBytes === sizeBytes) return entry;
     }
     return null;
+  }
+
+  private async pathExists(path: string): Promise<boolean> {
+    try {
+      await stat(path);
+      return true;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      return code !== 'ENOENT' && code !== 'ENOTDIR';
+    }
   }
 
   private async filterBookIdsMissingOnDisk(bookIds: number[]): Promise<number[]> {
@@ -1859,9 +1913,9 @@ export class ScannerService implements OnApplicationBootstrap {
     let sourceLibraryId: number | null = null;
 
     for (const file of contentFiles) {
-      if (file.ino === 0) continue;
+      if (file.ino === 0n) continue;
       const byIno = await this.scannerRepo.findMissingBookFileWithContextByIno(file.ino);
-      if (!byIno) continue;
+      if (!byIno || (await this.pathExists(byIno.file.absolutePath))) continue;
       sourceBookId = byIno.file.bookId;
       sourceLibraryId = byIno.libraryId;
       break;
@@ -1869,7 +1923,7 @@ export class ScannerService implements OnApplicationBootstrap {
 
     if (sourceBookId == null) {
       for (const file of contentFiles) {
-        if (file.ino === 0) continue;
+        if (file.ino === 0n) continue;
         const byIno = await this.scannerRepo.findBookFileWithContextByIno(file.ino);
         if (!byIno || byIno.file.absolutePath === file.absolutePath) continue;
         const previousPathStat = await stat(byIno.file.absolutePath).catch(() => null);
@@ -1892,14 +1946,14 @@ export class ScannerService implements OnApplicationBootstrap {
         }
 
         const byHash = await this.scannerRepo.findMissingBookFileWithContextByHash(fileHash);
-        if (byHash) {
+        if (byHash && byHash.file.sizeBytes === file.sizeBytes && !(await this.pathExists(byHash.file.absolutePath))) {
           sourceBookId = byHash.file.bookId;
           sourceLibraryId = byHash.libraryId;
           break;
         }
 
         const byHashAny = await this.scannerRepo.findBookFileWithContextByHash(fileHash);
-        if (!byHashAny || byHashAny.file.absolutePath === file.absolutePath) continue;
+        if (!byHashAny || byHashAny.file.absolutePath === file.absolutePath || byHashAny.file.sizeBytes !== file.sizeBytes) continue;
         const previousPathStat = await stat(byHashAny.file.absolutePath).catch(() => null);
         if (previousPathStat?.isFile()) continue;
         sourceBookId = byHashAny.file.bookId;
@@ -1940,7 +1994,7 @@ export class ScannerService implements OnApplicationBootstrap {
     bookId: number,
     libraryFolderId: number,
     fileByPath: Map<string, FileByPathEntry>,
-    fileByIno: Map<number, FileByInoEntry>,
+    fileByIno: Map<bigint, FileByInoEntry>,
     counts: ScanCounts,
     isFirstScan: boolean,
   ): Promise<ProcessedFileResult> {
@@ -1951,7 +2005,7 @@ export class ScannerService implements OnApplicationBootstrap {
 
     await waitForStability(fileStat.absolutePath, fileStat.mtime.getTime());
 
-    if (fileStat.ino !== 0) {
+    if (fileStat.ino !== 0n) {
       const byInoResult = await this.resolveByLocalIno(fileStat, format, role, sortOrder, bookId, libraryFolderId, fileByPath, fileByIno, counts);
       if (byInoResult) return byInoResult;
 
@@ -1983,21 +2037,22 @@ export class ScannerService implements OnApplicationBootstrap {
     bookId: number,
     libraryFolderId: number,
     fileByPath: Map<string, FileByPathEntry>,
-    fileByIno: Map<number, FileByInoEntry>,
+    fileByIno: Map<bigint, FileByInoEntry>,
     counts: ScanCounts,
   ): Promise<ProcessedFileResult & { fileId: number }> {
     const sizeUnchanged = fileStat.sizeBytes === byPath.sizeBytes;
     const mtimeUnchanged = fileStat.mtime.getTime() === byPath.mtime?.getTime();
+    const inoUnchanged = fileStat.ino === byPath.ino;
     const reassigned = byPath.bookId !== bookId;
     const sortOrderUnchanged = sortOrder === byPath.sortOrder;
 
-    if (sizeUnchanged && mtimeUnchanged && !reassigned && sortOrderUnchanged) {
+    if (sizeUnchanged && mtimeUnchanged && inoUnchanged && !reassigned && sortOrderUnchanged) {
       return { isNew: false, reassigned: false, changed: false, fileId: byPath.id };
     }
 
     await waitForStability(fileStat.absolutePath, fileStat.mtime.getTime());
 
-    if (!sizeUnchanged || !mtimeUnchanged || reassigned) {
+    if (!sizeUnchanged || !mtimeUnchanged || !inoUnchanged || reassigned) {
       await this.scannerRepo.updateBookFile(byPath.id, {
         ...(reassigned && { bookId }),
         libraryFolderId,
@@ -2027,7 +2082,7 @@ export class ScannerService implements OnApplicationBootstrap {
       fileHash: byPath.fileHash,
       sortOrder,
     });
-    if (fileStat.ino !== 0) {
+    if (fileStat.ino !== 0n) {
       fileByIno.set(fileStat.ino, {
         id: byPath.id,
         bookId,
@@ -2047,13 +2102,14 @@ export class ScannerService implements OnApplicationBootstrap {
     bookId: number,
     libraryFolderId: number,
     fileByPath: Map<string, FileByPathEntry>,
-    fileByIno: Map<number, FileByInoEntry>,
+    fileByIno: Map<bigint, FileByInoEntry>,
     counts: ScanCounts,
   ): Promise<(ProcessedFileResult & { fileId: number }) | null> {
     const byIno = fileByIno.get(fileStat.ino);
     if (!byIno) return null;
 
     const oldAbsolutePath = byIno.absolutePath;
+    if (await this.pathExists(oldAbsolutePath)) return null;
     const sizeUnchanged = fileStat.sizeBytes === byIno.sizeBytes;
     const mtimeUnchanged = fileStat.mtime.getTime() === byIno.mtime?.getTime();
     await this.scannerRepo.updateBookFile(byIno.id, {
@@ -2093,7 +2149,7 @@ export class ScannerService implements OnApplicationBootstrap {
     bookId: number,
     libraryFolderId: number,
     fileByPath: Map<string, FileByPathEntry>,
-    fileByIno: Map<number, FileByInoEntry>,
+    fileByIno: Map<bigint, FileByInoEntry>,
     counts: ScanCounts,
   ): Promise<(ProcessedFileResult & { fileId: number }) | null> {
     let globalByIno = await this.scannerRepo.findBookFileWithContextByIno(fileStat.ino);
@@ -2112,6 +2168,7 @@ export class ScannerService implements OnApplicationBootstrap {
     ) {
       return null;
     }
+    if (await this.pathExists(globalByIno.file.absolutePath)) return null;
 
     const oldAbsolutePath = globalByIno.file.absolutePath;
     const sizeUnchanged = fileStat.sizeBytes === globalByIno.file.sizeBytes;
@@ -2169,7 +2226,7 @@ export class ScannerService implements OnApplicationBootstrap {
     bookId: number,
     libraryFolderId: number,
     fileByPath: Map<string, FileByPathEntry>,
-    fileByIno: Map<number, FileByInoEntry>,
+    fileByIno: Map<bigint, FileByInoEntry>,
     counts: ScanCounts,
     isFirstScan: boolean,
   ): Promise<ProcessedFileResult> {
@@ -2189,7 +2246,7 @@ export class ScannerService implements OnApplicationBootstrap {
 
     if (!isFirstScan) {
       const byHash = await this.scannerRepo.findBookFileByHash(fileHash, libraryFolderId);
-      if (byHash) {
+      if (byHash && byHash.sizeBytes === fileStat.sizeBytes && !(await this.pathExists(byHash.absolutePath))) {
         const oldAbsolutePath = byHash.absolutePath;
         await this.scannerRepo.updateBookFile(byHash.id, {
           bookId,
@@ -2221,7 +2278,7 @@ export class ScannerService implements OnApplicationBootstrap {
           fileHash: byHash.fileHash,
           sortOrder,
         });
-        if (fileStat.ino !== 0) {
+        if (fileStat.ino !== 0n) {
           fileByIno.set(fileStat.ino, {
             id: byHash.id,
             bookId,
@@ -2245,7 +2302,9 @@ export class ScannerService implements OnApplicationBootstrap {
       if (
         globalByHash &&
         globalByHash.file.absolutePath !== fileStat.absolutePath &&
-        (globalByHash.file.bookId === bookId || globalByHash.bookStatus === 'missing')
+        globalByHash.file.sizeBytes === fileStat.sizeBytes &&
+        (globalByHash.file.bookId === bookId || globalByHash.bookStatus === 'missing') &&
+        !(await this.pathExists(globalByHash.file.absolutePath))
       ) {
         const oldAbsolutePath = globalByHash.file.absolutePath;
         await this.scannerRepo.updateBookFile(globalByHash.file.id, {
@@ -2279,7 +2338,7 @@ export class ScannerService implements OnApplicationBootstrap {
           fileHash,
           sortOrder,
         });
-        if (fileStat.ino !== 0) {
+        if (fileStat.ino !== 0n) {
           fileByIno.set(fileStat.ino, {
             id: globalByHash.file.id,
             bookId,
@@ -2342,7 +2401,7 @@ export class ScannerService implements OnApplicationBootstrap {
       fileHash,
       sortOrder,
     });
-    if (fileStat.ino !== 0) {
+    if (fileStat.ino !== 0n) {
       fileByIno.set(fileStat.ino, {
         id: created.id,
         bookId,
@@ -2359,7 +2418,7 @@ export class ScannerService implements OnApplicationBootstrap {
     retainedFileIds: Set<number>,
     fileIdsByBookId: Map<number, Set<number>>,
     fileByPath: Map<string, FileByPathEntry>,
-    fileByIno: Map<number, FileByInoEntry>,
+    fileByIno: Map<bigint, FileByInoEntry>,
     counts: { added: number; updated: number },
   ): Promise<void> {
     // Use in-memory index instead of DB query per book

@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { X, Loader2, FolderPlus } from '@lucide/vue'
 import { api } from '@/lib/api'
 import { useLibraries } from '@/features/library/composables/useLibraries'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   selectionPayload: { fileIds?: number[]; selectAll?: boolean; excludedIds?: number[]; status?: string; search?: string }
@@ -73,7 +76,7 @@ async function applyDestination() {
       error.value = (body as { message?: string } | null)?.message ?? `Error ${res.status}`
     }
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Failed to set destination'
+    error.value = e instanceof Error ? e.message : t('bookDock.setDestination.failed')
   } finally {
     loading.value = false
   }
@@ -92,7 +95,7 @@ function handleClose() {
       <div class="relative z-10 w-full max-w-xl mx-4 bg-card border border-border rounded-lg shadow-2xl overflow-hidden">
         <div class="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 class="text-base font-semibold text-foreground">
-            {{ result ? 'Destination Updated' : `Set Destination for ${selectionCount} file${selectionCount === 1 ? '' : 's'}` }}
+            {{ result ? t('bookDock.setDestination.resultTitle') : t('bookDock.setDestination.title', { count: selectionCount }, selectionCount) }}
           </h2>
           <button
             class="size-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
@@ -104,7 +107,7 @@ function handleClose() {
 
         <div v-if="!result" class="px-5 py-4 space-y-4">
           <label class="block">
-            <span class="text-xs font-medium text-muted-foreground">Destination Library</span>
+            <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.destinationLibrary') }}</span>
             <select
               class="mt-1 w-full h-9 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
               :value="targetLibraryId ?? ''"
@@ -115,7 +118,7 @@ function handleClose() {
           </label>
 
           <label class="block">
-            <span class="text-xs font-medium text-muted-foreground">Destination Folder</span>
+            <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.destinationFolder') }}</span>
             <select
               class="mt-1 w-full h-9 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
               :value="targetFolderId ?? ''"
@@ -129,7 +132,7 @@ function handleClose() {
 
           <div class="flex items-center justify-end gap-2 pt-1">
             <button class="h-8 px-4 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-all" @click="handleClose">
-              Cancel
+              {{ t('common.cancel') }}
             </button>
             <button
               class="flex items-center gap-1.5 h-8 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
@@ -138,22 +141,22 @@ function handleClose() {
             >
               <Loader2 v-if="loading" class="size-3.5 animate-spin" />
               <FolderPlus v-else class="size-3.5" />
-              Apply
+              {{ t('bookDock.apply') }}
             </button>
           </div>
         </div>
 
         <div v-else class="px-5 py-4 space-y-4">
           <div class="rounded-lg bg-emerald-500/10 p-3">
-            <p class="text-sm font-medium">Updated {{ result.updated }} of {{ result.total }} files</p>
-            <p v-if="result.failed > 0" class="text-xs text-muted-foreground mt-0.5">{{ result.failed }} failed</p>
+            <p class="text-sm font-medium">{{ t('bookDock.updatedOfFiles', { updated: result.updated, total: result.total }) }}</p>
+            <p v-if="result.failed > 0" class="text-xs text-muted-foreground mt-0.5">{{ t('bookDock.nFailed', { count: result.failed }) }}</p>
           </div>
           <div class="flex justify-end">
             <button
               class="h-8 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium transition-all hover:opacity-90 active:scale-95"
               @click="handleClose"
             >
-              Done
+              {{ t('bookDock.done') }}
             </button>
           </div>
         </div>

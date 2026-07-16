@@ -1,12 +1,10 @@
 import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
+import { parsePublishedDateKey, parsePublishedYear, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
 import { GoogleVolumeItem } from './google.types';
 
 function parseYear(dateString: string | undefined): number | undefined {
-  if (!dateString) return undefined;
-  const year = parseInt(dateString.substring(0, 4), 10);
-  if (Number.isNaN(year) || year < 1000 || year > 2200) return undefined;
-  return year;
+  return parsePublishedYear(dateString);
 }
 
 function normalizeCommunityRating(value: number | undefined): number | undefined {
@@ -21,7 +19,8 @@ export function mapGoogleVolume(raw: GoogleVolumeItem): MetadataCandidate {
   const info = raw.volumeInfo;
   const identifiers = info.industryIdentifiers ?? [];
 
-  const publishedYear = parseYear(info.publishedDate);
+  const publishedDate = parsePublishedDateKey(info.publishedDate);
+  const publishedYear = publishedDate ? publishedYearFromDateKey(publishedDate) : parseYear(info.publishedDate);
 
   const isbn10 = identifiers.find((i) => i.type === 'ISBN_10')?.identifier;
   const isbn13 = identifiers.find((i) => i.type === 'ISBN_13')?.identifier;
@@ -40,6 +39,7 @@ export function mapGoogleVolume(raw: GoogleVolumeItem): MetadataCandidate {
     authors: info.authors,
     description: info.description,
     publisher: info.publisher,
+    publishedDate,
     publishedYear,
     language: info.language,
     pageCount: info.pageCount,

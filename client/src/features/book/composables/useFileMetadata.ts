@@ -7,6 +7,7 @@ export interface FileMetadata {
   subtitle?: string | null
   description?: string | null
   publisher?: string | null
+  publishedDate?: string | null
   publishedYear?: number | null
   language?: string | null
   pageCount?: number | null
@@ -22,6 +23,7 @@ export interface FileMetadata {
   openLibraryId?: string | null
   itunesId?: string | null
   audibleId?: string | null
+  librofmId?: string | null
   koboId?: string | null
   comicvineId?: string | null
   ranobedbId?: string | null

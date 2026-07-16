@@ -1,5 +1,20 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, index, integer, jsonb, pgTable, primaryKey, real, serial, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  check,
+  foreignKey,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  real,
+  serial,
+  timestamp,
+  unique,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 
 import { books } from './books';
 import { users } from './auth';
@@ -17,7 +32,11 @@ export const koboDevices = pgTable(
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [index('kobo_devices_user_id_idx').on(t.userId), unique('kobo_devices_client_device_id_unique').on(t.clientDeviceId)],
+  (t) => [
+    index('kobo_devices_user_id_idx').on(t.userId),
+    unique('kobo_devices_client_device_id_unique').on(t.clientDeviceId),
+    unique('kobo_devices_id_user_id_unique').on(t.id, t.userId),
+  ],
 );
 
 export const koboSyncSettings = pgTable(
@@ -48,12 +67,13 @@ export const koboSyncSettings = pgTable(
   ],
 );
 
-export const koboLibrarySnapshots = pgTable('kobo_library_snapshots', {
+export const koboLegacyLibrarySnapshots = pgTable('kobo_library_snapshots', {
   id: serial('id').primaryKey(),
   userId: integer('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' })
     .unique(),
+  legacyDeviceCutoffAt: timestamp('legacy_device_cutoff_at', { withTimezone: true }).defaultNow().notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true })
     .defaultNow()
@@ -61,12 +81,12 @@ export const koboLibrarySnapshots = pgTable('kobo_library_snapshots', {
     .$onUpdateFn(() => new Date()),
 });
 
-export const koboSnapshotBooks = pgTable(
+export const koboLegacySnapshotBooks = pgTable(
   'kobo_snapshot_books',
   {
     snapshotId: integer('snapshot_id')
       .notNull()
-      .references(() => koboLibrarySnapshots.id, { onDelete: 'cascade' }),
+      .references(() => koboLegacyLibrarySnapshots.id, { onDelete: 'cascade' }),
     bookId: integer('book_id')
       .notNull()
       .references(() => books.id, { onDelete: 'cascade' }),
@@ -80,7 +100,58 @@ export const koboSnapshotBooks = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.snapshotId, t.bookId] }),
+    index('kobo_snapshot_books_book_id_idx').on(t.bookId),
     index('kobo_snapshot_books_snapshot_synced_book_idx').on(t.snapshotId, t.synced, t.bookId),
+  ],
+);
+
+export const koboLibrarySnapshots = pgTable(
+  'kobo_device_library_snapshots',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    deviceId: integer('device_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [
+    index('kobo_device_library_snapshots_user_id_idx').on(t.userId),
+    unique('kobo_device_library_snapshots_device_id_unique').on(t.deviceId),
+    foreignKey({
+      columns: [t.deviceId, t.userId],
+      foreignColumns: [koboDevices.id, koboDevices.userId],
+      name: 'kobo_device_library_snapshots_device_owner_fk',
+    }).onDelete('cascade'),
+  ],
+);
+
+export const koboSnapshotBooks = pgTable(
+  'kobo_device_snapshot_books',
+  {
+    snapshotId: integer('snapshot_id')
+      .notNull()
+      .references(() => koboLibrarySnapshots.id, { onDelete: 'cascade' }),
+    bookId: integer('book_id')
+      .notNull()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    synced: boolean('synced').notNull().default(false),
+    pendingDelete: boolean('pending_delete').notNull().default(false),
+    isNew: boolean('is_new').notNull().default(true),
+    removedByDevice: boolean('removed_by_device').notNull().default(false),
+    needsLegacyNumericRemoval: boolean('needs_legacy_numeric_removal').notNull().default(false),
+    fileHash: varchar('file_hash', { length: 64 }),
+    deliveryHash: varchar('delivery_hash', { length: 64 }),
+    metadataHash: varchar('metadata_hash', { length: 64 }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.snapshotId, t.bookId] }),
+    index('kobo_device_snapshot_books_book_id_idx').on(t.bookId),
+    index('kobo_device_snapshot_books_snapshot_synced_book_idx').on(t.snapshotId, t.synced, t.bookId),
   ],
 );
 
@@ -134,7 +205,35 @@ export const koboReadingStates = pgTable(
       .notNull()
       .$onUpdateFn(() => new Date()),
   },
-  (t) => [unique().on(t.userId, t.bookId)],
+  (t) => [unique().on(t.userId, t.bookId), index('kobo_reading_states_book_id_idx').on(t.bookId)],
+);
+
+export const koboSyncHistory = pgTable(
+  'kobo_sync_history',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    deviceId: integer('device_id').references(() => koboDevices.id, { onDelete: 'set null' }),
+    event: varchar('event', { length: 32 }).notNull(),
+    status: varchar('status', { length: 16 }).notNull(),
+    counts: jsonb('counts').notNull().default({}),
+    durationMs: integer('duration_ms').notNull(),
+    errorClass: varchar('error_class', { length: 128 }),
+    error: varchar('error', { length: 500 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index('kobo_sync_history_user_created_idx').on(t.userId, t.createdAt),
+    index('kobo_sync_history_device_created_idx').on(t.deviceId, t.createdAt),
+    check(
+      'kobo_sync_history_event_chk',
+      sql`${t.event} in ('library_sync', 'book_download', 'progress_update', 'annotations_pull', 'annotations_push')`,
+    ),
+    check('kobo_sync_history_status_chk', sql`${t.status} in ('success', 'failed')`),
+    check('kobo_sync_history_duration_nonnegative_chk', sql`${t.durationMs} >= 0`),
+  ],
 );
 
 export type KoboDevice = typeof koboDevices.$inferSelect;
@@ -145,3 +244,5 @@ export type KoboLibrarySnapshot = typeof koboLibrarySnapshots.$inferSelect;
 export type KoboSnapshotBook = typeof koboSnapshotBooks.$inferSelect;
 export type KoboBookEntitlement = typeof koboBookEntitlements.$inferSelect;
 export type KoboReadingState = typeof koboReadingStates.$inferSelect;
+export type KoboSyncHistory = typeof koboSyncHistory.$inferSelect;
+export type NewKoboSyncHistory = typeof koboSyncHistory.$inferInsert;

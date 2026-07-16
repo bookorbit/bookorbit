@@ -1,4 +1,7 @@
-export const THEME_IDS = ["light", "dark"] as const;
+export const RESOLVED_THEME_IDS = ["light", "dark"] as const;
+export type ResolvedTheme = (typeof RESOLVED_THEME_IDS)[number];
+
+export const THEME_IDS = [...RESOLVED_THEME_IDS, "system"] as const;
 export type Theme = (typeof THEME_IDS)[number];
 
 export const ACCENT_IDS = [

@@ -88,7 +88,7 @@ describe('ReleaseNotesService.getSince', () => {
     } as unknown as ConfigService;
     const appSettings = { isUpdateCheckEnabled: vi.fn().mockResolvedValue(true) } as unknown as AppSettingsService;
     const fetchMock = vi.fn((url: string) =>
-      url.includes('api.github.com')
+      new URL(url).hostname === 'api.github.com'
         ? Promise.resolve({ ok: true, json: () => Promise.resolve(releases) })
         : Promise.resolve({ headers: { get: () => 'video/mp4' } }),
     );
@@ -97,7 +97,7 @@ describe('ReleaseNotesService.getSince', () => {
     const highlights = (await service.getSince('v1.0.0')).releases[0].highlights;
     expect(highlights[0].media).toEqual([{ url: sharedUrl, type: 'video' }]);
     expect(highlights[1].media).toEqual([{ url: sharedUrl, type: 'video' }]);
-    const probeCalls = fetchMock.mock.calls.filter(([u]) => !String(u).includes('api.github.com'));
+    const probeCalls = fetchMock.mock.calls.filter(([u]) => new URL(String(u)).hostname !== 'api.github.com');
     expect(probeCalls).toHaveLength(1);
   });
 

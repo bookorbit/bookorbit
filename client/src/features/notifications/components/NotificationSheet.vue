@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Bell, BellOff, CheckCheck, Trash2 } from '@lucide/vue'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
@@ -7,6 +8,8 @@ import { useNotifications } from '../composables/useNotifications'
 import NotificationItemVue from './NotificationItem.vue'
 
 defineProps<{ iconRadiusClass: string }>()
+
+const { t } = useI18n()
 
 const { notifications, unreadCount, loading, hasMore, fetchNotifications, markAsRead, markAllAsRead, dismiss, clearAll } = useNotifications()
 
@@ -60,15 +63,15 @@ function handleLoadMore() {
 
     <SheetContent side="right" class="w-[90vw] sm:max-w-md p-0 flex flex-col gap-0">
       <SheetHeader class="flex flex-row items-center justify-between border-b px-4 py-3 h-14 shrink-0 space-y-0">
-        <SheetTitle class="text-sm font-semibold text-foreground">Notifications</SheetTitle>
+        <SheetTitle class="text-sm font-semibold text-foreground">{{ t('notifications.title') }}</SheetTitle>
         <div class="flex items-center gap-1 pr-8">
           <Button v-if="unreadCount > 0" variant="ghost" size="sm" class="h-7 gap-1.5 text-xs text-muted-foreground" @click="handleMarkAllRead">
             <CheckCheck :size="14" />
-            Mark all read
+            {{ t('notifications.markAllRead') }}
           </Button>
           <Button v-if="notifications.length > 0" variant="ghost" size="sm" class="h-7 gap-1.5 text-xs text-muted-foreground" @click="handleClearAll">
             <Trash2 :size="14" />
-            Clear
+            {{ t('notifications.clear') }}
           </Button>
         </div>
       </SheetHeader>
@@ -76,7 +79,7 @@ function handleLoadMore() {
       <div class="flex-1 overflow-y-auto min-h-0">
         <div v-if="notifications.length === 0 && !loading" class="flex flex-col items-center justify-center py-20 text-muted-foreground">
           <BellOff :size="32" class="mb-4 opacity-20" />
-          <p class="text-sm">No notifications yet</p>
+          <p class="text-sm">{{ t('notifications.empty') }}</p>
         </div>
 
         <div v-else class="flex flex-col gap-1.5 px-2 py-2">
@@ -89,7 +92,7 @@ function handleLoadMore() {
 
         <div v-if="hasMore && !loading" class="p-4">
           <Button variant="ghost" size="sm" class="w-full text-xs text-muted-foreground border border-dashed" @click="handleLoadMore">
-            Load more notifications
+            {{ t('notifications.loadMore') }}
           </Button>
         </div>
       </div>

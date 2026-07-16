@@ -31,6 +31,24 @@ describe('useFoliateAnnotations', () => {
     expect(anns.annotationStyleMap.get('epubcfi(/6/6)')).toEqual({ color: '#FB923C', style: 'strikethrough' })
   })
 
+  it('redraws an existing annotation by deleting then re-adding it with updated style metadata', () => {
+    const view = {
+      addAnnotation: vi.fn<(arg: { value: string }) => void>(),
+      deleteAnnotation: vi.fn<(arg: { value: string }) => void>(),
+    }
+    const anns = useFoliateAnnotations()
+
+    anns.addAnnotation(view, 'epubcfi(/6/4)', '#FACC15', 'highlight')
+    view.addAnnotation.mockClear()
+
+    anns.redrawAnnotation(view, 'epubcfi(/6/4)', '#38BDF8', 'underline')
+
+    expect(anns.annotationStyleMap.get('epubcfi(/6/4)')).toEqual({ color: '#38BDF8', style: 'underline' })
+    expect(view.deleteAnnotation).toHaveBeenCalledWith({ value: 'epubcfi(/6/4)' })
+    expect(view.addAnnotation).toHaveBeenCalledWith({ value: 'epubcfi(/6/4)' })
+    expect(view.deleteAnnotation.mock.invocationCallOrder[0]!).toBeLessThan(view.addAnnotation.mock.invocationCallOrder[0]!)
+  })
+
   it('re-adds all known annotations after renderer reload', () => {
     vi.useFakeTimers()
     const view = { addAnnotation: vi.fn<(arg: { value: string }) => void>() }

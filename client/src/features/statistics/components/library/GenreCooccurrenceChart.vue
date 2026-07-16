@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { GitMerge } from '@lucide/vue'
 import type { ChordDiagramData } from '@bookorbit/types'
 
 import { useGenreCooccurrence } from '../../composables/useGenreCooccurrence'
 import ChartCard from '../ChartCard.vue'
+
+const { t } = useI18n()
 
 const { data, loading, error } = useGenreCooccurrence()
 const option = shallowRef({})
@@ -50,7 +53,7 @@ watch(
 </script>
 
 <template>
-  <ChartCard title="Genre Co-occurrence" :icon="GitMerge" :color-index="3" :loading :error :empty="isEmpty">
+  <ChartCard :title="t('statistics.charts.genreCooccurrence.title')" :icon="GitMerge" :color-index="3" :loading :error :empty="isEmpty">
     <VChart :option autoresize style="height: 100%" />
   </ChartCard>
 </template>

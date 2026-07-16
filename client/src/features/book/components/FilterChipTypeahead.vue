@@ -2,6 +2,9 @@
 import { onUnmounted, ref, watch } from 'vue'
 import { X } from '@lucide/vue'
 import { api } from '@/lib/api'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   modelValue: string[]
@@ -103,7 +106,7 @@ function onBlur() {
     <input
       v-model="query"
       type="text"
-      :placeholder="modelValue.length === 0 ? (placeholder ?? 'Type to search...') : ''"
+      :placeholder="modelValue.length === 0 ? (placeholder ?? t('book.filter.typeToSearch')) : ''"
       class="flex-1 min-w-20 bg-transparent text-foreground text-sm outline-none placeholder:text-muted-foreground"
       @keydown="onKeydown"
       @blur="onBlur"

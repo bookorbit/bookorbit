@@ -49,6 +49,7 @@ describe('GoodreadsMapper', () => {
       authors: ['F. Scott Fitzgerald'],
       description: 'A story about Jay Gatsby.',
       publisher: 'Scribner',
+      publishedDate: '1973-11-29',
       publishedYear: 1973,
       language: 'English',
       pageCount: 180,

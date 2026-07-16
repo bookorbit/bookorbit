@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { Highlighter, RotateCcw, Trash2 } from '@lucide/vue'
 import type { AnnotationItem, BookDetail } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
@@ -18,16 +19,17 @@ import HighlightsExportMenu from './HighlightsExportMenu.vue'
 
 const props = defineProps<{ book: BookDetail }>()
 
+const { t } = useI18n()
 const router = useRouter()
 const bookIdRef = computed(() => props.book.id)
 const hl = useBookHighlights(bookIdRef)
 const { density } = useDensity()
 
-const SORT_OPTIONS = [
-  { value: 'position', label: 'Position' },
-  { value: 'newest', label: 'Newest first' },
-  { value: 'oldest', label: 'Oldest first' },
-]
+const SORT_OPTIONS = computed(() => [
+  { value: 'position', label: t('book.detail.highlights.sort.position') },
+  { value: 'newest', label: t('book.detail.highlights.sort.newest') },
+  { value: 'oldest', label: t('book.detail.highlights.sort.oldest') },
+])
 
 const groupedHighlights = computed(() => {
   const groups = new Map<string, AnnotationItem[]>()
@@ -46,10 +48,10 @@ const hasChapterGroups = computed(() => {
 })
 
 const summaryTexts = computed(() => {
-  const texts = [`${hl.total.value} ${hl.total.value === 1 ? 'highlight' : 'highlights'}`]
+  const texts = [t('book.detail.highlights.summary.highlights', { count: hl.total.value }, hl.total.value)]
   if (hl.stats.value) {
-    texts.push(`${hl.stats.value.highlightsWithNotes} notes`)
-    texts.push(`${hl.stats.value.chaptersWithHighlights} chapters`)
+    texts.push(t('book.detail.highlights.summary.notes', { count: hl.stats.value.highlightsWithNotes }, hl.stats.value.highlightsWithNotes))
+    texts.push(t('book.detail.highlights.summary.chapters', { count: hl.stats.value.chaptersWithHighlights }, hl.stats.value.chaptersWithHighlights))
   }
   return texts
 })
@@ -114,10 +116,10 @@ async function handleBulkTrash() {
         <select
           v-if="hl.chapters.value.length > 0"
           v-model="hl.chapter.value"
-          aria-label="Filter by chapter"
+          :aria-label="t('book.detail.highlights.filterByChapter')"
           class="h-9 max-w-[14rem] px-2 rounded-md border border-border bg-background text-sm"
         >
-          <option value="">All chapters</option>
+          <option value="">{{ t('book.detail.highlights.allChapters') }}</option>
           <option v-for="ch in hl.chapters.value" :key="ch" :value="ch">{{ ch }}</option>
         </select>
       </template>
@@ -133,7 +135,11 @@ async function handleBulkTrash() {
 
     <div v-if="hl.total.value > 0" class="flex flex-wrap items-center justify-between gap-2">
       <AnnotationSummaryBar :texts="summaryTexts" :origins="originSummary" />
-      <HighlightsExportMenu :items="hl.items.value" :book-title="book.title ?? 'Untitled'" label="Export page" />
+      <HighlightsExportMenu
+        :items="hl.items.value"
+        :book-title="book.title ?? t('book.detail.highlights.untitled')"
+        :label="t('book.detail.highlights.export.page')"
+      />
     </div>
 
     <AnnotationBulkBar
@@ -147,10 +153,14 @@ async function handleBulkTrash() {
       @restyle="handleBulkStyle"
     >
       <template #trailing>
-        <HighlightsExportMenu :items="hl.selectedItems.value" :book-title="book.title ?? 'Untitled'" label="Export selected" />
+        <HighlightsExportMenu
+          :items="hl.selectedItems.value"
+          :book-title="book.title ?? t('book.detail.highlights.untitled')"
+          :label="t('book.detail.highlights.export.selected')"
+        />
         <Button variant="destructive" size="sm" class="gap-1.5" @click="handleBulkTrash">
           <Trash2 :size="14" />
-          Trash
+          {{ t('book.detail.highlights.trash') }}
         </Button>
       </template>
     </AnnotationBulkBar>
@@ -161,19 +171,19 @@ async function handleBulkTrash() {
           <Highlighter :size="20" class="text-muted-foreground/60" />
         </div>
         <template v-if="hl.hasActiveFilters.value">
-          <p class="text-sm text-muted-foreground">No highlights match your filters.</p>
+          <p class="text-sm text-muted-foreground">{{ t('book.detail.highlights.empty.noMatch') }}</p>
           <button
             type="button"
             class="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
             @click="hl.resetAllFilters"
           >
             <RotateCcw :size="14" />
-            Reset filters
+            {{ t('book.detail.highlights.empty.resetFilters') }}
           </button>
         </template>
         <template v-else>
-          <p class="text-sm text-muted-foreground">No highlights yet</p>
-          <p class="text-xs text-muted-foreground/70">Select text while reading to create highlights</p>
+          <p class="text-sm text-muted-foreground">{{ t('book.detail.highlights.empty.none') }}</p>
+          <p class="text-xs text-muted-foreground/70">{{ t('book.detail.highlights.empty.hint') }}</p>
         </template>
       </div>
 
@@ -182,7 +192,7 @@ async function handleBulkTrash() {
           <HighlightChapterGroup
             v-for="[chapterTitle, highlights] in groupedHighlights"
             :key="chapterTitle"
-            :chapter-title="chapterTitle || 'Uncategorized'"
+            :chapter-title="chapterTitle || t('book.detail.highlights.uncategorized')"
             :highlights="highlights"
             :selected-ids="hl.selectedIds.value"
             :density="density"
@@ -222,7 +232,7 @@ async function handleBulkTrash() {
       :range-start="hl.rangeStart.value"
       :range-end="hl.rangeEnd.value"
       :total="hl.total.value"
-      unit="highlights"
+      :unit="t('book.detail.highlights.paginationUnit')"
       @update:page="handleSetPage"
     />
   </div>

@@ -7,10 +7,7 @@ import { NotificationGateway } from './notification.gateway';
 import { NotificationRepository } from './notification.repository';
 
 export type NotificationScope =
-  | { kind: 'library'; libraryId: number }
-  | { kind: 'user'; userId: number }
-  | { kind: 'permission'; permission: Permission }
-  | { kind: 'all' };
+  { kind: 'library'; libraryId: number } | { kind: 'user'; userId: number } | { kind: 'permission'; permission: Permission } | { kind: 'all' };
 
 export interface NotifyPayload {
   type: NotificationType;
@@ -104,7 +101,7 @@ export class NotificationService {
     await this.repo.setAllRead(userId);
     const count = await this.repo.countUnread(userId);
     this.gateway.emitCountUpdate(userId, count);
-    this.gateway.emitCleared(userId);
+    this.gateway.emitAllRead(userId);
   }
 
   async dismiss(userId: number, id: number): Promise<boolean> {

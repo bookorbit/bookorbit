@@ -9,13 +9,14 @@ import {
   type HardcoverImportPreviewRow,
   type HardcoverImportSummary,
 } from '@bookorbit/types';
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/common';
 import { distance } from 'fastest-levenshtein';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { LibraryService } from '../library/library.service';
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
+import { ReadingAttemptService } from '../user-book-status/reading-attempt.service';
 import { HARDCOVER_STATUS } from './hardcover.constants';
 import { HardcoverClientService } from './hardcover-client.service';
 import { type HardcoverImportLocalBook, HardcoverRepository } from './hardcover.repository';
@@ -143,6 +144,7 @@ export class HardcoverImportService {
     private readonly settingsService: HardcoverSettingsService,
     private readonly libraryService: LibraryService,
     private readonly userBookStatusService: UserBookStatusService,
+    @Optional() private readonly readingAttempts?: ReadingAttemptService,
   ) {}
 
   async previewImport(user: RequestUser): Promise<HardcoverImportPreview> {
@@ -177,6 +179,16 @@ export class HardcoverImportService {
         if (!canApplyRow(row, selectedIds) || row.localBookId == null || row.importedStatus == null) continue;
 
         try {
+          if (this.readingAttempts) {
+            for (const read of [...(row.hardcoverReads ?? [])].sort((left, right) => left.id - right.id)) {
+              await this.readingAttempts.importExternalRead(user.id, row.localBookId, {
+                provider: 'hardcover',
+                externalId: String(read.id),
+                startedOn: read.startedAt?.slice(0, 10) ?? null,
+                endedOn: read.finishedAt?.slice(0, 10) ?? null,
+              });
+            }
+          }
           await this.userBookStatusService.updateManual(user.id, row.localBookId, {
             status: row.importedStatus,
             startedAt: toDate(row.importedStartedAt),
@@ -340,6 +352,11 @@ export class HardcoverImportService {
       importedStartedAt,
       importedFinishedAt,
       importedProgressPercent: deriveImportedProgressPercent(hardcoverBook, latestRead, statusMapping?.status ?? null),
+      hardcoverReads: (hardcoverBook.user_book_reads ?? []).filter(hasReadSignal).map((read) => ({
+        id: read.id,
+        startedAt: read.started_at,
+        finishedAt: read.finished_at,
+      })),
     };
 
     if (!statusMapping) {
@@ -378,6 +395,7 @@ export class HardcoverImportService {
       | 'importedStartedAt'
       | 'importedFinishedAt'
       | 'importedProgressPercent'
+      | 'hardcoverReads'
     >,
     local: HardcoverImportLocalBook | null,
     matchMethod: HardcoverImportMatchMethod | null,

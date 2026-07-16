@@ -30,6 +30,44 @@ export type UserBookStatus = {
   updatedAt: string;
 };
 
+export const READING_ATTEMPT_OUTCOMES = ["completed", "skimmed", "abandoned"] as const;
+export type ReadingAttemptOutcome = (typeof READING_ATTEMPT_OUTCOMES)[number];
+
+export const READING_ATTEMPT_ORIGINS = ["manual", "bookorbit", "kobo", "koreader", "hardcover", "migration"] as const;
+export type ReadingAttemptOrigin = (typeof READING_ATTEMPT_ORIGINS)[number];
+
+export type ReadingAttempt = {
+  id: number;
+  bookId: number;
+  startedOn: string | null;
+  endedOn: string | null;
+  outcome: ReadingAttemptOutcome | null;
+  origin: ReadingAttemptOrigin;
+  externalProvider: string | null;
+  externalId: string | null;
+  totalSessions: number;
+  totalSeconds: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ReadingAttemptListResponse = {
+  items: ReadingAttempt[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+export type ReadingAttemptPatch = {
+  startedOn?: string | null;
+  endedOn?: string | null;
+  outcome?: ReadingAttemptOutcome | null;
+};
+
+export type ResetBookReadingStateResponse = {
+  readStatus: UserBookStatus;
+};
+
 export type BookFileRef = {
   id: number;
   format: string | null;
@@ -54,6 +92,7 @@ export type BookCard = {
   seriesIndex: number | null;
   seriesMemberships?: BookSeriesMembership[];
   files: BookFileRef[];
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   genres: string[];
@@ -101,11 +140,7 @@ export type AudioMetadata = {
 };
 
 export type BookFileWriteDisabledReason =
-  | "library_disabled"
-  | "no_primary_file"
-  | "format_not_supported"
-  | "format_disabled"
-  | "file_exceeds_size_limit";
+  "library_disabled" | "no_primary_file" | "format_not_supported" | "format_disabled" | "file_exceeds_size_limit";
 
 export type BookFileWriteStatus = {
   enabled: boolean;
@@ -128,6 +163,7 @@ export type BookDetail = {
   isbn10: string | null;
   isbn13: string | null;
   publisher: string | null;
+  publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
   pageCount: number | null;
@@ -136,6 +172,8 @@ export type BookDetail = {
   seriesIndex: number | null;
   seriesMemberships?: BookSeriesMembership[];
   rating: number | null;
+  personalNote: string | null;
+  personalNoteUpdatedAt: string | null;
   communityRatings: BookCommunityRating[];
   coverSource: "extracted" | "custom" | null;
   hardcoverEditionId: string | null;
@@ -169,6 +207,7 @@ export type BookMetadataRefreshPreviewFields = {
   authors?: string[];
   genres?: string[];
   publisher?: string | null;
+  publishedDate?: string | null;
   publishedYear?: number | null;
   language?: string | null;
   pageCount?: number | null;
@@ -185,6 +224,7 @@ export type BookMetadataRefreshPreviewFields = {
   openLibraryId?: string | null;
   itunesId?: string | null;
   audibleId?: string | null;
+  librofmId?: string | null;
   koboId?: string | null;
   comicvineId?: string | null;
   ranobedbId?: string | null;
@@ -214,6 +254,8 @@ export type BookKoboReadingState = {
 };
 
 export type BookKoboSnapshotState = {
+  deviceId: number;
+  deviceName: string;
   snapshotId: number;
   snapshotUpdatedAt: string;
   inSnapshot: boolean;
@@ -229,7 +271,7 @@ export type BookKoboState = {
   eligibleForKoboSync: boolean;
   syncCollections: string[];
   readingState: BookKoboReadingState | null;
-  snapshot: BookKoboSnapshotState | null;
+  snapshots: BookKoboSnapshotState[];
 };
 
 export type BooksPage = {

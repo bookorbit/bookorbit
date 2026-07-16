@@ -1,49 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { ACCOUNT_TABS, ACCOUNT_TAB_INFO, normalizeAccountTab } from '../lib/account-tabs'
+import { ACCOUNT_TABS, normalizeAccountTab } from '../lib/account-tabs'
 
 describe('account-tabs', () => {
   describe('ACCOUNT_TABS', () => {
-    it('contains exactly profile, notifications, and restrictions', () => {
-      expect(ACCOUNT_TABS).toEqual(['profile', 'notifications', 'restrictions'])
+    it('contains the account settings tabs in display order', () => {
+      expect(ACCOUNT_TABS).toEqual(['profile', 'privacy', 'notifications', 'restrictions'])
     })
 
-    it('has length 3', () => {
-      expect(ACCOUNT_TABS.length).toBe(3)
-    })
-  })
-
-  describe('ACCOUNT_TAB_INFO', () => {
-    it('has an entry for every tab', () => {
-      for (const tab of ACCOUNT_TABS) {
-        expect(ACCOUNT_TAB_INFO[tab]).toBeDefined()
-      }
-    })
-
-    it('every entry has navLabel, titleLabel, and subtitle', () => {
-      for (const tab of ACCOUNT_TABS) {
-        const info = ACCOUNT_TAB_INFO[tab]
-        expect(typeof info.navLabel).toBe('string')
-        expect(info.navLabel.length).toBeGreaterThan(0)
-        expect(typeof info.titleLabel).toBe('string')
-        expect(info.titleLabel.length).toBeGreaterThan(0)
-        expect(typeof info.subtitle).toBe('string')
-        expect(info.subtitle.length).toBeGreaterThan(0)
-      }
-    })
-
-    it('profile entry has correct labels', () => {
-      expect(ACCOUNT_TAB_INFO.profile.navLabel).toBe('Profile')
-      expect(ACCOUNT_TAB_INFO.profile.titleLabel).toBe('Account')
-    })
-
-    it('notifications entry has correct labels', () => {
-      expect(ACCOUNT_TAB_INFO.notifications.navLabel).toBe('Notifications')
-      expect(ACCOUNT_TAB_INFO.notifications.titleLabel).toBe('Notifications')
-    })
-
-    it('restrictions entry has correct labels', () => {
-      expect(ACCOUNT_TAB_INFO.restrictions.navLabel).toBe('Restrictions')
-      expect(ACCOUNT_TAB_INFO.restrictions.titleLabel).toBe('Content Restrictions')
+    it('has length 4', () => {
+      expect(ACCOUNT_TABS.length).toBe(4)
     })
   })
 
@@ -74,6 +39,10 @@ describe('account-tabs', () => {
 
     it('returns notifications when given "notifications"', () => {
       expect(normalizeAccountTab('notifications')).toBe('notifications')
+    })
+
+    it('returns privacy when given "privacy"', () => {
+      expect(normalizeAccountTab('privacy')).toBe('privacy')
     })
 
     it('returns restrictions when given "restrictions"', () => {

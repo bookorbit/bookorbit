@@ -15,9 +15,16 @@ import {
   isExtractedBookCoverFileName,
 } from '../../common/book-cover-storage';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import {
+  chooseCanonicalMetadataTextRow,
+  normalizeMetadataText,
+  normalizeMetadataTextKey,
+  normalizeMetadataTextKeySql,
+} from '../../common/utils/metadata-text-normalize.utils';
+import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
-import { refreshPrimaryAuthorSortNamesForBooks } from '../../db/book-author-sort-key';
+import { refreshPrimaryAuthorSortNamesForAuthors, refreshPrimaryAuthorSortNamesForBooks } from '../../db/book-author-sort-key';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
 import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
 import { ComicMetadataRepository } from './comic-metadata.repository';
@@ -26,31 +33,24 @@ import { NarratorService } from '../narrator/narrator.service';
 import { authors, bookAuthors, bookGenres, bookMetadata, books, bookTags, genres, tags } from '../../db/schema';
 import { type ComicMetadataFields, isAudioFormat } from '@bookorbit/types';
 import { parseAudioDuration } from './extractors/audio.extractor';
-import { AudioFormatExtractor } from './extractors/audio-format.extractor';
-import { ComicFormatExtractor } from './extractors/comic-format.extractor';
-import { EpubFormatExtractor } from './extractors/epub-format.extractor';
-import { Fb2FormatExtractor } from './extractors/fb2-format.extractor';
-import { MobiFormatExtractor } from './extractors/mobi-format.extractor';
-import { OpfFormatExtractor } from './extractors/opf-format.extractor';
-import { PdfFormatExtractor } from './extractors/pdf-format.extractor';
-import type { FormatExtractor, ParsedBookData } from './extractors/format-extractor.interface';
+import type { ParsedBookData } from './extractors/format-extractor.interface';
 import { generateThumbnail, imageExt } from './lib/cover';
-import type { PdfParseWarning } from './lib/pdf-parser';
+import { METADATA_AUDIO_FORMATS, MetadataExtractionService } from './metadata-extraction.service';
 import { MetadataEventsService, METADATA_AUTHORS_REPLACED } from './metadata-events.service';
 
 type Db = NodePgDatabase<typeof schema>;
-type RelationMutationExecutor = Pick<Db, 'delete' | 'execute' | 'insert' | 'select'>;
+type RelationMutationExecutor = Pick<Db, 'delete' | 'execute' | 'insert' | 'select' | 'update'>;
 
 interface RelationMutationOptions {
   executor?: RelationMutationExecutor;
   emitEvent?: boolean;
 }
 
-const AUDIO_FORMATS = ['m4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac'] as const;
 const MAX_RELATION_NAME_LENGTH = 200;
 const EXTRACTED_COVER_SOURCE = 'extracted';
 const MIN_PUBLISHED_YEAR = 1000;
 const MAX_PUBLISHED_YEAR = 2200;
+const NORMALIZED_AUTHOR_NAME_SQL = normalizeMetadataTextKeySql(authors.name);
 
 function normalizePublishedYear(year: number | null | undefined): number | null | undefined {
   if (year === undefined) return undefined;
@@ -64,11 +64,11 @@ function normalizePublishedYear(year: number | null | undefined): number | null 
 export class MetadataService {
   private readonly logger = new Logger(MetadataService.name);
   private readonly appDataPath: string;
-  private readonly extractorMap: Map<string, FormatExtractor>;
 
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly config: ConfigService,
+    private readonly extractionService: MetadataExtractionService,
     private readonly scoreService: MetadataScoreService,
     private readonly narratorService: NarratorService,
     private readonly comicMetadataRepository: ComicMetadataRepository,
@@ -79,26 +79,6 @@ export class MetadataService {
     @Optional() private readonly seriesMemberships?: SeriesMembershipService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
-    const audio = new AudioFormatExtractor();
-    const mobi = new MobiFormatExtractor();
-    const epub = new EpubFormatExtractor();
-    this.extractorMap = new Map<string, FormatExtractor>([
-      ['epub', epub],
-      ['kepub', epub],
-      ['opf', new OpfFormatExtractor()],
-      ['pdf', new PdfFormatExtractor({ extractCover: true, onWarning: (warning) => this.logPdfParseWarning(warning) })],
-      ['mobi', mobi],
-      ['azw3', mobi],
-      ['azw', mobi],
-      ['cbz', new ComicFormatExtractor('cbz')],
-      ['cbr', new ComicFormatExtractor('cbr')],
-      ['cb7', new ComicFormatExtractor('cb7')],
-      ['fb2', new Fb2FormatExtractor()],
-    ]);
-
-    for (const format of AUDIO_FORMATS) {
-      this.extractorMap.set(format, audio);
-    }
   }
 
   // ── Public API ───────────────────────────────────────────────────────────────
@@ -113,15 +93,14 @@ export class MetadataService {
     this.logger.debug(`[${event}] [start] bookId=${bookId} format=${format} - metadata extraction started`);
 
     try {
-      const extractor = this.extractorMap.get(format);
-      if (!extractor) {
+      if (!this.extractionService.supports(format)) {
         this.logger.debug(
           `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} extractorFound=false - metadata extraction skipped`,
         );
         return false;
       }
 
-      const data = await extractor.extract(absolutePath);
+      const data = await this.extractionService.extract(absolutePath, format);
       if (!data) {
         this.logger.debug(
           `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} parsed=false - metadata extraction skipped`,
@@ -155,13 +134,13 @@ export class MetadataService {
   // Saves audio-specific fields that no ebook format can provide, plus audio provider IDs.
   // Cover is intentionally excluded - the winner ebook owns cover.
   async extractAudioChaptersAndNarrators(bookId: number, absolutePath: string, format: string): Promise<void> {
-    const extractor = this.extractorMap.get(format);
-    if (!extractor) return;
-    const data = await extractor.extract(absolutePath);
+    if (!this.extractionService.supports(format)) return;
+    const data = await this.extractionService.extract(absolutePath, format);
     if (!data) return;
 
     const { dto: filtered } = await this.bookMetadataLockService.filterAutomatedBookUpdate(bookId, {
       audibleId: data.audibleId,
+      librofmId: data.librofmId,
       audioMetadata: {
         narrators: data.narrators,
         chapters: data.chapters && data.chapters.length > 0 ? data.chapters : null,
@@ -172,6 +151,10 @@ export class MetadataService {
 
     if (filtered.audibleId !== undefined) {
       updates.push(this.db.update(bookMetadata).set({ audibleId: filtered.audibleId, updatedAt: new Date() }).where(eq(bookMetadata.bookId, bookId)));
+    }
+
+    if (filtered.librofmId !== undefined) {
+      updates.push(this.db.update(bookMetadata).set({ librofmId: filtered.librofmId, updatedAt: new Date() }).where(eq(bookMetadata.bookId, bookId)));
     }
 
     if (filtered.audioMetadata?.chapters !== undefined) {
@@ -230,8 +213,7 @@ export class MetadataService {
   async refreshCoverForBook(bookId: number, absolutePath: string, format: string): Promise<boolean> {
     const event = 'metadata.cover_refresh';
     const startedAt = Date.now();
-    const extractor = this.extractorMap.get(format);
-    if (!extractor) {
+    if (!this.extractionService.supports(format)) {
       this.logger.debug(
         `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} refreshed=false extractorFound=false - cover refresh skipped`,
       );
@@ -245,7 +227,7 @@ export class MetadataService {
         );
         return false;
       }
-      const data = await extractor.extract(absolutePath);
+      const data = await this.extractionService.extract(absolutePath, format);
       if (!data?.cover) {
         this.logger.debug(
           `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} refreshed=false coverFound=false - cover refresh skipped`,
@@ -284,7 +266,7 @@ export class MetadataService {
       .select({ format: schema.bookFiles.format })
       .from(schema.books)
       .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.books.primaryFileId))
-      .where(and(eq(schema.books.id, bookId), inArray(schema.bookFiles.format, [...AUDIO_FORMATS])));
+      .where(and(eq(schema.books.id, bookId), inArray(schema.bookFiles.format, [...METADATA_AUDIO_FORMATS])));
     if (!primary?.format) return;
 
     const rows = await this.db
@@ -312,14 +294,15 @@ export class MetadataService {
   ): Promise<number[]> {
     const normalized = parsedAuthors
       .map((author) => ({
-        name: author.name.trim(),
-        sortName: author.sortName?.trim() || null,
+        name: normalizeMetadataText(author.name),
+        sortName: normalizeMetadataText(author.sortName),
       }))
-      .filter((author) => author.name.length > 0);
+      .filter((author): author is { name: string; sortName: string | null } => author.name !== null);
 
     const seen = new Set<string>();
     const unique = normalized.filter((author) => {
-      const key = author.name.toLowerCase();
+      const key = normalizeMetadataTextKey(author.name);
+      if (!key) return false;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -392,29 +375,39 @@ export class MetadataService {
       return [];
     }
 
-    const authorByName = new Map<string, { id: number }>();
-    const insertedAuthors = await executor
-      .insert(authors)
-      .values(uniqueAuthors.map((author) => ({ name: author.name, sortName: author.sortName })))
-      .onConflictDoNothing()
-      .returning({ id: authors.id, name: authors.name });
-    for (const row of insertedAuthors) {
-      authorByName.set(row.name, { id: row.id });
-    }
+    const authorByNameKey = new Map<string, { id: number }>();
+    await this.addExistingAuthorsByNormalizedName(
+      executor,
+      authorByNameKey,
+      uniqueAuthors.map((author) => author.name),
+    );
 
-    const unresolvedNames = [...new Set(uniqueAuthors.map((author) => author.name))].filter((name) => !authorByName.has(name));
-    if (unresolvedNames.length > 0) {
-      const existingAuthors = await executor
-        .select({ id: authors.id, name: authors.name })
-        .from(authors)
-        .where(inArray(authors.name, unresolvedNames));
-      for (const row of existingAuthors) {
-        authorByName.set(row.name, { id: row.id });
+    const missingAuthors = uniqueAuthors.filter((author) => {
+      const key = normalizeMetadataTextKey(author.name);
+      return key ? !authorByNameKey.has(key) : false;
+    });
+
+    if (missingAuthors.length > 0) {
+      const insertedAuthors = await executor
+        .insert(authors)
+        .values(missingAuthors.map((author) => ({ name: author.name, sortName: author.sortName })))
+        .onConflictDoNothing()
+        .returning({ id: authors.id, name: authors.name });
+      for (const row of insertedAuthors) {
+        const key = normalizeMetadataTextKey(row.name);
+        if (key) authorByNameKey.set(key, { id: row.id });
       }
     }
 
+    await this.addExistingAuthorsByNormalizedName(
+      executor,
+      authorByNameKey,
+      uniqueAuthors.filter((author) => !authorByNameKey.has(normalizeMetadataTextKey(author.name) ?? '')).map((author) => author.name),
+    );
+
     const links = uniqueAuthors.flatMap((author, index) => {
-      const match = authorByName.get(author.name);
+      const key = normalizeMetadataTextKey(author.name);
+      const match = key ? authorByNameKey.get(key) : undefined;
       if (!match) return [];
       return [{ bookId, authorId: match.id, displayOrder: index }];
     });
@@ -426,6 +419,58 @@ export class MetadataService {
     await refreshPrimaryAuthorSortNamesForBooks(executor, [bookId]);
 
     return links.map((link) => link.authorId);
+  }
+
+  private async addExistingAuthorsByNormalizedName(
+    executor: RelationMutationExecutor,
+    authorByNameKey: Map<string, { id: number }>,
+    names: string[],
+  ): Promise<void> {
+    const keys = [...new Set(names.map((name) => normalizeMetadataTextKey(name)).filter((key): key is string => key !== null))].filter(
+      (key) => !authorByNameKey.has(key),
+    );
+    if (keys.length === 0) return;
+
+    const existingAuthors = await executor
+      .select({ id: authors.id, name: authors.name, normalizedName: NORMALIZED_AUTHOR_NAME_SQL })
+      .from(authors)
+      .where(inArray(NORMALIZED_AUTHOR_NAME_SQL, keys));
+
+    const desiredNameByKey = new Map<string, string>();
+    for (const name of names) {
+      const key = normalizeMetadataTextKey(name);
+      const displayName = normalizeMetadataText(name);
+      if (key && displayName && !desiredNameByKey.has(key)) {
+        desiredNameByKey.set(key, displayName);
+      }
+    }
+
+    const rowsByKey = new Map<string, typeof existingAuthors>();
+    for (const row of existingAuthors) {
+      const key = normalizeMetadataTextKey(row.normalizedName) ?? normalizeMetadataTextKey(row.name);
+      if (!key || authorByNameKey.has(key)) continue;
+      const rows = rowsByKey.get(key) ?? [];
+      rows.push(row);
+      rowsByKey.set(key, rows);
+    }
+
+    const canonicalizedAuthorIds: number[] = [];
+    for (const [key, rows] of rowsByKey) {
+      const desiredName = desiredNameByKey.get(key);
+      const match = chooseCanonicalMetadataTextRow(rows, { desiredName });
+      if (!match) continue;
+
+      const canonicalName = normalizeMetadataText(match.name);
+      if (canonicalName && match.name !== canonicalName && !rows.some((row) => row.id !== match.id && row.name === canonicalName)) {
+        await executor.update(authors).set({ name: canonicalName }).where(eq(authors.id, match.id));
+        canonicalizedAuthorIds.push(match.id);
+      }
+      authorByNameKey.set(key, { id: match.id });
+    }
+
+    if (canonicalizedAuthorIds.length > 0) {
+      await refreshPrimaryAuthorSortNamesForAuthors(executor, canonicalizedAuthorIds);
+    }
   }
 
   private async replaceGenresInExecutor(executor: RelationMutationExecutor, bookId: number, uniqueGenres: string[]): Promise<void> {
@@ -514,14 +559,16 @@ export class MetadataService {
       title: data.title,
       subtitle: data.subtitle,
       description: data.description,
-      publisher: data.publisher,
+      publisher: normalizeMetadataText(data.publisher),
+      publishedDate: data.publishedDate,
       publishedYear: data.publishedYear,
       language: data.language,
-      seriesName: data.seriesName,
+      seriesName: normalizeMetadataText(data.seriesName),
       seriesIndex: data.seriesIndex,
       authors: data.authors.map((author) => author.name),
       genres: data.genres,
       audibleId: data.audibleId,
+      librofmId: data.librofmId,
       audioMetadata: {
         durationSeconds: data.durationSeconds ?? null,
         chapters: data.chapters && data.chapters.length > 0 ? data.chapters : null,
@@ -533,12 +580,23 @@ export class MetadataService {
     if (filtered.title !== undefined) scalarFields.title = filtered.title;
     if (filtered.subtitle !== undefined) scalarFields.subtitle = filtered.subtitle;
     if (filtered.description !== undefined) scalarFields.description = filtered.description;
-    if (filtered.publisher !== undefined) scalarFields.publisher = filtered.publisher;
-    if (filtered.publishedYear !== undefined) scalarFields.publishedYear = normalizePublishedYear(filtered.publishedYear);
+    if (filtered.publisher !== undefined) scalarFields.publisher = normalizeMetadataText(filtered.publisher);
+    const publishedDate = normalizePublishedDate(filtered.publishedDate);
+    if (publishedDate !== undefined) {
+      scalarFields.publishedDate = publishedDate;
+      if (publishedDate !== null) scalarFields.publishedYear = publishedYearFromDateKey(publishedDate);
+    }
+    if (filtered.publishedYear !== undefined && publishedDate === undefined) {
+      scalarFields.publishedDate = null;
+      scalarFields.publishedYear = normalizePublishedYear(filtered.publishedYear);
+    } else if (filtered.publishedYear !== undefined && publishedDate === null) {
+      scalarFields.publishedYear = normalizePublishedYear(filtered.publishedYear);
+    }
     if (filtered.language !== undefined) scalarFields.language = filtered.language;
-    if (filtered.seriesName !== undefined) scalarFields.seriesName = filtered.seriesName;
+    if (filtered.seriesName !== undefined) scalarFields.seriesName = normalizeMetadataText(filtered.seriesName);
     if (filtered.seriesIndex !== undefined) scalarFields.seriesIndex = filtered.seriesIndex;
     if (filtered.audibleId !== undefined) scalarFields.audibleId = filtered.audibleId;
+    if (filtered.librofmId !== undefined) scalarFields.librofmId = filtered.librofmId;
     if (filtered.audioMetadata?.durationSeconds !== undefined) scalarFields.durationSeconds = filtered.audioMetadata.durationSeconds;
     if (filtered.audioMetadata?.chapters !== undefined) scalarFields.chapters = filtered.audioMetadata.chapters;
     if (Object.keys(scalarFields).length > 0) {
@@ -573,10 +631,11 @@ export class MetadataService {
       description: data.description,
       isbn10: data.isbn10 ? data.isbn10.replace(/[^0-9Xx]/g, '') : data.isbn10,
       isbn13: data.isbn13 ? data.isbn13.replace(/[^0-9]/g, '') : data.isbn13,
-      publisher: data.publisher,
+      publisher: normalizeMetadataText(data.publisher),
+      publishedDate: data.publishedDate,
       publishedYear: data.publishedYear,
       language: data.language,
-      seriesName: data.seriesName,
+      seriesName: normalizeMetadataText(data.seriesName),
       seriesIndex: data.seriesIndex,
       authors: data.authors.map((author) => author.name),
       genres: data.genres,
@@ -603,10 +662,20 @@ export class MetadataService {
     if (filtered.description !== undefined) scalarFields.description = filtered.description;
     if (filtered.isbn10 !== undefined) scalarFields.isbn10 = filtered.isbn10;
     if (filtered.isbn13 !== undefined) scalarFields.isbn13 = filtered.isbn13;
-    if (filtered.publisher !== undefined) scalarFields.publisher = filtered.publisher;
-    if (filtered.publishedYear !== undefined) scalarFields.publishedYear = normalizePublishedYear(filtered.publishedYear);
+    if (filtered.publisher !== undefined) scalarFields.publisher = normalizeMetadataText(filtered.publisher);
+    const publishedDate = normalizePublishedDate(filtered.publishedDate);
+    if (publishedDate !== undefined) {
+      scalarFields.publishedDate = publishedDate;
+      if (publishedDate !== null) scalarFields.publishedYear = publishedYearFromDateKey(publishedDate);
+    }
+    if (filtered.publishedYear !== undefined && publishedDate === undefined) {
+      scalarFields.publishedDate = null;
+      scalarFields.publishedYear = normalizePublishedYear(filtered.publishedYear);
+    } else if (filtered.publishedYear !== undefined && publishedDate === null) {
+      scalarFields.publishedYear = normalizePublishedYear(filtered.publishedYear);
+    }
     if (filtered.language !== undefined) scalarFields.language = filtered.language;
-    if (filtered.seriesName !== undefined) scalarFields.seriesName = filtered.seriesName;
+    if (filtered.seriesName !== undefined) scalarFields.seriesName = normalizeMetadataText(filtered.seriesName);
     if (filtered.seriesIndex !== undefined) scalarFields.seriesIndex = filtered.seriesIndex;
     if (filtered.rating !== undefined) scalarFields.rating = filtered.rating;
     if (filtered.pageCount !== undefined) scalarFields.pageCount = filtered.pageCount;
@@ -700,20 +769,6 @@ export class MetadataService {
     if (!preserveCustom) {
       await this.db.update(books).set({ updatedAt: now }).where(eq(books.id, bookId));
     }
-  }
-
-  private logPdfParseWarning(warning: PdfParseWarning): void {
-    const pathValue = sanitizeLogValue(warning.absolutePath);
-    if (warning.code === 'buffered-large-pdf') {
-      this.logger.warn(
-        `[metadata.pdf_parse] [end] path="${pathValue}" code=${warning.code} sizeBytes=${warning.sizeBytes ?? 0} thresholdBytes=${warning.thresholdBytes ?? 0} - large pdf buffered in memory`,
-      );
-      return;
-    }
-    const errorMessage = sanitizeLogValue(warning.errorMessage);
-    this.logger.warn(
-      `[metadata.pdf_parse] [fail] path="${pathValue}" code=${warning.code} errorClass=${warning.errorClass} error="${errorMessage}" - pdf parse warning emitted`,
-    );
   }
 
   private normalizeUniqueRelationNames(values: string[]): string[] {

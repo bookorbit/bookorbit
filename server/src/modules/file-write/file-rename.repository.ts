@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -123,6 +123,7 @@ export class FileRenameRepository {
         relPath: bookFiles.relPath,
         role: bookFiles.role,
         format: bookFiles.format,
+        sortOrder: bookFiles.sortOrder,
       })
       .from(bookFiles)
       .where(eq(bookFiles.bookId, bookId))
@@ -143,6 +144,68 @@ export class FileRenameRepository {
         await tx.update(bookFiles).set({ absolutePath: update.absolutePath, relPath: update.relPath }).where(eq(bookFiles.id, update.id));
       }
       await tx.update(books).set({ folderPath }).where(eq(books.id, bookId));
+    });
+  }
+
+  async findBookByExactFolderPath(
+    libraryId: number,
+    folderPath: string,
+  ): Promise<Pick<typeof books.$inferSelect, 'id' | 'folderPath' | 'primaryFileId' | 'status'> | null> {
+    const [row] = await this.db
+      .select({
+        id: books.id,
+        folderPath: books.folderPath,
+        primaryFileId: books.primaryFileId,
+        status: books.status,
+      })
+      .from(books)
+      .where(and(eq(books.libraryId, libraryId), eq(books.folderPath, folderPath)))
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  async applyExistingFolderMerge(input: {
+    sourceBookId: number;
+    targetBookId: number;
+    updates: BookFilePathUpdate[];
+    fallbackPrimaryFileId: number | null;
+  }): Promise<void> {
+    if (input.sourceBookId === input.targetBookId) return;
+
+    await this.db.transaction(async (tx) => {
+      const now = new Date();
+      const [target] = await tx
+        .select({ libraryFolderId: books.libraryFolderId, primaryFileId: books.primaryFileId })
+        .from(books)
+        .where(eq(books.id, input.targetBookId))
+        .for('update')
+        .limit(1);
+      if (!target) return;
+
+      for (const update of input.updates) {
+        await tx
+          .update(bookFiles)
+          .set({
+            bookId: input.targetBookId,
+            libraryFolderId: target.libraryFolderId,
+            absolutePath: update.absolutePath,
+            relPath: update.relPath,
+            updatedAt: now,
+          })
+          .where(eq(bookFiles.id, update.id));
+      }
+
+      await tx.delete(books).where(eq(books.id, input.sourceBookId));
+
+      await tx
+        .update(books)
+        .set({
+          ...(target?.primaryFileId == null && input.fallbackPrimaryFileId != null ? { primaryFileId: input.fallbackPrimaryFileId } : {}),
+          status: 'present',
+          updatedAt: now,
+        })
+        .where(eq(books.id, input.targetBookId));
     });
   }
 

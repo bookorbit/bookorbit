@@ -8,6 +8,15 @@ import * as schema from '../../db/schema';
 type Db = NodePgDatabase<typeof schema>;
 type MigrationRunState = 'draft' | 'preflight_failed' | 'dry_run_ready' | 'running' | 'failed' | 'completed';
 const ACTIVE_RUN_STATES: MigrationRunState[] = ['running'];
+const BATCH_CHUNK_SIZE = 500;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
 
 @Injectable()
 export class MigrationRepository {
@@ -73,14 +82,12 @@ export class MigrationRepository {
     if (uniquePaths.length === 0) return new Set();
 
     const out = new Set<string>();
-    const chunkSize = 500;
 
-    for (let index = 0; index < uniquePaths.length; index += chunkSize) {
-      const chunk = uniquePaths.slice(index, index + chunkSize);
+    for (const batch of chunk(uniquePaths, BATCH_CHUNK_SIZE)) {
       const rows = await this.db
         .select({ absolutePath: schema.bookFiles.absolutePath })
         .from(schema.bookFiles)
-        .where(inArray(schema.bookFiles.absolutePath, chunk));
+        .where(inArray(schema.bookFiles.absolutePath, batch));
       for (const row of rows) out.add(row.absolutePath);
     }
 
@@ -183,12 +190,19 @@ export class MigrationRepository {
   }
 
   async findBookTitlesByIds(ids: number[]): Promise<Map<number, string | null>> {
-    if (ids.length === 0) return new Map();
-    const rows = await this.db
-      .select({ bookId: schema.bookMetadata.bookId, title: schema.bookMetadata.title })
-      .from(schema.bookMetadata)
-      .where(inArray(schema.bookMetadata.bookId, ids));
-    return new Map(rows.map((row) => [row.bookId, row.title ?? null]));
+    const targetIds = [...new Set(ids.filter((id) => Number.isFinite(id)))];
+    const titles = new Map<number, string | null>();
+    if (targetIds.length === 0) return titles;
+
+    for (const batch of chunk(targetIds, BATCH_CHUNK_SIZE)) {
+      const rows = await this.db
+        .select({ bookId: schema.bookMetadata.bookId, title: schema.bookMetadata.title })
+        .from(schema.bookMetadata)
+        .where(inArray(schema.bookMetadata.bookId, batch));
+      for (const row of rows) titles.set(row.bookId, row.title ?? null);
+    }
+
+    return titles;
   }
 
   async createRunWithLock(

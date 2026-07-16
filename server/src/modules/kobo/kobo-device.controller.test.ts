@@ -26,6 +26,11 @@ describe('KoboDeviceController', () => {
     resolveBookIdByEntitlementId: vi.fn(),
     resolveBookIdByCoverImageId: vi.fn(),
   };
+  const historyService = {
+    recordSuccess: vi.fn(),
+    recordFailure: vi.fn(),
+    countsForBook: vi.fn(),
+  };
 
   const controller = new KoboDeviceController(
     thumbnailService as never,
@@ -33,10 +38,16 @@ describe('KoboDeviceController', () => {
     proxyService as never,
     analyticsService as never,
     bookIdentityService as never,
+    historyService as never,
   );
 
   beforeEach(() => {
     vi.clearAllMocks();
+    historyService.countsForBook.mockImplementation((_userId: number, bookId: number, counts: Record<string, unknown>) => ({
+      ...counts,
+      bookId,
+      bookTitle: 'Dune',
+    }));
     bookIdentityService.resolveBookIdByEntitlementId.mockImplementation((_userId: number, id: string) => (/^\d+$/.test(id) ? Number(id) : null));
     bookIdentityService.resolveBookIdByCoverImageId.mockImplementation((_userId: number, id: string) => {
       const match = /^(\d+)(?:-\d+)?$/.exec(id);
@@ -102,9 +113,31 @@ describe('KoboDeviceController', () => {
     const req = { method: 'GET', url: '/api/v1/kobo/token/v1/books/9/download' };
     const reply = makeReply();
 
-    await controller.download('9', { id: 11 } as never, { deviceToken: 'dev-token' } as never, req as never, reply as never);
+    await controller.download('9', { id: 11 } as never, { deviceId: 4, deviceToken: 'dev-token' } as never, req as never, reply as never);
 
     expect(downloadService.streamBook).toHaveBeenCalledWith(11, 9, reply);
+    expect(historyService.recordSuccess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 11,
+        deviceId: 4,
+        event: 'book_download',
+        counts: { downloads: 1, bookId: 9, bookTitle: 'Dune' },
+      }),
+    );
+    expect(historyService.countsForBook).toHaveBeenCalledWith(11, 9, { downloads: 1 });
+  });
+
+  it('records failed downloads before rethrowing', async () => {
+    const error = new Error('file missing');
+    const req = { method: 'GET', url: '/api/v1/kobo/token/v1/books/9/download' };
+    const reply = makeReply();
+    downloadService.streamBook.mockRejectedValueOnce(error);
+
+    await expect(
+      controller.download('9', { id: 11 } as never, { deviceId: 4, deviceToken: 'dev-token' } as never, req as never, reply as never),
+    ).rejects.toThrow('file missing');
+
+    expect(historyService.recordFailure).toHaveBeenCalledWith(expect.objectContaining({ userId: 11, deviceId: 4, event: 'book_download' }), error);
   });
 
   it('streams downloads and thumbnails for resolved Kobo UUID ids', async () => {

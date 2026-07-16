@@ -23,6 +23,7 @@ export const fileWriteLog = pgTable(
   },
   (t) => [
     index('fwl_book_id_written_at_idx').on(t.bookId, t.writtenAt),
+    index('file_write_log_book_file_id_idx').on(t.bookFileId),
     check('file_write_log_status_chk', sql`${t.status} in ('success', 'skipped', 'failed')`),
     check('file_write_log_triggered_by_chk', sql`${t.triggeredBy} in ('auto', 'sync')`),
     check('file_write_log_duration_ms_nonnegative_chk', sql`${t.durationMs} is null or ${t.durationMs} >= 0`),

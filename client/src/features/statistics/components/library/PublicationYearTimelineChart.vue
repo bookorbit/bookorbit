@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { TrendingUp } from '@lucide/vue'
 
 import { usePublicationYearTimeline } from '../../composables/usePublicationYearTimeline'
 import ChartCard from '../ChartCard.vue'
+
+const { t } = useI18n()
 
 const { data, loading, error } = usePublicationYearTimeline()
 const option = shallowRef({})
@@ -202,7 +205,14 @@ watchEffect(() => {
 </script>
 
 <template>
-  <ChartCard title="Publication Year Timeline" :icon="TrendingUp" :color-index="4" :loading :error :empty="!data.items.length">
+  <ChartCard
+    :title="t('statistics.charts.publicationYearTimeline.title')"
+    :icon="TrendingUp"
+    :color-index="4"
+    :loading
+    :error
+    :empty="!data.items.length"
+  >
     <div class="flex h-full flex-col">
       <VChart :option autoresize style="flex: 1; min-height: 0" />
       <div v-if="statCards" class="mt-2 grid grid-cols-6 gap-2 md:gap-8 px-1">

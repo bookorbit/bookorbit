@@ -2,11 +2,13 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeft, ChevronRight } from '@lucide/vue'
+import { useI18n } from 'vue-i18n'
 import BookDetailTabs from './BookDetailTabs.vue'
 import { useBookNavigation } from '../../composables/useBookNavigation'
 
 const props = defineProps<{ bookId: number }>()
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
@@ -45,7 +47,7 @@ async function navigateToBook(id: number) {
         :disabled="!prevId"
         class="h-7 w-7 flex items-center justify-center rounded-md transition-colors"
         :class="prevId ? 'text-foreground hover:bg-muted' : 'text-muted-foreground/60 cursor-not-allowed'"
-        title="Previous book"
+        :title="t('book.detail.header.previousBook')"
       >
         <ChevronLeft :size="16" />
       </button>
@@ -54,7 +56,7 @@ async function navigateToBook(id: number) {
         :disabled="!nextId"
         class="h-7 w-7 flex items-center justify-center rounded-md transition-colors"
         :class="nextId ? 'text-foreground hover:bg-muted' : 'text-muted-foreground/60 cursor-not-allowed'"
-        title="Next book"
+        :title="t('book.detail.header.nextBook')"
       >
         <ChevronRight :size="16" />
       </button>
