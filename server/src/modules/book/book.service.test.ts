@@ -172,7 +172,6 @@ beforeEach(async () => {
     findTemporalJumpBuckets: vi.fn(),
     findTemporalJumpBucketsCollapsed: vi.fn(),
     checkBookPassesContentFilters: vi.fn().mockResolvedValue(true),
-    checkCandidateExists: vi.fn().mockResolvedValue(false),
     checkExistingCandidatesBatch: vi.fn().mockResolvedValue(new Set()),
   };
   const libraryService = {

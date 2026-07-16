@@ -427,4 +427,65 @@ describe('UserPreferencesService', () => {
     await expect(service.upsertWhatsNewPreferences(11, { popupEnabled: 'yes' })).rejects.toBeInstanceOf(BadRequestException);
     expect(repo.upsert).not.toHaveBeenCalled();
   });
+
+  describe('Shelfmark Preferences', () => {
+    it('getShelfmarkPreferences returns defaults when repository has no row', async () => {
+      repo.findByCategory.mockResolvedValueOnce(null);
+      await expect(service.getShelfmarkPreferences(7)).resolves.toEqual({ enabled: false, url: '' });
+      expect(repo.findByCategory).toHaveBeenCalledWith(7, 'shelfmark');
+    });
+
+    it('getShelfmarkPreferences returns stored data', async () => {
+      repo.findByCategory.mockResolvedValueOnce({
+        data: { enabled: true, url: 'http://localhost:8080', externalUrl: 'http://example.com' },
+      } as never);
+      await expect(service.getShelfmarkPreferences(7)).resolves.toEqual({
+        enabled: true,
+        url: 'http://localhost:8080',
+        externalUrl: 'http://example.com',
+      });
+    });
+
+    it('upsertShelfmarkPreferences validates schema and upserts', async () => {
+      await expect(
+        service.upsertShelfmarkPreferences(11, {
+          enabled: true,
+          url: 'http://localhost:8080',
+          externalUrl: 'http://example.com',
+        }),
+      ).resolves.toBeUndefined();
+      expect(repo.upsert).toHaveBeenCalledWith(11, 'shelfmark', {
+        enabled: true,
+        url: 'http://localhost:8080',
+        externalUrl: 'http://example.com',
+      });
+    });
+
+    it('upsertShelfmarkPreferences rejects invalid urls', async () => {
+      await expect(
+        service.upsertShelfmarkPreferences(11, {
+          enabled: true,
+          url: 'not-a-url',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('testShelfmarkConnection rejects unsafe URLs', async () => {
+      const result = await service.testShelfmarkConnection(11, 'ftp://localhost');
+      expect(result.ok).toBe(false);
+      expect(result.error).toBeDefined();
+    });
+
+    it('testShelfmarkConnection performs fetch for safe URLs', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+      } as Response);
+      const result = await service.testShelfmarkConnection(11, 'http://localhost:8080');
+      expect(result.ok).toBe(true);
+      expect(result.status).toBe(200);
+      expect(fetchSpy).toHaveBeenCalledWith('http://localhost:8080/api/health', expect.any(Object));
+      fetchSpy.mockRestore();
+    });
+  });
 });

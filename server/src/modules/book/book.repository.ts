@@ -1377,41 +1377,6 @@ export class BookRepository {
     return !!row;
   }
 
-  async checkCandidateExists(candidate: MetadataCandidate, libraryIds: number[]): Promise<boolean> {
-    if (libraryIds.length === 0) return false;
-    const conditions: SQL[] = [];
-    if (candidate.isbn13) {
-      conditions.push(eq(schema.bookMetadata.isbn13, candidate.isbn13));
-    }
-    if (candidate.isbn10) {
-      conditions.push(eq(schema.bookMetadata.isbn10, candidate.isbn10));
-    }
-
-    const providerField = this.getProviderField(candidate.provider);
-    if (providerField && candidate.providerId) {
-      conditions.push(eq((schema.bookMetadata as any)[providerField], candidate.providerId));
-    }
-
-    if (conditions.length === 0) {
-      const rows = await this.db
-        .select({ bookId: schema.bookMetadata.bookId })
-        .from(schema.bookMetadata)
-        .innerJoin(schema.books, eq(schema.bookMetadata.bookId, schema.books.id))
-        .where(and(inArray(schema.books.libraryId, libraryIds), sql`lower(${schema.bookMetadata.title}) = lower(${candidate.title})`))
-        .limit(1);
-      return rows.length > 0;
-    }
-
-    const rows = await this.db
-      .select({ bookId: schema.bookMetadata.bookId })
-      .from(schema.bookMetadata)
-      .innerJoin(schema.books, eq(schema.bookMetadata.bookId, schema.books.id))
-      .where(and(inArray(schema.books.libraryId, libraryIds), or(...conditions)!))
-      .limit(1);
-
-    return rows.length > 0;
-  }
-
   async checkExistingCandidatesBatch(candidates: MetadataCandidate[], libraryIds: number[]): Promise<Set<MetadataCandidate>> {
     const existing = new Set<MetadataCandidate>();
     if (candidates.length === 0 || libraryIds.length === 0) {
@@ -1466,6 +1431,13 @@ export class BookRepository {
         amazonId: schema.bookMetadata.amazonId,
         hardcoverId: schema.bookMetadata.hardcoverId,
         openLibraryId: schema.bookMetadata.openLibraryId,
+        itunesId: schema.bookMetadata.itunesId,
+        koboId: schema.bookMetadata.koboId,
+        audibleId: schema.bookMetadata.audibleId,
+        comicvineId: schema.bookMetadata.comicvineId,
+        ranobedbId: schema.bookMetadata.ranobedbId,
+        aladinId: schema.bookMetadata.aladinId,
+        lubimyczytacId: schema.bookMetadata.lubimyczytacId,
       })
       .from(schema.bookMetadata)
       .innerJoin(schema.books, eq(schema.bookMetadata.bookId, schema.books.id))

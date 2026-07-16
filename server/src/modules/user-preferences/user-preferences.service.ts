@@ -26,6 +26,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { ensureSafeUrl } from '../../common/utils/ssrf.utils';
 import { UserPreferencesRepository } from './user-preferences.repository';
 
 const THEME_PREFERENCES_SCHEMA = z
@@ -256,8 +257,9 @@ export class UserPreferencesService {
     this.logger.log(
       `[user_preferences.test_shelfmark_connection] [start] userId=${userId} url="${sanitizedUrl}" - test shelfmark connection started`,
     );
-    const testUrl = url.replace(/\/+$/, '') + '/api/health';
     try {
+      await ensureSafeUrl(url, { allowLocal: true, allowPrivate: true });
+      const testUrl = url.replace(/\/+$/, '') + '/api/health';
       const res = await fetch(testUrl, { signal: AbortSignal.timeout(5000) });
       const durationMs = Date.now() - start;
       this.logger.log(
