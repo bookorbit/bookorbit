@@ -4013,6 +4013,8 @@
   "components": {
     "appHeader": {
       "searchAllBooks": "Buscar em todos os livros...",
+      "shelfmarkSubtitle": "Não na biblioteca • Pesquisar no Shelfmark",
+      "shelfmarkSearching": "Pesquisando no Shelfmark por mais resultados...",
       "searching": "Buscando...",
       "noResults": "Nenhum resultado",
       "loadingMore": "Carregando mais...",

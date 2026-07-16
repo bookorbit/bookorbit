@@ -25,6 +25,7 @@ export function useGlobalSearch(query: Ref<string>) {
   const hasMore = computed(() => results.value.length < total.value)
 
   // Fetch shelfmark settings on initialization
+  let initPromise: Promise<void> | null = null
   async function initShelfmark() {
     try {
       const res = await api('/api/v1/user-preferences/shelfmark')
@@ -37,9 +38,14 @@ export function useGlobalSearch(query: Ref<string>) {
     }
   }
 
-  void initShelfmark()
+  initPromise = initShelfmark()
 
   async function loadPage(q: string, page: number, append: boolean, gen: number) {
+    if (initPromise) {
+      await initPromise
+    }
+    if (gen !== generation) return
+
     const requestController = new AbortController()
     controller = requestController
     if (append) loadingMore.value = true

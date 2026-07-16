@@ -93,8 +93,8 @@ const WHATS_NEW_DEFAULTS: WhatsNewPreferences = { lastSeenVersion: null, popupEn
 const SHELFMARK_PREFERENCES_SCHEMA = z
   .object({
     enabled: z.boolean(),
-    url: z.string(),
-    externalUrl: z.string().optional(),
+    url: z.string().url(),
+    externalUrl: z.string().url().optional().or(z.literal('')),
   })
   .strict();
 
@@ -250,12 +250,27 @@ export class UserPreferencesService {
     };
   }
 
-  async testShelfmarkConnection(url: string): Promise<{ ok: boolean; status?: number; error?: string }> {
+  async testShelfmarkConnection(userId: number, url: string): Promise<{ ok: boolean; status?: number; error?: string }> {
+    const start = Date.now();
+    const sanitizedUrl = sanitizeLogValue(url);
+    this.logger.log(
+      `[user_preferences.test_shelfmark_connection] [start] userId=${userId} url="${sanitizedUrl}" - test shelfmark connection started`,
+    );
     const testUrl = url.replace(/\/+$/, '') + '/api/health';
     try {
       const res = await fetch(testUrl, { signal: AbortSignal.timeout(5000) });
+      const durationMs = Date.now() - start;
+      this.logger.log(
+        `[user_preferences.test_shelfmark_connection] [end] userId=${userId} url="${sanitizedUrl}" durationMs=${durationMs} status=${res.status} - test shelfmark connection completed`,
+      );
       return { ok: res.ok, status: res.status };
     } catch (err) {
+      const durationMs = Date.now() - start;
+      const errorClass = err instanceof Error ? err.constructor.name : 'UnknownError';
+      const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.error(
+        `[user_preferences.test_shelfmark_connection] [fail] userId=${userId} url="${sanitizedUrl}" durationMs=${durationMs} errorClass=${errorClass} error="${error}" - test shelfmark connection failed`,
+      );
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
   }

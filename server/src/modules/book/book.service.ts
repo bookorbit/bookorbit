@@ -1055,17 +1055,17 @@ export class BookService {
       return [];
     }
 
-    const shelfmarkPref = await this.userPreferencesService.getShelfmarkPreferences(user.id);
-    if (!shelfmarkPref?.enabled || !shelfmarkPref.url) {
-      this.logger.log(
-        `[book.search_shelfmark] [end] userId=${user.id} query="${cleanQ}" durationMs=${Date.now() - startedAt} results=0 - shelfmark disabled`,
-      );
-      return [];
-    }
-
     try {
+      const shelfmarkPref = await this.userPreferencesService.getShelfmarkPreferences(user.id);
+      if (!shelfmarkPref?.enabled || !shelfmarkPref.url) {
+        this.logger.log(
+          `[book.search_shelfmark] [end] userId=${user.id} query="${cleanQ}" durationMs=${Date.now() - startedAt} results=0 - shelfmark disabled`,
+        );
+        return [];
+      }
+
       const externalBooks = await this.searchExternalProviders(q, signal);
-      const newExternalBooks = await this.filterExistingExternalBooks(externalBooks, shelfmarkPref.url, shelfmarkPref.externalUrl);
+      const newExternalBooks = await this.filterExistingExternalBooks(user, externalBooks, shelfmarkPref.url, shelfmarkPref.externalUrl);
       this.logger.log(
         `[book.search_shelfmark] [end] userId=${user.id} query="${cleanQ}" durationMs=${Date.now() - startedAt} results=${newExternalBooks.length} - search shelfmark completed`,
       );
@@ -1131,14 +1131,22 @@ export class BookService {
     });
   }
 
-  async filterExistingExternalBooks(candidates: MetadataCandidate[], shelfmarkUrl: string, externalUrl?: string): Promise<BookCard[]> {
+  async filterExistingExternalBooks(
+    user: RequestUser,
+    candidates: MetadataCandidate[],
+    shelfmarkUrl: string,
+    externalUrl?: string,
+  ): Promise<BookCard[]> {
     const results: BookCard[] = [];
     const linkBaseUrl = (externalUrl || shelfmarkUrl).replace(/\/+$/, '');
     let count = -1;
 
+    const libs = await this.libraryService.findAll(user);
+    const libraryIds = libs.map((l) => l.id);
+    const existing = await this.bookRepo.checkExistingCandidatesBatch(candidates, libraryIds);
+
     for (const candidate of candidates) {
-      const exists = await this.bookRepo.checkCandidateExists(candidate);
-      if (!exists) {
+      if (!existing.has(candidate)) {
         const bookCard: BookCard = {
           id: count--,
           status: 'placeholder',

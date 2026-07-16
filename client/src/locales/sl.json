@@ -4013,6 +4013,8 @@
   "components": {
     "appHeader": {
       "searchAllBooks": "Iskanje po vseh knjigah ...",
+      "shelfmarkSubtitle": "Ni v knjižnici • Išči v Shelfmark",
+      "shelfmarkSearching": "Iskanje po Shelfmark za več rezultatov...",
       "searching": "Iskanje ...",
       "noResults": "Ni rezultatov",
       "loadingMore": "Nalaganje več ...",

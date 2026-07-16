@@ -444,8 +444,8 @@ function formatBadgeStyle(fmt: string) {
                       <span v-else>{{ seg.text }}</span>
                     </template>
                   </p>
-                  <p v-if="row.result.doesNotExistLocally" class="text-xs text-amber-600 dark:text-amber-400 font-medium truncate mt-0.5">
-                    Not in Library • Search Shelfmark
+                  <p v-if="row.result.doesNotExistLocally" class="text-xs font-medium truncate mt-0.5 shelfmark-subtitle">
+                    {{ t('components.appHeader.shelfmarkSubtitle') }}
                   </p>
                   <p v-else-if="row.result.authors.length" class="text-xs text-muted-foreground truncate mt-0.5">
                     <template v-for="seg in highlightSegments(row.result.authors.join(', '), globalSearchQuery)" :key="seg.text + seg.match">
@@ -461,7 +461,7 @@ function formatBadgeStyle(fmt: string) {
                   </p>
                 </div>
                 <div class="flex shrink-0 gap-1">
-                  <span v-if="row.result.doesNotExistLocally" class="text-[9px] font-semibold px-1.5 py-0.5 rounded border border-amber-500/35 bg-amber-500/10 text-amber-600 dark:text-amber-400 uppercase">
+                  <span v-if="row.result.doesNotExistLocally" class="text-[9px] font-semibold px-1.5 py-0.5 rounded border uppercase shelfmark-badge">
                     Shelfmark
                   </span>
                   <template v-else-if="resultFormats(row.result).length">
@@ -478,8 +478,8 @@ function formatBadgeStyle(fmt: string) {
               </button>
             </div>
             <div v-if="shelfmarkEnabled && shelfmarkLoading" class="border-t border-border/40 p-2 text-center text-[10px] text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/20">
-              <Loader class="animate-spin text-amber-500" :size="12" />
-              <span>Searching Shelfmark for more results...</span>
+              <Loader class="animate-spin shelfmark-loader" :size="12" />
+              <span>{{ t('components.appHeader.shelfmarkSearching') }}</span>
             </div>
             <div v-if="globalResults.length > 0" class="border-t border-border/60 px-3 py-2 text-center text-xs text-muted-foreground">
               <button
@@ -591,8 +591,8 @@ function formatBadgeStyle(fmt: string) {
                       <span v-else>{{ seg.text }}</span>
                     </template>
                   </p>
-                  <p v-if="row.result.doesNotExistLocally" class="text-xs text-amber-600 dark:text-amber-400 font-medium truncate mt-0.5">
-                    Not in Library • Search Shelfmark
+                  <p v-if="row.result.doesNotExistLocally" class="text-xs font-medium truncate mt-0.5 shelfmark-subtitle">
+                    {{ t('components.appHeader.shelfmarkSubtitle') }}
                   </p>
                   <p v-else-if="row.result.authors.length" class="text-xs text-muted-foreground truncate mt-0.5">
                     <template v-for="seg in highlightSegments(row.result.authors.join(', '), globalSearchQuery)" :key="seg.text + seg.match">
@@ -608,7 +608,7 @@ function formatBadgeStyle(fmt: string) {
                   </p>
                 </div>
                 <div class="flex shrink-0 gap-1">
-                  <span v-if="row.result.doesNotExistLocally" class="text-[9px] font-semibold px-1.5 py-0.5 rounded border border-amber-500/35 bg-amber-500/10 text-amber-600 dark:text-amber-400 uppercase">
+                  <span v-if="row.result.doesNotExistLocally" class="text-[9px] font-semibold px-1.5 py-0.5 rounded border uppercase shelfmark-badge">
                     Shelfmark
                   </span>
                   <template v-else-if="resultFormats(row.result).length">
@@ -625,8 +625,8 @@ function formatBadgeStyle(fmt: string) {
               </button>
             </div>
             <div v-if="shelfmarkEnabled && shelfmarkLoading" class="border-t border-border/40 p-2 text-center text-[10px] text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/20">
-              <Loader class="animate-spin text-amber-500" :size="12" />
-              <span>Searching Shelfmark for more results...</span>
+              <Loader class="animate-spin shelfmark-loader" :size="12" />
+              <span>{{ t('components.appHeader.shelfmarkSearching') }}</span>
             </div>
             <div v-if="globalResults.length > 0" class="border-t border-border/60 px-3 py-2 text-center text-xs text-muted-foreground">
               <button
@@ -1109,3 +1109,17 @@ function formatBadgeStyle(fmt: string) {
 
   <BookUploadModal v-if="uploadOpen" @close="uploadOpen = false" @uploaded="uploadOpen = false" />
 </template>
+
+<style scoped>
+.shelfmark-subtitle {
+  color: var(--primary);
+}
+.shelfmark-badge {
+  border-color: color-mix(in oklch, var(--primary) 35%, transparent);
+  background-color: color-mix(in oklch, var(--primary) 10%, transparent);
+  color: var(--primary);
+}
+.shelfmark-loader {
+  color: var(--primary);
+}
+</style>

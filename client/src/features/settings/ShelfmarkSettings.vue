@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
-import { CloudDownload, HelpCircle, CheckCircle, XCircle, Loader } from '@lucide/vue'
+import { CloudDownload, HelpCircle, CheckCircle, XCircle, Loader } from 'lucide-vue-next'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import { api } from '@/lib/api'
@@ -13,6 +13,14 @@ const loading = ref(true)
 const saving = ref(false)
 const testing = ref(false)
 const testResult = ref<'success' | 'error' | null>(null)
+
+function handleUpdateEnabled(val: boolean) {
+  enabled.value = val
+}
+
+function handleInputUrl() {
+  testResult.value = null
+}
 
 onMounted(async () => {
   try {
@@ -109,7 +117,7 @@ async function saveSettings() {
             <p class="settings-label">Enable Shelfmark Integration</p>
             <p class="settings-hint">Search external metadata providers and show download links to Shelfmark</p>
           </div>
-          <ToggleSwitch :model-value="enabled" @update:model-value="enabled = $event" />
+          <ToggleSwitch :model-value="enabled" @update:model-value="handleUpdateEnabled" />
         </div>
       </div>
 
@@ -124,13 +132,13 @@ async function saveSettings() {
               type="url"
               placeholder="e.g. http://localhost:8080 or http://shelfmark.local"
               class="input-field w-full"
-              @input="testResult = null"
+              @input="handleInputUrl"
             />
             <button
               type="button"
               class="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent transition-colors disabled:opacity-50"
               :disabled="testing || !url.trim()"
-              @click="testConnection()"
+              @click="testConnection"
             >
               <Loader v-if="testing" :size="13" class="animate-spin" />
               <CheckCircle v-else-if="testResult === 'success'" :size="13" class="text-emerald-500" />
@@ -171,7 +179,7 @@ async function saveSettings() {
         <button
           class="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
           :disabled="saving"
-          @click="saveSettings()"
+          @click="saveSettings"
         >
           {{ saving ? 'Saving...' : 'Save Settings' }}
         </button>

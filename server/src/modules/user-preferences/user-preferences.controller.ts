@@ -3,6 +3,7 @@ import { Body, Controller, Get, HttpCode, Post, Put } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { UpsertUserPreferenceDto } from './dto/upsert-user-preference.dto';
+import { TestShelfmarkConnectionDto } from './dto/test-shelfmark-connection.dto';
 import { UserPreferencesService } from './user-preferences.service';
 
 @Controller('user-preferences')
@@ -64,8 +65,8 @@ export class UserPreferencesController {
   }
 
   @Post('shelfmark/test')
-  async testShelfmarkConnection(@Body() body: { url: string }) {
-    return this.userPreferencesService.testShelfmarkConnection(body.url);
+  async testShelfmarkConnection(@Body() body: TestShelfmarkConnectionDto, @CurrentUser() user: RequestUser) {
+    return this.userPreferencesService.testShelfmarkConnection(user.id, body.url);
   }
 
   @Put('shelfmark')
