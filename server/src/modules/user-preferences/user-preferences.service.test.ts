@@ -471,9 +471,12 @@ describe('UserPreferencesService', () => {
     });
 
     it('testShelfmarkConnection rejects unsafe URLs', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch');
       const result = await service.testShelfmarkConnection(11, 'ftp://localhost');
       expect(result.ok).toBe(false);
       expect(result.error).toBeDefined();
+      expect(fetchSpy).not.toHaveBeenCalled();
+      fetchSpy.mockRestore();
     });
 
     it('testShelfmarkConnection performs fetch for safe URLs', async () => {
