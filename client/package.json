@@ -77,6 +77,7 @@
     "driver.js": "^1.6.0",
     "echarts": "^6.1.0",
     "howler": "^2.2.4",
+    "lucide-vue-next": "^1.0.0",
     "pinia": "^3.0.4",
     "reka-ui": "^2.10.1",
     "socket.io-client": "^4.8.3",

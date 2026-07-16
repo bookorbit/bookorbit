@@ -61,7 +61,9 @@ function pageFor(page: number, total: number, size = 20): BooksPage {
 }
 
 function requestedBodies(): BookQuery[] {
-  return apiMock.mock.calls.map(([, init]) => JSON.parse(String(init?.body)) as BookQuery)
+  return apiMock.mock.calls
+    .filter(([url]) => url === '/api/v1/books/query')
+    .map(([, init]) => JSON.parse(String(init?.body)) as BookQuery)
 }
 
 async function flush() {
@@ -74,6 +76,18 @@ describe('useGlobalSearch', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     apiMock.mockReset()
+    apiMock.mockImplementation((url) => {
+      if (url.includes('/api/v1/user-preferences/shelfmark')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ settings: { enabled: false } }),
+        })
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(pageFor(0, 0)),
+      })
+    })
   })
 
   afterEach(() => {
@@ -81,9 +95,17 @@ describe('useGlobalSearch', () => {
   })
 
   it('loads the first page through the book query endpoint after the debounce', async () => {
-    apiMock.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(pageFor(0, 45)),
+    apiMock.mockImplementation((url) => {
+      if (url.includes('/api/v1/user-preferences/shelfmark')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ settings: { enabled: false } }),
+        })
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(pageFor(0, 45)),
+      })
     })
     const query = ref('')
     const search = useGlobalSearch(query)
@@ -93,8 +115,9 @@ describe('useGlobalSearch', () => {
     await vi.advanceTimersByTimeAsync(300)
     await flush()
 
-    expect(apiMock).toHaveBeenCalledOnce()
-    expect(apiMock.mock.calls[0]?.[0]).toBe('/api/v1/books/query')
+    const queryCalls = apiMock.mock.calls.filter(([url]) => url === '/api/v1/books/query')
+    expect(queryCalls).toHaveLength(1)
+    expect(queryCalls[0]?.[0]).toBe('/api/v1/books/query')
     expect(requestedBodies()[0]).toEqual({
       q: 'Prey',
       sort: [{ field: 'title', dir: 'asc' }],
@@ -108,7 +131,13 @@ describe('useGlobalSearch', () => {
   })
 
   it('appends the next page when loading more results', async () => {
-    apiMock.mockImplementation((_url, init) => {
+    apiMock.mockImplementation((url, init) => {
+      if (url.includes('/api/v1/user-preferences/shelfmark')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ settings: { enabled: false } }),
+        })
+      }
       const body = JSON.parse(String(init?.body)) as BookQuery
       return Promise.resolve({
         ok: true,

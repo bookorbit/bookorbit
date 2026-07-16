@@ -1377,7 +1377,8 @@ export class BookRepository {
     return !!row;
   }
 
-  async checkCandidateExists(candidate: MetadataCandidate): Promise<boolean> {
+  async checkCandidateExists(candidate: MetadataCandidate, libraryIds: number[]): Promise<boolean> {
+    if (libraryIds.length === 0) return false;
     const conditions: SQL[] = [];
     if (candidate.isbn13) {
       conditions.push(eq(schema.bookMetadata.isbn13, candidate.isbn13));
@@ -1395,7 +1396,8 @@ export class BookRepository {
       const rows = await this.db
         .select({ bookId: schema.bookMetadata.bookId })
         .from(schema.bookMetadata)
-        .where(sql`lower(${schema.bookMetadata.title}) = lower(${candidate.title})`)
+        .innerJoin(schema.books, eq(schema.bookMetadata.bookId, schema.books.id))
+        .where(and(inArray(schema.books.libraryId, libraryIds), sql`lower(${schema.bookMetadata.title}) = lower(${candidate.title})`))
         .limit(1);
       return rows.length > 0;
     }
@@ -1403,10 +1405,95 @@ export class BookRepository {
     const rows = await this.db
       .select({ bookId: schema.bookMetadata.bookId })
       .from(schema.bookMetadata)
-      .where(or(...conditions))
+      .innerJoin(schema.books, eq(schema.bookMetadata.bookId, schema.books.id))
+      .where(and(inArray(schema.books.libraryId, libraryIds), or(...conditions)!))
       .limit(1);
 
     return rows.length > 0;
+  }
+
+  async checkExistingCandidatesBatch(candidates: MetadataCandidate[], libraryIds: number[]): Promise<Set<MetadataCandidate>> {
+    const existing = new Set<MetadataCandidate>();
+    if (candidates.length === 0 || libraryIds.length === 0) {
+      return existing;
+    }
+
+    const conditions: SQL[] = [];
+    const titles: string[] = [];
+
+    for (const candidate of candidates) {
+      const candidateConditions: SQL[] = [];
+      if (candidate.isbn13) {
+        candidateConditions.push(eq(schema.bookMetadata.isbn13, candidate.isbn13));
+      }
+      if (candidate.isbn10) {
+        candidateConditions.push(eq(schema.bookMetadata.isbn10, candidate.isbn10));
+      }
+      const providerField = this.getProviderField(candidate.provider);
+      if (providerField && candidate.providerId) {
+        candidateConditions.push(eq((schema.bookMetadata as any)[providerField], candidate.providerId));
+      }
+
+      if (candidateConditions.length > 0) {
+        conditions.push(...candidateConditions);
+      } else if (candidate.title) {
+        titles.push(candidate.title.toLowerCase());
+      }
+    }
+
+    const whereClauses: SQL[] = [inArray(schema.books.libraryId, libraryIds)];
+    const orClauses: SQL[] = [];
+
+    if (conditions.length > 0) {
+      orClauses.push(...conditions);
+    }
+    if (titles.length > 0) {
+      orClauses.push(inArray(sql`lower(${schema.bookMetadata.title})`, titles));
+    }
+
+    if (orClauses.length === 0) {
+      return existing;
+    }
+    whereClauses.push(or(...orClauses)!);
+
+    const rows = await this.db
+      .select({
+        title: schema.bookMetadata.title,
+        isbn13: schema.bookMetadata.isbn13,
+        isbn10: schema.bookMetadata.isbn10,
+        googleBooksId: schema.bookMetadata.googleBooksId,
+        goodreadsId: schema.bookMetadata.goodreadsId,
+        amazonId: schema.bookMetadata.amazonId,
+        hardcoverId: schema.bookMetadata.hardcoverId,
+        openLibraryId: schema.bookMetadata.openLibraryId,
+      })
+      .from(schema.bookMetadata)
+      .innerJoin(schema.books, eq(schema.bookMetadata.bookId, schema.books.id))
+      .where(and(...whereClauses));
+
+    for (const candidate of candidates) {
+      const match = rows.find((row) => {
+        if (candidate.isbn13 && row.isbn13 === candidate.isbn13) return true;
+        if (candidate.isbn10 && row.isbn10 === candidate.isbn10) return true;
+
+        const providerField = this.getProviderField(candidate.provider);
+        if (providerField && candidate.providerId) {
+          if ((row as any)[providerField] === candidate.providerId) return true;
+        }
+
+        const hasIdentifiers = !!(candidate.isbn13 || candidate.isbn10 || (providerField && candidate.providerId));
+        if (!hasIdentifiers && candidate.title && row.title && row.title.toLowerCase() === candidate.title.toLowerCase()) {
+          return true;
+        }
+        return false;
+      });
+
+      if (match) {
+        existing.add(candidate);
+      }
+    }
+
+    return existing;
   }
 
   private getProviderField(provider: MetadataProviderKey): string | null {

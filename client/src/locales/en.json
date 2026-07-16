@@ -3971,6 +3971,8 @@
   "components": {
     "appHeader": {
       "searchAllBooks": "Search all books...",
+      "shelfmarkSubtitle": "Not in Library • Search Shelfmark",
+      "shelfmarkSearching": "Searching Shelfmark for more results...",
       "searching": "Searching...",
       "noResults": "No results",
       "loadingMore": "Loading more...",
