@@ -1438,6 +1438,7 @@ export class BookRepository {
         ranobedbId: schema.bookMetadata.ranobedbId,
         aladinId: schema.bookMetadata.aladinId,
         lubimyczytacId: schema.bookMetadata.lubimyczytacId,
+        librofmId: schema.bookMetadata.librofmId,
       })
       .from(schema.bookMetadata)
       .innerJoin(schema.books, eq(schema.bookMetadata.bookId, schema.books.id))
@@ -1494,6 +1495,8 @@ export class BookRepository {
         return 'aladinId';
       case MetadataProviderKey.LUBIMYCZYTAC:
         return 'lubimyczytacId';
+      case MetadataProviderKey.LIBROFM:
+        return 'librofmId';
       default:
         return null;
     }
