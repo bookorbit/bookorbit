@@ -13,6 +13,8 @@ export function useGlobalSearch(query: Ref<string>) {
   const loading = ref(false)
   const loadingMore = ref(false)
   const settled = ref(false)
+  const shelfmarkLoading = ref(false)
+  const shelfmarkEnabled = ref(false)
   let timer: ReturnType<typeof setTimeout> | null = null
   let controller: AbortController | null = null
   let shelfmarkController: AbortController | null = null
@@ -22,6 +24,21 @@ export function useGlobalSearch(query: Ref<string>) {
 
   const hasMore = computed(() => results.value.length < total.value)
 
+  // Fetch shelfmark settings on initialization
+  async function initShelfmark() {
+    try {
+      const res = await api('/api/v1/user-preferences/shelfmark')
+      if (res.ok) {
+        const data = await res.json()
+        shelfmarkEnabled.value = data.settings?.enabled ?? false
+      }
+    } catch {
+      shelfmarkEnabled.value = false
+    }
+  }
+
+  void initShelfmark()
+
   async function loadPage(q: string, page: number, append: boolean, gen: number) {
     const requestController = new AbortController()
     controller = requestController
@@ -29,6 +46,9 @@ export function useGlobalSearch(query: Ref<string>) {
     else {
       loading.value = true
       settled.value = false
+      if (shelfmarkEnabled.value && page === 0) {
+        shelfmarkLoading.value = true
+      }
     }
 
     try {
@@ -53,7 +73,7 @@ export function useGlobalSearch(query: Ref<string>) {
       total.value = data.total
       nextPage = data.page + 1
 
-      if (!append && page === 0) {
+      if (!append && page === 0 && shelfmarkEnabled.value) {
         await loadShelfmark(q, gen)
       }
     } catch {
@@ -66,6 +86,7 @@ export function useGlobalSearch(query: Ref<string>) {
       if (gen === generation) {
         loading.value = false
         loadingMore.value = false
+        shelfmarkLoading.value = false
         settled.value = true
       }
     }
@@ -74,6 +95,7 @@ export function useGlobalSearch(query: Ref<string>) {
   async function loadShelfmark(q: string, gen: number) {
     const requestController = new AbortController()
     shelfmarkController = requestController
+    shelfmarkLoading.value = true
 
     try {
       const res = await api(`/api/v1/books/shelfmark?q=${encodeURIComponent(q)}`, {
@@ -93,6 +115,10 @@ export function useGlobalSearch(query: Ref<string>) {
       total.value += uniqueNewItems.length
     } catch {
       // Ignore abort/errors, handle gracefully
+    } finally {
+      if (gen === generation) {
+        shelfmarkLoading.value = false
+      }
     }
   }
 
@@ -102,6 +128,7 @@ export function useGlobalSearch(query: Ref<string>) {
     shelfmarkController?.abort()
     generation += 1
     settled.value = false
+    shelfmarkLoading.value = false
     activeQuery = q.trim()
     nextPage = 0
     results.value = []
@@ -136,8 +163,9 @@ export function useGlobalSearch(query: Ref<string>) {
     total.value = 0
     loading.value = false
     loadingMore.value = false
+    shelfmarkLoading.value = false
     settled.value = false
   }
 
-  return { results, total, loading, loadingMore, settled, hasMore, loadMore, clear }
+  return { results, total, loading, loadingMore, settled, hasMore, loadMore, clear, shelfmarkLoading, shelfmarkEnabled }
 }

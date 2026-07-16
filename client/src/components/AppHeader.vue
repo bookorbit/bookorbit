@@ -20,6 +20,7 @@ import {
   Sparkles,
   Highlighter,
   CloudDownload,
+  Loader,
 } from '@lucide/vue'
 import { useRouter, useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -135,6 +136,8 @@ const {
   hasMore: globalSearchHasMore,
   loadMore: loadMoreGlobalSearch,
   clear: clearGlobalSearch,
+  shelfmarkLoading,
+  shelfmarkEnabled,
 } = useGlobalSearch(globalSearchQuery)
 
 const showDropdown = computed(
@@ -448,6 +451,10 @@ function formatBadgeStyle(fmt: string) {
                 </div>
               </button>
             </div>
+            <div v-if="shelfmarkEnabled && shelfmarkLoading" class="border-t border-border/40 p-2 text-center text-[10px] text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/20">
+              <Loader class="animate-spin text-amber-500" :size="12" />
+              <span>Searching Shelfmark for more results...</span>
+            </div>
             <div v-if="globalResults.length > 0" class="border-t border-border/60 px-3 py-2 text-center text-xs text-muted-foreground">
               <button
                 v-if="globalSearchHasMore"
@@ -582,6 +589,10 @@ function formatBadgeStyle(fmt: string) {
                   </template>
                 </div>
               </button>
+            </div>
+            <div v-if="shelfmarkEnabled && shelfmarkLoading" class="border-t border-border/40 p-2 text-center text-[10px] text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/20">
+              <Loader class="animate-spin text-amber-500" :size="12" />
+              <span>Searching Shelfmark for more results...</span>
             </div>
             <div v-if="globalResults.length > 0" class="border-t border-border/60 px-3 py-2 text-center text-xs text-muted-foreground">
               <button
