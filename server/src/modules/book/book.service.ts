@@ -1149,6 +1149,7 @@ export class BookService {
           seriesIndex: null,
           files: [],
           publishedYear: candidate.publishedYear || null,
+          publishedDate: candidate.publishedDate || null,
           language: candidate.language || null,
           genres: candidate.genres || [],
           rating: null,
