@@ -117,6 +117,7 @@ export type BookCard = {
   collapsedSeries?: import("./series-collapse").CollapsedSeriesInfo;
   doesNotExistLocally?: boolean;
   shelfmarkUrl?: string;
+  coverUrl?: string;
 };
 
 export type BookDetailFile = {
