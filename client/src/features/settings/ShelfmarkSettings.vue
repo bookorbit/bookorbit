@@ -25,7 +25,7 @@ onMounted(async () => {
     } else {
       toast.error('Failed to load Shelfmark settings')
     }
-  } catch (err) {
+  } catch {
     toast.error('Failed to load Shelfmark settings')
   } finally {
     loading.value = false
@@ -80,7 +80,7 @@ async function saveSettings() {
     } else {
       toast.error('Failed to save Shelfmark settings')
     }
-  } catch (err) {
+  } catch {
     toast.error('Failed to save Shelfmark settings')
   } finally {
     saving.value = false
