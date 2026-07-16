@@ -1094,40 +1094,62 @@ export class BookService {
 
     return new Promise<MetadataCandidate[]>((resolve) => {
       const results: MetadataCandidate[] = [];
-      const subscription = this.metadataFetchService.search(params, enabledProviderKeys).subscribe({
-        next: (candidate) => {
-          if (results.length < 20) {
-            results.push(candidate);
-          }
-        },
-        error: () => {
-          resolve(results);
-        },
-        complete: () => {
-          resolve(results);
-        },
-      });
+      let resolved = false;
+      let timer: NodeJS.Timeout | null = null;
+      let subscription: any = null;
+
+      const cleanup = () => {
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        if (subscription) {
+          subscription.unsubscribe();
+        }
+        if (signal) {
+          signal.removeEventListener('abort', onAbort);
+        }
+      };
+
+      const resolveResults = () => {
+        if (resolved) return;
+        resolved = true;
+        cleanup();
+        resolve(results);
+      };
 
       const onAbort = () => {
-        subscription.unsubscribe();
-        resolve(results);
+        resolveResults();
       };
 
       if (signal) {
         if (signal.aborted) {
-          onAbort();
+          resolveResults();
           return;
         }
         signal.addEventListener('abort', onAbort);
       }
 
-      setTimeout(() => {
-        subscription.unsubscribe();
-        if (signal) {
-          signal.removeEventListener('abort', onAbort);
-        }
-        resolve(results);
+      timer = setTimeout(() => {
+        resolveResults();
       }, 1500);
+
+      subscription = this.metadataFetchService.search(params, enabledProviderKeys).subscribe({
+        next: (candidate) => {
+          if (results.length < 20) {
+            results.push(candidate);
+          }
+          if (results.length === 20) {
+            resolveResults();
+          }
+        },
+        error: () => {
+          resolveResults();
+        },
+        complete: () => {
+          resolveResults();
+        },
+      });
     });
   }
 
