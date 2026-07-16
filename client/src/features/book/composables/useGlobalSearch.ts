@@ -15,6 +15,7 @@ export function useGlobalSearch(query: Ref<string>) {
   const settled = ref(false)
   let timer: ReturnType<typeof setTimeout> | null = null
   let controller: AbortController | null = null
+  let shelfmarkController: AbortController | null = null
   let generation = 0
   let activeQuery = ''
   let nextPage = 0
@@ -25,7 +26,10 @@ export function useGlobalSearch(query: Ref<string>) {
     const requestController = new AbortController()
     controller = requestController
     if (append) loadingMore.value = true
-    else loading.value = true
+    else {
+      loading.value = true
+      settled.value = false
+    }
 
     try {
       const body: BookQuery = {
@@ -48,6 +52,10 @@ export function useGlobalSearch(query: Ref<string>) {
       results.value = append ? [...results.value, ...data.items] : data.items
       total.value = data.total
       nextPage = data.page + 1
+
+      if (!append && page === 0) {
+        await loadShelfmark(q, gen)
+      }
     } catch {
       if (gen !== generation || requestController.signal.aborted) return
       if (!append) {
@@ -63,9 +71,35 @@ export function useGlobalSearch(query: Ref<string>) {
     }
   }
 
+  async function loadShelfmark(q: string, gen: number) {
+    const requestController = new AbortController()
+    shelfmarkController = requestController
+
+    try {
+      const res = await api(`/api/v1/books/shelfmark?q=${encodeURIComponent(q)}`, {
+        method: 'GET',
+        signal: requestController.signal,
+      })
+      if (gen !== generation) return
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+      const externalItems: BookCard[] = await res.json()
+      if (gen !== generation) return
+
+      const existingIds = new Set(results.value.map((item) => item.id))
+      const uniqueNewItems = externalItems.filter((item) => !existingIds.has(item.id))
+
+      results.value = [...results.value, ...uniqueNewItems]
+      total.value += uniqueNewItems.length
+    } catch {
+      // Ignore abort/errors, handle gracefully
+    }
+  }
+
   watch(query, (q) => {
     if (timer) clearTimeout(timer)
     controller?.abort()
+    shelfmarkController?.abort()
     generation += 1
     settled.value = false
     activeQuery = q.trim()
@@ -94,6 +128,7 @@ export function useGlobalSearch(query: Ref<string>) {
   function clear() {
     if (timer) clearTimeout(timer)
     controller?.abort()
+    shelfmarkController?.abort()
     generation += 1
     activeQuery = ''
     nextPage = 0

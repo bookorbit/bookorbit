@@ -1017,26 +1017,47 @@ export class BookService {
       timeZone,
       contentFilters: this.isSuperuser(user) ? undefined : user.contentFilters,
     });
-    const localBooks = await this.executeBooksQuery(user.id, where, query);
-
-    if (query.q && query.q.trim().length >= 2) {
-      const shelfmarkPref = await this.userPreferencesService.getShelfmarkPreferences(user.id);
-      if (shelfmarkPref?.enabled && shelfmarkPref.url) {
-        try {
-          const externalBooks = await this.searchExternalProviders(query.q);
-          const newExternalBooks = await this.filterExistingExternalBooks(externalBooks, shelfmarkPref.url, shelfmarkPref.externalUrl);
-          localBooks.items.push(...newExternalBooks);
-          localBooks.total += newExternalBooks.length;
-        } catch (err) {
-          this.logger.warn(`Shelfmark integration search failed: ${String(err)}`);
-        }
-      }
-    }
-
-    return localBooks;
+    return this.executeBooksQuery(user.id, where, query);
   }
 
-  async searchExternalProviders(queryText: string): Promise<MetadataCandidate[]> {
+  async searchShelfmark(q: string, user: RequestUser, signal?: AbortSignal): Promise<BookCard[]> {
+    const startedAt = Date.now();
+    const cleanQ = sanitizeLogValue(q);
+    this.logger.log(`[book.search_shelfmark] [start] userId=${user.id} query="${cleanQ}" - search shelfmark started`);
+
+    if (!q || q.trim().length < 2) {
+      this.logger.log(
+        `[book.search_shelfmark] [end] userId=${user.id} query="${cleanQ}" durationMs=${Date.now() - startedAt} results=0 - query too short`,
+      );
+      return [];
+    }
+
+    const shelfmarkPref = await this.userPreferencesService.getShelfmarkPreferences(user.id);
+    if (!shelfmarkPref?.enabled || !shelfmarkPref.url) {
+      this.logger.log(
+        `[book.search_shelfmark] [end] userId=${user.id} query="${cleanQ}" durationMs=${Date.now() - startedAt} results=0 - shelfmark disabled`,
+      );
+      return [];
+    }
+
+    try {
+      const externalBooks = await this.searchExternalProviders(q, signal);
+      const newExternalBooks = await this.filterExistingExternalBooks(externalBooks, shelfmarkPref.url, shelfmarkPref.externalUrl);
+      this.logger.log(
+        `[book.search_shelfmark] [end] userId=${user.id} query="${cleanQ}" durationMs=${Date.now() - startedAt} results=${newExternalBooks.length} - search shelfmark completed`,
+      );
+      return newExternalBooks;
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.constructor.name : 'Error';
+      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.error(
+        `[book.search_shelfmark] [fail] userId=${user.id} query="${cleanQ}" durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - search shelfmark failed`,
+      );
+      return [];
+    }
+  }
+
+  async searchExternalProviders(queryText: string, signal?: AbortSignal): Promise<MetadataCandidate[]> {
     const config = await this.providerConfigService.getConfig();
     const registeredProviders = this.providerRegistry.all();
     const enabledProviderKeys = registeredProviders.filter((provider) => config[provider.key]?.enabled !== false).map((provider) => provider.key);
@@ -1064,8 +1085,24 @@ export class BookService {
         },
       });
 
+      const onAbort = () => {
+        subscription.unsubscribe();
+        resolve(results);
+      };
+
+      if (signal) {
+        if (signal.aborted) {
+          onAbort();
+          return;
+        }
+        signal.addEventListener('abort', onAbort);
+      }
+
       setTimeout(() => {
         subscription.unsubscribe();
+        if (signal) {
+          signal.removeEventListener('abort', onAbort);
+        }
         resolve(results);
       }, 1500);
     });

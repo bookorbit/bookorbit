@@ -870,19 +870,32 @@ export class BookRepository {
 
   private getProviderField(provider: MetadataProviderKey): string | null {
     switch (provider) {
-      case MetadataProviderKey.GOOGLE: return 'googleBooksId';
-      case MetadataProviderKey.GOODREADS: return 'goodreadsId';
-      case MetadataProviderKey.AMAZON: return 'amazonId';
-      case MetadataProviderKey.HARDCOVER: return 'hardcoverId';
-      case MetadataProviderKey.OPEN_LIBRARY: return 'openLibraryId';
-      case MetadataProviderKey.ITUNES: return 'itunesId';
-      case MetadataProviderKey.KOBO: return 'koboId';
-      case MetadataProviderKey.AUDIBLE: return 'audibleId';
-      case MetadataProviderKey.COMICVINE: return 'comicvineId';
-      case MetadataProviderKey.RANOBEDB: return 'ranobedbId';
-      case MetadataProviderKey.ALADIN: return 'aladinId';
-      case MetadataProviderKey.LUBIMYCZYTAC: return 'lubimyczytacId';
-      default: return null;
+      case MetadataProviderKey.GOOGLE:
+        return 'googleBooksId';
+      case MetadataProviderKey.GOODREADS:
+        return 'goodreadsId';
+      case MetadataProviderKey.AMAZON:
+        return 'amazonId';
+      case MetadataProviderKey.HARDCOVER:
+        return 'hardcoverId';
+      case MetadataProviderKey.OPEN_LIBRARY:
+        return 'openLibraryId';
+      case MetadataProviderKey.ITUNES:
+        return 'itunesId';
+      case MetadataProviderKey.KOBO:
+        return 'koboId';
+      case MetadataProviderKey.AUDIBLE:
+        return 'audibleId';
+      case MetadataProviderKey.COMICVINE:
+        return 'comicvineId';
+      case MetadataProviderKey.RANOBEDB:
+        return 'ranobedbId';
+      case MetadataProviderKey.ALADIN:
+        return 'aladinId';
+      case MetadataProviderKey.LUBIMYCZYTAC:
+        return 'lubimyczytacId';
+      default:
+        return null;
     }
   }
 
