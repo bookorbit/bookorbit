@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { House } from '@lucide/vue'
 
+const { t } = useI18n()
 const router = useRouter()
 
 function goHome() {
@@ -18,8 +20,8 @@ function goHome() {
       404
     </p>
     <div class="space-y-1 animate-fade-up" style="animation-delay: 150ms">
-      <h1 class="text-xl font-semibold text-foreground">Page not found</h1>
-      <p class="text-sm text-muted-foreground">The page you're looking for doesn't exist.</p>
+      <h1 class="text-xl font-semibold text-foreground">{{ t('views.notFound.title') }}</h1>
+      <p class="text-sm text-muted-foreground">{{ t('views.notFound.description') }}</p>
     </div>
     <button
       class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors mt-2 animate-fade-up"
@@ -27,7 +29,7 @@ function goHome() {
       @click="goHome"
     >
       <House :size="15" />
-      Go home
+      {{ t('views.notFound.goHome') }}
     </button>
   </div>
 </template>

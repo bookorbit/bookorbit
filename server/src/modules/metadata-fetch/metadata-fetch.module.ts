@@ -16,6 +16,7 @@ import { OpenLibraryProvider } from './providers/open-library/open-library.provi
 import { ITunesProvider } from './providers/itunes/itunes.provider';
 import { AudibleProvider } from './providers/audible/audible.provider';
 import { AudnexusProvider } from './providers/audnexus/audnexus.provider';
+import { LibroFmProvider } from './providers/librofm/librofm.provider';
 import { HardcoverClient } from './providers/hardcover/hardcover.client';
 import { HardcoverProvider } from './providers/hardcover/hardcover.provider';
 import { ComicVineClient } from './providers/comicvine/comicvine.client';
@@ -34,6 +35,7 @@ const PROVIDER_CLASSES = [
   ITunesProvider,
   AudibleProvider,
   AudnexusProvider,
+  LibroFmProvider,
   HardcoverProvider,
   ComicVineProvider,
   RanobeDbProvider,

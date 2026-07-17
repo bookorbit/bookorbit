@@ -222,7 +222,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         author: authorRows[0]?.name ?? undefined,
         isbn: meta?.isbn13 ?? meta?.isbn10 ?? undefined,
         existingProviderIds: this.collectProviderIds(meta ?? {}),
-        isAudiobook: (meta?.durationSeconds !== null && meta?.durationSeconds !== undefined) || !!meta?.audibleId,
+        isAudiobook: (meta?.durationSeconds !== null && meta?.durationSeconds !== undefined) || !!meta?.audibleId || !!meta?.librofmId,
         maxCandidatesPerProvider: 1,
       };
 
@@ -342,6 +342,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     if (filteredProviderIds[MetadataProviderKey.OPEN_LIBRARY]) scalarFields.openLibraryId = filteredProviderIds[MetadataProviderKey.OPEN_LIBRARY];
     if (filteredProviderIds[MetadataProviderKey.ITUNES]) scalarFields.itunesId = filteredProviderIds[MetadataProviderKey.ITUNES];
     if (filteredProviderIds[MetadataProviderKey.AUDIBLE]) scalarFields.audibleId = filteredProviderIds[MetadataProviderKey.AUDIBLE];
+    if (filteredProviderIds[MetadataProviderKey.LIBROFM]) scalarFields.librofmId = filteredProviderIds[MetadataProviderKey.LIBROFM];
     if (filteredProviderIds[MetadataProviderKey.KOBO]) scalarFields.koboId = filteredProviderIds[MetadataProviderKey.KOBO];
     if (filteredProviderIds[MetadataProviderKey.COMICVINE]) scalarFields.comicvineId = filteredProviderIds[MetadataProviderKey.COMICVINE];
     if (filteredProviderIds[MetadataProviderKey.RANOBEDB]) scalarFields.ranobedbId = filteredProviderIds[MetadataProviderKey.RANOBEDB];
@@ -444,6 +445,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     openLibraryId?: string | null;
     itunesId?: string | null;
     audibleId?: string | null;
+    librofmId?: string | null;
     koboId?: string | null;
     comicvineId?: string | null;
     ranobedbId?: string | null;
@@ -458,6 +460,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     if (meta.openLibraryId) ids[MetadataProviderKey.OPEN_LIBRARY] = meta.openLibraryId;
     if (meta.itunesId) ids[MetadataProviderKey.ITUNES] = meta.itunesId;
     if (meta.audibleId) ids[MetadataProviderKey.AUDIBLE] = meta.audibleId;
+    if (meta.librofmId) ids[MetadataProviderKey.LIBROFM] = meta.librofmId;
     if (meta.koboId) ids[MetadataProviderKey.KOBO] = meta.koboId;
     if (meta.comicvineId) ids[MetadataProviderKey.COMICVINE] = meta.comicvineId;
     if (meta.ranobedbId) ids[MetadataProviderKey.RANOBEDB] = meta.ranobedbId;

@@ -86,6 +86,7 @@ export interface CreateBookDockRowInput {
 
 export interface CreateReadingSessionInput {
   userId: number;
+  bookId: number;
   bookFileId: number;
   startedAt: Date;
   endedAt: Date;
@@ -405,6 +406,7 @@ export async function createReadingSession(
     .insert(schema.readingSessions)
     .values({
       userId: input.userId,
+      bookId: input.bookId,
       bookFileId: input.bookFileId,
       sessionId: input.sessionId ?? `session-${randomUUID()}`,
       startedAt: input.startedAt,

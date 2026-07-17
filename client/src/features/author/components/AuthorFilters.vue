@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import type { LibraryFilterOption } from '../types/author'
 
 defineProps<{
@@ -18,6 +19,8 @@ const emit = defineEmits<{
   clear: []
   close: []
 }>()
+
+const { t } = useI18n()
 
 function onClear() {
   emit('clear')
@@ -49,21 +52,21 @@ function onMinBookCountChange(event: Event) {
 <template>
   <section :class="embedded ? 'rounded-md border border-border bg-card p-3' : 'mb-4 rounded-md border border-border bg-card p-3'">
     <div class="mb-3 flex items-center justify-between">
-      <span class="text-xs font-medium text-muted-foreground">Author Filters</span>
+      <span class="text-xs font-medium text-muted-foreground">{{ t('author.filters.title') }}</span>
       <div class="flex items-center gap-2">
         <button
           v-if="(activeCount ?? 0) > 0"
           class="h-7 rounded-md border border-input px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           @click="onClear"
         >
-          Clear all
+          {{ t('author.filters.clearAll') }}
         </button>
         <button
           v-if="closable"
           class="h-7 rounded-md border border-input px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           @click="onClose"
         >
-          Close
+          {{ t('common.close') }}
         </button>
       </div>
     </div>
@@ -74,7 +77,7 @@ function onMinBookCountChange(event: Event) {
         class="h-9 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60"
         @change="onLibraryChange"
       >
-        <option value="">All Libraries</option>
+        <option value="">{{ t('author.filters.allLibraries') }}</option>
         <option v-for="library in libraries" :key="library.id" :value="library.id">{{ library.name }}</option>
       </select>
 
@@ -83,18 +86,18 @@ function onMinBookCountChange(event: Event) {
         class="h-9 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60"
         @change="onHasPhotoChange"
       >
-        <option value="">All authors</option>
-        <option value="true">Has photo</option>
-        <option value="false">Missing photo</option>
+        <option value="">{{ t('author.filters.allAuthors') }}</option>
+        <option value="true">{{ t('author.filters.hasPhoto') }}</option>
+        <option value="false">{{ t('author.filters.missingPhoto') }}</option>
       </select>
 
       <div class="flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-2.5">
-        <span class="text-sm text-muted-foreground">Min books</span>
+        <span class="text-sm text-muted-foreground">{{ t('author.filters.minBooks') }}</span>
         <input
           type="number"
           :value="minBookCount ?? ''"
           min="1"
-          placeholder="Any"
+          :placeholder="t('author.filters.anyPlaceholder')"
           class="w-14 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/85"
           @change="onMinBookCountChange"
         />

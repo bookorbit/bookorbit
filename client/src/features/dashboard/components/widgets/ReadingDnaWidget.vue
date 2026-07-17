@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { Dna } from '@lucide/vue'
 
 import { useReadingDnaWidget } from '../../composables/useReadingDnaWidget'
 
 const { data, loading, error } = useReadingDnaWidget()
+const { t } = useI18n()
 
 const traitColors: Record<string, string> = {
   length: 'bg-blue-500',
@@ -18,7 +20,7 @@ const traitColors: Record<string, string> = {
   <div class="flex h-full flex-col p-3">
     <div class="mb-2 flex items-center gap-2 self-start">
       <Dna :size="16" class="text-primary/90" />
-      <span class="text-[15px] font-semibold text-foreground">Reading DNA</span>
+      <span class="text-[15px] font-semibold text-foreground">{{ t('dashboard.widgets.readingDna.title') }}</span>
     </div>
 
     <!-- Loading -->
@@ -28,14 +30,16 @@ const traitColors: Record<string, string> = {
     </div>
 
     <!-- Error -->
-    <div v-else-if="error" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">Failed to load</div>
+    <div v-else-if="error" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+      {{ t('dashboard.common.failedToLoad') }}
+    </div>
 
     <!-- Not enough data -->
     <div v-else-if="!data || data.booksAnalyzed < 5" class="flex flex-1 flex-col items-center justify-center gap-2">
       <div class="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
         <Dna :size="16" class="text-muted-foreground/60" />
       </div>
-      <p class="text-center text-xs text-muted-foreground">Read at least 5 books to unlock your Reading DNA</p>
+      <p class="text-center text-xs text-muted-foreground">{{ t('dashboard.widgets.readingDna.notEnoughData') }}</p>
     </div>
 
     <!-- DNA Card -->
@@ -45,11 +49,11 @@ const traitColors: Record<string, string> = {
       <div class="space-y-1.5">
         <div
           v-for="trait in [
-            { key: 'length', label: 'Length', score: data.lengthScore, valueLabel: data.lengthLabel },
-            { key: 'variety', label: 'Variety', score: data.varietyScore, valueLabel: data.varietyLabel },
-            { key: 'rhythm', label: 'Rhythm', score: data.rhythmScore, valueLabel: data.rhythmLabel },
-            { key: 'time', label: 'Time', score: data.timeScore, valueLabel: data.timeLabel },
-            { key: 'speed', label: 'Speed', score: data.speedScore, valueLabel: data.speedLabel },
+            { key: 'length', label: t('dashboard.widgets.readingDna.traits.length'), score: data.lengthScore, valueLabel: data.lengthLabel },
+            { key: 'variety', label: t('dashboard.widgets.readingDna.traits.variety'), score: data.varietyScore, valueLabel: data.varietyLabel },
+            { key: 'rhythm', label: t('dashboard.widgets.readingDna.traits.rhythm'), score: data.rhythmScore, valueLabel: data.rhythmLabel },
+            { key: 'time', label: t('dashboard.widgets.readingDna.traits.time'), score: data.timeScore, valueLabel: data.timeLabel },
+            { key: 'speed', label: t('dashboard.widgets.readingDna.traits.speed'), score: data.speedScore, valueLabel: data.speedLabel },
           ]"
           :key="trait.key"
           class="flex items-center gap-2"
@@ -62,7 +66,9 @@ const traitColors: Record<string, string> = {
         </div>
       </div>
 
-      <p class="text-center text-[10px] text-muted-foreground">Based on {{ data.booksAnalyzed }} books</p>
+      <p class="text-center text-[10px] text-muted-foreground">
+        {{ t('dashboard.widgets.readingDna.basedOn', { count: data.booksAnalyzed }, data.booksAnalyzed) }}
+      </p>
     </div>
   </div>
 </template>

@@ -64,7 +64,7 @@ export function parseSpanSelector(path: string): string | null {
 }
 
 export function spanSelectorFromId(id: string): string {
-  return `span#${id.replace(/\./g, '\\.')}`;
+  return `span#${id.replace(/\\/g, '\\\\').replace(/\./g, '\\.')}`;
 }
 
 function isKoboSpanElement(node: CfiNode): boolean {

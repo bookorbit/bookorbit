@@ -223,7 +223,7 @@ describe('BookMetadataLockService', () => {
   });
 
   it('filters resolved metadata and provider ids for locked fields', async () => {
-    const { service } = makeService(['cover', 'authors', 'openLibraryId', 'hardcoverEditionId', 'comicVolumeName']);
+    const { service } = makeService(['cover', 'authors', 'openLibraryId', 'librofmId', 'hardcoverEditionId', 'comicVolumeName']);
 
     const result = await service.filterResolvedMetadata(
       12,
@@ -239,6 +239,7 @@ describe('BookMetadataLockService', () => {
       },
       {
         [MetadataProviderKey.GOOGLE]: 'g-id',
+        [MetadataProviderKey.LIBROFM]: '9781234567890',
         [MetadataProviderKey.OPEN_LIBRARY]: 'ol-id',
       },
     );
@@ -252,6 +253,6 @@ describe('BookMetadataLockService', () => {
     expect(result.providerIds).toEqual({
       [MetadataProviderKey.GOOGLE]: 'g-id',
     });
-    expect(result.skippedFields).toEqual(['authors', 'hardcoverEditionId', 'openLibraryId', 'comicVolumeName', 'cover']);
+    expect(result.skippedFields).toEqual(['authors', 'hardcoverEditionId', 'openLibraryId', 'librofmId', 'comicVolumeName', 'cover']);
   });
 });

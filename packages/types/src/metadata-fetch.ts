@@ -9,6 +9,7 @@ export const MetadataProviderKey = {
   ITUNES: "itunes",
   AUDIBLE: "audible",
   AUDNEXUS: "audnexus",
+  LIBROFM: "librofm",
   COMICVINE: "comicvine",
   RANOBEDB: "ranobedb",
   KOBO: "kobo",

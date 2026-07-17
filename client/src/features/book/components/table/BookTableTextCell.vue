@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 import { ExternalLink } from '@lucide/vue'
 
@@ -19,6 +20,8 @@ const emit = defineEmits<{
   cancel: []
   navigate: [direction: 'next' | 'prev' | 'rowUp' | 'rowDown']
 }>()
+
+const { t } = useI18n()
 
 const inputRef = ref<HTMLInputElement | null>(null)
 const draft = ref<string>(props.value ?? '')
@@ -244,8 +247,8 @@ function handleClick() {
             ? 'opacity-100'
             : 'pointer-events-none opacity-0 group-hover/text-cell:pointer-events-auto group-hover/text-cell:opacity-100 group-focus-within/text-cell:pointer-events-auto group-focus-within/text-cell:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100'
         "
-        :aria-label="openLinkLabel ?? 'Open details'"
-        :title="openLinkLabel ?? 'Open details'"
+        :aria-label="openLinkLabel ?? t('book.table.text.openDetails')"
+        :title="openLinkLabel ?? t('book.table.text.openDetails')"
         @click.stop
       >
         <ExternalLink :size="12" />

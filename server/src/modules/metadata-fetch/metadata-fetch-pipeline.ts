@@ -45,6 +45,11 @@ export interface MetadataFetchRunOptions {
 }
 
 type ResolvedProviderIds = Partial<Record<MetadataProviderKey, string>>;
+const AUDIOBOOK_PROVIDER_KEYS = new Set<MetadataProviderKey>([
+  MetadataProviderKey.AUDIBLE,
+  MetadataProviderKey.AUDNEXUS,
+  MetadataProviderKey.LIBROFM,
+]);
 
 type ProviderSelectionDiagnostics = Pick<
   MetadataFetchDiagnostics,
@@ -119,8 +124,11 @@ export class MetadataFetchPipeline {
   }> {
     const { preferences, registeredKeys, providerConfig } = await this.resolveProviderPreferenceContext(libraryId);
     const providerSelection = this.deriveProviderSet(preferences, registeredKeys, providerConfig);
+    const searchParams = providerSelection.activeProviders.some((provider) => AUDIOBOOK_PROVIDER_KEYS.has(provider))
+      ? { ...params, isAudiobook: true }
+      : params;
     const candidates = providerSelection.activeProviders.length
-      ? await firstValueFrom(this.fetchService.search(params, providerSelection.activeProviders).pipe(toArray()), {
+      ? await firstValueFrom(this.fetchService.search(searchParams, providerSelection.activeProviders).pipe(toArray()), {
           defaultValue: [] as MetadataCandidate[],
         })
       : [];
@@ -332,8 +340,10 @@ export class MetadataFetchPipeline {
     const providerIds: ResolvedProviderIds = {};
     if (preferences.options?.saveProviderIds) {
       for (const candidate of byProvider.values()) {
-        if (candidate.providerId && (!options?.preserveExisting || !existingProviderIds?.[candidate.provider])) {
-          providerIds[candidate.provider] = candidate.providerId;
+        const providerIdKey = candidate.provider === MetadataProviderKey.AUDNEXUS ? MetadataProviderKey.AUDIBLE : candidate.provider;
+        const providerId = candidate.provider === MetadataProviderKey.AUDNEXUS ? (candidate.audibleId ?? candidate.providerId) : candidate.providerId;
+        if (providerId && (!options?.preserveExisting || !existingProviderIds?.[providerIdKey])) {
+          providerIds[providerIdKey] = providerId;
         }
         if (
           candidate.provider === MetadataProviderKey.HARDCOVER &&

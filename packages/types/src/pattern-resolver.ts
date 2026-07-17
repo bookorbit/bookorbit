@@ -3,6 +3,7 @@ export const DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE =
 export const DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER =
   "<{authors:first}|Unknown Author>/<{series}/><{seriesIndex}. ><{title}|{originalFilename}>< ({year})>/<{seriesIndex}. ><{title}|{originalFilename}>< ({year})>";
 export const DEFAULT_DOWNLOAD_PATTERN = "{originalFilename}";
+export const DEFAULT_KOREADER_DEVICE_PATTERN = "<Series/{series}/|Standalone/{authors:first} - ><{seriesIndex:fixed2} - >{title}";
 
 export const EXAMPLE_PATTERN_METADATA: Record<string, string> = {
   title: "Neuromancer",
@@ -91,6 +92,10 @@ export function applyModifier(value: string, modifier: string, fieldName: string
       return value.toUpperCase();
     case "lower":
       return value.toLowerCase();
+    case "fixed2": {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric.toFixed(2) : value;
+    }
     default:
       return value;
   }
@@ -136,11 +141,8 @@ function normalizeResolverOptions(options?: PathResolverOptions): Required<PathR
   };
 }
 
-function sanitizePathSegmentValue(value: string, replacementCharacter: "_" | "-"): string {
-  let sanitized = value
-    .replace(INVALID_SEGMENT_CHARS_REGEX, replacementCharacter)
-    .trim()
-    .replace(/[. ]+$/g, "");
+export function sanitizePathSegment(value: string, replacementCharacter: "_" | "-" = "_"): string {
+  let sanitized = stripTrailingDotsAndSpaces(value.replace(INVALID_SEGMENT_CHARS_REGEX, replacementCharacter).trim());
   if (!sanitized || sanitized === "." || sanitized === "..") {
     sanitized = replacementCharacter;
   }
@@ -153,12 +155,18 @@ function sanitizePathSegmentValue(value: string, replacementCharacter: "_" | "-"
   return sanitized;
 }
 
+function stripTrailingDotsAndSpaces(value: string): string {
+  let end = value.length;
+  while (end > 0 && (value[end - 1] === "." || value[end - 1] === " ")) end -= 1;
+  return end === value.length ? value : value.slice(0, end);
+}
+
 function sanitizeResolutionValues(values: Record<string, string>, options: Required<PathResolverOptions>): Record<string, string> {
   if (!options.sanitizeForCrossPlatform) return values;
 
   const sanitized: Record<string, string> = {};
   for (const [key, value] of Object.entries(values)) {
-    sanitized[key] = sanitizePathSegmentValue(value, options.replacementCharacter);
+    sanitized[key] = value.trim() ? sanitizePathSegment(value, options.replacementCharacter) : "";
   }
 
   return sanitized;

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 import * as LucideIcons from '@lucide/vue'
 import { ChevronDown, Search, X } from '@lucide/vue'
 import { RecycleScroller } from 'vue-virtual-scroller'
@@ -19,6 +21,8 @@ const emit = defineEmits<{
   'update:modelValue': [value: string]
   'open-change': [value: boolean]
 }>()
+
+const { t } = useI18n()
 
 // ── Icon list ─────────────────────────────────────────────────────────────
 
@@ -129,7 +133,9 @@ const customRows = computed<CustomIconRow[]>(() => {
 })
 
 const activeCount = computed(() => (activeSource.value === 'lucide' ? filteredIcons.value.length : filteredCustomIcons.value.length))
-const searchPlaceholder = computed(() => (activeSource.value === 'lucide' ? 'Search Lucide icons...' : 'Search custom icons...'))
+const searchPlaceholder = computed(() =>
+  activeSource.value === 'lucide' ? t('components.iconPicker.searchLucide') : t('components.iconPicker.searchCustom'),
+)
 const customIconsSearching = computed(
   () =>
     serverSearchLoading.value ||
@@ -260,44 +266,52 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <!-- Trigger button -->
-  <button
+  <div
     ref="triggerRef"
-    type="button"
-    @click="toggle"
-    class="h-9 flex items-center justify-center gap-2 rounded-md border border-input bg-background shadow-xs text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+    class="flex h-9 items-center justify-center gap-2 rounded-md border border-input bg-background shadow-xs text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-within:ring-1 focus-within:ring-ring"
     :class="[!hideText ? 'w-full px-3' : '', hideText && modelValue ? 'w-9 px-0' : '', hideText && !modelValue ? 'px-3 whitespace-nowrap' : '']"
   >
-    <AppIcon v-if="modelValue" :icon="modelValue" :size="16" class="shrink-0" />
+    <button
+      type="button"
+      class="flex min-w-0 flex-1 items-center justify-center gap-2 focus-visible:outline-none"
+      :aria-expanded="open"
+      aria-haspopup="dialog"
+      @click="toggle"
+    >
+      <AppIcon v-if="modelValue" :icon="modelValue" :size="16" class="shrink-0" />
 
-    <template v-if="!modelValue">
-      <span v-if="!hideText" class="text-muted-foreground flex-1 text-left font-normal truncate">
-        {{ placeholder ?? 'Choose an icon...' }}
-      </span>
-      <span v-else class="text-foreground flex items-center gap-1.5">
-        <component :is="LucideIcons.Shapes" :size="14" class="text-muted-foreground" />
-        {{ placeholder ?? 'Select icon' }}
-      </span>
-      <ChevronDown
-        v-if="!hideText"
-        :size="14"
-        class="text-muted-foreground shrink-0 transition-transform duration-200"
-        :class="open ? 'rotate-180' : ''"
-      />
-    </template>
+      <template v-if="!modelValue">
+        <span v-if="!hideText" class="text-muted-foreground flex-1 text-left font-normal truncate">
+          {{ placeholder ?? 'Choose an icon...' }}
+        </span>
+        <span v-else class="text-foreground flex items-center gap-1.5">
+          <component :is="LucideIcons.Shapes" :size="14" class="text-muted-foreground" />
+          {{ placeholder ?? 'Select icon' }}
+        </span>
+        <ChevronDown
+          v-if="!hideText"
+          :size="14"
+          class="text-muted-foreground shrink-0 transition-transform duration-200"
+          :class="open ? 'rotate-180' : ''"
+        />
+      </template>
 
-    <template v-else-if="!hideText">
-      <span class="flex-1 text-left text-foreground truncate">{{ selectedLabel }}</span>
-      <button
-        type="button"
-        @click.stop="clearValue"
-        class="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition-colors shrink-0"
-      >
-        <X :size="12" />
-      </button>
-      <ChevronDown :size="14" class="text-muted-foreground shrink-0 transition-transform duration-200" :class="open ? 'rotate-180' : ''" />
-    </template>
-  </button>
+      <template v-else-if="!hideText">
+        <span class="flex-1 text-left text-foreground truncate">{{ selectedLabel }}</span>
+        <ChevronDown :size="14" class="text-muted-foreground shrink-0 transition-transform duration-200" :class="open ? 'rotate-180' : ''" />
+      </template>
+    </button>
+
+    <button
+      v-if="modelValue && !hideText"
+      type="button"
+      class="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition-colors shrink-0 focus-visible:outline-none"
+      :aria-label="t('components.iconPicker.clearSelectionAria')"
+      @click="clearValue"
+    >
+      <X :size="12" />
+    </button>
+  </div>
 
   <!-- Floating panel (teleported to avoid overflow clipping) -->
   <Teleport to="body">
@@ -327,7 +341,7 @@ onUnmounted(() => {
               :class="activeSource === 'custom' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
               @click="selectCustomTab"
             >
-              Custom
+              {{ t('components.iconPicker.customTab') }}
             </button>
           </div>
           <div class="flex items-center gap-2 px-3 py-2 border-border shrink-0">
@@ -340,7 +354,7 @@ onUnmounted(() => {
               class="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
             />
             <div class="flex items-center gap-2 shrink-0">
-              <span class="text-[11px] text-muted-foreground/80">{{ activeCount.toLocaleString() }}</span>
+              <span class="text-[11px] text-muted-foreground/80">{{ formatNumber(activeCount) }}</span>
               <button v-if="query" type="button" class="text-muted-foreground hover:text-foreground transition-colors" @click="clearQuery">
                 <X :size="13" />
               </button>
@@ -350,11 +364,11 @@ onUnmounted(() => {
 
         <!-- No results -->
         <div v-if="activeCount === 0" class="flex items-center justify-center py-12 text-xs text-muted-foreground">
-          <span v-if="activeSource === 'custom' && (customIconsLoading || customIconsSearching)">Searching...</span>
-          <span v-else-if="query">No icons match "{{ query }}"</span>
-          <span v-else-if="activeSource === 'custom' && catalogTruncated">Type to search all icons</span>
-          <span v-else-if="activeSource === 'custom'">No custom icons uploaded</span>
-          <span v-else>No icons available</span>
+          <span v-if="activeSource === 'custom' && (customIconsLoading || customIconsSearching)">{{ t('components.iconPicker.searching') }}</span>
+          <span v-else-if="query">{{ t('components.iconPicker.noIconsMatch', { query }) }}</span>
+          <span v-else-if="activeSource === 'custom' && catalogTruncated">{{ t('components.iconPicker.typeToSearch') }}</span>
+          <span v-else-if="activeSource === 'custom'">{{ t('components.iconPicker.noCustomIcons') }}</span>
+          <span v-else>{{ t('components.iconPicker.noIconsAvailable') }}</span>
         </div>
 
         <!-- Virtual icon grid -->

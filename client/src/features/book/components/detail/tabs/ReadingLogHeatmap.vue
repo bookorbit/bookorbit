@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { CalendarDays } from '@lucide/vue'
 import type { BookReadingSessionStats } from '@bookorbit/types'
@@ -16,8 +17,35 @@ const props = withDefaults(
   { embedded: false },
 )
 
+const { t } = useI18n()
+
 const DAY_MS = 24 * 60 * 60 * 1000
-const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+const dayLabels = computed(
+  () =>
+    [
+      t('book.detail.readingLog.weekdays.sun'),
+      t('book.detail.readingLog.weekdays.mon'),
+      t('book.detail.readingLog.weekdays.tue'),
+      t('book.detail.readingLog.weekdays.wed'),
+      t('book.detail.readingLog.weekdays.thu'),
+      t('book.detail.readingLog.weekdays.fri'),
+      t('book.detail.readingLog.weekdays.sat'),
+    ] as const,
+)
+const monthLabels = computed(() => [
+  t('book.detail.readingLog.months.jan'),
+  t('book.detail.readingLog.months.feb'),
+  t('book.detail.readingLog.months.mar'),
+  t('book.detail.readingLog.months.apr'),
+  t('book.detail.readingLog.months.may'),
+  t('book.detail.readingLog.months.jun'),
+  t('book.detail.readingLog.months.jul'),
+  t('book.detail.readingLog.months.aug'),
+  t('book.detail.readingLog.months.sep'),
+  t('book.detail.readingLog.months.oct'),
+  t('book.detail.readingLog.months.nov'),
+  t('book.detail.readingLog.months.dec'),
+])
 
 const themeStore = useThemeStore()
 const option = shallowRef({})
@@ -90,7 +118,7 @@ watchEffect(() => {
   option.value = {}
   if (!hasData.value) return
 
-  const palette = buildHeatmapPalette({ theme: themeStore.theme, profile: 'github' })
+  const palette = buildHeatmapPalette({ theme: themeStore.resolvedTheme, profile: 'github' })
   // Touching accent makes this effect re-run when the palette source changes.
   void themeStore.accent
 
@@ -115,7 +143,7 @@ watchEffect(() => {
       textStyle: { color: palette.tooltipText, fontSize: 12 },
       formatter: (params: { value: [string, number] }) => {
         const [day, minutes] = params.value
-        return `${day}<br/><strong>${minutes}</strong> min`
+        return `${day}<br/><strong>${minutes}</strong> ${t('book.detail.readingLog.heatmap.minutesUnit')}`
       },
     },
     visualMap: {
@@ -146,7 +174,7 @@ watchEffect(() => {
         fontSize: 9,
         color: palette.axisColor,
         margin: 6,
-        nameMap: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+        nameMap: monthLabels.value,
       },
       dayLabel: {
         show: true,
@@ -154,7 +182,7 @@ watchEffect(() => {
         fontSize: 8,
         color: palette.axisColor,
         margin: 6,
-        nameMap: DAY_LABELS,
+        nameMap: dayLabels.value,
       },
       itemStyle: {
         color: 'transparent',
@@ -183,7 +211,7 @@ watchEffect(() => {
     <div class="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
       <span class="flex items-center gap-2 text-sm font-semibold text-foreground">
         <CalendarDays class="size-4 text-muted-foreground" />
-        <span id="reading-activity-heading">Activity</span>
+        <span id="reading-activity-heading">{{ t('book.detail.readingLog.heatmap.title') }}</span>
       </span>
       <span v-if="subtitle" class="text-xs text-muted-foreground">{{ subtitle }}</span>
     </div>
@@ -191,8 +219,8 @@ watchEffect(() => {
       <VChart :option autoresize class="absolute inset-0" />
     </div>
     <div v-else class="flex flex-1 flex-col items-center justify-center py-10 text-center" style="min-height: 228px">
-      <p class="text-sm font-medium text-foreground">No reading activity in this window.</p>
-      <p class="mt-1 text-sm text-muted-foreground">Sessions recorded here will build your consistency view.</p>
+      <p class="text-sm font-medium text-foreground">{{ t('book.detail.readingLog.heatmap.empty') }}</p>
+      <p class="mt-1 text-sm text-muted-foreground">{{ t('book.detail.readingLog.heatmap.emptyHint') }}</p>
     </div>
   </section>
 </template>

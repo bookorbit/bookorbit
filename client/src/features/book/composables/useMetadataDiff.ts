@@ -104,6 +104,7 @@ export interface MetadataPatch {
   openLibraryId?: string | null
   itunesId?: string | null
   audibleId?: string | null
+  librofmId?: string | null
   koboId?: string | null
   comicvineId?: string | null
   ranobedbId?: string | null
@@ -171,6 +172,7 @@ export type ProviderIdPatchField =
   | 'openLibraryId'
   | 'itunesId'
   | 'audibleId'
+  | 'librofmId'
   | 'koboId'
   | 'comicvineId'
   | 'ranobedbId'
@@ -185,7 +187,8 @@ export const PROVIDER_ID_FIELD: Record<MetadataProviderKey, ProviderIdPatchField
   openLibrary: 'openLibraryId',
   itunes: 'itunesId',
   audible: 'audibleId',
-  audnexus: undefined,
+  audnexus: 'audibleId',
+  librofm: 'librofmId',
   comicvine: 'comicvineId',
   ranobedb: 'ranobedbId',
   kobo: 'koboId',
@@ -207,7 +210,8 @@ export const PROVIDER_ID_LABEL: Record<MetadataProviderKey, string> = {
   openLibrary: 'Open Library ID',
   itunes: 'iTunes ID',
   audible: 'Audible ID',
-  audnexus: 'AudNexus ID',
+  audnexus: 'Audible ID',
+  librofm: 'Libro.fm ISBN',
   comicvine: 'ComicVine ID',
   ranobedb: 'RanobeDB ID',
   kobo: 'Kobo ID',
@@ -389,7 +393,7 @@ export function useMetadataDiff(
       }
     }
 
-    const existingProviderId = ids?.[ap] ?? ''
+    const existingProviderId = ids?.[ap] ?? (ap === 'audnexus' ? ids?.audible : '') ?? ''
     const providerIdKey = PROVIDER_ID_FIELD[ap]
     if (providerIdKey && activeCandidate && (activeCandidate.providerId || existingProviderId)) {
       const pickedProvider = pickedSources.get(providerIdKey) ?? null

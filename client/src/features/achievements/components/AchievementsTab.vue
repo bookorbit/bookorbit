@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Loader2 } from '@lucide/vue'
 import { useAchievements } from '../composables/useAchievements'
 import { groupAchievements } from '../composables/useGroupedAchievements'
@@ -7,6 +8,7 @@ import type { FilterState } from '../types'
 import AchievementCategorySection from './AchievementCategorySection.vue'
 import AchievementFilterBar from './AchievementFilterBar.vue'
 
+const { t } = useI18n()
 const { categories, totalEarned, totalAvailable, loading, error, reload } = useAchievements()
 
 const activeFilter = ref<FilterState>('all')
@@ -44,8 +46,8 @@ function handleFilterChange(filter: FilterState): void {
     </div>
 
     <div v-else-if="error" class="flex flex-col items-center gap-3 py-16">
-      <p class="text-muted-foreground text-sm">Failed to load achievements</p>
-      <button class="text-primary hover:text-primary/80 text-sm font-medium" @click="reload">Try again</button>
+      <p class="text-muted-foreground text-sm">{{ t('achievements.loadFailed') }}</p>
+      <button class="text-primary hover:text-primary/80 text-sm font-medium" @click="reload">{{ t('achievements.tryAgain') }}</button>
     </div>
 
     <template v-else>

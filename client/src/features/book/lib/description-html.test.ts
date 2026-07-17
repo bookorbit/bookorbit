@@ -18,6 +18,12 @@ describe('description-html', () => {
     expect(html).toBe('<p>Hello</p>')
   })
 
+  it('does not treat nested script-like input as visible markup', () => {
+    const html = sanitizeDescriptionHtml('<scr<script>ipt>alert(1)</scr</script>ipt>')
+
+    expect(html).not.toContain('<script')
+  })
+
   it('normalizes empty editor output to null', () => {
     expect(normalizeDescriptionHtml('<p><br></p>')).toBeNull()
     expect(normalizeDescriptionHtml('<ul><li></li></ul>')).toBeNull()

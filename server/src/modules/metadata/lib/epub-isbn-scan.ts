@@ -3,6 +3,7 @@ import { XMLParser } from 'fast-xml-parser';
 
 import { attr, findInZip, toRecordArray } from './epub-zip-utils';
 import { findIsbnInText, pickBestIsbn } from './isbn-detect';
+import { htmlToPlainText } from '../../../common/utils/html-to-text.utils';
 
 const SPINE_WINDOW_FRONT = 10;
 const SPINE_WINDOW_BACK = 5;
@@ -21,13 +22,6 @@ interface IsbnResult {
 }
 
 const EMPTY: IsbnResult = { isbn10: null, isbn13: null };
-
-function stripTags(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ');
-}
 
 async function readEntryCapped(file: unzipper.File): Promise<string> {
   const size = file.uncompressedSize ?? 0;
@@ -92,7 +86,7 @@ export async function scanEpubSpineForIsbn(zip: unzipper.CentralDirectory, opfXm
     for (const doc of docs) {
       let text: string;
       try {
-        text = stripTags(await readEntryCapped(doc));
+        text = htmlToPlainText(await readEntryCapped(doc));
       } catch {
         continue;
       }

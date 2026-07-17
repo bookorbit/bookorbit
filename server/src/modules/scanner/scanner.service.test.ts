@@ -21,14 +21,13 @@ import { ScannerService } from './scanner.service';
 import { ScanJobStore } from './scan-job-store.service';
 import { DEFAULT_FORMAT_PRIORITY } from './lib/classify';
 import type { BookCandidate, FileStat } from './lib/walk';
-import { findBookCandidates, findLooseFileCandidates, buildSingleBookCandidate, clampIno } from './lib/walk';
+import { findBookCandidates, findLooseFileCandidates, buildSingleBookCandidate } from './lib/walk';
 import { computeFileHash } from './lib/hash';
 import * as assembleBookCardsModule from '../book/utils/assemble-book-cards';
 
 const mockFindCandidates = findBookCandidates as MockedFunction<typeof findBookCandidates>;
 const mockFindLooseCandidates = findLooseFileCandidates as MockedFunction<typeof findLooseFileCandidates>;
 const mockBuildSingleCandidate = buildSingleBookCandidate as MockedFunction<typeof buildSingleBookCandidate>;
-const mockClampIno = clampIno as MockedFunction<typeof clampIno>;
 const mockFingerprint = computeFileHash as MockedFunction<typeof computeFileHash>;
 const mockReaddir = readdir as MockedFunction<typeof readdir>;
 const mockStat = stat as MockedFunction<typeof stat>;
@@ -39,7 +38,7 @@ function makeFileStat(overrides: Partial<FileStat> = {}): FileStat {
   return {
     absolutePath: '/library/Author/Book/book.epub',
     relPath: 'Author/Book/book.epub',
-    ino: 1001,
+    ino: 1001n,
     sizeBytes: 1024,
     mtime: new Date('2024-01-01'),
     ...overrides,
@@ -57,7 +56,7 @@ function makeBookFile(overrides: Record<string, unknown> = {}) {
     libraryFolderId: 1,
     absolutePath: '/library/Author/Book/book.epub',
     relPath: 'Author/Book/book.epub',
-    ino: 1001,
+    ino: 1001n,
     sizeBytes: 1024,
     mtime: new Date('2024-01-01'),
     fileHash: 'abc123',
@@ -190,9 +189,6 @@ beforeEach(() => {
   mockFindCandidates.mockResolvedValue({ candidates: [], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
   mockFindLooseCandidates.mockResolvedValue({ candidates: [], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
   mockBuildSingleCandidate.mockResolvedValue(null);
-  mockClampIno.mockImplementation((ino: bigint) => {
-    return ino > BigInt(Number.MAX_SAFE_INTEGER) ? 0 : Number(ino);
-  });
   mockFingerprint.mockResolvedValue('hash-abc');
   mockReaddir.mockResolvedValue([]);
   mockStat.mockResolvedValue({ isFile: () => true, ino: 2001n, size: 1024, mtime: new Date('2024-01-01') } as any);
@@ -648,7 +644,7 @@ describe('genuinely new primary file', () => {
     const opf = makeFileStat({
       absolutePath: '/library/Book/metadata.opf',
       relPath: 'Book/metadata.opf',
-      ino: 1002,
+      ino: 1002n,
       format: 'opf',
       role: 'metadata',
     });
@@ -678,7 +674,7 @@ describe('genuinely new primary file', () => {
     const opf = makeFileStat({
       absolutePath: '/library/Book/metadata.opf',
       relPath: 'Book/metadata.opf',
-      ino: 1002,
+      ino: 1002n,
       format: 'opf',
       role: 'metadata',
     });
@@ -702,7 +698,7 @@ describe('genuinely new primary file', () => {
     const opf = makeFileStat({
       absolutePath: '/library/Book/metadata.opf',
       relPath: 'Book/metadata.opf',
-      ino: 1002,
+      ino: 1002n,
       format: 'opf',
       role: 'metadata',
     });
@@ -735,7 +731,7 @@ describe('genuinely new primary file', () => {
     const opf = makeFileStat({
       absolutePath: '/library/Book/metadata.opf',
       relPath: 'Book/metadata.opf',
-      ino: 1002,
+      ino: 1002n,
       format: 'opf',
       role: 'metadata',
     });
@@ -767,7 +763,7 @@ describe('genuinely new primary file', () => {
     const opf = makeFileStat({
       absolutePath: '/library/Book/metadata.opf',
       relPath: 'Book/metadata.opf',
-      ino: 1002,
+      ino: 1002n,
       sizeBytes: 128,
       mtime: new Date('2024-01-02'),
       format: 'opf',
@@ -925,11 +921,12 @@ describe('file identity resolution', () => {
     expect(repo.createBookFile).not.toHaveBeenCalled();
   });
 
-  it('updates path when inode matches a known file at a different path (renamed file)', async () => {
-    const fileStat = makeFileStat({ absolutePath: '/library/Author/Book/renamed.epub', relPath: 'Author/Book/renamed.epub', ino: 9999 });
-
+  it('repairs a previously clamped inode even when the file size and mtime are unchanged', async () => {
+    const mtime = new Date('2024-01-01');
+    const exactIno = 14351917807348929000n;
+    const fileStat = makeFileStat({ ino: exactIno, mtime });
     const repo = makeRepo({
-      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([makeBookFile({ absolutePath: '/library/Author/Book/old-name.epub', ino: 9999 })]),
+      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([makeBookFile({ ino: 0n, mtime, sizeBytes: fileStat.sizeBytes })]),
       findBooksByLibraryFolder: vi
         .fn()
         .mockResolvedValue([{ id: 1, libraryId: 1, libraryFolderId: 1, folderPath: '/library/Author/Book', status: 'present' }]),
@@ -946,22 +943,48 @@ describe('file identity resolution', () => {
     await service.startScan(1, 'manual');
     await done;
 
+    expect(repo.updateBookFile).toHaveBeenCalledWith(1, expect.objectContaining({ ino: exactIno }));
+    expect(repo.createBookFile).not.toHaveBeenCalled();
+  });
+
+  it('updates path when inode matches a known file at a different path (renamed file)', async () => {
+    const fileStat = makeFileStat({ absolutePath: '/library/Author/Book/renamed.epub', relPath: 'Author/Book/renamed.epub', ino: 9999n });
+
+    const repo = makeRepo({
+      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([makeBookFile({ absolutePath: '/library/Author/Book/old-name.epub', ino: 9999n })]),
+      findBooksByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([{ id: 1, libraryId: 1, libraryFolderId: 1, folderPath: '/library/Author/Book', status: 'present' }]),
+    });
+    mockFindCandidates.mockResolvedValue({
+      candidates: [makeCandidate('/library/Author/Book', [fileStat])],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+    mockStat.mockRejectedValue(Object.assign(new Error('not found'), { code: 'ENOENT' }));
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
     expect(repo.updateBookFile).toHaveBeenCalledWith(1, expect.objectContaining({ absolutePath: '/library/Author/Book/renamed.epub' }));
     expect(repo.createBookFile).not.toHaveBeenCalled();
   });
 
-  it('reuses existing book id when an entire book folder is renamed via inode match', async () => {
+  it('reuses an existing book id when a MergerFS folder is renamed via an exact oversized inode match', async () => {
     const renamedFile = makeFileStat({
       absolutePath: '/library/Author/NewName/book.epub',
       relPath: 'Author/NewName/book.epub',
-      ino: 9090,
+      ino: 14351917807348929000n,
     });
     const existingFile = makeBookFile({
       id: 21,
       bookId: 10,
       absolutePath: '/library/Author/OldName/book.epub',
       relPath: 'Author/OldName/book.epub',
-      ino: 9090,
+      ino: 14351917807348929000n,
       fileHash: 'rename-hash',
     });
 
@@ -977,6 +1000,7 @@ describe('file identity resolution', () => {
       unchangedDirs: new Set(),
       dirMtimes: new Map(),
     });
+    mockStat.mockRejectedValue(Object.assign(new Error('not found'), { code: 'ENOENT' }));
 
     const done = awaitScan(repo);
     const { service } = makeService(repo);
@@ -1000,14 +1024,14 @@ describe('file identity resolution', () => {
     const renamedFile = makeFileStat({
       absolutePath: '/library/Author/NewName/book.epub',
       relPath: 'Author/NewName/book.epub',
-      ino: 0,
+      ino: 0n,
     });
     const existingFile = makeBookFile({
       id: 31,
       bookId: 11,
       absolutePath: '/library/Author/OldName/book.epub',
       relPath: 'Author/OldName/book.epub',
-      ino: 0,
+      ino: 0n,
       fileHash: 'rename-hash',
     });
 
@@ -1025,6 +1049,7 @@ describe('file identity resolution', () => {
       dirMtimes: new Map(),
     });
     mockFingerprint.mockResolvedValue('rename-hash');
+    mockStat.mockRejectedValue(Object.assign(new Error('not found'), { code: 'ENOENT' }));
 
     const done = awaitScan(repo);
     const { service } = makeService(repo);
@@ -1044,8 +1069,50 @@ describe('file identity resolution', () => {
     expect(repo.markBooksAsMissing).not.toHaveBeenCalled();
   });
 
+  it('does not reuse a book when a hash matches but the original folder still exists', async () => {
+    const newFile = makeFileStat({
+      absolutePath: '/library/Author/NewBook/book.epub',
+      relPath: 'Author/NewBook/book.epub',
+      ino: 14351917807348929000n,
+    });
+    const existingFile = makeBookFile({
+      id: 41,
+      bookId: 12,
+      absolutePath: '/library/Author/ExistingBook/book.epub',
+      relPath: 'Author/ExistingBook/book.epub',
+      ino: 15101917807348929000n,
+      fileHash: 'shared-partial-hash',
+    });
+    const repo = makeRepo({
+      findBooksByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([{ id: 12, libraryId: 1, libraryFolderId: 1, folderPath: '/library/Author/ExistingBook', status: 'present' }]),
+      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([existingFile]),
+      findBookFileByHash: vi.fn().mockResolvedValue(existingFile),
+    });
+    mockFindCandidates.mockResolvedValue({
+      candidates: [makeCandidate('/library/Author/NewBook', [newFile])],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+    mockFingerprint.mockResolvedValue('shared-partial-hash');
+    mockStat.mockResolvedValue({ isFile: () => true } as any);
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(repo.updateBookFolderPath).not.toHaveBeenCalled();
+    expect(repo.createBook).toHaveBeenCalledWith(
+      expect.objectContaining({ libraryId: 1, libraryFolderId: 1, folderPath: '/library/Author/NewBook' }),
+    );
+    expect(repo.createBookFile).toHaveBeenCalledWith(expect.objectContaining({ absolutePath: newFile.absolutePath, ino: newFile.ino }));
+  });
+
   it('gracefully skips a file that disappears during fingerprinting (ENOENT) — scan still completes', async () => {
-    const fileStat = makeFileStat({ ino: 7777 }); // different ino so inode match fails
+    const fileStat = makeFileStat({ ino: 7777n }); // different ino so inode match fails
     mockFindCandidates.mockResolvedValue({
       candidates: [makeCandidate('/library/Author/Book', [fileStat])],
       skippedDirs: new Set(),
@@ -1066,8 +1133,8 @@ describe('file identity resolution', () => {
   });
 
   it('updates path when hash matches a known file from a different filesystem (cross-fs move)', async () => {
-    const fileStat = makeFileStat({ absolutePath: '/library/moved.epub', relPath: 'moved.epub', ino: 8888 });
-    const existingFile = makeBookFile({ absolutePath: '/old-library/book.epub', ino: 1111, fileHash: 'fixed-hash' });
+    const fileStat = makeFileStat({ absolutePath: '/library/moved.epub', relPath: 'moved.epub', ino: 8888n });
+    const existingFile = makeBookFile({ absolutePath: '/old-library/book.epub', ino: 1111n, fileHash: 'fixed-hash' });
 
     const repo = makeRepo({
       findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([existingFile]),
@@ -1083,7 +1150,7 @@ describe('file identity resolution', () => {
       dirMtimes: new Map(),
     });
     mockFingerprint.mockResolvedValue('fixed-hash');
-
+    mockStat.mockRejectedValue(Object.assign(new Error('not found'), { code: 'ENOENT' }));
     const done = awaitScan(repo);
     const { service } = makeService(repo);
     await service.startScan(1, 'manual');
@@ -1158,7 +1225,7 @@ describe('allowedFormats filtering', () => {
 describe('audio multi-file audiobook', () => {
   it('calls extractAndSave on the winner (first natural-sorted) audio file only', async () => {
     const file1 = makeFileStat({ absolutePath: '/library/Book/chapter-01.mp3', relPath: 'Book/chapter-01.mp3' });
-    const file2 = makeFileStat({ absolutePath: '/library/Book/chapter-02.mp3', relPath: 'Book/chapter-02.mp3', ino: 1002 });
+    const file2 = makeFileStat({ absolutePath: '/library/Book/chapter-02.mp3', relPath: 'Book/chapter-02.mp3', ino: 1002n });
     const candidate = makeCandidate('/library/Book', [file1, file2]);
     mockFindCandidates.mockResolvedValue({ candidates: [candidate], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
 
@@ -1174,8 +1241,8 @@ describe('audio multi-file audiobook', () => {
 
   it('calls extractAudioFileDuration for ALL new audio files including the winner', async () => {
     const file1 = makeFileStat({ absolutePath: '/library/Book/chapter-01.mp3', relPath: 'Book/chapter-01.mp3' });
-    const file2 = makeFileStat({ absolutePath: '/library/Book/chapter-02.mp3', relPath: 'Book/chapter-02.mp3', ino: 1002 });
-    const file3 = makeFileStat({ absolutePath: '/library/Book/chapter-03.mp3', relPath: 'Book/chapter-03.mp3', ino: 1003 });
+    const file2 = makeFileStat({ absolutePath: '/library/Book/chapter-02.mp3', relPath: 'Book/chapter-02.mp3', ino: 1002n });
+    const file3 = makeFileStat({ absolutePath: '/library/Book/chapter-03.mp3', relPath: 'Book/chapter-03.mp3', ino: 1003n });
     const candidate = makeCandidate('/library/Book', [file1, file2, file3]);
     mockFindCandidates.mockResolvedValue({ candidates: [candidate], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
 
@@ -1195,7 +1262,7 @@ describe('audio multi-file audiobook', () => {
 
   it('calls aggregateAudioDuration after processing audio files', async () => {
     const file1 = makeFileStat({ absolutePath: '/library/Book/chapter-01.mp3', relPath: 'Book/chapter-01.mp3' });
-    const file2 = makeFileStat({ absolutePath: '/library/Book/chapter-02.mp3', relPath: 'Book/chapter-02.mp3', ino: 1002 });
+    const file2 = makeFileStat({ absolutePath: '/library/Book/chapter-02.mp3', relPath: 'Book/chapter-02.mp3', ino: 1002n });
     const candidate = makeCandidate('/library/Book', [file1, file2]);
     mockFindCandidates.mockResolvedValue({ candidates: [candidate], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
 
@@ -1239,9 +1306,9 @@ describe('audio multi-file audiobook', () => {
   });
 
   it('uses epub metadata (not audio) when a book has both epub and mp3 files', async () => {
-    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 2001 });
-    const mp3a = makeFileStat({ absolutePath: '/library/Book/book/01.mp3', relPath: 'Book/book/01.mp3', ino: 2002 });
-    const mp3b = makeFileStat({ absolutePath: '/library/Book/book/02.mp3', relPath: 'Book/book/02.mp3', ino: 2003 });
+    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 2001n });
+    const mp3a = makeFileStat({ absolutePath: '/library/Book/book/01.mp3', relPath: 'Book/book/01.mp3', ino: 2002n });
+    const mp3b = makeFileStat({ absolutePath: '/library/Book/book/02.mp3', relPath: 'Book/book/02.mp3', ino: 2003n });
     const candidate = makeCandidate('/library/Book', [epub, mp3a, mp3b]);
     mockFindCandidates.mockResolvedValue({ candidates: [candidate], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
 
@@ -1257,9 +1324,9 @@ describe('audio multi-file audiobook', () => {
   });
 
   it('extracts duration from ALL new audio files when ebook is the winner', async () => {
-    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 2001 });
-    const mp3a = makeFileStat({ absolutePath: '/library/Book/book/01.mp3', relPath: 'Book/book/01.mp3', ino: 2002 });
-    const mp3b = makeFileStat({ absolutePath: '/library/Book/book/02.mp3', relPath: 'Book/book/02.mp3', ino: 2003 });
+    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 2001n });
+    const mp3a = makeFileStat({ absolutePath: '/library/Book/book/01.mp3', relPath: 'Book/book/01.mp3', ino: 2002n });
+    const mp3b = makeFileStat({ absolutePath: '/library/Book/book/02.mp3', relPath: 'Book/book/02.mp3', ino: 2003n });
     const candidate = makeCandidate('/library/Book', [epub, mp3a, mp3b]);
     mockFindCandidates.mockResolvedValue({ candidates: [candidate], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
 
@@ -1277,7 +1344,7 @@ describe('audio multi-file audiobook', () => {
 
   it('falls back to audio metadata when no non-audio metadata format is in the candidate', async () => {
     const mp3a = makeFileStat({ absolutePath: '/library/Book/01.mp3', relPath: 'Book/01.mp3' });
-    const mp3b = makeFileStat({ absolutePath: '/library/Book/02.mp3', relPath: 'Book/02.mp3', ino: 1002 });
+    const mp3b = makeFileStat({ absolutePath: '/library/Book/02.mp3', relPath: 'Book/02.mp3', ino: 1002n });
     const candidate = makeCandidate('/library/Book', [mp3a, mp3b]);
     mockFindCandidates.mockResolvedValue({ candidates: [candidate], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
 
@@ -1314,8 +1381,8 @@ describe('multi-format metadata source routing', () => {
         organizationMode: 'book_per_folder',
       }),
     });
-    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 3001 });
-    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 3002 });
+    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 3001n });
+    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 3002n });
     mockFindCandidates.mockResolvedValue({
       candidates: [makeCandidate('/library/Book', [m4b, epub])],
       skippedDirs: new Set(),
@@ -1343,8 +1410,8 @@ describe('multi-format metadata source routing', () => {
         organizationMode: 'book_per_folder',
       }),
     });
-    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 3001 });
-    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 3002 });
+    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 3001n });
+    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 3002n });
     mockFindCandidates.mockResolvedValue({
       candidates: [makeCandidate('/library/Book', [m4b, epub])],
       skippedDirs: new Set(),
@@ -1363,8 +1430,8 @@ describe('multi-format metadata source routing', () => {
 
   it('epub primary + m4b secondary: epub owns text/cover, m4b provides chapters/narrators', async () => {
     // Default formatPriority has epub before m4b — epub wins.
-    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 4001 });
-    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 4002 });
+    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 4001n });
+    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 4002n });
     mockFindCandidates.mockResolvedValue({
       candidates: [makeCandidate('/library/Book', [epub, m4b])],
       skippedDirs: new Set(),
@@ -1390,9 +1457,9 @@ describe('multi-format metadata source routing', () => {
   });
 
   it('epub primary + multi-track m4b: chapters/narrators from first m4b, duration from all m4b files', async () => {
-    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 5001 });
-    const m4b1 = makeFileStat({ absolutePath: '/library/Book/disc-1.m4b', relPath: 'Book/disc-1.m4b', ino: 5002 });
-    const m4b2 = makeFileStat({ absolutePath: '/library/Book/disc-2.m4b', relPath: 'Book/disc-2.m4b', ino: 5003 });
+    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 5001n });
+    const m4b1 = makeFileStat({ absolutePath: '/library/Book/disc-1.m4b', relPath: 'Book/disc-1.m4b', ino: 5002n });
+    const m4b2 = makeFileStat({ absolutePath: '/library/Book/disc-2.m4b', relPath: 'Book/disc-2.m4b', ino: 5003n });
     mockFindCandidates.mockResolvedValue({
       candidates: [makeCandidate('/library/Book', [epub, m4b1, m4b2])],
       skippedDirs: new Set(),
@@ -1421,9 +1488,9 @@ describe('multi-format metadata source routing', () => {
 
   it('epub + pdf + mobi all new: only epub metadata extracted, pdf and mobi are ignored', async () => {
     // epub comes first in DEFAULT_FORMAT_PRIORITY
-    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 6001 });
-    const pdf = makeFileStat({ absolutePath: '/library/Book/book.pdf', relPath: 'Book/book.pdf', ino: 6002 });
-    const mobi = makeFileStat({ absolutePath: '/library/Book/book.mobi', relPath: 'Book/book.mobi', ino: 6003 });
+    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 6001n });
+    const pdf = makeFileStat({ absolutePath: '/library/Book/book.pdf', relPath: 'Book/book.pdf', ino: 6002n });
+    const mobi = makeFileStat({ absolutePath: '/library/Book/book.mobi', relPath: 'Book/book.mobi', ino: 6003n });
     mockFindCandidates.mockResolvedValue({
       candidates: [makeCandidate('/library/Book', [epub, pdf, mobi])],
       skippedDirs: new Set(),
@@ -1450,8 +1517,8 @@ describe('multi-format metadata source routing', () => {
         organizationMode: 'book_per_folder',
       }),
     });
-    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 7001 });
-    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 7002 });
+    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 7001n });
+    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 7002n });
     mockFindCandidates.mockResolvedValue({
       candidates: [makeCandidate('/library/Book', [m4b, epub])],
       skippedDirs: new Set(),
@@ -1476,8 +1543,8 @@ describe('multi-format metadata source routing', () => {
 
 describe('incremental scan — no re-extraction on unchanged winner', () => {
   it('does not call extractAndSave when winner m4b was already scanned and a new epub is added', async () => {
-    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 8001 });
-    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 8002 });
+    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 8001n });
+    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 8002n });
 
     const repo = makeRepo({
       findLibrarySettings: vi.fn().mockResolvedValue({
@@ -1513,8 +1580,8 @@ describe('incremental scan — no re-extraction on unchanged winner', () => {
   });
 
   it('extracts chapters/narrators/duration from new m4b even when winner epub was already scanned', async () => {
-    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 9001 });
-    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 9002 });
+    const epub = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', ino: 9001n });
+    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 9002n });
 
     const repo = makeRepo({
       // epub already exists in DB — not new; m4b is genuinely new
@@ -1544,7 +1611,7 @@ describe('incremental scan — no re-extraction on unchanged winner', () => {
   });
 
   it('does not call aggregateAudioDuration when existing audio book has no new files', async () => {
-    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 10001 });
+    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', ino: 10001n });
 
     const repo = makeRepo({
       findBooksByLibraryFolder: vi
@@ -1621,7 +1688,7 @@ describe('cross-library transfer', () => {
     const destinationFile = makeFileStat({
       absolutePath: '/dest/Inbox/book.epub',
       relPath: 'Inbox/book.epub',
-      ino: 4242,
+      ino: 4242n,
     });
     const sourceFile = makeBookFile({
       id: 500,
@@ -1629,7 +1696,7 @@ describe('cross-library transfer', () => {
       libraryFolderId: 10,
       absolutePath: '/source/Book/book.epub',
       relPath: 'Book/book.epub',
-      ino: 4242,
+      ino: 4242n,
       fileHash: 'transfer-hash',
     });
 
@@ -1658,6 +1725,7 @@ describe('cross-library transfer', () => {
       unchangedDirs: new Set(),
       dirMtimes: new Map(),
     });
+    mockStat.mockRejectedValue(Object.assign(new Error('not found'), { code: 'ENOENT' }));
 
     const done = awaitScan(repo);
     const { service, notificationService } = makeService(repo);
@@ -1686,7 +1754,7 @@ describe('cross-library transfer', () => {
     const destinationFile = makeFileStat({
       absolutePath: '/dest/Inbox/book.epub',
       relPath: 'Inbox/book.epub',
-      ino: 4343,
+      ino: 4343n,
     });
     const sourceFile = makeBookFile({
       id: 510,
@@ -1694,7 +1762,7 @@ describe('cross-library transfer', () => {
       libraryFolderId: 10,
       absolutePath: '/source/Book/book.epub',
       relPath: 'Book/book.epub',
-      ino: 4343,
+      ino: 4343n,
       fileHash: 'transfer-hash',
     });
 
@@ -1719,7 +1787,7 @@ describe('cross-library transfer', () => {
       unchangedDirs: new Set(),
       dirMtimes: new Map(),
     });
-    mockStat.mockRejectedValueOnce(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+    mockStat.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
 
     const done = awaitScan(repo);
     const { service } = makeService(repo);
@@ -1745,7 +1813,7 @@ describe('cross-library transfer', () => {
     const destinationFile = makeFileStat({
       absolutePath: '/dest/Inbox/book.epub',
       relPath: 'Inbox/book.epub',
-      ino: 9999,
+      ino: 9999n,
     });
     const sourceFile = makeBookFile({
       id: 600,
@@ -1753,7 +1821,7 @@ describe('cross-library transfer', () => {
       libraryFolderId: 11,
       absolutePath: '/source/Book/book.epub',
       relPath: 'Book/book.epub',
-      ino: 2222,
+      ino: 2222n,
       fileHash: 'transfer-hash',
     });
 
@@ -1786,6 +1854,7 @@ describe('cross-library transfer', () => {
       dirMtimes: new Map(),
     });
     mockFingerprint.mockResolvedValue('transfer-hash');
+    mockStat.mockRejectedValue(Object.assign(new Error('not found'), { code: 'ENOENT' }));
 
     const done = awaitScan(repo);
     const { service } = makeService(repo);
@@ -1810,7 +1879,7 @@ describe('cross-library transfer', () => {
     const destinationFile = makeFileStat({
       absolutePath: '/dest/Inbox/book.epub',
       relPath: 'Inbox/book.epub',
-      ino: 4242,
+      ino: 4242n,
     });
     const sourceFile = makeBookFile({
       id: 500,
@@ -1818,7 +1887,7 @@ describe('cross-library transfer', () => {
       libraryFolderId: 10,
       absolutePath: '/source/Book/book.epub',
       relPath: 'Book/book.epub',
-      ino: 4242,
+      ino: 4242n,
       fileHash: 'transfer-hash',
     });
 
@@ -1849,6 +1918,7 @@ describe('cross-library transfer', () => {
       unchangedDirs: new Set(),
       dirMtimes: new Map(),
     });
+    mockStat.mockRejectedValue(Object.assign(new Error('not found'), { code: 'ENOENT' }));
 
     const done = awaitScan(repo);
     const { service } = makeService(repo);
@@ -1863,7 +1933,7 @@ describe('cross-library transfer', () => {
     const destinationFile = makeFileStat({
       absolutePath: '/dest/Inbox/book.epub',
       relPath: 'Inbox/book.epub',
-      ino: 5151,
+      ino: 5151n,
     });
     const sourceFile = makeBookFile({
       id: 700,
@@ -1871,7 +1941,7 @@ describe('cross-library transfer', () => {
       libraryFolderId: 12,
       absolutePath: '/source/Book/book.epub',
       relPath: 'Book/book.epub',
-      ino: 5151,
+      ino: 5151n,
       fileHash: 'transfer-hash',
     });
     const repo = makeRepo({
@@ -1921,12 +1991,12 @@ describe('virtual sibling drain', () => {
     const parentFile = makeFileStat({
       absolutePath: `${parentFolder}/Rising Queen.epub`,
       relPath: 'Rising Queen (Court of the Sea Fae Trilogy Book 3) (2020)/Rising Queen.epub',
-      ino: 1001,
+      ino: 1001n,
     });
     const childFile = makeFileStat({
       absolutePath: `${childFolder}/City of Thorns - C.N. Crawford.epub`,
       relPath: 'Rising Queen (Court of the Sea Fae Trilogy Book 3) (2020)/City of Thorns (2021)/City of Thorns - C.N. Crawford.epub',
-      ino: 1002,
+      ino: 1002n,
     });
 
     const repo = makeRepo({
@@ -1961,12 +2031,12 @@ describe('virtual sibling drain', () => {
     const parentFile = makeFileStat({
       absolutePath: `${parentFolder}/Rising Queen.epub`,
       relPath: 'Rising Queen (Court of the Sea Fae Trilogy Book 3) (2020)/Rising Queen.epub',
-      ino: 1001,
+      ino: 1001n,
     });
     const childFile = makeFileStat({
       absolutePath: `${childFolder}/City of Thorns - C.N. Crawford.epub`,
       relPath: 'Rising Queen (Court of the Sea Fae Trilogy Book 3) (2020)/City of Thorns (2021)/City of Thorns - C.N. Crawford.epub',
-      ino: 1002,
+      ino: 1002n,
     });
 
     const repo = makeRepo({
@@ -2052,8 +2122,8 @@ describe('virtual sibling drain', () => {
   });
 
   it('uses inode ownership to merge renamed virtual children into the lowest-id survivor', async () => {
-    const currentFirst = makeFileStat({ absolutePath: '/library/Series/renamed-one.epub', relPath: 'Series/renamed-one.epub', ino: 3003 });
-    const currentSecond = makeFileStat({ absolutePath: '/library/Series/renamed-two.epub', relPath: 'Series/renamed-two.epub', ino: 1001 });
+    const currentFirst = makeFileStat({ absolutePath: '/library/Series/renamed-one.epub', relPath: 'Series/renamed-one.epub', ino: 3003n });
+    const currentSecond = makeFileStat({ absolutePath: '/library/Series/renamed-two.epub', relPath: 'Series/renamed-two.epub', ino: 1001n });
     const repo = makeRepo({
       findBooksByLibraryFolder: vi.fn().mockResolvedValue([
         { id: 3, libraryId: 1, libraryFolderId: 1, folderPath: '/library/Series/TitleOne', status: 'present' },
@@ -2065,14 +2135,14 @@ describe('virtual sibling drain', () => {
           bookId: 3,
           absolutePath: '/library/Series/TitleOne/old-one.epub',
           relPath: 'Series/TitleOne/old-one.epub',
-          ino: 3003,
+          ino: 3003n,
         }),
         makeBookFile({
           id: 10,
           bookId: 1,
           absolutePath: '/library/Series/TitleTwo/old-two.epub',
           relPath: 'Series/TitleTwo/old-two.epub',
-          ino: 1001,
+          ino: 1001n,
         }),
       ]),
     });
@@ -2127,7 +2197,7 @@ describe('virtual sibling drain', () => {
 
 describe('reassigned file metadata extraction', () => {
   it('extracts metadata when a content file moves to a new book (path match, different bookId)', async () => {
-    const fileStat = makeFileStat({ absolutePath: '/library/Author/Book/book.epub', relPath: 'Author/Book/book.epub', ino: 1001 });
+    const fileStat = makeFileStat({ absolutePath: '/library/Author/Book/book.epub', relPath: 'Author/Book/book.epub', ino: 1001n });
     const repo = makeRepo({
       findBookFilesByLibraryFolder: vi
         .fn()
@@ -2149,11 +2219,11 @@ describe('reassigned file metadata extraction', () => {
   });
 
   it('extracts metadata when a content file is reassigned via inode match (different bookId)', async () => {
-    const fileStat = makeFileStat({ absolutePath: '/library/Author/Book/book.epub', relPath: 'Author/Book/book.epub', ino: 7777 });
+    const fileStat = makeFileStat({ absolutePath: '/library/Author/Book/book.epub', relPath: 'Author/Book/book.epub', ino: 7777n });
     const repo = makeRepo({
       findBookFilesByLibraryFolder: vi
         .fn()
-        .mockResolvedValue([makeBookFile({ id: 5, bookId: 999, absolutePath: '/library/OldBook/book.epub', ino: 7777 })]),
+        .mockResolvedValue([makeBookFile({ id: 5, bookId: 999, absolutePath: '/library/OldBook/book.epub', ino: 7777n })]),
     });
     mockFindCandidates.mockResolvedValue({
       candidates: [makeCandidate('/library/Author/Book', [fileStat])],
@@ -2171,7 +2241,7 @@ describe('reassigned file metadata extraction', () => {
   });
 
   it('does not extract metadata when a sidecar/cover file is reassigned', async () => {
-    const fileStat = makeFileStat({ absolutePath: '/library/Author/Book/cover.jpg', relPath: 'Author/Book/cover.jpg', ino: 2002 });
+    const fileStat = makeFileStat({ absolutePath: '/library/Author/Book/cover.jpg', relPath: 'Author/Book/cover.jpg', ino: 2002n });
     const repo = makeRepo({
       findBookFilesByLibraryFolder: vi
         .fn()
@@ -2198,7 +2268,7 @@ describe('reassigned file metadata extraction', () => {
     const fileStat = makeFileStat({
       absolutePath: '/library/Author/Book/new-title.epub',
       relPath: 'Author/Book/new-title.epub',
-      ino: 7778,
+      ino: 7778n,
       sizeBytes: 2048,
       mtime: new Date('2024-01-02'),
     });
@@ -2212,7 +2282,7 @@ describe('reassigned file metadata extraction', () => {
           bookId: 1,
           absolutePath: '/library/Author/Book/old-title.epub',
           relPath: 'Author/Book/old-title.epub',
-          ino: 7778,
+          ino: 7778n,
           sizeBytes: 1024,
           mtime: new Date('2024-01-01'),
         }),
@@ -2234,7 +2304,7 @@ describe('reassigned file metadata extraction', () => {
   });
 
   it('does not extract metadata when the file stays in the same book (not reassigned)', async () => {
-    const fileStat = makeFileStat({ absolutePath: '/library/Author/Book/book.epub', relPath: 'Author/Book/book.epub', ino: 1001 });
+    const fileStat = makeFileStat({ absolutePath: '/library/Author/Book/book.epub', relPath: 'Author/Book/book.epub', ino: 1001n });
     const repo = makeRepo({
       findBooksByLibraryFolder: vi
         .fn()
@@ -2298,7 +2368,7 @@ describe('targeted book scan', () => {
     expect(mockBuildSingleCandidate).not.toHaveBeenCalled();
   });
 
-  it('clamps precision-unsafe root-level inode values to 0 before creating book files', async () => {
+  it('preserves precision-unsafe root-level inode values before creating book files', async () => {
     const repo = makeRepo({
       findLibraryFolders: vi.fn().mockResolvedValue([{ id: 1, path: '/library', libraryId: 1 }]),
     });
@@ -2310,7 +2380,7 @@ describe('targeted book scan', () => {
     expect(repo.createBookFile).toHaveBeenCalledWith(
       expect.objectContaining({
         absolutePath: '/library/book.epub',
-        ino: 0,
+        ino: 651896050678335552n,
       }),
     );
   });
@@ -2466,8 +2536,8 @@ describe('book_per_file mode — runScan', () => {
       }),
     });
 
-    const file1 = makeFileStat({ absolutePath: '/library/Author/book1.epub', relPath: 'Author/book1.epub', ino: 5001 });
-    const file2 = makeFileStat({ absolutePath: '/library/Author/book2.epub', relPath: 'Author/book2.epub', ino: 5002 });
+    const file1 = makeFileStat({ absolutePath: '/library/Author/book1.epub', relPath: 'Author/book1.epub', ino: 5001n });
+    const file2 = makeFileStat({ absolutePath: '/library/Author/book2.epub', relPath: 'Author/book2.epub', ino: 5002n });
     mockFindLooseCandidates.mockResolvedValue({
       candidates: [makeCandidate('/library/Author/book1.epub', [file1]), makeCandidate('/library/Author/book2.epub', [file2])],
       skippedDirs: new Set(),
@@ -2496,8 +2566,8 @@ describe('book_per_file mode — runScan', () => {
       }),
     });
 
-    const epubFile = makeFileStat({ absolutePath: '/library/book.epub', relPath: 'book.epub', ino: 6001 });
-    const pdfFile = makeFileStat({ absolutePath: '/library/book.pdf', relPath: 'book.pdf', ino: 6002 });
+    const epubFile = makeFileStat({ absolutePath: '/library/book.epub', relPath: 'book.epub', ino: 6001n });
+    const pdfFile = makeFileStat({ absolutePath: '/library/book.pdf', relPath: 'book.pdf', ino: 6002n });
     mockFindLooseCandidates.mockResolvedValue({
       candidates: [makeCandidate('/library/book.epub', [epubFile]), makeCandidate('/library/book.pdf', [pdfFile])],
       skippedDirs: new Set(),
@@ -2611,7 +2681,7 @@ describe('book_per_file mode — scanBookFolder', () => {
     const movedFile = makeFileStat({
       absolutePath: '/library/Moved/Alpha.epub',
       relPath: 'Moved/Alpha.epub',
-      ino: 3001,
+      ino: 3001n,
     });
     const repo = makeRepo({
       findLibrarySettings: vi.fn().mockResolvedValue({
@@ -2630,7 +2700,7 @@ describe('book_per_file mode — scanBookFolder', () => {
           id: 9,
           bookId: 7,
           absolutePath: '/library/Alpha.epub',
-          ino: 3001,
+          ino: 3001n,
           sizeBytes: 1024,
           mtime: new Date('2024-01-01'),
           fileHash: null,
@@ -2647,7 +2717,7 @@ describe('book_per_file mode — scanBookFolder', () => {
       unchangedDirs: new Set(),
       dirMtimes: new Map(),
     });
-    mockStat.mockRejectedValue(new Error('ENOENT'));
+    mockStat.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
     const { service } = makeService(repo);
 
     await (service as any).scanBookDirectory('/library/Moved', 1);
@@ -2859,7 +2929,7 @@ describe('TOCTOU start lock', () => {
 
 describe('inode zero guard', () => {
   it('skips global inode lookup in processFile when file has ino=0', async () => {
-    const fileStat = makeFileStat({ ino: 0 });
+    const fileStat = makeFileStat({ ino: 0n });
     mockFindCandidates.mockResolvedValue({
       candidates: [makeCandidate('/library/Author/Book', [fileStat])],
       skippedDirs: new Set(),

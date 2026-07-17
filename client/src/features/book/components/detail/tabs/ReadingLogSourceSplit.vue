@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { MonitorSmartphone } from '@lucide/vue'
 import type { BookReadingSessionStats, ReadingSessionSourceBucket } from '@bookorbit/types'
 import { READING_SESSION_SOURCE_BUCKET_LABELS } from '@bookorbit/types'
@@ -12,6 +13,8 @@ const props = withDefaults(
   }>(),
   { embedded: false, compact: false },
 )
+
+const { t } = useI18n()
 
 const BUCKET_TOKEN: Record<ReadingSessionSourceBucket, string> = {
   bookorbit: '--pill-web',
@@ -61,7 +64,7 @@ const shouldShow = computed(() => segments.value.length >= 2 && totalSeconds.val
     <template v-if="compact">
       <span class="flex items-center gap-1.5 font-medium text-muted-foreground">
         <MonitorSmartphone class="size-3.5" />
-        Sources
+        {{ t('book.detail.readingLog.sourceSplit.shortTitle') }}
       </span>
       <div class="flex h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-muted sm:w-28">
         <div
@@ -84,7 +87,7 @@ const shouldShow = computed(() => segments.value.length >= 2 && totalSeconds.val
     <div v-else class="flex flex-col gap-3 md:flex-row md:items-center">
       <p class="flex shrink-0 items-center gap-1.5 text-sm font-medium text-foreground">
         <MonitorSmartphone class="size-4 text-muted-foreground" />
-        Reading sources
+        {{ t('book.detail.readingLog.sourceSplit.title') }}
       </p>
       <div class="flex h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
         <div

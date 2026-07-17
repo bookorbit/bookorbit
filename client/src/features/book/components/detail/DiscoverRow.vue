@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { BookOpen, User, Sparkles, ChevronLeft, ChevronRight } from '@lucide/vue'
 
 import type { BookRecommendation, SeriesBookRecommendation } from '@bookorbit/types'
@@ -13,6 +14,8 @@ const props = defineProps<{
   seriesName: string | null
   authorCount: number
 }>()
+
+const { t } = useI18n()
 
 const seriesBooks = ref<SeriesBookRecommendation[]>([])
 const authorBooks = ref<BookRecommendation[]>([])
@@ -58,11 +61,11 @@ const availablePills = computed<Section[]>(() => {
   return pills
 })
 
-const pillLabels: Record<Section, string> = {
-  series: 'More in Series',
-  author: 'By Author',
-  similar: 'Similar Books',
-}
+const pillLabels = computed<Record<Section, string>>(() => ({
+  series: t('book.detail.discover.moreInSeries'),
+  author: t('book.detail.discover.byAuthor'),
+  similar: t('book.detail.discover.similarBooks'),
+}))
 
 const pillIcons: Record<Section, typeof BookOpen> = {
   series: BookOpen,

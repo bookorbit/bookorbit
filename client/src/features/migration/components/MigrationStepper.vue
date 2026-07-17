@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { Check, AlertCircle, Loader2 } from '@lucide/vue'
 
 export interface StepDefinition {
@@ -14,6 +15,8 @@ defineProps<{
 const emit = defineEmits<{
   stepClick: [index: number]
 }>()
+
+const { t } = useI18n()
 
 function handleStepClick(index: number) {
   emit('stepClick', index)
@@ -52,10 +55,14 @@ function handleStepClick(index: number) {
           <span class="text-xs font-medium leading-snug" :class="i === activeIndex ? 'text-primary' : 'text-foreground/80'">
             {{ step.label }}
           </span>
-          <span v-if="step.status === 'done' && i !== activeIndex" class="text-[10px] text-emerald-600 mt-0.5 leading-none">Done</span>
-          <span v-else-if="step.status === 'saved' && i !== activeIndex" class="text-[10px] text-amber-600 mt-0.5 leading-none">Saved</span>
-          <span v-else-if="step.status === 'running'" class="text-[10px] text-sky-600 mt-0.5 leading-none">Running</span>
-          <span v-else-if="step.status === 'failed'" class="text-[10px] text-red-600 mt-0.5 leading-none">Failed</span>
+          <span v-if="step.status === 'done' && i !== activeIndex" class="text-[10px] text-emerald-600 mt-0.5 leading-none">{{
+            t('migration.status.done')
+          }}</span>
+          <span v-else-if="step.status === 'saved' && i !== activeIndex" class="text-[10px] text-amber-600 mt-0.5 leading-none">{{
+            t('migration.status.saved')
+          }}</span>
+          <span v-else-if="step.status === 'running'" class="text-[10px] text-sky-600 mt-0.5 leading-none">{{ t('migration.status.running') }}</span>
+          <span v-else-if="step.status === 'failed'" class="text-[10px] text-red-600 mt-0.5 leading-none">{{ t('migration.status.failed') }}</span>
         </span>
       </button>
       <div v-if="i < steps.length - 1" class="ml-[1.375rem] w-px h-3 bg-border shrink-0" />

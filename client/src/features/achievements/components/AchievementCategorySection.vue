@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { BookOpen, Compass, Flame, Library, TabletSmartphone } from '@lucide/vue'
 import type { AchievementCategory, AchievementCategoryGroup } from '@bookorbit/types'
 import { groupAchievements } from '../composables/useGroupedAchievements'
@@ -12,6 +13,8 @@ const props = defineProps<{
   group: AchievementCategoryGroup
   filter: FilterState
 }>()
+
+const { t } = useI18n()
 
 const CATEGORY_ICONS: Record<AchievementCategory, Component> = {
   reading: BookOpen,
@@ -96,7 +99,7 @@ const filteredItems = computed<DisplayItem[]>(() => {
       </div>
     </div>
 
-    <p v-if="filteredItems.length === 0" class="text-muted-foreground py-4 text-center text-sm">No achievements match this filter</p>
+    <p v-if="filteredItems.length === 0" class="text-muted-foreground py-4 text-center text-sm">{{ t('achievements.noMatchFilter') }}</p>
 
     <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,17rem),1fr))] gap-6">
       <template v-for="item in filteredItems" :key="item.type === 'tiered' ? item.groupKey : item.achievement.key">

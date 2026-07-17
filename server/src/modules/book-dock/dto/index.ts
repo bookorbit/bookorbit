@@ -1,6 +1,7 @@
 import {
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -20,6 +21,7 @@ import {
   ValidatorConstraint,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { MetadataProviderKey } from '@bookorbit/types';
 
 @ValidatorConstraint({ name: 'hasCompleteDefaultDestination', async: false })
 class HasCompleteDefaultDestinationConstraint implements ValidatorConstraintInterface {
@@ -47,22 +49,82 @@ function HasCompleteDefaultDestination(options?: ValidationOptions) {
   };
 }
 
+class BookDockAudiobookChapterDto {
+  @IsString() title!: string;
+  @IsInt() @Min(0) startMs!: number;
+  @IsOptional() @IsInt() @Min(0) durationMs?: number | null;
+}
+
+class BookDockSeriesMembershipDto {
+  @IsString() @MaxLength(500) seriesName!: string;
+  @IsOptional() @IsNumber() seriesIndex?: number | null;
+}
+
+class BookDockCommunityRatingDto {
+  @IsIn(Object.values(MetadataProviderKey)) provider!: MetadataProviderKey;
+  @IsNumber() @Min(0) @Max(5) rating!: number;
+  @IsOptional() @IsInt() @Min(0) ratingCount?: number | null;
+}
+
+class BookDockComicMetadataDto {
+  @IsOptional() @IsString() @MaxLength(50) issueNumber?: string;
+  @IsOptional() @IsString() @MaxLength(500) volumeName?: string;
+  @IsOptional() @IsArray() @IsString({ each: true }) pencillers?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) inkers?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) colorists?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) letterers?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) coverArtists?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) characters?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) teams?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) locations?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) storyArcs?: string[];
+}
+
 export class BookDockMetadataFieldsDto {
-  @IsOptional() @IsString() title?: string;
-  @IsOptional() @IsString() subtitle?: string;
+  @IsOptional() @IsString() @MaxLength(1000) title?: string | null;
+  @IsOptional() @IsString() @MaxLength(1000) subtitle?: string | null;
   @IsOptional() @IsString() description?: string;
-  @IsOptional() @IsString() publisher?: string;
-  @IsOptional() @IsString() language?: string;
-  @IsOptional() @IsString() isbn10?: string;
-  @IsOptional() @IsString() isbn13?: string;
-  @IsOptional() @IsString() seriesName?: string;
+  @IsOptional() @IsString() @MaxLength(500) publisher?: string | null;
+  @IsOptional() @IsString() @MaxLength(100) language?: string | null;
+  @IsOptional() @IsString() @MaxLength(10) isbn10?: string | null;
+  @IsOptional() @IsString() @MaxLength(13) isbn13?: string | null;
+  @IsOptional() @IsString() @MaxLength(500) seriesName?: string | null;
   @IsOptional() @IsString() coverUrl?: string;
-  @IsOptional() @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) publishedDate?: string;
-  @IsOptional() @IsInt() @Min(1000) @Max(2200) publishedYear?: number;
-  @IsOptional() @IsNumber() pageCount?: number;
-  @IsOptional() @IsNumber() seriesIndex?: number;
+  @IsOptional() @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) publishedDate?: string | null;
+  @IsOptional() @IsInt() @Min(1000) @Max(2200) publishedYear?: number | null;
+  @IsOptional() @IsInt() @Min(0) pageCount?: number | null;
+  @IsOptional() @IsNumber() seriesIndex?: number | null;
   @IsOptional() @IsArray() @IsString({ each: true }) authors?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) genres?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) narrators?: string[];
+  @IsOptional() @IsInt() @Min(0) durationSeconds?: number | null;
+  @IsOptional() @IsBoolean() abridged?: boolean | null;
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => BookDockAudiobookChapterDto) chapters?: BookDockAudiobookChapterDto[] | null;
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BookDockSeriesMembershipDto)
+  seriesMemberships?: BookDockSeriesMembershipDto[] | null;
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BookDockCommunityRatingDto)
+  communityRatings?: BookDockCommunityRatingDto[] | null;
+  @IsOptional() @IsString() @MaxLength(50) googleBooksId?: string | null;
+  @IsOptional() @IsString() @MaxLength(50) goodreadsId?: string | null;
+  @IsOptional() @IsString() @MaxLength(20) amazonId?: string | null;
+  @IsOptional() @IsString() @MaxLength(255) hardcoverId?: string | null;
+  @IsOptional() @IsString() @MaxLength(50) hardcoverEditionId?: string | null;
+  @IsOptional() @IsString() @MaxLength(50) openLibraryId?: string | null;
+  @IsOptional() @IsString() @MaxLength(50) itunesId?: string | null;
+  @IsOptional() @IsString() @MaxLength(20) audibleId?: string | null;
+  @IsOptional() @IsString() @MaxLength(50) librofmId?: string | null;
+  @IsOptional() @IsString() @MaxLength(255) koboId?: string | null;
+  @IsOptional() @IsString() @MaxLength(50) comicvineId?: string | null;
+  @IsOptional() @IsString() @MaxLength(50) ranobedbId?: string | null;
+  @IsOptional() @IsString() @MaxLength(512) lubimyczytacId?: string | null;
+  @IsOptional() @IsString() @MaxLength(20) aladinId?: string | null;
+  @IsOptional() @ValidateNested() @Type(() => BookDockComicMetadataDto) comicMetadata?: BookDockComicMetadataDto | null;
 }
 
 export class UpdateBookDockFileDto {

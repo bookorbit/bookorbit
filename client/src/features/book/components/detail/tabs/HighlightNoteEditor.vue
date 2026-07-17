@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Save, X } from '@lucide/vue'
+import { useI18n } from 'vue-i18n'
 
 const props = withDefaults(
   defineProps<{
@@ -9,6 +10,8 @@ const props = withDefaults(
   }>(),
   { saving: false },
 )
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   save: [note: string | null]
@@ -33,7 +36,7 @@ function handleCancel() {
   <div class="mt-2 space-y-2">
     <textarea
       v-model="noteText"
-      placeholder="Add a note..."
+      :placeholder="t('book.detail.highlights.note.placeholder')"
       rows="3"
       :disabled="saving"
       class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-y"
@@ -46,7 +49,7 @@ function handleCancel() {
         @click="handleCancel"
       >
         <X :size="14" />
-        Cancel
+        {{ t('common.cancel') }}
       </button>
       <button
         type="button"
@@ -55,7 +58,7 @@ function handleCancel() {
         @click="handleSave"
       >
         <Save :size="14" />
-        {{ saving ? 'Saving' : 'Save' }}
+        {{ saving ? t('book.detail.highlights.note.saving') : t('common.save') }}
       </button>
     </div>
   </div>

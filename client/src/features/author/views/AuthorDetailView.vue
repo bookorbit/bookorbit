@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useWindowSize } from '@vueuse/core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowUpDown, ChevronDown, ChevronLeft, ImageMinus, LayoutGrid, List, Upload } from '@lucide/vue'
 import { toast } from 'vue-sonner'
@@ -32,6 +34,7 @@ import { useAuthorDetail } from '../composables/useAuthorDetail'
 import { useAuthorMetadataPreview } from '../composables/useAuthorMetadataPreview'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const mainRef = ref<HTMLElement | null>(null)
@@ -49,8 +52,8 @@ const { author, loading: loadingAuthor, error: authorError, notFound: authorNotF
 const { items: books, total, loading: loadingBooks, error: booksError, hasMore, sort, order, libraryId, load: loadBooks } = useAuthorBooks(authorId)
 const authorName = computed(() => author.value?.name ?? '')
 const pageTitle = computed(() => {
-  if (author.value?.name) return `Author · ${author.value.name}`
-  return Number.isFinite(authorId.value) ? `Author #${authorId.value}` : 'Author'
+  if (author.value?.name) return t('author.detail.pageTitleNamed', { name: author.value.name })
+  return Number.isFinite(authorId.value) ? t('author.detail.pageTitleId', { id: authorId.value }) : t('author.detail.pageTitle')
 })
 usePageTitle(pageTitle)
 const {
@@ -96,11 +99,13 @@ const selectedMergeBookCount = computed(() => {
   return mergeCandidates.value.filter((candidate) => selected.has(candidate.id)).reduce((sum, candidate) => sum + candidate.bookCount, 0)
 })
 
-const BOOK_SORT_OPTIONS = [
-  { value: 'addedAt', label: 'Recently Added' },
-  { value: 'title', label: 'Title' },
-  { value: 'publishedYear', label: 'Published Year' },
-] as const
+const BOOK_SORT_OPTIONS = [{ value: 'addedAt' }, { value: 'title' }, { value: 'publishedYear' }] as const
+
+const bookSortOptions = computed(() => [
+  { value: 'addedAt', label: t('author.detail.books.sort.recentlyAdded') },
+  { value: 'title', label: t('author.detail.books.sort.title') },
+  { value: 'publishedYear', label: t('author.detail.books.sort.publishedYear') },
+])
 
 type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
 
@@ -126,10 +131,10 @@ const {
 
 function showRefreshResultToast(updated: { imageUrl?: string | null }) {
   if (!updated.imageUrl) {
-    toast.warning('Metadata refreshed, but no author image was found.')
+    toast.warning(t('author.detail.toast.refreshedNoImage'))
     return
   }
-  toast.success('Author metadata refreshed')
+  toast.success(t('author.detail.toast.refreshed'))
 }
 
 watch(
@@ -192,7 +197,7 @@ async function saveAuthorEdits() {
   if (!author.value || savingEdit.value) return
   const name = draftName.value.trim()
   if (!name) {
-    toast.error('Author name is required')
+    toast.error(t('author.detail.toast.nameRequired'))
     return
   }
 
@@ -205,9 +210,9 @@ async function saveAuthorEdits() {
     })
     author.value = updated
     editOpen.value = false
-    toast.success('Author updated')
+    toast.success(t('author.detail.toast.updated'))
   } catch (error) {
-    toast.error(error instanceof Error ? error.message : 'Failed to update author')
+    toast.error(error instanceof Error ? error.message : t('author.detail.toast.updateFailed'))
   } finally {
     savingEdit.value = false
   }
@@ -228,9 +233,9 @@ async function onAuthorImageSelected(event: Event) {
   try {
     const updated = await uploadAuthorImage(author.value.id, file)
     author.value = updated
-    toast.success('Author image updated')
+    toast.success(t('author.detail.toast.imageUpdated'))
   } catch (error) {
-    toast.error(error instanceof Error ? error.message : 'Failed to upload author image')
+    toast.error(error instanceof Error ? error.message : t('author.detail.toast.imageUploadFailed'))
   } finally {
     uploadingImage.value = false
   }
@@ -243,9 +248,9 @@ async function removeAuthorImage() {
   try {
     const updated = await deleteAuthorImage(author.value.id)
     author.value = updated
-    toast.success('Author image removed')
+    toast.success(t('author.detail.toast.imageRemoved'))
   } catch (error) {
-    toast.error(error instanceof Error ? error.message : 'Failed to remove author image')
+    toast.error(error instanceof Error ? error.message : t('author.detail.toast.imageRemoveFailed'))
   } finally {
     removingImage.value = false
   }
@@ -306,9 +311,9 @@ async function runMerge() {
     mergeOpen.value = false
 
     await loadBooks(true)
-    toast.success(`Merged ${result.mergedAuthorIds.length} author(s); affected ${result.affectedBookCount} books`)
+    toast.success(t('author.detail.toast.mergeSuccess', { count: result.mergedAuthorIds.length, books: result.affectedBookCount }))
   } catch (error) {
-    toast.error(error instanceof Error ? error.message : 'Failed to merge authors')
+    toast.error(error instanceof Error ? error.message : t('author.detail.toast.mergeFailed'))
   } finally {
     merging.value = false
   }
@@ -321,10 +326,10 @@ async function runDelete() {
   deleting.value = true
   try {
     const result = await deleteAuthors({ authorIds: [author.value.id] })
-    toast.success(`Deleted author; affected ${result.affectedBookCount} books`)
+    toast.success(t('author.detail.toast.deleteSuccess', { books: result.affectedBookCount }))
     await router.push({ name: 'authors' })
   } catch (error) {
-    toast.error(error instanceof Error ? error.message : 'Failed to delete author')
+    toast.error(error instanceof Error ? error.message : t('author.detail.toast.deleteFailed'))
   } finally {
     deleting.value = false
   }
@@ -336,13 +341,13 @@ function promptRunMerge() {
 }
 
 const mergeDialogTitle = computed(() => {
-  if (!author.value) return 'Merge selected authors?'
-  return `Merge ${selectedMergeIds.value.length} author(s) into "${author.value.name}"?`
+  if (!author.value) return t('author.detail.mergeDialog.titleFallback')
+  return t('author.detail.mergeDialog.title', { count: selectedMergeIds.value.length, name: author.value.name })
 })
 
 const mergeDialogDescription = computed(() => {
-  if (selectedMergeIds.value.length === 0) return 'This action cannot be undone.'
-  return 'This will merge selected authors into the current author and re-link associated books. This action cannot be undone.'
+  if (selectedMergeIds.value.length === 0) return t('author.detail.mergeDialog.descriptionEmpty')
+  return t('author.detail.mergeDialog.description')
 })
 
 const isMobileLayout = computed(() => windowWidth.value < 640)
@@ -384,7 +389,7 @@ async function refreshMetadata() {
     await loadMetadataPreview()
     showRefreshResultToast(updated)
   } catch (error) {
-    toast.error(error instanceof Error ? error.message : 'Failed to refresh author metadata')
+    toast.error(error instanceof Error ? error.message : t('author.detail.toast.refreshFailed'))
   } finally {
     refreshingMetadata.value = false
   }
@@ -454,12 +459,12 @@ defineOptions({ name: 'AuthorDetailView' })
           @click="goBack"
         >
           <ChevronLeft :size="14" />
-          Back
+          {{ t('common.back') }}
         </button>
       </div>
 
       <div v-if="authorNotFound">
-        <EntityNotFound entity="Author" />
+        <EntityNotFound :entity="t('author.detail.entityName')" />
       </div>
 
       <template v-else>
@@ -468,7 +473,7 @@ defineOptions({ name: 'AuthorDetailView' })
         </div>
 
         <div v-if="loadingAuthor && !author" class="mb-4 rounded-lg border border-border/70 bg-card/60 p-4 text-sm text-muted-foreground">
-          Loading author...
+          {{ t('author.detail.loadingAuthor') }}
         </div>
         <AuthorHeader
           v-else-if="author"
@@ -488,27 +493,27 @@ defineOptions({ name: 'AuthorDetailView' })
         />
 
         <div v-if="metadataPreviewError" class="mt-3 rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-          Could not load external author preview metadata right now.
+          {{ t('author.detail.previewError') }}
         </div>
 
         <section v-if="author && (editOpen || mergeOpen)" class="mt-4 rounded-lg border border-border/70 bg-card/60 p-3 space-y-3">
           <div v-if="editOpen && canUpdate" class="space-y-2">
             <div class="grid gap-2 md:grid-cols-2">
               <label class="text-xs text-muted-foreground">
-                Name
+                {{ t('author.detail.edit.name') }}
                 <input v-model="draftName" class="mt-1 h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm" />
               </label>
               <label class="text-xs text-muted-foreground">
-                Sort Name
+                {{ t('author.detail.edit.sortName') }}
                 <input v-model="draftSortName" class="mt-1 h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm" />
               </label>
             </div>
             <label class="block text-xs text-muted-foreground">
-              Description
+              {{ t('author.detail.edit.description') }}
               <textarea v-model="draftDescription" rows="3" class="mt-1 w-full rounded-md border border-input bg-background px-2.5 py-2 text-sm" />
             </label>
             <div class="space-y-1.5">
-              <p class="text-xs text-muted-foreground">Image</p>
+              <p class="text-xs text-muted-foreground">{{ t('author.detail.edit.image') }}</p>
               <input ref="authorImageInput" type="file" accept="image/*" class="hidden" :disabled="authorImageBusy" @change="onAuthorImageSelected" />
               <div class="flex flex-wrap items-center gap-2">
                 <button
@@ -517,7 +522,13 @@ defineOptions({ name: 'AuthorDetailView' })
                   @click="openAuthorImagePicker"
                 >
                   <Upload :size="14" />
-                  {{ uploadingImage ? 'Uploading...' : author?.imageUrl ? 'Replace image' : 'Upload image' }}
+                  {{
+                    uploadingImage
+                      ? t('author.detail.edit.uploading')
+                      : author?.imageUrl
+                        ? t('author.detail.edit.replaceImage')
+                        : t('author.detail.edit.uploadImage')
+                  }}
                 </button>
                 <button
                   :disabled="authorImageBusy || !author?.imageUrl"
@@ -525,21 +536,23 @@ defineOptions({ name: 'AuthorDetailView' })
                   @click="removeAuthorImage"
                 >
                   <ImageMinus :size="14" />
-                  {{ removingImage ? 'Removing...' : 'Remove image' }}
+                  {{ removingImage ? t('author.detail.edit.removing') : t('author.detail.edit.removeImage') }}
                 </button>
               </div>
-              <p class="text-[11px] text-muted-foreground">PNG/JPEG/WEBP/GIF/BMP up to {{ Math.floor(MAX_AUTHOR_IMAGE_BYTES / 1024 / 1024) }} MB</p>
+              <p class="text-[11px] text-muted-foreground">
+                {{ t('author.detail.edit.imageHint', { size: Math.floor(MAX_AUTHOR_IMAGE_BYTES / 1024 / 1024) }) }}
+              </p>
             </div>
             <div class="flex items-center justify-end gap-2">
               <button class="h-8 rounded-md border border-input px-3 text-sm text-muted-foreground hover:bg-muted" @click="editOpen = false">
-                Cancel
+                {{ t('common.cancel') }}
               </button>
               <button
                 :disabled="savingEdit"
                 class="h-8 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
                 @click="saveAuthorEdits"
               >
-                {{ savingEdit ? 'Saving...' : 'Save' }}
+                {{ savingEdit ? t('author.detail.edit.saving') : t('common.save') }}
               </button>
             </div>
           </div>
@@ -548,21 +561,23 @@ defineOptions({ name: 'AuthorDetailView' })
             <input
               v-model="mergeQuery"
               class="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm"
-              placeholder="Search authors to merge into this author"
+              :placeholder="t('author.detail.merge.searchPlaceholder')"
             />
 
-            <div v-if="searchingMergeCandidates" class="text-xs text-muted-foreground">Searching...</div>
+            <div v-if="searchingMergeCandidates" class="text-xs text-muted-foreground">{{ t('author.detail.merge.searching') }}</div>
 
             <div v-if="mergeCandidates.length > 0" class="max-h-48 space-y-1 overflow-y-auto rounded-md border border-border/70 bg-background/50 p-2">
               <label v-for="candidate in mergeCandidates" :key="candidate.id" class="flex items-center gap-2 text-sm">
                 <input type="checkbox" :checked="selectedMergeIds.includes(candidate.id)" @change="onMergeCandidateToggle(candidate.id, $event)" />
                 <span class="min-w-0 flex-1 truncate">{{ candidate.name }}</span>
-                <span class="text-xs text-muted-foreground">{{ candidate.bookCount }} books</span>
+                <span class="text-xs text-muted-foreground">{{
+                  t('author.detail.merge.bookCount', { count: candidate.bookCount }, candidate.bookCount)
+                }}</span>
               </label>
             </div>
 
             <div v-if="selectedMergeIds.length > 0" class="text-xs text-muted-foreground">
-              Selected {{ selectedMergeIds.length }} author(s), approx. {{ selectedMergeBookCount }} books affected.
+              {{ t('author.detail.merge.selectedSummary', { count: selectedMergeIds.length, books: selectedMergeBookCount }) }}
             </div>
 
             <div class="flex items-center justify-end">
@@ -571,7 +586,7 @@ defineOptions({ name: 'AuthorDetailView' })
                 class="h-8 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
                 @click="promptRunMerge"
               >
-                {{ merging ? 'Merging...' : 'Merge Selected' }}
+                {{ merging ? t('author.detail.merge.merging') : t('author.detail.merge.mergeSelected') }}
               </button>
             </div>
           </div>
@@ -579,7 +594,7 @@ defineOptions({ name: 'AuthorDetailView' })
 
         <section class="mt-4 rounded-lg border border-border/70 bg-card/60 p-3">
           <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <h2 class="text-sm font-semibold text-foreground">Books</h2>
+            <h2 class="text-sm font-semibold text-foreground">{{ t('author.detail.books.heading') }}</h2>
             <div class="w-full space-y-2 sm:hidden">
               <div class="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2">
                 <div class="relative min-w-0">
@@ -588,7 +603,7 @@ defineOptions({ name: 'AuthorDetailView' })
                     class="h-8 w-full appearance-none rounded-md border border-input bg-background px-2.5 pr-8 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
                     @change="onMobileSortChange"
                   >
-                    <option v-for="opt in BOOK_SORT_OPTIONS" :key="opt.value" :value="opt.value">
+                    <option v-for="opt in bookSortOptions" :key="opt.value" :value="opt.value">
                       {{ opt.label }}
                     </option>
                   </select>
@@ -599,7 +614,7 @@ defineOptions({ name: 'AuthorDetailView' })
                   class="h-8 rounded-md border border-input bg-background px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   @click="toggleBookOrder"
                 >
-                  {{ order === 'asc' ? 'Asc' : 'Desc' }}
+                  {{ order === 'asc' ? t('author.detail.books.asc') : t('author.detail.books.desc') }}
                 </button>
 
                 <div class="flex items-center rounded-md border border-input bg-background">
@@ -630,7 +645,7 @@ defineOptions({ name: 'AuthorDetailView' })
                   class="h-8 w-full appearance-none rounded-md border border-input bg-background px-2.5 pr-8 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
                   @change="onLibraryFilterChange"
                 >
-                  <option value="">All Libraries</option>
+                  <option value="">{{ t('author.detail.books.allLibraries') }}</option>
                   <option v-for="library in libraries" :key="library.id" :value="library.id">
                     {{ library.name }}
                   </option>
@@ -644,17 +659,17 @@ defineOptions({ name: 'AuthorDetailView' })
                 v-model="sort"
                 class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60 sm:w-auto"
               >
-                <option value="addedAt">Recently Added</option>
-                <option value="title">Title</option>
-                <option value="publishedYear">Published Year</option>
+                <option value="addedAt">{{ t('author.detail.books.sort.recentlyAdded') }}</option>
+                <option value="title">{{ t('author.detail.books.sort.title') }}</option>
+                <option value="publishedYear">{{ t('author.detail.books.sort.publishedYear') }}</option>
               </select>
 
               <select
                 v-model="order"
                 class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60 sm:w-auto"
               >
-                <option value="desc">Descending</option>
-                <option value="asc">Ascending</option>
+                <option value="desc">{{ t('author.detail.books.descending') }}</option>
+                <option value="asc">{{ t('author.detail.books.ascending') }}</option>
               </select>
 
               <select
@@ -662,7 +677,7 @@ defineOptions({ name: 'AuthorDetailView' })
                 class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60 sm:w-auto"
                 @change="onLibraryFilterChange"
               >
-                <option value="">All Libraries</option>
+                <option value="">{{ t('author.detail.books.allLibraries') }}</option>
                 <option v-for="library in libraries" :key="library.id" :value="library.id">{{ library.name }}</option>
               </select>
 
@@ -694,8 +709,8 @@ defineOptions({ name: 'AuthorDetailView' })
           </div>
 
           <div v-if="!loadingBooks && books.length === 0" class="flex flex-col items-center justify-center gap-2 py-16 text-center">
-            <p class="text-sm font-medium text-foreground">No books found for this author</p>
-            <p class="text-xs text-muted-foreground">Try changing sort/order or selecting another library.</p>
+            <p class="text-sm font-medium text-foreground">{{ t('author.detail.books.empty.title') }}</p>
+            <p class="text-xs text-muted-foreground">{{ t('author.detail.books.empty.hint') }}</p>
           </div>
 
           <VirtualBookGrid
@@ -712,8 +727,10 @@ defineOptions({ name: 'AuthorDetailView' })
           </div>
 
           <div ref="sentinel" class="mt-4 flex h-8 items-center justify-center">
-            <span v-if="loadingBooks" class="text-xs text-muted-foreground">Loading...</span>
-            <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">All {{ total.toLocaleString() }} books loaded</span>
+            <span v-if="loadingBooks" class="text-xs text-muted-foreground">{{ t('common.loading') }}</span>
+            <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">{{
+              t('author.detail.books.allLoaded', { total: formatNumber(total) })
+            }}</span>
           </div>
         </section>
       </template>
@@ -721,9 +738,9 @@ defineOptions({ name: 'AuthorDetailView' })
 
     <AuthorConfirmDialog
       :open="confirmDeleteOpen"
-      title="Delete author?"
-      description="This removes the author from the catalog and unlinks it from associated books. This action cannot be undone."
-      confirm-label="Delete"
+      :title="t('author.detail.deleteDialog.title')"
+      :description="t('author.detail.deleteDialog.description')"
+      :confirm-label="t('common.delete')"
       :loading="deleting"
       destructive
       @confirm="runDelete"
@@ -734,7 +751,7 @@ defineOptions({ name: 'AuthorDetailView' })
       :open="confirmMergeOpen"
       :title="mergeDialogTitle"
       :description="mergeDialogDescription"
-      confirm-label="Merge"
+      :confirm-label="t('author.detail.merge.confirmLabel')"
       :loading="merging"
       @confirm="runMerge"
       @cancel="confirmMergeOpen = false"

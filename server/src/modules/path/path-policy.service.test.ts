@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { mkdtemp, mkdir, rm, symlink } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join, resolve } from 'path';
@@ -43,6 +43,25 @@ describe('PathPolicyService', () => {
     await expect(service.isWithinBrowseRoot(sibling)).resolves.toBe(false);
   });
 
+  it('rejects normalized traversal paths before filesystem access', async () => {
+    const parent = await makeTempRoot();
+    const root = join(parent, 'books');
+    await mkdir(root);
+    const service = makeService(root);
+
+    await expect(service.assertWithinBrowseRoot(join(root, '..', 'outside'))).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.isWithinBrowseRoot(join(root, '..', 'outside'))).resolves.toBe(false);
+  });
+
+  it('rejects oversized paths before resolving or accessing them', async () => {
+    const root = await makeTempRoot();
+    const service = makeService(root);
+    const oversizedPath = `/${'a'.repeat(4097)}`;
+
+    await expect(service.resolveBrowsePath(oversizedPath)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.isWithinBrowseRoot(oversizedPath)).resolves.toBe(false);
+  });
+
   it('rejects paths that escape through a symlinked existing ancestor', async () => {
     const parent = await makeTempRoot();
     const root = join(parent, 'books');
@@ -53,6 +72,15 @@ describe('PathPolicyService', () => {
     const service = makeService(root);
 
     await expect(service.assertWithinBrowseRoot(join(root, 'escape', 'new-library'))).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('fails closed when a path cannot be canonicalized safely', async () => {
+    const root = await makeTempRoot();
+    await symlink('loop', join(root, 'loop'));
+    const service = makeService(root);
+
+    await expect(service.assertWithinBrowseRoot(join(root, 'loop'))).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.isWithinBrowseRoot(join(root, 'loop'))).resolves.toBe(false);
   });
 
   async function makeTempRoot(): Promise<string> {

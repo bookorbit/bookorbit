@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 import { useRoute, useRouter } from 'vue-router'
 import * as Icons from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
@@ -44,6 +46,7 @@ function useSidebarSection(key: string) {
   return { isOpen, toggle }
 }
 
+const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const { isMobile, setOpenMobile } = useSidebar()
@@ -136,6 +139,11 @@ function navigateFromSidebar(to: { name: string; params?: Record<string, string 
   if (isMobile.value) setOpenMobile(false)
 }
 
+function navigateToTools(): void {
+  const name = hasPermission('manage_libraries') ? 'tools-entity-manager' : 'tools-duplicate-books'
+  navigateFromSidebar({ name })
+}
+
 async function onLibrarySaved(library: Library) {
   createLibraryOpen.value = false
   subscribeLibrary(library.id)
@@ -185,7 +193,7 @@ onUnmounted(() => stopLibraryUploadListener())
           <span class="text-lg font-serif font-semibold text-sidebar-foreground leading-tight tracking-tight">
             Book<span class="text-primary"> Orbit</span>
           </span>
-          <span class="mt-0.5 text-[10px] uppercase tracking-[0.16em] text-sidebar-foreground/65">Your Reading Space</span>
+          <span class="mt-0.5 text-[10px] uppercase tracking-[0.16em] text-sidebar-foreground/65">{{ t('components.sidebar.tagline') }}</span>
         </div>
       </div>
     </SidebarHeader>
@@ -197,32 +205,32 @@ onUnmounted(() => stopLibraryUploadListener())
           <SidebarMenu class="gap-0">
             <SidebarNavItem
               :is-active="isDashboardActive"
-              tooltip="Dashboard"
+              :tooltip="t('components.sidebar.dashboard')"
               :icon="Icons.LayoutDashboard"
-              label="Dashboard"
+              :label="t('components.sidebar.dashboard')"
               @click="navigateFromSidebar({ name: 'dashboard' })"
             />
             <SidebarNavItem
               :is-active="isAuthorsActive"
-              tooltip="Authors"
+              :tooltip="t('components.sidebar.authors')"
               :icon="Icons.Users"
-              label="Authors"
+              :label="t('components.sidebar.authors')"
               @click="navigateFromSidebar({ name: 'authors' })"
             />
             <SidebarNavItem
               :is-active="isSeriesActive"
-              tooltip="Series"
+              :tooltip="t('components.sidebar.series')"
               :icon="Icons.Library"
-              label="Series"
+              :label="t('components.sidebar.series')"
               @click="navigateFromSidebar({ name: 'series' })"
             />
             <SidebarNavItem
-              v-if="hasPermission('manage_libraries')"
+              v-if="hasPermission('manage_libraries') || hasPermission('library_delete_books')"
               :is-active="isToolsActive"
-              tooltip="Tools"
+              :tooltip="t('components.sidebar.tools')"
               :icon="Icons.Wrench"
-              label="Tools"
-              @click="navigateFromSidebar({ name: 'tools-entity-manager' })"
+              :label="t('components.sidebar.tools')"
+              @click="navigateToTools"
             />
           </SidebarMenu>
         </SidebarGroupContent>
@@ -234,11 +242,11 @@ onUnmounted(() => stopLibraryUploadListener())
       <SidebarGroup>
         <SidebarSectionHeader
           data-tour="sidebar-libraries"
-          label="Libraries"
+          :label="t('components.sidebar.libraries')"
           :is-open="librariesOpen"
           :collapsed-count="libraries.length"
           :can-add="hasPermission('manage_libraries')"
-          add-title="New Library"
+          :add-title="t('components.sidebar.newLibrary')"
           :can-reorder="hasPermission('manage_libraries')"
           :is-reordering="isReorderingLibraries"
           @toggle="toggleLibraries"
@@ -262,7 +270,11 @@ onUnmounted(() => stopLibraryUploadListener())
                   v-for="lib in localLibraries"
                   :key="lib.id"
                   :is-active="activeLibraryId === lib.id"
-                  :tooltip="getProgress(lib.id)?.status === 'running' ? `${lib.name} - Scanning ${scanPct(lib.id)}%` : lib.name"
+                  :tooltip="
+                    getProgress(lib.id)?.status === 'running'
+                      ? t('components.sidebar.libraryScanning', { name: lib.name, pct: scanPct(lib.id) })
+                      : lib.name
+                  "
                   :icon="lib.icon || 'BookCopy'"
                   fallback-icon="BookCopy"
                   :icon-class="''"
@@ -280,7 +292,7 @@ onUnmounted(() => stopLibraryUploadListener())
                       v-else-if="lib.bookCount !== undefined"
                       class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/15 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-sidebar-foreground/80 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
                     >
-                      {{ lib.bookCount.toLocaleString() }}
+                      {{ formatNumber(lib.bookCount) }}
                     </span>
                     <Icons.GripVertical
                       v-if="isReorderingLibraries"
@@ -301,7 +313,12 @@ onUnmounted(() => stopLibraryUploadListener())
                           />
                         </div>
                         <p class="mt-0.5 text-[10px] text-sidebar-foreground/45">
-                          {{ getProgress(lib.id)!.processed.toLocaleString() }} / {{ getProgress(lib.id)!.total.toLocaleString() }} books
+                          {{
+                            t('components.sidebar.scanProgress', {
+                              processed: formatNumber(getProgress(lib.id)!.processed),
+                              total: formatNumber(getProgress(lib.id)!.total),
+                            })
+                          }}
                         </p>
                       </div>
                     </Transition>
@@ -319,11 +336,11 @@ onUnmounted(() => stopLibraryUploadListener())
       <SidebarGroup>
         <SidebarSectionHeader
           data-tour="sidebar-smartScopes"
-          label="Smart Scopes"
+          :label="t('components.sidebar.smartScopes')"
           :is-open="smartScopesOpen"
           :collapsed-count="smartScopes.length"
           :can-add="true"
-          add-title="New Smart Scope"
+          :add-title="t('components.sidebar.newSmartScope')"
           :can-reorder="smartScopes.length > 1"
           :is-reordering="isReorderingSmartScopes"
           @toggle="toggleSmartScopes"
@@ -358,7 +375,7 @@ onUnmounted(() => stopLibraryUploadListener())
                       v-if="smartScope.bookCount != null && smartScope.bookCount > 0"
                       class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/15 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-sidebar-foreground/80 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
                     >
-                      {{ smartScope.bookCount.toLocaleString() }}
+                      {{ formatNumber(smartScope.bookCount) }}
                     </span>
                     <Icons.GripVertical
                       v-if="isReorderingSmartScopes"
@@ -369,7 +386,9 @@ onUnmounted(() => stopLibraryUploadListener())
                 </SidebarNavItem>
               </VueDraggable>
               <div v-if="localSmartScopes.length === 0">
-                <span class="px-2 py-1 text-[11px] text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden">No Smart Scopes yet</span>
+                <span class="px-2 py-1 text-[11px] text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden">{{
+                  t('components.sidebar.noSmartScopes')
+                }}</span>
               </div>
             </SidebarGroupContent>
           </div>
@@ -382,11 +401,11 @@ onUnmounted(() => stopLibraryUploadListener())
       <SidebarGroup>
         <SidebarSectionHeader
           data-tour="sidebar-collections"
-          label="Collections"
+          :label="t('components.sidebar.collections')"
           :is-open="collectionsOpen"
           :collapsed-count="collections.length"
           :can-add="true"
-          add-title="New Collection"
+          :add-title="t('components.sidebar.newCollection')"
           :can-reorder="collections.length > 1"
           :is-reordering="isReorderingCollections"
           @toggle="toggleCollections"
@@ -421,7 +440,7 @@ onUnmounted(() => stopLibraryUploadListener())
                       v-if="collection.bookCount > 0"
                       class="ml-auto shrink-0 rounded-md bg-sidebar-foreground/15 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-sidebar-foreground/80 transition-colors group-data-[active=true]/item:bg-primary/20 group-data-[active=true]/item:text-primary group-data-[collapsible=icon]:hidden"
                     >
-                      {{ collection.bookCount.toLocaleString() }}
+                      {{ formatNumber(collection.bookCount) }}
                     </span>
                     <Icons.GripVertical
                       v-if="isReorderingCollections"
@@ -432,7 +451,9 @@ onUnmounted(() => stopLibraryUploadListener())
                 </SidebarNavItem>
               </VueDraggable>
               <div v-if="localCollections.length === 0">
-                <span class="px-2 py-1 text-[11px] text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden">No collections yet</span>
+                <span class="px-2 py-1 text-[11px] text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden">{{
+                  t('components.sidebar.noCollections')
+                }}</span>
               </div>
             </SidebarGroupContent>
           </div>
@@ -448,13 +469,13 @@ onUnmounted(() => stopLibraryUploadListener())
               :href="supportUrl"
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="Support BookOrbit on Ko-fi"
+              :aria-label="t('components.sidebar.supportAria')"
               class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-sidebar-border/60 text-primary transition-colors hover:bg-primary/8 hover:text-primary/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
             >
               <Icons.Heart class="h-4 w-4 fill-primary/20" aria-hidden="true" />
             </a>
           </TooltipTrigger>
-          <TooltipContent side="right">Support BookOrbit</TooltipContent>
+          <TooltipContent side="right">{{ t('components.sidebar.support') }}</TooltipContent>
         </Tooltip>
       </div>
 
@@ -468,7 +489,11 @@ onUnmounted(() => stopLibraryUploadListener())
             class="inline-flex min-w-0 max-w-full items-center gap-1.5 transition-colors hover:text-sidebar-foreground"
           >
             <span class="truncate">{{ versionUi.currentLabel }}</span>
-            <span v-if="hasUnseenWhatsNew" class="h-1.5 w-1.5 flex-none rounded-full bg-primary" aria-label="New release notes available" />
+            <span
+              v-if="hasUnseenWhatsNew"
+              class="h-1.5 w-1.5 flex-none rounded-full bg-primary"
+              :aria-label="t('components.sidebar.newReleaseNotes')"
+            />
           </RouterLink>
 
           <span v-if="versionUi.currentLabel" class="text-sidebar-foreground/45">•</span>
@@ -477,11 +502,11 @@ onUnmounted(() => stopLibraryUploadListener())
             :href="supportUrl"
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Support BookOrbit on Ko-fi"
+            :aria-label="t('components.sidebar.supportAria')"
             class="inline-flex shrink-0 items-center gap-1.5 text-sidebar-foreground/85 transition-colors hover:text-primary"
           >
             <Icons.Heart class="h-3.5 w-3.5 fill-primary/20 text-primary" aria-hidden="true" />
-            <span>Support</span>
+            <span>{{ t('components.sidebar.supportShort') }}</span>
           </a>
 
           <span v-if="versionUi.showLatest" class="text-sidebar-foreground/45">•</span>

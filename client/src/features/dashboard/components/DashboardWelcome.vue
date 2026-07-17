@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { BookOpen, Plus, Users } from '@lucide/vue'
 import type { Library } from '@bookorbit/types'
 import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
@@ -7,6 +8,7 @@ import { useLibraryCreationRedirect } from '@/features/library/composables/useLi
 
 defineProps<{ canCreate: boolean }>()
 
+const { t } = useI18n()
 const { handleLibraryCreated } = useLibraryCreationRedirect()
 const createOpen = ref(false)
 
@@ -46,15 +48,15 @@ async function handleSaved(library: Library) {
 
         <!-- Heading -->
         <h2 class="mb-2 text-lg font-bold tracking-tight text-foreground">
-          {{ canCreate ? 'Your library is empty' : 'No libraries yet' }}
+          {{ canCreate ? t('dashboard.welcome.emptyTitle') : t('dashboard.welcome.noLibrariesTitle') }}
         </h2>
 
         <!-- Description -->
         <p class="mb-8 max-w-xs text-sm leading-relaxed text-muted-foreground">
           <template v-if="canCreate">
-            Create a library to start organizing and reading your books. Point it to a folder and it will do the rest.
+            {{ t('dashboard.welcome.emptyDescription') }}
           </template>
-          <template v-else> Your administrator hasn't set up any libraries yet. Reach out to them to get started. </template>
+          <template v-else> {{ t('dashboard.welcome.noLibrariesDescription') }} </template>
         </p>
 
         <!-- CTA -->
@@ -64,7 +66,7 @@ async function handleSaved(library: Library) {
           @click="handleOpenCreate"
         >
           <Plus :size="15" />
-          Create your first library
+          {{ t('dashboard.welcome.createFirstLibrary') }}
         </button>
       </div>
     </div>

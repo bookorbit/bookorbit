@@ -657,9 +657,7 @@ describe('AchievementRepository', () => {
 
   describe('wasBookAbandonedBefore', () => {
     it('returns true when gap between startedAt and finishedAt exceeds monthsAgo', async () => {
-      const startedAt = new Date('2023-01-01');
-      const finishedAt = new Date('2023-07-01');
-      const chain = makeSelectChain([{ startedAt, finishedAt }]);
+      const chain = makeSelectChain([{ startedOn: '2023-01-01', endedOn: '2023-07-01' }]);
       const db = { select: vi.fn().mockReturnValue(chain) };
       const repo = makeRepo(db);
 
@@ -669,9 +667,7 @@ describe('AchievementRepository', () => {
     });
 
     it('returns false when gap is less than monthsAgo', async () => {
-      const startedAt = new Date('2023-01-01');
-      const finishedAt = new Date('2023-02-01');
-      const chain = makeSelectChain([{ startedAt, finishedAt }]);
+      const chain = makeSelectChain([{ startedOn: '2023-01-01', endedOn: '2023-02-01' }]);
       const db = { select: vi.fn().mockReturnValue(chain) };
       const repo = makeRepo(db);
 
@@ -681,7 +677,7 @@ describe('AchievementRepository', () => {
     });
 
     it('returns false when startedAt is missing', async () => {
-      const chain = makeSelectChain([{ startedAt: null, finishedAt: new Date() }]);
+      const chain = makeSelectChain([{ startedOn: null, endedOn: '2023-02-01' }]);
       const db = { select: vi.fn().mockReturnValue(chain) };
       const repo = makeRepo(db);
 
@@ -691,7 +687,7 @@ describe('AchievementRepository', () => {
     });
 
     it('returns false when finishedAt is missing', async () => {
-      const chain = makeSelectChain([{ startedAt: new Date(), finishedAt: null }]);
+      const chain = makeSelectChain([{ startedOn: '2023-01-01', endedOn: null }]);
       const db = { select: vi.fn().mockReturnValue(chain) };
       const repo = makeRepo(db);
 
@@ -737,9 +733,7 @@ describe('AchievementRepository', () => {
 
   describe('wasBookStartedAndFinishedOnSameDay', () => {
     it('returns true when startedAt and finishedAt are on the same day', async () => {
-      const date = new Date('2024-03-15T10:00:00.000Z');
-      const finishedAt = new Date('2024-03-15T22:00:00.000Z');
-      const chain = makeSelectChain([{ startedAt: date, finishedAt }]);
+      const chain = makeSelectChain([{ startedOn: '2024-03-15', endedOn: '2024-03-15' }]);
       const db = { select: vi.fn().mockReturnValue(chain) };
       const repo = makeRepo(db);
 
@@ -749,9 +743,7 @@ describe('AchievementRepository', () => {
     });
 
     it('returns false when dates span different days', async () => {
-      const startedAt = new Date('2024-03-15T10:00:00.000Z');
-      const finishedAt = new Date('2024-03-16T10:00:00.000Z');
-      const chain = makeSelectChain([{ startedAt, finishedAt }]);
+      const chain = makeSelectChain([{ startedOn: '2024-03-15', endedOn: '2024-03-16' }]);
       const db = { select: vi.fn().mockReturnValue(chain) };
       const repo = makeRepo(db);
 
@@ -761,7 +753,7 @@ describe('AchievementRepository', () => {
     });
 
     it('returns false when startedAt is null', async () => {
-      const chain = makeSelectChain([{ startedAt: null, finishedAt: new Date() }]);
+      const chain = makeSelectChain([{ startedOn: null, endedOn: '2024-03-15' }]);
       const db = { select: vi.fn().mockReturnValue(chain) };
       const repo = makeRepo(db);
 
@@ -1517,7 +1509,7 @@ describe('AchievementRepository', () => {
     it('returns timestamps when found', async () => {
       const startedAt = new Date('2024-01-01');
       const finishedAt = new Date('2024-01-15');
-      const chain = makeSelectChain([{ startedAt, finishedAt }]);
+      const chain = makeSelectChain([{ startedOn: '2024-01-01', endedOn: '2024-01-15' }]);
       const db = { select: vi.fn().mockReturnValue(chain) };
       const repo = makeRepo(db);
 

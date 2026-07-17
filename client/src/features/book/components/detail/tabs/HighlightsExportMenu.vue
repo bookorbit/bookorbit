@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Download, FileText, FileJson, FileType } from '@lucide/vue'
+import { useI18n } from 'vue-i18n'
 import type { AnnotationItem } from '@bookorbit/types'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
@@ -10,8 +11,10 @@ const props = withDefaults(
     bookTitle: string
     label?: string
   }>(),
-  { label: 'Export' },
+  { label: '' },
 )
+
+const { t } = useI18n()
 
 const open = ref(false)
 
@@ -108,7 +111,7 @@ function exportJson() {
         :disabled="items.length === 0"
       >
         <Download :size="14" />
-        {{ label }}
+        {{ label || t('book.detail.highlights.export.trigger') }}
       </button>
     </PopoverTrigger>
     <PopoverContent align="end" class="w-44 p-1">
@@ -124,7 +127,7 @@ function exportJson() {
         @click="exportPlainText"
       >
         <FileType :size="14" class="text-muted-foreground" />
-        Plain Text
+        {{ t('book.detail.highlights.export.plainText') }}
       </button>
       <button class="flex items-center gap-2 w-full px-3 py-2 rounded text-sm text-foreground hover:bg-muted transition-colors" @click="exportJson">
         <FileJson :size="14" class="text-muted-foreground" />

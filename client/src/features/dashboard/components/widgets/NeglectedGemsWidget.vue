@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Gem, Star, BookMarked, Check } from '@lucide/vue'
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
@@ -10,6 +11,7 @@ import { useBookStatus } from '@/features/book/composables/useBookStatus'
 import { useNeglectedGemsWidget } from '../../composables/useNeglectedGemsWidget'
 
 const { data, loading, error } = useNeglectedGemsWidget()
+const { t } = useI18n()
 const router = useRouter()
 const { setStatus } = useBookStatus()
 const { coverUrl } = useCoverVersions()
@@ -40,7 +42,7 @@ async function addToQueue() {
   <div class="flex h-full flex-col p-3">
     <div class="mb-3 flex items-center gap-2 self-start">
       <Gem :size="16" class="text-primary/90" />
-      <span class="text-[15px] font-semibold text-foreground">Neglected Gems</span>
+      <span class="text-[15px] font-semibold text-foreground">{{ t('dashboard.widgets.neglectedGems.title') }}</span>
     </div>
 
     <!-- Loading -->
@@ -50,14 +52,16 @@ async function addToQueue() {
     </div>
 
     <!-- Error -->
-    <div v-else-if="error" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">Failed to load</div>
+    <div v-else-if="error" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+      {{ t('dashboard.common.failedToLoad') }}
+    </div>
 
     <!-- Empty -->
     <div v-else-if="!data || data.gems.length === 0" class="flex flex-1 flex-col items-center justify-center gap-2">
       <div class="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
         <Gem :size="16" class="text-muted-foreground/60" />
       </div>
-      <p class="text-center text-xs text-muted-foreground">All your top-rated books have been read!</p>
+      <p class="text-center text-xs text-muted-foreground">{{ t('dashboard.widgets.neglectedGems.empty') }}</p>
     </div>
 
     <!-- Gem -->
@@ -76,18 +80,18 @@ async function addToQueue() {
           :author-line="null"
           :is-audio="false"
           :seed="currentGem.title ?? String(currentGem.bookId)"
-          :alt="currentGem.title ?? 'Cover'"
+          :alt="currentGem.title ?? t('dashboard.common.cover')"
           frame-aspect-ratio="13/19"
         />
       </BookCoverSurface>
       <button class="max-w-full cursor-pointer truncate text-center text-xs font-semibold hover:underline" @click="goToBook">
-        {{ currentGem.title ?? 'Untitled' }}
+        {{ currentGem.title ?? t('dashboard.common.untitled') }}
       </button>
       <div class="flex items-center gap-1 text-[11px] text-muted-foreground">
         <Star :size="12" class="fill-amber-400 text-amber-400" />
-        <span>{{ currentGem.rating }}/5</span>
+        <span>{{ t('dashboard.widgets.neglectedGems.rating', { rating: currentGem.rating }) }}</span>
         <span>&middot;</span>
-        <span>{{ currentGem.waitingDays }}d waiting</span>
+        <span>{{ t('dashboard.widgets.neglectedGems.daysWaiting', { count: currentGem.waitingDays }) }}</span>
       </div>
 
       <!-- Actions -->
@@ -101,14 +105,14 @@ async function addToQueue() {
           @click="addToQueue"
         >
           <component :is="queuedIds.has(currentGem.bookId) ? Check : BookMarked" :size="11" />
-          {{ queuedIds.has(currentGem.bookId) ? 'Queued' : 'Add to queue' }}
+          {{ queuedIds.has(currentGem.bookId) ? t('dashboard.widgets.neglectedGems.queued') : t('dashboard.widgets.neglectedGems.addToQueue') }}
         </button>
         <button
           v-if="data.gems.length > 1"
           class="rounded-md border border-input px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted"
           @click="handleShuffle"
         >
-          Shuffle
+          {{ t('dashboard.widgets.neglectedGems.shuffle') }}
         </button>
       </div>
     </div>

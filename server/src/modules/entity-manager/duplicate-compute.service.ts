@@ -2,16 +2,25 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import type { EntityType } from '@bookorbit/types';
+import type { EntityType, FirstClassEntityType } from '@bookorbit/types';
 import { INLINE_ENTITY_TYPES } from '@bookorbit/types';
+import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { entityDuplicateCandidates, entityDuplicateScanStatus } from '../../db/schema';
-import type { EntityStrategy } from './strategies/entity-strategy.interface';
+import { books, entityDuplicateCandidates, entityDuplicateScanStatus } from '../../db/schema';
+import type { EntityBookScope, EntityStrategy } from './strategies/entity-strategy.interface';
 
 type Db = NodePgDatabase<typeof schema>;
 
 const BATCH_SIZE = 1000;
+
+const ENTITY_BOOK_RELATIONS: Record<FirstClassEntityType, { table: string; entityIdColumn: string }> = {
+  author: { table: 'book_authors', entityIdColumn: 'author_id' },
+  genre: { table: 'book_genres', entityIdColumn: 'genre_id' },
+  tag: { table: 'book_tags', entityIdColumn: 'tag_id' },
+  narrator: { table: 'book_narrators', entityIdColumn: 'narrator_id' },
+  series: { table: 'book_series_memberships', entityIdColumn: 'series_id' },
+};
 
 @Injectable()
 export class DuplicateComputeService {
@@ -55,6 +64,7 @@ export class DuplicateComputeService {
   async readCandidatePairs(
     entityType: EntityType,
     minSimilarity: number,
+    scope: EntityBookScope,
   ): Promise<
     {
       idA: number;
@@ -62,6 +72,23 @@ export class DuplicateComputeService {
       simScore: number;
     }[]
   > {
+    if (scope.libraryIds.length === 0 || this.isInline(entityType)) return [];
+
+    const relation = ENTITY_BOOK_RELATIONS[entityType as FirstClassEntityType];
+    const relationTable = sql.raw(relation.table);
+    const relationEntityId = sql.raw(`scoped_relation.${relation.entityIdColumn}`);
+    const relationBookId = sql.raw('scoped_relation.book_id');
+    const scopeClauses = [
+      sql`${books.libraryId} IN (${sql.join(
+        scope.libraryIds.map((id) => sql`${id}`),
+        sql`, `,
+      )})`,
+    ];
+    if (scope.contentFilters) {
+      scopeClauses.push(...buildContentFilterClauses(scope.contentFilters, this.db));
+    }
+    const bookScope = sql.join(scopeClauses, sql` AND `);
+
     const rows = await this.db.execute<{ idA: number; idB: number; simScore: number }>(sql`
       SELECT
         c.entity_id_a AS "idA",
@@ -70,6 +97,20 @@ export class DuplicateComputeService {
       FROM entity_duplicate_candidates c
       WHERE c.entity_type = ${entityType}
         AND c.sim_score >= ${minSimilarity}
+        AND EXISTS (
+          SELECT 1
+          FROM ${relationTable} scoped_relation
+          JOIN ${books} ON ${relationBookId} = ${books.id}
+          WHERE ${relationEntityId} = c.entity_id_a
+            AND ${bookScope}
+        )
+        AND EXISTS (
+          SELECT 1
+          FROM ${relationTable} scoped_relation
+          JOIN ${books} ON ${relationBookId} = ${books.id}
+          WHERE ${relationEntityId} = c.entity_id_b
+            AND ${bookScope}
+        )
         AND NOT EXISTS (
           SELECT 1 FROM dismissed_duplicate_pairs d
           WHERE d.entity_type = ${entityType}

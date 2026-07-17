@@ -1,5 +1,6 @@
 import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 import { parsePublishedDateKey, parsePublishedYear, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
+import { htmlToPlainText } from '../../../../common/utils/html-to-text.utils';
 import { AladinItem } from './aladin.types';
 
 function parseAuthors(authorString: string): string[] {
@@ -22,7 +23,7 @@ function parsePageCount(subInfo?: AladinItem['subInfo']): number | undefined {
 function parseDescription(description: string, fullDescription?: string): string | undefined {
   const desc = fullDescription ?? description;
   if (!desc) return undefined;
-  return desc.replace(/<[^>]*>/g, '').trim();
+  return htmlToPlainText(desc) || undefined;
 }
 
 function parseGenres(categoryIdList?: AladinItem['categoryIdList']): string[] | undefined {

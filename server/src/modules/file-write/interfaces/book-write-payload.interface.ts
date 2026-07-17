@@ -41,6 +41,7 @@ export interface BookWritePayload {
   comicStoryArcs?: string[];
   itunesId?: string | null;
   audibleId?: string | null;
+  librofmId?: string | null;
   narrators?: string[];
   customMetadata?: CustomMetadataBookValue[];
   coverBytes?: Buffer | null;

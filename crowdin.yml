@@ -1,0 +1,19 @@
+preserve_hierarchy: true
+
+export_languages:
+  - de
+  - nl
+  - pt-BR
+  - sl
+
+pull_request_title: "i18n(client): sync translations from Crowdin"
+commit_message: |-
+  i18n(client): sync %language% translations from Crowdin
+
+  Keep translated catalogs synchronized with reviewed Crowdin content.
+append_commit_message: false
+
+files:
+  - source: /client/src/locales/en.json
+    translation: /client/src/locales/%two_letters_code%.json
+    update_option: update_as_unapproved

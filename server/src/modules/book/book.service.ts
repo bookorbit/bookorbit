@@ -35,7 +35,7 @@ import {
   MetadataProviderKey,
   Permission,
   isAudioFormat,
-  jumpBucketKindForSort,
+  jumpRailStrategyForSort,
   resolveUploadPath,
 } from '@bookorbit/types';
 import type {
@@ -50,6 +50,7 @@ import type {
   BooksPage,
   FileRenameResult,
   JumpBucketsResponse,
+  JumpBucketsQuery,
   MetadataFetchDiagnostics,
   MetadataField,
   ReadStatus,
@@ -72,11 +73,10 @@ import { FileRenameService, RENAME_RELEVANT_FIELDS } from '../file-write/file-re
 import { FileWriteService } from '../file-write/file-write.service';
 import { NarratorService } from '../narrator/narrator.service';
 import { UserBookNoteService } from '../user-book-note/user-book-note.service';
-import { UserBookStatusService } from '../user-book-status/user-book-status.service';
+import { UserBookStatusService, type AutoReadingActivity } from '../user-book-status/user-book-status.service';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED } from '../achievement/achievement-events.service';
 import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
 import { BookQueryBuilder } from './book-query-builder.service';
-import { collapsedJumpBucketExpr, flatJumpBucketExpr } from './jump-bucket-expr';
 import { BookRepository } from './book.repository';
 import { ComicMetadataRepository } from '../metadata/comic-metadata.repository';
 import { CustomMetadataService } from '../custom-metadata/custom-metadata.service';
@@ -295,6 +295,7 @@ export class BookService {
     openLibraryId?: string | null;
     itunesId?: string | null;
     audibleId?: string | null;
+    librofmId?: string | null;
     koboId?: string | null;
     comicvineId?: string | null;
     ranobedbId?: string | null;
@@ -309,6 +310,7 @@ export class BookService {
     if (meta.openLibraryId) providerIds[MetadataProviderKey.OPEN_LIBRARY] = meta.openLibraryId;
     if (meta.itunesId) providerIds[MetadataProviderKey.ITUNES] = meta.itunesId;
     if (meta.audibleId) providerIds[MetadataProviderKey.AUDIBLE] = meta.audibleId;
+    if (meta.librofmId) providerIds[MetadataProviderKey.LIBROFM] = meta.librofmId;
     if (meta.koboId) providerIds[MetadataProviderKey.KOBO] = meta.koboId;
     if (meta.comicvineId) providerIds[MetadataProviderKey.COMICVINE] = meta.comicvineId;
     if (meta.ranobedbId) providerIds[MetadataProviderKey.RANOBEDB] = meta.ranobedbId;
@@ -328,6 +330,7 @@ export class BookService {
       | 'openLibraryId'
       | 'itunesId'
       | 'audibleId'
+      | 'librofmId'
       | 'koboId'
       | 'comicvineId'
       | 'ranobedbId'
@@ -343,6 +346,7 @@ export class BookService {
     if (providerIds[MetadataProviderKey.OPEN_LIBRARY]) dto.openLibraryId = providerIds[MetadataProviderKey.OPEN_LIBRARY];
     if (providerIds[MetadataProviderKey.ITUNES]) dto.itunesId = providerIds[MetadataProviderKey.ITUNES];
     if (providerIds[MetadataProviderKey.AUDIBLE]) dto.audibleId = providerIds[MetadataProviderKey.AUDIBLE];
+    if (providerIds[MetadataProviderKey.LIBROFM]) dto.librofmId = providerIds[MetadataProviderKey.LIBROFM];
     if (providerIds[MetadataProviderKey.KOBO]) dto.koboId = providerIds[MetadataProviderKey.KOBO];
     if (providerIds[MetadataProviderKey.COMICVINE]) dto.comicvineId = providerIds[MetadataProviderKey.COMICVINE];
     if (providerIds[MetadataProviderKey.RANOBEDB]) dto.ranobedbId = providerIds[MetadataProviderKey.RANOBEDB];
@@ -1106,7 +1110,7 @@ export class BookService {
     return result;
   }
 
-  async queryJumpBucketsForLibrary(user: RequestUser, libraryId: number, query: BookQuery): Promise<JumpBucketsResponse> {
+  async queryJumpBucketsForLibrary(user: RequestUser, libraryId: number, query: JumpBucketsQuery): Promise<JumpBucketsResponse> {
     await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
     const timeZone = this.resolveUserTimeZone(user);
     const where = this.queryBuilder.buildWhere(query.filter, {
@@ -1117,24 +1121,47 @@ export class BookService {
       timeZone,
       contentFilters: this.isSuperuser(user) ? undefined : user.contentFilters,
     });
-    return this.executeJumpBucketsQuery(user.id, where, query);
+    return this.executeJumpBucketsQuery(user.id, where, query, timeZone);
   }
 
-  async executeJumpBucketsQuery(userId: number, where: SQL | undefined, query: BookQuery): Promise<JumpBucketsResponse> {
+  async executeJumpBucketsQuery(userId: number, where: SQL | undefined, query: JumpBucketsQuery, timeZone = 'UTC'): Promise<JumpBucketsResponse> {
     const event = 'book.jump_buckets';
-    const kind = jumpBucketKindForSort(query.sort);
-    const primaryField = (query.sort[0] ?? { field: 'title', dir: 'asc' }).field;
+    const strategy = jumpRailStrategyForSort(query.sort);
+    const kind = strategy?.kind ?? null;
+    const primary = query.sort[0] ?? { field: 'title' as const, dir: 'asc' as const };
     const shouldCollapse = query.collapseSeries === true && !BookQueryBuilder.hasSeriesSelectionFilter(query.filter);
-    const bucketExpr = shouldCollapse ? collapsedJumpBucketExpr(primaryField) : flatJumpBucketExpr(primaryField);
-    if (!kind || !bucketExpr) throw new BadRequestException('jump buckets are not available for this sort');
+    if (!strategy) throw new BadRequestException('jump buckets are not available for this sort');
 
     const start = Date.now();
     try {
-      const response = shouldCollapse
-        ? await this.bookRepo.findJumpBucketsCollapsed({ where, bucketExpr, sort: query.sort, userId })
-        : await this.bookRepo.findJumpBuckets({ where, bucketExpr, orderBy: this.queryBuilder.buildOrderBy(query.sort, userId) });
+      let response: JumpBucketsResponse;
+      if (strategy.kind === 'temporal') {
+        const temporalOpts = {
+          where,
+          field: primary.field,
+          direction: primary.dir,
+          precision: strategy.precision,
+          userId,
+          timeZone,
+          maxBuckets: query.maxBuckets,
+        };
+        response = shouldCollapse
+          ? await this.bookRepo.findTemporalJumpBucketsCollapsed(temporalOpts)
+          : await this.bookRepo.findTemporalJumpBuckets(temporalOpts);
+      } else {
+        const discreteOpts = {
+          where,
+          field: primary.field,
+          kind: strategy.kind,
+          userId,
+          maxBuckets: query.maxBuckets,
+        };
+        response = shouldCollapse
+          ? await this.bookRepo.findJumpBucketsCollapsed({ ...discreteOpts, sort: query.sort })
+          : await this.bookRepo.findJumpBuckets({ ...discreteOpts, orderBy: this.queryBuilder.buildOrderBy(query.sort, userId) });
+      }
       this.logger.log(
-        `[${event}] [end] userId=${userId} kind=${kind} collapse=${shouldCollapse} durationMs=${Date.now() - start} bucketCount=${response.buckets.length} total=${response.total} - jump buckets computed`,
+        `[${event}] [end] userId=${userId} kind=${kind} collapse=${shouldCollapse} maxBuckets=${query.maxBuckets} durationMs=${Date.now() - start} bucketCount=${response.buckets.length} total=${response.total} - jump buckets computed`,
       );
       return response;
     } catch (err) {
@@ -1337,12 +1364,21 @@ export class BookService {
 
       let newAbsolutePath = file.absolutePath;
       if (dto.filename && dto.filename !== basename(file.absolutePath)) {
-        if (dto.filename.includes('/') || dto.filename.includes('\\')) {
-          throw new BadRequestException('Filename cannot contain path separators');
+        const safeFilename = basename(dto.filename);
+        if (
+          safeFilename !== dto.filename ||
+          safeFilename === '.' ||
+          safeFilename === '..' ||
+          safeFilename.includes('\\') ||
+          safeFilename.includes('\0') ||
+          Buffer.byteLength(safeFilename, 'utf8') > 255
+        ) {
+          throw new BadRequestException('Filename is invalid');
         }
-        newAbsolutePath = join(dirname(file.absolutePath), dto.filename);
+        newAbsolutePath = join(dirname(file.absolutePath), safeFilename);
         if (newAbsolutePath !== file.absolutePath) {
           try {
+            // codeql[js/path-injection] basename constrains the user-provided value to one validated filename segment.
             await rename(file.absolutePath, newAbsolutePath);
           } catch (err) {
             throw new BadRequestException(`Failed to rename file on disk: ${err instanceof Error ? err.message : String(err)}`);
@@ -1580,6 +1616,7 @@ export class BookService {
     if (dto.openLibraryId !== undefined) scalarFields.openLibraryId = dto.openLibraryId ?? null;
     if (dto.itunesId !== undefined) scalarFields.itunesId = dto.itunesId ?? null;
     if (dto.audibleId !== undefined) scalarFields.audibleId = dto.audibleId ?? null;
+    if (dto.librofmId !== undefined) scalarFields.librofmId = dto.librofmId ?? null;
     if (dto.koboId !== undefined) scalarFields.koboId = dto.koboId ?? null;
     if (dto.comicvineId !== undefined) scalarFields.comicvineId = dto.comicvineId ?? null;
     if (dto.ranobedbId !== undefined) scalarFields.ranobedbId = dto.ranobedbId ?? null;
@@ -1903,15 +1940,38 @@ export class BookService {
     if (currentFile.bookId !== bookId) {
       throw new BadRequestException(`currentFileId ${dto.currentFileId} does not belong to book ${bookId}`);
     }
+    const previous = await this.bookRepo.findAudioProgress(userId, bookId);
     await this.bookRepo.upsertAudioProgress(userId, bookId, dto.currentFileId, dto.positionSeconds, dto.percentage);
-    await this.autoUpdateReadStatusForProgress(userId, { bookId, libraryId }, dto.percentage);
+    const strongRereadEvidence = previous != null && previous.percentage - dto.percentage >= 10;
+    await this.autoUpdateReadStatusForProgress(
+      userId,
+      { bookId, libraryId },
+      dto.percentage,
+      strongRereadEvidence ? { origin: 'bookorbit', strongRereadEvidence: true } : {},
+    );
   }
 
-  async autoUpdateReadStatusForProgress(userId: number, file: ProgressStatusFileContext, percentage: number): Promise<void> {
+  async autoUpdateReadStatusForProgress(
+    userId: number,
+    file: ProgressStatusFileContext,
+    percentage: number,
+    activity: AutoReadingActivity = {},
+  ): Promise<void> {
     const startedAt = Date.now();
     try {
       const library = await this.libraryService.findOne(file.libraryId);
-      await this.userBookStatusService.autoUpdate(userId, file.bookId, percentage, library.readingThreshold, library.markAsFinishedPercentComplete);
+      if (Object.keys(activity).length > 0) {
+        await this.userBookStatusService.autoUpdate(
+          userId,
+          file.bookId,
+          percentage,
+          library.readingThreshold,
+          library.markAsFinishedPercentComplete,
+          activity,
+        );
+      } else {
+        await this.userBookStatusService.autoUpdate(userId, file.bookId, percentage, library.readingThreshold, library.markAsFinishedPercentComplete);
+      }
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       this.logger.warn(
@@ -1932,6 +1992,7 @@ export class BookService {
 
   async saveProgress(userId: number, fileId: number, dto: SaveProgressDto, user: RequestUser) {
     const file = await this.verifyFileAccess(fileId, user);
+    const previous = await this.bookRepo.findProgress(userId, fileId);
     await this.bookRepo.upsertProgress(
       userId,
       fileId,
@@ -1956,7 +2017,13 @@ export class BookService {
         dto.koboContentSourceProgressPercent ?? null,
       );
     }
-    await this.autoUpdateReadStatusForProgress(userId, file, dto.percentage);
+    const strongRereadEvidence = previous != null && previous.percentage - dto.percentage >= 10;
+    await this.autoUpdateReadStatusForProgress(
+      userId,
+      file,
+      dto.percentage,
+      strongRereadEvidence ? { origin: 'bookorbit', strongRereadEvidence: true } : {},
+    );
   }
 
   async clearFileProgress(userId: number, fileId: number, user: RequestUser): Promise<void> {
@@ -1964,11 +2031,16 @@ export class BookService {
     await this.bookRepo.clearFileProgress(userId, fileId);
   }
 
+  async clearBookProgressForReread(userId: number, bookId: number, user: RequestUser): Promise<void> {
+    await this.verifyBookAccess(bookId, user);
+    await this.bookRepo.clearBookProgress(userId, bookId);
+  }
+
   async setReadStatus(bookId: number, dto: SetStatusDto, user: RequestUser): Promise<UserBookStatus> {
     await this.verifyBookAccess(bookId, user);
-    const hasStatus = Object.prototype.hasOwnProperty.call(dto, 'status');
-    const hasStartedAt = Object.prototype.hasOwnProperty.call(dto, 'startedAt');
-    const hasFinishedAt = Object.prototype.hasOwnProperty.call(dto, 'finishedAt');
+    const hasStatus = dto.status !== undefined;
+    const hasStartedAt = dto.startedAt !== undefined;
+    const hasFinishedAt = dto.finishedAt !== undefined;
     if (!hasStatus && !hasStartedAt && !hasFinishedAt) {
       throw new BadRequestException('At least one of status, startedAt, or finishedAt is required');
     }
@@ -2012,7 +2084,14 @@ export class BookService {
       throw new BadRequestException('finishedAt must be on or after startedAt');
     }
 
-    const updated = await this.userBookStatusService.updateManual(user.id, bookId, patch);
+    const dateKeys = {
+      ...(startedKey ? { startedOn: startedKey } : {}),
+      ...(finishedKey ? { endedOn: finishedKey } : {}),
+    };
+    const updated =
+      Object.keys(dateKeys).length > 0
+        ? await this.userBookStatusService.updateManual(user.id, bookId, patch, dateKeys)
+        : await this.userBookStatusService.updateManual(user.id, bookId, patch);
     return this.toDateOnlyReadStatus(updated, timeZone);
   }
 
@@ -2494,7 +2573,7 @@ export class BookService {
         author: authorRows[0]?.name ?? undefined,
         isbn: meta?.isbn13 ?? meta?.isbn10 ?? undefined,
         existingProviderIds: providerIds,
-        isAudiobook: (meta?.durationSeconds !== null && meta?.durationSeconds !== undefined) || !!meta?.audibleId,
+        isAudiobook: (meta?.durationSeconds !== null && meta?.durationSeconds !== undefined) || !!meta?.audibleId || !!meta?.librofmId,
         maxCandidatesPerProvider: 1,
       };
 
@@ -2897,6 +2976,7 @@ export class BookService {
         [MetadataProviderKey.OPEN_LIBRARY]: meta?.openLibraryId ?? null,
         [MetadataProviderKey.ITUNES]: meta?.itunesId ?? null,
         [MetadataProviderKey.AUDIBLE]: meta?.audibleId ?? null,
+        [MetadataProviderKey.LIBROFM]: meta?.librofmId ?? null,
         [MetadataProviderKey.KOBO]: meta?.koboId ?? null,
         [MetadataProviderKey.COMICVINE]: meta?.comicvineId ?? null,
         [MetadataProviderKey.RANOBEDB]: meta?.ranobedbId ?? null,
@@ -3144,6 +3224,7 @@ export class BookService {
           if (parsed.seriesName !== null) result.seriesName = parsed.seriesName;
           if (parsed.seriesIndex !== null) result.seriesIndex = parsed.seriesIndex;
           if (parsed.audibleId !== null) result.audibleId = parsed.audibleId;
+          if (parsed.librofmId !== null) result.librofmId = parsed.librofmId;
           if (parsed.durationSeconds !== null) result.durationSeconds = parsed.durationSeconds;
           if (parsed.authors.length > 0) result.authors = parsed.authors.map((a) => a.name);
           if (parsed.genres.length > 0) result.genres = parsed.genres;

@@ -21,7 +21,7 @@ const LETTER_BUCKETS: JumpBucket[] = [
 function mockBucketsResponse(buckets: JumpBucket[]) {
   fetchMock.mockResolvedValue({
     ok: true,
-    json: () => Promise.resolve({ buckets, total: 50 }),
+    json: () => Promise.resolve({ buckets, total: 50, kind: 'letter', granularity: null }),
   })
 }
 
@@ -42,8 +42,9 @@ function makeBuckets(
   const query = ref<BookWindowQuery>({ sort: overrides.sort ?? [{ field: 'title', dir: 'asc' }] })
   const enabled = ref(overrides.enabledValue ?? true)
   const firstVisibleIndex = ref(0)
-  const composable = useJumpBuckets({ endpoint, query, enabled, firstVisibleIndex })
-  return { ...composable, endpoint, query, enabled, firstVisibleIndex }
+  const maxBuckets = ref(24)
+  const composable = useJumpBuckets({ endpoint, query, enabled, firstVisibleIndex, maxBuckets })
+  return { ...composable, endpoint, query, enabled, firstVisibleIndex, maxBuckets }
 }
 
 describe('useJumpBuckets', () => {
@@ -62,12 +63,41 @@ describe('useJumpBuckets', () => {
   })
 
   it('does not fetch when the sort is ineligible', async () => {
-    const { buckets, kind } = makeBuckets({ sort: [{ field: 'addedAt', dir: 'desc' }] })
+    const { buckets, kind } = makeBuckets({ sort: [{ field: 'rating', dir: 'desc' }] })
     await flush()
 
     expect(fetchMock).not.toHaveBeenCalled()
     expect(buckets.value).toEqual([])
     expect(kind.value).toBeNull()
+  })
+
+  it('requests bounded temporal buckets and retains their granularity', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          buckets: [{ key: '2026-07', label: '2026-07', index: 0 }],
+          total: 50,
+          kind: 'temporal',
+          granularity: { unit: 'month', step: 1 },
+        }),
+    })
+    const { kind, granularity } = makeBuckets({ sort: [{ field: 'addedAt', dir: 'desc' }] })
+    await flush()
+
+    expect(kind.value).toBe('temporal')
+    expect(granularity.value).toEqual({ unit: 'month', step: 1 })
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))
+    expect(body.maxBuckets).toBe(24)
+  })
+
+  it('fetches categorical buckets for supported discrete sorts', async () => {
+    mockBucketsResponse([{ key: 'epub', label: 'epub', index: 0 }])
+    const { kind, buckets } = makeBuckets({ sort: [{ field: 'format', dir: 'asc' }] })
+    await flush()
+
+    expect(kind.value).toBe('category')
+    expect(buckets.value[0]?.key).toBe('epub')
   })
 
   it('does not fetch while disabled and fetches once enabled', async () => {

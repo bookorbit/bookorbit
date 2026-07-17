@@ -22,6 +22,7 @@ const FILE_METADATA_PATCH_FIELDS = [
   'openLibraryId',
   'itunesId',
   'audibleId',
+  'librofmId',
   'koboId',
   'comicvineId',
   'ranobedbId',

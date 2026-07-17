@@ -24,8 +24,40 @@ local safeFilenameBase = CatalogUtil.safeFilenameBase
 local shortText = CatalogUtil.shortText
 
 local STEP_DELAY = 0.15
+local NEXT_ITEM_DELAY = 0.02
 local PROGRESS_THROTTLE = 1
 local FAILED_TITLES_LIMIT = 8
+local TITLE_LINE_LENGTH = 38
+
+local function fixedTwoLineTitle(book)
+    local title = shortText(book and book.title or _("Untitled"), TITLE_LINE_LENGTH * 2)
+    if #title <= TITLE_LINE_LENGTH then
+        return title .. "\n "
+    end
+
+    local split_at = TITLE_LINE_LENGTH
+    for index = TITLE_LINE_LENGTH, 1, -1 do
+        if title:sub(index, index) == " " then
+            split_at = index - 1
+            break
+        end
+    end
+    local first = title:sub(1, split_at):gsub("%s+$", "")
+    local second = title:sub(split_at + 1):gsub("^%s+", "")
+    return first .. "\n" .. shortText(second, TITLE_LINE_LENGTH)
+end
+
+local function pathKey(path)
+    return tostring(path or ""):gsub("\\", "/"):lower()
+end
+
+local function appendPathIdentity(path, identity)
+    local stem, extension = path:match("^(.*)(%.[^./]+)$")
+    if not stem then
+        stem, extension = path, ""
+    end
+    return stem .. " [" .. tostring(identity) .. "]" .. extension
+end
 
 local FORMAT_PRESETS = {
     {
@@ -521,10 +553,14 @@ function CatalogBulkDownload.install(Catalog)
                 skipped_on_device = 0,
                 skipped_unsupported = 0,
                 skipped_existing = 0,
+                path_conflicts = 0,
                 failed = 0,
             },
             failed_books = {},
             failed_titles = {},
+            existing_files = {},
+            path_conflicts = {},
+            destination_paths = {},
             cancel_requested = false,
             cancelled = false,
             progress_dialog = nil,
@@ -533,6 +569,8 @@ function CatalogBulkDownload.install(Catalog)
         }
         self.bulk_running = true
         self.bulk_ctx = ctx
+        UIManager:preventStandby()
+        ctx.standby_prevented = true
         if source.clear_selection then
             self:bulkClearSelection(true)
         end
@@ -561,6 +599,12 @@ function CatalogBulkDownload.install(Catalog)
         end)
     end
 
+    function Catalog:bulkReleaseStandby(ctx)
+        if not ctx or not ctx.standby_prevented then return end
+        ctx.standby_prevented = false
+        UIManager:allowStandby()
+    end
+
     function Catalog:bulkAbort(ctx, message)
         if ctx.progress_dialog then
             UIManager:close(ctx.progress_dialog)
@@ -568,6 +612,7 @@ function CatalogBulkDownload.install(Catalog)
         end
         self.bulk_running = false
         self.bulk_ctx = nil
+        self:bulkReleaseStandby(ctx)
         UIManager:show(InfoMessage:new{ text = message, timeout = 4 })
     end
 
@@ -589,9 +634,15 @@ function CatalogBulkDownload.install(Catalog)
                 buttons = {
                     {
                         {
-                            text = _("Cancel after current file"),
+                            text = ctx.cancel_requested and _("Stopping...") or _("Cancel after current file"),
+                            enabled = not ctx.cancel_requested,
                             callback = function()
+                                if ctx.cancel_requested then return end
                                 ctx.cancel_requested = true
+                                if ctx.progress_dialog then
+                                    UIManager:close(ctx.progress_dialog)
+                                    ctx.progress_dialog = nil
+                                end
                                 self:bulkSetProgress(ctx, _("Stopping after current file..."), true)
                             end,
                         },
@@ -601,6 +652,30 @@ function CatalogBulkDownload.install(Catalog)
             UIManager:show(ctx.progress_dialog)
         end
         UIManager:forceRePaint()
+    end
+
+    function Catalog:bulkProgressText(ctx, status, book)
+        local counts = ctx.counts
+        local lines = {
+            T(_("Processing %1/%2"), ctx.index, ctx.total),
+        }
+        table.insert(lines, fixedTwoLineTitle(book))
+        if status then
+            table.insert(lines, status)
+        end
+        table.insert(lines, T(_("Downloaded: %1\nAlready on device: %2\nExisting file (Not in BookOrbit): %3\nRenamed conflicts: %4\nUnsupported: %5\nFailed: %6"),
+            counts.downloaded,
+            counts.skipped_on_device,
+            counts.skipped_existing,
+            counts.path_conflicts or 0,
+            counts.skipped_unsupported,
+            counts.failed
+        ))
+        return table.concat(lines, "\n\n")
+    end
+
+    function Catalog:bulkShowStatus(ctx, status, book, force)
+        self:bulkSetProgress(ctx, self:bulkProgressText(ctx, status, book), force == true)
     end
 
     function Catalog:bulkQueueStep(ctx)
@@ -626,54 +701,96 @@ function CatalogBulkDownload.install(Catalog)
             self:bulkRecordFailure(ctx, book)
         end
 
-        UIManager:scheduleIn(STEP_DELAY, function()
+        if ctx.cancel_requested then
+            ctx.cancelled = true
+            self:bulkFinish(ctx)
+            return
+        end
+
+        UIManager:scheduleIn(NEXT_ITEM_DELAY, function()
             self:bulkQueueStep(ctx)
         end)
     end
 
     function Catalog:bulkProcessBook(ctx, book)
+        self:bulkShowStatus(ctx, _("Checking book..."), book, ctx.index % 5 == 0)
+
         if self:isOnDevice(book) then
             ctx.counts.skipped_on_device = ctx.counts.skipped_on_device + 1
+            self:bulkShowStatus(ctx, _("Already on device - skipping"), book, ctx.index % 5 == 0)
             return
         end
         if not self:bulkSupportedFormatHint(book) then
             ctx.counts.skipped_unsupported = ctx.counts.skipped_unsupported + 1
+            self:bulkShowStatus(ctx, _("No supported format - skipping"), book, true)
             return
         end
 
-        self:bulkSetProgress(ctx, T(_("Preparing %1/%2..."), ctx.index, ctx.total), true)
+        self:bulkShowStatus(ctx, _("Loading book details..."), book, true)
         local detail, err = self.client:catalogBook(book.id)
         if not detail then
             logger.warn("BookOrbit: bulk detail fetch failed", book.id, err)
             self:bulkRecordFailure(ctx, book)
+            self:bulkShowStatus(ctx, _("Could not load book details"), book, true)
             return
         end
         if self:isOnDevice(detail) then
             ctx.counts.skipped_on_device = ctx.counts.skipped_on_device + 1
+            self:bulkShowStatus(ctx, _("Already on device - skipping"), detail, true)
             return
         end
 
         local file = self:bulkChooseFile(detail)
         if not file then
             ctx.counts.skipped_unsupported = ctx.counts.skipped_unsupported + 1
+            self:bulkShowStatus(ctx, _("No supported format - skipping"), detail, true)
             return
         end
 
         local filename = safeFilenameBase(detail)
         local filetype = string.lower(file.format or "bin")
-        local local_path = self:getLocalDownloadPath(filename, filetype)
+        local book_id = detail.id or book.id
+        local local_path = self:getLocalDownloadPath(filename, filetype, file.devicePath)
+        local original_path = local_path
+        local owner = ctx.destination_paths[pathKey(local_path)]
+        if owner and owner.book_id ~= book_id then
+            local identity = book_id or file.id
+            local candidate = appendPathIdentity(local_path, identity)
+            local suffix = 2
+            while ctx.destination_paths[pathKey(candidate)] or lfs.attributes(candidate) do
+                candidate = appendPathIdentity(local_path, tostring(identity) .. "-" .. tostring(suffix))
+                suffix = suffix + 1
+            end
+            local_path = candidate
+            ctx.counts.path_conflicts = ctx.counts.path_conflicts + 1
+            table.insert(ctx.path_conflicts, {
+                book_id = book_id,
+                title = bookTitle(detail),
+                original_path = original_path,
+                resolved_path = local_path,
+                conflicting_book_id = owner.book_id,
+            })
+            logger.warn("BookOrbit: bulk destination path conflict renamed", book_id, owner.book_id, original_path, local_path)
+            self:bulkShowStatus(ctx, _("Path conflict - using unique filename"), detail, true)
+        end
         if lfs.attributes(local_path) and self:bulkExistingPolicy().id == "skip" then
             ctx.counts.skipped_existing = ctx.counts.skipped_existing + 1
+            table.insert(ctx.existing_files, { book_id = book_id, title = bookTitle(detail), path = local_path })
+            logger.warn("BookOrbit: existing destination skipped", detail.id, local_path)
+            self:bulkShowStatus(ctx, _("File already exists - skipping"), detail, true)
             return
         end
 
         local ok, linked = self:bulkDownloadFile(ctx, detail, file, local_path)
         if not ok then
             self:bulkRecordFailure(ctx, book)
+            self:bulkShowStatus(ctx, _("Download failed"), detail, true)
             return
         end
         ctx.counts.downloaded = ctx.counts.downloaded + 1
+        ctx.destination_paths[pathKey(local_path)] = { book_id = book_id, file_id = file.id }
         if linked then ctx.counts.linked = ctx.counts.linked + 1 end
+        self:bulkShowStatus(ctx, _("Download complete"), detail, true)
     end
 
     function Catalog:bulkChooseFile(detail)
@@ -702,22 +819,22 @@ function CatalogBulkDownload.install(Catalog)
         local total = file.sizeBytes
         local last_bucket = -1
         local function on_progress(received)
-            local text, bucket
+            local status, bucket
             if total and total > 0 then
                 local pct = math.min(100, math.floor(received / total * 100))
                 bucket = math.floor(pct / 5)
                 if bucket == last_bucket then return end
-                text = T(_("Downloading %1/%2:\n%3\n\n%4"), ctx.index, ctx.total, filename, pct .. "%")
+                status = T(_("Downloading - %1"), pct .. "%")
             else
                 bucket = math.floor(received / (256 * 1024))
                 if bucket == last_bucket then return end
-                text = T(_("Downloading %1/%2:\n%3\n\n%4"), ctx.index, ctx.total, filename, formatBytes(received))
+                status = T(_("Downloading - %1"), formatBytes(received))
             end
             last_bucket = bucket
-            self:bulkSetProgress(ctx, text, true)
+            self:bulkShowStatus(ctx, status, detail, true)
         end
 
-        self:bulkSetProgress(ctx, T(_("Downloading %1/%2:\n%3"), ctx.index, ctx.total, filename), true)
+        self:bulkShowStatus(ctx, _("Downloading..."), detail, true)
         local ok, err = self.client:downloadCatalogFile(file.id, local_path, on_progress)
         if not ok then
             logger.warn("BookOrbit: bulk file download failed", detail.id, file.id, err)
@@ -741,6 +858,7 @@ function CatalogBulkDownload.install(Catalog)
     end
 
     function Catalog:bulkFinish(ctx)
+        self:bulkReleaseStandby(ctx)
         if ctx.progress_dialog then
             UIManager:close(ctx.progress_dialog)
             ctx.progress_dialog = nil
@@ -759,10 +877,26 @@ function CatalogBulkDownload.install(Catalog)
             T(_("Downloaded: %1"), counts.downloaded),
             T(_("Linked: %1"), counts.linked),
             T(_("Skipped on device: %1"), counts.skipped_on_device),
-            T(_("Skipped existing: %1"), counts.skipped_existing),
+            T(_("Existing file (Not in BookOrbit): %1"), counts.skipped_existing),
+            T(_("Renamed path conflicts: %1"), counts.path_conflicts or 0),
             T(_("No supported format: %1"), counts.skipped_unsupported),
             T(_("Failed: %1"), counts.failed),
         }
+        local existing_files = ctx.existing_files or {}
+        local path_conflicts = ctx.path_conflicts or {}
+        if #existing_files > 0 then
+            table.insert(lines, "")
+            table.insert(lines, _("Existing files (Not in BookOrbit):"))
+            for _, entry in ipairs(existing_files) do
+                table.insert(lines, shortText(entry.title, 52))
+                table.insert(lines, shortText(entry.path, 72))
+            end
+        end
+        if #path_conflicts > 0 then
+            table.insert(lines, "")
+            table.insert(lines, _("Conflicting destinations were renamed with BookOrbit IDs."))
+        end
+
         if #ctx.failed_titles > 0 then
             table.insert(lines, "")
             table.insert(lines, _("Failed books:"))

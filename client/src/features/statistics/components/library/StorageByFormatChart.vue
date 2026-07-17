@@ -1,22 +1,20 @@
 <script setup lang="ts">
 import { shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { HardDrive } from '@lucide/vue'
 import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
+import { formatBytes } from '@/lib/formatting'
 
 import { useStorageByFormat } from '../../composables/useStorageByFormat'
 import ChartCard from '../ChartCard.vue'
+
+const { t } = useI18n()
 
 const { data, loading, error } = useStorageByFormat()
 const { md } = useBreakpoints(breakpointsTailwind)
 
 const option = shallowRef({})
-
-function formatBytes(bytes: number): string {
-  if (bytes >= 1_073_741_824) return `${(bytes / 1_073_741_824).toFixed(1)} GB`
-  if (bytes >= 1_048_576) return `${(bytes / 1_048_576).toFixed(1)} MB`
-  return `${(bytes / 1024).toFixed(1)} KB`
-}
 
 watchEffect(() => {
   if (!data.value.items.length) return
@@ -46,7 +44,7 @@ watchEffect(() => {
 
 <template>
   <ChartCard
-    title="Storage by Format"
+    :title="t('statistics.charts.storageByFormat.title')"
     :icon="HardDrive"
     :color-index="4"
     :loading

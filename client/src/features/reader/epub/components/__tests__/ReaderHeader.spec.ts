@@ -37,7 +37,7 @@ describe('ReaderHeader', () => {
     await wrapper.get('button[aria-label="Toggle bookmark"]').trigger('click')
     await wrapper.get('button[aria-label="Search"]').trigger('click')
     await wrapper.get('button[aria-label="Cycle footer info mode"]').trigger('click')
-    await wrapper.get('button[aria-label="Keyboard shortcuts"]').trigger('click')
+    await wrapper.get('button[aria-label="Keyboard Shortcuts"]').trigger('click')
     await wrapper.get('button[aria-label="Enter fullscreen"]').trigger('click')
 
     expect(wrapper.emitted('back')?.length).toBe(1)

@@ -12,6 +12,7 @@ import {
   type BookDockAutoFinalizeMetadataMode,
 } from '@bookorbit/types';
 
+import { StatsCache } from '../../common/cache/stats-cache';
 import {
   APP_SETTING_KEYS,
   DEFAULT_LIBRARY_ACCESS_CONFIG,
@@ -22,6 +23,7 @@ import { ensureSafeUrl } from '../../common/utils/ssrf.utils';
 import { AppSettingsRepository } from './app-settings.repository';
 
 const OIDC_TEST_TIMEOUT_MS = 10_000;
+const RUNTIME_SETTING_CACHE_TTL_MS = 30_000;
 
 function parseSafe<T>(key: string, val: string | undefined, fallback: T, logger: Logger): T {
   if (!val) return fallback;
@@ -42,6 +44,7 @@ function parseBooleanSetting(value: string | undefined, defaultValue: boolean): 
 @Injectable()
 export class AppSettingsService {
   private readonly logger = new Logger(AppSettingsService.name);
+  private readonly runtimeSettingCache = new StatsCache({ ttlMs: RUNTIME_SETTING_CACHE_TTL_MS, maxEntries: 8 });
 
   constructor(
     private readonly repo: AppSettingsRepository,
@@ -59,6 +62,7 @@ export class AppSettingsService {
 
   async setValue(key: string, value: string): Promise<void> {
     await this.repo.upsert(key, value);
+    this.clearRuntimeSettingCache(key);
   }
 
   async update(key: string, value: string) {
@@ -70,6 +74,7 @@ export class AppSettingsService {
     }
     const setting = await this.repo.updateByKey(key, value);
     if (!setting) throw new NotFoundException(`Setting '${key}' not found`);
+    this.clearRuntimeSettingCache(key);
     return setting;
   }
 
@@ -133,12 +138,21 @@ export class AppSettingsService {
   }
 
   async isCrossPlatformPathSanitizationEnabled(): Promise<boolean> {
-    const row = await this.repo.findByKey(APP_SETTING_KEYS.CROSS_PLATFORM_PATH_SANITIZATION_ENABLED);
-    return parseBooleanSetting(row?.value, true);
+    return this.runtimeSettingCache.get('app-settings', APP_SETTING_KEYS.CROSS_PLATFORM_PATH_SANITIZATION_ENABLED, async () => {
+      const row = await this.repo.findByKey(APP_SETTING_KEYS.CROSS_PLATFORM_PATH_SANITIZATION_ENABLED);
+      return parseBooleanSetting(row?.value, true);
+    });
   }
 
   async setCrossPlatformPathSanitizationEnabled(enabled: boolean): Promise<void> {
     await this.repo.upsert(APP_SETTING_KEYS.CROSS_PLATFORM_PATH_SANITIZATION_ENABLED, String(enabled));
+    this.clearRuntimeSettingCache(APP_SETTING_KEYS.CROSS_PLATFORM_PATH_SANITIZATION_ENABLED);
+  }
+
+  private clearRuntimeSettingCache(key: string): void {
+    if (key === APP_SETTING_KEYS.CROSS_PLATFORM_PATH_SANITIZATION_ENABLED) {
+      this.runtimeSettingCache.clearForScope('app-settings');
+    }
   }
 
   async updateOidcConfig(config: Partial<OidcFullConfig>): Promise<OidcFullConfig> {

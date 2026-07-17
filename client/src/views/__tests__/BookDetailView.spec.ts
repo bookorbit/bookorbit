@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, nextTick, reactive, ref, type PropType } from 'vue'
 import { mount } from '@vue/test-utils'
-import type { BookDetail } from '@bookorbit/types'
+import type { BookDetail, BookProgressChangedEvent } from '@bookorbit/types'
 import BookDetailView from '../BookDetailView.vue'
 
 const mockState = vi.hoisted(() => ({
@@ -10,6 +10,7 @@ const mockState = vi.hoisted(() => ({
   loading: null as unknown as { value: boolean },
   notFound: null as unknown as { value: boolean },
   fetch: vi.fn<(bookId: number) => void>(),
+  progressChangedCallback: null as ((event: BookProgressChangedEvent) => void) | null,
 }))
 
 vi.mock('vue-router', async (importOriginal) => {
@@ -35,6 +36,10 @@ vi.mock('@/features/book/composables/useBookEvents', () => ({
     onBookRestored: () => undefined,
     onBookMoved: () => undefined,
     onBookTransferred: () => undefined,
+    onBookProgressChanged: (callback: (event: BookProgressChangedEvent) => void) => {
+      mockState.progressChangedCallback = callback
+      return () => undefined
+    },
   }),
 }))
 
@@ -143,6 +148,7 @@ describe('BookDetailView', () => {
     mockState.loading = ref(false)
     mockState.notFound = ref(false)
     mockState.fetch.mockReset()
+    mockState.progressChangedCallback = null
   })
 
   it('keeps updated rating when switching details -> edit -> details tabs', async () => {
@@ -210,5 +216,25 @@ describe('BookDetailView', () => {
 
     expect(mockState.fetch).toHaveBeenCalledWith(218)
     expect(wrapper.get('[data-test="details-rating"]').text()).toBe('')
+  })
+
+  it('refetches the open book when external reader progress changes', () => {
+    mount(BookDetailView, {
+      global: {
+        stubs: {
+          BookDetailLayout: { template: '<div><slot /></div>' },
+          DetailsTab: DetailsTabStub,
+          EditMetadataTab: EditMetadataTabStub,
+          FilesTab: { template: '<div />' },
+        },
+      },
+    })
+    mockState.fetch.mockClear()
+
+    mockState.progressChangedCallback?.({ bookId: 999, progress: 40, source: 'koreader' })
+    expect(mockState.fetch).not.toHaveBeenCalled()
+
+    mockState.progressChangedCallback?.({ bookId: 217, progress: 61.02, source: 'koreader' })
+    expect(mockState.fetch).toHaveBeenCalledExactlyOnceWith(217)
   })
 })

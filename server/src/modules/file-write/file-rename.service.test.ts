@@ -1,15 +1,17 @@
 import { ConfigService } from '@nestjs/config';
 import { NotificationType } from '@bookorbit/types';
 import type { MockedFunction } from 'vitest';
-import { access, mkdir, readdir, rename as fsRename, rmdir } from 'fs/promises';
+import { access, lstat, mkdir, readdir, realpath, rename as fsRename, rmdir } from 'fs/promises';
 
 vi.mock('fs/promises', async () => {
   const actual = await vi.importActual<typeof import('fs/promises')>('fs/promises');
   return {
     ...actual,
     access: vi.fn(),
+    lstat: vi.fn(),
     mkdir: vi.fn(),
     readdir: vi.fn(),
+    realpath: vi.fn(),
     rename: vi.fn(),
     rmdir: vi.fn(),
   };
@@ -20,8 +22,10 @@ import { FileRenameService } from './file-rename.service';
 import { bookOperationLockKey } from './file-lock.service';
 
 const mockAccess = access as MockedFunction<typeof access>;
+const mockLstat = lstat as MockedFunction<typeof lstat>;
 const mockMkdir = mkdir as MockedFunction<typeof mkdir>;
 const mockReaddir = readdir as MockedFunction<typeof readdir>;
+const mockRealpath = realpath as MockedFunction<typeof realpath>;
 const mockRename = fsRename as MockedFunction<typeof fsRename>;
 const mockRmdir = rmdir as MockedFunction<typeof rmdir>;
 
@@ -114,13 +118,17 @@ describe('FileRenameService', () => {
     vi.clearAllMocks();
     vi.useRealTimers();
     mockAccess.mockReset();
+    mockLstat.mockReset();
     mockMkdir.mockReset();
     mockReaddir.mockReset();
+    mockRealpath.mockReset();
     mockRename.mockReset();
     mockRmdir.mockReset();
     mockAccess.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }) as never);
+    mockLstat.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }) as never);
     mockMkdir.mockResolvedValue(undefined as never);
     mockReaddir.mockResolvedValue(['still-here'] as never);
+    mockRealpath.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }) as never);
     mockRename.mockResolvedValue(undefined as never);
     mockRmdir.mockResolvedValue(undefined as never);
   });
@@ -687,6 +695,185 @@ describe('FileRenameService', () => {
     );
     expect(notificationService.notify).toHaveBeenCalledWith(expect.objectContaining({ type: NotificationType.FileRenameFailed }));
     expect(mockRename).not.toHaveBeenCalled();
+  });
+
+  it('renames a case-only file path when source and target are the same filesystem entry', async () => {
+    const { service, renameRepo, notificationService } = makeService();
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        file: {
+          absolutePath: '/library/Frank herbert/Dune.epub',
+          relPath: 'Frank herbert/Dune.epub',
+        },
+        bookFolderPath: '/library/Frank herbert/Dune.epub',
+      }),
+    );
+    mockAccess.mockImplementation((path: any) => {
+      if (path.toString() === '/library/Frank Herbert/Dune.epub') return Promise.resolve(undefined);
+      return Promise.reject(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+    });
+    mockLstat.mockResolvedValue({ dev: 1, ino: 42 } as never);
+    mockRealpath.mockResolvedValue('/library/Frank Herbert/Dune.epub');
+
+    const result = await service.performRename(5, 12);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'success',
+        oldPath: '/library/Frank herbert/Dune.epub',
+        newPath: '/library/Frank Herbert/Dune.epub',
+      }),
+    );
+    expect(mockRename).toHaveBeenCalledWith('/library/Frank herbert/Dune.epub', '/library/Frank Herbert/Dune.epub');
+    expect(notificationService.notify).toHaveBeenCalledWith(expect.objectContaining({ type: NotificationType.FileRenameCompleted }));
+  });
+
+  it('preserves a genuine hard-link destination collision even when inode numbers match', async () => {
+    const { service, renameRepo } = makeService();
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        file: {
+          absolutePath: '/library/Old Title.epub',
+          relPath: 'Old Title.epub',
+        },
+        bookFolderPath: '/library/Old Title.epub',
+      }),
+    );
+    mockAccess.mockResolvedValue(undefined as never);
+    mockLstat.mockResolvedValue({ dev: 1, ino: 42 } as never);
+    mockRealpath.mockImplementation((path: any) => Promise.resolve(path.toString()));
+
+    const result = await service.performRename(5, 12);
+
+    expect(result).toEqual(expect.objectContaining({ status: 'skipped', reason: 'target path already exists on disk' }));
+    expect(mockRename).not.toHaveBeenCalled();
+  });
+
+  it('renames files for a case-only book folder instead of treating the folder as a collision', async () => {
+    const { service, renameRepo } = makeService();
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        organizationMode: 'book_per_folder',
+        fileNamingPattern: '{authors}/{title}/{title}',
+        file: {
+          absolutePath: '/library/Frank herbert/Dune/Dune.epub',
+          relPath: 'Frank herbert/Dune/Dune.epub',
+        },
+        bookFolderPath: '/library/Frank herbert/Dune',
+      }),
+    );
+    mockAccess.mockImplementation((path: any) => {
+      if (path.toString() === '/library/Frank Herbert/Dune') return Promise.resolve(undefined);
+      return Promise.reject(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+    });
+    mockLstat.mockResolvedValue({ dev: 1, ino: 42 } as never);
+    mockRealpath.mockResolvedValue('/library/Frank Herbert/Dune');
+
+    const result = await service.performRename(5, 12);
+
+    expect(result).toEqual(expect.objectContaining({ status: 'success' }));
+    expect(renameRepo.findBookByExactFolderPath).not.toHaveBeenCalled();
+    expect(mockRename).toHaveBeenCalledTimes(1);
+    expect(mockRename).toHaveBeenCalledWith('/library/Frank herbert/Dune/Dune.epub', '/library/Frank Herbert/Dune/Dune.epub');
+  });
+
+  it('does not move a guessed sanitized source to a different target', async () => {
+    const { service, renameRepo, appSettings } = makeService();
+    appSettings.isCrossPlatformPathSanitizationEnabled.mockResolvedValue(true);
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        organizationMode: 'book_per_folder',
+        fileNamingPattern: '{authors}/{title}/{title}',
+        file: {
+          absolutePath: '/library/Ashley/Fighting The Pull: A Novel/The Bhagavad Gita/The Bhagavad Gita.azw3',
+          relPath: 'Ashley/Fighting The Pull: A Novel/The Bhagavad Gita/The Bhagavad Gita.azw3',
+          format: 'azw3',
+        },
+        metadata: { title: 'The Bhagavad Gita' },
+        authors: ['Swami'],
+        bookFolderPath: '/library/Ashley/Fighting The Pull: A Novel/The Bhagavad Gita',
+      }),
+    );
+    mockAccess.mockImplementation((path: any) => {
+      if (path.toString() === '/library/Ashley/Fighting The Pull_ A Novel/The Bhagavad Gita') return Promise.resolve(undefined);
+      return Promise.reject(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+    });
+    mockRename.mockImplementation((source: any) => {
+      if (source.toString() === '/library/Ashley/Fighting The Pull: A Novel/The Bhagavad Gita') {
+        return Promise.reject(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+      }
+      return Promise.resolve();
+    });
+
+    const result = await service.performRename(119, 1);
+
+    expect(result).toEqual(expect.objectContaining({ status: 'failed', reason: 'missing' }));
+    expect(mockRename).toHaveBeenCalledTimes(1);
+    expect(mockRename).toHaveBeenCalledWith('/library/Ashley/Fighting The Pull: A Novel/The Bhagavad Gita', '/library/Swami/The Bhagavad Gita');
+  });
+
+  it('reconciles a stale source when the sanitized source is already the desired target', async () => {
+    const { service, renameRepo, appSettings } = makeService();
+    appSettings.isCrossPlatformPathSanitizationEnabled.mockResolvedValue(true);
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        fileNamingPattern: '{title}',
+        file: {
+          absolutePath: '/library/Bad: Love.epub',
+          relPath: 'Bad: Love.epub',
+        },
+        metadata: { title: 'Bad: Love' },
+        bookFolderPath: '/library/Bad: Love.epub',
+      }),
+    );
+    mockAccess.mockImplementation((path: any) => {
+      if (path.toString() === '/library/Bad_ Love.epub') return Promise.resolve(undefined);
+      return Promise.reject(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+    });
+    mockLstat.mockImplementation((path: any) => {
+      if (path.toString() === '/library/Bad_ Love.epub') return Promise.resolve({ dev: 1, ino: 42 } as never);
+      return Promise.reject(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+    });
+    mockRealpath.mockImplementation((path: any) => {
+      if (path.toString() === '/library/Bad_ Love.epub') return Promise.resolve('/library/Bad_ Love.epub');
+      return Promise.reject(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+    });
+    mockRename.mockImplementation((source: any) => {
+      if (source.toString() === '/library/Bad: Love.epub') return Promise.reject(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+      return Promise.resolve();
+    });
+
+    const result = await service.performRename(5, 12);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'success',
+        oldPath: '/library/Bad: Love.epub',
+        newPath: '/library/Bad_ Love.epub',
+      }),
+    );
+    expect(mockRename).toHaveBeenCalledTimes(1);
+    expect(mockRename).toHaveBeenCalledWith('/library/Bad: Love.epub', '/library/Bad_ Love.epub');
+  });
+
+  it('does not guess a sanitized source path when cross-platform sanitization is disabled', async () => {
+    const { service, renameRepo } = makeService();
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        file: {
+          absolutePath: '/library/Old: Title.epub',
+          relPath: 'Old: Title.epub',
+        },
+        bookFolderPath: '/library/Old: Title.epub',
+      }),
+    );
+    mockRename.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }) as never);
+
+    const result = await service.performRename(5, 12);
+
+    expect(result).toEqual(expect.objectContaining({ status: 'failed', reason: 'missing' }));
+    expect(mockRename).toHaveBeenCalledTimes(1);
+    expect(mockRename).toHaveBeenCalledWith('/library/Old: Title.epub', '/library/Frank Herbert/Dune.epub');
   });
 
   it('skips when a generated audio part target already exists on disk', async () => {

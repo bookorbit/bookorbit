@@ -50,6 +50,7 @@ export const storygraphBookState = pgTable(
   },
   (t) => [
     unique('storygraph_book_state_user_book_uidx').on(t.userId, t.bookId),
+    index('storygraph_book_state_book_id_idx').on(t.bookId),
     index('storygraph_book_state_user_sync_override_idx').on(t.userId, t.syncOverride, t.bookId),
     index('storygraph_book_state_user_sync_error_idx')
       .on(t.userId, t.bookId)

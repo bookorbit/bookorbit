@@ -5,8 +5,10 @@ import { useAuth } from '@/features/auth/composables/useAuth'
 import {
   CBX_READER_DEFAULTS,
   EPUB_READER_DEFAULTS,
+  PDF_READER_DEFAULTS,
   type CbxReaderSettings,
   type EpubReaderSettings,
+  type PdfReaderSettings,
   type ReaderFormatGroup,
   type ReaderSettings,
   READER_GROUP_DEFAULTS,
@@ -138,8 +140,35 @@ function sanitizeCbxPartialSettings(settings: unknown): Partial<CbxReaderSetting
   return out
 }
 
+function sanitizePdfPartialSettings(settings: unknown): Partial<PdfReaderSettings> | null {
+  if (!isRecord(settings)) return null
+
+  const out: Partial<PdfReaderSettings> = {}
+
+  if (settings.scrollMode === 'vertical' || settings.scrollMode === 'horizontal' || settings.scrollMode === 'page') {
+    out.scrollMode = settings.scrollMode
+  } else if (settings.scrollMode === 'wrapped') {
+    out.scrollMode = 'vertical'
+  }
+  if (settings.spread === 'none' || settings.spread === 'odd' || settings.spread === 'even' || settings.spread === 'auto') {
+    out.spread = settings.spread
+  }
+  if (settings.zoomMode === 'fit-width' || settings.zoomMode === 'fit-page' || settings.zoomMode === 'automatic' || settings.zoomMode === 'custom') {
+    out.zoomMode = settings.zoomMode
+  }
+  if (isNumberInRange(settings.customScale, 0.25, 4)) {
+    out.customScale = settings.customScale
+  }
+  if (settings.rotation === 0 || settings.rotation === 90 || settings.rotation === 180 || settings.rotation === 270) {
+    out.rotation = settings.rotation
+  }
+
+  return out
+}
+
 function sanitizeBookDelta(group: ReaderFormatGroup, raw: unknown): Partial<ReaderSettings> | null {
   if (group === 'epub') return sanitizeEpubPartialSettings(raw) as Partial<ReaderSettings> | null
+  if (group === 'pdf') return sanitizePdfPartialSettings(raw) as Partial<ReaderSettings> | null
   if (group !== 'cbx') return isRecord(raw) ? (raw as Partial<ReaderSettings>) : null
   const sanitized = sanitizeCbxPartialSettings(raw)
   return sanitized as Partial<ReaderSettings> | null
@@ -151,6 +180,14 @@ function sanitizeDefaultSettings(group: ReaderFormatGroup, raw: unknown): Reader
     if (!sanitized) return null
     return {
       ...EPUB_READER_DEFAULTS,
+      ...sanitized,
+    } as ReaderSettings
+  }
+  if (group === 'pdf') {
+    const sanitized = sanitizePdfPartialSettings(raw)
+    if (!sanitized) return null
+    return {
+      ...PDF_READER_DEFAULTS,
       ...sanitized,
     } as ReaderSettings
   }

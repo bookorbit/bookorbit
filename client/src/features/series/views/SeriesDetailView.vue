@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeft, Pencil } from '@lucide/vue'
 import { toast } from 'vue-sonner'
@@ -39,6 +41,7 @@ import {
   shouldPersistCoverRatio,
 } from '../lib/cover-scale'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const mainRef = ref<HTMLElement | null>(null)
@@ -71,8 +74,8 @@ const {
 } = useSeriesDetail(seriesId)
 
 const pageTitle = computed(() => {
-  if (seriesInfo.value?.name) return `Series · ${seriesInfo.value.name}`
-  return seriesId.value != null ? `Series #${seriesId.value}` : 'Series'
+  if (seriesInfo.value?.name) return t('series.detail.pageTitleNamed', { name: seriesInfo.value.name })
+  return seriesId.value != null ? t('series.detail.pageTitleWithId', { id: seriesId.value }) : t('series.detail.pageTitle')
 })
 usePageTitle(pageTitle)
 
@@ -333,7 +336,7 @@ async function loadLeadBookPreview(preserveCurrent = false) {
     }
   } catch (err) {
     if (token !== leadBookRequestToken) return
-    leadBookError.value = err instanceof Error ? err.message : 'Failed to load lead book details'
+    leadBookError.value = err instanceof Error ? err.message : t('series.detail.leadBookLoadError')
   } finally {
     if (token === leadBookRequestToken) loadingLeadBook.value = false
   }
@@ -351,7 +354,7 @@ async function editSeriesMetadata() {
   if (!canEditMetadata.value || openingSeriesEditor.value || loadingBooks.value) return
 
   if (books.value.length === 0) {
-    toast.error('This series has no books to edit.')
+    toast.error(t('series.detail.noBooksToEdit'))
     return
   }
 
@@ -364,13 +367,13 @@ async function editSeriesMetadata() {
     }
 
     if (booksError.value || hasMore.value) {
-      toast.error(booksError.value ?? 'Failed to load the full series for editing.')
+      toast.error(booksError.value ?? t('series.detail.loadFullSeriesError'))
       return
     }
 
     const ids = books.value.map((book) => book.id)
     if (ids.length === 0) {
-      toast.error('This series has no books to edit.')
+      toast.error(t('series.detail.noBooksToEdit'))
       return
     }
 
@@ -453,12 +456,12 @@ defineOptions({ name: 'SeriesDetailView' })
       <div class="mb-4">
         <button class="flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground" @click="goBack">
           <ChevronLeft :size="16" />
-          Back
+          {{ t('common.back') }}
         </button>
       </div>
 
       <div v-if="notFound">
-        <EntityNotFound entity="Series" />
+        <EntityNotFound :entity="t('series.detail.entityName')" />
       </div>
 
       <template v-else>
@@ -522,10 +525,10 @@ defineOptions({ name: 'SeriesDetailView' })
                 <div class="min-w-0">
                   <h1 class="text-xl font-bold text-foreground">{{ seriesInfo.name }}</h1>
                   <div class="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                    <span>{{ seriesInfo.bookCount }} {{ seriesInfo.bookCount === 1 ? 'book' : 'books' }}</span>
+                    <span>{{ t('series.detail.bookCount', { count: seriesInfo.bookCount }, seriesInfo.bookCount) }}</span>
                     <span v-if="visibleSeriesAuthors.length > 0">
-                      by {{ visibleSeriesAuthors.join(', ') }}
-                      <span v-if="hiddenSeriesAuthorsCount > 0"> +{{ hiddenSeriesAuthorsCount }} more</span>
+                      {{ t('series.detail.byAuthors', { authors: visibleSeriesAuthors.join(', ') }) }}
+                      <span v-if="hiddenSeriesAuthorsCount > 0"> {{ t('series.detail.moreAuthors', { count: hiddenSeriesAuthorsCount }) }}</span>
                     </span>
                   </div>
                 </div>
@@ -537,7 +540,7 @@ defineOptions({ name: 'SeriesDetailView' })
                   @click="editSeriesMetadata"
                 >
                   <Pencil :size="14" />
-                  {{ openingSeriesEditor ? 'Preparing editor...' : 'Edit Metadata' }}
+                  {{ openingSeriesEditor ? t('series.detail.preparingEditor') : t('series.detail.editMetadata') }}
                 </button>
               </div>
 
@@ -546,9 +549,9 @@ defineOptions({ name: 'SeriesDetailView' })
 
               <div class="mt-4 border-t border-border/60 pt-4">
                 <div class="mb-2">
-                  <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/90">First in Series</p>
+                  <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/90">{{ t('series.detail.firstInSeries') }}</p>
                   <p v-if="leadBook" class="mt-1 text-base font-semibold leading-tight text-foreground">
-                    {{ leadBook.title ?? 'Untitled' }}
+                    {{ leadBook.title ?? t('series.detail.untitled') }}
                     <span v-if="leadBook.seriesIndex != null" class="text-muted-foreground">#{{ leadBook.seriesIndex }}</span>
                   </p>
                   <p v-if="leadMetaItems.length > 0" class="mt-1 text-[11px] text-muted-foreground">
@@ -556,7 +559,7 @@ defineOptions({ name: 'SeriesDetailView' })
                   </p>
                 </div>
 
-                <div v-if="loadingLeadBook && !leadBook" class="text-sm text-muted-foreground">Loading first book preview...</div>
+                <div v-if="loadingLeadBook && !leadBook" class="text-sm text-muted-foreground">{{ t('series.detail.loadingFirstBook') }}</div>
                 <div v-else-if="leadBookError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
                   {{ leadBookError }}
                 </div>
@@ -575,12 +578,12 @@ defineOptions({ name: 'SeriesDetailView' })
                       class="whitespace-nowrap text-xs font-medium text-foreground/75 transition-colors hover:text-foreground"
                       @click="toggleLeadGenresExpanded"
                     >
-                      {{ leadGenresExpanded ? 'Show less' : `+${hiddenLeadGenres} more` }}
+                      {{ leadGenresExpanded ? t('series.detail.showLess') : t('series.detail.moreGenres', { count: hiddenLeadGenres }) }}
                     </button>
                   </div>
 
                   <div>
-                    <p class="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Synopsis</p>
+                    <p class="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{{ t('series.detail.synopsis') }}</p>
                     <div v-if="leadBook.description">
                       <div
                         class="text-sm leading-relaxed text-foreground/85"
@@ -592,14 +595,14 @@ defineOptions({ name: 'SeriesDetailView' })
                         class="mt-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
                         @click="toggleLeadDescriptionExpanded"
                       >
-                        {{ leadDescriptionExpanded ? 'Show less' : 'Show more' }}
+                        {{ leadDescriptionExpanded ? t('series.detail.showLess') : t('series.detail.showMore') }}
                       </button>
                     </div>
-                    <p v-else class="text-sm italic text-muted-foreground">No description available.</p>
+                    <p v-else class="text-sm italic text-muted-foreground">{{ t('series.detail.noDescription') }}</p>
                   </div>
-                  <p v-if="loadingLeadBook" class="text-xs text-muted-foreground">Updating preview...</p>
+                  <p v-if="loadingLeadBook" class="text-xs text-muted-foreground">{{ t('series.detail.updatingPreview') }}</p>
                 </div>
-                <div v-else class="text-sm text-muted-foreground">No books available to preview.</div>
+                <div v-else class="text-sm text-muted-foreground">{{ t('series.detail.noBooksToPreview') }}</div>
               </div>
             </div>
           </div>
@@ -607,7 +610,7 @@ defineOptions({ name: 'SeriesDetailView' })
 
         <!-- Loading state -->
         <div v-if="loadingBooks && !seriesInfo" class="mb-4 rounded-lg border border-border/70 bg-card/60 p-4 text-sm text-muted-foreground">
-          Loading series...
+          {{ t('series.detail.loadingSeries') }}
         </div>
 
         <!-- Books section -->
@@ -616,23 +619,25 @@ defineOptions({ name: 'SeriesDetailView' })
             class="sticky top-0 z-20 -mx-3 mb-3 border-b border-border/60 bg-card/92 px-3 pb-3 pt-1 backdrop-blur supports-backdrop-filter:bg-card/78"
           >
             <div class="flex flex-col gap-2 md:flex-row md:items-center" :class="groupByMedia ? 'md:justify-end' : 'md:justify-between'">
-              <h2 v-if="!groupByMedia" data-testid="series-books-section-heading" class="text-sm font-semibold text-foreground">Books</h2>
+              <h2 v-if="!groupByMedia" data-testid="series-books-section-heading" class="text-sm font-semibold text-foreground">
+                {{ t('series.detail.booksHeading') }}
+              </h2>
               <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                 <select
                   v-model="sort"
                   class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60 sm:w-auto"
                 >
-                  <option value="seriesIndex">Series Order</option>
-                  <option value="title">Title</option>
-                  <option value="addedAt">Recently Added</option>
+                  <option value="seriesIndex">{{ t('series.detail.sort.seriesOrder') }}</option>
+                  <option value="title">{{ t('series.detail.sort.title') }}</option>
+                  <option value="addedAt">{{ t('series.detail.sort.recentlyAdded') }}</option>
                 </select>
 
                 <select
                   v-model="order"
                   class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60 sm:w-auto"
                 >
-                  <option value="asc">Ascending</option>
-                  <option value="desc">Descending</option>
+                  <option value="asc">{{ t('series.detail.order.ascending') }}</option>
+                  <option value="desc">{{ t('series.detail.order.descending') }}</option>
                 </select>
 
                 <select
@@ -640,15 +645,15 @@ defineOptions({ name: 'SeriesDetailView' })
                   class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60 sm:w-auto"
                   @change="onLibraryFilterChange"
                 >
-                  <option value="">All Libraries</option>
+                  <option value="">{{ t('series.detail.allLibraries') }}</option>
                   <option v-for="library in libraries" :key="library.id" :value="library.id">{{ library.name }}</option>
                 </select>
 
                 <div class="flex h-8 w-full items-center justify-between gap-2 rounded-md border border-input px-2.5 text-sm sm:w-auto">
-                  <span class="whitespace-nowrap text-muted-foreground">Group by media</span>
+                  <span class="whitespace-nowrap text-muted-foreground">{{ t('series.detail.groupByMedia') }}</span>
                   <ToggleSwitch
                     :model-value="groupByMedia"
-                    aria-label="Group by media"
+                    :aria-label="t('series.detail.groupByMedia')"
                     data-testid="series-group-by-media-toggle"
                     @update:model-value="handleGroupByMediaUpdate"
                   />
@@ -658,8 +663,8 @@ defineOptions({ name: 'SeriesDetailView' })
           </div>
 
           <div v-if="!loadingBooks && books.length === 0" class="flex flex-col items-center justify-center gap-2 py-16 text-center">
-            <p class="text-sm font-medium text-foreground">No books found in this series</p>
-            <p class="text-xs text-muted-foreground">Try selecting another library.</p>
+            <p class="text-sm font-medium text-foreground">{{ t('series.detail.noBooksFound') }}</p>
+            <p class="text-xs text-muted-foreground">{{ t('series.detail.trySelectingLibrary') }}</p>
           </div>
 
           <template v-if="books.length > 0">
@@ -667,7 +672,7 @@ defineOptions({ name: 'SeriesDetailView' })
               <section v-for="group in nonEmptyMediaGroups" :key="group.key" class="space-y-3" :data-testid="`series-media-group-${group.key}`">
                 <div class="flex items-center justify-between border-b border-border/60 pb-2">
                   <h3 class="text-sm font-semibold text-foreground">{{ group.label }}</h3>
-                  <span class="text-xs text-muted-foreground">{{ group.books.length.toLocaleString() }}</span>
+                  <span class="text-xs text-muted-foreground">{{ formatNumber(group.books.length) }}</span>
                 </div>
                 <VirtualBookGrid
                   :books="group.books"
@@ -694,9 +699,9 @@ defineOptions({ name: 'SeriesDetailView' })
           </template>
 
           <div ref="sentinel" class="mt-4 flex h-8 items-center justify-center">
-            <span v-if="loadingBooks" class="text-xs text-muted-foreground">Loading...</span>
+            <span v-if="loadingBooks" class="text-xs text-muted-foreground">{{ t('common.loading') }}</span>
             <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">
-              All {{ total.toLocaleString() }} books loaded
+              {{ t('series.detail.allBooksLoaded', { count: formatNumber(total) }) }}
             </span>
           </div>
         </section>

@@ -9,7 +9,7 @@ import { DialogRoot, DialogContent, DialogPortal, DialogOverlay, DialogClose, Di
 import { formatBytes } from '@/lib/formatting'
 import { getProviderColor } from '@/lib/provider-colors'
 import { providerIconPath } from '@/features/book/lib/provider-icons'
-import { lubimyczytacBookUrl } from '@/features/book/lib/provider-links'
+import { libroFmAudiobookUrl, lubimyczytacBookUrl } from '@/features/book/lib/provider-links'
 import { useBookDetail } from '../composables/useBookDetail'
 import { useCoverVersions } from '../composables/useCoverVersions'
 import { getFormatColor } from '../lib/format-colors'
@@ -21,6 +21,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useSafeHtml } from '@/features/book/composables/useSafeHtml'
 import BookCoverArtwork from './BookCoverArtwork.vue'
 import BookCoverSurface from './BookCoverSurface.vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{ bookId: number | null; open: boolean }>()
 const { hasPermission } = usePermissions()
@@ -135,6 +138,15 @@ const providerLinks = computed<ProviderLink[]>(() => {
       url: `https://books.apple.com/book/id${ids.itunes}`,
       iconUrl: providerIconPath('itunes'),
       fallback: '',
+    })
+  }
+  if (ids.librofm) {
+    out.push({
+      key: 'librofm',
+      label: 'Libro.fm',
+      url: libroFmAudiobookUrl(ids.librofm),
+      iconUrl: providerIconPath('librofm'),
+      fallback: 'Lf',
     })
   }
   if (ids.ranobedb) {
@@ -275,8 +287,10 @@ function handleDelete() {
   <TooltipProvider :delay-duration="0">
     <Sheet :open="props.open" @update:open="emit('update:open', $event)">
       <SheetContent side="right" class="sm:max-w-100 p-0 overflow-hidden">
-        <SheetTitle class="sr-only">{{ detail?.title ? `Quick view for ${detail.title}` : 'Book quick view' }}</SheetTitle>
-        <SheetDescription class="sr-only">Preview book details and run quick actions.</SheetDescription>
+        <SheetTitle class="sr-only">{{
+          detail?.title ? t('book.quickView.titleFor', { title: detail.title }) : t('book.quickView.title')
+        }}</SheetTitle>
+        <SheetDescription class="sr-only">{{ t('book.quickView.description') }}</SheetDescription>
         <div class="flex flex-col h-full">
           <!-- Header: cover + title block -->
           <div class="p-5 pt-10 border-b shrink-0">
@@ -320,7 +334,7 @@ function handleDelete() {
               <!-- Info -->
               <div class="flex-1 min-w-0 pr-2">
                 <h2 class="text-sm font-bold leading-snug line-clamp-3">
-                  {{ detail.title ?? 'Untitled' }}
+                  {{ detail.title ?? t('book.untitled') }}
                 </h2>
                 <p v-if="detail.subtitle" class="text-xs text-muted-foreground mt-0.5 line-clamp-2">
                   {{ detail.subtitle }}
@@ -332,7 +346,7 @@ function handleDelete() {
                     :href="link.url"
                     target="_blank"
                     rel="noopener noreferrer"
-                    :title="`Open in ${link.label}`"
+                    :title="t('book.quickView.openIn', { provider: link.label })"
                     class="inline-flex size-6 items-center justify-center rounded border transition-colors hover:bg-muted/60"
                     :style="providerLinkStyle(link.key)"
                   >
@@ -386,7 +400,7 @@ function handleDelete() {
                   {{ fmt }}
                 </span>
                 <span v-if="detail.pageCount" class="text-[10px] font-semibold px-2 py-0.5 rounded bg-muted text-muted-foreground">
-                  {{ detail.pageCount }} pages
+                  {{ t('book.quickView.pages', { count: detail.pageCount }, detail.pageCount) }}
                 </span>
                 <span v-if="publishedDisplay" class="text-[10px] font-semibold px-2 py-0.5 rounded bg-muted text-muted-foreground">
                   {{ publishedDisplay }}
@@ -406,8 +420,10 @@ function handleDelete() {
 
               <!-- Primary file summary -->
               <div v-if="primaryFile" class="rounded-md border border-border bg-muted/20 px-3 py-2.5">
-                <p class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Primary File</p>
-                <p class="text-xs text-foreground mt-1 truncate">{{ primaryFile.filename ?? `File #${primaryFile.id}` }}</p>
+                <p class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{{ t('book.quickView.primaryFile') }}</p>
+                <p class="text-xs text-foreground mt-1 truncate">
+                  {{ primaryFile.filename ?? t('book.quickView.fileNumber', { id: primaryFile.id }) }}
+                </p>
                 <div class="mt-1.5 flex items-center gap-1.5">
                   <span
                     class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border"
@@ -445,13 +461,13 @@ function handleDelete() {
                   class="text-xs text-muted-foreground hover:text-foreground mt-1.5 transition-colors"
                   @click="toggleGenres"
                 >
-                  {{ genresExpanded ? 'Show less' : 'Show more' }}
+                  {{ genresExpanded ? t('book.quickView.showLess') : t('book.quickView.showMore') }}
                 </button>
               </div>
 
               <!-- Collections -->
               <div v-if="detail.collections.length" class="border-t pt-4">
-                <p class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground mb-2">Collections</p>
+                <p class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground mb-2">{{ t('book.quickView.collections') }}</p>
                 <div class="flex flex-wrap gap-1.5">
                   <span
                     v-for="col in detail.collections"
@@ -476,10 +492,10 @@ function handleDelete() {
                     class="text-xs text-muted-foreground hover:text-foreground mt-1.5 transition-colors"
                     @click="descriptionExpanded = !descriptionExpanded"
                   >
-                    {{ descriptionExpanded ? 'Show less' : 'Show more' }}
+                    {{ descriptionExpanded ? t('book.quickView.showLess') : t('book.quickView.showMore') }}
                   </button>
                 </div>
-                <p v-else class="text-xs text-muted-foreground italic">No description available.</p>
+                <p v-else class="text-xs text-muted-foreground italic">{{ t('book.quickView.noDescription') }}</p>
               </div>
             </template>
           </div>
@@ -489,33 +505,33 @@ function handleDelete() {
             <button
               class="flex flex-1 items-center justify-center gap-2 h-9 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
               :disabled="!primaryFile"
-              :aria-label="isPrimaryAudio ? 'Listen' : 'Read'"
+              :aria-label="isPrimaryAudio ? t('book.actions.listen') : t('book.actions.read')"
               @click="openBook"
             >
               <Headphones v-if="isPrimaryAudio" class="size-4" />
               <BookOpen v-else class="size-4" />
-              <span class="hidden sm:inline">{{ isPrimaryAudio ? 'Listen' : 'Read' }}</span>
+              <span class="hidden sm:inline">{{ isPrimaryAudio ? t('book.actions.listen') : t('book.actions.read') }}</span>
             </button>
             <button
               class="flex flex-1 items-center justify-center text-primary-foreground gap-2 h-9 rounded-md bg-sky-600 text-sm font-medium hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600 transition-colors"
-              aria-label="Details"
+              :aria-label="t('book.actions.details')"
               @click="openDetails"
             >
               <ExternalLink class="size-4" />
-              <span class="hidden sm:inline">Details</span>
+              <span class="hidden sm:inline">{{ t('book.actions.details') }}</span>
             </button>
             <Tooltip>
               <TooltipTrigger as-child>
                 <button
                   class="flex items-center justify-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-50"
                   :disabled="!primaryFile"
-                  aria-label="Peek"
+                  :aria-label="t('book.actions.peek')"
                   @click="peekBook"
                 >
                   <Eye class="size-3.5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Peek</TooltipContent>
+              <TooltipContent>{{ t('book.actions.peek') }}</TooltipContent>
             </Tooltip>
             <Tooltip v-if="hasPermission('library_edit_metadata')">
               <TooltipTrigger as-child>
@@ -526,7 +542,7 @@ function handleDelete() {
                   <Pencil class="size-3.5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Open metadata editor</TooltipContent>
+              <TooltipContent>{{ t('book.quickView.openMetadataEditor') }}</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger as-child>
@@ -538,7 +554,7 @@ function handleDelete() {
                   <FolderPlus class="size-3.5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Add to collection</TooltipContent>
+              <TooltipContent>{{ t('book.actions.addToCollection') }}</TooltipContent>
             </Tooltip>
             <Tooltip v-if="hasPermission('library_delete_books')">
               <TooltipTrigger as-child>
@@ -550,7 +566,7 @@ function handleDelete() {
                   <Trash2 class="size-3.5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Delete</TooltipContent>
+              <TooltipContent>{{ t('common.delete') }}</TooltipContent>
             </Tooltip>
           </div>
         </div>
@@ -566,8 +582,10 @@ function handleDelete() {
         <DialogContent
           class="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 max-w-[90vw] max-h-[90vh] outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
         >
-          <DialogTitle class="sr-only">{{ detail?.title ? `${detail.title} cover preview` : 'Book cover preview' }}</DialogTitle>
-          <DialogDescription class="sr-only">Enlarged cover image preview dialog.</DialogDescription>
+          <DialogTitle class="sr-only">{{
+            detail?.title ? t('book.quickView.coverPreviewFor', { title: detail.title }) : t('book.quickView.coverPreview')
+          }}</DialogTitle>
+          <DialogDescription class="sr-only">{{ t('book.quickView.coverPreviewDescription') }}</DialogDescription>
           <img v-if="detail" :src="coverSrc ?? ''" :alt="detail.title ?? ''" class="max-w-[90vw] max-h-[90vh] rounded-md shadow-2xl object-contain" />
           <DialogClose
             class="absolute -top-3 -right-3 p-1 rounded-full bg-background border border-border text-muted-foreground hover:text-foreground transition-colors"

@@ -22,6 +22,7 @@ export interface AudioExtractResult {
   seriesIndex: number | null;
   genres: string[];
   audibleId: string | null;
+  librofmId: string | null;
   durationSeconds: number | null;
   chapters: AudiobookChapter[];
   coverBytes: Buffer | null;
@@ -91,12 +92,18 @@ export async function extractAudioMetadata(absolutePath: string): Promise<AudioE
       tagValue(tags, 'synopsis'),
     );
     const language = resolveLanguage(tags, streams);
-    const seriesName = tagValue(tags, 'series');
+    const seriesName = tagValue(tags, 'series') ?? tagValue(tags, 'show');
     const seriesIndex = parseSeriesIndex(
-      tagValue(tags, 'series-part') ?? tagValue(tags, 'part') ?? tagValue(tags, 'series_part') ?? tagValue(tags, 'seriespart'),
+      tagValue(tags, 'series-part') ??
+        tagValue(tags, 'part') ??
+        tagValue(tags, 'series_part') ??
+        tagValue(tags, 'seriespart') ??
+        tagValue(tags, 'episode_id') ??
+        tagValue(tags, 'episode_sort'),
     );
     const genres = splitTagList(tagValue(tags, 'genre'), ';');
     const audibleId = tagValue(tags, 'asin') ?? tagValue(tags, 'audible_asin');
+    const librofmId = tagValue(tags, 'librofm_isbn');
     const durationSeconds = parseDurationSeconds(data.format?.duration);
 
     const mappedChapters: AudiobookChapter[] = chapters.flatMap((ch) => {
@@ -121,6 +128,7 @@ export async function extractAudioMetadata(absolutePath: string): Promise<AudioE
       seriesIndex,
       genres,
       audibleId,
+      librofmId,
       durationSeconds,
       chapters: mappedChapters,
       coverBytes,
@@ -262,6 +270,7 @@ function emptyResult(): AudioExtractResult {
     seriesIndex: null,
     genres: [],
     audibleId: null,
+    librofmId: null,
     durationSeconds: null,
     chapters: [],
     coverBytes: null,

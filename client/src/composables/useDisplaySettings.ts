@@ -140,6 +140,7 @@ function normalizeViewMode(v: unknown): BookViewMode {
 
 const viewMode = ref<BookViewMode>(normalizeViewMode(storage.get('viewMode', 'grid')))
 const cardOverlays = ref<CardOverlayKey[]>(normalizeCardOverlays(storage.get('cardOverlays', DEFAULT_CARD_OVERLAYS)))
+const showJumpRails = ref(storage.get<boolean>('showJumpRails', true) !== false)
 const smartScopeFilterExpanded = ref(storage.get<boolean>('smartScopeFilterExpanded', true) === true)
 const authorCoverSize = ref(normalizePositiveInteger(storage.get('authorCoverSize', 120), 120, 100, 400))
 const authorCoverShape = ref<AuthorCoverShape>(normalizeAuthorCoverShape(storage.get('authorCoverShape', 'circle')))
@@ -167,6 +168,7 @@ watch(portraitGridGap, (v) => storage.set('portraitGridGap', v))
 watch(squareGridGap, (v) => storage.set('squareGridGap', v))
 watch(viewMode, (v) => storage.set('viewMode', v))
 watch(cardOverlays, (v) => storage.set('cardOverlays', normalizeCardOverlays(v)), { deep: true })
+watch(showJumpRails, (v) => storage.set('showJumpRails', v))
 watch(smartScopeFilterExpanded, (v) => storage.set('smartScopeFilterExpanded', v))
 watch(authorCoverSize, (v) => storage.set('authorCoverSize', v))
 watch(authorCoverShape, (v) => storage.set('authorCoverShape', normalizeAuthorCoverShape(v)))
@@ -192,6 +194,7 @@ export function getDisplayPreferencesSnapshot(): DisplayPreferences {
     squareGridGap: normalizePositiveInteger(squareGridGap.value, DEFAULT_GRID_GAP, 1, 80),
     viewMode: normalizeViewMode(viewMode.value),
     cardOverlays: normalizeCardOverlays(cardOverlays.value),
+    showJumpRails: showJumpRails.value !== false,
     smartScopeFilterExpanded: smartScopeFilterExpanded.value === true,
     authorCoverSize: normalizePositiveInteger(authorCoverSize.value, 120, 100, 400),
     authorCoverShape: normalizeAuthorCoverShape(authorCoverShape.value),
@@ -224,6 +227,7 @@ export function sanitizeDisplayPreferences(raw: unknown): Partial<DisplayPrefere
   if (typeof obj.squareGridGap === 'number') out.squareGridGap = normalizePositiveInteger(obj.squareGridGap, DEFAULT_GRID_GAP, 1, 80)
   if (BOOK_VIEW_MODES.includes(obj.viewMode as BookViewMode)) out.viewMode = obj.viewMode as BookViewMode
   if (Array.isArray(obj.cardOverlays)) out.cardOverlays = normalizeCardOverlays(obj.cardOverlays)
+  if (typeof obj.showJumpRails === 'boolean') out.showJumpRails = obj.showJumpRails
   if (typeof obj.smartScopeFilterExpanded === 'boolean') out.smartScopeFilterExpanded = obj.smartScopeFilterExpanded
   if (typeof obj.authorCoverSize === 'number') out.authorCoverSize = normalizePositiveInteger(obj.authorCoverSize, 120, 100, 400)
   if (AUTHOR_COVER_SHAPES.includes(obj.authorCoverShape as AuthorCoverShape)) out.authorCoverShape = obj.authorCoverShape as AuthorCoverShape
@@ -265,6 +269,7 @@ export function applyDisplayPreferences(raw: unknown): void {
   if (prefs.squareGridGap !== undefined) squareGridGap.value = prefs.squareGridGap
   if (prefs.viewMode !== undefined) viewMode.value = prefs.viewMode
   if (prefs.cardOverlays !== undefined) cardOverlays.value = prefs.cardOverlays
+  if (prefs.showJumpRails !== undefined) showJumpRails.value = prefs.showJumpRails
   if (prefs.smartScopeFilterExpanded !== undefined) smartScopeFilterExpanded.value = prefs.smartScopeFilterExpanded
   if (prefs.authorCoverSize !== undefined) authorCoverSize.value = prefs.authorCoverSize
   if (prefs.authorCoverShape !== undefined) authorCoverShape.value = prefs.authorCoverShape
@@ -291,6 +296,7 @@ export function useDisplaySettings() {
     squareGridGap,
     viewMode,
     cardOverlays,
+    showJumpRails,
     smartScopeFilterExpanded,
     authorCoverSize,
     authorCoverShape,

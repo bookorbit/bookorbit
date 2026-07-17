@@ -215,6 +215,7 @@ export class FileWriteRepository {
       aladinId: meta.aladinId,
       itunesId: meta.itunesId,
       audibleId: meta.audibleId,
+      librofmId: meta.librofmId,
       rating: meta.rating,
       authors: authorRows,
       narrators: narratorRows.map((n) => n.name),

@@ -8,6 +8,7 @@ import {
   GoodreadsAutocompleteItem,
 } from './goodreads.types';
 import { parsePublishedDateFromEpochMillis, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
+import { htmlToPlainText } from '../../../../common/utils/html-to-text.utils';
 
 export function mapGoodreadsApolloState(state: Record<string, unknown>, bookId: string): MetadataCandidate | null {
   const book = findBook(state, bookId);
@@ -106,17 +107,7 @@ function parseSeriesFromTitle(title: string | undefined): { seriesName?: string;
 function extractAutocompleteDescription(description: GoodreadsAutocompleteItem['description']): string | undefined {
   const html = typeof description === 'string' ? description : description?.html;
   if (!html) return undefined;
-  const text = html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&quot;/g, '"')
-    .replace(/&(?:#39|#x27|apos);/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  const text = htmlToPlainText(html, { preserveLineBreaks: true });
   return text || undefined;
 }
 

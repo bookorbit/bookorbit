@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DisplayPreferences, ThemePreferences } from '@bookorbit/types';
+import type { DisplayPreferences, LocalePreferences, ThemePreferences } from '@bookorbit/types';
 
 import { UserPreferencesRepository } from './user-preferences.repository';
 import { UserPreferencesService } from './user-preferences.service';
@@ -22,6 +22,7 @@ const validDisplayPreferences: DisplayPreferences = {
   squareGridGap: 20,
   viewMode: 'grid',
   cardOverlays: ['progress-bar', 'format', 'rating'],
+  showJumpRails: true,
   smartScopeFilterExpanded: true,
   authorCoverSize: 140,
   authorCoverShape: 'circle',
@@ -38,8 +39,12 @@ const validDisplayPreferences: DisplayPreferences = {
   thumbnailClickAction: 'reader',
 };
 
+const validLocalePreferences: LocalePreferences = {
+  locale: 'nl',
+};
+
 const repo = {
-  findByCategory: vi.fn<(...args: [number, string]) => Promise<{ data: ThemePreferences | DisplayPreferences } | undefined>>(),
+  findByCategory: vi.fn<(...args: [number, string]) => Promise<{ data: ThemePreferences | DisplayPreferences | LocalePreferences } | undefined>>(),
   upsert: vi.fn<(...args: [number, string, Record<string, unknown>]) => Promise<void>>(),
   delete: vi.fn<(...args: [number, string]) => Promise<void>>(),
 };
@@ -76,9 +81,44 @@ describe('UserPreferencesService', () => {
     await expect(service.getDisplayPreferences(7)).resolves.toEqual(validDisplayPreferences);
   });
 
+  it('getLocalePreferences returns null when repository has no row', async () => {
+    await expect(service.getLocalePreferences(7)).resolves.toBeNull();
+    expect(repo.findByCategory).toHaveBeenCalledWith(7, 'locale');
+  });
+
+  it('getLocalePreferences returns saved locale settings when row exists', async () => {
+    repo.findByCategory.mockResolvedValueOnce({ data: validLocalePreferences });
+
+    await expect(service.getLocalePreferences(7)).resolves.toEqual(validLocalePreferences);
+  });
+
+  it('upsertLocalePreferences persists validated settings', async () => {
+    await expect(service.upsertLocalePreferences(11, validLocalePreferences)).resolves.toBeUndefined();
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'locale', validLocalePreferences);
+  });
+
+  it('upsertLocalePreferences rejects unsupported locale', async () => {
+    await expect(service.upsertLocalePreferences(11, { locale: 'unsupported' } as never)).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.upsert).not.toHaveBeenCalled();
+  });
+
+  it('upsertLocalePreferences rejects extra unknown fields', async () => {
+    await expect(
+      service.upsertLocalePreferences(11, { ...validLocalePreferences, unexpected: true } as Record<string, unknown>),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.upsert).not.toHaveBeenCalled();
+  });
+
   it('upsertThemePreferences persists validated settings', async () => {
     await expect(service.upsertThemePreferences(11, validThemePreferences)).resolves.toBeUndefined();
     expect(repo.upsert).toHaveBeenCalledWith(11, 'theme', validThemePreferences);
+  });
+
+  it('upsertThemePreferences accepts the system theme', async () => {
+    const systemThemePreferences = { ...validThemePreferences, theme: 'system' } as const;
+
+    await expect(service.upsertThemePreferences(11, systemThemePreferences)).resolves.toBeUndefined();
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'theme', systemThemePreferences);
   });
 
   it('upsertThemePreferences rejects invalid theme ids', async () => {
@@ -217,6 +257,31 @@ describe('UserPreferencesService', () => {
   it('upsertDisplayPreferences rejects non-boolean showSpineOnComics', async () => {
     await expect(
       service.upsertDisplayPreferences(11, { ...validDisplayPreferences, showSpineOnComics: 'yes' } as unknown as Record<string, unknown>),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.upsert).not.toHaveBeenCalled();
+  });
+
+  it('upsertDisplayPreferences accepts both showJumpRails values', async () => {
+    for (const value of [true, false]) {
+      await expect(
+        service.upsertDisplayPreferences(11, { ...validDisplayPreferences, showJumpRails: value } as unknown as Record<string, unknown>),
+      ).resolves.toBeUndefined();
+      expect(repo.upsert).toHaveBeenCalledWith(11, 'display', expect.objectContaining({ showJumpRails: value }));
+    }
+  });
+
+  it('upsertDisplayPreferences defaults showJumpRails to true when omitted', async () => {
+    const { showJumpRails, ...withoutFlag } = validDisplayPreferences;
+    void showJumpRails;
+
+    await expect(service.upsertDisplayPreferences(11, withoutFlag as unknown as Record<string, unknown>)).resolves.toBeUndefined();
+
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'display', expect.objectContaining({ showJumpRails: true }));
+  });
+
+  it('upsertDisplayPreferences rejects non-boolean showJumpRails', async () => {
+    await expect(
+      service.upsertDisplayPreferences(11, { ...validDisplayPreferences, showJumpRails: 'yes' } as unknown as Record<string, unknown>),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(repo.upsert).not.toHaveBeenCalled();
   });

@@ -95,7 +95,7 @@ describe('UploadProcessorService', () => {
         libraryFolderId: 2,
         absolutePath: '/folder/book.epub',
         relPath: 'book/book.epub',
-        ino: 111,
+        ino: 111n,
         sizeBytes: 12345,
         fileHash: 'hash-abc',
         format: 'epub',
@@ -134,19 +134,19 @@ describe('UploadProcessorService', () => {
     expect(orchestrator.scheduleImportedBooksIfEligible).not.toHaveBeenCalled();
   });
 
-  it('clamps oversized MergerFS inode values to 0 before persisting', async () => {
+  it('preserves oversized MergerFS inode values before persisting', async () => {
     mockStat.mockResolvedValueOnce({ ino: 14351917807348929000n, mtime: new Date('2024-01-01') } as Awaited<ReturnType<typeof stat>>);
 
     await service.createBookRecord(1, 2, '/folder', '/folder/book.epub', 'book/book.epub', 'epub', 12345);
 
     expect(insertBookFilesValues).toHaveBeenCalledWith(
       expect.objectContaining({
-        ino: 0,
+        ino: 14351917807348929000n,
       }),
     );
   });
 
-  it('clamps oversized MergerFS inode values to 0 in existing-book upserts', async () => {
+  it('preserves oversized MergerFS inode values in existing-book upserts', async () => {
     selectLimit.mockResolvedValueOnce([{ id: 99 }]);
     mockStat.mockResolvedValueOnce({ ino: 14351917807348929000n, mtime: new Date('2024-01-01') } as Awaited<ReturnType<typeof stat>>);
 
@@ -155,20 +155,20 @@ describe('UploadProcessorService', () => {
     expect(insertBookFilesOnConflict).toHaveBeenCalledWith(
       expect.objectContaining({
         set: expect.objectContaining({
-          ino: 0,
+          ino: 14351917807348929000n,
         }),
       }),
     );
   });
 
-  it('clamps precision-unsafe inodes to 0 before persisting', async () => {
+  it('preserves precision-unsafe inodes exactly before persisting', async () => {
     mockStat.mockResolvedValueOnce({ ino: 651896050678335552n, mtime: new Date('2024-01-01') } as Awaited<ReturnType<typeof stat>>);
 
     await service.createBookRecord(1, 2, '/folder', '/folder/book.epub', 'book/book.epub', 'epub', 12345);
 
     expect(insertBookFilesValues).toHaveBeenCalledWith(
       expect.objectContaining({
-        ino: 0,
+        ino: 651896050678335552n,
       }),
     );
   });

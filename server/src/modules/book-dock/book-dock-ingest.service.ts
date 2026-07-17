@@ -4,7 +4,7 @@ import { basename, extname, join } from 'path';
 import { mkdir, realpath, stat } from 'fs/promises';
 import { Readable } from 'stream';
 
-import type { BookDockMetadata } from '@bookorbit/types';
+import { MetadataProviderKey, resolveBookDockSearchTitle, type BookDockMetadata } from '@bookorbit/types';
 import type { BookDockFileRow } from '../../db/schema';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { SUPPORTED_BOOK_FORMATS, UploadValidatorService } from '../upload/upload-validator.service';
@@ -226,7 +226,7 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
 
     const meta = row.embeddedMetadata;
     const params = {
-      title: meta?.title ?? undefined,
+      title: resolveBookDockSearchTitle(row.fileName, meta?.title),
       author: meta?.authors?.[0] ?? undefined,
       isbn: meta?.isbn13 ?? meta?.isbn10 ?? undefined,
     };
@@ -235,11 +235,17 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     await this.repo.update(fileId, { status: 'fetching' });
     await this.emitSummary();
     try {
-      const { resolved, sources } = await this.metadataFetchPipeline.runWithSources(params, {});
+      const { resolved, sources, providerIds = {} } = await this.metadataFetchPipeline.runWithSources(params, {});
       const fetched: Record<string, unknown> = {};
       for (const [field, value] of Object.entries(resolved)) {
         if (value === undefined) continue;
         fetched[field] = value;
+      }
+      for (const [provider, providerId] of Object.entries(providerIds)) {
+        const field = BOOK_DOCK_PROVIDER_ID_FIELDS[provider as MetadataProviderKey];
+        if (!field || !providerId) continue;
+        fetched[field] = providerId;
+        sources[field] = provider;
       }
       const updates =
         Object.keys(fetched).length > 0
@@ -276,6 +282,22 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     this.gateway.emitSummary({ ...summary, paused });
   }
 }
+
+const BOOK_DOCK_PROVIDER_ID_FIELDS: Partial<Record<MetadataProviderKey, keyof BookDockMetadata>> = {
+  [MetadataProviderKey.GOOGLE]: 'googleBooksId',
+  [MetadataProviderKey.GOODREADS]: 'goodreadsId',
+  [MetadataProviderKey.AMAZON]: 'amazonId',
+  [MetadataProviderKey.HARDCOVER]: 'hardcoverId',
+  [MetadataProviderKey.OPEN_LIBRARY]: 'openLibraryId',
+  [MetadataProviderKey.ITUNES]: 'itunesId',
+  [MetadataProviderKey.AUDIBLE]: 'audibleId',
+  [MetadataProviderKey.LIBROFM]: 'librofmId',
+  [MetadataProviderKey.KOBO]: 'koboId',
+  [MetadataProviderKey.COMICVINE]: 'comicvineId',
+  [MetadataProviderKey.RANOBEDB]: 'ranobedbId',
+  [MetadataProviderKey.LUBIMYCZYTAC]: 'lubimyczytacId',
+  [MetadataProviderKey.ALADIN]: 'aladinId',
+};
 
 function resolveSupportedFormat(row: Pick<BookDockFileRow, 'format' | 'absolutePath'>): string | null {
   const format = row.format ?? extname(row.absolutePath).toLowerCase().slice(1);

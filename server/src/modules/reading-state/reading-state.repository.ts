@@ -22,6 +22,7 @@ import {
   koreaderDeviceProgress,
   koreaderPageStats,
   readingProgress,
+  readingAttempts,
   readingSessions,
   userBookStatus,
   userReadingDailyStats,
@@ -80,6 +81,7 @@ export class ReadingStateRepository {
         tx.delete(koreaderDeviceProgress).where(and(eq(koreaderDeviceProgress.userId, userId), inArray(koreaderDeviceProgress.bookFileId, fileIds))),
         tx.delete(koreaderPageStats).where(and(eq(koreaderPageStats.userId, userId), inArray(koreaderPageStats.bookFileId, fileIds))),
         tx.delete(readingSessions).where(and(eq(readingSessions.userId, userId), eq(readingSessions.bookId, bookId))),
+        tx.delete(readingAttempts).where(and(eq(readingAttempts.userId, userId), eq(readingAttempts.bookId, bookId))),
         tx
           .insert(userBookStatus)
           .values({ userId, bookId, status: 'unread', source: 'manual', startedAt: null, finishedAt: null, updatedAt: now })

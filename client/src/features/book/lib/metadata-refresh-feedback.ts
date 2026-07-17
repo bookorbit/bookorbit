@@ -14,6 +14,7 @@ const PROVIDER_LABELS: Record<MetadataProviderKeyType, string> = {
   [MetadataProviderKey.ITUNES]: 'iTunes',
   [MetadataProviderKey.AUDIBLE]: 'Audible',
   [MetadataProviderKey.AUDNEXUS]: 'AudNexus',
+  [MetadataProviderKey.LIBROFM]: 'Libro.fm',
   [MetadataProviderKey.COMICVINE]: 'ComicVine',
   [MetadataProviderKey.RANOBEDB]: 'RanobeDB',
   [MetadataProviderKey.KOBO]: 'Kobo',
@@ -28,12 +29,25 @@ export function metadataRefreshEmptyMessage(diagnostics: MetadataFetchDiagnostic
     case 'providers_throttled':
       return 'No metadata fetched: active providers are temporarily in cooldown. Try again later.'
     case 'no_candidates':
-      return `No metadata found from active providers for ${bookSearchLabel(book)}.`
+      return appendUnreferencedProviderMessage(`No metadata found from active providers for ${bookSearchLabel(book)}.`, diagnostics)
     case 'no_resolved_fields':
       return 'Metadata providers responded, but Field Rules did not produce any fields to apply. Check fill/overwrite rules, genre blocklist, or selected providers.'
     default:
       return 'No new metadata found.'
   }
+}
+
+export function metadataRefreshAppliedMessage(diagnostics: MetadataFetchDiagnostics, updatedCount: number): string {
+  const fieldText = `${updatedCount} field${updatedCount === 1 ? '' : 's'}`
+  const matchedProviders = formatProviderList(diagnostics.candidateProviders)
+  const message = matchedProviders ? `Auto-filled ${fieldText}. Matched ${matchedProviders}.` : `Auto-filled ${fieldText}.`
+  return appendUnreferencedProviderMessage(message, diagnostics)
+}
+
+function appendUnreferencedProviderMessage(message: string, diagnostics: MetadataFetchDiagnostics): string {
+  const providers = formatProviderList(diagnostics.enabledUnreferencedProviders)
+  if (!providers) return message
+  return `${message} Not queried because they are not selected in Field Rules: ${providers}.`
 }
 
 function noActiveProvidersMessage(diagnostics: MetadataFetchDiagnostics): string {

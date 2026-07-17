@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { Check, X } from '@lucide/vue'
 import { ANNOTATION_COLOR_FILTER_OPTIONS } from '@bookorbit/types'
+
+const { t } = useI18n()
 
 const colors = defineModel<string[]>('colors', { required: true })
 const dateFrom = defineModel<string>('dateFrom', { required: true })
@@ -32,7 +35,7 @@ function handleClearAll() {
 <template>
   <div class="flex flex-col gap-3">
     <div :class="FIELD_LABEL_CLASS">
-      <span>Colors</span>
+      <span>{{ t('annotations.filters.colors') }}</span>
       <div class="flex flex-wrap gap-1.5">
         <button
           v-for="option in COLOR_OPTIONS"
@@ -52,25 +55,25 @@ function handleClearAll() {
     </div>
 
     <div :class="FIELD_LABEL_CLASS">
-      <span>Date range</span>
+      <span>{{ t('annotations.filters.dateRange') }}</span>
       <div class="flex items-center gap-1.5">
         <input
           v-model="dateFrom"
           type="date"
-          aria-label="From date"
+          :aria-label="t('annotations.filters.fromDate')"
           class="h-9 min-w-0 flex-1 px-2 rounded-md border border-border bg-background text-sm"
         />
-        <span class="text-xs text-muted-foreground">to</span>
+        <span class="text-xs text-muted-foreground">{{ t('annotations.filters.to') }}</span>
         <input
           v-model="dateTo"
           type="date"
-          aria-label="To date"
+          :aria-label="t('annotations.filters.toDate')"
           class="h-9 min-w-0 flex-1 px-2 rounded-md border border-border bg-background text-sm"
         />
         <button
           v-if="dateFrom || dateTo"
           type="button"
-          aria-label="Clear date range"
+          :aria-label="t('annotations.filters.clearDateRange')"
           class="inline-flex h-9 items-center rounded-md border border-border bg-background px-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           @click="clearDates"
         >
@@ -82,7 +85,9 @@ function handleClearAll() {
     <slot name="extra" />
 
     <div class="flex justify-end border-t border-border pt-3">
-      <button type="button" class="text-sm text-muted-foreground transition-colors hover:text-foreground" @click="handleClearAll">Clear all</button>
+      <button type="button" class="text-sm text-muted-foreground transition-colors hover:text-foreground" @click="handleClearAll">
+        {{ t('annotations.filters.clearAll') }}
+      </button>
     </div>
   </div>
 </template>

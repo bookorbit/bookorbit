@@ -77,7 +77,7 @@ describe('AuthorEnrichmentRepository', () => {
     };
   };
 
-  it('upsertSchedule dedupes valid author ids and resets queued state', async () => {
+  it('upsertSchedule dedupes valid author ids and only reactivates terminal failures', async () => {
     const { db, insertBuilder } = makeDb();
     insertBuilder.returning.mockResolvedValueOnce([{ authorId: 3 }, { authorId: 4 }]);
     const repo = new AuthorEnrichmentRepository(db as never);
@@ -94,6 +94,7 @@ describe('AuthorEnrichmentRepository', () => {
       expect.objectContaining({
         target: authorEnrichmentQueue.authorId,
         set: expect.objectContaining({ status: 'queued', reason: 'metadata_replace', attemptCount: 0 }),
+        setWhere: { op: 'eq', left: authorEnrichmentQueue.status, right: 'failed' },
       }),
     );
   });

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import BookDetailLayout from '@/features/book/components/detail/BookDetailLayout.vue'
 import FilesTab from '@/features/book/components/detail/tabs/FilesTab.vue'
 import { useBookDetail } from '@/features/book/composables/useBookDetail'
 import { usePageTitle } from '@/composables/usePageTitle'
 
+const { t } = useI18n()
 const route = useRoute()
 
 const bookId = computed(() => Number(route.params.bookId))
@@ -13,8 +15,8 @@ const bookId = computed(() => Number(route.params.bookId))
 const { detail, loading, fetch } = useBookDetail()
 const pageTitle = computed(() => {
   const title = detail.value?.title?.trim()
-  const base = title || (Number.isFinite(bookId.value) ? `Book #${bookId.value}` : 'Book')
-  return `Files · ${base}`
+  const base = title || (Number.isFinite(bookId.value) ? t('views.bookDetail.titleWithId', { id: bookId.value }) : t('views.bookDetail.title'))
+  return t('views.bookDetail.pageTitle.files', { base })
 })
 usePageTitle(pageTitle)
 

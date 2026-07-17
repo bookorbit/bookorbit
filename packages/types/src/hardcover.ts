@@ -2,12 +2,7 @@ export type HardcoverSyncDisabledReason = "permission_denied" | "missing_token" 
 export type HardcoverBookSyncMode = "all_eligible" | "selected_only";
 export type HardcoverBookSyncOverride = "included" | "excluded" | null;
 export type HardcoverBookSyncEffectiveReason =
-  | HardcoverSyncDisabledReason
-  | "global_disabled"
-  | "not_selected"
-  | "excluded"
-  | "unread"
-  | "unsupported_status";
+  HardcoverSyncDisabledReason | "global_disabled" | "not_selected" | "excluded" | "unread" | "unsupported_status";
 
 export interface HardcoverSettings {
   tokenConfigured: boolean;
@@ -93,6 +88,11 @@ export interface HardcoverImportPreviewRow {
   importedStartedAt: string | null;
   importedFinishedAt: string | null;
   importedProgressPercent: number | null;
+  hardcoverReads?: Array<{
+    id: number;
+    startedAt: string | null;
+    finishedAt: string | null;
+  }>;
   localBookId: number | null;
   localPrimaryFileId: number | null;
   localTitle: string | null;

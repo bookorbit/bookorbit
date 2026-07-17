@@ -112,7 +112,7 @@ describe('KoboAnalyticsService', () => {
     expect(readingSessionService.save).toHaveBeenCalledWith(100, expect.objectContaining({ sessionId: 'kobo-src' }), user, 'kobo');
   });
 
-  it('pairs OpenContent and LeaveContent to save progress delta and active duration', async () => {
+  it('pairs OpenContent and LeaveContent to save progress delta and Kobo-reported duration', async () => {
     await makeService().ingest(
       {
         Events: [
@@ -158,7 +158,7 @@ describe('KoboAnalyticsService', () => {
         sessionId: 'leave-forward',
         startedAt: '2026-06-06T18:20:01.000Z',
         endedAt: '2026-06-06T18:20:52.000Z',
-        durationSeconds: 49,
+        durationSeconds: 52,
         progressDelta: 4,
         endProgress: 12,
       },
@@ -172,7 +172,7 @@ describe('KoboAnalyticsService', () => {
         sessionId: 'leave-backward',
         startedAt: '2026-06-06T18:21:18.000Z',
         endedAt: '2026-06-06T18:21:44.000Z',
-        durationSeconds: 24,
+        durationSeconds: 26,
         progressDelta: -2,
         endProgress: 10,
       },
@@ -264,16 +264,23 @@ describe('KoboAnalyticsService', () => {
     );
   });
 
-  it('uses raw SecondsRead when IdleTime is invalid', async () => {
+  it('preserves SecondsRead when Kobo also reports IdleTime', async () => {
     await makeService().ingest(
       {
         Events: [
           {
-            Id: 'invalid-idle',
+            Id: 'open-with-idle',
+            EventType: 'OpenContent',
+            Timestamp: '2026-06-05T23:19:38Z',
+            Metrics: {},
+            Attributes: { volumeid: '1', progress: '0' },
+          },
+          {
+            Id: 'leave-with-idle',
             EventType: 'LeaveContent',
-            Timestamp: '2026-06-01T00:00:20Z',
-            Metrics: { SecondsRead: 20, IdleTime: '5' as never },
-            Attributes: { volumeid: '1', progress: '20' },
+            Timestamp: '2026-06-05T23:20:13Z',
+            Metrics: { SecondsRead: 35, IdleTime: 28, PagesTurned: 6 },
+            Attributes: { volumeid: '1', progress: '1' },
           },
         ],
       },
@@ -283,11 +290,14 @@ describe('KoboAnalyticsService', () => {
 
     expect(readingSessionService.save).toHaveBeenCalledWith(
       100,
-      expect.objectContaining({
-        sessionId: 'invalid-idle',
-        startedAt: '2026-06-01T00:00:00.000Z',
-        durationSeconds: 20,
-      }),
+      {
+        sessionId: 'leave-with-idle',
+        startedAt: '2026-06-05T23:19:38.000Z',
+        endedAt: '2026-06-05T23:20:13.000Z',
+        durationSeconds: 35,
+        progressDelta: 1,
+        endProgress: 1,
+      },
       user,
       'kobo',
     );

@@ -198,7 +198,6 @@ function stripSafePreamble(value: string): string {
   return value
     .replace(/^\uFEFF/, '')
     .replace(/<\?xml[^>]*\?>/gi, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/<!DOCTYPE[^>]*>/gi, '')
     .trim();
 }

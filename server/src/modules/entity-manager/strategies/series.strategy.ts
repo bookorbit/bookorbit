@@ -1,8 +1,9 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { SQL, and, asc, count, desc, eq, exists, ilike, inArray, notExists, or, sql } from 'drizzle-orm';
+import { SQL, and, asc, count, desc, eq, exists, inArray, notExists, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { buildContentFilterClauses } from '../../../common/utils/content-filter-sql.utils';
+import { accentInsensitiveIlike } from '../../../common/utils/accent-insensitive-search.utils';
 import { normalizeMetadataText, normalizeMetadataTextKey } from '../../../common/utils/metadata-text-normalize.utils';
 import { DB } from '../../../db';
 import * as schema from '../../../db/schema';
@@ -19,7 +20,9 @@ import type {
   StrategyMergeResult,
   StrategyRenameResult,
   StrategySplitResult,
+  EntityBookScope,
 } from './entity-strategy.interface';
+import { buildEntityBookScopeClauses } from './entity-book-scope';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -118,7 +121,7 @@ export class SeriesStrategy implements EntityStrategy {
             .from(books)
             .where(and(inArray(books.libraryId, params.libraryIds), ...filterClauses))
         : null;
-    const nameCondition = params.search ? (ilike(bookSeries.name, `%${escapeLike(params.search)}%`) as never) : undefined;
+    const nameCondition = params.search ? (accentInsensitiveIlike(bookSeries.name, `%${escapeLike(params.search)}%`) as never) : undefined;
     const joinCondition = bookSubquery
       ? and(eq(bookSeriesMemberships.seriesId, bookSeries.id), inArray(bookSeriesMemberships.bookId, bookSubquery))
       : and(eq(bookSeriesMemberships.seriesId, bookSeries.id), sql`false`);
@@ -266,7 +269,16 @@ export class SeriesStrategy implements EntityStrategy {
     return [...new Set(rows.map((row) => row.bookId))];
   }
 
-  async getBookCount(id: number | string): Promise<number> {
+  async getBookCount(id: number | string, scope?: EntityBookScope): Promise<number> {
+    if (scope) {
+      const [row] = await this.db
+        .select({ count: count() })
+        .from(bookSeriesMemberships)
+        .innerJoin(books, eq(books.id, bookSeriesMemberships.bookId))
+        .where(and(eq(bookSeriesMemberships.seriesId, Number(id)), ...buildEntityBookScopeClauses(this.db, scope)));
+      return row?.count ?? 0;
+    }
+
     const [row] = await this.db
       .select({ count: count() })
       .from(bookSeriesMemberships)
@@ -274,14 +286,20 @@ export class SeriesStrategy implements EntityStrategy {
     return row?.count ?? 0;
   }
 
-  async getBookTitles(id: number | string, limit: number): Promise<string[]> {
-    const rows = await this.db
-      .select({ title: sql<string>`COALESCE(${bookMetadata.title}, 'Untitled')` })
-      .from(bookSeriesMemberships)
-      .innerJoin(bookMetadata, eq(bookMetadata.bookId, bookSeriesMemberships.bookId))
-      .where(eq(bookSeriesMemberships.seriesId, Number(id)))
-      .orderBy(asc(bookMetadata.title))
-      .limit(limit);
+  async getBookTitles(id: number | string, limit: number, scope?: EntityBookScope): Promise<string[]> {
+    const baseQuery = this.db.select({ title: sql<string>`COALESCE(${bookMetadata.title}, 'Untitled')` }).from(bookSeriesMemberships);
+    const rows = scope
+      ? await baseQuery
+          .innerJoin(books, eq(books.id, bookSeriesMemberships.bookId))
+          .innerJoin(bookMetadata, eq(bookMetadata.bookId, bookSeriesMemberships.bookId))
+          .where(and(eq(bookSeriesMemberships.seriesId, Number(id)), ...buildEntityBookScopeClauses(this.db, scope)))
+          .orderBy(asc(bookMetadata.title))
+          .limit(limit)
+      : await baseQuery
+          .innerJoin(bookMetadata, eq(bookMetadata.bookId, bookSeriesMemberships.bookId))
+          .where(eq(bookSeriesMemberships.seriesId, Number(id)))
+          .orderBy(asc(bookMetadata.title))
+          .limit(limit);
     return rows.map((row) => row.title);
   }
 

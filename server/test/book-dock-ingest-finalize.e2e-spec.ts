@@ -123,6 +123,9 @@ describe('Book Dock ingest + finalize (e2e)', () => {
           title: 'Edited Review Title',
           authors: ['Edited Review Author'],
           genres: ['Mystery'],
+          hardcoverId: 'edited-review-book',
+          hardcoverEditionId: 'edited-review-edition',
+          openLibraryId: 'OL123W',
         },
         targetLibraryId: destination.libraryId,
         targetFolderId: destination.libraryFolderId,
@@ -135,6 +138,9 @@ describe('Book Dock ingest + finalize (e2e)', () => {
       title: 'Edited Review Title',
       authors: ['Edited Review Author'],
       genres: ['Mystery'],
+      hardcoverId: 'edited-review-book',
+      hardcoverEditionId: 'edited-review-edition',
+      openLibraryId: 'OL123W',
     });
     expect(updated.targetLibraryId).toBe(destination.libraryId);
     expect(updated.targetFolderId).toBe(destination.libraryFolderId);
@@ -311,6 +317,9 @@ describe('Book Dock ingest + finalize (e2e)', () => {
       selectedMetadata: {
         title: 'Finalize Success Title',
         authors: ['Finalize Author'],
+        hardcoverId: 'finalize-success-book',
+        hardcoverEditionId: 'finalize-success-edition',
+        openLibraryId: 'OL456W',
       },
       targetLibraryId: destination.libraryId,
       targetFolderId: destination.libraryFolderId,
@@ -358,11 +367,21 @@ describe('Book Dock ingest + finalize (e2e)', () => {
     expect(await fileExists(bookDockRow.absolutePath)).toBe(false);
 
     const [metadata] = await context.db
-      .select({ title: schema.bookMetadata.title })
+      .select({
+        title: schema.bookMetadata.title,
+        hardcoverId: schema.bookMetadata.hardcoverId,
+        hardcoverEditionId: schema.bookMetadata.hardcoverEditionId,
+        openLibraryId: schema.bookMetadata.openLibraryId,
+      })
       .from(schema.bookMetadata)
       .where(eq(schema.bookMetadata.bookId, finalizedBookId))
       .limit(1);
-    expect(metadata?.title).toBe('Finalize Success Title');
+    expect(metadata).toMatchObject({
+      title: 'Finalize Success Title',
+      hardcoverId: 'finalize-success-book',
+      hardcoverEditionId: 'finalize-success-edition',
+      openLibraryId: 'OL456W',
+    });
     expect(await getBookDockRow(context, bookDockRow.id)).toBeUndefined();
   });
 

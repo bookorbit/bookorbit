@@ -7,8 +7,10 @@ vi.mock('fs/promises', () => ({
 }));
 
 import { createReadStream } from 'fs';
+import { join } from 'path';
 import { stat } from 'fs/promises';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { DEFAULT_KOREADER_DEVICE_PATTERN } from '@bookorbit/types';
 import type { MockedFunction } from 'vitest';
 
 import { makeUser } from '../../common/test-utils/make-user';
@@ -84,7 +86,13 @@ function makeDetail(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeService() {
+function makeService(
+  deviceOrganization: {
+    fileNamingPattern: string;
+    seriesFileNamingPattern: string;
+    standaloneFileNamingPattern: string;
+  } | null = null,
+) {
   const opdsBookService = {
     getAccessibleLibraries: vi.fn().mockResolvedValue([{ id: 1, name: 'Main', bookCount: 99 }]),
     getUserCollections: vi.fn().mockResolvedValue([{ id: 2, name: 'Favorites', bookCount: 99 }]),
@@ -205,6 +213,11 @@ function makeService() {
     userBookStatusService as never,
     dashboardWidgetService as never,
     recommendationService as never,
+    { isCrossPlatformPathSanitizationEnabled: vi.fn().mockResolvedValue(true) } as never,
+    {
+      getKoreaderUserDefaultPattern: vi.fn().mockResolvedValue(DEFAULT_KOREADER_DEVICE_PATTERN),
+      getDeviceFileNamingPattern: vi.fn().mockResolvedValue(deviceOrganization),
+    } as never,
     { appDataPath: '/data', bookDockPath: '/data/book-dock' },
   );
 
@@ -501,6 +514,7 @@ describe('KoreaderCatalogService', () => {
             sizeBytes: 1234,
             durationSeconds: null,
             downloadUrl: '/api/v1/koreader/plugin/catalog/files/100/download',
+            devicePath: 'Series/Dune/1.00 - Dune.epub',
           },
         ],
         relatedSections: [
@@ -547,6 +561,79 @@ describe('KoreaderCatalogService', () => {
     expect(JSON.stringify(detail)).not.toContain('/books/dune.epub');
   });
 
+  it('normalizes catalog extensions once for format, placeholders, basename stripping, and fallback names', async () => {
+    const { service, bookService } = makeService({
+      fileNamingPattern: '{originalFilename}.{extension}',
+      seriesFileNamingPattern: '',
+      standaloneFileNamingPattern: '',
+    });
+    bookService.getDetail.mockResolvedValueOnce(
+      makeDetail({
+        seriesId: null,
+        seriesName: null,
+        seriesIndex: null,
+        files: [
+          {
+            id: 100,
+            format: 'EPUB',
+            role: 'primary',
+            sizeBytes: 1234,
+            absolutePath: '/books/dune.epub',
+            createdAt: new Date('2026-01-01T00:00:00.000Z'),
+            filename: 'dune.epub',
+            durationSeconds: null,
+          },
+          {
+            id: 101,
+            format: null,
+            role: 'content',
+            sizeBytes: 2345,
+            absolutePath: '/books/notes.bin',
+            createdAt: new Date('2026-01-01T00:00:00.000Z'),
+            filename: null,
+            durationSeconds: null,
+          },
+        ],
+      }),
+    );
+
+    const detail = await service.getBookDetail(makeUser(), 10, 'device-1');
+
+    expect(detail.files).toEqual([
+      expect.objectContaining({ format: 'epub', devicePath: 'dune.epub' }),
+      expect.objectContaining({ format: 'bin', devicePath: 'Dune.bin' }),
+    ]);
+  });
+
+  it('uses the device series pattern for books in a series', async () => {
+    const { service } = makeService({
+      fileNamingPattern: 'Default/{title}.{extension}',
+      seriesFileNamingPattern: 'SeriesOverride/{series}/{title}.{extension}',
+      standaloneFileNamingPattern: 'StandaloneOverride/{title}.{extension}',
+    });
+
+    const detail = await service.getBookDetail(makeUser(), 10, 'device-1');
+
+    expect(detail.files[0]?.devicePath).toBe('SeriesOverride/Dune/Dune.epub');
+  });
+
+  it('uses the standalone pattern and falls back to the device default when a specialized override is blank', async () => {
+    const organization = {
+      fileNamingPattern: 'Default/{title}.{extension}',
+      seriesFileNamingPattern: '',
+      standaloneFileNamingPattern: 'StandaloneOverride/{title}.{extension}',
+    };
+    const { service, bookService } = makeService(organization);
+    bookService.getDetail.mockResolvedValue(makeDetail({ seriesId: null, seriesName: null, seriesIndex: null }));
+
+    const standalone = await service.getBookDetail(makeUser(), 10, 'device-1');
+    expect(standalone.files[0]?.devicePath).toBe('StandaloneOverride/Dune.epub');
+
+    organization.standaloneFileNamingPattern = '   ';
+    const fallback = await service.getBookDetail(makeUser(), 10, 'device-1');
+    expect(fallback.files[0]?.devicePath).toBe('Default/Dune.epub');
+  });
+
   it('streams thumbnails with access checks and etags', async () => {
     const { service, bookService } = makeService();
     const reply = makeReply();
@@ -556,7 +643,7 @@ describe('KoreaderCatalogService', () => {
     expect(bookService.verifyBookAccess).toHaveBeenCalledWith(10, expect.objectContaining({ id: 1 }));
     expect(reply.header).toHaveBeenCalledWith('ETag', '"5000"');
     expect(reply.type).toHaveBeenCalledWith('image/jpeg');
-    expect(mockCreateReadStream).toHaveBeenCalledWith('/data/covers/10/thumbnail.jpg');
+    expect(mockCreateReadStream).toHaveBeenCalledWith(join('/data', 'covers', '10', 'thumbnail.jpg'));
 
     const cachedReply = makeReply();
     await service.streamThumbnail(makeUser(), 10, cachedReply as never, '"5000"');

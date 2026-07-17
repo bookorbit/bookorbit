@@ -432,6 +432,28 @@ export class HardcoverSyncService {
         }
       }
 
+      const localAttempts = typeof this.repo.findReadingAttempts === 'function' ? await this.repo.findReadingAttempts(userId, book.bookId) : [];
+      const primaryAttempt = [...localAttempts].reverse().find((attempt) => {
+        const attemptStarted = attempt.startedOn ?? null;
+        const attemptEnded = attempt.outcome === 'completed' ? (attempt.endedOn ?? null) : null;
+        return attemptStarted === startDate && attemptEnded === endDate;
+      });
+      if (hardcoverReadId != null && primaryAttempt) {
+        await this.repo.linkReadingAttempt(userId, primaryAttempt.id, hardcoverReadId);
+      }
+      for (const attempt of localAttempts) {
+        if (attempt.id === primaryAttempt?.id || attempt.outcome === 'skimmed' || attempt.outcome === 'abandoned') continue;
+        const existingReadId = attempt.externalProvider === 'hardcover' && attempt.externalId ? Number(attempt.externalId) : null;
+        const readId = await this.upsertUserBookRead(userId, token, {
+          userBookId,
+          existingReadId: Number.isInteger(existingReadId) ? existingReadId : null,
+          startedAt: attempt.startedOn,
+          finishedAt: attempt.outcome === 'completed' ? attempt.endedOn : null,
+          editionId: match.hardcoverEditionId ?? undefined,
+        });
+        if (readId != null) await this.repo.linkReadingAttempt(userId, attempt.id, readId);
+      }
+
       await this.repo.upsertBookState({
         userId,
         bookId: book.bookId,
@@ -618,6 +640,7 @@ export class HardcoverSyncService {
 
   private hasChanges(book: BookSyncData, state: Awaited<ReturnType<HardcoverRepository['findBookState']>>): boolean {
     if (!state?.lastSyncedAt) return true;
+    if (book.attemptsUpdatedAt && book.attemptsUpdatedAt > state.lastSyncedAt) return true;
     if (book.hardcoverMetadataId && state.syncError === 'no_match') return true;
     const metadataHardcoverId = this.parseNumericHardcoverMetadataId(book.hardcoverMetadataId);
     if (metadataHardcoverId !== null && metadataHardcoverId !== state.hardcoverBookId) return true;

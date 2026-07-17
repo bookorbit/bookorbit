@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { onUnmounted, ref, watch } from 'vue'
 import { api } from '@/lib/api'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   modelValue: string
@@ -80,7 +83,7 @@ function onBlur() {
     <input
       :value="modelValue"
       type="text"
-      :placeholder="placeholder ?? 'value'"
+      :placeholder="placeholder ?? t('book.filter.valuePlaceholder')"
       class="h-9 w-full rounded-md border border-input bg-background text-foreground text-sm px-2 focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-muted-foreground"
       @input="onInput"
       @keydown="onKeydown"

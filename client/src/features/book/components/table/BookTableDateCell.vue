@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+import { formatDate as formatLocaleDate, formatRelativeTime as formatLocaleRelativeTime } from '@/i18n/formatters'
+
+const { t } = useI18n()
+
 const props = defineProps<{
   value: string | null
   variant?: 'default' | 'relative'
@@ -18,7 +23,7 @@ function parseDate(isoDate: string | null): Date | null {
 function formatDate(isoDate: string | null): string {
   const date = parseDate(isoDate)
   if (!date) return '-'
-  return date.toLocaleDateString(undefined, {
+  return formatLocaleDate(date, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -28,9 +33,8 @@ function formatDate(isoDate: string | null): string {
 function formatRelativeTime(date: Date): string {
   const diffMs = date.getTime() - Date.now()
   const absMs = Math.abs(diffMs)
-  if (absMs < 5_000) return 'just now'
+  if (absMs < 5_000) return t('book.table.date.justNow')
 
-  const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
   const units = [
     ['year', 1000 * 60 * 60 * 24 * 365],
     ['month', 1000 * 60 * 60 * 24 * 30],
@@ -42,7 +46,7 @@ function formatRelativeTime(date: Date): string {
 
   for (const [unit, ms] of units) {
     if (absMs >= ms || unit === 'second') {
-      return formatter.format(Math.round(diffMs / ms), unit)
+      return formatLocaleRelativeTime(Math.round(diffMs / ms), unit)
     }
   }
 

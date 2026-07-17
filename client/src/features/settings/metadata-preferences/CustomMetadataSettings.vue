@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Archive, ArchiveRestore, ChevronDown, GripVertical, LayoutList, Loader2, Plus, Save, Search, Trash2 } from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import type { CustomMetadataFieldDefinition, CustomMetadataFieldType } from '@bookorbit/types'
@@ -15,6 +16,7 @@ type Draft = {
   enabledLibraryIds: number[]
 }
 
+const { t } = useI18n()
 const { libraries, fetchLibraries } = useLibraries()
 const {
   loading,
@@ -62,9 +64,9 @@ const canConfirmDelete = computed(() => deleteConfirmInput.value === deleteConfi
 function labelError(label: string, excludeId?: number): string | null {
   const trimmed = label.trim()
   if (!trimmed) return null
-  if (trimmed.length > 255) return 'Label must be 255 characters or fewer'
+  if (trimmed.length > 255) return t('settings.metadata.customFields.labelTooLong')
   const duplicate = activeFields.value.some((field) => field.id !== excludeId && field.label.toLowerCase() === trimmed.toLowerCase())
-  if (duplicate) return 'A field with this label already exists'
+  if (duplicate) return t('settings.metadata.customFields.labelDuplicate')
   return null
 }
 
@@ -104,7 +106,7 @@ function canSave(field: CustomMetadataFieldDefinition): boolean {
 }
 
 function usageLabel(field: CustomMetadataFieldDefinition): string {
-  return field.usageCount === 1 ? 'Used by 1 book' : `Used by ${field.usageCount} books`
+  return t('settings.metadata.customFields.usage', { count: field.usageCount }, field.usageCount)
 }
 
 function toggleCreate() {
@@ -192,8 +194,10 @@ onMounted(() => {
             <Plus :size="15" />
           </div>
           <div class="text-left">
-            <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">New Field</span>
-            <p class="settings-hint">Define a custom metadata field and choose which libraries use it.</p>
+            <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">{{
+              t('settings.metadata.customFields.newField.title')
+            }}</span>
+            <p class="settings-hint">{{ t('settings.metadata.customFields.newField.hint') }}</p>
           </div>
         </div>
         <ChevronDown class="h-4 w-4 shrink-0 text-muted-foreground transition-transform" :class="createOpen ? 'rotate-180' : ''" />
@@ -202,18 +206,18 @@ onMounted(() => {
       <div v-if="createOpen" class="p-4 md:p-5 space-y-4 border-t border-border">
         <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem]">
           <label class="space-y-1.5">
-            <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">Label</span>
+            <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">{{ t('settings.metadata.customFields.label') }}</span>
             <input
               v-model="createForm.label"
               class="input-field w-full"
-              placeholder="e.g. Original Title"
+              :placeholder="t('settings.metadata.customFields.labelPlaceholder')"
               :aria-invalid="!!createLabelError"
               @keydown.enter="handleCreate"
             />
             <span v-if="createLabelError" class="text-xs text-destructive">{{ createLabelError }}</span>
           </label>
           <label class="space-y-1.5">
-            <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">Type</span>
+            <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">{{ t('settings.metadata.customFields.type') }}</span>
             <select v-model="createForm.type" class="select-field w-full">
               <option v-for="type in CUSTOM_METADATA_FIELD_TYPES" :key="type" :value="type">{{ CUSTOM_FIELD_TYPE_META[type].label }}</option>
             </select>
@@ -230,10 +234,12 @@ onMounted(() => {
             @click="toggleCreatePreview"
           >
             <ChevronDown class="h-3.5 w-3.5 transition-transform" :class="showCreatePreview ? 'rotate-180' : ''" />
-            Preview how this field appears when editing a book
+            {{ t('settings.metadata.customFields.previewToggle') }}
           </button>
           <div v-if="showCreatePreview" class="mt-3 max-w-xs">
-            <span class="text-xs font-medium text-muted-foreground">{{ createForm.label.trim() || 'Untitled field' }}</span>
+            <span class="text-xs font-medium text-muted-foreground">{{
+              createForm.label.trim() || t('settings.metadata.customFields.untitledField')
+            }}</span>
             <CustomFieldPreviewInput class="mt-1" :type="createForm.type" />
           </div>
         </div>
@@ -242,7 +248,7 @@ onMounted(() => {
           <button class="settings-btn-primary" :disabled="!canCreate" @click="handleCreate">
             <Loader2 v-if="creating" :size="14" class="animate-spin" />
             <Plus v-else :size="14" />
-            Add field
+            {{ t('settings.metadata.customFields.addField') }}
           </button>
         </div>
       </div>
@@ -255,8 +261,8 @@ onMounted(() => {
             <LayoutList :size="15" />
           </div>
           <div>
-            <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">Fields</span>
-            <p class="settings-hint">Drag to reorder, edit labels, toggle libraries, or archive fields you no longer need.</p>
+            <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">{{ t('settings.metadata.customFields.fields') }}</span>
+            <p class="settings-hint">{{ t('settings.metadata.customFields.fieldsHint') }}</p>
           </div>
         </div>
         <div class="flex items-center gap-2">
@@ -265,9 +271,9 @@ onMounted(() => {
             <input
               v-model="searchQuery"
               type="search"
-              placeholder="Search fields"
+              :placeholder="t('settings.metadata.customFields.searchPlaceholder')"
               class="input-field w-full pl-8 sm:w-48"
-              aria-label="Search custom fields"
+              :aria-label="t('settings.metadata.customFields.searchAriaLabel')"
             />
           </div>
           <Loader2 v-if="loading || reordering" :size="15" class="animate-spin text-muted-foreground shrink-0" />
@@ -275,13 +281,13 @@ onMounted(() => {
       </div>
 
       <div v-if="activeFields.length === 0 && !loading" class="mx-4 my-5 rounded-lg border border-dashed border-border px-4 py-10 text-center">
-        <p class="text-sm font-medium text-foreground">No custom fields yet</p>
-        <p class="mt-1 text-xs text-muted-foreground">Use the form above to define your first custom metadata field.</p>
+        <p class="text-sm font-medium text-foreground">{{ t('settings.metadata.customFields.emptyTitle') }}</p>
+        <p class="mt-1 text-xs text-muted-foreground">{{ t('settings.metadata.customFields.emptyHint') }}</p>
       </div>
 
       <div v-else-if="isSearching && visibleFieldCount === 0" class="mx-4 my-5 rounded-lg border border-dashed border-border px-4 py-10 text-center">
-        <p class="text-sm font-medium text-foreground">No fields match "{{ searchQuery.trim() }}"</p>
-        <p class="mt-1 text-xs text-muted-foreground">Try a different label, key, or type.</p>
+        <p class="text-sm font-medium text-foreground">{{ t('settings.metadata.customFields.noMatchTitle', { query: searchQuery.trim() }) }}</p>
+        <p class="mt-1 text-xs text-muted-foreground">{{ t('settings.metadata.customFields.noMatchHint') }}</p>
       </div>
 
       <VueDraggable
@@ -301,8 +307,8 @@ onMounted(() => {
               type="button"
               class="custom-field-handle mt-7 shrink-0 text-muted-foreground/60 hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed cursor-grab active:cursor-grabbing"
               :disabled="reordering || isSearching"
-              :title="isSearching ? 'Clear search to reorder' : 'Drag to reorder'"
-              aria-label="Drag to reorder field"
+              :title="isSearching ? t('settings.metadata.customFields.clearSearchToReorder') : t('settings.metadata.customFields.dragToReorder')"
+              :aria-label="t('settings.metadata.customFields.dragToReorderField')"
             >
               <GripVertical :size="16" />
             </button>
@@ -310,13 +316,13 @@ onMounted(() => {
               <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_9rem]">
                 <label class="space-y-1.5">
                   <span class="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                    Label
+                    {{ t('settings.metadata.customFields.label') }}
                     <span
                       v-if="isDirty(field)"
                       class="inline-flex items-center gap-1 normal-case tracking-normal font-medium text-amber-600 dark:text-amber-400"
                     >
                       <span class="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                      Unsaved
+                      {{ t('settings.metadata.customFields.unsaved') }}
                     </span>
                   </span>
                   <input
@@ -328,7 +334,9 @@ onMounted(() => {
                   <span v-if="draftLabelError(field)" class="text-xs text-destructive">{{ draftLabelError(field) }}</span>
                 </label>
                 <div class="space-y-1.5">
-                  <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">Type</span>
+                  <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">{{
+                    t('settings.metadata.customFields.type')
+                  }}</span>
                   <div class="h-9 flex items-center gap-1.5 px-3 rounded-md border border-border bg-muted/30 text-sm">
                     <component :is="CUSTOM_FIELD_TYPE_META[field.type].icon" :size="14" class="text-muted-foreground" />
                     <span class="text-muted-foreground">{{ CUSTOM_FIELD_TYPE_META[field.type].label }}</span>
@@ -353,7 +361,7 @@ onMounted(() => {
                   <button class="settings-btn-outline" :disabled="!canSave(field)" @click="handleSave(field)">
                     <Loader2 v-if="savingId === field.id" :size="14" class="animate-spin" />
                     <Save v-else :size="14" />
-                    Save
+                    {{ t('common.save') }}
                   </button>
                   <button
                     class="settings-btn-outline text-destructive hover:border-destructive/40 hover:bg-destructive/5"
@@ -362,7 +370,7 @@ onMounted(() => {
                   >
                     <Loader2 v-if="archivingId === field.id" :size="14" class="animate-spin" />
                     <Archive v-else :size="14" />
-                    Archive
+                    {{ t('settings.metadata.customFields.archive') }}
                   </button>
                 </div>
               </div>
@@ -383,9 +391,11 @@ onMounted(() => {
             <Archive :size="15" />
           </div>
           <div class="text-left">
-            <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">Archived Fields</span>
+            <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">{{
+              t('settings.metadata.customFields.archivedFields')
+            }}</span>
             <p class="settings-hint">
-              {{ archivedFields.length }} archived {{ archivedFields.length === 1 ? 'field' : 'fields' }} - restore or permanently delete.
+              {{ t('settings.metadata.customFields.archivedSummary', { count: archivedFields.length }, archivedFields.length) }}
             </p>
           </div>
         </div>
@@ -410,7 +420,7 @@ onMounted(() => {
               </span>
               <span class="text-xs text-muted-foreground">{{ usageLabel(field) }}</span>
               <span class="text-xs text-muted-foreground" :title="formatAbsoluteDateTime(field.archivedAt!)">
-                Archived {{ formatRelativeTime(field.archivedAt!) }}
+                {{ t('settings.metadata.customFields.archivedAt', { when: formatRelativeTime(field.archivedAt!) }) }}
               </span>
             </div>
           </div>
@@ -418,7 +428,7 @@ onMounted(() => {
             <button class="settings-btn-outline" :disabled="restoringId === field.id" @click="handleRestore(field)">
               <Loader2 v-if="restoringId === field.id" :size="14" class="animate-spin" />
               <ArchiveRestore v-else :size="14" />
-              Restore
+              {{ t('settings.metadata.customFields.restore') }}
             </button>
             <button
               class="settings-btn-outline text-destructive hover:border-destructive/40 hover:bg-destructive/5"
@@ -426,7 +436,7 @@ onMounted(() => {
               @click="openDeleteConfirm(field)"
             >
               <Trash2 :size="14" />
-              Delete forever
+              {{ t('settings.metadata.customFields.deleteForever') }}
             </button>
           </div>
         </div>
@@ -442,28 +452,32 @@ onMounted(() => {
             <Trash2 :size="16" />
           </div>
           <div>
-            <p class="text-sm font-semibold text-foreground">Permanently delete field</p>
+            <p class="text-sm font-semibold text-foreground">{{ t('settings.metadata.customFields.deleteDialog.title') }}</p>
             <p class="mt-1 text-xs text-muted-foreground">
-              This will permanently delete <span class="font-medium text-foreground">{{ deleteConfirmField.label }}</span> and remove its stored
-              values from <span class="font-medium text-foreground">{{ usageLabel(deleteConfirmField).toLowerCase() }}</span
-              >. This cannot be undone.
+              {{ t('settings.metadata.customFields.deleteDialog.bodyBefore') }}
+              <span class="font-medium text-foreground">{{ deleteConfirmField.label }}</span>
+              {{ t('settings.metadata.customFields.deleteDialog.bodyMiddle') }}
+              <span class="font-medium text-foreground">{{ usageLabel(deleteConfirmField).toLowerCase() }}</span
+              >{{ t('settings.metadata.customFields.deleteDialog.bodyAfter') }}
             </p>
           </div>
         </div>
         <div class="p-5 space-y-3">
           <label class="space-y-1.5">
             <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-              Type <span class="text-foreground normal-case tracking-normal font-semibold">{{ deleteConfirmField.label }}</span> to confirm
+              {{ t('settings.metadata.customFields.deleteDialog.confirmBefore') }}
+              <span class="text-foreground normal-case tracking-normal font-semibold">{{ deleteConfirmField.label }}</span>
+              {{ t('settings.metadata.customFields.deleteDialog.confirmAfter') }}
             </span>
             <input
               v-model="deleteConfirmInput"
               class="input-field w-full"
-              placeholder="Type the field label to confirm"
+              :placeholder="t('settings.metadata.customFields.deleteDialog.confirmPlaceholder')"
               @keydown.enter="confirmDeletePermanently"
             />
           </label>
           <div class="flex justify-end gap-2">
-            <button class="settings-btn-outline" @click="cancelDeleteConfirm">Cancel</button>
+            <button class="settings-btn-outline" @click="cancelDeleteConfirm">{{ t('common.cancel') }}</button>
             <button
               class="settings-btn-outline text-destructive hover:border-destructive/40 hover:bg-destructive/5 disabled:opacity-50"
               :disabled="!canConfirmDelete"
@@ -471,7 +485,7 @@ onMounted(() => {
             >
               <Loader2 v-if="deletingPermanentlyId !== null" :size="14" class="animate-spin" />
               <Trash2 v-else :size="14" />
-              Delete forever
+              {{ t('settings.metadata.customFields.deleteForever') }}
             </button>
           </div>
         </div>

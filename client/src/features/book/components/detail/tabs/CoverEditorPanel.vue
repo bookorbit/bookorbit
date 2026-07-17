@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, ref, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Image, ImagePlus, Link, Lock, LockOpen, Loader2, RotateCcw, Search, Upload, X } from '@lucide/vue'
 import type { BookDetail } from '@bookorbit/types'
 import { FORMAT_TO_GROUP } from '@bookorbit/types'
@@ -13,6 +14,8 @@ import CoverSearchDrawer from './CoverSearchDrawer.vue'
 
 const props = defineProps<{ book: BookDetail; locked?: boolean }>()
 const emit = defineEmits<{ coverChanged: ['extracted' | 'custom' | null]; toggleLock: [] }>()
+
+const { t } = useI18n()
 
 const bookIdRef = computed(() => props.book.id)
 const { uploading, error, previewSrc, pendingFile, pendingUrl, selectFile, setUrl, clearPending, confirm, revert } = useCoverEditor(bookIdRef)
@@ -116,7 +119,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
       <button
         type="button"
         class="absolute bottom-2 right-2 flex items-center justify-center size-6 rounded-md bg-background/90 shadow-sm border border-input hover:bg-muted transition-colors"
-        :title="props.locked ? 'Unlock cover' : 'Lock cover'"
+        :title="props.locked ? t('book.detail.coverEditor.unlockCover') : t('book.detail.coverEditor.lockCover')"
         @click.stop="emit('toggleLock')"
       >
         <Lock v-if="props.locked" class="size-3.5 text-primary/70" />
@@ -152,7 +155,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
           @click="switchMode('file')"
         >
           <ImagePlus class="size-3.5" />
-          File
+          {{ t('book.detail.coverEditor.fileTab') }}
         </button>
         <button
           class="flex flex-1 items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -161,7 +164,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
           @click="switchMode('url')"
         >
           <Link class="size-3.5" />
-          URL
+          {{ t('book.detail.coverEditor.urlTab') }}
         </button>
       </div>
 
@@ -172,7 +175,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
           :class="props.locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'"
         >
           <Upload class="size-3.5 shrink-0" />
-          <span class="truncate">{{ pendingFile ? pendingFile.name : 'Choose image...' }}</span>
+          <span class="truncate">{{ pendingFile ? pendingFile.name : t('book.detail.coverEditor.chooseImage') }}</span>
           <input type="file" accept="image/*" class="hidden" :disabled="props.locked" @change="onFileChange" />
         </label>
       </div>
@@ -194,7 +197,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
         @click="isSearchOpen = true"
       >
         <Search class="size-3.5" />
-        Find cover online
+        {{ t('book.detail.coverEditor.findCoverOnline') }}
       </button>
 
       <!-- Cover Search Drawer -->
@@ -218,7 +221,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
           :disabled="uploading || props.locked"
           @click="handleConfirm"
         >
-          {{ uploading ? 'Saving...' : 'Save cover' }}
+          {{ uploading ? t('book.detail.coverEditor.saving') : t('book.detail.coverEditor.saveCover') }}
         </button>
         <button
           v-if="hasPending"
@@ -226,7 +229,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
           :disabled="uploading || props.locked"
           @click="cancelPending"
         >
-          Cancel
+          {{ t('common.cancel') }}
         </button>
         <button
           v-if="book.coverSource === 'custom'"
@@ -235,7 +238,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
           @click="handleRevert"
         >
           <RotateCcw class="size-3" />
-          Revert to original
+          {{ t('book.detail.coverEditor.revertToOriginal') }}
         </button>
         <button
           v-if="hasPermission('library_edit_metadata')"
@@ -245,7 +248,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
         >
           <Loader2 v-if="reExtractingCover" class="size-3 animate-spin" />
           <Image v-else class="size-3" />
-          Regenerate Cover
+          {{ t('book.detail.coverEditor.regenerateCover') }}
         </button>
       </div>
     </div>

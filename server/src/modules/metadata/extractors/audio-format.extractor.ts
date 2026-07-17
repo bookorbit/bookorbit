@@ -17,6 +17,7 @@ export class AudioFormatExtractor implements FormatExtractor {
       authors: audio.authors,
       genres: audio.genres,
       audibleId: audio.audibleId,
+      librofmId: audio.librofmId,
       cover: audio.coverBytes,
       narrators: audio.narrators,
       durationSeconds: audio.durationSeconds,

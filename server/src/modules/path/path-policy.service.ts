@@ -1,9 +1,11 @@
 import type { ConfigType } from '@nestjs/config';
-import { Inject, Injectable, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { realpath } from 'fs/promises';
-import { basename, dirname, isAbsolute, join, relative, resolve } from 'path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'path';
 
 import { storageConfig } from '../../config/config';
+
+const MAX_BROWSE_PATH_LENGTH = 4096;
 
 @Injectable()
 export class PathPolicyService {
@@ -19,7 +21,10 @@ export class PathPolicyService {
   }
 
   async resolveBrowsePath(rawPath?: string | null): Promise<string> {
-    const path = resolve(rawPath?.trim() || this.browseRoot);
+    const inputPath = typeof rawPath === 'string' ? rawPath.trim() : '';
+    if (inputPath.length > MAX_BROWSE_PATH_LENGTH) throw new BadRequestException('Path is too long');
+
+    const path = resolve(inputPath || this.browseRoot);
     await this.assertWithinBrowseRoot(path);
     return path;
   }
@@ -33,8 +38,39 @@ export class PathPolicyService {
   }
 
   async isWithinBrowseRoot(rawPath: string): Promise<boolean> {
-    const [root, path] = await Promise.all([this.getCanonicalBrowseRoot(), canonicalizeWithExistingAncestor(resolve(rawPath))]);
-    return isSameOrChildPath(root, path);
+    if (typeof rawPath !== 'string' || rawPath.length > MAX_BROWSE_PATH_LENGTH) return false;
+
+    const resolvedPath = resolve(rawPath);
+    const lexicalRelativePath = relative(this.browseRoot, resolvedPath);
+    if (lexicalRelativePath === '..' || lexicalRelativePath.startsWith(`..${sep}`) || isAbsolute(lexicalRelativePath)) return false;
+
+    const suffixSegments: string[] = [];
+    let current = resolvedPath;
+    let canonicalPath: string;
+
+    while (true) {
+      try {
+        const canonicalAncestor = await realpath(current);
+        canonicalPath = suffixSegments.reduceRight((built, segment) => join(built, segment), canonicalAncestor);
+        break;
+      } catch (error) {
+        const code = getErrorCode(error);
+        if (code !== 'ENOENT' && code !== 'ENOTDIR') return false;
+      }
+
+      const parent = dirname(current);
+      if (parent === current) return false;
+
+      suffixSegments.push(basename(current));
+      current = parent;
+    }
+
+    const root = await this.getCanonicalBrowseRoot();
+    const canonicalRelativePath = relative(root, canonicalPath);
+    return (
+      canonicalRelativePath === '' ||
+      (!canonicalRelativePath.startsWith(`..${sep}`) && canonicalRelativePath !== '..' && !isAbsolute(canonicalRelativePath))
+    );
   }
 
   private getCanonicalBrowseRoot(): Promise<string> {
@@ -49,7 +85,7 @@ async function canonicalizeWithExistingAncestor(resolvedPath: string): Promise<s
 
   while (true) {
     try {
-      const canonical = await realpath(current); // codeql[js/path-injection]
+      const canonical = await realpath(current);
       return suffixSegments.reduceRight((built, segment) => join(built, segment), canonical);
     } catch (error) {
       const code = getErrorCode(error);
@@ -64,11 +100,6 @@ async function canonicalizeWithExistingAncestor(resolvedPath: string): Promise<s
     suffixSegments.push(basename(current));
     current = parent;
   }
-}
-
-function isSameOrChildPath(root: string, path: string): boolean {
-  const rel = relative(root, path);
-  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
 }
 
 function getErrorCode(error: unknown): string | undefined {

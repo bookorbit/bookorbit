@@ -71,6 +71,7 @@ describe('ProviderConfigService', () => {
       itunes: { enabled: true, coverResolution: 'high' },
       audible: { enabled: false, domain: 'com' },
       audnexus: { enabled: false },
+      librofm: { enabled: false },
       comicvine: { enabled: false, apiKey: '' },
       ranobedb: { enabled: false },
       kobo: { enabled: false, country: 'us', language: 'en' },
@@ -355,6 +356,7 @@ describe('ProviderConfigService', () => {
       itunes: { enabled: true, coverResolution: 'high' },
       audible: { enabled: false, domain: 'com' },
       audnexus: { enabled: false },
+      librofm: { enabled: false },
       comicvine: { enabled: false, apiKey: '' },
       ranobedb: { enabled: false },
       kobo: { enabled: false, country: 'us', language: 'en' },
@@ -371,6 +373,7 @@ describe('ProviderConfigService', () => {
       MetadataProviderKey.ITUNES,
       MetadataProviderKey.AUDIBLE,
       MetadataProviderKey.AUDNEXUS,
+      MetadataProviderKey.LIBROFM,
       MetadataProviderKey.COMICVINE,
       MetadataProviderKey.RANOBEDB,
       MetadataProviderKey.KOBO,
@@ -397,6 +400,7 @@ describe('ProviderConfigService', () => {
       itunes: { enabled: true, coverResolution: 'high' },
       audible: { enabled: false, domain: 'com' },
       audnexus: { enabled: false },
+      librofm: { enabled: false },
       comicvine: { enabled: false, apiKey: '' },
       ranobedb: { enabled: false },
       kobo: { enabled: false, country: 'us', language: 'en' },
@@ -482,6 +486,19 @@ describe('ProviderConfigService', () => {
     expect(result.ok).toBe(false);
     expect(result.status).toBe('warning');
     expect(result.message).toContain('bot-check');
+  });
+
+  it('falls back to the allowlisted Amazon origin for an untrusted domain', async () => {
+    db.query.appSettings.findFirst.mockResolvedValue(undefined);
+    fetchMock.mockResolvedValue(new Response('<html>Amazon results</html>', { status: 200 }));
+
+    await service.testProvider(MetadataProviderKey.AMAZON, {
+      amazon: { domain: 'localhost' },
+    });
+
+    const requestUrl = fetchMock.mock.calls[0]?.[0];
+    expect(requestUrl).toBeInstanceOf(URL);
+    expect((requestUrl as URL).hostname).toBe('www.amazon.com');
   });
 
   it('rejects unsupported provider test requests', async () => {

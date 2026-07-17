@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Download, FileJson, FileSpreadsheet, Loader2 } from '@lucide/vue'
 import type { BookReadingSession } from '@bookorbit/types'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -9,6 +10,8 @@ const props = defineProps<{
   total: number
   exportAll: () => Promise<BookReadingSession[]>
 }>()
+
+const { t } = useI18n()
 
 const open = ref(false)
 const exporting = ref(false)
@@ -95,7 +98,7 @@ async function exportJson() {
       >
         <Loader2 v-if="exporting" :size="14" class="animate-spin" />
         <Download v-else :size="14" />
-        Export
+        {{ t('book.detail.readingLog.export.button') }}
       </button>
     </PopoverTrigger>
     <PopoverContent align="end" class="w-44 p-1">

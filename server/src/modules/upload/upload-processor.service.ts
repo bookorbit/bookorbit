@@ -11,7 +11,6 @@ import { bookFiles, bookMetadata, books } from '../../db/schema';
 import { BookMetadataFetchOrchestratorService } from '../book-metadata-fetch/book-metadata-fetch-orchestrator.service';
 import { MetadataService } from '../metadata/metadata.service';
 import { computeFileHash } from '../scanner/lib/hash';
-import { clampIno } from '../scanner/lib/walk';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -54,7 +53,7 @@ export class UploadProcessorService {
     sizeBytes: number,
   ): Promise<{ bookId: number; created: boolean }> {
     const [fileStat, fileHash] = await Promise.all([stat(absolutePath, { bigint: true }), computeFileHash(absolutePath)]);
-    const safeIno = clampIno(fileStat.ino);
+    const ino = fileStat.ino;
 
     const result = await this.db.transaction(async (tx) => {
       const [existingBook] = await tx
@@ -69,7 +68,7 @@ export class UploadProcessorService {
           libraryFolderId,
           absolutePath,
           relPath,
-          ino: safeIno,
+          ino,
           sizeBytes,
           mtime: fileStat.mtime,
           fileHash,
@@ -81,7 +80,7 @@ export class UploadProcessorService {
           .values(fileValues)
           .onConflictDoUpdate({
             target: bookFiles.absolutePath,
-            set: { bookId: existingBook.id, libraryFolderId, relPath, ino: safeIno, sizeBytes, mtime: fileStat.mtime, fileHash, format },
+            set: { bookId: existingBook.id, libraryFolderId, relPath, ino, sizeBytes, mtime: fileStat.mtime, fileHash, format },
           })
           .returning({ id: bookFiles.id });
         if (!file) throw new InternalServerErrorException('Failed to create book file');
@@ -101,7 +100,7 @@ export class UploadProcessorService {
           libraryFolderId,
           absolutePath,
           relPath,
-          ino: safeIno,
+          ino,
           sizeBytes,
           mtime: fileStat.mtime,
           fileHash,

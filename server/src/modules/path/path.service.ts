@@ -9,7 +9,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { lstat, mkdir, readdir } from 'fs/promises';
-import { join, resolve, sep } from 'path';
+import { basename, isAbsolute, join, relative, resolve, sep } from 'path';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { PathPolicyService } from './path-policy.service';
@@ -27,26 +27,25 @@ export class PathService {
   }
 
   async listDirectories(rawPath?: string): Promise<DirectoryEntry[]> {
-    const resolved = await this.pathPolicy.resolveBrowsePath(rawPath);
+    const browseRoot = resolve(this.pathPolicy.getBrowseRoot());
+    const resolved = resolve(await this.pathPolicy.resolveBrowsePath(rawPath));
+    const relativePath = relative(browseRoot, resolved);
+    if (relativePath === '..' || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) return [];
+
     if (this.isBlocked(resolved)) {
       return [];
     }
     try {
-      const rootStat = await lstat(resolved); // codeql[js/path-injection]
+      const rootStat = await lstat(resolved);
       if (rootStat.isSymbolicLink()) return [];
 
-      const entries = await readdir(resolved, { withFileTypes: true }); // codeql[js/path-injection]
+      const entries = await readdir(resolved, { withFileTypes: true });
       const dirs: DirectoryEntry[] = [];
       for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
+        if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
         if (entry.name.startsWith('.')) continue;
         const full = join(resolved, entry.name);
-        try {
-          const s = await lstat(full); // codeql[js/path-injection]
-          if (s.isDirectory() && !s.isSymbolicLink()) dirs.push({ name: entry.name, path: full });
-        } catch {
-          // skip inaccessible entries
-        }
+        dirs.push({ name: entry.name, path: full });
       }
       return dirs.sort((a, b) => a.name.localeCompare(b.name));
     } catch {
@@ -56,7 +55,13 @@ export class PathService {
 
   async createDirectory(rawParent: string, rawName: string): Promise<CreateFolderResult> {
     const name = this.assertSafeName(rawName);
-    const parent = await this.pathPolicy.resolveBrowsePath(rawParent);
+    const browseRoot = resolve(this.pathPolicy.getBrowseRoot());
+    const parent = resolve(await this.pathPolicy.resolveBrowsePath(rawParent));
+    const relativeParent = relative(browseRoot, parent);
+    if (relativeParent === '..' || relativeParent.startsWith(`..${sep}`) || isAbsolute(relativeParent)) {
+      throw new ForbiddenException('Cannot create a folder outside the configured library browse root');
+    }
+
     if (this.isBlocked(parent)) {
       throw new ForbiddenException('Cannot create a folder in this location');
     }
@@ -64,21 +69,23 @@ export class PathService {
     const startedAt = Date.now();
     this.logger.log(`[path.create_folder] [start] parentPath="${sanitizeLogValue(parent)}" name="${sanitizeLogValue(name)}" - create folder started`);
     try {
-      const parentStat = await lstat(parent); // codeql[js/path-injection]
+      const parentStat = await lstat(parent);
       if (parentStat.isSymbolicLink()) throw new ForbiddenException('Cannot create a folder under a symbolic link');
       if (!parentStat.isDirectory()) throw new BadRequestException('Parent path is not a directory');
 
       const target = join(parent, name);
-      const prefix = parent.endsWith(sep) ? parent : parent + sep;
       const resolvedTarget = resolve(target);
-      if (!resolvedTarget.startsWith(prefix)) {
+      const relativeTarget = relative(parent, resolvedTarget);
+      if (relativeTarget === '..' || relativeTarget.startsWith(`..${sep}`) || isAbsolute(relativeTarget)) {
         throw new BadRequestException('Invalid folder name');
       }
       await this.pathPolicy.assertWithinBrowseRoot(resolvedTarget);
 
-      await mkdir(target); // codeql[js/path-injection]
-      this.logger.log(`[path.create_folder] [end] path="${sanitizeLogValue(target)}" durationMs=${Date.now() - startedAt} - create folder completed`);
-      return { name, path: target };
+      await mkdir(resolvedTarget);
+      this.logger.log(
+        `[path.create_folder] [end] path="${sanitizeLogValue(resolvedTarget)}" durationMs=${Date.now() - startedAt} - create folder completed`,
+      );
+      return { name, path: resolvedTarget };
     } catch (error) {
       this.logger.warn(
         `[path.create_folder] [fail] parentPath="${sanitizeLogValue(parent)}" name="${sanitizeLogValue(name)}" durationMs=${Date.now() - startedAt} errorClass=${getErrorClass(error)} error="${sanitizeLogValue(getErrorMessage(error))}" - create folder failed`,
@@ -93,15 +100,16 @@ export class PathService {
 
   private assertSafeName(rawName: string): string {
     const name = (rawName ?? '').trim();
+    const safeName = basename(name);
     if (!name) throw new BadRequestException('Folder name is required');
-    if (name.includes('/') || name.includes('\\') || name.includes(sep)) {
+    if (safeName !== name || safeName.includes('/') || safeName.includes('\\') || safeName.includes(sep)) {
       throw new BadRequestException('Folder name cannot contain path separators');
     }
-    if (name === '.' || name === '..' || name.startsWith('.')) {
+    if (safeName === '.' || safeName === '..' || safeName.startsWith('.')) {
       throw new BadRequestException('Folder name cannot start with a dot');
     }
-    if (name.includes('\0')) throw new BadRequestException('Folder name contains invalid characters');
-    return name;
+    if (safeName.includes('\0')) throw new BadRequestException('Folder name contains invalid characters');
+    return safeName;
   }
 
   private mapCreateError(error: unknown): HttpException {

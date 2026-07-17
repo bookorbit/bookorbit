@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, provide, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import type { BookDetail, BookMetadataLockField } from '@bookorbit/types'
 import BookDetailLayout from '@/features/book/components/detail/BookDetailLayout.vue'
 import DetailsTab from '@/features/book/components/detail/tabs/DetailsTab.vue'
@@ -19,6 +20,7 @@ import EntityNotFound from '@/components/EntityNotFound.vue'
 const ReadingLogTab = defineAsyncComponent(() => import('@/features/book/components/detail/tabs/ReadingLogTab.vue'))
 const HighlightsTab = defineAsyncComponent(() => import('@/features/book/components/detail/tabs/HighlightsTab.vue'))
 
+const { t } = useI18n()
 const route = useRoute()
 const { hasPermission } = usePermissions()
 const { libraries } = useLibraries()
@@ -38,12 +40,12 @@ const tab = computed(() => normalizeBookDetailTab(route.query.tab))
 const { detail, loading, notFound, fetch } = useBookDetail()
 const pageTitle = computed(() => {
   const title = detail.value?.title?.trim()
-  const base = title || (Number.isFinite(bookId.value) ? `Book #${bookId.value}` : 'Book')
-  if (tab.value === 'edit') return `Edit Metadata · ${base}`
-  if (tab.value === 'files') return `Files · ${base}`
-  if (tab.value === 'reading-log') return `Reading Log · ${base}`
-  if (tab.value === 'highlights') return `Highlights · ${base}`
-  return `Book · ${base}`
+  const base = title || (Number.isFinite(bookId.value) ? t('views.bookDetail.titleWithId', { id: bookId.value }) : t('views.bookDetail.title'))
+  if (tab.value === 'edit') return t('views.bookDetail.pageTitle.editMetadata', { base })
+  if (tab.value === 'files') return t('views.bookDetail.pageTitle.files', { base })
+  if (tab.value === 'reading-log') return t('views.bookDetail.pageTitle.readingLog', { base })
+  if (tab.value === 'highlights') return t('views.bookDetail.pageTitle.highlights', { base })
+  return t('views.bookDetail.pageTitle.book', { base })
 })
 usePageTitle(pageTitle)
 
@@ -55,7 +57,7 @@ watch(
   },
 )
 
-const { onBookMissing, onBookRestored, onBookMoved, onBookTransferred } = useBookEvents()
+const { onBookMissing, onBookRestored, onBookMoved, onBookTransferred, onBookProgressChanged } = useBookEvents()
 onBookMissing((bookIds) => {
   if (detail.value && bookIds.includes(detail.value.id)) {
     detail.value = { ...detail.value, status: 'missing' }
@@ -69,6 +71,9 @@ onBookMoved((bookIds) => {
 })
 onBookTransferred((event) => {
   if (detail.value && event.bookIds.includes(detail.value.id)) fetch(detail.value.id)
+})
+onBookProgressChanged((event) => {
+  if (event.bookId === bookId.value) fetch(event.bookId)
 })
 
 watch(bookId, (id) => fetch(id), { immediate: true })
@@ -157,7 +162,7 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
       </div>
 
       <div v-else-if="notFound" key="not-found">
-        <EntityNotFound entity="Book" />
+        <EntityNotFound :entity="t('views.entity.book')" />
       </div>
     </Transition>
   </BookDetailLayout>

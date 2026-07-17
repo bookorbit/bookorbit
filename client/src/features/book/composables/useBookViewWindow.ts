@@ -1,5 +1,7 @@
 import { computed, ref, type Ref } from 'vue'
+import { useElementSize, useWindowSize } from '@vueuse/core'
 import { jumpBucketKindForSort, type GroupRule, type JumpBucket, type SortSpec } from '@bookorbit/types'
+import { useBookProgressRefresh } from './useBookProgressRefresh'
 import { BOOK_WINDOW_BLOCK_SIZE, useBookWindow, type BookWindowQuery } from './useBookWindow'
 import { useJumpBuckets } from './useJumpBuckets'
 import { useJumpRailGutter } from './useJumpRailGutter'
@@ -7,6 +9,9 @@ import { useJumpRailGutter } from './useJumpRailGutter'
 const LETTER_TEMPLATE = ['#', ...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i))]
 const MIN_TOTAL_FOR_RAIL = 50
 const LIST_CHUNK = 100
+const RAIL_SLOT_PX = 20
+const RAIL_VERTICAL_FRACTION = 0.85
+const RAIL_VERTICAL_PADDING_PX = 16
 
 function isValidScopeId(value: number | null): value is number {
   return value !== null && Number.isInteger(value) && value > 0
@@ -23,6 +28,8 @@ export function useBookViewWindow(options: {
   listEndpoint: (id: number) => string
   bucketsEndpoint: (id: number) => string
   viewMode: Ref<string>
+  railEnabled?: Ref<boolean>
+  railViewport?: Ref<HTMLElement | null>
   collapseEnabled?: Ref<boolean>
   q?: Ref<string>
 }) {
@@ -42,6 +49,14 @@ export function useBookViewWindow(options: {
   const window = useBookWindow({ endpoint: listEndpoint, query })
 
   const firstVisibleIndex = ref(0)
+  const { height: windowHeight } = useWindowSize()
+  const fallbackRailViewport = ref<HTMLElement | null>(null)
+  const { height: railViewportHeight } = useElementSize(options.railViewport ?? fallbackRailViewport)
+  const railCapacity = computed(() => {
+    const viewportHeight = railViewportHeight.value || windowHeight.value
+    const available = viewportHeight * RAIL_VERTICAL_FRACTION - RAIL_VERTICAL_PADDING_PX
+    return Math.min(64, Math.max(8, Math.floor(available / RAIL_SLOT_PX)))
+  })
 
   function handleFirstVisibleIndex(index: number) {
     firstVisibleIndex.value = index
@@ -52,14 +67,23 @@ export function useBookViewWindow(options: {
   }
 
   const bucketKind = computed(() => jumpBucketKindForSort(sort.value))
+  const primarySortField = computed(() => sort.value[0]?.field ?? 'title')
   const railModeActive = computed(() => options.viewMode.value === 'grid')
-  const railEligible = computed(() => bucketKind.value !== null && railModeActive.value && window.total.value >= MIN_TOTAL_FOR_RAIL)
+  const railEligible = computed(
+    () => (options.railEnabled?.value ?? true) && bucketKind.value !== null && railModeActive.value && window.total.value >= MIN_TOTAL_FOR_RAIL,
+  )
 
   const bucketsApi = useJumpBuckets({
     endpoint: bucketsEndpoint,
     query,
     enabled: railEligible,
     firstVisibleIndex,
+    maxBuckets: railCapacity,
+  })
+
+  useBookProgressRefresh(() => {
+    window.reset()
+    return bucketsApi.refresh()
   })
 
   const railVisible = computed(() => railEligible.value && bucketsApi.buckets.value.length >= 2)
@@ -104,7 +128,10 @@ export function useBookViewWindow(options: {
     hasMorePrefix,
     loadMorePrefix,
     bucketKind,
+    primarySortField,
     buckets: bucketsApi.buckets,
+    temporalGranularity: bucketsApi.granularity,
+    railCapacity,
     refreshBuckets: bucketsApi.refresh,
     railVisible,
     activeBucketKey,

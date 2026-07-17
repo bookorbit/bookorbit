@@ -312,6 +312,15 @@ describe('StorygraphSyncService', () => {
 
       await expect(makeService().syncBook(1, 1)).resolves.toBe('synced');
       expect(mockMatchService.matchBook).toHaveBeenCalled();
+      expect(mockClient.post).toHaveBeenCalledTimes(1);
+      expect(mockClient.post).toHaveBeenCalledWith(
+        1,
+        cookies,
+        expect.stringContaining('/update-status.js?book_id=abc-123&status=read'),
+        {},
+        'csrf-token',
+      );
+      expect(mockClient.post).not.toHaveBeenCalledWith(1, cookies, '/update-progress', expect.anything(), 'csrf-token');
     });
 
     it('skips unselected books when sync mode is selected-only', async () => {

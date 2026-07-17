@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import type { GroupRule, Rule } from '@bookorbit/types'
 import { ruleToParts } from '@/features/book/lib/filter-labels'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 defineProps<{
   node: GroupRule
@@ -14,7 +17,7 @@ defineProps<{
       class="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded shrink-0"
       :class="node.join === 'OR' ? 'bg-amber-500/15 text-amber-500' : 'bg-sky-500/15 text-sky-500'"
     >
-      {{ node.join === 'AND' ? 'ALL' : 'ANY' }}
+      {{ node.join === 'AND' ? t('book.filter.all') : t('book.filter.any') }}
     </span>
 
     <template v-for="(rule, i) in node.rules" :key="i">

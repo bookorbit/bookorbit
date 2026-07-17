@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ArrowLeft, CopyCheck, Copy, CheckCheck, Eye, EyeOff, Info } from '@lucide/vue'
 import type {
   BookMetadataLockField,
@@ -31,6 +32,7 @@ const emit = defineEmits<{
   apply: [{ formPatch: MetadataPatch; coverUrl?: string }]
 }>()
 
+const { t } = useI18n()
 const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 
 const activeProvider = ref<MetadataProviderKey>(props.initialCandidate.provider)
@@ -99,9 +101,9 @@ const { fields, picksPerProvider, toggleField, pickFieldFromProvider, clearPicks
 const activeProviderLabel = computed(() => getProviderLabel(activeProvider.value, props.providers))
 const resultsForActiveProvider = computed(() => props.filteredResults.filter((candidate) => candidate.provider === activeProvider.value))
 
-const bookSeed = computed(() => props.current.title ?? 'Untitled')
+const bookSeed = computed(() => props.current.title ?? t('book.detail.editMetadata.diffPanel.untitled'))
 const bookAuthorLine = computed(() => props.current.authors.join(', ') || null)
-const candidateSeed = computed(() => activeCandidate.value.title ?? 'Untitled')
+const candidateSeed = computed(() => activeCandidate.value.title ?? t('book.detail.editMetadata.diffPanel.untitled'))
 const candidateAuthorLine = computed(() => activeCandidate.value.authors?.join(', ') || null)
 
 const selectedFieldCount = computed(() => {
@@ -113,8 +115,8 @@ const selectedFieldCount = computed(() => {
 })
 
 const selectedCountLabel = computed(() => {
-  if (!selectedFieldCount.value) return 'No fields selected'
-  return `${selectedFieldCount.value} field${selectedFieldCount.value === 1 ? '' : 's'} selected`
+  if (!selectedFieldCount.value) return t('book.detail.editMetadata.diffPanel.noFieldsSelected')
+  return t('book.detail.editMetadata.diffPanel.fieldsSelected', { count: selectedFieldCount.value }, selectedFieldCount.value)
 })
 
 const providerResultMeta = computed(() => {
@@ -233,7 +235,7 @@ onBeforeUnmount(() => {
           @click="goBack"
         >
           <ArrowLeft class="size-4 transition-transform group-hover:-translate-x-0.5" />
-          {{ backLabel ?? 'Results' }}
+          {{ backLabel ?? t('book.detail.editMetadata.diffPanel.results') }}
         </button>
 
         <div class="flex-1 min-w-0">
@@ -262,8 +264,12 @@ onBeforeUnmount(() => {
       <!-- Within-provider result picker -->
       <div v-if="resultsForActiveProvider.length > 1" class="mt-2.5">
         <div class="flex items-center justify-between gap-2 mb-1.5">
-          <p class="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{{ activeProviderLabel }} matches</p>
-          <p class="text-[10px] text-muted-foreground">Selected {{ activeResultMeta.selectedIndex }} of {{ activeResultMeta.total }}</p>
+          <p class="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+            {{ t('book.detail.editMetadata.diffPanel.providerMatches', { provider: activeProviderLabel }) }}
+          </p>
+          <p class="text-[10px] text-muted-foreground">
+            {{ t('book.detail.editMetadata.diffPanel.selectedOf', { selected: activeResultMeta.selectedIndex, total: activeResultMeta.total }) }}
+          </p>
         </div>
         <div class="flex items-center gap-2 overflow-x-auto pb-0.5">
           <button
@@ -296,7 +302,7 @@ onBeforeUnmount(() => {
 
       <p v-if="showSwitchHint" class="mt-2 text-[11px] text-muted-foreground flex items-center gap-1.5">
         <Info class="size-3.5" />
-        Switched result. Previous selections from this provider were cleared.
+        {{ t('book.detail.editMetadata.diffPanel.switchedResult') }}
       </p>
     </div>
 
@@ -309,20 +315,20 @@ onBeforeUnmount(() => {
               <CheckCheck class="size-3.5 text-primary" />
               {{ selectedCountLabel }}
             </p>
-            <p v-else class="shrink-0 text-xs text-muted-foreground">Select fields to apply</p>
+            <p v-else class="shrink-0 text-xs text-muted-foreground">{{ t('book.detail.editMetadata.diffPanel.selectFieldsToApply') }}</p>
             <button
               class="flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-medium hover:bg-amber-500/20 transition-all active:scale-95"
               @click="handleCopyMissing"
             >
               <Copy class="size-3" />
-              Copy Missing
+              {{ t('book.detail.editMetadata.diffPanel.copyMissing') }}
             </button>
             <button
               class="flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-primary/40 bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-all active:scale-95"
               @click="handleCopyAll"
             >
               <CopyCheck class="size-3" />
-              Copy All
+              {{ t('book.detail.editMetadata.diffPanel.copyAll') }}
             </button>
           </div>
           <button
@@ -331,14 +337,14 @@ onBeforeUnmount(() => {
           >
             <EyeOff v-if="showUnchanged" class="size-3.5" />
             <Eye v-else class="size-3.5" />
-            {{ showUnchanged ? 'Hide unchanged' : 'Show unchanged' }}
+            {{ showUnchanged ? t('book.detail.editMetadata.diffPanel.hideUnchanged') : t('book.detail.editMetadata.diffPanel.showUnchanged') }}
           </button>
         </div>
 
         <div class="grid grid-cols-[1fr_auto_1fr] gap-2 mt-2.5">
           <div class="flex items-center gap-1.5">
             <div class="size-1.5 rounded-full bg-muted-foreground/40" />
-            <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Current</p>
+            <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{{ t('book.detail.editMetadata.diffPanel.current') }}</p>
           </div>
           <div class="w-11" />
           <div class="flex items-center gap-1.5 min-w-0 overflow-hidden">
@@ -365,7 +371,7 @@ onBeforeUnmount(() => {
         @pick-from-provider="handlePickFromProvider"
       />
       <p v-if="visibleFields.length === 0" class="py-8 text-center text-sm text-muted-foreground">
-        {{ showUnchanged ? 'No metadata available from this source.' : 'No changed or missing fields. Use Show unchanged to inspect everything.' }}
+        {{ showUnchanged ? t('book.detail.editMetadata.diffPanel.noMetadata') : t('book.detail.editMetadata.diffPanel.noChangedFields') }}
       </p>
     </div>
 
@@ -373,7 +379,7 @@ onBeforeUnmount(() => {
     <div class="flex flex-wrap items-center justify-end gap-2 px-4 py-3 border-t border-border shrink-0 bg-card/30">
       <div class="flex flex-wrap items-center gap-2">
         <button class="h-8 px-3 rounded-lg border border-border bg-background text-sm hover:bg-muted transition-all active:scale-95" @click="goBack">
-          Cancel
+          {{ t('common.cancel') }}
         </button>
         <button
           class="relative h-8 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium transition-all disabled:opacity-40 hover:opacity-90 active:scale-95 overflow-hidden group"
@@ -381,7 +387,7 @@ onBeforeUnmount(() => {
           @click="apply"
         >
           <span class="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-          Apply to form
+          {{ t('book.detail.editMetadata.diffPanel.applyToForm') }}
         </button>
       </div>
     </div>

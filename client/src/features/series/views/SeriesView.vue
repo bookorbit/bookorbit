@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowUpDown, Filter, Search, SlidersHorizontal, X } from '@lucide/vue'
 
@@ -14,6 +15,7 @@ import SeriesFilters from '../components/SeriesFilters.vue'
 import { useSeriesList } from '../composables/useSeriesList'
 import type { CompletionStatus, SeriesListSort, SortDirection } from '../types/series'
 
+const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const mainRef = ref<HTMLElement | null>(null)
@@ -46,15 +48,15 @@ const seriesGridGap = ref(Math.max(storage.get(SERIES_GRID_GAP_STORAGE_KEY, 20),
 let observer: IntersectionObserver | null = null
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
-const SORT_LABELS: Record<SeriesListSort, string> = {
-  name: 'Name',
-  bookCount: 'Book Count',
-  lastAddedAt: 'Recent Additions',
-  readProgress: 'Reading Progress',
-}
+const sortLabels = computed<Record<SeriesListSort, string>>(() => ({
+  name: t('series.list.sort.name'),
+  bookCount: t('series.list.sort.bookCount'),
+  lastAddedAt: t('series.list.sort.recentAdditions'),
+  readProgress: t('series.list.sort.readingProgress'),
+}))
 
 const isDefaultSort = computed(() => sort.value === 'name' && order.value === 'asc')
-const sortSummary = computed(() => `${SORT_LABELS[sort.value]} ${order.value === 'asc' ? '↑' : '↓'}`)
+const sortSummary = computed(() => `${sortLabels.value[sort.value]} ${order.value === 'asc' ? '↑' : '↓'}`)
 
 const activeFilterCount = computed(() => {
   let count = 0
@@ -262,7 +264,7 @@ defineOptions({ name: 'SeriesView' })
 <template>
   <section class="flex h-full flex-col">
     <ViewHeader
-      title="Series"
+      :title="t('series.list.title')"
       icon="Library"
       fallback-icon="Library"
       :total="total"
@@ -285,7 +287,7 @@ defineOptions({ name: 'SeriesView' })
           <input
             v-model="q"
             type="search"
-            placeholder="Search series or author"
+            :placeholder="t('series.list.searchPlaceholder')"
             class="series-search-input h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/85"
           />
           <button v-if="q.trim()" class="ml-1 text-muted-foreground/85 transition-colors hover:text-foreground" @click="clearSearchQuery">
@@ -308,11 +310,11 @@ defineOptions({ name: 'SeriesView' })
               >
                 <ArrowUpDown :size="13" />
                 <span class="hidden lg:inline">{{ sortSummary }}</span>
-                <span class="lg:hidden">Sort</span>
+                <span class="lg:hidden">{{ t('series.list.sortButton') }}</span>
               </button>
             </PopoverTrigger>
             <PopoverContent align="start" class="w-56 p-2">
-              <div class="mb-2 px-1 text-xs font-medium text-muted-foreground">Sort by</div>
+              <div class="mb-2 px-1 text-xs font-medium text-muted-foreground">{{ t('series.list.sortBy') }}</div>
               <div class="flex flex-col gap-0.5">
                 <button
                   v-for="field in ['name', 'bookCount', 'lastAddedAt', 'readProgress'] as const"
@@ -321,7 +323,7 @@ defineOptions({ name: 'SeriesView' })
                   :class="sort === field ? 'text-foreground font-medium' : 'text-muted-foreground'"
                   @click="setSortField(field)"
                 >
-                  {{ SORT_LABELS[field] }}
+                  {{ sortLabels[field] }}
                   <span v-if="sort === field" class="text-xs text-primary">{{ order === 'asc' ? '↑' : '↓' }}</span>
                 </button>
               </div>
@@ -334,7 +336,7 @@ defineOptions({ name: 'SeriesView' })
                   :class="order === dir ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground'"
                   @click="setSortOrder(dir)"
                 >
-                  {{ dir === 'asc' ? 'Ascending' : 'Descending' }}
+                  {{ dir === 'asc' ? t('series.list.ascending') : t('series.list.descending') }}
                 </button>
               </div>
             </PopoverContent>
@@ -342,7 +344,7 @@ defineOptions({ name: 'SeriesView' })
           <button
             v-if="!isDefaultSort"
             class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-destructive hover:bg-muted"
-            aria-label="Reset sort to default"
+            :aria-label="t('common.resetSortAria')"
             @click="resetSort"
           >
             <X :size="13" />
@@ -361,7 +363,7 @@ defineOptions({ name: 'SeriesView' })
           @click="toggleFiltersOpen"
         >
           <Filter :size="13" />
-          <span>Filters</span>
+          <span>{{ t('series.list.filters') }}</span>
           <span v-if="activeFilterCount > 0" class="text-xs font-semibold">({{ activeFilterCount }})</span>
         </button>
 
@@ -371,7 +373,7 @@ defineOptions({ name: 'SeriesView' })
           @click="clearFilters"
         >
           <X :size="13" />
-          Clear
+          {{ t('series.list.clear') }}
         </button>
 
         <button
@@ -381,7 +383,7 @@ defineOptions({ name: 'SeriesView' })
               ? 'border-primary text-primary bg-primary/10'
               : 'border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
           "
-          aria-label="Show series controls"
+          :aria-label="t('series.list.showControlsAria')"
           @click="toggleMobileControls"
         >
           <SlidersHorizontal :size="14" />
@@ -403,7 +405,7 @@ defineOptions({ name: 'SeriesView' })
           ref="mobileSearchInput"
           v-model="q"
           type="search"
-          placeholder="Search series or author"
+          :placeholder="t('series.list.searchPlaceholder')"
           class="mobile-search-input h-9 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/85"
         />
         <button v-if="q.trim()" class="text-muted-foreground/85 hover:text-foreground" @click="clearSearchQuery">
@@ -419,7 +421,7 @@ defineOptions({ name: 'SeriesView' })
             @change="onMobileSortChange"
           >
             <option v-for="field in ['name', 'bookCount', 'lastAddedAt', 'readProgress'] as const" :key="field" :value="field">
-              {{ SORT_LABELS[field] }}
+              {{ sortLabels[field] }}
             </option>
           </select>
           <ArrowUpDown :size="13" class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/85" />
@@ -434,7 +436,7 @@ defineOptions({ name: 'SeriesView' })
           "
           @click="setSortOrder(order === 'asc' ? 'desc' : 'asc')"
         >
-          {{ order === 'asc' ? 'Asc' : 'Desc' }}
+          {{ order === 'asc' ? t('series.list.ascShort') : t('series.list.descShort') }}
         </button>
 
         <button
@@ -442,7 +444,7 @@ defineOptions({ name: 'SeriesView' })
           class="h-8 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:text-destructive"
           @click="clearFilters"
         >
-          Clear
+          {{ t('series.list.clear') }}
         </button>
       </div>
 
@@ -499,8 +501,8 @@ defineOptions({ name: 'SeriesView' })
 
       <!-- Empty state -->
       <div v-if="initialLoadComplete && items.length === 0 && !loading" class="mt-12 text-center text-sm text-muted-foreground">
-        <p v-if="activeFilterCount > 0">No series match your filters.</p>
-        <p v-else>No series found in your libraries.</p>
+        <p v-if="activeFilterCount > 0">{{ t('series.list.noMatch') }}</p>
+        <p v-else>{{ t('series.list.empty') }}</p>
       </div>
 
       <!-- Error state -->

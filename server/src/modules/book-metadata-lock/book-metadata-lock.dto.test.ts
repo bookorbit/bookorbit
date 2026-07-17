@@ -8,7 +8,7 @@ import { UpdateBookMetadataLocksDto } from './dto/update-book-metadata-locks.dto
 describe('UpdateBookMetadataLocksDto', () => {
   it('accepts unique valid lock fields', async () => {
     const dto = plainToInstance(UpdateBookMetadataLocksDto, {
-      lockedFields: ['title', 'authors', 'cover'],
+      lockedFields: ['title', 'authors', 'librofmId', 'cover'],
     });
 
     expect((await validate(dto)).length).toBe(0);

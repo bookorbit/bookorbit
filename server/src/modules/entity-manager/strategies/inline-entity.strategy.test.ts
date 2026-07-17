@@ -12,6 +12,14 @@ function makeStrategy(db: Record<string, unknown> = {}) {
   return new TestInlineStrategy(db as never);
 }
 
+function flattenSql(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.map(flattenSql).join(' ');
+  if (!value || typeof value !== 'object') return '';
+  const record = value as Record<string, unknown>;
+  return [flattenSql(record.value), flattenSql(record.queryChunks)].join(' ');
+}
+
 function makeSelectChain(rows: unknown[]) {
   const limit = vi.fn().mockResolvedValue(rows);
   const orderBy = vi.fn().mockReturnValue({ limit });
@@ -64,6 +72,25 @@ describe('InlineEntityStrategy', () => {
 
       expect(Number(capturedThreshold)).toBe(1);
     });
+
+    it('applies content filters to both candidate values', async () => {
+      const execute = vi.fn().mockResolvedValueOnce(undefined).mockResolvedValueOnce({ rows: [] });
+      const transaction = vi.fn().mockImplementation(async (cb: (tx: { execute: typeof execute }) => Promise<unknown>) => cb({ execute }));
+      const where = vi.fn().mockReturnValue({ queryChunks: ['book_tags'] });
+      const from = vi.fn().mockReturnValue({ where });
+      const strategy = makeStrategy({ transaction, select: vi.fn().mockReturnValue({ from }) });
+
+      await strategy.findCandidatePairs([1], 0.5, {
+        includeTagIds: [9],
+        excludeTagIds: [],
+        includeGenreIds: [],
+        excludeGenreIds: [],
+      });
+
+      const query = flattenSql(execute.mock.calls[1]![0]);
+      expect(query).toContain('book_tags');
+      expect(query.match(/book_tags/g)?.length).toBeGreaterThanOrEqual(2);
+    });
   });
 
   describe('browse', () => {
@@ -93,11 +120,13 @@ describe('InlineEntityStrategy', () => {
 
   describe('merge', () => {
     it('calls execute once per source value and returns affected book ids', async () => {
-      const execute = vi.fn().mockResolvedValue({ rows: [] });
+      const execute = vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [{ bookId: 10 }, { bookId: 20 }] })
+        .mockResolvedValueOnce({ rows: [{ bookId: 20 }] });
       const strategy = makeStrategy({ execute });
-      vi.spyOn(strategy, 'findAffectedBookIds').mockResolvedValue([10, 20]);
 
-      const result = await strategy.merge({ targetId: 'Alice', sourceIds: ['Alicia', 'Ali'], userId: 1 });
+      const result = await strategy.merge({ targetId: 'Alice', sourceIds: ['Alicia', 'Ali'], userId: 1, libraryIds: [7] });
 
       expect(execute).toHaveBeenCalledTimes(2);
       expect(result).toEqual({ affectedBookIds: [10, 20] });
@@ -106,9 +135,19 @@ describe('InlineEntityStrategy', () => {
     it('does nothing when sourceIds is empty', async () => {
       const execute = vi.fn().mockResolvedValue({ rows: [] });
       const strategy = makeStrategy({ execute });
-      vi.spyOn(strategy, 'findAffectedBookIds').mockResolvedValue([]);
 
-      await strategy.merge({ targetId: 'Alice', sourceIds: [], userId: 1 });
+      await strategy.merge({ targetId: 'Alice', sourceIds: [], userId: 1, libraryIds: [7] });
+
+      expect(execute).not.toHaveBeenCalled();
+    });
+
+    it('does not update metadata when no libraries are accessible', async () => {
+      const execute = vi.fn();
+      const strategy = makeStrategy({ execute });
+
+      await expect(strategy.merge({ targetId: 'Alice', sourceIds: ['Alicia'], userId: 1, libraryIds: [] })).resolves.toEqual({
+        affectedBookIds: [],
+      });
 
       expect(execute).not.toHaveBeenCalled();
     });

@@ -1,20 +1,24 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Contrast, Highlighter, Palette, Strikethrough, Underline, Waves } from '@lucide/vue'
 import { ANNOTATION_HIGHLIGHT_COLORS } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+
+const { t } = useI18n()
 
 defineProps<{ count: number; allVisibleSelected: boolean; showRestyle?: boolean }>()
 
 const emit = defineEmits<{ selectPage: []; clear: []; recolor: [hex: string]; restyle: [style: string] }>()
 
 const COLORS = ANNOTATION_HIGHLIGHT_COLORS
-const STYLES = [
-  { value: 'highlight', label: 'Highlight', icon: Highlighter },
-  { value: 'underline', label: 'Underline', icon: Underline },
-  { value: 'strikethrough', label: 'Strike', icon: Strikethrough },
-  { value: 'squiggly', label: 'Squiggle', icon: Waves },
-  { value: 'invert', label: 'Invert', icon: Contrast },
-]
+const STYLES = computed(() => [
+  { value: 'highlight', label: t('annotations.styles.highlight'), icon: Highlighter },
+  { value: 'underline', label: t('annotations.styles.underline'), icon: Underline },
+  { value: 'strikethrough', label: t('annotations.styles.strike'), icon: Strikethrough },
+  { value: 'squiggly', label: t('annotations.styles.squiggle'), icon: Waves },
+  { value: 'invert', label: t('annotations.styles.invert'), icon: Contrast },
+])
 
 function handleSelectPage() {
   emit('selectPage')
@@ -35,20 +39,20 @@ function handleRestyle(style: string) {
 
 <template>
   <div class="flex flex-wrap items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
-    <span class="font-medium text-foreground">{{ count }} selected</span>
+    <span class="font-medium text-foreground">{{ t('annotations.bulk.countSelected', { count }) }}</span>
     <button
       type="button"
       class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       @click="handleSelectPage"
     >
-      {{ allVisibleSelected ? 'Page selected' : 'Select page' }}
+      {{ allVisibleSelected ? t('annotations.bulk.pageSelected') : t('annotations.bulk.selectPage') }}
     </button>
     <button
       type="button"
       class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       @click="handleClear"
     >
-      Clear
+      {{ t('annotations.bulk.clear') }}
     </button>
 
     <template v-if="showRestyle">
@@ -62,7 +66,7 @@ function handleRestyle(style: string) {
           class="h-6 w-6 rounded-full border border-border transition-transform hover:scale-110"
           :style="{ background: color.hex }"
           :title="color.label"
-          :aria-label="`Recolor to ${color.label}`"
+          :aria-label="t('annotations.bulk.recolorTo', { color: color.label })"
           @click="handleRecolor(color.hex)"
         />
       </div>
@@ -72,7 +76,7 @@ function handleRestyle(style: string) {
             <button
               type="button"
               class="flex h-7 w-7 items-center justify-center rounded border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              :aria-label="`Restyle to ${style.label}`"
+              :aria-label="t('annotations.bulk.restyleTo', { style: style.label })"
               @click="handleRestyle(style.value)"
             >
               <component :is="style.icon" :size="14" />

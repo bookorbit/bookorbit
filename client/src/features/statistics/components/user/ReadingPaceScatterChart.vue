@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { Zap } from '@lucide/vue'
 
@@ -13,6 +14,8 @@ import ChartEmptyState from '../ChartEmptyState.vue'
 const MIN_SESSIONS = 10
 
 const themeStore = useThemeStore()
+const { t } = useI18n()
+
 const { data, loading, error } = useUserReadingPace()
 
 const isEmpty = computed(() => data.value.length === 0)
@@ -27,7 +30,7 @@ watchEffect(() => {
 
   const visible = data.value.filter((p) => p.durationSeconds > 0 && p.durationSeconds <= 14400 && p.progressDelta > 0 && p.progressDelta <= 100)
   const formatKeys = [...new Set(visible.map((p) => p.format))].sort()
-  const seriesMeta = getBreakdownSeries(dimension.value, `${themeStore.theme}:${themeStore.accent}`, formatKeys)
+  const seriesMeta = getBreakdownSeries(dimension.value, `${themeStore.resolvedTheme}:${themeStore.accent}`, formatKeys)
   const series = seriesMeta.map((meta) => ({
     type: 'scatter',
     name: meta.label,
@@ -68,15 +71,15 @@ watchEffect(() => {
 </script>
 
 <template>
-  <ChartCard title="Reading Pace" :icon="Zap" :color-index="2" :loading :error :empty="isEmpty">
+  <ChartCard :title="t('statistics.charts.readingPace.title')" :icon="Zap" :color-index="2" :loading :error :empty="isEmpty">
     <template #controls>
       <BreakdownSelect v-model="dimension" />
     </template>
     <ChartEmptyState
       v-if="!hasEnoughData"
       :icon="Zap"
-      title="Not enough data yet"
-      :description="`Need at least ${MIN_SESSIONS} sessions with progress data for this chart.`"
+      :title="t('statistics.empty.notEnoughData')"
+      :description="t('statistics.charts.readingPace.notEnoughData', { count: MIN_SESSIONS })"
     />
     <VChart v-else :option autoresize style="height: 100%" />
   </ChartCard>

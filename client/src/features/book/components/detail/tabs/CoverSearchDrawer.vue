@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Search, Loader2, Image as ImageIcon, Check } from '@lucide/vue'
 import type { CoverSearchResult } from '@bookorbit/types'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -10,6 +11,8 @@ const props = defineProps<{
   initialAuthor: string
   isAudiobook: boolean
 }>()
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   'update:open': [boolean]
@@ -87,8 +90,10 @@ function handleOpenChange(val: boolean) {
             <Search class="size-5" />
           </div>
           <div>
-            <SheetTitle class="text-sm font-semibold">Online Search</SheetTitle>
-            <SheetDescription class="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Search for book covers</SheetDescription>
+            <SheetTitle class="text-sm font-semibold">{{ t('book.detail.coverSearch.title') }}</SheetTitle>
+            <SheetDescription class="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">{{
+              t('book.detail.coverSearch.subtitle')
+            }}</SheetDescription>
           </div>
         </div>
       </SheetHeader>
@@ -97,26 +102,32 @@ function handleOpenChange(val: boolean) {
       <div class="p-4 bg-muted/30 border-b space-y-3 shrink-0">
         <div class="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3">
           <div class="space-y-1">
-            <label class="hidden md:block text-[10px] font-bold text-muted-foreground ml-1 uppercase">Title</label>
+            <label class="hidden md:block text-[10px] font-bold text-muted-foreground ml-1 uppercase">{{
+              t('book.detail.coverSearch.titleField')
+            }}</label>
             <input
               v-model="searchTitle"
               class="w-full h-9 md:h-10 rounded-lg border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-              placeholder="Title"
+              :placeholder="t('book.detail.coverSearch.titleField')"
               @keyup.enter="performSearch"
             />
           </div>
           <div class="space-y-1">
-            <label class="hidden md:block text-[10px] font-bold text-muted-foreground ml-1 uppercase">Author</label>
+            <label class="hidden md:block text-[10px] font-bold text-muted-foreground ml-1 uppercase">{{
+              t('book.detail.coverSearch.authorField')
+            }}</label>
             <input
               v-model="searchAuthor"
               class="w-full h-9 md:h-10 rounded-lg border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-              placeholder="Author"
+              :placeholder="t('book.detail.coverSearch.authorField')"
               @keyup.enter="performSearch"
             />
           </div>
           <div class="col-span-2 md:col-span-1 flex gap-2 md:block md:space-y-1">
             <div class="flex-1 md:space-y-1">
-              <label class="hidden md:block text-[10px] font-bold text-muted-foreground ml-1 uppercase">Source</label>
+              <label class="hidden md:block text-[10px] font-bold text-muted-foreground ml-1 uppercase">{{
+                t('book.detail.coverSearch.sourceField')
+              }}</label>
               <select
                 v-model="searchProvider"
                 class="w-full h-9 md:h-10 rounded-lg border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
@@ -124,7 +135,7 @@ function handleOpenChange(val: boolean) {
                 <option value="duckduckgo">DuckDuckGo</option>
                 <option value="itunes">iTunes</option>
                 <option v-if="isAudiobookSearch" value="audiobookcovers">AudiobookCovers</option>
-                <option value="all">All Sources</option>
+                <option value="all">{{ t('book.detail.coverSearch.allSources') }}</option>
               </select>
             </div>
             <button
@@ -148,8 +159,8 @@ function handleOpenChange(val: boolean) {
             @change="toggleAudiobookSearch"
           />
           <span class="text-xs text-muted-foreground">
-            Audiobook covers
-            <span class="text-[10px] font-semibold text-primary/70 ml-0.5">(square)</span>
+            {{ t('book.detail.coverSearch.audiobookCovers') }}
+            <span class="text-[10px] font-semibold text-primary/70 ml-0.5">{{ t('book.detail.coverSearch.squareHint') }}</span>
           </span>
         </label>
 
@@ -160,7 +171,7 @@ function handleOpenChange(val: boolean) {
         >
           <Loader2 v-if="isSearching" class="size-4 animate-spin" />
           <Search v-else class="size-4" />
-          {{ isSearching ? 'Searching...' : 'Find covers' }}
+          {{ isSearching ? t('book.detail.coverSearch.searching') : t('book.detail.coverSearch.findCovers') }}
         </button>
       </div>
 
@@ -187,7 +198,7 @@ function handleOpenChange(val: boolean) {
               <div class="p-2 rounded-full bg-primary text-white scale-75 group-hover:scale-100 transition-transform">
                 <Check class="size-5" />
               </div>
-              <span class="text-xs font-bold text-white uppercase tracking-widest">Select Cover</span>
+              <span class="text-xs font-bold text-white uppercase tracking-widest">{{ t('book.detail.coverSearch.selectCover') }}</span>
             </div>
             <div
               class="absolute top-2 right-2 px-1.5 py-0.5 rounded-md text-[10px] font-bold text-white backdrop-blur-md shadow-sm"
@@ -206,8 +217,8 @@ function handleOpenChange(val: boolean) {
             <ImageIcon class="size-10 text-muted-foreground" />
           </div>
           <div>
-            <h3 class="font-semibold">No results found</h3>
-            <p class="text-xs text-muted-foreground">Try adjusting your search terms</p>
+            <h3 class="font-semibold">{{ t('book.detail.coverSearch.noResultsTitle') }}</h3>
+            <p class="text-xs text-muted-foreground">{{ t('book.detail.coverSearch.noResultsHint') }}</p>
           </div>
         </div>
         <div v-else class="h-full flex flex-col items-center justify-center text-center space-y-3 opacity-60 py-12">
@@ -215,8 +226,8 @@ function handleOpenChange(val: boolean) {
             <Search class="size-10 text-muted-foreground" />
           </div>
           <div>
-            <h3 class="font-semibold">Ready to search</h3>
-            <p class="text-xs text-muted-foreground">Enter a title and author above</p>
+            <h3 class="font-semibold">{{ t('book.detail.coverSearch.readyTitle') }}</h3>
+            <p class="text-xs text-muted-foreground">{{ t('book.detail.coverSearch.readyHint') }}</p>
           </div>
         </div>
       </div>
@@ -225,7 +236,7 @@ function handleOpenChange(val: boolean) {
       <div class="p-4 border-t bg-muted/10 shrink-0">
         <p class="text-[11px] text-center text-muted-foreground flex items-center justify-center gap-1">
           <ImageIcon class="size-3" />
-          Tip: High resolution covers are marked in green
+          {{ t('book.detail.coverSearch.resolutionTip') }}
         </p>
       </div>
     </SheetContent>

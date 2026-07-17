@@ -18,7 +18,8 @@
     "prestart": "pnpm --filter @bookorbit/types build",
     "prestart:dev": "pnpm --filter @bookorbit/types build",
     "prestart:debug": "pnpm --filter @bookorbit/types build",
-    "prebuild": "pnpm --filter @bookorbit/types build",
+    "prebuild": "pnpm --filter @bookorbit/types build && pnpm clean:swagger-metadata",
+    "clean:swagger-metadata": "node -e \"require('node:fs').rmSync('src/metadata.ts', { force: true })\"",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -27,7 +28,7 @@
     "start:debug": "nest start --debug --watch --config nest-cli.dev.json",
     "start:prod": "node dist/main",
     "db:generate": "drizzle-kit generate --name",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "tsx --env-file-if-exists=.env src/scripts/install-postgres-extensions.ts && drizzle-kit migrate",
     "e2e:db:migrate": "DATABASE_URL=postgres://bookorbit:bookorbit@localhost:5432/bookorbit_e2e pnpm db:migrate",
     "db:migrate:runtime": "node dist/scripts/migrate.js",
     "e2e:db:prepare": "tsx src/scripts/db-prepare-e2e.ts",
@@ -101,7 +102,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3.3.5",
+    "@eslint/eslintrc": "^3.3.6",
     "@eslint/js": "^10.0.1",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@ffprobe-installer/ffprobe": "^2.1.2",

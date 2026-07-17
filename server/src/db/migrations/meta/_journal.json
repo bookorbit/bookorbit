@@ -330,6 +330,62 @@
       "when": 1783630311448,
       "tag": "0046_kobo-device-snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1783791670862,
+      "tag": "0047_accent-insensitive-search-indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1783800042730,
+      "tag": "0048_preserve-bigint-inodes",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1783837707573,
+      "tag": "0049_add-librofm-provider-id",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1783874453297,
+      "tag": "0050_reading-attempts",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1783916699394,
+      "tag": "0051_add_account_activity_and_shared_insights",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1783968441335,
+      "tag": "0052_add_library_delete_fk_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1783973564941,
+      "tag": "0053_koreader_device_file_naming",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1784079674841,
+      "tag": "0054_add_book_duplicate_scans",
+      "breakpoints": true
     }
   ]
 }

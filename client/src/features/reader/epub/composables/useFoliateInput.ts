@@ -83,7 +83,6 @@ export function useFoliateInput(
     const selection = doc.defaultView?.getSelection()
     if (selection && !selection.isCollapsed && selection.rangeCount > 0) {
       isTextSelectionInProgress = true
-      e.preventDefault()
       return
     }
     if (deltaX > 10 && deltaX > deltaY && !isTextSelectionInProgress) return
@@ -99,7 +98,6 @@ export function useFoliateInput(
 
     if (hasSelection) {
       isTextSelectionInProgress = false
-      e.preventDefault()
       setTimeout(() => handleSelectionEnd(doc), 50)
       return
     }
@@ -186,8 +184,8 @@ export function useFoliateInput(
     )
 
     doc.addEventListener('touchstart', (e: TouchEvent) => handleTouchStart(e), { passive: true })
-    doc.addEventListener('touchmove', (e: TouchEvent) => handleTouchMove(e, doc), { passive: false })
-    doc.addEventListener('touchend', (e: TouchEvent) => handleTouchEnd(e, doc), { passive: false })
+    doc.addEventListener('touchmove', (e: TouchEvent) => handleTouchMove(e, doc), { passive: true })
+    doc.addEventListener('touchend', (e: TouchEvent) => handleTouchEnd(e, doc), { passive: true })
 
     doc.addEventListener('selectionchange', () => handleSelectionChange(doc))
   }

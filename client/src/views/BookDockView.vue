@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { PackageOpen, CheckCircle2, AlertCircle } from '@lucide/vue'
 import type { BookDockFile } from '@bookorbit/types'
 import { api } from '@/lib/api'
@@ -22,6 +23,8 @@ type ApplyFetchedResult = {
   skipped: number
   skippedEdited: number
 }
+
+const { t } = useI18n()
 
 const {
   items,
@@ -128,9 +131,9 @@ const errorCount = computed(() => {
 })
 
 const emptyMessage = computed(() => {
-  if (filters.search) return `No files match "${filters.search}"`
-  if (filters.status) return `No ${filters.status} files`
-  return 'Upload files or drop them in the Book Dock folder'
+  if (filters.search) return t('views.bookDock.empty.noSearchMatch', { query: filters.search })
+  if (filters.status) return t('views.bookDock.empty.noStatusFiles', { status: filters.status })
+  return t('views.bookDock.empty.uploadPrompt')
 })
 
 async function handleBulkDiscard() {
@@ -208,24 +211,18 @@ async function handleInlineApplyFetched(fileId: number) {
   }
 }
 
-function pluralizeFiles(count: number): string {
-  return `${count} file${count === 1 ? '' : 's'}`
-}
-
 function applyFetchedResultMessage(result: ApplyFetchedResult): string {
   const reasons: string[] = []
-  if (result.skippedEdited > 0)
-    reasons.push(`skipped ${pluralizeFiles(result.skippedEdited)} because ${result.skippedEdited === 1 ? 'it has' : 'they have'} manual edits`)
-  if (result.skipped > 0)
-    reasons.push(`skipped ${pluralizeFiles(result.skipped)} because ${result.skipped === 1 ? 'it has' : 'they have'} no fetched metadata`)
+  if (result.skippedEdited > 0) reasons.push(t('views.bookDock.applyFetched.skippedEdited', { count: result.skippedEdited }, result.skippedEdited))
+  if (result.skipped > 0) reasons.push(t('views.bookDock.applyFetched.skippedNoMetadata', { count: result.skipped }, result.skipped))
 
   if (result.applied > 0) {
-    const base = `Applied to ${pluralizeFiles(result.applied)}`
+    const base = t('views.bookDock.applyFetched.applied', { count: result.applied }, result.applied)
     return reasons.length ? `${base}; ${reasons.join('; ')}` : base
   }
 
-  if (reasons.length) return `No files applied; ${reasons.join('; ')}`
-  return 'No files selected'
+  if (reasons.length) return t('views.bookDock.applyFetched.noneApplied', { reasons: reasons.join('; ') })
+  return t('views.bookDock.applyFetched.noneSelected')
 }
 
 function handleRescanError() {
@@ -376,7 +373,7 @@ onUnmounted(() => {
           <div class="flex items-center justify-center size-9 rounded-lg bg-primary/10">
             <PackageOpen class="size-4.5 text-primary" />
           </div>
-          <h1 class="text-xl font-semibold text-foreground tracking-tight">Book Dock</h1>
+          <h1 class="text-xl font-semibold text-foreground tracking-tight">{{ t('views.bookDock.title') }}</h1>
           <span
             v-if="summary.total > 0"
             class="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary/15 text-primary text-xs font-semibold tabular-nums"
@@ -396,7 +393,7 @@ onUnmounted(() => {
               class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-xs font-medium"
             >
               <span class="size-1.5 rounded-full bg-current animate-pulse" />
-              New files detected
+              {{ t('views.bookDock.newFilesDetected') }}
             </span>
           </Transition>
           <Transition name="fade">
@@ -414,7 +411,11 @@ onUnmounted(() => {
               class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-primary/15 text-primary text-xs font-medium"
             >
               <CheckCircle2 class="size-3.5" />
-              {{ retryQueued === 0 ? 'No error files to retry' : `Retrying ${retryQueued} file${retryQueued !== 1 ? 's' : ''}` }}
+              {{
+                retryQueued === 0
+                  ? t('views.bookDock.retry.noneToRetry')
+                  : t('views.bookDock.retry.retrying', { count: retryQueued }, retryQueued ?? 0)
+              }}
             </span>
           </Transition>
           <Transition name="fade">
@@ -423,7 +424,7 @@ onUnmounted(() => {
               class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-muted text-muted-foreground text-xs font-medium"
             >
               <span class="size-1.5 rounded-full bg-muted-foreground animate-pulse" />
-              Reconnecting
+              {{ t('views.bookDock.reconnecting') }}
             </span>
           </Transition>
           <Transition name="fade">
@@ -432,7 +433,7 @@ onUnmounted(() => {
               class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-red-500/15 text-red-600 dark:text-red-400 text-xs font-medium"
             >
               <AlertCircle class="size-3.5" />
-              Rescan failed
+              {{ t('views.bookDock.rescanFailed') }}
             </span>
           </Transition>
           <Transition name="fade">
@@ -472,7 +473,7 @@ onUnmounted(() => {
 
         <!-- Statistics bar -->
         <div v-if="statistics && statistics.byFormat.length > 0" class="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
-          <span class="font-medium text-foreground">{{ formatBytes(statistics.totalSizeBytes) }} in Book Dock</span>
+          <span class="font-medium text-foreground">{{ t('views.bookDock.totalInDock', { size: formatBytes(statistics.totalSizeBytes) }) }}</span>
           <span
             v-for="f in statistics.byFormat"
             :key="f.format"
@@ -493,8 +494,10 @@ onUnmounted(() => {
                 <PackageOpen class="size-8 text-primary" />
               </div>
               <div class="text-center">
-                <p class="text-sm font-medium text-foreground">Drop files into Book Dock</p>
-                <p class="text-xs text-muted-foreground mt-1">Supported: {{ SUPPORTED_FORMATS.join(', ') }}</p>
+                <p class="text-sm font-medium text-foreground">{{ t('views.bookDock.dropFiles') }}</p>
+                <p class="text-xs text-muted-foreground mt-1">
+                  {{ t('views.bookDock.supportedFormats', { formats: SUPPORTED_FORMATS.join(', ') }) }}
+                </p>
               </div>
             </div>
           </div>

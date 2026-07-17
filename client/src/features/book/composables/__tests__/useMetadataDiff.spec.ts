@@ -114,6 +114,56 @@ describe('useMetadataDiff', () => {
     expect(formPatch.goodreadsId).toBe('gr1')
   })
 
+  it('shows and applies the Libro.fm ISBN as a provider ID', () => {
+    const candidate: MetadataCandidate = {
+      provider: 'librofm',
+      providerId: '9781234567890',
+      title: 'Libro.fm Title',
+    }
+    const candidates = ref([candidate])
+    const activeProvider = ref<MetadataProviderKey>('librofm')
+    const { fields, toggleField, buildPatch } = useMetadataDiff(mockCurrent, candidates, activeProvider, [
+      { key: 'librofm', label: 'Libro.fm', identifiable: true },
+    ])
+
+    expect(fields.value.find((field) => field.key === 'librofmId')).toMatchObject({
+      label: 'Libro.fm ISBN',
+      candidateDisplay: '9781234567890',
+    })
+
+    toggleField('title')
+    expect(buildPatch().formPatch.librofmId).toBe('9781234567890')
+  })
+
+  it('shows and applies an AudNexus ASIN as the Audible ID', () => {
+    const candidate: MetadataCandidate = {
+      provider: 'audnexus',
+      providerId: 'B0TEST12345',
+      audibleId: 'B0TEST12345',
+      title: 'AudNexus Title',
+    }
+    const candidates = ref([candidate])
+    const activeProvider = ref<MetadataProviderKey>('audnexus')
+    const providerIds = ref({ audible: 'B0OLD12345' })
+    const { fields, toggleField, buildPatch } = useMetadataDiff(
+      mockCurrent,
+      candidates,
+      activeProvider,
+      [{ key: 'audnexus', label: 'AudNexus', identifiable: false }],
+      undefined,
+      providerIds,
+    )
+
+    expect(fields.value.find((field) => field.key === 'audibleId')).toMatchObject({
+      label: 'Audible ID',
+      bookValue: 'B0OLD12345',
+      candidateDisplay: 'B0TEST12345',
+    })
+
+    toggleField('title')
+    expect(buildPatch().formPatch.audibleId).toBe('B0TEST12345')
+  })
+
   it('builds a date and derived year patch when published date is picked', () => {
     const candidate: MetadataCandidate = {
       provider: 'google',

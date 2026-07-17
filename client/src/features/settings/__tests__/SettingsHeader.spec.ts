@@ -168,7 +168,12 @@ describe('SettingsHeader', () => {
       expect(labels).toContain('Admin')
     })
 
-    it('hides Admin tab when user has neither manage_users nor manage_app_settings', () => {
+    it('shows Admin tab for user with view_user_activity', () => {
+      const labels = getTabLabels(mountHeader({ perms: ['view_user_activity'] }))
+      expect(labels).toContain('Admin')
+    })
+
+    it('hides Admin tab without an administrative permission', () => {
       const labels = getTabLabels(mountHeader({ perms: ['kobo_sync'] }))
       expect(labels).not.toContain('Admin')
     })

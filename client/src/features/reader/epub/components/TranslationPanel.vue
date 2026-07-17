@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Copy, RefreshCw } from '@lucide/vue'
 import type { SupportedLanguage, TranslationResult } from '../services/translation.types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   originalText: string
@@ -29,7 +32,7 @@ function handleLangChange(event: Event) {
   <div class="p-4 flex flex-col gap-3 min-w-0">
     <!-- Original text -->
     <div>
-      <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">Original</p>
+      <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">{{ t('reader.translation.original') }}</p>
       <div class="max-h-20 overflow-y-auto">
         <p class="text-sm text-foreground/70 leading-relaxed break-words">{{ originalText }}</p>
       </div>
@@ -39,18 +42,18 @@ function handleLangChange(event: Event) {
 
     <!-- Translation area -->
     <div>
-      <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">Translation</p>
+      <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">{{ t('reader.translation.translation') }}</p>
 
       <div v-if="loading" class="flex items-center gap-2 py-2">
         <div class="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin shrink-0" />
-        <span class="text-sm text-muted-foreground">Translating...</span>
+        <span class="text-sm text-muted-foreground">{{ t('reader.translation.translating') }}</span>
       </div>
 
       <div v-else-if="error" class="py-2">
         <p class="text-sm text-destructive mb-2">{{ error }}</p>
         <button class="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors" @click="emit('retry')">
           <RefreshCw :size="12" />
-          Retry
+          {{ t('reader.retry') }}
         </button>
       </div>
 
@@ -59,7 +62,7 @@ function handleLangChange(event: Event) {
       </div>
 
       <div v-else class="py-2">
-        <p class="text-sm text-muted-foreground italic">No translation yet</p>
+        <p class="text-sm text-muted-foreground italic">{{ t('reader.translation.noTranslation') }}</p>
       </div>
     </div>
 
@@ -75,13 +78,13 @@ function handleLangChange(event: Event) {
       </select>
 
       <span v-if="result" class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-medium bg-secondary text-secondary-foreground whitespace-nowrap">
-        via {{ result.provider }}
+        {{ t('reader.translation.viaProvider', { provider: result.provider }) }}
       </span>
 
       <button
         v-if="result"
         class="shrink-0 flex items-center justify-center w-7 h-7 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-        title="Copy translation"
+        :title="t('reader.translation.copyTranslation')"
         @click="emit('copy')"
       >
         <Copy :size="14" />

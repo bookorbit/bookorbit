@@ -242,6 +242,24 @@ describe('useMetadataEditor', () => {
     })
   })
 
+  it('loads and saves Libro.fm provider IDs', async () => {
+    const book = makeBook({ providerIds: { librofm: '9781111111111' } })
+    apiMock.mockResolvedValue({ ok: true, json: async () => ({ ...book, providerIds: { librofm: '9782222222222' } }) })
+
+    const { form, load, save } = useMetadataEditor()
+    load(book)
+    expect(form.librofmId).toBe('9781111111111')
+
+    form.librofmId = '9782222222222'
+    await save(book.id, [])
+
+    const [, req] = apiMock.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(String(req.body))).toEqual({
+      metadata: { librofmId: '9782222222222' },
+      lockedFields: [],
+    })
+  })
+
   it('loads and saves Hardcover edition IDs separately from Hardcover book IDs', async () => {
     const book = makeBook({ providerIds: { hardcover: 'old-book-slug' }, hardcoverEditionId: '8941973' })
     apiMock.mockResolvedValue({ ok: true, json: async () => ({ ...book, hardcoverEditionId: '8941974' }) })

@@ -148,6 +148,54 @@ describe('MetadataFetchPipeline', () => {
     expect(fetchService.search).toHaveBeenCalledWith({ title: 'Query' }, [MetadataProviderKey.KOBO]);
   });
 
+  it('enables audiobook search when Field Rules select an audiobook provider', async () => {
+    const global = createPreferences((fields) => {
+      fields.title = {
+        enabled: true,
+        providers: [MetadataProviderKey.LIBROFM],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+    });
+
+    providerConfig.getConfig.mockResolvedValue(
+      makeProviderConfig({
+        librofm: { enabled: true },
+      }),
+    );
+    preferencesService.getGlobal.mockResolvedValue(global);
+    resolver.resolve.mockReturnValue(global);
+    resolver.withForwardCompatibility.mockReturnValue(global);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.LIBROFM }] as never);
+    fetchService.search.mockReturnValue(
+      of(
+        candidate(MetadataProviderKey.LIBROFM, '9798217174331', {
+          title: 'Yesteryear: A GMA Book Club Pick',
+          authors: ['Caro Claire Burke'],
+        }),
+      ),
+    );
+
+    await pipeline.run(
+      {
+        title: 'Yesteryear',
+        author: 'Caro Claire Burke',
+        isbn: '9780593804223',
+        isAudiobook: false,
+      },
+      {},
+    );
+
+    expect(fetchService.search).toHaveBeenCalledWith(
+      {
+        title: 'Yesteryear',
+        author: 'Caro Claire Burke',
+        isbn: '9780593804223',
+        isAudiobook: true,
+      },
+      [MetadataProviderKey.LIBROFM],
+    );
+  });
+
   it('returns diagnostics when field rules only reference disabled providers', async () => {
     const global = createPreferences();
 
@@ -654,6 +702,37 @@ describe('MetadataFetchPipeline', () => {
 
     expect(resolved.title).toBeUndefined();
     expect(providerIds).toEqual({ [MetadataProviderKey.GOOGLE]: 'g1' });
+  });
+
+  it('stores an AudNexus ASIN as the Audible provider id', async () => {
+    const prefs = createPreferences((fields) => {
+      fields.title = {
+        enabled: true,
+        providers: [MetadataProviderKey.AUDNEXUS],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+    });
+    prefs.options = {
+      genres: { mode: 'firstProvider', blocklist: [] },
+      saveProviderIds: true,
+    };
+
+    preferencesService.getGlobal.mockResolvedValue(prefs);
+    resolver.resolve.mockReturnValue(prefs);
+    resolver.withForwardCompatibility.mockReturnValue(prefs);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.AUDNEXUS }] as never);
+    fetchService.search.mockReturnValue(
+      of(
+        candidate(MetadataProviderKey.AUDNEXUS, 'B0TEST12345', {
+          audibleId: 'B0TEST12345',
+          title: 'Fetched Audiobook',
+        }),
+      ),
+    );
+
+    const { providerIds } = await pipeline.runWithSources({ title: 'Query', isAudiobook: true }, {});
+
+    expect(providerIds).toEqual({ [MetadataProviderKey.AUDIBLE]: 'B0TEST12345' });
   });
 
   it('passes through Hardcover edition id with provider ids when saveProviderIds is enabled', async () => {

@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { vi } from 'vitest';
 
 import { AuthorStrategy } from './author.strategy';
@@ -25,7 +25,8 @@ function makeStrategy(db: Record<string, unknown> = {}, deps: Record<string, unk
     schedule: vi.fn().mockResolvedValue(undefined),
     ...(deps.enrichmentOrchestrator as object | undefined),
   };
-  return new AuthorStrategy(db as never, authorsRepo as never, authorImageStorage as never, enrichmentOrchestrator as never);
+  const resolvedDb = { execute: vi.fn().mockResolvedValue({ rows: [] }), ...db };
+  return new AuthorStrategy(resolvedDb as never, authorsRepo as never, authorImageStorage as never, enrichmentOrchestrator as never);
 }
 
 function makeSelectChain(rows: unknown[]) {
@@ -233,6 +234,16 @@ describe('AuthorStrategy', () => {
 
       return { select, selectDistinct, update };
     }
+
+    it('rejects merging authors that are used outside the accessible libraries', async () => {
+      const execute = vi.fn().mockResolvedValue({ rows: [{ '?column?': 1 }] });
+      const authorsRepo = { mergeAuthors: vi.fn() };
+      const strategy = makeStrategy({ execute }, { authorsRepo });
+
+      await expect(strategy.merge({ targetId: 1, sourceIds: [2], userId: 5, libraryIds: [7] })).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(authorsRepo.mergeAuthors).not.toHaveBeenCalled();
+    });
 
     it('throws NotFoundException when target author does not exist', async () => {
       const limit = vi.fn().mockResolvedValue([]);
@@ -799,6 +810,19 @@ describe('AuthorStrategy', () => {
 
       await expect(strategy.getBookCount(1)).resolves.toBe(0);
     });
+
+    it('joins books and applies the requested library scope', async () => {
+      const where = vi.fn().mockResolvedValue([{ count: 2 }]);
+      const innerJoin = vi.fn().mockReturnValue({ where });
+      const from = vi.fn().mockReturnValue({ innerJoin });
+      const select = vi.fn().mockReturnValue({ from });
+      const strategy = makeStrategy({ select });
+
+      await expect(strategy.getBookCount(1, { libraryIds: [7, 9] })).resolves.toBe(2);
+
+      expect(innerJoin).toHaveBeenCalledTimes(1);
+      expect(flattenSql(where.mock.calls[0]![0])).toMatch(/\bin\b/);
+    });
   });
 
   describe('getBookTitles', () => {
@@ -814,6 +838,21 @@ describe('AuthorStrategy', () => {
       const strategy = makeStrategy({ select });
 
       await expect(strategy.getBookTitles(1, 5)).resolves.toEqual(['The Hobbit', 'LOTR']);
+    });
+
+    it('applies the same library scope when loading preview titles', async () => {
+      const limit = vi.fn().mockResolvedValue([{ title: 'Visible Book' }]);
+      const orderBy = vi.fn().mockReturnValue({ limit });
+      const where = vi.fn().mockReturnValue({ orderBy });
+      const leftJoin = vi.fn().mockReturnValue({ where });
+      const innerJoin = vi.fn().mockReturnValue({ leftJoin });
+      const from = vi.fn().mockReturnValue({ innerJoin });
+      const select = vi.fn().mockReturnValue({ from });
+      const strategy = makeStrategy({ select });
+
+      await expect(strategy.getBookTitles(1, 5, { libraryIds: [7] })).resolves.toEqual(['Visible Book']);
+
+      expect(flattenSql(where.mock.calls[0]![0])).toMatch(/\bin\b/);
     });
   });
 

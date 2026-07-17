@@ -2,7 +2,7 @@
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useElementSize, useWindowSize, watchDebounced } from '@vueuse/core'
 import { RecycleScroller } from 'vue-virtual-scroller'
-import { isAudioFormat, type BookCard, type CoverAspectRatio } from '@bookorbit/types'
+import { isAudioFormat, type BookCard, type CoverAspectRatio, type JumpBucketKind } from '@bookorbit/types'
 import BookCoverCard from './BookCoverCard.vue'
 import BookCoverSkeleton from './BookCoverSkeleton.vue'
 import CollapsedSeriesCard from './CollapsedSeriesCard.vue'
@@ -23,6 +23,7 @@ const props = withDefaults(
     virtualized?: boolean
     audioCoverScale?: number
     railGutter?: boolean
+    railGutterKind?: JumpBucketKind | null
   }>(),
   {
     selectionMode: false,
@@ -31,6 +32,7 @@ const props = withDefaults(
     virtualized: true,
     audioCoverScale: 1,
     railGutter: false,
+    railGutterKind: null,
   },
 )
 
@@ -43,7 +45,7 @@ const emit = defineEmits<{
 }>()
 
 const containerRef = ref<HTMLElement | null>(null)
-const scrollerRef = ref<{ scrollToItem: (index: number) => void } | null>(null)
+const scrollerRef = ref<{ scrollToItem: (index: number, options?: { align?: 'start' | 'center' | 'end' | 'auto' }) => void } | null>(null)
 const { width: containerWidth } = useElementSize(containerRef)
 const { width: windowWidth } = useWindowSize()
 
@@ -173,6 +175,8 @@ function handleScrollerUpdate(startIndex: number, endIndex: number) {
 const firstVisibleIndex = ref(0)
 let scrollParent: HTMLElement | null = null
 let scrollRafId = 0
+let jumpAnchorIndex: number | null = null
+let jumpAnchorRowStart: number | null = null
 
 function findScrollParent(el: HTMLElement | null): HTMLElement | null {
   for (let node = el?.parentElement ?? null; node; node = node.parentElement) {
@@ -191,14 +195,27 @@ function computeFirstVisibleIndex() {
   const row = Math.max(0, Math.floor(scrolledIntoGrid / itemSize.value))
   const cols = gridItems.value
   const rowStart = Math.min(props.books.length - 1, row * cols)
-  if (rowStart === firstVisibleIndex.value) return
   firstVisibleIndex.value = rowStart
-  // Report the middle cell of the first visible row, not its first cell. A
-  // letter bucket usually starts mid-row, so reporting the row start would
-  // resolve the active bucket to the previous letter (the tail still showing
-  // in the top-left). The midpoint lands inside the dominant letter of the
-  // row, which is also the one a jump targets.
-  const activeIndex = Math.min(props.books.length - 1, rowStart + Math.floor((cols - 1) / 2))
+  if (jumpAnchorIndex !== null) {
+    const lastVisibleRow = Math.max(row, Math.floor(Math.max(0, parentRect.bottom - gridRect.top - 1) / itemSize.value))
+    const anchorRow = Math.floor(jumpAnchorIndex / cols)
+    if (jumpAnchorRowStart === null) {
+      if (anchorRow >= row && anchorRow <= lastVisibleRow) {
+        jumpAnchorRowStart = rowStart
+        emit('first-visible-index', jumpAnchorIndex)
+      }
+      return
+    }
+    if (rowStart === jumpAnchorRowStart) {
+      emit('first-visible-index', jumpAnchorIndex)
+      return
+    }
+    jumpAnchorIndex = null
+    jumpAnchorRowStart = null
+  }
+  // At the top boundary the first rail target must stay active. Below it, the
+  // midpoint represents the section occupying most of the first visible row.
+  const activeIndex = row === 0 ? 0 : Math.min(props.books.length - 1, rowStart + Math.floor((cols - 1) / 2))
   emit('first-visible-index', activeIndex)
 }
 
@@ -237,15 +254,20 @@ watch(gridItems, (next, prev) => {
 })
 
 function scrollToIndex(index: number) {
-  scrollerRef.value?.scrollToItem(index)
-  handleScrollParentScroll()
+  jumpAnchorIndex = index
+  jumpAnchorRowStart = null
+  scrollerRef.value?.scrollToItem(index, { align: 'start' })
 }
 
 defineExpose({ scrollToIndex })
 </script>
 
 <template>
-  <div ref="containerRef" class="w-full" :class="{ 'pr-9': railGutter }">
+  <div
+    ref="containerRef"
+    class="w-full"
+    :class="railGutter ? (railGutterKind === 'category' ? 'pr-22' : railGutterKind === 'temporal' ? 'pr-14' : 'pr-10') : ''"
+  >
     <div
       v-if="!virtualized && useVariableStaticWidths"
       class="flex w-full flex-wrap content-start items-end"

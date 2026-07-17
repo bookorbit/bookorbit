@@ -1,9 +1,13 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useMediaQuery } from '@vueuse/core'
 import type { FieldPreference, MetadataFetchPreferences, MetadataField, ProviderStatus } from '@bookorbit/types'
 import FieldGroupSection from './FieldGroupSection.vue'
 import ProviderReservoir from './ProviderReservoir.vue'
 import { Info } from '@lucide/vue'
+
+const { t } = useI18n()
 
 defineProps<{
   preferences: MetadataFetchPreferences
@@ -17,14 +21,16 @@ const emit = defineEmits<{
   revert: [field: MetadataField]
 }>()
 
-const GROUPS: { label: string; fields: MetadataField[] }[] = [
-  { label: 'Core', fields: ['title', 'subtitle', 'description', 'cover'] },
-  { label: 'Contributors', fields: ['authors'] },
-  { label: 'Publication', fields: ['publisher', 'publishedYear', 'language', 'pageCount', 'communityRating'] },
-  { label: 'Series', fields: ['seriesName', 'seriesIndex'] },
-  { label: 'Classification', fields: ['genres'] },
-  { label: 'Audiobook', fields: ['narrators', 'duration', 'abridged'] },
+const GROUPS: { id: string; label: string; fields: MetadataField[] }[] = [
+  { id: 'core', label: 'Core', fields: ['title', 'subtitle', 'description', 'cover'] },
+  { id: 'contributors', label: 'Contributors', fields: ['authors'] },
+  { id: 'publication', label: 'Publication', fields: ['publisher', 'publishedYear', 'language', 'pageCount', 'communityRating'] },
+  { id: 'series', label: 'Series', fields: ['seriesName', 'seriesIndex'] },
+  { id: 'classification', label: 'Classification', fields: ['genres'] },
+  { id: 'audiobook', label: 'Audiobook', fields: ['narrators', 'duration', 'abridged'] },
 ]
+
+const groups = computed(() => GROUPS.map((group) => ({ ...group, label: t(`settings.metadata.fieldRules.groups.${group.id}`) })))
 
 const isMobile = useMediaQuery('(max-width: 767px)')
 </script>
@@ -36,7 +42,7 @@ const isMobile = useMediaQuery('(max-width: 767px)')
       <div class="flex items-center gap-2.5">
         <Info :size="14" class="text-primary shrink-0" />
         <p class="text-[11px] font-medium text-muted-foreground uppercase tracking-widest leading-none">
-          Drag providers from here onto any field to add them
+          {{ t('settings.metadata.fieldRules.dragProvidersHint') }}
         </p>
       </div>
       <div class="flex items-center">
@@ -46,22 +52,28 @@ const isMobile = useMediaQuery('(max-width: 767px)')
 
     <!-- Table Header (desktop) -->
     <div class="hidden md:flex items-center gap-4 px-5 py-3 bg-muted/10 border-b border-border/60">
-      <div class="w-48 shrink-0 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Field</div>
-      <div class="flex-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Active Providers (ordered by priority)</div>
-      <div class="w-44 shrink-0 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Merge Strategy</div>
+      <div class="w-48 shrink-0 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        {{ t('settings.metadata.fieldRules.table.field') }}
+      </div>
+      <div class="flex-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        {{ t('settings.metadata.fieldRules.table.activeProviders') }}
+      </div>
+      <div class="w-44 shrink-0 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        {{ t('settings.metadata.fieldRules.table.mergeStrategy') }}
+      </div>
       <div
         v-if="overriddenFields !== undefined"
         class="w-16 shrink-0 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center"
       >
-        Status
+        {{ t('settings.metadata.fieldRules.table.status') }}
       </div>
     </div>
 
     <!-- Content -->
     <div class="divide-y divide-border/60">
       <FieldGroupSection
-        v-for="group in GROUPS"
-        :key="group.label"
+        v-for="group in groups"
+        :key="group.id"
         :label="group.label"
         :fields="group.fields"
         :default-open="!isMobile"

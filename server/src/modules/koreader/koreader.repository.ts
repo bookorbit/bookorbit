@@ -550,9 +550,66 @@ export class KoreaderRepository {
     }));
   }
 
+  async getKoreaderUserDefaultPattern(userId: number): Promise<string | null> {
+    const row = await this.db.query.koreaderUserSettings.findFirst({
+      where: eq(schema.koreaderUserSettings.userId, userId),
+    });
+    return row?.defaultFileNamingPattern ?? null;
+  }
+
+  async setKoreaderUserDefaultPattern(userId: number, pattern: string): Promise<void> {
+    await this.db
+      .insert(schema.koreaderUserSettings)
+      .values({ userId, defaultFileNamingPattern: pattern })
+      .onConflictDoUpdate({
+        target: schema.koreaderUserSettings.userId,
+        set: { defaultFileNamingPattern: pattern, updatedAt: new Date() },
+      });
+  }
+
+  async getDeviceFileNamingPatterns(userId: number) {
+    return this.db
+      .select({
+        deviceId: schema.koreaderDeviceSettings.deviceId,
+        fileNamingPattern: schema.koreaderDeviceSettings.fileNamingPattern,
+        seriesFileNamingPattern: schema.koreaderDeviceSettings.seriesFileNamingPattern,
+        standaloneFileNamingPattern: schema.koreaderDeviceSettings.standaloneFileNamingPattern,
+      })
+      .from(schema.koreaderDeviceSettings)
+      .where(eq(schema.koreaderDeviceSettings.userId, userId));
+  }
+
+  async getDeviceFileNamingPattern(userId: number, deviceId: string) {
+    return (
+      (await this.db.query.koreaderDeviceSettings.findFirst({
+        where: and(eq(schema.koreaderDeviceSettings.userId, userId), eq(schema.koreaderDeviceSettings.deviceId, deviceId)),
+      })) ?? null
+    );
+  }
+
+  async setDeviceFileNamingPattern(
+    userId: number,
+    deviceId: string,
+    config: { fileNamingPattern: string; seriesFileNamingPattern: string; standaloneFileNamingPattern: string },
+  ): Promise<void> {
+    await this.db
+      .insert(schema.koreaderDeviceSettings)
+      .values({ userId, deviceId, ...config })
+      .onConflictDoUpdate({
+        target: [schema.koreaderDeviceSettings.userId, schema.koreaderDeviceSettings.deviceId],
+        set: { ...config, updatedAt: new Date() },
+      });
+  }
+
+  async clearDeviceFileNamingPattern(userId: number, deviceId: string): Promise<void> {
+    await this.db
+      .delete(schema.koreaderDeviceSettings)
+      .where(and(eq(schema.koreaderDeviceSettings.userId, userId), eq(schema.koreaderDeviceSettings.deviceId, deviceId)));
+  }
+
   async removeDevice(userId: number, deviceId: string): Promise<number> {
     return this.db.transaction(async (tx) => {
-      const [deletedProgress, deletedSweep, deletedPageStats, deletedUnmatchedDeviceLinks] = await Promise.all([
+      const [deletedProgress, deletedSweep, deletedPageStats, deletedUnmatchedDeviceLinks, deletedDeviceSettings] = await Promise.all([
         tx
           .delete(schema.koreaderDeviceProgress)
           .where(and(eq(schema.koreaderDeviceProgress.userId, userId), eq(schema.koreaderDeviceProgress.deviceId, deviceId)))
@@ -569,6 +626,10 @@ export class KoreaderRepository {
           .delete(schema.koreaderUnmatchedBookDevices)
           .where(and(eq(schema.koreaderUnmatchedBookDevices.userId, userId), eq(schema.koreaderUnmatchedBookDevices.deviceId, deviceId)))
           .returning({ hash: schema.koreaderUnmatchedBookDevices.hash }),
+        tx
+          .delete(schema.koreaderDeviceSettings)
+          .where(and(eq(schema.koreaderDeviceSettings.userId, userId), eq(schema.koreaderDeviceSettings.deviceId, deviceId)))
+          .returning({ deviceId: schema.koreaderDeviceSettings.deviceId }),
       ]);
 
       // Only drop unmatched-book rows this device orphaned - a hash still reported by another
@@ -599,7 +660,12 @@ export class KoreaderRepository {
       }
 
       return (
-        deletedProgress.length + deletedSweep.length + deletedPageStats.length + deletedUnmatchedDeviceLinks.length + deletedUnmatchedBooks.length
+        deletedProgress.length +
+        deletedSweep.length +
+        deletedPageStats.length +
+        deletedUnmatchedDeviceLinks.length +
+        deletedDeviceSettings.length +
+        deletedUnmatchedBooks.length
       );
     });
   }

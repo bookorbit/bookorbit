@@ -28,6 +28,7 @@ export interface ParsedBookData {
   aladinId?: string | null;
   itunesId?: string | null;
   audibleId?: string | null;
+  librofmId?: string | null;
   cover: Buffer | null;
   // audio-specific
   narrators?: string[];

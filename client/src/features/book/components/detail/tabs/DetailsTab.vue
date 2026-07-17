@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { formatDate as formatLocaleDate } from '@/i18n/formatters'
+import { formatBytes as formatFileSize } from '@/lib/formatting'
 import { useRouter } from 'vue-router'
 import {
   BookOpen,
@@ -22,7 +25,7 @@ import {
 import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot } from 'reka-ui'
 import { getFormatColor } from '@/features/book/lib/format-colors'
 import { providerIconPath, providerIconPathSafe } from '@/features/book/lib/provider-icons'
-import { lubimyczytacBookUrl } from '@/features/book/lib/provider-links'
+import { libroFmAudiobookUrl, lubimyczytacBookUrl } from '@/features/book/lib/provider-links'
 import { getProviderColor, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
@@ -91,6 +94,7 @@ type SeriesDisplayLink = {
 
 const props = defineProps<{ book: BookDetail }>()
 const emit = defineEmits<{ saved: [BookDetail] }>()
+const { t } = useI18n()
 const router = useRouter()
 
 const addToCollectionOpen = ref(false)
@@ -240,7 +244,7 @@ function scheduleGenreOverflowMeasure() {
 
 function formatCustomMetadataValue(field: CustomMetadataBookValue): string {
   if (field.value === null) return ''
-  if (field.type === 'boolean') return field.value ? 'Yes' : 'No'
+  if (field.type === 'boolean') return field.value ? t('common.yes') : t('common.no')
   return String(field.value)
 }
 
@@ -480,9 +484,9 @@ function normalizeReadStatusDates(readStatus: UserBookStatus | null | undefined)
 
 function validateReadingDates(values: { startedAt: string; finishedAt: string }): string | null {
   const { startedAt, finishedAt } = values
-  if (startedAt && startedAt > todayDateInput.value) return 'Date Started cannot be in the future.'
-  if (finishedAt && finishedAt > todayDateInput.value) return 'Date Finished cannot be in the future.'
-  if (startedAt && finishedAt && finishedAt < startedAt) return 'Date Finished must be on or after Date Started.'
+  if (startedAt && startedAt > todayDateInput.value) return t('book.detail.details.dateStartedFutureError')
+  if (finishedAt && finishedAt > todayDateInput.value) return t('book.detail.details.dateFinishedFutureError')
+  if (startedAt && finishedAt && finishedAt < startedAt) return t('book.detail.details.dateFinishedBeforeStartedError')
   return null
 }
 
@@ -492,7 +496,7 @@ function formatDisplayDate(dateKey: string): string {
   if (!dateKey) return '-'
   const [year, month, day] = dateKey.split('-').map(Number)
   const d = new Date(year!, month! - 1, day!)
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  return formatLocaleDate(d, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 function isEditingReadingDate(field: 'startedAt' | 'finishedAt') {
@@ -574,7 +578,7 @@ async function saveReadingDateField(field: 'startedAt' | 'finishedAt') {
     applyReadStatusUpdate(updatedReadStatus)
     activeReadingDateField.value = null
   } catch {
-    readingDatesError.value = 'Failed to save reading dates.'
+    readingDatesError.value = t('book.detail.details.saveReadingDatesError')
   } finally {
     savingReadingDates.value = false
   }
@@ -660,6 +664,15 @@ const providerLinks = computed<ProviderLink[]>(() => {
       url: `https://www.audible.com/pd/${ids.audible}`,
       iconUrl: providerIconPath('audible'),
       fallback: 'Au',
+    })
+  }
+  if (ids.librofm) {
+    out.push({
+      key: 'librofm',
+      label: 'Libro.fm',
+      url: libroFmAudiobookUrl(ids.librofm),
+      iconUrl: providerIconPath('librofm'),
+      fallback: 'Lf',
     })
   }
   if (ids.kobo) {
@@ -860,7 +873,7 @@ const seriesLinks = computed<SeriesDisplayLink[]>(() => {
 })
 
 function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+  return formatLocaleDate(new Date(iso), { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
 function formatPercent(value: number): string {
@@ -871,13 +884,7 @@ function formatPercent(value: number): string {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
-function formatFileSize(bytes: number | null | undefined): string {
-  if (!bytes) return '-'
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return formatLocaleDate(new Date(iso), { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 function formatBadgeStyle(fmt: string) {
@@ -993,7 +1000,7 @@ function setFileResetting(fileId: number, resetting: boolean): void {
 async function handleResetFileProgress(row: ProgressRow) {
   const fileId = row.resetFileId
   if (fileId == null || isResettingFile(fileId)) return
-  if (!window.confirm(`Reset stored reading progress for ${row.label}?`)) return
+  if (!window.confirm(t('book.detail.details.resetProgressConfirm', { label: row.label }))) return
 
   setFileResetting(fileId, true)
   try {
@@ -1113,9 +1120,9 @@ watch(
   <div v-if="book.status === 'missing'" class="mb-6 flex items-start gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3">
     <TriangleAlert class="size-4 text-amber-500 shrink-0 mt-0.5" />
     <div>
-      <p class="text-sm font-medium text-amber-600 dark:text-amber-400">Files not found</p>
+      <p class="text-sm font-medium text-amber-600 dark:text-amber-400">{{ t('book.detail.details.filesNotFound') }}</p>
       <p class="text-xs text-muted-foreground mt-0.5">
-        The file(s) for this book can no longer be found on disk. Metadata is still available. Run a library scan to confirm, or remove the record.
+        {{ t('book.detail.details.filesNotFoundDescription') }}
       </p>
     </div>
   </div>
@@ -1153,7 +1160,7 @@ watch(
       </div>
       <!-- Identity info -->
       <div class="flex-1 min-w-0">
-        <h1 class="text-base font-bold leading-snug break-words">{{ book.title ?? 'Untitled' }}</h1>
+        <h1 class="text-base font-bold leading-snug break-words">{{ book.title ?? t('book.detail.details.untitled') }}</h1>
         <p v-if="book.subtitle" class="text-sm text-muted-foreground mt-1 leading-snug break-words">{{ book.subtitle }}</p>
 
         <div class="mt-2">
@@ -1162,7 +1169,7 @@ watch(
               <MetadataScoreBadge :score="book.metadataScore" />
             </PopoverTrigger>
             <PopoverContent class="w-72 p-4" align="start">
-              <p class="text-sm font-semibold mb-3">Metadata Score</p>
+              <p class="text-sm font-semibold mb-3">{{ t('book.detail.details.metadataScore') }}</p>
               <MetadataScoreBreakdown :book="book" :weights="scoreWeights" @edit-metadata="handleEditMetadataFromScore" />
             </PopoverContent>
           </Popover>
@@ -1171,7 +1178,7 @@ watch(
         <!-- Author / narrator / series -->
         <div class="mt-2 space-y-1 min-w-0">
           <p v-if="authorLinks.length" class="text-xs break-words">
-            <span class="text-muted-foreground">by</span>
+            <span class="text-muted-foreground">{{ t('book.detail.details.by') }}</span>
             <span class="ml-1 font-medium text-foreground">
               <template v-for="(author, index) in authorLinks" :key="`${author.id}-${index}`">
                 <RouterLink
@@ -1183,7 +1190,7 @@ watch(
             </span>
           </p>
           <p v-if="narratorLine" class="text-xs break-words">
-            <span class="text-muted-foreground">narrated by</span>
+            <span class="text-muted-foreground">{{ t('book.detail.details.narratedBy') }}</span>
             <span class="ml-1 font-medium text-foreground">{{ narratorLine }}</span>
           </p>
           <div v-if="seriesLinks.length" class="flex flex-wrap gap-1">
@@ -1215,7 +1222,9 @@ watch(
                     <Star class="size-4" :class="getRatingStarClass(star, displayRating)" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>{{ isRatingLocked ? 'Rating is locked' : `Rate ${star}` }}</TooltipContent>
+                <TooltipContent>{{
+                  isRatingLocked ? t('book.detail.details.ratingLocked') : t('book.detail.details.rateStar', { star })
+                }}</TooltipContent>
               </Tooltip>
             </template>
             <template v-else>
@@ -1282,13 +1291,13 @@ watch(
 
           <button
             type="button"
-            aria-label="Toggle personal review"
+            :aria-label="t('book.detail.details.personalReview.toggleAria')"
             class="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-1 py-1"
             :class="{ 'text-primary hover:text-primary/80': showPersonalReview }"
             @click="togglePersonalReview"
           >
             <StickyNote class="size-3.5" />
-            <span>Personal Review</span>
+            <span>{{ t('book.detail.details.personalReview.title') }}</span>
             <span v-if="hasPersonalNote" class="size-1.5 rounded-full bg-primary" />
           </button>
         </div>
@@ -1305,14 +1314,14 @@ watch(
         >
           <Headphones v-if="isPrimaryAudio" class="size-4" />
           <BookOpen v-else class="size-4" />
-          {{ isPrimaryAudio ? 'Listen' : 'Read' }}
+          {{ isPrimaryAudio ? t('book.detail.details.listen') : t('book.detail.details.read') }}
         </button>
         <div class="w-px bg-primary-foreground/20 shrink-0" />
         <Popover :open="mobileReadMenuOpen" @update:open="(v) => (mobileReadMenuOpen = v)">
           <PopoverTrigger as-child>
             <button
               class="w-8 shrink-0 flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-              title="Choose format"
+              :title="t('book.detail.details.chooseFormat')"
             >
               <ChevronDown class="size-3.5" />
             </button>
@@ -1330,10 +1339,12 @@ watch(
                 >{{ file.format ?? '?' }}</span
               >
               <span class="flex-1 text-left text-muted-foreground text-xs truncate">
-                <template v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">Audiobook</template>
+                <template v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">{{ t('book.detail.details.audiobook') }}</template>
                 <template v-else>{{ formatFileSize(file.sizeBytes) }}</template>
               </span>
-              <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="text-[10px] text-primary font-medium shrink-0">Primary</span>
+              <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="text-[10px] text-primary font-medium shrink-0">{{
+                t('book.detail.details.primary')
+              }}</span>
             </button>
           </PopoverContent>
         </Popover>
@@ -1346,20 +1357,20 @@ watch(
       >
         <Headphones v-if="isPrimaryAudio" class="size-4" />
         <BookOpen v-else class="size-4" />
-        {{ isPrimaryAudio ? 'Listen' : 'Read' }}
+        {{ isPrimaryAudio ? t('book.detail.details.listen') : t('book.detail.details.read') }}
       </button>
       <Tooltip>
         <TooltipTrigger as-child>
           <button
             class="flex items-center justify-center h-9 w-12 rounded-md border border-input bg-background hover:bg-muted transition-colors disabled:opacity-50"
             :disabled="!primaryFile"
-            aria-label="Peek"
+            :aria-label="t('book.detail.details.peek')"
             @click="peekBook"
           >
             <Eye class="size-3.5" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>Peek</TooltipContent>
+        <TooltipContent>{{ t('book.detail.details.peek') }}</TooltipContent>
       </Tooltip>
       <div v-if="hasPermission('library_download')" class="w-12 shrink-0">
         <BookDownloadButton :files="book.files" :book-id="book.id" />
@@ -1373,7 +1384,7 @@ watch(
       <button
         v-if="hasPermission('email_send')"
         class="flex items-center justify-center h-9 w-9 rounded-md border border-input bg-background hover:bg-muted transition-colors"
-        aria-label="Send via Email"
+        :aria-label="t('book.detail.details.sendViaEmail')"
         @click="handleSendFromMenu"
       >
         <Send class="size-3.5" />
@@ -1405,7 +1416,7 @@ watch(
             @click="handleDeleteFromMenu"
           >
             <Trash2 class="size-3.5" />
-            Delete
+            {{ t('common.delete') }}
           </button>
         </PopoverContent>
       </Popover>
@@ -1433,7 +1444,7 @@ watch(
                 <Pencil class="size-3" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Edit cover</TooltipContent>
+            <TooltipContent>{{ t('book.detail.details.editCover') }}</TooltipContent>
           </Tooltip>
           <BookCoverArtwork
             :src="coverSrc"
@@ -1464,14 +1475,14 @@ watch(
               >
                 <BookOpen v-if="isPrimaryAudio" class="size-4" />
                 <BookOpen v-else class="size-4" />
-                {{ isPrimaryAudio ? 'Listen' : 'Read' }}
+                {{ isPrimaryAudio ? t('book.detail.details.listen') : t('book.detail.details.read') }}
               </button>
               <div class="w-px bg-primary-foreground/20 shrink-0" />
               <Popover :open="readMenuOpen" @update:open="(v) => (readMenuOpen = v)">
                 <PopoverTrigger as-child>
                   <button
                     class="w-8 shrink-0 flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                    title="Choose format"
+                    :title="t('book.detail.details.chooseFormat')"
                   >
                     <ChevronDown class="size-3.5" />
                   </button>
@@ -1489,10 +1500,14 @@ watch(
                       >{{ file.format ?? '?' }}</span
                     >
                     <span class="flex-1 text-left text-muted-foreground text-xs truncate">
-                      <template v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">Audiobook</template>
+                      <template v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">{{
+                        t('book.detail.details.audiobook')
+                      }}</template>
                       <template v-else>{{ formatFileSize(file.sizeBytes) }}</template>
                     </span>
-                    <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="text-[10px] text-primary font-medium shrink-0">Primary</span>
+                    <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="text-[10px] text-primary font-medium shrink-0">{{
+                      t('book.detail.details.primary')
+                    }}</span>
                   </button>
                 </PopoverContent>
               </Popover>
@@ -1505,7 +1520,7 @@ watch(
             >
               <Headphones v-if="isPrimaryAudio" class="size-4" />
               <BookOpen v-else class="size-4" />
-              {{ isPrimaryAudio ? 'Listen' : 'Read' }}
+              {{ isPrimaryAudio ? t('book.detail.details.listen') : t('book.detail.details.read') }}
             </button>
 
             <Tooltip>
@@ -1513,13 +1528,13 @@ watch(
                 <button
                   class="flex items-center justify-center h-9 w-12 shrink-0 rounded-md border border-input bg-background hover:bg-muted transition-colors disabled:opacity-50"
                   :disabled="!primaryFile"
-                  aria-label="Peek"
+                  :aria-label="t('book.detail.details.peek')"
                   @click="peekBook"
                 >
                   <Eye class="size-4" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Peek</TooltipContent>
+              <TooltipContent>{{ t('book.detail.details.peek') }}</TooltipContent>
             </Tooltip>
           </div>
 
@@ -1536,7 +1551,7 @@ watch(
             <button
               v-if="hasPermission('email_send')"
               class="flex flex-1 items-center justify-center h-9 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors"
-              aria-label="Send via Email"
+              :aria-label="t('book.detail.details.sendViaEmail')"
               @click="handleSendFromMenu"
             >
               <Send class="size-3.5" />
@@ -1587,23 +1602,27 @@ watch(
                 }"
               />
             </div>
-            <span v-if="row.finished" class="text-[11px] font-medium text-green-500 shrink-0">Finished</span>
+            <span v-if="row.finished" class="text-[11px] font-medium text-green-500 shrink-0">{{ t('book.detail.details.finished') }}</span>
             <span v-else class="text-[11px] text-muted-foreground shrink-0 w-7 text-right">{{ formatPercent(row.percentage) }}</span>
             <Tooltip v-if="row.resetFileId != null">
               <TooltipTrigger as-child>
                 <button
                   class="ml-1 inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                  aria-label="Reset file progress"
+                  :aria-label="t('book.detail.details.resetFileProgress')"
                   :disabled="isResettingFile(row.resetFileId)"
                   @click.stop="void handleResetFileProgress(row)"
                 >
                   <RotateCcw class="size-3" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>{{ isResettingFile(row.resetFileId) ? 'Resetting...' : 'Reset file progress' }}</TooltipContent>
+              <TooltipContent>{{
+                isResettingFile(row.resetFileId) ? t('book.detail.details.resetting') : t('book.detail.details.resetFileProgress')
+              }}</TooltipContent>
             </Tooltip>
           </div>
-          <p v-if="leftColumnProgressOverflow > 0" class="text-[11px] text-muted-foreground">+{{ leftColumnProgressOverflow }} more</p>
+          <p v-if="leftColumnProgressOverflow > 0" class="text-[11px] text-muted-foreground">
+            {{ t('book.detail.details.moreCount', { count: leftColumnProgressOverflow }) }}
+          </p>
         </div>
         <Tooltip v-if="koboAnomaly">
           <TooltipTrigger as-child>
@@ -1622,13 +1641,13 @@ watch(
       <div class="hidden md:block">
         <!-- Identity block -->
         <div class="flex items-center flex-wrap gap-x-3 gap-y-2 -mt-1">
-          <h1 class="text-2xl font-bold leading-tight">{{ book.title ?? 'Untitled' }}</h1>
+          <h1 class="text-2xl font-bold leading-tight">{{ book.title ?? t('book.detail.details.untitled') }}</h1>
           <Popover :open="scoreBreakdownOpen" @update:open="(v) => (scoreBreakdownOpen = v)">
             <PopoverTrigger as-child>
               <MetadataScoreBadge :score="book.metadataScore" />
             </PopoverTrigger>
             <PopoverContent class="w-72 p-4" align="start">
-              <p class="text-sm font-semibold mb-3">Metadata Score</p>
+              <p class="text-sm font-semibold mb-3">{{ t('book.detail.details.metadataScore') }}</p>
               <MetadataScoreBreakdown :book="book" :weights="scoreWeights" @edit-metadata="handleEditMetadataFromScore" />
             </PopoverContent>
           </Popover>
@@ -1637,7 +1656,7 @@ watch(
 
         <div class="flex items-baseline flex-wrap gap-x-2 gap-y-1 mt-3">
           <p v-if="authorLinks.length" class="text-sm">
-            <span class="text-muted-foreground">by</span>
+            <span class="text-muted-foreground">{{ t('book.detail.details.by') }}</span>
             <span class="ml-1 font-medium text-foreground">
               <template v-for="(author, index) in authorLinks" :key="`${author.id}-${index}`">
                 <RouterLink
@@ -1649,7 +1668,7 @@ watch(
             </span>
           </p>
           <p v-if="narratorLine" class="text-sm">
-            <span class="text-muted-foreground">narrated by</span>
+            <span class="text-muted-foreground">{{ t('book.detail.details.narratedBy') }}</span>
             <span class="ml-1 font-medium text-foreground">{{ narratorLine }}</span>
           </p>
           <template v-if="seriesLinks.length">
@@ -1684,7 +1703,9 @@ watch(
                     <Star class="size-3.5" :class="getRatingStarClass(star, displayRating)" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>{{ isRatingLocked ? 'Rating is locked' : `Rate ${star}` }}</TooltipContent>
+                <TooltipContent>{{
+                  isRatingLocked ? t('book.detail.details.ratingLocked') : t('book.detail.details.rateStar', { star })
+                }}</TooltipContent>
               </Tooltip>
             </template>
             <template v-else>
@@ -1699,7 +1720,7 @@ watch(
                   <Lock class="size-3" />
                 </div>
               </TooltipTrigger>
-              <TooltipContent>Rating is locked</TooltipContent>
+              <TooltipContent>{{ t('book.detail.details.ratingLocked') }}</TooltipContent>
             </Tooltip>
           </template>
 
@@ -1726,13 +1747,13 @@ watch(
 
           <button
             type="button"
-            aria-label="Toggle personal review"
+            :aria-label="t('book.detail.details.personalReview.toggleAria')"
             class="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
             :class="{ 'text-primary hover:text-primary/80': showPersonalReview }"
             @click="togglePersonalReview"
           >
             <StickyNote class="size-3.5" />
-            <span>Personal Review</span>
+            <span>{{ t('book.detail.details.personalReview.title') }}</span>
             <span v-if="hasPersonalNote" class="size-1.5 rounded-full bg-primary" />
           </button>
         </div>
@@ -1742,7 +1763,9 @@ watch(
       <div v-show="showPersonalReview" class="mt-4 p-4 border border-border/70 rounded-lg bg-card/60 shadow-sm">
         <div class="mb-3 flex items-start justify-between gap-3">
           <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Personal Review</p>
+            <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+              {{ t('book.detail.details.personalReview.title') }}
+            </p>
             <p v-if="personalNoteUpdatedLabel && !personalNoteEditing" class="mt-0.5 text-[11px] text-muted-foreground">
               Updated {{ personalNoteUpdatedLabel }}
             </p>
@@ -1752,7 +1775,7 @@ watch(
               <button
                 type="button"
                 class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                aria-label="Edit personal review"
+                :aria-label="t('book.detail.details.personalReview.editAria')"
                 @click="startPersonalNoteEdit"
               >
                 <Pencil class="size-3.5" />
@@ -1768,7 +1791,7 @@ watch(
             class="min-h-24 max-h-72 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary"
             rows="4"
             :maxlength="PERSONAL_NOTE_MAX_LENGTH"
-            placeholder="Private review"
+            :placeholder="t('book.detail.details.personalReview.placeholder')"
           />
           <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p class="text-[11px] text-muted-foreground">{{ personalNoteCharCount }}/{{ PERSONAL_NOTE_MAX_LENGTH }}</p>
@@ -1778,28 +1801,28 @@ watch(
                   <button
                     type="button"
                     class="inline-flex h-8 w-8 items-center justify-center rounded border border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                    aria-label="Clear personal review"
+                    :aria-label="t('book.detail.details.personalReview.clearAria')"
                     :disabled="!canClearPersonalNoteDraft || personalNoteSaving"
                     @click="clearPersonalNoteDraft"
                   >
                     <Trash2 class="size-3.5" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>Clear personal review</TooltipContent>
+                <TooltipContent>{{ t('book.detail.details.personalReview.clearAria') }}</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger as-child>
                   <button
                     type="button"
                     class="inline-flex h-8 w-8 items-center justify-center rounded border border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                    aria-label="Cancel personal review edit"
+                    :aria-label="t('book.detail.details.personalReview.cancelEditAria')"
                     :disabled="personalNoteSaving"
                     @click="cancelPersonalNoteEdit"
                   >
                     <X class="size-3.5" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>Cancel</TooltipContent>
+                <TooltipContent>{{ t('common.cancel') }}</TooltipContent>
               </Tooltip>
               <button
                 type="button"
@@ -1840,7 +1863,7 @@ watch(
             <TooltipTrigger as-child>
               <span class="size-1.5 rounded-full shrink-0" :style="{ backgroundColor: 'currentColor' }" />
             </TooltipTrigger>
-            <TooltipContent>Primary format</TooltipContent>
+            <TooltipContent>{{ t('book.detail.details.primaryFormat') }}</TooltipContent>
           </Tooltip>
           {{ fmt }}
         </span>
@@ -1852,7 +1875,7 @@ watch(
             :href="link.url"
             target="_blank"
             rel="noopener noreferrer"
-            :title="communityRatingByProvider[link.key]?.tooltip ?? `Open in ${link.label}`"
+            :title="communityRatingByProvider[link.key]?.tooltip ?? t('book.detail.details.openIn', { provider: link.label })"
             class="inline-flex h-7 items-center overflow-hidden rounded-md border transition-colors hover:bg-muted/60"
             :style="providerLinkStyle(link.key)"
           >
@@ -1918,7 +1941,7 @@ watch(
               class="text-xs font-medium text-foreground/75 hover:text-foreground transition-colors whitespace-nowrap"
               @click="genresExpanded = !genresExpanded"
             >
-              {{ genresExpanded ? 'Show less' : `+${genreHiddenCount} more` }}
+              {{ genresExpanded ? t('book.detail.details.showLess') : t('book.detail.details.moreCount', { count: genreHiddenCount }) }}
             </button>
           </div>
           <div
@@ -1951,7 +1974,7 @@ watch(
       <!-- Metadata grid -->
       <dl class="mt-5 pt-5 border-t border-border grid grid-cols-2 xl:grid-cols-4 gap-x-6 gap-y-4">
         <div class="min-w-0">
-          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Publisher</dt>
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{{ t('book.detail.details.publisher') }}</dt>
           <template v-if="book.publisher">
             <Tooltip>
               <TooltipTrigger as-child>
@@ -1963,27 +1986,29 @@ watch(
           <dd v-else class="text-sm text-foreground mt-0.5">-</dd>
         </div>
         <div>
-          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Published</dt>
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{{ t('book.detail.details.published') }}</dt>
           <dd class="text-sm text-foreground mt-0.5">{{ book.publishedDate ? formatDisplayDate(book.publishedDate) : book.publishedYear || '-' }}</dd>
         </div>
         <div>
-          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Language</dt>
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{{ t('book.detail.details.language') }}</dt>
           <dd class="text-sm text-foreground mt-0.5 capitalize">{{ book.language || '-' }}</dd>
         </div>
         <div>
-          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Pages</dt>
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{{ t('book.detail.details.pages') }}</dt>
           <dd class="text-sm text-foreground mt-0.5">{{ book.pageCount || '-' }}</dd>
         </div>
         <div v-if="book.audioMetadata?.durationSeconds != null">
-          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Duration</dt>
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{{ t('book.detail.details.duration') }}</dt>
           <dd class="text-sm text-foreground mt-0.5">{{ formatDuration(book.audioMetadata.durationSeconds) }}</dd>
         </div>
         <div v-if="book.audioMetadata?.durationSeconds != null">
-          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Edition</dt>
-          <dd class="text-sm text-foreground mt-0.5">{{ book.audioMetadata.abridged ? 'Abridged' : 'Unabridged' }}</dd>
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{{ t('book.detail.details.edition') }}</dt>
+          <dd class="text-sm text-foreground mt-0.5">
+            {{ book.audioMetadata.abridged ? t('book.detail.details.abridged') : t('book.detail.details.unabridged') }}
+          </dd>
         </div>
         <div class="min-w-0">
-          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">ISBN</dt>
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{{ t('book.detail.details.isbn') }}</dt>
           <dd v-if="book.isbn13 || book.isbn10" class="text-sm text-foreground mt-0.5 font-mono space-y-0.5">
             <div v-if="book.isbn13">{{ book.isbn13 }}</div>
             <div v-if="book.isbn10" :class="book.isbn13 ? 'text-xs text-muted-foreground' : ''">{{ book.isbn10 }}</div>
@@ -1991,15 +2016,15 @@ watch(
           <dd v-else class="text-sm text-foreground mt-0.5">-</dd>
         </div>
         <div>
-          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">File Size</dt>
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{{ t('book.detail.details.fileSize') }}</dt>
           <dd class="text-sm text-foreground mt-0.5">{{ formatFileSize(primaryFile?.sizeBytes) }}</dd>
         </div>
         <div class="min-w-0">
-          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Library</dt>
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{{ t('book.detail.details.library') }}</dt>
           <dd class="text-sm text-foreground mt-0.5">{{ book.libraryName || '-' }}</dd>
         </div>
         <div class="min-w-0">
-          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Added</dt>
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{{ t('book.detail.details.added') }}</dt>
           <template v-if="book.addedAt">
             <Tooltip>
               <TooltipTrigger as-child>
@@ -2013,7 +2038,7 @@ watch(
         <HardcoverBookSyncGridItem :book-id="book.id" />
         <StorygraphBookSyncGridItem :book-id="book.id" />
         <div class="min-w-0">
-          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Date Started</dt>
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{{ t('book.detail.details.dateStarted') }}</dt>
           <template v-if="isEditingReadingDate('startedAt')">
             <dd class="mt-1">
               <div class="flex items-center gap-1.5">
@@ -2028,12 +2053,12 @@ watch(
                   :disabled="!hasReadingDateFieldChanges('startedAt') || savingReadingDates"
                   @click="saveReadingDateField('startedAt')"
                 >
-                  {{ savingReadingDates ? 'Saving...' : 'Save' }}
+                  {{ savingReadingDates ? t('book.detail.details.saving') : t('common.save') }}
                 </button>
                 <button
                   class="inline-flex h-6 w-6 items-center justify-center rounded border border-destructive/30 text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
-                  title="Cancel date started edit"
-                  aria-label="Cancel date started edit"
+                  :title="t('book.detail.details.cancelDateStartedEdit')"
+                  :aria-label="t('book.detail.details.cancelDateStartedEdit')"
                   :disabled="savingReadingDates"
                   @click="cancelReadingDateEdit('startedAt')"
                 >
@@ -2047,7 +2072,7 @@ watch(
             <span class="text-sm text-foreground">{{ formatDisplayDate(savedReadingDates.startedAt) }}</span>
             <button
               class="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-              title="Edit date started"
+              :title="t('book.detail.details.editDateStarted')"
               :disabled="isEditingAnyReadingDate || savingReadingDates"
               @click="startEditingReadingDate('startedAt')"
             >
@@ -2056,7 +2081,7 @@ watch(
           </dd>
         </div>
         <div class="min-w-0">
-          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Date Finished</dt>
+          <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{{ t('book.detail.details.dateFinished') }}</dt>
           <template v-if="isEditingReadingDate('finishedAt')">
             <dd class="mt-1">
               <div class="flex items-center gap-1.5">
@@ -2071,12 +2096,12 @@ watch(
                   :disabled="!hasReadingDateFieldChanges('finishedAt') || savingReadingDates"
                   @click="saveReadingDateField('finishedAt')"
                 >
-                  {{ savingReadingDates ? 'Saving...' : 'Save' }}
+                  {{ savingReadingDates ? t('book.detail.details.saving') : t('common.save') }}
                 </button>
                 <button
                   class="inline-flex h-6 w-6 items-center justify-center rounded border border-destructive/30 text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
-                  title="Cancel date finished edit"
-                  aria-label="Cancel date finished edit"
+                  :title="t('book.detail.details.cancelDateFinishedEdit')"
+                  :aria-label="t('book.detail.details.cancelDateFinishedEdit')"
                   :disabled="savingReadingDates"
                   @click="cancelReadingDateEdit('finishedAt')"
                 >
@@ -2090,7 +2115,7 @@ watch(
             <span class="text-sm text-foreground">{{ formatDisplayDate(savedReadingDates.finishedAt) }}</span>
             <button
               class="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-              title="Edit date finished"
+              :title="t('book.detail.details.editDateFinished')"
               :disabled="isEditingAnyReadingDate || savingReadingDates"
               @click="startEditingReadingDate('finishedAt')"
             >
@@ -2119,23 +2144,27 @@ watch(
                 }"
               />
             </div>
-            <span v-if="row.finished" class="text-[11px] font-medium text-green-500 shrink-0">Finished</span>
+            <span v-if="row.finished" class="text-[11px] font-medium text-green-500 shrink-0">{{ t('book.detail.details.finished') }}</span>
             <span v-else class="text-[11px] text-muted-foreground shrink-0 w-7 text-right">{{ formatPercent(row.percentage) }}</span>
             <Tooltip v-if="row.resetFileId != null">
               <TooltipTrigger as-child>
                 <button
                   class="ml-1 inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                  aria-label="Reset file progress"
+                  :aria-label="t('book.detail.details.resetFileProgress')"
                   :disabled="isResettingFile(row.resetFileId)"
                   @click.stop="void handleResetFileProgress(row)"
                 >
                   <RotateCcw class="size-3" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>{{ isResettingFile(row.resetFileId) ? 'Resetting...' : 'Reset file progress' }}</TooltipContent>
+              <TooltipContent>{{
+                isResettingFile(row.resetFileId) ? t('book.detail.details.resetting') : t('book.detail.details.resetFileProgress')
+              }}</TooltipContent>
             </Tooltip>
           </div>
-          <p v-if="leftColumnProgressOverflow > 0" class="text-[11px] text-muted-foreground">+{{ leftColumnProgressOverflow }} more</p>
+          <p v-if="leftColumnProgressOverflow > 0" class="text-[11px] text-muted-foreground">
+            {{ t('book.detail.details.moreCount', { count: leftColumnProgressOverflow }) }}
+          </p>
         </div>
         <Tooltip v-if="koboAnomaly">
           <TooltipTrigger as-child>
@@ -2149,7 +2178,7 @@ watch(
       </div>
 
       <div v-if="filledCustomMetadata.length > 0" class="mt-6 pt-5 border-t border-border">
-        <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">Custom Metadata</p>
+        <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">{{ t('book.detail.details.customMetadata') }}</p>
         <dl class="grid gap-3 sm:grid-cols-2">
           <div v-for="field in filledCustomMetadata" :key="field.fieldId" class="min-w-0">
             <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{{ field.label }}</dt>
@@ -2171,7 +2200,7 @@ watch(
 
       <!-- Synopsis -->
       <div class="mt-6 pt-5 border-t border-border">
-        <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">Synopsis</p>
+        <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">{{ t('book.detail.details.synopsis') }}</p>
         <div v-if="book.description">
           <div
             class="text-sm leading-relaxed text-foreground/80 transition-all"
@@ -2182,10 +2211,10 @@ watch(
             class="text-xs text-muted-foreground hover:text-foreground mt-2 transition-colors"
             @click="descriptionExpanded = !descriptionExpanded"
           >
-            {{ descriptionExpanded ? 'Show less' : 'Show more' }}
+            {{ descriptionExpanded ? t('book.detail.details.showLess') : t('book.detail.details.showMore') }}
           </button>
         </div>
-        <p v-else class="text-sm text-muted-foreground italic">No description available.</p>
+        <p v-else class="text-sm text-muted-foreground italic">{{ t('book.detail.details.noDescription') }}</p>
       </div>
     </div>
   </div>

@@ -1,23 +1,29 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Compass } from '@lucide/vue'
 
 import { useDiversityScoreWidget } from '../../composables/useDiversityScoreWidget'
 
 const { data, loading, error } = useDiversityScoreWidget()
+const { t } = useI18n()
 
-const subScores = [
-  { key: 'genre', label: 'Genre' },
-  { key: 'author', label: 'Author' },
-  { key: 'era', label: 'Era' },
-  { key: 'language', label: 'Lang' },
-] as const
+const subScores = computed(
+  () =>
+    [
+      { key: 'genre', label: t('dashboard.widgets.diversityScore.subScores.genre') },
+      { key: 'author', label: t('dashboard.widgets.diversityScore.subScores.author') },
+      { key: 'era', label: t('dashboard.widgets.diversityScore.subScores.era') },
+      { key: 'language', label: t('dashboard.widgets.diversityScore.subScores.language') },
+    ] as const,
+)
 </script>
 
 <template>
   <div class="flex h-full flex-col p-3">
     <div class="mb-3 flex items-center gap-2 self-start">
       <Compass :size="16" class="text-primary/90" />
-      <span class="text-[15px] font-semibold text-foreground">Diversity Score</span>
+      <span class="text-[15px] font-semibold text-foreground">{{ t('dashboard.widgets.diversityScore.title') }}</span>
     </div>
 
     <!-- Loading -->
@@ -27,14 +33,16 @@ const subScores = [
     </div>
 
     <!-- Error -->
-    <div v-else-if="error" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">Failed to load</div>
+    <div v-else-if="error" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+      {{ t('dashboard.common.failedToLoad') }}
+    </div>
 
     <!-- Not enough data -->
     <div v-else-if="!data || data.booksAnalyzed < 3" class="flex flex-1 flex-col items-center justify-center gap-2">
       <div class="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
         <Compass :size="16" class="text-muted-foreground/60" />
       </div>
-      <p class="text-center text-xs text-muted-foreground">Read at least 3 books to see your diversity score</p>
+      <p class="text-center text-xs text-muted-foreground">{{ t('dashboard.widgets.diversityScore.notEnoughData') }}</p>
     </div>
 
     <!-- Score -->
@@ -54,7 +62,9 @@ const subScores = [
         </div>
       </div>
 
-      <p class="text-[10px] text-muted-foreground">{{ data.booksAnalyzed }} books analyzed</p>
+      <p class="text-[10px] text-muted-foreground">
+        {{ t('dashboard.widgets.diversityScore.booksAnalyzed', { count: data.booksAnalyzed }, data.booksAnalyzed) }}
+      </p>
     </div>
   </div>
 </template>

@@ -5,6 +5,9 @@ import type { TableDensity } from '@/composables/useDisplaySettings'
 import type { SavedView } from '@/features/book/composables/useSavedViews'
 import type { ColumnDef } from '@/features/book/composables/useTableColumns'
 import type { TablePreset } from '@/features/book/composables/useTablePresets'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = withDefaults(
   defineProps<{
@@ -60,7 +63,7 @@ function handleSaveView() {
 
 function promptForRename(currentName: string): string | null {
   if (typeof window === 'undefined') return null
-  const nextName = window.prompt('Enter a new name', currentName)
+  const nextName = window.prompt(t('book.columnPanel.renamePrompt'), currentName)
   return nextName ? nextName.trim() : null
 }
 
@@ -95,65 +98,65 @@ function densityButtonClass(density: TableDensity) {
 }
 
 function pinBadge(column: ColumnDef & { visible: boolean }): string | null {
-  if (column.pinned === 'left') return 'Pinned left'
-  if (column.pinned === 'right') return 'Pinned right'
+  if (column.pinned === 'left') return t('book.columnPanel.pinnedLeft')
+  if (column.pinned === 'right') return t('book.columnPanel.pinnedRight')
   return null
 }
 
 function columnLabel(column: ColumnDef & { visible: boolean }): string {
   if (column.header) return column.header
-  if (column.id === 'cover') return 'Cover'
-  if (column.id === 'read') return 'Read'
-  return column.id === 'actions' ? 'Actions' : column.id
+  if (column.id === 'cover') return t('book.columnPanel.columns.cover')
+  if (column.id === 'read') return t('book.columnPanel.columns.read')
+  return column.id === 'actions' ? t('book.columnPanel.columns.actions') : column.id
 }
 </script>
 
 <template>
   <div class="space-y-3">
     <div class="flex items-center justify-between">
-      <span class="text-xs font-semibold uppercase tracking-wide text-foreground">Columns</span>
+      <span class="text-xs font-semibold uppercase tracking-wide text-foreground">{{ t('book.columnPanel.columnsHeading') }}</span>
       <button class="text-xs text-muted-foreground hover:text-foreground" @click="emit('reset')">
-        <RotateCcw :size="11" class="mr-0.5 inline" />Reset
+        <RotateCcw :size="11" class="mr-0.5 inline" />{{ t('book.columnPanel.reset') }}
       </button>
     </div>
 
     <div class="space-y-2 rounded-md border border-border/60 p-2">
-      <div class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Table density</div>
+      <div class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{{ t('book.columnPanel.tableDensity') }}</div>
       <div class="grid grid-cols-3 gap-1">
         <button
           class="h-8 rounded-md border text-xs transition-colors"
           :class="densityButtonClass('compact')"
           @click="emit('update:density', 'compact')"
         >
-          Compact
+          {{ t('book.columnPanel.density.compact') }}
         </button>
         <button
           class="h-8 rounded-md border text-xs transition-colors"
           :class="densityButtonClass('comfortable')"
           @click="emit('update:density', 'comfortable')"
         >
-          Comfortable
+          {{ t('book.columnPanel.density.comfortable') }}
         </button>
         <button class="h-8 rounded-md border text-xs transition-colors" :class="densityButtonClass('roomy')" @click="emit('update:density', 'roomy')">
-          Roomy
+          {{ t('book.columnPanel.density.roomy') }}
         </button>
       </div>
     </div>
 
     <div class="space-y-2 rounded-md border border-border/60 p-2">
       <div class="flex items-center justify-between gap-2">
-        <div class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Presets</div>
+        <div class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{{ t('book.columnPanel.presets') }}</div>
         <div class="flex items-center gap-1">
           <button
             class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-            title="Export presets and saved views"
+            :title="t('book.columnPanel.exportBackup')"
             @click="emit('export-backup')"
           >
             <Download :size="12" />
           </button>
           <button
             class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-            title="Import presets and saved views"
+            :title="t('book.columnPanel.importBackup')"
             @click="handleImportBackupClick"
           >
             <Upload :size="12" />
@@ -190,9 +193,9 @@ function columnLabel(column: ColumnDef & { visible: boolean }): string {
             class="rounded p-1 text-muted-foreground hover:bg-background hover:text-foreground"
             @click="handleRenamePreset(preset)"
           >
-            Rename
+            {{ t('book.columnPanel.rename') }}
           </button>
-          <span v-if="preset.isBuiltIn" class="text-[10px] text-muted-foreground">Built in</span>
+          <span v-if="preset.isBuiltIn" class="text-[10px] text-muted-foreground">{{ t('book.columnPanel.builtIn') }}</span>
           <button
             v-if="!preset.isBuiltIn"
             class="rounded p-1 text-muted-foreground hover:bg-background hover:text-destructive"
@@ -206,19 +209,19 @@ function columnLabel(column: ColumnDef & { visible: boolean }): string {
         <input
           v-model="presetName"
           class="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-xs text-foreground placeholder:text-muted-foreground"
-          placeholder="Save current preset"
+          :placeholder="t('book.columnPanel.saveCurrentPreset')"
         />
         <button
           class="h-8 shrink-0 rounded-md border border-input px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
           @click="handleSavePreset"
         >
-          Save
+          {{ t('common.save') }}
         </button>
       </div>
     </div>
 
     <div class="space-y-2 rounded-md border border-border/60 p-2">
-      <div class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Saved views</div>
+      <div class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{{ t('book.columnPanel.savedViews') }}</div>
       <div v-if="savedViews.length > 0" class="space-y-1">
         <div v-for="view in savedViews" :key="view.id" class="flex items-center gap-2 rounded px-2 py-1 text-xs transition-colors hover:bg-accent">
           <button class="min-w-0 flex-1 text-left" @click="emit('apply-view', view)">
@@ -234,24 +237,26 @@ function columnLabel(column: ColumnDef & { visible: boolean }): string {
           <button class="rounded p-1 text-muted-foreground hover:bg-background hover:text-foreground" @click="emit('duplicate-view', view.id)">
             <Copy :size="11" />
           </button>
-          <button class="rounded p-1 text-muted-foreground hover:bg-background hover:text-foreground" @click="handleRenameView(view)">Rename</button>
+          <button class="rounded p-1 text-muted-foreground hover:bg-background hover:text-foreground" @click="handleRenameView(view)">
+            {{ t('book.columnPanel.rename') }}
+          </button>
           <button class="rounded p-1 text-muted-foreground hover:bg-background hover:text-destructive" @click="emit('delete-view', view.id)">
             <X :size="11" />
           </button>
         </div>
       </div>
-      <p v-else class="text-xs text-muted-foreground">Save sort, layout, and view-specific filters for quick reuse.</p>
+      <p v-else class="text-xs text-muted-foreground">{{ t('book.columnPanel.savedViewsEmpty') }}</p>
       <div class="flex items-center gap-2">
         <input
           v-model="viewName"
           class="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-xs text-foreground placeholder:text-muted-foreground"
-          placeholder="Save current view"
+          :placeholder="t('book.columnPanel.saveCurrentView')"
         />
         <button
           class="h-8 shrink-0 rounded-md border border-input px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
           @click="handleSaveView"
         >
-          Save
+          {{ t('common.save') }}
         </button>
       </div>
     </div>

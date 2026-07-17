@@ -205,6 +205,12 @@ describe('Book DTO validation', () => {
     expect((await errorsFor(UpdateBookMetadataDto, { aladinId: 'a'.repeat(21) })).length).toBeGreaterThan(0);
   });
 
+  it('accepts librofmId and enforces its length bound', async () => {
+    expect((await errorsFor(UpdateBookMetadataDto, { librofmId: '9781234567890' })).length).toBe(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { librofmId: null })).length).toBe(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { librofmId: 'a'.repeat(51) })).length).toBeGreaterThan(0);
+  });
+
   it('normalizes a zero page count to null and validates other page count values', async () => {
     // A provider can return a page count of 0 (issue #329); it must normalize to null instead of failing validation.
     const zeroed = plainToInstance(UpdateBookMetadataDto, { pageCount: 0 });

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Ban, Loader2, Plus, Search, Trash2 } from '@lucide/vue'
 import type { MetadataFetchPreferences } from '@bookorbit/types'
 import { useMetadataPreferences } from './composables/useMetadataPreferences'
 
+const { t } = useI18n()
 const { globalPrefs, loadingGlobal, savingGlobal, fetchGlobal, saveGlobal } = useMetadataPreferences()
 
 const draftBlocklist = ref<string[]>([])
@@ -35,8 +37,8 @@ const filteredBlocklist = computed(() => {
   return draftBlocklist.value.filter((genre) => genre.toLowerCase().includes(filterToken.value))
 })
 const visibleCountLabel = computed(() => {
-  if (!filterToken.value) return `${draftBlocklist.value.length} ${draftBlocklist.value.length === 1 ? 'entry' : 'entries'}`
-  return `${filteredBlocklist.value.length} of ${draftBlocklist.value.length}`
+  if (!filterToken.value) return t('settings.metadata.genreBlocklist.entryCount', { count: draftBlocklist.value.length }, draftBlocklist.value.length)
+  return t('settings.metadata.genreBlocklist.filteredCount', { shown: filteredBlocklist.value.length, total: draftBlocklist.value.length })
 })
 
 function normalizeBlocklist(values: readonly string[]): string[] {
@@ -96,7 +98,7 @@ async function removeGenre(genre: string) {
 }
 
 function removeGenreLabel(genre: string): string {
-  return `Remove ${genre}`
+  return t('settings.metadata.genreBlocklist.removeLabel', { genre })
 }
 </script>
 
@@ -108,13 +110,13 @@ function removeGenreLabel(genre: string): string {
           <Ban :size="16" />
         </div>
         <div>
-          <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">Global Genre Exclusions</span>
-          <p class="settings-hint">Exact genre values in this list are stripped from provider results before metadata is written.</p>
+          <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">{{ t('settings.metadata.genreBlocklist.heading') }}</span>
+          <p class="settings-hint">{{ t('settings.metadata.genreBlocklist.hint') }}</p>
         </div>
       </div>
       <div v-if="savingGlobal" class="inline-flex h-8 items-center gap-2 text-xs font-medium text-muted-foreground">
         <Loader2 :size="14" class="animate-spin" />
-        <span>Saving</span>
+        <span>{{ t('settings.metadata.genreBlocklist.saving') }}</span>
       </div>
     </div>
 
@@ -125,20 +127,20 @@ function removeGenreLabel(genre: string): string {
     <div v-else class="p-4 md:p-5 space-y-5">
       <div class="grid gap-2 md:grid-cols-[1fr_auto]">
         <div>
-          <label for="genre-blocklist-entry" class="sr-only">Genre value</label>
+          <label for="genre-blocklist-entry" class="sr-only">{{ t('settings.metadata.genreBlocklist.genreValueLabel') }}</label>
           <input
             id="genre-blocklist-entry"
             v-model="newGenre"
             class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm outline-none transition-shadow focus:ring-1 focus:ring-ring placeholder:text-muted-foreground"
-            placeholder="Add a genre value, for example Audiobook"
+            :placeholder="t('settings.metadata.genreBlocklist.addPlaceholder')"
             @keydown.enter="addGenre"
           />
-          <p v-if="isDuplicate" class="mt-1.5 text-xs text-destructive">This genre is already blocked.</p>
+          <p v-if="isDuplicate" class="mt-1.5 text-xs text-destructive">{{ t('settings.metadata.genreBlocklist.duplicate') }}</p>
         </div>
         <button class="settings-btn-primary h-9 px-3 justify-center md:min-w-24" type="button" :disabled="!canAdd" @click="addGenre">
           <Loader2 v-if="savingGlobal" :size="14" class="animate-spin" />
           <Plus v-else :size="14" />
-          <span>Add</span>
+          <span>{{ t('settings.metadata.genreBlocklist.add') }}</span>
         </button>
       </div>
 
@@ -149,7 +151,7 @@ function removeGenreLabel(genre: string): string {
           <input
             v-model="filterText"
             class="w-full h-8 rounded-md border border-input bg-background pl-8 pr-3 text-sm outline-none transition-shadow focus:ring-1 focus:ring-ring placeholder:text-muted-foreground"
-            placeholder="Filter blocklist"
+            :placeholder="t('settings.metadata.genreBlocklist.filterPlaceholder')"
           />
         </div>
       </div>
@@ -169,12 +171,12 @@ function removeGenreLabel(genre: string): string {
             </button>
           </div>
         </div>
-        <div v-else class="px-4 py-8 text-center text-sm text-muted-foreground">No blocked genres match the current filter.</div>
+        <div v-else class="px-4 py-8 text-center text-sm text-muted-foreground">{{ t('settings.metadata.genreBlocklist.noFilterMatch') }}</div>
       </div>
 
       <div v-else class="rounded-lg border border-dashed border-border px-4 py-10 text-center">
-        <p class="text-sm font-medium text-foreground">No blocked genres</p>
-        <p class="mt-1 text-xs text-muted-foreground">Add exact values such as Audiobook or Adult to keep them out of fetched metadata.</p>
+        <p class="text-sm font-medium text-foreground">{{ t('settings.metadata.genreBlocklist.emptyTitle') }}</p>
+        <p class="mt-1 text-xs text-muted-foreground">{{ t('settings.metadata.genreBlocklist.emptyHint') }}</p>
       </div>
     </div>
   </div>

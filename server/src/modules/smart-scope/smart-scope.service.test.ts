@@ -389,7 +389,7 @@ describe('SmartScopeService', () => {
       });
 
       expect(bookService.executeJumpBucketsQuery).not.toHaveBeenCalled();
-      expect(result).toEqual({ buckets: [], total: 0 });
+      expect(result).toEqual({ buckets: [], total: 0, kind: 'letter', granularity: null });
     });
 
     it('resolves the scope default sort before delegating so eligibility is checked post-resolution', async () => {
@@ -403,7 +403,12 @@ describe('SmartScopeService', () => {
       smartScopeRepo.findById.mockResolvedValue([smartScope]);
       libraryService.findAccessibleLibraryIds.mockResolvedValue([9]);
       queryBuilder.buildWhere.mockReturnValue('where');
-      bookService.executeJumpBucketsQuery.mockResolvedValue({ buckets: [{ key: 'A', label: 'A', index: 0 }], total: 3 });
+      bookService.executeJumpBucketsQuery.mockResolvedValue({
+        buckets: [{ key: 'A', label: 'A', index: 0 }],
+        total: 3,
+        kind: 'letter',
+        granularity: null,
+      });
 
       const result = await service.queryJumpBuckets(5, makeUser({ id: 12 }), {
         sort: [],
@@ -414,8 +419,9 @@ describe('SmartScopeService', () => {
         12,
         'where',
         expect.objectContaining({ sort: [{ field: 'author', dir: 'desc' }] }),
+        'UTC',
       );
-      expect(result).toEqual({ buckets: [{ key: 'A', label: 'A', index: 0 }], total: 3 });
+      expect(result).toEqual({ buckets: [{ key: 'A', label: 'A', index: 0 }], total: 3, kind: 'letter', granularity: null });
     });
 
     it('denies access to private scopes of other users', async () => {

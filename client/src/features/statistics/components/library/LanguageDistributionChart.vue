@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { Globe } from '@lucide/vue'
 import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
 
 import { useLanguageDistribution } from '../../composables/useLanguageDistribution'
 import ChartCard from '../ChartCard.vue'
+
+const { t } = useI18n()
 
 const { data, loading, error } = useLanguageDistribution()
 const { md } = useBreakpoints(breakpointsTailwind)
@@ -43,7 +46,7 @@ watchEffect(() => {
 
 <template>
   <ChartCard
-    title="Language Distribution"
+    :title="t('statistics.charts.languageDistribution.title')"
     :icon="Globe"
     :color-index="2"
     :loading

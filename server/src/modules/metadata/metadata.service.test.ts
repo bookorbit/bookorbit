@@ -95,6 +95,7 @@ import { parsePdfFile } from './lib/pdf-parser';
 import { extractAudioMetadata, parseAudioDuration } from './extractors/audio.extractor';
 import { METADATA_AUTHORS_REPLACED } from './metadata-events.service';
 import { MetadataService } from './metadata.service';
+import { MetadataExtractionService } from './metadata-extraction.service';
 
 const mockMkdir = mkdir as MockedFunction<typeof mkdir>;
 const mockReadFile = readFile as MockedFunction<typeof readFile>;
@@ -214,6 +215,7 @@ describe('MetadataService', () => {
     return new MetadataService(
       db as never,
       config as never,
+      new MetadataExtractionService(),
       (overrides?.scoreService ?? { calculateAndSave: vi.fn().mockResolvedValue(undefined) }) as never,
       (overrides?.narratorService ?? { replaceForBook: vi.fn().mockResolvedValue(undefined) }) as never,
       (overrides?.comicMetadataRepository ?? { upsert: vi.fn().mockResolvedValue(undefined) }) as never,
@@ -691,6 +693,7 @@ describe('MetadataService', () => {
       seriesIndex: 2,
       genres: ['Fantasy', 'Adventure'],
       audibleId: 'B0AUDIBLE',
+      librofmId: '9781234567890',
       durationSeconds: 1234,
       chapters: [{ title: 'Chapter 1', startMs: 0 }],
       coverBytes: null,
@@ -707,6 +710,7 @@ describe('MetadataService', () => {
         seriesIndex: 2,
         genres: ['Fantasy', 'Adventure'],
         audibleId: 'B0AUDIBLE',
+        librofmId: '9781234567890',
         audioMetadata: expect.objectContaining({
           narrators: ['Audio Narrator'],
           durationSeconds: 1234,
@@ -724,6 +728,7 @@ describe('MetadataService', () => {
         seriesName: 'Audio Series',
         seriesIndex: 2,
         audibleId: 'B0AUDIBLE',
+        librofmId: '9781234567890',
         durationSeconds: 1234,
         chapters: [{ title: 'Chapter 1', startMs: 0 }],
         updatedAt: expect.any(Date),
@@ -985,6 +990,7 @@ describe('MetadataService', () => {
       filterAutomatedBookUpdate: vi.fn().mockResolvedValue({
         dto: {
           audibleId: 'B0SIDE',
+          librofmId: '9780987654321',
           audioMetadata: {
             chapters: [{ title: 'Chapter 1', startMs: 0 }],
             narrators: ['Narrator A'],
@@ -1011,6 +1017,7 @@ describe('MetadataService', () => {
       seriesIndex: null,
       genres: [],
       audibleId: 'B0SIDE',
+      librofmId: '9780987654321',
       durationSeconds: null,
       chapters: [{ title: 'Chapter 1', startMs: 0 }],
       coverBytes: null,
@@ -1021,6 +1028,7 @@ describe('MetadataService', () => {
       70,
       expect.objectContaining({
         audibleId: 'B0SIDE',
+        librofmId: '9780987654321',
         audioMetadata: expect.objectContaining({
           chapters: [{ title: 'Chapter 1', startMs: 0 }],
           narrators: ['Narrator A'],
@@ -1030,6 +1038,12 @@ describe('MetadataService', () => {
     expect(updateSet).toHaveBeenCalledWith(
       expect.objectContaining({
         audibleId: 'B0SIDE',
+        updatedAt: expect.any(Date),
+      }),
+    );
+    expect(updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        librofmId: '9780987654321',
         updatedAt: expect.any(Date),
       }),
     );
@@ -1168,22 +1182,6 @@ describe('MetadataService', () => {
     expect(tagDeleteWhere).toHaveBeenCalledTimes(1);
     expect(bookGenreLinks).toEqual([{ bookId: 41, genreId: 501 }]);
     expect(bookTagLinks).toEqual([{ bookId: 41, tagId: 601 }]);
-  });
-
-  it('logs buffered-large-pdf warnings with size metadata', () => {
-    const service = makeService(makeDb().db);
-    const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-
-    (service as any).logPdfParseWarning({
-      code: 'buffered-large-pdf',
-      absolutePath: '/tmp/large.pdf',
-      sizeBytes: 10_000_000,
-      thresholdBytes: 5_000_000,
-      errorClass: 'None',
-      errorMessage: 'none',
-    });
-
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('large pdf buffered in memory'));
   });
 
   it('aggregateAudioDuration sums only files that match the selected primary audio format', async () => {

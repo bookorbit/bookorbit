@@ -80,6 +80,7 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
     // intentionally; re-queuing from background events defeats the purpose.
     // Manual triggers (backfill, retry) use ignoreEnabled and bypass this check.
     if (this.paused && !options?.ignoreEnabled) return 0;
+    if (reason !== AUTHOR_ENRICHMENT_REASONS.METADATA_REPLACE) await this.finalizeCompletedSession();
     const queued = await this.queueRepo.upsertSchedule(authorIds, reason);
     if (queued > 0) {
       this.logger.debug(`[author.enrichment.queue] [end] reason=${reason} queued=${queued} - queued author enrichment jobs`);
@@ -87,7 +88,7 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
       // the session or emit status — these authors are enriched silently so the widget
       // doesn't flash for every book the metadata fetcher processes.
       if (reason !== AUTHOR_ENRICHMENT_REASONS.METADATA_REPLACE) {
-        this.session.sessionTotal += queued;
+        this.session.addToTotal(queued);
         await this.emitStatusSnapshot();
       }
     }
@@ -96,9 +97,10 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
 
   async backfillLinkedAuthors(): Promise<number> {
     const config = await this.enrichmentConfig.getConfig();
+    await this.finalizeCompletedSession();
     const queued = await this.queueRepo.enqueueEligibleLinkedAuthors(AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL, config.conditions);
     if (queued > 0) {
-      this.session.sessionTotal += queued;
+      this.session.addToTotal(queued);
       await this.unpauseIfNeeded();
       await this.emitStatusSnapshot();
       void this.pollOnce();
@@ -107,9 +109,10 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
   }
 
   async backfillAllLinkedAuthors(): Promise<number> {
+    await this.finalizeCompletedSession();
     const queued = await this.queueRepo.enqueueAllLinkedAuthors(AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL_ALL);
     if (queued > 0) {
-      this.session.sessionTotal += queued;
+      this.session.addToTotal(queued);
       await this.unpauseIfNeeded();
       await this.emitStatusSnapshot();
       void this.pollOnce();
@@ -139,9 +142,10 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
   }
 
   async requeueFailed(): Promise<number> {
+    await this.finalizeCompletedSession();
     const requeued = await this.queueRepo.requeueFailed();
     if (requeued > 0) {
-      this.session.sessionTotal += requeued;
+      this.session.addToTotal(requeued);
       await this.emitStatusSnapshot();
     }
     return requeued;
@@ -163,7 +167,7 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
 
       const dueRows = await this.queueRepo.fetchDue(BATCH_SIZE);
       for (const row of dueRows) {
-        await this.processOne(row.authorId, row.attemptCount, row.authorName);
+        await this.processOne(row.authorId, row.attemptCount, row.authorName, row.reason as AuthorEnrichmentReason);
         await this.randomDelay();
       }
     } catch (error) {
@@ -182,30 +186,52 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
   }
 
   private async checkAndResetSession(): Promise<void> {
+    const revision = this.session.getRevision();
     const summary = await this.queueRepo.getStatusSummary();
-    if (summary.queued === 0 && summary.processing === 0 && summary.rateLimited === 0) {
-      if (this.session.sessionTotal > 0) {
-        const hasFailed = summary.failed > 0;
-        this.notificationService
-          .notify({
-            type: hasFailed ? NotificationType.AuthorEnrichmentFailed : NotificationType.AuthorEnrichmentCompleted,
-            title: hasFailed ? 'Author enrichment completed with errors' : 'Author enrichment completed',
-            message:
-              `Processed ${this.session.sessionDone} of ${this.session.sessionTotal} authors` + (hasFailed ? `, ${summary.failed} failed` : ''),
-            scope: { kind: 'all' },
-            meta: { sessionTotal: this.session.sessionTotal, sessionDone: this.session.sessionDone, failed: summary.failed },
-          })
-          .catch(() => {});
-      }
-      this.session.reset();
-    }
+    if (summary.queued > 0 || summary.processing > 0 || summary.rateLimited > 0) return;
+    if (this.session.getRevision() !== revision) return;
+
+    const snapshot = this.session.getSnapshot();
+    if (snapshot.sessionTotal <= 0) return;
+    if (!this.session.resetIfRevision(revision)) return;
+    this.notifySessionCompletion(snapshot);
+    await this.emitStatusSnapshot();
   }
 
-  private async processOne(authorId: number, previousAttemptCount: number, authorName: string | null = null): Promise<void> {
+  private async finalizeCompletedSession(): Promise<void> {
+    const snapshot = this.session.getSnapshot();
+    if (snapshot.sessionTotal <= 0 || snapshot.sessionDone < snapshot.sessionTotal) return;
+    this.session.reset();
+    this.notifySessionCompletion(snapshot);
+    await this.emitStatusSnapshot();
+  }
+
+  private notifySessionCompletion(snapshot: ReturnType<AuthorEnrichmentSessionService['getSnapshot']>): void {
+    const hasFailed = snapshot.sessionFailed > 0;
+    this.notificationService
+      .notify({
+        type: hasFailed ? NotificationType.AuthorEnrichmentFailed : NotificationType.AuthorEnrichmentCompleted,
+        title: hasFailed ? 'Author enrichment completed with errors' : 'Author enrichment completed',
+        message: `Processed ${snapshot.sessionDone} of ${snapshot.sessionTotal} authors` + (hasFailed ? `, ${snapshot.sessionFailed} failed` : ''),
+        scope: { kind: 'all' },
+        meta: { sessionTotal: snapshot.sessionTotal, sessionDone: snapshot.sessionDone, failed: snapshot.sessionFailed },
+      })
+      .catch(() => {});
+  }
+
+  private async processOne(
+    authorId: number,
+    previousAttemptCount: number,
+    authorName: string | null = null,
+    reason: AuthorEnrichmentReason = AUTHOR_ENRICHMENT_REASONS.UNKNOWN,
+  ): Promise<void> {
     const claimed = await this.queueRepo.markProcessing(authorId);
     if (!claimed) return;
-    this.session.currentItemName = authorName;
-    await this.emitStatusSnapshot();
+    const trackSession = reason !== AUTHOR_ENRICHMENT_REASONS.METADATA_REPLACE;
+    if (trackSession) {
+      this.session.setCurrentItemName(authorName);
+      await this.emitStatusSnapshot();
+    }
 
     const [{ writeMode }, audnexusEnabled] = await Promise.all([
       this.enrichmentConfig.getConfig(),
@@ -223,9 +249,11 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
         `[author.enrichment.process] [end] authorId=${authorId} outcome=done provider=${result.provider ?? 'none'} descriptionUpdated=${result.descriptionUpdated} imageUpdated=${result.imageUpdated} - author enrichment processed`,
       );
       await this.queueRepo.markDone(authorId, result.imageUpdated);
-      if (this.session.sessionTotal > 0) this.session.sessionDone++;
-      this.session.currentItemName = null;
-      await this.emitStatusSnapshot();
+      if (trackSession) {
+        this.session.incrementDone();
+        this.session.setCurrentItemName(null);
+        await this.emitStatusSnapshot();
+      }
       return;
     }
 
@@ -234,9 +262,11 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
         `[author.enrichment.process] [end] authorId=${authorId} outcome=skipped reason=${result.reason} - author enrichment processed`,
       );
       await this.queueRepo.markDone(authorId, false);
-      if (this.session.sessionTotal > 0) this.session.sessionDone++;
-      this.session.currentItemName = null;
-      await this.emitStatusSnapshot();
+      if (trackSession) {
+        this.session.incrementDone();
+        this.session.setCurrentItemName(null);
+        await this.emitStatusSnapshot();
+      }
       return;
     }
 
@@ -261,8 +291,11 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
       nextAttemptAt,
       rateLimited: result.httpStatus === 429,
     });
-    this.session.currentItemName = null;
-    await this.emitStatusSnapshot();
+    if (trackSession) {
+      if (!nextAttemptAt) this.session.incrementDone(true);
+      this.session.setCurrentItemName(null);
+      await this.emitStatusSnapshot();
+    }
   }
 
   private computeNextAttemptAt(attemptNumber: number, retryAfterMs: number | null): Date {

@@ -774,7 +774,8 @@ function buildImportedReadingSessionId(sourceType: string, sourceSessionId: stri
   const raw = sourceSessionId.trim();
   const candidate = `${prefix}${raw}`;
   if (candidate.length <= 64) return candidate;
-  return `${prefix}${createHash('sha1').update(raw).digest('hex')}`;
+  const digest = createHash('sha256').update(sourceType).update('\0').update(raw).digest('base64url');
+  return `${prefix}${digest.slice(0, 64 - prefix.length)}`;
 }
 
 function sanitizeNullablePercent(value: number | null): number | null {

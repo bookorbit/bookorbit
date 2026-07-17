@@ -35,7 +35,13 @@ describe('lintHighlights', () => {
   it('warns when an explicit image uses a non-allowlisted host', () => {
     const body = ['## Highlights', '- **Thing** - body.', '![](https://imgur.com/x.png)'].join('\n');
     const r = lintHighlights(body);
-    expect(r.warnings.some((w) => w.includes('dropped') && w.includes('imgur.com'))).toBe(true);
+    expect(
+      r.warnings.some(
+        (w) =>
+          w ===
+          'Media will be dropped (host not allowed): https://imgur.com/x.png. Use a GitHub user-attachments or githubusercontent URL (drag-drop into the release).',
+      ),
+    ).toBe(true);
   });
 
   it('does not warn for an allowlisted image', () => {

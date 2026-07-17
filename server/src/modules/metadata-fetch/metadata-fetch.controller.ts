@@ -24,7 +24,7 @@ function normalizeSearchTitle(title: string | undefined): string | undefined {
 }
 
 function isAudiobookProvider(providerKey: MetadataProviderKey): boolean {
-  return providerKey === MetadataProviderKey.AUDIBLE || providerKey === MetadataProviderKey.AUDNEXUS;
+  return providerKey === MetadataProviderKey.AUDIBLE || providerKey === MetadataProviderKey.AUDNEXUS || providerKey === MetadataProviderKey.LIBROFM;
 }
 
 @Controller('metadata-fetch')
@@ -74,7 +74,9 @@ export class MetadataFetchController {
     const requestedAudiobookProvider = (dto.providers ?? []).some(isAudiobookProvider);
     const onlyAudiobookProviders = providerKeys.length > 0 && providerKeys.every(isAudiobookProvider);
     const isAudiobook =
-      requestedAudiobookProvider || onlyAudiobookProviders ? true : (dto.isAudiobook ?? Boolean(existingProviderIds[MetadataProviderKey.AUDIBLE]));
+      requestedAudiobookProvider || onlyAudiobookProviders
+        ? true
+        : (dto.isAudiobook ?? Boolean(existingProviderIds[MetadataProviderKey.AUDIBLE] || existingProviderIds[MetadataProviderKey.LIBROFM]));
 
     const params: MetadataSearchParams = {
       title: normalizeSearchTitle(dto.title),
