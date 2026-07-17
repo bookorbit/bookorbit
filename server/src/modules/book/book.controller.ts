@@ -128,7 +128,11 @@ export class BookController {
   @Get('shelfmark')
   searchShelfmark(@Query() dto: SearchBooksDto, @CurrentUser() user: RequestUser, @Req() req: FastifyRequest) {
     const controller = new AbortController();
-    req.raw.once('close', () => controller.abort());
+    req.raw.once('close', () => {
+      if (req.raw.aborted) {
+        controller.abort();
+      }
+    });
     return this.bookService.searchShelfmark(dto.q, user, controller.signal);
   }
 

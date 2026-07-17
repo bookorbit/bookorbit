@@ -162,7 +162,7 @@ describe('useGlobalSearch', () => {
 
   describe('shelfmark enabled', () => {
     it('merges unique external results from shelfmark after the first local page', async () => {
-      const externalBook = makeBook(9999)
+      const externalBook = { ...makeBook(9999), doesNotExistLocally: true }
       apiMock.mockImplementation((url, init) => {
         if (url.includes('/api/v1/user-preferences/shelfmark')) {
           return Promise.resolve({
@@ -232,7 +232,7 @@ describe('useGlobalSearch', () => {
     })
 
     it('preserves the shelfmark-augmented total across subsequent local pages', async () => {
-      const externalBook = makeBook(9999)
+      const externalBook = { ...makeBook(9999), doesNotExistLocally: true }
       apiMock.mockImplementation((url, init) => {
         if (url.includes('/api/v1/user-preferences/shelfmark')) {
           return Promise.resolve({
@@ -267,11 +267,12 @@ describe('useGlobalSearch', () => {
       await search.loadMore()
       await flush()
 
-      expect(search.total.value).toBe(25)
+      expect(search.total.value).toBe(26)
       expect(search.results.value).toHaveLength(26)
     })
 
     it('cancels shelfmark loading when the query changes', async () => {
+      let shelfmarkSignal: AbortSignal | null | undefined
       let shelfmarkResolve!: (v: ApiResponse) => void
       apiMock.mockImplementation((url, init) => {
         if (url.includes('/api/v1/user-preferences/shelfmark')) {
@@ -281,6 +282,7 @@ describe('useGlobalSearch', () => {
           })
         }
         if (url.includes('/api/v1/books/shelfmark')) {
+          shelfmarkSignal = init?.signal
           return new Promise((resolve) => {
             shelfmarkResolve = resolve
           })
@@ -305,9 +307,12 @@ describe('useGlobalSearch', () => {
       query.value = ''
       await nextTick()
 
+      expect(shelfmarkSignal).toBeDefined()
+      expect(shelfmarkSignal?.aborted).toBe(true)
+
       shelfmarkResolve({
         ok: true,
-        json: () => Promise.resolve([makeBook(9999)]),
+        json: () => Promise.resolve([{ ...makeBook(9999), doesNotExistLocally: true }]),
       })
       await flush()
 

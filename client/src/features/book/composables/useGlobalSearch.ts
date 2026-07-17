@@ -69,8 +69,9 @@ export function useGlobalSearch(query: Ref<string>) {
       const data: BooksPage = await res.json()
       if (gen !== generation) return
 
+      const externalCount = results.value.filter((item) => item.doesNotExistLocally).length
       results.value = append ? [...results.value, ...data.items] : data.items
-      total.value = data.total
+      total.value = data.total + (append ? externalCount : 0)
       nextPage = data.page + 1
 
       if (!append && page === 0) {
