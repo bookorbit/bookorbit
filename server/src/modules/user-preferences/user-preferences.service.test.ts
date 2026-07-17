@@ -479,6 +479,18 @@ describe('UserPreferencesService', () => {
       fetchSpy.mockRestore();
     });
 
+    it('testShelfmarkConnection rejects a URL whose origin differs from the saved one', async () => {
+      repo.findByCategory.mockResolvedValueOnce({
+        data: { enabled: true, url: 'http://192.168.1.10:8080', externalUrl: '' },
+      } as never);
+      const fetchSpy = vi.spyOn(globalThis, 'fetch');
+      const result = await service.testShelfmarkConnection(11, 'http://192.168.1.20:9000');
+      expect(result.ok).toBe(false);
+      expect(result.error).toMatch(/does not match/);
+      expect(fetchSpy).not.toHaveBeenCalled();
+      fetchSpy.mockRestore();
+    });
+
     it('testShelfmarkConnection performs fetch for safe URLs', async () => {
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
         ok: true,
@@ -487,7 +499,7 @@ describe('UserPreferencesService', () => {
       const result = await service.testShelfmarkConnection(11, 'http://localhost:8080');
       expect(result.ok).toBe(true);
       expect(result.status).toBe(200);
-      expect(fetchSpy).toHaveBeenCalledWith('http://localhost:8080/api/health', expect.any(Object));
+      expect(fetchSpy).toHaveBeenCalledWith('http://localhost:8080/api/health', expect.objectContaining({ redirect: 'error' }));
       fetchSpy.mockRestore();
     });
   });

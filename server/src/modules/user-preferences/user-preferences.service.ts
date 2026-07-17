@@ -267,8 +267,18 @@ export class UserPreferencesService {
     );
     try {
       await ensureSafeUrl(url, { allowLocal: true, allowPrivate: true });
+
+      const saved = await this.getShelfmarkPreferences(userId);
+      if (saved.url) {
+        const savedOrigin = new URL(saved.url).origin;
+        const requestedOrigin = new URL(url).origin;
+        if (savedOrigin !== requestedOrigin) {
+          return { ok: false, error: 'URL does not match saved Shelfmark destination' };
+        }
+      }
+
       const testUrl = url.replace(/\/+$/, '') + '/api/health';
-      const res = await fetch(testUrl, { signal: AbortSignal.timeout(5000) });
+      const res = await fetch(testUrl, { signal: AbortSignal.timeout(5000), redirect: 'error' });
       const durationMs = Date.now() - start;
       this.logger.log(
         `[user_preferences.test_shelfmark_connection] [end] userId=${userId} url="${sanitizedUrl}" durationMs=${durationMs} status=${res.status} - test shelfmark connection completed`,
