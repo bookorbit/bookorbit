@@ -1087,9 +1087,12 @@ export class BookService {
 
     if (enabledProviderKeys.length === 0) return [];
 
+    const internalController = new AbortController();
+
     const params: MetadataSearchParams = {
       title: queryText,
       isAudiobook: false,
+      signal: internalController.signal,
     };
 
     return new Promise<MetadataCandidate[]>((resolve) => {
@@ -1099,6 +1102,7 @@ export class BookService {
       let subscription: any = null;
 
       const cleanup = () => {
+        internalController.abort();
         if (timer) {
           clearTimeout(timer);
           timer = null;

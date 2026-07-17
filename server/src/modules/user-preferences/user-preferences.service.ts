@@ -94,10 +94,18 @@ const WHATS_NEW_DEFAULTS: WhatsNewPreferences = { lastSeenVersion: null, popupEn
 const SHELFMARK_PREFERENCES_SCHEMA = z
   .object({
     enabled: z.boolean(),
-    url: z.string().url(),
+    url: z.string(),
     externalUrl: z.string().url().optional().or(z.literal('')),
   })
-  .strict();
+  .strict()
+  .superRefine((val, ctx) => {
+    if (val.enabled && !z.string().url().safeParse(val.url).success) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['url'], message: 'Invalid url' });
+    }
+    if (!val.enabled && val.url !== '' && !z.string().url().safeParse(val.url).success) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['url'], message: 'Invalid url' });
+    }
+  });
 
 @Injectable()
 export class UserPreferencesService {

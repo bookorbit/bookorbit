@@ -41,9 +41,6 @@ export function useGlobalSearch(query: Ref<string>) {
   initPromise = initShelfmark()
 
   async function loadPage(q: string, page: number, append: boolean, gen: number) {
-    if (initPromise) {
-      await initPromise
-    }
     if (gen !== generation) return
 
     const requestController = new AbortController()
@@ -52,9 +49,6 @@ export function useGlobalSearch(query: Ref<string>) {
     else {
       loading.value = true
       settled.value = false
-      if (shelfmarkEnabled.value && page === 0) {
-        shelfmarkLoading.value = true
-      }
     }
 
     try {
@@ -79,8 +73,13 @@ export function useGlobalSearch(query: Ref<string>) {
       total.value = data.total
       nextPage = data.page + 1
 
-      if (!append && page === 0 && shelfmarkEnabled.value) {
-        await loadShelfmark(q, gen)
+      if (!append && page === 0) {
+        if (initPromise) await initPromise
+        if (gen !== generation) return
+        if (shelfmarkEnabled.value) {
+          shelfmarkLoading.value = true
+          await loadShelfmark(q, gen)
+        }
       }
     } catch {
       if (gen !== generation || requestController.signal.aborted) return

@@ -1454,7 +1454,16 @@ export class BookRepository {
           if ((row as any)[providerField] === candidate.providerId) return true;
         }
 
-        const hasIdentifiers = !!(candidate.isbn13 || candidate.isbn10 || (providerField && candidate.providerId));
+        if (candidate.hardcoverEditionId && row.hardcoverId === candidate.hardcoverEditionId) return true;
+        if (candidate.audibleId && row.audibleId === candidate.audibleId) return true;
+
+        const hasIdentifiers = !!(
+          candidate.isbn13 ||
+          candidate.isbn10 ||
+          (providerField && candidate.providerId) ||
+          candidate.hardcoverEditionId ||
+          candidate.audibleId
+        );
         if (!hasIdentifiers && candidate.title && row.title && row.title.toLowerCase() === candidate.title.toLowerCase()) {
           return true;
         }
@@ -1486,6 +1495,8 @@ export class BookRepository {
       case MetadataProviderKey.KOBO:
         return 'koboId';
       case MetadataProviderKey.AUDIBLE:
+        return 'audibleId';
+      case MetadataProviderKey.AUDNEXUS:
         return 'audibleId';
       case MetadataProviderKey.COMICVINE:
         return 'comicvineId';

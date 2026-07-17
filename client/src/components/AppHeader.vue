@@ -23,7 +23,7 @@ import {
   Loader,
   Check,
   Languages,
-} from '@lucide/vue'
+} from 'lucide-vue-next'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { formatNumber } from '@/i18n/formatters'
@@ -426,7 +426,10 @@ function formatBadgeStyle(fmt: string) {
                   class="h-16 w-12 object-cover rounded shrink-0 bg-muted border border-border/40"
                   :alt="row.result.title ?? ''"
                 />
-                <div v-else-if="row.result.doesNotExistLocally" class="h-16 w-12 rounded shrink-0 bg-muted/40 flex items-center justify-center text-muted-foreground border border-dashed">
+                <div
+                  v-else-if="row.result.doesNotExistLocally"
+                  class="h-16 w-12 rounded shrink-0 bg-muted/40 flex items-center justify-center text-muted-foreground border border-dashed"
+                >
                   <CloudDownload :size="18" />
                 </div>
                 <BookCoverImage
@@ -444,7 +447,7 @@ function formatBadgeStyle(fmt: string) {
                       <span v-else>{{ seg.text }}</span>
                     </template>
                   </p>
-                  <p v-if="row.result.doesNotExistLocally" class="text-xs font-medium truncate mt-0.5 shelfmark-subtitle">
+                  <p v-if="row.result.doesNotExistLocally" class="text-xs font-medium truncate mt-0.5 text-primary">
                     {{ t('components.appHeader.shelfmarkSubtitle') }}
                   </p>
                   <p v-else-if="row.result.authors.length" class="text-xs text-muted-foreground truncate mt-0.5">
@@ -461,7 +464,10 @@ function formatBadgeStyle(fmt: string) {
                   </p>
                 </div>
                 <div class="flex shrink-0 gap-1">
-                  <span v-if="row.result.doesNotExistLocally" class="text-[9px] font-semibold px-1.5 py-0.5 rounded border uppercase shelfmark-badge">
+                  <span
+                    v-if="row.result.doesNotExistLocally"
+                    class="text-[9px] font-semibold px-1.5 py-0.5 rounded border uppercase border-primary/35 bg-primary/10 text-primary"
+                  >
                     Shelfmark
                   </span>
                   <template v-else-if="resultFormats(row.result).length">
@@ -477,8 +483,11 @@ function formatBadgeStyle(fmt: string) {
                 </div>
               </button>
             </div>
-            <div v-if="shelfmarkEnabled && shelfmarkLoading" class="border-t border-border/40 p-2 text-center text-[10px] text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/20">
-              <Loader class="animate-spin shelfmark-loader" :size="12" />
+            <div
+              v-if="shelfmarkEnabled && shelfmarkLoading"
+              class="border-t border-border/40 p-2 text-center text-[10px] text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/20"
+            >
+              <Loader class="animate-spin text-primary" :size="12" />
               <span>{{ t('components.appHeader.shelfmarkSearching') }}</span>
             </div>
             <div v-if="globalResults.length > 0" class="border-t border-border/60 px-3 py-2 text-center text-xs text-muted-foreground">
@@ -573,7 +582,10 @@ function formatBadgeStyle(fmt: string) {
                   class="h-16 w-12 object-cover rounded shrink-0 bg-muted border border-border/40"
                   :alt="row.result.title ?? ''"
                 />
-                <div v-else-if="row.result.doesNotExistLocally" class="h-16 w-12 rounded shrink-0 bg-muted/40 flex items-center justify-center text-muted-foreground border border-dashed">
+                <div
+                  v-else-if="row.result.doesNotExistLocally"
+                  class="h-16 w-12 rounded shrink-0 bg-muted/40 flex items-center justify-center text-muted-foreground border border-dashed"
+                >
                   <CloudDownload :size="18" />
                 </div>
                 <BookCoverImage
@@ -591,7 +603,7 @@ function formatBadgeStyle(fmt: string) {
                       <span v-else>{{ seg.text }}</span>
                     </template>
                   </p>
-                  <p v-if="row.result.doesNotExistLocally" class="text-xs font-medium truncate mt-0.5 shelfmark-subtitle">
+                  <p v-if="row.result.doesNotExistLocally" class="text-xs font-medium truncate mt-0.5 text-primary">
                     {{ t('components.appHeader.shelfmarkSubtitle') }}
                   </p>
                   <p v-else-if="row.result.authors.length" class="text-xs text-muted-foreground truncate mt-0.5">
@@ -608,7 +620,10 @@ function formatBadgeStyle(fmt: string) {
                   </p>
                 </div>
                 <div class="flex shrink-0 gap-1">
-                  <span v-if="row.result.doesNotExistLocally" class="text-[9px] font-semibold px-1.5 py-0.5 rounded border uppercase shelfmark-badge">
+                  <span
+                    v-if="row.result.doesNotExistLocally"
+                    class="text-[9px] font-semibold px-1.5 py-0.5 rounded border uppercase border-primary/35 bg-primary/10 text-primary"
+                  >
                     Shelfmark
                   </span>
                   <template v-else-if="resultFormats(row.result).length">
@@ -624,8 +639,11 @@ function formatBadgeStyle(fmt: string) {
                 </div>
               </button>
             </div>
-            <div v-if="shelfmarkEnabled && shelfmarkLoading" class="border-t border-border/40 p-2 text-center text-[10px] text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/20">
-              <Loader class="animate-spin shelfmark-loader" :size="12" />
+            <div
+              v-if="shelfmarkEnabled && shelfmarkLoading"
+              class="border-t border-border/40 p-2 text-center text-[10px] text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/20"
+            >
+              <Loader class="animate-spin text-primary" :size="12" />
               <span>{{ t('components.appHeader.shelfmarkSearching') }}</span>
             </div>
             <div v-if="globalResults.length > 0" class="border-t border-border/60 px-3 py-2 text-center text-xs text-muted-foreground">
@@ -1109,17 +1127,3 @@ function formatBadgeStyle(fmt: string) {
 
   <BookUploadModal v-if="uploadOpen" @close="uploadOpen = false" @uploaded="uploadOpen = false" />
 </template>
-
-<style scoped>
-.shelfmark-subtitle {
-  color: var(--primary);
-}
-.shelfmark-badge {
-  border-color: color-mix(in oklch, var(--primary) 35%, transparent);
-  background-color: color-mix(in oklch, var(--primary) 10%, transparent);
-  color: var(--primary);
-}
-.shelfmark-loader {
-  color: var(--primary);
-}
-</style>
