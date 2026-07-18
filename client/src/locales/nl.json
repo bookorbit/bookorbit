@@ -4890,30 +4890,30 @@
           }
         },
         "addedAt": {
-          "title": "Date added",
-          "hint": "Choose what a book's \"date added\" reflects. This applies to books imported from now on.",
+          "title": "Toegevoegd op",
+          "hint": "Kies waarnaar de datum \"toegevoegd op\" van een boek verwijst. Dit geldt voor boeken die vanaf nu worden geïmporteerd.",
           "options": {
             "imported": {
-              "title": "When imported",
-              "hint": "The date BookOrbit first imported the book. This is the default."
+              "title": "Bij import",
+              "hint": "De datum waarop BookOrbit het boek voor het eerst importeerde. Dit is de standaard."
             },
             "file_modified": {
-              "title": "File modified time",
-              "hint": "The file's last-modified time (mtime), often preserved when files are copied."
+              "title": "Wijzigingstijd van bestand",
+              "hint": "De laatste wijzigingstijd van het bestand (mtime), vaak behouden bij het kopiëren van bestanden."
             },
             "file_created": {
-              "title": "File creation time",
-              "hint": "When the file first landed on disk (birthtime). Falls back to modified time on filesystems that don't record creation time."
+              "title": "Aanmaaktijd van bestand",
+              "hint": "Wanneer het bestand voor het eerst op schijf verscheen (birthtime). Valt terug op de wijzigingstijd bij bestandssystemen die geen aanmaaktijd vastleggen."
             }
           },
-          "recompute": "Recompute now",
-          "recomputing": "Recomputing...",
-          "recomputeHint": "Update the date added for existing books using this setting.",
-          "recomputeSaveFirst": "Save your changes first, then recompute existing books.",
-          "recomputeConfirm": "Apply this setting to the existing books in this library now? This reads dates from disk and can take a while.",
-          "recomputeConfirmWithCount": "Apply this setting to the {count} existing books in this library now? This reads dates from disk and can take a while.",
-          "recomputeDone": "Updated {updated} of {total} books.",
-          "recomputeFailed": "Could not recompute date added."
+          "recompute": "Nu opnieuw berekenen",
+          "recomputing": "Bezig met berekenen…",
+          "recomputeHint": "Werk de datum toegevoegd-op van bestaande boeken bij met deze instelling.",
+          "recomputeSaveFirst": "Sla eerst je wijzigingen op en bereken daarna bestaande boeken opnieuw.",
+          "recomputeConfirm": "Deze instelling nu toepassen op de bestaande boeken in deze bibliotheek? Hierbij worden datums van schijf gelezen en dit kan even duren.",
+          "recomputeConfirmWithCount": "Deze instelling nu toepassen op de {count} bestaande boeken in deze bibliotheek? Hierbij worden datums van schijf gelezen en dit kan even duren.",
+          "recomputeDone": "{updated} van {total} boeken bijgewerkt.",
+          "recomputeFailed": "Kon de datum toegevoegd-op niet opnieuw berekenen."
         },
         "allowedFormats": {
           "title": "Toegestane formaten",

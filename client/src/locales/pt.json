@@ -6682,30 +6682,30 @@
           }
         },
         "addedAt": {
-          "title": "Date added",
-          "hint": "Choose what a book's \"date added\" reflects. This applies to books imported from now on.",
+          "title": "Data de adição",
+          "hint": "Escolha o que a \"data de adição\" de um livro reflete. Aplica-se aos livros importados a partir de agora.",
           "options": {
             "imported": {
-              "title": "When imported",
-              "hint": "The date BookOrbit first imported the book. This is the default."
+              "title": "Na importação",
+              "hint": "A data em que o BookOrbit importou o livro pela primeira vez. Esta é a predefinição."
             },
             "file_modified": {
-              "title": "File modified time",
-              "hint": "The file's last-modified time (mtime), often preserved when files are copied."
+              "title": "Data de modificação do ficheiro",
+              "hint": "A data da última modificação do ficheiro (mtime), muitas vezes preservada ao copiar ficheiros."
             },
             "file_created": {
-              "title": "File creation time",
-              "hint": "When the file first landed on disk (birthtime). Falls back to modified time on filesystems that don't record creation time."
+              "title": "Data de criação do ficheiro",
+              "hint": "Quando o ficheiro surgiu no disco pela primeira vez (birthtime). Recorre à data de modificação em sistemas de ficheiros que não registam a data de criação."
             }
           },
-          "recompute": "Recompute now",
-          "recomputing": "Recomputing...",
-          "recomputeHint": "Update the date added for existing books using this setting.",
-          "recomputeSaveFirst": "Save your changes first, then recompute existing books.",
-          "recomputeConfirm": "Apply this setting to the existing books in this library now? This reads dates from disk and can take a while.",
-          "recomputeConfirmWithCount": "Apply this setting to the {count} existing books in this library now? This reads dates from disk and can take a while.",
-          "recomputeDone": "Updated {updated} of {total} books.",
-          "recomputeFailed": "Could not recompute date added."
+          "recompute": "Recalcular agora",
+          "recomputing": "A recalcular…",
+          "recomputeHint": "Atualiza a data de adição dos livros existentes com esta definição.",
+          "recomputeSaveFirst": "Guarde primeiro as alterações e depois recalcule os livros existentes.",
+          "recomputeConfirm": "Aplicar esta definição agora aos livros existentes nesta biblioteca? Esta ação lê as datas do disco e pode demorar algum tempo.",
+          "recomputeConfirmWithCount": "Aplicar esta definição agora aos {count} livros existentes nesta biblioteca? Esta ação lê as datas do disco e pode demorar algum tempo.",
+          "recomputeDone": "{updated} de {total} livros atualizados.",
+          "recomputeFailed": "Não foi possível recalcular a data de adição."
         },
         "allowedFormats": {
           "title": "Formatos permitidos",
