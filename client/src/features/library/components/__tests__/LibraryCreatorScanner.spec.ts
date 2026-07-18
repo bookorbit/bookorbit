@@ -15,6 +15,7 @@ function mountScanner(overrides: Partial<InstanceType<typeof LibraryCreatorScann
       organizationMode: 'book_per_folder',
       organizationModeLocked: false,
       allowedFormats: [],
+      addedAtSource: 'imported',
       excludePatterns: [],
       ...overrides,
     },

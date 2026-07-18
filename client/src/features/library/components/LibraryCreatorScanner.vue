@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Lock, Plus, X } from '@lucide/vue'
-import type { OrganizationMode } from '@bookorbit/types'
+import { Lock, Plus, RefreshCw, X } from '@lucide/vue'
+import type { AddedAtSource, OrganizationMode } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { FORMAT_LABELS } from '../composables/useLibraryCreator'
 
@@ -12,14 +12,33 @@ const props = defineProps<{
   organizationMode: OrganizationMode
   organizationModeLocked?: boolean
   allowedFormats: string[]
+  addedAtSource: AddedAtSource
+  canRecomputeAddedAt?: boolean
+  storedAddedAtSource?: AddedAtSource | null
+  recomputingAddedAt?: boolean
   excludePatterns: string[]
 }>()
 
 const emit = defineEmits<{
   'update:organizationMode': [value: OrganizationMode]
   'update:allowedFormats': [value: string[]]
+  'update:addedAtSource': [value: AddedAtSource]
   'update:excludePatterns': [value: string[]]
+  recompute: []
 }>()
+
+const ADDED_AT_SOURCES: AddedAtSource[] = ['imported', 'file_modified', 'file_created']
+
+const recomputeDisabled = computed(() => props.recomputingAddedAt || !props.storedAddedAtSource || props.storedAddedAtSource === 'imported')
+const showSaveFirstHint = computed(() => props.canRecomputeAddedAt && props.addedAtSource !== props.storedAddedAtSource)
+
+function selectAddedAtSource(source: AddedAtSource) {
+  emit('update:addedAtSource', source)
+}
+
+function requestRecompute() {
+  emit('recompute')
+}
 
 // ── Scan mode ─────────────────────────────────────────────────────────────────
 
@@ -153,6 +172,51 @@ function onPatternKeydown(e: KeyboardEvent) {
             {{ t('library.creator.scanner.scanMode.fileAsBook.hint') }}
           </p>
         </button>
+      </div>
+    </div>
+
+    <!-- Date added -->
+    <div>
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-1">
+        {{ t('library.creator.scanner.addedAt.title') }}
+      </p>
+      <p class="text-xs text-muted-foreground mb-3">{{ t('library.creator.scanner.addedAt.hint') }}</p>
+      <div class="space-y-2">
+        <button
+          v-for="source in ADDED_AT_SOURCES"
+          :key="source"
+          type="button"
+          class="w-full text-left rounded-lg border p-3 transition-colors"
+          :class="addedAtSource === source ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border bg-card hover:border-primary/40'"
+          @click="selectAddedAtSource(source)"
+        >
+          <div class="flex items-center gap-2 mb-1">
+            <span
+              class="w-3.5 h-3.5 rounded-full border-2 shrink-0 flex items-center justify-center"
+              :class="addedAtSource === source ? 'border-primary' : 'border-muted-foreground/40'"
+            >
+              <span v-if="addedAtSource === source" class="w-1.5 h-1.5 rounded-full bg-primary" />
+            </span>
+            <span class="text-sm font-semibold text-foreground">{{ t(`library.creator.scanner.addedAt.options.${source}.title`) }}</span>
+          </div>
+          <p class="text-xs text-muted-foreground leading-relaxed pl-5.5">
+            {{ t(`library.creator.scanner.addedAt.options.${source}.hint`) }}
+          </p>
+        </button>
+      </div>
+      <div v-if="canRecomputeAddedAt" class="mt-3 flex items-center gap-3">
+        <button
+          type="button"
+          class="flex items-center gap-1.5 px-3 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="recomputeDisabled"
+          @click="requestRecompute"
+        >
+          <RefreshCw :size="13" :class="recomputingAddedAt ? 'animate-spin' : ''" />
+          {{ recomputingAddedAt ? t('library.creator.scanner.addedAt.recomputing') : t('library.creator.scanner.addedAt.recompute') }}
+        </button>
+        <p class="text-xs text-muted-foreground">
+          {{ showSaveFirstHint ? t('library.creator.scanner.addedAt.recomputeSaveFirst') : t('library.creator.scanner.addedAt.recomputeHint') }}
+        </p>
       </div>
     </div>
 
