@@ -12,7 +12,14 @@ import { readdir, rm, stat } from 'fs/promises';
 import { join } from 'path';
 
 import { DEFAULT_FORMAT_PRIORITY } from '@bookorbit/types';
-import type { AccessLevel, LibraryFileSyncProgressEvent, OrganizationMode, WriteResult } from '@bookorbit/types';
+import type {
+  AccessLevel,
+  AddedAtSource,
+  LibraryFileSyncProgressEvent,
+  OrganizationMode,
+  RecomputeAddedAtResult,
+  WriteResult,
+} from '@bookorbit/types';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { normalizeIconValue } from '../../common/utils/icon-value.utils';
 import type { RequestUser } from '../../common/types/request-user';
@@ -27,7 +34,12 @@ import { GrantLibraryAccessDto } from './dto/grant-library-access.dto';
 import { PrescanLibraryDto } from './dto/prescan-library.dto';
 import { ReorderLibrariesDto } from './dto/reorder-libraries.dto';
 import { UpdateLibraryDto } from './dto/update-library.dto';
-import { DEFAULT_LIBRARY_COVER_ASPECT_RATIO, DEFAULT_LIBRARY_ORGANIZATION_MODE, LIBRARY_METADATA_PRECEDENCE_DEFAULT } from './library.constants';
+import {
+  DEFAULT_LIBRARY_ADDED_AT_SOURCE,
+  DEFAULT_LIBRARY_COVER_ASPECT_RATIO,
+  DEFAULT_LIBRARY_ORGANIZATION_MODE,
+  LIBRARY_METADATA_PRECEDENCE_DEFAULT,
+} from './library.constants';
 import { LibraryRepository } from './library.repository';
 
 interface LibraryMetadataWriteStreamOptions {
@@ -370,6 +382,76 @@ export class LibraryService {
     };
   }
 
+  async recomputeAddedAt(libraryId: number): Promise<RecomputeAddedAtResult> {
+    const [library] = await this.libraryRepo.findById(libraryId);
+    if (!library) throw new NotFoundException('Library not found');
+
+    const source = normalizeAddedAtSource(library.addedAtSource);
+    const event = 'library.recompute_added_at';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] libraryId=${libraryId} source=${source} - recompute added_at started`);
+
+    if (source === 'imported') {
+      this.logger.log(`[${event}] [end] libraryId=${libraryId} source=imported durationMs=${Date.now() - startedAt} updated=0 - recompute skipped`);
+      return { source, total: 0, updated: 0, skipped: 'source is imported' };
+    }
+
+    const [countRow] = await this.libraryRepo.countBooksByLibrary(libraryId);
+    const total = countRow?.count ?? 0;
+
+    if (source === 'file_modified') {
+      const updated = await this.libraryRepo.recomputeAddedAtFromMtime(libraryId);
+      this.logger.log(
+        `[${event}] [end] libraryId=${libraryId} source=file_modified durationMs=${Date.now() - startedAt} total=${total} updated=${updated} - recompute completed`,
+      );
+      return { source, total, updated };
+    }
+
+    const updated = await this.recomputeAddedAtFromBirthtime(libraryId);
+    this.logger.log(
+      `[${event}] [end] libraryId=${libraryId} source=file_created durationMs=${Date.now() - startedAt} total=${total} updated=${updated} - recompute completed`,
+    );
+    return { source, total, updated };
+  }
+
+  private async recomputeAddedAtFromBirthtime(libraryId: number): Promise<number> {
+    const rows = await this.libraryRepo.findContentFilePathsByLibrary(libraryId);
+
+    const pathsByBook = new Map<number, string[]>();
+    for (const row of rows) {
+      const paths = pathsByBook.get(row.bookId);
+      if (paths) paths.push(row.absolutePath);
+      else pathsByBook.set(row.bookId, [row.absolutePath]);
+    }
+
+    let updated = 0;
+    const bookIds = [...pathsByBook.keys()];
+    const batchSize = 50;
+
+    for (let i = 0; i < bookIds.length; i += batchSize) {
+      const batch = bookIds.slice(i, i + batchSize);
+      await Promise.all(
+        batch.map(async (bookId) => {
+          const paths = pathsByBook.get(bookId)!;
+          let earliest: Date | undefined;
+          for (const path of paths) {
+            const s = await stat(path).catch(() => null);
+            if (!s) continue;
+            const candidate = usableTime(s.birthtime) ?? usableTime(s.mtime);
+            if (candidate === undefined) continue;
+            if (earliest === undefined || candidate < earliest) earliest = candidate;
+          }
+          if (earliest !== undefined) {
+            await this.libraryRepo.updateBookAddedAt(bookId, earliest);
+            updated++;
+          }
+        }),
+      );
+    }
+
+    return updated;
+  }
+
   private async assertNameAvailable(name: string, excludeId?: number) {
     const existing = await this.libraryRepo.findByName(name, excludeId);
     if (existing.length > 0) throw new ConflictException('A library with this name already exists');
@@ -450,6 +532,22 @@ function getErrorMessage(error: unknown): string {
 function normalizeOrganizationMode(mode: string | null | undefined): OrganizationMode {
   if (mode === 'book_per_file') return 'book_per_file';
   return DEFAULT_LIBRARY_ORGANIZATION_MODE;
+}
+
+function normalizeAddedAtSource(source: string | null | undefined): AddedAtSource {
+  return source === 'file_modified' || source === 'file_created' ? source : DEFAULT_LIBRARY_ADDED_AT_SOURCE;
+}
+
+// Mirrors the scanner's usable-time guard: some filesystems report birthtime as
+// epoch 0 when they do not track creation time, so anything at or below this is
+// treated as unavailable.
+const MIN_VALID_TIME_MS = 1000;
+
+function usableTime(date: Date | undefined): Date | undefined {
+  if (!(date instanceof Date)) return undefined;
+  const ms = date.getTime();
+  if (Number.isNaN(ms) || ms <= MIN_VALID_TIME_MS) return undefined;
+  return date;
 }
 
 function normalizeLibraryOrganizationMode<T extends Record<string, unknown>>(library: T): T {

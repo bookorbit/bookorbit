@@ -66,6 +66,7 @@ export class ScannerRepository {
         metadataPrecedence: libraries.metadataPrecedence,
         excludePatterns: libraries.excludePatterns,
         organizationMode: libraries.organizationMode,
+        addedAtSource: libraries.addedAtSource,
       })
       .from(libraries)
       .where(eq(libraries.id, libraryId));

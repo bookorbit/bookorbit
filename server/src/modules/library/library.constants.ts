@@ -1,10 +1,12 @@
-import type { AccessLevel, CoverAspectRatio, OrganizationMode } from '@bookorbit/types';
+import type { AccessLevel, AddedAtSource, CoverAspectRatio, OrganizationMode } from '@bookorbit/types';
 
 export const LIBRARY_ACCESS_LEVELS = ['viewer', 'editor', 'owner'] as const satisfies readonly AccessLevel[];
 export const LIBRARY_COVER_ASPECT_RATIOS = ['2/3', '1/1'] as const satisfies readonly CoverAspectRatio[];
 export const LIBRARY_ORGANIZATION_MODES = ['book_per_file', 'book_per_folder'] as const satisfies readonly OrganizationMode[];
+export const LIBRARY_ADDED_AT_SOURCES = ['imported', 'file_modified', 'file_created'] as const satisfies readonly AddedAtSource[];
 
 export const DEFAULT_LIBRARY_ORGANIZATION_MODE: OrganizationMode = 'book_per_folder';
+export const DEFAULT_LIBRARY_ADDED_AT_SOURCE: AddedAtSource = 'imported';
 export const DEFAULT_LIBRARY_COVER_ASPECT_RATIO: CoverAspectRatio = '2/3';
 
 export const LIBRARY_AUTO_SCAN_CRON_EXPRESSION_REGEX = /^((\*|\d+(-\d+)?(,\d+(-\d+)?)*)(\/\d+)? ){4}(\*|\d+(-\d+)?(,\d+(-\d+)?)*)(\/\d+)?$/;

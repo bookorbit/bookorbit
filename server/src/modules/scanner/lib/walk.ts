@@ -9,6 +9,7 @@ export interface FileStat {
   ino: bigint;
   sizeBytes: number;
   mtime: Date;
+  birthtime: Date;
   format: string | null;
   role: FileRole;
 }
@@ -25,21 +26,42 @@ export interface WalkResult {
   dirMtimes: Map<string, number>;
 }
 
+// Birthtimes at or below this epoch are treated as unavailable. Some filesystems
+// report birthtime as epoch 0 (or a tiny value) when they do not track creation
+// time, so anything in that range is not a real creation date.
+const MIN_VALID_TIME_MS = 1000;
+
+function usableTime(date: Date | undefined): Date | undefined {
+  if (!(date instanceof Date)) return undefined;
+  const ms = date.getTime();
+  if (Number.isNaN(ms) || ms <= MIN_VALID_TIME_MS) return undefined;
+  return date;
+}
+
 /**
- * Derive a book's "date added" from the earliest on-disk mtime of its content
+ * Derive a book's "date added" from the earliest on-disk time of its content
  * files. This approximates when the book first landed on disk, rather than when
  * BookOrbit happened to import it. Cover/metadata/supplement sidecars are
  * excluded because they can be added later without meaning the book is "newer".
- * Returns undefined when no content file has a usable mtime, so callers can fall
- * back to the DB defaultNow() (import time).
+ *
+ * For 'file_modified' the earliest valid mtime is used. For 'file_created' the
+ * earliest valid birthtime is used, falling back to that same file's mtime when
+ * its birthtime is missing or invalid (some filesystems do not track creation
+ * time). Returns undefined when no content file yields a usable time, so callers
+ * can fall back to the DB defaultNow() (import time).
  */
-export function earliestContentMtime(files: FileStat[]): Date | undefined {
+export function earliestContentTime(files: FileStat[], source: 'file_modified' | 'file_created'): Date | undefined {
   let earliest: Date | undefined;
   for (const file of files) {
     if (file.role !== 'content') continue;
-    const { mtime } = file;
-    if (!(mtime instanceof Date) || Number.isNaN(mtime.getTime())) continue;
-    if (earliest === undefined || mtime < earliest) earliest = mtime;
+    let candidate: Date | undefined;
+    if (source === 'file_modified') {
+      candidate = usableTime(file.mtime);
+    } else {
+      candidate = usableTime(file.birthtime) ?? usableTime(file.mtime);
+    }
+    if (candidate === undefined) continue;
+    if (earliest === undefined || candidate < earliest) earliest = candidate;
   }
   return earliest;
 }
@@ -126,6 +148,7 @@ async function statFilesIntoAcc(
       ino,
       sizeBytes: Number(s.size),
       mtime: s.mtime,
+      birthtime: s.birthtime,
       format,
       role,
     });
@@ -463,6 +486,7 @@ export async function buildSingleBookCandidate(
         ino: s.ino,
         sizeBytes: Number(s.size),
         mtime: s.mtime,
+        birthtime: s.birthtime,
         format,
         role,
       } satisfies FileStat;

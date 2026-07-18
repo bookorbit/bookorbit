@@ -1,5 +1,6 @@
 export type OrganizationMode = "book_per_file" | "book_per_folder";
 export type CoverAspectRatio = "2/3" | "1/1";
+export type AddedAtSource = "imported" | "file_modified" | "file_created";
 
 export const DEFAULT_FORMAT_PRIORITY = [
   "epub",
@@ -58,6 +59,7 @@ export interface Library {
   formatPriority: string[];
   allowedFormats: string[];
   organizationMode: OrganizationMode;
+  addedAtSource: AddedAtSource;
   excludePatterns: string[];
   readingThreshold: number;
   markAsFinishedPercentComplete: number;
@@ -77,6 +79,13 @@ export interface Library {
   bookCount?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface RecomputeAddedAtResult {
+  source: AddedAtSource;
+  total: number;
+  updated: number;
+  skipped?: string;
 }
 
 export interface LibraryStats {

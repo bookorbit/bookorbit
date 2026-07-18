@@ -41,6 +41,7 @@ export enum AuditAction {
   LibraryAccessRevoke = "library.access.revoke",
   LibraryWriteMetadataToFiles = "library.write_metadata_to_files",
   LibraryBulkRename = "library.bulk_rename",
+  LibraryRecomputeAddedAt = "library.recompute_added_at",
 
   BookUpload = "book.upload",
   BookMetadataUpdate = "book.metadata.update",
