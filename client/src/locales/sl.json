@@ -4801,30 +4801,30 @@
           }
         },
         "addedAt": {
-          "title": "Date added",
-          "hint": "Choose what a book's \"date added\" reflects. This applies to books imported from now on.",
+          "title": "Datum dodajanja",
+          "hint": "Izberite, kaj predstavlja »datum dodajanja« knjige. To velja za knjige, uvožene od zdaj naprej.",
           "options": {
             "imported": {
-              "title": "When imported",
-              "hint": "The date BookOrbit first imported the book. This is the default."
+              "title": "Ob uvozu",
+              "hint": "Datum, ko je BookOrbit knjigo prvič uvozil. To je privzeta nastavitev."
             },
             "file_modified": {
-              "title": "File modified time",
-              "hint": "The file's last-modified time (mtime), often preserved when files are copied."
+              "title": "Čas spremembe datoteke",
+              "hint": "Čas zadnje spremembe datoteke (mtime), pogosto ohranjen ob kopiranju datotek."
             },
             "file_created": {
-              "title": "File creation time",
-              "hint": "When the file first landed on disk (birthtime). Falls back to modified time on filesystems that don't record creation time."
+              "title": "Čas ustvarjanja datoteke",
+              "hint": "Kdaj se je datoteka prvič pojavila na disku (birthtime). Na datotečnih sistemih, ki ne beležijo časa ustvarjanja, se vrne na čas spremembe."
             }
           },
-          "recompute": "Recompute now",
-          "recomputing": "Recomputing...",
-          "recomputeHint": "Update the date added for existing books using this setting.",
-          "recomputeSaveFirst": "Save your changes first, then recompute existing books.",
-          "recomputeConfirm": "Apply this setting to the existing books in this library now? This reads dates from disk and can take a while.",
-          "recomputeConfirmWithCount": "Apply this setting to the {count} existing books in this library now? This reads dates from disk and can take a while.",
-          "recomputeDone": "Updated {updated} of {total} books.",
-          "recomputeFailed": "Could not recompute date added."
+          "recompute": "Preračunaj zdaj",
+          "recomputing": "Preračunavanje …",
+          "recomputeHint": "Posodobi datum dodajanja obstoječih knjig s to nastavitvijo.",
+          "recomputeSaveFirst": "Najprej shranite spremembe, nato preračunajte obstoječe knjige.",
+          "recomputeConfirm": "Ali želite to nastavitev zdaj uporabiti za obstoječe knjige v tej knjižnici? To prebere datume z diska in lahko traja nekaj časa.",
+          "recomputeConfirmWithCount": "Ali želite to nastavitev zdaj uporabiti za {count} obstoječih knjig v tej knjižnici? To prebere datume z diska in lahko traja nekaj časa.",
+          "recomputeDone": "Posodobljenih {updated} od {total} knjig.",
+          "recomputeFailed": "Datuma dodajanja ni bilo mogoče preračunati."
         },
         "allowedFormats": {
           "title": "Dovoljene oblike",
