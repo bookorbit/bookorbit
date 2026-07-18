@@ -26,6 +26,25 @@ export interface WalkResult {
   dirMtimes: Map<string, number>;
 }
 
+/**
+ * Derive a book's "date added" from the earliest on-disk mtime of its content
+ * files. This approximates when the book first landed on disk, rather than when
+ * BookOrbit happened to import it. Cover/metadata/supplement sidecars are
+ * excluded because they can be added later without meaning the book is "newer".
+ * Returns undefined when no content file has a usable mtime, so callers can fall
+ * back to the DB defaultNow() (import time).
+ */
+export function earliestContentMtime(files: FileStat[]): Date | undefined {
+  let earliest: Date | undefined;
+  for (const file of files) {
+    if (file.role !== 'content') continue;
+    const { mtime } = file;
+    if (!(mtime instanceof Date) || Number.isNaN(mtime.getTime())) continue;
+    if (earliest === undefined || mtime < earliest) earliest = mtime;
+  }
+  return earliest;
+}
+
 const MAX_PATH_LENGTH = 4096;
 const DIR_CONCURRENCY_LIMIT = 50;
 

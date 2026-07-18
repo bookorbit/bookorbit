@@ -30,7 +30,15 @@ import { readdir, stat } from 'fs/promises';
 import { classifyFile, DEFAULT_FORMAT_PRIORITY, FileRole, isAudioFormat } from './lib/classify';
 import { computeFileHash } from './lib/hash';
 import { waitForStability } from './lib/stability';
-import { BookCandidate, FileStat, findBookCandidates, findLooseFileCandidates, buildSingleBookCandidate, type WalkResult } from './lib/walk';
+import {
+  BookCandidate,
+  FileStat,
+  earliestContentMtime,
+  findBookCandidates,
+  findLooseFileCandidates,
+  buildSingleBookCandidate,
+  type WalkResult,
+} from './lib/walk';
 import { ScannerRepository } from './scanner.repository';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
 import { LIBRARY_METADATA_PRECEDENCE_DEFAULT } from '../library/library.constants';
@@ -1811,11 +1819,14 @@ export class ScannerService implements OnApplicationBootstrap {
       const transferred = await this.tryTransferMissingBook(candidate, libraryId, libraryFolderId, bookByFolderPath, counts);
       if (transferred) return { ...transferred, created: false };
 
+      // date added = earliest on-disk mtime of the book's content files, falling
+      // back to import time (DB defaultNow) when no content file has a usable mtime.
       const book = await this.scannerRepo.createBook({
         libraryId,
         libraryFolderId,
         folderPath: candidate.folderPath,
         status: 'processing',
+        addedAt: earliestContentMtime(candidate.files),
       });
       counts.addedCount++;
       const entry = { id: book.id, status: book.status, folderPath: book.folderPath, primaryFileId: book.primaryFileId ?? null };
