@@ -93,7 +93,7 @@
       "themeMode": {
         "light": "Claro",
         "dark": "Escuro",
-        "system": "System"
+        "system": "Sistema"
       },
       "theme": {
         "title": "Tema",
@@ -3065,8 +3065,8 @@
     "jumpRail": {
       "jumpToSection": "Pular para a seção",
       "jumpTo": "Pular para {label}",
-      "unknownDate": "Unknown date",
-      "unknownValue": "Unknown value"
+      "unknownDate": "Data desconhecida",
+      "unknownValue": "Valor desconhecido"
     },
     "quickView": {
       "title": "Visualização rápida do livro",
@@ -4129,7 +4129,7 @@
         "display": "Exibição",
         "coverSize": "Tamanho da capa",
         "gridGap": "Espaçamento da grade",
-        "showJumpRails": "Show jump rails",
+        "showJumpRails": "Mostrar trilhos de salto",
         "columnsHint": "Use o painel de visibilidade de colunas no cabeçalho da tabela para mostrar ou ocultar colunas.",
         "coverShape": "Formato da capa",
         "circle": "Círculo",
@@ -4157,7 +4157,7 @@
     "themePicker": {
       "light": "Claro",
       "dark": "Escuro",
-      "system": "System"
+      "system": "Sistema"
     },
     "userAvatar": {
       "profilePicture": "Foto de perfil",
@@ -5863,7 +5863,7 @@
     "header": {
       "entityManager": "Gerenciador de Entidades",
       "bulkRename": "Renomeação em Massa",
-      "duplicateBooks": "Duplicate Books"
+      "duplicateBooks": "Livros duplicados"
     },
     "entityTypes": {
       "authors": "Autores",
@@ -5875,8 +5875,8 @@
       "series": "Séries"
     },
     "bulkRename": {
-      "previewToolbar": "Rename preview",
-      "renameSettings": "Rename settings",
+      "previewToolbar": "Pré-visualização da renomeação",
+      "renameSettings": "Renomear configurações",
       "library": "Biblioteca",
       "selectLibraryPlaceholder": "Selecione uma biblioteca...",
       "noEligibleLibraries": "Nenhuma biblioteca possui a renomeação de arquivos ativada. Ative isso em Configurações da Biblioteca.",
@@ -5931,84 +5931,84 @@
       }
     },
     "bookDuplicates": {
-      "scanSettings": "Scan settings",
-      "title": "Duplicate Books",
-      "description": "Scan files and metadata for potential duplicate records. Nothing is deleted during a scan.",
-      "scope": "Library scope",
-      "allLibraries": "All accessible libraries",
-      "similarity": "Similar-title threshold",
-      "explainSimilarity": "Explain the similar-title threshold",
-      "similarityHelp": "Only for Similar title and author matches. At least one author and the book type must also match. Lower finds more possible duplicates; higher requires closer titles. Identical files, ISBN, and exact metadata are checked separately.",
-      "runScan": "Run scan",
-      "rescan": "Rescan",
+      "scanSettings": "Configuração das Análises",
+      "title": "Livros duplicados",
+      "description": "Verificar arquivos e metadados para potenciais registros duplicados. Nada é excluído durante uma verificação.",
+      "scope": "Escopo de Biblioteca",
+      "allLibraries": "Todas as bibliotecas acessíveis",
+      "similarity": "Limite de título semelhante",
+      "explainSimilarity": "Explicar o limite de títulos similares",
+      "similarityHelp": "Apenas para títulos semelhantes e partidas de autor. Pelo menos um autor e o tipo de livro devem também corresponder. Baixar encontra mais duplicações possíveis; superior requer títulos mais próximos. Arquivos idênticos, ISBN e metadados exatos são verificados separadamente.",
+      "runScan": "Executar varredura",
+      "rescan": "Reescanear",
       "status": {
-        "queued": "Scan queued",
-        "running": "Scanning books"
+        "queued": "Escaneamento na fila",
+        "running": "Analisando livros"
       },
-      "groupsFound": "No duplicate groups | One duplicate group | {count} duplicate groups",
-      "filter": "Match type",
-      "allReasons": "All match types",
+      "groupsFound": "Sem grupos duplicados | Um grupo duplicado | {count} grupos duplicados",
+      "filter": "Tipo de correspondência",
+      "allReasons": "Todos os tipos de correspondência",
       "reasons": {
-        "file_hash": "Identical file set",
-        "isbn": "Same ISBN",
-        "exact_metadata": "Exact title and authors",
-        "fuzzy_metadata": "Similar title and author"
+        "file_hash": "Conjunto de arquivos idênticos",
+        "isbn": "Mesmo ISBN",
+        "exact_metadata": "Título exato e autores",
+        "fuzzy_metadata": "Título semelhante e autor"
       },
-      "similarityValue": "{percent}% title similarity",
-      "notDuplicates": "Not duplicates",
-      "keepThis": "Keep this book",
-      "discardThis": "Discard this book",
-      "selectKeeperFirst": "Select a keeper first",
-      "noDirectMatch": "No direct match with keeper",
-      "moreFiles": "+{count} more",
-      "showDetails": "Show details",
-      "hideDetails": "Hide details",
-      "deleteSelected": "Delete {count} selected",
-      "openBook": "Open details for {title}",
-      "unknownAuthor": "Unknown author",
-      "unknown": "Unknown",
-      "none": "None",
-      "accessDenied": "You do not have permission to use the duplicate book tool.",
-      "pairDetails": "Match details",
-      "pairLabel": "{first} and {second}",
+      "similarityValue": "{percent}% de similaridade do título",
+      "notDuplicates": "Não duplicados",
+      "keepThis": "Mantenha este livro",
+      "discardThis": "Descartar este livro",
+      "selectKeeperFirst": "Selecione um keeper primeiro",
+      "noDirectMatch": "Nenhum resultado direto com o keeper",
+      "moreFiles": "+{count} mais",
+      "showDetails": "Mostrar detalhes",
+      "hideDetails": "Ocultar detalhes",
+      "deleteSelected": "Deletar {count} selecionado",
+      "openBook": "Abrir detalhes do {title}",
+      "unknownAuthor": "Autor desconhecido",
+      "unknown": "Desconhecido",
+      "none": "Nenhum",
+      "accessDenied": "Você não tem permissão para usar a ferramenta de livro duplicado.",
+      "pairDetails": "Detalhes da correspondência",
+      "pairLabel": "{first} e {second}",
       "fields": {
-        "library": "Library",
+        "library": "Biblioteca",
         "isbn": "ISBN",
-        "formats": "Formats",
-        "fileLocation": "File",
-        "files": "Files",
-        "readingStatus": "Reading status",
-        "progress": "Progress",
-        "path": "Library path",
-        "collections": "Collections",
-        "added": "Added",
-        "updated": "Updated"
+        "formats": "Formatos",
+        "fileLocation": "Arquivo",
+        "files": "Arquivos",
+        "readingStatus": "Status de Leitura",
+        "progress": "Progresso",
+        "path": "Local da biblioteca",
+        "collections": "Coleções",
+        "added": "Adicionado",
+        "updated": "Atualizado"
       },
       "initial": {
-        "title": "Find duplicate books",
-        "description": "Choose a library scope and similarity level, then run a scan. No books are changed until you explicitly confirm a deletion."
+        "title": "Localizar livros duplicados",
+        "description": "Escolha o escopo de uma biblioteca e nível de similaridade e, em seguida, execute uma varredura. Nenhum livro será alterado até que você confirme explicitamente uma exclusão."
       },
       "empty": {
-        "title": "No duplicate groups found",
-        "description": "No books matched the current scope, similarity level, and match filter."
+        "title": "Nenhum grupo duplicado encontrado",
+        "description": "Nenhum livro corresponde ao escopo atual, nível de similaridade e filtro correspondente."
       },
       "deleteDialog": {
-        "title": "Permanently delete duplicate books?",
-        "description": "This will permanently delete {count} selected book and its files. | This will permanently delete {count} selected book and its files. | This will permanently delete {count} selected books and their files.",
-        "warning": "Metadata, collections, reading data, and device state are not transferred to the kept book. Associated data for other users is also removed.",
-        "confirm": "Delete {count} book | Delete {count} book | Delete {count} books",
-        "success": "No books deleted | One duplicate book deleted | {count} duplicate books deleted"
+        "title": "Excluir livros duplicados permanentemente?",
+        "description": "Isto irá excluir permanentemente o livro {count} selecionado e seus arquivos. This irá excluir permanentemente o livro selecionado do {count} e seus arquivos. £Isso irá apagar permanentemente os livros selecionados do {count} e seus arquivos.",
+        "warning": "Metadados, coleções, leitura de dados e estado do dispositivo não são transferidos para o livro mantido. Dados associados para outros usuários também são removidos.",
+        "confirm": "Excluir {count} livro? | Excluir {count} livro? | Excluir {count} livros",
+        "success": "Nenhum livro foi deletado. Um livro duplicado foi excluído ™️ {count} livros duplicados excluídos"
       },
       "errors": {
-        "start": "Could not start the duplicate scan.",
-        "status": "Could not load scan progress.",
-        "scan": "The duplicate scan failed. Try running it again.",
-        "results": "Could not load duplicate groups.",
-        "delete": "Could not delete the selected duplicate books."
+        "start": "Não foi possível iniciar o escaneamento duplicado.",
+        "status": "Não foi possível carregar o progresso do escaneamento.",
+        "scan": "A verificação de duplicada falhou. Tente executar novamente.",
+        "results": "Não foi possível carregar grupos duplicados.",
+        "delete": "Não foi possível excluir os livros duplicados selecionados."
       },
       "pagination": {
-        "label": "Duplicate groups pages",
-        "page": "Page {page} of {total}"
+        "label": "Páginas de grupos duplicados",
+        "page": "Página {page} de {total}"
       }
     },
     "entityManager": {
@@ -6302,7 +6302,7 @@
     "series": "Séries",
     "entityManager": "Gerenciador de Entidades",
     "bulkRename": "Renomeação em Massa",
-    "duplicateBooks": "Duplicate Books",
+    "duplicateBooks": "Livros duplicados",
     "notFound": "Não Encontrado",
     "signIn": "Entrar",
     "initialSetup": "Configuração Inicial",
