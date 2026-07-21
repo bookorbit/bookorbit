@@ -7,6 +7,7 @@ const DOCKER_IMAGE = "ghcr.io/bookorbit/bookorbit";
 const TYPES = [
   { type: "feat", section: "Features" },
   { type: "fix", section: "Bug Fixes" },
+  { type: "i18n", section: "Internationalization" },
   { type: "security", section: "Security" },
   { type: "perf", section: "Performance" },
   { type: "db", section: "Database" },
@@ -199,6 +200,7 @@ module.exports = {
         releaseRules: [
           { type: "feat", release: "minor" },
           { type: "fix", release: "patch" },
+          { type: "i18n", release: "patch" },
           { type: "perf", release: "patch" },
           { type: "security", release: "patch" },
           { type: "db", release: "patch" },

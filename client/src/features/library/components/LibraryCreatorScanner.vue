@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Lock, Plus, X } from '@lucide/vue'
 import type { OrganizationMode } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { FORMAT_LABELS } from '../composables/useLibraryCreator'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   organizationMode: OrganizationMode
@@ -19,9 +22,6 @@ const emit = defineEmits<{
 }>()
 
 // ── Scan mode ─────────────────────────────────────────────────────────────────
-
-const ORGANIZATION_MODE_LOCK_TOOLTIP =
-  'Organization mode is fixed after library creation because changing it can create duplicate or missing book entries. To use a different mode, create a new library and rescan.'
 
 function handleSelectMode(mode: OrganizationMode) {
   if (props.organizationModeLocked) return
@@ -86,18 +86,18 @@ function onPatternKeydown(e: KeyboardEvent) {
     <!-- Scan mode -->
     <div>
       <div class="flex items-center gap-2 mb-3">
-        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">Scan mode</p>
+        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">{{ t('library.creator.scanner.scanMode.title') }}</p>
         <Tooltip v-if="organizationModeLocked">
           <TooltipTrigger as-child>
             <span
               class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border text-muted-foreground cursor-help"
-              aria-label="Organization mode is locked"
+              :aria-label="t('library.creator.scanner.scanMode.lockedAria')"
             >
               <Lock :size="11" />
             </span>
           </TooltipTrigger>
           <TooltipContent class="max-w-72 text-xs leading-relaxed">
-            {{ ORGANIZATION_MODE_LOCK_TOOLTIP }}
+            {{ t('library.creator.scanner.scanMode.lockTooltip') }}
           </TooltipContent>
         </Tooltip>
       </div>
@@ -121,10 +121,10 @@ function onPatternKeydown(e: KeyboardEvent) {
             >
               <span v-if="organizationMode === 'book_per_folder'" class="w-1.5 h-1.5 rounded-full bg-primary" />
             </span>
-            <span class="text-sm font-semibold text-foreground">Folder as Book</span>
+            <span class="text-sm font-semibold text-foreground">{{ t('library.creator.scanner.scanMode.folderAsBook.title') }}</span>
           </div>
           <p class="text-xs text-muted-foreground leading-relaxed">
-            All files in a folder are grouped into one book. Works well when you keep multiple formats, like EPUB and MOBI, together.
+            {{ t('library.creator.scanner.scanMode.folderAsBook.hint') }}
           </p>
         </button>
 
@@ -147,11 +147,10 @@ function onPatternKeydown(e: KeyboardEvent) {
             >
               <span v-if="organizationMode === 'book_per_file'" class="w-1.5 h-1.5 rounded-full bg-primary" />
             </span>
-            <span class="text-sm font-semibold text-foreground">File as Book</span>
+            <span class="text-sm font-semibold text-foreground">{{ t('library.creator.scanner.scanMode.fileAsBook.title') }}</span>
           </div>
           <p class="text-xs text-muted-foreground leading-relaxed">
-            Treats every file as an individual book. Best suited for libraries with one format per title. Avoid if your audiobooks span multiple
-            files.
+            {{ t('library.creator.scanner.scanMode.fileAsBook.hint') }}
           </p>
         </button>
       </div>
@@ -162,18 +161,24 @@ function onPatternKeydown(e: KeyboardEvent) {
       <!-- Allowed formats -->
       <div class="mb-8">
         <div class="flex items-center justify-between mb-1">
-          <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">Allowed formats</p>
+          <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">
+            {{ t('library.creator.scanner.allowedFormats.title') }}
+          </p>
           <button
             v-if="allowedFormats.length > 0"
             type="button"
             class="text-xs text-muted-foreground hover:text-foreground transition-colors"
             @click="selectAllFormats"
           >
-            Allow all
+            {{ t('library.creator.scanner.allowedFormats.allowAll') }}
           </button>
         </div>
         <p class="text-xs text-muted-foreground mb-3">
-          {{ allowedFormats.length === 0 ? 'All formats are allowed.' : 'Only the selected formats will be imported.' }}
+          {{
+            allowedFormats.length === 0
+              ? t('library.creator.scanner.allowedFormats.allAllowed')
+              : t('library.creator.scanner.allowedFormats.onlySelected')
+          }}
         </p>
         <div class="flex flex-wrap gap-2">
           <button
@@ -199,9 +204,12 @@ function onPatternKeydown(e: KeyboardEvent) {
 
       <!-- Exclude patterns -->
       <div>
-        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-1">Exclude patterns</p>
+        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-1">
+          {{ t('library.creator.scanner.excludePatterns.title') }}
+        </p>
         <p class="text-xs text-muted-foreground mb-3">
-          Glob patterns to skip during scanning (e.g. <code class="font-mono bg-muted px-1 rounded">**/samples/**</code>).
+          {{ t('library.creator.scanner.excludePatterns.hintBefore') }} <code class="font-mono bg-muted px-1 rounded">**/samples/**</code
+          >{{ t('library.creator.scanner.excludePatterns.hintAfter') }}
         </p>
         <div class="flex gap-2 mb-2">
           <input
@@ -218,11 +226,13 @@ function onPatternKeydown(e: KeyboardEvent) {
             @click="addPattern"
           >
             <Plus :size="13" />
-            Add
+            {{ t('library.creator.scanner.excludePatterns.add') }}
           </button>
         </div>
         <div class="min-h-[40px] rounded-md border border-border bg-muted/30 p-2 flex flex-wrap gap-1.5 overflow-y-auto" style="max-height: 80px">
-          <span v-if="excludePatterns.length === 0" class="text-xs text-muted-foreground/50 self-center px-1"> No patterns added. </span>
+          <span v-if="excludePatterns.length === 0" class="text-xs text-muted-foreground/50 self-center px-1">
+            {{ t('library.creator.scanner.excludePatterns.empty') }}
+          </span>
           <span
             v-for="(pattern, i) in excludePatterns"
             :key="pattern"

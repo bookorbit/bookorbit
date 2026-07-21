@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Check, ChevronRight, ChevronUp, Folder, FolderOpen, FolderPlus, HardDrive, Info, Loader2, Search, X } from '@lucide/vue'
 import { RecycleScroller } from 'vue-virtual-scroller'
 import { useModal } from '@/composables/useModal'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useFolderBrowser } from '../composables/useFolderBrowser'
+
+const { t } = useI18n()
 
 const props = withDefaults(
   defineProps<{
@@ -95,34 +98,37 @@ useModal({
           <div class="flex min-w-0 items-start gap-2.5">
             <HardDrive :size="18" class="mt-0.5 shrink-0 text-primary" />
             <div class="min-w-0">
-              <h2 id="folder-picker-title" class="text-base font-semibold text-foreground">Browse server folders</h2>
-              <p id="folder-picker-description" class="text-xs text-muted-foreground">Select one or more folders for this library.</p>
+              <h2 id="folder-picker-title" class="text-base font-semibold text-foreground">{{ t('library.folderPicker.title') }}</h2>
+              <p id="folder-picker-description" class="text-xs text-muted-foreground">{{ t('library.folderPicker.description') }}</p>
             </div>
           </div>
           <button
             type="button"
             class="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            aria-label="Close folder browser"
+            :aria-label="t('library.folderPicker.closeAria')"
             @click="requestClose"
           >
             <X :size="18" />
           </button>
         </header>
 
-        <nav class="flex h-9 shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-muted/25 px-3" aria-label="Current folder">
+        <nav
+          class="flex h-9 shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-muted/25 px-3"
+          :aria-label="t('library.folderPicker.currentFolderAria')"
+        >
           <Tooltip>
             <TooltipTrigger as-child>
               <button
                 type="button"
                 class="mr-1 flex size-7 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-30"
                 :disabled="!canGoUp"
-                aria-label="Go to parent folder"
+                :aria-label="t('library.folderPicker.parentFolder')"
                 @click="goUp"
               >
                 <ChevronUp :size="14" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Go to parent folder</TooltipContent>
+            <TooltipContent>{{ t('library.folderPicker.parentFolder') }}</TooltipContent>
           </Tooltip>
           <template v-for="(crumb, index) in breadcrumbs" :key="crumb.path">
             <ChevronRight v-if="index > 0" :size="12" class="shrink-0 text-muted-foreground/60" />
@@ -147,14 +153,14 @@ useModal({
             <input
               v-model="search"
               type="text"
-              placeholder="Filter this folder"
+              :placeholder="t('library.folderPicker.filterPlaceholder')"
               class="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
             />
             <button
               v-if="search"
               type="button"
               class="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-              aria-label="Clear folder filter"
+              :aria-label="t('library.folderPicker.clearFilterAria')"
               @click="clearSearch"
             >
               <X :size="14" />
@@ -166,7 +172,7 @@ useModal({
             @click="toggleNewFolder"
           >
             <FolderPlus :size="15" />
-            New folder
+            {{ t('library.folderPicker.newFolder') }}
           </button>
         </div>
 
@@ -180,7 +186,7 @@ useModal({
                 ref="newFolderInput"
                 v-model="newFolderName"
                 type="text"
-                placeholder="New folder name"
+                :placeholder="t('library.folderPicker.newFolderNamePlaceholder')"
                 class="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
                 @keydown="onNewFolderKeydown"
               />
@@ -193,14 +199,14 @@ useModal({
                 @click="submitNewFolder"
               >
                 <Loader2 v-if="createLoading" :size="15" class="animate-spin" />
-                Create
+                {{ t('library.folderPicker.create') }}
               </button>
               <button
                 type="button"
                 class="h-9 rounded-md border border-border px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 @click="cancelNewFolder"
               >
-                Cancel
+                {{ t('common.cancel') }}
               </button>
             </div>
           </div>
@@ -210,14 +216,14 @@ useModal({
         <div class="min-h-0 flex-1 overflow-hidden">
           <div v-if="loading" class="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
             <Loader2 :size="24" class="animate-spin" />
-            <p class="text-sm">Loading folders...</p>
+            <p class="text-sm">{{ t('library.folderPicker.loading') }}</p>
           </div>
 
           <div v-else-if="error" class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
             <FolderOpen :size="30" class="text-muted-foreground/60" />
             <p class="text-sm text-muted-foreground">{{ error }}</p>
             <button type="button" class="h-10 rounded-lg border border-border px-4 text-sm font-medium hover:bg-muted" @click="reloadCurrent">
-              Retry
+              {{ t('reader.retry') }}
             </button>
           </div>
 
@@ -234,7 +240,7 @@ useModal({
                 @change="toggleCurrentPath"
               />
               <FolderOpen :size="17" class="shrink-0 text-primary" />
-              <span class="min-w-0 flex-1 truncate text-sm font-medium text-foreground">Select current folder</span>
+              <span class="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{{ t('library.folderPicker.selectCurrent') }}</span>
               <span class="max-w-40 truncate font-mono text-xs text-muted-foreground">{{ currentPath }}</span>
               <span
                 v-if="existingPathStatus(currentPath) || selectedPathStatus(currentPath)"
@@ -246,9 +252,11 @@ useModal({
 
             <div v-if="filteredEntries.length === 0" class="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
               <Folder :size="28" class="text-muted-foreground/50" />
-              <p class="text-sm font-medium text-foreground">{{ search ? 'No matching folders' : 'This folder is empty' }}</p>
+              <p class="text-sm font-medium text-foreground">
+                {{ search ? t('library.folderPicker.noMatches') : t('library.folderPicker.empty') }}
+              </p>
               <p class="text-sm text-muted-foreground">
-                {{ search ? 'Try a different filter.' : 'You can select the current folder or create a new one.' }}
+                {{ search ? t('library.folderPicker.noMatchesHint') : t('library.folderPicker.emptyHint') }}
               </p>
             </div>
 
@@ -280,7 +288,7 @@ useModal({
                   <button
                     type="button"
                     class="flex size-10 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    :aria-label="`Open ${entry.name}`"
+                    :aria-label="t('library.folderPicker.openFolderAria', { name: entry.name })"
                     @click="navigate(entry.path)"
                   >
                     <ChevronRight :size="16" />
@@ -297,14 +305,16 @@ useModal({
             <span>{{ selectionNotice }}</span>
           </div>
           <div class="flex items-center justify-between gap-3">
-            <p class="text-sm text-muted-foreground">{{ selectedCount }} folder{{ selectedCount === 1 ? '' : 's' }} selected</p>
+            <p class="text-sm text-muted-foreground">
+              {{ t('library.folderPicker.selectedCount', { count: selectedCount }, selectedCount) }}
+            </p>
             <div class="flex shrink-0 items-center gap-2">
               <button
                 type="button"
                 class="h-9 rounded-md border border-border px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 @click="requestClose"
               >
-                Cancel
+                {{ t('common.cancel') }}
               </button>
               <button
                 type="button"

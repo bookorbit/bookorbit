@@ -253,6 +253,7 @@ export class KoboSyncController {
         settings.readingThreshold,
         settings.finishedThreshold,
         settings.twoWayProgressSync,
+        device.deviceId,
       );
       await this.historyService.recordSuccess({
         userId: user.id,

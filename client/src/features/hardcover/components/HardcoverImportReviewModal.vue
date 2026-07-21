@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { CheckCircle2, ChevronLeft, ChevronRight, Download, Search, X, XCircle } from '@lucide/vue'
 import type { HardcoverImportMatchMethod, HardcoverImportPreview, HardcoverImportPreviewOutcome, HardcoverImportPreviewRow } from '@bookorbit/types'
 import { useModal } from '@/composables/useModal'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   preview: HardcoverImportPreview
@@ -41,20 +44,20 @@ useModal({
 })
 
 const tabs = computed<Array<{ id: OutcomeTab; label: string; count: number }>>(() => [
-  { id: 'all', label: 'All', count: props.preview.rows.length },
-  { id: 'will_update', label: 'Ready', count: props.preview.summary.willUpdate },
-  { id: 'needs_review', label: 'Review', count: props.preview.summary.needsReview },
-  { id: 'conflict', label: 'Conflicts', count: props.preview.summary.conflicts },
-  { id: 'unmatched', label: 'Unmatched', count: props.preview.summary.unmatched },
-  { id: 'skipped', label: 'Skipped', count: props.preview.summary.skipped },
+  { id: 'all', label: t('hardcover.review.tabs.all'), count: props.preview.rows.length },
+  { id: 'will_update', label: t('hardcover.review.tabs.ready'), count: props.preview.summary.willUpdate },
+  { id: 'needs_review', label: t('hardcover.review.tabs.review'), count: props.preview.summary.needsReview },
+  { id: 'conflict', label: t('hardcover.review.tabs.conflicts'), count: props.preview.summary.conflicts },
+  { id: 'unmatched', label: t('hardcover.review.tabs.unmatched'), count: props.preview.summary.unmatched },
+  { id: 'skipped', label: t('hardcover.review.tabs.skipped'), count: props.preview.summary.skipped },
 ])
 
-const matchOptions: Array<{ value: MatchFilter; label: string }> = [
-  { value: 'all', label: 'All match types' },
-  { value: 'hardcover_id', label: 'Hardcover ID' },
-  { value: 'isbn', label: 'ISBN' },
-  { value: 'title_author', label: 'Title + author' },
-]
+const matchOptions = computed<Array<{ value: MatchFilter; label: string }>>(() => [
+  { value: 'all', label: t('hardcover.review.matchOptions.all') },
+  { value: 'hardcover_id', label: t('hardcover.review.matchMethod.hardcoverId') },
+  { value: 'isbn', label: t('hardcover.review.matchMethod.isbn') },
+  { value: 'title_author', label: t('hardcover.review.matchMethod.titleAuthor') },
+])
 
 const filteredRows = computed(() => {
   const term = normalizeSearch(search.value)
@@ -87,7 +90,9 @@ const selectedReviewCount = computed(
 const selectedProgressCount = computed(
   () => props.preview.rows.filter((row) => row.progressOutcome === 'will_update' && selectedIds.value.has(row.hardcoverUserBookId)).length,
 )
-const selectedProgressLabel = computed(() => `${selectedProgressCount.value} progress update${selectedProgressCount.value === 1 ? '' : 's'}`)
+const selectedProgressLabel = computed(() =>
+  t('hardcover.review.selectedProgress', { count: selectedProgressCount.value }, selectedProgressCount.value),
+)
 const visibleImportableRows = computed(() => pagedRows.value.filter(isImportableRow))
 const allVisibleSelected = computed(
   () => visibleImportableRows.value.length > 0 && visibleImportableRows.value.every((row) => selectedIds.value.has(row.hardcoverUserBookId)),
@@ -160,7 +165,7 @@ function isImportableRow(row: HardcoverImportPreviewRow): boolean {
 }
 
 function rowTitle(row: HardcoverImportPreviewRow): string {
-  return row.localTitle ?? row.hardcoverTitle ?? 'Untitled'
+  return row.localTitle ?? row.hardcoverTitle ?? t('hardcover.review.untitled')
 }
 
 function rowSubtitle(row: HardcoverImportPreviewRow): string {
@@ -173,11 +178,11 @@ function rowSubtitle(row: HardcoverImportPreviewRow): string {
 function matchMethodLabel(row: HardcoverImportPreviewRow): string {
   switch (row.matchMethod) {
     case 'hardcover_id':
-      return 'Hardcover ID'
+      return t('hardcover.review.matchMethod.hardcoverId')
     case 'isbn':
-      return 'ISBN'
+      return t('hardcover.review.matchMethod.isbn')
     case 'title_author':
-      return 'Title + author'
+      return t('hardcover.review.matchMethod.titleAuthor')
     default:
       return '-'
   }
@@ -188,7 +193,7 @@ function statusLabel(row: HardcoverImportPreviewRow): string {
 }
 
 function localStatusLabel(row: HardcoverImportPreviewRow): string {
-  return row.localReadStatus?.replaceAll('_', ' ') ?? 'blank'
+  return row.localReadStatus?.replaceAll('_', ' ') ?? t('hardcover.review.blank')
 }
 
 function confidenceLabel(row: HardcoverImportPreviewRow): string {
@@ -203,11 +208,11 @@ function progressLabel(value: number | null): string {
 function progressOutcomeLabel(row: HardcoverImportPreviewRow): string {
   switch (row.progressOutcome) {
     case 'will_update':
-      return 'Ready'
+      return t('hardcover.review.outcome.ready')
     case 'conflict':
-      return 'Conflict'
+      return t('hardcover.review.outcome.conflict')
     case 'skipped':
-      return 'Skipped'
+      return t('hardcover.review.outcome.skipped')
   }
 }
 
@@ -225,15 +230,15 @@ function progressOutcomeClass(row: HardcoverImportPreviewRow): string {
 function outcomeLabel(row: HardcoverImportPreviewRow): string {
   switch (row.outcome) {
     case 'will_update':
-      return 'Ready'
+      return t('hardcover.review.outcome.ready')
     case 'needs_review':
-      return 'Review'
+      return t('hardcover.review.outcome.review')
     case 'conflict':
-      return 'Conflict'
+      return t('hardcover.review.outcome.conflict')
     case 'unmatched':
-      return 'Unmatched'
+      return t('hardcover.review.outcome.unmatched')
     case 'skipped':
-      return 'Skipped'
+      return t('hardcover.review.outcome.skipped')
   }
 }
 
@@ -274,9 +279,9 @@ function normalizeSearch(value: string): string {
       >
         <header class="flex shrink-0 items-start justify-between gap-4 border-b border-border px-4 py-3 md:px-5">
           <div class="min-w-0">
-            <h2 id="hardcover-import-review-title" class="text-sm font-semibold">Hardcover import review</h2>
+            <h2 id="hardcover-import-review-title" class="text-sm font-semibold">{{ t('hardcover.review.title') }}</h2>
             <p class="mt-0.5 text-xs text-muted-foreground">
-              {{ preview.summary.totalHardcoverBooks }} Hardcover books, {{ preview.summary.matchedBooks }} matched.
+              {{ t('hardcover.review.subtitle', { total: preview.summary.totalHardcoverBooks, matched: preview.summary.matchedBooks }) }}
             </p>
           </div>
           <button
@@ -284,7 +289,7 @@ function normalizeSearch(value: string): string {
             type="button"
             class="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
             :disabled="applying"
-            aria-label="Close import review"
+            :aria-label="t('hardcover.review.closeAriaLabel')"
             @click="handleClose"
           >
             <X class="size-4" />
@@ -293,23 +298,23 @@ function normalizeSearch(value: string): string {
 
         <div class="grid shrink-0 grid-cols-2 gap-2 border-b border-border px-4 py-3 sm:grid-cols-5 md:px-5">
           <div class="min-w-0 rounded-md border border-border bg-card px-3 py-2">
-            <p class="text-[10px] uppercase tracking-wider text-muted-foreground">Ready</p>
+            <p class="text-[10px] uppercase tracking-wider text-muted-foreground">{{ t('hardcover.review.summary.ready') }}</p>
             <p class="text-lg font-semibold tabular-nums">{{ preview.summary.willUpdate }}</p>
           </div>
           <div class="min-w-0 rounded-md border border-border bg-card px-3 py-2">
-            <p class="text-[10px] uppercase tracking-wider text-muted-foreground">Review</p>
+            <p class="text-[10px] uppercase tracking-wider text-muted-foreground">{{ t('hardcover.review.summary.review') }}</p>
             <p class="text-lg font-semibold tabular-nums">{{ preview.summary.needsReview }}</p>
           </div>
           <div class="min-w-0 rounded-md border border-border bg-card px-3 py-2">
-            <p class="text-[10px] uppercase tracking-wider text-muted-foreground">Conflicts</p>
+            <p class="text-[10px] uppercase tracking-wider text-muted-foreground">{{ t('hardcover.review.summary.conflicts') }}</p>
             <p class="text-lg font-semibold tabular-nums">{{ preview.summary.conflicts }}</p>
           </div>
           <div class="min-w-0 rounded-md border border-border bg-card px-3 py-2">
-            <p class="text-[10px] uppercase tracking-wider text-muted-foreground">Unmatched</p>
+            <p class="text-[10px] uppercase tracking-wider text-muted-foreground">{{ t('hardcover.review.summary.unmatched') }}</p>
             <p class="text-lg font-semibold tabular-nums">{{ preview.summary.unmatched }}</p>
           </div>
           <div class="min-w-0 rounded-md border border-border bg-card px-3 py-2">
-            <p class="text-[10px] uppercase tracking-wider text-muted-foreground">Skipped</p>
+            <p class="text-[10px] uppercase tracking-wider text-muted-foreground">{{ t('hardcover.review.summary.skipped') }}</p>
             <p class="text-lg font-semibold tabular-nums">{{ preview.summary.skipped }}</p>
           </div>
         </div>
@@ -322,7 +327,7 @@ function normalizeSearch(value: string): string {
                 v-model="search"
                 type="search"
                 class="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none transition-shadow focus:ring-2 focus:ring-primary/40"
-                placeholder="Search title or author"
+                :placeholder="t('hardcover.review.searchPlaceholder')"
               />
             </label>
             <select
@@ -338,7 +343,7 @@ function normalizeSearch(value: string): string {
                 class="size-4 rounded border-border text-primary focus:ring-primary/40"
                 :disabled="applying"
               />
-              <span>Import progress</span>
+              <span>{{ t('hardcover.review.importProgress') }}</span>
             </label>
           </div>
 
@@ -358,12 +363,12 @@ function normalizeSearch(value: string): string {
 
           <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <p class="text-xs text-muted-foreground">
-              {{ selectedCount }} selected: {{ selectedReadyCount }} ready, {{ selectedReviewCount }} reviewed.
+              {{ t('hardcover.review.selectionSummary', { count: selectedCount, ready: selectedReadyCount, reviewed: selectedReviewCount }) }}
               <span v-if="importProgressModel">{{ selectedProgressLabel }}.</span>
             </p>
             <div class="flex flex-wrap gap-2">
               <button type="button" class="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted" @click="handleSelectSafe">
-                Select ready
+                {{ t('hardcover.review.selectReady') }}
               </button>
               <button
                 type="button"
@@ -371,7 +376,7 @@ function normalizeSearch(value: string): string {
                 :disabled="visibleImportableRows.length === 0 || allVisibleSelected"
                 @click="handleSelectVisible"
               >
-                Select page
+                {{ t('hardcover.review.selectPage') }}
               </button>
               <button
                 type="button"
@@ -379,7 +384,7 @@ function normalizeSearch(value: string): string {
                 :disabled="visibleImportableRows.length === 0"
                 @click="handleClearVisible"
               >
-                Clear page
+                {{ t('hardcover.review.clearPage') }}
               </button>
               <button
                 type="button"
@@ -387,14 +392,14 @@ function normalizeSearch(value: string): string {
                 :disabled="selectedCount === 0"
                 @click="handleClearSelection"
               >
-                Clear selection
+                {{ t('hardcover.review.clearSelection') }}
               </button>
             </div>
           </div>
         </div>
 
         <div class="min-h-0 flex-1 overflow-y-auto">
-          <div v-if="pagedRows.length === 0" class="px-4 py-10 text-center text-sm text-muted-foreground">No rows match the current filters.</div>
+          <div v-if="pagedRows.length === 0" class="px-4 py-10 text-center text-sm text-muted-foreground">{{ t('hardcover.review.noRows') }}</div>
 
           <div v-else class="divide-y divide-border">
             <article
@@ -408,7 +413,7 @@ function normalizeSearch(value: string): string {
                   class="mt-1 size-4 rounded border-border text-primary focus:ring-primary/40 disabled:opacity-30"
                   :checked="selectedIds.has(row.hardcoverUserBookId)"
                   :disabled="!isImportableRow(row) || applying"
-                  :aria-label="`Select ${rowTitle(row)}`"
+                  :aria-label="t('hardcover.review.selectRowAriaLabel', { title: rowTitle(row) })"
                   @change="toggleRow(row)"
                 />
               </div>
@@ -432,7 +437,7 @@ function normalizeSearch(value: string): string {
               </div>
 
               <div class="min-w-0 text-xs">
-                <p class="font-medium text-muted-foreground">Progress</p>
+                <p class="font-medium text-muted-foreground">{{ t('hardcover.review.column.progress') }}</p>
                 <p class="truncate">{{ progressLabel(row.importedProgressPercent) }} Hardcover</p>
                 <p class="truncate text-muted-foreground">{{ progressLabel(row.localProgressPercent) }} BookOrbit</p>
                 <p class="truncate" :class="progressOutcomeClass(row)">{{ progressOutcomeLabel(row) }}</p>
@@ -452,17 +457,19 @@ function normalizeSearch(value: string): string {
               type="button"
               class="rounded-md border border-border p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-40"
               :disabled="!canGoPrevious"
-              aria-label="Previous page"
+              :aria-label="t('hardcover.review.previousPage')"
               @click="goPrevious"
             >
               <ChevronLeft class="size-4" />
             </button>
-            <p class="text-xs text-muted-foreground">{{ displayStart }}-{{ displayEnd }} of {{ filteredRows.length }}</p>
+            <p class="text-xs text-muted-foreground">
+              {{ t('hardcover.review.pageRange', { start: displayStart, end: displayEnd, total: filteredRows.length }) }}
+            </p>
             <button
               type="button"
               class="rounded-md border border-border p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-40"
               :disabled="!canGoNext"
-              aria-label="Next page"
+              :aria-label="t('hardcover.review.nextPage')"
               @click="goNext"
             >
               <ChevronRight class="size-4" />
@@ -477,7 +484,7 @@ function normalizeSearch(value: string): string {
               @click="handleClose"
             >
               <XCircle class="size-3.5" />
-              Close
+              {{ t('common.close') }}
             </button>
             <button
               type="button"
@@ -487,7 +494,7 @@ function normalizeSearch(value: string): string {
             >
               <CheckCircle2 v-if="applying" class="size-3.5 animate-pulse" />
               <Download v-else class="size-3.5" />
-              Import selected
+              {{ t('hardcover.review.importSelected') }}
             </button>
           </div>
         </footer>

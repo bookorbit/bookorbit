@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { formatNumber as formatLocaleNumber } from '@/i18n/formatters'
+import { formatBytes } from '@/lib/formatting'
 import { BarChart3, BookCheck, BookOpen, BookText, Building2, CalendarPlus, CalendarRange, Globe, Layers, Tags, Users } from '@lucide/vue'
 
 import { useStatisticsSummary } from '../composables/useStatisticsSummary'
 import { useUserStatisticsSummary } from '../composables/useUserStatisticsSummary'
+
+const { t } = useI18n()
 
 const { data, loading: libraryLoading } = useStatisticsSummary()
 const { data: userData, loading: userLoading } = useUserStatisticsSummary()
@@ -16,14 +21,8 @@ function iconStyle(colorIndex: number) {
   return { backgroundColor: `color-mix(in oklch, ${color} 15%, transparent)`, color }
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes >= 1_073_741_824) return `${(bytes / 1_073_741_824).toFixed(1)} GB`
-  if (bytes >= 1_048_576) return `${(bytes / 1_048_576).toFixed(1)} MB`
-  return `${(bytes / 1024).toFixed(1)} KB`
-}
-
 function formatNumber(n: number): string {
-  return n.toLocaleString()
+  return formatLocaleNumber(n)
 }
 
 const publicationRange = computed(() => {
@@ -42,19 +41,79 @@ const avgProgress = computed(() => {
 const loading = computed(() => libraryLoading.value || userLoading.value)
 
 const kpis = computed(() => [
-  { icon: BookOpen, label: 'Books', value: data.value ? formatNumber(data.value.totalBooks) : '-', colorIndex: 1 },
-  { icon: Users, label: 'Authors', value: data.value ? formatNumber(data.value.totalAuthors) : '-', colorIndex: 2 },
-  { icon: Layers, label: 'Series', value: data.value ? formatNumber(data.value.totalSeries) : '-', colorIndex: 3 },
-  { icon: Building2, label: 'Publishers', value: data.value ? formatNumber(data.value.totalPublishers) : '-', colorIndex: 4 },
-  { icon: BarChart3, label: 'Storage', value: data.value ? formatBytes(data.value.totalStorageBytes) : '-', colorIndex: 5 },
-  { icon: Tags, label: 'Genres', value: data.value ? formatNumber(data.value.totalGenres) : '-', colorIndex: 6 },
-  { icon: Globe, label: 'Languages', value: data.value ? formatNumber(data.value.totalLanguages) : '-', colorIndex: 7 },
-  { icon: CalendarRange, label: 'Published', value: publicationRange.value, colorIndex: 8 },
-  { icon: CalendarPlus, label: 'This Year', value: data.value ? formatNumber(data.value.booksAddedThisYear) : '-', colorIndex: 9 },
-  { icon: BookText, label: 'Started', value: userData.value ? formatNumber(userData.value.startedBooks) : '-', colorIndex: 1 },
-  { icon: BookOpen, label: 'In Progress', value: userData.value ? formatNumber(userData.value.inProgressBooks) : '-', colorIndex: 2 },
-  { icon: BookCheck, label: 'Completed', value: userData.value ? formatNumber(userData.value.completedBooks) : '-', colorIndex: 3 },
-  { icon: BarChart3, label: 'Avg Progress', value: avgProgress.value, colorIndex: 4 },
+  {
+    icon: BookOpen,
+    key: 'books',
+    label: t('statistics.summary.books'),
+    value: data.value ? formatNumber(data.value.totalBooks) : '-',
+    colorIndex: 1,
+  },
+  {
+    icon: Users,
+    key: 'authors',
+    label: t('statistics.summary.authors'),
+    value: data.value ? formatNumber(data.value.totalAuthors) : '-',
+    colorIndex: 2,
+  },
+  {
+    icon: Layers,
+    key: 'series',
+    label: t('statistics.summary.series'),
+    value: data.value ? formatNumber(data.value.totalSeries) : '-',
+    colorIndex: 3,
+  },
+  {
+    icon: Building2,
+    key: 'publishers',
+    label: t('statistics.summary.publishers'),
+    value: data.value ? formatNumber(data.value.totalPublishers) : '-',
+    colorIndex: 4,
+  },
+  {
+    icon: BarChart3,
+    key: 'storage',
+    label: t('statistics.summary.storage'),
+    value: data.value ? formatBytes(data.value.totalStorageBytes) : '-',
+    colorIndex: 5,
+  },
+  { icon: Tags, key: 'genres', label: t('statistics.summary.genres'), value: data.value ? formatNumber(data.value.totalGenres) : '-', colorIndex: 6 },
+  {
+    icon: Globe,
+    key: 'languages',
+    label: t('statistics.summary.languages'),
+    value: data.value ? formatNumber(data.value.totalLanguages) : '-',
+    colorIndex: 7,
+  },
+  { icon: CalendarRange, key: 'published', label: t('statistics.summary.published'), value: publicationRange.value, colorIndex: 8 },
+  {
+    icon: CalendarPlus,
+    key: 'thisYear',
+    label: t('statistics.summary.thisYear'),
+    value: data.value ? formatNumber(data.value.booksAddedThisYear) : '-',
+    colorIndex: 9,
+  },
+  {
+    icon: BookText,
+    key: 'started',
+    label: t('statistics.summary.started'),
+    value: userData.value ? formatNumber(userData.value.startedBooks) : '-',
+    colorIndex: 1,
+  },
+  {
+    icon: BookOpen,
+    key: 'inProgress',
+    label: t('statistics.summary.inProgress'),
+    value: userData.value ? formatNumber(userData.value.inProgressBooks) : '-',
+    colorIndex: 2,
+  },
+  {
+    icon: BookCheck,
+    key: 'completed',
+    label: t('statistics.summary.completed'),
+    value: userData.value ? formatNumber(userData.value.completedBooks) : '-',
+    colorIndex: 3,
+  },
+  { icon: BarChart3, key: 'avgProgress', label: t('statistics.summary.avgProgress'), value: avgProgress.value, colorIndex: 4 },
 ])
 </script>
 
@@ -67,7 +126,7 @@ const kpis = computed(() => [
       <div class="flex gap-3 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div
           v-for="(kpi, index) in kpis"
-          :key="kpi.label"
+          :key="kpi.key"
           :class="[
             'border-border/60 bg-background/50 flex shrink-0 items-center gap-3 rounded-lg border px-4 py-2.5 animate-fade-up',
             loading ? 'opacity-60' : '',

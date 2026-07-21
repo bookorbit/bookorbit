@@ -92,9 +92,14 @@ export async function extractAudioMetadata(absolutePath: string): Promise<AudioE
       tagValue(tags, 'synopsis'),
     );
     const language = resolveLanguage(tags, streams);
-    const seriesName = tagValue(tags, 'series');
+    const seriesName = tagValue(tags, 'series') ?? tagValue(tags, 'show');
     const seriesIndex = parseSeriesIndex(
-      tagValue(tags, 'series-part') ?? tagValue(tags, 'part') ?? tagValue(tags, 'series_part') ?? tagValue(tags, 'seriespart'),
+      tagValue(tags, 'series-part') ??
+        tagValue(tags, 'part') ??
+        tagValue(tags, 'series_part') ??
+        tagValue(tags, 'seriespart') ??
+        tagValue(tags, 'episode_id') ??
+        tagValue(tags, 'episode_sort'),
     );
     const genres = splitTagList(tagValue(tags, 'genre'), ';');
     const audibleId = tagValue(tags, 'asin') ?? tagValue(tags, 'audible_asin');

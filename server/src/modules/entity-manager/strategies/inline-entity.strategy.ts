@@ -1,12 +1,13 @@
 import { BadRequestException, Inject } from '@nestjs/common';
-import { SQL, asc, count, eq, sql } from 'drizzle-orm';
+import { SQL, and, asc, count, eq, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import type { InlineEntityType } from '@bookorbit/types';
+import type { ContentFilterRules, InlineEntityType } from '@bookorbit/types';
 import { DB } from '../../../db';
 import { accentInsensitiveIlike } from '../../../common/utils/accent-insensitive-search.utils';
+import { buildContentFilterClauses } from '../../../common/utils/content-filter-sql.utils';
 import * as schema from '../../../db/schema';
-import { bookMetadata } from '../../../db/schema';
+import { bookMetadata, books } from '../../../db/schema';
 import type {
   BrowseParams,
   BrowseResult,
@@ -20,7 +21,9 @@ import type {
   StrategyMergeResult,
   StrategyRenameResult,
   StrategySplitResult,
+  EntityBookScope,
 } from './entity-strategy.interface';
+import { buildEntityBookScopeClauses } from './entity-book-scope';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -50,17 +53,29 @@ export abstract class InlineEntityStrategy implements EntityStrategy {
     return sql`${sql.raw(`${alias}.${this.rawFieldName}`)} = ${value}`;
   }
 
-  async findCandidatePairs(libraryIds: number[], minSimilarity: number): Promise<RawCandidatePair[]> {
+  async findCandidatePairs(libraryIds: number[], minSimilarity: number, contentFilters?: ContentFilterRules): Promise<RawCandidatePair[]> {
     const similarityThreshold = Math.max(0.1, Math.min(1, minSimilarity));
     const f = sql.raw(this.rawFieldName);
     const hasLibraryFilter = libraryIds.length > 0;
     const idsLiteral = hasLibraryFilter ? sql.raw(`(${libraryIds.join(',')})`) : sql``;
 
+    const contentFilterClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
+    const contentFilterSql = contentFilterClauses.length > 0 ? sql`AND ${sql.join(contentFilterClauses, sql` AND `)}` : sql``;
     const v1LibraryFilter = hasLibraryFilter
-      ? sql`AND EXISTS (SELECT 1 FROM books b1 WHERE b1.id = bm1.book_id AND b1.library_id IN ${idsLiteral})`
+      ? sql`AND EXISTS (
+          SELECT 1 FROM ${books}
+          WHERE ${books.id} = bm1.book_id
+            AND ${books.libraryId} IN ${idsLiteral}
+            ${contentFilterSql}
+        )`
       : sql``;
     const v2LibraryFilter = hasLibraryFilter
-      ? sql`AND EXISTS (SELECT 1 FROM books b2 WHERE b2.id = bm2.book_id AND b2.library_id IN ${idsLiteral})`
+      ? sql`AND EXISTS (
+          SELECT 1 FROM ${books}
+          WHERE ${books.id} = bm2.book_id
+            AND ${books.libraryId} IN ${idsLiteral}
+            ${contentFilterSql}
+        )`
       : sql``;
 
     const rows = await this.db.transaction(async (tx) => {
@@ -141,25 +156,39 @@ export abstract class InlineEntityStrategy implements EntityStrategy {
   async merge(input: MergeInput): Promise<StrategyMergeResult> {
     const targetValue = input.targetId as string;
     const sourceValues = input.sourceIds as string[];
+    const libraryIds = input.libraryIds ?? [];
 
-    const affectedBookIds = await this.findAffectedBookIds(sourceValues);
+    if (sourceValues.length === 0 || libraryIds.length === 0) return { affectedBookIds: [] };
+
+    const libraryIdList = sql.join(
+      libraryIds.map((id) => sql`${id}`),
+      sql`, `,
+    );
+    const affectedBookIds = new Set<number>();
 
     for (const sourceValue of sourceValues) {
-      await this.db.execute(sql`
+      const affectedRows = await this.db.execute<{ bookId: number }>(sql`
         UPDATE book_metadata bm SET ${sql.raw(this.rawFieldName)} = ${targetValue}
         FROM books b
         WHERE bm.book_id = b.id
+        AND b.library_id IN (${libraryIdList})
         AND bm.${sql.raw(this.rawFieldName)} = ${sourceValue}
+        RETURNING bm.book_id AS "bookId"
       `);
+      for (const row of affectedRows.rows) affectedBookIds.add(row.bookId);
     }
 
-    return { affectedBookIds };
+    return { affectedBookIds: [...affectedBookIds] };
   }
 
   async rename(input: RenameInput): Promise<StrategyRenameResult> {
     const currentValue = input.entityId as string;
     const trimmed = this.normalizeInputValue(input.newName);
     if (!trimmed) throw new BadRequestException('Name cannot be empty');
+
+    if (input.libraryIds.length === 0) {
+      return { oldName: currentValue, affectedBookIds: [], wasImplicitMerge: false };
+    }
 
     const idsLiteral = sql.raw(`(${input.libraryIds.join(',')})`);
 
@@ -192,6 +221,8 @@ export abstract class InlineEntityStrategy implements EntityStrategy {
 
   async deleteEntity(input: DeleteInput): Promise<StrategyDeleteResult> {
     const value = input.entityId as string;
+    if (input.libraryIds.length === 0) return { name: value, affectedBookIds: [] };
+
     const idsLiteral = sql.raw(`(${input.libraryIds.join(',')})`);
 
     const affectedRows = await this.db.execute<{ bookId: number }>(sql`
@@ -227,18 +258,27 @@ export abstract class InlineEntityStrategy implements EntityStrategy {
     return rows.rows.map((r) => r.bookId);
   }
 
-  async getBookCount(id: number | string): Promise<number> {
+  async getBookCount(id: number | string, scope?: EntityBookScope): Promise<number> {
     const value = id as string;
+    if (scope) {
+      const [row] = await this.db
+        .select({ count: count() })
+        .from(bookMetadata)
+        .innerJoin(books, eq(books.id, bookMetadata.bookId))
+        .where(and(eq(this.field, value), ...buildEntityBookScopeClauses(this.db, scope)));
+      return row?.count ?? 0;
+    }
+
     const [row] = await this.db.select({ count: count() }).from(bookMetadata).where(eq(this.field, value));
     return row?.count ?? 0;
   }
 
-  async getBookTitles(id: number | string, limit: number): Promise<string[]> {
+  async getBookTitles(id: number | string, limit: number, scope?: EntityBookScope): Promise<string[]> {
     const value = id as string;
-    const rows = await this.db
-      .select({ title: sql<string>`COALESCE(${bookMetadata.title}, 'Untitled')` })
-      .from(bookMetadata)
-      .where(eq(this.field, value))
+    const query = this.db.select({ title: sql<string>`COALESCE(${bookMetadata.title}, 'Untitled')` }).from(bookMetadata);
+    const scopedQuery = scope ? query.innerJoin(books, eq(books.id, bookMetadata.bookId)) : query;
+    const rows = await scopedQuery
+      .where(and(eq(this.field, value), ...(scope ? buildEntityBookScopeClauses(this.db, scope) : [])))
       .orderBy(asc(bookMetadata.title))
       .limit(limit);
     return rows.map((r) => r.title);

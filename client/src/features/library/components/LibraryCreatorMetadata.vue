@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ChevronDown, ChevronUp, GripVertical } from '@lucide/vue'
 import { METADATA_LABELS, FORMAT_LABELS } from '../composables/useLibraryCreator'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   metadataPrecedence: string[]
@@ -75,8 +78,10 @@ function moveFormat(index: number, direction: -1 | 1) {
   <div class="px-6 py-6 space-y-6">
     <!-- Source precedence -->
     <div>
-      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-1">Source precedence</p>
-      <p class="text-xs text-muted-foreground mb-3">The highest source in the list is preferred when multiple are available.</p>
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-1">
+        {{ t('library.creator.metadata.sourcePrecedence.title') }}
+      </p>
+      <p class="text-xs text-muted-foreground mb-3">{{ t('library.creator.metadata.sourcePrecedence.hint') }}</p>
       <div class="rounded-lg border border-border overflow-hidden divide-y divide-border">
         <div
           v-for="(key, index) in metadataPrecedence"
@@ -121,8 +126,10 @@ function moveFormat(index: number, direction: -1 | 1) {
 
     <!-- Format priority -->
     <div>
-      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-1">Format priority</p>
-      <p class="text-xs text-muted-foreground mb-3">When a book has multiple formats, the format highest in the list is preferred.</p>
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-1">
+        {{ t('library.creator.metadata.formatPriority.title') }}
+      </p>
+      <p class="text-xs text-muted-foreground mb-3">{{ t('library.creator.metadata.formatPriority.hint') }}</p>
       <div class="rounded-lg border border-border overflow-hidden divide-y divide-border">
         <div
           v-for="(fmt, index) in formatPriority"

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { Rabbit } from '@lucide/vue'
 
@@ -8,6 +9,8 @@ import ChartCard from '../ChartCard.vue'
 import ChartEmptyState from '../ChartEmptyState.vue'
 
 const MIN_COMPLETIONS = 5
+
+const { t } = useI18n()
 
 const { data, loading, error } = useUserCompletionLatency()
 const option = shallowRef({})
@@ -59,12 +62,12 @@ function metric(value: number | null): string {
 </script>
 
 <template>
-  <ChartCard title="Completion Latency" :icon="Rabbit" :color-index="2" :loading :error :empty="isEmpty">
+  <ChartCard :title="t('statistics.charts.completionLatency.title')" :icon="Rabbit" :color-index="2" :loading :error :empty="isEmpty">
     <ChartEmptyState
       v-if="lowConfidence"
       :icon="Rabbit"
-      title="Not enough data yet"
-      :description="`Need at least ${MIN_COMPLETIONS} completed books for this chart.`"
+      :title="t('statistics.empty.notEnoughData')"
+      :description="t('statistics.charts.completionLatency.notEnoughData', { count: MIN_COMPLETIONS })"
     />
     <div v-else class="flex h-full flex-col gap-3">
       <div class="text-muted-foreground grid grid-cols-3 gap-2 text-xs">

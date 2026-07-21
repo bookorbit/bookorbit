@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Moon, Sun, Wallpaper } from '@lucide/vue'
 import { ACCENT_VIVID, ACCENT_PASTEL, ACCENT_OPTIONS, RADIUS_OPTIONS, BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
 import { api } from '@/lib/api'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
+const { t } = useI18n()
 const themeStore = useThemeStore()
 const accentOpen = ref(false)
 const radiusOpen = ref(false)
@@ -60,12 +62,12 @@ async function handleSubmit() {
       body: JSON.stringify({ email: email.value }),
     })
     if (res.status === 503) {
-      error.value = 'Password reset via email is not available. Contact your administrator.'
+      error.value = t('auth.forgotPassword.errors.emailUnavailable')
       return
     }
     submitted.value = true
   } catch {
-    error.value = 'Something went wrong. Please try again.'
+    error.value = t('auth.errors.generic')
   } finally {
     loading.value = false
   }
@@ -80,11 +82,13 @@ async function handleSubmit() {
       <Tooltip>
         <TooltipTrigger as-child>
           <button class="theme-btn" @click="themeStore.toggleTheme()">
-            <Sun v-if="themeStore.theme === 'dark'" :size="14" />
+            <Sun v-if="themeStore.resolvedTheme === 'dark'" :size="14" />
             <Moon v-else :size="14" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>{{ themeStore.theme === 'dark' ? 'Switch to light' : 'Switch to dark' }}</TooltipContent>
+        <TooltipContent>{{
+          themeStore.resolvedTheme === 'dark' ? t('auth.themePicker.switchToLight') : t('auth.themePicker.switchToDark')
+        }}</TooltipContent>
       </Tooltip>
 
       <!-- Radius picker -->
@@ -117,7 +121,7 @@ async function handleSubmit() {
               <span class="w-3.5 h-3.5 border-2 border-current block" :style="{ borderRadius: radiusPreview(themeStore.radius) }" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Change corner radius</TooltipContent>
+          <TooltipContent>{{ t('auth.themePicker.changeRadius') }}</TooltipContent>
         </Tooltip>
       </div>
 
@@ -149,7 +153,7 @@ async function handleSubmit() {
               <Wallpaper :size="14" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Change background</TooltipContent>
+          <TooltipContent>{{ t('auth.themePicker.changeBackground') }}</TooltipContent>
         </Tooltip>
       </div>
 
@@ -199,7 +203,7 @@ async function handleSubmit() {
               <span class="w-3.5 h-3.5 rounded-full block" :style="{ backgroundColor: currentAccent?.color }" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Change accent color</TooltipContent>
+          <TooltipContent>{{ t('auth.themePicker.changeAccent') }}</TooltipContent>
         </Tooltip>
       </div>
     </div>
@@ -210,16 +214,16 @@ async function handleSubmit() {
     <div class="login-card relative z-10 w-full max-w-sm rounded-2xl p-8">
       <div class="text-center mb-8">
         <h1 class="text-2xl font-serif font-semibold text-foreground">Book<span class="text-primary"> Orbit</span></h1>
-        <p class="text-sm text-muted-foreground mt-1">Reset your password</p>
+        <p class="text-sm text-muted-foreground mt-1">{{ t('auth.forgotPassword.subtitle') }}</p>
       </div>
 
       <div v-if="submitted" class="rounded-md border border-border bg-card/60 backdrop-blur-sm p-4 text-sm text-foreground">
-        If an account with that email exists, a reset link has been sent. Check your inbox.
+        {{ t('auth.forgotPassword.submitted') }}
       </div>
 
       <form v-else @submit.prevent="handleSubmit" class="space-y-4">
         <div class="space-y-1.5">
-          <label for="email" class="text-sm font-medium text-foreground">Email address</label>
+          <label for="email" class="text-sm font-medium text-foreground">{{ t('auth.fields.emailAddress') }}</label>
           <input
             id="email"
             v-model="email"
@@ -237,12 +241,12 @@ async function handleSubmit() {
           :disabled="loading"
           class="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
         >
-          {{ loading ? 'Sending...' : 'Send reset link' }}
+          {{ loading ? t('auth.forgotPassword.sending') : t('auth.forgotPassword.sendResetLink') }}
         </button>
       </form>
 
       <p class="mt-4 text-center text-sm text-muted-foreground">
-        <RouterLink to="/login" class="text-primary hover:underline">Back to sign in</RouterLink>
+        <RouterLink to="/login" class="text-primary hover:underline">{{ t('auth.backToSignIn') }}</RouterLink>
       </p>
     </div>
   </div>

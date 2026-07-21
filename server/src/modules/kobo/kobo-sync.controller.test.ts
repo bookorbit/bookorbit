@@ -383,6 +383,7 @@ describe('KoboSyncController', () => {
       1,
       99,
       true,
+      77,
     );
     expect(historyService.recordSuccess).toHaveBeenCalledWith(
       expect.objectContaining({

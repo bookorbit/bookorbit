@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { Check, ChevronDown, GripVertical, Settings2 } from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
@@ -31,6 +32,7 @@ const {
   setLibraryFilter,
 } = useStatisticsConfig()
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const { libraries, fetchLibraries } = useLibraries()
@@ -82,8 +84,8 @@ const activeOrderedCharts = computed(() => (activeTab.value === 'library' ? orde
 
 const libraryLabel = computed(() => {
   const count = filters.value.libraryIds.length
-  if (count === 0 || count === libraries.value.length) return 'All Libraries'
-  return `${count} of ${libraries.value.length} Libraries`
+  if (count === 0 || count === libraries.value.length) return t('statistics.filter.allLibraries')
+  return t('statistics.filter.librarySelection', { count, total: libraries.value.length })
 })
 
 const isFiltered = computed(() => filters.value.libraryIds.length > 0 && filters.value.libraryIds.length < libraries.value.length)
@@ -147,7 +149,7 @@ function setTab(tab: StatisticsTab) {
           ]"
           @click="setTab('library')"
         >
-          Library Stats
+          {{ t('statistics.tabs.library') }}
         </button>
         <button
           :class="[
@@ -156,7 +158,7 @@ function setTab(tab: StatisticsTab) {
           ]"
           @click="setTab('user')"
         >
-          My Reading
+          {{ t('statistics.tabs.user') }}
         </button>
       </div>
 
@@ -181,7 +183,7 @@ function setTab(tab: StatisticsTab) {
               <div :class="['flex size-4 items-center justify-center rounded border', !isFiltered ? 'border-primary bg-primary' : 'border-border']">
                 <Check v-if="!isFiltered" class="text-primary-foreground size-2.5" />
               </div>
-              All Libraries
+              {{ t('statistics.filter.allLibraries') }}
             </button>
             <div class="border-border my-1 border-t" />
             <button
@@ -208,7 +210,7 @@ function setTab(tab: StatisticsTab) {
           @click="openConfig"
         >
           <Settings2 class="size-3.5" />
-          Configure
+          {{ t('statistics.config.button') }}
         </button>
       </div>
     </div>
@@ -219,12 +221,12 @@ function setTab(tab: StatisticsTab) {
       <SheetContent side="right" class="w-[90dvw] max-w-[90dvw] sm:w-[420px] sm:max-w-[420px]">
         <SheetHeader>
           <div class="flex items-center justify-between pr-8">
-            <SheetTitle>Configure Charts</SheetTitle>
+            <SheetTitle>{{ t('statistics.config.title') }}</SheetTitle>
             <span class="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium tabular-nums">
               {{ activeVisibleCount }} / {{ activeTotalCount }}
             </span>
           </div>
-          <SheetDescription>Drag to reorder, toggle to show or hide.</SheetDescription>
+          <SheetDescription>{{ t('statistics.config.description') }}</SheetDescription>
         </SheetHeader>
 
         <div class="flex-1 overflow-y-auto px-4">
@@ -258,7 +260,7 @@ function setTab(tab: StatisticsTab) {
             class="text-muted-foreground hover:text-foreground w-full rounded-md py-2 text-sm transition-colors hover:bg-transparent"
             @click="handleReset"
           >
-            Reset to defaults
+            {{ t('statistics.config.reset') }}
           </button>
         </SheetFooter>
       </SheetContent>

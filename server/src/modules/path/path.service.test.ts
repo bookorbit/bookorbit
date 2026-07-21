@@ -28,22 +28,22 @@ function entry(name: string, options: { directory?: boolean; symbolicLink?: bool
 
 describe('PathService', () => {
   const pathPolicy = {
-    getBrowseRoot: vi.fn(() => '/books'),
-    resolveBrowsePath: vi.fn((path?: string) => Promise.resolve(path || '/books')),
+    getBrowseRoot: vi.fn(() => '/tmp/books'),
+    resolveBrowsePath: vi.fn((path?: string) => Promise.resolve(path || '/tmp/books')),
     assertWithinBrowseRoot: vi.fn((path: string) => Promise.resolve(path)),
   };
   let service: PathService;
 
   beforeEach(() => {
     vi.resetAllMocks();
-    pathPolicy.getBrowseRoot.mockReturnValue('/books');
-    pathPolicy.resolveBrowsePath.mockImplementation((path?: string) => Promise.resolve(path || '/books'));
+    pathPolicy.getBrowseRoot.mockReturnValue('/tmp/books');
+    pathPolicy.resolveBrowsePath.mockImplementation((path?: string) => Promise.resolve(path || '/tmp/books'));
     pathPolicy.assertWithinBrowseRoot.mockImplementation((path: string) => Promise.resolve(path));
     service = new PathService(pathPolicy as never);
   });
 
   it('returns the configured browse root in config', () => {
-    expect(service.getConfig()).toEqual({ root: '/books' });
+    expect(service.getConfig()).toEqual({ root: '/tmp/books' });
   });
 
   it('returns empty for blocked system paths', async () => {
@@ -60,7 +60,7 @@ describe('PathService', () => {
     await expect(service.listDirectories()).resolves.toEqual([]);
 
     expect(pathPolicy.resolveBrowsePath).toHaveBeenCalledWith(undefined);
-    expect(lstatMock).toHaveBeenCalledWith('/books');
+    expect(lstatMock).toHaveBeenCalledWith('/tmp/books');
   });
 
   it('rejects symlinked root paths', async () => {
@@ -70,42 +70,27 @@ describe('PathService', () => {
   });
 
   it('lists only accessible real (non-symlink) directories and sorts them by name', async () => {
-    lstatMock.mockImplementation((fullPath) => {
-      if (String(fullPath) === '/tmp/books') {
-        return Promise.resolve({ isSymbolicLink: () => false, isDirectory: () => true } as never);
-      }
-      if (String(fullPath).endsWith('/beta')) {
-        throw Object.assign(new Error('denied'), { code: 'EACCES' });
-      }
-      if (String(fullPath).endsWith('/alpha-link')) {
-        return Promise.resolve({ isDirectory: () => true, isSymbolicLink: () => true } as never);
-      }
-      return Promise.resolve({ isDirectory: () => true, isSymbolicLink: () => false } as never);
-    });
+    lstatMock.mockResolvedValue({ isSymbolicLink: () => false, isDirectory: () => true } as never);
 
     readdirMock.mockResolvedValue([
       entry('notes.txt'),
       entry('.cache', { directory: true }),
       entry('zeta', { directory: true }),
-      entry('alpha-link', { directory: true }),
+      entry('alpha-link', { directory: true, symbolicLink: true }),
       entry('beta', { directory: true }),
     ] as never);
 
-    await expect(service.listDirectories('/tmp/books')).resolves.toEqual([{ name: 'zeta', path: '/tmp/books/zeta' }]);
+    await expect(service.listDirectories('/tmp/books')).resolves.toEqual([
+      { name: 'beta', path: '/tmp/books/beta' },
+      { name: 'zeta', path: '/tmp/books/zeta' },
+    ]);
+    expect(lstatMock).toHaveBeenCalledTimes(1);
   });
 
   it('excludes entries that appear as directories but are symlinks when lstat confirms it', async () => {
-    lstatMock.mockImplementation((fullPath) => {
-      if (String(fullPath) === '/tmp/books') {
-        return Promise.resolve({ isSymbolicLink: () => false, isDirectory: () => true } as never);
-      }
-      if (String(fullPath).endsWith('/real-dir')) {
-        return Promise.resolve({ isDirectory: () => true, isSymbolicLink: () => false } as never);
-      }
-      return Promise.resolve({ isDirectory: () => true, isSymbolicLink: () => true } as never);
-    });
+    lstatMock.mockResolvedValue({ isSymbolicLink: () => false, isDirectory: () => true } as never);
 
-    readdirMock.mockResolvedValue([entry('real-dir', { directory: true }), entry('sym-dir', { directory: true })] as never);
+    readdirMock.mockResolvedValue([entry('real-dir', { directory: true }), entry('sym-dir', { directory: true, symbolicLink: true })] as never);
 
     await expect(service.listDirectories('/tmp/books')).resolves.toEqual([{ name: 'real-dir', path: '/tmp/books/real-dir' }]);
   });
@@ -121,7 +106,16 @@ describe('PathService', () => {
     lstatMock.mockResolvedValue({ isSymbolicLink: () => false, isDirectory: () => true } as never);
     readdirMock.mockRejectedValue(new Error('missing'));
 
-    await expect(service.listDirectories('/does/not/exist')).resolves.toEqual([]);
+    await expect(service.listDirectories('/tmp/books/does/not/exist')).resolves.toEqual([]);
+  });
+
+  it('rechecks browse-root containment before accessing the filesystem', async () => {
+    pathPolicy.getBrowseRoot.mockReturnValue('/books');
+    pathPolicy.resolveBrowsePath.mockResolvedValue('/etc');
+
+    await expect(service.listDirectories('/books/../../etc')).resolves.toEqual([]);
+    expect(lstatMock).not.toHaveBeenCalled();
+    expect(readdirMock).not.toHaveBeenCalled();
   });
 
   describe('createDirectory', () => {
@@ -164,14 +158,14 @@ describe('PathService', () => {
     it('rejects a symlinked parent', async () => {
       lstatMock.mockResolvedValue({ isSymbolicLink: () => true, isDirectory: () => false } as never);
 
-      await expect(service.createDirectory('/tmp/link', 'scifi')).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(service.createDirectory('/tmp/books/link', 'scifi')).rejects.toBeInstanceOf(ForbiddenException);
       expect(mkdirMock).not.toHaveBeenCalled();
     });
 
     it('rejects a parent that is not a directory', async () => {
       lstatMock.mockResolvedValue({ isSymbolicLink: () => false, isDirectory: () => false } as never);
 
-      await expect(service.createDirectory('/tmp/file.txt', 'scifi')).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.createDirectory('/tmp/books/file.txt', 'scifi')).rejects.toBeInstanceOf(BadRequestException);
       expect(mkdirMock).not.toHaveBeenCalled();
     });
 
@@ -205,7 +199,16 @@ describe('PathService', () => {
     it('maps a missing parent (ENOENT) to a bad request', async () => {
       lstatMock.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }));
 
-      await expect(service.createDirectory('/tmp/gone', 'scifi')).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.createDirectory('/tmp/books/gone', 'scifi')).rejects.toBeInstanceOf(BadRequestException);
+      expect(mkdirMock).not.toHaveBeenCalled();
+    });
+
+    it('rechecks browse-root containment before accessing the filesystem', async () => {
+      pathPolicy.getBrowseRoot.mockReturnValue('/books');
+      pathPolicy.resolveBrowsePath.mockResolvedValue('/etc');
+
+      await expect(service.createDirectory('/books/../../etc', 'scifi')).rejects.toBeInstanceOf(ForbiddenException);
+      expect(lstatMock).not.toHaveBeenCalled();
       expect(mkdirMock).not.toHaveBeenCalled();
     });
   });

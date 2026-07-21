@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { watch, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import { useRecommendations } from '@/features/book/composables/useRecommendations'
 import BookCarousel from '@/features/book/components/detail/BookCarousel.vue'
@@ -14,6 +15,7 @@ const props = withDefaults(
   },
 )
 
+const { t } = useI18n()
 const { recommendations, loading, fetch } = useRecommendations()
 
 watch(
@@ -33,7 +35,7 @@ const filteredRecommendations = computed(() => {
   <div v-if="loading || filteredRecommendations.length > 0" class="mt-8 pt-6 border-t border-border">
     <BookCarousel :books="filteredRecommendations" :loading="loading">
       <template #header>
-        <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">More Like This</p>
+        <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{{ t('book.detail.recommended.moreLikeThis') }}</p>
       </template>
     </BookCarousel>
   </div>

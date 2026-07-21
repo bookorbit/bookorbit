@@ -3,7 +3,7 @@ export function stripFragment(href: string): string {
 }
 
 export function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  return formatLocaleDate(new Date(dateStr), { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function getCfiBody(cfi: string): string | null {
@@ -138,3 +138,4 @@ export function findMatchingCfiRange<T extends { cfi: string | null | undefined 
   if (!selectedCfi) return null
   return items.find((item) => item.cfi != null && cfiRangesMatch(selectedCfi, item.cfi)) ?? null
 }
+import { formatDate as formatLocaleDate } from '@/i18n/formatters'

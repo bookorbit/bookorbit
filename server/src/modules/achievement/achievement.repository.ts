@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, countDistinct, desc, eq, gt, gte, isNotNull, lt, lte, ne, notInArray, sql, sum } from 'drizzle-orm';
+import { and, count, countDistinct, desc, eq, gt, gte, isNotNull, isNull, lt, lte, ne, notInArray, sql, sum } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -10,6 +10,7 @@ import {
   userBookStatus,
   userBookRatings,
   readingSessions,
+  readingAttempts,
   annotations,
   collections,
   collectionBooks,
@@ -303,12 +304,20 @@ export class AchievementRepository {
 
   async wasBookAbandonedBefore(userId: number, bookId: number, monthsAgo: number): Promise<boolean> {
     const [row] = await this.db
-      .select({ startedAt: userBookStatus.startedAt, finishedAt: userBookStatus.finishedAt })
-      .from(userBookStatus)
-      .where(and(eq(userBookStatus.userId, userId), eq(userBookStatus.bookId, bookId)))
+      .select({ startedOn: readingAttempts.startedOn, endedOn: readingAttempts.endedOn })
+      .from(readingAttempts)
+      .where(
+        and(
+          eq(readingAttempts.userId, userId),
+          eq(readingAttempts.bookId, bookId),
+          eq(readingAttempts.outcome, 'abandoned'),
+          isNull(readingAttempts.deletedAt),
+        ),
+      )
+      .orderBy(desc(readingAttempts.id))
       .limit(1);
-    if (!row?.startedAt || !row?.finishedAt) return false;
-    const diffMs = row.finishedAt.getTime() - row.startedAt.getTime();
+    if (!row?.startedOn || !row?.endedOn) return false;
+    const diffMs = new Date(row.endedOn).getTime() - new Date(row.startedOn).getTime();
     const diffMonths = diffMs / (1000 * 60 * 60 * 24 * 30);
     return diffMonths >= monthsAgo;
   }
@@ -316,13 +325,14 @@ export class AchievementRepository {
   async countBooksFinishedInDateRange(userId: number, start: Date, end: Date): Promise<number> {
     const [{ value }] = await this.db
       .select({ value: count() })
-      .from(userBookStatus)
+      .from(readingAttempts)
       .where(
         and(
-          eq(userBookStatus.userId, userId),
-          eq(userBookStatus.status, 'read'),
-          gte(userBookStatus.finishedAt, start),
-          lt(userBookStatus.finishedAt, end),
+          eq(readingAttempts.userId, userId),
+          eq(readingAttempts.outcome, 'completed'),
+          isNull(readingAttempts.deletedAt),
+          sql`${readingAttempts.endedOn} >= ${start.toISOString().slice(0, 10)}::date`,
+          sql`${readingAttempts.endedOn} < ${end.toISOString().slice(0, 10)}::date`,
         ),
       );
     return value;
@@ -330,12 +340,19 @@ export class AchievementRepository {
 
   async wasBookStartedAndFinishedOnSameDay(userId: number, bookId: number): Promise<boolean> {
     const [row] = await this.db
-      .select({ startedAt: userBookStatus.startedAt, finishedAt: userBookStatus.finishedAt })
-      .from(userBookStatus)
-      .where(and(eq(userBookStatus.userId, userId), eq(userBookStatus.bookId, bookId)))
+      .select({ startedOn: readingAttempts.startedOn, endedOn: readingAttempts.endedOn })
+      .from(readingAttempts)
+      .where(
+        and(
+          eq(readingAttempts.userId, userId),
+          eq(readingAttempts.bookId, bookId),
+          eq(readingAttempts.outcome, 'completed'),
+          isNull(readingAttempts.deletedAt),
+        ),
+      )
+      .orderBy(desc(readingAttempts.id))
       .limit(1);
-    if (!row?.startedAt || !row?.finishedAt) return false;
-    return row.startedAt.toDateString() === row.finishedAt.toDateString();
+    return !!row?.startedOn && row.startedOn === row.endedOn;
   }
 
   async sumWeekendReadingHours(userId: number, saturdayDate: string): Promise<number> {
@@ -445,15 +462,16 @@ export class AchievementRepository {
 
   async hasAnyBookStartedAndFinishedOnSameDay(userId: number): Promise<boolean> {
     const [row] = await this.db
-      .select({ bookId: userBookStatus.bookId })
-      .from(userBookStatus)
+      .select({ bookId: readingAttempts.bookId })
+      .from(readingAttempts)
       .where(
         and(
-          eq(userBookStatus.userId, userId),
-          eq(userBookStatus.status, 'read'),
-          isNotNull(userBookStatus.startedAt),
-          isNotNull(userBookStatus.finishedAt),
-          sql`${userBookStatus.startedAt}::date = ${userBookStatus.finishedAt}::date`,
+          eq(readingAttempts.userId, userId),
+          eq(readingAttempts.outcome, 'completed'),
+          isNull(readingAttempts.deletedAt),
+          isNotNull(readingAttempts.startedOn),
+          isNotNull(readingAttempts.endedOn),
+          eq(readingAttempts.startedOn, readingAttempts.endedOn),
         ),
       )
       .limit(1);
@@ -814,11 +832,19 @@ export class AchievementRepository {
 
   async getBookStartedAndFinishedAt(userId: number, bookId: number): Promise<{ startedAt: Date | null; finishedAt: Date | null } | null> {
     const [row] = await this.db
-      .select({ startedAt: userBookStatus.startedAt, finishedAt: userBookStatus.finishedAt })
-      .from(userBookStatus)
-      .where(and(eq(userBookStatus.userId, userId), eq(userBookStatus.bookId, bookId)))
+      .select({ startedOn: readingAttempts.startedOn, endedOn: readingAttempts.endedOn })
+      .from(readingAttempts)
+      .where(
+        and(
+          eq(readingAttempts.userId, userId),
+          eq(readingAttempts.bookId, bookId),
+          eq(readingAttempts.outcome, 'completed'),
+          isNull(readingAttempts.deletedAt),
+        ),
+      )
+      .orderBy(desc(readingAttempts.id))
       .limit(1);
-    return row ?? null;
+    return row ? { startedAt: row.startedOn ? new Date(row.startedOn) : null, finishedAt: row.endedOn ? new Date(row.endedOn) : null } : null;
   }
 
   async hasAnySlowBurnBook(userId: number, minDays: number): Promise<boolean> {
@@ -842,11 +868,12 @@ export class AchievementRepository {
     const result = await this.db.execute<{ found: boolean }>(sql`
       SELECT EXISTS (
         SELECT 1
-        FROM user_book_status
+        FROM reading_attempts
         WHERE user_id = ${userId}
-          AND status = 'read'
-          AND finished_at IS NOT NULL
-        GROUP BY DATE_TRUNC('month', finished_at)
+          AND outcome = 'completed'
+          AND ended_on IS NOT NULL
+          AND deleted_at IS NULL
+        GROUP BY DATE_TRUNC('month', ended_on)
         HAVING COUNT(*) >= ${minCount}
       ) AS found
     `);

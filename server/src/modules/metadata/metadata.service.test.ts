@@ -95,6 +95,7 @@ import { parsePdfFile } from './lib/pdf-parser';
 import { extractAudioMetadata, parseAudioDuration } from './extractors/audio.extractor';
 import { METADATA_AUTHORS_REPLACED } from './metadata-events.service';
 import { MetadataService } from './metadata.service';
+import { MetadataExtractionService } from './metadata-extraction.service';
 
 const mockMkdir = mkdir as MockedFunction<typeof mkdir>;
 const mockReadFile = readFile as MockedFunction<typeof readFile>;
@@ -214,6 +215,7 @@ describe('MetadataService', () => {
     return new MetadataService(
       db as never,
       config as never,
+      new MetadataExtractionService(),
       (overrides?.scoreService ?? { calculateAndSave: vi.fn().mockResolvedValue(undefined) }) as never,
       (overrides?.narratorService ?? { replaceForBook: vi.fn().mockResolvedValue(undefined) }) as never,
       (overrides?.comicMetadataRepository ?? { upsert: vi.fn().mockResolvedValue(undefined) }) as never,
@@ -1180,22 +1182,6 @@ describe('MetadataService', () => {
     expect(tagDeleteWhere).toHaveBeenCalledTimes(1);
     expect(bookGenreLinks).toEqual([{ bookId: 41, genreId: 501 }]);
     expect(bookTagLinks).toEqual([{ bookId: 41, tagId: 601 }]);
-  });
-
-  it('logs buffered-large-pdf warnings with size metadata', () => {
-    const service = makeService(makeDb().db);
-    const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-
-    (service as any).logPdfParseWarning({
-      code: 'buffered-large-pdf',
-      absolutePath: '/tmp/large.pdf',
-      sizeBytes: 10_000_000,
-      thresholdBytes: 5_000_000,
-      errorClass: 'None',
-      errorMessage: 'none',
-    });
-
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('large pdf buffered in memory'));
   });
 
   it('aggregateAudioDuration sums only files that match the selected primary audio format', async () => {

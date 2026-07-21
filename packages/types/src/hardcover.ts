@@ -88,6 +88,11 @@ export interface HardcoverImportPreviewRow {
   importedStartedAt: string | null;
   importedFinishedAt: string | null;
   importedProgressPercent: number | null;
+  hardcoverReads?: Array<{
+    id: number;
+    startedAt: string | null;
+    finishedAt: string | null;
+  }>;
   localBookId: number | null;
   localPrimaryFileId: number | null;
   localTitle: string | null;

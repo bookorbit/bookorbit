@@ -33,6 +33,8 @@ export const emailSendLog = pgTable(
   },
   (t) => [
     index('email_send_log_user_created_at_idx').on(t.userId, t.createdAt),
+    index('email_send_log_book_id_idx').on(t.bookId),
+    index('email_send_log_book_file_id_idx').on(t.bookFileId),
     index('email_send_log_created_at_idx').on(t.createdAt),
     index('email_send_log_status_next_retry_idx').on(t.status, t.nextRetryAt),
     check('email_send_log_status_chk', sql`${t.status} in ('pending', 'sent', 'failed')`),

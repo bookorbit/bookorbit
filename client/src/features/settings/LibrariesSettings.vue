@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { formatDate } from '@/i18n/formatters'
+import { formatBytes } from '@/lib/formatting'
 import { useRoute, useRouter } from 'vue-router'
 import {
   FolderOpen,
@@ -32,6 +35,7 @@ import { parseCronToHuman } from '@/features/library/utils/cron'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import AppIcon from '@/components/AppIcon.vue'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const { hasPermission } = usePermissions()
@@ -67,13 +71,13 @@ async function confirmSyncFiles() {
   fileSyncingMap.value[lib.id] = true
   try {
     await syncAllFiles(lib.id)
-    toast.success(`Metadata synced to files for "${lib.name}"`)
+    toast.success(t('settings.admin.libraries.metadataSynced', { name: lib.name }))
   } catch (e) {
     const msg = e instanceof Error ? e.message : ''
     if (msg.includes('400')) {
-      toast.error('Metadata file write is not enabled for this library. Enable it in the library settings.')
+      toast.error(t('settings.admin.libraries.fileWriteNotEnabled'))
     } else {
-      toast.error(`File sync failed for "${lib.name}"`)
+      toast.error(t('settings.admin.libraries.fileSyncFailed', { name: lib.name }))
     }
   } finally {
     fileSyncingMap.value[lib.id] = false
@@ -120,22 +124,22 @@ async function scan(lib: LibraryType) {
   try {
     const res = await api(`/api/v1/scanner/libraries/${lib.id}/scan`, { method: 'POST' })
     if (res.ok) {
-      toast.success(`Scan started for "${lib.name}"`)
+      toast.success(t('settings.admin.libraries.scanStarted', { name: lib.name }))
       subscribeLibrary(lib.id)
     } else {
-      toast.error(`Failed to start scan for "${lib.name}"`)
+      toast.error(t('settings.admin.libraries.scanStartFailed', { name: lib.name }))
     }
   } catch {
-    toast.error(`Failed to start scan for "${lib.name}"`)
+    toast.error(t('settings.admin.libraries.scanStartFailed', { name: lib.name }))
   }
 }
 
 async function refreshCovers(lib: LibraryType) {
   try {
     const res = await api(`/api/v1/scanner/libraries/${lib.id}/refresh-covers`, { method: 'POST' })
-    if (!res.ok) toast.error(`Failed to refresh covers for "${lib.name}"`)
+    if (!res.ok) toast.error(t('settings.admin.libraries.refreshCoversFailed', { name: lib.name }))
   } catch {
-    toast.error(`Failed to refresh covers for "${lib.name}"`)
+    toast.error(t('settings.admin.libraries.refreshCoversFailed', { name: lib.name }))
   }
 }
 
@@ -145,13 +149,13 @@ async function scanAll() {
     const results = await Promise.all(libraries.value.map((lib) => api(`/api/v1/scanner/libraries/${lib.id}/scan`, { method: 'POST' })))
     const failed = results.filter((r) => !r.ok).length
     if (failed === 0) {
-      toast.success('Scan started for all libraries')
+      toast.success(t('settings.admin.libraries.scanStartedAll'))
       subscribeAll()
     } else {
-      toast.error(`${failed} librar${failed === 1 ? 'y' : 'ies'} failed to start`)
+      toast.error(t('settings.admin.libraries.librariesFailedToStart', { count: failed }, failed))
     }
   } catch {
-    toast.error('Failed to start scans')
+    toast.error(t('settings.admin.libraries.scansStartFailed'))
   } finally {
     scanningAll.value = false
   }
@@ -178,10 +182,10 @@ async function onSaved(library: LibraryType) {
   editingLibrary.value = null
   subscribeLibrary(library.id)
   if (isNew) {
-    toast.success(`Library "${library.name}" created`)
+    toast.success(t('settings.admin.libraries.libraryCreated', { name: library.name }))
     await handleLibraryCreated(library)
   } else {
-    toast.success(`Library "${library.name}" updated`)
+    toast.success(t('settings.admin.libraries.libraryUpdated', { name: library.name }))
     await refreshLibraries()
   }
   loadAllStats()
@@ -200,7 +204,7 @@ async function confirmDelete() {
   try {
     const res = await api(`/api/v1/libraries/${deletedId}`, { method: 'DELETE' })
     if (res.ok) {
-      toast.success(`"${deletedName}" deleted`)
+      toast.success(t('settings.admin.libraries.libraryDeleted', { name: deletedName }))
       deletingLibrary.value = null
       await refreshLibraries()
       loadAllStats()
@@ -213,33 +217,26 @@ async function confirmDelete() {
         }
       }
     } else {
-      toast.error('Failed to delete library')
+      toast.error(t('settings.admin.libraries.deleteFailed'))
     }
   } catch {
-    toast.error('Failed to delete library')
+    toast.error(t('settings.admin.libraries.deleteFailed'))
   } finally {
     deleting.value = false
   }
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
 }
 
 function scanProgressLabel(libraryId: number): string {
   const p = getProgress(libraryId)
   if (!p) return ''
   if (p.status === 'running') {
-    if (p.total === 0) return 'Scanning...'
+    if (p.total === 0) return t('settings.admin.libraries.scanning')
     const pct = Math.floor((p.processed / p.total) * 100)
-    return `Scanning ${pct}% (${p.processed}/${p.total})`
+    return t('settings.admin.libraries.scanningProgress', { pct, processed: p.processed, total: p.total })
   }
-  if (p.status === 'completed') return `Done - ${p.added} added, ${p.updated} updated`
-  if (p.status === 'failed') return p.errorMessage ? `Failed: ${p.errorMessage}` : 'Scan failed'
+  if (p.status === 'completed') return t('settings.admin.libraries.scanDone', { added: p.added, updated: p.updated })
+  if (p.status === 'failed')
+    return p.errorMessage ? t('settings.admin.libraries.scanFailedWithError', { error: p.errorMessage }) : t('settings.admin.libraries.scanFailed')
   return ''
 }
 
@@ -248,18 +245,18 @@ function coverRefreshLabel(libraryId: number): string {
   if (!p) return ''
   if (p.status === 'running') {
     const pct = p.total > 0 ? Math.floor((p.processed / p.total) * 100) : 0
-    return `Refreshing covers ${pct}% (${p.processed}/${p.total})`
+    return t('settings.admin.libraries.refreshingCovers', { pct, processed: p.processed, total: p.total })
   }
-  if (p.status === 'completed') return `Covers refreshed (${p.total} processed)`
+  if (p.status === 'completed') return t('settings.admin.libraries.coversRefreshed', { count: p.total })
   return ''
 }
 </script>
 
 <template>
   <div class="md:hidden mb-3">
-    <h2 class="settings-title">Libraries</h2>
+    <h2 class="settings-title">{{ t('settings.admin.libraries.title') }}</h2>
     <p class="settings-subtitle overflow-hidden" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2">
-      Manage your media libraries and trigger content scans.
+      {{ t('settings.admin.libraries.subtitle') }}
     </p>
   </div>
   <div
@@ -268,23 +265,23 @@ function coverRefreshLabel(libraryId: number): string {
     <div class="grid grid-cols-2 gap-2">
       <button class="settings-btn-outline w-full justify-center" :disabled="scanningAll || libraries.length === 0" @click="scanAll">
         <RefreshCw :size="14" :class="scanningAll ? 'animate-spin' : ''" />
-        {{ scanningAll ? 'Scanning...' : 'Scan All' }}
+        {{ scanningAll ? t('settings.admin.libraries.scanning') : t('settings.admin.libraries.scanAll') }}
       </button>
       <button class="settings-btn-primary w-full justify-center" @click="openCreate">
         <Plus :size="14" />
-        Add Library
+        {{ t('settings.admin.libraries.addLibrary') }}
       </button>
     </div>
   </div>
 
-  <SettingsPageHeader title="Libraries" subtitle="Manage your media libraries and trigger content scans." class="hidden md:flex">
+  <SettingsPageHeader :title="t('settings.admin.libraries.title')" :subtitle="t('settings.admin.libraries.subtitle')" class="hidden md:flex">
     <button class="settings-btn-outline" :disabled="scanningAll || libraries.length === 0" @click="scanAll">
       <RefreshCw :size="14" :class="scanningAll ? 'animate-spin' : ''" />
-      {{ scanningAll ? 'Scanning...' : 'Scan All' }}
+      {{ scanningAll ? t('settings.admin.libraries.scanning') : t('settings.admin.libraries.scanAll') }}
     </button>
     <button class="settings-btn-primary" @click="openCreate">
       <Plus :size="14" />
-      Add Library
+      {{ t('settings.admin.libraries.addLibrary') }}
     </button>
   </SettingsPageHeader>
 
@@ -314,10 +311,16 @@ function coverRefreshLabel(libraryId: number): string {
                 <!-- Col 1 -->
                 <span v-if="stats[lib.id]" class="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
                   <BookOpen :size="11" class="shrink-0" />
-                  <span class="truncate">{{ stats[lib.id]?.totalBooks }} book{{ stats[lib.id]?.totalBooks === 1 ? '' : 's' }}</span>
+                  <span class="truncate">{{
+                    t('settings.admin.libraries.bookCount', { count: stats[lib.id]?.totalBooks ?? 0 }, stats[lib.id]?.totalBooks ?? 0)
+                  }}</span>
                 </span>
                 <span v-else class="text-xs text-muted-foreground truncate min-w-0">
-                  Added {{ new Date(lib.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) }}
+                  {{
+                    t('settings.admin.libraries.addedDate', {
+                      date: formatDate(new Date(lib.createdAt), { year: 'numeric', month: 'short', day: 'numeric' }),
+                    })
+                  }}
                 </span>
 
                 <span
@@ -332,14 +335,16 @@ function coverRefreshLabel(libraryId: number): string {
                 <!-- Col 2 -->
                 <span class="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
                   <component :is="lib.organizationMode === 'book_per_file' ? FileText : Folder" :size="11" class="shrink-0" />
-                  <span class="truncate">{{ lib.organizationMode === 'book_per_file' ? 'File mode' : 'Folder mode' }}</span>
+                  <span class="truncate">{{
+                    lib.organizationMode === 'book_per_file' ? t('settings.admin.libraries.fileMode') : t('settings.admin.libraries.folderMode')
+                  }}</span>
                 </span>
 
                 <Tooltip v-if="lib.folders.length > 0">
                   <TooltipTrigger as-child>
                     <span class="flex items-center gap-1 text-xs text-muted-foreground cursor-default min-w-0">
                       <FolderOpen :size="11" class="shrink-0" />
-                      <span class="truncate">{{ lib.folders.length }} {{ lib.folders.length === 1 ? 'folder' : 'folders' }}</span>
+                      <span class="truncate">{{ t('settings.admin.libraries.folderCount', { count: lib.folders.length }, lib.folders.length) }}</span>
                     </span>
                   </TooltipTrigger>
                   <TooltipContent class="max-w-xs">
@@ -353,7 +358,7 @@ function coverRefreshLabel(libraryId: number): string {
                 <!-- Col 3 -->
                 <span v-if="lib.watch" class="flex items-center gap-1 text-xs font-medium text-primary/80 min-w-0">
                   <Eye :size="11" class="shrink-0" />
-                  <span class="truncate">Watching</span>
+                  <span class="truncate">{{ t('settings.admin.libraries.watching') }}</span>
                 </span>
                 <span v-else class="min-w-0"></span>
 
@@ -370,13 +375,13 @@ function coverRefreshLabel(libraryId: number): string {
                 <!-- Col 4 -->
                 <span v-if="lib.fileWriteEnabled" class="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
                   <FileEdit :size="11" class="shrink-0" />
-                  <span class="truncate">File write</span>
+                  <span class="truncate">{{ t('settings.admin.libraries.fileWrite') }}</span>
                 </span>
                 <span v-else class="min-w-0"></span>
 
                 <span v-if="lib.fileRenameEnabled" class="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
                   <Pencil :size="11" class="shrink-0" />
-                  <span class="truncate">File rename</span>
+                  <span class="truncate">{{ t('settings.admin.libraries.fileRename') }}</span>
                 </span>
                 <span v-else class="min-w-0"></span>
               </div>
@@ -386,7 +391,7 @@ function coverRefreshLabel(libraryId: number): string {
             <div class="flex items-center gap-2 shrink-0">
               <button class="settings-btn-outline" :disabled="isScanning(lib.id)" @click="scan(lib)">
                 <RefreshCw :size="14" :class="isScanning(lib.id) ? 'animate-spin' : ''" />
-                {{ isScanning(lib.id) ? 'Scanning...' : 'Scan' }}
+                {{ isScanning(lib.id) ? t('settings.admin.libraries.scanning') : t('settings.admin.libraries.scan') }}
               </button>
 
               <DropdownMenu>
@@ -400,20 +405,20 @@ function coverRefreshLabel(libraryId: number): string {
                 <DropdownMenuContent align="end" class="w-52">
                   <DropdownMenuItem @click="openEdit(lib)">
                     <Pencil />
-                    Edit library
+                    {{ t('settings.admin.libraries.editLibrary') }}
                   </DropdownMenuItem>
                   <DropdownMenuItem :disabled="isRefreshingCovers(lib.id)" @click="refreshCovers(lib)">
                     <Images :class="isRefreshingCovers(lib.id) ? 'animate-pulse' : ''" />
-                    Refresh covers
+                    {{ t('settings.admin.libraries.refreshCovers') }}
                   </DropdownMenuItem>
                   <DropdownMenuItem :disabled="!!fileSyncingMap[lib.id] || !lib.fileWriteEnabled" @click="promptSyncFiles(lib)">
                     <FileEdit :class="fileSyncingMap[lib.id] ? 'animate-pulse' : ''" />
-                    <span class="flex-1">Sync metadata to files</span>
+                    <span class="flex-1">{{ t('settings.admin.libraries.syncMetadataToFiles') }}</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem variant="destructive" @click="openDelete(lib)">
                     <Trash2 />
-                    Delete library
+                    {{ t('settings.admin.libraries.deleteLibrary') }}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -474,11 +479,11 @@ function coverRefreshLabel(libraryId: number): string {
         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-muted mx-auto mb-4">
           <FolderOpen :size="22" class="text-muted-foreground/80" />
         </div>
-        <p class="text-sm font-medium text-foreground mb-1">No libraries yet</p>
-        <p class="text-sm text-muted-foreground mb-5">Add a library to start organizing your books.</p>
+        <p class="text-sm font-medium text-foreground mb-1">{{ t('settings.admin.libraries.emptyTitle') }}</p>
+        <p class="text-sm text-muted-foreground mb-5">{{ t('settings.admin.libraries.emptyHint') }}</p>
         <button class="settings-btn-primary" @click="openCreate">
           <Plus :size="14" />
-          Add your first library
+          {{ t('settings.admin.libraries.addFirstLibrary') }}
         </button>
       </div>
     </div>
@@ -490,11 +495,13 @@ function coverRefreshLabel(libraryId: number): string {
   <!-- Delete confirmation dialog -->
   <div v-if="deletingLibrary" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
     <div class="bg-card border border-border rounded-lg shadow-xl w-full max-w-sm p-6">
-      <h3 class="text-base font-semibold text-foreground mb-1">Delete "{{ deletingLibrary.name }}"?</h3>
+      <h3 class="text-base font-semibold text-foreground mb-1">
+        {{ t('settings.admin.libraries.deleteConfirmTitle', { name: deletingLibrary.name }) }}
+      </h3>
       <p class="text-sm text-muted-foreground mb-4">
-        This will permanently remove all books, metadata, reading progress, bookmarks, and annotations in this library. This cannot be undone.
+        {{ t('settings.admin.libraries.deleteConfirmBody') }}
       </p>
-      <p class="text-sm text-foreground mb-2">Type the library name to confirm:</p>
+      <p class="text-sm text-foreground mb-2">{{ t('settings.admin.libraries.deleteConfirmTypeName') }}</p>
       <input
         v-model="deleteConfirmName"
         type="text"
@@ -508,14 +515,14 @@ function coverRefreshLabel(libraryId: number): string {
           class="px-4 py-2 text-sm font-medium rounded-md border border-border hover:bg-muted transition-colors text-muted-foreground"
           @click="deletingLibrary = null"
         >
-          Cancel
+          {{ t('common.cancel') }}
         </button>
         <button
           class="px-4 py-2 text-sm font-medium rounded-md bg-destructive text-destructive-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
           :disabled="deleteConfirmName !== deletingLibrary.name || deleting"
           @click="confirmDelete"
         >
-          {{ deleting ? 'Deleting...' : 'Delete Library' }}
+          {{ deleting ? t('settings.admin.libraries.deleting') : t('settings.admin.libraries.deleteLibraryButton') }}
         </button>
       </div>
     </div>
@@ -524,24 +531,24 @@ function coverRefreshLabel(libraryId: number): string {
   <!-- Sync confirmation dialog -->
   <div v-if="confirmSyncLibrary" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
     <div class="bg-card border border-border rounded-lg shadow-xl w-full max-w-sm p-6">
-      <h3 class="text-base font-semibold text-foreground mb-1">Sync metadata to files?</h3>
+      <h3 class="text-base font-semibold text-foreground mb-1">{{ t('settings.admin.libraries.syncConfirmTitle') }}</h3>
       <p class="text-sm text-muted-foreground mb-4">
-        This will overwrite the metadata inside every supported file in
+        {{ t('settings.admin.libraries.syncConfirmBodyPrefix') }}
         <span class="font-medium text-foreground">{{ confirmSyncLibrary.name }}</span>
-        directly on disk. This cannot be undone.
+        {{ t('settings.admin.libraries.syncConfirmBodySuffix') }}
       </p>
       <div class="flex justify-end gap-2">
         <button
           class="px-4 py-2 text-sm font-medium rounded-md border border-border hover:bg-muted transition-colors text-muted-foreground"
           @click="confirmSyncLibrary = null"
         >
-          Cancel
+          {{ t('common.cancel') }}
         </button>
         <button
           class="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
           @click="confirmSyncFiles"
         >
-          Sync files
+          {{ t('settings.admin.libraries.syncFiles') }}
         </button>
       </div>
     </div>

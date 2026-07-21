@@ -31,6 +31,7 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
 }))
 
 vi.mock('@/features/admin/UsersPage.vue', () => ({ default: { template: '<div data-testid="users-page" />' } }))
+vi.mock('@/features/admin/AccountActivityPage.vue', () => ({ default: { template: '<div data-testid="account-activity-page" />' } }))
 vi.mock('../MagicLinksSettings.vue', () => ({
   default: {
     name: 'MagicLinksSettings',
@@ -58,10 +59,11 @@ describe('AdminAllSettings', () => {
   })
 
   describe('superuser', () => {
-    it('sees Users, Magic Links, and OIDC tabs', () => {
+    it('sees Users, Account Activity, Magic Links, and OIDC tabs', () => {
       const wrapper = mountComponent(undefined, { su: true })
       const labels = wrapper.findAll('button').map((b) => b.text())
       expect(labels).toContain('Users')
+      expect(labels).toContain('Account Activity')
       expect(labels).toContain('Magic Links')
       expect(labels).toContain('OIDC / SSO')
     })
@@ -105,6 +107,7 @@ describe('AdminAllSettings', () => {
       expect(labels).toContain('Users')
       expect(labels).not.toContain('Magic Links')
       expect(labels).not.toContain('OIDC / SSO')
+      expect(labels).not.toContain('Account Activity')
     })
 
     it('defaults to users tab and shows UsersPage', () => {
@@ -116,6 +119,17 @@ describe('AdminAllSettings', () => {
       const wrapper = mountComponent('oidc', { perms: ['manage_users'] })
       expect(wrapper.find('[data-testid="users-page"]').exists()).toBe(true)
       expect(wrapper.find('[data-testid="oidc-settings"]').exists()).toBe(false)
+    })
+  })
+
+  describe('user with view_user_activity only', () => {
+    it('sees and defaults to only the Account Activity tab', () => {
+      const wrapper = mountComponent(undefined, { perms: ['view_user_activity'] })
+      const labels = wrapper.findAll('button').map((button) => button.text())
+
+      expect(labels).toEqual(['Account Activity'])
+      expect(wrapper.find('[data-testid="account-activity-page"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="users-page"]').exists()).toBe(false)
     })
   })
 

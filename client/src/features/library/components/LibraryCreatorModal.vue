@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch, type Component } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   AlertCircle,
   BookOpen,
@@ -28,6 +29,8 @@ import LibraryCreatorMetadata from './LibraryCreatorMetadata.vue'
 import LibraryCreatorReading from './LibraryCreatorReading.vue'
 import LibraryCreatorScanner from './LibraryCreatorScanner.vue'
 import LibraryCreatorSchedule from './LibraryCreatorSchedule.vue'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   library?: Library | null
@@ -339,14 +342,16 @@ onMounted(async () => {
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <h2 id="library-creator-title" class="truncate font-serif text-lg font-semibold text-foreground sm:text-xl">{{ title }}</h2>
-                <span v-if="isDirty" class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">Unsaved</span>
+                <span v-if="isDirty" class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  {{ t('library.creator.unsaved') }}
+                </span>
               </div>
               <p id="library-creator-description" class="mt-0.5 text-xs text-muted-foreground sm:text-sm">{{ activeSection.description }}</p>
             </div>
             <button
               type="button"
               class="-mr-1 flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-              aria-label="Close library creator"
+              :aria-label="t('library.creator.closeAria')"
               :disabled="loading"
               @click="requestClose"
             >
@@ -359,7 +364,7 @@ onMounted(async () => {
           v-if="mode === 'create' && !props.library"
           class="h-1 shrink-0 bg-muted md:hidden"
           role="progressbar"
-          aria-label="Library setup progress"
+          :aria-label="t('library.creator.progressAria')"
           :aria-valuenow="stepIndex + 1"
           aria-valuemin="1"
           :aria-valuemax="sections.length"
@@ -370,7 +375,7 @@ onMounted(async () => {
         <div class="flex min-h-0 flex-1 flex-col md:flex-row">
           <nav
             class="flex shrink-0 gap-1 overflow-x-auto border-b border-border bg-muted/30 px-3 py-2 md:w-56 md:flex-col md:overflow-y-auto md:border-b-0 md:border-r md:px-3 md:py-4"
-            aria-label="Library settings sections"
+            :aria-label="t('library.creator.sectionsAria')"
           >
             <button
               v-for="(section, index) in sections"
@@ -403,13 +408,13 @@ onMounted(async () => {
                 <component :is="section.icon" v-else :size="13" />
               </span>
               <span class="whitespace-nowrap md:min-w-0 md:flex-1 md:whitespace-normal">{{ section.label }}</span>
-              <span v-if="section.required" class="hidden text-[10px] text-muted-foreground md:block">Required</span>
+              <span v-if="section.required" class="hidden text-[10px] text-muted-foreground md:block">{{ t('library.creator.required') }}</span>
             </button>
           </nav>
 
           <main class="min-w-0 flex-1 overflow-y-auto bg-background">
             <div v-if="initializing" class="flex h-full items-center justify-center text-muted-foreground">
-              <Loader2 class="size-5 animate-spin" aria-label="Loading library settings" />
+              <Loader2 class="size-5 animate-spin" :aria-label="t('library.creator.loadingAria')" />
             </div>
             <template v-else>
               <div

@@ -50,8 +50,33 @@ jobs:
       issues: read
       pull-requests: read
     steps:
+      - name: Checkout trusted pull request base
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Classify Crowdin pull request
+        id: crowdin
+        shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REPO: ${{ github.repository }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          args=("$PR_BASE_SHA" "$PR_HEAD_SHA" "$BASE_REPO" "$HEAD_REPO" "$HEAD_BRANCH")
+          if git cat-file -e "$PR_BASE_SHA:scripts/classify-crowdin-pr.sh" 2>/dev/null; then
+            is_crowdin="$(git show "$PR_BASE_SHA:scripts/classify-crowdin-pr.sh" | bash -s -- "${args[@]}")"
+          else
+            is_crowdin="$(git show "$PR_HEAD_SHA:scripts/classify-crowdin-pr.sh" | bash -s -- "${args[@]}")"
+          fi
+          echo "is_crowdin=$is_crowdin" >> "$GITHUB_OUTPUT"
+
       - name: Validate PR branch name
-        if: github.event.pull_request.user.login != 'dependabot[bot]'
+        if: github.event.pull_request.user.login != 'dependabot[bot]' && steps.crowdin.outputs.is_crowdin != 'true'
         shell: bash
         env:
           PR_BRANCH: ${{ github.head_ref }}
@@ -65,7 +90,7 @@ jobs:
           fi
 
       - name: Validate referenced issues exist
-        if: github.event.pull_request.user.login != 'dependabot[bot]'
+        if: github.event.pull_request.user.login != 'dependabot[bot]' && steps.crowdin.outputs.is_crowdin != 'true'
         shell: bash
         env:
           GH_REPO: ${{ github.repository }}

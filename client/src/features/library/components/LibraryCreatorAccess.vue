@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { UserPlus, Trash2 } from '@lucide/vue'
 import { api } from '@/lib/api'
 import type { LibraryAccessEntry } from '@bookorbit/types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   libraryId: number | null
@@ -120,13 +123,13 @@ onMounted(loadAccess)
   <div class="px-6 py-6 space-y-6">
     <div v-if="!libraryId" class="rounded-lg border border-dashed border-border px-5 py-8 text-center">
       <UserPlus :size="22" class="text-muted-foreground/60 mx-auto mb-2" />
-      <p class="text-sm text-muted-foreground">Access can be configured after the library is created.</p>
+      <p class="text-sm text-muted-foreground">{{ t('library.creator.access.notYetCreated') }}</p>
     </div>
 
     <template v-else>
       <div>
-        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-1">Access control</p>
-        <p class="text-xs text-muted-foreground mb-3">Superusers always have full access. Grant access to other users below.</p>
+        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-1">{{ t('library.creator.access.title') }}</p>
+        <p class="text-xs text-muted-foreground mb-3">{{ t('library.creator.access.description') }}</p>
 
         <p v-if="error" class="text-xs text-destructive mb-3" role="alert">{{ error }}</p>
 
@@ -134,22 +137,22 @@ onMounted(loadAccess)
         <div class="mb-4 grid grid-cols-2 gap-2 sm:flex">
           <select
             v-model="grantUserId"
-            aria-label="User to grant access"
+            :aria-label="t('library.creator.access.userSelectAria')"
             class="col-span-2 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring sm:flex-1"
             :disabled="loading || actionLoading"
           >
-            <option :value="null" disabled>Select a user…</option>
+            <option :value="null" disabled>{{ t('library.creator.access.selectUser') }}</option>
             <option v-for="u in availableUsers" :key="u.id" :value="u.id">{{ u.name }} ({{ u.username }})</option>
           </select>
           <select
             v-model="grantLevel"
-            aria-label="Access level to grant"
+            :aria-label="t('library.creator.access.levelSelectAria')"
             class="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             :disabled="loading || actionLoading"
           >
-            <option value="viewer">Viewer</option>
-            <option value="editor">Editor</option>
-            <option value="owner">Owner</option>
+            <option value="viewer">{{ t('library.creator.access.levels.viewer') }}</option>
+            <option value="editor">{{ t('library.creator.access.levels.editor') }}</option>
+            <option value="owner">{{ t('library.creator.access.levels.owner') }}</option>
           </select>
           <button
             type="button"
@@ -158,7 +161,7 @@ onMounted(loadAccess)
             @click="grant"
           >
             <UserPlus :size="14" />
-            Grant
+            {{ t('library.creator.access.grant') }}
           </button>
         </div>
 
@@ -167,14 +170,16 @@ onMounted(loadAccess)
           <table class="w-full min-w-md text-sm">
             <thead class="bg-muted/50">
               <tr>
-                <th class="px-4 py-3 text-left font-medium text-muted-foreground text-xs">User</th>
-                <th class="px-4 py-3 text-left font-medium text-muted-foreground text-xs">Access level</th>
+                <th class="px-4 py-3 text-left font-medium text-muted-foreground text-xs">{{ t('library.creator.access.columns.user') }}</th>
+                <th class="px-4 py-3 text-left font-medium text-muted-foreground text-xs">{{ t('library.creator.access.columns.accessLevel') }}</th>
                 <th class="px-4 py-3 w-10" />
               </tr>
             </thead>
             <tbody class="divide-y divide-border">
               <tr v-if="loading">
-                <td colspan="3" class="px-4 py-6 text-center text-xs text-muted-foreground">Loading access settings...</td>
+                <td colspan="3" class="px-4 py-6 text-center text-xs text-muted-foreground">
+                  {{ t('library.creator.access.loading') }}
+                </td>
               </tr>
               <tr v-for="entry in accessList" :key="entry.userId" class="hover:bg-muted/20 transition-colors">
                 <td class="px-4 py-3">
@@ -189,9 +194,9 @@ onMounted(loadAccess)
                     class="rounded border border-border bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     @change="changeLevel(entry.userId, ($event.target as HTMLSelectElement).value as 'viewer' | 'editor' | 'owner')"
                   >
-                    <option value="viewer">Viewer</option>
-                    <option value="editor">Editor</option>
-                    <option value="owner">Owner</option>
+                    <option value="viewer">{{ t('library.creator.access.levels.viewer') }}</option>
+                    <option value="editor">{{ t('library.creator.access.levels.editor') }}</option>
+                    <option value="owner">{{ t('library.creator.access.levels.owner') }}</option>
                   </select>
                 </td>
                 <td class="px-4 py-3">
@@ -207,7 +212,7 @@ onMounted(loadAccess)
                 </td>
               </tr>
               <tr v-if="!loading && accessList.length === 0">
-                <td colspan="3" class="px-4 py-6 text-center text-xs text-muted-foreground">No users have been granted access yet.</td>
+                <td colspan="3" class="px-4 py-6 text-center text-xs text-muted-foreground">{{ t('library.creator.access.empty') }}</td>
               </tr>
             </tbody>
           </table>

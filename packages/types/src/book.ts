@@ -30,6 +30,40 @@ export type UserBookStatus = {
   updatedAt: string;
 };
 
+export const READING_ATTEMPT_OUTCOMES = ["completed", "skimmed", "abandoned"] as const;
+export type ReadingAttemptOutcome = (typeof READING_ATTEMPT_OUTCOMES)[number];
+
+export const READING_ATTEMPT_ORIGINS = ["manual", "bookorbit", "kobo", "koreader", "hardcover", "migration"] as const;
+export type ReadingAttemptOrigin = (typeof READING_ATTEMPT_ORIGINS)[number];
+
+export type ReadingAttempt = {
+  id: number;
+  bookId: number;
+  startedOn: string | null;
+  endedOn: string | null;
+  outcome: ReadingAttemptOutcome | null;
+  origin: ReadingAttemptOrigin;
+  externalProvider: string | null;
+  externalId: string | null;
+  totalSessions: number;
+  totalSeconds: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ReadingAttemptListResponse = {
+  items: ReadingAttempt[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+export type ReadingAttemptPatch = {
+  startedOn?: string | null;
+  endedOn?: string | null;
+  outcome?: ReadingAttemptOutcome | null;
+};
+
 export type ResetBookReadingStateResponse = {
   readStatus: UserBookStatus;
 };

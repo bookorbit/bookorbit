@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { BookCheck } from '@lucide/vue'
 
@@ -9,6 +10,8 @@ import ChartEmptyState from '../ChartEmptyState.vue'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const MIN_COMPLETIONS = 2
+
+const { t } = useI18n()
 
 const { data, loading, error } = useUserBooksCompleted()
 
@@ -72,12 +75,12 @@ watchEffect(() => {
 </script>
 
 <template>
-  <ChartCard title="Books Completed" :icon="BookCheck" :color-index="3" :loading :error :empty="isEmpty">
+  <ChartCard :title="t('statistics.charts.booksCompleted.title')" :icon="BookCheck" :color-index="3" :loading :error :empty="isEmpty">
     <ChartEmptyState
       v-if="!hasEnoughData"
       :icon="BookCheck"
-      title="Not enough data yet"
-      :description="`Need at least ${MIN_COMPLETIONS} completed books for this chart.`"
+      :title="t('statistics.empty.notEnoughData')"
+      :description="t('statistics.charts.booksCompleted.notEnoughData', { count: MIN_COMPLETIONS })"
     />
     <VChart v-else :option autoresize style="height: 100%" />
   </ChartCard>

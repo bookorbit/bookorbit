@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { Pencil, Trash2, Upload, X, Check, ChevronDown, ChevronRight } from '@lucide/vue'
 import { MAX_FONTS_PER_USER } from '@bookorbit/types'
@@ -7,18 +8,21 @@ import type { UserFont } from '@bookorbit/types'
 import { useCustomFonts } from '@/features/reader/epub/composables/useCustomFonts'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import SettingsPageHeader from './SettingsPageHeader.vue'
+import { formatBytes } from '@/lib/formatting'
 
-const WEIGHT_LABELS: Record<number, string> = {
-  100: 'Thin',
-  200: 'Extra Light',
-  300: 'Light',
-  400: 'Regular',
-  500: 'Medium',
-  600: 'Semi Bold',
-  700: 'Bold',
-  800: 'Extra Bold',
-  900: 'Black',
-}
+const { t } = useI18n()
+
+const WEIGHT_LABELS = computed<Record<number, string>>(() => ({
+  100: t('settings.reader.fonts.weightThin'),
+  200: t('settings.reader.fonts.weightExtraLight'),
+  300: t('settings.reader.fonts.weightLight'),
+  400: t('settings.reader.fonts.weightRegular'),
+  500: t('settings.reader.fonts.weightMedium'),
+  600: t('settings.reader.fonts.weightSemiBold'),
+  700: t('settings.reader.fonts.weightBold'),
+  800: t('settings.reader.fonts.weightExtraBold'),
+  900: t('settings.reader.fonts.weightBlack'),
+}))
 
 const customFonts = useCustomFonts()
 const { fonts, families, loading, uploading, fetchFonts, uploadFont, updateFont } = customFonts
@@ -93,10 +97,10 @@ async function saveEditFamily() {
   const results = await Promise.allSettled(variantsToUpdate.map((f) => updateFont(f.id, { familyName: newName })))
   const failed = results.some((r) => r.status === 'rejected' || r.value === null)
   if (failed) {
-    toast.error('Failed to rename font family')
+    toast.error(t('settings.reader.fonts.renameFamilyFailed'))
     await fetchFonts()
   } else {
-    toast.success(`Renamed to "${newName}"`)
+    toast.success(t('settings.reader.fonts.renamedTo', { name: newName }))
   }
 }
 
@@ -122,7 +126,7 @@ async function saveEditVariant() {
     style: editingVariantStyle.value,
   })
   if (!result) {
-    toast.error('Failed to update font variant')
+    toast.error(t('settings.reader.fonts.updateVariantFailed'))
     await fetchFonts()
   }
 }
@@ -140,11 +144,11 @@ async function deleteVariant(font: UserFont) {
     const success = await customFonts.deleteFont(font.id)
     if (!success) {
       fonts.value = snapshot
-      toast.error('Failed to delete font')
+      toast.error(t('settings.reader.fonts.deleteFontFailed'))
     }
   } catch {
     fonts.value = snapshot
-    toast.error('Failed to delete font')
+    toast.error(t('settings.reader.fonts.deleteFontFailed'))
   }
 }
 
@@ -158,7 +162,7 @@ async function deleteFamily(familyName: string) {
   const failed = results.some((r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value))
   if (failed) {
     await fetchFonts()
-    toast.error('Failed to delete font family')
+    toast.error(t('settings.reader.fonts.deleteFamilyFailed'))
   }
 }
 
@@ -187,16 +191,16 @@ function handleFileInput(event: Event) {
 
 async function processFiles(files: File[]) {
   if (isDemoRestrictedAccount.value) {
-    toast.error('Demo-restricted account cannot manage fonts')
+    toast.error(t('settings.reader.fonts.demoCannotManage'))
     return
   }
   uploadErrors.value = []
   for (const file of files) {
     try {
       await uploadFont(file)
-      toast.success(`"${file.name}" added`)
+      toast.success(t('settings.reader.fonts.fileAdded', { name: file.name }))
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Upload failed'
+      const message = err instanceof Error ? err.message : t('settings.reader.fonts.uploadFailed')
       uploadErrors.value = [...uploadErrors.value, `${file.name}: ${message}`]
     }
   }
@@ -205,21 +209,15 @@ async function processFiles(files: File[]) {
 function dismissError(index: number) {
   uploadErrors.value = uploadErrors.value.filter((_, i) => i !== index)
 }
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
 </script>
 
 <template>
   <div>
-    <SettingsPageHeader title="Fonts" subtitle="Upload custom fonts for use in the eBook reader." />
+    <SettingsPageHeader :title="t('settings.reader.fonts.title')" :subtitle="t('settings.reader.fonts.subtitle')" />
 
     <!-- Upload zone -->
     <div class="mb-6">
-      <p class="settings-group-label">Upload Fonts</p>
+      <p class="settings-group-label">{{ t('settings.reader.fonts.uploadFonts') }}</p>
       <label
         class="relative flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed px-6 py-8 text-center transition-colors"
         :class="[
@@ -239,12 +237,15 @@ function formatBytes(bytes: number): string {
         </div>
         <div>
           <p class="text-sm font-medium text-foreground">
-            <span v-if="isDemoRestrictedAccount">Not available for demo accounts</span>
-            <span v-else-if="uploading">Uploading...</span>
-            <span v-else-if="isDragging">Drop files here</span>
-            <span v-else>Drag font files here, or <span class="text-primary underline underline-offset-2">browse</span></span>
+            <span v-if="isDemoRestrictedAccount">{{ t('settings.reader.fonts.notAvailableDemo') }}</span>
+            <span v-else-if="uploading">{{ t('settings.reader.fonts.uploading') }}</span>
+            <span v-else-if="isDragging">{{ t('settings.reader.fonts.dropFilesHere') }}</span>
+            <span v-else
+              >{{ t('settings.reader.fonts.dragFontsPrefix') }}
+              <span class="text-primary underline underline-offset-2">{{ t('settings.reader.fonts.browse') }}</span></span
+            >
           </p>
-          <p class="mt-1 text-xs text-muted-foreground">TTF, OTF, WOFF, WOFF2 - max 10 MB each</p>
+          <p class="mt-1 text-xs text-muted-foreground">{{ t('settings.reader.fonts.fileTypesHint') }}</p>
         </div>
         <input
           type="file"
@@ -274,12 +275,14 @@ function formatBytes(bytes: number): string {
     <!-- Font list -->
     <div>
       <div class="flex items-center justify-between mb-2">
-        <p class="settings-group-label mb-0">Your Fonts</p>
-        <span class="text-xs text-muted-foreground">{{ fonts.length }} / {{ MAX_FONTS_PER_USER }} used</span>
+        <p class="settings-group-label mb-0">{{ t('settings.reader.fonts.yourFonts') }}</p>
+        <span class="text-xs text-muted-foreground">{{
+          t('settings.reader.fonts.fontsUsed', { count: fonts.length, max: MAX_FONTS_PER_USER })
+        }}</span>
       </div>
 
       <div v-if="loading" class="flex items-center justify-center py-10 text-muted-foreground">
-        <span class="text-sm">Loading...</span>
+        <span class="text-sm">{{ t('common.loading') }}</span>
       </div>
 
       <div
@@ -290,8 +293,8 @@ function formatBytes(bytes: number): string {
           <Upload :size="22" />
         </div>
         <div>
-          <p class="text-sm font-medium text-foreground">No fonts uploaded yet</p>
-          <p class="text-xs text-muted-foreground mt-1">Drag a font file above to get started.</p>
+          <p class="text-sm font-medium text-foreground">{{ t('settings.reader.fonts.noFontsYet') }}</p>
+          <p class="text-xs text-muted-foreground mt-1">{{ t('settings.reader.fonts.noFontsHint') }}</p>
         </div>
       </div>
 
@@ -323,15 +326,15 @@ function formatBytes(bytes: number): string {
               @click.stop
             />
 
-            <span class="shrink-0 text-xs text-muted-foreground"
-              >{{ family.variants.length }} {{ family.variants.length === 1 ? 'file' : 'files' }}</span
-            >
+            <span class="shrink-0 text-xs text-muted-foreground">{{
+              t('settings.reader.fonts.fileCount', { count: family.variants.length }, family.variants.length)
+            }}</span>
 
             <div class="flex items-center gap-1 shrink-0">
               <button
                 v-if="editingFamilyName !== family.name && !isDemoRestrictedAccount"
                 class="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                title="Rename family"
+                :title="t('settings.reader.fonts.renameFamily')"
                 @click.stop="startEditFamily(family.name)"
               >
                 <Pencil :size="13" />
@@ -339,7 +342,7 @@ function formatBytes(bytes: number): string {
               <button
                 v-if="editingFamilyName === family.name"
                 class="flex h-7 w-7 items-center justify-center rounded-md text-primary transition-colors hover:bg-primary/10"
-                title="Save"
+                :title="t('common.save')"
                 @click.stop="saveEditFamily"
               >
                 <Check :size="13" />
@@ -347,7 +350,7 @@ function formatBytes(bytes: number): string {
               <button
                 v-if="!isDemoRestrictedAccount"
                 class="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                title="Delete family"
+                :title="t('settings.reader.fonts.deleteFamily')"
                 @click.stop="deleteFamily(family.name)"
               >
                 <Trash2 :size="13" />
@@ -360,7 +363,7 @@ function formatBytes(bytes: number): string {
             class="px-4 pb-3 -mt-1 text-sm text-muted-foreground/90 truncate"
             :style="{ fontFamily: `'${family.cssFamilyName}', sans-serif`, fontSize: '16px' }"
           >
-            The quick brown fox jumps over the lazy dog
+            {{ t('settings.reader.fonts.pangram') }}
           </div>
 
           <!-- Variant rows (expanded) -->
@@ -381,14 +384,15 @@ function formatBytes(bytes: number): string {
                       class="h-7 rounded border border-border bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
                       @keydown="handleVariantEditKeydown"
                     >
-                      <option value="normal">Normal</option>
-                      <option value="italic">Italic</option>
+                      <option value="normal">{{ t('settings.reader.fonts.styleNormal') }}</option>
+                      <option value="italic">{{ t('settings.reader.fonts.styleItalic') }}</option>
                     </select>
                   </div>
                 </template>
                 <template v-else>
                   <span class="text-xs text-foreground">
-                    {{ WEIGHT_LABELS[variant.weight] ?? variant.weight }} {{ variant.style === 'italic' ? '· Italic' : '' }}
+                    {{ WEIGHT_LABELS[variant.weight] ?? variant.weight }}
+                    {{ variant.style === 'italic' ? '· ' + t('settings.reader.fonts.styleItalic') : '' }}
                   </span>
                   <span class="ml-2 text-xs text-muted-foreground uppercase">{{ variant.format }}</span>
                   <span class="ml-2 text-xs text-muted-foreground">{{ formatBytes(variant.fileSize) }}</span>
@@ -399,7 +403,7 @@ function formatBytes(bytes: number): string {
                 <button
                   v-if="editingVariantId !== variant.id && !isDemoRestrictedAccount"
                   class="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  title="Edit weight/style"
+                  :title="t('settings.reader.fonts.editVariant')"
                   @click="startEditVariant(variant)"
                 >
                   <Pencil :size="12" />
@@ -407,7 +411,7 @@ function formatBytes(bytes: number): string {
                 <button
                   v-if="editingVariantId === variant.id"
                   class="flex h-6 w-6 items-center justify-center rounded text-primary transition-colors hover:bg-primary/10"
-                  title="Save"
+                  :title="t('common.save')"
                   @click="saveEditVariant"
                 >
                   <Check :size="12" />
@@ -415,7 +419,7 @@ function formatBytes(bytes: number): string {
                 <button
                   v-if="editingVariantId === variant.id"
                   class="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted"
-                  title="Cancel"
+                  :title="t('common.cancel')"
                   @click="cancelEdits"
                 >
                   <X :size="12" />
@@ -423,7 +427,7 @@ function formatBytes(bytes: number): string {
                 <button
                   v-if="editingVariantId !== variant.id && !isDemoRestrictedAccount"
                   class="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                  title="Delete variant"
+                  :title="t('settings.reader.fonts.deleteVariant')"
                   @click="deleteVariant(variant)"
                 >
                   <Trash2 :size="12" />

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { formatDate } from '@/i18n/formatters'
 import { Check, CheckCircle2, Circle } from '@lucide/vue'
 import type { AchievementRarity } from '@bookorbit/types'
 import type { TieredGroup } from '../types'
@@ -9,14 +11,16 @@ const props = defineProps<{
   group: TieredGroup
 }>()
 
+const { t } = useI18n()
+
 const isExpanded = ref(false)
 
-const rarityLabel: Record<AchievementRarity, string> = {
-  common: 'Common',
-  rare: 'Rare',
-  epic: 'Epic',
-  legendary: 'Legendary',
-}
+const rarityLabel = computed<Record<AchievementRarity, string>>(() => ({
+  common: t('achievements.rarity.common'),
+  rare: t('achievements.rarity.rare'),
+  epic: t('achievements.rarity.epic'),
+  legendary: t('achievements.rarity.legendary'),
+}))
 
 const rarityPillClass: Record<AchievementRarity, string> = {
   common: 'bg-blue-500/15 text-blue-700 dark:text-blue-300',
@@ -108,7 +112,7 @@ function pipClass(tierRarity: AchievementRarity, earned: boolean): string {
 }
 
 function formatTierDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(undefined, {
+  return formatDate(new Date(dateStr), {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -147,10 +151,16 @@ function handleClick(): void {
       <div class="flex shrink-0 items-center gap-1">
         <div v-for="tier in group.tiers" :key="tier.key" :class="['size-2 rounded-full', pipClass(tier.rarity, tier.earned)]" />
       </div>
-      <span class="shrink-0">Tier {{ group.earnedCount }} of {{ group.totalTiers }}</span>
+      <span class="shrink-0">{{ t('achievements.tierProgress', { earned: group.earnedCount, total: group.totalTiers }) }}</span>
       <template v-if="progressPercent != null">
         <span :class="['shrink-0', isLocked ? 'text-current/70' : 'text-muted-foreground/50']">·</span>
-        <span class="min-w-0">{{ group.currentProgress }} / {{ group.nextUnearned?.threshold }} to {{ group.nextUnearned?.name }}</span>
+        <span class="min-w-0">{{
+          t('achievements.progressToNext', {
+            current: group.currentProgress,
+            threshold: group.nextUnearned?.threshold,
+            name: group.nextUnearned?.name,
+          })
+        }}</span>
       </template>
     </div>
 

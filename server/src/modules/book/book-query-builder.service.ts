@@ -962,6 +962,9 @@ export class BookQueryBuilder {
         case 'publisher':
           parts.push(`publisher ${D} NULLS LAST`);
           break;
+        case 'language':
+          parts.push(`r.language ${D} NULLS LAST`);
+          break;
         case 'pageCount':
           parts.push(`page_count ${D} NULLS LAST`);
           break;
@@ -998,7 +1001,9 @@ export class BookQueryBuilder {
           break;
         }
         case 'readStatus':
-          parts.push(`(SELECT ubs.status FROM user_book_status ubs WHERE ubs.book_id = r.id AND ubs.user_id = ${safeUserId}) ${D} NULLS LAST`);
+          parts.push(
+            `COALESCE((SELECT ubs.status FROM user_book_status ubs WHERE ubs.book_id = r.id AND ubs.user_id = ${safeUserId}), 'unread') ${D} NULLS LAST`,
+          );
           break;
         case 'format':
           parts.push(`(SELECT bf.format FROM book_files bf WHERE bf.id = r.primary_file_id) ${D} NULLS LAST`);

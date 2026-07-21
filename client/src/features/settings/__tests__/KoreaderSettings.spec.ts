@@ -4,6 +4,20 @@ import KoreaderSettings from '../KoreaderSettings.vue'
 import type { BookCard, KoreaderCredentials, KoreaderManualHashLink, KoreaderSyncStatus, KoreaderUnmatchedBook } from '@bookorbit/types'
 import { copyToClipboard } from '@/lib/clipboard'
 
+const routerState = vi.hoisted(() => ({
+  currentQuery: {} as Record<string, string>,
+  replacedQuery: null as Record<string, string> | null,
+}))
+
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ query: routerState.currentQuery }),
+  useRouter: () => ({
+    replace: vi.fn<(to: { name: string; query: Record<string, string> }) => void>((to) => {
+      routerState.replacedQuery = to.query
+    }),
+  }),
+}))
+
 const koreaderMock = vi.hoisted(() => ({
   credentials: { __v_isRef: true, value: null as KoreaderCredentials | null },
   syncStatus: { __v_isRef: true, value: null as KoreaderSyncStatus | null },
@@ -57,6 +71,10 @@ vi.mock('@/lib/clipboard', () => ({
 
 vi.mock('../SettingsPageHeader.vue', () => ({
   default: { template: '<div />' },
+}))
+
+vi.mock('../KoreaderFileNamingSettings.vue', () => ({
+  default: { template: '<div data-testid="file-naming-settings" />' },
 }))
 
 function makeCredentials(overrides: Partial<KoreaderCredentials> = {}): KoreaderCredentials {
@@ -184,6 +202,8 @@ function buttonByText(wrapper: ReturnType<typeof mount>, text: string) {
 describe('KoreaderSettings', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    routerState.currentQuery = {}
+    routerState.replacedQuery = null
     koreaderMock.credentials.value = null
     koreaderMock.syncStatus.value = null
     koreaderMock.unmatchedBooks.value = []
@@ -212,6 +232,36 @@ describe('KoreaderSettings', () => {
     searchMock.hasMore.value = false
     searchMock.loadMore.mockClear()
     searchMock.clear.mockClear()
+  })
+
+  it('switches between sync and file naming tabs outside embedded mode', async () => {
+    const wrapper = mount(KoreaderSettings)
+    await flushPromises()
+
+    expect(routerState.replacedQuery).toEqual({ tab: 'settings' })
+    const fileNamingTab = buttonByText(wrapper, 'File Naming')!
+    const syncTab = buttonByText(wrapper, 'Sync Settings')!
+    expect(syncTab.attributes('aria-pressed')).toBe('true')
+    expect(fileNamingTab.attributes('aria-pressed')).toBe('false')
+    await fileNamingTab.trigger('click')
+    expect(fileNamingTab.classes()).toContain('border-primary')
+    expect(fileNamingTab.attributes('aria-pressed')).toBe('true')
+    expect(routerState.replacedQuery).toEqual({ tab: 'file-naming' })
+    await syncTab.trigger('click')
+    expect(syncTab.classes()).toContain('border-primary')
+    expect(syncTab.attributes('aria-pressed')).toBe('true')
+    expect(routerState.replacedQuery).toEqual({ tab: 'settings' })
+  })
+
+  it('opens the tab selected by the URL query', async () => {
+    routerState.currentQuery = { tab: 'file-naming' }
+
+    const wrapper = mount(KoreaderSettings)
+    await flushPromises()
+
+    expect(buttonByText(wrapper, 'File Naming')!.attributes('aria-pressed')).toBe('true')
+    expect(wrapper.find('[data-testid="file-naming-settings"]').isVisible()).toBe(true)
+    expect(routerState.replacedQuery).toBeNull()
   })
 
   it('shows loading state', () => {
@@ -398,6 +448,9 @@ describe('KoreaderSettings', () => {
 
     await buttonByText(wrapper, 'Link')!.trigger('click')
     expect(wrapper.text()).toContain('Link KOReader book')
+    const searchInput = wrapper.find('input[type="search"]')
+    await searchInput.setValue('BookOrbit')
+    expect((searchInput.element as HTMLInputElement).value).toBe('BookOrbit')
     expect(wrapper.text()).toContain('BookOrbit Title')
 
     const bookResult = wrapper.findAll('button').find((button) => button.text().includes('BookOrbit Title'))!

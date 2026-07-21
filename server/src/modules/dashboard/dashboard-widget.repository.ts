@@ -26,6 +26,7 @@ import {
   books,
   genres,
   readingProgress,
+  readingAttempts,
   readingSessions,
   userBookRatings,
   userBookStatus,
@@ -54,14 +55,15 @@ export class DashboardWidgetRepository {
     const yearStart = sql`date_trunc('year', current_date)`;
     const [row] = await this.db
       .select({ count: sql<number>`count(*)::int` })
-      .from(userBookStatus)
-      .innerJoin(books, eq(books.id, userBookStatus.bookId))
+      .from(readingAttempts)
+      .innerJoin(books, eq(books.id, readingAttempts.bookId))
       .where(
         and(
-          eq(userBookStatus.userId, userId),
-          inArray(userBookStatus.status, ['read', 'skimmed']),
-          isNotNull(userBookStatus.finishedAt),
-          gte(userBookStatus.finishedAt, yearStart),
+          eq(readingAttempts.userId, userId),
+          eq(readingAttempts.outcome, 'completed'),
+          isNull(readingAttempts.deletedAt),
+          isNotNull(readingAttempts.endedOn),
+          gte(readingAttempts.endedOn, yearStart),
           inArray(books.libraryId, accessibleLibraryIds),
           ...cfClauses,
         ),
@@ -226,7 +228,7 @@ export class DashboardWidgetRepository {
       .select({ count: sql<number>`count(*)::int` })
       .from(annotations)
       .innerJoin(books, eq(books.id, annotations.bookId))
-      .where(and(eq(annotations.userId, userId), inArray(books.libraryId, accessibleLibraryIds), ...cfClauses));
+      .where(and(eq(annotations.userId, userId), isNull(annotations.deletedAt), inArray(books.libraryId, accessibleLibraryIds), ...cfClauses));
 
     return row?.count ?? 0;
   }
@@ -253,7 +255,7 @@ export class DashboardWidgetRepository {
       .from(annotations)
       .innerJoin(books, eq(books.id, annotations.bookId))
       .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-      .where(and(eq(annotations.userId, userId), inArray(books.libraryId, accessibleLibraryIds), ...cfClauses))
+      .where(and(eq(annotations.userId, userId), isNull(annotations.deletedAt), inArray(books.libraryId, accessibleLibraryIds), ...cfClauses))
       .orderBy(annotations.id)
       .limit(1)
       .offset(offset);

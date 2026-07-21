@@ -32,7 +32,7 @@ The **footer** is optional. Use it to reference issues, close PRs, or document b
   │                             users|stats|notifications|settings|scanner|
   │                             email|audit|smart-scope|types|docker|deps|server|client
   │
-  └─ Type: feat|fix|db|perf|refactor|style|docs|test|build|ci|chore|security|revert
+  └─ Type: feat|fix|i18n|db|perf|refactor|style|docs|test|build|ci|chore|security|revert
 ```
 
 The `<type>` and `<summary>` fields are required. The `(<scope>)` field is optional.
@@ -45,6 +45,7 @@ The type signals the intent of the change at a glance.
 | ---------- | -------------------------------------------------------------------------------------------------------- |
 | `feat`     | Introduces a new feature or user-visible capability                                                      |
 | `fix`      | Patches a bug in existing behavior                                                                       |
+| `i18n`     | Adds or updates translations and localization catalogs                                                   |
 | `db`       | Adds or modifies a Drizzle schema, generates a migration, or changes seed data                           |
 | `perf`     | Improves performance without changing observable behavior                                                |
 | `refactor` | Restructures code without fixing bugs or adding features                                                 |
@@ -193,6 +194,12 @@ causing sessions that crossed a DST boundary to report incorrect
 elapsed time.
 
 Fixes #412
+```
+
+### `i18n`
+
+```
+i18n(client): sync German translations from Crowdin
 ```
 
 ### `db`

@@ -1,10 +1,4 @@
-const HTML_ENTITY_REPLACEMENTS: Array<[RegExp, string]> = [
-  [/&amp;/g, '&'],
-  [/&lt;/g, '<'],
-  [/&gt;/g, '>'],
-  [/&quot;/g, '"'],
-  [/&#39;/g, "'"],
-];
+import { htmlToPlainText } from '../../../common/utils/html-to-text.utils';
 
 export function normalizeMaxCandidates(value: number | undefined, maxResults: number): number {
   if (!Number.isFinite(value) || value == null) return maxResults;
@@ -42,11 +36,7 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 }
 
 export function stripHtml(html: string): string {
-  let value = html.replace(/<[^>]*>/g, ' ');
-  for (const [pattern, replacement] of HTML_ENTITY_REPLACEMENTS) {
-    value = value.replace(pattern, replacement);
-  }
-  return value.replace(/\s+/g, ' ').trim();
+  return htmlToPlainText(html);
 }
 
 export function sanitizeLogError(error: unknown): string {

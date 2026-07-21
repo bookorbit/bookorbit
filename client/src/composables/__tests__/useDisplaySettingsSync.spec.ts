@@ -12,6 +12,7 @@ function validDisplayPreferences(overrides: Partial<DisplayPreferences> = {}): D
     squareGridGap: 20,
     viewMode: 'grid',
     cardOverlays: ['progress-bar', 'format', 'rating'],
+    showJumpRails: true,
     smartScopeFilterExpanded: true,
     authorCoverSize: 140,
     authorCoverShape: 'circle',
@@ -189,6 +190,24 @@ describe('useDisplaySettingsSync', () => {
       '/api/v1/user-preferences/display',
       expect.objectContaining({
         body: expect.stringContaining('"bookShadowStrength":"strong"'),
+      }),
+    )
+  })
+
+  it('syncs showJumpRails changes to the server', async () => {
+    vi.useFakeTimers()
+    const { apiMock, displaySettings, sync } = await loadModules()
+    apiMock.mockResolvedValue({ ok: true })
+
+    sync.initDisplaySettingsSync()
+    displaySettings.useDisplaySettings().showJumpRails.value = false
+    await vi.advanceTimersByTimeAsync(1500)
+
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/v1/user-preferences/display',
+      expect.objectContaining({
+        method: 'PUT',
+        body: expect.stringContaining('"showJumpRails":false'),
       }),
     )
   })

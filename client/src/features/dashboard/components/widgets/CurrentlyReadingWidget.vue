@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { BookOpen, Play } from '@lucide/vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { FORMAT_TO_GROUP } from '@bookorbit/types'
 
@@ -9,6 +10,7 @@ import BookCoverSurface from '@/features/book/components/BookCoverSurface.vue'
 import { useCurrentlyReadingWidget } from '../../composables/useCurrentlyReadingWidget'
 
 const { data, loading, error } = useCurrentlyReadingWidget()
+const { t } = useI18n()
 const router = useRouter()
 const { coverUrl } = useCoverVersions()
 
@@ -33,7 +35,7 @@ function continueReading(bookId: number, fileId: number | null, fileFormat: stri
   <div class="flex h-full flex-col p-3">
     <div class="mb-3 flex items-center gap-2 self-start">
       <BookOpen :size="16" class="text-primary/90" />
-      <span class="text-[15px] font-semibold text-foreground">Currently Reading</span>
+      <span class="text-[15px] font-semibold text-foreground">{{ t('dashboard.widgets.currentlyReading.title') }}</span>
     </div>
 
     <!-- Loading -->
@@ -49,14 +51,16 @@ function continueReading(bookId: number, fileId: number | null, fileFormat: stri
     </div>
 
     <!-- Error -->
-    <div v-else-if="error" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">Failed to load</div>
+    <div v-else-if="error" class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+      {{ t('dashboard.common.failedToLoad') }}
+    </div>
 
     <!-- Empty -->
     <div v-else-if="!data || data.books.length === 0" class="flex flex-1 flex-col items-center justify-center gap-2">
       <div class="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
         <BookOpen :size="16" class="text-muted-foreground/60" />
       </div>
-      <p class="text-center text-xs text-muted-foreground">No books in progress. Start reading one to see it here.</p>
+      <p class="text-center text-xs text-muted-foreground">{{ t('dashboard.widgets.currentlyReading.empty') }}</p>
     </div>
 
     <!-- Books list -->
@@ -81,7 +85,7 @@ function continueReading(bookId: number, fileId: number | null, fileFormat: stri
               :author-line="book.authors.length > 0 ? book.authors.join(', ') : null"
               :is-audio="false"
               :seed="book.title ?? String(book.bookId)"
-              :alt="book.title ?? 'Book cover'"
+              :alt="book.title ?? t('dashboard.common.bookCover')"
               frame-aspect-ratio="9/14"
               :is-comic="isComic(book.fileFormat)"
             />
@@ -89,7 +93,7 @@ function continueReading(bookId: number, fileId: number | null, fileFormat: stri
 
           <!-- Info -->
           <div class="flex min-w-0 flex-1 flex-col justify-center">
-            <p class="truncate text-xs font-semibold leading-tight">{{ book.title ?? 'Untitled' }}</p>
+            <p class="truncate text-xs font-semibold leading-tight">{{ book.title ?? t('dashboard.common.untitled') }}</p>
             <p v-if="book.authors.length > 0" class="truncate text-xs text-muted-foreground">
               {{ book.authors.join(', ') }}
             </p>
@@ -105,7 +109,7 @@ function continueReading(bookId: number, fileId: number | null, fileFormat: stri
           <!-- Continue button (hover) -->
           <button
             class="absolute right-2 top-1/3 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground opacity-0 shadow transition-opacity group-hover/book:opacity-100"
-            title="Continue reading"
+            :title="t('dashboard.widgets.currentlyReading.continueReading')"
             @click.stop="continueReading(book.bookId, book.fileId, book.fileFormat)"
           >
             <Play :size="11" class="translate-x-px" />

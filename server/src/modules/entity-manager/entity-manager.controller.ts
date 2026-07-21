@@ -150,8 +150,8 @@ export class EntityManagerController {
 
   @Get(':entityType/info/:entityId')
   @RequirePermission(Permission.LibraryEditMetadata)
-  getEntityInfo(@Param('entityType', EntityTypePipe) entityType: EntityType, @Param('entityId') entityId: string) {
+  getEntityInfo(@Param('entityType', EntityTypePipe) entityType: EntityType, @Param('entityId') entityId: string, @CurrentUser() user: RequestUser) {
     const parsedId = isInline(entityType) ? entityId : Number(entityId);
-    return this.service.getEntityInfo(entityType, parsedId);
+    return this.service.getEntityInfo(entityType, user, parsedId);
   }
 }

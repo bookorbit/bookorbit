@@ -2,7 +2,7 @@
 
 Everything you need to work in this codebase: architecture, setup, workflows, conventions, and commands.
 
-For the contribution process (issues, PRs, review), see [CONTRIBUTING.md](CONTRIBUTING.md). For test architecture and E2E suite details, see [TESTING.md](TESTING.md).
+For the contribution process (issues, PRs, review), see [CONTRIBUTING.md](CONTRIBUTING.md). For localization and Crowdin workflow details, see [LOCALIZATION.md](LOCALIZATION.md). For test architecture and E2E suite details, see [TESTING.md](TESTING.md).
 
 ---
 

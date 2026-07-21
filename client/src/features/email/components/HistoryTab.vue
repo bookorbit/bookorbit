@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { formatDate as formatLocaleDate } from '@/i18n/formatters'
 import { toast } from 'vue-sonner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Trash2, RefreshCw } from '@lucide/vue'
 import { useEmailSendLog, type EmailSendLogEntry } from '../composables/useEmailSendLog'
 
+const { t } = useI18n()
 const { logEntries, fetchLog, deleteEntry, resendEntry } = useEmailSendLog()
 
 const loading = ref(true)
@@ -29,9 +32,9 @@ async function loadMore() {
 async function remove(entry: EmailSendLogEntry) {
   try {
     await deleteEntry(entry.id)
-    toast.success('Entry deleted')
+    toast.success(t('email.history.entryDeleted'))
   } catch {
-    toast.error('Failed to delete')
+    toast.error(t('email.deleteFailed'))
   }
 }
 
@@ -50,16 +53,16 @@ async function resend(entry: EmailSendLogEntry) {
   resending.value = entry.id
   try {
     await resendEntry(entry.id)
-    toast.success('Queued for resend')
+    toast.success(t('email.history.queuedForResend'))
   } catch (e) {
-    toast.error(e instanceof Error ? e.message : 'Failed to resend')
+    toast.error(e instanceof Error ? e.message : t('email.history.resendFailed'))
   } finally {
     resending.value = null
   }
 }
 
 function formatDate(date: string): string {
-  return new Date(date).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return formatLocaleDate(new Date(date), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function statusClass(status: string): string {
@@ -67,16 +70,24 @@ function statusClass(status: string): string {
   if (status === 'failed') return 'bg-destructive/15 text-destructive'
   return 'bg-muted text-muted-foreground'
 }
+
+function statusLabel(status: string): string {
+  if (status === 'sent') return t('email.history.statusSent')
+  if (status === 'failed') return t('email.history.statusFailed')
+  if (status === 'queued') return t('email.history.statusQueued')
+  if (status === 'pending') return t('email.history.statusPending')
+  return status
+}
 </script>
 
 <template>
   <div class="space-y-4">
-    <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Send History</p>
+    <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{{ t('email.history.heading') }}</p>
 
-    <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>
+    <div v-if="loading" class="text-sm text-muted-foreground">{{ t('common.loading') }}</div>
 
     <div v-else-if="logEntries.length === 0" class="border border-border rounded-lg px-5 py-8 bg-card text-center">
-      <p class="text-sm text-muted-foreground">No emails sent yet.</p>
+      <p class="text-sm text-muted-foreground">{{ t('email.history.empty') }}</p>
     </div>
 
     <div v-else class="border border-border rounded-lg overflow-hidden divide-y divide-border">
@@ -84,12 +95,12 @@ function statusClass(status: string): string {
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap mb-0.5">
             <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wide" :class="statusClass(entry.status)">
-              {{ entry.status }}
+              {{ statusLabel(entry.status) }}
             </span>
             <span class="text-sm text-foreground truncate">{{ entry.toName || entry.toEmail }}</span>
           </div>
           <p class="text-xs text-muted-foreground line-clamp-2">
-            {{ entry.subject ?? '(no subject)' }}
+            {{ entry.subject ?? t('email.history.noSubject') }}
           </p>
           <p class="text-xs text-muted-foreground mt-0.5">{{ formatDate(entry.createdAt) }}</p>
           <p v-if="entry.errorMessage" class="text-xs text-destructive mt-0.5 line-clamp-2">{{ entry.errorMessage }}</p>
@@ -106,7 +117,7 @@ function statusClass(status: string): string {
                 <RefreshCw :size="13" :class="resending === entry.id ? 'animate-spin' : ''" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Resend</TooltipContent>
+            <TooltipContent>{{ t('email.history.resend') }}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger as-child>
@@ -117,7 +128,7 @@ function statusClass(status: string): string {
                 <Trash2 :size="13" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Delete</TooltipContent>
+            <TooltipContent>{{ t('common.delete') }}</TooltipContent>
           </Tooltip>
         </div>
       </div>
@@ -128,26 +139,26 @@ function statusClass(status: string): string {
       class="w-full py-2 text-xs text-muted-foreground hover:text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
       @click="loadMore()"
     >
-      Load more
+      {{ t('email.history.loadMore') }}
     </button>
 
     <div v-if="deleteConfirm" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="deleteConfirm = null">
       <button class="absolute inset-0 bg-black/45" @click="deleteConfirm = null" />
       <div class="relative w-full rounded-t-xl border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
-        <p class="text-base font-semibold text-foreground">Delete history entry?</p>
-        <p class="mt-1 text-sm text-muted-foreground line-clamp-2">{{ deleteConfirm.subject ?? '(no subject)' }}</p>
+        <p class="text-base font-semibold text-foreground">{{ t('email.history.deleteTitle') }}</p>
+        <p class="mt-1 text-sm text-muted-foreground line-clamp-2">{{ deleteConfirm.subject ?? t('email.history.noSubject') }}</p>
         <div class="mt-4 flex items-center justify-end gap-2">
           <button
             class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
             @click="deleteConfirm = null"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
           <button
             class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
             @click="confirmRemove"
           >
-            Delete
+            {{ t('common.delete') }}
           </button>
         </div>
       </div>

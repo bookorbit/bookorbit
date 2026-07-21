@@ -1,21 +1,15 @@
 type ContentDispositionType = 'attachment' | 'inline';
+const MAX_HEADER_FILENAME_CODE_UNITS = 1024;
 
 function stripLoneSurrogates(value: string): string {
-  let out = '';
-  for (let i = 0; i < value.length; i++) {
-    const code = value.charCodeAt(i);
-    if (code >= 0xd800 && code <= 0xdbff) {
-      const next = value.charCodeAt(i + 1);
-      if (next >= 0xdc00 && next <= 0xdfff) {
-        out += value[i] + value[i + 1];
-        i += 1;
-      }
-      continue;
-    }
-    if (code >= 0xdc00 && code <= 0xdfff) continue;
-    out += value[i];
-  }
-  return out;
+  return Array.from(value, (character) => {
+    const codePoint = character.codePointAt(0);
+    return codePoint !== undefined && codePoint >= 0xd800 && codePoint <= 0xdfff ? '' : character;
+  }).join('');
+}
+
+function boundedHeaderValue(value: unknown): string {
+  return typeof value === 'string' ? value.slice(0, MAX_HEADER_FILENAME_CODE_UNITS) : '';
 }
 
 function encodeFilenameStar(value: string): string | null {
@@ -29,9 +23,11 @@ function encodeFilenameStar(value: string): string | null {
 }
 
 export function contentDispositionHeader(type: ContentDispositionType, filename: string, fallbackFilename: string): string {
-  const asciiFallback = fallbackFilename.replace(/[^\x20-\x7E]|["\\]/g, '_') || 'download';
-  const asciiFilename = filename.replace(/[^\x20-\x7E]|["\\]/g, '_') || asciiFallback;
-  const encodedFilename = encodeFilenameStar(filename);
+  const boundedFilename = boundedHeaderValue(filename);
+  const boundedFallback = boundedHeaderValue(fallbackFilename);
+  const asciiFallback = boundedFallback.replace(/[^\x20-\x7E]|["\\]/g, '_') || 'download';
+  const asciiFilename = boundedFilename.replace(/[^\x20-\x7E]|["\\]/g, '_') || asciiFallback;
+  const encodedFilename = encodeFilenameStar(boundedFilename);
   const disposition = `${type}; filename="${asciiFilename}"`;
 
   return encodedFilename ? `${disposition}; filename*=UTF-8''${encodedFilename}` : disposition;

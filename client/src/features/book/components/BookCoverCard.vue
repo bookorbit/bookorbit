@@ -50,6 +50,9 @@ import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import BookCoverArtwork from './BookCoverArtwork.vue'
 import BookCoverSurface from './BookCoverSurface.vue'
 import { fetchAuthors } from '@/features/author/api/author'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const route = useRoute()
 const router = useRouter()
@@ -513,7 +516,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
           <div v-if="isMissing" class="absolute top-1.5 right-1.5 z-20">
             <span class="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded bg-amber-600/95 text-white">
               <TriangleAlert class="size-2.5 shrink-0" />
-              Missing
+              {{ t('book.card.missing') }}
             </span>
           </div>
 
@@ -587,24 +590,26 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem v-if="openableFiles.length <= 1 && primaryFile && !isMissing" @click="openFile(primaryFile)">
                     <BookOpen class="size-4 mr-2" />
-                    Read
+                    {{ t('book.actions.read') }}
                   </DropdownMenuItem>
                   <DropdownMenuSub v-else-if="openableFiles.length > 1 && !isMissing">
                     <DropdownMenuSubTrigger>
                       <BookOpen class="size-4 mr-2" />
-                      Read
+                      {{ t('book.actions.read') }}
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent>
                       <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="openFile(file)">
-                        <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">Audiobook</span>
+                        <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">{{ t('book.file.audiobook') }}</span>
                         <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
-                        <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">Primary</span>
+                        <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">{{
+                          t('book.file.primary')
+                        }}</span>
                       </DropdownMenuItem>
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
                   <DropdownMenuItem v-if="primaryFile && !isMissing" @click="peekPrimaryFile">
                     <Eye class="size-4 mr-2" />
-                    Peek
+                    {{ t('book.actions.peek') }}
                   </DropdownMenuItem>
 
                   <!-- Download submenu -->
@@ -613,54 +618,56 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                     @click="handleDownloadFile(primaryFile)"
                   >
                     <Download class="size-4 mr-2" />
-                    Download
+                    {{ t('book.actions.download') }}
                   </DropdownMenuItem>
                   <DropdownMenuSub v-else-if="hasPermission('library_download') && openableFiles.length > 1">
                     <DropdownMenuSubTrigger>
                       <Download class="size-4 mr-2" />
-                      Download
+                      {{ t('book.actions.download') }}
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent>
                       <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="handleDownloadFile(file)">
-                        <span v-if="isMultiTrackAudio && isAudioFile(file)">Audiobook (ZIP)</span>
+                        <span v-if="isMultiTrackAudio && isAudioFile(file)">{{ t('book.download.audiobookZip') }}</span>
                         <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
-                        <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">Primary</span>
+                        <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">{{
+                          t('book.file.primary')
+                        }}</span>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem @click="handleExportAll"> All formats (ZIP) </DropdownMenuItem>
+                      <DropdownMenuItem @click="handleExportAll"> {{ t('book.download.allFormatsZip') }} </DropdownMenuItem>
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
 
                   <DropdownMenuItem @click="openBookDetails">
                     <BookText class="size-4 mr-2" />
-                    Book Details
+                    {{ t('book.actions.bookDetails') }}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator v-if="hasPermission('library_edit_metadata')" />
                   <DropdownMenuSub v-if="hasPermission('library_edit_metadata')">
                     <DropdownMenuSubTrigger>
                       <Pencil class="size-4 mr-2" />
-                      Metadata
+                      {{ t('book.actions.metadata') }}
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent>
                       <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })">
                         <Pencil class="size-4 mr-2" />
-                        Edit Metadata
+                        {{ t('book.actions.editMetadata') }}
                       </DropdownMenuItem>
                       <DropdownMenuItem :disabled="anyRefreshing" @click="handleRefreshMetadata">
                         <Loader2 v-if="anyRefreshing" class="size-4 mr-2 animate-spin" />
                         <RefreshCw v-else class="size-4 mr-2" />
-                        Refresh Metadata
+                        {{ t('book.actions.refreshMetadata') }}
                       </DropdownMenuItem>
                       <DropdownMenuItem :disabled="reExtractingCover" @click="reExtractCover()">
                         <Loader2 v-if="reExtractingCover" class="size-4 mr-2 animate-spin" />
                         <Image v-else class="size-4 mr-2" />
-                        Regenerate Cover
+                        {{ t('book.actions.regenerateCover') }}
                       </DropdownMenuItem>
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
                   <DropdownMenuItem @click="emit('action', 'add-to-collection')">
                     <FolderPlus class="size-4 mr-2" />
-                    Add to Collection
+                    {{ t('book.actions.addToCollection') }}
                   </DropdownMenuItem>
                   <DropdownMenuSub>
                     <DropdownMenuSubTrigger>
@@ -669,7 +676,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                         class="size-4 mr-2"
                         :class="STATUS_COLORS[localReadStatus ?? 'unread']"
                       />
-                      Set Status
+                      {{ t('book.actions.setStatus') }}
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent>
                       <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="handleSetStatus(opt.value)">
@@ -681,7 +688,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                   </DropdownMenuSub>
                   <DropdownMenuItem v-if="hasPermission('email_send')" @click="showSendDialog = true">
                     <Send class="size-4 mr-2" />
-                    Send via Email
+                    {{ t('book.actions.sendViaEmail') }}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator v-if="hasPermission('email_send') || hasPermission('library_delete_books')" />
                   <DropdownMenuItem
@@ -690,7 +697,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                     @click="emit('action', 'delete')"
                   >
                     <Trash2 class="size-4 mr-2" />
-                    Delete
+                    {{ t('common.delete') }}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -722,24 +729,26 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
           <DropdownMenuContent align="end">
             <DropdownMenuItem v-if="openableFiles.length <= 1 && primaryFile && !isMissing" @click="openFile(primaryFile)">
               <BookOpen class="size-4 mr-2" />
-              Read
+              {{ t('book.actions.read') }}
             </DropdownMenuItem>
             <DropdownMenuSub v-else-if="openableFiles.length > 1 && !isMissing">
               <DropdownMenuSubTrigger>
                 <BookOpen class="size-4 mr-2" />
-                Read
+                {{ t('book.actions.read') }}
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="openFile(file)">
-                  <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">Audiobook</span>
+                  <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">{{ t('book.file.audiobook') }}</span>
                   <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
-                  <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">Primary</span>
+                  <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">{{
+                    t('book.file.primary')
+                  }}</span>
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuItem v-if="primaryFile && !isMissing" @click="peekPrimaryFile">
               <Eye class="size-4 mr-2" />
-              Peek
+              {{ t('book.actions.peek') }}
             </DropdownMenuItem>
 
             <DropdownMenuItem
@@ -747,59 +756,61 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
               @click="handleDownloadFile(primaryFile)"
             >
               <Download class="size-4 mr-2" />
-              Download
+              {{ t('book.actions.download') }}
             </DropdownMenuItem>
             <DropdownMenuSub v-else-if="hasPermission('library_download') && openableFiles.length > 1">
               <DropdownMenuSubTrigger>
                 <Download class="size-4 mr-2" />
-                Download
+                {{ t('book.actions.download') }}
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="handleDownloadFile(file)">
-                  <span v-if="isMultiTrackAudio && isAudioFile(file)">Audiobook (ZIP)</span>
+                  <span v-if="isMultiTrackAudio && isAudioFile(file)">{{ t('book.download.audiobookZip') }}</span>
                   <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
-                  <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">Primary</span>
+                  <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">{{
+                    t('book.file.primary')
+                  }}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem @click="handleExportAll"> All formats (ZIP) </DropdownMenuItem>
+                <DropdownMenuItem @click="handleExportAll"> {{ t('book.download.allFormatsZip') }} </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
 
             <DropdownMenuItem @click="openBookDetails">
               <BookText class="size-4 mr-2" />
-              Book Details
+              {{ t('book.actions.bookDetails') }}
             </DropdownMenuItem>
             <DropdownMenuSeparator v-if="hasPermission('library_edit_metadata')" />
             <DropdownMenuSub v-if="hasPermission('library_edit_metadata')">
               <DropdownMenuSubTrigger>
                 <Pencil class="size-4 mr-2" />
-                Metadata
+                {{ t('book.actions.metadata') }}
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })">
                   <Pencil class="size-4 mr-2" />
-                  Edit Metadata
+                  {{ t('book.actions.editMetadata') }}
                 </DropdownMenuItem>
                 <DropdownMenuItem :disabled="anyRefreshing" @click="handleRefreshMetadata">
                   <Loader2 v-if="anyRefreshing" class="size-4 mr-2 animate-spin" />
                   <RefreshCw v-else class="size-4 mr-2" />
-                  Refresh Metadata
+                  {{ t('book.actions.refreshMetadata') }}
                 </DropdownMenuItem>
                 <DropdownMenuItem :disabled="reExtractingCover" @click="reExtractCover()">
                   <Loader2 v-if="reExtractingCover" class="size-4 mr-2 animate-spin" />
                   <Image v-else class="size-4 mr-2" />
-                  Regenerate Cover
+                  {{ t('book.actions.regenerateCover') }}
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuItem @click="emit('action', 'add-to-collection')">
               <FolderPlus class="size-4 mr-2" />
-              Add to Collection
+              {{ t('book.actions.addToCollection') }}
             </DropdownMenuItem>
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
                 <component :is="STATUS_ICONS[localReadStatus ?? 'unread']" class="size-4 mr-2" :class="STATUS_COLORS[localReadStatus ?? 'unread']" />
-                Set Status
+                {{ t('book.actions.setStatus') }}
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="handleSetStatus(opt.value)">
@@ -811,7 +822,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
             </DropdownMenuSub>
             <DropdownMenuItem v-if="hasPermission('email_send')" @click="showSendDialog = true">
               <Send class="size-4 mr-2" />
-              Send via Email
+              {{ t('book.actions.sendViaEmail') }}
             </DropdownMenuItem>
             <DropdownMenuSeparator v-if="hasPermission('email_send') || hasPermission('library_delete_books')" />
             <DropdownMenuItem
@@ -820,7 +831,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
               @click="emit('action', 'delete')"
             >
               <Trash2 class="size-4 mr-2" />
-              Delete
+              {{ t('common.delete') }}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

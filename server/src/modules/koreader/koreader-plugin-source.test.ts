@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest';
 const pluginRoot = join(process.cwd(), '..', 'koreader-plugin', 'bookorbit.koplugin');
 
 async function readPluginFile(name: string): Promise<string> {
-  return readFile(join(pluginRoot, name), 'utf8');
+  const source = await readFile(join(pluginRoot, name), 'utf8');
+  return source.replace(/\r\n/g, '\n');
 }
 
 describe('KOReader plugin update source wiring', () => {
@@ -256,7 +257,7 @@ describe('KOReader plugin update source wiring', () => {
     expect(bulk).toContain('function Catalog:confirmBulkAllMatching()');
     expect(bulk).toContain('function Catalog:bulkClearSelectedBooks(redraw)');
     expect(bulk).toContain('function Catalog:bulkQueueStep(ctx)');
-    expect(bulk).toContain('text = _("Cancel after current file")');
+    expect(bulk).toContain('_("Cancel after current file")');
     expect(bulk).toContain('text = _("Retry failed")');
     expect(bulk).toContain('label = _("EPUB first")');
     expect(bulk).toContain('label = _("PDF first")');

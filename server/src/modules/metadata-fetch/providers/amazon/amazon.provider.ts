@@ -3,6 +3,7 @@ import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
+import { amazonOrigin } from '../../../../common/utils/metadata-provider-hosts.utils';
 import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
@@ -60,14 +61,14 @@ export class AmazonProvider implements IdentifiableProvider {
   private async searchAsins(params: MetadataSearchParams, domain: string, cookie: string, limit: number, signal?: AbortSignal): Promise<string[]> {
     const query = params.isbn?.trim() || [params.title, params.author].filter(Boolean).join(' ');
     if (!query) return [];
-    const url = `https://www.${domain}/s?k=${encodeURIComponent(query)}&i=stripbooks`;
+    const url = `${amazonOrigin(domain)}/s?k=${encodeURIComponent(query)}&i=stripbooks`;
     const html = await this.fetchHtml(url, cookie, 'search', query, undefined, signal);
     return html ? extractAsins(html, limit) : [];
   }
 
   private async fetchByAsin(asin: string, domain: string, cookie: string, signal?: AbortSignal): Promise<MetadataCandidate | null> {
-    const url = `https://www.${domain}/dp/${asin}`;
-    const html = await this.fetchHtml(url, cookie, 'lookup', undefined, asin, signal);
+    const url = new URL(`/dp/${encodeURIComponent(asin)}`, amazonOrigin(domain));
+    const html = await this.fetchHtml(url.toString(), cookie, 'lookup', undefined, asin, signal);
     if (!html) return null;
     const data = parseBookPage(html);
     if (!data.title) return null;
@@ -89,7 +90,7 @@ export class AmazonProvider implements IdentifiableProvider {
       seriesIndex: data.seriesIndex,
       coverUrl: data.coverUrl,
       genres: data.tags?.length ? data.tags : undefined,
-      sourceUrl: `https://www.${domain}/dp/${asin}`,
+      sourceUrl: url.toString(),
       ...(data.communityRating !== undefined ? { communityRating: data.communityRating } : {}),
       ...(data.communityRatingCount !== undefined ? { communityRatingCount: data.communityRatingCount } : {}),
     };

@@ -317,19 +317,76 @@ describe('BookDockIngestService', () => {
   });
 
   describe('autoFetchMetadataAsync', () => {
-    it('returns early when auto-fetch is disabled or no searchable metadata is available', async () => {
+    it('returns early when auto-fetch is disabled', async () => {
       const { service, appSettings, repo } = makeService();
-      appSettings.isBookDockAutoFetchEnabled.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+      appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(false);
+
+      await (service as any).autoFetchMetadataAsync(8);
+
+      expect(repo.findById).not.toHaveBeenCalled();
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      {
+        fileName: 'Batman #007.cbz',
+        embeddedMetadata: {},
+        expectedTitle: 'Batman #007',
+      },
+      {
+        fileName: 'Saga.Volume.1.cbz',
+        embeddedMetadata: { title: '   ' },
+        expectedTitle: 'Saga.Volume.1',
+      },
+      {
+        fileName: 'fallback.cbz',
+        embeddedMetadata: { title: '  Canonical Title  ' },
+        expectedTitle: 'Canonical Title',
+      },
+    ])('searches for $fileName with title "$expectedTitle"', async ({ fileName, embeddedMetadata, expectedTitle }) => {
+      const { service, appSettings, repo, metadataFetchPipeline } = makeService();
+      appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(true);
+      repo.findById.mockResolvedValue({ id: 8, fileName, status: 'ready', embeddedMetadata });
+      (metadataFetchPipeline as any).runWithSources = vi.fn().mockResolvedValue({ resolved: {}, sources: {} });
+
+      await (service as any).autoFetchMetadataAsync(8);
+
+      expect(metadataFetchPipeline.runWithSources).toHaveBeenCalledWith(
+        {
+          title: expectedTitle,
+          author: undefined,
+          isbn: undefined,
+        },
+        {},
+      );
+      expect(repo.update).toHaveBeenNthCalledWith(1, 8, { status: 'fetching' });
+      expect(repo.update).toHaveBeenNthCalledWith(2, 8, { status: 'ready' });
+    });
+
+    it('keeps extracted author and ISBN search terms when the title falls back to the filename', async () => {
+      const { service, appSettings, repo, metadataFetchPipeline } = makeService();
+      appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(true);
       repo.findById.mockResolvedValue({
         id: 8,
+        fileName: 'The Sandman #001.cbz',
         status: 'ready',
-        embeddedMetadata: { authors: ['No title and no isbn'] },
+        embeddedMetadata: {
+          authors: ['Neil Gaiman'],
+          isbn13: '9781401284770',
+        },
       });
+      (metadataFetchPipeline as any).runWithSources = vi.fn().mockResolvedValue({ resolved: {}, sources: {} });
 
       await (service as any).autoFetchMetadataAsync(8);
-      await (service as any).autoFetchMetadataAsync(8);
 
-      expect(repo.update).not.toHaveBeenCalledWith(8, { status: 'fetching' });
+      expect(metadataFetchPipeline.runWithSources).toHaveBeenCalledWith(
+        {
+          title: 'The Sandman #001',
+          author: 'Neil Gaiman',
+          isbn: '9781401284770',
+        },
+        {},
+      );
     });
 
     it('updates fetched metadata and confidence after pipeline resolution', async () => {
@@ -337,6 +394,7 @@ describe('BookDockIngestService', () => {
       appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(true);
       repo.findById.mockResolvedValue({
         id: 9,
+        fileName: 'dune.epub',
         status: 'ready',
         embeddedMetadata: { title: 'Dune', isbn13: '9780441172719', authors: ['Frank Herbert'] },
       });
@@ -345,8 +403,13 @@ describe('BookDockIngestService', () => {
           title: 'Dune',
           isbn13: '9780441172719',
           authors: ['Frank Herbert'],
+          hardcoverEditionId: 'hardcover-edition',
         },
         sources: { title: { provider: 'google' } },
+        providerIds: {
+          hardcover: 'hardcover-book',
+          openLibrary: 'OL1W',
+        },
       });
 
       await (service as any).autoFetchMetadataAsync(9);
@@ -358,7 +421,17 @@ describe('BookDockIngestService', () => {
         expect.objectContaining({
           status: 'ready',
           confidence: 95,
-          fetchedMetadata: expect.objectContaining({ title: 'Dune', isbn13: '9780441172719' }),
+          fetchedMetadata: expect.objectContaining({
+            title: 'Dune',
+            isbn13: '9780441172719',
+            hardcoverId: 'hardcover-book',
+            hardcoverEditionId: 'hardcover-edition',
+            openLibraryId: 'OL1W',
+          }),
+          fetchedMetadataSources: expect.objectContaining({
+            hardcoverId: 'hardcover',
+            openLibraryId: 'openLibrary',
+          }),
         }),
       );
     });
@@ -368,6 +441,7 @@ describe('BookDockIngestService', () => {
       appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(true);
       repo.findById.mockResolvedValue({
         id: 10,
+        fileName: 'dune.epub',
         status: 'ready',
         embeddedMetadata: { title: 'Dune' },
       });
@@ -383,6 +457,7 @@ describe('BookDockIngestService', () => {
       appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(true);
       repo.findById.mockResolvedValue({
         id: 11,
+        fileName: 'dune.epub',
         status: 'ready',
         embeddedMetadata: { title: 'Dune', isbn13: '9780441172719', authors: ['Frank Herbert'] },
       });
@@ -411,6 +486,7 @@ describe('BookDockIngestService', () => {
       appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(true);
       repo.findById.mockResolvedValue({
         id: 12,
+        fileName: 'dune.epub',
         status: 'ready',
         embeddedMetadata: {
           title: 'Dune: Deluxe Edition',
@@ -445,6 +521,7 @@ describe('BookDockIngestService', () => {
       appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(true);
       repo.findById.mockResolvedValue({
         id: 13,
+        fileName: 'known-title.epub',
         status: 'ready',
         embeddedMetadata: { title: 'Known Title' },
       });
@@ -467,6 +544,7 @@ describe('BookDockIngestService', () => {
       appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(true);
       repo.findById.mockResolvedValue({
         id: 14,
+        fileName: 'dune.epub',
         status: 'ready',
         embeddedMetadata: { title: 'Dune' },
       });
@@ -617,6 +695,7 @@ describe('BookDockIngestService', () => {
       repo.findById.mockImplementation((fileId: number) =>
         Promise.resolve({
           id: fileId,
+          fileName: `Book ${fileId}.epub`,
           status: 'pending',
           format: 'epub',
           absolutePath: `/bucket/${fileId}.epub`,

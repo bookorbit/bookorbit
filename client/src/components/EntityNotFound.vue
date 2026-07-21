@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { SearchX } from '@lucide/vue'
+
+const { t } = useI18n()
 
 defineProps<{ entity: string }>()
 
@@ -21,14 +24,14 @@ function goBack() {
       <SearchX :size="28" />
     </div>
     <div class="space-y-1">
-      <h2 class="text-lg font-semibold text-foreground">{{ entity }} not found</h2>
-      <p class="text-sm text-muted-foreground">This {{ entity.toLowerCase() }} doesn't exist or has been deleted.</p>
+      <h2 class="text-lg font-semibold text-foreground">{{ t('components.entityNotFound.title', { entity }) }}</h2>
+      <p class="text-sm text-muted-foreground">{{ t('components.entityNotFound.description', { entity: entity.toLowerCase() }) }}</p>
     </div>
     <button
       class="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-border bg-background text-sm font-medium text-foreground hover:bg-muted transition-colors mt-1"
       @click="goBack"
     >
-      Go back
+      {{ t('components.entityNotFound.goBack') }}
     </button>
   </div>
 </template>

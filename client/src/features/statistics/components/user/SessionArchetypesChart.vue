@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { Layers } from '@lucide/vue'
 
@@ -17,6 +18,8 @@ const DAY_COLORS = [
   '#eab308', // Fri
   '#06b6d4', // Sat
 ]
+
+const { t } = useI18n()
 
 const { data, loading, error } = useUserSessionArchetypes()
 const option = shallowRef({})
@@ -95,7 +98,7 @@ watchEffect(() => {
 </script>
 
 <template>
-  <ChartCard title="Session Archetypes" :icon="Layers" :color-index="8" :loading :error :empty="isEmpty()">
+  <ChartCard :title="t('statistics.charts.sessionArchetypes.title')" :icon="Layers" :color-index="8" :loading :error :empty="isEmpty()">
     <VChart :option autoresize style="height: 100%" />
   </ChartCard>
 </template>

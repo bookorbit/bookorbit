@@ -17,6 +17,10 @@ function makeController() {
     getCredentials: vi.fn().mockResolvedValue({ username: 'reader', syncEnabled: true, createdAt: '2026-01-01' }),
     getSyncStatus: vi.fn().mockResolvedValue({ credentials: null }),
     getDevices: vi.fn().mockResolvedValue([]),
+    getKoreaderUserDefaultPattern: vi.fn().mockResolvedValue('{authors}/{title}'),
+    setKoreaderUserDefaultPattern: vi.fn().mockResolvedValue(undefined),
+    setDeviceFileNamingPattern: vi.fn().mockResolvedValue(undefined),
+    clearDeviceFileNamingPattern: vi.fn().mockResolvedValue(undefined),
     removeDevice: vi.fn().mockResolvedValue(undefined),
     getBookProgress: vi.fn().mockResolvedValue(null),
     testConnection: vi.fn().mockResolvedValue(true),
@@ -115,11 +119,38 @@ describe('KoreaderController', () => {
     expect(koreaderService.getBookProgress).toHaveBeenCalledWith(7, 10);
   });
 
+  it('scopes KOReader default pattern reads and writes to the authenticated user', async () => {
+    const { controller, koreaderService } = makeController();
+    const user = { id: 7 } as never;
+
+    await expect(controller.getFileNamingPattern(user)).resolves.toEqual({ pattern: '{authors}/{title}' });
+    expect(koreaderService.getKoreaderUserDefaultPattern).toHaveBeenCalledWith(7);
+
+    await expect(controller.setFileNamingPattern(user, { pattern: '{title}' } as never)).resolves.toEqual({ pattern: '{title}' });
+    expect(koreaderService.setKoreaderUserDefaultPattern).toHaveBeenCalledWith(7, '{title}');
+  });
+
+  it('forwards device file naming updates and clears to the service', async () => {
+    const { controller, koreaderService } = makeController();
+    const user = { id: 7 } as never;
+    const dto = { pattern: '{title}', seriesPattern: '{series}/{title}', standalonePattern: 'Standalone/{title}' } as never;
+
+    await expect(controller.setDeviceFileNamingPattern(user, { deviceId: 'device-one' }, dto)).resolves.toBe(dto);
+    expect(koreaderService.setDeviceFileNamingPattern).toHaveBeenCalledWith(7, 'device-one', {
+      fileNamingPattern: '{title}',
+      seriesFileNamingPattern: '{series}/{title}',
+      standaloneFileNamingPattern: 'Standalone/{title}',
+    });
+
+    await expect(controller.clearDeviceFileNamingPattern(user, { deviceId: 'device-one' })).resolves.toEqual({ success: true });
+    expect(koreaderService.clearDeviceFileNamingPattern).toHaveBeenCalledWith(7, 'device-one');
+  });
+
   it('forwards device removal requests to the service', async () => {
     const { controller, koreaderService } = makeController();
     const user = { id: 7 } as never;
 
-    await expect(controller.removeDevice(user, 'device-1')).resolves.toEqual({ success: true });
+    await expect(controller.removeDevice(user, { deviceId: 'device-1' })).resolves.toEqual({ success: true });
     expect(koreaderService.removeDevice).toHaveBeenCalledWith(7, 'device-1');
   });
 

@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Loader2, Save } from '@lucide/vue'
 import { MetadataProviderKey } from '@bookorbit/types'
 import type { ProviderConfigurations, ProviderConnectionTestResult, ProviderStatus, ProviderThrottleRuntimeState } from '@bookorbit/types'
 import { toast } from 'vue-sonner'
 import { Badge } from '@/components/ui/badge'
 import { stripBearerPrefix } from '../lib/provider-token'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   config: ProviderConfigurations | null
@@ -109,63 +112,76 @@ type RowDef = {
   }
 }
 
-const rows: RowDef[] = [
+const rows = computed<RowDef[]>(() => [
   {
     key: 'google',
     label: 'Google Books',
-    hint: "Broad coverage from Google's book index. Google Books now requires an API key before this provider can be enabled.",
+    hint: t('settings.metadata.providers.hints.google'),
     fields: [
       {
         key: 'apiKey',
-        label: 'API Key',
+        label: t('settings.metadata.providers.fields.apiKey'),
         type: 'password',
         placeholder: 'AIza...',
-        helper: 'Google Books API key from Google Cloud.',
+        helper: t('settings.metadata.providers.helpers.googleApiKey'),
         alwaysEditable: true,
       },
     ],
     enableRequirement: {
       isConfigured: (c) => !!c.google.apiKey.trim(),
-      blockedMessage: 'Google Books requires an API key before it can be enabled',
+      blockedMessage: t('settings.metadata.providers.blocked.google'),
     },
   },
   {
     key: 'amazon',
     label: 'Amazon',
-    hint: 'Session cookie is recommended. Paste cookie value only (no "Cookie:").',
+    hint: t('settings.metadata.providers.hints.amazon'),
     fields: [
-      { key: 'domain', label: 'Region', type: 'select', options: AMAZON_DOMAINS, widthClass: 'md:w-[6.75rem] md:min-w-[6.75rem]' },
-      { key: 'cookie', label: 'Cookie', type: 'password', placeholder: 'session-id=...; ubid-main=...; x-main=...' },
+      {
+        key: 'domain',
+        label: t('settings.metadata.providers.fields.region'),
+        type: 'select',
+        options: AMAZON_DOMAINS,
+        widthClass: 'md:w-[6.75rem] md:min-w-[6.75rem]',
+      },
+      {
+        key: 'cookie',
+        label: t('settings.metadata.providers.fields.cookie'),
+        type: 'password',
+        placeholder: 'session-id=...; ubid-main=...; x-main=...',
+      },
     ],
   },
-  { key: 'goodreads', label: 'Goodreads', hint: 'The largest reading community on the web. No setup required.', fields: [] },
+  { key: 'goodreads', label: 'Goodreads', hint: t('settings.metadata.providers.hints.goodreads'), fields: [] },
   {
     key: 'hardcover',
     label: 'Hardcover',
-    hint: 'A modern alternative to Goodreads. Token from hardcover.app/account/api. "Bearer " prefix is optional.',
-    fields: [{ key: 'apiKey', label: 'API Key', type: 'password', placeholder: 'eyJ...', alwaysEditable: true }],
+    hint: t('settings.metadata.providers.hints.hardcover'),
+    fields: [{ key: 'apiKey', label: t('settings.metadata.providers.fields.apiKey'), type: 'password', placeholder: 'eyJ...', alwaysEditable: true }],
     enableRequirement: {
       isConfigured: (c) => !!c.hardcover.apiKey.trim(),
-      blockedMessage: 'Hardcover requires an API key before it can be enabled',
+      blockedMessage: t('settings.metadata.providers.blocked.hardcover'),
       requiresPassingTest: true,
-      missingTestMessage: 'Hardcover token must pass Test before it can be enabled',
+      missingTestMessage: t('settings.metadata.providers.blocked.hardcoverTest'),
     },
   },
-  { key: 'openLibrary', label: 'Open Library', hint: "The Internet Archive's free book catalog. No setup required.", fields: [] },
+  { key: 'openLibrary', label: 'Open Library', hint: t('settings.metadata.providers.hints.openLibrary'), fields: [] },
   {
     key: 'itunes',
     label: 'iTunes',
-    hint: "Apple's digital book catalog. Choose whether to fetch high or standard resolution covers.",
-    fields: [{ key: 'coverResolution', label: 'Cover Resolution', type: 'select', options: ['high', 'standard'] }],
+    hint: t('settings.metadata.providers.hints.itunes'),
+    fields: [
+      { key: 'coverResolution', label: t('settings.metadata.providers.fields.coverResolution'), type: 'select', options: ['high', 'standard'] },
+    ],
   },
   {
     key: 'kobo',
     label: 'Kobo',
-    hint: "Scrapes Kobo's public book pages. Country and language must match Kobo URL paths; bot protection can block requests.",
+    hint: t('settings.metadata.providers.hints.kobo'),
     fields: [
       {
         key: 'country',
-        label: 'Country',
+        label: t('settings.metadata.providers.fields.country'),
         type: 'select',
         options: KOBO_COUNTRIES,
         alwaysEditable: true,
@@ -173,7 +189,7 @@ const rows: RowDef[] = [
       },
       {
         key: 'language',
-        label: 'Language',
+        label: t('settings.metadata.providers.fields.language'),
         type: 'select',
         options: KOBO_LANGUAGES,
         alwaysEditable: true,
@@ -184,10 +200,10 @@ const rows: RowDef[] = [
   {
     key: 'audible',
     label: 'Audible',
-    hint: 'Pulls audiobook metadata from Audible. No additional setup is required.',
-    fields: [{ key: 'domain', label: 'Region', type: 'select', options: AUDIBLE_DOMAINS }],
+    hint: t('settings.metadata.providers.hints.audible'),
+    fields: [{ key: 'domain', label: t('settings.metadata.providers.fields.region'), type: 'select', options: AUDIBLE_DOMAINS }],
   },
-  { key: 'audnexus', label: 'AudNexus', hint: 'Community-driven audiobook metadata. No setup required.', fields: [] },
+  { key: 'audnexus', label: 'AudNexus', hint: t('settings.metadata.providers.hints.audnexus'), fields: [] },
   {
     key: 'librofm',
     label: 'Libro.fm',
@@ -197,31 +213,31 @@ const rows: RowDef[] = [
   {
     key: 'comicvine',
     label: 'ComicVine',
-    hint: 'Comic book metadata from ComicVine. A free API key is required from comicvine.gamespot.com.',
-    fields: [{ key: 'apiKey', label: 'API Key', type: 'password', alwaysEditable: true }],
+    hint: t('settings.metadata.providers.hints.comicvine'),
+    fields: [{ key: 'apiKey', label: t('settings.metadata.providers.fields.apiKey'), type: 'password', alwaysEditable: true }],
     enableRequirement: {
       isConfigured: (c) => !!c.comicvine.apiKey.trim(),
-      blockedMessage: 'ComicVine requires an API key before it can be enabled',
+      blockedMessage: t('settings.metadata.providers.blocked.comicvine'),
     },
   },
-  { key: 'ranobedb', label: 'RanobeDB', hint: 'Japanese light novel metadata from RanobeDB. No setup required.', fields: [] },
+  { key: 'ranobedb', label: 'RanobeDB', hint: t('settings.metadata.providers.hints.ranobedb'), fields: [] },
   {
     key: 'lubimyczytac',
     label: 'LubimyCzytac',
-    hint: 'Polish book catalog (lubimyczytac.pl). Scrapes public book pages. No setup required.',
+    hint: t('settings.metadata.providers.hints.lubimyczytac'),
     fields: [],
   },
   {
     key: 'aladin',
     label: 'Aladin',
-    hint: 'Korean book metadata from Aladin (알라딘). A TTB Key from aladin.co.kr is required.',
-    fields: [{ key: 'ttbKey', label: 'TTB Key', type: 'password', placeholder: 'ttb...', alwaysEditable: true }],
+    hint: t('settings.metadata.providers.hints.aladin'),
+    fields: [{ key: 'ttbKey', label: t('settings.metadata.providers.fields.ttbKey'), type: 'password', placeholder: 'ttb...', alwaysEditable: true }],
     enableRequirement: {
       isConfigured: (c) => !!c.aladin.ttbKey.trim(),
-      blockedMessage: 'Aladin requires a TTB Key before it can be enabled',
+      blockedMessage: t('settings.metadata.providers.blocked.aladin'),
     },
   },
-]
+])
 
 const TESTABLE_PROVIDERS: MetadataProviderKey[] = [MetadataProviderKey.AMAZON, MetadataProviderKey.HARDCOVER, MetadataProviderKey.ALADIN]
 
@@ -247,7 +263,7 @@ function isThrottled(key: string): boolean {
 function throttleMessage(key: string): string | null {
   const seconds = throttleSecondsLeft(key)
   if (seconds === null) return null
-  return `Retry in ${formatDuration(seconds)}`
+  return t('settings.metadata.providers.retryIn', { duration: formatDuration(seconds) })
 }
 
 function isTesting(key: string): boolean {
@@ -290,7 +306,7 @@ function enableBlockedMessage(row: RowDef): string | null {
   const req = row.enableRequirement
   if (!req.isConfigured(draft.value)) return req.blockedMessage
   if (req.requiresPassingTest && !hasPassingTestForCurrentInput(row.key as MetadataProviderKey)) {
-    return req.missingTestMessage ?? 'Run Test before enabling'
+    return req.missingTestMessage ?? t('settings.metadata.providers.runTestBeforeEnabling')
   }
   return null
 }
@@ -306,11 +322,11 @@ function isConfiguredBadge(row: RowDef): boolean {
 type BadgeView = { label: string; variant: 'destructive' | 'outline'; class?: string }
 function badgeFor(row: RowDef): BadgeView | null {
   if (!statusFor(row.key)) return null
-  if (!isConfiguredBadge(row)) return { label: 'Setup Required', variant: 'destructive' }
+  if (!isConfiguredBadge(row)) return { label: t('settings.metadata.providers.badge.setupRequired'), variant: 'destructive' }
   if (isThrottled(row.key)) {
-    return { label: 'Throttled', variant: 'outline', class: 'text-amber-600 border-amber-500/30 bg-amber-500/5' }
+    return { label: t('settings.metadata.providers.badge.throttled'), variant: 'outline', class: 'text-amber-600 border-amber-500/30 bg-amber-500/5' }
   }
-  return { label: 'Ready', variant: 'outline', class: 'text-emerald-600 border-emerald-500/30 bg-emerald-500/5' }
+  return { label: t('settings.metadata.providers.badge.ready'), variant: 'outline', class: 'text-emerald-600 border-emerald-500/30 bg-emerald-500/5' }
 }
 
 function formatDuration(totalSeconds: number): string {
@@ -369,7 +385,7 @@ function toggleProvider(row: RowDef) {
 const draftReady = computed(() => draft.value !== null)
 const visibleRows = computed(() => {
   if (!draft.value) return []
-  return rows.filter((row) => Object.prototype.hasOwnProperty.call(draft.value, row.key))
+  return rows.value.filter((row) => Object.prototype.hasOwnProperty.call(draft.value, row.key))
 })
 </script>
 
@@ -377,12 +393,12 @@ const visibleRows = computed(() => {
   <form class="border border-border rounded-lg bg-card overflow-hidden shadow-xs" @submit.prevent="save">
     <div class="px-4 py-3.5 md:px-5 md:py-4 border-b border-border flex items-center justify-between bg-muted/30">
       <div class="flex items-center gap-2">
-        <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">Available Sources</span>
+        <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">{{ t('settings.metadata.providers.availableSources') }}</span>
       </div>
       <button type="submit" class="settings-btn-primary h-8 px-3" :disabled="saving || !draftReady">
         <Loader2 v-if="saving" :size="14" class="animate-spin" />
         <Save v-else :size="14" />
-        <span>Save Changes</span>
+        <span>{{ t('settings.metadata.providers.saveChanges') }}</span>
       </button>
     </div>
 
@@ -455,10 +471,10 @@ const visibleRows = computed(() => {
               @click="testProvider(row.key)"
             >
               <Loader2 v-if="isTesting(row.key)" :size="11" class="animate-spin" />
-              <span>{{ isTesting(row.key) ? 'Testing...' : 'Test' }}</span>
+              <span>{{ isTesting(row.key) ? t('settings.metadata.providers.testing') : t('settings.metadata.providers.test') }}</span>
             </button>
             <span v-else />
-            <span class="text-[11px] text-muted-foreground md:hidden">Enabled</span>
+            <span class="text-[11px] text-muted-foreground md:hidden">{{ t('settings.metadata.providers.enabled') }}</span>
             <button
               type="button"
               role="switch"
@@ -480,7 +496,7 @@ const visibleRows = computed(() => {
             {{ testResultFor(row.key)?.message }}
           </p>
           <p v-if="showHardcoverEnableHint(row)" class="text-[10px] text-muted-foreground md:text-right">
-            Run Test with the current token to unlock the enable switch.
+            {{ t('settings.metadata.providers.hardcoverEnableHint') }}
           </p>
         </div>
       </div>

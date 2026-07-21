@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { X } from '@lucide/vue'
 
 const props = defineProps<{
@@ -8,6 +9,8 @@ const props = defineProps<{
   saving: boolean
   error: string | null
 }>()
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   close: []
@@ -50,19 +53,19 @@ function handleSubmit() {
   localError.value = null
   const parsed = new Date(startedAt.value)
   if (!startedAt.value || Number.isNaN(parsed.getTime())) {
-    localError.value = 'Pick a valid date and time.'
+    localError.value = t('book.detail.addSession.errors.invalidDate')
     return
   }
   if (parsed.getTime() > Date.now()) {
-    localError.value = 'The session cannot start in the future.'
+    localError.value = t('book.detail.addSession.errors.future')
     return
   }
   if (!Number.isInteger(durationMinutes.value) || durationMinutes.value < 1 || durationMinutes.value > 1440) {
-    localError.value = 'Duration must be between 1 and 1440 minutes.'
+    localError.value = t('book.detail.addSession.errors.duration')
     return
   }
   if (endProgress.value != null && (endProgress.value < 0 || endProgress.value > 100)) {
-    localError.value = 'End progress must be between 0 and 100.'
+    localError.value = t('book.detail.addSession.errors.endProgress')
     return
   }
   emit('submit', {
@@ -80,7 +83,7 @@ function handleSubmit() {
       <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="handleClose" />
       <div class="relative z-10 w-full max-w-md mx-4 bg-card border border-border rounded-lg shadow-2xl p-6">
         <div class="flex items-center justify-between mb-5">
-          <h2 class="text-base font-semibold text-foreground">Add reading session</h2>
+          <h2 class="text-base font-semibold text-foreground">{{ t('book.detail.addSession.title') }}</h2>
           <button class="text-muted-foreground hover:text-foreground transition-colors" @click="handleClose">
             <X :size="18" />
           </button>
@@ -88,7 +91,7 @@ function handleSubmit() {
 
         <form class="flex flex-col gap-4" @submit.prevent="handleSubmit">
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">Started at</label>
+            <label class="text-sm font-medium text-foreground">{{ t('book.detail.addSession.startedAt') }}</label>
             <input
               v-model="startedAt"
               type="datetime-local"
@@ -99,7 +102,7 @@ function handleSubmit() {
 
           <div class="grid grid-cols-2 gap-3">
             <div class="flex flex-col gap-1.5">
-              <label class="text-sm font-medium text-foreground">Duration (minutes)</label>
+              <label class="text-sm font-medium text-foreground">{{ t('book.detail.addSession.duration') }}</label>
               <input
                 v-model.number="durationMinutes"
                 type="number"
@@ -109,26 +112,26 @@ function handleSubmit() {
               />
             </div>
             <div class="flex flex-col gap-1.5">
-              <label class="text-sm font-medium text-foreground">End progress %</label>
+              <label class="text-sm font-medium text-foreground">{{ t('book.detail.addSession.endProgress') }}</label>
               <input
                 v-model.number="endProgress"
                 type="number"
                 min="0"
                 max="100"
                 step="0.1"
-                placeholder="Optional"
+                :placeholder="t('book.detail.addSession.optional')"
                 class="h-9 rounded-md border border-input bg-background text-foreground text-sm px-3 focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-muted-foreground"
               />
             </div>
           </div>
 
           <div v-if="formats.length >= 2" class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-foreground">Format</label>
+            <label class="text-sm font-medium text-foreground">{{ t('book.detail.addSession.format') }}</label>
             <select
               v-model="format"
               class="h-9 rounded-md border border-input bg-background text-foreground text-sm px-3 focus:outline-none focus:ring-2 focus:ring-primary"
             >
-              <option value="">No specific format</option>
+              <option value="">{{ t('book.detail.addSession.noFormat') }}</option>
               <option v-for="fmt in formats" :key="fmt" :value="fmt">{{ fmt.toUpperCase() }}</option>
             </select>
           </div>
@@ -141,14 +144,14 @@ function handleSubmit() {
               class="h-9 px-4 rounded-md border border-input bg-background text-sm text-foreground hover:bg-muted transition-colors"
               @click="handleClose"
             >
-              Cancel
+              {{ t('common.cancel') }}
             </button>
             <button
               type="submit"
               :disabled="saving"
               class="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {{ saving ? 'Saving...' : 'Add session' }}
+              {{ saving ? t('book.detail.addSession.saving') : t('book.detail.addSession.submit') }}
             </button>
           </div>
         </form>

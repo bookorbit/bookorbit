@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 import { X, Zap } from '@lucide/vue'
 import { api } from '@/lib/api'
 import type { GroupRule, SmartScope, Rule, SortSpec } from '@bookorbit/types'
@@ -8,28 +10,32 @@ import BookFilterBuilder from '@/features/book/components/BookFilterBuilder.vue'
 import BookSortBuilder from '@/features/book/components/BookSortBuilder.vue'
 import IconPicker from '@/components/IconPicker.vue'
 
-const TEMPLATES: { label: string; build: () => GroupRule }[] = [
+const { t } = useI18n()
+
+const TEMPLATES: { id: string; build: () => GroupRule }[] = [
   {
-    label: 'Has Series',
+    id: 'hasSeries',
     build: () => ({ type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'series', operator: 'isNotEmpty' } as Rule] }),
   },
   {
-    label: 'Added Recently',
+    id: 'addedRecently',
     build: () => ({ type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'addedAt', operator: 'withinLast', value: 30 } as Rule] }),
   },
   {
-    label: 'PDF Only',
+    id: 'pdfOnly',
     build: () => ({ type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'format', operator: 'includesAny', value: ['pdf'] } as Rule] }),
   },
   {
-    label: 'No Genres',
+    id: 'noGenres',
     build: () => ({ type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'genre', operator: 'isEmpty' } as Rule] }),
   },
   {
-    label: 'EPUB Only',
+    id: 'epubOnly',
     build: () => ({ type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'format', operator: 'includesAny', value: ['epub'] } as Rule] }),
   },
 ]
+
+const templates = computed(() => TEMPLATES.map((tpl) => ({ ...tpl, label: t(`smartScope.editorPanel.templates.${tpl.id}`) })))
 
 const props = defineProps<{
   open: boolean
@@ -99,8 +105,8 @@ async function fetchPreview() {
   }
 }
 
-function applyTemplate(t: (typeof TEMPLATES)[number]) {
-  draftFilter.value = t.build()
+function applyTemplate(tpl: (typeof TEMPLATES)[number]) {
+  draftFilter.value = tpl.build()
 }
 
 function initFilter() {
@@ -114,11 +120,11 @@ function hasCompleteRules(group: GroupRule | undefined): boolean {
 async function save() {
   if (!props.smartScope) return
   if (!trimmedDraftName.value) {
-    saveError.value = 'Name is required'
+    saveError.value = t('smartScope.dialog.nameRequired')
     return
   }
   if (!trimmedDraftIcon.value) {
-    saveError.value = 'Choose an icon'
+    saveError.value = t('smartScope.dialog.iconRequired')
     return
   }
   saving.value = true
@@ -134,7 +140,7 @@ async function save() {
     emit('saved')
     emit('close')
   } catch {
-    saveError.value = 'Failed to save'
+    saveError.value = t('smartScope.editorPanel.saveFailed')
   } finally {
     saving.value = false
   }
@@ -153,9 +159,9 @@ async function save() {
         <div class="flex items-start gap-4 px-6 py-5 border-b border-border shrink-0">
           <div class="flex-1 min-w-0">
             <h2 class="text-base font-semibold text-foreground leading-tight truncate">
-              {{ draftName || 'Untitled SmartScope' }}
+              {{ draftName || t('smartScope.editorPanel.untitled') }}
             </h2>
-            <p class="text-xs text-muted-foreground mt-0.5">Configure smartScope settings</p>
+            <p class="text-xs text-muted-foreground mt-0.5">{{ t('smartScope.editorPanel.subtitle') }}</p>
           </div>
           <div class="flex items-center gap-2 shrink-0 mt-0.5">
             <span
@@ -163,8 +169,8 @@ async function save() {
               class="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-medium transition-all"
               :class="previewLoading ? 'border-border text-muted-foreground' : 'border-primary/30 bg-primary/8 text-primary'"
             >
-              <span v-if="previewLoading" class="animate-pulse">counting...</span>
-              <template v-else>{{ previewCount?.toLocaleString() }} books</template>
+              <span v-if="previewLoading" class="animate-pulse">{{ t('smartScope.editorPanel.counting') }}</span>
+              <template v-else>{{ t('smartScope.editorPanel.bookCount', { count: formatNumber(previewCount ?? 0) }, previewCount ?? 0) }}</template>
             </span>
             <button
               @click="emit('close')"
@@ -179,27 +185,27 @@ async function save() {
         <div class="flex-1 overflow-y-auto px-6 py-6 flex flex-col gap-5">
           <!-- Identity card -->
           <div class="rounded-lg border border-border bg-background p-5 flex flex-col gap-4">
-            <h3 class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Identity</h3>
+            <h3 class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{{ t('smartScope.editorPanel.identity') }}</h3>
             <div class="flex gap-3">
               <div class="flex-1 flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-foreground/70">Name</label>
+                <label class="text-xs font-medium text-foreground/70">{{ t('smartScope.dialog.name') }}</label>
                 <input
                   v-model="draftName"
                   type="text"
-                  placeholder="e.g. Unread Sci-Fi"
+                  :placeholder="t('smartScope.dialog.namePlaceholder')"
                   class="h-10 rounded-lg border border-input bg-card text-foreground text-sm px-3 focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-muted-foreground/60"
                 />
               </div>
               <div class="flex-1 flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-foreground/70">Icon</label>
-                <IconPicker v-model="draftIcon" placeholder="Choose an icon..." />
+                <label class="text-xs font-medium text-foreground/70">{{ t('smartScope.dialog.icon') }}</label>
+                <IconPicker v-model="draftIcon" :placeholder="t('smartScope.dialog.iconPlaceholder')" />
               </div>
             </div>
 
             <div class="flex items-center justify-between py-1">
               <div>
-                <p class="text-sm font-medium text-foreground">Sync to Kobo</p>
-                <p class="text-xs text-muted-foreground mt-0.5">Books matching this scope will appear on your Kobo device</p>
+                <p class="text-sm font-medium text-foreground">{{ t('smartScope.syncToKobo') }}</p>
+                <p class="text-xs text-muted-foreground mt-0.5">{{ t('smartScope.syncToKoboHint') }}</p>
               </div>
               <button
                 type="button"
@@ -219,27 +225,27 @@ async function save() {
 
           <!-- Filters card -->
           <div class="rounded-lg border border-border bg-background p-5 flex flex-col gap-4">
-            <h3 class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Filters</h3>
+            <h3 class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{{ t('smartScope.editorPanel.filters') }}</h3>
 
             <!-- Empty state -->
             <template v-if="!draftFilter">
-              <p class="text-sm text-muted-foreground leading-relaxed">No filters set. All accessible books will be included in this smartScope.</p>
+              <p class="text-sm text-muted-foreground leading-relaxed">{{ t('smartScope.editorPanel.noFilters') }}</p>
               <div class="flex flex-wrap gap-2">
                 <button
-                  v-for="t in TEMPLATES"
-                  :key="t.label"
-                  @click="applyTemplate(t)"
+                  v-for="tpl in templates"
+                  :key="tpl.id"
+                  @click="applyTemplate(tpl)"
                   class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-dashed border-border bg-muted/30 text-foreground hover:border-primary hover:bg-primary/5 hover:text-primary transition-colors"
                 >
                   <Zap :size="11" class="shrink-0" />
-                  {{ t.label }}
+                  {{ tpl.label }}
                 </button>
               </div>
               <button
                 @click="initFilter"
                 class="self-start flex items-center gap-1.5 h-9 px-4 rounded-lg border border-input bg-card text-sm text-foreground hover:bg-muted transition-colors"
               >
-                Build from scratch
+                {{ t('smartScope.editorPanel.buildFromScratch') }}
               </button>
             </template>
 
@@ -247,14 +253,14 @@ async function save() {
             <template v-else>
               <BookFilterBuilder v-model="draftFilter" preserve-incomplete-root />
               <div class="flex flex-wrap items-center gap-1.5 pt-3 border-t border-border/50">
-                <span class="text-xs text-muted-foreground shrink-0">Replace with template:</span>
+                <span class="text-xs text-muted-foreground shrink-0">{{ t('smartScope.editorPanel.replaceWithTemplate') }}</span>
                 <button
-                  v-for="t in TEMPLATES"
-                  :key="t.label"
-                  @click="applyTemplate(t)"
+                  v-for="tpl in templates"
+                  :key="tpl.id"
+                  @click="applyTemplate(tpl)"
                   class="text-xs px-2.5 py-1 rounded-full border border-dashed border-border text-muted-foreground hover:border-primary hover:text-primary transition-colors"
                 >
-                  {{ t.label }}
+                  {{ tpl.label }}
                 </button>
               </div>
             </template>
@@ -262,7 +268,7 @@ async function save() {
 
           <!-- Sort card -->
           <div class="rounded-lg border border-border bg-background p-5 flex flex-col gap-4">
-            <h3 class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Default Sort</h3>
+            <h3 class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{{ t('smartScope.editorPanel.defaultSort') }}</h3>
             <BookSortBuilder v-model="draftSort" />
           </div>
         </div>
@@ -276,14 +282,14 @@ async function save() {
               @click="emit('close')"
               class="h-10 px-5 rounded-lg border border-input bg-card text-sm text-foreground hover:bg-muted transition-colors"
             >
-              Cancel
+              {{ t('common.cancel') }}
             </button>
             <button
               @click="save"
               :disabled="!trimmedDraftName || !trimmedDraftIcon || saving"
               class="h-10 px-6 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {{ saving ? 'Saving...' : 'Save changes' }}
+              {{ saving ? t('smartScope.dialog.saving') : t('smartScope.editorPanel.saveChanges') }}
             </button>
           </div>
         </div>

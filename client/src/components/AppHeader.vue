@@ -19,8 +19,12 @@ import {
   ExternalLink,
   Sparkles,
   Highlighter,
+  Check,
+  Languages,
 } from '@lucide/vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 import { toast } from 'vue-sonner'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
@@ -54,10 +58,12 @@ import NotificationSheet from '@/features/notifications/components/NotificationS
 import { useNotifications } from '@/features/notifications/composables/useNotifications'
 import { useWhatsNew } from '@/features/whats-new/composables/useWhatsNew'
 import UserAvatar from '@/components/UserAvatar.vue'
-import { DEFAULT_FORMAT_PRIORITY } from '@bookorbit/types'
+import { DEFAULT_FORMAT_PRIORITY, LOCALE_LABELS, SUPPORTED_LOCALES, type Locale } from '@bookorbit/types'
 import { useThemeStore } from '@/stores/theme'
+import { useLocaleStore } from '@/stores/locale'
 import { getFormatColor } from '@/features/book/lib/format-colors'
 
+const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const { user, logout } = useAuth()
@@ -68,6 +74,8 @@ const { summary: bookDockSummary, fetchSummary: fetchBookDockSummary, subscribe:
 const { subscribe: subscribeNotifications } = useNotifications()
 const { hasUnseen: hasUnseenWhatsNew } = useWhatsNew()
 const themeStore = useThemeStore()
+const localeStore = useLocaleStore()
+const languageOptions = SUPPORTED_LOCALES.map((id) => ({ id, label: LOCALE_LABELS[id] }))
 const documentationUrl = 'https://bookorbit.app/what-is-bookorbit.html'
 const githubRepositoryUrl = 'https://github.com/bookorbit/bookorbit'
 const githubStarPopoverOpen = ref(false)
@@ -111,6 +119,14 @@ function navigateToSettings() {
   router.push({ name: 'settings-libraries' })
 }
 
+async function selectLanguage(locale: Locale) {
+  try {
+    await localeStore.setLocale(locale)
+  } catch {
+    toast.error(t('settings.appearance.language.loadError'))
+  }
+}
+
 function navigateToWhatsNew() {
   router.push({ name: 'whats-new' })
 }
@@ -145,12 +161,13 @@ const showDropdown = computed(
 )
 
 const globalSearchLoadMoreLabel = computed(() =>
-  globalSearchLoadingMore.value ? 'Loading more...' : `Load more (${globalResults.value.length}/${globalSearchTotal.value})`,
+  globalSearchLoadingMore.value
+    ? t('components.appHeader.loadingMore')
+    : t('components.appHeader.loadMore', { loaded: globalResults.value.length, total: globalSearchTotal.value }),
 )
-const globalSearchAllLoadedLabel = computed(() => {
-  const count = globalSearchTotal.value
-  return count === 1 ? 'All 1 match shown' : `All ${count.toLocaleString()} matches shown`
-})
+const globalSearchAllLoadedLabel = computed(() =>
+  t('components.appHeader.allMatchesShown', { count: formatNumber(globalSearchTotal.value) }, globalSearchTotal.value),
+)
 const globalSearchVirtualHeightStyle = computed(() => ({
   height: `${globalResults.value.length * GLOBAL_SEARCH_ROW_HEIGHT}px`,
 }))
@@ -284,19 +301,19 @@ onMounted(() => {
 const stopLibraryUploadListener = onLibraryUploadCompleted((event) => {
   if (event.uploadedCount === 0 && event.failedCount === 0) return
 
-  const uploadedLabel = `${event.uploadedCount} book${event.uploadedCount === 1 ? '' : 's'}`
-  const failedLabel = `${event.failedCount} file${event.failedCount === 1 ? '' : 's'}`
+  const uploadedLabel = t('components.appHeader.bookCount', { count: event.uploadedCount }, event.uploadedCount)
+  const failedLabel = t('components.appHeader.fileCount', { count: event.failedCount }, event.failedCount)
 
   if (event.failedCount === 0) {
-    toast.success(`Uploaded ${uploadedLabel}`)
+    toast.success(t('components.appHeader.uploadedToast', { uploaded: uploadedLabel }))
     return
   }
   if (event.uploadedCount === 0) {
-    toast.error(`Upload failed for ${failedLabel}`)
+    toast.error(t('components.appHeader.uploadFailedToast', { failed: failedLabel }))
     return
   }
 
-  toast.warning(`Uploaded ${uploadedLabel}, ${failedLabel} failed`)
+  toast.warning(t('components.appHeader.uploadPartialToast', { uploaded: uploadedLabel, failed: failedLabel }))
 })
 
 onUnmounted(() => {
@@ -358,7 +375,7 @@ function formatBadgeStyle(fmt: string) {
           ref="mobileSearchInput"
           v-model="globalSearchQuery"
           @keydown="handleSearchKeydown"
-          placeholder="Search all books..."
+          :placeholder="t('components.appHeader.searchAllBooks')"
           class="w-full h-8 pl-8 pr-7 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
         />
         <button v-if="globalSearchQuery" @click="clearSearch()" class="absolute right-2 text-muted-foreground hover:text-foreground">
@@ -375,12 +392,14 @@ function formatBadgeStyle(fmt: string) {
             @scroll.passive="handleSearchDropdownScroll"
             class="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-50 overflow-hidden max-h-72 overflow-y-auto"
           >
-            <div v-if="globalSearchLoading && globalResults.length === 0" class="p-3 text-xs text-muted-foreground text-center">Searching...</div>
+            <div v-if="globalSearchLoading && globalResults.length === 0" class="p-3 text-xs text-muted-foreground text-center">
+              {{ t('components.appHeader.searching') }}
+            </div>
             <div
               v-else-if="globalSearchSettled && !globalSearchLoading && globalResults.length === 0"
               class="p-3 text-xs text-muted-foreground text-center"
             >
-              No results
+              {{ t('components.appHeader.noResults') }}
             </div>
             <div v-if="globalResults.length > 0" class="relative" :style="globalSearchVirtualHeightStyle">
               <button
@@ -468,7 +487,7 @@ function formatBadgeStyle(fmt: string) {
           @focus="searchFocused = true"
           @blur="onSearchBlur"
           @keydown="handleSearchKeydown"
-          placeholder="Search all books..."
+          :placeholder="t('components.appHeader.searchAllBooks')"
           class="w-full h-8 pl-9 pr-8 text-[13.5px] rounded-full border-none bg-primary/5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1.5 focus:ring-primary/30 transition-all duration-300 shadow-inner shadow-black/5"
         />
         <div class="absolute inset-y-0 right-2.5 flex items-center gap-1.5">
@@ -498,12 +517,14 @@ function formatBadgeStyle(fmt: string) {
             @scroll.passive="handleSearchDropdownScroll"
             class="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-50 overflow-hidden max-h-80 overflow-y-auto"
           >
-            <div v-if="globalSearchLoading && globalResults.length === 0" class="p-3 text-xs text-muted-foreground text-center">Searching...</div>
+            <div v-if="globalSearchLoading && globalResults.length === 0" class="p-3 text-xs text-muted-foreground text-center">
+              {{ t('components.appHeader.searching') }}
+            </div>
             <div
               v-else-if="globalSearchSettled && !globalSearchLoading && globalResults.length === 0"
               class="p-3 text-xs text-muted-foreground text-center"
             >
-              No results
+              {{ t('components.appHeader.noResults') }}
             </div>
             <div v-if="globalResults.length > 0" class="relative" :style="globalSearchVirtualHeightStyle">
               <button
@@ -588,7 +609,7 @@ function formatBadgeStyle(fmt: string) {
               <Search :size="15" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Search</TooltipContent>
+          <TooltipContent>{{ t('common.search') }}</TooltipContent>
         </Tooltip>
 
         <!-- Mobile: Notifications bell -->
@@ -613,7 +634,7 @@ function formatBadgeStyle(fmt: string) {
           <DropdownMenuContent align="end" class="w-44">
             <DropdownMenuItem v-if="hasPermission('book_dock_access')" @click="navigateToBookDock">
               <PackageOpen :size="15" class="mr-2 text-muted-foreground" />
-              Book Dock
+              {{ t('components.appHeader.bookDock') }}
               <span
                 v-if="bookDockSummary.total > 0"
                 class="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground tabular-nums leading-none"
@@ -623,19 +644,19 @@ function formatBadgeStyle(fmt: string) {
             </DropdownMenuItem>
             <DropdownMenuItem @click="navigateToAnnotations">
               <Highlighter :size="15" class="mr-2 text-muted-foreground" />
-              Annotations
+              {{ t('components.appHeader.annotations') }}
             </DropdownMenuItem>
             <DropdownMenuItem @click="navigateToStatistics">
               <BarChart3 :size="15" class="mr-2 text-muted-foreground" />
-              Statistics
+              {{ t('components.appHeader.statistics') }}
             </DropdownMenuItem>
             <DropdownMenuItem v-if="achievementsEnabled" @click="navigateToAchievements">
               <Trophy :size="15" class="mr-2 text-muted-foreground" />
-              Achievements
+              {{ t('components.appHeader.achievements') }}
             </DropdownMenuItem>
             <DropdownMenuItem v-if="hasPermission('library_upload')" @click="uploadOpen = true">
               <Upload :size="15" class="mr-2 text-muted-foreground" />
-              Upload books
+              {{ t('components.appHeader.uploadBooks') }}
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />
@@ -643,46 +664,60 @@ function formatBadgeStyle(fmt: string) {
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
                 <Palette :size="15" class="mr-2 text-muted-foreground" />
-                Appearance
+                {{ t('components.appHeader.appearance') }}
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent class="w-72 p-4">
                 <div class="space-y-4">
                   <div class="space-y-1.5">
-                    <span class="text-xs text-muted-foreground">Theme</span>
+                    <span class="text-xs text-muted-foreground">{{ t('components.appHeader.theme') }}</span>
                     <ThemePicker />
                   </div>
                   <div class="space-y-1.5">
-                    <span class="text-xs text-muted-foreground">Accent</span>
+                    <span class="text-xs text-muted-foreground">{{ t('components.appHeader.accent') }}</span>
                     <AccentPicker />
                   </div>
                   <div class="space-y-1.5">
-                    <span class="text-xs text-muted-foreground">Radius</span>
+                    <span class="text-xs text-muted-foreground">{{ t('components.appHeader.radius') }}</span>
                     <RadiusPicker />
                   </div>
                   <div class="space-y-1.5">
-                    <span class="text-xs text-muted-foreground">Background</span>
+                    <span class="text-xs text-muted-foreground">{{ t('components.appHeader.background') }}</span>
                     <BackgroundPicker />
                   </div>
                 </div>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
 
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Languages :size="15" class="mr-2 text-muted-foreground" />
+                {{ t('settings.appearance.language.label') }}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent class="w-44">
+                <DropdownMenuItem v-for="option in languageOptions" :key="option.id" @click="selectLanguage(option.id)">
+                  <Check v-if="localeStore.locale === option.id" :size="14" class="mr-2" />
+                  <span v-else class="mr-2 w-3.5" />
+                  {{ option.label }}
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+
             <DropdownMenuItem @click="navigateToSettings">
               <Settings :size="15" class="mr-2 text-muted-foreground" />
-              Settings
+              {{ t('components.appHeader.settings') }}
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />
 
             <DropdownMenuItem @click="navigateToWhatsNew">
               <Sparkles :size="15" class="mr-2 text-muted-foreground" />
-              What's New
-              <span v-if="hasUnseenWhatsNew" class="ml-auto h-1.5 w-1.5 rounded-full bg-primary" aria-label="New" />
+              {{ t('components.appHeader.whatsNew') }}
+              <span v-if="hasUnseenWhatsNew" class="ml-auto h-1.5 w-1.5 rounded-full bg-primary" :aria-label="t('components.appHeader.new')" />
             </DropdownMenuItem>
             <DropdownMenuItem as-child>
               <a :href="documentationUrl" target="_blank" rel="noopener noreferrer">
                 <BadgeQuestionMark :size="15" class="mr-2 text-muted-foreground" />
-                Documentation
+                {{ t('components.appHeader.documentation') }}
                 <ExternalLink :size="12" class="ml-auto text-muted-foreground" />
               </a>
             </DropdownMenuItem>
@@ -716,7 +751,7 @@ function formatBadgeStyle(fmt: string) {
                 </span>
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Book Dock</TooltipContent>
+            <TooltipContent>{{ t('components.appHeader.bookDock') }}</TooltipContent>
           </Tooltip>
 
           <!-- Notifications button -->
@@ -740,7 +775,7 @@ function formatBadgeStyle(fmt: string) {
                 <Highlighter :size="15" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Annotations</TooltipContent>
+            <TooltipContent>{{ t('components.appHeader.annotations') }}</TooltipContent>
           </Tooltip>
 
           <!-- Statistics button -->
@@ -762,7 +797,7 @@ function formatBadgeStyle(fmt: string) {
                 <BarChart3 :size="15" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Statistics</TooltipContent>
+            <TooltipContent>{{ t('components.appHeader.statistics') }}</TooltipContent>
           </Tooltip>
 
           <!-- Achievements button -->
@@ -783,7 +818,7 @@ function formatBadgeStyle(fmt: string) {
                 <Trophy :size="15" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Achievements</TooltipContent>
+            <TooltipContent>{{ t('components.appHeader.achievements') }}</TooltipContent>
           </Tooltip>
 
           <!-- Upload button -->
@@ -802,7 +837,7 @@ function formatBadgeStyle(fmt: string) {
                 <Upload :size="15" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Upload books</TooltipContent>
+            <TooltipContent>{{ t('components.appHeader.uploadBooks') }}</TooltipContent>
           </Tooltip>
         </div>
 
@@ -826,7 +861,7 @@ function formatBadgeStyle(fmt: string) {
                     <span
                       v-if="hasUnseenWhatsNew"
                       class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary ring-2 ring-background"
-                      aria-label="New release notes available"
+                      :aria-label="t('components.appHeader.newReleaseNotes')"
                     />
                   </Button>
                 </DropdownMenuTrigger>
@@ -835,18 +870,18 @@ function formatBadgeStyle(fmt: string) {
                 <DropdownMenuItem as-child>
                   <a :href="documentationUrl" target="_blank" rel="noopener noreferrer">
                     <BadgeQuestionMark :size="14" class="mr-2 text-muted-foreground" />
-                    Documentation
+                    {{ t('components.appHeader.documentation') }}
                     <ExternalLink :size="12" class="ml-auto text-muted-foreground" />
                   </a>
                 </DropdownMenuItem>
                 <DropdownMenuItem @click="navigateToWhatsNew">
                   <Sparkles :size="14" class="mr-2 text-muted-foreground" />
-                  What's New
-                  <span v-if="hasUnseenWhatsNew" class="ml-auto h-1.5 w-1.5 rounded-full bg-primary" aria-label="New" />
+                  {{ t('components.appHeader.whatsNew') }}
+                  <span v-if="hasUnseenWhatsNew" class="ml-auto h-1.5 w-1.5 rounded-full bg-primary" :aria-label="t('components.appHeader.new')" />
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <TooltipContent>Help</TooltipContent>
+            <TooltipContent>{{ t('components.appHeader.help') }}</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -871,27 +906,26 @@ function formatBadgeStyle(fmt: string) {
                   variant="ghost"
                   size="icon"
                   class="absolute right-2 top-2 h-6 w-6 text-muted-foreground hover:text-foreground"
-                  aria-label="Close"
+                  :aria-label="t('common.close')"
                   @click="closeGithubStarPopover"
                 >
                   <X :size="13" />
                 </Button>
                 <div class="space-y-3 pr-5">
-                  <p class="text-sm font-medium text-foreground">Enjoying BookOrbit?</p>
+                  <p class="text-sm font-medium text-foreground">{{ t('components.appHeader.githubStar.title') }}</p>
                   <p class="text-xs leading-relaxed text-muted-foreground">
-                    If BookOrbit is helping with your library, please consider starring the project on GitHub. It helps more people discover the app
-                    and supports ongoing development.
+                    {{ t('components.appHeader.githubStar.body') }}
                   </p>
                   <Button as-child class="w-full">
                     <a :href="githubRepositoryUrl" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-1.5">
-                      <span>Star BookOrbit on GitHub</span>
+                      <span>{{ t('components.appHeader.githubStar.cta') }}</span>
                       <ExternalLink :size="14" />
                     </a>
                   </Button>
                 </div>
               </PopoverContent>
             </Popover>
-            <TooltipContent>Star on GitHub</TooltipContent>
+            <TooltipContent>{{ t('components.appHeader.starOnGithub') }}</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -910,27 +944,55 @@ function formatBadgeStyle(fmt: string) {
               </TooltipTrigger>
               <PopoverContent class="w-72 p-4" align="end">
                 <div class="space-y-4">
-                  <p class="text-xs font-semibold text-foreground uppercase tracking-wider">Appearance</p>
+                  <p class="text-xs font-semibold text-foreground uppercase tracking-wider">{{ t('components.appHeader.appearance') }}</p>
                   <div class="space-y-1.5">
-                    <span class="text-xs text-muted-foreground">Theme</span>
+                    <span class="text-xs text-muted-foreground">{{ t('components.appHeader.theme') }}</span>
                     <ThemePicker />
                   </div>
                   <div class="space-y-1.5">
-                    <span class="text-xs text-muted-foreground">Accent</span>
+                    <span class="text-xs text-muted-foreground">{{ t('components.appHeader.accent') }}</span>
                     <AccentPicker />
                   </div>
                   <div class="space-y-1.5">
-                    <span class="text-xs text-muted-foreground">Radius</span>
+                    <span class="text-xs text-muted-foreground">{{ t('components.appHeader.radius') }}</span>
                     <RadiusPicker />
                   </div>
                   <div class="space-y-1.5">
-                    <span class="text-xs text-muted-foreground">Background</span>
+                    <span class="text-xs text-muted-foreground">{{ t('components.appHeader.background') }}</span>
                     <BackgroundPicker />
                   </div>
                 </div>
               </PopoverContent>
             </Popover>
-            <TooltipContent>Appearance</TooltipContent>
+            <TooltipContent>{{ t('components.appHeader.appearance') }}</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <DropdownMenu>
+              <TooltipTrigger as-child>
+                <DropdownMenuTrigger as-child>
+                  <Button
+                    data-testid="language-control"
+                    variant="ghost"
+                    size="icon"
+                    class="h-8 w-8 border border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground transition-colors"
+                    :class="iconRadiusClass"
+                    :aria-label="t('settings.appearance.language.label')"
+                  >
+                    <Languages :size="15" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <DropdownMenuContent align="end" class="w-44">
+                <DropdownMenuLabel>{{ t('settings.appearance.language.label') }}</DropdownMenuLabel>
+                <DropdownMenuItem v-for="option in languageOptions" :key="option.id" @click="selectLanguage(option.id)">
+                  <Check v-if="localeStore.locale === option.id" :size="14" class="mr-2" />
+                  <span v-else class="mr-2 w-3.5" />
+                  {{ option.label }}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <TooltipContent>{{ t('settings.appearance.language.label') }}</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -948,7 +1010,7 @@ function formatBadgeStyle(fmt: string) {
                 <Settings :size="15" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Settings</TooltipContent>
+            <TooltipContent>{{ t('components.appHeader.settings') }}</TooltipContent>
           </Tooltip>
         </div>
 
@@ -975,17 +1037,17 @@ function formatBadgeStyle(fmt: string) {
             <DropdownMenuSeparator />
             <DropdownMenuItem @click="navigateToAccount">
               <User :size="13" class="mr-2 text-muted-foreground" />
-              Account
+              {{ t('components.appHeader.account') }}
             </DropdownMenuItem>
             <DropdownMenuSeparator v-if="canChangePassword" />
             <DropdownMenuItem v-if="canChangePassword" @click="openChangePassword()">
               <KeyRound :size="13" class="mr-2 text-muted-foreground" />
-              Change Password
+              {{ t('components.appHeader.changePassword') }}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem @click="logout" class="text-destructive focus:text-destructive">
               <LogOut :size="13" class="mr-2" />
-              Sign out
+              {{ t('components.appHeader.signOut') }}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ChevronLeft, ChevronRight, ChevronsUpDown } from '@lucide/vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   fraction: number
@@ -74,11 +77,17 @@ function handleGoToBlur() {
   >
     <Tooltip>
       <TooltipTrigger as-child>
-        <button type="button" aria-label="Previous section" class="viewer-btn" :disabled="sectionIndex === 0" @click="emit('prevSection')">
+        <button
+          type="button"
+          :aria-label="t('reader.footer.previousSection')"
+          class="viewer-btn"
+          :disabled="sectionIndex === 0"
+          @click="emit('prevSection')"
+        >
           <ChevronLeft :size="18" />
         </button>
       </TooltipTrigger>
-      <TooltipContent>Previous section</TooltipContent>
+      <TooltipContent>{{ t('reader.footer.previousSection') }}</TooltipContent>
     </Tooltip>
 
     <div class="relative flex-1 flex items-center h-6">
@@ -120,7 +129,7 @@ function handleGoToBlur() {
         ref="goToInputRef"
         v-model="goToValue"
         type="text"
-        placeholder="45 or p123"
+        :placeholder="t('reader.footer.goToPlaceholder')"
         class="w-24 h-8 text-sm tabular-nums text-center bg-muted border border-border rounded px-2 py-1 text-foreground outline-none focus:ring-1 focus:ring-primary"
         @keydown.enter="handleGoToSubmit"
         @keydown="handleGoToKeydown"
@@ -132,16 +141,16 @@ function handleGoToBlur() {
         <TooltipTrigger as-child>
           <button
             type="button"
-            aria-label="Jump to location"
+            :aria-label="t('reader.footer.jumpToLocation')"
             class="h-8 px-2 rounded-md border border-transparent hover:border-border text-xs tabular-nums shrink-0 min-w-18 text-center text-muted-foreground hover:text-foreground transition-colors inline-flex items-center justify-center gap-1"
             @click="handlePercentageClick"
           >
-            <span class="text-[11px] uppercase tracking-wide">Go</span>
+            <span class="text-[11px] uppercase tracking-wide">{{ t('reader.footer.go') }}</span>
             <span>{{ Math.round(fraction * 100) }}%</span>
             <ChevronsUpDown :size="12" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>Jump to % or page (e.g. 45 or p123)</TooltipContent>
+        <TooltipContent>{{ t('reader.footer.jumpTooltip') }}</TooltipContent>
       </Tooltip>
     </template>
 
@@ -149,7 +158,7 @@ function handleGoToBlur() {
       <TooltipTrigger as-child>
         <button
           type="button"
-          aria-label="Next section"
+          :aria-label="t('reader.footer.nextSection')"
           class="viewer-btn"
           :disabled="totalSections > 0 && sectionIndex >= totalSections - 1"
           @click="emit('nextSection')"
@@ -157,7 +166,7 @@ function handleGoToBlur() {
           <ChevronRight :size="18" />
         </button>
       </TooltipTrigger>
-      <TooltipContent>Next section</TooltipContent>
+      <TooltipContent>{{ t('reader.footer.nextSection') }}</TooltipContent>
     </Tooltip>
   </footer>
 </template>

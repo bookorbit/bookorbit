@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
 import { mount } from '@vue/test-utils'
 import type { BookCard } from '@bookorbit/types'
 import VirtualBookGrid from './VirtualBookGrid.vue'
 
-const scrollToItemMock = vi.fn<(index: number) => void>()
+const scrollToItemMock = vi.fn<(index: number, options?: { align?: string }) => void>()
 
 vi.mock('vue-virtual-scroller', () => ({
   RecycleScroller: {
@@ -12,8 +12,8 @@ vi.mock('vue-virtual-scroller', () => ({
     props: ['items'],
     emits: ['update'],
     methods: {
-      scrollToItem(index: number) {
-        scrollToItemMock(index)
+      scrollToItem(index: number, options?: { align?: string }) {
+        scrollToItemMock(index, options)
       },
     },
     template: '<div data-testid="recycle-scroller"><slot v-for="item in items" :key="item.id" :item="item" /></div>',
@@ -236,15 +236,82 @@ describe('VirtualBookGrid', () => {
       })
 
       ;(wrapper.vm as unknown as { scrollToIndex: (i: number) => void }).scrollToIndex(42)
-      expect(scrollToItemMock).toHaveBeenCalledWith(42)
+      expect(scrollToItemMock).toHaveBeenCalledWith(42, { align: 'start' })
     })
 
-    it('reserves a right gutter when railGutter is set', () => {
+    it('reports index zero at the top and preserves a jump target within the same row', async () => {
+      const scrollParent = document.createElement('div')
+      scrollParent.style.overflowY = 'auto'
+      document.body.append(scrollParent)
+      const requestAnimationFrameSpy = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((callback) => {
+        callback(0)
+        return 0
+      })
+      const books = Array.from({ length: 12 }, (_, index) => makeBook(index + 1))
+      const wrapper = mount(VirtualBookGrid, {
+        attachTo: scrollParent,
+        props: { books, coverSize: 120, gridGap: 12 },
+      })
+      vi.spyOn(scrollParent, 'getBoundingClientRect').mockReturnValue({
+        top: 0,
+        left: 0,
+        right: 600,
+        bottom: 800,
+        width: 600,
+        height: 800,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      })
+      vi.spyOn(wrapper.element, 'getBoundingClientRect').mockReturnValue({
+        top: 0,
+        left: 0,
+        right: 600,
+        bottom: 1600,
+        width: 600,
+        height: 1600,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      })
+
+      await nextTick()
+      scrollParent.dispatchEvent(new Event('scroll'))
+
+      expect(wrapper.emitted('first-visible-index')).toEqual([[0]])
+
+      ;(wrapper.vm as unknown as { scrollToIndex: (index: number) => void }).scrollToIndex(3)
+      scrollParent.dispatchEvent(new Event('scroll'))
+
+      expect(wrapper.emitted('first-visible-index')).toEqual([[0], [3]])
+
+      wrapper.unmount()
+      scrollParent.remove()
+      requestAnimationFrameSpy.mockRestore()
+    })
+
+    it('reserves a compact right gutter for the alphabet rail', () => {
       const wrapper = mount(VirtualBookGrid, {
         props: { books: [makeBook(1)], coverSize: 120, gridGap: 12, railGutter: true },
       })
 
-      expect(wrapper.classes()).toContain('pr-9')
+      expect(wrapper.classes()).toContain('pr-10')
+    })
+
+    it('reserves a wider right gutter for the temporal rail', () => {
+      const wrapper = mount(VirtualBookGrid, {
+        props: { books: [makeBook(1)], coverSize: 120, gridGap: 12, railGutter: true, railGutterKind: 'temporal' },
+      })
+
+      expect(wrapper.classes()).toContain('pr-14')
+    })
+
+    it('reserves the widest right gutter for categorical labels', () => {
+      const wrapper = mount(VirtualBookGrid, {
+        props: { books: [makeBook(1)], coverSize: 120, gridGap: 12, railGutter: true, railGutterKind: 'category' },
+      })
+
+      expect(wrapper.classes()).toContain('pr-22')
     })
   })
 

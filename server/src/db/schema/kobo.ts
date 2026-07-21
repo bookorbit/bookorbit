@@ -100,6 +100,7 @@ export const koboLegacySnapshotBooks = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.snapshotId, t.bookId] }),
+    index('kobo_snapshot_books_book_id_idx').on(t.bookId),
     index('kobo_snapshot_books_snapshot_synced_book_idx').on(t.snapshotId, t.synced, t.bookId),
   ],
 );
@@ -149,6 +150,7 @@ export const koboSnapshotBooks = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.snapshotId, t.bookId] }),
+    index('kobo_device_snapshot_books_book_id_idx').on(t.bookId),
     index('kobo_device_snapshot_books_snapshot_synced_book_idx').on(t.snapshotId, t.synced, t.bookId),
   ],
 );
@@ -203,7 +205,7 @@ export const koboReadingStates = pgTable(
       .notNull()
       .$onUpdateFn(() => new Date()),
   },
-  (t) => [unique().on(t.userId, t.bookId)],
+  (t) => [unique().on(t.userId, t.bookId), index('kobo_reading_states_book_id_idx').on(t.bookId)],
 );
 
 export const koboSyncHistory = pgTable(

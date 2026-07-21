@@ -109,6 +109,7 @@ export function initDisplaySettingsSync(): void {
         settings.squareGridGap.value,
         settings.viewMode.value,
         settings.cardOverlays.value.join('\u0000'),
+        settings.showJumpRails.value,
         settings.smartScopeFilterExpanded.value,
         settings.authorCoverSize.value,
         settings.authorCoverShape.value,

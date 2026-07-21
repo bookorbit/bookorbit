@@ -1,11 +1,23 @@
 import { nextTick, ref } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BookCard, BooksPage, GroupRule, JumpBucket } from '@bookorbit/types'
 
 const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<unknown>>()
+const bookEventsMock = vi.hoisted(() => ({
+  progressChangedCallback: null as (() => void) | null,
+}))
 
 vi.mock('@/lib/api', () => ({
   api: (url: string, init?: RequestInit) => fetchMock(url, init),
+}))
+
+vi.mock('../useBookEvents', () => ({
+  useBookEvents: () => ({
+    onBookProgressChanged: (callback: () => void) => {
+      bookEventsMock.progressChangedCallback = callback
+      return () => undefined
+    },
+  }),
 }))
 
 import { BOOK_WINDOW_BLOCK_SIZE } from '../useBookWindow'
@@ -61,7 +73,7 @@ function bucket(key: string, index: number): JumpBucket {
 function mockApi(total: number, buckets: JumpBucket[] = []) {
   fetchMock.mockImplementation((url, init) => {
     if (url.includes('jump-buckets')) {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ buckets }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ buckets, total, kind: 'letter', granularity: null }) })
     }
     const body = JSON.parse(String(init?.body)) as { pagination: { page: number } }
     return Promise.resolve({ ok: true, json: () => Promise.resolve(pageFor(body.pagination.page, total)) })
@@ -74,9 +86,10 @@ async function flush() {
   await nextTick()
 }
 
-function setup(options: { scope?: number | null; viewMode?: string; collapse?: boolean; q?: string } = {}) {
+function setup(options: { scope?: number | null; viewMode?: string; collapse?: boolean; q?: string; railEnabled?: boolean } = {}) {
   const scopeId = ref<number | null>(options.scope === undefined ? 1 : options.scope)
   const viewMode = ref(options.viewMode ?? 'table')
+  const railEnabled = ref(options.railEnabled ?? true)
   const collapseEnabled = ref(options.collapse ?? false)
   const q = ref(options.q ?? '')
   const win = useBookViewWindow({
@@ -84,10 +97,11 @@ function setup(options: { scope?: number | null; viewMode?: string; collapse?: b
     listEndpoint: (id) => `/api/v1/libraries/${id}/books`,
     bucketsEndpoint: (id) => `/api/v1/libraries/${id}/books/jump-buckets`,
     viewMode,
+    railEnabled,
     collapseEnabled,
     q,
   })
-  return { win, scopeId, viewMode, collapseEnabled, q }
+  return { win, scopeId, viewMode, railEnabled, collapseEnabled, q }
 }
 
 function listRequests(): number[] {
@@ -96,9 +110,18 @@ function listRequests(): number[] {
     .map(([, init]) => (JSON.parse(String(init?.body)) as { pagination: { page: number } }).pagination.page)
 }
 
+function jumpRequestCount(): number {
+  return fetchMock.mock.calls.filter(([url]) => url.includes('jump-buckets')).length
+}
+
 describe('useBookViewWindow', () => {
   beforeEach(() => {
     fetchMock.mockReset()
+    bookEventsMock.progressChangedCallback = null
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('loads the first block on creation and exposes window state', async () => {
@@ -109,6 +132,24 @@ describe('useBookViewWindow', () => {
     expect(win.total.value).toBe(250)
     expect(win.contiguousPrefix.value).toHaveLength(100)
     expect(win.hasMorePrefix.value).toBe(true)
+  })
+
+  it('debounces external progress events and reloads the current book window', async () => {
+    vi.useFakeTimers()
+    mockApi(250)
+    setup()
+    await flush()
+    fetchMock.mockClear()
+
+    bookEventsMock.progressChangedCallback?.()
+    bookEventsMock.progressChangedCallback?.()
+    bookEventsMock.progressChangedCallback?.()
+    await vi.advanceTimersByTimeAsync(249)
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(1)
+    await flush()
+    expect(listRequests()).toEqual([0])
   })
 
   it('does not fetch when the scope id is invalid', async () => {
@@ -190,6 +231,20 @@ describe('useBookViewWindow', () => {
     expect(win.bucketKind.value).not.toBeNull()
   })
 
+  it('exposes categorical rail eligibility and the primary sort field', async () => {
+    mockApi(120, [bucket('en', 0), bucket('de', 60)])
+    const { win } = setup({ viewMode: 'grid' })
+    await flush()
+
+    win.sort.value = [{ field: 'language', dir: 'asc' }]
+    await flush()
+    await flush()
+
+    expect(win.bucketKind.value).toBe('category')
+    expect(win.primarySortField.value).toBe('language')
+    expect(win.railVisible.value).toBe(true)
+  })
+
   it('keeps the jump rail hidden in table mode', async () => {
     mockApi(250, [bucket('A', 0), bucket('B', 120)])
     const { win } = setup({ viewMode: 'table' })
@@ -197,6 +252,22 @@ describe('useBookViewWindow', () => {
 
     expect(win.railVisible.value).toBe(false)
     expect(win.railGutterReserved.value).toBe(false)
+  })
+
+  it('does not request buckets while jump rails are disabled and loads them when enabled', async () => {
+    mockApi(250, [bucket('A', 0), bucket('B', 120)])
+    const { win, railEnabled } = setup({ viewMode: 'grid', railEnabled: false })
+    await flush()
+
+    expect(jumpRequestCount()).toBe(0)
+    expect(win.railVisible.value).toBe(false)
+
+    railEnabled.value = true
+    await flush()
+    await flush()
+
+    expect(jumpRequestCount()).toBe(1)
+    expect(win.railVisible.value).toBe(true)
   })
 
   it('shows the jump rail in grid mode once buckets load and jumps scroll to the bucket index', async () => {

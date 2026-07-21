@@ -22,6 +22,16 @@ const manualHashLinks = ref<KoreaderManualHashLink[]>([])
 const loading = ref(false)
 const unmatchedLoading = ref(false)
 const manualLinksLoading = ref(false)
+const fileNamingPattern = ref('')
+
+export type KoreaderFileNamingRequestErrorCode = 'load' | 'account-save' | 'device-save' | 'device-reset'
+
+export class KoreaderFileNamingRequestError extends Error {
+  constructor(readonly code: KoreaderFileNamingRequestErrorCode) {
+    super(code)
+    this.name = 'KoreaderFileNamingRequestError'
+  }
+}
 
 export function useKoreaderSync() {
   async function fetchSyncStatus(silent = false): Promise<void> {
@@ -192,6 +202,42 @@ export function useKoreaderSync() {
     return result
   }
 
+  async function fetchFileNamingPattern(): Promise<void> {
+    const res = await api('/api/v1/koreader/file-naming-pattern')
+    if (!res.ok) throw new KoreaderFileNamingRequestError('load')
+    const body = await res.json()
+    fileNamingPattern.value = body.pattern
+  }
+
+  async function saveFileNamingPattern(config: { pattern: string }): Promise<void> {
+    const res = await api('/api/v1/koreader/file-naming-pattern', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    })
+    if (!res.ok) throw new KoreaderFileNamingRequestError('account-save')
+    fileNamingPattern.value = config.pattern
+  }
+
+  async function saveDeviceFileNamingPattern(
+    deviceId: string,
+    config: { pattern: string; seriesPattern: string; standalonePattern: string },
+  ): Promise<void> {
+    const res = await api(`/api/v1/koreader/devices/${encodeURIComponent(deviceId)}/file-naming-pattern`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    })
+    if (!res.ok) throw new KoreaderFileNamingRequestError('device-save')
+    await fetchSyncStatus(true)
+  }
+
+  async function clearDeviceFileNamingPattern(deviceId: string): Promise<void> {
+    const res = await api(`/api/v1/koreader/devices/${encodeURIComponent(deviceId)}/file-naming-pattern`, { method: 'DELETE' })
+    if (!res.ok) throw new KoreaderFileNamingRequestError('device-reset')
+    await fetchSyncStatus(true)
+  }
+
   async function removeDevice(deviceId: string): Promise<void> {
     const res = await api(`/api/v1/koreader/devices/${deviceId}`, { method: 'DELETE' })
     if (!res.ok) {
@@ -209,6 +255,7 @@ export function useKoreaderSync() {
     loading,
     unmatchedLoading,
     manualLinksLoading,
+    fileNamingPattern,
     fetchSyncStatus,
     fetchUnmatchedBooks,
     fetchManualHashLinks,
@@ -223,6 +270,10 @@ export function useKoreaderSync() {
     dismissAllUnmatchedBooks,
     relinkManualHashLink,
     unlinkManualHashLink,
+    fetchFileNamingPattern,
+    saveFileNamingPattern,
+    saveDeviceFileNamingPattern,
+    clearDeviceFileNamingPattern,
     removeDevice,
   }
 }

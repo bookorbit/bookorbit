@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, type CSSProperties } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ChevronDown, ChevronRight, Loader2, RotateCcw, Library, Trash2, Save } from '@lucide/vue'
 import type {
   FieldPreference,
@@ -14,6 +15,8 @@ import FieldPreferenceTable from './FieldPreferenceTable.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Badge } from '@/components/ui/badge'
 import { getFormatColor } from '@/features/book/lib/format-colors'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   libraryName: string
@@ -87,7 +90,7 @@ function onRevert(field: MetadataField) {
 
 function onClearAll() {
   if (!draft.value) return
-  if (!confirm(`Remove all active providers from every field in "${props.libraryName}"?`)) return
+  if (!confirm(t('settings.metadata.fieldRules.library.clearAllConfirm', { library: props.libraryName }))) return
   const updatedFields = { ...draft.value.fields }
   const newChanges = new Map(pendingChanges.value)
   for (const field of ALL_METADATA_FIELDS) {
@@ -101,7 +104,7 @@ function onClearAll() {
 
 function onReset() {
   if (!props.libraryPrefs) return
-  if (!confirm(`Reset "${props.libraryName}" to global defaults? All library overrides will be removed.`)) return
+  if (!confirm(t('settings.metadata.fieldRules.library.resetConfirm', { library: props.libraryName }))) return
   emit('reset', props.libraryPrefs.libraryId)
 }
 
@@ -134,22 +137,22 @@ function onSave() {
           <div class="flex items-center gap-3">
             <span class="text-sm font-semibold text-foreground truncate">{{ libraryName }}</span>
             <Badge variant="outline" class="h-4.5 px-1.5 text-[10px] font-bold uppercase tracking-tight">
-              <span class="text-muted-foreground">Primary:</span>
+              <span class="text-muted-foreground">{{ t('settings.metadata.fieldRules.library.primary') }}</span>
               <span class="ml-1" :style="primaryFormatStyle">{{ primaryFormat }}</span>
             </Badge>
             <Badge v-if="overriddenFields.size > 0" variant="secondary" class="h-4.5 px-1.5 text-[10px] font-bold uppercase tracking-tight">
-              {{ overriddenFields.size }} {{ overriddenFields.size === 1 ? 'Override' : 'Overrides' }}
-              <span v-if="isDirty" class="ml-1 opacity-60">(unsaved)</span>
+              {{ t('settings.metadata.fieldRules.library.overrideCount', { count: overriddenFields.size }, overriddenFields.size) }}
+              <span v-if="isDirty" class="ml-1 opacity-60">{{ t('settings.metadata.fieldRules.library.unsavedSuffix') }}</span>
             </Badge>
             <Badge v-else variant="outline" class="h-4.5 px-1.5 text-[10px] font-bold uppercase tracking-tight opacity-60">
-              {{ isDirty ? 'Unsaved changes' : 'Global Defaults' }}
+              {{ isDirty ? t('settings.metadata.fieldRules.library.unsavedChanges') : t('settings.metadata.fieldRules.library.globalDefaults') }}
             </Badge>
           </div>
           <p v-if="!open" class="text-[11px] text-muted-foreground font-mono truncate">
             {{
               hasPersistedOverrides
-                ? `Overriding: ${Array.from(Object.keys(libraryPrefs?.overrides ?? {})).join(', ')}`
-                : 'Inheriting all global metadata rules'
+                ? t('settings.metadata.fieldRules.library.overriding', { fields: Array.from(Object.keys(libraryPrefs?.overrides ?? {})).join(', ') })
+                : t('settings.metadata.fieldRules.library.inheritingAll')
             }}
           </p>
         </div>
@@ -166,7 +169,7 @@ function onSave() {
         <div class="px-5 py-4 border-t border-border flex flex-col md:flex-row md:items-center justify-between gap-4 bg-muted/30">
           <div>
             <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">{{ libraryName }}</span>
-            <p class="settings-hint">Fields not overridden inherit global defaults.</p>
+            <p class="settings-hint">{{ t('settings.metadata.fieldRules.library.subHint') }}</p>
           </div>
           <div class="flex items-center gap-2 flex-wrap">
             <button
@@ -175,7 +178,7 @@ function onSave() {
               @click="onClearAll"
             >
               <Trash2 :size="13" />
-              <span>Clear All Providers</span>
+              <span>{{ t('settings.metadata.fieldRules.clearAllProviders') }}</span>
             </button>
             <Tooltip>
               <TooltipTrigger as-child>
@@ -185,15 +188,15 @@ function onSave() {
                   @click="onReset"
                 >
                   <RotateCcw :size="13" />
-                  <span>Reset to Default</span>
+                  <span>{{ t('settings.metadata.fieldRules.resetToDefault') }}</span>
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Remove all overrides and inherit global defaults</TooltipContent>
+              <TooltipContent>{{ t('settings.metadata.fieldRules.library.resetTooltip') }}</TooltipContent>
             </Tooltip>
             <button class="settings-btn-primary h-8 px-3" :disabled="saving || !isDirty" @click="onSave">
               <Loader2 v-if="saving" :size="14" class="animate-spin" />
               <Save v-else :size="14" />
-              <span>Save</span>
+              <span>{{ t('common.save') }}</span>
             </button>
           </div>
         </div>

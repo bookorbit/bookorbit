@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { api } from '@/lib/api'
 import { generatePkce } from '@/features/auth/composables/useOidc'
 import { toast } from 'vue-sonner'
@@ -9,6 +10,8 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+
+const { t } = useI18n()
 
 interface ProviderSummary {
   id: number
@@ -144,14 +147,14 @@ async function startEdit(slug: string) {
       api(`/api/v1/app-settings/oidc/providers/${slug}`),
       api(`/api/v1/app-settings/oidc/providers/${slug}/group-mappings`),
     ])
-    if (!providerRes.ok) throw new Error('Failed to load provider')
+    if (!providerRes.ok) throw new Error(t('settings.oidc.errors.loadProvider'))
     const data = await providerRes.json()
     Object.assign(form, data)
     form.clientSecret = ''
     if (mappingsRes.ok) groupMappings.value = await mappingsRes.json()
     viewMode.value = 'edit'
   } catch (err) {
-    toast.error(err instanceof Error ? err.message : 'Failed to load provider')
+    toast.error(err instanceof Error ? err.message : t('settings.oidc.errors.loadProvider'))
   } finally {
     loading.value = false
   }
@@ -186,9 +189,9 @@ async function saveProvider() {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(((err as Record<string, unknown>).message as string) ?? 'Failed to create provider')
+        throw new Error(((err as Record<string, unknown>).message as string) ?? t('settings.oidc.errors.createProvider'))
       }
-      toast.success('Provider created')
+      toast.success(t('settings.oidc.toasts.providerCreated'))
       backToList()
     } else {
       const body: Record<string, unknown> = {
@@ -210,12 +213,12 @@ async function saveProvider() {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(((err as Record<string, unknown>).message as string) ?? 'Failed to save')
+        throw new Error(((err as Record<string, unknown>).message as string) ?? t('settings.oidc.errors.save'))
       }
-      toast.success('Provider saved')
+      toast.success(t('settings.oidc.toasts.providerSaved'))
     }
   } catch (err) {
-    saveError.value = err instanceof Error ? err.message : 'Failed to save'
+    saveError.value = err instanceof Error ? err.message : t('settings.oidc.errors.save')
     toast.error(saveError.value)
   } finally {
     saving.value = false
@@ -229,12 +232,12 @@ async function deleteProvider() {
     const res = await api(`/api/v1/app-settings/oidc/providers/${editingSlug.value}`, { method: 'DELETE' })
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
-      throw new Error(((err as Record<string, unknown>).message as string) ?? 'Failed to delete')
+      throw new Error(((err as Record<string, unknown>).message as string) ?? t('settings.oidc.errors.delete'))
     }
-    toast.success('Provider deleted')
+    toast.success(t('settings.oidc.toasts.providerDeleted'))
     backToList()
   } catch (err) {
-    toast.error(err instanceof Error ? err.message : 'Failed to delete provider')
+    toast.error(err instanceof Error ? err.message : t('settings.oidc.errors.deleteProvider'))
   } finally {
     deleting.value = false
   }
@@ -249,7 +252,7 @@ async function testConnection() {
     const res = await api(`/api/v1/app-settings/oidc/providers/${slug}/test?issuerUri=${encodeURIComponent(form.issuerUri)}`, { method: 'POST' })
     testResult.value = await res.json()
   } catch {
-    testResult.value = { success: false, error: 'Request failed' }
+    testResult.value = { success: false, error: t('settings.oidc.errors.requestFailed') }
   } finally {
     testing.value = false
   }
@@ -261,7 +264,7 @@ async function previewOidcClaims() {
   previewClaims.value = null
   try {
     const stateRes = await api(`/api/v1/auth/oidc/${editingSlug.value}/preview-state`, { method: 'POST' })
-    if (!stateRes.ok) throw new Error('Failed to generate preview state')
+    if (!stateRes.ok) throw new Error(t('settings.oidc.errors.previewState'))
     const { state, authorizationEndpoint } = await stateRes.json()
     const nonce = crypto.randomUUID()
     const { codeVerifier, codeChallenge } = await generatePkce()
@@ -280,7 +283,7 @@ async function previewOidcClaims() {
     sessionStorage.setItem('oidc_preview_pending', editingSlug.value)
     window.location.href = `${authorizationEndpoint}?${params.toString()}`
   } catch (err) {
-    toast.error(err instanceof Error ? err.message : 'Failed to start preview')
+    toast.error(err instanceof Error ? err.message : t('settings.oidc.errors.startPreview'))
     previewing.value = false
   }
 }
@@ -309,14 +312,14 @@ async function addGroupMapping() {
     })
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
-      throw new Error(((err as Record<string, unknown>).message as string) ?? 'Failed to add mapping')
+      throw new Error(((err as Record<string, unknown>).message as string) ?? t('settings.oidc.errors.addMapping'))
     }
     const created: GroupMapping = await res.json()
     groupMappings.value.push(created)
     newMapping.oidcGroupClaim = ''
-    toast.success('Group mapping added')
+    toast.success(t('settings.oidc.toasts.mappingAdded'))
   } catch (err) {
-    toast.error(err instanceof Error ? err.message : 'Failed to add mapping')
+    toast.error(err instanceof Error ? err.message : t('settings.oidc.errors.addMapping'))
   } finally {
     addingMapping.value = false
   }
@@ -326,11 +329,11 @@ async function deleteGroupMapping(id: number) {
   if (!editingSlug.value) return
   try {
     const res = await api(`/api/v1/app-settings/oidc/providers/${editingSlug.value}/group-mappings/${id}`, { method: 'DELETE' })
-    if (!res.ok) throw new Error('Failed to delete')
+    if (!res.ok) throw new Error(t('settings.oidc.errors.delete'))
     groupMappings.value = groupMappings.value.filter((m) => m.id !== id)
-    toast.success('Group mapping removed')
+    toast.success(t('settings.oidc.toasts.mappingRemoved'))
   } catch {
-    toast.error('Failed to remove group mapping')
+    toast.error(t('settings.oidc.errors.removeMapping'))
   }
 }
 </script>
@@ -338,30 +341,25 @@ async function deleteGroupMapping(id: number) {
 <template>
   <!-- List view -->
   <template v-if="viewMode === 'list'">
-    <SettingsPageHeader
-      v-if="!props.embedded"
-      class="hidden md:flex"
-      title="OIDC / SSO"
-      subtitle="Manage OpenID Connect providers for single sign-on."
-    />
+    <SettingsPageHeader v-if="!props.embedded" class="hidden md:flex" :title="t('settings.oidc.title')" :subtitle="t('settings.oidc.subtitle')" />
     <div v-if="!props.embedded" class="md:hidden px-1">
-      <h1 class="text-xl font-semibold tracking-tight text-foreground">OIDC / SSO</h1>
+      <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ t('settings.oidc.title') }}</h1>
       <p
         class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
       >
-        Manage OpenID Connect providers for single sign-on.
+        {{ t('settings.oidc.subtitle') }}
       </p>
     </div>
 
-    <div v-if="loading" class="mt-5 md:mt-0 text-sm text-muted-foreground">Loading...</div>
+    <div v-if="loading" class="mt-5 md:mt-0 text-sm text-muted-foreground">{{ t('common.loading') }}</div>
 
     <div v-else class="mt-5 md:mt-0 space-y-4">
       <div>
         <div class="flex items-center justify-between mb-3">
-          <p class="settings-group-label mb-0">Providers</p>
+          <p class="settings-group-label mb-0">{{ t('settings.oidc.providers') }}</p>
           <button type="button" class="settings-btn-primary" @click="startCreate">
             <Plus :size="12" />
-            Add Provider
+            {{ t('settings.oidc.addProvider') }}
           </button>
         </div>
         <div class="border border-border rounded-lg overflow-hidden shadow-xs">
@@ -387,7 +385,7 @@ async function deleteGroupMapping(id: number) {
                 class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium"
                 :class="provider.enabled ? 'bg-green-500/10 text-green-600' : 'bg-muted text-muted-foreground'"
               >
-                {{ provider.enabled ? 'Enabled' : 'Disabled' }}
+                {{ provider.enabled ? t('settings.oidc.enabled') : t('settings.oidc.disabled') }}
               </span>
             </button>
           </div>
@@ -395,8 +393,8 @@ async function deleteGroupMapping(id: number) {
             <div class="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
               <ShieldCheck :size="18" class="text-muted-foreground/70" />
             </div>
-            <p class="text-sm font-medium text-foreground">No providers yet</p>
-            <p class="text-xs text-muted-foreground mt-1 max-w-[240px] mx-auto">Add an OIDC provider to enable single sign-on for your users.</p>
+            <p class="text-sm font-medium text-foreground">{{ t('settings.oidc.empty.title') }}</p>
+            <p class="text-xs text-muted-foreground mt-1 max-w-[240px] mx-auto">{{ t('settings.oidc.empty.description') }}</p>
           </div>
         </div>
       </div>
@@ -416,31 +414,35 @@ async function deleteGroupMapping(id: number) {
         <img :src="form.iconUrl" alt="" class="h-7 w-7 object-contain" />
       </div>
       <div>
-        <h2 class="text-lg font-semibold text-foreground">{{ viewMode === 'create' ? 'Add Provider' : form.displayName || 'Edit Provider' }}</h2>
-        <p class="text-sm text-muted-foreground">{{ viewMode === 'create' ? 'Configure a new OIDC provider.' : `Editing ${editingSlug}` }}</p>
+        <h2 class="text-lg font-semibold text-foreground">
+          {{ viewMode === 'create' ? t('settings.oidc.addProvider') : form.displayName || t('settings.oidc.editProvider') }}
+        </h2>
+        <p class="text-sm text-muted-foreground">
+          {{ viewMode === 'create' ? t('settings.oidc.configureNew') : t('settings.oidc.editing', { slug: editingSlug }) }}
+        </p>
       </div>
     </div>
     <div class="md:hidden px-1 mb-4">
       <button type="button" class="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-2" @click="backToList">
         <ArrowLeft class="w-4 h-4" />
-        Back
+        {{ t('common.back') }}
       </button>
       <h1 class="text-xl font-semibold tracking-tight text-foreground">
-        {{ viewMode === 'create' ? 'Add Provider' : form.displayName || 'Edit Provider' }}
+        {{ viewMode === 'create' ? t('settings.oidc.addProvider') : form.displayName || t('settings.oidc.editProvider') }}
       </h1>
     </div>
 
-    <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>
+    <div v-if="loading" class="text-sm text-muted-foreground">{{ t('common.loading') }}</div>
 
     <form v-else class="space-y-6" @submit.prevent="saveProvider">
       <!-- Status -->
       <div>
-        <p class="settings-group-label">Status</p>
+        <p class="settings-group-label">{{ t('settings.oidc.form.status') }}</p>
         <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
           <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
             <div class="min-w-0">
-              <p class="settings-label">Enable provider</p>
-              <p class="settings-hint">Show this provider on the login page.</p>
+              <p class="settings-label">{{ t('settings.oidc.form.enableProvider') }}</p>
+              <p class="settings-hint">{{ t('settings.oidc.form.enableProviderHint') }}</p>
             </div>
             <ToggleSwitch v-model="form.enabled" class="self-start md:self-auto" />
           </div>
@@ -449,32 +451,37 @@ async function deleteGroupMapping(id: number) {
 
       <!-- Identity -->
       <div>
-        <p class="settings-group-label">Provider Identity</p>
+        <p class="settings-group-label">{{ t('settings.oidc.form.identity') }}</p>
         <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
           <div
             v-if="viewMode === 'create'"
             class="flex flex-col gap-2 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:gap-8 md:px-5 md:py-4"
           >
             <div class="min-w-0 md:shrink-0">
-              <p class="settings-label">Slug</p>
-              <p class="settings-hint">Unique identifier (lowercase, hyphens). Cannot be changed later.</p>
+              <p class="settings-label">{{ t('settings.oidc.form.slug') }}</p>
+              <p class="settings-hint">{{ t('settings.oidc.form.slugHint') }}</p>
             </div>
             <input v-model="form.slug" type="text" placeholder="keycloak" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" class="input-field w-full md:w-72" />
           </div>
           <div class="flex flex-col gap-2 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:gap-8 md:px-5 md:py-4">
             <div class="min-w-0 md:shrink-0">
-              <p class="settings-label">Display Name</p>
-              <p class="settings-hint">Shown on the login button.</p>
+              <p class="settings-label">{{ t('settings.oidc.form.displayName') }}</p>
+              <p class="settings-hint">{{ t('settings.oidc.form.displayNameHint') }}</p>
             </div>
             <input v-model="form.displayName" type="text" placeholder="Keycloak" class="input-field w-full md:w-72" />
           </div>
           <div class="flex flex-col gap-2 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:gap-8 md:px-5 md:py-4">
             <div class="min-w-0 md:shrink-0">
-              <p class="settings-label">Icon URL</p>
-              <p class="settings-hint">Optional logo shown next to the login button.</p>
+              <p class="settings-label">{{ t('settings.oidc.form.iconUrl') }}</p>
+              <p class="settings-hint">{{ t('settings.oidc.form.iconUrlHint') }}</p>
             </div>
             <div class="flex w-full items-center gap-2 md:w-72">
-              <img v-if="form.iconUrl" :src="form.iconUrl" alt="icon preview" class="h-5 w-5 shrink-0 rounded object-contain" />
+              <img
+                v-if="form.iconUrl"
+                :src="form.iconUrl"
+                :alt="t('settings.oidc.form.iconPreviewAlt')"
+                class="h-5 w-5 shrink-0 rounded object-contain"
+              />
               <input v-model="form.iconUrl" type="url" placeholder="https://example.com/logo.svg" class="input-field min-w-0 flex-1" />
             </div>
           </div>
@@ -483,12 +490,12 @@ async function deleteGroupMapping(id: number) {
 
       <!-- Connection -->
       <div>
-        <p class="settings-group-label">Connection</p>
+        <p class="settings-group-label">{{ t('settings.oidc.form.connection') }}</p>
         <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
           <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-start md:justify-between md:gap-8 md:px-5 md:py-4">
             <div class="min-w-0 md:shrink-0 md:pt-0.5">
-              <p class="settings-label">Issuer URI</p>
-              <p class="settings-hint">The provider's base URL.</p>
+              <p class="settings-label">{{ t('settings.oidc.form.issuerUri') }}</p>
+              <p class="settings-hint">{{ t('settings.oidc.form.issuerUriHint') }}</p>
             </div>
             <div class="flex w-full flex-col items-start gap-2 md:w-auto md:items-end">
               <div class="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
@@ -499,7 +506,7 @@ async function deleteGroupMapping(id: number) {
                   class="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-medium hover:bg-muted disabled:opacity-50 transition-colors shrink-0 focus:outline-none focus:ring-2 focus:ring-primary/50 md:w-auto md:py-1.5"
                   @click="testConnection"
                 >
-                  {{ testing ? 'Testing...' : 'Test' }}
+                  {{ testing ? t('settings.oidc.form.testing') : t('settings.oidc.form.test') }}
                 </button>
               </div>
               <div
@@ -510,14 +517,18 @@ async function deleteGroupMapping(id: number) {
                 "
               >
                 <div class="flex items-center justify-between gap-2">
-                  <span>{{ testResult.success ? `Connected - ${testResult.issuer ?? ''}` : (testResult.error ?? 'Connection failed') }}</span>
+                  <span>{{
+                    testResult.success
+                      ? t('settings.oidc.test.connected', { issuer: testResult.issuer ?? '' })
+                      : (testResult.error ?? t('settings.oidc.test.connectionFailed'))
+                  }}</span>
                   <button
                     v-if="testResult.success"
                     type="button"
                     class="shrink-0 underline underline-offset-2 opacity-70 hover:opacity-100"
                     @click="toggleTestDetails"
                   >
-                    {{ showTestDetails ? 'Hide' : 'Details' }}
+                    {{ showTestDetails ? t('settings.oidc.test.hide') : t('settings.oidc.test.details') }}
                   </button>
                 </div>
                 <div v-if="testResult.success && showTestDetails" class="mt-2 space-y-0.5 border-t border-green-500/20 pt-2 font-mono text-[10px]">
@@ -526,27 +537,30 @@ async function deleteGroupMapping(id: number) {
                   <div v-if="testResult.jwksUri">jwks: {{ testResult.jwksUri }}</div>
                   <div v-if="testResult.codeChallengeMethodsSupported?.length">pkce: {{ testResult.codeChallengeMethodsSupported.join(', ') }}</div>
                   <div v-if="testResult.supportedScopes?.length">scopes: {{ testResult.supportedScopes.join(', ') }}</div>
-                  <div>backchannel logout: {{ testResult.backchannelLogoutSupported ? 'supported' : 'not supported' }}</div>
+                  <div>
+                    backchannel logout:
+                    {{ testResult.backchannelLogoutSupported ? t('settings.oidc.test.supported') : t('settings.oidc.test.notSupported') }}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
           <div class="flex flex-col gap-2 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:gap-8 md:px-5 md:py-4">
-            <p class="settings-label md:shrink-0">Client ID</p>
+            <p class="settings-label md:shrink-0">{{ t('settings.oidc.form.clientId') }}</p>
             <input v-model="form.clientId" type="text" class="input-field w-full md:w-72" />
           </div>
           <div class="flex flex-col gap-2 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:gap-8 md:px-5 md:py-4">
-            <p class="settings-label md:shrink-0">Client Secret</p>
+            <p class="settings-label md:shrink-0">{{ t('settings.oidc.form.clientSecret') }}</p>
             <input
               v-model="form.clientSecret"
               type="password"
-              :placeholder="viewMode === 'edit' ? 'Leave blank to keep existing' : ''"
+              :placeholder="viewMode === 'edit' ? t('settings.oidc.form.clientSecretPlaceholder') : ''"
               autocomplete="new-password"
               class="input-field w-full md:w-72"
             />
           </div>
           <div class="flex flex-col gap-2 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:gap-8 md:px-5 md:py-4">
-            <p class="settings-label md:shrink-0">Scopes</p>
+            <p class="settings-label md:shrink-0">{{ t('settings.oidc.form.scopes') }}</p>
             <input v-model="form.scopes" type="text" class="input-field w-full md:w-72" />
           </div>
         </div>
@@ -555,7 +569,7 @@ async function deleteGroupMapping(id: number) {
       <!-- Claim mapping -->
       <div>
         <div class="flex items-center justify-between">
-          <p class="settings-group-label">Claim Mapping</p>
+          <p class="settings-group-label">{{ t('settings.oidc.form.claimMapping') }}</p>
           <button
             v-if="viewMode === 'edit' && form.enabled && form.clientId && form.issuerUri"
             type="button"
@@ -563,34 +577,34 @@ async function deleteGroupMapping(id: number) {
             class="text-xs font-medium text-primary underline-offset-2 hover:underline disabled:opacity-50"
             @click="previewOidcClaims"
           >
-            {{ previewing ? 'Redirecting...' : 'Preview claims' }}
+            {{ previewing ? t('settings.oidc.form.redirecting') : t('settings.oidc.form.previewClaims') }}
           </button>
         </div>
         <div v-if="previewClaims" class="mb-3 rounded-md border border-border bg-card p-3 text-xs">
-          <p class="font-medium text-foreground mb-1.5">Mapped claims</p>
+          <p class="font-medium text-foreground mb-1.5">{{ t('settings.oidc.form.mappedClaims') }}</p>
           <pre class="text-muted-foreground overflow-auto rounded bg-muted/40 p-2 text-[11px]">{{
             JSON.stringify(previewClaims.mapped, null, 2)
           }}</pre>
-          <p class="mt-2 font-medium text-foreground mb-1.5">Raw claims</p>
+          <p class="mt-2 font-medium text-foreground mb-1.5">{{ t('settings.oidc.form.rawClaims') }}</p>
           <pre class="text-muted-foreground overflow-auto rounded bg-muted/40 p-2 text-[11px] max-h-40">{{
             JSON.stringify(previewClaims.raw, null, 2)
           }}</pre>
         </div>
         <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
           <div class="flex flex-col gap-2 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:gap-8 md:px-5 md:py-4">
-            <p class="settings-label md:shrink-0">Username claim</p>
+            <p class="settings-label md:shrink-0">{{ t('settings.oidc.form.usernameClaim') }}</p>
             <input v-model="form.claimMapping.username" type="text" class="input-field w-full md:w-72" />
           </div>
           <div class="flex flex-col gap-2 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:gap-8 md:px-5 md:py-4">
-            <p class="settings-label md:shrink-0">Name claim</p>
+            <p class="settings-label md:shrink-0">{{ t('settings.oidc.form.nameClaim') }}</p>
             <input v-model="form.claimMapping.name" type="text" class="input-field w-full md:w-72" />
           </div>
           <div class="flex flex-col gap-2 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:gap-8 md:px-5 md:py-4">
-            <p class="settings-label md:shrink-0">Email claim</p>
+            <p class="settings-label md:shrink-0">{{ t('settings.oidc.form.emailClaim') }}</p>
             <input v-model="form.claimMapping.email" type="text" class="input-field w-full md:w-72" />
           </div>
           <div class="flex flex-col gap-2 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:gap-8 md:px-5 md:py-4">
-            <p class="settings-label md:shrink-0">Groups claim</p>
+            <p class="settings-label md:shrink-0">{{ t('settings.oidc.form.groupsClaim') }}</p>
             <input v-model="form.claimMapping.groups" type="text" class="input-field w-full md:w-72" />
           </div>
         </div>
@@ -598,26 +612,26 @@ async function deleteGroupMapping(id: number) {
 
       <!-- Auto-provisioning -->
       <div>
-        <p class="settings-group-label">Auto-Provisioning</p>
+        <p class="settings-group-label">{{ t('settings.oidc.form.autoProvisioning') }}</p>
         <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
           <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
             <div class="min-w-0">
-              <p class="settings-label">Auto-provision users</p>
-              <p class="settings-hint">Create accounts on first OIDC login if user does not exist.</p>
+              <p class="settings-label">{{ t('settings.oidc.form.autoProvisionUsers') }}</p>
+              <p class="settings-hint">{{ t('settings.oidc.form.autoProvisionUsersHint') }}</p>
             </div>
             <ToggleSwitch v-model="form.autoProvision.enabled" class="self-start md:self-auto" />
           </div>
           <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
             <div class="min-w-0">
-              <p class="settings-label">Allow local account linking</p>
-              <p class="settings-hint">Link OIDC identity to an existing local account by username match.</p>
+              <p class="settings-label">{{ t('settings.oidc.form.allowLocalLinking') }}</p>
+              <p class="settings-hint">{{ t('settings.oidc.form.allowLocalLinkingHint') }}</p>
             </div>
             <ToggleSwitch v-model="form.autoProvision.allowLocalLinking" class="self-start md:self-auto" />
           </div>
           <div class="px-4 py-3.5 bg-card md:px-5 md:py-4">
             <div class="mb-3">
-              <p class="settings-label">Default permissions</p>
-              <p class="settings-hint">Permissions granted to new users on first OIDC login.</p>
+              <p class="settings-label">{{ t('settings.oidc.form.defaultPermissions') }}</p>
+              <p class="settings-hint">{{ t('settings.oidc.form.defaultPermissionsHint') }}</p>
             </div>
             <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <label v-for="perm in ALL_PERMISSIONS" :key="perm" class="flex items-center gap-2.5 cursor-pointer select-none">
@@ -636,15 +650,19 @@ async function deleteGroupMapping(id: number) {
 
       <!-- Group Mappings (only in edit mode) -->
       <div v-if="viewMode === 'edit'">
-        <p class="settings-group-label">Group Mappings</p>
-        <p class="mb-3 text-xs text-muted-foreground">Map OIDC group claims to BookOrbit permissions. Synced on every login.</p>
+        <p class="settings-group-label">{{ t('settings.oidc.groupMappings.title') }}</p>
+        <p class="mb-3 text-xs text-muted-foreground">{{ t('settings.oidc.groupMappings.description') }}</p>
         <div class="border border-border rounded-lg overflow-hidden bg-card shadow-xs">
           <div v-if="groupMappings.length > 0" class="divide-y divide-border">
             <div v-for="mapping in groupMappings" :key="mapping.id" class="flex items-center justify-between gap-3 px-4 py-3 md:px-5">
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-medium text-foreground truncate">{{ mapping.oidcGroupClaim }}</p>
                 <p class="text-xs text-muted-foreground">
-                  {{ mapping.permissionName ? (PERMISSION_LABELS[mapping.permissionName as Permission] ?? mapping.permissionName) : 'No permission' }}
+                  {{
+                    mapping.permissionName
+                      ? (PERMISSION_LABELS[mapping.permissionName as Permission] ?? mapping.permissionName)
+                      : t('settings.oidc.groupMappings.noPermission')
+                  }}
                 </p>
               </div>
               <button
@@ -656,15 +674,15 @@ async function deleteGroupMapping(id: number) {
               </button>
             </div>
           </div>
-          <div v-else class="px-4 py-4 text-sm text-muted-foreground md:px-5">No group mappings configured.</div>
+          <div v-else class="px-4 py-4 text-sm text-muted-foreground md:px-5">{{ t('settings.oidc.groupMappings.empty') }}</div>
 
           <div class="border-t border-border px-4 py-3.5 md:px-5 md:py-4">
-            <p class="settings-label mb-2">Add mapping</p>
+            <p class="settings-label mb-2">{{ t('settings.oidc.groupMappings.addMapping') }}</p>
             <div class="flex flex-col gap-2 sm:flex-row">
               <input
                 v-model="newMapping.oidcGroupClaim"
                 type="text"
-                placeholder="OIDC group claim (e.g. admins)"
+                :placeholder="t('settings.oidc.groupMappings.claimPlaceholder')"
                 class="input-field flex-1 min-w-0"
               />
               <select v-model="newMapping.permissionName" class="input-field sm:w-52 shrink-0">
@@ -678,7 +696,7 @@ async function deleteGroupMapping(id: number) {
                 class="settings-btn-primary shrink-0 disabled:opacity-50"
                 @click="addGroupMapping"
               >
-                {{ addingMapping ? 'Adding...' : 'Add' }}
+                {{ addingMapping ? t('settings.oidc.groupMappings.adding') : t('settings.oidc.groupMappings.add') }}
               </button>
             </div>
           </div>
@@ -688,7 +706,13 @@ async function deleteGroupMapping(id: number) {
       <!-- Save + Delete -->
       <div class="hidden md:flex items-center gap-3">
         <button type="submit" :disabled="saving" class="settings-btn-primary">
-          {{ saving ? 'Saving...' : viewMode === 'create' ? 'Create Provider' : 'Save Changes' }}
+          {{
+            saving
+              ? t('settings.oidc.form.saving')
+              : viewMode === 'create'
+                ? t('settings.oidc.form.createProvider')
+                : t('settings.oidc.form.saveChanges')
+          }}
         </button>
         <button
           v-if="viewMode === 'edit'"
@@ -697,14 +721,20 @@ async function deleteGroupMapping(id: number) {
           class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50 transition-colors"
           @click="deleteProvider"
         >
-          {{ deleting ? 'Deleting...' : 'Delete Provider' }}
+          {{ deleting ? t('settings.oidc.form.deleting') : t('settings.oidc.form.deleteProvider') }}
         </button>
         <p v-if="saveError" class="text-sm text-destructive">{{ saveError }}</p>
       </div>
       <div class="md:hidden sticky bottom-2 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
         <div class="flex items-center gap-2">
           <button type="submit" :disabled="saving" class="settings-btn-primary w-full min-h-10 justify-center">
-            {{ saving ? 'Saving...' : viewMode === 'create' ? 'Create Provider' : 'Save Changes' }}
+            {{
+              saving
+                ? t('settings.oidc.form.saving')
+                : viewMode === 'create'
+                  ? t('settings.oidc.form.createProvider')
+                  : t('settings.oidc.form.saveChanges')
+            }}
           </button>
           <button
             v-if="viewMode === 'edit'"

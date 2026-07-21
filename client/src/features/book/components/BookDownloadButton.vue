@@ -7,6 +7,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { getFormatColor } from '@/features/book/lib/format-colors'
 import { useBookDownload } from '@/features/book/composables/useBookDownload'
+import { useI18n } from 'vue-i18n'
+import { formatBytes as formatFileSize } from '@/lib/formatting'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   files: BookDetailFile[]
@@ -34,12 +38,6 @@ const hasMultiple = computed(() => {
 function formatBadgeStyle(fmt: string) {
   const color = getFormatColor(fmt)
   return { color, borderColor: `${color}66`, backgroundColor: `${color}1a` }
-}
-
-function formatFileSize(bytes: number | null | undefined): string {
-  if (!bytes) return '-'
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function handleSingleDownload() {
@@ -78,7 +76,7 @@ function handleExportPrimary() {
         <Download class="size-3.5" />
       </button>
     </TooltipTrigger>
-    <TooltipContent>Download</TooltipContent>
+    <TooltipContent>{{ t('book.download.action') }}</TooltipContent>
   </Tooltip>
 
   <Popover v-else>
@@ -86,7 +84,7 @@ function handleExportPrimary() {
       <button
         class="flex w-full items-center justify-center gap-1.5 h-9 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-50"
         :disabled="!primaryFile || isDownloading"
-        title="Download"
+        :title="t('book.download.action')"
       >
         <Download class="size-3.5" />
         <ChevronDown class="size-3" />
@@ -97,7 +95,7 @@ function handleExportPrimary() {
       <template v-if="isMultiTrackAudio">
         <button class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors" @click="handleExportPrimary">
           <Download class="size-3.5 shrink-0" />
-          <span>Audiobook (ZIP)</span>
+          <span>{{ t('book.download.audiobookZip') }}</span>
         </button>
         <button
           v-for="file in nonAudioFiles"
@@ -128,7 +126,7 @@ function handleExportPrimary() {
             >{{ file.format ?? '?' }}</span
           >
           <span class="flex-1 text-left text-muted-foreground text-xs truncate">{{ formatFileSize(file.sizeBytes) }}</span>
-          <span v-if="file.role === 'primary'" class="text-[10px] text-primary font-medium shrink-0">Primary</span>
+          <span v-if="file.role === 'primary'" class="text-[10px] text-primary font-medium shrink-0">{{ t('book.file.primary') }}</span>
         </button>
         <div class="my-1 border-t border-border" />
         <button
@@ -136,14 +134,14 @@ function handleExportPrimary() {
           @click="handleExportAll"
         >
           <Download class="size-3.5 shrink-0" />
-          <span>All formats (ZIP)</span>
+          <span>{{ t('book.download.allFormatsZip') }}</span>
         </button>
         <button
           class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors text-muted-foreground"
           @click="handleExportPrimary"
         >
           <Download class="size-3.5 shrink-0" />
-          <span>Primary only (ZIP)</span>
+          <span>{{ t('book.download.primaryOnlyZip') }}</span>
         </button>
       </template>
     </PopoverContent>

@@ -1,10 +1,23 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { defineComponent } from 'vue'
 import type { ScrollerType } from '@bookorbit/types'
 
+const bookEventsMock = vi.hoisted(() => ({
+  progressChangedCallback: null as (() => void) | null,
+}))
+
 vi.mock('@/lib/api', () => ({
   api: vi.fn<() => Promise<Response>>(),
+}))
+
+vi.mock('@/features/book/composables/useBookEvents', () => ({
+  useBookEvents: () => ({
+    onBookProgressChanged: (callback: () => void) => {
+      bookEventsMock.progressChangedCallback = callback
+      return () => undefined
+    },
+  }),
 }))
 
 import { api } from '@/lib/api'
@@ -35,6 +48,11 @@ function mountComposable(type: ScrollerType, limit = 20, smartScopeId?: number) 
 describe('useDashboardScroller', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    bookEventsMock.progressChangedCallback = null
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('loads books for up-next-in-series on mount', async () => {
@@ -94,5 +112,22 @@ describe('useDashboardScroller', () => {
 
     expect(state.error.value).toBe(false)
     expect(state.books.value).toEqual([{ id: 42 }])
+  })
+
+  it('debounces progress events and refreshes dashboard membership', async () => {
+    vi.useFakeTimers()
+    mockApi.mockResolvedValue(mockResponse([{ id: 42 }]))
+    mountComposable('continue-reading', 5)
+    await flushPromises()
+    mockApi.mockClear()
+
+    bookEventsMock.progressChangedCallback?.()
+    bookEventsMock.progressChangedCallback?.()
+    await vi.advanceTimersByTimeAsync(249)
+    expect(mockApi).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(1)
+    await flushPromises()
+    expect(mockApi).toHaveBeenCalledExactlyOnceWith('/api/v1/dashboard/scrollers/continue-reading?limit=5')
   })
 })

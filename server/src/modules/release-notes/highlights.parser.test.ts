@@ -159,6 +159,13 @@ describe('parseHighlights', () => {
     expect(parseHighlights(body)).toEqual([]);
   });
 
+  it('removes malformed nested tag-like text without creating executable markup', () => {
+    const result = parseHighlights('## Highlights\n- **Safe** - before <scr<script>ipt>alert(1)</scr</script>ipt> after')[0];
+
+    expect(result.title).toBe('Safe');
+    expect(result.body).not.toContain('<script');
+  });
+
   it('stops at the next heading but NOT at a horizontal rule', () => {
     const body = ['## Highlights', '- **One** - first.', '', '---', '', '- **Two** - second.', '', '### Features', '- not a highlight'].join('\n');
     expect(parseHighlights(body).map((h) => h.title)).toEqual(['One', 'Two']);

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical, Loader2 } from '@lucide/vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { ColumnDef } from '@/features/book/composables/tableColumnSchema'
@@ -33,6 +34,8 @@ const emit = defineEmits<{
   autoFitColumn: [colId: string]
 }>()
 
+const { t } = useI18n()
+
 function getSortDir(sortField: string): 'asc' | 'desc' | null {
   return props.sort.find((s) => s.field === sortField)?.dir ?? null
 }
@@ -61,7 +64,7 @@ function isSortableColumn(col: ColumnDef): boolean {
           class="accent-primary h-3.5 w-3.5 cursor-pointer"
           :checked="allBooksSelected"
           :indeterminate="someBooksSelected"
-          aria-label="Select all books"
+          :aria-label="t('book.table.header.selectAllBooks')"
           @change="emit('selectAll', $event)"
         />
       </th>
@@ -134,7 +137,7 @@ function isSortableColumn(col: ColumnDef): boolean {
             </div>
           </TooltipTrigger>
           <TooltipContent>
-            {{ getSortDir(col.sortField!) ? 'Shift+click to add secondary sort' : 'Click to sort' }}
+            {{ getSortDir(col.sortField!) ? t('book.table.header.shiftClickSecondarySort') : t('book.table.header.clickToSort') }}
           </TooltipContent>
         </Tooltip>
         <div v-else data-col-label class="flex min-w-0 items-center gap-1 overflow-hidden pr-2">

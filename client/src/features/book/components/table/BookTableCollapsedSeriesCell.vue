@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ChevronRight, LibraryBig } from '@lucide/vue'
 import { FORMAT_TO_GROUP, type BookCard } from '@bookorbit/types'
 import BookCoverSurface from '../BookCoverSurface.vue'
@@ -9,6 +10,8 @@ const props = defineProps<{
   book: BookCard
   colId: string
 }>()
+
+const { t } = useI18n()
 
 const collapsed = computed(() => props.book.collapsedSeries!)
 const seriesName = computed(() => props.book.seriesName ?? '')
@@ -70,8 +73,10 @@ function thumbnailUrl(bookId: number): string {
 
   <div v-else-if="colId === 'title'" class="flex items-center gap-2 min-w-0 h-full px-1">
     <span class="font-medium text-sm truncate block">{{ seriesName }}</span>
-    <span class="text-xs text-muted-foreground shrink-0 mt-0.5">({{ bookCount }} {{ bookCount === 1 ? 'book' : 'books' }})</span>
-    <span v-if="readCount > 0" class="text-xs text-muted-foreground shrink-0 mt-0.5">&middot; {{ readCount }} of {{ bookCount }} read</span>
+    <span class="text-xs text-muted-foreground shrink-0 mt-0.5">{{ t('book.table.series.bookCount', { count: bookCount }, bookCount) }}</span>
+    <span v-if="readCount > 0" class="text-xs text-muted-foreground shrink-0 mt-0.5"
+      >&middot; {{ t('book.table.series.readOfCount', { read: readCount, total: bookCount }) }}</span
+    >
   </div>
 
   <div v-else-if="colId === 'actions'" class="flex h-full w-6 items-center justify-center">

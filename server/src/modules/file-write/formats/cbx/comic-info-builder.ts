@@ -2,6 +2,7 @@ import { XMLParser, XMLBuilder } from 'fast-xml-parser';
 
 import type { BookWritePayload, BookWritePayloadKey } from '../../interfaces/book-write-payload.interface';
 import { COMIC_INFO_MANAGED_NOTES_KEYS, COMIC_INFO_PROVIDER_ID_KEYS, COMIC_INFO_PROVIDER_WEB_URL_BUILDERS } from '../../file-write.constants';
+import { htmlToPlainText } from '../../../../common/utils/html-to-text.utils';
 
 type ComicInfoObject = Record<string, unknown>;
 
@@ -36,7 +37,7 @@ export function buildComicInfoXml(existingXml: string | null, payload: BookWrite
   const info: ComicInfoObject = existingXml ? parseComicInfoXml(existingXml) : {};
 
   setComicInfoField(info, fieldMask, 'title', 'Title', payload.title);
-  setComicInfoField(info, fieldMask, 'description', 'Summary', payload.description, stripHtml);
+  setComicInfoField(info, fieldMask, 'description', 'Summary', payload.description, htmlToPlainText);
   setComicInfoField(info, fieldMask, 'publisher', 'Publisher', payload.publisher);
   setComicInfoField(info, fieldMask, 'seriesName', 'Series', payload.seriesName);
   setIssueNumberField(info, fieldMask, payload);
@@ -87,18 +88,6 @@ export function buildComicInfoXml(existingXml: string | null, payload: BookWrite
 
   const xmlBody = BUILDER.build({ ComicInfo: info });
   return `<?xml version="1.0" encoding="UTF-8"?>\n${xmlBody}`;
-}
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
 }
 
 function formatSeriesIndex(val: number): string {

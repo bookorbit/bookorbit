@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Loader2, TriangleAlert } from '@lucide/vue'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     open: boolean
     title: string
@@ -12,14 +14,19 @@ withDefaults(
     destructive?: boolean
   }>(),
   {
-    confirmLabel: 'Confirm',
-    cancelLabel: 'Cancel',
+    confirmLabel: undefined,
+    cancelLabel: undefined,
     loading: false,
     destructive: false,
   },
 )
 
 const emit = defineEmits<{ confirm: []; cancel: [] }>()
+
+const { t } = useI18n()
+
+const resolvedConfirmLabel = computed(() => props.confirmLabel ?? t('common.confirm'))
+const resolvedCancelLabel = computed(() => props.cancelLabel ?? t('common.cancel'))
 </script>
 
 <template>
@@ -43,7 +50,7 @@ const emit = defineEmits<{ confirm: []; cancel: [] }>()
             :disabled="loading"
             @click="emit('cancel')"
           >
-            {{ cancelLabel }}
+            {{ resolvedCancelLabel }}
           </button>
           <button
             class="inline-flex h-9 items-center gap-2 rounded-md px-4 text-sm font-medium transition-colors disabled:opacity-50"
@@ -56,7 +63,7 @@ const emit = defineEmits<{ confirm: []; cancel: [] }>()
             @click="emit('confirm')"
           >
             <Loader2 v-if="loading" :size="14" class="animate-spin" />
-            {{ confirmLabel }}
+            {{ resolvedConfirmLabel }}
           </button>
         </div>
       </div>

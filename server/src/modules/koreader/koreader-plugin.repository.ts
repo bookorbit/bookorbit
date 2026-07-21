@@ -142,6 +142,7 @@ export class KoreaderPluginRepository {
               userId,
               bookFileId,
               bookId,
+              attemptId: sql`(select id from reading_attempts where user_id = ${userId} and book_id = ${bookId} and outcome is null and deleted_at is null limit 1)`,
               sessionId: session.sessionId,
               source: 'koreader' as const,
               startedAt: session.startedAt,
@@ -158,6 +159,7 @@ export class KoreaderPluginRepository {
               durationSeconds: sql`excluded.duration_seconds`,
               progressDelta: sql`excluded.progress_delta`,
               endProgress: sql`excluded.end_progress`,
+              attemptId: sql`coalesce(excluded.attempt_id, ${schema.readingSessions.attemptId})`,
             },
           });
       }

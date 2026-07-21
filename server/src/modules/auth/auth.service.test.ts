@@ -417,6 +417,29 @@ describe('AuthService', () => {
         expect.objectContaining({ path: '/api/v1/auth', secure: 'auto' }),
       );
     });
+
+    it('records successful primary authentication timestamps', async () => {
+      const { service, db, userService } = makeService();
+      userService.findByUsername.mockResolvedValue({
+        id: 1,
+        active: true,
+        passwordHash: 'mock-hash:pass',
+        tokenVersion: 1,
+        username: 'jdoe',
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+      });
+      userService.findByIdWithPermissions.mockResolvedValue(makeFullUser());
+
+      await service.login({ username: 'jdoe', password: 'pass' }, makeReply());
+
+      expect((db as unknown as Record<string, vi.Mock>).set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lastLoginAt: expect.any(Date),
+          lastAuthenticatedAt: expect.any(Date),
+        }),
+      );
+    });
   });
 
   describe('buildUserResponse', () => {
@@ -499,7 +522,7 @@ describe('AuthService', () => {
 
       expect(jwtService.sign).toHaveBeenCalledWith({ sub: 5, ver: 7 });
       expect(db.transaction).not.toHaveBeenCalled();
-      expect(db.update).not.toHaveBeenCalled();
+      expect((db as unknown as Record<string, vi.Mock>).set).toHaveBeenCalledWith(expect.objectContaining({ lastAuthenticatedAt: expect.any(Date) }));
       expect(db.delete).not.toHaveBeenCalled();
 
       const setCookieCalls = (reply as unknown as { setCookie: vi.Mock }).setCookie.mock.calls;
@@ -912,6 +935,7 @@ describe('AuthService', () => {
       expect(rotationSetArg.revokedAt).toBeInstanceOf(Date);
       expect(rotationSetArg.rotatedAt).toBe(rotationSetArg.revokedAt);
       expect(rotationSetArg).toEqual(expect.objectContaining({ replacedByTokenHash: expect.any(String) }));
+      expect((db as unknown as Record<string, vi.Mock>).set).toHaveBeenCalledWith(expect.objectContaining({ lastAuthenticatedAt: expect.any(Date) }));
       expect(oidcSessionRepo.touchActiveByUserId).toHaveBeenCalledWith(5, expect.any(Date));
       expect((reply as unknown as { setCookie: vi.Mock }).setCookie).toHaveBeenCalled();
     });

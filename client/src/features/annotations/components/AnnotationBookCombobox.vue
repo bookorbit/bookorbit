@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ChevronsUpDown, X } from '@lucide/vue'
 import type { AnnotationHubBookFacet } from '@bookorbit/types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   searchFn: (q: string) => Promise<AnnotationHubBookFacet[]>
@@ -58,7 +61,7 @@ function onInput(event: Event) {
 
 function select(option: AnnotationHubBookFacet) {
   model.value = option.bookId
-  selectedLabel.value = option.bookTitle ?? 'Unknown book'
+  selectedLabel.value = option.bookTitle ?? t('annotations.unknownBook')
   query.value = ''
   showDropdown.value = false
   isFocused.value = false
@@ -110,9 +113,9 @@ onUnmounted(() => {
       :value="inputValue"
       type="text"
       role="combobox"
-      aria-label="Filter by book"
+      :aria-label="t('annotations.combobox.filterByBook')"
       :aria-expanded="showDropdown"
-      :placeholder="placeholder ?? 'All books'"
+      :placeholder="placeholder ?? t('annotations.combobox.allBooks')"
       class="h-9 w-full rounded-md border border-border bg-background pl-2.5 pr-8 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
       @focus="onFocus"
       @input="onInput"
@@ -122,7 +125,7 @@ onUnmounted(() => {
     <button
       v-if="hasSelection"
       type="button"
-      aria-label="Clear book filter"
+      :aria-label="t('annotations.combobox.clearBookFilter')"
       class="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       @mousedown.prevent="clear"
     >
@@ -134,8 +137,8 @@ onUnmounted(() => {
       v-if="showDropdown"
       class="absolute top-full left-0 mt-1 z-50 w-full min-w-[16rem] max-h-64 overflow-y-auto rounded-md border border-border bg-popover shadow-md"
     >
-      <p v-if="loading && options.length === 0" class="px-3 py-2 text-sm text-muted-foreground">Searching...</p>
-      <p v-else-if="showEmpty" class="px-3 py-2 text-sm text-muted-foreground">No books found</p>
+      <p v-if="loading && options.length === 0" class="px-3 py-2 text-sm text-muted-foreground">{{ t('annotations.combobox.searching') }}</p>
+      <p v-else-if="showEmpty" class="px-3 py-2 text-sm text-muted-foreground">{{ t('annotations.combobox.noBooksFound') }}</p>
       <button
         v-for="(option, index) in options"
         :key="option.bookId"
@@ -146,7 +149,7 @@ onUnmounted(() => {
         :class="{ 'bg-accent': index === activeIndex }"
         @mousedown.prevent="select(option)"
       >
-        <span class="min-w-0 flex-1 truncate">{{ option.bookTitle ?? 'Unknown book' }}</span>
+        <span class="min-w-0 flex-1 truncate">{{ option.bookTitle ?? t('annotations.unknownBook') }}</span>
         <span class="shrink-0 text-xs text-muted-foreground">{{ option.count }}</span>
       </button>
     </div>

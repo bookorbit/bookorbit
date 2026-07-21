@@ -21,6 +21,7 @@ import { BookController } from './book.controller';
 import { BookRepository } from './book.repository';
 import { BookService } from './book.service';
 import { BookAuthorSortKeyBackfillService } from './book-author-sort-key-backfill.service';
+import { ReadingAttemptController } from './reading-attempt.controller';
 
 @Module({
   imports: [
@@ -39,7 +40,7 @@ import { BookAuthorSortKeyBackfillService } from './book-author-sort-key-backfil
     AchievementModule,
     BookMoveModule,
   ],
-  controllers: [BookController],
+  controllers: [BookController, ReadingAttemptController],
   providers: [BookService, BookRepository, BookReadService, BookSortBuilder, BookQueryBuilder, BookAuthorSortKeyBackfillService],
   exports: [BookService, BookReadService, BookQueryBuilder],
 })

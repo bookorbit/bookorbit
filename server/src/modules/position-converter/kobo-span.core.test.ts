@@ -79,6 +79,10 @@ describe('parseSpanSelector', () => {
   it('round-trips through spanSelectorFromId', () => {
     expect(parseSpanSelector(spanSelectorFromId('kobo.12.34'))).toBe('kobo.12.34');
   });
+
+  it('escapes backslashes before building a selector', () => {
+    expect(spanSelectorFromId('kobo\\.12.34')).toBe('span#kobo\\\\\\.12\\.34');
+  });
 });
 
 describe('buildKoboSpanIndex', () => {

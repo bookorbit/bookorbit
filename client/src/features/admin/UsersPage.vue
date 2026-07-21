@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { UserPlus, Plus, Pencil, KeyRound, Trash2, ShieldCheck, MoreVertical, ShieldAlert, Save } from '@lucide/vue'
 import { api } from '@/lib/api'
@@ -26,6 +27,7 @@ interface UserRow extends AuthUser {
   hasContentFilters?: boolean
 }
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const { isSuperuser, hasPermission } = usePermissions()
@@ -82,7 +84,7 @@ async function loadData() {
       api('/api/v1/libraries'),
       api('/api/v1/app-settings/default-library-access'),
     ])
-    if (!usersRes.ok || !libsRes.ok || !defaultAccessRes.ok) throw new Error('Failed to load data')
+    if (!usersRes.ok || !libsRes.ok || !defaultAccessRes.ok) throw new Error(t('adminFeature.usersPage.errors.loadData'))
     const ud = await usersRes.json()
     users.value = ud.users ?? ud.items ?? ud
     total.value = ud.total ?? users.value.length
@@ -93,7 +95,7 @@ async function loadData() {
     savedDefaultLibraryIds.value = new Set(defaultAccess.libraryIds ?? [])
     defaultLibraryAccessSaved.value = false
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Failed to load'
+    error.value = e instanceof Error ? e.message : t('adminFeature.usersPage.errors.load')
   } finally {
     loading.value = false
   }
@@ -130,13 +132,13 @@ async function confirmDeleteUser() {
     const res = await api(`/api/v1/users/${user.id}`, { method: 'DELETE' })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      error.value = data.message ?? 'Failed to delete user'
+      error.value = data.message ?? t('adminFeature.usersPage.errors.deleteUser')
       return
     }
     deleteConfirmUser.value = null
     loadData()
   } catch {
-    error.value = 'Failed to delete user'
+    error.value = t('adminFeature.usersPage.errors.deleteUser')
   } finally {
     deleting.value = false
   }
@@ -180,7 +182,7 @@ async function saveDefaultLibraryAccess() {
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      defaultLibraryAccessError.value = data.message ?? 'Failed to save default library access'
+      defaultLibraryAccessError.value = data.message ?? t('adminFeature.usersPage.defaultLibraryAccess.saveError')
       return
     }
     const saved = (await res.json()) as DefaultLibraryAccessConfig
@@ -188,7 +190,7 @@ async function saveDefaultLibraryAccess() {
     savedDefaultLibraryIds.value = new Set(saved.libraryIds ?? [])
     defaultLibraryAccessSaved.value = true
   } catch (e) {
-    defaultLibraryAccessError.value = e instanceof Error ? e.message : 'Failed to save default library access'
+    defaultLibraryAccessError.value = e instanceof Error ? e.message : t('adminFeature.usersPage.defaultLibraryAccess.saveError')
   } finally {
     savingDefaultLibraryAccess.value = false
   }
@@ -208,26 +210,28 @@ function setsEqual(a: Set<number>, b: Set<number>) {
   <SettingsPageHeader
     v-if="!props.embedded"
     class="hidden md:flex"
-    :title="activeTab === 'users' ? 'Users' : 'Magic Links'"
-    :subtitle="activeTab === 'users' ? 'Manage user accounts and permission assignments.' : 'Create shareable login links for shared accounts.'"
+    :title="activeTab === 'users' ? t('adminFeature.usersPage.usersTitle') : t('adminFeature.usersPage.magicLinksTitle')"
+    :subtitle="activeTab === 'users' ? t('adminFeature.usersPage.usersSubtitle') : t('adminFeature.usersPage.magicLinksSubtitle')"
   >
     <button v-if="activeTab === 'users'" class="settings-btn-primary" @click="openCreate">
       <UserPlus :size="14" />
-      Create user
+      {{ t('adminFeature.usersPage.createUser') }}
     </button>
     <button v-else class="settings-btn-primary" @click="openMagicLinkCreate">
       <Plus :size="14" />
-      Create link
+      {{ t('adminFeature.usersPage.createLink') }}
     </button>
   </SettingsPageHeader>
 
   <!-- Mobile title -->
   <div v-if="!props.embedded" class="md:hidden px-1">
-    <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ activeTab === 'users' ? 'Users' : 'Magic Links' }}</h1>
+    <h1 class="text-xl font-semibold tracking-tight text-foreground">
+      {{ activeTab === 'users' ? t('adminFeature.usersPage.usersTitle') : t('adminFeature.usersPage.magicLinksTitle') }}
+    </h1>
     <p
       class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
     >
-      {{ activeTab === 'users' ? 'Manage user accounts and permission assignments.' : 'Create shareable login links for shared accounts.' }}
+      {{ activeTab === 'users' ? t('adminFeature.usersPage.usersSubtitle') : t('adminFeature.usersPage.magicLinksSubtitle') }}
     </p>
   </div>
 
@@ -245,7 +249,7 @@ function setsEqual(a: Set<number>, b: Set<number>) {
       "
       @click="selectTab('users')"
     >
-      Users
+      {{ t('adminFeature.usersPage.usersTab') }}
     </button>
     <button
       class="px-3 py-3 md:py-2 text-sm font-medium shrink-0 border-b-2 -mb-px transition-colors snap-start"
@@ -256,7 +260,7 @@ function setsEqual(a: Set<number>, b: Set<number>) {
       "
       @click="selectTab('magic-links')"
     >
-      Magic Links
+      {{ t('adminFeature.usersPage.magicLinksTab') }}
     </button>
   </div>
 
@@ -267,21 +271,21 @@ function setsEqual(a: Set<number>, b: Set<number>) {
   >
     <button class="settings-btn-primary w-full min-h-10 justify-center" @click="openCreate">
       <UserPlus :size="14" />
-      Create user
+      {{ t('adminFeature.usersPage.createUser') }}
     </button>
   </div>
 
   <!-- Users tab content -->
   <template v-if="activeTab === 'users'">
     <div v-if="error" class="mb-4 text-sm text-destructive">{{ error }}</div>
-    <div v-if="loading" class="text-sm text-muted-foreground">Loading...</div>
+    <div v-if="loading" class="text-sm text-muted-foreground">{{ t('common.loading') }}</div>
 
     <section v-else class="space-y-3">
       <div class="flex items-center justify-between mb-3">
-        <p class="settings-group-label mb-0">Current Users</p>
+        <p class="settings-group-label mb-0">{{ t('adminFeature.usersPage.currentUsers') }}</p>
         <button v-if="props.embedded" class="settings-btn-primary" @click="openCreate">
           <UserPlus :size="14" />
-          Create user
+          {{ t('adminFeature.usersPage.createUser') }}
         </button>
       </div>
 
@@ -290,11 +294,13 @@ function setsEqual(a: Set<number>, b: Set<number>) {
           <table class="w-full text-sm">
             <thead class="bg-muted/50">
               <tr>
-                <th class="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
-                <th class="px-4 py-3 text-left font-medium text-muted-foreground">Username</th>
-                <th class="px-4 py-3 text-left font-medium text-muted-foreground hidden sm:table-cell">Email</th>
-                <th class="px-4 py-3 text-left font-medium text-muted-foreground">Access</th>
-                <th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+                <th class="px-4 py-3 text-left font-medium text-muted-foreground">{{ t('adminFeature.usersPage.columns.name') }}</th>
+                <th class="px-4 py-3 text-left font-medium text-muted-foreground">{{ t('adminFeature.usersPage.columns.username') }}</th>
+                <th class="px-4 py-3 text-left font-medium text-muted-foreground hidden sm:table-cell">
+                  {{ t('adminFeature.usersPage.columns.email') }}
+                </th>
+                <th class="px-4 py-3 text-left font-medium text-muted-foreground">{{ t('adminFeature.usersPage.columns.access') }}</th>
+                <th class="px-4 py-3 text-left font-medium text-muted-foreground">{{ t('adminFeature.usersPage.columns.status') }}</th>
                 <th class="px-4 py-3" />
               </tr>
             </thead>
@@ -310,10 +316,10 @@ function setsEqual(a: Set<number>, b: Set<number>) {
                       class="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary"
                     >
                       <ShieldCheck :size="11" />
-                      Admin
+                      {{ t('adminFeature.usersPage.adminBadge') }}
                     </span>
                     <span v-else class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                      {{ user.permissions?.length ?? 0 }} permissions
+                      {{ t('adminFeature.usersPage.permissionCount', { count: user.permissions?.length ?? 0 }, user.permissions?.length ?? 0) }}
                     </span>
                     <Tooltip v-if="user.hasContentFilters">
                       <TooltipTrigger as-child>
@@ -321,10 +327,10 @@ function setsEqual(a: Set<number>, b: Set<number>) {
                           class="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400"
                         >
                           <ShieldAlert :size="11" />
-                          Filtered
+                          {{ t('adminFeature.usersPage.filteredBadge') }}
                         </span>
                       </TooltipTrigger>
-                      <TooltipContent>Content restrictions active</TooltipContent>
+                      <TooltipContent>{{ t('adminFeature.usersPage.contentRestrictionsActive') }}</TooltipContent>
                     </Tooltip>
                   </div>
                 </td>
@@ -333,7 +339,7 @@ function setsEqual(a: Set<number>, b: Set<number>) {
                     class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                     :class="user.active ? 'bg-green-500/15 text-green-600 dark:text-green-400' : 'bg-destructive/15 text-destructive'"
                   >
-                    {{ user.active ? 'Active' : 'Inactive' }}
+                    {{ user.active ? t('adminFeature.usersPage.statusActive') : t('adminFeature.usersPage.statusInactive') }}
                   </span>
                 </td>
                 <td class="px-4 py-3">
@@ -348,7 +354,7 @@ function setsEqual(a: Set<number>, b: Set<number>) {
                             <Pencil :size="14" />
                           </button>
                         </TooltipTrigger>
-                        <TooltipContent>Edit</TooltipContent>
+                        <TooltipContent>{{ t('common.edit') }}</TooltipContent>
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger as-child>
@@ -368,10 +374,10 @@ function setsEqual(a: Set<number>, b: Set<number>) {
                         <TooltipContent>
                           {{
                             user.provisioningMethod === 'oidc'
-                              ? 'OIDC users reset passwords in their identity provider'
+                              ? t('adminFeature.usersPage.resetPasswordOidcHint')
                               : user.provisioningMethod === 'shared'
-                                ? 'Shared accounts do not have passwords'
-                                : 'Reset password'
+                                ? t('adminFeature.usersPage.resetPasswordSharedHint')
+                                : t('adminFeature.usersPage.resetPassword')
                           }}
                         </TooltipContent>
                       </Tooltip>
@@ -384,7 +390,7 @@ function setsEqual(a: Set<number>, b: Set<number>) {
                             <Trash2 :size="14" />
                           </button>
                         </TooltipTrigger>
-                        <TooltipContent>Delete</TooltipContent>
+                        <TooltipContent>{{ t('common.delete') }}</TooltipContent>
                       </Tooltip>
                     </template>
                   </div>
@@ -402,7 +408,7 @@ function setsEqual(a: Set<number>, b: Set<number>) {
                 class="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                 :class="user.active ? 'bg-green-500/15 text-green-600 dark:text-green-400' : 'bg-destructive/15 text-destructive'"
               >
-                {{ user.active ? 'Active' : 'Inactive' }}
+                {{ user.active ? t('adminFeature.usersPage.statusActive') : t('adminFeature.usersPage.statusInactive') }}
               </span>
             </div>
             <div class="mt-2 flex items-center justify-between gap-3">
@@ -412,10 +418,10 @@ function setsEqual(a: Set<number>, b: Set<number>) {
                 class="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary"
               >
                 <ShieldCheck :size="11" />
-                Admin
+                {{ t('adminFeature.usersPage.adminBadge') }}
               </span>
               <span v-else class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                {{ user.permissions?.length ?? 0 }} permissions
+                {{ t('adminFeature.usersPage.permissionCount', { count: user.permissions?.length ?? 0 }, user.permissions?.length ?? 0) }}
               </span>
             </div>
             <div v-if="isSuperuser || !user.isSuperuser" class="mt-3 flex items-center gap-2">
@@ -423,7 +429,7 @@ function setsEqual(a: Set<number>, b: Set<number>) {
                 class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
                 @click="openEdit(user)"
               >
-                Edit
+                {{ t('common.edit') }}
               </button>
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
@@ -435,15 +441,17 @@ function setsEqual(a: Set<number>, b: Set<number>) {
                   <DropdownMenuItem
                     :disabled="user.provisioningMethod === 'oidc' || user.provisioningMethod === 'shared'"
                     @click="handleResetPassword(user.id)"
-                    >Reset password</DropdownMenuItem
+                    >{{ t('adminFeature.usersPage.resetPassword') }}</DropdownMenuItem
                   >
-                  <DropdownMenuItem class="text-destructive focus:text-destructive" @click="requestDeleteUser(user)">Delete user</DropdownMenuItem>
+                  <DropdownMenuItem class="text-destructive focus:text-destructive" @click="requestDeleteUser(user)">{{
+                    t('adminFeature.usersPage.deleteUserAction')
+                  }}</DropdownMenuItem>
                   <DropdownMenuSeparator v-if="user.provisioningMethod === 'oidc' || user.provisioningMethod === 'shared'" />
                   <p v-if="user.provisioningMethod === 'oidc'" class="px-2 py-1.5 text-[11px] leading-4 text-muted-foreground">
-                    OIDC users reset passwords in their identity provider.
+                    {{ t('adminFeature.usersPage.resetPasswordOidcHintFull') }}
                   </p>
                   <p v-else-if="user.provisioningMethod === 'shared'" class="px-2 py-1.5 text-[11px] leading-4 text-muted-foreground">
-                    Shared accounts do not have passwords.
+                    {{ t('adminFeature.usersPage.resetPasswordSharedHintFull') }}
                   </p>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -455,12 +463,12 @@ function setsEqual(a: Set<number>, b: Set<number>) {
 
     <section v-if="!loading && !error && canManageUserDefaults" class="mt-10 space-y-3">
       <div>
-        <p class="settings-group-label mb-1">Default Library Access</p>
-        <p class="text-sm text-muted-foreground">Viewer access granted to self-registered and OIDC-provisioned users.</p>
+        <p class="settings-group-label mb-1">{{ t('adminFeature.usersPage.defaultLibraryAccess.title') }}</p>
+        <p class="text-sm text-muted-foreground">{{ t('adminFeature.usersPage.defaultLibraryAccess.subtitle') }}</p>
       </div>
       <div class="rounded-lg border border-border bg-card p-4 shadow-xs">
         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <p class="text-sm text-muted-foreground">Select the libraries assigned automatically to new users.</p>
+          <p class="text-sm text-muted-foreground">{{ t('adminFeature.usersPage.defaultLibraryAccess.description') }}</p>
           <button
             type="button"
             class="settings-btn-outline justify-center md:justify-start"
@@ -468,7 +476,11 @@ function setsEqual(a: Set<number>, b: Set<number>) {
             @click="saveDefaultLibraryAccess"
           >
             <Save :size="14" />
-            {{ savingDefaultLibraryAccess ? 'Saving...' : 'Save defaults' }}
+            {{
+              savingDefaultLibraryAccess
+                ? t('adminFeature.usersPage.defaultLibraryAccess.saving')
+                : t('adminFeature.usersPage.defaultLibraryAccess.save')
+            }}
           </button>
         </div>
         <div v-if="libraries.length > 0" class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -482,9 +494,11 @@ function setsEqual(a: Set<number>, b: Set<number>) {
             <span class="min-w-0 truncate text-sm text-foreground">{{ lib.name }}</span>
           </label>
         </div>
-        <p v-else class="mt-3 text-sm text-muted-foreground">No libraries available.</p>
+        <p v-else class="mt-3 text-sm text-muted-foreground">{{ t('adminFeature.usersPage.defaultLibraryAccess.noLibraries') }}</p>
         <p v-if="defaultLibraryAccessError" class="mt-3 text-sm text-destructive">{{ defaultLibraryAccessError }}</p>
-        <p v-else-if="defaultLibraryAccessSaved" class="mt-3 text-sm text-muted-foreground">Default library access saved.</p>
+        <p v-else-if="defaultLibraryAccessSaved" class="mt-3 text-sm text-muted-foreground">
+          {{ t('adminFeature.usersPage.defaultLibraryAccess.saved') }}
+        </p>
       </div>
     </section>
 
@@ -505,21 +519,21 @@ function setsEqual(a: Set<number>, b: Set<number>) {
     >
       <button class="absolute inset-0 bg-black/45" @click="deleteConfirmUser = null" />
       <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
-        <p class="text-base font-semibold text-foreground">Delete user?</p>
-        <p class="mt-1 text-sm text-muted-foreground">Delete user "{{ deleteConfirmUser.username }}". This action cannot be undone.</p>
+        <p class="text-base font-semibold text-foreground">{{ t('adminFeature.usersPage.deleteDialogTitle') }}</p>
+        <p class="mt-1 text-sm text-muted-foreground">{{ t('adminFeature.usersPage.deleteDialogBody', { username: deleteConfirmUser.username }) }}</p>
         <div class="mt-4 flex items-center justify-end gap-2">
           <button
             class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
             @click="deleteConfirmUser = null"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
           <button
             class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 transition-colors"
             :disabled="deleting"
             @click="confirmDeleteUser"
           >
-            {{ deleting ? 'Deleting...' : 'Delete' }}
+            {{ deleting ? t('adminFeature.usersPage.deleting') : t('common.delete') }}
           </button>
         </div>
       </div>

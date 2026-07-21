@@ -465,6 +465,8 @@ describe('extractAudioMetadata — misc fields', () => {
     ['part', '6'],
     ['series_part', '7'],
     ['seriespart', '8'],
+    ['episode_id', '8.5'],
+    ['episode_sort', '9'],
   ])('uses %s as a series index fallback', async (tagName, rawIndex) => {
     makeExecFileSuccess(makeProbeOutput({ format: { tags: { series: 'Dungeon Crawler Carl', [tagName]: rawIndex } } }));
 
@@ -472,6 +474,35 @@ describe('extractAudioMetadata — misc fields', () => {
 
     expect(result.seriesName).toBe('Dungeon Crawler Carl');
     expect(result.seriesIndex).toBe(Number(rawIndex));
+  });
+
+  it('reads MP4-native series tags when custom tags are absent', async () => {
+    makeExecFileSuccess(makeProbeOutput({ format: { tags: { show: 'The Murderbot Diaries', episode_id: '2.5' } } }));
+
+    const result = await extractAudioMetadata('/path/book.m4b');
+
+    expect(result.seriesName).toBe('The Murderbot Diaries');
+    expect(result.seriesIndex).toBe(2.5);
+  });
+
+  it('prefers established custom series tags over MP4-native aliases', async () => {
+    makeExecFileSuccess(
+      makeProbeOutput({
+        format: {
+          tags: {
+            series: 'Custom Series',
+            'series-part': '4.5',
+            show: 'Native Series',
+            episode_id: '9',
+          },
+        },
+      }),
+    );
+
+    const result = await extractAudioMetadata('/path/book.m4b');
+
+    expect(result.seriesName).toBe('Custom Series');
+    expect(result.seriesIndex).toBe(4.5);
   });
 
   it('parses year from a plain year string', async () => {

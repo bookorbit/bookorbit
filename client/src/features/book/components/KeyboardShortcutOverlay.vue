@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { X } from '@lucide/vue'
+import { useI18n } from 'vue-i18n'
 
 defineProps<{ open: boolean }>()
 const emit = defineEmits<{ 'update:open': [value: boolean] }>()
+
+const { t } = useI18n()
 
 const isMac = computed(() => typeof navigator !== 'undefined' && /Mac/i.test(navigator.userAgent))
 const modKey = computed(() => (isMac.value ? '⌘' : 'Ctrl'))
@@ -14,29 +17,29 @@ function handleClose() {
 
 const sections = computed(() => [
   {
-    title: 'Navigation',
+    title: t('book.shortcuts.navigation.title'),
     shortcuts: [
-      { keys: ['↑', '↓'], label: 'Move focus up/down' },
-      { keys: ['←', '→'], label: 'Move focus left/right' },
-      { keys: ['Home'], label: 'Jump to first column' },
-      { keys: ['End'], label: 'Jump to last column' },
-      { keys: [`${modKey.value}+Home`], label: 'Jump to first row' },
-      { keys: [`${modKey.value}+End`], label: 'Jump to last row' },
+      { keys: ['↑', '↓'], label: t('book.shortcuts.navigation.moveFocusVertical') },
+      { keys: ['←', '→'], label: t('book.shortcuts.navigation.moveFocusHorizontal') },
+      { keys: ['Home'], label: t('book.shortcuts.navigation.jumpFirstColumn') },
+      { keys: ['End'], label: t('book.shortcuts.navigation.jumpLastColumn') },
+      { keys: [`${modKey.value}+Home`], label: t('book.shortcuts.navigation.jumpFirstRow') },
+      { keys: [`${modKey.value}+End`], label: t('book.shortcuts.navigation.jumpLastRow') },
     ],
   },
   {
-    title: 'Actions',
+    title: t('book.shortcuts.actions.title'),
     shortcuts: [
-      { keys: ['Enter'], label: 'Edit focused cell' },
-      { keys: ['Escape'], label: 'Cancel editing / Close overlay' },
-      { keys: ['Space'], label: 'Toggle row selection' },
-      { keys: [`${modKey.value}+C`], label: 'Copy cell value' },
-      { keys: [`${modKey.value}+Shift+C`], label: 'Copy focused row' },
+      { keys: ['Enter'], label: t('book.shortcuts.actions.editCell') },
+      { keys: ['Escape'], label: t('book.shortcuts.actions.cancelEditing') },
+      { keys: ['Space'], label: t('book.shortcuts.actions.toggleRowSelection') },
+      { keys: [`${modKey.value}+C`], label: t('book.shortcuts.actions.copyCell') },
+      { keys: [`${modKey.value}+Shift+C`], label: t('book.shortcuts.actions.copyRow') },
     ],
   },
   {
-    title: 'General',
-    shortcuts: [{ keys: ['?'], label: 'Toggle this help overlay' }],
+    title: t('book.shortcuts.general.title'),
+    shortcuts: [{ keys: ['?'], label: t('book.shortcuts.general.toggleHelp') }],
   },
 ])
 </script>
@@ -50,9 +53,9 @@ const sections = computed(() => [
         @click.self="handleClose"
         @keydown.escape="handleClose"
       >
-        <div class="relative w-full max-w-md rounded-xl border border-border bg-card shadow-xl" role="dialog" aria-label="Keyboard shortcuts">
+        <div class="relative w-full max-w-md rounded-xl border border-border bg-card shadow-xl" role="dialog" :aria-label="t('book.shortcuts.title')">
           <div class="flex items-center justify-between border-b border-border px-5 py-3">
-            <h2 class="text-sm font-semibold text-foreground">Keyboard Shortcuts</h2>
+            <h2 class="text-sm font-semibold text-foreground">{{ t('book.shortcuts.title') }}</h2>
             <button
               class="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
               @click="handleClose"

@@ -1,28 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { X, ChevronUp, ChevronDown } from '@lucide/vue'
 import type { FieldPreference, MetadataField, MetadataProviderKey, ProviderStatus } from '@bookorbit/types'
 import MergeStrategyPicker from './MergeStrategyPicker.vue'
 import { providerChipStyle, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
 
-const FIELD_LABELS: Record<MetadataField, string> = {
-  title: 'Title',
-  subtitle: 'Subtitle',
-  description: 'Description',
-  cover: 'Cover',
-  authors: 'Authors',
-  publisher: 'Publisher',
-  publishedYear: 'Published year',
-  language: 'Language',
-  pageCount: 'Page count',
-  communityRating: 'Community rating',
-  seriesName: 'Series name',
-  seriesIndex: 'Series index',
-  genres: 'Genres',
-  narrators: 'Narrators',
-  duration: 'Duration',
-  abridged: 'Abridged',
-}
+const { t } = useI18n()
 
 const props = defineProps<{
   field: MetadataField
@@ -85,8 +69,8 @@ const sortedStatuses = computed(() => {
       <div class="relative bg-card border-t border-border rounded-t-2xl max-h-[85vh] flex flex-col z-10">
         <div class="flex items-center justify-between px-4 py-3.5 border-b border-border shrink-0">
           <div>
-            <p class="text-sm font-semibold text-foreground">{{ FIELD_LABELS[field] }}</p>
-            <p class="text-xs text-muted-foreground mt-0.5">Tap providers to assign, use arrows to reorder</p>
+            <p class="text-sm font-semibold text-foreground">{{ t(`settings.metadata.fields.${field}`) }}</p>
+            <p class="text-xs text-muted-foreground mt-0.5">{{ t('settings.metadata.fieldRules.sheet.subtitle') }}</p>
           </div>
           <button class="h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors" @click="$emit('close')">
             <X :size="16" />
@@ -101,11 +85,13 @@ const sortedStatuses = computed(() => {
               class="h-4 w-4 rounded border-input accent-primary"
               @change="$emit('change', { ...preference, enabled: ($event.target as HTMLInputElement).checked })"
             />
-            <span class="text-sm text-foreground">Enable this field during refresh</span>
+            <span class="text-sm text-foreground">{{ t('settings.metadata.fieldRules.sheet.enableField') }}</span>
           </label>
 
           <div>
-            <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">Providers</p>
+            <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">
+              {{ t('settings.metadata.fieldRules.sheet.providers') }}
+            </p>
             <div class="space-y-1.5">
               <div
                 v-for="status in sortedStatuses"
@@ -124,8 +110,12 @@ const sortedStatuses = computed(() => {
                   <span class="text-xs font-medium px-2 py-0.5 rounded" :style="providerChipStyle(status.key, !isUsable(status))">
                     {{ PROVIDER_SHORT_LABELS[status.key] ?? status.key }}
                   </span>
-                  <span v-if="!status.enabled" class="text-xs text-muted-foreground">disabled</span>
-                  <span v-else-if="!status.configured" class="text-xs text-muted-foreground">not configured</span>
+                  <span v-if="!status.enabled" class="text-xs text-muted-foreground">{{
+                    t('settings.metadata.fieldRules.sheet.statusDisabled')
+                  }}</span>
+                  <span v-else-if="!status.configured" class="text-xs text-muted-foreground">{{
+                    t('settings.metadata.fieldRules.sheet.statusNotConfigured')
+                  }}</span>
                 </div>
                 <div v-if="isAssigned(status.key as MetadataProviderKey)" class="flex items-center gap-1 shrink-0">
                   <span class="text-xs tabular-nums text-muted-foreground w-4 text-center">
@@ -151,7 +141,9 @@ const sortedStatuses = computed(() => {
           </div>
 
           <div>
-            <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">Merge Strategy</p>
+            <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">
+              {{ t('settings.metadata.fieldRules.table.mergeStrategy') }}
+            </p>
             <MergeStrategyPicker
               :model-value="preference.mergeStrategy"
               :disabled="!preference.enabled"
@@ -166,7 +158,7 @@ const sortedStatuses = computed(() => {
             class="w-full h-10 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
             @click="$emit('close')"
           >
-            Done
+            {{ t('settings.metadata.fieldRules.sheet.done') }}
           </button>
         </div>
       </div>

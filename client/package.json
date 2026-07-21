@@ -24,12 +24,13 @@
     "pretype-check": "pnpm --filter @bookorbit/types build",
     "type-check": "vue-tsc --build",
     "lint": "pnpm run lint:check",
-    "lint:check": "run-s lint:oxlint:check lint:eslint:check",
+    "lint:check": "run-s validate:locales lint:oxlint:check lint:eslint:check",
     "lint:fix": "run-s lint:oxlint:fix lint:eslint:fix",
     "lint:oxlint:check": "oxlint src",
     "lint:oxlint:fix": "oxlint src --fix",
     "lint:eslint:check": "eslint src --cache",
     "lint:eslint:fix": "eslint src --fix --cache",
+    "validate:locales": "node ./scripts/validate-locales.mjs",
     "format": "prettier --write --experimental-cli src/",
     "format:check": "prettier --check src/",
     "generate-pwa-icons": "pwa-assets-generator --config pwa-assets.config.ts"
@@ -85,11 +86,13 @@
     "vue": "^3.5.39",
     "vue-draggable-plus": "^0.6.1",
     "vue-echarts": "8.1.0-beta.2",
+    "vue-i18n": "^11.4.6",
     "vue-router": "^5.1.0",
     "vue-sonner": "^2.0.9",
     "vue-virtual-scroller": "^3.0.4"
   },
   "devDependencies": {
+    "@intlify/unplugin-vue-i18n": "^11.2.4",
     "@tsconfig/node24": "^24.0.4",
     "@types/canvas-confetti": "^1.9.0",
     "@types/jsdom": "^28.0.3",

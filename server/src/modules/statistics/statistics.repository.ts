@@ -650,7 +650,7 @@ export class StatisticsRepository {
       totalAuthors: authorsRow.count,
       totalSeries: seriesRow.count,
       totalPublishers: publishersRow.count,
-      totalStorageBytes: storageRow.total,
+      totalStorageBytes: Number(storageRow.total),
       totalGenres: genresRow.count,
       totalLanguages: languagesRow.count,
       publicationYearMin: pubRangeRow.minYear,

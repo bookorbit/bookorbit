@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Check, ChevronDown, FileCheck, HardDriveDownload, HardDriveUpload, Loader2, Lock, LockOpen, RefreshCw, Sparkles, Star, X } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import type {
@@ -47,6 +48,8 @@ const emit = defineEmits<{
   coverChanged: ['extracted' | 'custom' | null]
   fileRenamed: []
 }>()
+
+const { t } = useI18n()
 
 const DIRECT_PATCH_FIELDS = [
   'title',
@@ -99,35 +102,37 @@ const fileWriteEnabledForBook = computed(() => fileWriteStatus.value?.enabled ==
 const fileWriteWritableFormats = computed(() => fileWriteStatus.value?.writableFormats ?? [])
 const fileWriteFormatLabels = computed(() => fileWriteWritableFormats.value.map((format) => format.toUpperCase()))
 const fileWriteFieldLabels = computed(() => (fileWriteStatus.value?.writableFields ?? []).map((field) => BOOK_FILE_WRITE_FIELD_LABELS[field]))
-const fileWriteFieldCountLabel = computed(() => `${fileWriteFieldLabels.value.length} field${fileWriteFieldLabels.value.length === 1 ? '' : 's'}`)
+const fileWriteFieldCountLabel = computed(() =>
+  t('book.detail.editMetadata.fieldCount', { count: fileWriteFieldLabels.value.length }, fileWriteFieldLabels.value.length),
+)
 const fileWriteTargetSummary = computed(() => {
   const formats = fileWriteWritableFormats.value
-  if (formats.length === 0) return 'book files'
-  return `${formatWritableFormatList(formats)} files`
+  if (formats.length === 0) return t('book.detail.editMetadata.bookFilesTarget')
+  return t('book.detail.editMetadata.formatFilesTarget', { formats: formatWritableFormatList(formats) })
 })
 const fileWriteManualDisabledReasonLabel = computed(() => {
-  if (!primaryFile.value) return 'No primary file available'
+  if (!primaryFile.value) return t('book.detail.editMetadata.noPrimaryFile')
   switch (fileWriteStatus.value?.reason) {
     case 'no_primary_file':
-      return 'No primary file available'
+      return t('book.detail.editMetadata.noPrimaryFile')
     case 'format_not_supported':
-      return 'This file format does not support write-back'
+      return t('book.detail.editMetadata.formatNotSupported')
     case 'format_disabled':
-      return 'Write-back is disabled for this format'
+      return t('book.detail.editMetadata.formatDisabled')
     case 'file_exceeds_size_limit':
-      return 'This file exceeds the write-back size limit'
+      return t('book.detail.editMetadata.fileExceedsSizeLimit')
     default:
       return null
   }
 })
 const fileWriteManualTooltip = computed(() => {
-  if (writingAndRenaming.value) return 'Writing...'
-  if (saving.value) return 'Save in progress'
+  if (writingAndRenaming.value) return t('book.detail.editMetadata.writing')
+  if (saving.value) return t('book.detail.editMetadata.saveInProgress')
   if (fileWriteManualDisabledReasonLabel.value) return fileWriteManualDisabledReasonLabel.value
   if (fileWriteStatus.value?.reason === 'library_disabled') {
-    return 'Write metadata to file and rename on disk; automatic write-back is disabled for this library'
+    return t('book.detail.editMetadata.writeManualLibraryDisabled')
   }
-  return `Write ${fileWriteFieldCountLabel.value} to ${fileWriteTargetSummary.value} and rename on disk`
+  return t('book.detail.editMetadata.writeManualTooltip', { fields: fileWriteFieldCountLabel.value, target: fileWriteTargetSummary.value })
 })
 const comicSectionOpen = ref(true)
 
@@ -509,9 +514,9 @@ function applyPatchToForm(formPatch: MetadataPatch, coverUrl: string | undefined
 
 function showApplyResult(skippedFields: BookMetadataLockField[], updatedCount: number) {
   if (skippedFields.length === 0) return
-  const skippedPart = `Skipped ${skippedFields.length} locked field${skippedFields.length === 1 ? '' : 's'}`
-  const updatedPart = `updated ${updatedCount} field${updatedCount === 1 ? '' : 's'}`
-  toast.info(`${skippedPart}, ${updatedPart}`)
+  const skippedPart = t('book.detail.editMetadata.skippedLockedFields', { count: skippedFields.length }, skippedFields.length)
+  const updatedPart = t('book.detail.editMetadata.updatedFields', { count: updatedCount }, updatedCount)
+  toast.info(t('book.detail.editMetadata.applyResult', { skipped: skippedPart, updated: updatedPart }))
 }
 
 function handleApply({ formPatch, coverUrl }: { formPatch: MetadataPatch; coverUrl?: string }) {
@@ -531,7 +536,7 @@ const {
 let dismissTimer: ReturnType<typeof setTimeout> | null = null
 
 function pluralizeField(count: number): string {
-  return `${count} field${count === 1 ? '' : 's'}`
+  return t('book.detail.editMetadata.fieldCount', { count }, count)
 }
 
 function truncateReason(reason: string | null | undefined): string {
@@ -541,37 +546,37 @@ function truncateReason(reason: string | null | undefined): string {
 
 function showWriteResultToast(result: Pick<WriteResult, 'status' | 'fieldsWritten' | 'reason'>): void {
   if (result.status === 'success') {
-    toast.success(`Wrote ${pluralizeField(result.fieldsWritten.length)} to file`)
+    toast.success(t('book.detail.editMetadata.wroteFieldsToFile', { fields: pluralizeField(result.fieldsWritten.length) }))
     return
   }
 
   const reason = truncateReason(result.reason)
   if (result.status === 'failed') {
-    toast.error(reason ? `File write failed: ${reason}` : 'File write failed')
+    toast.error(reason ? t('book.detail.editMetadata.fileWriteFailedReason', { reason }) : t('book.detail.editMetadata.fileWriteFailed'))
     return
   }
 
-  toast.info(reason ? `File write skipped: ${reason}` : 'File write skipped')
+  toast.info(reason ? t('book.detail.editMetadata.fileWriteSkippedReason', { reason }) : t('book.detail.editMetadata.fileWriteSkipped'))
 }
 
 function showSaveResultToast(write: WriteResult | null, libraryAutoWriteEnabled: boolean): void {
   if (!write || (!libraryAutoWriteEnabled && write.status === 'skipped')) {
-    toast.success('Metadata saved')
+    toast.success(t('book.detail.editMetadata.metadataSaved'))
     return
   }
 
   if (write.status === 'success') {
-    toast.success('Metadata written to file')
+    toast.success(t('book.detail.editMetadata.metadataWrittenToFile'))
     return
   }
 
   const reason = truncateReason(write.reason)
   if (write.status === 'failed') {
-    toast.error(reason ? `Metadata saved, but file write failed: ${reason}` : 'Metadata saved, but file write failed')
+    toast.error(reason ? t('book.detail.editMetadata.savedButWriteFailedReason', { reason }) : t('book.detail.editMetadata.savedButWriteFailed'))
     return
   }
 
-  toast.info(reason ? `Metadata saved, file write skipped: ${reason}` : 'Metadata saved, file write skipped')
+  toast.info(reason ? t('book.detail.editMetadata.savedWriteSkippedReason', { reason }) : t('book.detail.editMetadata.savedWriteSkipped'))
 }
 
 function buildPreviewPatch(preview: MetadataRefreshPreview): MetadataPatch {
@@ -643,11 +648,11 @@ function applyFileMetadataToForm(meta: FileMetadata): number {
 async function handleLoadFromFile() {
   const meta = await loadFromFile(props.book.id)
   if (!meta) {
-    toast.error('Failed to load metadata from file')
+    toast.error(t('book.detail.editMetadata.loadFromFileFailed'))
     return
   }
   const count = applyFileMetadataToForm(meta)
-  toast.info(count > 0 ? `Loaded ${count} field${count === 1 ? '' : 's'} from file` : 'No metadata found in file')
+  toast.info(count > 0 ? t('book.detail.editMetadata.loadedFieldsFromFile', { count }, count) : t('book.detail.editMetadata.noMetadataInFile'))
 }
 
 async function handleWriteAndRename() {
@@ -737,11 +742,15 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               >
                 <Loader2 v-if="loadingFromFile" class="size-3.5 animate-spin" />
                 <HardDriveUpload v-else class="size-3.5" />
-                <span class="hidden sm:inline">Load from file</span>
+                <span class="hidden sm:inline">{{ t('book.detail.editMetadata.loadFromFile') }}</span>
               </button>
             </TooltipTrigger>
             <TooltipContent>{{
-              loadingFromFile ? 'Loading...' : !primaryFile ? 'No primary file available' : 'Load metadata from the primary book file'
+              loadingFromFile
+                ? t('common.loading')
+                : !primaryFile
+                  ? t('book.detail.editMetadata.noPrimaryFile')
+                  : t('book.detail.editMetadata.loadFromFileTooltip')
             }}</TooltipContent>
           </Tooltip>
 
@@ -750,13 +759,13 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               <button
                 class="flex-none flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-40"
                 :disabled="writingAndRenaming || saving || fileWriteManualDisabledReasonLabel !== null"
-                aria-label="Write to File & Rename"
+                :aria-label="t('book.detail.editMetadata.writeAndRename')"
                 @click="handleWriteAndRename"
               >
                 <Loader2 v-if="writingAndRenaming" class="size-3.5 animate-spin" />
                 <HardDriveDownload v-else class="size-3.5" />
-                <span class="sm:hidden">Write & Rename</span>
-                <span class="hidden sm:inline">Write to File & Rename</span>
+                <span class="sm:hidden">{{ t('book.detail.editMetadata.writeAndRenameShort') }}</span>
+                <span class="hidden sm:inline">{{ t('book.detail.editMetadata.writeAndRename') }}</span>
               </button>
             </TooltipTrigger>
             <TooltipContent>{{ fileWriteManualTooltip }}</TooltipContent>
@@ -769,7 +778,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
             @click="searchOpen = true"
           >
             <Sparkles class="size-3.5" />
-            <span class="hidden sm:inline">Search</span>
+            <span class="hidden sm:inline">{{ t('common.search') }}</span>
           </button>
 
           <Tooltip>
@@ -781,11 +790,15 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               >
                 <Loader2 v-if="autoFilling" class="size-3.5 animate-spin" />
                 <RefreshCw v-else class="size-3.5" />
-                <span class="hidden sm:inline">Auto-fill</span>
+                <span class="hidden sm:inline">{{ t('book.detail.editMetadata.autoFill') }}</span>
               </button>
             </TooltipTrigger>
             <TooltipContent>{{
-              autoFilling ? 'Fetching metadata...' : areAllLocked ? 'All fields are locked' : 'Auto-fill fields using your metadata preferences'
+              autoFilling
+                ? t('book.detail.editMetadata.fetchingMetadata')
+                : areAllLocked
+                  ? t('book.detail.editMetadata.allFieldsLocked')
+                  : t('book.detail.editMetadata.autoFillTooltip')
             }}</TooltipContent>
           </Tooltip>
 
@@ -799,10 +812,10 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
                 @click="handleLockAll"
               >
                 <Lock class="size-3.5" />
-                <span class="hidden sm:inline">Lock all</span>
+                <span class="hidden sm:inline">{{ t('book.detail.editMetadata.lockAll') }}</span>
               </button>
             </TooltipTrigger>
-            <TooltipContent>Lock all fields</TooltipContent>
+            <TooltipContent>{{ t('book.detail.editMetadata.lockAllTooltip') }}</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -813,18 +826,18 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
                 @click="handleUnlockAll"
               >
                 <LockOpen class="size-3.5" />
-                <span class="hidden sm:inline">Unlock all</span>
+                <span class="hidden sm:inline">{{ t('book.detail.editMetadata.unlockAll') }}</span>
               </button>
             </TooltipTrigger>
-            <TooltipContent>Unlock all fields</TooltipContent>
+            <TooltipContent>{{ t('book.detail.editMetadata.unlockAllTooltip') }}</TooltipContent>
           </Tooltip>
 
           <div class="flex-none w-px h-4 bg-border mx-0.5" />
 
           <button
             class="flex items-center justify-center h-8 px-2.5 rounded-lg border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-40"
-            title="Cancel"
-            aria-label="Cancel"
+            :title="t('common.cancel')"
+            :aria-label="t('common.cancel')"
             :disabled="!hasPendingChanges || saving || writingAndRenaming"
             @click="handleReset"
           >
@@ -837,11 +850,11 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           >
             <span class="col-start-1 row-start-1 flex items-center gap-1.5" :class="{ invisible: saving }">
               <Check class="size-3.5" />
-              <span class="hidden sm:inline">Save</span>
+              <span class="hidden sm:inline">{{ t('common.save') }}</span>
             </span>
             <span class="col-start-1 row-start-1 flex items-center gap-1.5" :class="{ invisible: !saving }">
               <Loader2 class="size-3.5 animate-spin" />
-              <span class="hidden sm:inline">Saving...</span>
+              <span class="hidden sm:inline">{{ t('book.detail.editMetadata.saving') }}</span>
             </span>
           </button>
           <Popover v-if="fileWriteEnabledForBook">
@@ -849,7 +862,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               <button
                 type="button"
                 class="flex-none inline-flex size-8 items-center justify-center rounded-lg border border-border bg-muted/40 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                aria-label="File write-back details"
+                :aria-label="t('book.detail.editMetadata.fileWriteBackDetails')"
               >
                 <FileCheck class="size-3.5 text-primary" />
               </button>
@@ -862,18 +875,20 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
                   </span>
                   <div class="min-w-0 flex-1 space-y-1">
                     <div class="flex items-center justify-between gap-2">
-                      <p class="text-sm font-semibold text-foreground">File write-back</p>
+                      <p class="text-sm font-semibold text-foreground">{{ t('book.detail.editMetadata.fileWriteBack') }}</p>
                       <span class="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
-                        Enabled
+                        {{ t('book.detail.editMetadata.enabled') }}
                       </span>
                     </div>
-                    <p class="text-xs leading-5 text-muted-foreground">'Save' writes metadata to {{ fileWriteTargetSummary }}</p>
+                    <p class="text-xs leading-5 text-muted-foreground">
+                      {{ t('book.detail.editMetadata.saveWritesMetadata', { target: fileWriteTargetSummary }) }}
+                    </p>
                   </div>
                 </div>
 
                 <div class="space-y-2 rounded-lg border border-border bg-muted/30 p-2.5 text-xs">
                   <div class="flex items-start justify-between gap-3">
-                    <span class="shrink-0 text-muted-foreground">Formats</span>
+                    <span class="shrink-0 text-muted-foreground">{{ t('book.detail.editMetadata.formats') }}</span>
                     <div v-if="fileWriteFormatLabels.length > 0" class="flex min-w-0 flex-wrap justify-end gap-1">
                       <span
                         v-for="format in fileWriteFormatLabels"
@@ -883,11 +898,11 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
                         {{ format }}
                       </span>
                     </div>
-                    <span v-else class="text-right font-medium text-foreground">Book files</span>
+                    <span v-else class="text-right font-medium text-foreground">{{ t('book.detail.editMetadata.bookFiles') }}</span>
                   </div>
                   <div class="space-y-1.5 border-t border-border/70 pt-2">
                     <div class="flex items-center justify-between gap-3">
-                      <span class="text-muted-foreground">Supported fields</span>
+                      <span class="text-muted-foreground">{{ t('book.detail.editMetadata.supportedFields') }}</span>
                       <span class="font-medium text-foreground">{{ fileWriteFieldCountLabel }}</span>
                     </div>
                     <div v-if="fileWriteFieldLabels.length > 0" class="flex max-h-28 flex-wrap gap-1 overflow-y-auto pr-1">
@@ -925,7 +940,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
       <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
         <MetadataFieldLabel
           class="sm:col-span-3"
-          label="Title"
+          :label="t('book.detail.editMetadata.titleLabel')"
           field="title"
           :locked="isLocked('title')"
           :is-updating="isUpdatingLock"
@@ -937,7 +952,13 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
             :disabled="isLocked('title')"
           />
         </MetadataFieldLabel>
-        <MetadataFieldLabel label="Subtitle" field="subtitle" :locked="isLocked('subtitle')" :is-updating="isUpdatingLock" @toggle="handleLockToggle">
+        <MetadataFieldLabel
+          :label="t('book.detail.editMetadata.subtitleLabel')"
+          field="subtitle"
+          :locked="isLocked('subtitle')"
+          :is-updating="isUpdatingLock"
+          @toggle="handleLockToggle"
+        >
           <input
             v-model="form.subtitle"
             class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
@@ -949,7 +970,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
       <!-- Authors | Narrators (audio only) -->
       <div class="grid gap-3" :class="isPrimaryAudio ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'">
         <MetadataFieldLabel
-          label="Authors"
+          :label="t('book.detail.editMetadata.authorsLabel')"
           field="authors"
           :locked="isLocked('authors')"
           :is-updating="isUpdatingLock"
@@ -960,7 +981,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         </MetadataFieldLabel>
         <MetadataFieldLabel
           v-if="isPrimaryAudio"
-          label="Narrators"
+          :label="t('book.detail.editMetadata.narratorsLabel')"
           field="narrators"
           :locked="isLocked('narrators')"
           :is-updating="isUpdatingLock"
@@ -973,7 +994,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
 
       <!-- Genres -->
       <MetadataFieldLabel
-        label="Genres"
+        :label="t('book.detail.editMetadata.genresLabel')"
         field="genres"
         :locked="isLocked('genres')"
         :is-updating="isUpdatingLock"
@@ -987,7 +1008,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
       <div class="flex flex-col sm:flex-row items-start gap-3">
         <MetadataFieldLabel
           class="w-full sm:flex-1"
-          label="Tags"
+          :label="t('book.detail.editMetadata.tagsLabel')"
           field="tags"
           :locked="isLocked('tags')"
           :is-updating="isUpdatingLock"
@@ -998,7 +1019,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         </MetadataFieldLabel>
         <MetadataFieldLabel
           class="w-full sm:w-auto sm:shrink-0"
-          label="Rating"
+          :label="t('book.detail.editMetadata.ratingLabel')"
           field="rating"
           :locked="isLocked('rating')"
           :is-updating="isUpdatingLock"
@@ -1021,7 +1042,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
                   <Star class="size-5 sm:size-4" :class="getRatingStarClass(star, displayRating)" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Rate {{ star }}</TooltipContent>
+              <TooltipContent>{{ t('book.detail.editMetadata.rateStar', { star }) }}</TooltipContent>
             </Tooltip>
             <button
               v-if="form.rating"
@@ -1030,14 +1051,14 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               :disabled="isLocked('rating')"
               @click="clearRating"
             >
-              Clear
+              {{ t('book.detail.editMetadata.clear') }}
             </button>
           </div>
         </MetadataFieldLabel>
       </div>
 
       <MetadataFieldLabel
-        label="Community Ratings"
+        :label="t('book.detail.editMetadata.communityRatingsLabel')"
         field="communityRating"
         :locked="isLocked('communityRating')"
         :is-updating="isUpdatingLock"
@@ -1055,14 +1076,14 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               {{ line }}
             </span>
           </div>
-          <span v-else class="text-sm text-muted-foreground">No provider ratings</span>
+          <span v-else class="text-sm text-muted-foreground">{{ t('book.detail.editMetadata.noProviderRatings') }}</span>
         </div>
       </MetadataFieldLabel>
 
       <!-- Series | Publisher -->
       <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)] gap-3">
         <MetadataFieldLabel
-          label="Series"
+          :label="t('book.detail.editMetadata.seriesLabel')"
           field="seriesName"
           :locked="isSeriesLocked"
           :is-updating="isUpdatingLock"
@@ -1078,7 +1099,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           />
         </MetadataFieldLabel>
         <MetadataFieldLabel
-          label="Publisher"
+          :label="t('book.detail.editMetadata.publisherLabel')"
           field="publisher"
           :locked="isLocked('publisher')"
           :is-updating="isUpdatingLock"
@@ -1097,7 +1118,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
       <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3">
         <MetadataFieldLabel
           class="col-span-2 sm:w-32 sm:shrink-0"
-          label="Language"
+          :label="t('book.detail.editMetadata.languageLabel')"
           field="language"
           :locked="isLocked('language')"
           :is-updating="isUpdatingLock"
@@ -1113,7 +1134,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         </MetadataFieldLabel>
         <MetadataFieldLabel
           class="sm:w-40 sm:shrink-0"
-          label="Published Date"
+          :label="t('bookDock.field.publishedDate')"
           field="publishedYear"
           :locked="isLocked('publishedYear')"
           :is-updating="isUpdatingLock"
@@ -1129,7 +1150,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         </MetadataFieldLabel>
         <MetadataFieldLabel
           class="sm:w-28 sm:shrink-0"
-          label="Year"
+          :label="t('book.detail.editMetadata.yearLabel')"
           field="publishedYear"
           :locked="isLocked('publishedYear')"
           :is-updating="isUpdatingLock"
@@ -1147,7 +1168,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         </MetadataFieldLabel>
         <MetadataFieldLabel
           class="sm:w-28 sm:shrink-0"
-          label="Page Count"
+          :label="t('book.detail.editMetadata.pageCountLabel')"
           field="pageCount"
           :locked="isLocked('pageCount')"
           :is-updating="isUpdatingLock"
@@ -1164,7 +1185,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         </MetadataFieldLabel>
         <MetadataFieldLabel
           class="sm:flex-1 sm:min-w-22.5"
-          label="ISBN-13"
+          :label="t('book.detail.editMetadata.isbn13Label')"
           field="isbn13"
           :locked="isLocked('isbn13')"
           :is-updating="isUpdatingLock"
@@ -1179,7 +1200,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         </MetadataFieldLabel>
         <MetadataFieldLabel
           class="sm:flex-1 sm:min-w-21.25"
-          label="ISBN-10"
+          :label="t('book.detail.editMetadata.isbn10Label')"
           field="isbn10"
           :locked="isLocked('isbn10')"
           :is-updating="isUpdatingLock"
@@ -1195,7 +1216,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         <MetadataFieldLabel
           v-if="isPrimaryAudio"
           class="sm:w-30 sm:shrink-0"
-          label="Duration (s)"
+          :label="t('book.detail.editMetadata.durationLabel')"
           field="durationSeconds"
           :locked="isLocked('durationSeconds')"
           :is-updating="isUpdatingLock"
@@ -1213,7 +1234,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
         <MetadataFieldLabel
           v-if="isPrimaryAudio"
           class="sm:w-20 sm:shrink-0"
-          label="Abridged"
+          :label="t('book.detail.editMetadata.abridgedLabel')"
           field="abridged"
           :locked="isLocked('abridged')"
           :is-updating="isUpdatingLock"
@@ -1228,7 +1249,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               v-model="form.abridged"
               type="checkbox"
               class="h-4 w-4 rounded border-input accent-primary"
-              aria-label="Abridged"
+              :aria-label="t('book.detail.editMetadata.abridgedLabel')"
               :disabled="isLocked('abridged')"
             />
           </div>
@@ -1242,7 +1263,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           class="w-full flex items-center justify-between px-3 py-2 bg-muted/40 hover:bg-muted/70 transition-colors"
           @click="providerIdsOpen = !providerIdsOpen"
         >
-          <span class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Provider IDs</span>
+          <span class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{{ t('book.detail.editMetadata.providerIds') }}</span>
           <ChevronDown class="size-3.5 text-muted-foreground transition-transform" :class="providerIdsOpen ? 'rotate-180' : ''" />
         </button>
         <div v-if="providerIdsOpen" class="p-3">
@@ -1267,14 +1288,14 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           class="w-full flex items-center justify-between px-3 py-2 bg-muted/40 hover:bg-muted/70 transition-colors"
           @click="toggleComicSection"
         >
-          <span class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Comic Details</span>
+          <span class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{{ t('book.detail.editMetadata.comicDetails') }}</span>
           <ChevronDown class="size-3.5 text-muted-foreground transition-transform" :class="comicSectionOpen ? 'rotate-180' : ''" />
         </button>
         <div v-if="comicSectionOpen" class="p-3 space-y-3">
           <!-- Issue Number | Volume -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <MetadataFieldLabel
-              label="Issue Number"
+              :label="t('book.detail.editMetadata.comicIssueNumberLabel')"
               field="comicIssueNumber"
               :locked="isLocked('comicIssueNumber')"
               :is-updating="isUpdatingLock"
@@ -1287,7 +1308,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               />
             </MetadataFieldLabel>
             <MetadataFieldLabel
-              label="Volume"
+              :label="t('book.detail.editMetadata.comicVolumeLabel')"
               field="comicVolumeName"
               :locked="isLocked('comicVolumeName')"
               :is-updating="isUpdatingLock"
@@ -1302,7 +1323,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           </div>
           <!-- Story Arcs -->
           <MetadataFieldLabel
-            label="Story Arcs"
+            :label="t('book.detail.editMetadata.comicStoryArcsLabel')"
             field="comicStoryArcs"
             :locked="isLocked('comicStoryArcs')"
             :is-updating="isUpdatingLock"
@@ -1314,7 +1335,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           <!-- Pencillers | Inkers -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <MetadataFieldLabel
-              label="Pencillers"
+              :label="t('book.detail.editMetadata.comicPencillersLabel')"
               field="comicPencillers"
               :locked="isLocked('comicPencillers')"
               :is-updating="isUpdatingLock"
@@ -1329,7 +1350,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               />
             </MetadataFieldLabel>
             <MetadataFieldLabel
-              label="Inkers"
+              :label="t('book.detail.editMetadata.comicInkersLabel')"
               field="comicInkers"
               :locked="isLocked('comicInkers')"
               :is-updating="isUpdatingLock"
@@ -1342,7 +1363,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           <!-- Colorists | Letterers -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <MetadataFieldLabel
-              label="Colorists"
+              :label="t('book.detail.editMetadata.comicColoristsLabel')"
               field="comicColorists"
               :locked="isLocked('comicColorists')"
               :is-updating="isUpdatingLock"
@@ -1357,7 +1378,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               />
             </MetadataFieldLabel>
             <MetadataFieldLabel
-              label="Letterers"
+              :label="t('book.detail.editMetadata.comicLetterersLabel')"
               field="comicLetterers"
               :locked="isLocked('comicLetterers')"
               :is-updating="isUpdatingLock"
@@ -1374,7 +1395,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           </div>
           <!-- Cover Artists -->
           <MetadataFieldLabel
-            label="Cover Artists"
+            :label="t('book.detail.editMetadata.comicCoverArtistsLabel')"
             field="comicCoverArtists"
             :locked="isLocked('comicCoverArtists')"
             :is-updating="isUpdatingLock"
@@ -1391,7 +1412,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           <!-- Characters | Teams -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <MetadataFieldLabel
-              label="Characters"
+              :label="t('book.detail.editMetadata.comicCharactersLabel')"
               field="comicCharacters"
               :locked="isLocked('comicCharacters')"
               :is-updating="isUpdatingLock"
@@ -1406,7 +1427,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               />
             </MetadataFieldLabel>
             <MetadataFieldLabel
-              label="Teams"
+              :label="t('book.detail.editMetadata.comicTeamsLabel')"
               field="comicTeams"
               :locked="isLocked('comicTeams')"
               :is-updating="isUpdatingLock"
@@ -1418,7 +1439,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           </div>
           <!-- Locations -->
           <MetadataFieldLabel
-            label="Locations"
+            :label="t('book.detail.editMetadata.comicLocationsLabel')"
             field="comicLocations"
             :locked="isLocked('comicLocations')"
             :is-updating="isUpdatingLock"
@@ -1432,7 +1453,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
 
       <div v-if="form.customMetadata.length > 0" class="rounded-lg border border-border overflow-hidden">
         <div class="px-3 py-2 bg-muted/40">
-          <span class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Custom Metadata</span>
+          <span class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{{ t('book.detail.editMetadata.customMetadata') }}</span>
         </div>
         <div class="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2">
           <label v-for="field in form.customMetadata" :key="field.fieldId" class="space-y-1">
@@ -1473,7 +1494,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
 
       <!-- Description -->
       <MetadataFieldLabel
-        label="Description"
+        :label="t('book.detail.editMetadata.descriptionLabel')"
         field="description"
         :locked="isLocked('description')"
         :is-updating="isUpdatingLock"
@@ -1493,7 +1514,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           @click="handleReset"
         >
           <X class="size-3.5" />
-          Cancel
+          {{ t('common.cancel') }}
         </button>
         <button
           class="inline-grid grid-cols-1 grid-rows-1 flex-1 items-center justify-items-center h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40"

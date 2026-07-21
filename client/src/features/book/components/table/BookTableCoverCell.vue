@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Loader2 } from '@lucide/vue'
 import { useCoverVersions } from '../../composables/useCoverVersions'
 import BookCoverArtwork from '../BookCoverArtwork.vue'
@@ -17,6 +18,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ 'cover-click': [] }>()
+const { t } = useI18n()
 const { isRefreshing } = useRefreshingBooks()
 
 const seed = computed(() => props.title ?? String(props.bookId))
@@ -81,7 +83,7 @@ const adjustedTop = computed(() => {
       :is-comic="isComic"
       tabindex="0"
       role="button"
-      aria-label="View cover"
+      :aria-label="t('book.table.cover.view')"
       class="book-cover-surface--spine-fitted relative flex h-9 w-9 shrink-0 cursor-pointer overflow-hidden rounded-sm transition-opacity hover:opacity-80"
       @click="handleCoverClick"
       @keydown="handleKeydown"

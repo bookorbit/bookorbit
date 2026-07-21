@@ -30,4 +30,21 @@ describe('contentDispositionHeader', () => {
       `attachment; filename="ok-_-_.epub"; filename*=UTF-8''ok--.epub`,
     );
   });
+
+  it('bounds oversized untrusted filenames before encoding', () => {
+    const header = contentDispositionHeader('attachment', `${'a'.repeat(10_000)}.epub`, 'download');
+    const quotedFilename = header.match(/filename="([^"]+)"/)?.[1];
+
+    expect(quotedFilename).toHaveLength(1024);
+    expect(header.length).toBeLessThan(2200);
+  });
+
+  it('rejects non-string runtime values without iterating over an attacker-controlled length', () => {
+    const maliciousValue = { length: Number.MAX_SAFE_INTEGER };
+
+    expect(contentDispositionHeader('attachment', maliciousValue as never, 'download')).toBe(`attachment; filename="download"`);
+    expect(contentDispositionHeader('attachment', 'book.epub', maliciousValue as never)).toBe(
+      `attachment; filename="book.epub"; filename*=UTF-8''book.epub`,
+    );
+  });
 });

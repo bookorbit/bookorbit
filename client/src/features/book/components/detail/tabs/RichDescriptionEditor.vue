@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   Bold,
   Check,
@@ -34,6 +35,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: string | null]
 }>()
+
+const { t } = useI18n()
 
 const linkPanelOpen = ref(false)
 const linkUrl = ref('')
@@ -212,7 +215,7 @@ function applyLink() {
   }
 
   if (!isAllowedLinkUrl(href)) {
-    linkError.value = 'Use http, https, or mailto.'
+    linkError.value = t('book.detail.richDescription.linkProtocolError')
     return
   }
 
@@ -253,152 +256,218 @@ function isAllowedLinkUrl(value: string): boolean {
     <div class="flex min-h-10 flex-wrap items-center gap-1 border-b border-border bg-muted/30 px-1.5 py-1">
       <Tooltip>
         <TooltipTrigger as-child>
-          <button type="button" :class="boldButtonClass" :disabled="!canEdit" aria-label="Bold" @click="toggleBold">
+          <button type="button" :class="boldButtonClass" :disabled="!canEdit" :aria-label="t('book.detail.richDescription.bold')" @click="toggleBold">
             <Bold class="size-4" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>Bold</TooltipContent>
+        <TooltipContent>{{ t('book.detail.richDescription.bold') }}</TooltipContent>
       </Tooltip>
 
       <Tooltip>
         <TooltipTrigger as-child>
-          <button type="button" :class="italicButtonClass" :disabled="!canEdit" aria-label="Italic" @click="toggleItalic">
+          <button
+            type="button"
+            :class="italicButtonClass"
+            :disabled="!canEdit"
+            :aria-label="t('book.detail.richDescription.italic')"
+            @click="toggleItalic"
+          >
             <Italic class="size-4" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>Italic</TooltipContent>
+        <TooltipContent>{{ t('book.detail.richDescription.italic') }}</TooltipContent>
       </Tooltip>
 
       <Tooltip>
         <TooltipTrigger as-child>
-          <button type="button" :class="underlineButtonClass" :disabled="!canEdit" aria-label="Underline" @click="toggleUnderline">
+          <button
+            type="button"
+            :class="underlineButtonClass"
+            :disabled="!canEdit"
+            :aria-label="t('book.detail.richDescription.underline')"
+            @click="toggleUnderline"
+          >
             <Underline class="size-4" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>Underline</TooltipContent>
+        <TooltipContent>{{ t('book.detail.richDescription.underline') }}</TooltipContent>
       </Tooltip>
 
       <Tooltip>
         <TooltipTrigger as-child>
-          <button type="button" :class="strikeButtonClass" :disabled="!canEdit" aria-label="Strikethrough" @click="toggleStrike">
+          <button
+            type="button"
+            :class="strikeButtonClass"
+            :disabled="!canEdit"
+            :aria-label="t('book.detail.richDescription.strikethrough')"
+            @click="toggleStrike"
+          >
             <Strikethrough class="size-4" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>Strikethrough</TooltipContent>
+        <TooltipContent>{{ t('book.detail.richDescription.strikethrough') }}</TooltipContent>
       </Tooltip>
 
       <div class="mx-0.5 h-5 w-px bg-border" />
 
       <Tooltip>
         <TooltipTrigger as-child>
-          <button type="button" :class="bulletListButtonClass" :disabled="!canEdit" aria-label="Bullet list" @click="toggleBulletList">
+          <button
+            type="button"
+            :class="bulletListButtonClass"
+            :disabled="!canEdit"
+            :aria-label="t('book.detail.richDescription.bulletList')"
+            @click="toggleBulletList"
+          >
             <List class="size-4" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>Bullet list</TooltipContent>
+        <TooltipContent>{{ t('book.detail.richDescription.bulletList') }}</TooltipContent>
       </Tooltip>
 
       <Tooltip>
         <TooltipTrigger as-child>
-          <button type="button" :class="orderedListButtonClass" :disabled="!canEdit" aria-label="Numbered list" @click="toggleOrderedList">
+          <button
+            type="button"
+            :class="orderedListButtonClass"
+            :disabled="!canEdit"
+            :aria-label="t('book.detail.richDescription.numberedList')"
+            @click="toggleOrderedList"
+          >
             <ListOrdered class="size-4" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>Numbered list</TooltipContent>
+        <TooltipContent>{{ t('book.detail.richDescription.numberedList') }}</TooltipContent>
       </Tooltip>
 
       <Tooltip>
         <TooltipTrigger as-child>
-          <button type="button" :class="plainButtonClass" :disabled="!canOutdentList" aria-label="Outdent list item" @click="outdentList">
+          <button
+            type="button"
+            :class="plainButtonClass"
+            :disabled="!canOutdentList"
+            :aria-label="t('book.detail.richDescription.outdentAria')"
+            @click="outdentList"
+          >
             <IndentDecrease class="size-4" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>Outdent</TooltipContent>
+        <TooltipContent>{{ t('book.detail.richDescription.outdent') }}</TooltipContent>
       </Tooltip>
 
       <Tooltip>
         <TooltipTrigger as-child>
-          <button type="button" :class="plainButtonClass" :disabled="!canIndentList" aria-label="Indent list item" @click="indentList">
+          <button
+            type="button"
+            :class="plainButtonClass"
+            :disabled="!canIndentList"
+            :aria-label="t('book.detail.richDescription.indentAria')"
+            @click="indentList"
+          >
             <IndentIncrease class="size-4" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>Indent</TooltipContent>
+        <TooltipContent>{{ t('book.detail.richDescription.indent') }}</TooltipContent>
       </Tooltip>
 
       <Tooltip>
         <TooltipTrigger as-child>
-          <button type="button" :class="blockquoteButtonClass" :disabled="!canEdit" aria-label="Quote" @click="toggleBlockquote">
+          <button
+            type="button"
+            :class="blockquoteButtonClass"
+            :disabled="!canEdit"
+            :aria-label="t('book.detail.richDescription.quote')"
+            @click="toggleBlockquote"
+          >
             <Quote class="size-4" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>Quote</TooltipContent>
+        <TooltipContent>{{ t('book.detail.richDescription.quote') }}</TooltipContent>
       </Tooltip>
 
       <div class="mx-0.5 h-5 w-px bg-border" />
 
       <Tooltip>
         <TooltipTrigger as-child>
-          <button type="button" :class="linkButtonClass" :disabled="!canEdit" aria-label="Edit link" @click="toggleLinkPanel">
+          <button
+            type="button"
+            :class="linkButtonClass"
+            :disabled="!canEdit"
+            :aria-label="t('book.detail.richDescription.editLink')"
+            @click="toggleLinkPanel"
+          >
             <LinkIcon class="size-4" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>Link</TooltipContent>
+        <TooltipContent>{{ t('book.detail.richDescription.link') }}</TooltipContent>
       </Tooltip>
 
       <Tooltip>
         <TooltipTrigger as-child>
-          <button type="button" :class="plainButtonClass" :disabled="!canEdit || !isLinkActive" aria-label="Remove link" @click="removeLink">
+          <button
+            type="button"
+            :class="plainButtonClass"
+            :disabled="!canEdit || !isLinkActive"
+            :aria-label="t('book.detail.richDescription.removeLink')"
+            @click="removeLink"
+          >
             <Unlink class="size-4" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>Remove link</TooltipContent>
+        <TooltipContent>{{ t('book.detail.richDescription.removeLink') }}</TooltipContent>
       </Tooltip>
 
       <div class="mx-0.5 h-5 w-px bg-border" />
 
       <Tooltip>
         <TooltipTrigger as-child>
-          <button type="button" :class="plainButtonClass" :disabled="!canUndo" aria-label="Undo" @click="undo">
+          <button type="button" :class="plainButtonClass" :disabled="!canUndo" :aria-label="t('book.detail.richDescription.undo')" @click="undo">
             <Undo2 class="size-4" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>Undo</TooltipContent>
+        <TooltipContent>{{ t('book.detail.richDescription.undo') }}</TooltipContent>
       </Tooltip>
 
       <Tooltip>
         <TooltipTrigger as-child>
-          <button type="button" :class="plainButtonClass" :disabled="!canRedo" aria-label="Redo" @click="redo">
+          <button type="button" :class="plainButtonClass" :disabled="!canRedo" :aria-label="t('book.detail.richDescription.redo')" @click="redo">
             <Redo2 class="size-4" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>Redo</TooltipContent>
+        <TooltipContent>{{ t('book.detail.richDescription.redo') }}</TooltipContent>
       </Tooltip>
 
       <Tooltip>
         <TooltipTrigger as-child>
-          <button type="button" :class="plainButtonClass" :disabled="!canEdit" aria-label="Clear formatting" @click="clearFormatting">
+          <button
+            type="button"
+            :class="plainButtonClass"
+            :disabled="!canEdit"
+            :aria-label="t('book.detail.richDescription.clearFormatting')"
+            @click="clearFormatting"
+          >
             <Eraser class="size-4" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>Clear formatting</TooltipContent>
+        <TooltipContent>{{ t('book.detail.richDescription.clearFormatting') }}</TooltipContent>
       </Tooltip>
 
       <div class="mx-0.5 h-5 w-px bg-border" />
 
       <Tooltip>
         <TooltipTrigger as-child>
-          <button type="button" :class="previewButtonClass" aria-label="Preview description" @click="togglePreview">
+          <button type="button" :class="previewButtonClass" :aria-label="t('book.detail.richDescription.previewDescription')" @click="togglePreview">
             <PencilLine v-if="previewOpen" class="size-4" />
             <Eye v-else class="size-4" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>{{ previewOpen ? 'Edit' : 'Preview' }}</TooltipContent>
+        <TooltipContent>{{ previewOpen ? t('common.edit') : t('book.detail.richDescription.preview') }}</TooltipContent>
       </Tooltip>
     </div>
 
     <div v-if="linkPanelOpen" class="flex flex-wrap items-start gap-2 border-b border-border bg-card px-2 py-2">
       <label class="min-w-0 flex-1">
-        <span class="sr-only">Link URL</span>
+        <span class="sr-only">{{ t('book.detail.richDescription.linkUrlLabel') }}</span>
         <input
           v-model="linkUrl"
           type="url"
@@ -415,26 +484,26 @@ function isAllowedLinkUrl(value: string): boolean {
             <button
               type="button"
               class="inline-flex size-8 items-center justify-center rounded-md border border-input hover:bg-muted"
-              aria-label="Apply link"
+              :aria-label="t('book.detail.richDescription.applyLink')"
               @click="applyLink"
             >
               <Check class="size-4" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Apply</TooltipContent>
+          <TooltipContent>{{ t('book.detail.richDescription.apply') }}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
             <button
               type="button"
               class="inline-flex size-8 items-center justify-center rounded-md border border-input hover:bg-muted"
-              aria-label="Cancel link"
+              :aria-label="t('book.detail.richDescription.cancelLink')"
               @click="closeLinkPanel"
             >
               <X class="size-4" />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Cancel</TooltipContent>
+          <TooltipContent>{{ t('common.cancel') }}</TooltipContent>
         </Tooltip>
       </div>
     </div>
@@ -445,7 +514,7 @@ function isAllowedLinkUrl(value: string): boolean {
     >
       <!-- eslint-disable-next-line vue/no-v-html -- sanitized by sanitizeDescriptionHtml -->
       <div v-if="previewHtml" v-html="previewHtml"></div>
-      <p v-else class="italic text-muted-foreground">No description available.</p>
+      <p v-else class="italic text-muted-foreground">{{ t('book.detail.richDescription.noDescription') }}</p>
     </div>
     <EditorContent v-else-if="editor" :editor="editor" :class="{ 'pointer-events-none opacity-50': disabled }" />
   </div>

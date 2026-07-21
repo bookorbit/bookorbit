@@ -15,12 +15,12 @@ import {
 } from '@nestjs/common';
 
 import { AuditAction, AuditResource } from '@bookorbit/types';
-import type { BookQuery } from '@bookorbit/types';
+import type { BookQuery, JumpBucketsQuery } from '@bookorbit/types';
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';
-import { BookQueryPipe } from '../book/pipes/book-query.pipe';
+import { BookQueryPipe, JumpBucketsQueryPipe } from '../book/pipes/book-query.pipe';
 import { CreateSmartScopeDto } from './dto/create-smart-scope.dto';
 import { ReorderSmartScopesDto } from './dto/reorder-smart-scopes.dto';
 import { UpdateSmartScopeDto } from './dto/update-smart-scope.dto';
@@ -120,7 +120,7 @@ export class SmartScopeController {
   }
 
   @Post(':id/books/jump-buckets')
-  queryJumpBuckets(@Param('id', ParseIntPipe) id: number, @Body(BookQueryPipe) query: BookQuery, @CurrentUser() user: RequestUser) {
+  queryJumpBuckets(@Param('id', ParseIntPipe) id: number, @Body(JumpBucketsQueryPipe) query: JumpBucketsQuery, @CurrentUser() user: RequestUser) {
     return this.smartScopeService.queryJumpBuckets(id, user, query);
   }
 }

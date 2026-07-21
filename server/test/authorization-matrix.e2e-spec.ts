@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { ConfigService } from '@nestjs/config';
 import { Permission } from '@bookorbit/types';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import { and, eq, inArray } from 'drizzle-orm';
 
 import { createCoverToken } from '../src/modules/opds/opds-auth.guard';
 import * as schema from '../src/db/schema';
@@ -224,6 +225,7 @@ describe('Authorization matrix (e2e)', () => {
 
     const session = await createReadingSession(ctx, {
       userId: personas.ownerUser.userId,
+      bookId: bookB.bookId,
       bookFileId: bookB.bookFileId,
       startedAt: new Date('2026-01-01T10:00:00.000Z'),
       endedAt: new Date('2026-01-01T10:30:00.000Z'),
@@ -273,6 +275,168 @@ describe('Authorization matrix (e2e)', () => {
 
   afterAll(async () => {
     await closeAuthorizationMatrixE2EContext(ctx);
+  });
+
+  describe('shared reading insights privacy contract', () => {
+    it('enforces permission, consent, session snapshots, revocation, and one audit event per profile view', async () => {
+      const subjectId = personas.basicUser.userId;
+      const rawGenreName = `private-label-${randomUUID()}`;
+      const duplicateBroadGenreNames = [`fantasy-${randomUUID()}`, `fantastik-${randomUUID()}`];
+      const insertedGenres = await ctx.db
+        .insert(schema.genres)
+        .values([rawGenreName, ...duplicateBroadGenreNames].map((name) => ({ name })))
+        .returning({ id: schema.genres.id, name: schema.genres.name });
+      await ctx.db.insert(schema.bookGenres).values(insertedGenres.map((genre) => ({ bookId: bookA.bookId, genreId: genre.id })));
+      await ctx.db.insert(schema.readingSessions).values({
+        userId: subjectId,
+        bookId: bookA.bookId,
+        bookFileId: bookA.bookFileId,
+        sessionId: `shared-insights-${randomUUID()}`,
+        source: 'web',
+        startedAt: new Date(Date.now() - 20 * 60 * 1000),
+        endedAt: new Date(Date.now() - 5 * 60 * 1000),
+        durationSeconds: 15 * 60,
+      });
+      const privateAsSuperuser = await ctx.app.inject({
+        method: 'POST',
+        url: `/api/v1/shared-reading-insights/${subjectId}/view-sessions`,
+        headers: authHeader(personas.targetSuperuser.accessToken),
+      });
+      expect(privateAsSuperuser.statusCode).toBe(403);
+      expect(privateAsSuperuser.json()).toEqual(expect.objectContaining({ errorCode: 'READING_INSIGHTS_PRIVATE' }));
+
+      const enableSummary = await ctx.app.inject({
+        method: 'PATCH',
+        url: '/api/v1/reading-insights-sharing/me',
+        headers: authHeader(personas.basicUser.accessToken),
+        payload: { sharingLevel: 'summary' },
+      });
+      expect(enableSummary.statusCode).toBe(200);
+
+      const consentWithoutPermission = await ctx.app.inject({
+        method: 'POST',
+        url: `/api/v1/shared-reading-insights/${subjectId}/view-sessions`,
+        headers: authHeader(personas.otherUser.accessToken),
+      });
+      expectError(consentWithoutPermission, 403, 'Missing permission: view_user_activity');
+
+      const summarySessionResponse = await ctx.app.inject({
+        method: 'POST',
+        url: `/api/v1/shared-reading-insights/${subjectId}/view-sessions`,
+        headers: authHeader(personas.allPermsUser.accessToken),
+      });
+      expect(summarySessionResponse.statusCode).toBe(201);
+      const summarySession = summarySessionResponse.json() as { viewSessionId: string; sharingLevel: string };
+      expect(summarySession.sharingLevel).toBe('summary');
+      const sessionHeaders = {
+        ...authHeader(personas.allPermsUser.accessToken),
+        'x-reading-insights-view-session': summarySession.viewSessionId,
+      };
+
+      const summaryResponse = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/shared-reading-insights/${subjectId}/summary?days=90`,
+        headers: sessionHeaders,
+      });
+      expect(summaryResponse.statusCode).toBe(200);
+      const summaryBody = summaryResponse.json() as Record<string, unknown>;
+      expect(summaryBody).not.toHaveProperty('topBooks');
+      expect(summaryBody).not.toHaveProperty('recentBooks');
+      expect(summaryBody).not.toHaveProperty('bookId');
+      expect(summaryBody).not.toHaveProperty('title');
+      expect(summaryBody.genreDistribution).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'other' })]));
+      expect(summaryBody.genreDistribution).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'fantasy', readingSeconds: 15 * 60 })]));
+      expect(JSON.stringify(summaryBody)).not.toContain(rawGenreName);
+
+      const summaryOnlyDetail = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/shared-reading-insights/${subjectId}/detailed?days=90`,
+        headers: sessionHeaders,
+      });
+      expect(summaryOnlyDetail.statusCode).toBe(403);
+      expect(summaryOnlyDetail.json()).toEqual(expect.objectContaining({ errorCode: 'READING_INSIGHTS_SUMMARY_ONLY' }));
+
+      await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/shared-reading-insights/${subjectId}/summary?days=30`,
+        headers: sessionHeaders,
+      });
+      const firstHistory = await ctx.app.inject({
+        method: 'GET',
+        url: '/api/v1/reading-insights-sharing/me/access-history?page=1&pageSize=20',
+        headers: authHeader(personas.basicUser.accessToken),
+      });
+      expect(firstHistory.statusCode).toBe(200);
+      expect(firstHistory.json()).toEqual(expect.objectContaining({ total: 1, items: [expect.objectContaining({ sharingLevel: 'summary' })] }));
+
+      const enableDetailed = await ctx.app.inject({
+        method: 'PATCH',
+        url: '/api/v1/reading-insights-sharing/me',
+        headers: authHeader(personas.basicUser.accessToken),
+        payload: { sharingLevel: 'detailed' },
+      });
+      expect(enableDetailed.statusCode).toBe(200);
+
+      const oldSessionAfterUpgrade = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/shared-reading-insights/${subjectId}/detailed?days=90`,
+        headers: sessionHeaders,
+      });
+      expect(oldSessionAfterUpgrade.statusCode).toBe(403);
+      expect(oldSessionAfterUpgrade.json()).toEqual(expect.objectContaining({ errorCode: 'READING_INSIGHTS_SUMMARY_ONLY' }));
+
+      const detailedSessionResponse = await ctx.app.inject({
+        method: 'POST',
+        url: `/api/v1/shared-reading-insights/${subjectId}/view-sessions`,
+        headers: authHeader(personas.allPermsUser.accessToken),
+      });
+      expect(detailedSessionResponse.statusCode).toBe(201);
+      const detailedSession = detailedSessionResponse.json() as { viewSessionId: string };
+      const detailedResponse = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/shared-reading-insights/${subjectId}/detailed?days=90`,
+        headers: {
+          ...authHeader(personas.allPermsUser.accessToken),
+          'x-reading-insights-view-session': detailedSession.viewSessionId,
+        },
+      });
+      expect(detailedResponse.statusCode).toBe(200);
+
+      const auditResponse = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/audit-log?action=reading_insights.profile.view&userId=${personas.allPermsUser.userId}`,
+        headers: authHeader(personas.allPermsUser.accessToken),
+      });
+      expect(auditResponse.statusCode).toBe(200);
+      expect(auditResponse.json()).toEqual(expect.objectContaining({ total: 2 }));
+
+      const withdraw = await ctx.app.inject({
+        method: 'PATCH',
+        url: '/api/v1/reading-insights-sharing/me',
+        headers: authHeader(personas.basicUser.accessToken),
+        payload: { sharingLevel: 'private' },
+      });
+      expect(withdraw.statusCode).toBe(200);
+
+      const afterWithdrawal = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/shared-reading-insights/${subjectId}/summary?days=90`,
+        headers: {
+          ...authHeader(personas.allPermsUser.accessToken),
+          'x-reading-insights-view-session': detailedSession.viewSessionId,
+        },
+      });
+      expect(afterWithdrawal.statusCode).toBe(403);
+      expect(afterWithdrawal.json()).toEqual(expect.objectContaining({ errorCode: 'READING_INSIGHTS_PRIVATE' }));
+
+      const otherHistory = await ctx.app.inject({
+        method: 'GET',
+        url: '/api/v1/reading-insights-sharing/me/access-history?page=1&pageSize=20',
+        headers: authHeader(personas.otherUser.accessToken),
+      });
+      expect(otherHistory.statusCode).toBe(200);
+      expect(otherHistory.json()).toEqual(expect.objectContaining({ total: 0, items: [] }));
+    });
   });
 
   describe('guard matrix - jwt/permission/library/default-password', () => {
@@ -396,6 +560,12 @@ describe('Authorization matrix (e2e)', () => {
           path: '/metadata-preferences/global',
           token: 'allPerms',
         },
+        [Permission.ManageIcons]: {
+          method: 'PATCH',
+          path: '/custom-icons/:slug',
+          payload: {},
+          token: 'allPerms',
+        },
         [Permission.ManageAppSettings]: {
           method: 'GET',
           path: '/app-settings',
@@ -409,6 +579,11 @@ describe('Authorization matrix (e2e)', () => {
         [Permission.ViewAuditLog]: {
           method: 'GET',
           path: '/audit-log',
+          token: 'allPerms',
+        },
+        [Permission.ViewUserActivity]: {
+          method: 'GET',
+          path: '/account-activity/summary',
           token: 'allPerms',
         },
         [Permission.NotificationAccess]: {
@@ -699,9 +874,20 @@ describe('Authorization matrix (e2e)', () => {
       });
       expect(response.statusCode).toBe(200);
       const entitlements = response.json() as unknown[];
-      const syncedBookIds = extractKoboEntitlementBookIds(entitlements);
-      expect(syncedBookIds).toContain(bookA.bookId);
-      expect(syncedBookIds).not.toContain(bookB.bookId);
+      const syncedEntitlementIds = extractKoboEntitlementIds(entitlements);
+      const identities = await ctx.db
+        .select({ bookId: schema.koboBookEntitlements.bookId, entitlementId: schema.koboBookEntitlements.entitlementId })
+        .from(schema.koboBookEntitlements)
+        .where(
+          and(
+            eq(schema.koboBookEntitlements.userId, personas.koboActive.userId),
+            inArray(schema.koboBookEntitlements.bookId, [bookA.bookId, bookB.bookId]),
+          ),
+        );
+      const entitlementByBookId = new Map(identities.map((identity) => [identity.bookId, identity.entitlementId]));
+      expect(syncedEntitlementIds).toContain(entitlementByBookId.get(bookA.bookId));
+      const inaccessibleEntitlementId = entitlementByBookId.get(bookB.bookId);
+      if (inaccessibleEntitlementId) expect(syncedEntitlementIds).not.toContain(inaccessibleEntitlementId);
     });
 
     it('does not expose metadata for books outside active library access', async () => {
@@ -754,10 +940,15 @@ describe('Authorization matrix (e2e)', () => {
         url: `/api/v1/kobo/${koboActiveDeviceToken}/v1/library/${bookA.bookId}/state`,
       });
       expect(readState.statusCode).toBe(200);
+      const [identity] = await ctx.db
+        .select({ entitlementId: schema.koboBookEntitlements.entitlementId })
+        .from(schema.koboBookEntitlements)
+        .where(and(eq(schema.koboBookEntitlements.userId, personas.koboActive.userId), eq(schema.koboBookEntitlements.bookId, bookA.bookId)))
+        .limit(1);
       expect(readState.json()).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            EntitlementId: String(bookA.bookId),
+            EntitlementId: identity.entitlementId,
           }),
         ]),
       );
@@ -1237,8 +1428,8 @@ describe('Authorization matrix (e2e)', () => {
     return asRecord[key] ?? null;
   }
 
-  function extractKoboEntitlementBookIds(entitlements: unknown[]): number[] {
-    const ids = new Set<number>();
+  function extractKoboEntitlementIds(entitlements: unknown[]): string[] {
+    const ids = new Set<string>();
     for (const item of entitlements) {
       if (!item || typeof item !== 'object') continue;
       const record = item as Record<string, unknown>;
@@ -1249,10 +1440,7 @@ describe('Authorization matrix (e2e)', () => {
       if (!payload || typeof payload !== 'object') continue;
       const entitlement = payload.BookEntitlement as Record<string, unknown> | undefined;
       const rawId = entitlement?.Id ?? entitlement?.RevisionId ?? entitlement?.CrossRevisionId;
-      const parsedId = typeof rawId === 'string' ? Number.parseInt(rawId, 10) : Number.NaN;
-      if (Number.isFinite(parsedId)) {
-        ids.add(parsedId);
-      }
+      if (typeof rawId === 'string') ids.add(rawId);
     }
     return [...ids];
   }

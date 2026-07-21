@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { CommonModule } from '../../common/common.module';
 import { AchievementModule } from '../achievement/achievement.module';
+import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { AnnotationModule } from '../annotation/annotation.module';
 import { BookModule } from '../book/book.module';
 import { DashboardModule } from '../dashboard/dashboard.module';
@@ -35,6 +36,7 @@ import { KoreaderStatsService } from './koreader-stats.service';
     UserBookNoteModule,
     UserBookStatusModule,
     AchievementModule,
+    AppSettingsModule,
     AnnotationModule,
     BookModule,
     DashboardModule,

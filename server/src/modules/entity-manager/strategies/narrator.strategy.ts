@@ -1,11 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db';
 import * as schema from '../../../db/schema';
 import { bookMetadata, bookNarrators, books, narrators } from '../../../db/schema';
-import type { BrowseParams, BrowseResult } from './entity-strategy.interface';
+import type { BrowseParams, BrowseResult, EntityBookScope } from './entity-strategy.interface';
+import { buildEntityBookScopeClauses } from './entity-book-scope';
 import { JunctionEntityStrategy } from './junction-entity.strategy';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -49,13 +50,13 @@ export class NarratorStrategy extends JunctionEntityStrategy {
     };
   }
 
-  override async getBookTitles(id: number | string, limit: number): Promise<string[]> {
+  override async getBookTitles(id: number | string, limit: number, scope?: EntityBookScope): Promise<string[]> {
     const rows = await this.db
       .select({ title: sql<string>`COALESCE(${bookMetadata.title}, 'Untitled')` })
       .from(bookNarrators)
       .innerJoin(books, eq(books.id, bookNarrators.bookId))
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-      .where(eq(bookNarrators.narratorId, id as number))
+      .where(and(eq(bookNarrators.narratorId, id as number), ...(scope ? buildEntityBookScopeClauses(this.db, scope) : [])))
       .orderBy(asc(bookMetadata.title))
       .limit(limit);
     return rows.map((r) => r.title);

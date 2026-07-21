@@ -1,38 +1,41 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Keyboard, X } from '@lucide/vue'
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   close: []
 }>()
 
-const shortcutGroups = [
+const shortcutGroups = computed(() => [
   {
-    title: 'Panels',
+    title: t('reader.shortcuts.groups.panels'),
     shortcuts: [
-      { key: 't', description: 'Toggle table of contents' },
-      { key: 's', description: 'Toggle search' },
-      { key: '?', description: 'Show/hide this help' },
-      { key: 'Esc', description: 'Close panel' },
+      { key: 't', description: t('reader.shortcuts.toggleToc') },
+      { key: 's', description: t('reader.shortcuts.toggleSearch') },
+      { key: '?', description: t('reader.shortcuts.toggleHelp') },
+      { key: 'Esc', description: t('reader.shortcuts.closePanel') },
     ],
   },
   {
-    title: 'Reading',
+    title: t('reader.shortcuts.groups.reading'),
     shortcuts: [
-      { key: '← →', description: 'Previous/next page' },
-      { key: 'Home', description: 'Go to start of book' },
-      { key: 'End', description: 'Go to end of book' },
+      { key: '← →', description: t('reader.shortcuts.prevNextPage') },
+      { key: 'Home', description: t('reader.shortcuts.goToStart') },
+      { key: 'End', description: t('reader.shortcuts.goToEnd') },
     ],
   },
   {
-    title: 'Actions',
+    title: t('reader.shortcuts.groups.actions'),
     shortcuts: [
-      { key: 'b', description: 'Toggle bookmark' },
-      { key: 'f', description: 'Toggle fullscreen' },
-      { key: 'm', description: 'Cycle footer info mode' },
+      { key: 'b', description: t('reader.shortcuts.toggleBookmark') },
+      { key: 'f', description: t('reader.shortcuts.toggleFullscreen') },
+      { key: 'm', description: t('reader.shortcuts.cycleFooterMode') },
     ],
   },
-]
+])
 
 function onKeyDown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
@@ -58,7 +61,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeyDown, true))
       <div class="flex items-center justify-between border-b border-border/80 bg-gradient-to-br from-muted/75 via-card to-muted/40 px-4 py-3">
         <div class="inline-flex items-center gap-2">
           <Keyboard :size="14" class="text-primary" />
-          <h2 class="text-sm font-semibold text-foreground">Keyboard Shortcuts</h2>
+          <h2 class="text-sm font-semibold text-foreground">{{ t('reader.shortcuts.title') }}</h2>
         </div>
 
         <button class="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" @click="emit('close')">

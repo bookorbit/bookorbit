@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import { ShieldCheck } from '@lucide/vue'
 
 import { readCssColor } from '@/lib/echarts'
 import { useLibraryIntegrityGauge } from '../../composables/useLibraryIntegrityGauge'
 import ChartCard from '../ChartCard.vue'
+
+const { t } = useI18n()
 
 const { data, loading, error } = useLibraryIntegrityGauge()
 const option = shallowRef({})
@@ -96,7 +99,7 @@ watchEffect(() => {
 </script>
 
 <template>
-  <ChartCard title="Library Integrity" :icon="ShieldCheck" :color-index="4" :loading :error :empty="totalBooks === 0">
+  <ChartCard :title="t('statistics.charts.libraryIntegrity.title')" :icon="ShieldCheck" :color-index="4" :loading :error :empty="totalBooks === 0">
     <div class="flex h-full flex-col">
       <VChart :option="option" autoresize style="height: 76%" />
       <div class="mt-0 grid grid-cols-3 gap-2 px-1">

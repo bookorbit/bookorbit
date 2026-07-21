@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { formatNumber } from '@/i18n/formatters'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowUpDown, CheckCheck, Filter, RefreshCcw, Search, SlidersHorizontal, Trash2, X } from '@lucide/vue'
 import { toast } from 'vue-sonner'
@@ -23,6 +25,7 @@ import { useRefreshingAuthors } from '../composables/useRefreshingAuthors'
 import type { AuthorListSort, SortDirection } from '../types/author'
 import type { BookViewMode } from '@/composables/useDisplaySettings'
 
+const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const mainRef = ref<HTMLElement | null>(null)
@@ -64,17 +67,17 @@ const authorViewMode = computed<BookViewMode>({
   },
 })
 
-const SORT_LABELS: Record<AuthorListSort, string> = {
-  name: 'Name',
-  sortName: 'Sort Name',
-  bookCount: 'Book Count',
-  lastAddedAt: 'Recent Additions',
-  lastEnrichedAt: 'Last Enriched',
-}
+const sortLabels = computed<Record<AuthorListSort, string>>(() => ({
+  name: t('author.list.sort.name'),
+  sortName: t('author.list.sort.sortName'),
+  bookCount: t('author.list.sort.bookCount'),
+  lastAddedAt: t('author.list.sort.recentAdditions'),
+  lastEnrichedAt: t('author.list.sort.lastEnriched'),
+}))
 
 const isDefaultSort = computed(() => sort.value === 'name' && order.value === 'asc')
 
-const sortSummary = computed(() => `${SORT_LABELS[sort.value]} ${order.value === 'asc' ? '↑' : '↓'}`)
+const sortSummary = computed(() => `${sortLabels.value[sort.value]} ${order.value === 'asc' ? '↑' : '↓'}`)
 
 const activeFilterCount = computed(() => {
   let count = 0
@@ -93,23 +96,23 @@ const deleteDialogLoading = computed(() => {
 })
 
 const deleteDialogTitle = computed(() => {
-  if (pendingDeleteIds.value.length > 1) return `Delete ${pendingDeleteIds.value.length} authors?`
-  return 'Delete author?'
+  if (pendingDeleteIds.value.length > 1) return t('author.list.deleteDialog.titleMany', { count: pendingDeleteIds.value.length })
+  return t('author.list.deleteDialog.titleOne')
 })
 
 const deleteDialogDescription = computed(() => {
   if (pendingDeleteIds.value.length > 1) {
-    return 'This removes selected authors from the catalog and unlinks them from associated books. This action cannot be undone.'
+    return t('author.list.deleteDialog.descriptionMany')
   }
-  return 'This removes the author from the catalog and unlinks it from associated books. This action cannot be undone.'
+  return t('author.list.deleteDialog.descriptionOne')
 })
 
 function showRefreshResultToast(updated: { imageUrl?: string | null }) {
   if (!updated.imageUrl) {
-    toast.warning('Metadata refreshed, but no author image was found.')
+    toast.warning(t('author.list.toast.refreshedNoImage'))
     return
   }
-  toast.success('Author metadata refreshed')
+  toast.success(t('author.list.toast.refreshed'))
 }
 
 function parseSort(value: unknown): AuthorListSort {
@@ -269,12 +272,12 @@ async function refreshSelectedAuthorsMetadata() {
     })
 
     if (result.failed > 0) {
-      toast.warning(`Refreshed ${result.updated} author(s), ${result.failed} failed`)
+      toast.warning(t('author.list.toast.bulkRefreshPartial', { updated: result.updated, failed: result.failed }))
     } else {
-      toast.success(`Refreshed metadata for ${result.updated} author(s)`)
+      toast.success(t('author.list.toast.bulkRefreshSuccess', { updated: result.updated }))
     }
   } catch (actionError) {
-    toast.error(actionError instanceof Error ? actionError.message : 'Failed to refresh selected authors')
+    toast.error(actionError instanceof Error ? actionError.message : t('author.list.toast.bulkRefreshFailed'))
   } finally {
     clearRefreshing(ids)
     bulkRefreshing.value = false
@@ -297,7 +300,7 @@ async function refreshSingleAuthorMetadata(authorId: number) {
     }
     showRefreshResultToast(updated)
   } catch (actionError) {
-    toast.error(actionError instanceof Error ? actionError.message : 'Failed to refresh author metadata')
+    toast.error(actionError instanceof Error ? actionError.message : t('author.list.toast.refreshFailed'))
   } finally {
     clearRefreshing([authorId])
   }
@@ -340,10 +343,18 @@ async function confirmDeleteAuthors() {
     await load(true)
     if (ids.length > 1) exitSelectionMode()
 
-    const noun = result.deletedAuthorIds.length === 1 ? 'author' : 'authors'
-    toast.success(`Deleted ${result.deletedAuthorIds.length} ${noun}; affected ${result.affectedBookCount} books`)
+    toast.success(
+      t(
+        'author.list.toast.deleteSuccess',
+        {
+          count: result.deletedAuthorIds.length,
+          books: result.affectedBookCount,
+        },
+        result.deletedAuthorIds.length,
+      ),
+    )
   } catch (actionError) {
-    toast.error(actionError instanceof Error ? actionError.message : 'Failed to delete author(s)')
+    toast.error(actionError instanceof Error ? actionError.message : t('author.list.toast.deleteFailed'))
   } finally {
     if (singleAuthorId !== null) {
       deletingAuthorId.value = null
@@ -434,7 +445,7 @@ defineOptions({ name: 'AuthorsView' })
   <div class="flex h-full flex-col">
     <section class="flex flex-1 flex-col min-h-0">
       <ViewHeader
-        title="Authors"
+        :title="t('author.list.title')"
         icon="Users"
         fallback-icon="Users"
         :total="total"
@@ -452,7 +463,7 @@ defineOptions({ name: 'AuthorsView' })
             <input
               v-model="q"
               type="search"
-              placeholder="Search authors"
+              :placeholder="t('author.list.searchPlaceholder')"
               class="author-search-input h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/85"
             />
             <button v-if="q.trim()" class="ml-1 text-muted-foreground/85 transition-colors hover:text-foreground" @click="clearSearchQuery">
@@ -475,11 +486,11 @@ defineOptions({ name: 'AuthorsView' })
                 >
                   <ArrowUpDown :size="13" />
                   <span class="hidden lg:inline">{{ sortSummary }}</span>
-                  <span class="lg:hidden">Sort</span>
+                  <span class="lg:hidden">{{ t('author.list.sortButton') }}</span>
                 </button>
               </PopoverTrigger>
               <PopoverContent align="start" class="w-56 p-2">
-                <div class="mb-2 px-1 text-xs font-medium text-muted-foreground">Sort by</div>
+                <div class="mb-2 px-1 text-xs font-medium text-muted-foreground">{{ t('author.list.sortBy') }}</div>
                 <div class="flex flex-col gap-0.5">
                   <button
                     v-for="field in ['name', 'sortName', 'bookCount', 'lastAddedAt', 'lastEnrichedAt'] as const"
@@ -488,7 +499,7 @@ defineOptions({ name: 'AuthorsView' })
                     :class="sort === field ? 'text-foreground font-medium' : 'text-muted-foreground'"
                     @click="setSortField(field)"
                   >
-                    {{ SORT_LABELS[field] }}
+                    {{ sortLabels[field] }}
                     <span v-if="sort === field" class="text-xs text-primary">{{ order === 'asc' ? '↑' : '↓' }}</span>
                   </button>
                 </div>
@@ -501,7 +512,7 @@ defineOptions({ name: 'AuthorsView' })
                     :class="order === dir ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground'"
                     @click="setSortOrder(dir)"
                   >
-                    {{ dir === 'asc' ? 'Ascending' : 'Descending' }}
+                    {{ dir === 'asc' ? t('author.list.ascending') : t('author.list.descending') }}
                   </button>
                 </div>
               </PopoverContent>
@@ -509,7 +520,7 @@ defineOptions({ name: 'AuthorsView' })
             <button
               v-if="!isDefaultSort"
               class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-destructive hover:bg-muted"
-              aria-label="Reset sort to default"
+              :aria-label="t('common.resetSortAria')"
               @click="resetSort"
             >
               <X :size="13" />
@@ -528,7 +539,7 @@ defineOptions({ name: 'AuthorsView' })
             "
           >
             <Filter :size="13" />
-            <span>Filters</span>
+            <span>{{ t('author.list.filters') }}</span>
             <span v-if="activeFilterCount > 0" class="text-xs font-semibold">({{ activeFilterCount }})</span>
           </button>
 
@@ -538,7 +549,7 @@ defineOptions({ name: 'AuthorsView' })
             class="hidden sm:flex h-8 items-center gap-1 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:text-destructive"
           >
             <X :size="13" />
-            Clear
+            {{ t('author.list.clear') }}
           </button>
 
           <button
@@ -548,7 +559,7 @@ defineOptions({ name: 'AuthorsView' })
                 ? 'border-primary text-primary bg-primary/10'
                 : 'border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
             "
-            aria-label="Show author controls"
+            :aria-label="t('author.list.showControlsAria')"
             @click="toggleMobileControls"
           >
             <SlidersHorizontal :size="14" />
@@ -569,7 +580,7 @@ defineOptions({ name: 'AuthorsView' })
             ref="mobileSearchInput"
             v-model="q"
             type="search"
-            placeholder="Search authors"
+            :placeholder="t('author.list.searchPlaceholder')"
             class="mobile-search-input h-9 w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/85"
           />
           <button v-if="q.trim()" class="text-muted-foreground/85 transition-colors hover:text-foreground" @click="clearSearchQuery">
@@ -585,7 +596,7 @@ defineOptions({ name: 'AuthorsView' })
               @change="onMobileSortChange"
             >
               <option v-for="field in ['name', 'sortName', 'bookCount', 'lastAddedAt', 'lastEnrichedAt'] as const" :key="field" :value="field">
-                {{ SORT_LABELS[field] }}
+                {{ sortLabels[field] }}
               </option>
             </select>
             <ArrowUpDown :size="13" class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/85" />
@@ -600,7 +611,7 @@ defineOptions({ name: 'AuthorsView' })
             "
             @click="setSortOrder(order === 'asc' ? 'desc' : 'asc')"
           >
-            {{ order === 'asc' ? 'Asc' : 'Desc' }}
+            {{ order === 'asc' ? t('author.list.asc') : t('author.list.desc') }}
           </button>
 
           <button
@@ -608,7 +619,7 @@ defineOptions({ name: 'AuthorsView' })
             class="h-8 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:text-destructive"
             @click="clearFilters"
           >
-            Clear
+            {{ t('author.list.clear') }}
           </button>
         </div>
 
@@ -656,8 +667,8 @@ defineOptions({ name: 'AuthorsView' })
         </div>
 
         <div v-if="!loading && items.length === 0" class="flex flex-col items-center justify-center gap-2 py-24 text-center">
-          <p class="text-sm font-medium text-foreground">No authors found</p>
-          <p class="text-xs text-muted-foreground">Try changing search text, sort, or library filter.</p>
+          <p class="text-sm font-medium text-foreground">{{ t('author.list.empty.title') }}</p>
+          <p class="text-xs text-muted-foreground">{{ t('author.list.empty.hint') }}</p>
         </div>
 
         <div
@@ -697,9 +708,9 @@ defineOptions({ name: 'AuthorsView' })
         </div>
 
         <div ref="sentinel" class="mt-4 flex h-8 items-center justify-center">
-          <span v-if="loading" class="text-xs text-muted-foreground">Loading...</span>
+          <span v-if="loading" class="text-xs text-muted-foreground">{{ t('common.loading') }}</span>
           <span v-else-if="initialLoadComplete && !hasMore && items.length > 0" class="text-xs text-muted-foreground">
-            All {{ total.toLocaleString() }} authors loaded
+            {{ t('author.list.allLoaded', { total: formatNumber(total) }) }}
           </span>
         </div>
       </main>
@@ -727,7 +738,7 @@ defineOptions({ name: 'AuthorsView' })
                 <CheckCheck :size="17" />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top">Select visible</TooltipContent>
+            <TooltipContent side="top">{{ t('author.list.selection.selectVisible') }}</TooltipContent>
           </Tooltip>
 
           <Tooltip v-if="canRefreshMetadata">
@@ -741,7 +752,9 @@ defineOptions({ name: 'AuthorsView' })
                 <RefreshCcw :size="17" :class="bulkRefreshing ? 'animate-spin' : ''" />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top">{{ bulkRefreshing ? 'Refreshing metadata...' : 'Refresh metadata' }}</TooltipContent>
+            <TooltipContent side="top">{{
+              bulkRefreshing ? t('author.list.selection.refreshingMetadata') : t('author.list.selection.refreshMetadata')
+            }}</TooltipContent>
           </Tooltip>
 
           <Tooltip v-if="canDeleteAuthors">
@@ -759,7 +772,9 @@ defineOptions({ name: 'AuthorsView' })
                 <Trash2 :size="17" />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top">{{ bulkDeleting ? 'Deleting...' : 'Delete selected' }}</TooltipContent>
+            <TooltipContent side="top">{{
+              bulkDeleting ? t('author.list.selection.deleting') : t('author.list.selection.deleteSelected')
+            }}</TooltipContent>
           </Tooltip>
 
           <div class="w-px h-5 bg-border mx-1 shrink-0" />
@@ -773,14 +788,14 @@ defineOptions({ name: 'AuthorsView' })
                 <X :size="17" />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top">Exit selection</TooltipContent>
+            <TooltipContent side="top">{{ t('author.list.selection.exitSelection') }}</TooltipContent>
           </Tooltip>
         </template>
 
         <template v-else>
-          <span class="px-3 text-sm font-semibold text-destructive whitespace-nowrap"
-            >Delete {{ selectedCount }} author{{ selectedCount === 1 ? '' : 's' }}?</span
-          >
+          <span class="px-3 text-sm font-semibold text-destructive whitespace-nowrap">{{
+            t('author.list.selection.confirmDeleteCount', { count: selectedCount }, selectedCount)
+          }}</span>
 
           <div class="w-px h-5 bg-border mx-1 shrink-0" />
 
@@ -789,7 +804,7 @@ defineOptions({ name: 'AuthorsView' })
             :disabled="bulkDeleting"
             @click="confirmDeleteSelectedFromPopover"
           >
-            {{ bulkDeleting ? 'Deleting...' : 'Delete' }}
+            {{ bulkDeleting ? t('author.list.selection.deleting') : t('common.delete') }}
           </button>
 
           <button
@@ -797,7 +812,7 @@ defineOptions({ name: 'AuthorsView' })
             :disabled="bulkDeleting"
             @click="confirmingBulkDelete = false"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
         </template>
       </template>
@@ -807,7 +822,7 @@ defineOptions({ name: 'AuthorsView' })
       :open="deleteDialogOpen"
       :title="deleteDialogTitle"
       :description="deleteDialogDescription"
-      confirm-label="Delete"
+      :confirm-label="t('common.delete')"
       :loading="deleteDialogLoading"
       destructive
       @confirm="confirmDeleteAuthors"

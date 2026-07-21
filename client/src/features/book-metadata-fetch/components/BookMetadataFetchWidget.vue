@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { Sparkles, Users } from '@lucide/vue'
+import { Sparkles, Users, X } from '@lucide/vue'
 import { toast } from 'vue-sonner'
+import { useI18n } from 'vue-i18n'
 import { useBookMetadataFetchStatus } from '../composables/useBookMetadataFetchStatus'
 import { useAuthorEnrichmentStatus } from '@/features/settings/composables/useAuthorEnrichmentStatus'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -13,6 +14,7 @@ import AuthorEnrichmentReportModal from './AuthorEnrichmentReportModal.vue'
 const { status, subscribe } = useBookMetadataFetchStatus()
 const { status: authorStatus, subscribe: subscribeAuthors } = useAuthorEnrichmentStatus()
 const { hasPermission, isSuperuser } = usePermissions()
+const { t } = useI18n()
 
 const canView = computed(() => isSuperuser.value || hasPermission('manage_metadata_config'))
 
@@ -40,15 +42,23 @@ watch(
   },
 )
 
-const isBookFetchActive = computed(() => status.value.queued + status.value.processing + status.value.failed > 0)
-const isAuthorActive = computed(
-  () => authorStatus.value.queued + authorStatus.value.processing + authorStatus.value.rateLimited + authorStatus.value.failed > 0,
-)
+const hasBookWork = computed(() => status.value.queued + status.value.processing > 0)
+const hasAuthorWork = computed(() => authorStatus.value.queued + authorStatus.value.processing + authorStatus.value.rateLimited > 0)
+const hasBookStatus = computed(() => hasBookWork.value || status.value.failed > 0)
+const hasAuthorStatus = computed(() => hasAuthorWork.value || authorStatus.value.failed > 0)
+const bookCardDismissed = ref(false)
+const authorCardDismissed = ref(false)
+const showBookCard = computed(() => hasBookStatus.value && !bookCardDismissed.value)
+const showAuthorCard = computed(() => hasAuthorStatus.value && !authorCardDismissed.value)
 
-watch(isAuthorActive, (active) => {
+watch(hasBookWork, (active, wasActive) => {
+  if (active && !wasActive) bookCardDismissed.value = false
+})
+watch(hasAuthorWork, (active, wasActive) => {
+  if (active && !wasActive) authorCardDismissed.value = false
   if (!active) lastAuthorName.value = null
 })
-const isAnyActive = computed(() => isBookFetchActive.value || isAuthorActive.value)
+const isAnyVisible = computed(() => showBookCard.value || showAuthorCard.value)
 
 const bookProgressPercent = computed(() => {
   if (status.value.sessionTotal === 0) return 0
@@ -60,20 +70,20 @@ const authorProgressPercent = computed(() => {
 })
 
 const bookRemainingLabel = computed(() => {
-  if (status.value.paused) return 'Paused'
+  if (status.value.paused && hasBookWork.value) return t('bookMetadataFetch.label.paused')
   const { queued, processing, failed } = status.value
-  if (queued > 0) return `${queued + processing} remaining`
-  if (processing > 0) return `${processing} processing`
-  if (failed > 0) return `${failed} failed`
+  if (queued > 0) return t('bookMetadataFetch.label.remaining', { count: queued + processing })
+  if (processing > 0) return t('bookMetadataFetch.label.processing', { count: processing })
+  if (failed > 0) return t('bookMetadataFetch.label.failed', { count: failed })
   return ''
 })
 const authorRemainingLabel = computed(() => {
-  if (authorStatus.value.paused) return 'Paused'
+  if (authorStatus.value.paused && hasAuthorWork.value) return t('bookMetadataFetch.label.paused')
   const { queued, processing, rateLimited, failed } = authorStatus.value
-  if (rateLimited > 0) return `${rateLimited} rate limited`
-  if (queued > 0) return `${queued + processing} remaining`
-  if (processing > 0) return `${processing} processing`
-  if (failed > 0) return `${failed} failed`
+  if (rateLimited > 0) return t('bookMetadataFetch.label.rateLimited', { count: rateLimited })
+  if (queued > 0) return t('bookMetadataFetch.label.remaining', { count: queued + processing })
+  if (processing > 0) return t('bookMetadataFetch.label.processing', { count: processing })
+  if (failed > 0) return t('bookMetadataFetch.label.failed', { count: failed })
   return ''
 })
 
@@ -83,7 +93,7 @@ const bookIconWrapperClass = computed(() => {
 })
 const bookIconOpacity = computed(() => (status.value.paused ? 'opacity-40' : ''))
 
-const showBookDot = computed(() => !status.value.paused && (status.value.processing > 0 || status.value.failed > 0))
+const showBookDot = computed(() => !status.value.paused && status.value.processing > 0)
 
 const authorIconWrapperClass = computed(() => {
   if ((authorStatus.value.rateLimited > 0 || authorStatus.value.failed > 0) && authorStatus.value.processing === 0 && authorStatus.value.queued === 0)
@@ -92,8 +102,12 @@ const authorIconWrapperClass = computed(() => {
 })
 const authorIconOpacity = computed(() => (authorStatus.value.paused ? 'opacity-40' : ''))
 
-const showAuthorDot = computed(
-  () => !authorStatus.value.paused && (authorStatus.value.processing > 0 || authorStatus.value.rateLimited > 0 || authorStatus.value.failed > 0),
+const showAuthorDot = computed(() => !authorStatus.value.paused && (authorStatus.value.processing > 0 || authorStatus.value.rateLimited > 0))
+const bookCardTitle = computed(() =>
+  hasBookWork.value ? t('bookMetadataFetch.card.fetchingMetadata') : t('bookMetadataFetch.card.metadataFetchFinished'),
+)
+const authorCardTitle = computed(() =>
+  hasAuthorWork.value ? t('bookMetadataFetch.card.enrichingAuthors') : t('bookMetadataFetch.card.authorEnrichmentFinished'),
 )
 
 // completion toast - fires only when transitioning from active to done, not on the initial snapshot
@@ -105,8 +119,8 @@ watch(status, (newVal, oldVal) => {
     bookSessionToasted = true
     const msg =
       newVal.failed > 0
-        ? `Metadata fetch done - ${newVal.sessionDone} processed, ${newVal.failed} failed`
-        : `Metadata fetch complete - ${newVal.sessionDone} books updated`
+        ? t('bookMetadataFetch.toast.bookDoneWithFailures', { done: newVal.sessionDone, failed: newVal.failed })
+        : t('bookMetadataFetch.toast.bookComplete', { done: newVal.sessionDone })
     toast.success(msg)
   }
   if (newVal.sessionTotal === 0) bookSessionToasted = false
@@ -120,10 +134,11 @@ watch(authorStatus, (newVal, oldVal) => {
   if (!authorSessionToasted && wasActive && isDone) {
     authorSessionToasted = true
     const msg =
-      newVal.failed > 0
-        ? `Author enrichment done - ${newVal.sessionDone} processed, ${newVal.failed} failed`
-        : `Author enrichment complete - ${newVal.sessionDone} authors updated`
-    toast.success(msg)
+      newVal.sessionFailed > 0
+        ? t('bookMetadataFetch.toast.authorDoneWithFailures', { done: newVal.sessionDone, failed: newVal.sessionFailed })
+        : t('bookMetadataFetch.toast.authorComplete', { done: newVal.sessionDone })
+    if (newVal.sessionFailed > 0) toast.warning(msg)
+    else toast.success(msg)
   }
   if (newVal.sessionTotal === 0) authorSessionToasted = false
 })
@@ -161,6 +176,24 @@ function handleOpenAuthorReport() {
   showAuthorReport.value = true
 }
 
+function handleDismissBookCard() {
+  bookCardDismissed.value = true
+  expanded.value = false
+}
+
+function handleDismissAuthorCard() {
+  authorCardDismissed.value = true
+  authorExpanded.value = false
+}
+
+function handleCloseReport() {
+  showReport.value = false
+}
+
+function handleCloseAuthorReport() {
+  showAuthorReport.value = false
+}
+
 onMounted(() => {
   if (canView.value) {
     subscribe()
@@ -170,7 +203,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <div v-if="canView && isAnyActive" class="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+  <div
+    v-if="canView && isAnyVisible"
+    class="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] end-3 z-50 flex flex-col items-end gap-2 sm:bottom-6 sm:end-6"
+  >
     <!-- Book metadata expanded panel -->
     <div v-if="expanded" class="rounded-lg border border-border bg-popover shadow-xl">
       <BookMetadataFetchExpanded :status="status" @close="handleClose" @open-report="handleOpenReport" />
@@ -182,55 +218,71 @@ onMounted(() => {
     </div>
 
     <!-- Book metadata fetch card -->
-    <button
-      v-if="isBookFetchActive"
-      class="relative overflow-hidden flex items-center gap-3 px-4 py-3 rounded-lg bg-card border border-border shadow-xl text-sm transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] w-60"
-      :class="status.paused ? 'opacity-70' : ''"
-      @click="toggleExpanded"
-    >
-      <div class="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors duration-300" :class="bookIconWrapperClass">
-        <Sparkles :size="20" class="text-violet-500" :class="[bookIconOpacity, showBookDot ? 'animate-pulse' : '']" />
-      </div>
-      <div class="flex flex-col items-start gap-0.5 min-w-0">
-        <span class="text-xs font-semibold text-foreground leading-none">Fetching metadata</span>
-        <span class="text-xs text-muted-foreground leading-none">{{ bookRemainingLabel }}</span>
-        <span class="text-xs text-muted-foreground/80 leading-none truncate mt-0.5" :class="lastBookName ? '' : 'invisible'">{{
-          lastBookName ?? '\u00a0'
-        }}</span>
-      </div>
-      <!-- bottom progress bar -->
-      <div v-if="status.sessionTotal > 0" class="absolute bottom-0 left-0 right-0 h-[3px] bg-muted">
-        <div class="h-full bg-violet-500 transition-all duration-500" :style="{ width: `${bookProgressPercent}%` }" />
-      </div>
-    </button>
+    <div v-if="showBookCard" class="relative w-60">
+      <button
+        class="relative overflow-hidden flex items-center gap-3 px-4 py-3 pe-9 rounded-lg bg-card border border-border shadow-xl text-sm transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        :class="status.paused ? 'opacity-70' : ''"
+        @click="toggleExpanded"
+      >
+        <div
+          class="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors duration-300"
+          :class="bookIconWrapperClass"
+        >
+          <Sparkles :size="20" class="text-violet-500" :class="[bookIconOpacity, showBookDot ? 'animate-pulse' : '']" />
+        </div>
+        <div class="flex flex-col items-start gap-0.5 min-w-0">
+          <span class="text-xs font-semibold text-foreground leading-none">{{ bookCardTitle }}</span>
+          <span class="text-xs text-muted-foreground leading-none">{{ bookRemainingLabel }}</span>
+          <span class="text-xs text-muted-foreground/80 leading-none truncate mt-0.5" :class="lastBookName ? '' : 'invisible'">{{
+            lastBookName ?? '\u00a0'
+          }}</span>
+        </div>
+        <div v-if="status.sessionTotal > 0" class="absolute bottom-0 start-0 end-0 h-[3px] bg-muted">
+          <div class="h-full bg-violet-500 transition-all duration-500" :style="{ width: `${bookProgressPercent}%` }" />
+        </div>
+      </button>
+      <button
+        class="absolute end-1.5 top-1.5 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        :aria-label="t('bookMetadataFetch.actions.dismissBookStatus')"
+        @click="handleDismissBookCard"
+      >
+        <X :size="14" aria-hidden="true" />
+      </button>
+    </div>
 
     <!-- Author enrichment card -->
-    <button
-      v-if="isAuthorActive"
-      class="relative overflow-hidden flex items-center gap-3 px-4 py-3 rounded-lg bg-card border border-border shadow-xl text-sm transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] w-60"
-      :class="authorStatus.paused ? 'opacity-70' : ''"
-      @click="toggleAuthorExpanded"
-    >
-      <div
-        class="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors duration-300"
-        :class="authorIconWrapperClass"
+    <div v-if="showAuthorCard" class="relative w-60">
+      <button
+        class="relative overflow-hidden flex items-center gap-3 px-4 py-3 pe-9 rounded-lg bg-card border border-border shadow-xl text-sm transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        :class="authorStatus.paused ? 'opacity-70' : ''"
+        @click="toggleAuthorExpanded"
       >
-        <Users :size="20" class="text-emerald-500" :class="[authorIconOpacity, showAuthorDot ? 'animate-pulse' : '']" />
-      </div>
-      <div class="flex flex-col items-start gap-0.5 min-w-0">
-        <span class="text-xs font-semibold text-foreground leading-none">Enriching authors</span>
-        <span class="text-xs text-muted-foreground leading-none">{{ authorRemainingLabel }}</span>
-        <span class="text-xs text-muted-foreground/80 leading-none truncate mt-0.5" :class="lastAuthorName ? '' : 'invisible'">{{
-          lastAuthorName ?? '\u00a0'
-        }}</span>
-      </div>
-      <!-- bottom progress bar -->
-      <div v-if="authorStatus.sessionTotal > 0" class="absolute bottom-0 left-0 right-0 h-[3px] bg-muted">
-        <div class="h-full bg-emerald-500 transition-all duration-500" :style="{ width: `${authorProgressPercent}%` }" />
-      </div>
-    </button>
-
-    <BookMetadataFetchReportModal v-if="showReport" @close="showReport = false" />
-    <AuthorEnrichmentReportModal v-if="showAuthorReport" @close="showAuthorReport = false" />
+        <div
+          class="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors duration-300"
+          :class="authorIconWrapperClass"
+        >
+          <Users :size="20" class="text-emerald-500" :class="[authorIconOpacity, showAuthorDot ? 'animate-pulse' : '']" />
+        </div>
+        <div class="flex flex-col items-start gap-0.5 min-w-0">
+          <span class="text-xs font-semibold text-foreground leading-none">{{ authorCardTitle }}</span>
+          <span class="text-xs text-muted-foreground leading-none">{{ authorRemainingLabel }}</span>
+          <span class="text-xs text-muted-foreground/80 leading-none truncate mt-0.5" :class="lastAuthorName ? '' : 'invisible'">{{
+            lastAuthorName ?? '\u00a0'
+          }}</span>
+        </div>
+        <div v-if="authorStatus.sessionTotal > 0" class="absolute bottom-0 start-0 end-0 h-[3px] bg-muted">
+          <div class="h-full bg-emerald-500 transition-all duration-500" :style="{ width: `${authorProgressPercent}%` }" />
+        </div>
+      </button>
+      <button
+        class="absolute end-1.5 top-1.5 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        :aria-label="t('bookMetadataFetch.actions.dismissAuthorStatus')"
+        @click="handleDismissAuthorCard"
+      >
+        <X :size="14" aria-hidden="true" />
+      </button>
+    </div>
   </div>
+  <BookMetadataFetchReportModal v-if="showReport" @close="handleCloseReport" />
+  <AuthorEnrichmentReportModal v-if="showAuthorReport" @close="handleCloseAuthorReport" />
 </template>

@@ -1,27 +1,58 @@
 import type { AudiobookChapter } from "./audiobook";
+import type { ComicMetadataFields, MetadataProviderKey, MetadataSeriesMembership } from "./metadata-fetch";
 
 export type BookDockFileStatus = "pending" | "extracting" | "fetching" | "ready" | "error";
 export type BookDockAutoFinalizeMetadataMode = "safe_merge" | "fetched_only" | "embedded_only";
 
+export function resolveBookDockSearchTitle(fileName: string, metadataTitle?: string | null): string | undefined {
+  const normalizedMetadataTitle = metadataTitle?.trim();
+  if (normalizedMetadataTitle) return normalizedMetadataTitle;
+
+  const normalizedFileName = fileName.trim();
+  if (!normalizedFileName) return undefined;
+
+  const extensionIndex = normalizedFileName.lastIndexOf(".");
+  const stem = extensionIndex > 0 ? normalizedFileName.slice(0, extensionIndex) : normalizedFileName;
+  return stem.trim() || undefined;
+}
+
 export interface BookDockMetadata {
-  title?: string;
-  subtitle?: string;
+  title?: string | null;
+  subtitle?: string | null;
   authors?: string[];
   narrators?: string[];
-  description?: string;
-  publisher?: string;
-  publishedDate?: string;
-  publishedYear?: number;
-  language?: string;
-  pageCount?: number;
-  isbn10?: string;
-  isbn13?: string;
-  seriesName?: string;
-  seriesIndex?: number;
+  description?: string | null;
+  publisher?: string | null;
+  publishedDate?: string | null;
+  publishedYear?: number | null;
+  language?: string | null;
+  pageCount?: number | null;
+  isbn10?: string | null;
+  isbn13?: string | null;
+  seriesName?: string | null;
+  seriesIndex?: number | null;
+  seriesMemberships?: MetadataSeriesMembership[] | null;
   genres?: string[];
-  coverUrl?: string;
-  durationSeconds?: number;
-  chapters?: AudiobookChapter[];
+  coverUrl?: string | null;
+  durationSeconds?: number | null;
+  abridged?: boolean | null;
+  chapters?: AudiobookChapter[] | null;
+  communityRatings?: Array<{ provider: MetadataProviderKey; rating: number; ratingCount?: number | null }> | null;
+  googleBooksId?: string | null;
+  goodreadsId?: string | null;
+  amazonId?: string | null;
+  hardcoverId?: string | null;
+  hardcoverEditionId?: string | null;
+  openLibraryId?: string | null;
+  itunesId?: string | null;
+  audibleId?: string | null;
+  librofmId?: string | null;
+  koboId?: string | null;
+  comicvineId?: string | null;
+  ranobedbId?: string | null;
+  lubimyczytacId?: string | null;
+  aladinId?: string | null;
+  comicMetadata?: ComicMetadataFields | null;
 }
 
 export interface BookDockFile {

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { formatDateTime } from '@/i18n/formatters'
 import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Loader2, RefreshCw, Search } from '@lucide/vue'
 import type { BrowseEntityItem, DuplicateCluster } from '@bookorbit/types'
 
@@ -16,6 +18,7 @@ import SplitModal from '../components/SplitModal.vue'
 import BulkDeleteModal from '../components/BulkDeleteModal.vue'
 import BrowseMergeModal from '../components/BrowseMergeModal.vue'
 
+const { t } = useI18n()
 const em = useEntityManager()
 
 const renameTarget = ref<BrowseEntityItem | null>(null)
@@ -244,22 +247,24 @@ async function handleBulkDeleteConfirm(mode: 'soft' | 'hard' | 'inline', writeFi
           <template v-if="em.duplicateScanStatus.value.state === 'computing'">
             <Loader2 class="h-3 w-3 animate-spin shrink-0" />
             <span>
-              Computing candidates...
+              {{ t('tools.entityManager.duplicates.computing') }}
               <template v-if="em.duplicateScanStatus.value.progressPct !== null">{{ em.duplicateScanStatus.value.progressPct }}%</template>
             </span>
           </template>
           <template v-else-if="em.duplicateScanStatus.value.state === 'done' && em.duplicateScanStatus.value.computedAt">
-            <span>Candidates computed {{ new Date(em.duplicateScanStatus.value.computedAt).toLocaleString() }}</span>
+            <span>{{
+              t('tools.entityManager.duplicates.computedAt', { date: formatDateTime(new Date(em.duplicateScanStatus.value.computedAt)) })
+            }}</span>
             <button class="flex items-center gap-1 hover:text-foreground transition-colors" @click="handleRefreshDuplicates">
               <RefreshCw class="h-3 w-3" />
-              Recompute
+              {{ t('tools.entityManager.duplicates.recompute') }}
             </button>
           </template>
           <template v-else-if="em.duplicateScanStatus.value.state === 'idle'">
-            <span>No candidates computed yet.</span>
+            <span>{{ t('tools.entityManager.duplicates.noneComputed') }}</span>
             <button class="flex items-center gap-1 hover:text-foreground transition-colors" @click="handleRefreshDuplicates">
               <RefreshCw class="h-3 w-3" />
-              Compute now
+              {{ t('tools.entityManager.duplicates.computeNow') }}
             </button>
           </template>
         </div>
@@ -283,8 +288,8 @@ async function handleBulkDeleteConfirm(mode: 'soft' | 'hard' | 'inline', writeFi
               <Search class="h-8 w-8 text-muted-foreground" />
             </div>
             <div class="space-y-1">
-              <p class="text-sm font-medium">Find duplicate entities</p>
-              <p class="text-xs text-muted-foreground max-w-xs">Adjust the similarity threshold and click Scan to detect potential duplicates.</p>
+              <p class="text-sm font-medium">{{ t('tools.entityManager.duplicates.emptyTitle') }}</p>
+              <p class="text-xs text-muted-foreground max-w-xs">{{ t('tools.entityManager.duplicates.emptyDescription') }}</p>
             </div>
           </div>
           <div v-else class="rounded-lg border border-border/50 bg-card/40 px-6 py-12 flex flex-col items-center gap-4 text-center">
@@ -292,14 +297,16 @@ async function handleBulkDeleteConfirm(mode: 'soft' | 'hard' | 'inline', writeFi
               <CheckCircle2 class="h-8 w-8 text-green-500" />
             </div>
             <div class="space-y-1">
-              <p class="text-sm font-medium">No duplicates found</p>
-              <p class="text-xs text-muted-foreground">No potential duplicates were detected with the current settings.</p>
+              <p class="text-sm font-medium">{{ t('tools.entityManager.duplicates.noneFoundTitle') }}</p>
+              <p class="text-xs text-muted-foreground">{{ t('tools.entityManager.duplicates.noneFoundDescription') }}</p>
             </div>
           </div>
         </template>
 
         <div v-if="em.clusters.value.length > 0" class="space-y-3">
-          <p class="text-sm text-muted-foreground">{{ em.scanTotal.value }} {{ em.scanTotal.value === 1 ? 'cluster' : 'clusters' }} found</p>
+          <p class="text-sm text-muted-foreground">
+            {{ t('tools.entityManager.duplicates.clustersFound', { count: em.scanTotal.value }, em.scanTotal.value) }}
+          </p>
           <DuplicateClusterCard
             v-for="(cluster, idx) in em.clusters.value"
             :key="idx"
@@ -337,7 +344,7 @@ async function handleBulkDeleteConfirm(mode: 'soft' | 'hard' | 'inline', writeFi
           >
             <component :is="em.showDismissed.value ? ChevronUp : ChevronDown" class="h-4 w-4" />
             <span>
-              {{ em.showDismissed.value ? 'Hide' : 'Show' }} dismissed pairs
+              {{ em.showDismissed.value ? t('tools.entityManager.dismissed.hidePairs') : t('tools.entityManager.dismissed.showPairs') }}
               <template v-if="!em.showDismissed.value && em.dismissedPairs.value.length > 0"> ({{ em.dismissedPairs.value.length }}) </template>
             </span>
           </button>

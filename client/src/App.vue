@@ -39,7 +39,7 @@ initChartThemes()
 provide(INIT_OPTIONS_KEY, { renderer: 'svg' })
 provide(
   THEME_KEY,
-  computed(() => getBookorbitThemeName(themeStore.theme, themeStore.accent)),
+  computed(() => getBookorbitThemeName(themeStore.resolvedTheme, themeStore.accent)),
 )
 </script>
 

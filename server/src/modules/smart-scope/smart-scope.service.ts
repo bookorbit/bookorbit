@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { SQL } from 'drizzle-orm';
 
-import type { BookQuery, BooksPage, GroupRule, JumpBucketsResponse, SortSpec } from '@bookorbit/types';
+import type { BookQuery, BooksPage, GroupRule, JumpBucketsQuery, JumpBucketsResponse, SortSpec } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { normalizeIconValue } from '../../common/utils/icon-value.utils';
 import { resolveTimeZone } from '../../common/utils/timezone.utils';
@@ -182,21 +182,22 @@ export class SmartScopeService {
     }
   }
 
-  async queryJumpBuckets(id: number, user: RequestUser, query: BookQuery): Promise<JumpBucketsResponse> {
+  async queryJumpBuckets(id: number, user: RequestUser, query: JumpBucketsQuery): Promise<JumpBucketsResponse> {
     const prepared = await this.prepareBooksQuery(id, user, query);
     if (!prepared) {
-      return { buckets: [], total: 0 };
+      return { buckets: [], total: 0, kind: 'letter', granularity: null };
     }
     // Eligibility is validated by the book service against effectiveQuery.sort,
     // i.e. after the scope's defaultSort has been resolved.
-    return this.bookService.executeJumpBucketsQuery(user.id, prepared.where, prepared.effectiveQuery);
+    const timeZone = resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
+    return this.bookService.executeJumpBucketsQuery(user.id, prepared.where, prepared.effectiveQuery, timeZone);
   }
 
-  private async prepareBooksQuery(
+  private async prepareBooksQuery<T extends BookQuery>(
     id: number,
     user: RequestUser,
-    query: BookQuery,
-  ): Promise<{ where: SQL | undefined; effectiveQuery: BookQuery } | null> {
+    query: T,
+  ): Promise<{ where: SQL | undefined; effectiveQuery: T } | null> {
     const smartScope = await this.getSmartScopeOrThrow(id);
     this.assertReadAccess(smartScope, user);
 
@@ -205,7 +206,7 @@ export class SmartScopeService {
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
     const timeZone = resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
     const filter = this.combineFilters(smartScope.filter, query.filter);
-    const effectiveQuery: BookQuery = {
+    const effectiveQuery: T = {
       ...query,
       filter,
       sort: this.resolveSort(query.sort, smartScope),

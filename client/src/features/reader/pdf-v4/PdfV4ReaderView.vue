@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, shallowRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { EmbedPDF } from '@embedpdf/core/vue'
 import { createPluginRegistration, type PluginBatchRegistrations, type PluginRegistry } from '@embedpdf/core'
@@ -30,6 +31,8 @@ import { useReadingSession } from '../shared/composables/useReadingSession'
 import { useReaderSettings } from '../shared/composables/useReaderSettings'
 import PdfReaderContent from './components/PdfReaderContent.vue'
 import { toRotation, toScrollStrategy, toSpreadMode, toZoomLevel } from './pdf-viewer-utils'
+
+const { t } = useI18n()
 
 const props = defineProps<{ bookId: number; fileId: number; peekMode?: boolean }>()
 const route = useRoute()
@@ -261,7 +264,7 @@ onUnmounted(() => {
   <div class="fixed inset-0 overflow-hidden bg-background text-foreground">
     <div v-if="engineError || documentError" class="absolute inset-0 flex items-center justify-center p-6">
       <div class="max-w-sm text-center">
-        <p class="mb-2 text-sm font-medium text-foreground">Unable to open this PDF</p>
+        <p class="mb-2 text-sm font-medium text-foreground">{{ t('reader.pdf.openError') }}</p>
         <p class="text-xs text-muted-foreground">{{ (engineError || documentError)?.message }}</p>
         <div class="mt-4 flex justify-center gap-2">
           <button
@@ -270,7 +273,9 @@ onUnmounted(() => {
           >
             Go back
           </button>
-          <button class="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground" @click="handleRetry">Retry</button>
+          <button class="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground" @click="handleRetry">
+            {{ t('reader.retry') }}
+          </button>
         </div>
       </div>
     </div>
@@ -278,7 +283,7 @@ onUnmounted(() => {
     <div v-else-if="engineLoading || !engine || !readerReady" class="absolute inset-0 flex items-center justify-center bg-background">
       <div class="flex flex-col items-center gap-3 text-muted-foreground" role="status" aria-live="polite">
         <LoaderCircle :size="30" class="animate-spin text-primary" />
-        <span class="text-sm">Preparing PDF reader</span>
+        <span class="text-sm">{{ t('reader.pdf.preparing') }}</span>
       </div>
     </div>
 
@@ -287,7 +292,7 @@ onUnmounted(() => {
         <div v-if="!pluginsReady || !activeDocumentId || !activeDocument" class="absolute inset-0 flex items-center justify-center bg-background">
           <div class="flex flex-col items-center gap-3 text-muted-foreground" role="status" aria-live="polite">
             <LoaderCircle :size="30" class="animate-spin text-primary" />
-            <span class="text-sm">Opening PDF</span>
+            <span class="text-sm">{{ t('reader.pdf.opening') }}</span>
           </div>
         </div>
         <PdfReaderContent

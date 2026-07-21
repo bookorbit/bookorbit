@@ -1,4 +1,6 @@
+import { watch } from 'vue'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
+import { i18n } from '@/i18n'
 import { formatPageTitle } from '@/lib/page-title'
 
 function firstText(value: unknown): string | null {
@@ -43,13 +45,21 @@ export function resolveRouteTitle(route: RouteLocationNormalizedLoaded): string 
 }
 
 export function registerRouteTitleHook(router: Router): void {
-  router.afterEach((to) => {
+  function updateTitle(route: RouteLocationNormalizedLoaded): void {
     if (typeof document !== 'undefined') {
-      document.title = resolveRouteTitle(to)
+      document.title = resolveRouteTitle(route)
     }
+  }
+
+  router.afterEach((to) => {
+    updateTitle(to)
 
     if (import.meta.env.DEV && needsTitleWarning(to)) {
       console.warn(`[router:title] Missing meta.title for route "${String(to.name)}" at "${to.fullPath}"`)
     }
+  })
+
+  watch(i18n.global.locale, () => {
+    updateTitle(router.currentRoute.value)
   })
 }

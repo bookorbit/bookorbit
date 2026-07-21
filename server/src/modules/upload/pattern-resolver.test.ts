@@ -8,6 +8,7 @@ import {
   replacePlaceholders,
   resolveDownloadFilename,
   resolveUploadPath,
+  sanitizePathSegment,
   validatePattern,
 } from '@bookorbit/types';
 
@@ -32,6 +33,12 @@ const DECIMAL_INDEX: Record<string, string> = {
   ...FULL,
   seriesIndex: '01.5',
 };
+
+describe('sanitizePathSegment', () => {
+  it('removes a large trailing run of dots and spaces in linear time', () => {
+    expect(sanitizePathSegment(`book${'. '.repeat(100_000)}`)).toBe('book');
+  });
+});
 
 // ── applyModifier ─────────────────────────────────────────────────────────────
 
@@ -289,6 +296,14 @@ describe('replacePlaceholders', () => {
 
 // ── resolveUploadPath ─────────────────────────────────────────────────────────
 
+describe('KOReader device pattern', () => {
+  it('routes series and standalone books into separate folders', () => {
+    const pattern = '<Series/{series}/|Standalone/{authors:first} - ><{seriesIndex:fixed2} - >{title}';
+    expect(resolveUploadPath(pattern, FULL, 'epub')).toBe('Series/Sprawl/1.00 - Neuromancer.epub');
+    expect(resolveUploadPath(pattern, { ...FULL, series: '', seriesIndex: '' }, 'epub')).toBe('Standalone/William Gibson - Neuromancer.epub');
+  });
+});
+
 describe('resolveUploadPath', () => {
   describe('extension handling', () => {
     it('appends the extension when the resolved path has none', () => {
@@ -479,6 +494,26 @@ describe('cross-platform sanitization option', () => {
     });
     expect(result).toContain('/');
     expect(result).not.toMatch(/[:"]/);
+  });
+
+  it('keeps empty values empty so optional blocks are omitted during sanitization', () => {
+    const pattern =
+      '<{authors:first}|Unknown Author>/<{series}/><{seriesIndex:fixed2} - ><{title}|{originalFilename}>< ({year})>/<{seriesIndex:fixed2} - ><{title}|{originalFilename}>< ({year})> - <{authors:first}|Unknown Author>';
+    const values = { ...FULL, series: '', seriesIndex: '' };
+
+    expect(resolveUploadPath(pattern, values, 'epub', { sanitizeForCrossPlatform: true })).toBe(
+      'William Gibson/Neuromancer (1984)/Neuromancer (1984) - William Gibson.epub',
+    );
+  });
+
+  it('omits an empty optional series segment instead of replacing it with an underscore', () => {
+    expect(resolveUploadPath('<{series}/>{title}', { ...FULL, series: '' }, 'epub', { sanitizeForCrossPlatform: true })).toBe('Neuromancer.epub');
+  });
+
+  it('omits an empty optional series index prefix instead of replacing it with an underscore', () => {
+    expect(resolveUploadPath('<{seriesIndex:fixed2} - >{title}', { ...FULL, seriesIndex: '' }, 'epub', { sanitizeForCrossPlatform: true })).toBe(
+      'Neuromancer.epub',
+    );
   });
 });
 

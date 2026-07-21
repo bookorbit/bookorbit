@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, FolderOpen, FolderPlus, Loader2, Plus, RefreshCw, Trash2, XCircle } from '@lucide/vue'
 import type { PrescanPathResult, PrescanResult } from '@bookorbit/types'
 import { useLibraryFolderSelection } from '../composables/useLibraryFolderSelection'
 import FolderPickerModal from './FolderPickerModal.vue'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   folders: string[]
@@ -92,15 +95,15 @@ function handlePrescan() {
         <FolderOpen :size="19" />
       </span>
       <span>
-        <span class="block text-sm font-semibold text-foreground">Browse server folders</span>
-        <span class="mt-1 block text-sm text-muted-foreground">Select one or more folders without leaving the browser.</span>
+        <span class="block text-sm font-semibold text-foreground">{{ t('library.creator.folders.browseTitle') }}</span>
+        <span class="mt-1 block text-sm text-muted-foreground">{{ t('library.creator.folders.browseDescription') }}</span>
       </span>
     </button>
 
     <section v-else aria-labelledby="selected-folders-title">
       <div class="mb-3 flex items-center justify-between gap-3">
         <div class="flex items-center gap-2">
-          <h4 id="selected-folders-title" class="text-sm font-semibold text-foreground">Selected folders</h4>
+          <h4 id="selected-folders-title" class="text-sm font-semibold text-foreground">{{ t('library.creator.folders.selectedTitle') }}</h4>
           <span class="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{{ folders.length }}</span>
         </div>
         <button
@@ -109,7 +112,7 @@ function handlePrescan() {
           @click="openPicker"
         >
           <Plus :size="16" />
-          Add folders
+          {{ t('library.creator.folders.addFolders') }}
         </button>
       </div>
 
@@ -128,7 +131,7 @@ function handlePrescan() {
             <button
               type="button"
               class="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-              :aria-label="`Remove ${folder}`"
+              :aria-label="t('library.creator.folders.removeFolder', { folder })"
               @click="removeFolder(folder)"
             >
               <Trash2 :size="16" />
@@ -146,19 +149,19 @@ function handlePrescan() {
         @click="toggleManualEntry"
       >
         <FolderPlus :size="16" />
-        Enter a path manually
+        {{ t('library.creator.folders.manualEntry') }}
         <ChevronUp v-if="manualEntryOpen" :size="15" />
         <ChevronDown v-else :size="15" />
       </button>
 
       <form v-if="manualEntryOpen" class="mt-2 rounded-lg border border-border bg-muted/20 p-3" @submit.prevent="addManualFolder">
-        <label for="manual-folder-path" class="mb-2 block text-sm font-medium text-foreground">Absolute server path</label>
+        <label for="manual-folder-path" class="mb-2 block text-sm font-medium text-foreground">{{ t('library.creator.folders.absolutePath') }}</label>
         <div class="flex flex-col gap-2 sm:flex-row">
           <input
             id="manual-folder-path"
             v-model="manualPath"
             type="text"
-            placeholder="/path/to/books"
+            :placeholder="t('library.creator.folders.pathPlaceholder')"
             class="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm text-foreground placeholder:font-sans placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
             @input="clearManualError"
           />
@@ -167,19 +170,19 @@ function handlePrescan() {
               type="submit"
               class="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
             >
-              Add folder
+              {{ t('library.creator.folders.addFolder') }}
             </button>
             <button
               type="button"
               class="h-10 rounded-md border border-border px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               @click="closeManualEntry"
             >
-              Cancel
+              {{ t('common.cancel') }}
             </button>
           </div>
         </div>
         <p v-if="manualError" class="mt-2 text-sm text-destructive">{{ manualError }}</p>
-        <p v-else class="mt-2 text-xs text-muted-foreground">Manual paths are checked together with the rest of the selected folders.</p>
+        <p v-else class="mt-2 text-xs text-muted-foreground">{{ t('library.creator.folders.manualCheckHint') }}</p>
       </form>
     </div>
 

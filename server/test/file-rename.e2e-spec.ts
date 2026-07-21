@@ -168,7 +168,8 @@ describe('Bulk file rename (e2e)', { timeout: SUITE_TIMEOUT_MS }, () => {
 
       const result = await executeBulkRename(ctx, lib.libraryId);
       const done = getDoneEvent(result.events);
-      expect(done!.skipped).toBe(1);
+      expect(done!.processed).toBe(0);
+      expect(done!.skipped).toBe(0);
       expect(done!.succeeded).toBe(0);
     });
   });
@@ -404,7 +405,7 @@ describe('Bulk file rename (e2e)', { timeout: SUITE_TIMEOUT_MS }, () => {
       await expect(pathExists(join(newFolderPath, `${newTitle}.epub`))).resolves.toBe(true);
 
       // Extra files from the old folder should be moved to the new folder too
-      const newPdfPath = join(newFolderPath, `${fixtures[0].extraRelPaths[0].split('/')[1]}`);
+      const newPdfPath = join(newFolderPath, `${newTitle}.pdf`);
       await expect(pathExists(newPdfPath)).resolves.toBe(true);
 
       // Old folder should not exist
@@ -437,18 +438,13 @@ describe('Bulk file rename (e2e)', { timeout: SUITE_TIMEOUT_MS }, () => {
       expect(preview.totalByStatus.collision).toBe(2);
       expect(preview.totalByStatus.will_rename).toBe(0);
 
-      // Execute: preview marks both as collision.
-      // Known behavior: execute processes books sequentially and only checks current DB state,
-      // so the first book in the pair succeeds (its target path is free at that point) and
-      // the second is skipped once the target is taken. One book renames, one is skipped.
       const result = await executeBulkRename(ctx, lib.libraryId);
       const done = getDoneEvent(result.events);
-      expect(done!.succeeded + done!.skipped).toBe(2);
+      expect(done!.processed).toBe(0);
       expect(done!.failed).toBe(0);
-      // The "winner" of the collision should be at the new path; the other stays put.
       const finalBooks = await findAllBooksInLibrary(ctx, lib.libraryId);
       const atNewPath = finalBooks.filter((b) => b.relPath === 'Duplicate Title.epub');
-      expect(atNewPath).toHaveLength(1);
+      expect(atNewPath).toHaveLength(0);
     });
 
     it('marks book as collision when target path is already registered to another book', async () => {
@@ -795,11 +791,11 @@ describe('Bulk file rename (e2e)', { timeout: SUITE_TIMEOUT_MS }, () => {
       const firstDone = getDoneEvent(first.events);
       expect(firstDone!.succeeded).toBe(3);
 
-      // Second run — all should be unchanged
       const second = await executeBulkRename(ctx, lib.libraryId);
       const secondDone = getDoneEvent(second.events);
       expect(secondDone!.succeeded).toBe(0);
-      expect(secondDone!.skipped).toBe(3);
+      expect(secondDone!.processed).toBe(0);
+      expect(secondDone!.skipped).toBe(0);
     });
   });
 

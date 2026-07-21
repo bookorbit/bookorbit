@@ -45,6 +45,10 @@ function makeService() {
     replaceAuthors: vi.fn().mockResolvedValue(undefined),
     replaceGenres: vi.fn().mockResolvedValue(undefined),
     replaceNarrators: vi.fn().mockResolvedValue(undefined),
+    upsertComicMetadata: vi.fn().mockResolvedValue(undefined),
+  };
+  const bookReadService = {
+    replaceCommunityRatings: vi.fn().mockResolvedValue(undefined),
   };
   const validator = {
     validateFormat: vi.fn(),
@@ -66,6 +70,10 @@ function makeService() {
     isPaused: vi.fn().mockResolvedValue(false),
     getCachedPaused: vi.fn().mockReturnValue(false),
   };
+  const seriesMemberships = {
+    replaceForBook: vi.fn().mockResolvedValue(undefined),
+    syncPrimaryFromMetadata: vi.fn().mockResolvedValue(undefined),
+  };
 
   const service = new BookDockFinalizeService(
     db as never,
@@ -73,6 +81,7 @@ function makeService() {
     libraryService as never,
     appSettings as never,
     metadataService as never,
+    bookReadService as never,
     validator as never,
     storage as never,
     processor as never,
@@ -80,9 +89,26 @@ function makeService() {
     gateway as never,
     { notify: vi.fn().mockResolvedValue(undefined) } as never,
     processingState as never,
+    undefined as never,
+    seriesMemberships as never,
   );
 
-  return { service, db, repo, libraryService, appSettings, metadataService, validator, storage, processor, events, gateway, processingState };
+  return {
+    service,
+    db,
+    repo,
+    libraryService,
+    appSettings,
+    metadataService,
+    bookReadService,
+    validator,
+    storage,
+    processor,
+    events,
+    gateway,
+    processingState,
+    seriesMemberships,
+  };
 }
 
 function makeRow(overrides?: Partial<Record<string, unknown>>) {
@@ -1201,6 +1227,79 @@ describe('BookDockFinalizeService', () => {
         publishedYear: null,
       }),
     );
+  });
+
+  it('applyMetadata persists provider IDs and every structured field emitted by metadata search', async () => {
+    const { service, db, metadataService, bookReadService, seriesMemberships } = makeService();
+    const updateChain = {
+      set: vi.fn(),
+      where: vi.fn().mockResolvedValue(undefined),
+    };
+    updateChain.set.mockReturnValue(updateChain);
+    db.update.mockReturnValue(updateChain);
+
+    await (service as any).applyMetadata(
+      19,
+      makeRow({
+        coverPath: null,
+        selectedMetadata: {
+          title: 'Dune',
+          pageCount: 688,
+          narrators: ['Simon Vance'],
+          durationSeconds: 1200,
+          abridged: false,
+          seriesMemberships: [
+            { seriesName: 'Dune', seriesIndex: 1 },
+            { seriesName: 'Dune Chronicles', seriesIndex: 1 },
+          ],
+          communityRatings: [{ provider: 'hardcover', rating: 4.5, ratingCount: 1000 }],
+          googleBooksId: 'google-id',
+          goodreadsId: 'goodreads-id',
+          amazonId: 'amazon-id',
+          hardcoverId: 'hardcover-book',
+          hardcoverEditionId: 'hardcover-edition',
+          openLibraryId: 'OL1W',
+          itunesId: 'itunes-id',
+          audibleId: 'audible-id',
+          librofmId: 'librofm-id',
+          koboId: 'kobo-id',
+          comicvineId: 'comicvine-id',
+          ranobedbId: 'ranobedb-id',
+          lubimyczytacId: 'lubimyczytac-id',
+          aladinId: 'aladin-id',
+          comicMetadata: { issueNumber: '1', pencillers: ['Artist'] },
+        } as BookDockMetadata,
+      }),
+    );
+
+    expect(updateChain.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pageCount: 688,
+        durationSeconds: 1200,
+        abridged: false,
+        googleBooksId: 'google-id',
+        goodreadsId: 'goodreads-id',
+        amazonId: 'amazon-id',
+        hardcoverId: 'hardcover-book',
+        hardcoverEditionId: 'hardcover-edition',
+        openLibraryId: 'OL1W',
+        itunesId: 'itunes-id',
+        audibleId: 'audible-id',
+        librofmId: 'librofm-id',
+        koboId: 'kobo-id',
+        comicvineId: 'comicvine-id',
+        ranobedbId: 'ranobedb-id',
+        lubimyczytacId: 'lubimyczytac-id',
+        aladinId: 'aladin-id',
+      }),
+    );
+    expect(seriesMemberships.replaceForBook).toHaveBeenCalledWith(19, [
+      { seriesName: 'Dune', seriesIndex: 1 },
+      { seriesName: 'Dune Chronicles', seriesIndex: 1 },
+    ]);
+    expect(bookReadService.replaceCommunityRatings).toHaveBeenCalledWith(19, [{ provider: 'hardcover', rating: 4.5, ratingCount: 1000 }]);
+    expect(metadataService.upsertComicMetadata).toHaveBeenCalledWith(19, { issueNumber: '1', pencillers: ['Artist'] });
+    expect(metadataService.replaceNarrators).toHaveBeenCalledWith(19, [{ name: 'Simon Vance', sortName: null }]);
   });
 
   it('applyMetadata prefers selected coverUrl and skips extracted cover copy when download succeeds', async () => {

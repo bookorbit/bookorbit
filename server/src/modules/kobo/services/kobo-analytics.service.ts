@@ -38,12 +38,7 @@ function parseKoboStars(metrics: KoboAnalyticsEvent['Metrics'] | undefined): Kob
 function parseKoboDurationSeconds(metrics: KoboAnalyticsEvent['Metrics'] | undefined): number | null {
   const secondsRead = metrics?.SecondsRead;
   if (typeof secondsRead !== 'number' || !Number.isFinite(secondsRead) || secondsRead < 0) return null;
-
-  const idleTime = metrics?.IdleTime;
-  const activeSeconds =
-    typeof idleTime === 'number' && Number.isFinite(idleTime) && idleTime >= 0 ? Math.max(0, secondsRead - idleTime) : secondsRead;
-
-  return Math.floor(activeSeconds);
+  return Math.floor(secondsRead);
 }
 
 function formatAnalyticsPayload(value: unknown, maxLength = DEBUG_PAYLOAD_MAX_LENGTH): string {

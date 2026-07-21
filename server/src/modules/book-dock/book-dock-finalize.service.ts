@@ -25,8 +25,11 @@ import type {
   BookDockFinalizePreviewStatus,
   BookDockFinalizeResult,
   BookDockMetadata,
+  ComicMetadataFields,
+  MetadataSeriesMembership,
 } from '@bookorbit/types';
-import { NotificationType, resolveUploadPath } from '@bookorbit/types';
+import { MetadataProviderKey, NotificationType, resolveUploadPath } from '@bookorbit/types';
+import { BookReadService } from '../book/book-read.service';
 import { NotificationService } from '../notification/notification.service';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
@@ -68,6 +71,7 @@ const MAX_PUBLISHED_YEAR = 2200;
 const PUBLISHED_YEAR_RANGE_CONSTRAINT = 'book_metadata_published_year_range_chk';
 const INVALID_PUBLISHED_YEAR_MESSAGE = `Invalid metadata: published year must be between ${MIN_PUBLISHED_YEAR} and ${MAX_PUBLISHED_YEAR}.`;
 const INVALID_METADATA_MESSAGE = 'Invalid metadata values for this file. Review metadata fields and try again.';
+const METADATA_PROVIDER_KEYS = new Set<MetadataProviderKey>(Object.values(MetadataProviderKey));
 
 type NormalizedFinalizeMetadata = {
   title: string | null;
@@ -85,6 +89,23 @@ type NormalizedFinalizeMetadata = {
   authors: string[];
   genres: string[];
   coverUrl: string | null;
+  googleBooksId: string | null;
+  goodreadsId: string | null;
+  amazonId: string | null;
+  hardcoverId: string | null;
+  hardcoverEditionId: string | null;
+  openLibraryId: string | null;
+  itunesId: string | null;
+  audibleId: string | null;
+  librofmId: string | null;
+  koboId: string | null;
+  comicvineId: string | null;
+  ranobedbId: string | null;
+  lubimyczytacId: string | null;
+  aladinId: string | null;
+  seriesMemberships: MetadataSeriesMembership[] | undefined;
+  communityRatings: Array<{ provider: MetadataProviderKey; rating: number; ratingCount: number | null }> | undefined;
+  comicMetadata: ComicMetadataFields | undefined;
 };
 
 type FinalizeCandidateAnalysis = {
@@ -112,6 +133,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     private readonly libraryService: LibraryService,
     private readonly appSettings: AppSettingsService,
     private readonly metadataService: MetadataService,
+    private readonly bookReadService: BookReadService,
     private readonly validator: UploadValidatorService,
     private readonly storage: UploadStorageService,
     private readonly processor: UploadProcessorService,
@@ -899,7 +921,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
 
   private async applyMetadata(bookId: number, row: BookDockFileRow): Promise<void> {
     const meta = normalizeFinalizeMetadata(row.selectedMetadata ?? row.embeddedMetadata);
-    const audio = resolveAudioFinalizeFields(row.embeddedMetadata ?? row.selectedMetadata);
+    const audio = resolveAudioFinalizeFields(row.embeddedMetadata, row.selectedMetadata);
     let selectedCoverApplied = false;
 
     const selectedCoverUrl = meta.coverUrl;
@@ -929,6 +951,20 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       seriesName: meta.seriesName ?? null,
       seriesIndex: meta.seriesIndex ?? null,
       pageCount: meta.pageCount ?? null,
+      googleBooksId: meta.googleBooksId,
+      goodreadsId: meta.goodreadsId,
+      amazonId: meta.amazonId,
+      hardcoverId: meta.hardcoverId,
+      hardcoverEditionId: meta.hardcoverEditionId,
+      openLibraryId: meta.openLibraryId,
+      itunesId: meta.itunesId,
+      audibleId: meta.audibleId,
+      librofmId: meta.librofmId,
+      koboId: meta.koboId,
+      comicvineId: meta.comicvineId,
+      ranobedbId: meta.ranobedbId,
+      lubimyczytacId: meta.lubimyczytacId,
+      aladinId: meta.aladinId,
       updatedAt: new Date(),
     };
     const patch = (await this.seriesIdentity?.resolveMetadataPatch(scalarFields)) ?? scalarFields;
@@ -937,7 +973,19 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       .update(bookMetadata)
       .set({ ...patch, ...buildAudioMetadataPatch(audio) })
       .where(eq(bookMetadata.bookId, bookId));
-    await this.seriesMemberships?.syncPrimaryFromMetadata(bookId);
+    if (meta.seriesMemberships !== undefined) {
+      await this.seriesMemberships?.replaceForBook(bookId, meta.seriesMemberships);
+    } else {
+      await this.seriesMemberships?.syncPrimaryFromMetadata(bookId);
+    }
+
+    if (meta.communityRatings !== undefined) {
+      await this.bookReadService.replaceCommunityRatings(bookId, meta.communityRatings);
+    }
+
+    if (meta.comicMetadata) {
+      await this.metadataService.upsertComicMetadata(bookId, meta.comicMetadata);
+    }
 
     if (meta.authors.length > 0) {
       await this.metadataService.replaceAuthors(
@@ -1143,28 +1191,106 @@ function normalizeFinalizeMetadata(meta: BookDockMetadata | null | undefined): N
     authors: normalizeStringArray(meta?.authors, 500),
     genres: normalizeStringArray(meta?.genres, 200),
     coverUrl: normalizeText(meta?.coverUrl),
+    googleBooksId: normalizeText(meta?.googleBooksId, 50),
+    goodreadsId: normalizeText(meta?.goodreadsId, 50),
+    amazonId: normalizeText(meta?.amazonId, 20),
+    hardcoverId: normalizeText(meta?.hardcoverId, 255),
+    hardcoverEditionId: normalizeText(meta?.hardcoverEditionId, 50),
+    openLibraryId: normalizeText(meta?.openLibraryId, 50),
+    itunesId: normalizeText(meta?.itunesId, 50),
+    audibleId: normalizeText(meta?.audibleId, 20),
+    librofmId: normalizeText(meta?.librofmId, 50),
+    koboId: normalizeText(meta?.koboId, 255),
+    comicvineId: normalizeText(meta?.comicvineId, 50),
+    ranobedbId: normalizeText(meta?.ranobedbId, 50),
+    lubimyczytacId: normalizeText(meta?.lubimyczytacId, 512),
+    aladinId: normalizeText(meta?.aladinId, 20),
+    seriesMemberships: normalizeSeriesMemberships(meta?.seriesMemberships),
+    communityRatings: normalizeCommunityRatings(meta?.communityRatings),
+    comicMetadata: normalizeComicMetadata(meta?.comicMetadata),
   };
+}
+
+function normalizeSeriesMemberships(value: BookDockMetadata['seriesMemberships']): MetadataSeriesMembership[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) return [];
+
+  const memberships: MetadataSeriesMembership[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    const seriesName = normalizeText(item?.seriesName, 500);
+    if (!seriesName) continue;
+    const key = seriesName.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    memberships.push({ seriesName, seriesIndex: normalizeReal(item.seriesIndex) });
+  }
+  return memberships;
+}
+
+function normalizeCommunityRatings(
+  value: BookDockMetadata['communityRatings'],
+): Array<{ provider: MetadataProviderKey; rating: number; ratingCount: number | null }> | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) return [];
+
+  const ratings = new Map<MetadataProviderKey, { provider: MetadataProviderKey; rating: number; ratingCount: number | null }>();
+  for (const item of value) {
+    if (!item || !METADATA_PROVIDER_KEYS.has(item.provider)) continue;
+    if (!Number.isFinite(item.rating) || item.rating < 0 || item.rating > 5) continue;
+    const ratingCount = Number.isInteger(item.ratingCount) && item.ratingCount! >= 0 ? item.ratingCount! : null;
+    ratings.set(item.provider, { provider: item.provider, rating: item.rating, ratingCount });
+  }
+  return [...ratings.values()];
+}
+
+function normalizeComicMetadata(value: BookDockMetadata['comicMetadata']): ComicMetadataFields | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+
+  const comic: ComicMetadataFields = {};
+  const issueNumber = normalizeText(value.issueNumber, 50);
+  const volumeName = normalizeText(value.volumeName, 500);
+  if (issueNumber !== null) comic.issueNumber = issueNumber;
+  if (volumeName !== null) comic.volumeName = volumeName;
+
+  const arrayFields = ['pencillers', 'inkers', 'colorists', 'letterers', 'coverArtists', 'characters', 'teams', 'locations', 'storyArcs'] as const;
+  for (const field of arrayFields) {
+    const normalized = normalizeStringArray(value[field], 500);
+    if (normalized.length > 0) comic[field] = normalized;
+  }
+
+  return Object.keys(comic).length > 0 ? comic : undefined;
 }
 
 type AudioFinalizeFields = {
   durationSeconds: number | null;
   chapters: AudiobookChapter[] | null;
   narrators: string[];
+  abridged: boolean | null;
 };
 
-function resolveAudioFinalizeFields(meta: BookDockMetadata | null | undefined): AudioFinalizeFields {
+function resolveAudioFinalizeFields(
+  embedded: BookDockMetadata | null | undefined,
+  selected: BookDockMetadata | null | undefined,
+): AudioFinalizeFields {
   return {
-    durationSeconds: normalizeDurationSeconds(meta?.durationSeconds),
-    chapters: normalizeChapters(meta?.chapters),
-    narrators: normalizeStringArray(meta?.narrators, 500),
+    durationSeconds: normalizeDurationSeconds(selected?.durationSeconds !== undefined ? selected.durationSeconds : embedded?.durationSeconds),
+    chapters: normalizeChapters(selected?.chapters !== undefined ? selected.chapters : embedded?.chapters),
+    narrators: normalizeStringArray(selected?.narrators !== undefined ? selected.narrators : embedded?.narrators, 500),
+    abridged: normalizeAbridged(selected?.abridged !== undefined ? selected.abridged : embedded?.abridged),
   };
 }
 
-function buildAudioMetadataPatch(audio: AudioFinalizeFields): { durationSeconds?: number; chapters?: AudiobookChapter[] } {
-  const patch: { durationSeconds?: number; chapters?: AudiobookChapter[] } = {};
+function buildAudioMetadataPatch(audio: AudioFinalizeFields): { durationSeconds?: number; chapters?: AudiobookChapter[]; abridged?: boolean } {
+  const patch: { durationSeconds?: number; chapters?: AudiobookChapter[]; abridged?: boolean } = {};
   if (audio.durationSeconds !== null) patch.durationSeconds = audio.durationSeconds;
   if (audio.chapters !== null) patch.chapters = audio.chapters;
+  if (audio.abridged !== null) patch.abridged = audio.abridged;
   return patch;
+}
+
+function normalizeAbridged(value: unknown): boolean | null {
+  return typeof value === 'boolean' ? value : null;
 }
 
 function normalizeDurationSeconds(value: unknown): number | null {

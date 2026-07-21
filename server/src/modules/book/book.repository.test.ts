@@ -1,4 +1,6 @@
 import { BookRepository } from './book.repository';
+import { sql } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 function makeSelectChain<T>(terminalMethod: string, terminalResult: T) {
   const chain: Record<string, vi.Mock> = {
@@ -903,6 +905,154 @@ describe('BookRepository', () => {
     expect(del).toHaveBeenCalledTimes(2);
     expect(readingWhere).toHaveBeenCalledTimes(1);
     expect(audioWhere).toHaveBeenCalledTimes(1);
+  });
+
+  describe('temporal jump buckets', () => {
+    const dialect = new PgDialect();
+
+    it('maps bounded temporal groups and the unknown tail without a full row sort', async () => {
+      const execute = vi.fn().mockResolvedValue({
+        rows: [
+          { bucket: '2026-07', item_index: 0, total: 100_000, is_unknown: false, unit: 'month', step: 1 },
+          { bucket: '__unknown__', item_index: 99_900, total: 100_000, is_unknown: true, unit: 'month', step: 1 },
+        ],
+      });
+      const repo = new BookRepository({ execute } as never);
+
+      const result = await repo.findTemporalJumpBuckets({
+        where: undefined,
+        field: 'addedAt',
+        direction: 'desc',
+        precision: 'date',
+        userId: 7,
+        timeZone: 'America/Denver',
+        maxBuckets: 24,
+      });
+
+      expect(result).toEqual({
+        buckets: [
+          { key: '2026-07', label: '2026-07', index: 0 },
+          { key: '__unknown__', label: '__unknown__', index: 99_900, isUnknown: true },
+        ],
+        total: 100_000,
+        kind: 'temporal',
+        granularity: { unit: 'month', step: 1 },
+      });
+      const query = dialect.sqlToQuery(execute.mock.calls[0]![0]).sql;
+      expect(query).toContain('temporal_rows AS MATERIALIZED');
+      expect(query).toContain('known_capacity');
+      expect(query).toContain('ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING');
+      expect(query).not.toContain('ROW_NUMBER()');
+    });
+
+    it('pre-aggregates per-user last-read values before collapsing series', async () => {
+      const execute = vi.fn().mockResolvedValue({ rows: [] });
+      const repo = new BookRepository({ execute } as never);
+
+      await repo.findTemporalJumpBucketsCollapsed({
+        where: undefined,
+        field: 'lastReadAt',
+        direction: 'asc',
+        precision: 'date',
+        userId: 9,
+        timeZone: 'UTC',
+        maxBuckets: 32,
+      });
+
+      const query = dialect.sqlToQuery(execute.mock.calls[0]![0]).sql;
+      expect(query).toContain('rail_last_read AS MATERIALIZED');
+      expect(query).toContain('GROUP BY rail_bf.book_id');
+      expect(query).toContain('base_rows AS MATERIALIZED');
+      expect(query).toContain('representatives AS');
+      expect(query).not.toContain('SELECT max(rp.updated_at)');
+    });
+  });
+
+  describe('discrete jump buckets', () => {
+    const dialect = new PgDialect();
+
+    it('maps bounded categorical groups and unknown values', async () => {
+      const execute = vi.fn().mockResolvedValue({
+        rows: [
+          { bucket: 'en', item_index: 0, total: 100_000, is_unknown: false },
+          { bucket: '__unknown__', item_index: 90_000, total: 100_000, is_unknown: true },
+        ],
+      });
+      const repo = new BookRepository({ execute } as never);
+
+      const result = await repo.findJumpBuckets({
+        where: undefined,
+        field: 'language',
+        kind: 'category',
+        userId: 7,
+        maxBuckets: 24,
+        orderBy: [sql`book_metadata.language ASC NULLS LAST`],
+      });
+
+      expect(result).toEqual({
+        buckets: [
+          { key: 'en', label: 'en', index: 0 },
+          { key: '__unknown__', label: '__unknown__', index: 90_000, isUnknown: true },
+        ],
+        total: 100_000,
+        kind: 'category',
+        granularity: null,
+      });
+      const query = dialect.sqlToQuery(execute.mock.calls[0]![0]).sql;
+      expect(query).toContain('ordered AS MATERIALIZED');
+      expect(query).toContain('bucket_count');
+      expect(query).toContain('LIMIT');
+    });
+
+    it('joins primary formats and per-user statuses once instead of correlating each row', async () => {
+      const execute = vi.fn().mockResolvedValue({ rows: [] });
+      const repo = new BookRepository({ execute } as never);
+
+      await repo.findJumpBuckets({
+        where: undefined,
+        field: 'format',
+        kind: 'category',
+        userId: 9,
+        maxBuckets: 32,
+        orderBy: [sql`books.id ASC`],
+      });
+      const formatQuery = dialect.sqlToQuery(execute.mock.calls[0]![0]).sql;
+      expect(formatQuery).toContain('LEFT JOIN "book_files" rail_primary_file');
+      expect(formatQuery).not.toContain('SELECT bf.format');
+
+      await repo.findJumpBuckets({
+        where: undefined,
+        field: 'readStatus',
+        kind: 'category',
+        userId: 9,
+        maxBuckets: 32,
+        orderBy: [sql`books.id ASC`],
+      });
+      const statusQuery = dialect.sqlToQuery(execute.mock.calls[1]![0]).sql;
+      expect(statusQuery).toContain('LEFT JOIN "user_book_status" rail_ubs');
+      expect(statusQuery).toContain('rail_ubs.user_id =');
+      expect(statusQuery).not.toContain('SELECT ubs.status');
+    });
+
+    it('carries categorical values through the collapsed representative query', async () => {
+      const execute = vi.fn().mockResolvedValue({ rows: [] });
+      const repo = new BookRepository({ execute } as never);
+
+      await repo.findJumpBucketsCollapsed({
+        where: undefined,
+        field: 'readStatus',
+        kind: 'category',
+        sort: [{ field: 'readStatus', dir: 'asc' }],
+        userId: 9,
+        maxBuckets: 32,
+      });
+
+      const query = dialect.sqlToQuery(execute.mock.calls[0]![0]).sql;
+      expect(query).toContain('base_rows AS MATERIALIZED');
+      expect(query).toContain("coalesce(rail_ubs.status::text, 'unread') AS rail_discrete_value");
+      expect(query).toContain('base.rail_discrete_value');
+      expect(query).toContain('r.rail_discrete_value');
+    });
   });
 
   describe('bulkSetRating', () => {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { X, Check, AlertCircle, Copy, Loader2, ExternalLink, ChevronDown, FileText, Trash2 } from '@lucide/vue'
 import type { BookDockDiscardDuplicatesResult, BookDockFinalizePreviewResult } from '@bookorbit/types'
@@ -7,6 +8,8 @@ import type { BookDockDiscardDuplicatesResult, BookDockFinalizePreviewResult } f
 import { api } from '@/lib/api'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useBookDockFinalize } from '../composables/useBookDockFinalize'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   selectionPayload: { fileIds?: number[]; selectAll?: boolean; excludedIds?: number[]; status?: string; search?: string }
@@ -376,50 +379,65 @@ async function handleDiscardResultDuplicates() {
             <p class="text-xs text-muted-foreground">
               {{
                 requiresDefaultDestination
-                  ? `${selectionSummary.withoutDestination} of ${selectionSummary.total} selected file${selectionSummary.total === 1 ? '' : 's'} need a destination`
-                  : 'All selected files already have destination set'
+                  ? t(
+                      'bookDock.finalizeDialog.needDestination',
+                      {
+                        count: selectionSummary.total,
+                        without: selectionSummary.withoutDestination,
+                      },
+                      selectionSummary.total,
+                    )
+                  : t('bookDock.finalizeDialog.allHaveDestination')
               }}
             </p>
           </div>
 
           <div v-if="finalizePreviewLoading" class="flex items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2.5">
             <Loader2 class="size-3.5 animate-spin text-muted-foreground" />
-            <span class="text-xs text-muted-foreground">Checking selected files...</span>
+            <span class="text-xs text-muted-foreground">{{ t('bookDock.finalizeDialog.checking') }}</span>
           </div>
 
           <div v-else-if="finalizePreview" class="rounded-lg border border-border bg-muted/20 px-3 py-2.5 space-y-2">
             <div class="flex flex-wrap items-center gap-2 text-xs">
               <span class="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-1 text-emerald-700 dark:text-emerald-300">
                 <Check class="size-3" />
-                {{ finalizePreview.ready }} ready
+                {{ t('bookDock.finalizeDialog.readyCount', { count: finalizePreview.ready }, finalizePreview.ready) }}
               </span>
               <span
                 v-if="finalizePreview.duplicates > 0"
                 class="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-1 text-amber-700 dark:text-amber-300"
               >
                 <Copy class="size-3" />
-                {{ finalizePreview.duplicates }} already in library
+                {{ t('bookDock.finalizeDialog.duplicateCount', { count: finalizePreview.duplicates }, finalizePreview.duplicates) }}
               </span>
               <span
                 v-if="finalizePreview.destinationConflicts > 0"
                 class="inline-flex items-center gap-1 rounded-md bg-red-500/10 px-2 py-1 text-red-600 dark:text-red-400"
               >
                 <AlertCircle class="size-3" />
-                {{ finalizePreview.destinationConflicts }} filename conflict{{ finalizePreview.destinationConflicts === 1 ? '' : 's' }}
+                {{
+                  t('bookDock.finalizeDialog.conflictCount', { count: finalizePreview.destinationConflicts }, finalizePreview.destinationConflicts)
+                }}
               </span>
               <span
                 v-if="finalizePreview.missingDestination > 0"
                 class="inline-flex items-center gap-1 rounded-md bg-red-500/10 px-2 py-1 text-red-600 dark:text-red-400"
               >
                 <AlertCircle class="size-3" />
-                {{ finalizePreview.missingDestination }} missing destination
+                {{
+                  t(
+                    'bookDock.finalizeDialog.missingDestinationCount',
+                    { count: finalizePreview.missingDestination },
+                    finalizePreview.missingDestination,
+                  )
+                }}
               </span>
               <span
                 v-if="finalizePreview.blocked > 0"
                 class="inline-flex items-center gap-1 rounded-md bg-red-500/10 px-2 py-1 text-red-600 dark:text-red-400"
               >
                 <AlertCircle class="size-3" />
-                {{ finalizePreview.blocked }} blocked
+                {{ t('bookDock.finalizeDialog.blockedCount', { count: finalizePreview.blocked }, finalizePreview.blocked) }}
               </span>
             </div>
 
@@ -432,11 +450,17 @@ async function handleDiscardResultDuplicates() {
                   class="text-xs text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 shrink-0"
                   @click="goToBook(item.existingBookId)"
                 >
-                  View existing <ExternalLink class="size-3" />
+                  {{ t('bookDock.finalizeDialog.viewExisting') }} <ExternalLink class="size-3" />
                 </button>
               </div>
               <div v-if="previewDuplicateCount > previewDuplicateItems.length" class="px-2.5 py-1.5 text-xs text-muted-foreground">
-                +{{ previewDuplicateCount - previewDuplicateItems.length }} more already in library
+                {{
+                  t(
+                    'bookDock.finalizeDialog.moreDuplicates',
+                    { count: previewDuplicateCount - previewDuplicateItems.length },
+                    previewDuplicateCount - previewDuplicateItems.length,
+                  )
+                }}
               </div>
             </div>
           </div>
@@ -445,7 +469,7 @@ async function handleDiscardResultDuplicates() {
 
           <div v-if="requiresDefaultDestination" class="space-y-3">
             <label class="block">
-              <span class="text-xs font-medium text-muted-foreground">Default Destination Library</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.finalizeDialog.defaultDestinationLibrary') }}</span>
               <select
                 class="mt-1 w-full h-9 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
                 :value="defaultLibraryId ?? ''"
@@ -456,7 +480,7 @@ async function handleDiscardResultDuplicates() {
             </label>
 
             <label class="block">
-              <span class="text-xs font-medium text-muted-foreground">Default Destination Folder</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.finalizeDialog.defaultDestinationFolder') }}</span>
               <select
                 class="mt-1 w-full h-9 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
                 :value="defaultFolderId ?? ''"
@@ -470,15 +494,15 @@ async function handleDiscardResultDuplicates() {
           <div v-if="namePreview.length || previewLoading" class="space-y-1.5">
             <div class="flex items-center gap-1.5">
               <FileText class="size-3.5 text-muted-foreground" />
-              <span class="text-xs font-medium text-muted-foreground">Rename preview</span>
-              <span v-if="previewLoading" class="text-xs text-muted-foreground italic">Loading...</span>
+              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.finalizeDialog.renamePreview') }}</span>
+              <span v-if="previewLoading" class="text-xs text-muted-foreground italic">{{ t('common.loading') }}</span>
             </div>
             <div class="rounded-lg border border-border bg-muted/20 divide-y divide-border max-h-48 overflow-y-auto">
               <div v-for="p in namePreview.slice(0, 8)" :key="p.fileId" class="px-3 py-1.5 text-xs">
                 <span class="text-foreground font-medium font-mono break-all">{{ p.newName }}</span>
               </div>
               <div v-if="namePreview.length > 8" class="px-3 py-1.5 text-xs text-muted-foreground italic">
-                +{{ namePreview.length - 8 }} more files
+                {{ t('bookDock.finalizeDialog.moreFiles', { count: namePreview.length - 8 }) }}
               </div>
             </div>
           </div>
@@ -487,7 +511,7 @@ async function handleDiscardResultDuplicates() {
 
           <div class="flex items-center justify-end gap-2 pt-2">
             <button class="h-8 px-4 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-all" @click="handleClose">
-              Cancel
+              {{ t('common.cancel') }}
             </button>
             <button
               v-if="previewDuplicateCount > 0"
@@ -497,7 +521,7 @@ async function handleDiscardResultDuplicates() {
             >
               <Loader2 v-if="duplicateDiscardLoading" class="size-3.5 animate-spin" />
               <Trash2 v-else class="size-3.5" />
-              Discard duplicates
+              {{ t('bookDock.finalizeDialog.discardDuplicates') }}
             </button>
             <button
               class="flex items-center gap-1.5 h-8 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
@@ -505,7 +529,7 @@ async function handleDiscardResultDuplicates() {
               @click="start"
             >
               <Loader2 v-if="loading" class="size-3.5 animate-spin" />
-              Start
+              {{ t('bookDock.finalizeDialog.start') }}
             </button>
           </div>
         </div>
@@ -515,10 +539,14 @@ async function handleDiscardResultDuplicates() {
             <Check v-if="result.failed === 0" class="size-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <AlertCircle v-else class="size-5 text-amber-600 dark:text-amber-400 shrink-0" />
             <div>
-              <p class="text-sm font-medium">{{ result.succeeded }} of {{ result.total }} files finalized</p>
+              <p class="text-sm font-medium">
+                {{ t('bookDock.finalizeDialog.filesFinalized', { succeeded: result.succeeded, total: result.total }) }}
+              </p>
               <p v-if="result.failed > 0" class="text-xs text-muted-foreground mt-0.5">
-                {{ result.failed }} failed{{
-                  resultDuplicateCount > 0 ? ` (${resultDuplicateCount} duplicate${resultDuplicateCount !== 1 ? 's' : ''})` : ''
+                {{
+                  resultDuplicateCount > 0
+                    ? t('bookDock.finalizeDialog.failedWithDuplicates', { failed: result.failed, count: resultDuplicateCount }, resultDuplicateCount)
+                    : t('bookDock.finalizeDialog.failedCount', { count: result.failed }, result.failed)
                 }}
               </p>
             </div>
@@ -541,14 +569,14 @@ async function handleDiscardResultDuplicates() {
                   class="text-xs text-primary hover:underline flex items-center gap-1 shrink-0"
                   @click="goToBook(r.bookId!)"
                 >
-                  View <ExternalLink class="size-3" />
+                  {{ t('bookDock.finalizeDialog.view') }} <ExternalLink class="size-3" />
                 </button>
                 <button
                   v-if="!r.success && r.isDuplicate && r.existingBookId"
                   class="text-xs text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 shrink-0"
                   @click="goToBook(r.existingBookId!)"
                 >
-                  View existing <ExternalLink class="size-3" />
+                  {{ t('bookDock.finalizeDialog.viewExisting') }} <ExternalLink class="size-3" />
                 </button>
                 <button
                   v-if="!r.success && r.isDuplicate"
@@ -557,24 +585,24 @@ async function handleDiscardResultDuplicates() {
                   @click="handleReimportDuplicate(r.fileId)"
                 >
                   <Loader2 v-if="reimportingIds.has(r.fileId)" class="size-3 animate-spin" />
-                  Import anyway
+                  {{ t('bookDock.finalizeDialog.importAnyway') }}
                 </button>
                 <button
                   v-if="!r.success && !r.isDuplicate && r.message && !isFileExistsError(r.message)"
                   class="text-xs text-red-500 flex items-center gap-1 shrink-0 hover:text-red-600 transition-colors"
                   @click="expandedErrors.has(r.fileId) ? expandedErrors.delete(r.fileId) : expandedErrors.add(r.fileId)"
                 >
-                  {{ expandedErrors.has(r.fileId) ? 'Hide' : 'Details' }}
+                  {{ expandedErrors.has(r.fileId) ? t('bookDock.finalizeDialog.hide') : t('bookDock.finalizeDialog.details') }}
                   <ChevronDown class="size-3 transition-transform" :class="expandedErrors.has(r.fileId) ? 'rotate-180' : ''" />
                 </button>
               </div>
               <div v-if="!r.success && isFileExistsError(r.message)" class="px-3 pb-2.5">
                 <div class="flex items-center gap-1.5">
-                  <span class="text-xs text-muted-foreground shrink-0">Already exists - save as:</span>
+                  <span class="text-xs text-muted-foreground shrink-0">{{ t('bookDock.finalizeDialog.alreadyExistsSaveAs') }}</span>
                   <input
                     type="text"
                     :value="getRenameInput(r.fileId)"
-                    :placeholder="'e.g. ' + r.fileName.replace(/\.[^.]+$/, '') + ' (2)'"
+                    :placeholder="t('bookDock.finalizeDialog.renamePlaceholder', { name: r.fileName.replace(/\.[^.]+$/, '') })"
                     class="flex-1 min-w-0 h-7 rounded-md border border-input bg-background px-2 text-xs outline-none focus:ring-1 focus:ring-ring"
                     @input="setRenameInput(r.fileId, ($event.target as HTMLInputElement).value)"
                   />
@@ -585,7 +613,7 @@ async function handleDiscardResultDuplicates() {
                     @click="handleRenameAndRetry(r.fileId)"
                   >
                     <Loader2 v-if="reimportingIds.has(r.fileId)" class="size-3 animate-spin" />
-                    Import
+                    {{ t('bookDock.finalizeDialog.import') }}
                   </button>
                 </div>
               </div>
@@ -604,14 +632,14 @@ async function handleDiscardResultDuplicates() {
             >
               <Loader2 v-if="duplicateDiscardLoading" class="size-3.5 animate-spin" />
               <Trash2 v-else class="size-3.5" />
-              Discard duplicates
+              {{ t('bookDock.finalizeDialog.discardDuplicates') }}
             </button>
             <div v-else />
             <button
               class="h-8 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium transition-all hover:opacity-90 active:scale-95"
               @click="handleClose"
             >
-              Done
+              {{ t('bookDock.done') }}
             </button>
           </div>
         </div>

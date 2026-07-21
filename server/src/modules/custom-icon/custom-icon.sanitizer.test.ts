@@ -46,6 +46,12 @@ describe('sanitizeSvgIcon', () => {
     expect(sanitized).not.toContain('style=');
   });
 
+  it('rejects comments containing script-like markup', () => {
+    expect(() => sanitizeSvgIcon(Buffer.from('<svg viewBox="0 0 24 24"><!-- <script>alert(1)</script> --><path d="M0 0"/></svg>'))).toThrow(
+      BadRequestException,
+    );
+  });
+
   it('rejects doctype subsets', () => {
     expect(() => sanitizeSvgIcon(Buffer.from('<!DOCTYPE svg [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]><svg viewBox="0 0 24 24"></svg>'))).toThrow(
       BadRequestException,

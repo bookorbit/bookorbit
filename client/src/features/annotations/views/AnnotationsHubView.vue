@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Download, Highlighter, RotateCcw, StickyNote, Trash2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
@@ -21,6 +22,7 @@ import { useAnnotationsHub } from '../composables/useAnnotationsHub'
 import { useAnnotationsUrlSync } from '../composables/useAnnotationsUrlSync'
 import { useDensity } from '../composables/useDensity'
 
+const { t } = useI18n()
 const router = useRouter()
 const hub = useAnnotationsHub()
 useAnnotationsUrlSync(hub)
@@ -36,7 +38,7 @@ const groupedByBook = computed(() => {
   let current: (typeof groups)[number] | null = null
   for (const item of hub.items.value) {
     if (!current || current.bookId !== item.bookId) {
-      current = { bookId: item.bookId, bookTitle: item.bookTitle ?? 'Unknown book', author: item.author, items: [] }
+      current = { bookId: item.bookId, bookTitle: item.bookTitle ?? t('annotations.unknownBook'), author: item.author, items: [] }
       groups.push(current)
     }
     current.items.push(item)
@@ -48,8 +50,8 @@ const summaryTexts = computed(() => {
   const stats = hub.stats.value
   if (!stats) return []
   const texts: string[] = []
-  if (stats.books > 0) texts.push(`${stats.books} ${stats.books === 1 ? 'book' : 'books'}`)
-  if (stats.withNotes > 0) texts.push(`${stats.withNotes} ${stats.withNotes === 1 ? 'note' : 'notes'}`)
+  if (stats.books > 0) texts.push(t('annotations.hub.bookCount', { count: stats.books }, stats.books))
+  if (stats.withNotes > 0) texts.push(t('annotations.hub.noteCount', { count: stats.withNotes }, stats.withNotes))
   return texts
 })
 
@@ -87,38 +89,38 @@ function handleJump(annotation: AnnotationHubItem) {
 async function handleTrash(id: number) {
   hub.selectedIds.value = new Set([id])
   const affected = await hub.bulk('trash')
-  if (affected > 0) toast.success('Moved to trash')
+  if (affected > 0) toast.success(t('annotations.hub.toast.movedToTrash'))
 }
 
 async function handleRestore(id: number) {
   const ok = await hub.restore(id)
-  if (ok) toast.success('Annotation restored')
+  if (ok) toast.success(t('annotations.hub.toast.annotationRestored'))
 }
 
 async function handlePurge(id: number) {
   const result = await hub.purge(id)
-  if (result.ok) toast.success('Annotation deleted forever')
-  else toast.error(result.message ?? 'Failed to delete')
+  if (result.ok) toast.success(t('annotations.hub.toast.annotationDeletedForever'))
+  else toast.error(result.message ?? t('annotations.hub.toast.failedToDelete'))
 }
 
 async function handleBulkTrash() {
   const affected = await hub.bulk('trash')
-  if (affected > 0) toast.success(`Moved ${affected} annotation(s) to trash`)
+  if (affected > 0) toast.success(t('annotations.hub.toast.bulkTrashed', { count: affected }, affected))
 }
 
 async function handleBulkRestore() {
   const affected = await hub.bulk('restore')
-  if (affected > 0) toast.success(`Restored ${affected} annotation(s)`)
+  if (affected > 0) toast.success(t('annotations.hub.toast.bulkRestored', { count: affected }, affected))
 }
 
 async function handleBulkRecolor(color: string) {
   const affected = await hub.bulk('restyle', { color })
-  if (affected > 0) toast.success(`Recolored ${affected} annotation(s)`)
+  if (affected > 0) toast.success(t('annotations.hub.toast.bulkRecolored', { count: affected }, affected))
 }
 
 async function handleBulkRestyle(style: string) {
   const affected = await hub.bulk('restyle', { style })
-  if (affected > 0) toast.success(`Restyled ${affected} annotation(s)`)
+  if (affected > 0) toast.success(t('annotations.hub.toast.bulkRestyled', { count: affected }, affected))
 }
 
 function handleExport(format: 'md' | 'csv' | 'json') {
@@ -143,8 +145,8 @@ function handleExportJson() {
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
       <div class="flex flex-wrap items-center gap-2.5">
         <Highlighter :size="22" class="text-primary" />
-        <h1 class="text-xl font-semibold">Annotations</h1>
-        <span class="text-sm text-muted-foreground">{{ hub.total.value }} total</span>
+        <h1 class="text-xl font-semibold">{{ t('annotations.hub.title') }}</h1>
+        <span class="text-sm text-muted-foreground">{{ t('annotations.hub.totalCount', { count: hub.total.value }) }}</span>
         <template v-if="summaryTexts.length > 0 || originSummary.length > 0">
           <span class="hidden h-5 w-px bg-border sm:block" />
           <AnnotationSummaryBar
@@ -161,13 +163,13 @@ function handleExportJson() {
           <DropdownMenuTrigger as-child>
             <Button variant="outline" size="sm" class="gap-1.5">
               <Download :size="14" />
-              Export
+              {{ t('annotations.hub.export') }}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem @click="handleExportMarkdown">Markdown</DropdownMenuItem>
-            <DropdownMenuItem @click="handleExportCsv">CSV</DropdownMenuItem>
-            <DropdownMenuItem @click="handleExportJson">JSON</DropdownMenuItem>
+            <DropdownMenuItem @click="handleExportMarkdown">{{ t('annotations.hub.exportMarkdown') }}</DropdownMenuItem>
+            <DropdownMenuItem @click="handleExportCsv">{{ t('annotations.hub.exportCsv') }}</DropdownMenuItem>
+            <DropdownMenuItem @click="handleExportJson">{{ t('annotations.hub.exportJson') }}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -180,7 +182,7 @@ function handleExportJson() {
         :class="hub.status.value === 'active' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
         @click="setActiveTab"
       >
-        Highlights
+        {{ t('annotations.hub.tabs.highlights') }}
       </button>
       <button
         type="button"
@@ -189,7 +191,7 @@ function handleExportJson() {
         @click="setTrashTab"
       >
         <Trash2 :size="13" />
-        Trash
+        {{ t('annotations.hub.tabs.trash') }}
       </button>
     </div>
 
@@ -218,7 +220,7 @@ function handleExportJson() {
           @click="hub.toggleNotesOnly"
         >
           <StickyNote :size="14" />
-          Notes only
+          {{ t('annotations.hub.notesOnly') }}
         </button>
       </template>
       <template #filters>
@@ -230,13 +232,13 @@ function handleExportJson() {
         >
           <template #extra>
             <label :class="FIELD_LABEL_CLASS">
-              Style
+              {{ t('annotations.hub.style') }}
               <select v-model="hub.styleFilter.value" :class="SELECT_CLASS">
                 <option v-for="option in STYLE_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
               </select>
             </label>
             <label :class="FIELD_LABEL_CLASS">
-              Source
+              {{ t('annotations.hub.source') }}
               <select v-model="hub.originFilter.value" :class="SELECT_CLASS">
                 <option v-for="option in ORIGIN_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
               </select>
@@ -260,9 +262,9 @@ function handleExportJson() {
       <template #trailing>
         <Button v-if="hub.status.value === 'active'" variant="destructive" size="sm" class="gap-1.5" @click="handleBulkTrash">
           <Trash2 :size="13" />
-          Trash
+          {{ t('annotations.hub.bulkTrash') }}
         </Button>
-        <Button v-else variant="outline" size="sm" @click="handleBulkRestore">Restore</Button>
+        <Button v-else variant="outline" size="sm" @click="handleBulkRestore">{{ t('annotations.hub.bulkRestore') }}</Button>
       </template>
     </AnnotationBulkBar>
 
@@ -272,18 +274,18 @@ function handleExportJson() {
     <div v-else-if="hub.error.value" class="py-12 text-center text-sm text-destructive">{{ hub.error.value }}</div>
     <div v-else-if="hub.items.value.length === 0" class="py-12 text-center">
       <template v-if="hub.hasActiveFilters.value">
-        <p class="text-sm text-muted-foreground">No highlights match your filters.</p>
+        <p class="text-sm text-muted-foreground">{{ t('annotations.hub.empty.noMatch') }}</p>
         <button
           type="button"
           class="mt-3 inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
           @click="hub.resetAllFilters"
         >
           <RotateCcw :size="14" />
-          Reset filters
+          {{ t('annotations.hub.empty.resetFilters') }}
         </button>
       </template>
       <p v-else class="text-sm text-muted-foreground">
-        {{ hub.status.value === 'trashed' ? 'Trash is empty' : 'No annotations yet. Highlights you create on the web or your e-reader appear here.' }}
+        {{ hub.status.value === 'trashed' ? t('annotations.hub.empty.trashEmpty') : t('annotations.hub.empty.noAnnotations') }}
       </p>
     </div>
     <div v-else class="transition-opacity" :class="{ 'opacity-50 pointer-events-none': hub.loading.value }">

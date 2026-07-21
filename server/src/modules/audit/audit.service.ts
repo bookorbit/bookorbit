@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 
 import { APP_SETTING_KEYS, DEFAULT_AUDIT_RETENTION_DAYS } from '../../common/constants/app-settings.constants';
+import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { AUDIT_EVENT, AuditEventPayload, AuditEventsService } from './audit-events.service';
 import { AuditRepository, AuditLogQuery } from './audit.repository';
 import { AppSettingsService } from '../app-settings/app-settings.service';
@@ -50,7 +51,9 @@ export class AuditService implements OnModuleInit, OnModuleDestroy {
       .catch((err: unknown) => {
         const errorClass = err instanceof Error ? err.constructor.name : 'Error';
         const error = err instanceof Error ? err.message : String(err);
-        this.logger.error(`[audit.write] [fail] action=${payload.action} errorClass=${errorClass} error="${error}" - audit write failed`);
+        this.logger.error(
+          `[audit.write] [fail] action=${payload.action} errorClass=${errorClass} error="${sanitizeLogValue(error)}" - audit write failed`,
+        );
       });
 
     this.pendingWrites.add(write);
@@ -59,6 +62,23 @@ export class AuditService implements OnModuleInit, OnModuleDestroy {
 
   getAuditLogs(query: AuditLogQuery) {
     return this.auditRepository.findAll(query);
+  }
+
+  record(payload: AuditEventPayload): Promise<void> {
+    return this.auditRepository.insert({
+      userId: payload.userId,
+      actorUsername: payload.actorUsername,
+      action: payload.action,
+      resource: payload.resource ?? null,
+      resourceId: payload.resourceId ?? null,
+      description: payload.description,
+      ip: payload.ip ?? null,
+      meta: payload.meta ?? null,
+    });
+  }
+
+  getReadingInsightsAccess(subjectUserId: number, page: number, pageSize: number) {
+    return this.auditRepository.findReadingInsightsAccess(subjectUserId, page, pageSize);
   }
 
   async getRetentionDays(): Promise<number> {
@@ -70,7 +90,9 @@ export class AuditService implements OnModuleInit, OnModuleDestroy {
     } catch (err: unknown) {
       const errorClass = err instanceof Error ? err.constructor.name : 'Error';
       const error = err instanceof Error ? err.message : String(err);
-      this.logger.error(`[audit.retention_days] [fail] errorClass=${errorClass} error="${error}" - failed to read retention days, using default`);
+      this.logger.error(
+        `[audit.retention_days] [fail] errorClass=${errorClass} error="${sanitizeLogValue(error)}" - failed to read retention days, using default`,
+      );
       return DEFAULT_AUDIT_RETENTION_DAYS;
     }
   }
@@ -88,7 +110,7 @@ export class AuditService implements OnModuleInit, OnModuleDestroy {
       const errorClass = err instanceof Error ? err.constructor.name : 'Error';
       const error = err instanceof Error ? err.message : String(err);
       this.logger.error(
-        `[audit.retention_cleanup] [fail] retentionDays=${days} durationMs=${Date.now() - start} errorClass=${errorClass} error="${error}" - audit retention cleanup failed`,
+        `[audit.retention_cleanup] [fail] retentionDays=${days} durationMs=${Date.now() - start} errorClass=${errorClass} error="${sanitizeLogValue(error)}" - audit retention cleanup failed`,
       );
       throw err;
     }

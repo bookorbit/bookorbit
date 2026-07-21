@@ -25,6 +25,7 @@ export enum Permission {
   ManageIcons = "manage_icons",
   ManageAppSettings = "manage_app_settings",
   ManageUsers = "manage_users",
+  ViewUserActivity = "view_user_activity",
   ViewAuditLog = "view_audit_log",
 
   // Notifications
@@ -51,6 +52,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   [Permission.ManageIcons]: "Manage icons",
   [Permission.ManageAppSettings]: "App settings",
   [Permission.ManageUsers]: "Manage users",
+  [Permission.ViewUserActivity]: "View user activity",
   [Permission.ViewAuditLog]: "View audit log",
   [Permission.NotificationAccess]: "Notifications",
 };

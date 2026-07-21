@@ -1,6 +1,7 @@
 import type { Component } from 'vue'
 import { Calendar, Hash, Link, ToggleLeft, Type } from '@lucide/vue'
 import type { CustomMetadataFieldType } from '@bookorbit/types'
+import { formatDate, formatRelativeTime as formatLocaleRelativeTime } from '@/i18n/formatters'
 
 type CustomFieldTypeMeta = {
   label: string
@@ -52,21 +53,19 @@ const RELATIVE_TIME_DIVISIONS: { amount: number; unit: Intl.RelativeTimeFormatUn
   { amount: Number.POSITIVE_INFINITY, unit: 'year' },
 ]
 
-const relativeTimeFormatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
-
 export function formatRelativeTime(isoString: string): string {
   let duration = (new Date(isoString).getTime() - Date.now()) / 1000
   for (const division of RELATIVE_TIME_DIVISIONS) {
     if (Math.abs(duration) < division.amount) {
-      return relativeTimeFormatter.format(Math.round(duration), division.unit)
+      return formatLocaleRelativeTime(Math.round(duration), division.unit)
     }
     duration /= division.amount
   }
-  return relativeTimeFormatter.format(Math.round(duration), 'year')
+  return formatLocaleRelativeTime(Math.round(duration), 'year')
 }
 
 export function formatAbsoluteDateTime(isoString: string): string {
-  return new Date(isoString).toLocaleString(undefined, {
+  return formatDate(new Date(isoString), {
     year: 'numeric',
     month: 'short',
     day: 'numeric',

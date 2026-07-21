@@ -1606,7 +1606,13 @@ describe('BookQueryBuilder.buildCollapseOrderBy', () => {
   it('generates readStatus sort using subquery', () => {
     const result = BookQueryBuilder.buildCollapseOrderBy([{ field: 'readStatus', dir: 'asc' }], 1);
     expect(result).toContain('user_book_status');
+    expect(result).toContain('COALESCE');
+    expect(result).toContain("'unread'");
     expect(result).toContain('ASC NULLS LAST');
+  });
+
+  it('generates language sort over the representative field', () => {
+    expect(BookQueryBuilder.buildCollapseOrderBy([{ field: 'language', dir: 'desc' }], 1)).toBe('r.language DESC NULLS LAST, r.id ASC');
   });
 
   it('generates format sort using subquery', () => {

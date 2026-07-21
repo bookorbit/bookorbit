@@ -11,6 +11,9 @@ export interface KoreaderDeviceInfo {
   deviceId: string;
   lastSyncAt: string;
   lastBookTitle: string | null;
+  fileNamingPattern?: string | null;
+  seriesFileNamingPattern?: string | null;
+  standaloneFileNamingPattern?: string | null;
 }
 
 export interface KoreaderBookProgress {
@@ -32,6 +35,9 @@ export interface KoreaderDeviceSweepInfo {
   lastSweepBooksMatched: number;
   lastSweepPageStats: number;
   lastSweepAnnotations: number;
+  fileNamingPattern?: string | null;
+  seriesFileNamingPattern?: string | null;
+  standaloneFileNamingPattern?: string | null;
 }
 
 export interface KoreaderPluginTotals {
@@ -169,6 +175,7 @@ export interface KoreaderCatalogFile {
   sizeBytes: number | null;
   durationSeconds: number | null;
   downloadUrl: string;
+  devicePath: string;
 }
 
 export interface KoreaderCatalogProgress {

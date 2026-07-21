@@ -1,4 +1,5 @@
 import { AuthorAutoEnrichmentWriteMode } from '@bookorbit/types';
+import { NotificationType } from '@bookorbit/types';
 
 import { AUTHOR_ENRICHMENT_REASONS } from './author-enrichment-reasons';
 import { AuthorEnrichmentSessionService } from './author-enrichment-session.service';
@@ -43,6 +44,10 @@ describe('AuthorEnrichmentOrchestratorService', () => {
 
   const gateway = {
     emitStatus: vi.fn(),
+  };
+
+  const notificationService = {
+    notify: vi.fn(),
   };
 
   let session: AuthorEnrichmentSessionService;
@@ -90,6 +95,7 @@ describe('AuthorEnrichmentOrchestratorService', () => {
     });
     enrichmentConfig.isPaused.mockResolvedValue(false);
     enrichmentConfig.setPaused.mockResolvedValue(undefined);
+    notificationService.notify.mockResolvedValue(undefined);
 
     service = new AuthorEnrichmentOrchestratorService(
       queueRepo as never,
@@ -98,7 +104,7 @@ describe('AuthorEnrichmentOrchestratorService', () => {
       enrichmentConfig as never,
       metadataEvents as never,
       session,
-      { notify: vi.fn() } as never,
+      notificationService as never,
       gateway as never,
     );
   });
@@ -132,6 +138,7 @@ describe('AuthorEnrichmentOrchestratorService', () => {
   });
 
   it('marks rate-limited failures for retry with delayed nextAttemptAt', async () => {
+    session.addToTotal(1);
     executor.execute.mockResolvedValue({
       kind: 'failed',
       message: 'Audnexus 429',
@@ -153,9 +160,11 @@ describe('AuthorEnrichmentOrchestratorService', () => {
         nextAttemptAt: expect.any(Date),
       }),
     );
+    expect(session.getSnapshot()).toMatchObject({ sessionDone: 0, sessionFailed: 0 });
   });
 
   it('marks non-transient failures as final', async () => {
+    session.addToTotal(1);
     executor.execute.mockResolvedValue({
       kind: 'failed',
       message: 'bad request',
@@ -177,6 +186,48 @@ describe('AuthorEnrichmentOrchestratorService', () => {
         rateLimited: false,
       }),
     );
+    expect(session.getSnapshot()).toMatchObject({ sessionTotal: 1, sessionDone: 1, sessionFailed: 1, currentItemName: null });
+  });
+
+  it('counts success, skipped work, and an exhausted transient failure as terminal outcomes', async () => {
+    session.addToTotal(3);
+    executor.execute
+      .mockResolvedValueOnce({
+        kind: 'done',
+        provider: 'audnexus',
+        descriptionUpdated: true,
+        imageUpdated: false,
+      })
+      .mockResolvedValueOnce({
+        kind: 'skipped',
+        reason: 'no_match',
+        provider: null,
+        descriptionUpdated: false,
+        imageUpdated: false,
+      })
+      .mockResolvedValueOnce({
+        kind: 'failed',
+        message: 'provider unavailable',
+        provider: 'audnexus',
+        httpStatus: 503,
+        retryAfterMs: null,
+        transient: true,
+        descriptionUpdated: false,
+        imageUpdated: false,
+      });
+
+    await (service as any).processOne(1, 0, 'Success', AUTHOR_ENRICHMENT_REASONS.AUTHOR_RENAME);
+    await (service as any).processOne(2, 0, 'Skipped', AUTHOR_ENRICHMENT_REASONS.AUTHOR_RENAME);
+    await (service as any).processOne(3, 5, 'Failed', AUTHOR_ENRICHMENT_REASONS.AUTHOR_RENAME);
+
+    expect(session.getSnapshot()).toEqual({
+      sessionTotal: 3,
+      sessionDone: 3,
+      sessionFailed: 1,
+      currentItemName: null,
+    });
+    expect(queueRepo.markDone).toHaveBeenCalledTimes(2);
+    expect(queueRepo.markFailed).toHaveBeenLastCalledWith(expect.objectContaining({ authorId: 3, nextAttemptAt: null }));
   });
 
   it('resets processing rows and starts polling on bootstrap', async () => {
@@ -228,9 +279,9 @@ describe('AuthorEnrichmentOrchestratorService', () => {
   });
 
   it('cancelPending pauses and resets session counters', async () => {
-    session.sessionTotal = 10;
-    session.sessionDone = 4;
-    session.currentItemName = 'Someone';
+    session.addToTotal(10);
+    for (let index = 0; index < 4; index += 1) session.incrementDone();
+    session.setCurrentItemName('Someone');
 
     await service.cancelPending();
 
@@ -239,6 +290,7 @@ describe('AuthorEnrichmentOrchestratorService', () => {
     expect(session.getSnapshot()).toEqual({
       sessionTotal: 0,
       sessionDone: 0,
+      sessionFailed: 0,
       currentItemName: null,
     });
   });
@@ -249,6 +301,104 @@ describe('AuthorEnrichmentOrchestratorService', () => {
     await expect(service.requeueFailed()).resolves.toBe(4);
     expect(session.getSnapshot().sessionTotal).toBe(4);
     expect(gateway.emitStatus).toHaveBeenCalled();
+  });
+
+  it('finalizes a completed session before scheduling a new one', async () => {
+    session.addToTotal(1);
+    session.incrementDone(true);
+    queueRepo.upsertSchedule.mockResolvedValue(2);
+
+    await service.scheduleMany([1, 2], AUTHOR_ENRICHMENT_REASONS.AUTHOR_RENAME, { ignoreEnabled: true });
+
+    expect(notificationService.notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: NotificationType.AuthorEnrichmentFailed,
+        message: 'Processed 1 of 1 authors, 1 failed',
+        meta: { sessionTotal: 1, sessionDone: 1, failed: 1 },
+      }),
+    );
+    expect(session.getSnapshot()).toEqual({
+      sessionTotal: 2,
+      sessionDone: 0,
+      sessionFailed: 0,
+      currentItemName: null,
+    });
+    expect(gateway.emitStatus).toHaveBeenCalledTimes(2);
+  });
+
+  it('resets a drained session, reports only current-session failures, and emits the reset snapshot', async () => {
+    session.addToTotal(2);
+    session.incrementDone();
+    session.incrementDone(true);
+    queueRepo.getStatusSummary
+      .mockResolvedValueOnce({ queued: 0, processing: 0, rateLimited: 0, failed: 152, done: 0, total: 152 })
+      .mockResolvedValueOnce({ queued: 0, processing: 0, rateLimited: 0, failed: 152, done: 0, total: 152 });
+
+    await (service as any).checkAndResetSession();
+
+    expect(notificationService.notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: NotificationType.AuthorEnrichmentFailed,
+        message: 'Processed 2 of 2 authors, 1 failed',
+        meta: { sessionTotal: 2, sessionDone: 2, failed: 1 },
+      }),
+    );
+    expect(session.getSnapshot()).toEqual({
+      sessionTotal: 0,
+      sessionDone: 0,
+      sessionFailed: 0,
+      currentItemName: null,
+    });
+    expect(gateway.emitStatus).toHaveBeenLastCalledWith(expect.objectContaining({ sessionTotal: 0, sessionDone: 0, sessionFailed: 0, failed: 152 }));
+  });
+
+  it('does not reset an active session or emit repeatedly for an empty session', async () => {
+    session.addToTotal(1);
+    queueRepo.getStatusSummary.mockResolvedValueOnce({ queued: 1, processing: 0, rateLimited: 0, failed: 0, done: 0, total: 1 });
+
+    await (service as any).checkAndResetSession();
+
+    expect(session.getSnapshot().sessionTotal).toBe(1);
+    expect(notificationService.notify).not.toHaveBeenCalled();
+    expect(gateway.emitStatus).not.toHaveBeenCalled();
+
+    session.reset();
+    queueRepo.getStatusSummary.mockResolvedValueOnce({ queued: 0, processing: 0, rateLimited: 0, failed: 0, done: 0, total: 0 });
+    await (service as any).checkAndResetSession();
+    expect(gateway.emitStatus).not.toHaveBeenCalled();
+  });
+
+  it('does not let a stale drained summary reset newly scheduled session work', async () => {
+    session.addToTotal(1);
+    let resolveSummary!: (summary: { queued: number; processing: number; rateLimited: number; failed: number; done: number; total: number }) => void;
+    queueRepo.getStatusSummary.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveSummary = resolve;
+      }),
+    );
+
+    const resetPromise = (service as any).checkAndResetSession();
+    session.addToTotal(1);
+    resolveSummary({ queued: 0, processing: 0, rateLimited: 0, failed: 0, done: 0, total: 0 });
+    await resetPromise;
+
+    expect(session.getSnapshot()).toMatchObject({ sessionTotal: 2, sessionDone: 0, sessionFailed: 0 });
+    expect(notificationService.notify).not.toHaveBeenCalled();
+    expect(gateway.emitStatus).not.toHaveBeenCalled();
+  });
+
+  it('keeps silent metadata-replace work out of a visible session', async () => {
+    session.addToTotal(1);
+
+    await (service as any).processOne(91, 0, 'Background Author', AUTHOR_ENRICHMENT_REASONS.METADATA_REPLACE);
+
+    expect(session.getSnapshot()).toEqual({
+      sessionTotal: 1,
+      sessionDone: 0,
+      sessionFailed: 0,
+      currentItemName: null,
+    });
+    expect(gateway.emitStatus).not.toHaveBeenCalled();
   });
 
   it('pollOnce catches unexpected errors and does not re-throw', async () => {

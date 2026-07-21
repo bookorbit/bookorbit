@@ -6,6 +6,8 @@ import { createPinia } from 'pinia'
 
 import App from './App.vue'
 import router from './router'
+import { i18n } from './i18n'
+import { useLocaleStore } from './stores/locale'
 import { useAuth } from './features/auth/composables/useAuth'
 import { useSetupStatus } from './features/auth/composables/useSetupStatus'
 
@@ -36,6 +38,12 @@ ariaHiddenObserver.observe(document.body, {
 const app = createApp(App)
 
 app.use(createPinia())
+app.use(i18n)
+
+// Load and apply the initial locale (stored preference or browser language) before mount
+// so the first paint is already localized. Server-synced locale is applied later during auth.
+const localeStore = useLocaleStore()
+await localeStore.setLocale(localeStore.locale)
 
 // Resolve setup status/auth before installing router.
 // app.use(router) triggers initial navigation and guard execution.

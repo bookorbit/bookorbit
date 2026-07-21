@@ -228,6 +228,49 @@ describe('AudioFormatWriter', () => {
     );
   });
 
+  it.each(['m4b', 'm4a'])('writes artwork-safe MP4 series aliases for %s', (format) => {
+    const metadata = testing.buildAudioMetadataArgs(
+      { seriesName: 'The Murderbot Diaries', seriesIndex: 2.5 },
+      { dryRun: false, fieldMask: new Set(['seriesName', 'seriesIndex']) },
+      format,
+    );
+
+    expect(metadata).toEqual([
+      { key: 'series', value: 'The Murderbot Diaries' },
+      { key: 'show', value: 'The Murderbot Diaries' },
+      { key: 'series-part', value: '2.5' },
+      { key: 'episode_id', value: '2.5' },
+    ]);
+  });
+
+  it.each(['m4b', 'm4a'])('clears custom and MP4-native series tags for %s', (format) => {
+    const metadata = testing.buildAudioMetadataArgs(
+      { seriesName: null, seriesIndex: null },
+      { dryRun: false, fieldMask: new Set(['seriesName', 'seriesIndex']) },
+      format,
+    );
+
+    expect(metadata).toEqual([
+      { key: 'series', value: '' },
+      { key: 'show', value: '' },
+      { key: 'series-part', value: '' },
+      { key: 'episode_id', value: '' },
+    ]);
+  });
+
+  it.each(['mp3', 'flac'])('does not write MP4 series aliases for %s', (format) => {
+    const metadata = testing.buildAudioMetadataArgs(
+      { seriesName: 'The Murderbot Diaries', seriesIndex: 2 },
+      { dryRun: false, fieldMask: new Set(['seriesName', 'seriesIndex']) },
+      format,
+    );
+
+    expect(metadata).toEqual([
+      { key: 'series', value: 'The Murderbot Diaries' },
+      { key: 'series-part', value: '2' },
+    ]);
+  });
+
   it('exposes one concrete writer per supported audio format', () => {
     const embedder = { embedMetadata: vi.fn() } as unknown as AudioMetadataEmbedder;
 

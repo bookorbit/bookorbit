@@ -69,6 +69,9 @@ import { ReadwiseModule } from './modules/readwise/readwise.module';
 import { StorygraphModule } from './modules/storygraph/storygraph.module';
 import { CustomMetadataModule } from './modules/custom-metadata/custom-metadata.module';
 import { CustomIconModule } from './modules/custom-icon/custom-icon.module';
+import { AccountActivityModule } from './modules/account-activity/account-activity.module';
+import { SharedReadingInsightsModule } from './modules/shared-reading-insights/shared-reading-insights.module';
+import { BookDuplicatesModule } from './modules/book-duplicates/book-duplicates.module';
 
 @Module({
   imports: [
@@ -145,6 +148,9 @@ import { CustomIconModule } from './modules/custom-icon/custom-icon.module';
     HardcoverModule,
     ReadwiseModule,
     StorygraphModule,
+    AccountActivityModule,
+    SharedReadingInsightsModule,
+    BookDuplicatesModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
