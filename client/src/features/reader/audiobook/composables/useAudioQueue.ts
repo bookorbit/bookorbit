@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { Howl } from 'howler'
+import { refreshAccessToken } from '@/lib/api'
 
 export interface AudioFile {
   id: number
@@ -18,148 +18,124 @@ export function useAudioQueue(files: AudioFile[], onFileEnd: (fileId: number) =>
   const duration = ref(0)
   const loadError = ref<string | null>(null)
 
-  // Only the active Howl and its immediate neighbours are kept alive.
-  const howls = new Map<number, Howl>()
+  const audio = new Audio()
+  audio.crossOrigin = 'anonymous'
 
-  // Pending seek to apply when the current Howl finishes loading.
-  // Using a single variable prevents stacking multiple once('load') seek handlers.
-  let pendingSeek: number | null = null
+  let retriedForSrc: string | null = null
 
-  function buildHowl(index: number): Howl {
-    const file = files[index]!
-    const fmt = file.format?.toLowerCase() ?? 'm4b'
-    const howl = new Howl({
-      src: [serveUrl(file.id)],
-      format: [fmt],
-      html5: true,
-      preload: false,
-      onend() {
-        onFileEnd(file.id)
-      },
-      onplay() {
-        isPlaying.value = true
-      },
-      onpause() {
-        isPlaying.value = false
-      },
-      onstop() {
-        isPlaying.value = false
-      },
-      onload() {
-        if (index === currentIndex.value) {
-          duration.value = howl.duration()
-        }
-      },
-      onloaderror(_id: number, err: unknown) {
-        if (index === currentIndex.value) {
-          loadError.value = typeof err === 'string' ? err : 'Failed to load audio file'
-        }
-      },
-    })
-    return howl
+  audio.addEventListener('ended', () => {
+    onFileEnd(files[currentIndex.value]?.id ?? 0)
+  })
+
+  audio.addEventListener('play', () => {
+    isPlaying.value = true
+  })
+
+  audio.addEventListener('pause', () => {
+    isPlaying.value = false
+  })
+
+  audio.addEventListener('loadedmetadata', () => {
+    if (Number.isFinite(audio.duration)) {
+      duration.value = audio.duration
+    }
+  })
+
+  audio.addEventListener('timeupdate', () => {
+    currentPosition.value = audio.currentTime
+  })
+
+  audio.addEventListener('error', () => {
+    retryOnError()
+  })
+
+  // The access_token cookie can expire during long screen-off playback.
+  // Refresh it and retry loading the current src once.
+  function retryOnError() {
+    const src = audio.src
+    if (!src || retriedForSrc === src) {
+      loadError.value = 'Failed to load audio file'
+      return
+    }
+    retriedForSrc = src
+    void refreshAccessToken()
+      .catch(() => {})
+      .finally(() => {
+        if (audio.src !== src) return
+        const pos = audio.currentTime
+        audio.src = src
+        audio.currentTime = pos
+        audio.play().catch(() => {})
+      })
   }
 
-  function getOrCreate(index: number): Howl {
-    const file = files[index]!
-    if (!howls.has(file.id)) {
-      howls.set(file.id, buildHowl(index))
-    }
-    return howls.get(file.id)!
-  }
+  function loadTrack(index: number) {
+    const clamped = Math.max(0, Math.min(index, files.length - 1))
+    currentIndex.value = clamped
+    const file = files[clamped]!
+    const url = serveUrl(file.id)
 
-  function evictDistant(activeIndex: number) {
-    for (const [fileId, howl] of howls) {
-      const idx = files.findIndex((f) => f.id === fileId)
-      if (Math.abs(idx - activeIndex) > 1) {
-        howl.stop()
-        howl.unload()
-        howls.delete(fileId)
-      }
+    if (audio.src !== url) {
+      audio.src = url
+      retriedForSrc = null
     }
+
+    duration.value = file.durationSeconds ?? 0
+    loadError.value = null
   }
 
   function activateIndex(index: number, positionSeconds = 0) {
-    const clamped = Math.max(0, Math.min(index, files.length - 1))
-    if (clamped !== currentIndex.value) {
-      const prev = howls.get(files[currentIndex.value]!.id)
-      prev?.stop()
-      currentIndex.value = clamped
-      pendingSeek = null
-    }
+    loadTrack(index)
+    currentPosition.value = positionSeconds
 
-    const howl = getOrCreate(clamped)
-    if (clamped + 1 < files.length) getOrCreate(clamped + 1)
-    if (clamped - 1 >= 0) getOrCreate(clamped - 1)
-    evictDistant(clamped)
-
-    loadError.value = null
-    duration.value = files[clamped]!.durationSeconds ?? 0
-
-    if (howl.state() === 'loaded') {
-      duration.value = howl.duration()
-      howl.seek(positionSeconds)
-      currentPosition.value = positionSeconds
+    if (audio.readyState >= HTMLMediaElement.HAVE_METADATA && Number.isFinite(audio.duration)) {
+      audio.currentTime = positionSeconds
     } else {
-      pendingSeek = positionSeconds
-      howl.once('load', () => {
-        duration.value = howl.duration()
-        const seekTo = pendingSeek ?? positionSeconds
-        pendingSeek = null
-        howl.seek(seekTo)
-        currentPosition.value = seekTo
-      })
-      howl.load()
+      const target = positionSeconds
+      const onMeta = () => {
+        audio.currentTime = target
+        audio.removeEventListener('loadedmetadata', onMeta)
+      }
+      audio.addEventListener('loadedmetadata', onMeta)
     }
-  }
-
-  function currentHowl(): Howl | undefined {
-    const id = files[currentIndex.value]?.id
-    return id !== undefined ? howls.get(id) : undefined
   }
 
   function play() {
-    const h = currentHowl()
-    if (!h) return
-    if (h.state() === 'unloaded') {
-      h.once('load', () => h.play())
-      h.load()
-    } else {
-      h.play()
-    }
+    audio.play().catch(() => {})
   }
 
   function pause() {
-    currentHowl()?.pause()
+    audio.pause()
   }
 
   function seek(seconds: number) {
-    const h = currentHowl()
-    if (!h) return
     const fileDur = files[currentIndex.value]?.durationSeconds
     const upper = duration.value || (fileDur != null ? fileDur : Infinity)
     const s = Math.max(0, Math.min(seconds, upper))
-    if (h.state() === 'loaded') {
-      h.seek(s)
+
+    if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      audio.currentTime = s
     } else {
-      // Store as pending; the activateIndex load handler will apply the latest value.
-      pendingSeek = s
+      const target = s
+      const onMeta = () => {
+        audio.currentTime = target
+        audio.removeEventListener('loadedmetadata', onMeta)
+      }
+      audio.addEventListener('loadedmetadata', onMeta)
     }
     currentPosition.value = s
   }
 
   function position(): number {
-    const h = currentHowl()
-    if (!h) return currentPosition.value
-    const p = h.seek()
-    return typeof p === 'number' ? p : currentPosition.value
+    return audio.currentTime
   }
 
   function setSpeed(rate: number) {
-    for (const h of howls.values()) h.rate(rate)
+    audio.playbackRate = rate
   }
 
   function setVolume(vol: number) {
-    for (const h of howls.values()) h.volume(vol)
+    audio.volume = vol
   }
 
   function goToFile(fileId: number, positionSeconds = 0) {
@@ -177,11 +153,9 @@ export function useAudioQueue(files: AudioFile[], onFileEnd: (fileId: number) =>
   }
 
   function destroy() {
-    for (const h of howls.values()) {
-      h.stop()
-      h.unload()
-    }
-    howls.clear()
+    audio.pause()
+    audio.src = ''
+    retriedForSrc = null
   }
 
   return {
