@@ -2964,6 +2964,15 @@
       "title": "Buch löschen?",
       "description": "Dadurch werden das Buch sowie alle zugehörigen Metadaten, Dateien, Lesefortschritte und Lesezeichen dauerhaft gelöscht. Dies kann nicht rückgängig gemacht werden."
     },
+    "moveDialog": {
+      "title": "Verschiebe {count} Buch in Bibliothek | Verschiebe {count} Buch in Bibliothek | Verschiebe {count} Bücher in Bibliothek",
+      "description": "Die Dateien werden in den Ordner der Ziel-Bibliothek verschoben. Lesefortschritt, Anmerkungen und Sammlungen bleiben den Büchern erhalten.",
+      "targetLibrary": "Ziel-Bibliothek",
+      "targetFolder": "Ziel-Ordner",
+      "selectLibrary": "Bibliothek auswählen…",
+      "selectFolder": "Ordner auswählen…",
+      "move": "Verschieben"
+    },
     "bulkEdit": {
       "title": "Metadaten bearbeiten - {count} Buch | Metadaten bearbeiten - {count} Buch | Metadaten bearbeiten - {count} Bücher",
       "instructions": "Aktivieren Sie Felder zur Bearbeitung und legen Sie dann Werte fest. Nur aktivierte Felder werden geändert.",
@@ -3228,6 +3237,7 @@
         "primary": "Primär",
         "peek": "Vorschau",
         "sendViaEmail": "Per E-Mail senden",
+        "moveToLibrary": "In Bibliothek verschieben",
         "personalReview": {
           "title": "Persönliche Rezension",
           "toggleAria": "Persönliche Rezension ein- oder ausblenden",
@@ -4093,6 +4103,7 @@
       "lockAll": "Alle sperren",
       "unlockAll": "Alle entsperren",
       "exportMetadata": "Metadaten exportieren",
+      "moveToLibrary": "In Bibliothek verschieben",
       "deleteSelected": "Auswahl löschen",
       "exitSelection": "Auswahl beenden",
       "downloadFilesZipLabel": "Dateien als ZIP herunterladen:",

@@ -2964,6 +2964,15 @@
       "title": "Excluir livro?",
       "description": "Isso excluirá permanentemente o livro e todos os seus metadados, arquivos, progresso de leitura e marcadores. Isso não pode ser desfeito."
     },
+    "moveDialog": {
+      "title": "Mover {count} livro para a biblioteca | Mover {count} livro para a biblioteca | Mover {count} livros para a biblioteca",
+      "description": "Os ficheiros são movidos para a pasta da biblioteca de destino. O progresso de leitura, as anotações e as coleções permanecem com os livros.",
+      "targetLibrary": "Biblioteca de destino",
+      "targetFolder": "Pasta de destino",
+      "selectLibrary": "Selecionar uma biblioteca…",
+      "selectFolder": "Selecionar uma pasta…",
+      "move": "Mover"
+    },
     "bulkEdit": {
       "title": "Editar metadados - {count} livro | Editar metadados - {count} livro | Editar metadados - {count} livros",
       "instructions": "Alterne os campos para editar e, em seguida, configure os valores. Apenas os campos ativados serão alterados.",
@@ -3228,6 +3237,7 @@
         "primary": "Primário",
         "peek": "Espiar",
         "sendViaEmail": "Enviar por E-mail",
+        "moveToLibrary": "Mover para a biblioteca",
         "personalReview": {
           "title": "Revisão Pessoal",
           "toggleAria": "Alternar revisão pessoal",
@@ -4093,6 +4103,7 @@
       "lockAll": "Bloquear tudo",
       "unlockAll": "Desbloquear tudo",
       "exportMetadata": "Exportar metadados",
+      "moveToLibrary": "Mover para a biblioteca",
       "deleteSelected": "Excluir selecionados",
       "exitSelection": "Sair da seleção",
       "downloadFilesZipLabel": "Baixar arquivos como ZIP:",

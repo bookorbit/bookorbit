@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { FolderInput, Loader2 } from '@lucide/vue'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 
@@ -11,6 +12,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ confirm: [libraryId: number, folderId: number | undefined]; cancel: [] }>()
 
+const { t } = useI18n()
 const { libraries, fetchLibraries } = useLibraries()
 
 const selectedLibraryId = ref<number | null>(null)
@@ -69,26 +71,26 @@ function onConfirm() {
             <FolderInput class="text-primary" :size="18" />
           </div>
           <div>
-            <h2 class="text-base font-semibold text-foreground">Move {{ count }} book{{ count === 1 ? '' : 's' }} to library</h2>
+            <h2 class="text-base font-semibold text-foreground">{{ t('book.moveDialog.title', { count }, count) }}</h2>
             <p class="text-sm text-muted-foreground mt-1">
-              Files are moved into the target library's folder. Reading progress, annotations, and collections stay with the books.
+              {{ t('book.moveDialog.description') }}
             </p>
           </div>
         </div>
 
         <div class="space-y-3 mb-5">
           <label class="block">
-            <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Target library</span>
+            <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">{{ t('book.moveDialog.targetLibrary') }}</span>
             <select data-testid="move-library-select" :value="selectedLibraryId ?? ''" :class="[SELECT_CLASS, 'mt-1']" @change="onLibraryChange">
-              <option value="" disabled>Select a library…</option>
+              <option value="" disabled>{{ t('book.moveDialog.selectLibrary') }}</option>
               <option v-for="library in targetLibraries" :key="library.id" :value="library.id">{{ library.name }}</option>
             </select>
           </label>
 
           <label v-if="needsFolderChoice" class="block">
-            <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Target folder</span>
+            <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">{{ t('book.moveDialog.targetFolder') }}</span>
             <select data-testid="move-folder-select" :value="selectedFolderId ?? ''" :class="[SELECT_CLASS, 'mt-1']" @change="onFolderChange">
-              <option value="" disabled>Select a folder…</option>
+              <option value="" disabled>{{ t('book.moveDialog.selectFolder') }}</option>
               <option v-for="folder in selectedLibrary?.folders ?? []" :key="folder.id" :value="folder.id">{{ folder.path }}</option>
             </select>
           </label>
@@ -101,7 +103,7 @@ function onConfirm() {
             :disabled="moving"
             @click="emit('cancel')"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
           <button
             data-testid="move-confirm"
@@ -110,7 +112,7 @@ function onConfirm() {
             @click="onConfirm"
           >
             <Loader2 v-if="moving" class="animate-spin" :size="14" />
-            Move
+            {{ t('book.moveDialog.move') }}
           </button>
         </div>
       </div>

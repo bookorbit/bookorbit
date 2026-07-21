@@ -2964,6 +2964,15 @@
       "title": "Izbrišem knjigo?",
       "description": "S tem boste trajno izbrisali knjigo ter vse njene metapodatke, datoteke, napredek branja in zaznamke. Tega dejanja ni mogoče razveljaviti."
     },
+    "moveDialog": {
+      "title": "Premakni {count} knjigo v knjižnico | Premakni {count} knjigo v knjižnico | Premakni {count} knjig v knjižnico",
+      "description": "Datoteke se premaknejo v mapo ciljne knjižnice. Napredek branja, opombe in zbirke ostanejo pri knjigah.",
+      "targetLibrary": "Ciljna knjižnica",
+      "targetFolder": "Ciljna mapa",
+      "selectLibrary": "Izberi knjižnico…",
+      "selectFolder": "Izberi mapo…",
+      "move": "Premakni"
+    },
     "bulkEdit": {
       "title": "Uredi metapodatke - {count} knjiga | Uredi metapodatke - {count} knjiga | Uredi metapodatke - {count} knjig",
       "instructions": "Preklopite polja za urejanje, nato nastavite vrednosti. Spremenjena bodo samo preklopljena polja.",
@@ -3228,6 +3237,7 @@
         "primary": "Primarno",
         "peek": "Hitri pogled",
         "sendViaEmail": "Pošlji po e-pošti",
+        "moveToLibrary": "Premakni v knjižnico",
         "personalReview": {
           "title": "Osebna ocena",
           "toggleAria": "Preklopi osebno oceno",
@@ -4093,6 +4103,7 @@
       "lockAll": "Zakleni vse",
       "unlockAll": "Odkleni vse",
       "exportMetadata": "Izvozi metapodatke",
+      "moveToLibrary": "Premakni v knjižnico",
       "deleteSelected": "Izbriši izbrano",
       "exitSelection": "Zapri izbiranje",
       "downloadFilesZipLabel": "Prenesi datoteke kot ZIP:",

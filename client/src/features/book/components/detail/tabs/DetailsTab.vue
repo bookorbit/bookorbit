@@ -1462,7 +1462,7 @@ watch(
             @click="handleMoveFromMenu"
           >
             <FolderInput class="size-3.5" />
-            Move to Library
+            {{ t('book.detail.details.moveToLibrary') }}
           </button>
           <button
             v-if="hasPermission('library_delete_books')"
@@ -1633,7 +1633,7 @@ watch(
                   @click="handleMoveFromMenu"
                 >
                   <FolderInput class="size-3.5" />
-                  Move to Library
+                  {{ t('book.detail.details.moveToLibrary') }}
                 </button>
                 <button
                   v-if="hasPermission('library_delete_books')"

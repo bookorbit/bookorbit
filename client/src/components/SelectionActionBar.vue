@@ -466,7 +466,7 @@ watch(
                   <FolderInput :size="ICON_SIZE" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top">Move to library</TooltipContent>
+              <TooltipContent side="top">{{ t('components.selectionActionBar.moveToLibrary') }}</TooltipContent>
             </Tooltip>
 
             <Tooltip v-if="hasPermission('library_delete_books')">

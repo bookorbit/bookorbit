@@ -2964,6 +2964,15 @@
       "title": "Boek verwijderen?",
       "description": "Hiermee worden het boek en alle bijbehorende metadata, bestanden, leesvoortgang en bladwijzers permanent verwijderd. Dit kan niet ongedaan worden gemaakt."
     },
+    "moveDialog": {
+      "title": "Verplaats {count} boek naar bibliotheek | Verplaats {count} boek naar bibliotheek | Verplaats {count} boeken naar bibliotheek",
+      "description": "De bestanden worden naar de map van de doelbibliotheek verplaatst. Leesvoortgang, annotaties en collecties blijven bij de boeken.",
+      "targetLibrary": "Doelbibliotheek",
+      "targetFolder": "Doelmap",
+      "selectLibrary": "Selecteer een bibliotheek…",
+      "selectFolder": "Selecteer een map…",
+      "move": "Verplaatsen"
+    },
     "bulkEdit": {
       "title": "Metadata bewerken - {count} boek | Metadata bewerken - {count} boek | Metadata bewerken - {count} boeken",
       "instructions": "Schakel velden in om te bewerken en stel vervolgens waarden in. Alleen ingeschakelde velden worden gewijzigd.",
@@ -3228,6 +3237,7 @@
         "primary": "Primair",
         "peek": "Voorvertoning",
         "sendViaEmail": "Verzenden via e-mail",
+        "moveToLibrary": "Verplaatsen naar bibliotheek",
         "personalReview": {
           "title": "Persoonlijke recensie",
           "toggleAria": "Persoonlijke recensie in- of uitklappen",
@@ -4093,6 +4103,7 @@
       "lockAll": "Alles vergrendelen",
       "unlockAll": "Alles ontgrendelen",
       "exportMetadata": "Metadata exporteren",
+      "moveToLibrary": "Verplaatsen naar bibliotheek",
       "deleteSelected": "Selectie verwijderen",
       "exitSelection": "Selectie afsluiten",
       "downloadFilesZipLabel": "Bestanden downloaden als ZIP:",

@@ -23,9 +23,18 @@
       "levelLegend": "Reading insights sharing level",
       "current": "Current setting",
       "levels": {
-        "private": { "title": "Private", "description": "Only you can see your reading statistics." },
-        "summary": { "title": "Share summary", "description": "Share aggregate habits without book titles, authors, series, or narrators." },
-        "detailed": { "title": "Share detailed insights", "description": "Also share recent and top books, authors, series, genres, and narrators." }
+        "private": {
+          "title": "Private",
+          "description": "Only you can see your reading statistics."
+        },
+        "summary": {
+          "title": "Share summary",
+          "description": "Share aggregate habits without book titles, authors, series, or narrators."
+        },
+        "detailed": {
+          "title": "Share detailed insights",
+          "description": "Also share recent and top books, authors, series, genres, and narrators."
+        }
       },
       "fields": {
         "frequency": "Reading frequency and active days",
@@ -2186,7 +2195,12 @@
       "never": "Never",
       "openInsightsFor": "Open shared reading insights for {name}",
       "permissionLabel": "View user activity",
-      "states": { "recent": "Recently active", "dormant": "Dormant", "never": "No recorded activity", "disabled": "Disabled" },
+      "states": {
+        "recent": "Recently active",
+        "dormant": "Dormant",
+        "never": "No recorded activity",
+        "disabled": "Disabled"
+      },
       "filters": {
         "search": "Search accounts",
         "searchPlaceholder": "Search name or username",
@@ -2204,7 +2218,12 @@
         "apply": "Apply",
         "clear": "Clear"
       },
-      "methods": { "local": "Local", "manual": "Administrator-created", "oidc": "OIDC / SSO", "shared": "Shared magic link" },
+      "methods": {
+        "local": "Local",
+        "manual": "Administrator-created",
+        "oidc": "OIDC / SSO",
+        "shared": "Shared magic link"
+      },
       "columns": {
         "user": "User",
         "state": "Account state",
@@ -2213,10 +2232,22 @@
         "created": "Created",
         "readingInsights": "Reading insights"
       },
-      "sharing": { "private": "Not shared", "summary": "Summary shared", "detailed": "Detailed shared" },
-      "empty": { "title": "No accounts found", "description": "Try changing or clearing the current filters." },
-      "pagination": { "label": "Account activity pages", "page": "Page {page} of {totalPages}" },
-      "errors": { "load": "Failed to load account activity." }
+      "sharing": {
+        "private": "Not shared",
+        "summary": "Summary shared",
+        "detailed": "Detailed shared"
+      },
+      "empty": {
+        "title": "No accounts found",
+        "description": "Try changing or clearing the current filters."
+      },
+      "pagination": {
+        "label": "Account activity pages",
+        "page": "Page {page} of {totalPages}"
+      },
+      "errors": {
+        "load": "Failed to load account activity."
+      }
     },
     "sharedInsights": {
       "title": "Shared reading insights",
@@ -2237,7 +2268,13 @@
       "emptyTitle": "No reading activity in this period",
       "noData": "No recorded reading data for this period.",
       "sessionCount": "{count} session | {count} sessions",
-      "sourceNames": { "web": "Web reader", "koreader": "KOReader", "manual": "Manual", "kobo": "Kobo", "unknown": "Unknown" },
+      "sourceNames": {
+        "web": "Web reader",
+        "koreader": "KOReader",
+        "manual": "Manual",
+        "kobo": "Kobo",
+        "unknown": "Unknown"
+      },
       "formats": "Formats",
       "genres": "Genres",
       "broadGenres": {
@@ -2260,7 +2297,12 @@
       "topBooks": "Most-read books",
       "recentBooks": "Recently read",
       "unknownTitle": "Untitled book",
-      "top": { "authors": "Top authors", "genres": "Top genres", "series": "Top series", "narrators": "Top narrators" },
+      "top": {
+        "authors": "Top authors",
+        "genres": "Top genres",
+        "series": "Top series",
+        "narrators": "Top narrators"
+      },
       "errors": {
         "READING_INSIGHTS_PRIVATE": "This user is not sharing reading insights.",
         "READING_INSIGHTS_SUMMARY_ONLY": "This user shares summary insights only.",
@@ -2922,6 +2964,15 @@
       "title": "Delete book?",
       "description": "This will permanently delete the book and all its metadata, files, reading progress, and bookmarks. This cannot be undone."
     },
+    "moveDialog": {
+      "title": "Move {count} book to library | Move {count} book to library | Move {count} books to library",
+      "description": "Files are moved into the target library's folder. Reading progress, annotations, and collections stay with the books.",
+      "targetLibrary": "Target library",
+      "targetFolder": "Target folder",
+      "selectLibrary": "Select a library…",
+      "selectFolder": "Select a folder…",
+      "move": "Move"
+    },
     "bulkEdit": {
       "title": "Edit metadata - {count} book | Edit metadata - {count} book | Edit metadata - {count} books",
       "instructions": "Toggle fields to edit, then configure values. Only toggled fields will be changed.",
@@ -3186,6 +3237,7 @@
         "primary": "Primary",
         "peek": "Peek",
         "sendViaEmail": "Send via Email",
+        "moveToLibrary": "Move to Library",
         "personalReview": {
           "title": "Personal Review",
           "toggleAria": "Toggle personal review",
@@ -4051,6 +4103,7 @@
       "lockAll": "Lock all",
       "unlockAll": "Unlock all",
       "exportMetadata": "Export metadata",
+      "moveToLibrary": "Move to library",
       "deleteSelected": "Delete selected",
       "exitSelection": "Exit selection",
       "downloadFilesZipLabel": "Download files as ZIP:",
@@ -5899,7 +5952,10 @@
       "similarityHelp": "Only for Similar title and author matches. At least one author and the book type must also match. Lower finds more possible duplicates; higher requires closer titles. Identical files, ISBN, and exact metadata are checked separately.",
       "runScan": "Run scan",
       "rescan": "Rescan",
-      "status": { "queued": "Scan queued", "running": "Scanning books" },
+      "status": {
+        "queued": "Scan queued",
+        "running": "Scanning books"
+      },
       "groupsFound": "No duplicate groups | One duplicate group | {count} duplicate groups",
       "filter": "Match type",
       "allReasons": "All match types",
@@ -5943,7 +5999,10 @@
         "title": "Find duplicate books",
         "description": "Choose a library scope and similarity level, then run a scan. No books are changed until you explicitly confirm a deletion."
       },
-      "empty": { "title": "No duplicate groups found", "description": "No books matched the current scope, similarity level, and match filter." },
+      "empty": {
+        "title": "No duplicate groups found",
+        "description": "No books matched the current scope, similarity level, and match filter."
+      },
       "deleteDialog": {
         "title": "Permanently delete duplicate books?",
         "description": "This will permanently delete {count} selected book and its files. | This will permanently delete {count} selected book and its files. | This will permanently delete {count} selected books and their files.",
@@ -5958,7 +6017,10 @@
         "results": "Could not load duplicate groups.",
         "delete": "Could not delete the selected duplicate books."
       },
-      "pagination": { "label": "Duplicate groups pages", "page": "Page {page} of {total}" }
+      "pagination": {
+        "label": "Duplicate groups pages",
+        "page": "Page {page} of {total}"
+      }
     },
     "entityManager": {
       "unknown": "Unknown",

@@ -57,6 +57,22 @@ describe('MoveBooksDialog', () => {
     ]
   })
 
+  it('renders translated title, labels, and buttons through the i18n keys', () => {
+    const wrapper = mountDialog({ count: 2 })
+
+    expect(wrapper.text()).toContain('Move 2 books to library')
+    expect(wrapper.text()).toContain('Target library')
+    expect(wrapper.find('[data-testid="move-library-select"] option').text()).toBe('Select a library…')
+    expect(wrapper.find('[data-testid="move-cancel"]').text()).toBe('Cancel')
+    expect(wrapper.find('[data-testid="move-confirm"]').text()).toBe('Move')
+  })
+
+  it('uses the singular title form for a single book', () => {
+    const wrapper = mountDialog({ count: 1 })
+
+    expect(wrapper.text()).toContain('Move 1 book to library')
+  })
+
   it('lists all libraries except the current one', () => {
     const wrapper = mountDialog({ currentLibraryId: 1 })
 
