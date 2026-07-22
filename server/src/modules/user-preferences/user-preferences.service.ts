@@ -23,6 +23,7 @@ import {
   type ShelfmarkPreferences,
 } from '@bookorbit/types';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
@@ -120,7 +121,10 @@ const SHELFMARK_PREFERENCES_SCHEMA = z
 export class UserPreferencesService {
   private readonly logger = new Logger(UserPreferencesService.name);
 
-  constructor(private readonly repo: UserPreferencesRepository) {}
+  constructor(
+    private readonly repo: UserPreferencesRepository,
+    private readonly config: ConfigService,
+  ) {}
 
   async getWhatsNewPreferences(userId: number): Promise<WhatsNewPreferences> {
     const row = await this.repo.findByCategory(userId, 'whats-new');
@@ -275,16 +279,10 @@ export class UserPreferencesService {
       `[user_preferences.test_shelfmark_connection] [start] userId=${userId} url="${sanitizedUrl}" - test shelfmark connection started`,
     );
     try {
-      await ensureSafeUrl(url, { allowLocal: true, allowPrivate: true });
+      const isProduction = this.config.get<string>('app.nodeEnv') === 'production';
+      const allowPrivate = !isProduction || this.config.get<boolean>('app.oidcAllowLocalIssuers') === true;
 
-      const saved = await this.getShelfmarkPreferences(userId);
-      if (saved.url) {
-        const savedOrigin = new URL(saved.url).origin;
-        const requestedOrigin = new URL(url).origin;
-        if (savedOrigin !== requestedOrigin) {
-          return { ok: false, error: 'URL does not match saved Shelfmark destination' };
-        }
-      }
+      await ensureSafeUrl(url, { allowLocal: allowPrivate, allowPrivate: allowPrivate });
 
       const testUrl = url.replace(/\/+$/, '') + '/api/health';
       const res = await fetch(testUrl, { signal: AbortSignal.timeout(5000), redirect: 'error' });

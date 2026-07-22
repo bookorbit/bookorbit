@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DisplayPreferences, LocalePreferences, ThemePreferences } from '@bookorbit/types';
 
@@ -49,6 +50,14 @@ const repo = {
   delete: vi.fn<(...args: [number, string]) => Promise<void>>(),
 };
 
+const config = {
+  get: vi.fn<(...args: [string]) => unknown>((key: string) => {
+    if (key === 'app.nodeEnv') return 'development';
+    if (key === 'app.oidcAllowLocalIssuers') return false;
+    return undefined;
+  }),
+};
+
 describe('UserPreferencesService', () => {
   let service: UserPreferencesService;
 
@@ -56,7 +65,7 @@ describe('UserPreferencesService', () => {
     vi.clearAllMocks();
     repo.findByCategory.mockResolvedValue(undefined);
     repo.upsert.mockResolvedValue(undefined);
-    service = new UserPreferencesService(repo as unknown as UserPreferencesRepository);
+    service = new UserPreferencesService(repo as unknown as UserPreferencesRepository, config as unknown as ConfigService);
   });
 
   it('getThemePreferences returns null when repository has no row', async () => {
@@ -504,19 +513,26 @@ describe('UserPreferencesService', () => {
       fetchSpy.mockRestore();
     });
 
-    it('testShelfmarkConnection rejects a URL whose origin differs from the saved one', async () => {
-      repo.findByCategory.mockResolvedValueOnce({
-        data: { enabled: true, url: 'http://192.168.1.10:8080', externalUrl: '' },
-      } as never);
+    it('testShelfmarkConnection rejects private/local addresses in production', async () => {
+      config.get.mockImplementation((key: string) => {
+        if (key === 'app.nodeEnv') return 'production';
+        if (key === 'app.oidcAllowLocalIssuers') return false;
+        return undefined;
+      });
       const fetchSpy = vi.spyOn(globalThis, 'fetch');
-      const result = await service.testShelfmarkConnection(11, 'http://192.168.1.20:9000');
+      const result = await service.testShelfmarkConnection(11, 'http://localhost:8080');
       expect(result.ok).toBe(false);
-      expect(result.error).toMatch(/does not match/);
+      expect(result.error).toContain('private or local address');
       expect(fetchSpy).not.toHaveBeenCalled();
       fetchSpy.mockRestore();
     });
 
-    it('testShelfmarkConnection performs fetch for safe URLs', async () => {
+    it('testShelfmarkConnection allows private/local addresses in development', async () => {
+      config.get.mockImplementation((key: string) => {
+        if (key === 'app.nodeEnv') return 'development';
+        if (key === 'app.oidcAllowLocalIssuers') return false;
+        return undefined;
+      });
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -525,6 +541,23 @@ describe('UserPreferencesService', () => {
       expect(result.ok).toBe(true);
       expect(result.status).toBe(200);
       expect(fetchSpy).toHaveBeenCalledWith('http://localhost:8080/api/health', expect.objectContaining({ redirect: 'error' }));
+      fetchSpy.mockRestore();
+    });
+
+    it('testShelfmarkConnection performs fetch for safe URLs', async () => {
+      config.get.mockImplementation((key: string) => {
+        if (key === 'app.nodeEnv') return 'production';
+        if (key === 'app.oidcAllowLocalIssuers') return false;
+        return undefined;
+      });
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+      } as Response);
+      const result = await service.testShelfmarkConnection(11, 'https://example.com');
+      expect(result.ok).toBe(true);
+      expect(result.status).toBe(200);
+      expect(fetchSpy).toHaveBeenCalledWith('https://example.com/api/health', expect.objectContaining({ redirect: 'error' }));
       fetchSpy.mockRestore();
     });
   });
