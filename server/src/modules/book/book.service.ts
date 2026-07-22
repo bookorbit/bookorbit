@@ -1203,6 +1203,7 @@ export class BookService {
           tags: [],
           customMetadata: [],
           doesNotExistLocally: true,
+          coverAspectRatio: '2/3',
           shelfmarkUrl: `${linkBaseUrl}/search?q=${encodeURIComponent(
             candidate.title + (candidate.authors && candidate.authors.length ? ' ' + candidate.authors.join(' ') : ''),
           )}`,
