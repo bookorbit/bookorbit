@@ -1062,9 +1062,39 @@
         "kobo": "Kobo",
         "koreader": "KOReader",
         "hardcover": "Hardcover",
+        "integrations": "Integrations",
+        "shelfmark": "Shelfmark",
         "admin": "Admin",
         "system": "System",
         "account": "Konto"
+      }
+    },
+    "shelfmark": {
+      "title": "Shelfmark Integration",
+      "subtitle": "Configure Shelfmark to search and download books that are not in your library.",
+      "enableLabel": "Enable Shelfmark Integration",
+      "enableHint": "Search external metadata providers and show download links to Shelfmark.",
+      "urlLabel": "Shelfmark URL",
+      "urlPlaceholder": "e.g. http://localhost:8080 or http://shelfmark.local",
+      "urlHint": "The URL of your self-hosted Shelfmark instance. Used for metadata search and as the fallback link target.",
+      "testConnection": "Test Connection",
+      "testing": "Testing...",
+      "externalUrlLabel": "External URL",
+      "externalUrlPlaceholder": "e.g. https://shelfmark.example.com",
+      "externalUrlHint": "When set, search results open this URL instead of the Shelfmark URL above. Use it when Shelfmark has a different public address.",
+      "optional": "(optional)",
+      "directoryNoteTitle": "Seamless experience:",
+      "directoryNote": "Configure Shelfmark to download books to the directory mounted as Book Dock in BookOrbit.",
+      "save": "Save Settings",
+      "saving": "Saving...",
+      "toasts": {
+        "loadFailed": "Failed to load Shelfmark settings",
+        "urlRequired": "Enter a Shelfmark URL before testing",
+        "connectionSuccessful": "Connection successful",
+        "connectionFailed": "Connection failed. Check the URL and try again.",
+        "connectionFailedStatus": "Connection failed (HTTP {status})",
+        "saved": "Shelfmark settings saved",
+        "saveFailed": "Failed to save Shelfmark settings"
       }
     },
     "metadata": {
@@ -3065,8 +3095,8 @@
     "jumpRail": {
       "jumpToSection": "Zu Abschnitt springen",
       "jumpTo": "Zu {label} springen",
-      "unknownDate": "Unknown date",
-      "unknownValue": "Unknown value"
+      "unknownDate": "Unbekanntes Datum",
+      "unknownValue": "Unbekannter Wert"
     },
     "quickView": {
       "title": "Schnellansicht des Buchs",
@@ -4015,6 +4045,7 @@
       "searchAllBooks": "Alle Bücher durchsuchen ...",
       "shelfmarkSubtitle": "Nicht in der Bibliothek • In Shelfmark suchen",
       "shelfmarkSearching": "Shelfmark wird nach weiteren Ergebnissen durchsucht...",
+      "shelfmarkProvider": "Shelfmark",
       "searching": "Wird gesucht ...",
       "noResults": "Keine Ergebnisse",
       "loadingMore": "Weitere werden geladen ...",
@@ -5933,61 +5964,61 @@
       }
     },
     "bookDuplicates": {
-      "scanSettings": "Scan settings",
+      "scanSettings": "Scan-Einstellungen",
       "title": "Duplicate Books",
       "description": "Scan files and metadata for potential duplicate records. Nothing is deleted during a scan.",
       "scope": "Library scope",
-      "allLibraries": "All accessible libraries",
+      "allLibraries": "Alle verfügbaren Bibliotheken",
       "similarity": "Similar-title threshold",
       "explainSimilarity": "Explain the similar-title threshold",
       "similarityHelp": "Only for Similar title and author matches. At least one author and the book type must also match. Lower finds more possible duplicates; higher requires closer titles. Identical files, ISBN, and exact metadata are checked separately.",
-      "runScan": "Run scan",
-      "rescan": "Rescan",
+      "runScan": "Scan ausführen",
+      "rescan": "Erneut scannen",
       "status": {
-        "queued": "Scan queued",
+        "queued": "Scan in Warteschlange",
         "running": "Scanning books"
       },
-      "groupsFound": "No duplicate groups | One duplicate group | {count} duplicate groups",
-      "filter": "Match type",
+      "groupsFound": "Keine duplizierten Gruppen | Eine duplizierte Gruppe | {count} duplizierte Gruppen",
+      "filter": "Übereinstimmungstyp",
       "allReasons": "All match types",
       "reasons": {
         "file_hash": "Identical file set",
-        "isbn": "Same ISBN",
-        "exact_metadata": "Exact title and authors",
-        "fuzzy_metadata": "Similar title and author"
+        "isbn": "Gleiche ISBN",
+        "exact_metadata": "Exakter Titel und Autoren",
+        "fuzzy_metadata": "Ähnlicher Titel und Autor"
       },
-      "similarityValue": "{percent}% title similarity",
-      "notDuplicates": "Not duplicates",
-      "keepThis": "Keep this book",
-      "discardThis": "Discard this book",
+      "similarityValue": "{percent}% Titel-Ähnlichkeit",
+      "notDuplicates": "Keine Duplikate",
+      "keepThis": "Dieses Buch behalten",
+      "discardThis": "Dieses Buch verwerfen",
       "selectKeeperFirst": "Select a keeper first",
       "noDirectMatch": "No direct match with keeper",
       "moreFiles": "+{count} more",
-      "showDetails": "Show details",
-      "hideDetails": "Hide details",
-      "deleteSelected": "Delete {count} selected",
-      "openBook": "Open details for {title}",
-      "unknownAuthor": "Unknown author",
-      "unknown": "Unknown",
-      "none": "None",
+      "showDetails": "Details anzeigen",
+      "hideDetails": "Details ausblenden",
+      "deleteSelected": "Ausgewählte {count} löschen",
+      "openBook": "Details für {title} öffnen",
+      "unknownAuthor": "Unbekannter Autor",
+      "unknown": "Unbekannt",
+      "none": "Keine",
       "accessDenied": "You do not have permission to use the duplicate book tool.",
       "pairDetails": "Match details",
-      "pairLabel": "{first} and {second}",
+      "pairLabel": "{first} und {second}",
       "fields": {
-        "library": "Library",
+        "library": "Bibliothek",
         "isbn": "ISBN",
-        "formats": "Formats",
-        "fileLocation": "File",
-        "files": "Files",
-        "readingStatus": "Reading status",
+        "formats": "Formate",
+        "fileLocation": "Datei",
+        "files": "Dateien",
+        "readingStatus": "Lesestatus",
         "progress": "Progress",
-        "path": "Library path",
-        "collections": "Collections",
-        "added": "Added",
-        "updated": "Updated"
+        "path": "Bibliothekspfad",
+        "collections": "Sammlungen",
+        "added": "Hinzugefügt",
+        "updated": "Aktualisiert"
       },
       "initial": {
-        "title": "Find duplicate books",
+        "title": "Doppelte Bücher finden",
         "description": "Choose a library scope and similarity level, then run a scan. No books are changed until you explicitly confirm a deletion."
       },
       "empty": {
@@ -5995,22 +6026,22 @@
         "description": "No books matched the current scope, similarity level, and match filter."
       },
       "deleteDialog": {
-        "title": "Permanently delete duplicate books?",
+        "title": "Doppelte Bücher dauerhaft löschen?",
         "description": "This will permanently delete {count} selected book and its files. | This will permanently delete {count} selected book and its files. | This will permanently delete {count} selected books and their files.",
         "warning": "Metadata, collections, reading data, and device state are not transferred to the kept book. Associated data for other users is also removed.",
         "confirm": "Delete {count} book | Delete {count} book | Delete {count} books",
         "success": "No books deleted | One duplicate book deleted | {count} duplicate books deleted"
       },
       "errors": {
-        "start": "Could not start the duplicate scan.",
-        "status": "Could not load scan progress.",
-        "scan": "The duplicate scan failed. Try running it again.",
+        "start": "Duplikats-Scan konnte nicht gestartet werden.",
+        "status": "Scanfortschritt konnte nicht geladen werden.",
+        "scan": "Duplikats-Scan ist fehlgeschlagen. Erneut versuchen.",
         "results": "Could not load duplicate groups.",
         "delete": "Could not delete the selected duplicate books."
       },
       "pagination": {
         "label": "Duplicate groups pages",
-        "page": "Page {page} of {total}"
+        "page": "Seite {page} von {total}"
       }
     },
     "entityManager": {
@@ -6295,6 +6326,7 @@
     "opds": "OPDS",
     "koboSync": "Kobo-Synchronisierung",
     "koreaderSync": "KOReader-Synchronisierung",
+    "shelfmark": "Shelfmark",
     "bookDock": "Book Dock",
     "whatsNew": "Neuigkeiten",
     "annotations": "Markierungen",
@@ -6304,7 +6336,7 @@
     "series": "Reihen",
     "entityManager": "Entitäten-Manager",
     "bulkRename": "Massenumbenennung",
-    "duplicateBooks": "Duplicate Books",
+    "duplicateBooks": "Doppelte Bücher",
     "notFound": "Nicht gefunden",
     "signIn": "Anmelden",
     "initialSetup": "Ersteinrichtung",

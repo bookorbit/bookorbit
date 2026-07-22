@@ -251,7 +251,7 @@ function navigateToResult(result: GlobalSearchResult) {
   clearSearch()
   mobileSearchOpen.value = false
   if (result.doesNotExistLocally && result.shelfmarkUrl) {
-    window.open(result.shelfmarkUrl, '_blank')
+    window.open(result.shelfmarkUrl, '_blank', 'noopener')
     return
   }
   router.push({ name: 'book-detail', params: { bookId: result.id } })
@@ -468,7 +468,7 @@ function formatBadgeStyle(fmt: string) {
                     v-if="row.result.doesNotExistLocally"
                     class="text-[9px] font-semibold px-1.5 py-0.5 rounded border uppercase border-primary/35 bg-primary/10 text-primary"
                   >
-                    Shelfmark
+                    {{ t('components.appHeader.shelfmarkProvider') }}
                   </span>
                   <template v-else-if="resultFormats(row.result).length">
                     <span
@@ -624,7 +624,7 @@ function formatBadgeStyle(fmt: string) {
                     v-if="row.result.doesNotExistLocally"
                     class="text-[9px] font-semibold px-1.5 py-0.5 rounded border uppercase border-primary/35 bg-primary/10 text-primary"
                   >
-                    Shelfmark
+                    {{ t('components.appHeader.shelfmarkProvider') }}
                   </span>
                   <template v-else-if="resultFormats(row.result).length">
                     <span

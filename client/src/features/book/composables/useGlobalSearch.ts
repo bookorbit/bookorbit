@@ -4,8 +4,13 @@ import type { BookCard, BookQuery, BooksPage } from '@bookorbit/types'
 
 const GLOBAL_SEARCH_PAGE_SIZE = 20
 const GLOBAL_SEARCH_DEBOUNCE_MS = 300
+const shelfmarkEnabledState = ref(false)
 
 export type GlobalSearchResult = BookCard
+
+export function setShelfmarkEnabled(enabled: boolean): void {
+  shelfmarkEnabledState.value = enabled
+}
 
 export function useGlobalSearch(query: Ref<string>) {
   const results = ref<GlobalSearchResult[]>([])
@@ -14,7 +19,7 @@ export function useGlobalSearch(query: Ref<string>) {
   const loadingMore = ref(false)
   const settled = ref(false)
   const shelfmarkLoading = ref(false)
-  const shelfmarkEnabled = ref(false)
+  const shelfmarkEnabled = shelfmarkEnabledState
   let timer: ReturnType<typeof setTimeout> | null = null
   let controller: AbortController | null = null
   let shelfmarkController: AbortController | null = null
@@ -24,7 +29,6 @@ export function useGlobalSearch(query: Ref<string>) {
 
   const hasMore = computed(() => results.value.length < total.value)
 
-  // Fetch shelfmark settings on initialization
   let initPromise: Promise<void> | null = null
   async function initShelfmark() {
     try {

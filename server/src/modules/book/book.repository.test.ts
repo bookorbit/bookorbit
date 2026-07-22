@@ -47,6 +47,34 @@ function makeInsertChain() {
 }
 
 describe('BookRepository', () => {
+  it('matches existing candidates by Hardcover edition ID', async () => {
+    const candidate = {
+      provider: 'hardcover',
+      providerId: null,
+      title: 'Dune',
+      hardcoverEditionId: '8941973',
+    };
+    const db = {
+      select: vi.fn().mockReturnValue(
+        makeSelectChain('where', [
+          {
+            title: 'Dune',
+            isbn13: null,
+            isbn10: null,
+            hardcoverId: 'dune',
+            hardcoverEditionId: '8941973',
+          },
+        ]),
+      ),
+    };
+    const repo = new BookRepository(db as never);
+
+    const result = await repo.checkExistingCandidatesBatch([candidate] as never, [7]);
+
+    expect(db.select).toHaveBeenCalledWith(expect.objectContaining({ hardcoverEditionId: expect.anything() }));
+    expect(result.has(candidate as never)).toBe(true);
+  });
+
   it('runs callbacks inside db transactions', async () => {
     const db = {
       transaction: vi.fn((callback: (tx: { id: string }) => Promise<string>) => callback({ id: 'tx-1' })),

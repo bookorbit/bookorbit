@@ -53,10 +53,10 @@ const sections = computed<Section[]>(() => {
   }
 
   if (su || perms.includes(Permission.HardcoverSync) || perms.includes(Permission.ReadwiseSync) || perms.includes(Permission.StorygraphSync)) {
-    result.push({ label: 'Integrations', routeName: 'settings-integrations' })
+    result.push({ label: t('settings.common.nav.integrations'), routeName: 'settings-integrations' })
   }
 
-  result.push({ label: 'Shelfmark', routeName: 'settings-shelfmark' })
+  result.push({ label: t('settings.common.nav.shelfmark'), routeName: 'settings-shelfmark' })
 
   if (su || perms.includes('manage_users') || perms.includes('view_user_activity') || perms.includes('manage_app_settings')) {
     result.push({ label: t('settings.common.nav.admin'), routeName: 'settings-admin' })

@@ -173,7 +173,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'shelfmark',
             name: 'settings-shelfmark',
             component: () => import('@/features/settings/ShelfmarkSettings.vue'),
-            meta: { maxWidth: 'max-w-3xl', title: 'Shelfmark' },
+            meta: { maxWidth: 'max-w-3xl', title: () => t('titles.shelfmark') },
           },
           {
             path: 'email',

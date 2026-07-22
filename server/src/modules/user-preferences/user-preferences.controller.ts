@@ -1,6 +1,8 @@
 import { Body, Controller, Get, HttpCode, Post, Put } from '@nestjs/common';
+import { Permission } from '@bookorbit/types';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { UpsertUserPreferenceDto } from './dto/upsert-user-preference.dto';
 import { TestShelfmarkConnectionDto } from './dto/test-shelfmark-connection.dto';
@@ -65,6 +67,7 @@ export class UserPreferencesController {
   }
 
   @Post('shelfmark/test')
+  @RequirePermission(Permission.ManageAppSettings)
   async testShelfmarkConnection(@Body() body: TestShelfmarkConnectionDto, @CurrentUser() user: RequestUser) {
     return this.userPreferencesService.testShelfmarkConnection(user.id, body.url);
   }

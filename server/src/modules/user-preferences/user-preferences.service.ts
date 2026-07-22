@@ -91,19 +91,28 @@ const WHATS_NEW_PREFERENCES_SCHEMA = z
 
 const WHATS_NEW_DEFAULTS: WhatsNewPreferences = { lastSeenVersion: null, popupEnabled: true };
 
+const HTTP_URL_SCHEMA = z
+  .string()
+  .url()
+  .refine((value) => {
+    try {
+      const protocol = new URL(value).protocol;
+      return protocol === 'http:' || protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }, 'URL must use http or https');
+
 const SHELFMARK_PREFERENCES_SCHEMA = z
   .object({
     enabled: z.boolean(),
     url: z.string(),
-    externalUrl: z.string().url().optional().or(z.literal('')),
+    externalUrl: HTTP_URL_SCHEMA.optional().or(z.literal('')),
   })
   .strict()
   .superRefine((val, ctx) => {
-    if (val.enabled && !z.string().url().safeParse(val.url).success) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['url'], message: 'Invalid url' });
-    }
-    if (!val.enabled && val.url !== '' && !z.string().url().safeParse(val.url).success) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['url'], message: 'Invalid url' });
+    if ((val.enabled || val.url !== '') && !HTTP_URL_SCHEMA.safeParse(val.url).success) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['url'], message: 'URL must use http or https' });
     }
   });
 

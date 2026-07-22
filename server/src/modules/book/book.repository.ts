@@ -1398,6 +1398,12 @@ export class BookRepository {
       if (providerField && candidate.providerId) {
         candidateConditions.push(eq((schema.bookMetadata as any)[providerField], candidate.providerId));
       }
+      if (candidate.hardcoverEditionId) {
+        candidateConditions.push(eq(schema.bookMetadata.hardcoverEditionId, candidate.hardcoverEditionId));
+      }
+      if (candidate.audibleId) {
+        candidateConditions.push(eq(schema.bookMetadata.audibleId, candidate.audibleId));
+      }
 
       if (candidateConditions.length > 0) {
         conditions.push(...candidateConditions);
@@ -1430,6 +1436,7 @@ export class BookRepository {
         goodreadsId: schema.bookMetadata.goodreadsId,
         amazonId: schema.bookMetadata.amazonId,
         hardcoverId: schema.bookMetadata.hardcoverId,
+        hardcoverEditionId: schema.bookMetadata.hardcoverEditionId,
         openLibraryId: schema.bookMetadata.openLibraryId,
         itunesId: schema.bookMetadata.itunesId,
         koboId: schema.bookMetadata.koboId,
@@ -1454,7 +1461,7 @@ export class BookRepository {
           if ((row as any)[providerField] === candidate.providerId) return true;
         }
 
-        if (candidate.hardcoverEditionId && row.hardcoverId === candidate.hardcoverEditionId) return true;
+        if (candidate.hardcoverEditionId && row.hardcoverEditionId === candidate.hardcoverEditionId) return true;
         if (candidate.audibleId && row.audibleId === candidate.audibleId) return true;
 
         const hasIdentifiers = !!(

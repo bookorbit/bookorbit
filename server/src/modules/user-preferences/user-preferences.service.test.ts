@@ -470,6 +470,31 @@ describe('UserPreferencesService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it.each(['javascript:alert(1)', 'data:text/plain,book', 'ftp://example.com'])(
+      'upsertShelfmarkPreferences rejects unsafe Shelfmark URL protocol %s',
+      async (url) => {
+        await expect(
+          service.upsertShelfmarkPreferences(11, {
+            enabled: true,
+            url,
+          }),
+        ).rejects.toThrow(BadRequestException);
+      },
+    );
+
+    it.each(['javascript:alert(1)', 'data:text/plain,book', 'ftp://example.com'])(
+      'upsertShelfmarkPreferences rejects unsafe external URL protocol %s',
+      async (externalUrl) => {
+        await expect(
+          service.upsertShelfmarkPreferences(11, {
+            enabled: true,
+            url: 'http://localhost:8080',
+            externalUrl,
+          }),
+        ).rejects.toThrow(BadRequestException);
+      },
+    );
+
     it('testShelfmarkConnection rejects unsafe URLs', async () => {
       const fetchSpy = vi.spyOn(globalThis, 'fetch');
       const result = await service.testShelfmarkConnection(11, 'ftp://localhost');
