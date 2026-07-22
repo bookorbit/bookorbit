@@ -48,6 +48,7 @@ import { UploadValidatorService } from '../upload/upload-validator.service';
 import { BookDockRepository } from './book-dock.repository';
 import { BookDockEventsService, BOOK_DOCK_FILE_INGESTED } from './book-dock-events.service';
 import { BookDockGateway } from './book-dock.gateway';
+import { normalizeBookDockMetadata } from './book-dock-metadata.utils';
 import { BookDockProcessingStateService } from './book-dock-processing-state.service';
 import { BookDockWorkQueue } from './book-dock-work-queue';
 import type { BookDockFileRow } from '../../db/schema';
@@ -1174,40 +1175,41 @@ function normalizeDuplicateAuthors(value: string[] | null | undefined): string[]
 }
 
 function normalizeFinalizeMetadata(meta: BookDockMetadata | null | undefined): NormalizedFinalizeMetadata {
-  const publishedDate = normalizePublishedDate(meta?.publishedDate) ?? null;
+  const normalizedMeta = normalizeBookDockMetadata(meta);
+  const publishedDate = normalizePublishedDate(normalizedMeta?.publishedDate) ?? null;
   return {
-    title: normalizeText(meta?.title, 1000),
-    subtitle: normalizeText(meta?.subtitle, 1000),
-    description: normalizeText(meta?.description),
-    isbn10: normalizeIsbn(meta?.isbn10, 10),
-    isbn13: normalizeIsbn(meta?.isbn13, 13),
-    publisher: normalizeText(meta?.publisher, 500),
+    title: normalizeText(normalizedMeta?.title, 1000),
+    subtitle: normalizeText(normalizedMeta?.subtitle, 1000),
+    description: normalizeText(normalizedMeta?.description),
+    isbn10: normalizeIsbn(normalizedMeta?.isbn10, 10),
+    isbn13: normalizeIsbn(normalizedMeta?.isbn13, 13),
+    publisher: normalizeText(normalizedMeta?.publisher, 500),
     publishedDate,
-    publishedYear: publishedDate ? publishedYearFromDateKey(publishedDate) : normalizePublishedYear(meta?.publishedYear),
-    language: normalizeLanguage(meta?.language),
-    pageCount: normalizeInteger(meta?.pageCount),
-    seriesName: normalizeText(meta?.seriesName, 500),
-    seriesIndex: normalizeReal(meta?.seriesIndex),
-    authors: normalizeStringArray(meta?.authors, 500),
-    genres: normalizeStringArray(meta?.genres, 200),
-    coverUrl: normalizeText(meta?.coverUrl),
-    googleBooksId: normalizeText(meta?.googleBooksId, 50),
-    goodreadsId: normalizeText(meta?.goodreadsId, 50),
-    amazonId: normalizeText(meta?.amazonId, 20),
-    hardcoverId: normalizeText(meta?.hardcoverId, 255),
-    hardcoverEditionId: normalizeText(meta?.hardcoverEditionId, 50),
-    openLibraryId: normalizeText(meta?.openLibraryId, 50),
-    itunesId: normalizeText(meta?.itunesId, 50),
-    audibleId: normalizeText(meta?.audibleId, 20),
-    librofmId: normalizeText(meta?.librofmId, 50),
-    koboId: normalizeText(meta?.koboId, 255),
-    comicvineId: normalizeText(meta?.comicvineId, 50),
-    ranobedbId: normalizeText(meta?.ranobedbId, 50),
-    lubimyczytacId: normalizeText(meta?.lubimyczytacId, 512),
-    aladinId: normalizeText(meta?.aladinId, 20),
-    seriesMemberships: normalizeSeriesMemberships(meta?.seriesMemberships),
-    communityRatings: normalizeCommunityRatings(meta?.communityRatings),
-    comicMetadata: normalizeComicMetadata(meta?.comicMetadata),
+    publishedYear: publishedDate ? publishedYearFromDateKey(publishedDate) : normalizePublishedYear(normalizedMeta?.publishedYear),
+    language: normalizeLanguage(normalizedMeta?.language),
+    pageCount: normalizeInteger(normalizedMeta?.pageCount),
+    seriesName: normalizeText(normalizedMeta?.seriesName, 500),
+    seriesIndex: normalizeReal(normalizedMeta?.seriesIndex),
+    authors: normalizeStringArray(normalizedMeta?.authors, 500),
+    genres: normalizeStringArray(normalizedMeta?.genres, 200),
+    coverUrl: normalizeText(normalizedMeta?.coverUrl),
+    googleBooksId: normalizeText(normalizedMeta?.googleBooksId, 50),
+    goodreadsId: normalizeText(normalizedMeta?.goodreadsId, 50),
+    amazonId: normalizeText(normalizedMeta?.amazonId, 20),
+    hardcoverId: normalizeText(normalizedMeta?.hardcoverId, 255),
+    hardcoverEditionId: normalizeText(normalizedMeta?.hardcoverEditionId, 50),
+    openLibraryId: normalizeText(normalizedMeta?.openLibraryId, 50),
+    itunesId: normalizeText(normalizedMeta?.itunesId, 50),
+    audibleId: normalizeText(normalizedMeta?.audibleId, 20),
+    librofmId: normalizeText(normalizedMeta?.librofmId, 50),
+    koboId: normalizeText(normalizedMeta?.koboId, 255),
+    comicvineId: normalizeText(normalizedMeta?.comicvineId, 50),
+    ranobedbId: normalizeText(normalizedMeta?.ranobedbId, 50),
+    lubimyczytacId: normalizeText(normalizedMeta?.lubimyczytacId, 512),
+    aladinId: normalizeText(normalizedMeta?.aladinId, 20),
+    seriesMemberships: normalizeSeriesMemberships(normalizedMeta?.seriesMemberships),
+    communityRatings: normalizeCommunityRatings(normalizedMeta?.communityRatings),
+    comicMetadata: normalizeComicMetadata(normalizedMeta?.comicMetadata),
   };
 }
 
@@ -1273,11 +1275,15 @@ function resolveAudioFinalizeFields(
   embedded: BookDockMetadata | null | undefined,
   selected: BookDockMetadata | null | undefined,
 ): AudioFinalizeFields {
+  const normalizedEmbedded = normalizeBookDockMetadata(embedded);
+  const normalizedSelected = normalizeBookDockMetadata(selected);
   return {
-    durationSeconds: normalizeDurationSeconds(selected?.durationSeconds !== undefined ? selected.durationSeconds : embedded?.durationSeconds),
-    chapters: normalizeChapters(selected?.chapters !== undefined ? selected.chapters : embedded?.chapters),
-    narrators: normalizeStringArray(selected?.narrators !== undefined ? selected.narrators : embedded?.narrators, 500),
-    abridged: normalizeAbridged(selected?.abridged !== undefined ? selected.abridged : embedded?.abridged),
+    durationSeconds: normalizeDurationSeconds(
+      normalizedSelected?.durationSeconds !== undefined ? normalizedSelected.durationSeconds : normalizedEmbedded?.durationSeconds,
+    ),
+    chapters: normalizeChapters(normalizedSelected?.chapters !== undefined ? normalizedSelected.chapters : normalizedEmbedded?.chapters),
+    narrators: normalizeStringArray(normalizedSelected?.narrators !== undefined ? normalizedSelected.narrators : normalizedEmbedded?.narrators, 500),
+    abridged: normalizeAbridged(normalizedSelected?.abridged !== undefined ? normalizedSelected.abridged : normalizedEmbedded?.abridged),
   };
 }
 
@@ -1374,9 +1380,9 @@ function mergeBookDockMetadata(
   selected: BookDockMetadata | null | undefined,
 ): BookDockMetadata | null {
   const merged: BookDockMetadata = {
-    ...(embedded ?? {}),
-    ...(fetched ?? {}),
-    ...(selected ?? {}),
+    ...(normalizeBookDockMetadata(embedded) ?? {}),
+    ...(normalizeBookDockMetadata(fetched) ?? {}),
+    ...(normalizeBookDockMetadata(selected) ?? {}),
   };
   return Object.keys(merged).length > 0 ? merged : null;
 }

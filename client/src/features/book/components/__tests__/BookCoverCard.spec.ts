@@ -86,6 +86,7 @@ afterEach(() => {
 const missingBook: BookCard = {
   id: 1,
   status: 'missing',
+  coverAspectRatio: '2/3',
   title: 'Gone Book',
   authors: ['Test Author'],
   seriesName: null,
@@ -116,6 +117,7 @@ const missingBook: BookCard = {
 const presentBook: BookCard = {
   id: 2,
   status: 'present',
+  coverAspectRatio: '2/3',
   title: 'Available Book',
   authors: ['Test Author'],
   seriesName: null,
@@ -180,6 +182,13 @@ describe('BookCoverCard — missing state', () => {
 })
 
 describe('BookCoverCard — cover aspect override', () => {
+  it('uses the book library ratio over an unrelated injected view ratio', () => {
+    const wrapper = mountCard({ ...presentBookWithCover, coverAspectRatio: '1/1' }, '2/3')
+    const style = wrapper.find('[style*="aspect-ratio"]').attributes('style') ?? ''
+
+    expect(style.includes('aspect-ratio: 1 / 1') || style.includes('aspect-ratio: 1/1')).toBe(true)
+  })
+
   it('uses explicit coverAspectRatio prop over injected ratio', () => {
     const wrapper = mountCard(presentBookWithCover, '2/3', '1/1')
     const coverDiv = wrapper.find('[style*="aspect-ratio"]')
@@ -343,6 +352,20 @@ describe('BookCoverCard — cover style preferences', () => {
 
     const coverDiv = wrapper.find('[style*="aspect-ratio"]')
     expect(coverDiv.attributes('data-cover-spine')).toBe('off')
+  })
+
+  it('keeps ebook spine behavior when a secondary audiobook format is available', async () => {
+    const wrapper = mountCard({
+      ...presentBook,
+      files: [
+        { id: 10, format: 'epub', role: 'primary', sizeBytes: null },
+        { id: 12, format: 'm4b', role: 'content', sizeBytes: null },
+      ],
+    })
+    bookSpineOverlay.value = 'strong'
+    await nextTick()
+
+    expect(wrapper.find('[style*="aspect-ratio"]').attributes('data-cover-spine')).toBe('strong')
   })
 })
 

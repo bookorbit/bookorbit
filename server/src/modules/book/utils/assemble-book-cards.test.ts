@@ -4,6 +4,7 @@ function makeBookRow(id: number, overrides?: Partial<Parameters<typeof assembleB
   return {
     id,
     status: 'ready',
+    coverAspectRatio: '2/3',
     folderPath: `/books/folder-${id}`,
     addedAt: new Date('2024-01-01T00:00:00.000Z'),
     title: `Book ${id}`,
@@ -37,6 +38,24 @@ describe('assembleBookCards', () => {
     expect(card.title).toBe('Book 1');
     expect(card.authors).toEqual(['Author A']);
     expect(card.files).toEqual([{ id: 10, format: 'epub', role: 'primary', sizeBytes: null }]);
+    expect(card.coverAspectRatio).toBe('2/3');
+  });
+
+  it('preserves square library cover slots independently of file format', () => {
+    const rows = [makeBookRow(1, { coverAspectRatio: '1/1' })];
+    const fileRows = [{ bookId: 1, id: 10, format: 'epub', role: 'primary', sizeBytes: null }];
+
+    const [card] = assembleBookCards(rows, [], fileRows, [], []);
+
+    expect(card.coverAspectRatio).toBe('1/1');
+  });
+
+  it('normalizes an invalid stored cover ratio to portrait', () => {
+    const rows = [makeBookRow(1, { coverAspectRatio: 'invalid' })];
+
+    const [card] = assembleBookCards(rows, [], [], [], []);
+
+    expect(card.coverAspectRatio).toBe('2/3');
   });
 
   it('includes updatedAt, metadataScore, and file size when present', () => {
@@ -318,6 +337,7 @@ function makeCollapsedRow(id: number, overrides?: Record<string, unknown>) {
   return {
     id,
     status: 'ready',
+    coverAspectRatio: '2/3',
     primaryFileId: null,
     folderPath: `/books/folder-${id}`,
     addedAt: new Date('2024-01-01T00:00:00.000Z'),
@@ -348,6 +368,7 @@ function makeBookCard(id: number, overrides?: Record<string, unknown>) {
   return {
     id,
     status: 'ready',
+    coverAspectRatio: '2/3' as const,
     title: `Book ${id}`,
     authors: [] as string[],
     seriesName: null as string | null,

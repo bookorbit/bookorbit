@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { FORMAT_TO_GROUP, type BookCard } from '@bookorbit/types'
+import { getBookMediaProfile, type BookCard } from '@bookorbit/types'
 import { Library } from '@lucide/vue'
 import BookCoverArtwork from './BookCoverArtwork.vue'
 import BookCoverPlaceholder from './BookCoverPlaceholder.vue'
@@ -21,7 +21,8 @@ const props = defineProps<{
 
 const route = useRoute()
 const router = useRouter()
-const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
+const injectedCoverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
+const coverAspectRatio = computed(() => props.book.coverAspectRatio ?? injectedCoverAspectRatio.value)
 const { coverUrl } = useCoverVersions()
 const { seriesCardCoverMode, gridCardPrimaryLabel, gridCardSecondaryLabel, cardInfoMode, cardOverlays } = useDisplaySettings()
 
@@ -81,9 +82,9 @@ watch(
   },
   { immediate: true },
 )
-const primaryFile = computed(() => props.book.files.find((file) => file.role === 'primary') ?? props.book.files[0] ?? null)
-const isAudiobook = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
-const isComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'cbx')
+const mediaProfile = computed(() => getBookMediaProfile(props.book.files))
+const isAudiobook = computed(() => mediaProfile.value.primaryMediaKind === 'audiobook')
+const isComic = computed(() => mediaProfile.value.primaryMediaKind === 'comic')
 
 function handleCoverLoad(bookId: number) {
   loadedCovers.value = new Set([...loadedCovers.value, bookId])

@@ -6,6 +6,7 @@ import { ValidationPipe } from '@nestjs/common';
 
 import { BulkEditBookDockDto, BulkSetTargetDto, FinalizeBookDockDto, UpdateBookDockFileDto } from './dto';
 import { ListBookDockFilesDto } from './dto/list-book-dock-files.dto';
+import { normalizeBookDockMetadata } from './book-dock-metadata.utils';
 
 async function errorsFor<T extends object>(dtoClass: new () => T, value: Record<string, unknown>) {
   return validate(plainToInstance(dtoClass, value));
@@ -75,6 +76,30 @@ describe('BookDock DTO validation', () => {
 
     await expect(pipe.transform({ selectedMetadata }, { type: 'body', metatype: UpdateBookDockFileDto, data: undefined })).resolves.toMatchObject({
       selectedMetadata,
+    });
+  });
+
+  it('normalizes legacy fetched metadata into a payload accepted by the production validation path', async () => {
+    const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
+    const selectedMetadata = normalizeBookDockMetadata({
+      title: "Harry Potter and the Sorcerer's Stone",
+      duration: 31260,
+      communityRatings: [
+        {
+          provider: 'audible',
+          rating: 4.78,
+          ratingCount: 16077,
+          updatedAt: '2026-07-22T05:10:27.373Z',
+        },
+      ],
+    });
+
+    await expect(pipe.transform({ selectedMetadata }, { type: 'body', metatype: UpdateBookDockFileDto, data: undefined })).resolves.toMatchObject({
+      selectedMetadata: {
+        title: "Harry Potter and the Sorcerer's Stone",
+        durationSeconds: 31260,
+        communityRatings: [{ provider: 'audible', rating: 4.78, ratingCount: 16077 }],
+      },
     });
   });
 

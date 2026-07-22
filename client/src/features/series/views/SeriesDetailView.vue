@@ -123,7 +123,7 @@ const hiddenLeadGenres = computed(() => {
   const totalGenres = leadBook.value?.genres.length ?? 0
   return Math.max(0, totalGenres - displayedLeadGenres.value.length)
 })
-const SERIES_AUDIOBOOK_COVER_SCALE = 1.25
+const SERIES_SQUARE_COVER_SCALE = 1.25
 const GROUP_BY_MEDIA_STORAGE_KEY = 'bookorbit:series-detail:group-by-media'
 const seriesBooksCoverSize = computed(() => Math.max(125, portraitCoverSize.value - 20))
 const leadMetaItems = computed(() => {
@@ -249,7 +249,7 @@ const leadCoverDisplayModes = computed(() => visibleLeadCoverBookIds.value.map((
 const scaledLeadCoverStyles = computed(() =>
   leadCoverStyles.value.map((base, index) => {
     const ratio = leadCoverRatioAt(index)
-    const squareScale = resolveSquareCoverScale(ratio, SERIES_AUDIOBOOK_COVER_SCALE)
+    const squareScale = resolveSquareCoverScale(ratio, SERIES_SQUARE_COVER_SCALE)
     const squareTransform = centeredBottomScaleTransform(squareScale)
     const baseForRatio = {
       ...base,
@@ -678,7 +678,7 @@ defineOptions({ name: 'SeriesDetailView' })
                   :books="group.books"
                   :cover-size="seriesBooksCoverSize"
                   :grid-gap="gridGap"
-                  :audio-cover-scale="SERIES_AUDIOBOOK_COVER_SCALE"
+                  :square-cover-scale="SERIES_SQUARE_COVER_SCALE"
                   :virtualized="false"
                   @action="handleBookAction"
                   @update:book="handleBookUpdate"
@@ -691,7 +691,7 @@ defineOptions({ name: 'SeriesDetailView' })
               :books="books"
               :cover-size="seriesBooksCoverSize"
               :grid-gap="gridGap"
-              :audio-cover-scale="SERIES_AUDIOBOOK_COVER_SCALE"
+              :square-cover-scale="SERIES_SQUARE_COVER_SCALE"
               :virtualized="false"
               @action="handleBookAction"
               @update:book="handleBookUpdate"

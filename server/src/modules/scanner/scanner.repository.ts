@@ -533,6 +533,7 @@ export class ScannerRepository {
         .select({
           id: books.id,
           status: books.status,
+          coverAspectRatio: libraries.coverAspectRatio,
           primaryFileId: books.primaryFileId,
           folderPath: books.folderPath,
           addedAt: books.addedAt,
@@ -553,6 +554,7 @@ export class ScannerRepository {
           hardcoverEditionId: bookMetadata.hardcoverEditionId,
         })
         .from(books)
+        .innerJoin(libraries, eq(libraries.id, books.libraryId))
         .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
         .where(inArray(books.id, bookIds)),
       this.db

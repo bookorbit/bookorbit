@@ -27,6 +27,7 @@ function makeBook(overrides: Partial<BookCard> = {}): BookCard {
   return {
     id: 1,
     status: 'present',
+    coverAspectRatio: '2/3',
     title: 'Test Book',
     authors: ['Author One'],
     seriesName: null,

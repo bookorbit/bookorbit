@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import type { BookRecommendation, SeriesBookRecommendation } from '@bookorbit/types';
+import { normalizeCoverAspectRatio } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
 import { BookReadService } from '../book/book-read.service';
@@ -92,19 +93,7 @@ export class RecommendationService {
       const rowMap = new Map(rows.map((row) => [row.id, row]));
       const recommendations = rescored
         .map((rescoredCandidate) => rowMap.get(rescoredCandidate.bookId))
-        .filter(
-          (
-            row,
-          ): row is {
-            id: number;
-            title: string | null;
-            updatedAt: string | null;
-            hasCover: boolean;
-            authors: string[];
-            isAudiobook: boolean;
-            isComic: boolean;
-          } => row != null,
-        );
+        .filter((row): row is BookRecommendation => row != null);
 
       this.logger.log(
         `[${RECOMMENDATION_EVENT}] [end] bookId=${bookId} userId=${user.id} libraryId=${libraryId} durationMs=${Date.now() - startedAt} accessibleLibraryCount=${accessibleLibraryIds.length} candidateCount=${candidates.length} rescoredCount=${rescored.length} resultCount=${recommendations.length} - recommendation lookup completed`,
@@ -147,6 +136,7 @@ export class RecommendationService {
       return rows.map((r) => ({
         id: r.bookId,
         title: r.title,
+        coverAspectRatio: normalizeCoverAspectRatio(r.coverAspectRatio),
         updatedAt: r.updatedAt?.toISOString() ?? null,
         seriesIndex: r.seriesIndex,
         hasCover: r.coverSource !== null,
@@ -182,6 +172,7 @@ export class RecommendationService {
       return rows.map((r) => ({
         id: r.bookId,
         title: r.title,
+        coverAspectRatio: normalizeCoverAspectRatio(r.coverAspectRatio),
         updatedAt: r.updatedAt?.toISOString() ?? null,
         hasCover: r.coverSource !== null,
         authors: r.authorNames,

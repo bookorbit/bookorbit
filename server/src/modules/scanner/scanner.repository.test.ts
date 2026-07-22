@@ -187,6 +187,35 @@ describe('ScannerRepository', () => {
     await expect(repo.findMissingBooksByFolderPath('/books/B', 5)).resolves.toEqual([{ id: 12, folderPath: '/books/B', status: 'missing' }]);
   });
 
+  it('includes the owning library cover ratio in scanner book-card data', async () => {
+    const { repo, queues, db, chains } = makeRepo();
+    queues.select.push([
+      {
+        id: 1,
+        status: 'present',
+        coverAspectRatio: '1/1',
+        primaryFileId: 10,
+        folderPath: '/books/Audio',
+        addedAt: new Date('2026-01-01T00:00:00.000Z'),
+        title: 'Audio',
+      },
+    ]);
+    queues.select.push([]);
+    queues.select.push([{ bookId: 1, id: 10, format: 'm4b', role: 'primary', sizeBytes: 123 }]);
+    queues.select.push([]);
+
+    const result = await repo.findBookCardData([1]);
+
+    expect(result.rows).toEqual([
+      expect.objectContaining({
+        id: 1,
+        coverAspectRatio: '1/1',
+      }),
+    ]);
+    expect(db.select.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ coverAspectRatio: expect.anything() }));
+    expect(chains.select[0]?.mocks.innerJoin).toHaveBeenCalledTimes(1);
+  });
+
   it('creates and updates book files and supports hash lookup', async () => {
     const { repo, queues, chains, db } = makeRepo();
     queues.select.push([{ id: 50, fileHash: 'abc123' }]);

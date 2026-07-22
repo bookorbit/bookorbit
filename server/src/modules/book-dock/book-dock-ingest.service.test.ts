@@ -403,9 +403,22 @@ describe('BookDockIngestService', () => {
           title: 'Dune',
           isbn13: '9780441172719',
           authors: ['Frank Herbert'],
+          duration: 1200,
+          communityRatings: [
+            {
+              provider: 'hardcover',
+              rating: 4.5,
+              ratingCount: 1000,
+              updatedAt: '2026-07-22T00:00:00.000Z',
+            },
+          ],
           hardcoverEditionId: 'hardcover-edition',
         },
-        sources: { title: { provider: 'google' } },
+        sources: {
+          title: 'google',
+          duration: 'audible',
+          communityRating: 'hardcover',
+        },
         providerIds: {
           hardcover: 'hardcover-book',
           openLibrary: 'OL1W',
@@ -424,16 +437,23 @@ describe('BookDockIngestService', () => {
           fetchedMetadata: expect.objectContaining({
             title: 'Dune',
             isbn13: '9780441172719',
+            durationSeconds: 1200,
+            communityRatings: [{ provider: 'hardcover', rating: 4.5, ratingCount: 1000 }],
             hardcoverId: 'hardcover-book',
             hardcoverEditionId: 'hardcover-edition',
             openLibraryId: 'OL1W',
           }),
           fetchedMetadataSources: expect.objectContaining({
+            durationSeconds: 'audible',
+            communityRatings: 'hardcover',
             hardcoverId: 'hardcover',
             openLibraryId: 'openLibrary',
           }),
         }),
       );
+      const persistedMetadata = repo.update.mock.calls[1]?.[1]?.fetchedMetadata as Record<string, unknown>;
+      expect(persistedMetadata).not.toHaveProperty('duration');
+      expect(persistedMetadata.communityRatings).toEqual([{ provider: 'hardcover', rating: 4.5, ratingCount: 1000 }]);
     });
 
     it('falls back to ready status when metadata fetch pipeline throws', async () => {

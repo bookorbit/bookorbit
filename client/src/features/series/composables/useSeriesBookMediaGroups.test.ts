@@ -6,6 +6,7 @@ function makeBook(format: string | null | undefined, overrides: Partial<BookCard
   return {
     id: 1,
     status: 'present',
+    coverAspectRatio: '2/3',
     title: 'Series Book',
     authors: [],
     seriesId: 42,

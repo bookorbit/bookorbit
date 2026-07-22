@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { BookCard, BookFileRef, CoverAspectRatio } from '@bookorbit/types'
-import { FORMAT_TO_GROUP, READER_OPENABLE_FORMATS } from '@bookorbit/types'
+import { FORMAT_TO_GROUP, getBookMediaProfile, READER_OPENABLE_FORMATS } from '@bookorbit/types'
 import { getFormatColor } from '../lib/format-colors'
 import { computed, inject, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -77,8 +77,9 @@ const authorQuery = computed(() => props.book.authors[0] ?? null)
 
 const readableFiles = computed(() => props.book.files.filter((f) => f.format && READER_OPENABLE_FORMATS.has(f.format)))
 const primaryFile = computed(() => readableFiles.value.find((f) => f.role === 'primary') ?? readableFiles.value[0] ?? null)
-const isAudiobook = computed(() => readableFiles.value.some((f) => FORMAT_TO_GROUP[f.format!] === 'audio'))
-const isComic = computed(() => readableFiles.value.some((f) => FORMAT_TO_GROUP[f.format!] === 'cbx'))
+const mediaProfile = computed(() => getBookMediaProfile(readableFiles.value))
+const isAudiobook = computed(() => mediaProfile.value.primaryMediaKind === 'audiobook')
+const isComic = computed(() => mediaProfile.value.primaryMediaKind === 'comic')
 
 // For multi-file audiobooks, collapse all tracks into one representative entry.
 // The audio reader loads the full track queue from the book, so opening any track is equivalent.
@@ -121,7 +122,9 @@ async function handleRefreshMetadata() {
 const { hasPermission } = usePermissions()
 const { cardOverlays, bookCoverDisplayMode, gridCardPrimaryLabel, gridCardSecondaryLabel, cardInfoMode, thumbnailClickAction } = useDisplaySettings()
 const injectedCoverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
-const effectiveCoverAspectRatio = computed<CoverAspectRatio>(() => props.coverAspectRatio ?? injectedCoverAspectRatio.value)
+const effectiveCoverAspectRatio = computed<CoverAspectRatio>(
+  () => props.coverAspectRatio ?? props.book.coverAspectRatio ?? injectedCoverAspectRatio.value,
+)
 const showSendDialog = ref(false)
 
 const hasProgress = computed(() => props.book.readingProgress != null && props.book.readingProgress > 0)

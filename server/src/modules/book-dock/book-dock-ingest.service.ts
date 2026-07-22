@@ -15,6 +15,7 @@ import { BookDockRepository } from './book-dock.repository';
 import { BookDockMetadataService } from './book-dock-metadata.service';
 import { BookDockEventsService, BOOK_DOCK_FILE_INGESTED } from './book-dock-events.service';
 import { BookDockGateway } from './book-dock.gateway';
+import { normalizeBookDockMetadata, normalizeBookDockMetadataSources } from './book-dock-metadata.utils';
 import { BookDockProcessingStateService } from './book-dock-processing-state.service';
 import { BookDockWorkQueue, type BookDockWorkPriority } from './book-dock-work-queue';
 
@@ -236,24 +237,21 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     await this.emitSummary();
     try {
       const { resolved, sources, providerIds = {} } = await this.metadataFetchPipeline.runWithSources(params, {});
-      const fetched: Record<string, unknown> = {};
-      for (const [field, value] of Object.entries(resolved)) {
-        if (value === undefined) continue;
-        fetched[field] = value;
-      }
+      const fetched = normalizeBookDockMetadata(resolved) ?? {};
       for (const [provider, providerId] of Object.entries(providerIds)) {
         const field = BOOK_DOCK_PROVIDER_ID_FIELDS[provider as MetadataProviderKey];
         if (!field || !providerId) continue;
-        fetched[field] = providerId;
+        (fetched as Record<string, unknown>)[field] = providerId;
         sources[field] = provider;
       }
+      const fetchedMetadataSources = normalizeBookDockMetadataSources(sources);
       const updates =
         Object.keys(fetched).length > 0
           ? {
               status: 'ready' as const,
               fetchedMetadata: fetched,
-              confidence: computeConfidence(row.embeddedMetadata ?? {}, fetched as BookDockMetadata),
-              fetchedMetadataSources: sources,
+              confidence: computeConfidence(row.embeddedMetadata ?? {}, fetched),
+              fetchedMetadataSources,
             }
           : { status: 'ready' as const };
       await this.repo.update(fileId, updates);

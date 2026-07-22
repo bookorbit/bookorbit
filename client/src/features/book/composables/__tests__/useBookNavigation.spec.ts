@@ -8,6 +8,7 @@ function makeBook(id: number): BookCard {
   return {
     id,
     status: 'active',
+    coverAspectRatio: '2/3',
     title: `Book ${id}`,
     authors: [],
     seriesName: null,

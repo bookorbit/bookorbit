@@ -16,6 +16,7 @@ function makeBook(format: string | null): BookCard {
   return {
     id: 1,
     status: 'present',
+    coverAspectRatio: '2/3',
     title: 'Saga',
     authors: [],
     seriesName: 'Saga',

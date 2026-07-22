@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { BookCard, BookFileRef } from '@bookorbit/types'
-import { FORMAT_TO_GROUP } from '@bookorbit/types'
+import { getBookMediaProfile } from '@bookorbit/types'
 import BookCoverArtwork from './BookCoverArtwork.vue'
 import BookCoverSurface from './BookCoverSurface.vue'
 import { api } from '@/lib/api'
@@ -90,8 +90,9 @@ const seriesLine = computed(() => {
 
 const isMissing = computed(() => props.book.status === 'missing')
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
-const isAudiobook = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
-const isComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'cbx')
+const mediaProfile = computed(() => getBookMediaProfile(props.book.files))
+const isAudiobook = computed(() => mediaProfile.value.primaryMediaKind === 'audiobook')
+const isComic = computed(() => mediaProfile.value.primaryMediaKind === 'comic')
 const secondaryFiles = computed(() => props.book.files.filter((f) => f !== primaryFile.value))
 
 const uniqueSecondaryFiles = computed(() => {
@@ -143,7 +144,8 @@ const { coverUrl } = useCoverVersions()
 const coverSrc = computed(() => coverUrl(props.book.id, 'thumbnail', props.book.updatedAt ?? props.book.addedAt))
 
 const { refreshing, refreshWithFeedback } = useRefreshMetadata()
-const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
+const injectedCoverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
+const coverAspectRatio = computed(() => props.book.coverAspectRatio ?? injectedCoverAspectRatio.value)
 
 function openFile(file: BookFileRef, mode?: 'peek') {
   router.push({

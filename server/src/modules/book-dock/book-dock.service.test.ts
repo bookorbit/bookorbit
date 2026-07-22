@@ -116,6 +116,43 @@ describe('BookDockService', () => {
     );
   });
 
+  it('normalizes legacy tainted metadata before returning it through the API', async () => {
+    const { service, repo } = makeService();
+    const taintedMetadata = {
+      title: 'Fetched',
+      duration: 1200,
+      communityRatings: [
+        {
+          provider: 'hardcover',
+          rating: 4.5,
+          ratingCount: 1000,
+          updatedAt: '2026-07-22T00:00:00.000Z',
+        },
+      ],
+    };
+    repo.findAll.mockResolvedValue({
+      items: [
+        row({
+          selectedMetadata: taintedMetadata,
+          fetchedMetadata: taintedMetadata,
+          fetchedMetadataSources: { duration: 'audible', communityRating: 'hardcover' },
+        }),
+      ],
+      total: 1,
+    });
+
+    const result = await service.listFiles({ page: 1, limit: 20, sort: 'createdAt', order: 'desc', userId: 1, isSuperuser: false });
+
+    const normalizedMetadata = {
+      title: 'Fetched',
+      durationSeconds: 1200,
+      communityRatings: [{ provider: 'hardcover', rating: 4.5, ratingCount: 1000 }],
+    };
+    expect(result.items[0]?.selectedMetadata).toEqual(normalizedMetadata);
+    expect(result.items[0]?.fetchedMetadata).toEqual(normalizedMetadata);
+    expect(result.items[0]?.fetchedMetadataSources).toEqual({ durationSeconds: 'audible', communityRatings: 'hardcover' });
+  });
+
   it('getFile throws when row is missing', async () => {
     const { service, repo } = makeService();
     repo.findById.mockResolvedValue(undefined);
@@ -158,7 +195,22 @@ describe('BookDockService', () => {
     repo.findByIds.mockResolvedValue([
       row({ id: 1, metadataEditedAt: new Date() }),
       row({ id: 2, fetchedMetadata: null }),
-      row({ id: 3, fetchedMetadata: { title: 'Fetched' }, metadataEditedAt: null }),
+      row({
+        id: 3,
+        fetchedMetadata: {
+          title: 'Fetched',
+          duration: 1200,
+          communityRatings: [
+            {
+              provider: 'hardcover',
+              rating: 4.5,
+              ratingCount: 1000,
+              updatedAt: '2026-07-22T00:00:00.000Z',
+            },
+          ],
+        },
+        metadataEditedAt: null,
+      }),
     ]);
 
     const result = await service.bulkApplyFetched([1, 2, 3]);
@@ -170,7 +222,11 @@ describe('BookDockService', () => {
       skippedEdited: 1,
     });
     expect(repo.update).toHaveBeenCalledWith(3, {
-      selectedMetadata: { title: 'Fetched' },
+      selectedMetadata: {
+        title: 'Fetched',
+        durationSeconds: 1200,
+        communityRatings: [{ provider: 'hardcover', rating: 4.5, ratingCount: 1000 }],
+      },
       metadataEditedAt: null,
     });
   });

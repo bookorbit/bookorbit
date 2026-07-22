@@ -1,6 +1,10 @@
 export type OrganizationMode = "book_per_file" | "book_per_folder";
 export type CoverAspectRatio = "2/3" | "1/1";
 
+export function normalizeCoverAspectRatio(value: unknown): CoverAspectRatio {
+  return value === "1/1" ? "1/1" : "2/3";
+}
+
 export const DEFAULT_FORMAT_PRIORITY = [
   "epub",
   "kepub",

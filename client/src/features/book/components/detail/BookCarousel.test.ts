@@ -46,6 +46,7 @@ function makeBook(overrides: Partial<CarouselBook> = {}): CarouselBook {
   return {
     id: 1,
     title: 'Dune',
+    coverAspectRatio: '2/3',
     hasCover: true,
     authors: ['Frank Herbert'],
     seriesIndex: null,
@@ -119,18 +120,27 @@ describe('BookCarousel', () => {
     expect(cover.attributes('style')).toContain('aspect-ratio: 2/3')
   })
 
-  it('uses square ratio for audiobook cards', () => {
-    const wrapper = mountCarousel([makeBook({ isAudiobook: true })])
+  it('keeps audiobook cards portrait when configured portrait', () => {
+    const wrapper = mountCarousel([makeBook({ isAudiobook: true, coverAspectRatio: '2/3' })])
+    const cover = wrapper.find('.book-cover-surface')
+    expect(cover.attributes('style')).toContain('aspect-ratio: 2/3')
+  })
+
+  it('uses square ratio for ebook cards when configured square', () => {
+    const wrapper = mountCarousel([makeBook({ isAudiobook: false, coverAspectRatio: '1/1' })])
     const cover = wrapper.find('.book-cover-surface')
     expect(cover.attributes('style')).toContain('aspect-ratio: 1/1')
   })
 
-  it('renders audiobook cards wider than non-audiobook cards', () => {
-    const wrapper = mountCarousel([makeBook({ id: 1, isAudiobook: false }), makeBook({ id: 2, isAudiobook: true })])
-    const nonAudioCard = wrapper.find('[data-book-id="1"]')
-    const audioCard = wrapper.find('[data-book-id="2"]')
-    expect(nonAudioCard.classes()).toContain('w-30')
-    expect(audioCard.classes()).toContain('w-38')
+  it('renders square slots wider than portrait slots regardless of media type', () => {
+    const wrapper = mountCarousel([
+      makeBook({ id: 1, isAudiobook: true, coverAspectRatio: '2/3' }),
+      makeBook({ id: 2, isAudiobook: false, coverAspectRatio: '1/1' }),
+    ])
+    const portraitCard = wrapper.find('[data-book-id="1"]')
+    const squareCard = wrapper.find('[data-book-id="2"]')
+    expect(portraitCard.classes()).toContain('w-30')
+    expect(squareCard.classes()).toContain('w-38')
   })
 
   it('renders an img when book.hasCover is true', () => {

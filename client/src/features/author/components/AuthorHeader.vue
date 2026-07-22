@@ -72,7 +72,7 @@ watch(resolvedBio, () => {
 </script>
 
 <template>
-  <section class="overflow-hidden rounded-lg border border-border/70 bg-card/80">
+  <section class="shrink-0 overflow-hidden rounded-lg border border-border/70 bg-card/80">
     <div class="bg-gradient-to-b from-primary/8 via-background/0 to-transparent p-4">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-start">
         <div

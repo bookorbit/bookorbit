@@ -1229,6 +1229,38 @@ describe('BookDockFinalizeService', () => {
     );
   });
 
+  it('applyMetadata preserves legacy fetched duration and strips rating timestamps during finalization', async () => {
+    const { service, db, bookReadService } = makeService();
+    const updateChain = {
+      set: vi.fn(),
+      where: vi.fn().mockResolvedValue(undefined),
+    };
+    updateChain.set.mockReturnValue(updateChain);
+    db.update.mockReturnValue(updateChain);
+
+    await (service as any).applyMetadata(
+      18,
+      makeRow({
+        coverPath: null,
+        selectedMetadata: {
+          title: "Harry Potter and the Sorcerer's Stone",
+          duration: 31260,
+          communityRatings: [
+            {
+              provider: 'audible',
+              rating: 4.78,
+              ratingCount: 16077,
+              updatedAt: '2026-07-22T05:10:27.373Z',
+            },
+          ],
+        } as unknown as BookDockMetadata,
+      }),
+    );
+
+    expect(updateChain.set).toHaveBeenCalledWith(expect.objectContaining({ durationSeconds: 31260 }));
+    expect(bookReadService.replaceCommunityRatings).toHaveBeenCalledWith(18, [{ provider: 'audible', rating: 4.78, ratingCount: 16077 }]);
+  });
+
   it('applyMetadata persists provider IDs and every structured field emitted by metadata search', async () => {
     const { service, db, metadataService, bookReadService, seriesMemberships } = makeService();
     const updateChain = {
