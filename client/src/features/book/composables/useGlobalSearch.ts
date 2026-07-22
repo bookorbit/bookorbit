@@ -5,11 +5,42 @@ import type { BookCard, BookQuery, BooksPage } from '@bookorbit/types'
 const GLOBAL_SEARCH_PAGE_SIZE = 20
 const GLOBAL_SEARCH_DEBOUNCE_MS = 300
 const shelfmarkEnabledState = ref(false)
+let shelfmarkInitialized = false
+let initPromise: Promise<void> | null = null
 
 export type GlobalSearchResult = BookCard
 
 export function setShelfmarkEnabled(enabled: boolean): void {
   shelfmarkEnabledState.value = enabled
+  shelfmarkInitialized = true
+}
+
+export function resetShelfmarkEnabled(): void {
+  shelfmarkEnabledState.value = false
+  shelfmarkInitialized = false
+  initPromise = null
+}
+
+export async function initShelfmark(force = false): Promise<void> {
+  if (shelfmarkInitialized && !force) return
+  if (initPromise) return initPromise
+
+  initPromise = (async () => {
+    try {
+      const res = await api('/api/v1/user-preferences/shelfmark')
+      if (res.ok) {
+        const data = await res.json()
+        shelfmarkEnabledState.value = data.settings?.enabled ?? false
+        shelfmarkInitialized = true
+      }
+    } catch {
+      shelfmarkEnabledState.value = false
+    } finally {
+      initPromise = null
+    }
+  })()
+
+  return initPromise
 }
 
 export function useGlobalSearch(query: Ref<string>) {
@@ -29,20 +60,7 @@ export function useGlobalSearch(query: Ref<string>) {
 
   const hasMore = computed(() => results.value.length < total.value)
 
-  let initPromise: Promise<void> | null = null
-  async function initShelfmark() {
-    try {
-      const res = await api('/api/v1/user-preferences/shelfmark')
-      if (res.ok) {
-        const data = await res.json()
-        shelfmarkEnabled.value = data.settings?.enabled ?? false
-      }
-    } catch {
-      shelfmarkEnabled.value = false
-    }
-  }
-
-  initPromise = initShelfmark()
+  initShelfmark()
 
   async function loadPage(q: string, page: number, append: boolean, gen: number) {
     if (gen !== generation) return
@@ -79,7 +97,7 @@ export function useGlobalSearch(query: Ref<string>) {
       nextPage = data.page + 1
 
       if (!append && page === 0) {
-        if (initPromise) await initPromise
+        await initShelfmark()
         if (gen !== generation) return
         if (shelfmarkEnabled.value) {
           shelfmarkLoading.value = true

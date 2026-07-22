@@ -14,7 +14,7 @@ vi.mock('@/lib/api', () => ({
   api: (url: string, init?: RequestInit) => apiMock(url, init),
 }))
 
-import { setShelfmarkEnabled, useGlobalSearch } from './useGlobalSearch'
+import { resetShelfmarkEnabled, setShelfmarkEnabled, useGlobalSearch } from './useGlobalSearch'
 
 function makeBook(id: number): BookCard {
   return {
@@ -73,7 +73,7 @@ async function flush() {
 describe('useGlobalSearch', () => {
   beforeEach(() => {
     vi.useFakeTimers()
-    setShelfmarkEnabled(false)
+    resetShelfmarkEnabled()
     apiMock.mockReset()
     apiMock.mockImplementation((url) => {
       if (url.includes('/api/v1/user-preferences/shelfmark')) {

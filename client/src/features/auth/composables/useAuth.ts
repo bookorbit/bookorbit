@@ -12,6 +12,7 @@ import { resetWhatsNew } from '@/features/whats-new/composables/useWhatsNew'
 import { resetLibraries } from '@/features/library/composables/useLibraries'
 import { resetSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
 import { resetCollections } from '@/features/collection/composables/useCollections'
+import { initShelfmark, resetShelfmarkEnabled } from '@/features/book/composables/useGlobalSearch'
 
 const SESSION_REFRESH_INTERVAL_MS = 5 * 60 * 1000
 
@@ -57,6 +58,7 @@ function clearAuth() {
   resetLibraries()
   resetSmartScopes()
   resetCollections()
+  resetShelfmarkEnabled()
   user.value = null
   setAccessToken(null)
   disconnectAuthorEnrichmentSocket()
@@ -86,6 +88,7 @@ async function hydratePreferences(options: { refreshUser?: boolean } = {}): Prom
     await loadDisplaySettingsFromServer()
   }
   await hydrateLocalePreference()
+  await initShelfmark(true)
 
   initThemeSync()
   initDisplaySettingsSync()
