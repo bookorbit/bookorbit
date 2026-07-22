@@ -3,14 +3,15 @@ import { Permission } from '@bookorbit/types'
 import { INTEGRATION_TAB_INFO, INTEGRATION_TABS, normalizeIntegrationTab } from '../integration-tabs'
 
 describe('integration-tabs', () => {
-  it('contains Hardcover, Readwise, and StoryGraph', () => {
-    expect(INTEGRATION_TABS).toEqual(['hardcover', 'readwise', 'storygraph'])
+  it('contains Hardcover, Readwise, StoryGraph, and Shelfmark', () => {
+    expect(INTEGRATION_TABS).toEqual(['hardcover', 'readwise', 'storygraph', 'shelfmark'])
   })
 
   it('associates each tab with its sync permission', () => {
     expect(INTEGRATION_TAB_INFO.hardcover.permission).toBe(Permission.HardcoverSync)
     expect(INTEGRATION_TAB_INFO.readwise.permission).toBe(Permission.ReadwiseSync)
     expect(INTEGRATION_TAB_INFO.storygraph.permission).toBe(Permission.StorygraphSync)
+    expect(INTEGRATION_TAB_INFO.shelfmark.permission).toBeUndefined()
   })
 
   it('defaults to Hardcover for an invalid tab', () => {
@@ -22,5 +23,6 @@ describe('integration-tabs', () => {
     expect(normalizeIntegrationTab('hardcover')).toBe('hardcover')
     expect(normalizeIntegrationTab('readwise')).toBe('readwise')
     expect(normalizeIntegrationTab('storygraph')).toBe('storygraph')
+    expect(normalizeIntegrationTab('shelfmark')).toBe('shelfmark')
   })
 })

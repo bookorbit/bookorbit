@@ -13,6 +13,7 @@ import { api } from '@/lib/api'
 const { t } = useI18n()
 const { hasPermission } = usePermissions()
 const canTestConnection = hasPermission(Permission.ManageAppSettings)
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 const enabled = ref(false)
 const url = ref('')
 const externalUrl = ref('')
@@ -109,13 +110,18 @@ async function saveSettings() {
 </script>
 
 <template>
-  <SettingsPageHeader class="hidden md:flex" :title="t('settings.shelfmark.title')" :subtitle="t('settings.shelfmark.subtitle')" />
-  <div class="md:hidden px-1 mb-6">
+  <SettingsPageHeader
+    v-if="!props.embedded"
+    class="hidden md:flex"
+    :title="t('settings.shelfmark.title')"
+    :subtitle="t('settings.shelfmark.subtitle')"
+  />
+  <div v-if="!props.embedded" class="md:hidden px-1 mb-6">
     <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ t('settings.shelfmark.title') }}</h1>
     <p class="mt-1 text-sm text-muted-foreground leading-5">{{ t('settings.shelfmark.subtitle') }}</p>
   </div>
 
-  <div v-if="loading" class="mt-5 md:mt-0 text-sm text-muted-foreground" role="status">{{ t('common.loading') }}</div>
+  <div v-if="loading" class="text-sm text-muted-foreground" :class="{ 'mt-5 md:mt-0': !props.embedded }" role="status">{{ t('common.loading') }}</div>
   <template v-else>
     <div class="space-y-6">
       <div class="border border-border rounded-lg overflow-hidden shadow-xs">

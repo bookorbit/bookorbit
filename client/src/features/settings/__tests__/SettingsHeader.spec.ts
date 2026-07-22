@@ -59,7 +59,7 @@ describe('SettingsHeader', () => {
 
     it('hides integration tabs when user has no integration permissions', () => {
       const labels = getTabLabels(mountHeader())
-      expect(labels).not.toContain('Integrations')
+      expect(labels).toContain('Integrations')
       expect(labels).not.toContain('Kobo')
       expect(labels).not.toContain('KOReader')
       expect(labels).not.toContain('Hardcover')
@@ -68,13 +68,13 @@ describe('SettingsHeader', () => {
     it('shows Kobo tab for users with kobo_sync', () => {
       const labels = getTabLabels(mountHeader({ perms: ['kobo_sync'] }))
       expect(labels).toContain('Kobo')
-      expect(labels).not.toContain('Integrations')
+      expect(labels).toContain('Integrations')
     })
 
     it('shows KOReader tab for users with koreader_sync', () => {
       const labels = getTabLabels(mountHeader({ perms: ['koreader_sync'] }))
       expect(labels).toContain('KOReader')
-      expect(labels).not.toContain('Integrations')
+      expect(labels).toContain('Integrations')
     })
 
     it('shows Integrations tab for users with hardcover_sync', () => {
@@ -89,11 +89,6 @@ describe('SettingsHeader', () => {
       expect(labels).not.toContain('Readwise')
     })
 
-    it('hides Integrations tab when user lacks integration permissions', () => {
-      const labels = getTabLabels(mountHeader())
-      expect(labels).not.toContain('Integrations')
-    })
-
     it('shows Integrations tab for superusers', () => {
       const labels = getTabLabels(mountHeader({ su: true }))
       expect(labels).toContain('Kobo')
@@ -106,7 +101,7 @@ describe('SettingsHeader', () => {
 
     it('places integration tabs after OPDS', () => {
       const labels = getTabLabels(mountHeader({ su: true }))
-      expect(labels.slice(labels.indexOf('OPDS'), labels.indexOf('Admin'))).toEqual(['OPDS', 'Kobo', 'KOReader', 'Integrations', 'Shelfmark'])
+      expect(labels.slice(labels.indexOf('OPDS'), labels.indexOf('Admin'))).toEqual(['OPDS', 'Kobo', 'KOReader', 'Integrations'])
     })
 
     it('places Integrations after KOReader', () => {

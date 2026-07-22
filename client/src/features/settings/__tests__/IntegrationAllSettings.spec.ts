@@ -26,6 +26,7 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({
     isSuperuser: computed(() => permissionState.isSuperuser),
     userPermissions: computed(() => permissionState.permissions),
+    hasPermission: (permission: string) => permissionState.isSuperuser || permissionState.permissions.includes(permission),
   }),
 }))
 
@@ -33,6 +34,7 @@ vi.mock('../SettingsPageHeader.vue', () => ({ default: { template: '<div data-te
 vi.mock('@/features/hardcover/components/HardcoverSettings.vue', () => ({ default: { template: '<div data-testid="hardcover-settings" />' } }))
 vi.mock('@/features/readwise/components/ReadwiseSettings.vue', () => ({ default: { template: '<div data-testid="readwise-settings" />' } }))
 vi.mock('@/features/storygraph/components/StorygraphSettings.vue', () => ({ default: { template: '<div data-testid="storygraph-settings" />' } }))
+vi.mock('../ShelfmarkSettings.vue', () => ({ default: { template: '<div data-testid="shelfmark-settings" />' } }))
 
 function mountComponent(tab?: string, permissions: string[] = [], isSuperuser = false) {
   permissionState.permissions = permissions
@@ -50,7 +52,7 @@ describe('IntegrationAllSettings', () => {
   it('shows only the integrations the user can access', () => {
     const wrapper = mountComponent(undefined, ['readwise_sync'])
 
-    expect(wrapper.findAll('button').map((button) => button.text())).toEqual(['Readwise'])
+    expect(wrapper.findAll('button').map((button) => button.text())).toEqual(['Readwise', 'Shelfmark'])
     expect(wrapper.find('[data-testid="readwise-settings"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="hardcover-settings"]').exists()).toBe(false)
   })
@@ -58,7 +60,7 @@ describe('IntegrationAllSettings', () => {
   it('shows every integration to a superuser', () => {
     const wrapper = mountComponent(undefined, [], true)
 
-    expect(wrapper.findAll('button').map((button) => button.text())).toEqual(['Hardcover', 'Readwise', 'StoryGraph'])
+    expect(wrapper.findAll('button').map((button) => button.text())).toEqual(['Hardcover', 'Readwise', 'StoryGraph', 'Shelfmark'])
     expect(wrapper.find('[data-testid="hardcover-settings"]').exists()).toBe(true)
   })
 
@@ -85,10 +87,10 @@ describe('IntegrationAllSettings', () => {
     expect(wrapper.find('[data-testid="readwise-settings"]').exists()).toBe(true)
   })
 
-  it('shows a permission message when no integration is available', () => {
+  it('shows only Shelfmark when user has no other integration permissions', () => {
     const wrapper = mountComponent()
 
-    expect(wrapper.findAll('button')).toHaveLength(0)
-    expect(wrapper.text()).toContain('You do not have permission to use any integrations.')
+    expect(wrapper.findAll('button').map((button) => button.text())).toEqual(['Shelfmark'])
+    expect(wrapper.find('[data-testid="shelfmark-settings"]').exists()).toBe(true)
   })
 })
