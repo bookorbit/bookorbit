@@ -6,11 +6,12 @@ import { ChevronLeft, ChevronRight } from '@lucide/vue'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
 import BookCoverSurface from '@/features/book/components/BookCoverSurface.vue'
-import { DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
+import type { CoverAspectRatio } from '@bookorbit/types'
 
 export interface CarouselBook {
   id: number
   title: string | null
+  coverAspectRatio: CoverAspectRatio
   updatedAt?: string | null
   seriesIndex?: number | null
   hasCover: boolean
@@ -62,7 +63,7 @@ function isComic(book: CarouselBook): boolean {
 }
 
 function cardAspectRatio(book: CarouselBook): string {
-  return isAudiobook(book) ? '1/1' : DEFAULT_COVER_ASPECT_RATIO
+  return book.coverAspectRatio
 }
 
 watch(
@@ -119,7 +120,7 @@ defineExpose({ scroll })
         :key="book.id"
         :data-book-id="book.id"
         class="shrink-0 text-left group animate-fade-up"
-        :class="isAudiobook(book) ? 'w-38' : 'w-30'"
+        :class="book.coverAspectRatio === '1/1' ? 'w-38' : 'w-30'"
         :style="{ animationDelay: `${index * 40}ms` }"
         @click="navigateToBook(book.id)"
       >

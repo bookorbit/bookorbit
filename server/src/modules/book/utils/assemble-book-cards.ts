@@ -1,7 +1,7 @@
 import { basename } from 'path';
 
 import type { BookCard, BookMetadataLockField, CollapsedSeriesInfo, CustomMetadataBookValue, UserBookStatus } from '@bookorbit/types';
-import { BOOK_METADATA_LOCK_FIELDS } from '@bookorbit/types';
+import { BOOK_METADATA_LOCK_FIELDS, normalizeCoverAspectRatio } from '@bookorbit/types';
 
 const LOCK_FIELD_SET = new Set<string>(BOOK_METADATA_LOCK_FIELDS);
 
@@ -13,6 +13,7 @@ function normalizeLockedFields(raw: string[] | null | undefined): BookMetadataLo
 type BookRow = {
   id: number;
   status: string;
+  coverAspectRatio: string;
   primaryFileId?: number | null;
   folderPath: string;
   addedAt: Date;
@@ -181,6 +182,7 @@ export function assembleBookCards(
     return {
       id: row.id,
       status: row.status,
+      coverAspectRatio: normalizeCoverAspectRatio(row.coverAspectRatio),
       title: row.title ?? basename(row.folderPath),
       seriesId: row.seriesId ?? null,
       seriesName: row.seriesName ?? null,

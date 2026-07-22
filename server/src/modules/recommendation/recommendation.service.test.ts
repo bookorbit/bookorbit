@@ -84,11 +84,11 @@ describe('RecommendationService', () => {
     recRepo.findAnnCandidates.mockResolvedValue([{ bookId: 91, cosineSim: 0.78, seriesId: null, seriesName: null, rating: null }]);
     recRepo.getCandidateMetadata.mockResolvedValue([{ bookId: 91, authorNames: [], genreTagNames: [] }]);
     bookRepo.findRecommendationTitlesByBookIds.mockResolvedValue([
-      { id: 91, title: 'Fallback Match', updatedAt: null, hasCover: false, authors: [], isAudiobook: false },
+      { id: 91, title: 'Fallback Match', coverAspectRatio: '1/1', updatedAt: null, hasCover: false, authors: [], isAudiobook: false },
     ]);
 
     await expect(service.getRecommendations(55, makeUser())).resolves.toEqual([
-      { id: 91, title: 'Fallback Match', updatedAt: null, hasCover: false, authors: [], isAudiobook: false },
+      { id: 91, title: 'Fallback Match', coverAspectRatio: '1/1', updatedAt: null, hasCover: false, authors: [], isAudiobook: false },
     ]);
     expect(embedder.embedBook).toHaveBeenCalledWith(55);
     expect(recRepo.findAnnCandidates).toHaveBeenCalledWith([0.4, 0.6], 55, [7, 9], EMPTY_CONTENT_FILTER_RULES);
@@ -144,15 +144,31 @@ describe('RecommendationService', () => {
       { bookId: 200, authorNames: [], genreTagNames: [] },
     ]);
     bookRepo.findRecommendationTitlesByBookIds.mockResolvedValue([
-      { id: 200, title: 'Second', updatedAt: null, hasCover: true, authors: [], isAudiobook: false },
-      { id: 100, title: 'First', updatedAt: null, hasCover: false, authors: ['Frank Herbert'], isAudiobook: false },
+      { id: 200, title: 'Second', coverAspectRatio: '2/3', updatedAt: null, hasCover: true, authors: [], isAudiobook: false },
+      { id: 100, title: 'First', coverAspectRatio: '1/1', updatedAt: null, hasCover: false, authors: ['Frank Herbert'], isAudiobook: false },
     ]);
 
     const result = await service.getRecommendations(9, makeUser());
 
     expect(result).toHaveLength(2);
-    expect(result[0]).toEqual({ id: 100, title: 'First', updatedAt: null, hasCover: false, authors: ['Frank Herbert'], isAudiobook: false });
-    expect(result[1]).toEqual({ id: 200, title: 'Second', updatedAt: null, hasCover: true, authors: [], isAudiobook: false });
+    expect(result[0]).toEqual({
+      id: 100,
+      title: 'First',
+      coverAspectRatio: '1/1',
+      updatedAt: null,
+      hasCover: false,
+      authors: ['Frank Herbert'],
+      isAudiobook: false,
+    });
+    expect(result[1]).toEqual({
+      id: 200,
+      title: 'Second',
+      coverAspectRatio: '2/3',
+      updatedAt: null,
+      hasCover: true,
+      authors: [],
+      isAudiobook: false,
+    });
   });
 
   it('normalizes author and genre-tag metadata before similarity scoring', async () => {
@@ -176,15 +192,31 @@ describe('RecommendationService', () => {
       { bookId: 2, authorNames: [], genreTagNames: [] },
     ]);
     bookRepo.findRecommendationTitlesByBookIds.mockResolvedValue([
-      { id: 1, title: 'Token Match', updatedAt: null, hasCover: true, authors: ['frank herbert'], isAudiobook: true },
-      { id: 2, title: 'Cosine Only', updatedAt: null, hasCover: false, authors: [], isAudiobook: false },
+      { id: 1, title: 'Token Match', coverAspectRatio: '2/3', updatedAt: null, hasCover: true, authors: ['frank herbert'], isAudiobook: true },
+      { id: 2, title: 'Cosine Only', coverAspectRatio: '1/1', updatedAt: null, hasCover: false, authors: [], isAudiobook: false },
     ]);
 
     const result = await service.getRecommendations(13, makeUser());
 
     expect(result).toHaveLength(2);
-    expect(result[0]).toEqual({ id: 1, title: 'Token Match', updatedAt: null, hasCover: true, authors: ['frank herbert'], isAudiobook: true });
-    expect(result[1]).toEqual({ id: 2, title: 'Cosine Only', updatedAt: null, hasCover: false, authors: [], isAudiobook: false });
+    expect(result[0]).toEqual({
+      id: 1,
+      title: 'Token Match',
+      coverAspectRatio: '2/3',
+      updatedAt: null,
+      hasCover: true,
+      authors: ['frank herbert'],
+      isAudiobook: true,
+    });
+    expect(result[1]).toEqual({
+      id: 2,
+      title: 'Cosine Only',
+      coverAspectRatio: '1/1',
+      updatedAt: null,
+      hasCover: false,
+      authors: [],
+      isAudiobook: false,
+    });
   });
 
   it('filters out ANN results that cannot be mapped to cards', async () => {
@@ -208,13 +240,21 @@ describe('RecommendationService', () => {
       { bookId: 11, authorNames: [], genreTagNames: [] },
     ]);
     bookRepo.findRecommendationTitlesByBookIds.mockResolvedValue([
-      { id: 11, title: 'Only Card', updatedAt: null, hasCover: true, authors: [], isAudiobook: false },
+      { id: 11, title: 'Only Card', coverAspectRatio: '2/3', updatedAt: null, hasCover: true, authors: [], isAudiobook: false },
     ]);
 
     const result = await service.getRecommendations(2, makeUser());
 
     expect(result).toHaveLength(1);
-    expect(result[0]).toEqual({ id: 11, title: 'Only Card', updatedAt: null, hasCover: true, authors: [], isAudiobook: false });
+    expect(result[0]).toEqual({
+      id: 11,
+      title: 'Only Card',
+      coverAspectRatio: '2/3',
+      updatedAt: null,
+      hasCover: true,
+      authors: [],
+      isAudiobook: false,
+    });
   });
 
   it('returns empty recommendations when user has no accessible libraries with ANN candidates', async () => {
@@ -264,6 +304,7 @@ describe('RecommendationService', () => {
       Array.from({ length: 30 }, (_, i) => ({
         id: i + 1,
         title: `Book ${i + 1}`,
+        coverAspectRatio: '2/3',
         updatedAt: null,
         hasCover: false,
         authors: [],
@@ -313,16 +354,27 @@ describe('RecommendationService', () => {
         {
           bookId: 1,
           title: 'The Way of Kings',
+          coverAspectRatio: '2/3',
           updatedAt: null,
           seriesIndex: 1,
           coverSource: 'extracted',
           authorNames: ['Brandon Sanderson'],
           isAudiobook: false,
         },
-        { bookId: 2, title: 'Words of Radiance', updatedAt: null, seriesIndex: 2, coverSource: null, authorNames: [], isAudiobook: false },
+        {
+          bookId: 2,
+          title: 'Words of Radiance',
+          coverAspectRatio: '1/1',
+          updatedAt: null,
+          seriesIndex: 2,
+          coverSource: null,
+          authorNames: [],
+          isAudiobook: false,
+        },
         {
           bookId: 3,
           title: 'Oathbringer',
+          coverAspectRatio: '2/3',
           updatedAt: null,
           seriesIndex: 3,
           coverSource: 'custom',
@@ -334,9 +386,36 @@ describe('RecommendationService', () => {
       const result = await service.getSeriesBooks(2, makeUser());
 
       expect(result).toEqual([
-        { id: 1, title: 'The Way of Kings', updatedAt: null, seriesIndex: 1, hasCover: true, authors: ['Brandon Sanderson'], isAudiobook: false },
-        { id: 2, title: 'Words of Radiance', updatedAt: null, seriesIndex: 2, hasCover: false, authors: [], isAudiobook: false },
-        { id: 3, title: 'Oathbringer', updatedAt: null, seriesIndex: 3, hasCover: true, authors: ['Brandon Sanderson'], isAudiobook: false },
+        {
+          id: 1,
+          title: 'The Way of Kings',
+          coverAspectRatio: '2/3',
+          updatedAt: null,
+          seriesIndex: 1,
+          hasCover: true,
+          authors: ['Brandon Sanderson'],
+          isAudiobook: false,
+        },
+        {
+          id: 2,
+          title: 'Words of Radiance',
+          coverAspectRatio: '1/1',
+          updatedAt: null,
+          seriesIndex: 2,
+          hasCover: false,
+          authors: [],
+          isAudiobook: false,
+        },
+        {
+          id: 3,
+          title: 'Oathbringer',
+          coverAspectRatio: '2/3',
+          updatedAt: null,
+          seriesIndex: 3,
+          hasCover: true,
+          authors: ['Brandon Sanderson'],
+          isAudiobook: false,
+        },
       ]);
       expect(recRepo.findSeriesBooks).toHaveBeenCalledWith(42, [5, 6], EMPTY_CONTENT_FILTER_RULES);
     });
@@ -378,15 +457,23 @@ describe('RecommendationService', () => {
       bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
       libraryService.findAccessibleLibraryIds.mockResolvedValue([5]);
       recRepo.findAuthorBooks.mockResolvedValue([
-        { bookId: 10, title: 'Other Book A', updatedAt: null, coverSource: 'extracted', authorNames: ['Jane Austen'], isAudiobook: false },
-        { bookId: 20, title: 'Other Book B', updatedAt: null, coverSource: null, authorNames: [], isAudiobook: true },
+        {
+          bookId: 10,
+          title: 'Other Book A',
+          coverAspectRatio: '2/3',
+          updatedAt: null,
+          coverSource: 'extracted',
+          authorNames: ['Jane Austen'],
+          isAudiobook: false,
+        },
+        { bookId: 20, title: 'Other Book B', coverAspectRatio: '1/1', updatedAt: null, coverSource: null, authorNames: [], isAudiobook: true },
       ]);
 
       const result = await service.getAuthorBooks(1, makeUser());
 
       expect(result).toEqual([
-        { id: 10, title: 'Other Book A', updatedAt: null, hasCover: true, authors: ['Jane Austen'], isAudiobook: false },
-        { id: 20, title: 'Other Book B', updatedAt: null, hasCover: false, authors: [], isAudiobook: true },
+        { id: 10, title: 'Other Book A', coverAspectRatio: '2/3', updatedAt: null, hasCover: true, authors: ['Jane Austen'], isAudiobook: false },
+        { id: 20, title: 'Other Book B', coverAspectRatio: '1/1', updatedAt: null, hasCover: false, authors: [], isAudiobook: true },
       ]);
       expect(recRepo.findAuthorBooks).toHaveBeenCalledWith(1, [5], EMPTY_CONTENT_FILTER_RULES);
     });

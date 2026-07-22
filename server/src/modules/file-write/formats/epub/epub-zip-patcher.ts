@@ -11,6 +11,11 @@ export async function readEntry(filePath: string, entryPath: string): Promise<st
   return (await entry.buffer()).toString('utf-8');
 }
 
+export async function listEntryPaths(filePath: string): Promise<string[]> {
+  const zip = await unzipper.Open.file(filePath);
+  return zip.files.map((entry) => entry.path);
+}
+
 export async function patch(filePath: string, patches: Map<string, Buffer>): Promise<void> {
   const tmpPath = filePath + '.tmp';
   const zip = await unzipper.Open.file(filePath);

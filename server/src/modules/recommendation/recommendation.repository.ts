@@ -6,7 +6,7 @@ import type { ContentFilterRules } from '@bookorbit/types';
 import { isAudioFormat, isComicFormat } from '@bookorbit/types';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookAuthors, bookFiles, bookGenres, bookMetadata, bookTags, books, genres, tags } from '../../db/schema';
+import { authors, bookAuthors, bookFiles, bookGenres, bookMetadata, bookTags, books, genres, libraries, tags } from '../../db/schema';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -17,6 +17,7 @@ const AUTHOR_BOOKS_LIMIT = 25;
 export interface SeriesBookRow {
   bookId: number;
   title: string | null;
+  coverAspectRatio: string;
   updatedAt: Date | null;
   seriesIndex: number | null;
   coverSource: string | null;
@@ -28,6 +29,7 @@ export interface SeriesBookRow {
 export interface AuthorBookRow {
   bookId: number;
   title: string | null;
+  coverAspectRatio: string;
   updatedAt: Date | null;
   coverSource: string | null;
   authorNames: string[];
@@ -170,12 +172,14 @@ export class RecommendationRepository {
       .select({
         bookId: books.id,
         title: bookMetadata.title,
+        coverAspectRatio: libraries.coverAspectRatio,
         updatedAt: books.updatedAt,
         seriesIndex: bookMetadata.seriesIndex,
         coverSource: bookMetadata.coverSource,
         primaryFormat: bookFiles.format,
       })
       .from(books)
+      .innerJoin(libraries, eq(libraries.id, books.libraryId))
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .leftJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
       .where(and(inArray(books.libraryId, libraryIds), eq(bookMetadata.seriesId, seriesId), ...filterClauses))
@@ -197,6 +201,7 @@ export class RecommendationRepository {
     return rows.map((r) => ({
       bookId: r.bookId,
       title: r.title,
+      coverAspectRatio: r.coverAspectRatio,
       updatedAt: r.updatedAt ?? null,
       seriesIndex: r.seriesIndex,
       coverSource: r.coverSource,
@@ -216,6 +221,7 @@ export class RecommendationRepository {
       .select({
         bookId: books.id,
         title: bookMetadata.title,
+        coverAspectRatio: libraries.coverAspectRatio,
         updatedAt: books.updatedAt,
         coverSource: bookMetadata.coverSource,
         sharedAuthors: sql<number>`count(*)::int`.as('shared_authors'),
@@ -223,10 +229,11 @@ export class RecommendationRepository {
       })
       .from(bookAuthors)
       .innerJoin(books, eq(books.id, bookAuthors.bookId))
+      .innerJoin(libraries, eq(libraries.id, books.libraryId))
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .leftJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
       .where(and(inArray(bookAuthors.authorId, authorIds), inArray(books.libraryId, libraryIds), ne(books.id, bookId), ...filterClauses))
-      .groupBy(books.id, books.updatedAt, bookMetadata.title, bookMetadata.coverSource, bookFiles.format)
+      .groupBy(books.id, books.updatedAt, libraries.coverAspectRatio, bookMetadata.title, bookMetadata.coverSource, bookFiles.format)
       .orderBy(desc(sql`shared_authors`), asc(bookMetadata.title), asc(books.id))
       .limit(AUTHOR_BOOKS_LIMIT);
 
@@ -245,6 +252,7 @@ export class RecommendationRepository {
     return rows.map((r) => ({
       bookId: r.bookId,
       title: r.title,
+      coverAspectRatio: r.coverAspectRatio,
       updatedAt: r.updatedAt ?? null,
       coverSource: r.coverSource,
       authorNames: authorsByBook.get(r.bookId) ?? [],

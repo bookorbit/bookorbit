@@ -2,7 +2,7 @@
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useElementSize, useWindowSize, watchDebounced } from '@vueuse/core'
 import { RecycleScroller } from 'vue-virtual-scroller'
-import { isAudioFormat, type BookCard, type CoverAspectRatio, type JumpBucketKind } from '@bookorbit/types'
+import type { BookCard, CoverAspectRatio, JumpBucketKind } from '@bookorbit/types'
 import BookCoverCard from './BookCoverCard.vue'
 import BookCoverSkeleton from './BookCoverSkeleton.vue'
 import CollapsedSeriesCard from './CollapsedSeriesCard.vue'
@@ -21,7 +21,7 @@ const props = withDefaults(
     isSelected?: (bookId: number) => boolean
     newBookIds?: Set<number>
     virtualized?: boolean
-    audioCoverScale?: number
+    squareCoverScale?: number
     railGutter?: boolean
     railGutterKind?: JumpBucketKind | null
   }>(),
@@ -30,7 +30,7 @@ const props = withDefaults(
     isSelected: undefined,
     newBookIds: () => new Set<number>(),
     virtualized: true,
-    audioCoverScale: 1,
+    squareCoverScale: 1,
     railGutter: false,
     railGutterKind: null,
   },
@@ -86,7 +86,7 @@ watchDebounced(
 
 const coverPx = computed(() => asPositiveInt(props.coverSize, 140))
 const gapPx = computed(() => asPositiveInt(props.gridGap, 20))
-const audioCoverScale = computed(() => normalizeScale(props.audioCoverScale))
+const squareCoverScale = computed(() => normalizeScale(props.squareCoverScale))
 
 const availableWidth = computed(() => {
   if (settledWidth.value > 0) return settledWidth.value
@@ -143,7 +143,7 @@ const staticVariableWrapStyle = computed(() => ({
   gap: `${gapPx.value}px`,
 }))
 
-const useVariableStaticWidths = computed(() => !props.virtualized && audioCoverScale.value > 1)
+const useVariableStaticWidths = computed(() => !props.virtualized && squareCoverScale.value > 1)
 
 const staticBooks = computed(() => props.books.filter((slot): slot is BookCard => !isBookPlaceholder(slot)))
 
@@ -151,19 +151,14 @@ function asBook(slot: BookSlot): BookCard {
   return slot as BookCard
 }
 
-function isAudiobook(book: BookCard): boolean {
-  return book.files.some((file) => (file.format ? isAudioFormat(file.format) : false))
-}
-
 function staticItemStyle(book: BookCard): { width: string; maxWidth: string } {
-  const scale = isAudiobook(book) ? audioCoverScale.value : 1
+  const scale = book.coverAspectRatio === '1/1' ? squareCoverScale.value : 1
   const width = Math.max(1, Math.round(coverPx.value * scale))
   return { width: `${width}px`, maxWidth: '100%' }
 }
 
 function staticCoverAspectRatio(book: BookCard): CoverAspectRatio {
-  if (isAudiobook(book)) return '1/1'
-  return coverAspectRatio.value
+  return book.coverAspectRatio ?? coverAspectRatio.value
 }
 
 function handleScrollerUpdate(startIndex: number, endIndex: number) {

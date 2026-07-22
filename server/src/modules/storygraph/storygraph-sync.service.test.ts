@@ -229,6 +229,41 @@ describe('StorygraphSyncService', () => {
       );
     });
 
+    it.each([
+      ['rereading', 'reading'],
+      ['currently reading', 'reading'],
+      ['currently reading', 'rereading'],
+      ['rereading', 'rereading'],
+    ] as const)('updates progress without resetting a %s StoryGraph attempt for local status %s', async (currentStatus, localStatus) => {
+      mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
+      mockRepo.findSyncableBook.mockResolvedValue({ ...readingBook, status: localStatus });
+      mockRepo.findBookState.mockResolvedValue({
+        storygraphBookId: 'abc-123',
+        matchMethod: 'isbn',
+        lastSyncedAt: new Date('2026-07-01T00:00:00Z'),
+        lastSyncedStatus: localStatus,
+        lastSyncedProgress: 10,
+      });
+      mockMatchService.matchBook.mockResolvedValue({ storygraphBookId: 'abc-123', matchMethod: 'isbn' });
+      mockClient.get.mockResolvedValue({
+        status: 200,
+        html: `<button class="read-status-label">${currentStatus}</button><input name="read_status[book_num_of_pages]" value="288">`,
+        redirectedToSignIn: false,
+      });
+
+      await expect(makeService().syncBook(1, 1)).resolves.toBe('synced');
+
+      expect(mockClient.post).toHaveBeenCalledTimes(1);
+      expect(mockClient.post).toHaveBeenCalledWith(
+        1,
+        cookies,
+        '/update-progress',
+        expect.objectContaining({ 'read_status[progress_number]': '42', book_id: 'abc-123' }),
+        'csrf-token',
+      );
+      expect(mockClient.post).not.toHaveBeenCalledWith(1, cookies, expect.stringContaining('/update-status.js'), expect.anything(), 'csrf-token');
+    });
+
     it('records a failure when StoryGraph rejects the progress update', async () => {
       mockSettingsService.getCookiesForUser.mockResolvedValue(cookies);
       mockRepo.findSyncableBook.mockResolvedValue(readingBook);

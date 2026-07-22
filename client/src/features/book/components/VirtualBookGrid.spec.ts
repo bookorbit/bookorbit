@@ -57,6 +57,7 @@ function makeBook(id: number, overrides: Partial<BookCard> = {}): BookCard {
   return {
     id,
     status: 'present',
+    coverAspectRatio: '2/3',
     title: `Book ${id}`,
     authors: [],
     seriesName: null,
@@ -174,10 +175,16 @@ describe('VirtualBookGrid', () => {
     expect(updatedBook?.title).toBe('Updated')
   })
 
-  it('renders audiobook cards 1.25x wider in static mode when audioCoverScale is set', () => {
+  it('scales square cover slots independently of media format in static mode', () => {
     const books = [
-      makeBook(1, { files: [{ id: 11, format: 'epub', role: 'primary', sizeBytes: null }] }),
-      makeBook(2, { files: [{ id: 22, format: 'MP3', role: 'primary', sizeBytes: null }] }),
+      makeBook(1, {
+        coverAspectRatio: '2/3',
+        files: [
+          { id: 11, format: 'epub', role: 'primary', sizeBytes: null },
+          { id: 12, format: 'm4b', role: 'content', sizeBytes: null },
+        ],
+      }),
+      makeBook(2, { coverAspectRatio: '1/1', files: [{ id: 22, format: 'epub', role: 'primary', sizeBytes: null }] }),
     ]
 
     const wrapper = mount(VirtualBookGrid, {
@@ -186,7 +193,7 @@ describe('VirtualBookGrid', () => {
         coverSize: 120,
         gridGap: 12,
         virtualized: false,
-        audioCoverScale: 1.25,
+        squareCoverScale: 1.25,
       },
     })
 

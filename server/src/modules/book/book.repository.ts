@@ -13,7 +13,8 @@ import type {
   TemporalJumpBucketUnit,
   MetadataCandidate,
 } from '@bookorbit/types';
-import { isAudioFormat, isComicFormat, MetadataProviderKey } from '@bookorbit/types';
+import type { BookRecommendation } from '@bookorbit/types';
+import { isAudioFormat, isComicFormat, normalizeCoverAspectRatio, MetadataProviderKey } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
@@ -60,6 +61,7 @@ type JsonObj = Record<string, unknown>;
 type CollapsedRawRow = {
   id: number;
   status: string;
+  cover_aspect_ratio: string;
   primary_file_id: number | null;
   folder_path: string;
   added_at: string;
@@ -536,6 +538,7 @@ export class BookRepository {
       .select({
         id: books.id,
         status: books.status,
+        coverAspectRatio: libraries.coverAspectRatio,
         primaryFileId: books.primaryFileId,
         folderPath: books.folderPath,
         addedAt: books.addedAt,
@@ -560,6 +563,7 @@ export class BookRepository {
         _total: sql<number>`count(*) over()`.as('_total'),
       })
       .from(books)
+      .innerJoin(libraries, eq(libraries.id, books.libraryId))
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .leftJoin(userBookRatings, and(eq(userBookRatings.bookId, books.id), eq(userBookRatings.userId, userId)))
       .where(visibleWhere)
@@ -727,6 +731,7 @@ export class BookRepository {
     rows: Array<{
       id: number;
       status: string;
+      coverAspectRatio: string;
       primaryFileId: number | null;
       folderPath: string;
       addedAt: Date;
@@ -784,6 +789,7 @@ export class BookRepository {
           books.id,
           books.library_id,
           books.status,
+          libraries.cover_aspect_ratio,
           books.primary_file_id,
           books.primary_author_sort_name,
           books.folder_path,
@@ -807,6 +813,7 @@ export class BookRepository {
           book_metadata.metadata_score,
           NULLIF(lower(btrim(book_metadata.series_name)), '') AS norm_series
         FROM books
+        INNER JOIN libraries ON libraries.id = books.library_id
         LEFT JOIN book_metadata ON book_metadata.book_id = books.id
         WHERE ${whereFragment}
       ),
@@ -916,6 +923,7 @@ export class BookRepository {
         SELECT DISTINCT ON (${sql.raw(COLLAPSE_GROUP_KEY_SQL)})
           base.id,
           base.status,
+          base.cover_aspect_ratio,
           base.primary_file_id,
           base.folder_path,
           base.added_at,
@@ -982,6 +990,7 @@ export class BookRepository {
     const mappedRows = rawRows.map((r) => ({
       id: r.id,
       status: r.status,
+      coverAspectRatio: r.cover_aspect_ratio,
       primaryFileId: r.primary_file_id,
       folderPath: r.folder_path,
       addedAt: new Date(r.added_at),
@@ -1775,11 +1784,7 @@ export class BookRepository {
     return this.db.select({ id: books.id, libraryId: books.libraryId }).from(books).where(inArray(books.id, bookIds));
   }
 
-  async findRecommendationTitlesByBookIds(
-    bookIds: number[],
-  ): Promise<
-    { id: number; title: string | null; updatedAt: string | null; hasCover: boolean; authors: string[]; isAudiobook: boolean; isComic: boolean }[]
-  > {
+  async findRecommendationTitlesByBookIds(bookIds: number[]): Promise<BookRecommendation[]> {
     if (bookIds.length === 0) return [];
 
     const [rows, authorRows] = await Promise.all([
@@ -1787,11 +1792,13 @@ export class BookRepository {
         .select({
           id: books.id,
           title: bookMetadata.title,
+          coverAspectRatio: libraries.coverAspectRatio,
           updatedAt: books.updatedAt,
           coverSource: bookMetadata.coverSource,
           primaryFormat: bookFiles.format,
         })
         .from(books)
+        .innerJoin(libraries, eq(libraries.id, books.libraryId))
         .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
         .leftJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
         .where(inArray(books.id, bookIds)),
@@ -1812,6 +1819,7 @@ export class BookRepository {
     return rows.map((r) => ({
       id: r.id,
       title: r.title,
+      coverAspectRatio: normalizeCoverAspectRatio(r.coverAspectRatio),
       updatedAt: r.updatedAt?.toISOString() ?? null,
       hasCover: r.coverSource !== null,
       authors: authorsByBook.get(r.id) ?? [],
@@ -1865,7 +1873,11 @@ export class BookRepository {
   }
 
   async findIdsByWhere(where: SQL | undefined): Promise<number[]> {
-    const rows = await this.db.select({ id: books.id }).from(books).where(this.visibleWhere(where));
+    const rows = await this.db
+      .select({ id: books.id })
+      .from(books)
+      .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .where(this.visibleWhere(where));
     return rows.map((r) => r.id);
   }
 

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { type Component, computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
+import { useVirtualizer } from '@tanstack/vue-virtual'
 import {
   AlignJustify,
   ArrowDownUp,
@@ -77,10 +78,12 @@ const settingsScrollMemory = ref<Record<SettingsTab, number>>({
 })
 const scrollContainer = ref<HTMLElement | null>(null)
 const viewportWidth = ref(0)
+const viewportHeight = ref(0)
 const currentImageLoaded = ref(false)
 const pendingImageLoads = ref(0)
 const loadedImageCount = ref(0)
 const pageRatios = ref<number[]>([])
+const stripImagesReady = ref(false)
 const highlightForceTwoPage = ref(false)
 const forceTwoPageToggleButton = ref<HTMLButtonElement | null>(null)
 let forceToggleHighlightTimer: ReturnType<typeof setTimeout> | null = null
@@ -279,6 +282,44 @@ const stripFrameClass = computed(() => {
   return 'w-full flex justify-center'
 })
 
+const stripGap = computed(() => (scrollMode.value === 'long-strip' ? 0 : 8))
+const stripPadding = computed(() => (scrollMode.value === 'long-strip' ? 0 : 16))
+const stripViewportWidth = computed(() => Math.max(1, viewportWidth.value - (scrollMode.value === 'long-strip' ? 0 : 16)))
+
+const stripVirtualizer = useVirtualizer(
+  computed(() => {
+    const mode = scrollMode.value
+    const fit = fitMode.value
+    const height = Math.max(1, viewportHeight.value)
+    const width = stripViewportWidth.value
+    const ratios = pageRatios.value
+
+    return {
+      count: mode === 'paginated' ? 0 : pageCount.value,
+      getScrollElement: () => scrollContainer.value,
+      estimateSize: (index: number) => {
+        if (fit === 'fit-page' || fit === 'fit-height') return height
+        const ratio = ratios[index]
+        if (fit === 'fit-width' && ratio && ratio > 0) return width / ratio
+        return height
+      },
+      gap: stripGap.value,
+      paddingStart: stripPadding.value,
+      paddingEnd: stripPadding.value,
+      overscan: 2,
+      getItemKey: (index: number) => index,
+    }
+  }),
+)
+
+const virtualStripPages = computed(() => stripVirtualizer.value.getVirtualItems())
+const virtualStripSize = computed(() => stripVirtualizer.value.getTotalSize())
+const renderedStripPages = computed(() => (stripImagesReady.value ? virtualStripPages.value : []))
+
+function measureStripPage(element: unknown) {
+  if (element instanceof Element) stripVirtualizer.value.measureElement(element)
+}
+
 const stripImageClass = computed(() => {
   switch (fitMode.value) {
     case 'fit-width':
@@ -373,6 +414,11 @@ function goToPage(n: number) {
 
   const clamped = Math.max(0, Math.min(n, pageCount.value - 1))
   const target = isTwoPageEffective.value ? spreadLayout.value.anchorForPage(clamped) : clamped
+  if (scrollMode.value !== 'paginated') {
+    currentPage.value = target
+    void scrollContinuousToPage(target)
+    return
+  }
   if (target === currentPage.value) return
 
   currentPage.value = target
@@ -478,37 +524,57 @@ function onKeyDown(e: KeyboardEvent) {
   }
 }
 
-// ── Infinite scroll page tracking ─────────────────────────────────────────────
-let io: IntersectionObserver | null = null
+let readerReady = false
+let restoringContinuousPosition = false
+let stripScrollFrame: number | null = null
 
-function setupScrollObserver() {
-  io?.disconnect()
-  if (!scrollContainer.value) return
+function syncCurrentPageFromScroll() {
+  stripScrollFrame = null
+  if (restoringContinuousPosition || !scrollContainer.value) return
 
-  io = new IntersectionObserver(
-    (entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting) {
-          currentPage.value = parseInt((entry.target as HTMLElement).dataset.page ?? '0')
-        }
-      }
-    },
-    { root: scrollContainer.value, threshold: 0.5 },
-  )
+  const viewportStart = scrollContainer.value.scrollTop
+  const viewportEnd = viewportStart + scrollContainer.value.clientHeight
+  let visiblePage = currentPage.value
+  let visiblePixels = -1
 
-  nextTick(() => {
-    scrollContainer.value?.querySelectorAll('[data-page]').forEach((el) => io?.observe(el))
+  for (const item of stripVirtualizer.value.getVirtualItems()) {
+    const overlap = Math.max(0, Math.min(item.end, viewportEnd) - Math.max(item.start, viewportStart))
+    if (overlap > visiblePixels) {
+      visiblePage = item.index
+      visiblePixels = overlap
+    }
+  }
+
+  currentPage.value = visiblePage
+}
+
+function onStripScroll() {
+  if (stripScrollFrame !== null) cancelAnimationFrame(stripScrollFrame)
+  stripScrollFrame = requestAnimationFrame(syncCurrentPageFromScroll)
+}
+
+async function scrollContinuousToPage(page: number, restoring = false) {
+  if (scrollMode.value === 'paginated' || pageCount.value <= 0) return
+  restoringContinuousPosition = restoring
+  await nextTick()
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      stripVirtualizer.value.scrollToIndex(page, { align: 'start' })
+      resolve()
+    })
   })
+  if (restoring) {
+    requestAnimationFrame(() => {
+      restoringContinuousPosition = false
+    })
+  }
 }
 
 watch(scrollMode, async (mode) => {
-  if (mode !== 'paginated') {
-    await nextTick()
-    setupScrollObserver()
-    scrollContainer.value?.querySelector(`[data-page="${currentPage.value}"]`)?.scrollIntoView()
-  } else {
-    io?.disconnect()
-  }
+  stripImagesReady.value = false
+  if (mode === 'paginated' || !readerReady) return
+  await scrollContinuousToPage(currentPage.value, true)
+  stripImagesReady.value = true
 })
 
 watch(spreadLayout, (layout) => {
@@ -535,21 +601,41 @@ const sliderTicks = computed(() => {
 
 // ── Progress save ──────────────────────────────────────────────────────────────
 let saveTimer: ReturnType<typeof setTimeout> | null = null
+let progressSavePending = false
+
+async function savePageProgress(page: number) {
+  progress.pageNumber.value = page + 1
+  progress.percentage.value = progressPercent.value
+  progressSavePending = false
+  await progress.save()
+}
+
+async function flushPendingProgress() {
+  if (!progressSavePending) return
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+  }
+  await savePageProgress(currentPage.value)
+}
 
 watch(currentPage, (page) => {
   schedulePreload(page)
   onActivity()
 
+  if (!readerReady || restoringContinuousPosition) return
+
   if (saveTimer) clearTimeout(saveTimer)
+  progressSavePending = true
   saveTimer = setTimeout(() => {
-    progress.pageNumber.value = page + 1
-    progress.percentage.value = progressPercent.value
-    progress.save()
+    saveTimer = null
+    void savePageProgress(page)
   }, 2000)
 })
 
 function onResize() {
   viewportWidth.value = window.innerWidth
+  viewportHeight.value = window.innerHeight
 }
 
 async function startTrackedReading() {
@@ -566,6 +652,7 @@ async function startTrackedReading() {
 // ── Mount / unmount ────────────────────────────────────────────────────────────
 onMounted(async () => {
   viewportWidth.value = window.innerWidth
+  viewportHeight.value = window.innerHeight
   window.addEventListener('resize', onResize)
   window.addEventListener('keydown', onKeyDown)
 
@@ -596,14 +683,23 @@ onMounted(async () => {
     currentPage.value = spreadLayout.value.anchorForPage(currentPage.value)
   }
 
+  readerReady = true
+  if (scrollMode.value !== 'paginated') {
+    await scrollContinuousToPage(currentPage.value, true)
+    stripImagesReady.value = true
+  }
   schedulePreload(currentPage.value)
+})
+
+onBeforeRouteLeave(async () => {
+  await flushPendingProgress()
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', onResize)
   window.removeEventListener('keydown', onKeyDown)
-  io?.disconnect()
-  if (saveTimer) clearTimeout(saveTimer)
+  if (stripScrollFrame !== null) cancelAnimationFrame(stripScrollFrame)
+  void flushPendingProgress()
   if (forceToggleHighlightTimer) clearTimeout(forceToggleHighlightTimer)
 })
 </script>
@@ -969,15 +1065,19 @@ onUnmounted(() => {
     </div>
 
     <!-- ── Infinite / long-strip view ─────────────────────────────────────── -->
-    <div
-      v-else
-      ref="scrollContainer"
-      class="absolute inset-0 overflow-y-auto overflow-x-hidden"
-      :class="scrollMode === 'long-strip' ? '' : 'flex flex-col items-center'"
-    >
-      <div :class="scrollMode === 'long-strip' ? '' : 'flex flex-col items-center w-full gap-2 py-4 px-2'">
-        <div v-for="i in pageCount" :key="i - 1" :data-page="i - 1" :class="stripFrameClass">
-          <img :src="pageUrl(i - 1)" :class="stripImageClass" loading="lazy" draggable="false" @load="onStripImageLoad(i - 1, $event)" />
+    <div v-else ref="scrollContainer" class="absolute inset-0 overflow-y-auto overflow-x-hidden" @scroll.passive="onStripScroll">
+      <div class="relative w-full" :style="{ height: `${virtualStripSize}px` }">
+        <div
+          v-for="page in renderedStripPages"
+          :key="String(page.key)"
+          :ref="measureStripPage"
+          :data-index="page.index"
+          :data-page="page.index"
+          class="absolute start-0 top-0"
+          :class="[stripFrameClass, scrollMode === 'long-strip' ? '' : 'px-2']"
+          :style="{ transform: `translateY(${page.start}px)` }"
+        >
+          <img :src="pageUrl(page.index)" :class="stripImageClass" decoding="async" draggable="false" @load="onStripImageLoad(page.index, $event)" />
         </div>
       </div>
     </div>

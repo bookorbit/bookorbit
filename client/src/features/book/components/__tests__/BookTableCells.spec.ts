@@ -221,6 +221,7 @@ describe('BookTableReadButtonCell', () => {
     return {
       id: 42,
       status,
+      coverAspectRatio: '2/3',
       title: 'Example Book',
       authors: ['Author'],
       seriesName: null,

@@ -77,15 +77,16 @@ import { useDashboardScroller } from '../composables/useDashboardScroller'
 
 const mockUseDashboardScroller = vi.mocked(useDashboardScroller)
 
-function makeBook(id: number, format: string): BookCard {
+function makeBook(id: number, format: string, coverAspectRatio: BookCard['coverAspectRatio'] = '2/3'): BookCard {
   return {
     id,
     status: 'present',
+    coverAspectRatio,
     title: `Book ${id}`,
     authors: [],
     seriesName: null,
     seriesIndex: null,
-    files: [{ id, format, role: 'content', sizeBytes: 123 }],
+    files: [{ id, format, role: 'primary', sizeBytes: 123 }],
     publishedDate: null,
     publishedYear: null,
     language: null,
@@ -181,14 +182,24 @@ describe('DashboardScroller', () => {
     expect(refresh).toHaveBeenCalledTimes(1)
   })
 
-  it('renders book cards with count and cover shape based on audio format', () => {
-    const wrapper = mountScroller({ type: 'continue-listening', books: [makeBook(1, 'm4b'), makeBook(2, 'epub')] })
+  it('renders cover slots from library configuration instead of media format', () => {
+    const wrapper = mountScroller({ type: 'continue-listening', books: [makeBook(1, 'epub', '1/1'), makeBook(2, 'm4b', '2/3')] })
 
     const cards = wrapper.findAll('.book-card')
     expect(wrapper.text()).toContain('2')
     expect(cards).toHaveLength(2)
     expect(cards[0]?.attributes('data-aspect')).toBe('1/1')
     expect(cards[1]?.attributes('data-aspect')).toBe('2/3')
+  })
+
+  it('keeps a mixed ebook and audiobook portrait when its library is portrait', () => {
+    const mixedBook = makeBook(1, 'epub', '2/3')
+    mixedBook.files.push({ id: 2, format: 'm4b', role: 'content', sizeBytes: 456 })
+
+    const wrapper = mountScroller({ type: 'want-to-read', books: [mixedBook] })
+
+    expect(wrapper.get('.book-card').attributes('data-aspect')).toBe('2/3')
+    expect(wrapper.get('.book-card').element.parentElement?.classList.contains('w-[120px]')).toBe(true)
   })
 
   it('opens related book actions from card events', async () => {

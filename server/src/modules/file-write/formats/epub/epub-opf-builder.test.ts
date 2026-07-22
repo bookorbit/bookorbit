@@ -169,6 +169,28 @@ describe('epub-opf-builder', () => {
     expect(parsed.length).toBeGreaterThan(0);
   });
 
+  it('preserves explicit OPF prefixes when the whole package is namespaced', () => {
+    const opf = `
+      <opf:package xmlns:opf="http://www.idpf.org/2007/opf" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0" unique-identifier="uid">
+        <opf:metadata>
+          <dc:identifier id="uid">urn:uuid:abc</dc:identifier>
+          <dc:title>Old</dc:title>
+          <opf:meta name="cover" content="cover" />
+        </opf:metadata>
+        <opf:manifest><opf:item id="cover" href="cover.jpg" media-type="image/jpeg" /></opf:manifest>
+      </opf:package>
+    `;
+
+    const result = build(opf, { title: 'Replacement', subtitle: 'Subtitle' });
+
+    expect(result.newOpfXml).toContain('<opf:package');
+    expect(result.newOpfXml).toContain('<opf:metadata>');
+    expect(result.newOpfXml).toContain('<opf:meta name="bookorbit:subtitle" content="Subtitle"></opf:meta>');
+    expect(result.newOpfXml).toContain('<opf:meta name="cover" content="cover"></opf:meta>');
+    expect(result.newOpfXml).toContain('<opf:manifest><opf:item');
+    expect(result.newOpfXml).not.toContain('<meta name="bookorbit:subtitle"');
+  });
+
   it('writes EPUB2-only BookOrbit metadata fields and preserves omitted values', () => {
     const opf = `
       <package version="2.0" unique-identifier="uid">

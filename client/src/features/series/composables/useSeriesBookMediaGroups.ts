@@ -1,6 +1,4 @@
-import { isAudioFormat, type BookCard } from '@bookorbit/types'
-
-const COMIC_FORMATS = new Set(['cbz', 'cbr', 'cb7'])
+import { getBookMediaProfile, type BookCard } from '@bookorbit/types'
 
 export const SERIES_BOOK_MEDIA_GROUP_DEFS = [
   { key: 'books', label: 'Books' },
@@ -17,12 +15,9 @@ export type SeriesBookMediaGroup = {
 }
 
 export function getSeriesBookMediaGroupKey(book: BookCard): SeriesBookMediaGroupKey {
-  const file = book.files.find((candidate) => candidate.role === 'primary') ?? book.files.find((candidate) => candidate.format) ?? null
-  const format = file?.format?.trim().toLowerCase()
-
-  if (!format) return 'books'
-  if (isAudioFormat(format)) return 'audiobooks'
-  if (COMIC_FORMATS.has(format)) return 'comics'
+  const primaryMediaKind = getBookMediaProfile(book.files).primaryMediaKind
+  if (primaryMediaKind === 'audiobook') return 'audiobooks'
+  if (primaryMediaKind === 'comic') return 'comics'
   return 'books'
 }
 

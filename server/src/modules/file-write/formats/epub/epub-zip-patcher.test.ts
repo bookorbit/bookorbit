@@ -6,7 +6,7 @@ import * as fs from 'fs/promises';
 import * as unzipper from 'unzipper';
 import { ZipArchive } from 'archiver';
 
-import { patch, readEntry } from './epub-zip-patcher';
+import { listEntryPaths, patch, readEntry } from './epub-zip-patcher';
 
 vi.mock('fs', async () => {
   const actual = await vi.importActual('fs');
@@ -83,6 +83,14 @@ describe('epub-zip-patcher', () => {
     mockOpenFile.mockResolvedValue({ files: [] } as never);
 
     await expect(readEntry('/book.epub', 'OPS/content.opf')).rejects.toThrow('Entry not found in EPUB: OPS/content.opf');
+  });
+
+  it('lists every occupied archive entry path', async () => {
+    mockOpenFile.mockResolvedValue({
+      files: [{ path: 'mimetype' }, { path: 'OPS/content.opf' }, { path: 'OPS/images/cover.webp' }],
+    } as never);
+
+    await expect(listEntryPaths('/book.epub')).resolves.toEqual(['mimetype', 'OPS/content.opf', 'OPS/images/cover.webp']);
   });
 
   it('patch writes mimetype first, patches existing entries, and appends new ones', async () => {

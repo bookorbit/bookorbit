@@ -34,6 +34,7 @@ function makeBook(overrides: Partial<BookCard> = {}): BookCard {
   return {
     id: 1,
     status: 'present',
+    coverAspectRatio: '2/3',
     title: 'Dune',
     authors: [],
     seriesName: null,
@@ -110,6 +111,7 @@ describe('tableColumnSchema', () => {
     const book = {
       id: 1,
       status: 'present',
+      coverAspectRatio: '2/3',
       title: 'Dune',
       authors: ['Frank Herbert'],
       seriesName: null,

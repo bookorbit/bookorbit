@@ -54,42 +54,43 @@ function getUniqueIdentifierRef(pkg: Record<string, unknown>): string {
   return attr(pkg, '@_unique-identifier') || 'uid';
 }
 
-function getPackageNode(parsed: OrderedNode[]): { pkgNode: OrderedNode; pkgAttrs: Record<string, unknown>; pkgIndex: number } | null {
+function getPackageNode(parsed: OrderedNode[]): { pkgNode: OrderedNode; pkgTag: string; pkgAttrs: Record<string, unknown> } | null {
   for (let i = 0; i < parsed.length; i++) {
     const node = parsed[i] as Record<string, unknown>;
-    if ('package' in node) {
+    const pkgTag = nodeTagName(node);
+    if (localName(pkgTag) === 'package') {
       const attrs = (node[':@'] ?? {}) as Record<string, unknown>;
-      return { pkgNode: node, pkgAttrs: attrs, pkgIndex: i };
+      return { pkgNode: node, pkgTag, pkgAttrs: attrs };
     }
   }
   return null;
 }
 
-function findMetadataChildren(pkgContent: OrderedNode[]): OrderedNode[] {
+function findMetadata(pkgContent: OrderedNode[]): { node: OrderedNode; tag: string; children: OrderedNode[] } | null {
   for (const node of pkgContent) {
-    if ('metadata' in node || 'opf:metadata' in node) {
-      const key = 'metadata' in node ? 'metadata' : 'opf:metadata';
-      return (node[key] as OrderedNode[]) ?? [];
+    const tag = nodeTagName(node);
+    if (localName(tag) === 'metadata') {
+      return { node, tag, children: (node[tag] as OrderedNode[]) ?? [] };
     }
   }
-  return [];
-}
-
-function setMetadataChildren(pkgContent: OrderedNode[], children: OrderedNode[]): void {
-  for (const node of pkgContent) {
-    if ('metadata' in node) {
-      (node as Record<string, unknown>)['metadata'] = children;
-      return;
-    }
-    if ('opf:metadata' in node) {
-      (node as Record<string, unknown>)['opf:metadata'] = children;
-      return;
-    }
-  }
+  return null;
 }
 
 function nodeTagName(node: OrderedNode): string {
   return Object.keys(node).find((k) => k !== ':@') ?? '';
+}
+
+function localName(tag: string): string {
+  return tag.split(':').at(-1) ?? '';
+}
+
+function opfElementName(tag: string): string {
+  return tag.startsWith('opf:') ? tag.slice(4) : tag;
+}
+
+function childTag(parentTag: string, name: string): string {
+  const separatorIndex = parentTag.indexOf(':');
+  return separatorIndex === -1 ? name : `${parentTag.slice(0, separatorIndex)}:${name}`;
 }
 
 function getNodeAttrs(node: OrderedNode): Record<string, unknown> {
@@ -122,7 +123,7 @@ function stripMetadata(children: OrderedNode[], uidRef: string): { cleaned: Orde
   const collectionIds = new Set<string>();
 
   for (const node of children) {
-    const tag = nodeTagName(node);
+    const tag = opfElementName(nodeTagName(node));
     if (tag === 'dc:creator') {
       const id = attr(getNodeAttrs(node), '@_id');
       if (id) creatorIds.add(id);
@@ -141,7 +142,7 @@ function stripMetadata(children: OrderedNode[], uidRef: string): { cleaned: Orde
   const cleaned: OrderedNode[] = [];
 
   for (const node of children) {
-    const tag = nodeTagName(node);
+    const tag = opfElementName(nodeTagName(node));
     const nodeAttrs = getNodeAttrs(node);
 
     if (KNOWN_DC.has(tag)) {
@@ -182,7 +183,7 @@ function stripMetadata(children: OrderedNode[], uidRef: string): { cleaned: Orde
   return { cleaned, uidNode };
 }
 
-function buildFreshMetadata(payload: BookWritePayload, epubVersion: 3 | 2, uidNode: OrderedNode | null): OrderedNode[] {
+function buildFreshMetadata(payload: BookWritePayload, epubVersion: 3 | 2, uidNode: OrderedNode | null, metaTag: string): OrderedNode[] {
   const nodes: OrderedNode[] = [];
 
   // Always re-insert UID node first
@@ -192,7 +193,7 @@ function buildFreshMetadata(payload: BookWritePayload, epubVersion: 3 | 2, uidNo
   if (payload.title != null) {
     if (epubVersion === 3) {
       nodes.push(makeTextNode('dc:title', payload.title, { '@_id': 't-main' }));
-      nodes.push({ meta: [{ '#text': 'main' }], ':@': { '@_refines': '#t-main', '@_property': 'title-type' } } as OrderedNode);
+      nodes.push(makeTextNode(metaTag, 'main', { '@_refines': '#t-main', '@_property': 'title-type' }));
     } else {
       nodes.push(makeTextNode('dc:title', payload.title));
     }
@@ -202,9 +203,9 @@ function buildFreshMetadata(payload: BookWritePayload, epubVersion: 3 | 2, uidNo
   if (payload.subtitle != null) {
     if (epubVersion === 3) {
       nodes.push(makeTextNode('dc:title', payload.subtitle, { '@_id': 't-sub' }));
-      nodes.push({ meta: [{ '#text': 'subtitle' }], ':@': { '@_refines': '#t-sub', '@_property': 'title-type' } } as OrderedNode);
+      nodes.push(makeTextNode(metaTag, 'subtitle', { '@_refines': '#t-sub', '@_property': 'title-type' }));
     } else {
-      nodes.push(makeEmptyNode('meta', { '@_name': `${APP_WRITE_NAMESPACE}:subtitle`, '@_content': payload.subtitle }));
+      nodes.push(makeEmptyNode(metaTag, { '@_name': `${APP_WRITE_NAMESPACE}:subtitle`, '@_content': payload.subtitle }));
     }
   }
 
@@ -215,8 +216,8 @@ function buildFreshMetadata(payload: BookWritePayload, epubVersion: 3 | 2, uidNo
       const fileAs = author.sortName ?? author.name;
       if (epubVersion === 3) {
         nodes.push(makeTextNode('dc:creator', author.name, { '@_id': id }));
-        nodes.push({ meta: [{ '#text': 'aut' }], ':@': { '@_refines': `#${id}`, '@_property': 'role', '@_scheme': 'marc:relators' } } as OrderedNode);
-        nodes.push({ meta: [{ '#text': fileAs }], ':@': { '@_refines': `#${id}`, '@_property': 'file-as' } } as OrderedNode);
+        nodes.push(makeTextNode(metaTag, 'aut', { '@_refines': `#${id}`, '@_property': 'role', '@_scheme': 'marc:relators' }));
+        nodes.push(makeTextNode(metaTag, fileAs, { '@_refines': `#${id}`, '@_property': 'file-as' }));
       } else {
         nodes.push(
           makeTextNode('dc:creator', author.name, {
@@ -262,9 +263,9 @@ function buildFreshMetadata(payload: BookWritePayload, epubVersion: 3 | 2, uidNo
 
   if (payload.isbn10 != null) {
     if (epubVersion === 3) {
-      nodes.push({ meta: [{ '#text': payload.isbn10 }], ':@': { '@_property': `${APP_WRITE_NAMESPACE}:isbn10` } } as OrderedNode);
+      nodes.push(makeTextNode(metaTag, payload.isbn10, { '@_property': `${APP_WRITE_NAMESPACE}:isbn10` }));
     } else {
-      nodes.push(makeEmptyNode('meta', { '@_name': `${APP_WRITE_NAMESPACE}:isbn10`, '@_content': payload.isbn10 }));
+      nodes.push(makeEmptyNode(metaTag, { '@_name': `${APP_WRITE_NAMESPACE}:isbn10`, '@_content': payload.isbn10 }));
     }
   }
 
@@ -278,37 +279,34 @@ function buildFreshMetadata(payload: BookWritePayload, epubVersion: 3 | 2, uidNo
 
   // Series - dual write (Calibre EPUB2 + EPUB3 belongs-to-collection)
   if (payload.seriesName != null) {
-    nodes.push(makeEmptyNode('meta', { '@_name': 'calibre:series', '@_content': payload.seriesName }));
+    nodes.push(makeEmptyNode(metaTag, { '@_name': 'calibre:series', '@_content': payload.seriesName }));
     if (payload.seriesIndex != null) {
-      nodes.push(makeEmptyNode('meta', { '@_name': 'calibre:series_index', '@_content': String(payload.seriesIndex) }));
+      nodes.push(makeEmptyNode(metaTag, { '@_name': 'calibre:series_index', '@_content': String(payload.seriesIndex) }));
     }
 
     const collectionId = 'series-col';
-    nodes.push(makeTextNode('meta', payload.seriesName, { '@_id': collectionId, '@_property': 'belongs-to-collection' }));
-    nodes.push({ meta: [{ '#text': 'series' }], ':@': { '@_refines': `#${collectionId}`, '@_property': 'collection-type' } } as OrderedNode);
+    nodes.push(makeTextNode(metaTag, payload.seriesName, { '@_id': collectionId, '@_property': 'belongs-to-collection' }));
+    nodes.push(makeTextNode(metaTag, 'series', { '@_refines': `#${collectionId}`, '@_property': 'collection-type' }));
     if (payload.seriesIndex != null) {
-      nodes.push({
-        meta: [{ '#text': String(payload.seriesIndex) }],
-        ':@': { '@_refines': `#${collectionId}`, '@_property': 'group-position' },
-      } as OrderedNode);
+      nodes.push(makeTextNode(metaTag, String(payload.seriesIndex), { '@_refines': `#${collectionId}`, '@_property': 'group-position' }));
     }
   }
 
   // pageCount
   if (payload.pageCount != null) {
     if (epubVersion === 3) {
-      nodes.push({ meta: [{ '#text': String(payload.pageCount) }], ':@': { '@_property': `${APP_WRITE_NAMESPACE}:page_count` } } as OrderedNode);
+      nodes.push(makeTextNode(metaTag, String(payload.pageCount), { '@_property': `${APP_WRITE_NAMESPACE}:page_count` }));
     } else {
-      nodes.push(makeEmptyNode('meta', { '@_name': `${APP_WRITE_NAMESPACE}:page_count`, '@_content': String(payload.pageCount) }));
+      nodes.push(makeEmptyNode(metaTag, { '@_name': `${APP_WRITE_NAMESPACE}:page_count`, '@_content': String(payload.pageCount) }));
     }
   }
 
   // rating
   if (payload.rating != null) {
     if (epubVersion === 3) {
-      nodes.push({ meta: [{ '#text': String(payload.rating) }], ':@': { '@_property': `${APP_WRITE_NAMESPACE}:rating` } } as OrderedNode);
+      nodes.push(makeTextNode(metaTag, String(payload.rating), { '@_property': `${APP_WRITE_NAMESPACE}:rating` }));
     } else {
-      nodes.push(makeEmptyNode('meta', { '@_name': `${APP_WRITE_NAMESPACE}:rating`, '@_content': String(payload.rating) }));
+      nodes.push(makeEmptyNode(metaTag, { '@_name': `${APP_WRITE_NAMESPACE}:rating`, '@_content': String(payload.rating) }));
     }
   }
 
@@ -316,9 +314,9 @@ function buildFreshMetadata(payload: BookWritePayload, epubVersion: 3 | 2, uidNo
   if (payload.tags?.length) {
     const tagsJson = JSON.stringify(payload.tags);
     if (epubVersion === 3) {
-      nodes.push({ meta: [{ '#text': tagsJson }], ':@': { '@_property': `${APP_WRITE_NAMESPACE}:tags` } } as OrderedNode);
+      nodes.push(makeTextNode(metaTag, tagsJson, { '@_property': `${APP_WRITE_NAMESPACE}:tags` }));
     } else {
-      nodes.push(makeEmptyNode('meta', { '@_name': `${APP_WRITE_NAMESPACE}:tags`, '@_content': tagsJson }));
+      nodes.push(makeEmptyNode(metaTag, { '@_name': `${APP_WRITE_NAMESPACE}:tags`, '@_content': tagsJson }));
     }
   }
 
@@ -328,22 +326,22 @@ function buildFreshMetadata(payload: BookWritePayload, epubVersion: 3 | 2, uidNo
     const property = `${CUSTOM_METADATA_PREFIX}${entry.key}`;
     const value = String(entry.value);
     if (epubVersion === 3) {
-      nodes.push({ meta: [{ '#text': value }], ':@': { '@_property': property } } as OrderedNode);
+      nodes.push(makeTextNode(metaTag, value, { '@_property': property }));
     } else {
-      nodes.push(makeEmptyNode('meta', { '@_name': property, '@_content': value }));
+      nodes.push(makeEmptyNode(metaTag, { '@_name': property, '@_content': value }));
     }
   }
 
   // EPUB3: dcterms:modified is required
   if (epubVersion === 3) {
-    nodes.push({ meta: [{ '#text': new Date().toISOString() }], ':@': { '@_property': 'dcterms:modified' } } as OrderedNode);
+    nodes.push(makeTextNode(metaTag, new Date().toISOString(), { '@_property': 'dcterms:modified' }));
   }
 
   return nodes;
 }
 
-function getPkgContentAll(pkgNode: OrderedNode): OrderedNode[] {
-  return pkgNode['package'] as OrderedNode[];
+function getPkgContentAll(pkgNode: OrderedNode, pkgTag: string): OrderedNode[] {
+  return pkgNode[pkgTag] as OrderedNode[];
 }
 
 export function build(opfXml: string, payload: BookWritePayload): { newOpfXml: string; fieldsWritten: string[] } {
@@ -351,7 +349,7 @@ export function build(opfXml: string, payload: BookWritePayload): { newOpfXml: s
   const pkgResult = getPackageNode(parsed);
   if (!pkgResult) throw new Error('Cannot find <package> element in OPF');
 
-  const { pkgNode, pkgAttrs } = pkgResult;
+  const { pkgNode, pkgTag, pkgAttrs } = pkgResult;
   const epubVersion = detectEpubVersion(pkgAttrs);
   const uidRef = getUniqueIdentifierRef(pkgAttrs);
 
@@ -373,12 +371,13 @@ export function build(opfXml: string, payload: BookWritePayload): { newOpfXml: s
     pkgAttrs['@_xmlns:opf'] = 'http://www.idpf.org/2007/opf';
   }
 
-  const pkgContent = getPkgContentAll(pkgNode);
-  const metaChildren = findMetadataChildren(pkgContent);
-  const { cleaned, uidNode } = stripMetadata(metaChildren, uidRef);
-  const freshNodes = buildFreshMetadata(payload, epubVersion, uidNode);
+  const pkgContent = getPkgContentAll(pkgNode, pkgTag);
+  const metadata = findMetadata(pkgContent);
+  if (!metadata) throw new Error('Cannot find <metadata> element in OPF');
+  const { cleaned, uidNode } = stripMetadata(metadata.children, uidRef);
+  const freshNodes = buildFreshMetadata(payload, epubVersion, uidNode, childTag(metadata.tag, 'meta'));
   const newMetaChildren = [...freshNodes, ...cleaned];
-  setMetadataChildren(pkgContent, newMetaChildren);
+  metadata.node[metadata.tag] = newMetaChildren;
 
   const newOpfXml = String(writerBuilder.build(parsed));
 

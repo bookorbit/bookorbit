@@ -52,6 +52,7 @@ afterEach(() => {
 const missingBook: BookCard = {
   id: 1,
   status: 'missing',
+  coverAspectRatio: '2/3',
   title: 'Gone Book',
   authors: ['Test Author'],
   seriesName: null,
@@ -82,6 +83,7 @@ const missingBook: BookCard = {
 const presentBook: BookCard = {
   id: 2,
   status: 'present',
+  coverAspectRatio: '2/3',
   title: 'Available Book',
   authors: ['Test Author'],
   seriesName: null,

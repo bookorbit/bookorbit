@@ -12,6 +12,7 @@ import { BookDockRepository, type ListOptions } from './book-dock.repository';
 import { BookDockIngestService } from './book-dock-ingest.service';
 import { BookDockFinalizeService } from './book-dock-finalize.service';
 import { BookDockGateway } from './book-dock.gateway';
+import { normalizeBookDockMetadata, normalizeBookDockMetadataSources } from './book-dock-metadata.utils';
 import { BookDockProcessingStateService } from './book-dock-processing-state.service';
 import { BookDockWatcherService } from './book-dock-watcher.service';
 import type { BookDockFileRow } from '../../db/schema';
@@ -61,7 +62,10 @@ export class BookDockService {
       await this.assertValidTarget(data.targetLibraryId, data.targetFolderId);
     }
 
-    const updateData = data.selectedMetadata !== undefined ? { ...data, metadataEditedAt: new Date() } : data;
+    const updateData =
+      data.selectedMetadata !== undefined
+        ? { ...data, selectedMetadata: normalizeBookDockMetadata(data.selectedMetadata) ?? {}, metadataEditedAt: new Date() }
+        : data;
     const updated = await this.repo.update(id, updateData);
     if (!updated) throw new NotFoundException('Book Dock file not found');
     return toDto(updated);
@@ -130,7 +134,7 @@ export class BookDockService {
       async (rows) => {
         for (const row of rows) {
           try {
-            const current: Record<string, unknown> = { ...(row.selectedMetadata ?? row.embeddedMetadata ?? {}) };
+            const current: Record<string, unknown> = { ...(normalizeBookDockMetadata(row.selectedMetadata ?? row.embeddedMetadata) ?? {}) };
 
             for (const field of enabledFields) {
               const value = (fields as Record<string, unknown>)[field];
@@ -188,7 +192,10 @@ export class BookDockService {
             skipped++;
             continue;
           }
-          await this.repo.update(row.id, { selectedMetadata: row.fetchedMetadata, metadataEditedAt: null });
+          await this.repo.update(row.id, {
+            selectedMetadata: normalizeBookDockMetadata(row.fetchedMetadata) ?? {},
+            metadataEditedAt: null,
+          });
           applied++;
         }
       },
@@ -488,13 +495,13 @@ function toDto(row: BookDockFileRow): BookDockFile {
     fileSize: row.fileSize ? Number(row.fileSize) : null,
     format: row.format,
     status: row.status as BookDockFile['status'],
-    embeddedMetadata: row.embeddedMetadata ?? null,
-    selectedMetadata: row.selectedMetadata ?? null,
-    fetchedMetadata: row.fetchedMetadata ?? null,
+    embeddedMetadata: normalizeBookDockMetadata(row.embeddedMetadata),
+    selectedMetadata: normalizeBookDockMetadata(row.selectedMetadata),
+    fetchedMetadata: normalizeBookDockMetadata(row.fetchedMetadata),
     targetLibraryId: row.targetLibraryId,
     targetFolderId: row.targetFolderId,
     confidence: row.confidence ?? null,
-    fetchedMetadataSources: row.fetchedMetadataSources ?? null,
+    fetchedMetadataSources: normalizeBookDockMetadataSources(row.fetchedMetadataSources),
     errorMessage: row.errorMessage,
     metadataEditedAt: row.metadataEditedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
