@@ -6060,10 +6060,10 @@
       },
       "deleteDialog": {
         "title": "Excluir livros duplicados permanentemente?",
-        "description": "This will permanently delete {count} selected book and its files. | This will permanently delete {count} selected book and its files. | This will permanently delete {count} selected books and their files.",
+        "description": "Isto irá excluir permanentemente o livro {count} selecionado e seus arquivos. This irá excluir permanentemente o livro selecionado do {count} e seus arquivos. £Isso irá apagar permanentemente os livros selecionados do {count} e seus arquivos.",
         "warning": "Metadados, coleções, leitura de dados e estado do dispositivo não são transferidos para o livro mantido. Dados associados para outros usuários também são removidos.",
         "confirm": "Excluir {count} livro? | Excluir {count} livro? | Excluir {count} livros",
-        "success": "No books deleted | One duplicate book deleted | {count} duplicate books deleted"
+        "success": "Nenhum livro foi deletado. Um livro duplicado foi excluído ™️ {count} livros duplicados excluídos"
       },
       "errors": {
         "start": "Não foi possível iniciar o escaneamento duplicado.",
