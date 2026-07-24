@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DisplayPreferences, LocalePreferences, ThemePreferences } from '@bookorbit/types';
+import type { Accent, DisplayPreferences, LocalePreferences, ThemePreferences } from '@bookorbit/types';
 
 import { UserPreferencesRepository } from './user-preferences.repository';
 import { UserPreferencesService } from './user-preferences.service';
@@ -12,6 +12,43 @@ const validThemePreferences: ThemePreferences = {
   background: 'vinyl',
   brightness: 35,
 };
+
+const addedAccentIds: readonly Accent[] = [
+  'scarlet',
+  'marigold',
+  'viridian',
+  'iris',
+  'rosewater',
+  'flax',
+  'foam',
+  'cornflower',
+  'vermilion',
+  'salmon',
+  'copper',
+  'sand',
+  'chartreuse',
+  'pear',
+  'wasabi',
+  'sprout',
+  'malachite',
+  'aloe',
+  'turquoise',
+  'aqua',
+  'acid-green',
+  'pistachio',
+  'electric-blue',
+  'baby-blue',
+  'ultramarine',
+  'bluebell',
+  'purple',
+  'thistle',
+  'amethyst',
+  'mauve',
+  'raspberry',
+  'rose-quartz',
+  'jade',
+  'sea-glass',
+];
 
 const validDisplayPreferences: DisplayPreferences = {
   portraitCoverSize: 180,
@@ -119,6 +156,13 @@ describe('UserPreferencesService', () => {
 
     await expect(service.upsertThemePreferences(11, systemThemePreferences)).resolves.toBeUndefined();
     expect(repo.upsert).toHaveBeenCalledWith(11, 'theme', systemThemePreferences);
+  });
+
+  it.each(addedAccentIds)('upsertThemePreferences accepts the %s accent', async (accent) => {
+    const preferences = { ...validThemePreferences, accent };
+
+    await expect(service.upsertThemePreferences(11, preferences)).resolves.toBeUndefined();
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'theme', preferences);
   });
 
   it('upsertThemePreferences rejects invalid theme ids', async () => {

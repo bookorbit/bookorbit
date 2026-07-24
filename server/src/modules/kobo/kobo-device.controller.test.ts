@@ -1,3 +1,6 @@
+import { RequestMethod } from '@nestjs/common';
+import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
+
 import { KoboDeviceController } from './kobo-device.controller';
 
 function makeReply() {
@@ -160,14 +163,34 @@ describe('KoboDeviceController', () => {
     expect(thumbnailService.serveThumbnail).toHaveBeenCalledWith(11, 420, undefined, reply);
   });
 
-  it('returns static payload endpoints and analytics keys', async () => {
+  it('returns static payload endpoints and ingests analytics events', async () => {
     expect(controller.affiliate()).toEqual({});
     expect(controller.remainingBookSeries()).toEqual({ TotalResultCount: 0, SearchResults: [] });
     expect(controller.productNextRead()).toEqual([]);
     analyticsService.ingest.mockResolvedValue(undefined);
     await expect(controller.analyticsEvent({ Events: [] }, { id: 3 } as never, { deviceToken: 't' } as never)).resolves.toEqual({});
     expect(analyticsService.ingest).toHaveBeenCalledWith({ Events: [] }, { id: 3 }, { deviceToken: 't' });
-    expect(controller.getTests()).toEqual({ Result: 'Success', TestKey: expect.any(String) });
+  });
+
+  it('registers GET and POST handlers for the advertised gettests endpoint', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, KoboDeviceController.prototype.getTests)).toBe('v1/analytics/gettests');
+    expect(Reflect.getMetadata(METHOD_METADATA, KoboDeviceController.prototype.getTests)).toBe(RequestMethod.GET);
+    expect(Reflect.getMetadata(PATH_METADATA, KoboDeviceController.prototype.postGetTests)).toBe('v1/analytics/gettests');
+    expect(Reflect.getMetadata(METHOD_METADATA, KoboDeviceController.prototype.postGetTests)).toBe(RequestMethod.POST);
+  });
+
+  it.each([
+    ['GET', () => controller.getTests()],
+    ['POST', () => controller.postGetTests()],
+  ])('returns a Kobo-compatible success payload for %s gettests requests', (_method, request) => {
+    const response = request();
+
+    expect(response).toEqual({
+      Result: 'Success',
+      TestKey: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
+      Tests: {},
+    });
+    expect(proxyService.forward).not.toHaveBeenCalled();
   });
 
   it('returns {} when analytics ingest throws', async () => {

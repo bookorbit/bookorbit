@@ -76,7 +76,7 @@ const { hasUnseen: hasUnseenWhatsNew } = useWhatsNew()
 const themeStore = useThemeStore()
 const localeStore = useLocaleStore()
 const languageOptions = SUPPORTED_LOCALES.map((id) => ({ id, label: LOCALE_LABELS[id] }))
-const documentationUrl = 'https://bookorbit.app/what-is-bookorbit.html'
+const documentationUrl = 'https://bookorbit.app/what-is-bookorbit'
 const githubRepositoryUrl = 'https://github.com/bookorbit/bookorbit'
 const githubStarPopoverOpen = ref(false)
 

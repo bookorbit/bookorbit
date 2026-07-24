@@ -55,8 +55,15 @@ package.loaded["logger"] = {
     warn = function() end,
 }
 package.loaded["ffi/util"] = {
-    template = function(text)
-        return text
+    template = function(value, ...)
+        local result = value
+        for index = 1, select("#", ...) do
+            local replacement = tostring(select(index, ...))
+            result = result:gsub("%%" .. index, function()
+                return replacement
+            end)
+        end
+        return result
     end,
 }
 local made_paths = {}

@@ -3,7 +3,7 @@ import { ModuleRef } from '@nestjs/core';
 import { access as fsAccess, stat } from 'fs/promises';
 import { basename, dirname, extname, join, relative } from 'path';
 import { Readable } from 'stream';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { formatSeriesIndex } from '../../common/utils/series-index-format.utils';
@@ -27,6 +27,8 @@ import { parsePdfFile, type PdfParseWarning } from '../metadata/lib/pdf-parser';
 import { computeFileHash } from '../scanner/lib/hash';
 
 type Db = NodePgDatabase<typeof schema>;
+
+type PrimaryFileCandidate = Pick<typeof bookFiles.$inferSelect, 'id' | 'format' | 'sizeBytes'>;
 
 @Injectable()
 export class UploadService {
@@ -127,8 +129,6 @@ export class UploadService {
         folderPath: books.folderPath,
         libraryId: books.libraryId,
         libraryFolderId: books.libraryFolderId,
-        primaryFileId: books.primaryFileId,
-        status: books.status,
         allowedFormats: libraries.allowedFormats,
         organizationMode: libraries.organizationMode,
         libraryFolderPath: libraryFolders.path,
@@ -190,48 +190,75 @@ export class UploadService {
       const ino = fileStat.ino;
       const relPath = relative(bookRow.libraryFolderPath, destination);
 
-      const [inserted] = await this.db
-        .insert(bookFiles)
-        .values({
-          bookId,
-          libraryFolderId: bookRow.libraryFolderId,
-          absolutePath: destination,
-          relPath,
-          ino,
-          sizeBytes,
-          mtime: fileStat.mtime,
-          fileHash,
-          format,
-          role: 'content',
-        })
-        .returning({
-          id: bookFiles.id,
-          format: bookFiles.format,
-          role: bookFiles.role,
-          sizeBytes: bookFiles.sizeBytes,
-          absolutePath: bookFiles.absolutePath,
-          createdAt: bookFiles.createdAt,
-          durationSeconds: bookFiles.durationSeconds,
-        });
-
-      if (!inserted) throw new Error('Failed to insert book file record');
-
-      let finalStatus = bookRow.status;
-      const needsPrimaryPromotion = bookRow.primaryFileId === null;
-      const needsStatusUpdate = bookRow.status === 'missing';
-
-      if (needsPrimaryPromotion || needsStatusUpdate) {
-        await this.db
-          .update(books)
-          .set({
-            ...(needsPrimaryPromotion ? { primaryFileId: inserted.id } : {}),
-            ...(needsStatusUpdate ? { status: 'present' } : {}),
-            updatedAt: new Date(),
+      const { inserted, isPrimary, finalStatus } = await this.db.transaction(async (tx) => {
+        const [lockedBook] = await tx
+          .select({
+            primaryFileId: books.primaryFileId,
+            status: books.status,
+            formatPriority: libraries.formatPriority,
           })
-          .where(eq(books.id, bookId));
+          .from(books)
+          .innerJoin(libraries, eq(books.libraryId, libraries.id))
+          .where(eq(books.id, bookId))
+          .for('update', { of: books })
+          .limit(1);
 
-        if (needsStatusUpdate) finalStatus = 'present';
-      }
+        if (!lockedBook) throw new NotFoundException(`Book ${bookId} not found`);
+
+        const [inserted] = await tx
+          .insert(bookFiles)
+          .values({
+            bookId,
+            libraryFolderId: bookRow.libraryFolderId,
+            absolutePath: destination,
+            relPath,
+            ino,
+            sizeBytes,
+            mtime: fileStat.mtime,
+            fileHash,
+            format,
+            role: 'content',
+          })
+          .returning({
+            id: bookFiles.id,
+            format: bookFiles.format,
+            role: bookFiles.role,
+            sizeBytes: bookFiles.sizeBytes,
+            absolutePath: bookFiles.absolutePath,
+            createdAt: bookFiles.createdAt,
+            durationSeconds: bookFiles.durationSeconds,
+          });
+
+        if (!inserted) throw new Error('Failed to insert book file record');
+
+        const contentFiles = await tx
+          .select({ id: bookFiles.id, format: bookFiles.format, sizeBytes: bookFiles.sizeBytes })
+          .from(bookFiles)
+          .where(and(eq(bookFiles.bookId, bookId), eq(bookFiles.role, 'content')))
+          .orderBy(asc(bookFiles.id));
+
+        const winner = this.pickPrimaryFile(contentFiles, lockedBook.primaryFileId, lockedBook.formatPriority);
+        const nextPrimaryFileId = winner?.id ?? null;
+        const needsPrimaryUpdate = nextPrimaryFileId !== lockedBook.primaryFileId;
+        const needsStatusUpdate = lockedBook.status === 'missing';
+
+        if (needsPrimaryUpdate || needsStatusUpdate) {
+          await tx
+            .update(books)
+            .set({
+              ...(needsPrimaryUpdate ? { primaryFileId: nextPrimaryFileId } : {}),
+              ...(needsStatusUpdate ? { status: 'present' } : {}),
+              updatedAt: new Date(),
+            })
+            .where(eq(books.id, bookId));
+        }
+
+        return {
+          inserted,
+          isPrimary: inserted.id === nextPrimaryFileId,
+          finalStatus: needsStatusUpdate ? 'present' : lockedBook.status,
+        };
+      });
 
       this.processor.extractAudioDurationAsync(bookId, destination, format);
 
@@ -242,7 +269,7 @@ export class UploadService {
       return {
         id: inserted.id,
         format: inserted.format,
-        role: needsPrimaryPromotion ? 'primary' : inserted.role,
+        role: isPrimary ? 'primary' : inserted.role,
         sizeBytes: inserted.sizeBytes,
         absolutePath: inserted.absolutePath,
         createdAt: inserted.createdAt.toISOString(),
@@ -262,6 +289,18 @@ export class UploadService {
       ]);
       throw err;
     }
+  }
+
+  private pickPrimaryFile(files: PrimaryFileCandidate[], currentPrimaryFileId: number | null, formatPriority: string[]): PrimaryFileCandidate | null {
+    const candidates = files.filter((file) => (file.sizeBytes ?? 0) > 0);
+    if (candidates.length === 0) return null;
+
+    const currentPrimary = candidates.find((file) => file.id === currentPrimaryFileId) ?? null;
+    const preferredFormat = formatPriority.find((candidateFormat) => candidates.some((file) => file.format === candidateFormat));
+
+    if (preferredFormat === undefined) return currentPrimary ?? candidates[0] ?? null;
+    if (currentPrimary?.format === preferredFormat) return currentPrimary;
+    return candidates.find((file) => file.format === preferredFormat) ?? null;
   }
 
   async renameBookFiles(bookId: number, user: RequestUser): Promise<void> {

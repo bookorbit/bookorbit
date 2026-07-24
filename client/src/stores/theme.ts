@@ -13,7 +13,7 @@ import {
 } from '@bookorbit/types'
 import { storage } from '@/services/storage'
 
-export { ACCENT_VIVID, ACCENT_PASTEL, ACCENT_OPTIONS } from '@/lib/theme-accent-meta'
+export { ACCENT_VIVID, ACCENT_PASTEL, ACCENT_OPTIONS, ACCENT_PAIRS, ACCENT_ROWS } from '@/lib/theme-accent-meta'
 
 export const RADIUS_OPTIONS: { id: Radius; label: string }[] = [
   { id: 'sharp', label: 'Sharp' },

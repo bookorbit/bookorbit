@@ -119,10 +119,16 @@ export class KoboDeviceController {
     return [];
   }
 
-  @Post('v1/analytics/gettests')
+  @Get('v1/analytics/gettests')
   @HttpCode(HttpStatus.OK)
   getTests() {
-    return { Result: 'Success', TestKey: randomUUID() };
+    return this.buildGetTestsResponse();
+  }
+
+  @Post('v1/analytics/gettests')
+  @HttpCode(HttpStatus.OK)
+  postGetTests() {
+    return this.buildGetTestsResponse();
   }
 
   @Post('v1/analytics/event')
@@ -141,6 +147,10 @@ export class KoboDeviceController {
   async proxy(@KoboDevice() device: KoboDeviceContext, @Req() req: FastifyRequest, @Res() reply: FastifyReply) {
     this.logger.log(`proxy: ${req.method} ${req.url}`);
     await this.proxyService.forward(req, reply, device.deviceToken);
+  }
+
+  private buildGetTestsResponse() {
+    return { Result: 'Success', TestKey: randomUUID(), Tests: {} };
   }
 
   private async serveThumbnailOrProxy(
