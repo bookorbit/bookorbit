@@ -105,7 +105,7 @@ docker compose up -d
 
 Open `http://your-server-ip:3000` and complete setup using your `SETUP_BOOTSTRAP_TOKEN`.
 
-For the full installation guide including reverse proxy setup, file permissions on NAS, external databases, and environment variable reference, see **[bookorbit.app/installation](https://bookorbit.app/installation.html)**.
+For the full installation guide including reverse proxy setup, file permissions on NAS, external databases, and environment variable reference, see **[bookorbit.app/installation](https://bookorbit.app/installation)**.
 
 ---
 
@@ -119,13 +119,13 @@ The BookOrbit plugin for KOReader adds progress sync, two-way annotation sync, a
 4. Restart KOReader and open a book.
 5. Use **Tools > BookOrbit Sync** to connect.
 
-The download is pre-configured with your server URL and credentials; no manual entry on the device. For full setup and sync options, see **[bookorbit.app/koreader-plugin](https://bookorbit.app/koreader-plugin.html)**.
+The download is pre-configured with your server URL and credentials; no manual entry on the device. For full setup and sync options, see **[bookorbit.app/koreader-plugin](https://bookorbit.app/koreader-plugin)**.
 
 ---
 
 ## Documentation and Contributing
 
-Full documentation is at **[bookorbit.app](https://bookorbit.app/what-is-bookorbit.html)** - covering libraries, metadata, readers, Kobo sync, OPDS, users and permissions, OIDC setup, and more.
+Full documentation is at **[bookorbit.app](https://bookorbit.app/what-is-bookorbit)** - covering libraries, metadata, readers, Kobo sync, OPDS, users and permissions, OIDC setup, and more.
 
 For local development, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). To contribute, see [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for the full workflow: branch naming, test expectations, PR checklist, and commit format.
 

@@ -109,8 +109,14 @@ vi.mock('@/composables/useDisplaySettingsSync', () => ({
 }))
 
 vi.mock('@/stores/theme', () => ({
-  ACCENT_VIVID: [{ id: 'blue', label: 'Blue', color: '#0000ff' }],
-  ACCENT_PASTEL: [{ id: 'grey', label: 'Grey', color: '#999999' }],
+  ACCENT_VIVID: [{ id: 'blue', label: 'Blue', labelKey: 'settings.appearance.theme.accents.blue', color: '#0000ff' }],
+  ACCENT_PASTEL: [{ id: 'grey', label: 'Grey', labelKey: 'settings.appearance.theme.accents.grey', color: '#999999' }],
+  ACCENT_ROWS: [
+    [{ id: 'blue', label: 'Blue', labelKey: 'settings.appearance.theme.accents.blue', color: '#0000ff' }],
+    [{ id: 'grey', label: 'Grey', labelKey: 'settings.appearance.theme.accents.grey', color: '#999999' }],
+    [],
+    [],
+  ],
   RADIUS_OPTIONS: [{ id: 'rounded', label: 'Rounded', className: 'rounded-lg' }],
   BACKGROUND_OPTIONS: [{ id: 'vinyl', label: 'Vinyl', cssClass: 'bg-muted' }],
   useThemeStore: () => themeStore,

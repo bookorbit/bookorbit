@@ -195,6 +195,18 @@
     "file": "server/src/modules/kobo/kobo-device.controller.ts",
     "className": "KoboDeviceController",
     "methodName": "getTests",
+    "httpMethod": "GET",
+    "path": "/kobo/:deviceToken/v1/analytics/gettests",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": ["KoboTokenGuard"]
+  },
+  {
+    "file": "server/src/modules/kobo/kobo-device.controller.ts",
+    "className": "KoboDeviceController",
+    "methodName": "postGetTests",
     "httpMethod": "POST",
     "path": "/kobo/:deviceToken/v1/analytics/gettests",
     "permissions": [],

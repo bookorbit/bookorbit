@@ -38,6 +38,30 @@ local function sanitizeDevicePath(device_path)
     return table.concat(segments, "/")
 end
 
+local function joinDownloadPath(download_dir, relative_path)
+    return (download_dir ~= "/" and download_dir or "") .. "/" .. relative_path
+end
+
+local function resolveRelativeDownloadPath(download_dir, filename, filetype, device_path, filename_override)
+    local relative = sanitizeDevicePath(device_path)
+    if relative and not filename_override then return relative end
+
+    local parent = relative and relative:match("^(.*)/[^/]+$")
+    local safe_filename = util.getSafeFilename(filename .. "." .. string.lower(filetype or "bin"), download_dir)
+    return parent and parent ~= "" and parent .. "/" .. safe_filename or safe_filename
+end
+
+local function splitDownloadPreview(download_dir, relative_path, filetype)
+    local parent, filename = relative_path:match("^(.*)/([^/]+)$")
+    local folder = parent and parent ~= "" and joinDownloadPath(download_dir, parent) or download_dir
+    filename = filename or relative_path
+    local extension = "." .. string.lower(filetype or "bin")
+    if filename:sub(-#extension):lower() == extension then
+        filename = filename:sub(1, #filename - #extension)
+    end
+    return folder, filename
+end
+
 function CatalogDownload.install(Catalog)
     function Catalog:showFileChoices(detail)
         local files = self:supportedFiles(detail)
@@ -88,17 +112,18 @@ function CatalogDownload.install(Catalog)
         return G_reader_settings:readSetting("download_dir") or G_reader_settings:readSetting("lastdir")
     end
 
-    function Catalog:getLocalDownloadPath(filename, filetype, device_path)
+    function Catalog:getLocalDownloadPath(filename, filetype, device_path, filename_override)
         local download_dir = self:getCurrentDownloadDir()
-        local relative = sanitizeDevicePath(device_path)
-        if relative then
-            local parent = relative:match("^(.*)/[^/]+$")
-            if parent and parent ~= "" then util.makePath(download_dir .. "/" .. parent) end
-            return (download_dir ~= "/" and download_dir or "") .. "/" .. relative
-        end
-        filename = filename .. "." .. string.lower(filetype or "bin")
-        filename = util.getSafeFilename(filename, download_dir)
-        return (download_dir ~= "/" and download_dir or "") .. "/" .. filename
+        local relative = resolveRelativeDownloadPath(download_dir, filename, filetype, device_path, filename_override)
+        local parent = relative:match("^(.*)/[^/]+$")
+        if parent and parent ~= "" then util.makePath(joinDownloadPath(download_dir, parent)) end
+        return joinDownloadPath(download_dir, relative)
+    end
+
+    function Catalog:getLocalDownloadPreview(filename, filetype, device_path, filename_override)
+        local download_dir = self:getCurrentDownloadDir()
+        local relative = resolveRelativeDownloadPath(download_dir, filename, filetype, device_path, filename_override)
+        return splitDownloadPreview(download_dir, relative, filetype)
     end
 
     function Catalog:downloadDefaultFile(detail, file)
@@ -141,9 +166,13 @@ function CatalogDownload.install(Catalog)
         UIManager:show(dialog)
     end
 
-    function Catalog:showDownloadDialog(detail, file)
-        local filename = safeFilenameBase(detail)
+    function Catalog:showDownloadDialog(detail, file, initial_filename_override)
+        local filename = initial_filename_override or safeFilenameBase(detail)
         local filetype = string.lower(file.format or "bin")
+        local filename_overridden = initial_filename_override ~= nil
+
+        local folder
+        folder, filename = self:getLocalDownloadPreview(filename, filetype, file.devicePath, filename_overridden)
 
         local function createTitle(path, name)
             return T(_("Download folder:\n%1\n\nDownload filename:\n%2\n\nDownload file type:\n%3"),
@@ -152,14 +181,14 @@ function CatalogDownload.install(Catalog)
 
         local dialog
         dialog = ButtonDialog:new{
-            title = createTitle(self:getCurrentDownloadDir(), filename),
+            title = createTitle(folder, filename),
             buttons = {
                 {
                     {
                         text = _("Download"),
                         callback = function()
                             UIManager:close(dialog)
-                            local local_path = self:getLocalDownloadPath(filename, filetype, file.devicePath)
+                            local local_path = self:getLocalDownloadPath(filename, filetype, file.devicePath, filename_overridden)
                             self:checkDownloadFile(local_path, detail, file)
                         end,
                     },
@@ -179,7 +208,7 @@ function CatalogDownload.install(Catalog)
                                     end
                                     G_reader_settings:saveSetting("download_dir", path)
                                     UIManager:nextTick(function()
-                                        self:showDownloadDialog(detail, file)
+                                        self:showDownloadDialog(detail, file, filename_overridden and filename or nil)
                                     end)
                                 end,
                             }:chooseDir(self:getCurrentDownloadDir())
@@ -206,9 +235,12 @@ function CatalogDownload.install(Catalog)
                                             is_enter_default = true,
                                             callback = function()
                                                 local value = util.trim(input_dialog:getInputText() or "")
-                                                if value ~= "" then filename = value end
+                                                if value ~= "" then
+                                                    filename_overridden = true
+                                                    folder, filename = self:getLocalDownloadPreview(value, filetype, file.devicePath, true)
+                                                end
                                                 UIManager:close(input_dialog)
-                                                dialog:setTitle(createTitle(self:getCurrentDownloadDir(), filename))
+                                                dialog:setTitle(createTitle(folder, filename))
                                             end,
                                         },
                                     },

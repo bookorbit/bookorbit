@@ -17,6 +17,7 @@ import { extractCbzMetadata } from '../metadata/lib/cbz-metadata';
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
 import { parsePdfFile } from '../metadata/lib/pdf-parser';
 import { computeFileHash } from '../scanner/lib/hash';
+import { books } from '../../db/schema';
 
 import { UploadService } from './upload.service';
 
@@ -41,16 +42,44 @@ function selectChain(rows: unknown[]) {
   };
 }
 
+function lockedBookSelectChain(rows: unknown[], forUpdateMock: ReturnType<typeof vi.fn>) {
+  const limitMock = vi.fn().mockResolvedValue(rows);
+  forUpdateMock.mockReturnValue({ limit: limitMock });
+  const whereMock = vi.fn().mockReturnValue({ for: forUpdateMock });
+  const joinMock = vi.fn().mockReturnValue({ where: whereMock });
+
+  return {
+    from: vi.fn().mockReturnValue({ innerJoin: joinMock }),
+  };
+}
+
+function contentFilesSelectChain(rows: unknown[]) {
+  const orderByMock = vi.fn().mockResolvedValue(rows);
+  const whereMock = vi.fn().mockReturnValue({ orderBy: orderByMock });
+
+  return {
+    from: vi.fn().mockReturnValue({ where: whereMock }),
+  };
+}
+
 describe('UploadService', () => {
   const insertReturning = vi.fn();
   const insertValues = vi.fn();
   const updateSet = vi.fn();
   const updateWhere = vi.fn();
+  const forUpdate = vi.fn();
+
+  const tx = {
+    select: vi.fn(),
+    insert: vi.fn(),
+    update: vi.fn(),
+  };
 
   const db = {
     select: vi.fn(),
     insert: vi.fn(() => ({ values: insertValues })),
     update: vi.fn(() => ({ set: updateSet })),
+    transaction: vi.fn(),
   };
 
   const appSettings = { getUploadPattern: vi.fn(), getUploadPatternBookPerFolder: vi.fn(), isCrossPlatformPathSanitizationEnabled: vi.fn() };
@@ -107,6 +136,9 @@ describe('UploadService', () => {
     mockExtractEpubMetadata.mockResolvedValue(null);
 
     // addFileToBook defaults
+    tx.insert.mockReturnValue({ values: insertValues });
+    tx.update.mockReturnValue({ set: updateSet });
+    db.transaction.mockImplementation((callback) => callback(tx));
     insertValues.mockReturnValue({ returning: insertReturning });
     insertReturning.mockResolvedValue([
       {
@@ -121,6 +153,14 @@ describe('UploadService', () => {
     ]);
     updateSet.mockReturnValue({ where: updateWhere });
     updateWhere.mockResolvedValue(undefined);
+    tx.select
+      .mockReturnValueOnce(lockedBookSelectChain([{ primaryFileId: 99, status: 'present', formatPriority: ['epub', 'm4b', 'mp3'] }], forUpdate))
+      .mockReturnValueOnce(
+        contentFilesSelectChain([
+          { id: 55, format: 'epub', sizeBytes: 456 },
+          { id: 99, format: 'epub', sizeBytes: 1000 },
+        ]),
+      );
     mockComputeFileHash.mockResolvedValue('hash-abc');
     mockStat.mockResolvedValue({ ino: 12345n, mtime: new Date('2025-01-01') } as any);
   });
@@ -735,6 +775,32 @@ describe('UploadService', () => {
       return selectChain([]);
     }
 
+    function mockElection(
+      lockedBook: { primaryFileId: number | null; status: string; formatPriority: string[] },
+      files: Array<{ id: number; format: string | null; sizeBytes: number | null }>,
+    ) {
+      tx.select
+        .mockReset()
+        .mockReturnValueOnce(lockedBookSelectChain([lockedBook], forUpdate))
+        .mockReturnValueOnce(contentFilesSelectChain(files));
+    }
+
+    function mockUploadedFormat(format: string, filename = `book.${format}`) {
+      validator.sanitizeFilename.mockReturnValue(filename);
+      validator.validateFormat.mockReturnValue(format);
+      insertReturning.mockResolvedValue([
+        {
+          id: 55,
+          format,
+          role: 'content',
+          sizeBytes: 456,
+          absolutePath: `/library/Book Title/${filename}`,
+          createdAt: new Date('2025-01-01'),
+          durationSeconds: null,
+        },
+      ]);
+    }
+
     it('adds a file successfully to an existing book with a primary file', async () => {
       db.select.mockReturnValueOnce(selectJoinChain([makeBookRow()])).mockReturnValueOnce(noHashConflict());
 
@@ -742,11 +808,140 @@ describe('UploadService', () => {
 
       expect(storage.streamToTemp).toHaveBeenCalled();
       expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/upload.bin', '/library/Book Title/book.epub');
-      expect(db.insert).toHaveBeenCalled();
+      expect(db.transaction).toHaveBeenCalledTimes(1);
+      expect(forUpdate).toHaveBeenCalledWith('update', { of: books });
+      expect(tx.insert).toHaveBeenCalled();
       expect(result.filename).toBe('book.epub');
       expect(result.format).toBe('epub');
       expect(result.bookStatus).toBe('present');
       expect(result.role).toBe('content');
+    });
+
+    it.each([
+      {
+        name: 'promotes a higher-priority EPUB over the existing M4B',
+        currentFormat: 'm4b',
+        uploadedFormat: 'epub',
+        formatPriority: ['epub', 'm4b'],
+        expectedPrimaryFileId: 55,
+      },
+      {
+        name: 'retains a higher-priority EPUB when an M4B is added',
+        currentFormat: 'epub',
+        uploadedFormat: 'm4b',
+        formatPriority: ['epub', 'm4b'],
+        expectedPrimaryFileId: 99,
+      },
+      {
+        name: 'honors a custom priority that places M4B above EPUB',
+        currentFormat: 'epub',
+        uploadedFormat: 'm4b',
+        formatPriority: ['m4b', 'epub'],
+        expectedPrimaryFileId: 55,
+      },
+      {
+        name: 'promotes a listed format over an unlisted current format',
+        currentFormat: 'm4b',
+        uploadedFormat: 'epub',
+        formatPriority: ['epub'],
+        expectedPrimaryFileId: 55,
+      },
+      {
+        name: 'retains a listed current format over an unlisted upload',
+        currentFormat: 'epub',
+        uploadedFormat: 'm4b',
+        formatPriority: ['epub'],
+        expectedPrimaryFileId: 99,
+      },
+      {
+        name: 'retains the current primary when both formats are unlisted',
+        currentFormat: 'm4b',
+        uploadedFormat: 'epub',
+        formatPriority: [],
+        expectedPrimaryFileId: 99,
+      },
+      {
+        name: 'retains the current primary when another file of the same audio format is added',
+        currentFormat: 'mp3',
+        uploadedFormat: 'mp3',
+        formatPriority: ['epub', 'mp3'],
+        expectedPrimaryFileId: 99,
+      },
+    ])('$name', async ({ currentFormat, uploadedFormat, formatPriority, expectedPrimaryFileId }) => {
+      mockUploadedFormat(uploadedFormat);
+      db.select.mockReturnValueOnce(selectJoinChain([makeBookRow()])).mockReturnValueOnce(noHashConflict());
+      mockElection({ primaryFileId: 99, status: 'present', formatPriority }, [
+        { id: 55, format: uploadedFormat, sizeBytes: 456 },
+        { id: 99, format: currentFormat, sizeBytes: 1000 },
+      ]);
+
+      const result = await service.addFileToBook(10, `book.${uploadedFormat}`, {} as any, user);
+
+      expect(insertValues).toHaveBeenCalledWith(expect.objectContaining({ format: uploadedFormat, role: 'content' }));
+      if (expectedPrimaryFileId === 55) {
+        expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ primaryFileId: 55 }));
+        expect(result.role).toBe('primary');
+      } else {
+        expect(tx.update).not.toHaveBeenCalled();
+        expect(result.role).toBe('content');
+      }
+    });
+
+    it('elects an existing higher-priority file when the book has no primary', async () => {
+      mockUploadedFormat('m4b');
+      db.select.mockReturnValueOnce(selectJoinChain([makeBookRow({ primaryFileId: null })])).mockReturnValueOnce(noHashConflict());
+      mockElection({ primaryFileId: null, status: 'present', formatPriority: ['epub', 'm4b'] }, [
+        { id: 10, format: 'epub', sizeBytes: 1000 },
+        { id: 55, format: 'm4b', sizeBytes: 456 },
+      ]);
+
+      const result = await service.addFileToBook(10, 'book.m4b', {} as any, user);
+
+      expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ primaryFileId: 10 }));
+      expect(result.role).toBe('content');
+    });
+
+    it('repairs a stale primary reference using the highest-priority eligible file', async () => {
+      mockUploadedFormat('m4b');
+      db.select.mockReturnValueOnce(selectJoinChain([makeBookRow({ primaryFileId: 777 })])).mockReturnValueOnce(noHashConflict());
+      mockElection({ primaryFileId: 777, status: 'present', formatPriority: ['pdf', 'm4b'] }, [
+        { id: 10, format: 'pdf', sizeBytes: 1000 },
+        { id: 55, format: 'm4b', sizeBytes: 456 },
+      ]);
+
+      const result = await service.addFileToBook(10, 'book.m4b', {} as any, user);
+
+      expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ primaryFileId: 10 }));
+      expect(result.role).toBe('content');
+    });
+
+    it('ignores a zero-byte higher-priority legacy file during election', async () => {
+      mockUploadedFormat('pdf');
+      db.select.mockReturnValueOnce(selectJoinChain([makeBookRow()])).mockReturnValueOnce(noHashConflict());
+      mockElection({ primaryFileId: 99, status: 'present', formatPriority: ['epub', 'pdf', 'm4b'] }, [
+        { id: 10, format: 'epub', sizeBytes: 0 },
+        { id: 55, format: 'pdf', sizeBytes: 456 },
+        { id: 99, format: 'm4b', sizeBytes: 1000 },
+      ]);
+
+      const result = await service.addFileToBook(10, 'book.pdf', {} as any, user);
+
+      expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ primaryFileId: 55 }));
+      expect(result.role).toBe('primary');
+    });
+
+    it('updates status and primary file together when a higher-priority format restores a missing book', async () => {
+      db.select.mockReturnValueOnce(selectJoinChain([makeBookRow({ status: 'missing' })])).mockReturnValueOnce(noHashConflict());
+      mockElection({ primaryFileId: 99, status: 'missing', formatPriority: ['epub', 'm4b'] }, [
+        { id: 55, format: 'epub', sizeBytes: 456 },
+        { id: 99, format: 'm4b', sizeBytes: 1000 },
+      ]);
+
+      const result = await service.addFileToBook(10, 'book.epub', {} as any, user);
+
+      expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ primaryFileId: 55, status: 'present' }));
+      expect(result.bookStatus).toBe('present');
+      expect(result.role).toBe('primary');
     });
 
     it('kicks off per-file audio duration extraction for an added audio file', async () => {
@@ -769,30 +964,40 @@ describe('UploadService', () => {
 
     it('promotes new file to primary when book has no primary file', async () => {
       db.select.mockReturnValueOnce(selectJoinChain([makeBookRow({ primaryFileId: null })])).mockReturnValueOnce(noHashConflict());
+      mockElection({ primaryFileId: null, status: 'present', formatPriority: ['epub', 'm4b'] }, [{ id: 55, format: 'epub', sizeBytes: 456 }]);
 
       const result = await service.addFileToBook(10, 'book.epub', {} as any, user);
 
-      expect(db.update).toHaveBeenCalled();
+      expect(tx.update).toHaveBeenCalled();
+      expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ primaryFileId: 55 }));
       expect(updateWhere).toHaveBeenCalled();
       expect(result.role).toBe('primary');
     });
 
     it('updates book status from missing to present and promotes primary when null', async () => {
       db.select.mockReturnValueOnce(selectJoinChain([makeBookRow({ primaryFileId: null, status: 'missing' })])).mockReturnValueOnce(noHashConflict());
+      mockElection({ primaryFileId: null, status: 'missing', formatPriority: ['epub', 'm4b'] }, [{ id: 55, format: 'epub', sizeBytes: 456 }]);
 
       const result = await service.addFileToBook(10, 'book.epub', {} as any, user);
 
-      expect(db.update).toHaveBeenCalled();
+      expect(tx.update).toHaveBeenCalled();
+      expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ primaryFileId: 55, status: 'present' }));
       expect(result.bookStatus).toBe('present');
       expect(result.role).toBe('primary');
     });
 
     it('updates only status when book is missing but already has a primary file', async () => {
       db.select.mockReturnValueOnce(selectJoinChain([makeBookRow({ primaryFileId: 42, status: 'missing' })])).mockReturnValueOnce(noHashConflict());
+      mockElection({ primaryFileId: 42, status: 'missing', formatPriority: ['epub', 'm4b'] }, [
+        { id: 42, format: 'epub', sizeBytes: 1000 },
+        { id: 55, format: 'epub', sizeBytes: 456 },
+      ]);
 
       const result = await service.addFileToBook(10, 'book.epub', {} as any, user);
 
-      expect(db.update).toHaveBeenCalled();
+      expect(tx.update).toHaveBeenCalled();
+      expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ status: 'present' }));
+      expect(updateSet.mock.calls[0]?.[0]).not.toHaveProperty('primaryFileId');
       expect(result.bookStatus).toBe('present');
       expect(result.role).toBe('content');
     });
@@ -802,7 +1007,7 @@ describe('UploadService', () => {
 
       await service.addFileToBook(10, 'book.epub', {} as any, user);
 
-      expect(db.update).not.toHaveBeenCalled();
+      expect(tx.update).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException when book does not exist', async () => {
@@ -810,6 +1015,18 @@ describe('UploadService', () => {
 
       await expect(service.addFileToBook(999, 'book.epub', {} as any, user)).rejects.toBeInstanceOf(NotFoundException);
       expect(storage.streamToTemp).not.toHaveBeenCalled();
+    });
+
+    it('does not insert when the book is deleted while the file is being uploaded', async () => {
+      db.select.mockReturnValueOnce(selectJoinChain([makeBookRow()])).mockReturnValueOnce(noHashConflict());
+      tx.select.mockReset().mockReturnValueOnce(lockedBookSelectChain([], forUpdate));
+
+      await expect(service.addFileToBook(10, 'book.epub', {} as any, user)).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(forUpdate).toHaveBeenCalledWith('update', { of: books });
+      expect(tx.insert).not.toHaveBeenCalled();
+      expect(storage.cleanup).toHaveBeenCalledWith('/tmp/upload.bin');
+      expect(storage.cleanup).not.toHaveBeenCalledWith('/library/Book Title/book.epub');
     });
 
     it('throws ForbiddenException when user has no library access', async () => {
@@ -867,6 +1084,21 @@ describe('UploadService', () => {
       insertReturning.mockRejectedValue(new Error('DB error'));
 
       await expect(service.addFileToBook(10, 'book.epub', {} as any, user)).rejects.toThrow('DB error');
+      expect(storage.cleanup).toHaveBeenCalledWith('/tmp/upload.bin');
+      expect(storage.cleanup).not.toHaveBeenCalledWith('/library/Book Title/book.epub');
+    });
+
+    it('does not dispatch processing when the primary election update fails', async () => {
+      db.select.mockReturnValueOnce(selectJoinChain([makeBookRow()])).mockReturnValueOnce(noHashConflict());
+      mockElection({ primaryFileId: 99, status: 'present', formatPriority: ['epub', 'm4b'] }, [
+        { id: 55, format: 'epub', sizeBytes: 456 },
+        { id: 99, format: 'm4b', sizeBytes: 1000 },
+      ]);
+      updateWhere.mockRejectedValue(new Error('primary update failed'));
+
+      await expect(service.addFileToBook(10, 'book.epub', {} as any, user)).rejects.toThrow('primary update failed');
+
+      expect(processor.extractAudioDurationAsync).not.toHaveBeenCalled();
       expect(storage.cleanup).toHaveBeenCalledWith('/tmp/upload.bin');
       expect(storage.cleanup).not.toHaveBeenCalledWith('/library/Book Title/book.epub');
     });
