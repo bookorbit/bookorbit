@@ -108,6 +108,18 @@ describe('KOReader plugin update source wiring', () => {
     expect(dashboard).not.toContain('catalog_dashboard_max_height');
   });
 
+  it('renders the canonical account reading streak on the device dashboard', async () => {
+    const dashboard = await readPluginFile('bookorbit_catalog_dashboard.lua');
+    const catalogUtil = await readPluginFile('bookorbit_catalog_util.lua');
+
+    expect(catalogUtil).toContain('function CatalogUtil.readingStreakDays(dashboard, fallback)');
+    expect(catalogUtil).toContain('dashboard and dashboard.readingStreak');
+    expect(catalogUtil).toContain('reading_streak and tonumber(reading_streak.currentStreak)');
+    expect(dashboard).toContain('local streak_days = readingStreakDays(dashboard, summary.streak_days)');
+    expect(dashboard).toContain('{ value = tostring(streak_days), label = _("Day streak") }');
+    expect(dashboard).not.toContain('{ value = tostring(summary.streak_days or 0), label = _("Day streak") }');
+  });
+
   it('uses tall detail space for measured related-book grids', async () => {
     const detail = await readPluginFile('bookorbit_catalog_detail.lua');
 

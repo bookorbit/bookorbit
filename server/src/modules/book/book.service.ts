@@ -49,6 +49,7 @@ import type {
   BookWriteAndRenameResult,
   BooksPage,
   FileRenameResult,
+  GroupRule,
   JumpBucketsResponse,
   JumpBucketsQuery,
   MetadataFetchDiagnostics,
@@ -93,6 +94,10 @@ import { UpdatePersonalNoteDto } from './dto/update-personal-note.dto';
 import type { UpdateBookMetadataAndLocksDto } from './dto/update-book-metadata-and-locks.dto';
 import { buildBookDetailSupplementalFields } from './utils/build-book-detail-supplemental-fields';
 import type { SetStatusDto } from '../user-book-status/dto/set-status.dto';
+
+type SeriesCollapseQueryOptions = {
+  seriesSelectionFilter: GroupRule | undefined;
+};
 
 const METADATA_UPDATE_FAILPOINTS = [
   'afterScalarUpdate',
@@ -1033,10 +1038,16 @@ export class BookService {
     return this.executeBooksQuery(user.id, where, query);
   }
 
-  async executeBooksQuery(userId: number, where: SQL | undefined, query: BookQuery): Promise<BooksPage> {
+  async executeBooksQuery(
+    userId: number,
+    where: SQL | undefined,
+    query: BookQuery,
+    collapseOptions?: SeriesCollapseQueryOptions,
+  ): Promise<BooksPage> {
     const start = Date.now();
     const { page, size } = query.pagination;
-    const shouldCollapse = query.collapseSeries === true && !BookQueryBuilder.hasSeriesSelectionFilter(query.filter);
+    const seriesSelectionFilter = collapseOptions ? collapseOptions.seriesSelectionFilter : query.filter;
+    const shouldCollapse = query.collapseSeries === true && !BookQueryBuilder.hasSeriesSelectionFilter(seriesSelectionFilter);
 
     if (shouldCollapse) {
       const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows, narratorRows, seriesMembershipRows, total } =
@@ -1124,12 +1135,19 @@ export class BookService {
     return this.executeJumpBucketsQuery(user.id, where, query, timeZone);
   }
 
-  async executeJumpBucketsQuery(userId: number, where: SQL | undefined, query: JumpBucketsQuery, timeZone = 'UTC'): Promise<JumpBucketsResponse> {
+  async executeJumpBucketsQuery(
+    userId: number,
+    where: SQL | undefined,
+    query: JumpBucketsQuery,
+    timeZone = 'UTC',
+    collapseOptions?: SeriesCollapseQueryOptions,
+  ): Promise<JumpBucketsResponse> {
     const event = 'book.jump_buckets';
     const strategy = jumpRailStrategyForSort(query.sort);
     const kind = strategy?.kind ?? null;
     const primary = query.sort[0] ?? { field: 'title' as const, dir: 'asc' as const };
-    const shouldCollapse = query.collapseSeries === true && !BookQueryBuilder.hasSeriesSelectionFilter(query.filter);
+    const seriesSelectionFilter = collapseOptions ? collapseOptions.seriesSelectionFilter : query.filter;
+    const shouldCollapse = query.collapseSeries === true && !BookQueryBuilder.hasSeriesSelectionFilter(seriesSelectionFilter);
     if (!strategy) throw new BadRequestException('jump buckets are not available for this sort');
 
     const start = Date.now();

@@ -332,7 +332,7 @@ export class ScannerRepository {
     return this.db.select().from(bookFiles).where(eq(bookFiles.bookId, bookId));
   }
 
-  async findBookFilesByBookIds(bookIds: number[]) {
+  async findBookFilesByBookIds(bookIds: number[]): Promise<(typeof bookFiles.$inferSelect)[]> {
     if (bookIds.length === 0) return [];
     return this.db.select().from(bookFiles).where(inArray(bookFiles.bookId, bookIds));
   }

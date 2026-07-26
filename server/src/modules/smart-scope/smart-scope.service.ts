@@ -4,6 +4,7 @@ import type { SQL } from 'drizzle-orm';
 import type { BookQuery, BooksPage, GroupRule, JumpBucketsQuery, JumpBucketsResponse, SortSpec } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { normalizeIconValue } from '../../common/utils/icon-value.utils';
+import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import type { SmartScope } from '../../db/schema/smart-scopes';
 import { BookService } from '../book/book.service';
@@ -74,7 +75,21 @@ export class SmartScopeService {
         if (!smartScope.filter) {
           return { ...smartScope, bookCount: 0 };
         }
-        const where = this.queryBuilder.buildWhere(smartScope.filter, { accessibleLibraryIds, userId: user.id, timeZone });
+        const startedAt = Date.now();
+        let where: SQL | undefined;
+        try {
+          const filter = validateGroupRule(smartScope.filter);
+          if (!filter) return { ...smartScope, bookCount: 0 };
+          where = this.queryBuilder.buildWhere(filter, { accessibleLibraryIds, userId: user.id, timeZone });
+        } catch (err) {
+          if (!(err instanceof BadRequestException)) throw err;
+          const errorClass = err.constructor.name;
+          const error = sanitizeLogValue(err.message);
+          this.logger.error(
+            `[smart_scope.count] [fail] scopeId=${smartScope.id} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${error}" - smart scope filter is invalid`,
+          );
+          return { ...smartScope, bookCount: null };
+        }
         const bookCount = await this.bookReadService.countWhere(where);
         return { ...smartScope, bookCount };
       }),
@@ -165,7 +180,9 @@ export class SmartScopeService {
     const { where, effectiveQuery } = prepared;
 
     try {
-      const result = await this.bookService.executeBooksQuery(user.id, where, effectiveQuery);
+      const result = await this.bookService.executeBooksQuery(user.id, where, effectiveQuery, {
+        seriesSelectionFilter: query.filter,
+      });
       const durationMs = Date.now() - start;
       if (durationMs >= 500) {
         this.logger.warn(
@@ -190,7 +207,9 @@ export class SmartScopeService {
     // Eligibility is validated by the book service against effectiveQuery.sort,
     // i.e. after the scope's defaultSort has been resolved.
     const timeZone = resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
-    return this.bookService.executeJumpBucketsQuery(user.id, prepared.where, prepared.effectiveQuery, timeZone);
+    return this.bookService.executeJumpBucketsQuery(user.id, prepared.where, prepared.effectiveQuery, timeZone, {
+      seriesSelectionFilter: query.filter,
+    });
   }
 
   private async prepareBooksQuery<T extends BookQuery>(

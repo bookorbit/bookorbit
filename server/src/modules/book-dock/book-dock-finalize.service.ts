@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { basename, dirname, extname, join, resolve } from 'path';
 import { access as fsAccess, readFile, stat, unlink } from 'fs/promises';
-import { and, eq, inArray, or, sql } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type {
@@ -28,7 +28,7 @@ import type {
   ComicMetadataFields,
   MetadataSeriesMembership,
 } from '@bookorbit/types';
-import { MetadataProviderKey, NotificationType, resolveUploadPath } from '@bookorbit/types';
+import { MetadataProviderKey, NotificationType, resolveDownloadFilename, resolveUploadPath } from '@bookorbit/types';
 import { BookReadService } from '../book/book-read.service';
 import { NotificationService } from '../notification/notification.service';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
@@ -38,7 +38,7 @@ import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/u
 import { formatSeriesIndex } from '../../common/utils/series-index-format.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookAuthors, bookMetadata, books, libraries, libraryFolders } from '../../db/schema';
+import { bookMetadata, libraries, libraryFolders } from '../../db/schema';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { LibraryService } from '../library/library.service';
 import { MetadataService } from '../metadata/metadata.service';
@@ -60,7 +60,6 @@ type LibraryFolderRow = typeof libraryFolders.$inferSelect;
 type FinalizeOverrideEntry = {
   libraryId?: number;
   folderId?: number;
-  skipDuplicateCheck?: boolean;
   targetFileName?: string;
 };
 
@@ -201,9 +200,9 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
         });
         if (rows.length === 0) break;
 
-        const duplicateLookup = await this.buildDuplicateLookup(rows, defaultLibraryId, overrideMap);
-        for (const row of rows) {
-          const result = await this.finalizeFile(row, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser, duplicateLookup);
+        const prepared = await this.prepareFinalizeBatch(rows, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser);
+        for (const analysis of prepared.analyses) {
+          const result = await this.finalizePreparedCandidate(analysis, prepared.existingDestinations);
           results.push(result);
           if (result.success) succeeded++;
           else failed++;
@@ -215,12 +214,12 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       for (let i = 0; i < ids.length; i += BATCH_SIZE) {
         const batch = ids.slice(i, i + BATCH_SIZE);
         const rows = await this.repo.findByIds(batch, userId, isSuperuser);
-        const rowById = new Map(rows.map((row) => [row.id, row]));
-        const duplicateLookup = await this.buildDuplicateLookup(rows, defaultLibraryId, overrideMap);
+        const prepared = await this.prepareFinalizeBatch(rows, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser);
+        const analysisById = new Map(prepared.analyses.map((analysis) => [analysis.fileId, analysis]));
 
         for (const fileId of batch) {
-          const row = rowById.get(fileId);
-          if (!row) {
+          const analysis = analysisById.get(fileId);
+          if (!analysis) {
             failed++;
             results.push({
               fileId,
@@ -231,7 +230,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
             continue;
           }
 
-          const result = await this.finalizeFile(row, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser, duplicateLookup);
+          const result = await this.finalizePreparedCandidate(analysis, prepared.existingDestinations);
           results.push(result);
           if (result.success) succeeded++;
           else failed++;
@@ -261,10 +260,22 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     overrideMap: Map<number, FinalizeOverrideEntry>,
     userId: number,
     isSuperuser: boolean,
-    duplicateLookup?: Map<string, number>,
   ): Promise<BookDockFinalizeFileResult> {
+    const prepared = await this.prepareFinalizeBatch([row], defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser);
+    const analysis = prepared.analyses[0];
+    if (!analysis) {
+      return { fileId: row.id, fileName: row.fileName, success: false, message: 'Finalization target could not be resolved' };
+    }
+    return this.finalizePreparedCandidate(analysis, prepared.existingDestinations);
+  }
+
+  private async finalizePreparedCandidate(
+    preparedAnalysis: FinalizeCandidateAnalysis,
+    existingDestinations: Map<string, number>,
+  ): Promise<BookDockFinalizeFileResult> {
+    const row = preparedAnalysis.row;
     try {
-      const analysis = await this.analyzeFinalizeCandidate(row, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser, duplicateLookup);
+      const analysis = await this.classifyDestination(preparedAnalysis, existingDestinations);
       if (analysis.status !== 'ready') return this.analysisToFileResult(analysis);
 
       const { destPath, folder, library, format } = analysis;
@@ -294,6 +305,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       }
 
       await this.cleanupBookDockRecord(row);
+      existingDestinations.set(this.destinationKey(library.id, destPath), bookId);
 
       const newName = destPath.substring(folder.path.length + 1);
       return { fileId: row.id, fileName: row.fileName, newName, success: true, bookId };
@@ -320,17 +332,9 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     const overrideMap = new Map((overrides ?? []).map((o) => [o.fileId, o]));
 
     await this.processFinalizeSelection(userId, isSuperuser, fileIds, selectAll, excludedIds, status, search, async (rows, missingIds) => {
-      const duplicateLookup = await this.buildDuplicateLookup(rows, defaultLibraryId, overrideMap);
-      for (const row of rows) {
-        const analysis = await this.analyzeFinalizeCandidate(
-          row,
-          defaultLibraryId,
-          defaultFolderId,
-          overrideMap,
-          userId,
-          isSuperuser,
-          duplicateLookup,
-        );
+      const prepared = await this.prepareFinalizeBatch(rows, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser);
+      for (const candidate of prepared.analyses) {
+        const analysis = await this.classifyDestination(candidate, prepared.existingDestinations);
         addFinalizePreviewAnalysis(summary, analysis);
       }
       for (const fileId of missingIds) {
@@ -369,20 +373,12 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     try {
       await this.processFinalizeSelection(userId, isSuperuser, fileIds, selectAll, excludedIds, status, search, async (rows, missingIds) => {
         total += rows.length + missingIds.length;
-        const duplicateLookup = await this.buildDuplicateLookup(rows, defaultLibraryId, overrideMap);
+        const prepared = await this.prepareFinalizeBatch(rows, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser);
         const duplicateRows: BookDockFileRow[] = [];
 
-        for (const row of rows) {
-          const analysis = await this.analyzeFinalizeCandidate(
-            row,
-            defaultLibraryId,
-            defaultFolderId,
-            overrideMap,
-            userId,
-            isSuperuser,
-            duplicateLookup,
-          );
-          if (analysis.status === 'duplicate') duplicateRows.push(row);
+        for (const candidate of prepared.analyses) {
+          const analysis = await this.classifyDestination(candidate, prepared.existingDestinations);
+          if (analysis.status === 'duplicate') duplicateRows.push(candidate.row);
         }
 
         if (duplicateRows.length === 0) return;
@@ -411,14 +407,13 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     }
   }
 
-  private async analyzeFinalizeCandidate(
+  private async resolveFinalizeCandidate(
     row: BookDockFileRow,
     defaultLibraryId: number | undefined,
     defaultFolderId: number | undefined,
     overrideMap: Map<number, FinalizeOverrideEntry>,
     userId: number,
     isSuperuser: boolean,
-    duplicateLookup?: Map<string, number>,
   ): Promise<FinalizeCandidateAnalysis> {
     try {
       const override = overrideMap.get(row.id);
@@ -456,36 +451,6 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
 
       const newName = destPath.substring(folder.path.length + 1);
 
-      if (!override?.skipDuplicateCheck) {
-        const meta = normalizeFinalizeMetadata(row.selectedMetadata ?? row.embeddedMetadata ?? {});
-        const existingBookId = await this.findDuplicate(libraryId, meta, duplicateLookup);
-        if (existingBookId !== null) {
-          return {
-            fileId: row.id,
-            fileName: row.fileName,
-            row,
-            status: 'duplicate',
-            existingBookId,
-            newName,
-            message: 'Duplicate: this book already exists in the library',
-          };
-        }
-      }
-
-      const exists = await fsAccess(destPath)
-        .then(() => true)
-        .catch(() => false);
-      if (exists) {
-        return {
-          fileId: row.id,
-          fileName: row.fileName,
-          row,
-          status: 'destination_conflict',
-          newName,
-          message: 'A file with this name already exists at the target location',
-        };
-      }
-
       return { fileId: row.id, fileName: row.fileName, row, status: 'ready', newName, library, folder, format, destPath };
     } catch (error) {
       return {
@@ -496,6 +461,66 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
         message: resolveFinalizeErrorMessage(error),
       };
     }
+  }
+
+  private async prepareFinalizeBatch(
+    rows: BookDockFileRow[],
+    defaultLibraryId: number | undefined,
+    defaultFolderId: number | undefined,
+    overrideMap: Map<number, FinalizeOverrideEntry>,
+    userId: number,
+    isSuperuser: boolean,
+  ): Promise<{ analyses: FinalizeCandidateAnalysis[]; existingDestinations: Map<string, number> }> {
+    const analyses: FinalizeCandidateAnalysis[] = [];
+    for (const row of rows) {
+      analyses.push(await this.resolveFinalizeCandidate(row, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser));
+    }
+
+    const destinationPaths = analyses.filter((analysis) => analysis.status === 'ready' && analysis.destPath).map((analysis) => analysis.destPath!);
+    const existingRows = await this.repo.findExistingBooksByAbsolutePaths(destinationPaths);
+    const existingDestinations = new Map(
+      existingRows.map((existing) => [this.destinationKey(existing.libraryId, existing.absolutePath), existing.bookId]),
+    );
+
+    return { analyses, existingDestinations };
+  }
+
+  private async classifyDestination(
+    analysis: FinalizeCandidateAnalysis,
+    existingDestinations: Map<string, number>,
+  ): Promise<FinalizeCandidateAnalysis> {
+    if (analysis.status !== 'ready' || !analysis.destPath || !analysis.library) return analysis;
+
+    try {
+      await fsAccess(analysis.destPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return analysis;
+      return {
+        ...analysis,
+        status: 'error',
+        message: resolveFinalizeErrorMessage(error),
+      };
+    }
+
+    const existingBookId = existingDestinations.get(this.destinationKey(analysis.library.id, analysis.destPath));
+    if (existingBookId !== undefined) {
+      return {
+        ...analysis,
+        status: 'duplicate',
+        existingBookId,
+        message: 'A file with this name already exists at the target location',
+      };
+    }
+
+    return {
+      ...analysis,
+      status: 'destination_conflict',
+      message: 'A file with this name already exists at the target location',
+    };
+  }
+
+  private destinationKey(libraryId: number, absolutePath: string): string {
+    return `${libraryId}\u0000${absolutePath}`;
   }
 
   private analysisToFileResult(analysis: FinalizeCandidateAnalysis): BookDockFinalizeFileResult {
@@ -676,205 +701,24 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     return rows.map((row) => {
       const format = row.format ?? extname(row.fileName).toLowerCase().slice(1);
       const meta = row.selectedMetadata ?? row.embeddedMetadata ?? {};
-      let newName = row.fileName;
       const effectiveLibraryId = row.targetLibraryId ?? defaultLibraryId ?? null;
       const lib = effectiveLibraryId !== null ? libraryMap.get(effectiveLibraryId) : undefined;
+      let newName = lib?.organizationMode === 'book_per_folder' ? join(basename(row.fileName, extname(row.fileName)), row.fileName) : row.fileName;
       const libraryPattern = lib?.fileNamingPattern ?? null;
       const appPattern = lib?.organizationMode === 'book_per_folder' ? appPatternFolder : appPatternFile;
       const pattern = libraryPattern ?? appPattern;
 
       if (pattern) {
         const tokens = this.buildPatternTokens(meta, row.fileName, format);
-        const resolved = resolveUploadPath(pattern, tokens, format, { sanitizeForCrossPlatform });
+        const resolved =
+          lib?.organizationMode === 'book_per_file'
+            ? resolveDownloadFilename(pattern, tokens, format, { sanitizeForCrossPlatform })
+            : resolveUploadPath(pattern, tokens, format, { sanitizeForCrossPlatform });
         if (resolved) newName = resolved;
       }
 
       return { fileId: row.id, fileName: row.fileName, newName };
     });
-  }
-
-  private async buildDuplicateLookup(
-    rows: BookDockFileRow[],
-    defaultLibraryId: number | undefined,
-    overrideMap: Map<number, FinalizeOverrideEntry>,
-  ): Promise<Map<string, number>> {
-    const needsByLibrary = new Map<
-      number,
-      { isbn13: Set<string>; isbn10: Set<string>; titles: Set<string>; authors: Set<string>; titleAuthorPairs: Set<string> }
-    >();
-
-    for (const row of rows) {
-      const override = overrideMap.get(row.id);
-      const libraryId = override?.libraryId ?? row.targetLibraryId ?? defaultLibraryId ?? null;
-      if (libraryId === null) continue;
-
-      const meta = normalizeFinalizeMetadata(row.selectedMetadata ?? row.embeddedMetadata ?? {});
-      let bucket = needsByLibrary.get(libraryId);
-      if (!bucket) {
-        bucket = { isbn13: new Set(), isbn10: new Set(), titles: new Set(), authors: new Set(), titleAuthorPairs: new Set() };
-        needsByLibrary.set(libraryId, bucket);
-      }
-
-      if (meta.isbn13) {
-        bucket.isbn13.add(meta.isbn13);
-      } else if (meta.isbn10) {
-        bucket.isbn10.add(meta.isbn10);
-      } else if (meta.title) {
-        const normalizedAuthors = normalizeDuplicateAuthors(meta.authors);
-        if (normalizedAuthors.length === 0) continue;
-        bucket.titles.add(meta.title.toLowerCase());
-        for (const authorName of normalizedAuthors) {
-          bucket.authors.add(authorName);
-          bucket.titleAuthorPairs.add(`${meta.title.toLowerCase()}|${authorName}`);
-        }
-      }
-    }
-
-    const lookup = new Map<string, number>();
-    for (const [libraryId, values] of needsByLibrary) {
-      if (values.isbn13.size > 0) {
-        const rowsByIsbn13 = await this.db
-          .select({ bookId: bookMetadata.bookId, isbn13: bookMetadata.isbn13 })
-          .from(bookMetadata)
-          .innerJoin(books, eq(books.id, bookMetadata.bookId))
-          .where(and(eq(books.libraryId, libraryId), inArray(bookMetadata.isbn13, [...values.isbn13])));
-        for (const row of rowsByIsbn13) {
-          if (!row.isbn13) continue;
-          const key = this.buildDuplicateLookupKey(libraryId, { isbn13: row.isbn13, isbn10: null, title: null });
-          if (key && !lookup.has(key)) {
-            lookup.set(key, row.bookId);
-          }
-        }
-      }
-
-      if (values.isbn10.size > 0) {
-        const rowsByIsbn10 = await this.db
-          .select({ bookId: bookMetadata.bookId, isbn10: bookMetadata.isbn10 })
-          .from(bookMetadata)
-          .innerJoin(books, eq(books.id, bookMetadata.bookId))
-          .where(and(eq(books.libraryId, libraryId), inArray(bookMetadata.isbn10, [...values.isbn10])));
-        for (const row of rowsByIsbn10) {
-          if (!row.isbn10) continue;
-          const key = this.buildDuplicateLookupKey(libraryId, { isbn13: null, isbn10: row.isbn10, title: null });
-          if (key && !lookup.has(key)) {
-            lookup.set(key, row.bookId);
-          }
-        }
-      }
-
-      if (values.titles.size > 0 && values.authors.size > 0) {
-        const rowsByTitleAuthor = await this.db
-          .select({
-            bookId: bookMetadata.bookId,
-            normalizedTitle: sql<string>`lower(${bookMetadata.title})`,
-            normalizedAuthor: sql<string>`lower(${authors.name})`,
-          })
-          .from(bookMetadata)
-          .innerJoin(books, eq(books.id, bookMetadata.bookId))
-          .innerJoin(bookAuthors, eq(bookAuthors.bookId, bookMetadata.bookId))
-          .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
-          .where(
-            and(
-              eq(books.libraryId, libraryId),
-              inArray(sql<string>`lower(${bookMetadata.title})`, [...values.titles]),
-              inArray(sql<string>`lower(${authors.name})`, [...values.authors]),
-            ),
-          );
-        for (const row of rowsByTitleAuthor) {
-          if (!row.normalizedTitle || !row.normalizedAuthor) continue;
-          const pairKey = `${row.normalizedTitle}|${row.normalizedAuthor}`;
-          if (!values.titleAuthorPairs.has(pairKey)) continue;
-          const key = this.buildDuplicateLookupKey(libraryId, {
-            isbn13: null,
-            isbn10: null,
-            title: row.normalizedTitle,
-            author: row.normalizedAuthor,
-          });
-          if (key && !lookup.has(key)) {
-            lookup.set(key, row.bookId);
-          }
-        }
-      }
-    }
-
-    return lookup;
-  }
-
-  private buildDuplicateLookupKey(
-    libraryId: number,
-    meta: { isbn13: string | null; isbn10: string | null; title: string | null; author?: string | null },
-  ): string | null {
-    const isbn = meta.isbn13 ?? meta.isbn10;
-    if (isbn) {
-      const isbnKind = meta.isbn13 ? 'isbn13' : 'isbn10';
-      return `library:${libraryId}|${isbnKind}:${isbn}`;
-    }
-    if (meta.title && meta.author) {
-      return `library:${libraryId}|title:${meta.title.toLowerCase()}|author:${meta.author.toLowerCase()}`;
-    }
-    return null;
-  }
-
-  private async findDuplicate(
-    libraryId: number,
-    meta: Pick<NormalizedFinalizeMetadata, 'isbn13' | 'isbn10' | 'title' | 'authors'>,
-    duplicateLookup?: Map<string, number>,
-  ): Promise<number | null> {
-    const isbn = meta.isbn13 ?? meta.isbn10;
-
-    if (isbn) {
-      const lookupKey = this.buildDuplicateLookupKey(libraryId, { isbn13: meta.isbn13, isbn10: meta.isbn10, title: null, author: null });
-      if (lookupKey && duplicateLookup?.has(lookupKey)) {
-        return duplicateLookup.get(lookupKey) ?? null;
-      }
-
-      const conditions = meta.isbn13 ? [eq(bookMetadata.isbn13, meta.isbn13)] : [eq(bookMetadata.isbn10, meta.isbn10!)];
-
-      const [existing] = await this.db
-        .select({ bookId: bookMetadata.bookId })
-        .from(bookMetadata)
-        .innerJoin(books, eq(books.id, bookMetadata.bookId))
-        .where(and(eq(books.libraryId, libraryId), or(...conditions)))
-        .limit(1);
-
-      if (existing) return existing.bookId;
-    }
-
-    if (!isbn && meta.title) {
-      const normalizedAuthors = normalizeDuplicateAuthors(meta.authors);
-      if (normalizedAuthors.length === 0) return null;
-
-      for (const authorName of normalizedAuthors) {
-        const lookupKey = this.buildDuplicateLookupKey(libraryId, {
-          isbn13: null,
-          isbn10: null,
-          title: meta.title,
-          author: authorName,
-        });
-        if (lookupKey && duplicateLookup?.has(lookupKey)) {
-          return duplicateLookup.get(lookupKey) ?? null;
-        }
-      }
-
-      const [existing] = await this.db
-        .select({ bookId: bookMetadata.bookId })
-        .from(bookMetadata)
-        .innerJoin(books, eq(books.id, bookMetadata.bookId))
-        .innerJoin(bookAuthors, eq(bookAuthors.bookId, bookMetadata.bookId))
-        .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
-        .where(
-          and(
-            eq(books.libraryId, libraryId),
-            sql`lower(${bookMetadata.title}) = lower(${meta.title})`,
-            inArray(sql<string>`lower(${authors.name})`, normalizedAuthors),
-          ),
-        )
-        .limit(1);
-
-      if (existing) return existing.bookId;
-    }
-
-    return null;
   }
 
   private async resolveDestination(
@@ -893,11 +737,17 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
 
     if (pattern) {
       const tokens = this.buildPatternTokens(meta, row.fileName, format);
-      const resolved = resolveUploadPath(pattern, tokens, format, { sanitizeForCrossPlatform });
+      const resolved =
+        library.organizationMode === 'book_per_file'
+          ? resolveDownloadFilename(pattern, tokens, format, { sanitizeForCrossPlatform })
+          : resolveUploadPath(pattern, tokens, format, { sanitizeForCrossPlatform });
       if (resolved) return join(folderPath, resolved);
     }
 
-    return join(folderPath, row.fileName);
+    if (library.organizationMode === 'book_per_file') return join(folderPath, row.fileName);
+
+    const stem = basename(row.fileName, extname(row.fileName));
+    return join(folderPath, stem, row.fileName);
   }
 
   private buildPatternTokens(meta: BookDockMetadata, fileName: string, format: string): Record<string, string> {
@@ -1160,18 +1010,6 @@ function normalizeStringArray(value: unknown, maxLength: number): string[] {
     normalized.push(trimmed.slice(0, maxLength));
   }
   return normalized;
-}
-
-function normalizeDuplicateAuthors(value: string[] | null | undefined): string[] {
-  if (!Array.isArray(value)) return [];
-  const normalized = new Set<string>();
-  for (const author of value) {
-    if (typeof author !== 'string') continue;
-    const trimmed = author.trim().toLowerCase();
-    if (!trimmed) continue;
-    normalized.add(trimmed);
-  }
-  return [...normalized];
 }
 
 function normalizeFinalizeMetadata(meta: BookDockMetadata | null | undefined): NormalizedFinalizeMetadata {

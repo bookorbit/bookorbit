@@ -4016,7 +4016,6 @@
       "failedWithDuplicates": "{failed} fehlgeschlagen ({count} Duplikate) | {failed} fehlgeschlagen ({count} Duplikat) | {failed} fehlgeschlagen ({count} Duplikate)",
       "view": "Anzeigen",
       "viewExisting": "Vorhandenes anzeigen",
-      "importAnyway": "Trotzdem importieren",
       "hide": "Ausblenden",
       "details": "Details",
       "alreadyExistsSaveAs": "Existiert bereits - speichern als:",

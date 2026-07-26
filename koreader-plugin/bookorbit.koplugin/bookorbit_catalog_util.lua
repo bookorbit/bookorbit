@@ -136,6 +136,13 @@ function CatalogUtil.formatProgress(value)
     return tostring(math.floor(value + 0.5)) .. "%"
 end
 
+function CatalogUtil.readingStreakDays(dashboard, fallback)
+    local reading_streak = dashboard and dashboard.readingStreak
+    local current_streak = reading_streak and tonumber(reading_streak.currentStreak)
+    if current_streak then return current_streak end
+    return tonumber(fallback) or 0
+end
+
 function CatalogUtil.formatRating(value)
     if not value then return nil end
     if value == math.floor(value) then

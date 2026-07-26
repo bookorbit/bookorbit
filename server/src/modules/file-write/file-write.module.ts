@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 
+import { SelfWriteRegistryModule } from '../../common/self-write-registry.module';
 import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { NotificationModule } from '../notification/notification.module';
 import { BulkRenameRepository } from './bulk-rename.repository';
@@ -18,7 +19,7 @@ import { PdfFormatWriter } from './formats/pdf/pdf-format-writer';
 import { FORMAT_WRITERS } from './interfaces/format-writer.interface';
 
 @Module({
-  imports: [forwardRef(() => NotificationModule), AppSettingsModule],
+  imports: [forwardRef(() => NotificationModule), AppSettingsModule, SelfWriteRegistryModule],
   providers: [
     FileWriteService,
     FileWriteRepository,

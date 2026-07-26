@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { NotificationType } from '@bookorbit/types';
 import type { MockedFunction } from 'vitest';
 import { access, lstat, mkdir, readdir, realpath, rename as fsRename, rmdir } from 'fs/promises';
+import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
 
 vi.mock('fs/promises', async () => {
   const actual = await vi.importActual<typeof import('fs/promises')>('fs/promises');
@@ -109,9 +110,17 @@ describe('FileRenameService', () => {
       get: vi.fn().mockImplementation((key: string) => configValues[key]),
     } as unknown as ConfigService;
 
-    const service = new FileRenameService(renameRepo as never, lockService as never, appSettings as never, notificationService as never, config);
+    const selfWriteRegistry = new SelfWriteRegistry();
+    const service = new FileRenameService(
+      renameRepo as never,
+      lockService as never,
+      appSettings as never,
+      notificationService as never,
+      config,
+      selfWriteRegistry,
+    );
 
-    return { service, renameRepo, lockService, appSettings, notificationService };
+    return { service, renameRepo, lockService, appSettings, notificationService, selfWriteRegistry };
   }
 
   beforeEach(() => {
@@ -499,6 +508,7 @@ describe('FileRenameService', () => {
           absolutePath: '/library/old-folder/Old Title.epub',
           relPath: 'old-folder/Old Title.epub',
         },
+        libraryFolderPath: '/library/',
         bookFolderPath: '/library/old-folder',
       }),
     );
@@ -547,6 +557,43 @@ describe('FileRenameService', () => {
     expect(lockService.withLock).toHaveBeenNthCalledWith(1, bookOperationLockKey(5), expect.any(Function));
     expect(lockService.withLock).toHaveBeenNthCalledWith(2, '/library/old-folder', expect.any(Function));
     expect(lockService.withLock).toHaveBeenNthCalledWith(3, '/library/Frank Herbert/Dune/Old Title.epub', expect.any(Function));
+  });
+
+  it('suppresses file and directory watcher paths for the full folder rename', async () => {
+    const { service, renameRepo, selfWriteRegistry } = makeService();
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        organizationMode: 'book_per_folder',
+        fileNamingPattern: '{authors}/{title}/{title}',
+        file: {
+          absolutePath: '/library/old-folder/Old Title.epub',
+          relPath: 'old-folder/Old Title.epub',
+        },
+        bookFolderPath: '/library/old-folder',
+      }),
+    );
+    renameRepo.findAllBookFiles.mockResolvedValue([
+      {
+        id: 10,
+        absolutePath: '/library/old-folder/Old Title.epub',
+        relPath: 'old-folder/Old Title.epub',
+        role: 'primary',
+      },
+    ]);
+    mockRename.mockImplementation(() => {
+      expect(selfWriteRegistry.isSuppressed('/library/old-folder')).toBe(true);
+      expect(selfWriteRegistry.isSuppressed('/library/old-folder/Old Title.epub')).toBe(true);
+      expect(selfWriteRegistry.isSuppressed('/library/Frank Herbert')).toBe(true);
+      expect(selfWriteRegistry.isSuppressed('/library/Frank Herbert/Dune')).toBe(true);
+      expect(selfWriteRegistry.isSuppressed('/library/Frank Herbert/Dune/Dune.epub')).toBe(true);
+      expect(selfWriteRegistry.isSuppressed('/library')).toBe(false);
+      return Promise.resolve();
+    });
+
+    await expect(service.performRename(5, 12)).resolves.toEqual(expect.objectContaining({ status: 'success' }));
+
+    expect(selfWriteRegistry.isSuppressed('/library/old-folder')).toBe(false);
+    expect(selfWriteRegistry.isSuppressed('/library/Frank Herbert/Dune')).toBe(false);
   });
 
   it('rolls back database paths and reports failure when the filesystem rename fails', async () => {

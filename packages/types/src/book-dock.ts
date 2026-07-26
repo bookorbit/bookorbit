@@ -93,7 +93,6 @@ export interface BookDockFinalizeOverride {
   fileId: number;
   libraryId?: number;
   folderId?: number;
-  skipDuplicateCheck?: boolean;
   targetFileName?: string;
 }
 

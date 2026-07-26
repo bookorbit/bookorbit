@@ -10,7 +10,7 @@ export interface SmartScope {
   isPublic: boolean;
   syncToKobo: boolean;
   displayOrder: number;
-  bookCount?: number;
+  bookCount?: number | null;
   createdAt: string;
   updatedAt: string;
 }
