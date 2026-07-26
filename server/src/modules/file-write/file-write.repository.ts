@@ -112,8 +112,11 @@ export class FileWriteRepository {
       .orderBy(asc(books.id));
   }
 
-  async updateFileHash(bookFileId: number, fileHash: string): Promise<void> {
-    await this.db.update(bookFiles).set({ fileHash, updatedAt: new Date() }).where(eq(bookFiles.id, bookFileId));
+  async updateFileStat(bookFileId: number, fields: { fileHash?: string; mtime?: Date; sizeBytes?: number; ino?: bigint }): Promise<void> {
+    await this.db
+      .update(bookFiles)
+      .set({ ...fields, updatedAt: new Date() })
+      .where(eq(bookFiles.id, bookFileId));
   }
 
   async recordHashHistory(bookFileId: number, fileHash: string, reason: string): Promise<void> {

@@ -1,5 +1,7 @@
 import { Client } from 'pg';
 
+import { createPostgresClientConfig } from '../db/postgres-connection-config';
+
 import { installPostgresExtensions } from './postgres-extensions';
 
 const DEFAULT_E2E_DATABASE_URL = 'postgres://bookorbit:bookorbit@localhost:5432/bookorbit_e2e';
@@ -40,7 +42,7 @@ async function connectWithRetry(connectionString: string, label: string): Promis
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= CONNECT_RETRY_ATTEMPTS; attempt++) {
-    const client = new Client({ connectionString });
+    const client = new Client(createPostgresClientConfig(connectionString));
     try {
       await client.connect();
       return client;

@@ -133,18 +133,22 @@ export class BookDuplicatesRepository {
 
   async insertFileHashKeys(scanId: number, libraryIds: number[], user: RequestUser): Promise<void> {
     const scope = this.scopeWhere(libraryIds, user);
+    // A chapterized audiobook can have enough content files for the raw signature to
+    // exceed PostgreSQL's btree tuple limit, so only its fixed-size digest is indexed.
     await this.db.execute(sql`
       INSERT INTO ${bookDuplicateScanKeys} (scan_id, book_id, kind, value)
       SELECT
         CAST(${scanId} AS integer),
         ${books.id},
         'file_hash',
-        array_to_string(
-          array_agg(
-            lower(btrim(${bookFiles.fileHash})) || ':' || ${bookFiles.sizeBytes}::text
-            ORDER BY lower(btrim(${bookFiles.fileHash})), ${bookFiles.sizeBytes}, ${bookFiles.id}
-          ),
-          chr(30)
+        md5(
+          array_to_string(
+            array_agg(
+              lower(btrim(${bookFiles.fileHash})) || ':' || ${bookFiles.sizeBytes}::text
+              ORDER BY lower(btrim(${bookFiles.fileHash})), ${bookFiles.sizeBytes}, ${bookFiles.id}
+            ),
+            chr(30)
+          )
         )
       FROM ${books}
       JOIN ${bookFiles} ON ${bookFiles.bookId} = ${books.id}
@@ -197,6 +201,8 @@ export class BookDuplicatesRepository {
 
   async insertExactMetadataKeys(scanId: number, libraryIds: number[], user: RequestUser): Promise<void> {
     const scope = this.scopeWhere(libraryIds, user);
+    // Long titles and author lists can exceed PostgreSQL's btree tuple limit, so only
+    // the fixed-size digest of the normalized metadata signature is indexed.
     await this.db.execute(sql`
       WITH eligible AS (
         SELECT
@@ -234,7 +240,7 @@ export class BookDuplicatesRepository {
         CAST(${scanId} AS integer),
         eligible.book_id,
         'exact_metadata',
-        eligible.title_key || chr(31) || array_to_string(eligible.author_keys, chr(30)) || chr(31) || family
+        md5(eligible.title_key || chr(31) || array_to_string(eligible.author_keys, chr(30)) || chr(31) || family)
       FROM eligible
       CROSS JOIN LATERAL unnest(eligible.families) AS family
       WHERE eligible.title_key <> '' AND cardinality(eligible.author_keys) > 0

@@ -39,6 +39,13 @@ export async function generateThumbnail(bytes: Buffer): Promise<Buffer> {
   return sharp(bytes).resize(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
 }
 
+export async function normalizeProgressiveJpeg(bytes: Buffer): Promise<Buffer> {
+  const metadata = await sharp(bytes, { failOn: 'error' }).metadata();
+  if (metadata.format !== 'jpeg' || !metadata.isProgressive) return bytes;
+
+  return sharp(bytes, { failOn: 'error' }).keepMetadata().jpeg({ quality: 90, progressive: false }).toBuffer();
+}
+
 /**
  * Extract cover bytes from a book file based on its format.
  * Returns null if no cover can be extracted.

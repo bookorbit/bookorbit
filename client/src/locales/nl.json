@@ -4016,7 +4016,6 @@
       "failedWithDuplicates": "{failed} mislukt ({count} duplicaten) | {failed} mislukt ({count} duplicaat) | {failed} mislukt ({count} duplicaten)",
       "view": "Bekijken",
       "viewExisting": "Bestaande bekijken",
-      "importAnyway": "Toch importeren",
       "hide": "Verbergen",
       "details": "Details",
       "alreadyExistsSaveAs": "Bestaat al - opslaan als:",

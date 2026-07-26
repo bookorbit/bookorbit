@@ -4016,7 +4016,6 @@
       "failedWithDuplicates": "{failed} falhou ({count} duplicatas) | {failed} falhou ({count} duplicata) | {failed} falharam ({count} duplicatas)",
       "view": "Ver",
       "viewExisting": "Ver existente",
-      "importAnyway": "Importar de qualquer forma",
       "hide": "Esconder",
       "details": "Detalhes",
       "alreadyExistsSaveAs": "Já existe - salvar como:",

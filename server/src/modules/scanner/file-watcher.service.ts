@@ -2,8 +2,8 @@ import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } f
 import { watch, type FSWatcher } from 'chokidar';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { stat } from 'fs/promises';
 import { dirname, sep } from 'path';
+import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 
 import { DB } from '../../db';
@@ -12,7 +12,6 @@ import { libraries, libraryFolders } from '../../db/schema';
 import { ScanGateway } from './scan.gateway';
 import { ScannerService } from './scanner.service';
 import { FileEventProcessorService, type FileEventResult } from './file-event-processor.service';
-import { classifyFile } from './lib/classify';
 
 type Db = NodePgDatabase<typeof schema>;
 type EventType = 'delete' | 'create';
@@ -42,6 +41,7 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
     private readonly processor: FileEventProcessorService,
     private readonly gateway: ScanGateway,
     private readonly scannerService: ScannerService,
+    private readonly selfWriteRegistry: SelfWriteRegistry,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -375,37 +375,44 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
 
     const existing = this.pendingTimers.get(path);
     if (existing) clearTimeout(existing.timer);
-    const timer = setTimeout(() => {
+    const timer = this.createPendingTimer(path);
+    this.pendingTimers.set(path, { timer, type, libraryId });
+  }
+
+  private createPendingTimer(path: string): ReturnType<typeof setTimeout> {
+    return setTimeout(() => {
+      const entry = this.pendingTimers.get(path);
+      if (!entry) return;
+      if (!this.subscriptions.has(entry.libraryId)) {
+        this.pendingTimers.delete(path);
+        return;
+      }
+      if (this.selfWriteRegistry.isSuppressed(path)) {
+        entry.timer = this.createPendingTimer(path);
+        return;
+      }
+
       this.pendingTimers.delete(path);
-      this.process(type, path, libraryId).catch((err) =>
+      this.process(entry.type, path, entry.libraryId).catch((err) =>
         this.logger.error(
-          `[scanner.watcher.process_event] [fail] libraryId=${libraryId} type=${type} path="${sanitizeLogValue(path)}" errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - file event processing failed`,
+          `[scanner.watcher.process_event] [fail] libraryId=${entry.libraryId} type=${entry.type} path="${sanitizeLogValue(path)}" errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - file event processing failed`,
         ),
       );
     }, DEBOUNCE_MS);
-    this.pendingTimers.set(path, { timer, type, libraryId });
   }
 
   private async process(type: EventType, path: string, libraryId: number): Promise<void> {
     let result: FileEventResult;
     if (type === 'create') {
       result = await this.processor.handleCreate(path, libraryId);
-      if (result.type === 'noop') {
-        const pathStat = await stat(path).catch(() => null);
-        if (pathStat?.isDirectory()) {
-          // A created directory can be either one book folder or a grouping folder
-          // containing many books, so scan that subtree instead of one synthetic child.
+      if (result.type === 'scan-required') {
+        if (result.scope === 'directory') {
           this.suppressFolderScansForDir(path, libraryId);
           this.scannerService.scanBookDirectoryAsync(path, libraryId);
           return;
         }
-        // Only schedule a scan for unrecognized content-format files. Supplementary
-        // files (covers, metadata, .lit, etc.) don't need a full scan on creation.
-        const { role } = classifyFile(path);
-        if (role === 'content') {
-          if (this.isFolderScanSuppressed(path, libraryId) && this.scannerService.isScanRunning(libraryId)) return;
-          this.scheduleFolderScan(path, libraryId);
-        }
+        if (this.isFolderScanSuppressed(path, libraryId) && this.scannerService.isScanRunning(libraryId)) return;
+        this.scheduleFolderScan(path, libraryId);
         return;
       }
     } else {

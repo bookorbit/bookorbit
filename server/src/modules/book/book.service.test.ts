@@ -2714,6 +2714,75 @@ describe('BookService', () => {
       expect(bookRepo.findJumpBucketsCollapsed).not.toHaveBeenCalled();
     });
 
+    it('executeJumpBucketsQuery collapses when a series rule belongs to the containing scope', async () => {
+      const { service, bookRepo } = makeService();
+      const scopeFilter = {
+        type: 'group' as const,
+        join: 'OR' as const,
+        rules: [{ type: 'rule' as const, field: 'series' as const, operator: 'contains' as const, value: 'Batman' }],
+      };
+      bookRepo.findJumpBucketsCollapsed.mockResolvedValue({ buckets: [], total: 0, kind: 'letter', granularity: null });
+
+      await service.executeJumpBucketsQuery(
+        9,
+        'WHERE' as never,
+        {
+          sort: [{ field: 'title', dir: 'asc' }],
+          pagination: { page: 0, size: 50 },
+          maxBuckets: 24,
+          collapseSeries: true,
+          filter: scopeFilter,
+        },
+        'UTC',
+        { seriesSelectionFilter: undefined },
+      );
+
+      expect(bookRepo.findJumpBucketsCollapsed).toHaveBeenCalledWith(
+        expect.objectContaining({ where: 'WHERE', sort: [{ field: 'title', dir: 'asc' }], userId: 9 }),
+      );
+      expect(bookRepo.findJumpBuckets).not.toHaveBeenCalled();
+    });
+
+    it('executeJumpBucketsQuery still expands when a temporary series filter is supplied separately', async () => {
+      const { service, queryBuilder, bookRepo } = makeService();
+      const temporaryFilter = {
+        type: 'group' as const,
+        join: 'AND' as const,
+        rules: [{ type: 'rule' as const, field: 'series' as const, operator: 'eq' as const, value: 'Batman' }],
+      };
+      const effectiveFilter = {
+        type: 'group' as const,
+        join: 'AND' as const,
+        rules: [
+          {
+            type: 'group' as const,
+            join: 'AND' as const,
+            rules: [{ type: 'rule' as const, field: 'language' as const, operator: 'eq' as const, value: 'en' }],
+          },
+          temporaryFilter,
+        ],
+      };
+      queryBuilder.buildOrderBy.mockReturnValue(['ORDER'] as never);
+      bookRepo.findJumpBuckets.mockResolvedValue({ buckets: [], total: 0, kind: 'letter', granularity: null });
+
+      await service.executeJumpBucketsQuery(
+        9,
+        'WHERE' as never,
+        {
+          sort: [{ field: 'title', dir: 'asc' }],
+          pagination: { page: 0, size: 50 },
+          maxBuckets: 24,
+          collapseSeries: true,
+          filter: effectiveFilter,
+        },
+        'UTC',
+        { seriesSelectionFilter: temporaryFilter },
+      );
+
+      expect(bookRepo.findJumpBuckets).toHaveBeenCalledWith(expect.objectContaining({ where: 'WHERE', orderBy: ['ORDER'], userId: 9 }));
+      expect(bookRepo.findJumpBucketsCollapsed).not.toHaveBeenCalled();
+    });
+
     it('executeJumpBucketsQuery keeps collapseSeries for a series presence filter', async () => {
       const { service, bookRepo } = makeService();
       bookRepo.findJumpBucketsCollapsed.mockResolvedValue({ buckets: [], total: 0, kind: 'letter', granularity: null });
@@ -4329,6 +4398,85 @@ describe('BookService', () => {
         expect.objectContaining({ where: 'where', sort: [{ field: 'title', dir: 'asc' }], userId: 12 }),
       );
       expect(bookRepo.findCards).not.toHaveBeenCalled();
+    });
+
+    it('returns collapsed results when series selection rules belong to the containing scope', async () => {
+      const { service, bookRepo, queryBuilder } = makeService();
+      const scopeFilter = {
+        type: 'group' as const,
+        join: 'OR' as const,
+        rules: [
+          { type: 'rule' as const, field: 'series' as const, operator: 'contains' as const, value: 'Batman' },
+          { type: 'rule' as const, field: 'series' as const, operator: 'contains' as const, value: 'Detective Comics' },
+        ],
+      };
+      bookRepo.findCardsCollapsed.mockResolvedValue(emptyCardQueryResult);
+
+      await service.executeBooksQuery(
+        12,
+        'scope-where' as never,
+        {
+          pagination: { page: 0, size: 50 },
+          sort: [{ field: 'series', dir: 'asc' }],
+          filter: scopeFilter,
+          collapseSeries: true,
+        },
+        { seriesSelectionFilter: undefined },
+      );
+
+      expect(bookRepo.findCardsCollapsed).toHaveBeenCalledWith({
+        where: 'scope-where',
+        sort: [{ field: 'series', dir: 'asc' }],
+        limit: 50,
+        offset: 0,
+        userId: 12,
+      });
+      expect(bookRepo.findCards).not.toHaveBeenCalled();
+      expect(queryBuilder.buildOrderBy).not.toHaveBeenCalled();
+    });
+
+    it('returns expanded results when a temporary series filter is supplied separately', async () => {
+      const { service, bookRepo, queryBuilder } = makeService();
+      const temporaryFilter = {
+        type: 'group' as const,
+        join: 'AND' as const,
+        rules: [{ type: 'rule' as const, field: 'series' as const, operator: 'eq' as const, value: 'Batman' }],
+      };
+      const effectiveFilter = {
+        type: 'group' as const,
+        join: 'AND' as const,
+        rules: [
+          {
+            type: 'group' as const,
+            join: 'AND' as const,
+            rules: [{ type: 'rule' as const, field: 'language' as const, operator: 'eq' as const, value: 'en' }],
+          },
+          temporaryFilter,
+        ],
+      };
+      queryBuilder.buildOrderBy.mockReturnValue('order-by');
+      bookRepo.findCards.mockResolvedValue(emptyCardQueryResult);
+
+      await service.executeBooksQuery(
+        12,
+        'scope-where' as never,
+        {
+          pagination: { page: 0, size: 50 },
+          sort: [{ field: 'title', dir: 'asc' }],
+          filter: effectiveFilter,
+          collapseSeries: true,
+        },
+        { seriesSelectionFilter: temporaryFilter },
+      );
+
+      expect(bookRepo.findCards).toHaveBeenCalledWith({
+        where: 'scope-where',
+        orderBy: 'order-by',
+        limit: 50,
+        offset: 0,
+        userId: 12,
+      });
+      expect(bookRepo.findCardsCollapsed).not.toHaveBeenCalled();
     });
 
     it('does not call logger.warn when query completes fast', async () => {

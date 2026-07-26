@@ -1,6 +1,8 @@
 import { JwtService } from '@nestjs/jwt';
 import { Client } from 'pg';
 
+import { createPostgresClientConfig } from '../db/postgres-connection-config';
+
 type BenchCase = {
   name: string;
   path: string;
@@ -90,7 +92,7 @@ async function getBenchUser(): Promise<{ id: number; tokenVersion: number }> {
 
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required (or BENCH_USER_ID/BENCH_USER_VER).');
 
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  const client = new Client(createPostgresClientConfig(process.env.DATABASE_URL));
   await client.connect();
   try {
     const result = await client.query<{ id: number; token_version: number }>(

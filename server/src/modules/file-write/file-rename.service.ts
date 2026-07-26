@@ -1,10 +1,11 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { access, lstat, mkdir, readdir, realpath, rename as fsRename, rmdir } from 'fs/promises';
-import { basename, dirname, extname, isAbsolute, join, relative, sep } from 'path';
+import { basename, dirname, extname, isAbsolute, join, normalize, relative, sep } from 'path';
 
 import type { FileRenameResult } from '@bookorbit/types';
 import { isAudioFormat, NotificationType, resolveUploadPath, sanitizePathSegment } from '@bookorbit/types';
+import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { NotificationService } from '../notification/notification.service';
@@ -34,6 +35,7 @@ export class FileRenameService implements OnModuleDestroy {
     private readonly appSettings: AppSettingsService,
     private readonly notificationService: NotificationService,
     private readonly config: ConfigService,
+    private readonly selfWriteRegistry: SelfWriteRegistry,
   ) {
     this.debounceMs = resolvePositiveInteger(this.config.get('fileWrite.debounceMs'), DEFAULT_RENAME_DEBOUNCE_MS);
   }
@@ -248,6 +250,8 @@ export class FileRenameService implements OnModuleDestroy {
       }
     }
 
+    const suppressPaths = this.buildSuppressedRenamePaths(allFiles, fileTargets, currentFolderPath, newFolderPath, data.libraryFolderPath);
+    this.selfWriteRegistry.begin(suppressPaths);
     try {
       if (bookHasOwnFolder && newFolderPath !== currentFolderPath) {
         if (mergeTargetBookId !== null) {
@@ -277,6 +281,8 @@ export class FileRenameService implements OnModuleDestroy {
       );
       await this.notifyFailure(userId, bookId, err instanceof Error ? err.message : String(err), suppressNotification);
       return { status: 'failed', reason: errorMessage, oldPath: currentAbsolutePath, newPath: newAbsolutePath, durationMs: Date.now() - startedAt };
+    } finally {
+      this.selfWriteRegistry.end(suppressPaths);
     }
 
     this.logger.log(
@@ -285,6 +291,45 @@ export class FileRenameService implements OnModuleDestroy {
 
     await this.notifySuccess(userId, bookId, currentAbsolutePath, newAbsolutePath, suppressNotification);
     return { status: 'success', oldPath: currentAbsolutePath, newPath: newAbsolutePath, durationMs: Date.now() - startedAt };
+  }
+
+  private buildSuppressedRenamePaths(
+    files: RenameBookFile[],
+    fileTargets: Map<number, string>,
+    currentFolderPath: string,
+    newFolderPath: string,
+    libraryFolderPath: string,
+  ): string[] {
+    const libraryRoot = normalize(libraryFolderPath);
+    const paths = new Set<string>();
+    const addPath = (path: string): boolean => {
+      const normalizedPath = normalize(path);
+      const relativePath = relative(libraryRoot, normalizedPath);
+      if (relativePath === '' || relativePath === '..' || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) return false;
+      paths.add(normalizedPath);
+      return true;
+    };
+    const addParentPaths = (path: string) => {
+      let parent = dirname(normalize(path));
+      while (parent !== libraryRoot) {
+        if (!addPath(parent)) return;
+        const next = dirname(parent);
+        if (next === parent) return;
+        parent = next;
+      }
+    };
+
+    addPath(currentFolderPath);
+    addPath(newFolderPath);
+    for (const file of files) {
+      addPath(file.absolutePath);
+      addParentPaths(file.absolutePath);
+    }
+    for (const targetPath of fileTargets.values()) {
+      addPath(targetPath);
+      addParentPaths(targetPath);
+    }
+    return [...paths];
   }
 
   private async renameBookFilesOnly(
