@@ -36,6 +36,7 @@ local BookOrbitStatsReader = require("bookorbit_stats_reader")
 
 local formatDuration = CatalogUtil.formatDuration
 local formatProgress = CatalogUtil.formatProgress
+local readingStreakDays = CatalogUtil.readingStreakDays
 
 local BookOrbitDashboardCoverCard = CatalogWidgets.DashboardCoverCard
 local BookOrbitDashboardHeroCard = CatalogWidgets.DashboardHeroCard
@@ -455,8 +456,8 @@ function CatalogDashboard:addDashboardEmptyState(text, button_text, callback)
 end
 
 -- Local reading activity from statistics.sqlite3, cached briefly so row page
--- turns do not reopen the database. Returns nil when there is nothing to
--- show (no stats database, or no recorded reading at all).
+-- turns do not reopen the database. The local streak is retained as a fallback
+-- for cached responses from servers that do not provide the account streak.
 function CatalogDashboard:dashboardStatsSummary()
     local cache = self._dash_stats_cache
     if not cache or os.time() - cache.at >= STATS_CACHE_TTL then
@@ -477,10 +478,11 @@ end
 function CatalogDashboard:buildDashboardStatsStrip(summary, dashboard, height)
     local sep_w = Size.line.thin
     local today_seconds = summary.today_seconds or 0
+    local streak_days = readingStreakDays(dashboard, summary.streak_days)
     local blocks = {
         { value = today_seconds > 0 and formatDuration(today_seconds) or _("Not yet"), label = _("Today") },
         { value = formatDuration(summary.week_seconds or 0), label = _("Past 7 days") },
-        { value = tostring(summary.streak_days or 0), label = _("Day streak") },
+        { value = tostring(streak_days), label = _("Day streak") },
     }
     local total = dashboard and tonumber(dashboard.totalBooks or dashboard.bookCount)
     if total then
