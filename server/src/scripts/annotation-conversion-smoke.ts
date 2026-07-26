@@ -10,6 +10,7 @@ import { loadEnvFile } from 'node:process';
 import { Client } from 'pg';
 import * as unzipper from 'unzipper';
 
+import { createPostgresClientConfig } from '../db/postgres-connection-config';
 import { loadChapterFromZip, readEpubSpine } from '../modules/position-converter/epub-dom.service';
 import { cfiRangeToXPointer, xpointerRangeToCfi } from '../modules/position-converter/position-converter.core';
 import { parseXPointer } from '../modules/position-converter/xpointer.utils';
@@ -19,7 +20,12 @@ if (existsSync('.env')) {
 }
 
 async function main() {
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL is required');
+  }
+
+  const client = new Client(createPostgresClientConfig(connectionString));
   await client.connect();
   const { rows } = await client.query<{
     id: number;

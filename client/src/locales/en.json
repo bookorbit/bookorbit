@@ -3974,7 +3974,6 @@
       "failedWithDuplicates": "{failed} failed ({count} duplicates) | {failed} failed ({count} duplicate) | {failed} failed ({count} duplicates)",
       "view": "View",
       "viewExisting": "View existing",
-      "importAnyway": "Import anyway",
       "hide": "Hide",
       "details": "Details",
       "alreadyExistsSaveAs": "Already exists - save as:",

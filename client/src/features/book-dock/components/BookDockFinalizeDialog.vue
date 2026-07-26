@@ -275,38 +275,6 @@ function goToBook(bookId: number) {
   handleClose()
 }
 
-async function handleReimportDuplicate(fileId: number) {
-  if (!result.value || reimportingIds.has(fileId)) return
-  reimportingIds.add(fileId)
-  try {
-    const payload: Record<string, unknown> = {
-      fileIds: [fileId],
-      overrides: [{ fileId, skipDuplicateCheck: true }],
-    }
-    if (defaultLibraryId.value !== null) payload.defaultLibraryId = defaultLibraryId.value
-    if (defaultFolderId.value !== null) payload.defaultFolderId = defaultFolderId.value
-    const res = await api('/api/v1/book-dock/finalize', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    if (!res.ok) return
-    const newResult = await res.json()
-    const fileResult = (newResult.results as typeof result.value.results)[0]
-    if (!fileResult) return
-    const entry = result.value.results.find((r) => r.fileId === fileId)
-    if (entry) {
-      Object.assign(entry, fileResult)
-      if (fileResult.success) {
-        result.value.succeeded++
-        result.value.failed--
-      }
-    }
-  } finally {
-    reimportingIds.delete(fileId)
-  }
-}
-
 async function discardDuplicateSelection(payload: FinalizePayload): Promise<BookDockDiscardDuplicatesResult | null> {
   const res = await api('/api/v1/book-dock/finalize/discard-duplicates', {
     method: 'POST',
@@ -577,15 +545,6 @@ async function handleDiscardResultDuplicates() {
                   @click="goToBook(r.existingBookId!)"
                 >
                   {{ t('bookDock.finalizeDialog.viewExisting') }} <ExternalLink class="size-3" />
-                </button>
-                <button
-                  v-if="!r.success && r.isDuplicate"
-                  class="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 shrink-0 transition-colors"
-                  :disabled="reimportingIds.has(r.fileId)"
-                  @click="handleReimportDuplicate(r.fileId)"
-                >
-                  <Loader2 v-if="reimportingIds.has(r.fileId)" class="size-3 animate-spin" />
-                  {{ t('bookDock.finalizeDialog.importAnyway') }}
                 </button>
                 <button
                   v-if="!r.success && !r.isDuplicate && r.message && !isFileExistsError(r.message)"

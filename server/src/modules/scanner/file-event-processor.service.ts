@@ -12,6 +12,7 @@ export type FileEventResult =
   | { type: 'book-restored'; libraryId: number; bookIds: number[] }
   | { type: 'book-moved'; libraryId: number; bookIds: number[] }
   | { type: 'book-transferred'; fromLibraryId: number; toLibraryId: number; bookIds: number[] }
+  | { type: 'scan-required'; scope: 'file' | 'directory' }
   | { type: 'noop' };
 
 type FsStat = BigIntStats;
@@ -116,7 +117,9 @@ export class FileEventProcessorService {
       const book =
         (await this.scannerRepo.findMissingBookByFolderPath(dirname(absolutePath), scopeLibraryId)) ??
         (await this.scannerRepo.findMissingBookByFolderPath(absolutePath, scopeLibraryId));
-      if (!book) return { type: 'noop' };
+      if (!book) {
+        return this.fileStateMatches(existing.file, fileStat) ? { type: 'noop' } : { type: 'scan-required', scope: 'file' };
+      }
 
       await this.scannerRepo.updateBookFile(existing.file.id, this.statToFileInfo(fileStat));
       await this.refreshPrimaryFile(book.id, book.libraryId);
@@ -180,7 +183,8 @@ export class FileEventProcessorService {
       }
     }
 
-    return this.detectMovedFile(absolutePath, fileStat, scopeLibraryId);
+    const moveResult = await this.detectMovedFile(absolutePath, fileStat, scopeLibraryId);
+    return moveResult.type === 'noop' ? { type: 'scan-required', scope: 'file' } : moveResult;
   }
 
   async reconcileMissingBooks(libraryIds: number[]): Promise<FileEventResult[]> {
@@ -375,6 +379,10 @@ export class FileEventProcessorService {
     return { ino: s.ino, sizeBytes: Number(s.size), mtime: s.mtime };
   }
 
+  private fileStateMatches(file: { ino: bigint; sizeBytes: number | null; mtime: Date | null }, fileStat: FsStat): boolean {
+    return file.ino === fileStat.ino && file.sizeBytes === Number(fileStat.size) && file.mtime?.getTime() === fileStat.mtime.getTime();
+  }
+
   private async pathIsFile(path: string): Promise<boolean> {
     try {
       const s = await stat(path, { bigint: true });
@@ -395,27 +403,48 @@ export class FileEventProcessorService {
   }
 
   private async detectMovedBooksInDir(dirPath: string, scopeLibraryId?: number): Promise<FileEventResult> {
-    const entries = await readdir(dirPath, { recursive: true, withFileTypes: true }).catch(() => []);
+    const entries = await readdir(dirPath, { recursive: true, withFileTypes: true }).catch(() => null);
+    if (!entries) return { type: 'scan-required', scope: 'directory' };
+
     const movedBookIds: number[] = [];
     let detectedLibraryId: number | null = null;
+    let contentFound = false;
+    let scanRequired = false;
+    const knownBooks = await this.scannerRepo.findBooksByFolderPath(dirPath, scopeLibraryId);
+    const knownFiles = await this.scannerRepo.findBookFilesByBookIds(knownBooks.map((book) => book.id));
+    const knownFileByPath = new Map(knownFiles.map((file) => [file.absolutePath, file]));
 
     for (const entry of entries) {
       if (!entry.isFile()) continue;
       const fullPath = join(entry.parentPath ?? dirPath, entry.name);
       const { role } = classifyFile(fullPath);
       if (role !== 'content') continue;
+      contentFound = true;
 
       const s = await stat(fullPath, { bigint: true }).catch(() => null);
-      if (!s) continue;
+      if (!s) {
+        scanRequired = true;
+        continue;
+      }
+
+      const existing = knownFileByPath.get(fullPath);
+      if (existing) {
+        if (!this.fileStateMatches(existing, s)) scanRequired = true;
+        continue;
+      }
 
       const result = await this.detectMovedFile(fullPath, s, scopeLibraryId);
       if (result.type === 'book-moved') {
         movedBookIds.push(...result.bookIds);
         detectedLibraryId = result.libraryId;
+      } else if (result.type === 'noop') {
+        scanRequired = true;
       }
     }
 
-    if (movedBookIds.length === 0 || !detectedLibraryId) return { type: 'noop' };
+    if (movedBookIds.length === 0 || !detectedLibraryId) {
+      return !contentFound || scanRequired ? { type: 'scan-required', scope: 'directory' } : { type: 'noop' };
+    }
     this.logger.log(
       `[scanner.file_event.move_dir] [end] libraryId=${detectedLibraryId} dirPath="${sanitizeLogValue(dirPath)}" movedCount=${movedBookIds.length} - moved books detected in directory`,
     );

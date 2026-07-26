@@ -1,5 +1,6 @@
 import { MODULE_METADATA } from '@nestjs/common/constants';
 
+import { SelfWriteRegistryModule } from '../../common/self-write-registry.module';
 import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { FileLockService } from './file-lock.service';
 import { FileRenameRepository } from './file-rename.repository';
@@ -22,7 +23,7 @@ describe('FileWriteModule', () => {
     const exportsMeta = Reflect.getMetadata(MODULE_METADATA.EXPORTS, FileWriteModule);
     const importsMeta = Reflect.getMetadata(MODULE_METADATA.IMPORTS, FileWriteModule);
 
-    expect(importsMeta).toEqual(expect.arrayContaining([AppSettingsModule]));
+    expect(importsMeta).toEqual(expect.arrayContaining([AppSettingsModule, SelfWriteRegistryModule]));
     expect(providers).toEqual(
       expect.arrayContaining([
         FileWriteService,

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import type { StringValue } from 'ms';
 
+import { SelfWriteRegistryModule } from '../../common/self-write-registry.module';
 import { AchievementModule } from '../achievement/achievement.module';
 import { AuthModule } from '../auth/auth.module';
 import { BookMetadataFetchModule } from '../book-metadata-fetch/book-metadata-fetch.module';
@@ -21,6 +22,7 @@ import { ScannerService } from './scanner.service';
     MetadataModule,
     AuthModule,
     AchievementModule,
+    SelfWriteRegistryModule,
     forwardRef(() => NotificationModule),
     forwardRef(() => BookMetadataFetchModule),
     JwtModule.registerAsync({

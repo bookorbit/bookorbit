@@ -5,7 +5,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DB } from '../../db';
 import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
 import * as schema from '../../db/schema';
-import { bookDockFiles, type NewBookDockFileRow, type BookDockFileRow } from '../../db/schema';
+import { bookDockFiles, bookFiles, books, type NewBookDockFileRow, type BookDockFileRow } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -116,6 +116,21 @@ export class BookDockRepository {
       .select()
       .from(bookDockFiles)
       .where(and(...conditions));
+  }
+
+  async findExistingBooksByAbsolutePaths(absolutePaths: string[]): Promise<Array<{ absolutePath: string; bookId: number; libraryId: number }>> {
+    const paths = [...new Set(absolutePaths)];
+    if (paths.length === 0) return [];
+
+    return this.db
+      .select({
+        absolutePath: bookFiles.absolutePath,
+        bookId: bookFiles.bookId,
+        libraryId: books.libraryId,
+      })
+      .from(bookFiles)
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .where(inArray(bookFiles.absolutePath, paths));
   }
 
   async findSelectionBatch(options: SelectionBatchOptions): Promise<BookDockFileRow[]> {

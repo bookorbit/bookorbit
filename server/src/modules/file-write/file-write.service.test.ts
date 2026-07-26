@@ -1,7 +1,8 @@
 import { ConfigService } from '@nestjs/config';
 import type { MockedFunction } from 'vitest';
-import { readdir, readFile } from 'fs/promises';
-import { AUDIO_BOOK_FILE_WRITE_FIELDS, EPUB_BOOK_FILE_WRITE_FIELDS } from '@bookorbit/types';
+import { readdir, readFile, stat } from 'fs/promises';
+import { AUDIO_BOOK_FILE_WRITE_FIELDS, EPUB_BOOK_FILE_WRITE_FIELDS, NotificationType } from '@bookorbit/types';
+import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
 
 const { computeFileHashMock } = vi.hoisted(() => ({
   computeFileHashMock: vi.fn(),
@@ -20,11 +21,14 @@ vi.mock('fs/promises', async () => {
     ...actual,
     readdir: vi.fn(),
     readFile: vi.fn(),
+    stat: vi.fn(),
   };
 });
 
 const mockReaddir = readdir as MockedFunction<typeof readdir>;
 const mockReadFile = readFile as MockedFunction<typeof readFile>;
+const mockStat = stat as MockedFunction<typeof stat>;
+const POST_WRITE_MTIME = new Date('2026-07-22T12:34:56.789Z');
 
 const DEFAULT_LIB_CONFIG = {
   fileWriteEnabled: true,
@@ -51,7 +55,7 @@ describe('FileWriteService', () => {
       findLibraryWriteSettingsForBook: vi.fn(),
       insertLog: vi.fn().mockResolvedValue(undefined),
       setLastWrittenAt: vi.fn().mockResolvedValue(undefined),
-      updateFileHash: vi.fn().mockResolvedValue(undefined),
+      updateFileStat: vi.fn().mockResolvedValue(undefined),
       recordHashHistory: vi.fn().mockResolvedValue(undefined),
     };
     const writer = {
@@ -71,15 +75,25 @@ describe('FileWriteService', () => {
     const notificationService = {
       notify: vi.fn().mockResolvedValue(undefined),
     };
-    const service = new FileWriteService(fileWriteRepo as never, registry as never, lockService as never, config, notificationService as never);
+    const selfWriteRegistry = new SelfWriteRegistry();
+    const service = new FileWriteService(
+      fileWriteRepo as never,
+      registry as never,
+      lockService as never,
+      config,
+      notificationService as never,
+      selfWriteRegistry,
+    );
 
-    return { service, fileWriteRepo, registry, writer, lockService, notificationService };
+    return { service, fileWriteRepo, registry, writer, lockService, notificationService, selfWriteRegistry };
   }
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockReaddir.mockReset();
     mockReadFile.mockReset();
+    mockStat.mockReset();
+    mockStat.mockResolvedValue({ mtime: POST_WRITE_MTIME, size: 57n, ino: 9_007_199_254_740_993n } as never);
     computeFileHashMock.mockReset();
     computeFileHashMock.mockRejectedValue(new Error('missing file'));
   });
@@ -280,7 +294,7 @@ describe('FileWriteService', () => {
     expect(fileWriteRepo.recordHashHistory).toHaveBeenCalledWith(1, 'oldhash', 'file_write');
   });
 
-  it('updates file hash after successful write', async () => {
+  it('updates file hash and scanner identity fields after successful write', async () => {
     const { service, fileWriteRepo, writer } = makeService();
 
     fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
@@ -298,8 +312,144 @@ describe('FileWriteService', () => {
 
     await expect(service.writeToFile(5, 'auto')).resolves.toEqual({ status: 'success', fieldsWritten: ['title'], durationMs: 5 });
 
-    expect(fileWriteRepo.updateFileHash).toHaveBeenCalledWith(1, 'newhash');
+    expect(fileWriteRepo.updateFileStat).toHaveBeenCalledWith(1, {
+      fileHash: 'newhash',
+      mtime: POST_WRITE_MTIME,
+      sizeBytes: 57,
+      ino: 9_007_199_254_740_993n,
+    });
     expect(fileWriteRepo.setLastWrittenAt).toHaveBeenCalledWith(5, expect.any(Date));
+  });
+
+  it('persists scanner identity fields when hash recomputation fails', async () => {
+    const { service, fileWriteRepo, writer } = makeService();
+    fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
+      id: 1,
+      absolutePath: '/books/lib/book.epub',
+      format: 'epub',
+      sizeBytes: 40,
+      fileHash: 'oldhash',
+      libraryId: 2,
+    });
+    fileWriteRepo.loadPayload.mockResolvedValue({ title: 'Book' });
+    fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteWriteCover: false });
+    writer.write.mockResolvedValue({ status: 'success', fieldsWritten: ['title'], durationMs: 5 });
+
+    await expect(service.writeToFile(5, 'auto')).resolves.toEqual({ status: 'success', fieldsWritten: ['title'], durationMs: 5 });
+
+    expect(fileWriteRepo.updateFileStat).toHaveBeenCalledWith(1, {
+      mtime: POST_WRITE_MTIME,
+      sizeBytes: 57,
+      ino: 9_007_199_254_740_993n,
+    });
+  });
+
+  it('retries transient post-write stat failures before reporting success', async () => {
+    const { service, fileWriteRepo, writer } = makeService();
+    fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
+      id: 1,
+      absolutePath: '/books/lib/book.epub',
+      format: 'epub',
+      sizeBytes: 40,
+      fileHash: 'oldhash',
+      libraryId: 2,
+    });
+    fileWriteRepo.loadPayload.mockResolvedValue({ title: 'Book' });
+    fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteWriteCover: false });
+    writer.write.mockResolvedValue({ status: 'success', fieldsWritten: ['title'], durationMs: 5 });
+    mockStat.mockRejectedValueOnce(new Error('temporary stat failure'));
+
+    await expect(service.writeToFile(5, 'auto')).resolves.toEqual({ status: 'success', fieldsWritten: ['title'], durationMs: 5 });
+
+    expect(mockStat).toHaveBeenCalledTimes(2);
+    expect(fileWriteRepo.updateFileStat).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries transient scanner identity persistence failures before reporting success', async () => {
+    const { service, fileWriteRepo, writer } = makeService();
+    fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
+      id: 1,
+      absolutePath: '/books/lib/book.epub',
+      format: 'epub',
+      sizeBytes: 40,
+      fileHash: 'oldhash',
+      libraryId: 2,
+    });
+    fileWriteRepo.loadPayload.mockResolvedValue({ title: 'Book' });
+    fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteWriteCover: false });
+    fileWriteRepo.updateFileStat.mockRejectedValueOnce(new Error('temporary database failure'));
+    writer.write.mockResolvedValue({ status: 'success', fieldsWritten: ['title'], durationMs: 5 });
+
+    await expect(service.writeToFile(5, 'auto')).resolves.toEqual({ status: 'success', fieldsWritten: ['title'], durationMs: 5 });
+
+    expect(mockStat).toHaveBeenCalledTimes(2);
+    expect(fileWriteRepo.updateFileStat).toHaveBeenCalledTimes(2);
+    expect(fileWriteRepo.setLastWrittenAt).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps watcher events deferred through scanner identity persistence', async () => {
+    const { service, fileWriteRepo, writer, selfWriteRegistry } = makeService();
+    const path = '/books/lib/book.epub';
+    fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
+      id: 1,
+      absolutePath: path,
+      format: 'epub',
+      sizeBytes: 40,
+      fileHash: 'oldhash',
+      libraryId: 2,
+    });
+    fileWriteRepo.loadPayload.mockResolvedValue({ title: 'Book' });
+    fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteWriteCover: false });
+    writer.write.mockImplementation(() => {
+      expect(selfWriteRegistry.isSuppressed(path)).toBe(true);
+      return Promise.resolve({ status: 'success', fieldsWritten: ['title'], durationMs: 5 });
+    });
+    fileWriteRepo.updateFileStat.mockImplementation(() => {
+      expect(selfWriteRegistry.isSuppressed(path)).toBe(true);
+      return Promise.resolve();
+    });
+
+    await expect(service.writeToFile(5, 'auto')).resolves.toEqual({ status: 'success', fieldsWritten: ['title'], durationMs: 5 });
+
+    expect(selfWriteRegistry.isSuppressed(path)).toBe(false);
+  });
+
+  it('reports and notifies a sync failure when scanner identity fields cannot be refreshed', async () => {
+    const { service, fileWriteRepo, writer, notificationService } = makeService();
+    fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
+      id: 1,
+      absolutePath: '/books/lib/book.epub',
+      format: 'epub',
+      sizeBytes: 40,
+      fileHash: 'oldhash',
+      libraryId: 2,
+    });
+    fileWriteRepo.loadPayload.mockResolvedValue({ title: 'Book' });
+    fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteWriteCover: false });
+    writer.write.mockResolvedValue({ status: 'success', fieldsWritten: ['title'], durationMs: 5 });
+    mockStat.mockRejectedValue(new Error('stat unavailable'));
+
+    await expect(service.writeToFile(5, 'sync', 3)).resolves.toEqual({
+      status: 'failed',
+      fieldsWritten: ['title'],
+      durationMs: expect.any(Number),
+      reason: 'post-write file state refresh failed',
+    });
+
+    expect(mockStat).toHaveBeenCalledTimes(3);
+    expect(fileWriteRepo.updateFileStat).not.toHaveBeenCalled();
+    expect(fileWriteRepo.setLastWrittenAt).not.toHaveBeenCalled();
+    expect(fileWriteRepo.insertLog).toHaveBeenCalledWith(
+      expect.objectContaining({ result: expect.objectContaining({ status: 'failed', reason: 'post-write file state refresh failed' }) }),
+    );
+    expect(notificationService.notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: NotificationType.FileWriteBackFailed,
+        message: 'post-write file state refresh failed',
+        scope: { kind: 'user', userId: 3 },
+        meta: { bookId: 5 },
+      }),
+    );
   });
 
   it('returns skip when library config is not found', async () => {
@@ -465,8 +615,8 @@ describe('FileWriteService', () => {
     );
     expect(fileWriteRepo.recordHashHistory).toHaveBeenNthCalledWith(1, 1, 'm4bhash', 'file_write');
     expect(fileWriteRepo.recordHashHistory).toHaveBeenNthCalledWith(2, 2, 'mp3hash', 'file_write');
-    expect(fileWriteRepo.updateFileHash).toHaveBeenNthCalledWith(1, 1, 'new-m4b');
-    expect(fileWriteRepo.updateFileHash).toHaveBeenNthCalledWith(2, 2, 'new-mp3');
+    expect(fileWriteRepo.updateFileStat).toHaveBeenNthCalledWith(1, 1, expect.objectContaining({ fileHash: 'new-m4b' }));
+    expect(fileWriteRepo.updateFileStat).toHaveBeenNthCalledWith(2, 2, expect.objectContaining({ fileHash: 'new-mp3' }));
     expect(fileWriteRepo.setLastWrittenAt).toHaveBeenCalledTimes(1);
   });
 
@@ -549,7 +699,7 @@ describe('FileWriteService', () => {
     expect(result.status).toBe('failed');
     expect(result.reason).toBe('1 of 2 file writes failed');
     expect(result.fieldsWritten).toEqual(['coverBytes']);
-    expect(fileWriteRepo.updateFileHash).toHaveBeenCalledWith(1, 'new-m4b');
+    expect(fileWriteRepo.updateFileStat).toHaveBeenCalledWith(1, expect.objectContaining({ fileHash: 'new-m4b' }));
     expect(fileWriteRepo.setLastWrittenAt).not.toHaveBeenCalled();
     expect(fileWriteRepo.insertLog).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -841,6 +991,7 @@ describe('FileWriteService', () => {
         { withLock: vi.fn().mockImplementation(async (_: string, fn: () => Promise<unknown>) => fn()) } as never,
         { get: vi.fn().mockImplementation((key: string) => (key === 'storage.appDataPath' ? '/books' : undefined)) } as unknown as ConfigService,
         notificationService as never,
+        new SelfWriteRegistry(),
       );
 
       fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
@@ -868,6 +1019,7 @@ describe('FileWriteService', () => {
         { withLock: vi.fn().mockImplementation(async (_: string, fn: () => Promise<unknown>) => fn()) } as never,
         { get: vi.fn().mockImplementation((key: string) => (key === 'storage.appDataPath' ? '/books' : undefined)) } as unknown as ConfigService,
         notificationService as never,
+        new SelfWriteRegistry(),
       );
 
       fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({

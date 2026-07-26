@@ -4,6 +4,7 @@ import { Pool } from 'pg';
 
 import { aggregateReadingSessionDailyStats } from '../common/utils/reading-daily-stats.utils';
 import { resolveTimeZone } from '../common/utils/timezone.utils';
+import { createPostgresClientConfig } from '../db/postgres-connection-config';
 import * as schema from '../db/schema';
 
 const INSERT_CHUNK_SIZE = 1_000;
@@ -14,12 +15,13 @@ async function runBackfill() {
     throw new Error('DATABASE_URL is required');
   }
 
-  const pool = new Pool({
-    connectionString,
-    max: 3,
-    idleTimeoutMillis: 10_000,
-    connectionTimeoutMillis: 5_000,
-  });
+  const pool = new Pool(
+    createPostgresClientConfig(connectionString, {
+      max: 3,
+      idleTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 5_000,
+    }),
+  );
 
   const db = drizzle(pool, { schema });
 
