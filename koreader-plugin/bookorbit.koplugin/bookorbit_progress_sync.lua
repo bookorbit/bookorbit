@@ -84,10 +84,6 @@ function ProgressSync:syncToProgress(progress, percentage_fallback)
     end
 end
 
-local function hasUsableRemoteProgress(progress)
-    return progress ~= nil and progress ~= ""
-end
-
 function ProgressSync:remoteProgressIsNewer(body, local_percentage)
     local local_timestamp = self.last_page_turn_timestamp or 0
     if body.timestamp ~= nil then
@@ -149,19 +145,6 @@ function ProgressSync:reconcileProgressBeforeBookSync(digest, on_done)
     end
 
     local remote_newer = self:remoteProgressIsNewer(body, local_percentage)
-    if not hasUsableRemoteProgress(body.progress) then
-        if remote_newer then
-            UIManager:show(InfoMessage:new{
-                text = _("BookOrbit has newer progress but no exact location. Syncing book data without changing progress."),
-                timeout = 4,
-            })
-            on_done(true)
-        else
-            on_done(false)
-        end
-        return true
-    end
-
     local strategy = remote_newer and self.settings.sync_forward or self.settings.sync_backward
     if strategy == SYNC_STRATEGY.SILENT then
         self:applyRemoteProgress(body, on_done)
