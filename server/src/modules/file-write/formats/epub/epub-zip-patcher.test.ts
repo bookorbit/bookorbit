@@ -132,6 +132,9 @@ describe('epub-zip-patcher', () => {
 
     expect(missingEntry.stream).toHaveBeenCalledTimes(1);
     expect(mockRename).not.toHaveBeenCalled();
+    // the archive never reached the atomic replace, so the partial temp file must
+    // still be cleaned up here rather than left next to the book
+    expect(mockUnlink).toHaveBeenCalledWith('/book.epub.tmp');
   });
 
   it('deletes temp file when rename fails', async () => {

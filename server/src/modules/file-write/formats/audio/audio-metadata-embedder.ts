@@ -1,13 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { execFile as execFileCallback } from 'child_process';
 import { randomUUID } from 'crypto';
-import { unlink, writeFile } from 'fs/promises';
+import { writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import sharp from 'sharp';
 import { promisify } from 'util';
 
 import { FORMAT_M4A, FORMAT_M4B, FORMAT_MP3 } from '../../file-write.constants';
 import { replaceFileAtomically } from '../shared/atomic-file-replace';
+import { removeFileIfPresent } from '../shared/remove-file-if-present';
 
 const execFile = promisify(execFileCallback);
 const FFMPEG_OUTPUT_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
@@ -133,14 +134,6 @@ function resolveFfmpegPath(): string {
 
 function resolveFfprobePath(): string {
   return process.env.FFPROBE_PATH || 'ffprobe';
-}
-
-async function removeFileIfPresent(path: string): Promise<void> {
-  try {
-    await unlink(path);
-  } catch {
-    // Cleanup is best-effort; preserve the primary write result or error.
-  }
 }
 
 export const testing = {

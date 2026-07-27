@@ -135,6 +135,9 @@ describe('cbz-zip-patcher', () => {
 
     expect(imageEntry.stream).toHaveBeenCalledTimes(1);
     expect(mockRename).not.toHaveBeenCalled();
+    // the archive never reached the atomic replace, so the partial temp file must
+    // still be cleaned up here rather than left next to the book
+    expect(mockUnlink).toHaveBeenCalledWith(expect.stringContaining('.cbx-write-uuid-1234'));
   });
 
   it('deletes temp archive when rename fails', async () => {

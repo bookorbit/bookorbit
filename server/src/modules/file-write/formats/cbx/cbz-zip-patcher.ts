@@ -5,6 +5,7 @@ import type { Readable } from 'stream';
 import * as unzipper from 'unzipper';
 import { ZipArchive, type Archiver } from 'archiver';
 import { replaceFileAtomically } from '../shared/atomic-file-replace';
+import { removeFileIfPresent } from '../shared/remove-file-if-present';
 
 function isComicInfoEntry(entryPath: string): boolean {
   const normalized = entryPath.replace(/\\/g, '/').toLowerCase();
@@ -24,25 +25,31 @@ export async function writeComicInfoToZip(filePath: string, xmlContent: string):
   const xmlEntryPath = existing?.path ?? 'ComicInfo.xml';
 
   const tmpPath = join(dirname(filePath), `.cbx-write-${randomUUID()}`);
-  const archive = new ZipArchive({ zlib: { level: 6 } });
-  const output = createWriteStream(tmpPath);
 
-  await new Promise<void>((resolve, reject) => {
-    output.on('close', resolve);
-    output.on('error', reject);
-    archive.on('error', reject);
-    archive.pipe(output);
+  try {
+    const archive = new ZipArchive({ zlib: { level: 6 } });
+    const output = createWriteStream(tmpPath);
 
-    for (const entry of zip.files) {
-      if (isComicInfoEntry(entry.path)) continue;
-      appendEntryStream(archive, entry, reject);
-    }
+    await new Promise<void>((resolve, reject) => {
+      output.on('close', resolve);
+      output.on('error', reject);
+      archive.on('error', reject);
+      archive.pipe(output);
 
-    archive.append(Buffer.from(xmlContent, 'utf-8'), { name: xmlEntryPath });
-    void archive.finalize();
-  });
+      for (const entry of zip.files) {
+        if (isComicInfoEntry(entry.path)) continue;
+        appendEntryStream(archive, entry, reject);
+      }
 
-  await replaceFileAtomically(tmpPath, filePath);
+      archive.append(Buffer.from(xmlContent, 'utf-8'), { name: xmlEntryPath });
+      void archive.finalize();
+    });
+
+    await replaceFileAtomically(tmpPath, filePath);
+  } catch (error) {
+    await removeFileIfPresent(tmpPath);
+    throw error;
+  }
 }
 
 function appendEntryStream(archive: Archiver, entry: { path: string; stream: () => Readable }, reject: (error: Error) => void): void {
