@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { stat } from 'fs/promises';
 import * as unzipper from 'unzipper';
 import { XMLParser } from 'fast-xml-parser';
@@ -88,7 +88,7 @@ async function readEntryBounded(entry: unzipper.File, maxBytes: number): Promise
     total += chunk.length;
     if (total > maxBytes) {
       stream.destroy();
-      throw new Error(`EPUB entry exceeds maximum allowed size of ${maxBytes} bytes: ${entry.path}`);
+      throw new UnprocessableEntityException(`EPUB entry exceeds maximum allowed size of ${maxBytes} bytes: ${entry.path}`);
     }
     chunks.push(chunk);
   }
@@ -247,7 +247,7 @@ async function parseEpub(epubPath: string): Promise<EpubBookInfo> {
 
   let coverPath: string | null = manifest.find((m) => m.properties?.includes('cover-image'))?.href ?? null;
   if (!coverPath && metadataEl) {
-    const coverMeta = toArray(metadataEl['meta'] as any).find((m: any) => m['@_name'] === 'cover');
+    const coverMeta = toArray((metadataEl['meta'] ?? metadataEl['opf:meta']) as any).find((m: any) => m['@_name'] === 'cover');
     if (coverMeta) coverPath = manifestById.get((coverMeta as any)['@_content'])?.href ?? null;
   }
 
