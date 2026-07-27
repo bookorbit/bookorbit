@@ -40,6 +40,7 @@ vi.mock('unzipper', () => ({
   },
 }));
 
+let lastOutput: EventEmitter & { closed: boolean; destroy: () => void };
 let lastArchive: EventEmitter & {
   append: vi.Mock;
   pipe: vi.Mock;
@@ -79,7 +80,18 @@ describe('cbz-zip-patcher', () => {
     mockRandomUuid.mockReturnValue('uuid-1234');
     mockRename.mockResolvedValue(undefined);
     mockUnlink.mockResolvedValue(undefined);
-    mockCreateWriteStream.mockImplementation(() => new EventEmitter() as never);
+    // model a real WriteStream closely enough to observe handle release ordering:
+    // destroy() must be what triggers 'close', so cleanup can await it
+    mockCreateWriteStream.mockImplementation(() => {
+      const output = new EventEmitter() as EventEmitter & { closed: boolean; destroy: () => void };
+      output.closed = false;
+      output.destroy = vi.fn(() => {
+        output.closed = true;
+        output.emit('close');
+      });
+      lastOutput = output;
+      return output as never;
+    });
   });
 
   it('readComicInfoFromZip finds comicinfo case-insensitively in root or nested paths', async () => {
@@ -138,6 +150,10 @@ describe('cbz-zip-patcher', () => {
     // the archive never reached the atomic replace, so the partial temp file must
     // still be cleaned up here rather than left next to the book
     expect(mockUnlink).toHaveBeenCalledWith(expect.stringContaining('.cbx-write-uuid-1234'));
+    // and the writer must be closed first, or the unlink fails on an open handle
+    // and gets swallowed by best-effort cleanup
+    expect(lastOutput.destroy).toHaveBeenCalled();
+    expect((lastOutput.destroy as unknown as vi.Mock).mock.invocationCallOrder[0]).toBeLessThan(mockUnlink.mock.invocationCallOrder[0]);
   });
 
   it('deletes temp archive when rename fails', async () => {

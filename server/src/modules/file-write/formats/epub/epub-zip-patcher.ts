@@ -3,6 +3,7 @@ import type { Readable } from 'stream';
 import * as unzipper from 'unzipper';
 import { ZipArchive, type Archiver } from 'archiver';
 import { replaceFileAtomically } from '../shared/atomic-file-replace';
+import { destroyAndClose } from '../shared/destroy-and-close';
 import { removeFileIfPresent } from '../shared/remove-file-if-present';
 
 export async function readEntry(filePath: string, entryPath: string): Promise<string> {
@@ -21,10 +22,10 @@ export async function patch(filePath: string, patches: Map<string, Buffer>): Pro
   const tmpPath = filePath + '.tmp';
   const zip = await unzipper.Open.file(filePath);
 
-  try {
-    const archive = new ZipArchive({ zlib: { level: 6 } });
-    const output = createWriteStream(tmpPath);
+  const archive = new ZipArchive({ zlib: { level: 6 } });
+  const output = createWriteStream(tmpPath);
 
+  try {
     await new Promise<void>((resolve, reject) => {
       output.on('close', resolve);
       output.on('error', reject);
@@ -54,6 +55,10 @@ export async function patch(filePath: string, patches: Map<string, Buffer>): Pro
 
     await replaceFileAtomically(tmpPath, filePath);
   } catch (error) {
+    // the writer may still hold tmpPath open, so stop it and wait for the handle to
+    // be released before unlinking, otherwise the delete fails and is swallowed
+    if (typeof archive.destroy === 'function') archive.destroy();
+    await destroyAndClose(output);
     await removeFileIfPresent(tmpPath);
     throw error;
   }
