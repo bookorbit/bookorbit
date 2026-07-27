@@ -1,7 +1,7 @@
 vi.mock('fs/promises', () => ({ stat: vi.fn() }));
 vi.mock('unzipper', () => ({ Open: { file: vi.fn() } }));
 
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { stat } from 'fs/promises';
 import { Readable } from 'stream';
 import * as unzipper from 'unzipper';
@@ -27,7 +27,7 @@ function zipEntry(spec: ZipEntrySpec) {
     uncompressedSize: spec.uncompressedSize ?? content.length,
     buffer: spec.bufferError ? vi.fn().mockRejectedValue(spec.bufferError) : vi.fn().mockResolvedValue(content),
     // bufferError models "this entry cannot be read", so it must fail the stream path
-    // too — structural XML entries are read via stream() rather than buffer().
+    // too, because structural XML entries are read via stream() rather than buffer().
     stream: vi.fn(() =>
       spec.bufferError
         ? new Readable({
@@ -92,10 +92,12 @@ const OPF_XML_NAMESPACED = `
 <opf:package xmlns:opf="http://www.idpf.org/2007/opf" version="3.0">
   <opf:metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:title>Reader Test</dc:title>
+    <opf:meta name="cover" content="cover-image" />
   </opf:metadata>
   <opf:manifest>
     <opf:item id="chap1" href="text/ch1.xhtml" media-type="application/xhtml+xml" />
     <opf:item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml" />
+    <opf:item id="cover-image" href="images/cover.jpg" media-type="image/jpeg" />
   </opf:manifest>
   <opf:spine>
     <opf:itemref idref="chap1" />
@@ -246,8 +248,10 @@ describe('EpubService', () => {
     const info = await service.getBookInfo(99, undefined, user);
 
     expect(info.metadata).toEqual(expect.objectContaining({ title: 'Reader Test' }));
-    expect(info.manifest.map((m) => m.id)).toEqual(['chap1', 'ncx']);
+    expect(info.manifest.map((m) => m.id)).toEqual(['chap1', 'ncx', 'cover-image']);
     expect(info.spine.map((s) => s.href)).toEqual(['OPS/text/ch1.xhtml']);
+    // legacy <opf:meta name="cover"> must resolve too, not just the unprefixed form
+    expect(info.coverPath).toBe('OPS/images/cover.jpg');
   });
 
   it('rejects a structural XML entry that exceeds the size cap instead of buffering it', async () => {
@@ -256,7 +260,7 @@ describe('EpubService', () => {
       makeArchive([{ path: 'META-INF/container.xml', content: oversized, uncompressedSize: oversized.length }]) as any,
     );
 
-    await expect(service.getBookInfo(99, undefined, user)).rejects.toThrow(/exceeds maximum allowed size/);
+    await expect(service.getBookInfo(99, undefined, user)).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 
   it('falls back to NCX TOC when nav parsing fails', async () => {
