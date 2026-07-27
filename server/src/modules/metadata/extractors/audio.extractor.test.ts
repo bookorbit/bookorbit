@@ -660,7 +660,7 @@ describe('extractAudioMetadata — failure tolerance', () => {
     expect(mockExecFile).toHaveBeenCalledWith(
       'ffprobe',
       ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_chapters', '-show_streams', '/books/my-audiobook.m4b'],
-      expect.objectContaining({ timeout: expect.any(Number), maxBuffer: expect.any(Number) }),
+      { maxBuffer: 10 * 1024 * 1024, timeout: 60_000 },
       expect.any(Function),
     );
   });
@@ -711,7 +711,7 @@ describe('parseAudioDuration', () => {
     expect(mockExecFile).toHaveBeenCalledWith(
       'ffprobe',
       ['-v', 'quiet', '-print_format', 'json', '-show_format', '/books/test.mp3'],
-      expect.objectContaining({ timeout: expect.any(Number), maxBuffer: expect.any(Number) }),
+      { maxBuffer: 10 * 1024 * 1024, timeout: 60_000 },
       expect.any(Function),
     );
   });

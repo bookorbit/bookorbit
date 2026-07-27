@@ -45,6 +45,23 @@ describe('extractPdfCover', () => {
     expect(mockRm).toHaveBeenCalledWith('/tmp/pdf-cover-abc', { recursive: true, force: true });
   });
 
+  it('invokes pdftoppm with a bounded timeout and maxBuffer', async () => {
+    mockExecFile.mockImplementation((_file, _args, optionsOrCallback, maybeCallback) => {
+      const callback = (typeof optionsOrCallback === 'function' ? optionsOrCallback : maybeCallback) as (
+        err: Error | null,
+        stdout: string,
+        stderr: string,
+      ) => void;
+      callback?.(null, '', '');
+      return {} as never;
+    });
+    mockReadFile.mockResolvedValue(Buffer.from('cover-bytes'));
+
+    await extractPdfCover('/books/test.pdf');
+
+    expect(mockExecFile).toHaveBeenCalledWith('pdftoppm', expect.any(Array), { maxBuffer: 10 * 1024 * 1024, timeout: 60_000 }, expect.any(Function));
+  });
+
   it('cleans up temp directory even when pdftoppm fails', async () => {
     mockExecFile.mockImplementation((_file, _args, optionsOrCallback, maybeCallback) => {
       const callback = (typeof optionsOrCallback === 'function' ? optionsOrCallback : maybeCallback) as (
