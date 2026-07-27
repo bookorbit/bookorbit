@@ -26,7 +26,17 @@ function zipEntry(spec: ZipEntrySpec) {
     path: spec.path,
     uncompressedSize: spec.uncompressedSize ?? content.length,
     buffer: spec.bufferError ? vi.fn().mockRejectedValue(spec.bufferError) : vi.fn().mockResolvedValue(content),
-    stream: vi.fn(() => Readable.from(streamContent)),
+    // bufferError models "this entry cannot be read", so it must fail the stream path
+    // too — structural XML entries are read via stream() rather than buffer().
+    stream: vi.fn(() =>
+      spec.bufferError
+        ? new Readable({
+            read() {
+              this.destroy(spec.bufferError);
+            },
+          })
+        : Readable.from(streamContent),
+    ),
   };
 }
 
@@ -74,6 +84,23 @@ const OPF_XML = `
     <itemref idref="chap2" linear="no" />
   </spine>
 </package>
+`;
+
+// Same package as OPF_XML but with every structural element carrying an explicit
+// `opf:` namespace prefix, which is valid per the EPUB spec.
+const OPF_XML_NAMESPACED = `
+<opf:package xmlns:opf="http://www.idpf.org/2007/opf" version="3.0">
+  <opf:metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Reader Test</dc:title>
+  </opf:metadata>
+  <opf:manifest>
+    <opf:item id="chap1" href="text/ch1.xhtml" media-type="application/xhtml+xml" />
+    <opf:item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml" />
+  </opf:manifest>
+  <opf:spine>
+    <opf:itemref idref="chap1" />
+  </opf:spine>
+</opf:package>
 `;
 
 const NAV_XHTML = `
@@ -204,6 +231,32 @@ describe('EpubService', () => {
       }),
     );
     expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(10, 3, false);
+  });
+
+  it('parses an OPF whose package/manifest/spine elements use an explicit opf: prefix', async () => {
+    mockOpenFile.mockResolvedValueOnce(
+      makeArchive([
+        { path: 'META-INF/container.xml', content: CONTAINER_XML },
+        { path: 'OPS/content.opf', content: OPF_XML_NAMESPACED },
+        { path: 'OPS/toc.ncx', content: NCX_XML },
+        { path: 'OPS/text/ch1.xhtml', content: '<h1>ch1</h1>' },
+      ]) as any,
+    );
+
+    const info = await service.getBookInfo(99, undefined, user);
+
+    expect(info.metadata).toEqual(expect.objectContaining({ title: 'Reader Test' }));
+    expect(info.manifest.map((m) => m.id)).toEqual(['chap1', 'ncx']);
+    expect(info.spine.map((s) => s.href)).toEqual(['OPS/text/ch1.xhtml']);
+  });
+
+  it('rejects a structural XML entry that exceeds the size cap instead of buffering it', async () => {
+    const oversized = Buffer.alloc(11 * 1024 * 1024, 0x20);
+    mockOpenFile.mockResolvedValueOnce(
+      makeArchive([{ path: 'META-INF/container.xml', content: oversized, uncompressedSize: oversized.length }]) as any,
+    );
+
+    await expect(service.getBookInfo(99, undefined, user)).rejects.toThrow(/exceeds maximum allowed size/);
   });
 
   it('falls back to NCX TOC when nav parsing fails', async () => {
