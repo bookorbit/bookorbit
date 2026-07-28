@@ -467,7 +467,7 @@
       },
       "feedback": {
         "unsavedChanges": "Niet-opgeslagen wijzigingen",
-        "allSaved": "Alle wijzigingen opgeslagen"
+        "discard": "Discard"
       },
       "profile": {
         "securityHeading": "Profiel & Beveiliging",
@@ -484,7 +484,11 @@
         "accountTypeLocal": "Lokaal",
         "nameRequired": "Naam is verplicht",
         "updateFailed": "Bijwerken van profiel mislukt",
-        "updated": "Profiel bijgewerkt"
+        "updated": "Profiel bijgewerkt",
+        "usernameHint": "Your username cannot be changed.",
+        "passwordHint": "Change the password you use to sign in.",
+        "passwordHintOidc": "Your password is managed by your identity provider.",
+        "passwordHintShared": "Shared accounts sign in through a magic link and have no password."
       },
       "readingPreferences": {
         "title": "Leesvoorkeuren",
@@ -492,7 +496,10 @@
         "timezone": "Tijdzone",
         "save": "Voorkeuren opslaan",
         "enableAchievements": "Prestaties inschakelen",
-        "enableAchievementsHint": "Houd de voortgang van prestaties bij en toon prestatiegerelateerde onderdelen. Beheer prestatiemeldingen afzonderlijk onder Meldingen."
+        "enableAchievementsHint": "Houd de voortgang van prestaties bij en toon prestatiegerelateerde onderdelen. Beheer prestatiemeldingen afzonderlijk onder Meldingen.",
+        "achievementsEnabled": "Achievements enabled",
+        "achievementsDisabled": "Achievements disabled",
+        "achievementsSaveFailed": "Failed to update the achievement preference"
       },
       "preferences": {
         "saveFailed": "Opslaan van voorkeuren mislukt",
@@ -534,7 +541,9 @@
           "title": "{provider}-identiteit ontkoppelen?",
           "description": "Voer je wachtwoord in om te bevestigen. Je kunt daarna niet meer inloggen met deze provider.",
           "currentPassword": "Huidig wachtwoord"
-        }
+        },
+        "description": "Sign in with an external identity provider linked to this account.",
+        "unlinkAria": "Unlink {provider}"
       },
       "tour": {
         "title": "Rondleiding",
@@ -563,6 +572,11 @@
           "title": "Geblokkeerde genres",
           "description": "Boeken met een van deze genres worden voor je verborgen."
         }
+      },
+      "groups": {
+        "profile": "Profile",
+        "preferences": "Preferences",
+        "security": "Security & access"
       }
     },
     "magicLinks": {
@@ -596,10 +610,10 @@
         "createdBy": "Gemaakt door",
         "expires": "Verloopt",
         "uses": "Gebruik",
-        "lastUsed": "Laatst gebruikt",
         "created": "Gemaakt",
         "status": "Status",
-        "totalUses": "Totaal gebruik"
+        "totalUses": "Totaal gebruik",
+        "actions": "Actions"
       },
       "createDialog": {
         "title": "Magic link maken",
@@ -627,7 +641,12 @@
       "emptyTitle": "Nog geen magische links aangemaakt",
       "emptyHint": "Klik op \"{action}\" om een deelbare login-URL te genereren.",
       "noActiveTitle": "Geen actieve magische links",
-      "noActiveHint": "Alle gegenereerde magische links voor deze pagina zijn verlopen of ingetrokken."
+      "noActiveHint": "Alle gegenereerde magische links voor deze pagina zijn verlopen of ingetrokken.",
+      "copyLinkAria": "Copy the link for {label}",
+      "pauseAria": "Pause {label}",
+      "resumeAria": "Resume {label}",
+      "revokeAria": "Revoke {label}",
+      "lastUsedLabel": "Last used {date}"
     },
     "oidc": {
       "title": "OIDC / SSO",
@@ -1692,9 +1711,6 @@
         "subtitle": "Bepaal hoe bestanden op de schijf worden georganiseerd bij het uploaden en hoe ze worden benoemd bij het downloaden met behulp van placeholdertokens.",
         "copy": "Kopiëren",
         "previewLabel": "Voorbeeld:",
-        "fileAsBookPreview": "Voorbeeld Bestand als Boek",
-        "folderAsBookPreview": "Voorbeeld Map als Boek",
-        "downloadPreview": "Voorbeeld download",
         "globalDefaults": "Algemene standaardwaarden",
         "crossPlatform": "Platformonafhankelijke padopschoning",
         "crossPlatformHint": "Maak gegenereerde bestands- en mapnamen veilig op Windows door ongeldige tekens en gereserveerde namen te vervangen en volgpunten en spaties te verwijderen. Schakel dit alleen uit voor Linux-only-configuraties die die tekens bewust behouden.",
@@ -1711,15 +1727,10 @@
         "orgFolderAsBook": "Map als Boek",
         "orgFileAsBook": "Bestand als Boek",
         "resetToDefault": "Standaardwaarde herstellen",
-        "patternReference": "Patroonreferentie",
-        "placeholderReference": "Placeholderreferentie",
-        "placeholderReferenceHint": "- gids voor het maken van aangepaste naamgevingspatronen",
         "tokens": "Tokens",
-        "tokensHint": "Kopieer placeholders snel",
         "clickTokenHint": "Klik op een token om het naar je klembord te kopiëren.",
         "copyValue": "Kopieer {value}",
         "modifiers": "Modificaties",
-        "modifiersHint": "Tokenwaarden transformeren",
         "modifiersExplain": "Voeg een modificatie toe binnen een token om de waarde te transformeren:",
         "modFirst": "Alleen eerste waarde",
         "modSort": "Achternaam, voornaam-notatie",
@@ -1728,14 +1739,10 @@
         "folderOnlyPrefix": "Beëindig een patroon met",
         "folderOnlySuffix": "om alleen een map op te geven. De oorspronkelijke bestandsnaam blijft daarbinnen behouden.",
         "conditionalLogic": "Voorwaardelijke logica",
-        "conditionalLogicHint": "Optionele segmenten en terugvallen",
         "conditionalPart1": "Zet tussen",
         "conditionalPart2": "om een segment over te slaan wanneer het token leeg is. Gebruik",
         "conditionalPart3": "voor een standaardwaarde.",
         "examples": "Voorbeelden",
-        "patternExamples": "Patroonvoorbeelden",
-        "patternExamplesHint": "Kant-en-klare patronen voor veelvoorkomende bibliotheekstijlen",
-        "copyPatternTooltip": "Patroon naar klembord kopiëren",
         "exCalibre": "Calibre-achtige standaard",
         "exSeriesReader": "Reekslezer",
         "exCleanDownload": "Nette downloadbestandsnaam",
@@ -1763,7 +1770,37 @@
         "patternCopied": "Patroon gekopieerd naar klembord",
         "copyPatternFailed": "Kan patroon niet kopiëren",
         "labelCopied": "{label} gekopieerd naar klembord",
-        "copyLabelFailed": "Kan {label} niet kopiëren"
+        "copyLabelFailed": "Kan {label} niet kopiëren",
+        "patternHelp": "Pattern help",
+        "patternHelpDescription": "Tokens, modifiers and ready-made patterns you can copy into any field.",
+        "copyPreview": "Copy {label}",
+        "copyExample": "Copy the {label} pattern",
+        "invalidCharacters": "Pattern contains invalid characters",
+        "fileAsBookSaved": "File as Book default saved",
+        "folderAsBookSaved": "Folder as Book default saved",
+        "downloadPatternSaved": "Download pattern saved",
+        "savePatternFailed": "Failed to save pattern",
+        "saveDownloadPatternFailed": "Failed to save download pattern",
+        "crossPlatformEnabled": "Cross-platform path sanitization enabled",
+        "crossPlatformDisabled": "Cross-platform path sanitization disabled",
+        "crossPlatformSaveFailed": "Failed to save cross-platform path sanitization",
+        "librarySaved": "Pattern saved for {name}",
+        "librarySaveFailed": "Failed to save library pattern",
+        "saveLibraryPattern": "Save pattern for {name}",
+        "resetLibraryPattern": "Reset {name} to the default pattern",
+        "tokenTitle": "Book title",
+        "tokenSubtitle": "Book subtitle",
+        "tokenAuthors": "Author(s), comma-separated",
+        "tokenYear": "Publication year",
+        "tokenSeries": "Series name",
+        "tokenSeriesIndex": "Series index (zero-padded)",
+        "tokenPublisher": "Publisher",
+        "tokenIsbn": "ISBN-13",
+        "tokenLanguage": "Language",
+        "tokenOriginalFilename": "Original filename (without extension)",
+        "tokenExtension": "File extension (without dot)",
+        "patternHelpIntro": "Patterns use tokens like {titleToken} and {authorsToken}, plus modifiers and optional segments.",
+        "browseTokensAndExamples": "Browse tokens and examples"
       },
       "kobo": {
         "title": "Kobo-synchronisatie",
@@ -2451,19 +2488,15 @@
     },
     "usersPage": {
       "usersTitle": "Gebruikers",
-      "magicLinksTitle": "Magic Links",
       "usersSubtitle": "Beheer gebruikersaccounts en rechtentoewijzingen.",
-      "magicLinksSubtitle": "Maak deelbare inloglinks voor gedeelde accounts.",
       "createUser": "Gebruiker aanmaken",
-      "createLink": "Link aanmaken",
-      "usersTab": "Gebruikers",
-      "magicLinksTab": "Magic Links",
       "columns": {
         "name": "Naam",
         "username": "Gebruikersnaam",
         "email": "E-mail",
         "access": "Toegang",
-        "status": "Status"
+        "status": "Status",
+        "actions": "Actions"
       },
       "adminBadge": "Beheer",
       "permissionCount": "{count, plural, =0 {geen rechten} one {één recht} other {# rechten}}",
@@ -2481,11 +2514,10 @@
       "deleteDialogBody": "Gebruiker \"{username}\" verwijderen. Deze actie kan niet ongedaan worden gemaakt.",
       "deleting": "Verwijderen...",
       "errors": {
-        "loadData": "Gegevens laden mislukt",
         "load": "Laden mislukt",
-        "deleteUser": "Gebruiker verwijderen mislukt"
+        "deleteUser": "Gebruiker verwijderen mislukt",
+        "resetPassword": "Failed to create a password reset link"
       },
-      "currentUsers": "Huidige gebruikers",
       "defaultLibraryAccess": {
         "title": "Standaard bibliotheektoegang",
         "subtitle": "Kijktoegang voor zelf-geregistreerde en via OIDC aangemaakte gebruikers.",
@@ -2493,9 +2525,37 @@
         "noLibraries": "Geen bibliotheken beschikbaar.",
         "save": "Standaardwaarden opslaan",
         "saving": "Opslaan...",
-        "saved": "Standaard bibliotheektoegang opgeslagen.",
         "saveError": "Opslaan van standaard bibliotheektoegang mislukt"
-      }
+      },
+      "filters": {
+        "search": "Search users",
+        "searchPlaceholder": "Search by name, username or email",
+        "sort": "Sort users",
+        "usernameAsc": "Username A-Z",
+        "nameAsc": "Name A-Z",
+        "newest": "Newest first",
+        "oldest": "Oldest first",
+        "apply": "Apply",
+        "clear": "Clear",
+        "state": "Filter users",
+        "allUsers": "All users",
+        "admins": "Administrators",
+        "active": "Active",
+        "inactive": "Inactive"
+      },
+      "empty": {
+        "title": "No users yet",
+        "description": "Create the first account to get started.",
+        "filtered": "No users match the current search and filters."
+      },
+      "pagination": {
+        "label": "Users pagination",
+        "page": "Page {page} of {totalPages}"
+      },
+      "editUserAria": "Edit {name}",
+      "resetPasswordAria": "Reset the password for {name}",
+      "deleteUserAria": "Delete {name}",
+      "moreActionsAria": "More actions for {name}"
     }
   },
   "annotations": {
@@ -4298,17 +4358,17 @@
         "title": "Vind je BookOrbit leuk?",
         "body": "Als BookOrbit je helpt met je bibliotheek, overweeg dan om het project een ster te geven op GitHub. Het helpt meer mensen de app te ontdekken en ondersteunt de doorlopende ontwikkeling.",
         "cta": "Geef BookOrbit een ster op GitHub"
-      }
+      },
+      "surfaceOpacity": "Surface opacity",
+      "surfaceOpacityValue": "{value}%"
     },
     "sidebar": {
-      "tagline": "Jouw leesruimte",
       "dashboard": "Dashboard",
       "authors": "Auteurs",
       "series": "Reeksen",
       "tools": "Hulpmiddelen",
       "libraries": "Bibliotheken",
       "newLibrary": "Nieuwe bibliotheek",
-      "libraryScanning": "{name} - Scannen {pct}%",
       "scanProgress": "{processed} / {total} boeken",
       "smartScopes": "Smart Scopes",
       "newSmartScope": "Nieuwe Smart Scope",
@@ -4316,15 +4376,41 @@
       "collections": "Collecties",
       "newCollection": "Nieuwe collectie",
       "noCollections": "Nog geen collecties",
-      "latest": "Nieuwste {version}",
       "newReleaseNotes": "Nieuwe release-opmerkingen beschikbaar",
       "support": "BookOrbit ondersteunen",
-      "supportShort": "Ondersteunen",
       "supportAria": "BookOrbit ondersteunen op Ko-fi",
       "sectionHeader": {
         "add": "Toevoegen",
+        "showAll": "Show all",
+        "showCount": "Show {count}",
+        "rowsShown": "Rows shown",
+        "menuAria": "Section options for {section}",
         "reorder": "Herschikken",
         "doneReordering": "Klaar met herschikken"
+      },
+      "noLibraries": "No libraries yet",
+      "clearFilter": "Clear filter",
+      "filterSummary": "{shown} of {total} shown",
+      "filterLibraries": "Filter libraries",
+      "filterLibrariesPlaceholder": "Filter libraries...",
+      "filterSmartScopes": "Filter smart scopes",
+      "filterSmartScopesPlaceholder": "Filter smart scopes...",
+      "filterCollections": "Filter collections",
+      "filterCollectionsPlaceholder": "Filter collections...",
+      "seeAllLibraries": "See all libraries ({count})",
+      "seeAllSmartScopes": "See all smart scopes ({count})",
+      "seeAllCollections": "See all collections ({count})",
+      "updateAvailable": "Update {version}",
+      "zones": {
+        "browse": "Browse"
+      },
+      "reorder": {
+        "gripAria": "Reorder {name}",
+        "lifted": "{name} lifted, position {position} of {total}. Use the arrow keys to move it.",
+        "moved": "{name}, position {position} of {total}",
+        "dropped": "{name} dropped at position {position} of {total}",
+        "cancelled": "Reorder cancelled. {name} returned to position {position} of {total}.",
+        "filteredHint": "Clear the filter to reorder"
       }
     },
     "selectionActionBar": {
@@ -4424,6 +4510,24 @@
         "typeAndEnter": "Typ en druk op Enter om toe te voegen",
         "pressEnter": "Druk op Enter om toe te voegen"
       }
+    },
+    "entityIndex": {
+      "sortBy": "Sort by",
+      "sort": {
+        "custom": "Custom order",
+        "name": "Name",
+        "bookCount": "Book count"
+      },
+      "ascending": "Ascending",
+      "descending": "Descending",
+      "clearSearch": "Clear search",
+      "resultCount": "{shown} of {total}",
+      "noMatches": "No matches",
+      "noMatchesHint": "Try a different search term.",
+      "bookCount": "Books: {count}",
+      "librariesEmptyHint": "Create a library to start adding books.",
+      "smartScopesEmptyHint": "Smart scopes save a set of filters you use often.",
+      "collectionsEmptyHint": "Collections group books you pick by hand."
     }
   },
   "customIcons": {
@@ -5094,6 +5198,11 @@
           "hint": "Schrijft metadata naar het OPF-bestand in het EPUB-archief.",
           "toggleAria": "EPUB-metadata schrijven"
         },
+        "fb2": {
+          "title": "FictionBook (FB2)",
+          "hint": "Rewrites the description block inside FB2 files, leaving the book text untouched.",
+          "toggleAria": "Write FB2 metadata"
+        },
         "pdf": {
           "title": "PDF",
           "hint": "Sluit metadata in de PDF Info-dictionary en XMP-stream in.",
@@ -5103,6 +5212,11 @@
           "title": "Striparchieven (CBX)",
           "hint": "Schrijft ComicInfo.xml naar CBZ- en CB7-archieven.",
           "toggleAria": "Metadata naar striparchieven schrijven"
+        },
+        "kindle": {
+          "title": "Kindle (MOBI, AZW3)",
+          "hint": "Writes metadata into the EXTH header of MOBI, AZW3, and AZW files.",
+          "toggleAria": "Write Kindle metadata"
         },
         "audio": {
           "title": "Audio",
@@ -5542,7 +5656,61 @@
       "saveFailed": "Opslaan van voorkeuren mislukt",
       "savePreferenceFailed": "Opslaan van voorkeur mislukt",
       "whatsNewToggle": "\"Wat is er nieuw\" tonen na updates",
-      "whatsNewToggleHint": "Een popup die nieuwe functies benadrukt nadat de app is bijgewerkt. Het archief blijft hoe dan ook beschikbaar."
+      "whatsNewToggleHint": "Een popup die nieuwe functies benadrukt nadat de app is bijgewerkt. Het archief blijft hoe dan ook beschikbaar.",
+      "groups": {
+        "library": "Library",
+        "files": "Files",
+        "integrations": "Integrations",
+        "personal": "Personal",
+        "app": "App updates"
+      },
+      "enabledCount": "{enabled} of {total} enabled",
+      "categories": {
+        "scanning": {
+          "label": "Library scanning",
+          "description": "When a library scan finishes, fails, or finds missing books."
+        },
+        "metadata": {
+          "label": "Metadata fetching",
+          "description": "When metadata lookups for your books complete or fail."
+        },
+        "authorEnrichment": {
+          "label": "Author enrichment",
+          "description": "When author biographies and photos finish being fetched."
+        },
+        "fileWriteBack": {
+          "label": "File write-back",
+          "description": "When edited metadata is written back into book files on disk."
+        },
+        "fileRename": {
+          "label": "File rename",
+          "description": "When a single book file is renamed to match your naming pattern."
+        },
+        "bulkRename": {
+          "label": "Bulk rename",
+          "description": "When a bulk rename across many books completes or fails."
+        },
+        "migration": {
+          "label": "Data migration",
+          "description": "When an import from another library tool completes or fails."
+        },
+        "bookDock": {
+          "label": "Book Dock",
+          "description": "When files dropped into the dock are ready to review or finalized."
+        },
+        "koboSync": {
+          "label": "Kobo sync",
+          "description": "When a Kobo device finishes syncing with your library."
+        },
+        "email": {
+          "label": "Email delivery",
+          "description": "When sending a book to an email address succeeds or fails."
+        },
+        "achievements": {
+          "label": "Achievements",
+          "description": "When you unlock a new reading achievement."
+        }
+      }
     }
   },
   "reader": {
@@ -6618,6 +6786,8 @@
       "privacy": "Privacy en delen",
       "notifications": "Meldingen",
       "restrictions": "Inhoudsbeperkingen"
-    }
+    },
+    "smartScopes": "Smart Scopes",
+    "collections": "Collections"
   }
 }
