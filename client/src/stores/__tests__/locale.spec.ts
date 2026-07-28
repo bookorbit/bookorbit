@@ -31,7 +31,11 @@ describe('locale store', () => {
 
     expect(matchSupportedLocale(['nl-NL', 'en-US'])).toBe('nl')
     expect(matchSupportedLocale(['de-DE', 'en-GB'])).toBe('de')
+    expect(matchSupportedLocale(['es-ES', 'en-GB'])).toBe('es')
+    expect(matchSupportedLocale(['fr-FR', 'en-GB'])).toBe('fr')
+    expect(matchSupportedLocale(['it-IT', 'en-GB'])).toBe('it')
     expect(matchSupportedLocale(['nl-BE', 'en'])).toBe('nl')
+    expect(matchSupportedLocale(['pl-PL', 'en-GB'])).toBe('pl')
     expect(matchSupportedLocale(['pt-BR'])).toBe('pt')
   })
 

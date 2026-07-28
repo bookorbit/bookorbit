@@ -77,7 +77,7 @@ const validDisplayPreferences: DisplayPreferences = {
 };
 
 const validLocalePreferences: LocalePreferences = {
-  locale: 'nl',
+  locale: 'it',
 };
 
 const repo = {
@@ -132,6 +132,13 @@ describe('UserPreferencesService', () => {
   it('upsertLocalePreferences persists validated settings', async () => {
     await expect(service.upsertLocalePreferences(11, validLocalePreferences)).resolves.toBeUndefined();
     expect(repo.upsert).toHaveBeenCalledWith(11, 'locale', validLocalePreferences);
+  });
+
+  it.each(['es', 'fr', 'pl'] as const)('upsertLocalePreferences accepts the %s locale', async (locale) => {
+    const preferences: LocalePreferences = { locale };
+
+    await expect(service.upsertLocalePreferences(11, preferences)).resolves.toBeUndefined();
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'locale', preferences);
   });
 
   it('upsertLocalePreferences rejects unsupported locale', async () => {

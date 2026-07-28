@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { createI18n } from 'vue-i18n'
 import de from '@/locales/de.json'
 import en from '@/locales/en.json'
+import spanish from '@/locales/es.json'
+import french from '@/locales/fr.json'
+import italian from '@/locales/it.json'
 import nl from '@/locales/nl.json'
+import polish from '@/locales/pl.json'
 import pt from '@/locales/pt.json'
 import sl from '@/locales/sl.json'
 import { compileIcuCatalog, icuCountValues, isIcuPluralMessage, splitIcuCount } from './icu'
@@ -71,7 +75,11 @@ describe('ICU message compilation', () => {
   it.each([
     ['en', en, [0, 1, 2, 1_234]],
     ['de', de, [0, 1, 2, 1_234]],
+    ['es', spanish, [0, 1, 2, 1_000_000]],
+    ['fr', french, [0, 1, 2, 1_000_000]],
+    ['it', italian, [0, 1, 2, 1_000_000]],
     ['nl', nl, [0, 1, 2, 1_234]],
+    ['pl', polish, [0, 1, 2, 5, 1_000_000]],
     ['pt', pt, [0, 1, 2, 1_234]],
     ['sl', sl, [0, 1, 2, 3, 5, 1_234]],
   ] as const)('isolates the styled count in both dialogs for %s', (locale, catalog, counts) => {
@@ -126,7 +134,16 @@ describe('ICU message compilation', () => {
   it.each([
     ['en', en, [0, 1, 2], ['No duplicate groups', 'One duplicate group', '2 duplicate groups']],
     ['de', de, [0, 1, 2], ['Keine duplizierten Gruppen', 'Eine duplizierte Gruppe', '2 duplizierte Gruppen']],
+    ['es', spanish, [0, 1, 1_000_000], ['No hay grupos duplicados', 'Un grupo duplicado', '1.000.000 grupos duplicados']],
+    ['fr', french, [0, 1, 1_000_000], ['Pas de groupes en double', 'Un groupe en double', '1 000 000 groupes en double']],
+    ['it', italian, [0, 1, 1_000_000], ['Nessun gruppo duplicato', 'Un gruppo duplicato', '1.000.000 gruppi duplicati']],
     ['nl', nl, [0, 1, 2], ['No duplicate groups', 'One duplicate group', '2 duplicate groups']],
+    [
+      'pl',
+      polish,
+      [0, 1, 2, 5, 1_000_000],
+      ['Brak zduplikowanych grup', 'Jedna zduplikowana grupa', '2 zduplikowane grupy', '5 zduplikowanych grup', '1 000 000 zduplikowanych grup'],
+    ],
     ['pt', pt, [0, 1, 1_000_000], ['Sem grupos duplicados', 'Um grupo duplicado', '1.000.000 grupos duplicados']],
     ['sl', sl, [0, 1, 2, 3, 5], ['No duplicate groups', 'One duplicate group', '2 duplicate groups', '3 duplicate groups', '5 duplicate groups']],
   ] as const)('renders migrated Book Duplicates messages for %s', (locale, catalog, counts, expectedGroups) => {
@@ -155,7 +172,11 @@ describe('ICU message compilation', () => {
   it.each([
     ['en', en, [1, 2], ['1 failure', '2 failures']],
     ['de', de, [1, 2], ['1 Fehler', '2 Fehler']],
+    ['es', spanish, [1, 1_000_000], ['1 fracaso', '1.000.000 fracasos']],
+    ['fr', french, [1, 1_000_000], ['1 échec', '1 000 000 échecs']],
+    ['it', italian, [1, 1_000_000], ['1 fallimento', '1.000.000 fallimenti']],
     ['nl', nl, [1, 2], ['1 fout', '2 fouten']],
+    ['pl', polish, [1, 2, 5, 1_000_000], ['1 porażka', '2 niepowodzenia', '5 niepowodzeń', '1 000 000 niepowodzeń']],
     ['pt', pt, [1, 1_000_000], ['1 falha', '1.000.000 falhas']],
     ['sl', sl, [1, 2, 3, 5], ['1 napaka', '2 napaki', '3 napak', '5 napak']],
   ] as const)('renders migrated Kobo activity plurals for %s', (locale, catalog, counts, expected) => {
@@ -172,7 +193,16 @@ describe('ICU message compilation', () => {
   it.each([
     ['en', en, [0, 1, 2], ['no files ready', '1 file ready', '2 files ready']],
     ['de', de, [0, 1, 2], ['keine Dateien bereit', '1 Datei bereit', '2 Dateien bereit']],
+    ['es', spanish, [0, 1, 1_000_000], ['no hay archivos listos', '1 archivo listo', '1.000.000 archivos listos']],
+    ['fr', french, [0, 1, 1_000_000], ["aucun fichier n'est prêt", '1 fichier prêt', '1 000 000 fichiers prêts']],
+    ['it', italian, [0, 1, 1_000_000], ['nessun file pronto', '1 file pronto', '1.000.000 file pronti']],
     ['nl', nl, [0, 1, 2], ['geen bestanden gereed', '1 bestand gereed', '2 bestanden gereed']],
+    [
+      'pl',
+      polish,
+      [0, 1, 2, 5, 1_000_000],
+      ['brak gotowych plików', '1 plik gotowy', '2 pliki gotowe', '5 plików gotowych', '1 000 000 plików gotowych'],
+    ],
     ['pt', pt, [0, 1, 1_000_000], ['nenhum arquivo pronto', '1 arquivo pronto', '1.000.000 arquivos prontos']],
     [
       'sl',
@@ -208,7 +238,11 @@ describe('ICU message compilation', () => {
   it.each([
     ['en', en, [0, 1, 2]],
     ['de', de, [0, 1, 2]],
+    ['es', spanish, [0, 1, 2, 1_000_000]],
+    ['fr', french, [0, 1, 2, 1_000_000]],
+    ['it', italian, [0, 1, 2, 1_000_000]],
     ['nl', nl, [0, 1, 2]],
+    ['pl', polish, [0, 1, 2, 5, 1_000_000]],
     ['pt', pt, [0, 1, 2, 1_000_000]],
     ['sl', sl, [0, 1, 2, 3, 5]],
   ] as const)('formats every ICU message for all relevant plural categories in %s', (locale, catalog, counts) => {
