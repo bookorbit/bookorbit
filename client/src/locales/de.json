@@ -71,7 +71,7 @@
         "paginationLabel": "Seiten des Profilzugriffsverlaufs"
       },
       "durationMinutes": "{count, plural, one {# Minute} other {# Minuten}}",
-      "durationHours": "{count} Stunden",
+      "durationHours": "{count, plural, one {# Stunde} other {# Stunden}}",
       "unknownTitle": "Buch ohne Titel",
       "errors": {
         "load": "Freigabeeinstellungen konnten nicht geladen werden.",
@@ -407,7 +407,7 @@
           "newest": "Neueste",
           "name": "Name"
         },
-        "selectedCount": "{count} ausgewählt",
+        "selectedCount": "{count, plural, one {# ausgewählt} other {# ausgewählt}}",
         "clear": "Leeren",
         "deleteSelected": "Auswahl löschen",
         "loading": "Symbole werden geladen...",
@@ -1216,7 +1216,7 @@
           "minutesAgo": "vor {count} Min.",
           "hoursAgo": "vor {count} Std.",
           "yesterday": "gestern",
-          "daysAgo": "vor {count} Tagen",
+          "daysAgo": "{count, plural, one {vor # Tag} other {vor # Tagen}}",
           "label": "Letzter Lauf: {when}",
           "labelQueued": "Letzter Lauf: {when} - {count} Bücher eingereiht",
           "labelNoneEligible": "Letzter Lauf: {when} - keine berechtigten Bücher"
@@ -2362,7 +2362,7 @@
       "period": "Berichtszeitraum",
       "periodDays": "Letzte {count} Tage",
       "durationMinutes": "{count, plural, one {# Minute} other {# Minuten}}",
-      "durationHours": "{count} Stunden",
+      "durationHours": "{count, plural, one {# Stunde} other {# Stunden}}",
       "metrics": {
         "sessions": "Sitzungen",
         "readingTime": "Lesezeit",
@@ -2575,7 +2575,7 @@
       "noBooksFound": "Keine Bücher gefunden"
     },
     "bulk": {
-      "countSelected": "{count} ausgewählt",
+      "countSelected": "{count, plural, one {# ausgewählt} other {# ausgewählt}}",
       "pageSelected": "Seite ausgewählt",
       "selectPage": "Seite auswählen",
       "clear": "Zurücksetzen",
@@ -5956,7 +5956,7 @@
       "sleep": "Schlafmodus",
       "chapterAbbrev": "Kap.",
       "sleepTimer": "Einschlaftimer",
-      "minutes": "{count} Minuten",
+      "minutes": "{count, plural, one {# Minute} other {# Minuten}}",
       "endOfChapter": "Ende des Kapitels",
       "noChaptersAvailable": "Keine Kapitel verfügbar",
       "extend15": "+ 15 Minuten",
