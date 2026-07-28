@@ -467,7 +467,7 @@
       },
       "feedback": {
         "unsavedChanges": "Modifications non enregistrées",
-        "allSaved": "Toutes les modifications enregistrées"
+        "discard": "Abandonner"
       },
       "profile": {
         "securityHeading": "Profil et sécurité",
@@ -484,7 +484,11 @@
         "accountTypeLocal": "Local",
         "nameRequired": "Le nom est requis",
         "updateFailed": "Échec de la mise à jour du profil",
-        "updated": "Profil mis à jour"
+        "updated": "Profil mis à jour",
+        "usernameHint": "Votre nom d'utilisateur ne peut pas être modifié.",
+        "passwordHint": "Modifiez le mot de passe que vous utilisez pour vous connecter.",
+        "passwordHintOidc": "Votre mot de passe est géré par votre fournisseur d'identité.",
+        "passwordHintShared": "Les comptes partagés se connectent via un lien magique et n'ont pas de mot de passe."
       },
       "readingPreferences": {
         "title": "Préférences de lecture",
@@ -492,7 +496,10 @@
         "timezone": "Fuseau horaire",
         "save": "Enregistrer les préférences",
         "enableAchievements": "Activer les réalisations",
-        "enableAchievementsHint": "Suivez la progression des réalisations et affichez l’interface liée aux réalisations. Gérez les notifications de réussite séparément dans Notifications."
+        "enableAchievementsHint": "Suivez la progression des réalisations et affichez l’interface liée aux réalisations. Gérez les notifications de réussite séparément dans Notifications.",
+        "achievementsEnabled": "Réalisations activées",
+        "achievementsDisabled": "Réalisations désactivées",
+        "achievementsSaveFailed": "Échec de la mise à jour de la préférence de réalisations"
       },
       "preferences": {
         "saveFailed": "Échec de l'enregistrement des préférences",
@@ -534,7 +541,9 @@
           "title": "Dissocier l'identité {provider} ?",
           "description": "Entrez votre mot de passe pour confirmer. Vous ne pourrez plus vous connecter avec ce fournisseur.",
           "currentPassword": "Mot de passe actuel"
-        }
+        },
+        "description": "Connectez-vous avec un fournisseur d'identité externe lié à ce compte.",
+        "unlinkAria": "Dissocier {provider}"
       },
       "tour": {
         "title": "Visite guidée",
@@ -563,6 +572,11 @@
           "title": "Genres bloqués",
           "description": "Les livres appartenant à l’un de ces genres vous sont cachés."
         }
+      },
+      "groups": {
+        "profile": "Profil",
+        "preferences": "Préférences",
+        "security": "Sécurité et accès"
       }
     },
     "magicLinks": {
@@ -596,10 +610,10 @@
         "createdBy": "Créé par",
         "expires": "Expire",
         "uses": "Utilisations",
-        "lastUsed": "Dernière utilisation",
         "created": "Créé",
         "status": "Statut",
-        "totalUses": "Utilisations totales"
+        "totalUses": "Utilisations totales",
+        "actions": "Actions"
       },
       "createDialog": {
         "title": "Créer un lien magique",
@@ -627,7 +641,12 @@
       "emptyTitle": "Aucun lien magique n'a encore été créé",
       "emptyHint": "Cliquez sur \"{action}\" pour générer une connexion partageable URL.",
       "noActiveTitle": "Aucun lien magique actif",
-      "noActiveHint": "Tous les liens magiques générés pour cette page ont expiré ou ont été révoqués."
+      "noActiveHint": "Tous les liens magiques générés pour cette page ont expiré ou ont été révoqués.",
+      "copyLinkAria": "Copier le lien pour {label}",
+      "pauseAria": "Suspendre {label}",
+      "resumeAria": "Reprendre {label}",
+      "revokeAria": "Révoquer {label}",
+      "lastUsedLabel": "Dernière utilisation : {date}"
     },
     "oidc": {
       "title": "OIDC / SSO",
@@ -1692,9 +1711,6 @@
         "subtitle": "Contrôlez la manière dont les fichiers sont organisés sur le disque lorsqu'ils sont téléchargés et comment ils sont nommés lors du téléchargement à l'aide de jetons d'espace réservé.",
         "copy": "Copier",
         "previewLabel": "Aperçu :",
-        "fileAsBookPreview": "Fichier en tant qu'aperçu du livre",
-        "folderAsBookPreview": "Dossier en tant qu'aperçu du livre",
-        "downloadPreview": "Télécharger l'aperçu",
         "globalDefaults": "Valeurs par défaut globales",
         "crossPlatform": "Désinfection des chemins multiplateformes",
         "crossPlatformHint": "Sécurisez les noms de fichiers et de dossiers générés sous Windows en remplaçant les caractères non valides et les noms réservés, et en supprimant les points et les espaces de fin. Désactivez uniquement pour les configurations Linux uniquement qui conservent intentionnellement ces caractères.",
@@ -1711,15 +1727,10 @@
         "orgFolderAsBook": "Dossier en tant que livre",
         "orgFileAsBook": "Classer en tant que livre",
         "resetToDefault": "Réinitialiser aux valeurs par défaut",
-        "patternReference": "Référence du modèle",
-        "placeholderReference": "Référence d'espace réservé",
-        "placeholderReferenceHint": "- guide pour créer des modèles de dénomination personnalisés",
         "tokens": "Jetons",
-        "tokensHint": "Copiez rapidement les espaces réservés",
         "clickTokenHint": "Cliquez sur n'importe quel jeton pour le copier dans votre presse-papiers.",
         "copyValue": "Copier {value}",
         "modifiers": "Modificateurs",
-        "modifiersHint": "Transformer les valeurs des jetons",
         "modifiersExplain": "Ajoutez un modificateur à l'intérieur d'un jeton pour transformer sa valeur :",
         "modFirst": "Première valeur uniquement",
         "modSort": "Format Dernier, Premier",
@@ -1728,14 +1739,10 @@
         "folderOnlyPrefix": "Terminez un motif avec",
         "folderOnlySuffix": "pour spécifier un dossier uniquement. Le nom du fichier original sera conservé à l'intérieur.",
         "conditionalLogic": "Logique conditionnelle",
-        "conditionalLogicHint": "Segments facultatifs et solutions de secours",
         "conditionalPart1": "Enveloppez-vous",
         "conditionalPart2": "pour sauter un segment lorsque son jeton est vide. Utiliser",
         "conditionalPart3": "pour une valeur par défaut.",
         "examples": "Exemples",
-        "patternExamples": "Exemples de modèles",
-        "patternExamplesHint": "Modèles prêts à l'emploi pour les styles de bibliothèque courants",
-        "copyPatternTooltip": "Copier le motif dans le presse-papiers",
         "exCalibre": "Style Calibre par défaut",
         "exSeriesReader": "Lecteur de série",
         "exCleanDownload": "Nettoyer le nom du fichier de téléchargement",
@@ -1763,7 +1770,37 @@
         "patternCopied": "Motif copié dans le presse-papiers",
         "copyPatternFailed": "Échec de la copie du modèle",
         "labelCopied": "{label} copié dans le presse-papiers",
-        "copyLabelFailed": "Échec de la copie de {label}"
+        "copyLabelFailed": "Échec de la copie de {label}",
+        "patternHelp": "Aide sur les modèles",
+        "patternHelpDescription": "Jetons, modificateurs et modèles prêts à l'emploi que vous pouvez copier dans n'importe quel champ.",
+        "copyPreview": "Copier {label}",
+        "copyExample": "Copier le modèle {label}",
+        "invalidCharacters": "Le modèle contient des caractères non valides",
+        "fileAsBookSaved": "Valeur par défaut Fichier comme livre enregistrée",
+        "folderAsBookSaved": "Valeur par défaut Dossier comme livre enregistrée",
+        "downloadPatternSaved": "Modèle de téléchargement enregistré",
+        "savePatternFailed": "Échec de l'enregistrement du modèle",
+        "saveDownloadPatternFailed": "Échec de l'enregistrement du modèle de téléchargement",
+        "crossPlatformEnabled": "Désinfection des chemins multiplateformes activée",
+        "crossPlatformDisabled": "Désinfection des chemins multiplateformes désactivée",
+        "crossPlatformSaveFailed": "Échec de l'enregistrement de la désinfection des chemins multiplateformes",
+        "librarySaved": "Modèle enregistré pour {name}",
+        "librarySaveFailed": "Échec de l'enregistrement du modèle de bibliothèque",
+        "saveLibraryPattern": "Enregistrer le modèle pour {name}",
+        "resetLibraryPattern": "Réinitialiser {name} au modèle par défaut",
+        "tokenTitle": "Titre du livre",
+        "tokenSubtitle": "Sous-titre du livre",
+        "tokenAuthors": "Auteur(s), séparés par des virgules",
+        "tokenYear": "Année de publication",
+        "tokenSeries": "Nom de la série",
+        "tokenSeriesIndex": "Index de la série (complété par des zéros)",
+        "tokenPublisher": "Éditeur",
+        "tokenIsbn": "ISBN-13",
+        "tokenLanguage": "Langue",
+        "tokenOriginalFilename": "Nom de fichier d'origine (sans extension)",
+        "tokenExtension": "Extension de fichier (sans point)",
+        "patternHelpIntro": "Les modèles utilisent des jetons comme {titleToken} et {authorsToken}, ainsi que des modificateurs et des segments facultatifs.",
+        "browseTokensAndExamples": "Parcourir les jetons et les exemples"
       },
       "kobo": {
         "title": "Kobo Synchronisation",
@@ -2451,19 +2488,15 @@
     },
     "usersPage": {
       "usersTitle": "Utilisateurs",
-      "magicLinksTitle": "Liens magiques",
       "usersSubtitle": "Gérez les comptes d'utilisateurs et les attributions d'autorisations.",
-      "magicLinksSubtitle": "Créez des liens de connexion partageables pour les comptes partagés.",
       "createUser": "Créer un utilisateur",
-      "createLink": "Créer un lien",
-      "usersTab": "Utilisateurs",
-      "magicLinksTab": "Liens magiques",
       "columns": {
         "name": "Nom",
         "username": "Nom d'utilisateur",
         "email": "Courriel",
         "access": "Accès",
-        "status": "Statut"
+        "status": "Statut",
+        "actions": "Actions"
       },
       "adminBadge": "Administrateur",
       "permissionCount": "{count, plural, =0 {aucune autorisation} one {une autorisation} other {# autorisations} many {# autorisations}}",
@@ -2481,11 +2514,10 @@
       "deleteDialogBody": "Supprimez l'utilisateur \"{username}\". Cette action ne peut pas être annulée.",
       "deleting": "Suppression...",
       "errors": {
-        "loadData": "Échec du chargement des données",
         "load": "Échec du chargement",
-        "deleteUser": "Échec de la suppression de l'utilisateur"
+        "deleteUser": "Échec de la suppression de l'utilisateur",
+        "resetPassword": "Échec de la création d'un lien de réinitialisation du mot de passe"
       },
-      "currentUsers": "Utilisateurs actuels",
       "defaultLibraryAccess": {
         "title": "Accès à la bibliothèque par défaut",
         "subtitle": "Accès de visualisation accordé aux utilisateurs auto-enregistrés et dotés de OIDC.",
@@ -2493,9 +2525,37 @@
         "noLibraries": "Aucune bibliothèque disponible.",
         "save": "Enregistrer les valeurs par défaut",
         "saving": "Sauvegarde...",
-        "saved": "Accès à la bibliothèque par défaut enregistré.",
         "saveError": "Échec de l'enregistrement de l'accès par défaut à la bibliothèque"
-      }
+      },
+      "filters": {
+        "search": "Rechercher des utilisateurs",
+        "searchPlaceholder": "Rechercher par nom, nom d'utilisateur ou e-mail",
+        "sort": "Trier les utilisateurs",
+        "usernameAsc": "Nom d'utilisateur A-Z",
+        "nameAsc": "Nom A-Z",
+        "newest": "Les plus récents d'abord",
+        "oldest": "Les plus anciens d'abord",
+        "apply": "Appliquer",
+        "clear": "Effacer",
+        "state": "Filtrer les utilisateurs",
+        "allUsers": "Tous les utilisateurs",
+        "admins": "Administrateurs",
+        "active": "Actif",
+        "inactive": "Inactif"
+      },
+      "empty": {
+        "title": "Aucun utilisateur pour l'instant",
+        "description": "Créez le premier compte pour commencer.",
+        "filtered": "Aucun utilisateur ne correspond à la recherche et aux filtres actuels."
+      },
+      "pagination": {
+        "label": "Pagination des utilisateurs",
+        "page": "Page {page} sur {totalPages}"
+      },
+      "editUserAria": "Modifier {name}",
+      "resetPasswordAria": "Réinitialiser le mot de passe de {name}",
+      "deleteUserAria": "Supprimer {name}",
+      "moreActionsAria": "Plus d'actions pour {name}"
     }
   },
   "annotations": {
@@ -4298,17 +4358,17 @@
         "title": "Vous appréciez BookOrbit ?",
         "body": "Si BookOrbit vous aide avec votre bibliothèque, pensez à mettre le projet en vedette sur GitHub. Cela aide davantage de personnes à découvrir l’application et prend en charge le développement continu.",
         "cta": "Étoile BookOrbit sur GitHub"
-      }
+      },
+      "surfaceOpacity": "Opacité de la surface",
+      "surfaceOpacityValue": "{value} %"
     },
     "sidebar": {
-      "tagline": "Votre espace de lecture",
       "dashboard": "Tableau de bord",
       "authors": "Auteurs",
       "series": "Série",
       "tools": "Outils",
       "libraries": "Bibliothèques",
       "newLibrary": "Nouvelle bibliothèque",
-      "libraryScanning": "{name} - Numérisation {pct}%",
       "scanProgress": "Livres {processed} / {total}",
       "smartScopes": "Portées intelligentes",
       "newSmartScope": "Nouvelle lunette intelligente",
@@ -4316,15 +4376,41 @@
       "collections": "Collections",
       "newCollection": "Nouvelle collection",
       "noCollections": "Aucune collection pour l'instant",
-      "latest": "Dernier {version}",
       "newReleaseNotes": "Nouvelles notes de version disponibles",
       "support": "Prise en charge de BookOrbit",
-      "supportShort": "Assistance",
       "supportAria": "Soutenez BookOrbit sur Ko-fi",
       "sectionHeader": {
         "add": "Ajouter",
+        "showAll": "Tout afficher",
+        "showCount": "Afficher {count}",
+        "rowsShown": "Lignes affichées",
+        "menuAria": "Options de section pour {section}",
         "reorder": "Réorganiser",
         "doneReordering": "Réorganisation terminée"
+      },
+      "noLibraries": "Aucune bibliothèque pour l'instant",
+      "clearFilter": "Effacer le filtre",
+      "filterSummary": "{shown} sur {total} affichés",
+      "filterLibraries": "Filtrer les bibliothèques",
+      "filterLibrariesPlaceholder": "Filtrer les bibliothèques...",
+      "filterSmartScopes": "Filtrer les portées intelligentes",
+      "filterSmartScopesPlaceholder": "Filtrer les portées intelligentes...",
+      "filterCollections": "Filtrer les collections",
+      "filterCollectionsPlaceholder": "Filtrer les collections...",
+      "seeAllLibraries": "Voir toutes les bibliothèques ({count})",
+      "seeAllSmartScopes": "Voir toutes les portées intelligentes ({count})",
+      "seeAllCollections": "Voir toutes les collections ({count})",
+      "updateAvailable": "Mettre à jour {version}",
+      "zones": {
+        "browse": "Parcourir"
+      },
+      "reorder": {
+        "gripAria": "Réorganiser {name}",
+        "lifted": "{name} soulevé, position {position} sur {total}. Utilisez les touches fléchées pour le déplacer.",
+        "moved": "{name}, position {position} sur {total}",
+        "dropped": "{name} déposé à la position {position} sur {total}",
+        "cancelled": "Réorganisation annulée. {name} est revenu à la position {position} sur {total}.",
+        "filteredHint": "Effacez le filtre pour réorganiser"
       }
     },
     "selectionActionBar": {
@@ -4424,6 +4510,24 @@
         "typeAndEnter": "Tapez et appuyez sur Entrée pour ajouter",
         "pressEnter": "Appuyez sur Entrée pour ajouter"
       }
+    },
+    "entityIndex": {
+      "sortBy": "Trier par",
+      "sort": {
+        "custom": "Ordre personnalisé",
+        "name": "Nom",
+        "bookCount": "Nombre de livres"
+      },
+      "ascending": "Ascendant",
+      "descending": "Décroissant",
+      "clearSearch": "Effacer la recherche",
+      "resultCount": "{shown} sur {total}",
+      "noMatches": "Aucun résultat",
+      "noMatchesHint": "Essayez un autre terme de recherche.",
+      "bookCount": "Livres : {count}",
+      "librariesEmptyHint": "Créez une bibliothèque pour commencer à ajouter des livres.",
+      "smartScopesEmptyHint": "Les portées intelligentes enregistrent un ensemble de filtres que vous utilisez souvent.",
+      "collectionsEmptyHint": "Les collections regroupent les livres que vous choisissez à la main."
     }
   },
   "customIcons": {
@@ -5552,7 +5656,61 @@
       "saveFailed": "Échec de l'enregistrement des préférences",
       "savePreferenceFailed": "Échec de l'enregistrement des préférences",
       "whatsNewToggle": "Afficher \"Quoi de neuf\" après les mises à jour",
-      "whatsNewToggleHint": "Une fenêtre contextuelle mettant en évidence les nouvelles fonctionnalités après les mises à jour de l'application. Les archives restent disponibles dans tous les cas."
+      "whatsNewToggleHint": "Une fenêtre contextuelle mettant en évidence les nouvelles fonctionnalités après les mises à jour de l'application. Les archives restent disponibles dans tous les cas.",
+      "groups": {
+        "library": "Bibliothèque",
+        "files": "Fichiers",
+        "integrations": "Intégrations",
+        "personal": "Personnel",
+        "app": "Mises à jour de l'application"
+      },
+      "enabledCount": "{enabled} sur {total} activés",
+      "categories": {
+        "scanning": {
+          "label": "Analyse de la bibliothèque",
+          "description": "Lorsqu'une analyse de bibliothèque se termine, échoue ou détecte des livres manquants."
+        },
+        "metadata": {
+          "label": "Récupération des métadonnées",
+          "description": "Lorsque les recherches de métadonnées de vos livres aboutissent ou échouent."
+        },
+        "authorEnrichment": {
+          "label": "Enrichissement des auteurs",
+          "description": "Lorsque la récupération des biographies et des photos d'auteurs est terminée."
+        },
+        "fileWriteBack": {
+          "label": "Réécriture dans les fichiers",
+          "description": "Lorsque les métadonnées modifiées sont réécrites dans les fichiers de livres sur le disque."
+        },
+        "fileRename": {
+          "label": "Renommage de fichier",
+          "description": "Lorsqu'un fichier de livre est renommé pour correspondre à votre modèle de dénomination."
+        },
+        "bulkRename": {
+          "label": "Renommage groupé",
+          "description": "Lorsqu'un renommage groupé sur de nombreux livres aboutit ou échoue."
+        },
+        "migration": {
+          "label": "Migration des données",
+          "description": "Lorsqu'une importation depuis un autre outil de bibliothèque aboutit ou échoue."
+        },
+        "bookDock": {
+          "label": "Book Dock",
+          "description": "Lorsque les fichiers déposés dans le dock sont prêts à être examinés ou finalisés."
+        },
+        "koboSync": {
+          "label": "Synchronisation Kobo",
+          "description": "Lorsqu'un appareil Kobo termine la synchronisation avec votre bibliothèque."
+        },
+        "email": {
+          "label": "Envoi par e-mail",
+          "description": "Lorsque l'envoi d'un livre à une adresse e-mail réussit ou échoue."
+        },
+        "achievements": {
+          "label": "Réalisations",
+          "description": "Lorsque vous débloquez une nouvelle réalisation de lecture."
+        }
+      }
     }
   },
   "reader": {
@@ -6628,6 +6786,8 @@
       "privacy": "Confidentialité et partage",
       "notifications": "Notifications",
       "restrictions": "Restrictions de contenu"
-    }
+    },
+    "smartScopes": "Portées intelligentes",
+    "collections": "Collections"
   }
 }

@@ -467,7 +467,7 @@
       },
       "feedback": {
         "unsavedChanges": "Cambios no guardados",
-        "allSaved": "Todos los cambios guardados"
+        "discard": "Descartar"
       },
       "profile": {
         "securityHeading": "Perfil y seguridad",
@@ -484,7 +484,11 @@
         "accountTypeLocal": "Local",
         "nameRequired": "El nombre es obligatorio",
         "updateFailed": "No se pudo actualizar el perfil",
-        "updated": "Perfil actualizado"
+        "updated": "Perfil actualizado",
+        "usernameHint": "Tu nombre de usuario no se puede cambiar.",
+        "passwordHint": "Cambia la contraseña que usas para iniciar sesión.",
+        "passwordHintOidc": "Tu contraseña la gestiona tu proveedor de identidad.",
+        "passwordHintShared": "Las cuentas compartidas inician sesión mediante un enlace mágico y no tienen contraseña."
       },
       "readingPreferences": {
         "title": "Preferencias de lectura",
@@ -492,7 +496,10 @@
         "timezone": "Zona horaria",
         "save": "Guardar preferencias",
         "enableAchievements": "Habilitar logros",
-        "enableAchievementsHint": "Realice un seguimiento del progreso de los logros y muestre la interfaz relacionada con los logros. Administre las notificaciones de logros por separado en Notificaciones."
+        "enableAchievementsHint": "Realice un seguimiento del progreso de los logros y muestre la interfaz relacionada con los logros. Administre las notificaciones de logros por separado en Notificaciones.",
+        "achievementsEnabled": "Logros habilitados",
+        "achievementsDisabled": "Logros deshabilitados",
+        "achievementsSaveFailed": "No se pudo actualizar la preferencia de logros"
       },
       "preferences": {
         "saveFailed": "No se pudieron guardar las preferencias",
@@ -534,7 +541,9 @@
           "title": "¿Desvincular la identidad {provider}?",
           "description": "Ingrese su contraseña para confirmar. Ya no podrás iniciar sesión con este proveedor.",
           "currentPassword": "Contraseña actual"
-        }
+        },
+        "description": "Inicia sesión con un proveedor de identidad externo vinculado a esta cuenta.",
+        "unlinkAria": "Desvincular {provider}"
       },
       "tour": {
         "title": "Visita guiada",
@@ -563,6 +572,11 @@
           "title": "Géneros bloqueados",
           "description": "Los libros con cualquiera de estos géneros están ocultos para usted."
         }
+      },
+      "groups": {
+        "profile": "Perfil",
+        "preferences": "Preferencias",
+        "security": "Seguridad y acceso"
       }
     },
     "magicLinks": {
@@ -596,10 +610,10 @@
         "createdBy": "Creado por",
         "expires": "Vence",
         "uses": "Usos",
-        "lastUsed": "último usado",
         "created": "Creado",
         "status": "Estado",
-        "totalUses": "Usos totales"
+        "totalUses": "Usos totales",
+        "actions": "Acciones"
       },
       "createDialog": {
         "title": "Crear enlace mágico",
@@ -627,7 +641,12 @@
       "emptyTitle": "Aún no se han creado enlaces mágicos",
       "emptyHint": "Haga clic en \"{action}\" para generar un inicio de sesión compartible URL.",
       "noActiveTitle": "No hay enlaces mágicos activos",
-      "noActiveHint": "Todos los enlaces mágicos generados para esta página han caducado o han sido revocados."
+      "noActiveHint": "Todos los enlaces mágicos generados para esta página han caducado o han sido revocados.",
+      "copyLinkAria": "Copiar el enlace de {label}",
+      "pauseAria": "Pausar {label}",
+      "resumeAria": "Reanudar {label}",
+      "revokeAria": "Revocar {label}",
+      "lastUsedLabel": "Último uso: {date}"
     },
     "oidc": {
       "title": "OIDC/SSO",
@@ -1692,9 +1711,6 @@
         "subtitle": "Controle cómo se organizan los archivos en el disco cuando se cargan y cómo se nombran cuando se descargan mediante tokens de marcador de posición.",
         "copy": "Copiar",
         "previewLabel": "Vista previa:",
-        "fileAsBookPreview": "Archivo como vista previa del libro",
-        "folderAsBookPreview": "Carpeta como vista previa del libro",
-        "downloadPreview": "Descargar vista previa",
         "globalDefaults": "Valores predeterminados globales",
         "crossPlatform": "Desinfección de rutas multiplataforma",
         "crossPlatformHint": "Haga que los nombres de archivos y carpetas generados sean seguros en Windows reemplazando caracteres no válidos y nombres reservados, y eliminando puntos y espacios al final. Desactívelo solo para configuraciones de Linux que mantienen intencionalmente esos caracteres.",
@@ -1711,15 +1727,10 @@
         "orgFolderAsBook": "Carpeta como libro",
         "orgFileAsBook": "Archivar como libro",
         "resetToDefault": "Restablecer los valores predeterminados",
-        "patternReference": "Referencia de patrón",
-        "placeholderReference": "Referencia de marcador de posición",
-        "placeholderReferenceHint": "- guía para crear patrones de nombres personalizados",
         "tokens": "Fichas",
-        "tokensHint": "Copie marcadores de posición rápidamente",
         "clickTokenHint": "Haga clic en cualquier token para copiarlo a su portapapeles.",
         "copyValue": "Copiar {value}",
         "modifiers": "Modificadores",
-        "modifiersHint": "Transformar valores de token",
         "modifiersExplain": "Agregue un modificador dentro de un token para transformar su valor:",
         "modFirst": "Solo primer valor",
         "modSort": "Último, primer formato",
@@ -1728,14 +1739,10 @@
         "folderOnlyPrefix": "Terminar un patrón con",
         "folderOnlySuffix": "para especificar solo una carpeta. El nombre del archivo original se conservará en su interior.",
         "conditionalLogic": "Lógica condicional",
-        "conditionalLogicHint": "Segmentos opcionales y alternativas",
         "conditionalPart1": "Envolver",
         "conditionalPart2": "para omitir un segmento cuando su token está vacío. uso",
         "conditionalPart3": "para un valor predeterminado.",
         "examples": "Ejemplos",
-        "patternExamples": "Ejemplos de patrones",
-        "patternExamplesHint": "Patrones listos para usar para estilos de biblioteca comunes",
-        "copyPatternTooltip": "Copiar patrón al portapapeles",
         "exCalibre": "Calibre-estilo predeterminado",
         "exSeriesReader": "Lector de series",
         "exCleanDownload": "Limpiar el nombre del archivo de descarga",
@@ -1763,7 +1770,37 @@
         "patternCopied": "Patrón copiado al portapapeles",
         "copyPatternFailed": "No se pudo copiar el patrón",
         "labelCopied": "{label} copiado al portapapeles",
-        "copyLabelFailed": "No se pudo copiar {label}"
+        "copyLabelFailed": "No se pudo copiar {label}",
+        "patternHelp": "Ayuda sobre patrones",
+        "patternHelpDescription": "Tokens, modificadores y patrones listos para copiar en cualquier campo.",
+        "copyPreview": "Copiar {label}",
+        "copyExample": "Copiar el patrón {label}",
+        "invalidCharacters": "El patrón contiene caracteres no válidos",
+        "fileAsBookSaved": "Valor predeterminado de Archivar como libro guardado",
+        "folderAsBookSaved": "Valor predeterminado de Carpeta como libro guardado",
+        "downloadPatternSaved": "Patrón de descarga guardado",
+        "savePatternFailed": "No se pudo guardar el patrón",
+        "saveDownloadPatternFailed": "No se pudo guardar el patrón de descarga",
+        "crossPlatformEnabled": "Desinfección de rutas multiplataforma habilitada",
+        "crossPlatformDisabled": "Desinfección de rutas multiplataforma deshabilitada",
+        "crossPlatformSaveFailed": "No se pudo guardar la desinfección de rutas multiplataforma",
+        "librarySaved": "Patrón guardado para {name}",
+        "librarySaveFailed": "No se pudo guardar el patrón de la biblioteca",
+        "saveLibraryPattern": "Guardar patrón para {name}",
+        "resetLibraryPattern": "Restablecer {name} al patrón predeterminado",
+        "tokenTitle": "Título del libro",
+        "tokenSubtitle": "Subtítulo del libro",
+        "tokenAuthors": "Autor(es), separados por comas",
+        "tokenYear": "Año de publicación",
+        "tokenSeries": "Nombre de la serie",
+        "tokenSeriesIndex": "Índice de la serie (con ceros a la izquierda)",
+        "tokenPublisher": "Editorial",
+        "tokenIsbn": "ISBN-13",
+        "tokenLanguage": "Idioma",
+        "tokenOriginalFilename": "Nombre de archivo original (sin extensión)",
+        "tokenExtension": "Extensión de archivo (sin punto)",
+        "patternHelpIntro": "Los patrones usan tokens como {titleToken} y {authorsToken}, además de modificadores y segmentos opcionales.",
+        "browseTokensAndExamples": "Explorar tokens y ejemplos"
       },
       "kobo": {
         "title": "Kobo Sincronización",
@@ -2451,19 +2488,15 @@
     },
     "usersPage": {
       "usersTitle": "Usuarios",
-      "magicLinksTitle": "Enlaces mágicos",
       "usersSubtitle": "Administrar cuentas de usuario y asignaciones de permisos.",
-      "magicLinksSubtitle": "Cree enlaces de inicio de sesión que se puedan compartir para cuentas compartidas.",
       "createUser": "Crear usuario",
-      "createLink": "Crear enlace",
-      "usersTab": "Usuarios",
-      "magicLinksTab": "Enlaces mágicos",
       "columns": {
         "name": "Nombre",
         "username": "Nombre de usuario",
         "email": "Correo electrónico",
         "access": "Acceso",
-        "status": "Estado"
+        "status": "Estado",
+        "actions": "Acciones"
       },
       "adminBadge": "administrador",
       "permissionCount": "{count, plural, =0 {sin permisos} one {un permiso} other {# permisos} many {# permisos}}",
@@ -2481,11 +2514,10 @@
       "deleteDialogBody": "Eliminar usuario \"{username}\". Esta acción no se puede deshacer.",
       "deleting": "Eliminando...",
       "errors": {
-        "loadData": "No se pudieron cargar los datos",
         "load": "No se pudo cargar",
-        "deleteUser": "No se pudo eliminar el usuario"
+        "deleteUser": "No se pudo eliminar el usuario",
+        "resetPassword": "No se pudo crear un enlace para restablecer la contraseña"
       },
-      "currentUsers": "Usuarios actuales",
       "defaultLibraryAccess": {
         "title": "Acceso predeterminado a la biblioteca",
         "subtitle": "Acceso de espectador otorgado a usuarios registrados automáticamente y proporcionados por OIDC.",
@@ -2493,9 +2525,37 @@
         "noLibraries": "No hay bibliotecas disponibles.",
         "save": "Guardar valores predeterminados",
         "saving": "Guardando...",
-        "saved": "Acceso predeterminado a la biblioteca guardado.",
         "saveError": "No se pudo guardar el acceso predeterminado a la biblioteca"
-      }
+      },
+      "filters": {
+        "search": "Buscar usuarios",
+        "searchPlaceholder": "Buscar por nombre, nombre de usuario o correo electrónico",
+        "sort": "Ordenar usuarios",
+        "usernameAsc": "Nombre de usuario A-Z",
+        "nameAsc": "Nombre A-Z",
+        "newest": "Más recientes primero",
+        "oldest": "Más antiguos primero",
+        "apply": "Aplicar",
+        "clear": "Borrar",
+        "state": "Filtrar usuarios",
+        "allUsers": "Todos los usuarios",
+        "admins": "Administradores",
+        "active": "Activo",
+        "inactive": "Inactivo"
+      },
+      "empty": {
+        "title": "Aún no hay usuarios",
+        "description": "Crea la primera cuenta para empezar.",
+        "filtered": "Ningún usuario coincide con la búsqueda y los filtros actuales."
+      },
+      "pagination": {
+        "label": "Paginación de usuarios",
+        "page": "Página {page} de {totalPages}"
+      },
+      "editUserAria": "Editar {name}",
+      "resetPasswordAria": "Restablecer la contraseña de {name}",
+      "deleteUserAria": "Eliminar {name}",
+      "moreActionsAria": "Más acciones para {name}"
     }
   },
   "annotations": {
@@ -4298,17 +4358,17 @@
         "title": "¿Estás disfrutando de BookOrbit?",
         "body": "Si BookOrbit está ayudando con su biblioteca, considere destacar el proyecto en GitHub. Ayuda a que más personas descubran la aplicación y respalda el desarrollo continuo.",
         "cta": "Estrella BookOrbit en GitHub"
-      }
+      },
+      "surfaceOpacity": "Opacidad de la superficie",
+      "surfaceOpacityValue": "{value}%"
     },
     "sidebar": {
-      "tagline": "Tu espacio de lectura",
       "dashboard": "Panel de control",
       "authors": "Autores",
       "series": "Serie",
       "tools": "Herramientas",
       "libraries": "Bibliotecas",
       "newLibrary": "Nueva biblioteca",
-      "libraryScanning": "{name} - Escaneando {pct}%",
       "scanProgress": "{processed} / {total} libros",
       "smartScopes": "Visores inteligentes",
       "newSmartScope": "Nuevo alcance inteligente",
@@ -4316,15 +4376,41 @@
       "collections": "Colecciones",
       "newCollection": "Nueva colección",
       "noCollections": "Aún no hay colecciones",
-      "latest": "Último {version}",
       "newReleaseNotes": "Nuevas notas de la versión disponibles",
       "support": "Soporte BookOrbit",
-      "supportShort": "Soporte",
       "supportAria": "Soporte BookOrbit en Ko-fi",
       "sectionHeader": {
         "add": "Añadir",
+        "showAll": "Mostrar todo",
+        "showCount": "Mostrar {count}",
+        "rowsShown": "Filas mostradas",
+        "menuAria": "Opciones de sección para {section}",
         "reorder": "Reordenar",
         "doneReordering": "Hecho de reordenar"
+      },
+      "noLibraries": "Aún no hay bibliotecas",
+      "clearFilter": "Borrar filtro",
+      "filterSummary": "{shown} de {total} mostrados",
+      "filterLibraries": "Filtrar bibliotecas",
+      "filterLibrariesPlaceholder": "Filtrar bibliotecas...",
+      "filterSmartScopes": "Filtrar visores inteligentes",
+      "filterSmartScopesPlaceholder": "Filtrar visores inteligentes...",
+      "filterCollections": "Filtrar colecciones",
+      "filterCollectionsPlaceholder": "Filtrar colecciones...",
+      "seeAllLibraries": "Ver todas las bibliotecas ({count})",
+      "seeAllSmartScopes": "Ver todos los visores inteligentes ({count})",
+      "seeAllCollections": "Ver todas las colecciones ({count})",
+      "updateAvailable": "Actualizar {version}",
+      "zones": {
+        "browse": "Explorar"
+      },
+      "reorder": {
+        "gripAria": "Reordenar {name}",
+        "lifted": "{name} elevado, posición {position} de {total}. Usa las teclas de flecha para moverlo.",
+        "moved": "{name}, posición {position} de {total}",
+        "dropped": "{name} soltado en la posición {position} de {total}",
+        "cancelled": "Reordenación cancelada. {name} volvió a la posición {position} de {total}.",
+        "filteredHint": "Borra el filtro para reordenar"
       }
     },
     "selectionActionBar": {
@@ -4424,6 +4510,24 @@
         "typeAndEnter": "Escribe y presiona Enter para agregar",
         "pressEnter": "Presione Entrar para agregar"
       }
+    },
+    "entityIndex": {
+      "sortBy": "Ordenar por",
+      "sort": {
+        "custom": "Orden personalizado",
+        "name": "Nombre",
+        "bookCount": "Número de libros"
+      },
+      "ascending": "Ascendente",
+      "descending": "Descendente",
+      "clearSearch": "Borrar búsqueda",
+      "resultCount": "{shown} de {total}",
+      "noMatches": "Sin coincidencias",
+      "noMatchesHint": "Prueba con otro término de búsqueda.",
+      "bookCount": "Libros: {count}",
+      "librariesEmptyHint": "Crea una biblioteca para empezar a añadir libros.",
+      "smartScopesEmptyHint": "Los visores inteligentes guardan un conjunto de filtros que usas a menudo.",
+      "collectionsEmptyHint": "Las colecciones agrupan libros que eliges manualmente."
     }
   },
   "customIcons": {
@@ -5552,7 +5656,61 @@
       "saveFailed": "No se pudieron guardar las preferencias",
       "savePreferenceFailed": "No se pudo guardar la preferencia",
       "whatsNewToggle": "Mostrar \"Novedades\" después de las actualizaciones",
-      "whatsNewToggleHint": "Una ventana emergente que destaca nuevas funciones después de las actualizaciones de la aplicación. El archivo permanece disponible de cualquier manera."
+      "whatsNewToggleHint": "Una ventana emergente que destaca nuevas funciones después de las actualizaciones de la aplicación. El archivo permanece disponible de cualquier manera.",
+      "groups": {
+        "library": "Biblioteca",
+        "files": "Archivos",
+        "integrations": "Integraciones",
+        "personal": "Personal",
+        "app": "Actualizaciones de la aplicación"
+      },
+      "enabledCount": "{enabled} de {total} habilitados",
+      "categories": {
+        "scanning": {
+          "label": "Escaneo de la biblioteca",
+          "description": "Cuando un escaneo de la biblioteca termina, falla o encuentra libros que faltan."
+        },
+        "metadata": {
+          "label": "Obtención de metadatos",
+          "description": "Cuando las búsquedas de metadatos de tus libros se completan o fallan."
+        },
+        "authorEnrichment": {
+          "label": "Enriquecimiento de autores",
+          "description": "Cuando termina la obtención de biografías y fotos de autores."
+        },
+        "fileWriteBack": {
+          "label": "Escritura en archivos",
+          "description": "Cuando los metadatos editados se vuelven a escribir en los archivos de los libros en el disco."
+        },
+        "fileRename": {
+          "label": "Cambio de nombre de archivo",
+          "description": "Cuando se cambia el nombre de un archivo de libro para que coincida con tu patrón de nombres."
+        },
+        "bulkRename": {
+          "label": "Cambio de nombre masivo",
+          "description": "Cuando un cambio de nombre masivo en muchos libros se completa o falla."
+        },
+        "migration": {
+          "label": "Migración de datos",
+          "description": "Cuando una importación desde otra herramienta de biblioteca se completa o falla."
+        },
+        "bookDock": {
+          "label": "Book Dock",
+          "description": "Cuando los archivos soltados en el dock están listos para revisar o se finalizan."
+        },
+        "koboSync": {
+          "label": "Sincronización de Kobo",
+          "description": "Cuando un dispositivo Kobo termina de sincronizarse con tu biblioteca."
+        },
+        "email": {
+          "label": "Envío por correo electrónico",
+          "description": "Cuando el envío de un libro a una dirección de correo electrónico se realiza correctamente o falla."
+        },
+        "achievements": {
+          "label": "Logros",
+          "description": "Cuando desbloqueas un nuevo logro de lectura."
+        }
+      }
     }
   },
   "reader": {
@@ -6628,6 +6786,8 @@
       "privacy": "Privacidad y uso compartido",
       "notifications": "Notificaciones",
       "restrictions": "Restricciones de contenido"
-    }
+    },
+    "smartScopes": "Visores inteligentes",
+    "collections": "Colecciones"
   }
 }
