@@ -71,7 +71,7 @@
         "paginationLabel": "Profile access history pages"
       },
       "durationMinutes": "{count, plural, one {# minute} other {# minutes}}",
-      "durationHours": "{count} hours",
+      "durationHours": "{count, plural, one {# hour} other {# hours}}",
       "unknownTitle": "Untitled book",
       "errors": {
         "load": "Failed to load sharing settings.",
@@ -407,7 +407,7 @@
           "newest": "Newest",
           "name": "Name"
         },
-        "selectedCount": "{count} selected",
+        "selectedCount": "{count, plural, one {# selected} other {# selected}}",
         "clear": "Clear",
         "deleteSelected": "Delete selected",
         "loading": "Loading icons...",
@@ -1216,7 +1216,7 @@
           "minutesAgo": "{count}m ago",
           "hoursAgo": "{count}h ago",
           "yesterday": "yesterday",
-          "daysAgo": "{count} days ago",
+          "daysAgo": "{count, plural, one {# day ago} other {# days ago}}",
           "label": "Last run: {when}",
           "labelQueued": "Last run: {when} - queued {count} books",
           "labelNoneEligible": "Last run: {when} - no eligible books"
@@ -2362,7 +2362,7 @@
       "period": "Reporting period",
       "periodDays": "Last {count} days",
       "durationMinutes": "{count, plural, one {# minute} other {# minutes}}",
-      "durationHours": "{count} hours",
+      "durationHours": "{count, plural, one {# hour} other {# hours}}",
       "metrics": {
         "sessions": "Sessions",
         "readingTime": "Reading time",
@@ -2575,7 +2575,7 @@
       "noBooksFound": "No books found"
     },
     "bulk": {
-      "countSelected": "{count} selected",
+      "countSelected": "{count, plural, one {# selected} other {# selected}}",
       "pageSelected": "Page selected",
       "selectPage": "Select page",
       "clear": "Clear",
@@ -5956,7 +5956,7 @@
       "sleep": "Sleep",
       "chapterAbbrev": "Ch.",
       "sleepTimer": "Sleep timer",
-      "minutes": "{count} minutes",
+      "minutes": "{count, plural, one {# minute} other {# minutes}}",
       "endOfChapter": "End of chapter",
       "noChaptersAvailable": "No chapters available",
       "extend15": "+ 15 minutes",

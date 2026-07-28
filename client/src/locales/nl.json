@@ -71,7 +71,7 @@
         "paginationLabel": "Pagina's met profieltoegangsgeschiedenis"
       },
       "durationMinutes": "{count, plural, one {# minuut} other {# minuten}}",
-      "durationHours": "{count} uur",
+      "durationHours": "{count, plural, one {# uur} other {# uur}}",
       "unknownTitle": "Boek zonder titel",
       "errors": {
         "load": "Deelinstellingen konden niet worden geladen.",
@@ -407,7 +407,7 @@
           "newest": "Nieuwste",
           "name": "Naam"
         },
-        "selectedCount": "{count} geselecteerd",
+        "selectedCount": "{count, plural, one {# geselecteerd} other {# geselecteerd}}",
         "clear": "Wissen",
         "deleteSelected": "Selectie verwijderen",
         "loading": "Pictogrammen laden...",
@@ -1216,7 +1216,7 @@
           "minutesAgo": "{count}m geleden",
           "hoursAgo": "{count}u geleden",
           "yesterday": "gisteren",
-          "daysAgo": "{count} dagen geleden",
+          "daysAgo": "{count, plural, one {# dag geleden} other {# dagen geleden}}",
           "label": "Laatste uitvoering: {when}",
           "labelQueued": "Laatste uitvoering: {when} - {count} boeken in wachtrij geplaatst",
           "labelNoneEligible": "Laatste uitvoering: {when} - geen in aanmerking komende boeken"
@@ -2362,7 +2362,7 @@
       "period": "Rapportageperiode",
       "periodDays": "Afgelopen {count} dagen",
       "durationMinutes": "{count, plural, one {# minuut} other {# minuten}}",
-      "durationHours": "{count} uur",
+      "durationHours": "{count, plural, one {# uur} other {# uur}}",
       "metrics": {
         "sessions": "Sessies",
         "readingTime": "Leestijd",
@@ -2575,7 +2575,7 @@
       "noBooksFound": "Geen boeken gevonden"
     },
     "bulk": {
-      "countSelected": "{count} geselecteerd",
+      "countSelected": "{count, plural, one {# geselecteerd} other {# geselecteerd}}",
       "pageSelected": "Pagina geselecteerd",
       "selectPage": "Pagina selecteren",
       "clear": "Wissen",
@@ -5956,7 +5956,7 @@
       "sleep": "Slaap",
       "chapterAbbrev": "Hfst.",
       "sleepTimer": "Slaaptimer",
-      "minutes": "{count} minuten",
+      "minutes": "{count, plural, one {# minuut} other {# minuten}}",
       "endOfChapter": "Einde van hoofdstuk",
       "noChaptersAvailable": "Geen hoofdstukken beschikbaar",
       "extend15": "+ 15 minuten",

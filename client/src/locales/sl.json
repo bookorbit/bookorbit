@@ -71,7 +71,7 @@
         "paginationLabel": "Strani zgodovine dostopov do profila"
       },
       "durationMinutes": "{count, plural, one {# minuta} two {# minuti} few {# minute} other {# minut}}",
-      "durationHours": "{count} ur",
+      "durationHours": "{count, plural, one {# ura} two {# uri} few {# ure} other {# ur}}",
       "unknownTitle": "Knjiga brez naslova",
       "errors": {
         "load": "Nastavitev deljenja ni bilo mogoče naložiti.",
@@ -407,7 +407,7 @@
           "newest": "Najnovejše",
           "name": "Ime"
         },
-        "selectedCount": "{count} izbranih",
+        "selectedCount": "{count, plural, one {# izbrana ikona} two {# izbrani ikoni} few {# izbrane ikone} other {# izbranih ikon}}",
         "clear": "Počisti",
         "deleteSelected": "Izbriši izbrano",
         "loading": "Nalaganje ikon...",
@@ -1216,7 +1216,7 @@
           "minutesAgo": "pred {count} min",
           "hoursAgo": "pred {count} h",
           "yesterday": "včeraj",
-          "daysAgo": "pred {count} dnevi",
+          "daysAgo": "{count, plural, one {pred # dnevom} two {pred # dnevoma} few {pred # dnevi} other {pred # dnevi}}",
           "label": "Zadnji zagon: {when}",
           "labelQueued": "Zadnji zagon: {when} - v vrsto uvrščenih {count} knjig",
           "labelNoneEligible": "Zadnji zagon: {when} - ni upravičenih knjig"
@@ -2362,7 +2362,7 @@
       "period": "Obdobje poročila",
       "periodDays": "Zadnjih {count} dni",
       "durationMinutes": "{count, plural, one {# minuta} two {# minuti} few {# minute} other {# minut}}",
-      "durationHours": "{count} ur",
+      "durationHours": "{count, plural, one {# ura} two {# uri} few {# ure} other {# ur}}",
       "metrics": {
         "sessions": "Seje",
         "readingTime": "Čas branja",
@@ -2575,7 +2575,7 @@
       "noBooksFound": "Ni najdenih knjig"
     },
     "bulk": {
-      "countSelected": "Izbranih: {count}",
+      "countSelected": "{count, plural, one {# izbrana opomba} two {# izbrani opombi} few {# izbrane opombe} other {# izbranih opomb}}",
       "pageSelected": "Stran izbrana",
       "selectPage": "Izberi stran",
       "clear": "Počisti",
@@ -5956,7 +5956,7 @@
       "sleep": "Spanje",
       "chapterAbbrev": "Pogl.",
       "sleepTimer": "Časovnik spanja",
-      "minutes": "{count} minut",
+      "minutes": "{count, plural, one {# minuta} two {# minuti} few {# minute} other {# minut}}",
       "endOfChapter": "Konec poglavja",
       "noChaptersAvailable": "Ni razpoložljivih poglavij",
       "extend15": "+ 15 minut",

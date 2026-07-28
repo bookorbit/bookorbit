@@ -71,7 +71,7 @@
         "paginationLabel": "Páginas do histórico de acesso ao perfil"
       },
       "durationMinutes": "{count, plural, one {# minuto} many {# minutos} other {# minutos}}",
-      "durationHours": "{count} horas",
+      "durationHours": "{count, plural, one {# hora} other {# horas} many {# horas}}",
       "unknownTitle": "Livro sem título",
       "errors": {
         "load": "Falha ao carregar configurações de compartilhamento.",
@@ -407,7 +407,7 @@
           "newest": "Mais recentes",
           "name": "Nome"
         },
-        "selectedCount": "{count} selecionado(s)",
+        "selectedCount": "{count, plural, one {# ícone selecionado} other {# ícones selecionados} many {# ícones selecionados}}",
         "clear": "Limpar",
         "deleteSelected": "Excluir selecionados",
         "loading": "Carregando ícones...",
@@ -1216,7 +1216,7 @@
           "minutesAgo": "há {count}m",
           "hoursAgo": "há {count}h",
           "yesterday": "ontem",
-          "daysAgo": "há {count} dias",
+          "daysAgo": "{count, plural, one {há # dia} other {há # dias} many {há # dias}}",
           "label": "Última execução: {when}",
           "labelQueued": "Última execução: {when} - {count} livro(s) na fila",
           "labelNoneEligible": "Última execução: {when} - nenhum livro elegível"
@@ -2362,7 +2362,7 @@
       "period": "Período do relatório",
       "periodDays": "Últimos {count} dias",
       "durationMinutes": "{count, plural, one {# minuto} many {# minutos} other {# minutos}}",
-      "durationHours": "{count} horas",
+      "durationHours": "{count, plural, one {# hora} other {# horas} many {# horas}}",
       "metrics": {
         "sessions": "Sessões",
         "readingTime": "Tempo de leitura",
@@ -2575,7 +2575,7 @@
       "noBooksFound": "Nenhum livro encontrado"
     },
     "bulk": {
-      "countSelected": "{count} selecionado(s)",
+      "countSelected": "{count, plural, one {# anotação selecionada} other {# anotações selecionadas} many {# anotações selecionadas}}",
       "pageSelected": "Página selecionada",
       "selectPage": "Selecionar página",
       "clear": "Limpar",
@@ -5956,7 +5956,7 @@
       "sleep": "Pausa",
       "chapterAbbrev": "Cap.",
       "sleepTimer": "Temporizador de pausa",
-      "minutes": "{count} minutos",
+      "minutes": "{count, plural, one {# minuto} other {# minutos} many {# minutos}}",
       "endOfChapter": "Fim do capítulo",
       "noChaptersAvailable": "Nenhum capítulo disponível",
       "extend15": "+ 15 minutos",

@@ -131,6 +131,62 @@ describe('ICU message compilation', () => {
     expect(testI18n.global.t('books', { count: 5 })).toBe('5 knjig')
   })
 
+  it('renders reviewed Italian and Polish count messages with the correct grammar', () => {
+    const italianI18n = createI18n({
+      legacy: false,
+      locale: 'it',
+      messages: { it: compileIcuCatalog(italian, 'it') },
+    })
+    const polishI18n = createI18n({
+      legacy: false,
+      locale: 'pl',
+      messages: { pl: compileIcuCatalog(polish, 'pl') },
+    })
+
+    expect(italianI18n.global.t('settings.appearance.icons.selectedCount', { count: 1 })).toBe('1 icona selezionata')
+    expect(italianI18n.global.t('settings.appearance.icons.selectedCount', { count: 2 })).toBe('2 icone selezionate')
+    expect(italianI18n.global.t('annotations.bulk.countSelected', { count: 1 })).toBe('1 annotazione selezionata')
+    expect(italianI18n.global.t('annotations.bulk.countSelected', { count: 2 })).toBe('2 annotazioni selezionate')
+
+    expect([1, 2, 5].map((count) => polishI18n.global.t('settings.privacySharing.durationHours', { count }))).toEqual([
+      '1 godzina',
+      '2 godziny',
+      '5 godzin',
+    ])
+    expect([1, 2, 5].map((count) => polishI18n.global.t('settings.metadata.autoFetch.lastRun.daysAgo', { count }))).toEqual([
+      '1 dzień temu',
+      '2 dni temu',
+      '5 dni temu',
+    ])
+    expect([1, 2, 5].map((count) => polishI18n.global.t('reader.audiobook.minutes', { count }))).toEqual(['1 minuta', '2 minuty', '5 minut'])
+  })
+
+  it('keeps reviewed technical terms in their software context', () => {
+    for (const catalog of [spanish, french, italian, polish]) {
+      expect(catalog.settings.oidc.form.slug).toBe('Slug')
+      expect(catalog.annotations.hub.exportMarkdown).toBe('Markdown')
+    }
+
+    expect(spanish.settings.metadata.autoFetch.runNow).toBe('Ejecutar ahora')
+    expect(french.settings.metadata.autoFetch.runNow).toBe('Exécuter maintenant')
+    expect(italian.settings.metadata.autoFetch.runNow).toBe('Esegui ora')
+    expect(polish.settings.metadata.autoFetch.runNow).toBe('Uruchom teraz')
+    expect(italian.settings.admin.migration.host).toBe('Host')
+    expect(italian.settings.admin.migration.port).toBe('Porta')
+    expect(polish.tools.bookDuplicates.selectKeeperFirst).toBe('Najpierw wybierz książkę do zachowania')
+  })
+
+  it('preserves spacing around collection names in reviewed Italian messages', () => {
+    const testI18n = createI18n({
+      legacy: false,
+      locale: 'it',
+      messages: { it: compileIcuCatalog(italian, 'it') },
+    })
+
+    expect(testI18n.global.t('collection.addToSheet.createdAndAdded', { count: 2, name: 'Preferiti' })).toBe('Creata "Preferiti" e aggiunti 2 libri')
+    expect(testI18n.global.t('collection.addToSheet.addedToCollection', { count: 2, name: 'Preferiti' })).toBe('Aggiunti 2 libri a "Preferiti"')
+  })
+
   it.each([
     ['en', en, [0, 1, 2], ['No duplicate groups', 'One duplicate group', '2 duplicate groups']],
     ['de', de, [0, 1, 2], ['Keine duplizierten Gruppen', 'Eine duplizierte Gruppe', '2 duplizierte Gruppen']],
