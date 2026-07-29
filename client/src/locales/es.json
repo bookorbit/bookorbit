@@ -2866,6 +2866,7 @@
       "BookDelete": "Eliminar libro",
       "BookBulkMetadataRefresh": "Actualizar metadatos del libro",
       "BookBulkDelete": "Eliminar libros",
+      "BookBulkMove": "Mover libros",
       "BookBulkCoverReextract": "Volver a extraer portadas de libros",
       "BookBulkSetStatus": "Establecer estado del libro",
       "BookBulkSetRating": "Establecer calificación de libro",

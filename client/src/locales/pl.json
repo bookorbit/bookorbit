@@ -2866,6 +2866,7 @@
       "BookDelete": "Usuń książkę",
       "BookBulkMetadataRefresh": "Odśwież metadane książki",
       "BookBulkDelete": "Usuń książki",
+      "BookBulkMove": "Przenieś książki",
       "BookBulkCoverReextract": "Wyjmij ponownie okładki książek",
       "BookBulkSetStatus": "Ustaw stan książki",
       "BookBulkSetRating": "Ustaw ocenę książki",

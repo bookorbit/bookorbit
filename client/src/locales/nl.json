@@ -2866,6 +2866,7 @@
       "BookDelete": "Delete book",
       "BookBulkMetadataRefresh": "Refresh book metadata",
       "BookBulkDelete": "Delete books",
+      "BookBulkMove": "Boeken verplaatsen",
       "BookBulkCoverReextract": "Re-extract book covers",
       "BookBulkSetStatus": "Set book status",
       "BookBulkSetRating": "Set book rating",
