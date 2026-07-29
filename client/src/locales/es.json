@@ -1,6 +1,6 @@
 {
   "common": {
-    "resetSortAria": "Restablecer la clasificación a la predeterminada",
+    "resetSortAria": "Restablecer orden al predeterminado",
     "save": "Guardar",
     "cancel": "Cancelar",
     "delete": "Eliminar",
@@ -13,32 +13,32 @@
     "next": "Siguiente",
     "previous": "Anterior",
     "retry": "Reintentar",
-    "yes": "si",
+    "yes": "Sí",
     "no": "No"
   },
   "settings": {
     "privacySharing": {
       "title": "Privacidad y uso compartido",
-      "subtitle": "Controle si los administradores pueden ver un resumen identificable de su actividad de lectura.",
-      "levelLegend": "Nivel de intercambio de conocimientos de lectura",
+      "subtitle": "Controla si los administradores pueden ver un resumen identificable de tu actividad de lectura.",
+      "levelLegend": "Nivel de compartición de estadísticas de lectura",
       "current": "Configuración actual",
       "levels": {
         "private": {
           "title": "Privado",
-          "description": "Sólo tú puedes ver tus estadísticas de lectura."
+          "description": "Solo tú puedes ver tus estadísticas de lectura."
         },
         "summary": {
           "title": "Compartir resumen",
-          "description": "Comparta hábitos agregados sin títulos de libros, autores, series o narradores."
+          "description": "Compartir hábitos agregados sin títulos de libros, autores, series o narradores."
         },
         "detailed": {
-          "title": "Comparta información detallada",
-          "description": "Comparta también libros, autores, series, géneros y narradores recientes y destacados."
+          "title": "Compartir información detallada",
+          "description": "También comparte libros recientes y de primer nivel, autores, series, géneros y narradores."
         }
       },
       "fields": {
-        "frequency": "Frecuencia de lectura y días activos.",
-        "completion": "Libros agregados iniciados y completados",
+        "frequency": "Frecuencia de lectura y días activos",
+        "completion": "Agregar libros iniciados y completados",
         "formats": "Distribución de formato",
         "genres": "Amplia distribución de géneros",
         "trend": "Tendencia de lectura agregada",
@@ -50,7 +50,7 @@
       "confirm": {
         "shareTitle": "¿Habilitar {level}?",
         "shareDescription": "Los administradores con permiso podrán ver la siguiente información.",
-        "stopTitle": "¿Dejar de compartir ideas de lectura?",
+        "stopTitle": "¿Dejar de compartir información sobre la lectura?",
         "stopDescription": "El acceso del administrador se bloqueará inmediatamente. Los registros de acceso existentes permanecen en su historial.",
         "recordedNotice": "Cada vista del perfil de administrador se registra y aparece en su historial de acceso."
       },
@@ -58,114 +58,114 @@
         "title": "Vista previa de su perfil compartido",
         "description": "Consulte la información disponible actualmente para los administradores autorizados.",
         "action": "Cargar vista previa",
-        "readingTime": "tiempo de lectura",
+        "readingTime": "Tiempo de lectura",
         "activeDays": "Días activos",
-        "started": "libros comenzados",
+        "started": "Libros comenzados",
         "completed": "Libros completados",
-        "topBooks": "mejores libros"
+        "topBooks": "Mejores libros"
       },
       "history": {
         "title": "Historial de acceso al perfil",
-        "description": "Vistas recientes del administrador de su perfil de lectura compartido.",
-        "empty": "Ningún administrador ha visto su perfil de lectura compartido.",
+        "description": "Vistas recientes del administrador de tu perfil de lectura compartido.",
+        "empty": "Ningún administrador ha visto tu perfil de lectura compartido.",
         "paginationLabel": "Páginas del historial de acceso al perfil"
       },
       "durationMinutes": "{count, plural, one {# minuto} other {# minutos} many {# minutos}}",
       "durationHours": "{count, plural, one {# hora} other {# horas} many {# horas}}",
       "unknownTitle": "Libro sin título",
       "errors": {
-        "load": "No se pudo cargar la configuración para compartir.",
-        "save": "No se pudo actualizar la configuración para compartir.",
-        "preview": "No se pudo cargar la vista previa del perfil compartido."
+        "load": "Error al cargar la configuración de compartir.",
+        "save": "Error al actualizar la configuración de compartir.",
+        "preview": "Error al cargar la vista previa del perfil compartido."
       }
     },
     "appearance": {
       "language": {
         "title": "Idioma",
-        "description": "Elija el idioma utilizado en la interfaz.",
-        "label": "Idioma de la interfaz",
-        "loadError": "No se pudo cargar el idioma seleccionado",
-        "saveError": "No se pudo guardar la preferencia de idioma"
+        "description": "Elige el idioma utilizado en la interfaz.",
+        "label": "Idioma de interfaz",
+        "loadError": "Error al cargar el idioma seleccionado",
+        "saveError": "Error al guardar preferencias de idioma"
       },
       "pageTitle": "Visualización",
       "pageSubtitle": "Controle los temas, las portadas, el diseño y cómo se presenta su biblioteca.",
       "mobileSummary": "Tema: {theme} • Acento: {accent} • Fondo: {background}",
       "themeMode": {
         "light": "Luz",
-        "dark": "oscuro",
+        "dark": "Oscuro",
         "system": "Sistema"
       },
       "theme": {
         "title": "Tema",
         "colorScheme": {
-          "label": "esquema de color",
+          "label": "Esquema de color",
           "hint": "Interfaz clara u oscura"
         },
         "accents": {
-          "grey": "gris",
-          "scarlet": "escarlata",
-          "vermilion": "bermellón",
-          "rose": "rosa",
+          "grey": "Gris",
+          "scarlet": "Escarlata",
+          "vermilion": "Bermellón",
+          "rose": "Rosado",
           "copper": "Cobre",
-          "orange": "naranja",
+          "orange": "Naranja",
           "chartreuse": "Chartreuse",
-          "marigold": "caléndula",
-          "wasabi": "wasabi",
-          "amber": "ámbar",
-          "malachite": "malaquita",
-          "yellow": "amarillo",
-          "viridian": "viridiano",
-          "turquoise": "turquesa",
-          "lime": "lima",
+          "marigold": "Caléndula",
+          "wasabi": "Wasabi",
+          "amber": "Ámbar",
+          "malachite": "Malaquita",
+          "yellow": "Amarillo",
+          "viridian": "Viridiano",
+          "turquoise": "Turquesa",
+          "lime": "Lima",
           "green": "Verde",
           "acid-green": "Verde ácido",
           "emerald": "Esmeralda",
-          "teal": "verde azulado",
+          "teal": "Verde azulado",
           "electric-blue": "Azul eléctrico",
-          "cyan": "cian",
-          "jade": "jade",
-          "ultramarine": "ultramarino",
+          "cyan": "Cian",
+          "jade": "Jade",
+          "ultramarine": "Ultramarino",
           "iris": "Iris",
           "purple": "Púrpura",
-          "blue": "azul",
-          "indigo": "índigo",
-          "violet": "violeta",
-          "amethyst": "amatista",
-          "fuchsia": "fucsia",
-          "raspberry": "frambuesa",
-          "pink": "rosa",
-          "white": "blanco",
-          "rosewater": "agua de rosas",
+          "blue": "Azul",
+          "indigo": "Índigo",
+          "violet": "Violeta",
+          "amethyst": "Amatista",
+          "fuchsia": "Fucsia",
+          "raspberry": "Frambuesa",
+          "pink": "Rosa",
+          "white": "Blanco",
+          "rosewater": "Agua de rosas",
           "salmon": "Salmón",
-          "coral": "Corales",
-          "sand": "arena",
-          "peach": "durazno",
-          "pear": "pera",
-          "flax": "lino",
-          "sprout": "Brotar",
-          "butter": "mantequilla",
-          "aloe": "Áloe",
-          "lemon": "limon",
+          "coral": "Coral",
+          "sand": "Arena",
+          "peach": "Melocotón",
+          "pear": "Pera",
+          "flax": "Lino",
+          "sprout": "Brote",
+          "butter": "Mantequilla",
+          "aloe": "Aloe",
+          "lemon": "Limón",
           "foam": "Espuma",
-          "aqua": "aguamarina",
-          "celadon": "celadón",
-          "sage": "sabio",
-          "pistachio": "pistacho",
-          "mint": "menta",
-          "seafoam": "espuma de mar",
-          "baby-blue": "azul bebe",
-          "powder": "polvo",
-          "sea-glass": "Vidrio de mar",
+          "aqua": "Agua marina",
+          "celadon": "Celadón",
+          "sage": "Salvia",
+          "pistachio": "Pistacho",
+          "mint": "Menta",
+          "seafoam": "Espuma de mar",
+          "baby-blue": "Azul bebé",
+          "powder": "Azul polvo",
+          "sea-glass": "Vidrio marino",
           "bluebell": "Campanilla",
-          "cornflower": "aciano",
-          "thistle": "cardo",
-          "periwinkle": "Bígaro",
-          "wisteria": "glicina",
-          "lavender": "lavanda",
-          "mauve": "malva",
-          "orchid": "orquídea",
+          "cornflower": "Aciano",
+          "thistle": "Cardo",
+          "periwinkle": "Vincapervinca",
+          "wisteria": "Glicinia",
+          "lavender": "Lavanda",
+          "mauve": "Malva",
+          "orchid": "Orquídea",
           "rose-quartz": "Cuarzo Rosa",
-          "blush": "rubor"
+          "blush": "Rubor"
         },
         "accentColor": {
           "label": "Color de acento",
@@ -173,25 +173,25 @@
         },
         "cornerRadius": {
           "label": "Radio de esquina",
-          "hint": "Redondez de tarjetas y elementos de la interfaz de usuario."
+          "hint": "Redondez de tarjetas y elementos de interfaz de usuario"
         },
         "surfaceBrightness": {
-          "label": "Brillo de la superficie",
-          "hint": "Aclarar superficies en modo oscuro",
+          "label": "Brillo de superficie",
+          "hint": "Ilumina superficies de modo oscuro",
           "reset": "Reiniciar"
         },
         "libraryBackground": {
-          "title": "Fondo de la biblioteca",
+          "title": "Fondo de biblioteca",
           "pattern": {
             "label": "Patrón de fondo",
-            "hint": "Patrón mostrado detrás de la cuadrícula del libro."
+            "hint": "Patrón mostrado detrás de la cuadrícula del libro"
           }
         },
         "backgroundGroups": {
           "fundamental": "Fundamental",
-          "structural": "estructural",
-          "ambient": "ambiente",
-          "refractive": "refractivo"
+          "structural": "Estructural",
+          "ambient": "Ambiental",
+          "refractive": "Refractivo"
         }
       },
       "storage": {
@@ -199,12 +199,12 @@
         "active": "Activo",
         "notAvailable": "No disponible",
         "device": {
-          "title": "Este dispositivo solo",
-          "description": "Las preferencias permanecen en su navegador. Lo mejor si quieres una apariencia diferente en diferentes dispositivos."
+          "title": "Solo este dispositivo",
+          "description": "Las preferencias permanecen en tu navegador. Lo mejor quieres una apariencia diferente en diferentes dispositivos."
         },
         "account": {
-          "title": "mi cuenta",
-          "description": "Las preferencias se guardan en su cuenta. Lo mejor es si quieres la misma apariencia en todos los dispositivos."
+          "title": "Mi cuenta",
+          "description": "Las preferencias se guardan en tu cuenta. Lo mejor si quieres la misma apariencia en cada dispositivo."
         },
         "toasts": {
           "synced": "Las preferencias ahora se sincronizarán",
@@ -212,8 +212,8 @@
         },
         "errors": {
           "demoRestricted": "La cuenta restringida de demostración no puede cambiar el modo de almacenamiento del tema",
-          "update": "No se pudo actualizar el modo de almacenamiento",
-          "generic": "Se produjo un error al actualizar el modo de almacenamiento."
+          "update": "Error al actualizar el modo de almacenamiento",
+          "generic": "Error al actualizar el modo de almacenamiento"
         }
       },
       "bookCovers": {
@@ -222,32 +222,32 @@
           "title": "Modo de visualización de portada",
           "hint": "Controla cómo encajan las portadas reales dentro de las ranuras para libros cuando las relaciones de aspecto difieren",
           "blurredFit": {
-            "label": "ajuste borroso",
+            "label": "Ajuste difuminado",
             "hint": "Muestra la portada completa con un relleno borroso detrás"
           },
           "fillCrop": {
-            "label": "llenar tarjeta",
-            "hint": "Llene toda la ranura recortando los bordes cuando las relaciones de aspecto difieran"
+            "label": "Rellenar tarjeta",
+            "hint": "Rellena todo el espacio recortando los bordes cuando la relación de aspecto difiere"
           },
           "naturalBottom": {
-            "label": "fondo natural",
-            "hint": "Mantenga la proporción de cubierta original y ancle la cubierta al fondo."
+            "label": "Ajuste natural inferior",
+            "hint": "Mantiene la proporción original de la portada y ancla a la parte inferior"
           }
         },
         "spine": {
           "title": "Superposición del lomo del libro",
-          "hint": "Agrega un lomo estilizado y un efecto brillante a las tarjetas de portada.",
+          "hint": "Añade un efecto estilizado de lomo y brillo a las tarjetas de portada",
           "off": {
-            "label": "Apagado",
-            "hint": "Sin efecto lomo/brillo en las cubiertas"
+            "label": "Desactivado",
+            "hint": "Sin efecto lomo/brillo en las portadas"
           },
           "subtle": {
-            "label": "sutil",
+            "label": "Sutil",
             "hint": "Lomo y brillo claros, más cercanos al aspecto predeterminado"
           },
           "strong": {
-            "label": "fuerte",
-            "hint": "Tratamiento de lomo y brillo más pronunciado."
+            "label": "Intenso",
+            "hint": "Tratamiento de lomo y brillo más pronunciado"
           }
         },
         "showSpineOnComics": {
@@ -255,23 +255,23 @@
           "hint": "Aplicar el efecto de lomo y brillo a las portadas de cómics (cbz, cbr, cb7)"
         },
         "shadow": {
-          "title": "Cubrir la fuerza de la sombra",
-          "hint": "Controla la profundidad debajo de las cubiertas en miniaturas de cuadrículas, listas, tablas y paneles.",
+          "title": "Intensidad de la sombra de portada",
+          "hint": "Controla la profundidad bajo las portadas en las miniaturas de cuadrícula, lista, tabla y panel",
           "default": {
             "label": "Predeterminado",
             "hint": "Elevación y profundidad actuales"
           },
           "strong": {
-            "label": "fuerte",
-            "hint": "Sombra paralela más pesada en forma de estante debajo de las sábanas"
+            "label": "Intensa",
+            "hint": "Sombra proyectada más pronunciada, tipo estantería bajo las portadas"
           }
         },
         "overlays": {
           "title": "Superposiciones de tarjetas",
-          "hint": "Elija los metadatos que se muestran directamente en las tarjetas de portada del libro.",
+          "hint": "Elegir metadatos que se muestran directamente en las tarjetas de portada del libro",
           "progressBar": {
             "label": "Barra de progreso",
-            "hint": "Línea fina de color a lo largo del borde inferior."
+            "hint": "Línea fina de color a lo largo del borde inferior"
           },
           "format": {
             "label": "Formato de archivo",
@@ -291,7 +291,7 @@
           },
           "lockStatus": {
             "label": "Estado de bloqueo",
-            "hint": "Icono de bloqueo de metadatos en la parte superior derecha: naranja cuando está bloqueado, verde cuando está desbloqueado"
+            "hint": "Icono de bloqueo de metadatos en la parte superior derecha - naranja cuando está bloqueado, verde cuando está desbloqueado"
           }
         }
       },
@@ -310,11 +310,11 @@
         },
         "portraitCoverSize": {
           "label": "Tamaño de portada vertical",
-          "hint": "Se utiliza para vistas y bibliotecas de retratos."
+          "hint": "Utilizado para bibliotecas de retratos y vistas"
         },
         "squareCoverSize": {
           "label": "Tamaño de la cubierta cuadrada",
-          "hint": "Se utiliza para bibliotecas y vistas cuadradas."
+          "hint": "Utilizado para bibliotecas y vistas cuadradas"
         },
         "portraitGridSpacing": {
           "label": "Espaciado de cuadrícula vertical",
@@ -327,12 +327,12 @@
         "cardInfoMode": {
           "label": "Modo de información de tarjeta",
           "hint": "Dónde mostrar el título del libro y el autor en las tarjetas de cuadrícula",
-          "onHover": "Al pasar el mouse",
+          "onHover": "Al pasar el ratón",
           "belowCover": "Debajo de la cubierta",
           "off": "Apagado"
         },
         "primaryCardLabel": {
-          "label": "Etiqueta de tarjeta primaria",
+          "label": "Etiqueta de tarjeta principal",
           "hint": "Texto que se muestra debajo de la portada de cada libro (primera línea)"
         },
         "secondaryCardLabel": {
@@ -350,32 +350,32 @@
           "title": "Pantalla de serie",
           "collapsedCover": {
             "label": "Portada de serie contraída",
-            "hint": "Elija qué portada mostrar cuando las series estén colapsadas en la cuadrícula del libro"
+            "hint": "Elegir que portada mostrar cuando la serie se contrae en la cuadrícula del libro"
           },
-          "stack": "pila",
-          "mosaic": "mosaico",
-          "first": "primero",
-          "latest": "Lo último",
-          "firstUnread": "Primera no leída"
+          "stack": "Pila",
+          "mosaic": "Mosaico",
+          "first": "Primero",
+          "latest": "Más reciente",
+          "firstUnread": "Primero sin leer"
         },
         "authorGrid": {
           "title": "Cuadrícula de autor",
           "coverSize": {
             "label": "Tamaño de la cubierta",
-            "hint": "Ancho de las portadas del autor en la cuadrícula."
+            "hint": "Ancho de portadas de autor en la cuadrícula"
           },
           "coverShape": {
             "label": "Forma de la cubierta",
-            "hint": "Forma de portadas de autor en la cuadrícula."
+            "hint": "Forma de las portadas de autor en la cuadrícula"
           },
-          "circle": "circulo",
-          "square": "cuadrado"
+          "circle": "Círculo",
+          "square": "Cuadrado"
         },
         "listTableViews": {
           "title": "Vistas de lista y tabla"
         },
         "zebraStriping": {
-          "label": "rayas de cebra",
+          "label": "Rayas de cebra",
           "hint": "Colores de fondo de fila alternativos para facilitar el escaneo"
         }
       },
@@ -383,40 +383,40 @@
         "title": "Comportamiento de la biblioteca",
         "thumbnailClicks": {
           "label": "Clics en miniatura",
-          "hint": "Elija qué sucede al abrir un libro desde las vistas de cuadrícula y lista",
+          "hint": "Elegir qué sucede al abrir un libro desde las vistas de cuadrícula y lista",
           "readFirst": "Leer primero",
-          "readFirstHint": "Abra el lector cuando exista un archivo legible",
+          "readFirstHint": "Abrir el lector cuando exista un archivo legible",
           "openDetails": "Abrir detalles",
-          "openDetailsHint": "Vaya a la página de detalles del libro desde la cuadrícula y las miniaturas de la lista."
+          "openDetailsHint": "Ir a la página de detalles del libro desde la cuadrícula y lista de miniaturas"
         },
         "filterPreview": {
-          "label": "Mostrar vista previa del filtro de forma predeterminada",
-          "hint": "Expanda el filtro activo y ordene el resumen al abrir un smartScope"
+          "label": "Mostrar vista previa de filtro por defecto",
+          "hint": "Expandir el filtro activo y ordenar el resumen al abrir un smartSscope"
         },
         "collapseSeries": {
-          "label": "Contraer serie por defecto",
-          "hint": "Agrupe libros de la misma serie en una sola tarjeta en las vistas de biblioteca y colección"
+          "label": "Contraer series por defecto",
+          "hint": "Agrupa los libros de la misma serie en una sola tarjeta en las vistas de biblioteca y colección"
         }
       },
       "icons": {
         "title": "Iconos personalizados",
         "uploadIcons": "Subir iconos",
         "uploadedCount": "{count, plural, =0 {no se han subido iconos} one {# icono subido} other {# iconos subidos} many {# iconos subidos}}",
-        "searchPlaceholder": "Iconos de búsqueda",
+        "searchPlaceholder": "Buscar iconos",
         "sort": {
-          "newest": "Lo más nuevo",
+          "newest": "Más recientes",
           "name": "Nombre"
         },
         "selectedCount": "{count, plural, one {# icono seleccionado} other {# iconos seleccionados} many {# iconos seleccionados}}",
         "clear": "Borrar",
-        "deleteSelected": "Eliminar seleccionado",
+        "deleteSelected": "Eliminar seleccionados",
         "loading": "Cargando iconos...",
         "emptySearch": "Ningún icono coincide con tu búsqueda.",
         "emptyNoIcons": "Aún no se han subido iconos personalizados.",
         "namePlaceholder": "Nombre",
         "checkingUsage": "Comprobando uso...",
         "usedBy": "Utilizado por {count}",
-        "notUsedYet": "Aún no usado",
+        "notUsedYet": "Aún no se utiliza",
         "rename": "Cambiar nombre",
         "replace": "Reemplazar",
         "usage": {
@@ -433,14 +433,14 @@
           "updated": "Icono actualizado",
           "deleted": "Icono eliminado",
           "bulkDeleted": "{count, plural, =0 {Eliminado sin iconos} one {Eliminado # icono} other {Eliminado # iconos} many {Eliminado # iconos}}",
-          "bulkDeletePartial": "Eliminado {deleted}, {failed} falló"
+          "bulkDeletePartial": "Eliminados {deleted}, {failed} fallidos"
         },
         "errors": {
           "load": "No se pudieron cargar los iconos",
-          "save": "No se pudo guardar el ícono",
-          "replace": "No se pudo reemplazar el ícono",
-          "delete": "No se pudo eliminar el ícono",
-          "bulkDelete": "No se pudieron eliminar los íconos"
+          "save": "No se pudo guardar el icono",
+          "replace": "No se pudo reemplazar el icono",
+          "delete": "No se pudo eliminar el icono",
+          "bulkDelete": "No se pudieron eliminar los iconos"
         }
       },
       "tabs": {
@@ -452,9 +452,9 @@
       }
     },
     "account": {
-      "title": "cuenta",
-      "subtitle": "Administre la configuración de su perfil personal.",
-      "subtitleAll": "Administre su perfil y preferencias de notificación.",
+      "title": "Cuenta",
+      "subtitle": "Gestiona los ajustes de tu perfil personal.",
+      "subtitleAll": "Gestiona tu perfil y preferencias de notificaciones.",
       "tabs": {
         "profile": "Perfil",
         "privacy": "Privacidad y uso compartido",
@@ -472,7 +472,7 @@
       "profile": {
         "securityHeading": "Perfil y seguridad",
         "username": "Nombre de usuario",
-        "fullName": "nombre completo",
+        "fullName": "Nombre completo",
         "email": "Correo electrónico",
         "emailHint": "Póngase en contacto con un administrador para cambiar su dirección de correo electrónico.",
         "save": "Guardar perfil",
@@ -483,7 +483,7 @@
         "accountTypeShared": "Compartido",
         "accountTypeLocal": "Local",
         "nameRequired": "El nombre es obligatorio",
-        "updateFailed": "No se pudo actualizar el perfil",
+        "updateFailed": "Error al actualizar el perfil",
         "updated": "Perfil actualizado",
         "usernameHint": "Tu nombre de usuario no se puede cambiar.",
         "passwordHint": "Cambia la contraseña que usas para iniciar sesión.",
@@ -492,17 +492,17 @@
       },
       "readingPreferences": {
         "title": "Preferencias de lectura",
-        "timezoneHint": "La zona horaria se utiliza para logros urgentes como Early Bird y All-nighter.",
+        "timezoneHint": "La zona horaria se utiliza para logros sensibles al tiempo como Early Bird y All-nighter.",
         "timezone": "Zona horaria",
         "save": "Guardar preferencias",
         "enableAchievements": "Habilitar logros",
-        "enableAchievementsHint": "Realice un seguimiento del progreso de los logros y muestre la interfaz relacionada con los logros. Administre las notificaciones de logros por separado en Notificaciones.",
+        "enableAchievementsHint": "Sigue el progreso de logros y muestra la interfaz relacionada. Gestiona las notificaciones de logros por separado en Notificaciones.",
         "achievementsEnabled": "Logros habilitados",
         "achievementsDisabled": "Logros deshabilitados",
-        "achievementsSaveFailed": "No se pudo actualizar la preferencia de logros"
+        "achievementsSaveFailed": "Error al actualizar la preferencia de logros"
       },
       "preferences": {
-        "saveFailed": "No se pudieron guardar las preferencias",
+        "saveFailed": "Error al guardar las preferencias.",
         "saved": "Preferencias guardadas"
       },
       "avatar": {
@@ -510,16 +510,16 @@
         "unknownUser": "Usuario desconocido",
         "formatHint": "PNG/JPEG/WEBP hasta {size} MB",
         "upload": "Subir foto",
-        "replace": "Reemplazar imagen",
+        "replace": "Sustituir foto",
         "uploading": "Subiendo...",
-        "remove": "Quitar imagen",
+        "remove": "Eliminar foto",
         "removing": "Eliminando...",
         "updated": "Foto de perfil actualizada",
-        "uploadFailed": "No se pudo cargar la foto de perfil",
+        "uploadFailed": "No se ha podido subir la foto de perfil",
         "removed": "Foto de perfil eliminada",
-        "removeFailed": "No se pudo eliminar la foto de perfil",
+        "removeFailed": "No se ha podido eliminar la foto de perfil",
         "removeConfirm": {
-          "title": "¿Quitar foto de perfil?",
+          "title": "¿Eliminar foto de perfil?",
           "description": "Tu avatar será eliminado y reemplazado con iniciales.",
           "confirm": "Quitar"
         }
@@ -4584,6 +4584,29 @@
         "widgets": "widgets",
         "shelves": "estantes"
       },
+      "widgetNames": {
+        "readingStreak": "Racha de lectura",
+        "currentlyReading": "Actualmente leyendo",
+        "readingGoal": "Meta de lectura",
+        "readingDna": "ADN de lectura",
+        "monthlyChallenge": "Reto Mensual",
+        "highlightOfTheDay": "Lo más destacado del día",
+        "neglectedGems": "Gemas olvidadas",
+        "readingRhythm": "Ritmo de lectura",
+        "diversityScore": "Puntuación de diversidad",
+        "libraryOverview": "Resumen de la biblioteca",
+        "yearProjection": "Proyección anual",
+        "longWait": "La larga espera"
+      },
+      "shelfNames": {
+        "recentlyAdded": "Agregado recientemente",
+        "continueReading": "Seguir leyendo",
+        "continueListening": "Continuar escuchando",
+        "wantToRead": "Quiero Leer",
+        "upNextInSeries": "Siguiente en la Serie",
+        "random": "Descubre Algo Nuevo",
+        "smartScope": "Alcance Inteligente"
+      },
       "reorderHintWidget": "Arrastre para reordenar. Alternar para mostrar u ocultar un widget.",
       "reorderHintShelf": "Arrastre para reordenar. Alternar para mostrar u ocultar un estante.",
       "smartScope": "Alcance inteligente",
@@ -6657,6 +6680,11 @@
       "defaultName": "Alcance inteligente",
       "filter": "Filtrar",
       "edit": "Editar alcance inteligente",
+      "koboSync": {
+        "label": "Sincronizar con Kobo",
+        "enabledHint": "Los libros en este Alcance Inteligente compartido se sincronizan con tu dispositivo Kobo. Desactiva para dejar de sincronizarlos.",
+        "disabledHint": "Activa para sincronizar los libros de este Alcance Inteligente compartido con tu dispositivo Kobo."
+      },
       "showControlsAria": "Mostrar controles de alcance inteligente",
       "hideFilter": "Ocultar filtro",
       "showFilter": "Mostrar filtro",
@@ -6664,7 +6692,10 @@
       "loadError": "No se pudo cargar este SmartScope",
       "toast": {
         "deleted": "\"{name}\" eliminado",
-        "deleteFailed": "No se pudo eliminar \"{name}\""
+        "deleteFailed": "No se pudo eliminar \"{name}\"",
+        "koboSyncEnabled": "\"{name}\" ahora sincroniza con tu Kobo",
+        "koboSyncDisabled": "\"{name}\" ya no sincroniza con tu Kobo",
+        "koboSyncFailed": "Error al actualizar la sincronización de Kobo para \"{name}\""
       },
       "empty": {
         "noRules": "No hay reglas configuradas",
