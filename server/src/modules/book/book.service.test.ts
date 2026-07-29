@@ -226,24 +226,7 @@ beforeEach(async () => {
     findOne: vi.fn().mockResolvedValue(null),
     setNote: vi.fn().mockResolvedValue({ note: null, updatedAt: '2026-01-01T00:00:00.000Z' }),
   };
-  const embedder = {
-    embedBook: vi.fn().mockResolvedValue(undefined),
-  };
-  const fileWriteService = {
-    scheduleWrite: vi.fn(),
-    cancelPendingWrite: vi.fn(),
-    writeToFile: vi.fn(),
-    findLibraryWriteSettingsForBook: vi.fn().mockResolvedValue({ fileWriteEnabled: false, fileRenameEnabled: false }),
-    resolveBookFileWriteStatus: vi.fn().mockReturnValue({ enabled: false, reason: 'library_disabled', writableFormats: [], writableFields: [] }),
-  };
-  const fileRenameService = {
-    scheduleRename: vi.fn(),
-    cancelPendingRename: vi.fn(),
-    performRename: vi.fn(),
-  };
-  const achievementEvents = {
-    emit: vi.fn(),
-  };
+
   const narratorService = {
     replaceForBook: vi.fn().mockResolvedValue(undefined),
   };

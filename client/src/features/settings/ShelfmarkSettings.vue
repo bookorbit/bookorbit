@@ -170,7 +170,7 @@ async function saveSettings() {
         <div>
           <label for="shelfmark-external-url" class="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
             {{ t('settings.shelfmark.externalUrlLabel') }}
-            <span class="ml-1.5 normal-case font-normal text-muted-foreground/70">{{ t('settings.shelfmark.optional') }}</span>
+            <span class="ml-1.5 normal-case font-normal text-muted-foreground">{{ t('settings.shelfmark.optional') }}</span>
           </label>
           <input
             id="shelfmark-external-url"

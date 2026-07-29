@@ -17,7 +17,6 @@ import {
   Star,
   ExternalLink,
   Sparkles,
-  Highlighter,
   CloudDownload,
   Loader,
   Check,
