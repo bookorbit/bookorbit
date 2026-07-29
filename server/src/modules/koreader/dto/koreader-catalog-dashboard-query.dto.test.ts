@@ -1,11 +1,16 @@
 import 'reflect-metadata';
 
+import { Test } from '@nestjs/testing';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
 import { KoreaderCatalogDashboardQueryDto } from './koreader-catalog-query.dto';
 
 describe('KoreaderCatalogDashboardQueryDto', () => {
+  beforeAll(async () => {
+    await Test.createTestingModule({}).compile();
+  });
+
   it('accepts and transforms a smart-scope dashboard request', async () => {
     const dto = plainToInstance(KoreaderCatalogDashboardQueryDto, {
       section: 'smart-scope',
