@@ -160,6 +160,31 @@ describe('BookMoveService', () => {
       expect(results).toEqual([{ bookId: 5, status: 'failed', reason: 'no access to source library' }]);
     });
 
+    it('fails a single book with a distinct reason when the source access check errors unexpectedly', async () => {
+      const { service, libraryService } = makeService();
+      libraryService.verifyUserAccess
+        .mockResolvedValueOnce(undefined) // target library
+        .mockRejectedValueOnce(new Error('connection reset')); // source library, infra error
+
+      const results = await service.moveBooks([5], 3, 9, makeUser());
+
+      expect(results).toEqual([{ bookId: 5, status: 'failed', reason: 'source library access check failed' }]);
+    });
+
+    it('fails a single book (not the batch) when the database re-parent throws', async () => {
+      const { service, repo, scanGateway } = makeService();
+      repo.findBookForMove.mockResolvedValueOnce(makeBook()).mockResolvedValueOnce(makeBook({ id: 6 }));
+      repo.applyMove.mockRejectedValueOnce(new Error('connection terminated'));
+
+      const results = await service.moveBooks([5, 6], 3, 9, makeUser());
+
+      expect(results).toEqual([
+        { bookId: 5, status: 'failed', reason: 'database update failed' },
+        { bookId: 6, status: 'moved' },
+      ]);
+      expect(scanGateway.emitBookTransferred).toHaveBeenCalledWith({ fromLibraryId: 1, toLibraryId: 3, bookIds: [6] });
+    });
+
     it('rejects when the target folder does not belong to the target library', async () => {
       const { service, repo } = makeService();
       repo.findFolder.mockResolvedValue({ id: 9, libraryId: 999, path: '/other' });
@@ -284,6 +309,19 @@ describe('BookMoveService', () => {
         { id: 10, absolutePath: '/src-lib/Frank Herbert/Dune/Dune.epub', relPath: 'Frank Herbert/Dune/Dune.epub' },
         { id: 11, absolutePath: '/src-lib/Frank Herbert/Dune/cover.jpg', relPath: 'Frank Herbert/Dune/cover.jpg' },
       ]);
+    });
+
+    it('flags the outcome when the rollback itself fails and the book may be inconsistent', async () => {
+      const { service, repo } = makeService();
+      repo.findBookForMove.mockResolvedValue(makeBook());
+      mockRename
+        .mockResolvedValueOnce(undefined) // first file moves fine
+        .mockRejectedValueOnce(Object.assign(new Error('disk full'), { code: 'ENOSPC' })) // second file fails
+        .mockRejectedValueOnce(new Error('permission denied')); // rollback of first file fails too
+
+      const results = await service.moveBooks([5], 3, 9, makeUser());
+
+      expect(results).toEqual([{ bookId: 5, status: 'failed', reason: 'disk full (rollback incomplete, manual check required)' }]);
     });
 
     it('computes relPath from absolute paths when a file has no stored relPath', async () => {

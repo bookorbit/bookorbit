@@ -524,6 +524,18 @@ describe('useBookBulkActions', () => {
     expect(mocks.toastError).toHaveBeenCalledWith('Failed to move books')
   })
 
+  it('reports a failed move instead of throwing when the request itself throws', async () => {
+    mocks.api.mockRejectedValue(new Error('network down'))
+    const selectedIds = ref(new Set([1]))
+    const onDeleted = vi.fn<(ids: number[]) => void>()
+    const { handleBulkMove } = useBookBulkActions(selectedIds, onDeleted)
+
+    await expect(handleBulkMove(3, 9)).resolves.toBe(false)
+
+    expect(onDeleted).not.toHaveBeenCalled()
+    expect(mocks.toastError).toHaveBeenCalledWith('Failed to move books')
+  })
+
   it('shows an error toast when no book could be moved', async () => {
     mocks.api.mockResolvedValue({
       ok: true,

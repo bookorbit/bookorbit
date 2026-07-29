@@ -5,7 +5,7 @@ import type { BookCard } from '@bookorbit/types'
 const mockSelectionMode = { value: false }
 const mockSelectedIds = { value: new Set<number>() }
 
-const handleBulkMoveMock = vi.hoisted(() => vi.fn<(libraryId: number, folderId?: number) => Promise<void>>().mockResolvedValue(undefined))
+const handleBulkMoveMock = vi.hoisted(() => vi.fn<(libraryId: number, folderId?: number) => Promise<boolean>>().mockResolvedValue(true))
 
 const mocks = vi.hoisted(() => ({
   enterSelectionMode: vi.fn<() => void>(),
@@ -135,6 +135,20 @@ describe('useBookTableShell', () => {
     expect(handleBulkMoveMock).toHaveBeenCalledWith(3, 9)
     expect(shell.movingBooks.value).toBe(false)
     expect(shell.moveBooksOpen.value).toBe(false)
+  })
+
+  it('keeps the move dialog open and skips the refresh callback when the request fails', async () => {
+    const books = ref([makeBook()])
+    const onBooksMoved = vi.fn<() => void>()
+    const shell = useBookTableShell({ books, onBooksMoved })
+    handleBulkMoveMock.mockResolvedValueOnce(false)
+
+    shell.moveBooksOpen.value = true
+    await shell.confirmMoveBooks(3, 9)
+
+    expect(shell.movingBooks.value).toBe(false)
+    expect(shell.moveBooksOpen.value).toBe(true)
+    expect(onBooksMoved).not.toHaveBeenCalled()
   })
 
   it('notifies the view after a bulk move so it can refresh counts without relying on websockets', async () => {

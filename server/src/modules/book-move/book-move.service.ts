@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { access, copyFile, mkdir, readdir, rename as fsRename, rmdir, unlink } from 'fs/promises';
 import { dirname, extname, join, relative } from 'path';
 
@@ -75,8 +75,15 @@ export class BookMoveService {
 
     try {
       await this.libraryService.verifyUserAccess(user.id, book.libraryId, user.isSuperuser);
-    } catch {
-      return { bookId, status: 'failed', reason: 'no access to source library' };
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        return { bookId, status: 'failed', reason: 'no access to source library' };
+      }
+      const message = sanitizeLogValue(error instanceof Error ? error.message : String(error));
+      this.logger.error(
+        `[${BOOK_MOVE_EVENT}] bookId=${bookId} userId=${user.id} errorClass=${error instanceof Error ? error.constructor.name : 'unknown'} error="${message}" - source library access check failed`,
+      );
+      return { bookId, status: 'failed', reason: 'source library access check failed' };
     }
 
     if (book.status === 'processing') return { bookId, status: 'skipped', reason: 'book is processing' };
@@ -114,7 +121,15 @@ export class BookMoveService {
       }
     }
 
-    await this.moveRepo.applyMove(bookId, { libraryId: library.id, libraryFolderId: folder.id, folderPath: newFolderPath }, fileUpdates);
+    try {
+      await this.moveRepo.applyMove(bookId, { libraryId: library.id, libraryFolderId: folder.id, folderPath: newFolderPath }, fileUpdates);
+    } catch (error) {
+      const message = sanitizeLogValue(error instanceof Error ? error.message : String(error));
+      this.logger.error(
+        `[${BOOK_MOVE_EVENT}] bookId=${bookId} errorClass=${error instanceof Error ? error.constructor.name : 'unknown'} error="${message}" - database re-parent failed`,
+      );
+      return { bookId, status: 'failed', reason: 'database update failed' };
+    }
 
     const moved: Array<{ from: string; to: string }> = [];
     try {
@@ -127,9 +142,9 @@ export class BookMoveService {
         moved.push({ from, to });
       }
     } catch (error) {
-      await this.rollback(bookId, book, moved, error);
+      const rolledBack = await this.rollback(bookId, book, moved, error);
       const reason = error instanceof Error ? error.message : String(error);
-      return { bookId, status: 'failed', reason };
+      return { bookId, status: 'failed', reason: rolledBack ? reason : `${reason} (rollback incomplete, manual check required)` };
     }
 
     for (const { from } of moved) {
@@ -148,11 +163,13 @@ export class BookMoveService {
     return { bookId, status: 'moved' };
   }
 
-  private async rollback(bookId: number, book: BookMoveBookData, moved: Array<{ from: string; to: string }>, cause: unknown): Promise<void> {
+  private async rollback(bookId: number, book: BookMoveBookData, moved: Array<{ from: string; to: string }>, cause: unknown): Promise<boolean> {
+    let rollbackOk = true;
     for (const { from, to } of [...moved].reverse()) {
       try {
         await this.moveFile(to, from);
       } catch (rollbackError) {
+        rollbackOk = false;
         const causeMessage = sanitizeLogValue(cause instanceof Error ? cause.message : String(cause));
         const rollbackMessage = sanitizeLogValue(rollbackError instanceof Error ? rollbackError.message : String(rollbackError));
         this.logger.error(
@@ -173,9 +190,11 @@ export class BookMoveService {
         fileUpdates,
       );
     } catch (rollbackError) {
+      rollbackOk = false;
       const rollbackMessage = sanitizeLogValue(rollbackError instanceof Error ? rollbackError.message : String(rollbackError));
       this.logger.error(`[${BOOK_MOVE_EVENT}] bookId=${bookId} rollbackError="${rollbackMessage}" - failed to restore book rows during rollback`);
     }
+    return rollbackOk;
   }
 
   private async moveFile(from: string, to: string): Promise<void> {

@@ -118,6 +118,26 @@ describe('MoveBooksDialog', () => {
     expect(wrapper.emitted('cancel')).toHaveLength(1)
   })
 
+  it('emits cancel from the backdrop', async () => {
+    const wrapper = mountDialog()
+
+    await wrapper.find('div.absolute.inset-0').trigger('click')
+
+    expect(wrapper.emitted('cancel')).toHaveLength(1)
+  })
+
+  it('ignores backdrop and cancel clicks while a move is running', async () => {
+    const wrapper = mount(MoveBooksDialog, {
+      props: { open: true, count: 2, currentLibraryId: null, moving: true },
+      global: { stubs: { Teleport: true } },
+    })
+
+    await wrapper.find('div.absolute.inset-0').trigger('click')
+    await wrapper.find('[data-testid="move-cancel"]').trigger('click')
+
+    expect(wrapper.emitted('cancel')).toBeUndefined()
+  })
+
   it('fetches libraries when opened', () => {
     mountDialog()
 

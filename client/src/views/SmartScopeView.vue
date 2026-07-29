@@ -249,6 +249,10 @@ const {
   handleEditIndividually,
 } = useBookTableShell({
   books,
+  onBooksMoved: () => {
+    resetBooks()
+    refreshBuckets()
+  },
 })
 
 const metadataExportOpen = ref(false)

@@ -394,36 +394,43 @@ export function useBookBulkActions(
     toast.success(`${locked ? 'Locked' : 'Unlocked'} metadata for ${count} book${count === 1 ? '' : 's'}`)
   }
 
-  async function handleBulkMove(targetLibraryId: number, targetFolderId?: number) {
+  async function handleBulkMove(targetLibraryId: number, targetFolderId?: number): Promise<boolean> {
     if (!hasSelection()) {
       toast.error('No books selected to move')
-      return
+      return false
     }
-    const res = await api('/api/v1/books/move', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...getSelectionPayload(), targetLibraryId, ...(targetFolderId !== undefined ? { targetFolderId } : {}) }),
-    })
-    if (!res.ok) {
+    let results: MoveBooksResponse['results']
+    try {
+      const res = await api('/api/v1/books/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...getSelectionPayload(), targetLibraryId, ...(targetFolderId !== undefined ? { targetFolderId } : {}) }),
+      })
+      if (!res.ok) {
+        toast.error('Failed to move books')
+        return false
+      }
+      ;({ results } = (await res.json()) as MoveBooksResponse)
+    } catch {
       toast.error('Failed to move books')
-      return
+      return false
     }
-    const { results } = (await res.json()) as MoveBooksResponse
     const movedIds = results.filter((entry) => entry.status === 'moved').map((entry) => entry.bookId)
     const skipped = results.filter((entry) => entry.status === 'skipped').length
     const failed = results.filter((entry) => entry.status === 'failed').length
     if (movedIds.length > 0) onDeleted(movedIds)
     if (movedIds.length === results.length) {
       toast.success(`Moved ${movedIds.length} book${movedIds.length === 1 ? '' : 's'}`)
-      return
+      return true
     }
     if (movedIds.length === 0) {
       const parts = [skipped > 0 ? `${skipped} skipped` : null, failed > 0 ? `${failed} failed` : null].filter(Boolean).join(', ')
       toast.error(`No books were moved${parts ? ` (${parts})` : ''}`)
-      return
+      return true
     }
     const parts = [skipped > 0 ? `${skipped} skipped` : null, failed > 0 ? `${failed} failed` : null].filter(Boolean).join(', ')
     toast.warning(`Moved ${movedIds.length} of ${results.length} books${parts ? ` (${parts})` : ''}`)
+    return true
   }
 
   async function handleDeleteSelected() {

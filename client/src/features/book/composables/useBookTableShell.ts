@@ -61,9 +61,10 @@ export function useBookTableShell({ books, querySelection, onBooksMoved }: BookT
   async function confirmMoveBooks(libraryId: number, folderId?: number): Promise<void> {
     if (movingBooks.value) return
     movingBooks.value = true
+    let completed = false
     try {
-      await bulk.handleBulkMove(libraryId, folderId)
-      if (onBooksMoved) {
+      completed = await bulk.handleBulkMove(libraryId, folderId)
+      if (completed && onBooksMoved) {
         try {
           await onBooksMoved()
         } catch {
@@ -72,7 +73,8 @@ export function useBookTableShell({ books, querySelection, onBooksMoved }: BookT
       }
     } finally {
       movingBooks.value = false
-      moveBooksOpen.value = false
+      // Keep the dialog open on transport errors so the user can retry.
+      if (completed) moveBooksOpen.value = false
     }
   }
 
