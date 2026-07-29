@@ -304,80 +304,22 @@ function MainMenu:applyDashboardSection(index, config, catalog, touchmenu_instan
     if touchmenu_instance then touchmenu_instance:updateItems() end
 end
 
-function MainMenu:dashboardSectionClient(catalog)
-    if catalog and catalog.client then return catalog.client end
-    return BookOrbitApi.new(self:apiOpts())
-end
+function MainMenu:chooseDashboardCatalogSource(index, section, catalog, touchmenu_instance)
+    if touchmenu_instance then UIManager:close(touchmenu_instance) end
 
-function MainMenu:dashboardParamsForEntry(section, entry)
-    local params = { sort = "title" }
-    if section == "libraries" then
-        params.libraryId = tonumber(entry.id)
-    elseif section == "collections" then
-        params.collectionId = tonumber(entry.id)
-    elseif section == "smart-scopes" then
-        params.smartScopeId = tonumber(entry.id)
-    elseif section == "authors" then
-        params.author = entry.id
-    elseif section == "series" then
-        if entry.seriesId then params.seriesId = tonumber(entry.seriesId) else params.series = entry.id end
-        params.sort = "series"
+    local function openSelector(target)
+        target:loadSection(section, { dashboard_source_index = index })
     end
-    return params
-end
 
-function MainMenu:chooseDashboardCatalogSource(index, section, catalog, touchmenu_instance, page)
-    local ButtonDialog = require("ui/widget/buttondialog")
-    page = page or 1
-    if NetworkMgr:willRerunWhenConnected(function()
-        self:chooseDashboardCatalogSource(index, section, catalog, touchmenu_instance, page)
-    end) then return end
-
-    Device:setIgnoreInput(true)
-    local params = (section == "authors" or section == "series") and { page = page } or nil
-    local body, err = self:dashboardSectionClient(catalog):catalogSection(section, params)
-    Device:setIgnoreInput(false)
-    local entries = body and body.items or nil
-    if not entries then
-        UIManager:show(InfoMessage:new{ text = T(_("Could not load %1: %2"), DashboardSections.label(section), tostring(err)), timeout = 3 })
+    if catalog then
+        UIManager:nextTick(function() openSelector(catalog) end)
         return
     end
 
-    local current = DashboardSections.at(self.settings, index)
-    local dialog
-    local buttons = {}
-    for _, entry in ipairs(entries) do
-        local config = { type = section, sourceName = entry.title, params = self:dashboardParamsForEntry(section, entry) }
-        local checked = DashboardSections.signature(current) == DashboardSections.signature(config)
-        table.insert(buttons, {{
-            text = entry.title .. (checked and " ✓" or ""),
-            callback = function()
-                UIManager:close(dialog)
-                self:applyDashboardSection(index, config, catalog, touchmenu_instance)
-            end,
-        }})
-    end
-    if #buttons == 0 then
-        table.insert(buttons, {{ text = T(_("No %1 found."), DashboardSections.label(section)), enabled = false }})
-    end
-    if page > 1 or body.hasNext == true then
-        local nav = {}
-        if page > 1 then
-            table.insert(nav, { text = _("Previous"), callback = function()
-                UIManager:close(dialog)
-                self:chooseDashboardCatalogSource(index, section, catalog, touchmenu_instance, page - 1)
-            end })
-        end
-        if body.hasNext == true then
-            table.insert(nav, { text = _("Next"), callback = function()
-                UIManager:close(dialog)
-                self:chooseDashboardCatalogSource(index, section, catalog, touchmenu_instance, page + 1)
-            end })
-        end
-        table.insert(buttons, nav)
-    end
-    dialog = ButtonDialog:new{ title = DashboardSections.label(section), buttons = buttons }
-    UIManager:show(dialog)
+    self:openCatalogBrowser(false)
+    UIManager:nextTick(function()
+        if self.catalog_browser then openSelector(self.catalog_browser) end
+    end)
 end
 
 function MainMenu:dashboardSectionItems(index, catalog)
