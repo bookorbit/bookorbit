@@ -58,6 +58,7 @@ local DASHBOARD_TALL_ASPECT_RATIO = 1.55
 local SECTION_MAX_ROWS = 2
 local STATS_MIN_BODY_HEIGHT = 56
 local SECTION_PAGE_ID = "section"
+local SECOND_SECTION_PAGE_ID = "section2"
 
 local CatalogDashboard = {}
 
@@ -113,6 +114,11 @@ function CatalogDashboard.dashboardSectionBooks(body)
     if type(body) ~= "table" then return {} end
     if type(body.section) == "table" then return body.section.books or {} end
     return body.discover or {}
+end
+
+function CatalogDashboard.dashboardSecondSectionBooks(body)
+    if type(body) ~= "table" or type(body.section2) ~= "table" then return {} end
+    return body.section2.books or {}
 end
 
 function CatalogDashboard.dashboardItems()
@@ -212,6 +218,21 @@ function CatalogDashboard:dashboardRoot(opts)
         end, opts)
     end
     if body and body.continueReading then
+        local second_config = DashboardSections.at(self.settings, 2)
+        local second_body
+        if self.client.catalogDashboardSection then
+            second_body = self:fetch(_("Loading dashboard..."), function()
+                return self.client:catalogDashboardSection(second_config)
+            end, opts)
+        end
+        if type(second_body) == "table" then
+            local second_section = type(second_body.section) == "table" and second_body.section or second_body
+            body.section2 = {
+                type = second_section.type or second_config.type,
+                smartScopeId = second_section.smartScopeId or second_config.smartScopeId,
+                books = second_section.books or {},
+            }
+        end
         self:cacheDashboard(body)
         return self:dashboardContext(body)
     end
@@ -266,6 +287,9 @@ function CatalogDashboard.dashboardBooks(dashboard)
         table.insert(books, book)
     end
     for _, book in ipairs(CatalogDashboard.dashboardSectionBooks(dashboard)) do
+        table.insert(books, book)
+    end
+    for _, book in ipairs(CatalogDashboard.dashboardSecondSectionBooks(dashboard)) do
         table.insert(books, book)
     end
     return books
@@ -714,6 +738,8 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
     local section_config = section_pending and self:dashboardConfiguredSection()
         or self:dashboardBodySection(dashboard)
     local section_books = section_pending and {} or self.dashboardSectionBooks(dashboard)
+    local second_config = DashboardSections.at(self.settings, 2)
+    local second_books = self.dashboardSecondSectionBooks(dashboard)
     local action_entries = self:dashboardActionEntries()
     local summary = self:dashboardStatsSummary() or { today_seconds = 0, week_seconds = 0, streak_days = 0 }
 
@@ -739,6 +765,7 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
 
     local show_stats = stats_widget ~= nil
     local show_section = #section_books > 0 or section_pending
+    local show_second = #second_books > 0
     local section_row_gap = inner_gap
     local section_slots = 0
     local section_card_w = 0
@@ -746,8 +773,9 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
     local section_rows = 1
 
     local function updateSectionMetrics()
-        if show_section and #section_books > 0 then
-            section_slots, section_card_w, section_row_h = self:sectionRowMetrics(#section_books, section_row_gap)
+        local section_count = math.max(show_section and #section_books or 0, show_second and #second_books or 0)
+        if section_count > 0 then
+            section_slots, section_card_w, section_row_h = self:sectionRowMetrics(section_count, section_row_gap)
         else
             section_slots, section_card_w, section_row_h = 0, 0, 0
         end
@@ -769,12 +797,17 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
             + (has_continue and hero_h or empty_h)
             + section_gap
             + (show_section and (header_h + inner_gap + sectionGridHeight() + section_gap) or 0)
+            + (show_second and (header_h + inner_gap + section_row_h + section_gap) or 0)
             + header_h + inner_gap + browse_rows * browse_row_h
             + inner_gap
         return fixed
     end
     if show_stats and fixedHeight() > avail then
         show_stats = false
+    end
+    if show_second and fixedHeight() > avail then
+        show_second = false
+        updateSectionMetrics()
     end
     if show_section and fixedHeight() > avail then
         show_section = false
@@ -856,9 +889,10 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
     if show_section then
         local section_controls = {}
         local section_page = 1
+        local first_slots = section_slots
         if not section_pending then
-            section_slots = math.min(section_slots, #section_books)
-            local section_page_size = math.max(1, section_slots * section_rows)
+            first_slots = math.min(section_slots, #section_books)
+            local section_page_size = math.max(1, first_slots * section_rows)
             local section_pages = math.max(1, math.ceil(#section_books / section_page_size))
             section_page = self:dashboardPage(SECTION_PAGE_ID, section_pages)
             if section_pages > 1 then
@@ -877,8 +911,25 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
             self:addDashboardEmptyState(_("Loading..."))
         else
             self:addDashboardCoverGrid(SECTION_PAGE_ID, section_books, section_row_h, false, false,
-                section_slots, section_card_w, section_page, section_rows)
+                first_slots, section_card_w, section_page, section_rows)
         end
+        self:addDashboardSpacer(section_gap)
+    end
+
+    if show_second then
+        local second_slots = math.min(section_slots, #second_books)
+        local second_pages = math.max(1, math.ceil(#second_books / math.max(1, second_slots)))
+        local second_page = self:dashboardPage(SECOND_SECTION_PAGE_ID, second_pages)
+        local second_controls = {}
+        if second_pages > 1 then
+            local prev_button, next_button = self:buildDashboardHeaderNav(SECOND_SECTION_PAGE_ID, second_page, second_pages)
+            table.insert(second_controls, prev_button)
+            table.insert(second_controls, next_button)
+        end
+        self:addDashboardHeader(DashboardSections.headerText(second_config), second_controls)
+        self:addDashboardSpacer(inner_gap)
+        self:addDashboardCoverGrid(SECOND_SECTION_PAGE_ID, second_books, section_row_h, false, false,
+            second_slots, section_card_w, second_page, 1)
         self:addDashboardSpacer(section_gap)
     end
 
@@ -935,14 +986,16 @@ function CatalogDashboard:setDashboardSection(config, index)
         return
     end
     self:persistSetting(DashboardSections.SETTING_KEY, DashboardSections.storeAt(self.settings, index, normalized))
-    -- Row 2 is settings-only in this checkpoint. Row 1 keeps the proven refresh
-    -- and cache path unchanged until the second-row renderer is introduced.
-    if index ~= 1 or not self:dashboardMode() then return end
+    if not self:dashboardMode() then return end
     local context = self.current_context
     if context then
-        context.section_stale = true
         context.dash_pages = context.dash_pages or {}
-        context.dash_pages[SECTION_PAGE_ID] = 1
+        if index == 1 then
+            context.section_stale = true
+            context.dash_pages[SECTION_PAGE_ID] = 1
+        else
+            context.dash_pages[SECOND_SECTION_PAGE_ID] = 1
+        end
         self:updateItems()
     end
     self:refreshCurrent()

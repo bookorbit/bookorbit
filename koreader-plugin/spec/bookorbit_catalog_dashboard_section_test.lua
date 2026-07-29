@@ -121,7 +121,7 @@ local function newCatalog(opts)
         settings = {
             catalog_dashboard_cache = opts.cache,
             catalog_dashboard_cache_section = opts.cache_section,
-            [DashboardSections.SETTING_KEY] = opts.section and { opts.section } or nil,
+            [DashboardSections.SETTING_KEY] = opts.sections or (opts.section and { opts.section } or nil),
         },
         client = {
             server_url = opts.server_url or "https://example.test",
@@ -141,6 +141,10 @@ local function newCatalog(opts)
                     body.discover = {}
                 end
                 return body
+            end,
+            catalogDashboardSection = function(_, section)
+                table.insert(requests, "section2")
+                return { type = section.type, smartScopeId = section.smartScopeId, books = { { id = 10 } } }
             end,
         },
     }
@@ -191,7 +195,8 @@ assertEqual(#prefetch, 3, "prefetching covers continue reading and the configure
 catalog = newCatalog{ section = { type = "want-to-read" }, capabilities = { "catalogDashboardSections" } }
 local _, refreshed = catalog:dashboardRoot()
 assertEqual(last_section.type, "want-to-read", "the configured section reaches the client")
-assertEqual(refreshed.dashboard.section.books[1].id, 9, "the section body is what gets rendered")
+assertEqual(refreshed.dashboard.section.books[1].id, 9, "the first section body is what gets rendered")
+assertEqual(refreshed.dashboard.section2.books[1].id, 10, "the second section is fetched and merged into the dashboard")
 assertEqual(catalog.settings.catalog_dashboard_cache_section, "want-to-read", "the cache records which section it holds")
 assertEqual(catalog:dashboardCacheMatchesSection(), true, "the cache matches the configuration it was fetched for")
 
