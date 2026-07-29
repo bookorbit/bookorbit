@@ -21,7 +21,8 @@ local _ = require("gettext")
 local BookOrbitApi = require("bookorbit_api")
 local BookOrbitHighlightDiagnostics = require("bookorbit_highlight_diagnostics")
 local BookOrbitSweep = require("bookorbit_sweep")
-local DashboardSections = require("bookorbit_dashboard_sections")
+local CatalogUtil = require("bookorbit_catalog_util")
+local DashboardConfig = require("bookorbit_dashboard_config")
 
 -- Assigned from the plugin class on install so menu labels can name the
 -- shared sync strategies.
@@ -289,116 +290,114 @@ function MainMenu:testConnection()
     end)
 end
 
-function MainMenu:dashboardSectionLabel()
-    return DashboardSections.headerText(DashboardSections.primary(self.settings))
+function MainMenu:dashboardSections()
+    return DashboardConfig.sections(self.settings)
 end
 
--- Applies a new choice for the configurable dashboard row. When the dashboard
--- is open it owns the setting write, so the row and its cache signature move
--- together; otherwise the setting is written directly.
-function MainMenu:applyDashboardSection(config, catalog, touchmenu_instance)
-    if catalog and catalog.setDashboardSection then
-        catalog:setDashboardSection(config)
-    else
-        self.settings[DashboardSections.SETTING_KEY] = DashboardSections.store(config)
-        G_reader_settings:flush()
-    end
-    if touchmenu_instance then touchmenu_instance:updateItems() end
+function MainMenu:setDashboardSection(index, section)
+    local sections = self:dashboardSections()
+    sections[index] = DashboardConfig.clone(section)
+    self.settings.catalog_dashboard_sections = sections
+    self.settings.catalog_dashboard_cache = nil
+    G_reader_settings:flush()
 end
 
-function MainMenu:dashboardSectionClient(catalog)
-    if catalog and catalog.client then return catalog.client end
-    return BookOrbitApi.new(self:apiOpts())
-end
-
--- SmartScopes live on the server, so the chooser has to ask for them. The
--- chosen name is stored beside the id purely so the row can be labelled later
--- without another request.
-function MainMenu:chooseDashboardSmartScope(catalog, touchmenu_instance)
-    local ButtonDialog = require("ui/widget/buttondialog")
-    if NetworkMgr:willRerunWhenConnected(function() self:chooseDashboardSmartScope(catalog, touchmenu_instance) end) then
-        return
-    end
-
-    Device:setIgnoreInput(true)
-    local body, err = self:dashboardSectionClient(catalog):catalogSection("smart-scopes")
-    Device:setIgnoreInput(false)
-
-    local scopes = body and body.items or nil
-    if not scopes then
-        UIManager:show(InfoMessage:new{
-            text = T(_("Could not load your SmartScopes: %1"), tostring(err)),
-            timeout = 3,
-        })
-        return
-    end
-    if #scopes == 0 then
-        UIManager:show(InfoMessage:new{
-            text = _("You have no SmartScopes yet. Create one in BookOrbit web settings."),
-            timeout = 3,
-        })
-        return
-    end
-
-    local current = DashboardSections.primary(self.settings)
-    local dialog
-    local buttons = {}
-    for _index, scope in ipairs(scopes) do
-        local scope_id = tonumber(scope.id)
-        if scope_id then
-            table.insert(buttons, {
-                {
-                    text = scope.title .. (current.smartScopeId == scope_id and " *" or ""),
-                    callback = function()
-                        UIManager:close(dialog)
-                        self:applyDashboardSection(
-                            { type = "smart-scope", smartScopeId = scope_id, smartScopeName = scope.title },
-                            catalog, touchmenu_instance)
-                    end,
-                },
-            })
-        end
-    end
-    dialog = ButtonDialog:new{
-        title = _("Show which SmartScope?"),
-        buttons = buttons,
-    }
-    UIManager:show(dialog)
-end
-
-function MainMenu:dashboardSectionItems(catalog)
+function MainMenu:dashboardSortMenu(index)
     local items = {}
-    for _index, section_type in ipairs(DashboardSections.TYPES) do
-        local is_smart_scope = section_type == "smart-scope"
+    for _, sort in ipairs(CatalogUtil.SORTS) do
+        local sort_id = sort.id
         table.insert(items, {
-            text_func = function()
-                if is_smart_scope then
-                    local current = DashboardSections.primary(self.settings)
-                    if current.type == "smart-scope" and current.smartScopeName then
-                        return T(_("SmartScope (%1)"), current.smartScopeName)
-                    end
-                end
-                return DashboardSections.label(section_type)
-            end,
-            help_text = DashboardSections.helpText(section_type),
+            text = sort.text,
             checked_func = function()
-                return DashboardSections.primary(self.settings).type == section_type
+                local section = self:dashboardSections()[index]
+                return (section.sort or DashboardConfig.defaultSort(section)) == sort_id
             end,
-            keep_menu_open = is_smart_scope,
-            callback = function(touchmenu_instance)
-                if is_smart_scope then
-                    self:chooseDashboardSmartScope(catalog, touchmenu_instance)
-                else
-                    self:applyDashboardSection({ type = section_type }, catalog, touchmenu_instance)
-                end
+            callback = function()
+                local section = self:dashboardSections()[index]
+                section.sort = sort_id
+                self:setDashboardSection(index, section)
             end,
         })
     end
     return items
 end
 
-function MainMenu:dashboardSettingsMenu(catalog)
+function MainMenu:showDashboardTargetDialog(index, section_name)
+    local function selectSource(entry)
+        local kind = DashboardConfig.targetKind(section_name)
+        local id = entry.id or entry.name or entry.title
+        local title = entry.name or entry.title or tostring(id)
+        self:setDashboardSection(index, {
+            kind = kind,
+            id = id,
+            seriesId = entry.seriesId,
+            title = title,
+            sort = DashboardConfig.defaultSort({ kind = kind }),
+        })
+    end
+
+    NetworkMgr:runWhenConnected(function()
+        local catalog = self.catalog_browser
+        if catalog then
+            catalog.source_select_callback = selectSource
+            catalog:loadSection(section_name)
+        else
+            self:openCatalogBrowser(false, {
+                initial_section = section_name,
+                source_select_callback = selectSource,
+            })
+        end
+    end)
+end
+
+function MainMenu:dashboardSectionChoiceMenu(index)
+    local function direct(text, descriptor)
+        return {
+            text = text,
+            callback = function() self:setDashboardSection(index, descriptor) end,
+        }
+    end
     return {
+        direct(_("Stats"), { kind = "stats" }),
+        direct(_("Continue reading"), { kind = "continue" }),
+        direct(_("Discover"), { kind = "discover" }),
+        direct(_("Browse"), { kind = "browse" }),
+        direct(_("In progress"), { kind = "in-progress", sort = "recently_read" }),
+        direct(_("All Books"), { kind = "books", sort = "title" }),
+        direct(_("On device"), { kind = "on-device", sort = "title" }),
+        { text = _("Libraries") .. "  >", callback = function() self:showDashboardTargetDialog(index, "libraries") end },
+        { text = _("Authors") .. "  >", callback = function() self:showDashboardTargetDialog(index, "authors") end },
+        { text = _("Series") .. "  >", callback = function() self:showDashboardTargetDialog(index, "series") end },
+        { text = _("Collections") .. "  >", callback = function() self:showDashboardTargetDialog(index, "collections") end },
+        { text = _("SmartScopes") .. "  >", callback = function() self:showDashboardTargetDialog(index, "smart-scopes") end },
+        direct(_("Off"), { kind = "off" }),
+    }
+end
+
+function MainMenu:dashboardSectionMenu(index)
+    local section = self:dashboardSections()[index]
+    local items = {
+        {
+            text_func = function()
+                return T(_("Content (%1)"), DashboardConfig.label(self:dashboardSections()[index]))
+            end,
+            sub_item_table = self:dashboardSectionChoiceMenu(index),
+        },
+    }
+    if DashboardConfig.isShelf(section) and section.kind ~= "discover" then
+        table.insert(items, {
+            text_func = function()
+                local current = self:dashboardSections()[index]
+                return T(_("Sort (%1)"), CatalogUtil.SORT_LABELS[current.sort or DashboardConfig.defaultSort(current)])
+            end,
+            sub_item_table = self:dashboardSortMenu(index),
+        })
+    end
+    return items
+end
+
+function MainMenu:dashboardSettingsMenu()
+    local items = {
         {
             text_func = function()
                 return T(_("Open dashboard on startup (%1)"), self:catalogAutoOpenLabel())
@@ -412,6 +411,28 @@ function MainMenu:dashboardSettingsMenu(catalog)
             sub_item_table = self:dashboardSectionItems(catalog),
         },
     }
+    for index = 1, 4 do
+        table.insert(items, {
+            text_func = function()
+                return T(_("Section %1 (%2)"), index, DashboardConfig.summary(self:dashboardSections()[index]))
+            end,
+            sub_item_table = self:dashboardSectionMenu(index),
+        })
+    end
+    table.insert(items, {
+        text = _("Reset to default"),
+        separator = true,
+        callback = function()
+            self.settings.catalog_dashboard_sections = DashboardConfig.clone(DashboardConfig.DEFAULT_SECTIONS)
+            self.settings.catalog_dashboard_cache = nil
+            G_reader_settings:flush()
+            local catalog = self.catalog_browser
+            if catalog and catalog.dashboardMode and catalog:dashboardMode() then
+                catalog:loadDashboardRoot(true)
+            end
+        end,
+    })
+    return items
 end
 
 function MainMenu:syncSettingsMenu(has_open_book)
