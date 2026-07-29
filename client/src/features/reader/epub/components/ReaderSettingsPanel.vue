@@ -170,7 +170,7 @@ function setFixedLayoutSpreadNone() {
       <template v-if="activeTab === 'appearance'">
         <div class="space-y-6">
           <div>
-            <p class="mb-2 text-[13px] font-medium text-foreground/90">{{ t('reader.settings.appearance.mode') }}</p>
+            <p class="mb-2 text-[13px] font-medium text-foreground">{{ t('reader.settings.appearance.mode') }}</p>
             <div class="grid grid-cols-2 gap-1 rounded-lg bg-muted/55 p-1">
               <button
                 class="flex h-[2.125rem] items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors"
@@ -202,7 +202,7 @@ function setFixedLayoutSpreadNone() {
           <div class="h-px bg-border/70" />
 
           <div>
-            <p class="mb-2 text-[13px] font-medium text-foreground/90">{{ t('reader.settings.appearance.colorTheme') }}</p>
+            <p class="mb-2 text-[13px] font-medium text-foreground">{{ t('reader.settings.appearance.colorTheme') }}</p>
             <div class="grid grid-cols-6 gap-2">
               <button
                 v-for="theme in themes"

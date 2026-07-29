@@ -9,6 +9,7 @@ import { BookModule } from '../book/book.module';
 import { LibraryModule } from '../library/library.module';
 import { MetadataFetchModule } from '../metadata-fetch/metadata-fetch.module';
 import { MetadataModule } from '../metadata/metadata.module';
+import { MetadataScoreModule } from '../metadata-score/metadata-score.module';
 import { NotificationModule } from '../notification/notification.module';
 import { UploadModule } from '../upload/upload.module';
 import { BookDockController } from './book-dock.controller';
@@ -30,6 +31,7 @@ import { BookDockRepository } from './book-dock.repository';
     LibraryModule,
     MetadataFetchModule,
     MetadataModule,
+    MetadataScoreModule,
     forwardRef(() => NotificationModule),
     AppSettingsModule,
     JwtModule.registerAsync({

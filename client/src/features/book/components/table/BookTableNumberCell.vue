@@ -102,7 +102,7 @@ function handleClick() {
     <span
       v-else
       class="block min-h-[20px] truncate rounded px-1 text-sm"
-      :class="[isReadOnly ? 'text-foreground' : 'cursor-pointer hover:bg-primary/5', value != null ? 'text-foreground' : 'text-muted-foreground/40']"
+      :class="[isReadOnly ? 'text-foreground' : 'cursor-pointer hover:bg-primary/5', value != null ? 'text-foreground' : 'text-muted-foreground']"
       :title="value != null ? String(value) : ''"
       :tabindex="isReadOnly ? -1 : 0"
       :role="isReadOnly ? undefined : 'button'"

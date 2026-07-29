@@ -344,14 +344,10 @@ async function confirmDeleteAuthors() {
     if (ids.length > 1) exitSelectionMode()
 
     toast.success(
-      t(
-        'author.list.toast.deleteSuccess',
-        {
-          count: result.deletedAuthorIds.length,
-          books: result.affectedBookCount,
-        },
-        result.deletedAuthorIds.length,
-      ),
+      t('author.list.toast.deleteSuccess', {
+        count: result.deletedAuthorIds.length,
+        books: result.affectedBookCount,
+      }),
     )
   } catch (actionError) {
     toast.error(actionError instanceof Error ? actionError.message : t('author.list.toast.deleteFailed'))
@@ -459,14 +455,14 @@ defineOptions({ name: 'AuthorsView' })
       >
         <template #toolbar>
           <div class="hidden lg:flex h-8 w-64 items-center rounded-md border border-input bg-background px-2.5">
-            <Search :size="13" class="mr-1.5 shrink-0 text-muted-foreground/85" />
+            <Search :size="13" class="mr-1.5 shrink-0 text-muted-foreground" />
             <input
               v-model="q"
               type="search"
               :placeholder="t('author.list.searchPlaceholder')"
-              class="author-search-input h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/85"
+              class="author-search-input h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
             />
-            <button v-if="q.trim()" class="ml-1 text-muted-foreground/85 transition-colors hover:text-foreground" @click="clearSearchQuery">
+            <button v-if="q.trim()" class="ml-1 text-muted-foreground transition-colors hover:text-foreground" @click="clearSearchQuery">
               <X :size="12" />
             </button>
           </div>
@@ -575,15 +571,15 @@ defineOptions({ name: 'AuthorsView' })
 
       <section v-if="mobileControlsExpanded" class="mb-3 space-y-2 rounded-lg border border-border/70 bg-card/70 p-2 sm:hidden">
         <div class="flex items-center gap-1 rounded-md border border-input bg-background px-2.5">
-          <Search :size="13" class="shrink-0 text-muted-foreground/85" />
+          <Search :size="13" class="shrink-0 text-muted-foreground" />
           <input
             ref="mobileSearchInput"
             v-model="q"
             type="search"
             :placeholder="t('author.list.searchPlaceholder')"
-            class="mobile-search-input h-9 w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/85"
+            class="mobile-search-input h-9 w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
           />
-          <button v-if="q.trim()" class="text-muted-foreground/85 transition-colors hover:text-foreground" @click="clearSearchQuery">
+          <button v-if="q.trim()" class="text-muted-foreground transition-colors hover:text-foreground" @click="clearSearchQuery">
             <X :size="12" />
           </button>
         </div>
@@ -599,7 +595,7 @@ defineOptions({ name: 'AuthorsView' })
                 {{ sortLabels[field] }}
               </option>
             </select>
-            <ArrowUpDown :size="13" class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/85" />
+            <ArrowUpDown :size="13" class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
           </div>
 
           <button
@@ -731,7 +727,7 @@ defineOptions({ name: 'AuthorsView' })
                 :disabled="selectedCount === 0"
                 class="h-9 w-9 flex items-center justify-center rounded-full transition-colors"
                 :class="
-                  selectedCount > 0 ? 'text-foreground hover:bg-primary hover:text-primary-foreground' : 'text-muted-foreground/60 cursor-not-allowed'
+                  selectedCount > 0 ? 'text-foreground hover:bg-primary hover:text-primary-foreground' : 'text-muted-foreground cursor-not-allowed'
                 "
                 @click="selectAllVisible"
               >
@@ -746,7 +742,7 @@ defineOptions({ name: 'AuthorsView' })
               <button
                 :disabled="selectedCount === 0 || bulkRefreshing"
                 class="h-9 w-9 flex items-center justify-center rounded-full transition-colors"
-                :class="selectedCount > 0 ? 'text-foreground hover:bg-muted' : 'text-muted-foreground/60 cursor-not-allowed'"
+                :class="selectedCount > 0 ? 'text-foreground hover:bg-muted' : 'text-muted-foreground cursor-not-allowed'"
                 @click="refreshSelectedAuthorsMetadata"
               >
                 <RefreshCcw :size="17" :class="bulkRefreshing ? 'animate-spin' : ''" />
@@ -765,7 +761,7 @@ defineOptions({ name: 'AuthorsView' })
                 :class="
                   selectedCount > 0
                     ? 'text-destructive hover:bg-destructive hover:text-destructive-foreground'
-                    : 'text-muted-foreground/60 cursor-not-allowed'
+                    : 'text-muted-foreground cursor-not-allowed'
                 "
                 @click="confirmingBulkDelete = true"
               >
@@ -794,7 +790,7 @@ defineOptions({ name: 'AuthorsView' })
 
         <template v-else>
           <span class="px-3 text-sm font-semibold text-destructive whitespace-nowrap">{{
-            t('author.list.selection.confirmDeleteCount', { count: selectedCount }, selectedCount)
+            t('author.list.selection.confirmDeleteCount', { count: selectedCount })
           }}</span>
 
           <div class="w-px h-5 bg-border mx-1 shrink-0" />

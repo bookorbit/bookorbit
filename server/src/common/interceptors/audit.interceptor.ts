@@ -25,6 +25,7 @@ export class AuditInterceptor implements NestInterceptor {
       tap((responseBody) => {
         const user = req.user;
         const description = typeof options.description === 'function' ? options.description(req, responseBody) : options.description;
+        const meta = options.getMeta?.(req, responseBody);
 
         this.auditEvents.emit(AUDIT_EVENT, {
           userId: user?.id ?? null,
@@ -34,6 +35,7 @@ export class AuditInterceptor implements NestInterceptor {
           resourceId: options.getResourceId?.(req, responseBody),
           description,
           ip: req.ip,
+          ...(meta ? { meta } : {}),
         });
       }),
     );

@@ -14,6 +14,8 @@ import {
   RADIUS_IDS,
   SERIES_CARD_COVER_MODES,
   SUPPORTED_LOCALES,
+  SURFACE_OPACITY_MAX,
+  SURFACE_OPACITY_MIN,
   TABLE_DENSITIES,
   THEME_IDS,
   type DisplayPreferences,
@@ -37,6 +39,7 @@ const THEME_PREFERENCES_SCHEMA = z
     radius: z.enum(RADIUS_IDS),
     background: z.enum(BACKGROUND_IDS),
     brightness: z.number().int().min(0).max(100),
+    surfaceOpacity: z.number().int().min(SURFACE_OPACITY_MIN).max(SURFACE_OPACITY_MAX).optional(),
   })
   .strict();
 

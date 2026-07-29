@@ -29,5 +29,5 @@ const barColor = computed(() => {
     </TooltipTrigger>
     <TooltipContent>{{ t('book.table.progress.complete', { percent: displayPct }) }}</TooltipContent>
   </Tooltip>
-  <span v-else class="text-xs text-muted-foreground/40">-</span>
+  <span v-else class="text-xs text-muted-foreground">-</span>
 </template>

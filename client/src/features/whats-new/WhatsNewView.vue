@@ -232,7 +232,7 @@ onUnmounted(() => {
                 :href="release.changelogUrl"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="inline-flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:text-primary/85"
+                class="inline-flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:text-primary"
               >
                 {{ t('whatsNew.openOnGitHub') }}
                 <ExternalLink :size="12" />

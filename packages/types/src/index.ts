@@ -35,6 +35,7 @@ export * from "./author";
 export * from "./metadata-score";
 export * from "./book-metadata-fetch";
 export * from "./statistics";
+export * from "./user-list";
 export * from "./user-statistics";
 export * from "./migration";
 export * from "./notification";
@@ -56,4 +57,4 @@ export * from "./readwise";
 export * from "./storygraph";
 export * from "./path";
 export * from "./shelfmark";
-
+export * from "./sidebar";

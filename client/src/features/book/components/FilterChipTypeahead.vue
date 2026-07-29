@@ -99,7 +99,7 @@ function onBlur() {
       class="flex items-center gap-1 h-5 px-1.5 rounded bg-primary/15 text-primary text-xs font-medium shrink-0"
     >
       {{ chip }}
-      <button type="button" @click="removeChip(chip)" class="text-primary/60 hover:text-primary leading-none">
+      <button type="button" @click="removeChip(chip)" class="text-primary hover:text-primary leading-none">
         <X :size="10" />
       </button>
     </span>

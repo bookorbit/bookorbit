@@ -61,8 +61,8 @@ function handlePeriodChange() {
 
 function durationLabel(seconds: number): string {
   const minutes = Math.round(seconds / 60)
-  if (minutes < 60) return t('adminFeature.sharedInsights.durationMinutes', { count: minutes }, minutes)
-  return t('adminFeature.sharedInsights.durationHours', { count: formatNumber(Math.round((minutes / 60) * 10) / 10) })
+  if (minutes < 60) return t('adminFeature.sharedInsights.durationMinutes', { count: minutes })
+  return t('adminFeature.sharedInsights.durationHours', { count: Math.round((minutes / 60) * 10) / 10 })
 }
 
 function trendDayLabel(day: string): string {

@@ -5,21 +5,6 @@ import { WIDGET_TYPES } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { useAuth } from '@/features/auth/composables/useAuth'
 
-const WIDGET_LABELS: Record<WidgetType, string> = {
-  'reading-goal': 'Reading Goal',
-  'currently-reading': 'Currently Reading',
-  'reading-streak': 'Reading Streak',
-  'library-overview': 'Library Overview',
-  'highlight-of-the-day': 'Highlight of the Day',
-  'monthly-challenge': 'Monthly Challenge',
-  'year-projection': 'Year Projection',
-  'neglected-gems': 'Neglected Gems',
-  'reading-dna': 'Reading DNA',
-  'long-wait': 'The Long Wait',
-  'diversity-score': 'Diversity Score',
-  'reading-rhythm': 'Reading Rhythm',
-}
-
 const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: '1', type: 'reading-streak', enabled: true, order: 1 },
   { id: '2', type: 'currently-reading', enabled: true, order: 2 },
@@ -134,7 +119,6 @@ export function useDashboardWidgets() {
     readingGoal,
     saveWidgets,
     saveReadingGoal,
-    WIDGET_LABELS,
     DEFAULT_WIDGETS,
   }
 }

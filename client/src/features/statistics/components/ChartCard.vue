@@ -45,7 +45,7 @@ const iconStyle = computed(() => {
         </div>
         <div class="flex items-center gap-2">
           <slot name="controls" />
-          <GripVertical class="drag-handle text-muted-foreground/70 hover:text-muted-foreground size-4 cursor-grab active:cursor-grabbing" />
+          <GripVertical class="drag-handle text-muted-foreground hover:text-muted-foreground size-4 cursor-grab active:cursor-grabbing" />
         </div>
       </div>
 
@@ -71,7 +71,7 @@ const iconStyle = computed(() => {
       </div>
 
       <p v-if="!loading && !error && unknownCount && unknownCount > 0" class="text-muted-foreground mt-2 text-xs">
-        {{ t('statistics.card.unknownField', { count: unknownCount }, unknownCount) }}
+        {{ t('statistics.card.unknownField', { count: unknownCount }) }}
       </p>
     </div>
   </div>

@@ -115,7 +115,7 @@ async function rebuildEmbeddings() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data: { queued: number } = await res.json()
     queued.value = data.queued
-    toast.success(t('settings.admin.maintenance.booksQueuedForEmbedding', { count: data.queued }, data.queued))
+    toast.success(t('settings.admin.maintenance.booksQueuedForEmbedding', { count: data.queued }))
   } catch (e) {
     embeddingError.value = e instanceof Error ? e.message : t('settings.admin.maintenance.failed')
     toast.error(
@@ -342,7 +342,7 @@ function formatDate(iso: string | null | undefined): string {
               </p>
               <p v-if="queued !== null" class="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400 mt-2">
                 <Check :size="12" />
-                {{ t('settings.admin.maintenance.booksQueuedForProcessing', { count: queued }, queued) }}
+                {{ t('settings.admin.maintenance.booksQueuedForProcessing', { count: queued }) }}
               </p>
               <p v-if="embeddingError" class="text-xs text-destructive mt-2">{{ embeddingError }}</p>
             </div>

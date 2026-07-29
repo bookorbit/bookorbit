@@ -73,7 +73,7 @@ const { t } = useI18n()
             : 'right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]',
           // Adjust the padding for floating and inset variants.
           variant === 'floating' || variant === 'inset'
-            ? 'p-3 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(6))+2px)]'
+            ? 'p-(--shell-gap) group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+2*var(--shell-gap)+2px)]'
             : 'group-data-[collapsible=icon]:w-(--sidebar-width-icon)',
           props.class,
         )
@@ -82,7 +82,7 @@ const { t } = useI18n()
     >
       <div
         data-sidebar="sidebar"
-        class="relative z-0 border-r border-sidebar-border/60 shadow-[1px_0_0_0_oklch(1_0_0/0.04)] group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-xl group-data-[variant=floating]:shadow-black/5 before:content-[''] before:absolute before:inset-0 before:bg-sidebar before:saturate-[1.5] before:-z-10 group-data-[variant=floating]:before:rounded-lg"
+        class="relative z-0 flex h-full w-full flex-col border-r border-(--shell-border) bg-(--shell-surface) backdrop-blur-xl backdrop-saturate-150 group-data-[variant=floating]:rounded-(--shell-radius) group-data-[variant=floating]:border group-data-[variant=floating]:shadow-lg"
       >
         <slot />
       </div>

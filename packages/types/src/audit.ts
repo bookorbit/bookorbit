@@ -153,6 +153,22 @@ export interface AuditLogEntry {
   createdAt: string;
 }
 
+export interface BookDeletionAuditBook {
+  id: number;
+  title: string | null;
+}
+
+export interface BookDeletionAuditMeta {
+  total: number;
+  books: BookDeletionAuditBook[];
+  omitted: number;
+}
+
+export interface AuditActorOption {
+  userId: number | null;
+  username: string;
+}
+
 export interface AuditLogPage {
   data: AuditLogEntry[];
   total: number;

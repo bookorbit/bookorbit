@@ -8,7 +8,12 @@ function makeRow(overrides?: Record<string, unknown>) {
     cfi: 'epubcfi(/6/2)',
     title: 'Chapter 1',
     positionSeconds: null,
+    origin: 'web',
+    devicePos: null,
+    pageno: null,
     createdAt: new Date('2026-01-01T00:00:00Z'),
+    updatedAt: new Date('2026-01-01T00:00:00Z'),
+    deletedAt: null,
     ...overrides,
   };
 }
@@ -31,6 +36,13 @@ function makeDb() {
   valuesResult.onConflictDoNothing.mockReturnValue(conflictResult);
   conflictResult.returning.mockResolvedValue([]);
 
+  const updateResult = { set: vi.fn() };
+  const setResult = { where: vi.fn() };
+  const updateWhereResult = { returning: vi.fn() };
+  updateResult.set.mockReturnValue(setResult);
+  setResult.where.mockReturnValue(updateWhereResult);
+  updateWhereResult.returning.mockResolvedValue([]);
+
   const deleteResult = { where: vi.fn() };
   const deleteWhereResult = { returning: vi.fn() };
   deleteResult.where.mockReturnValue(deleteWhereResult);
@@ -39,12 +51,15 @@ function makeDb() {
   const db = {
     select: vi.fn().mockReturnValue(selectResult),
     insert: vi.fn().mockReturnValue(insertResult),
+    update: vi.fn().mockReturnValue(updateResult),
     delete: vi.fn().mockReturnValue(deleteResult),
     _where: whereResult,
     _orderBy: orderByResult,
     _insert: insertResult,
     _values: valuesResult,
     _conflict: conflictResult,
+    _update: updateResult,
+    _updateWhere: updateWhereResult,
     _deleteWhere: deleteWhereResult,
   };
   return db;
@@ -70,14 +85,14 @@ describe('BookmarkRepository', () => {
     });
   });
 
-  describe('findExistingByLocation', () => {
+  describe('findLiveByLocation', () => {
     it('returns first bookmark for duplicate CFI location', async () => {
       const { repo, db } = makeRepository();
       const row = makeRow();
       db._where.orderBy.mockReturnValue(db._orderBy);
       db._orderBy.limit.mockResolvedValue([row]);
 
-      const result = await repo.findExistingByLocation(10, 5, { cfi: 'epubcfi(/6/2)', positionSeconds: null });
+      const result = await repo.findLiveByLocation(10, 5, { cfi: 'epubcfi(/6/2)', positionSeconds: null });
 
       expect(result).toEqual(row);
       expect(db._orderBy.limit).toHaveBeenCalledWith(1);
@@ -89,7 +104,7 @@ describe('BookmarkRepository', () => {
       db._where.orderBy.mockReturnValue(db._orderBy);
       db._orderBy.limit.mockResolvedValue([row]);
 
-      const result = await repo.findExistingByLocation(10, 5, { cfi: null, positionSeconds: 93.5 });
+      const result = await repo.findLiveByLocation(10, 5, { cfi: null, positionSeconds: 93.5 });
 
       expect(result).toEqual(row);
       expect(db._orderBy.limit).toHaveBeenCalledWith(1);
@@ -98,7 +113,7 @@ describe('BookmarkRepository', () => {
     it('returns null when no location fields are provided', async () => {
       const { repo, db } = makeRepository();
 
-      const result = await repo.findExistingByLocation(10, 5, { cfi: null, positionSeconds: null });
+      const result = await repo.findLiveByLocation(10, 5, { cfi: null, positionSeconds: null });
 
       expect(result).toBeNull();
       expect(db.select).not.toHaveBeenCalled();
@@ -109,7 +124,7 @@ describe('BookmarkRepository', () => {
       db._where.orderBy.mockReturnValue(db._orderBy);
       db._orderBy.limit.mockResolvedValue([]);
 
-      const result = await repo.findExistingByLocation(10, 5, { cfi: 'epubcfi(/6/2)', positionSeconds: null });
+      const result = await repo.findLiveByLocation(10, 5, { cfi: 'epubcfi(/6/2)', positionSeconds: null });
 
       expect(result).toBeNull();
     });
@@ -138,23 +153,139 @@ describe('BookmarkRepository', () => {
     });
   });
 
-  describe('delete', () => {
-    it('returns true when delete query returns at least one row', async () => {
+  describe('restoreAtLocation', () => {
+    it('clears the tombstone and rewrites the row fields', async () => {
       const { repo, db } = makeRepository();
-      db._deleteWhere.returning.mockResolvedValue([{ id: 1 }]);
+      const row = makeRow({ deletedAt: null, origin: 'koreader', devicePos: '/body/DocFragment[2]' });
+      db._updateWhere.returning.mockResolvedValue([row]);
 
-      const result = await repo.delete(5, 1, 10);
+      const result = await repo.restoreAtLocation(
+        10,
+        5,
+        { cfi: 'epubcfi(/6/2)', positionSeconds: null },
+        { title: 'Chapter 1', origin: 'koreader', devicePos: '/body/DocFragment[2]', pageno: 12 },
+      );
 
-      expect(result).toBe(true);
+      expect(db._update.set).toHaveBeenCalledWith({
+        title: 'Chapter 1',
+        origin: 'koreader',
+        devicePos: '/body/DocFragment[2]',
+        pageno: 12,
+        deletedAt: null,
+      });
+      expect(result).toEqual(row);
     });
 
-    it('returns false when no rows are deleted', async () => {
+    it('returns null without querying when the location is empty', async () => {
       const { repo, db } = makeRepository();
-      db._deleteWhere.returning.mockResolvedValue([]);
 
-      const result = await repo.delete(5, 999, 10);
+      const result = await repo.restoreAtLocation(
+        10,
+        5,
+        { cfi: null, positionSeconds: null },
+        { title: 'x', origin: 'web', devicePos: null, pageno: null },
+      );
+
+      expect(result).toBeNull();
+      expect(db.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('softDelete', () => {
+    it('returns true when a live row was tombstoned', async () => {
+      const { repo, db } = makeRepository();
+      db._updateWhere.returning.mockResolvedValue([{ id: 1 }]);
+
+      const result = await repo.softDelete(5, 1, 10);
+
+      expect(result).toBe(true);
+      expect(db.delete).not.toHaveBeenCalled();
+    });
+
+    it('returns false when nothing matched', async () => {
+      const { repo, db } = makeRepository();
+      db._updateWhere.returning.mockResolvedValue([]);
+
+      const result = await repo.softDelete(5, 999, 10);
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe('sync operations', () => {
+    it('lists a bounded, tombstone-inclusive working set', async () => {
+      const { repo, db } = makeRepository();
+      const rows = [makeRow(), makeRow({ id: 2, deletedAt: new Date('2026-02-01T00:00:00Z') })];
+      db._where.orderBy.mockReturnValue(db._orderBy);
+      db._orderBy.limit.mockResolvedValue(rows);
+
+      const result = await repo.listForSync(10, 5, 500);
+
+      expect(result).toEqual(rows);
+      expect(db._orderBy.limit).toHaveBeenCalledWith(500);
+    });
+
+    it('inserts a device bookmark with its canonical device position', async () => {
+      const { repo, db } = makeRepository();
+      const row = makeRow({ origin: 'koreader' });
+      db._conflict.returning.mockResolvedValue([row]);
+
+      const result = await repo.createFromDevice(10, 5, {
+        cfi: 'epubcfi(/6/2)',
+        title: 'Chapter 1',
+        devicePos: '/body/DocFragment[2]/body/p[3]/text().0',
+        pageno: 12,
+      });
+
+      expect(db._insert.values).toHaveBeenCalledWith({
+        userId: 10,
+        bookId: 5,
+        cfi: 'epubcfi(/6/2)',
+        title: 'Chapter 1',
+        origin: 'koreader',
+        devicePos: '/body/DocFragment[2]/body/p[3]/text().0',
+        pageno: 12,
+      });
+      expect(result).toEqual(row);
+    });
+
+    it('skips the tombstone update when no ids are given', async () => {
+      const { repo, db } = makeRepository();
+
+      expect(await repo.tombstone(10, [])).toBe(0);
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
+    it('counts tombstoned rows', async () => {
+      const { repo, db } = makeRepository();
+      db._updateWhere.returning.mockResolvedValue([{ id: 3 }, { id: 4 }]);
+
+      expect(await repo.tombstone(10, [3, 4])).toBe(2);
+    });
+
+    it('skips the purge delete when no ids are given', async () => {
+      const { repo, db } = makeRepository();
+
+      expect(await repo.purge(10, [])).toBe(0);
+      expect(db.delete).not.toHaveBeenCalled();
+    });
+
+    it('hard deletes purgeable tombstones', async () => {
+      const { repo, db } = makeRepository();
+      db._deleteWhere.returning.mockResolvedValue([{ id: 7 }]);
+
+      expect(await repo.purge(10, [7])).toBe(1);
+    });
+
+    it('returns purge candidate ids oldest first', async () => {
+      const { repo, db } = makeRepository();
+      db._where.orderBy.mockReturnValue(db._orderBy);
+      db._orderBy.limit.mockResolvedValue([{ id: 3 }, { id: 9 }]);
+
+      const result = await repo.listPurgeableTombstones(10, new Date('2026-01-01T00:00:00Z'), 50);
+
+      expect(result).toEqual([3, 9]);
+      expect(db._orderBy.limit).toHaveBeenCalledWith(50);
     });
   });
 });

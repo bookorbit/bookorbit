@@ -17,8 +17,9 @@ import { setupSwaggerDocs } from './swagger';
 import {
   parseBooleanEnv,
   parseTrustProxy,
-  buildCspDirectives,
+  buildHelmetOptions,
   buildEmptyJsonBodyStream,
+  registerConditionalHsts,
   registerEmptyBodyContentTypeParser,
   shouldInjectEmptyJsonBody,
 } from './common/utils/bootstrap.utils';
@@ -75,12 +76,8 @@ async function bootstrap() {
     await setupSwaggerDocs(app, appConfiguration);
   }
 
-  await app.register(fastifyHelmet as never, {
-    crossOriginOpenerPolicy: false,
-    contentSecurityPolicy: {
-      directives: buildCspDirectives({ allowCloudflareInsights }),
-    },
-  });
+  await app.register(fastifyHelmet as never, buildHelmetOptions({ allowCloudflareInsights }));
+  registerConditionalHsts(fastify);
 
   await app.register(fastifyCompress as never, { encodings: ['gzip', 'br'] });
 

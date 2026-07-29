@@ -2,6 +2,7 @@ local mock_http_body = "{}"
 local mock_http_code = 200
 local request_ran_in_subprocess = false
 local in_subprocess = false
+local encoded_subprocess_result
 
 package.loaded["logger"] = {
     dbg = function() end,
@@ -77,11 +78,17 @@ package.loaded["socket.http"] = {
 local rapidjson_null = {}
 package.loaded["rapidjson"] = {
     null = rapidjson_null,
-    encode = function()
+    encode = function(value)
+        if type(value) == "table"
+                and (value.body ~= nil or value.err ~= nil or value.errbody ~= nil) then
+            encoded_subprocess_result = value
+            return "__subprocess_result__"
+        end
         return "{}"
     end,
     decode = function(raw)
         if raw == "{}" then return {} end
+        if raw == "__subprocess_result__" then return encoded_subprocess_result end
         if raw == "{\"ok\":true}" then return { ok = true } end
         if raw == "{\"value\":null}" then return { value = rapidjson_null } end
         if raw == "null" then return rapidjson_null end
@@ -117,6 +124,18 @@ local client = BookOrbitApi.new{
     userkey = "secret",
 }
 
+local loopback_client = BookOrbitApi.new{
+    server_url = "http://localhost:3000/api/v1",
+}
+assertEqual(loopback_client.server_url, "http://127.0.0.1:3000/api/v1",
+    "HTTP localhost is made safe before a macOS subprocess fork")
+
+local secure_loopback_client = BookOrbitApi.new{
+    server_url = "https://localhost:3443/api/v1",
+}
+assertEqual(secure_loopback_client.server_url, "https://localhost:3443/api/v1",
+    "HTTPS localhost retains its certificate hostname")
+
 mock_http_body = "{\"ok\":true}"
 mock_http_code = 200
 local body
@@ -140,16 +159,23 @@ assertEqual(errbody, nil, "invalid HTTP error body is ignored")
 
 local wrapped = true
 local subprocess_calls = 0
+local subprocess_result_mode = "normal"
 package.loaded["ui/trapper"] = {
     isWrapped = function()
         return wrapped
     end,
-    dismissableRunInSubprocess = function(_, task, trap_widget)
+    dismissableRunInSubprocess = function(_, task, trap_widget, task_returns_simple_string)
         assertEqual(type(trap_widget), "table", "background request uses a detached trap widget")
+        assertEqual(task_returns_simple_string, true, "background request uses a string result envelope")
         subprocess_calls = subprocess_calls + 1
         in_subprocess = true
         local result = task()
         in_subprocess = false
+        if subprocess_result_mode == "missing" then
+            return true
+        elseif subprocess_result_mode == "malformed" then
+            return true, "not-json"
+        end
         return true, result
     end,
 }
@@ -169,11 +195,22 @@ assertEqual(err, nil, "background request preserves success result")
 assertEqual(subprocess_calls, 1, "wrapped background request uses subprocess")
 assertEqual(request_ran_in_subprocess, true, "HTTP request runs inside subprocess task")
 
+subprocess_result_mode = "missing"
+body, err = background_client:auth()
+assertEqual(body, nil, "missing subprocess payload has no response body")
+assertEqual(err, "subprocess_no_result", "missing subprocess payload has a specific error")
+
+subprocess_result_mode = "malformed"
+body, err = background_client:auth()
+assertEqual(body, nil, "malformed subprocess payload has no response body")
+assertEqual(err, "subprocess_invalid_result", "malformed subprocess payload has a specific error")
+
+subprocess_result_mode = "normal"
 wrapped = false
 request_ran_in_subprocess = false
 body, err = background_client:auth()
 assertEqual(body.ok, true, "unwrapped request falls back safely")
-assertEqual(subprocess_calls, 1, "unwrapped request does not start subprocess")
+assertEqual(subprocess_calls, 3, "unwrapped request does not start subprocess")
 assertEqual(request_ran_in_subprocess, false, "unwrapped fallback runs in current process")
 
 print("bookorbit_api_test.lua: ok")

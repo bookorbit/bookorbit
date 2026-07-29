@@ -73,7 +73,7 @@ function displayValue(value: unknown): string {
         v-model="searchTerm"
         :display-value="displayValue"
         :placeholder="placeholder ?? t('migration.userSelect.placeholder')"
-        class="h-9 w-full bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground/70 disabled:opacity-50"
+        class="h-9 w-full bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground disabled:opacity-50"
       />
       <ComboboxTrigger class="shrink-0 px-2 text-muted-foreground">
         <ChevronsUpDown class="size-3.5" />

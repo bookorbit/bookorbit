@@ -440,7 +440,7 @@ watch(
                 class="flex items-center justify-center w-7 h-7 rounded transition-colors"
                 :class="
                   p.isSystemProvider
-                    ? 'cursor-not-allowed text-muted-foreground/40'
+                    ? 'cursor-not-allowed text-muted-foreground opacity-50'
                     : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'
                 "
                 :disabled="p.isSystemProvider"

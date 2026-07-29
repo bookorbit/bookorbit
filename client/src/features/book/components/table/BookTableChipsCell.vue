@@ -105,7 +105,7 @@ function handleChipAction(chip: string) {
             </template>
             <span v-if="value.length > 2" class="text-xs text-muted-foreground"> +{{ value.length - 2 }} </span>
           </template>
-          <span v-else class="text-xs text-muted-foreground/40">-</span>
+          <span v-else class="text-xs text-muted-foreground">-</span>
         </div>
       </PopoverTrigger>
       <PopoverContent

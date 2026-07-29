@@ -117,14 +117,14 @@ function onClear() {
               ><mark class="bg-yellow-300 text-yellow-900 rounded px-0.5">{{ result.excerpt.match }}</mark
               ><span class="text-muted-foreground">{{ result.excerpt.post }}</span>
             </p>
-            <p v-if="result.sectionTitle" class="text-xs text-muted-foreground/80 truncate">
+            <p v-if="result.sectionTitle" class="text-xs text-muted-foreground truncate">
               {{ result.sectionTitle }}
             </p>
           </li>
         </ul>
 
         <p v-if="results.length > 0 && !isSearching" class="px-4 py-2 text-xs text-muted-foreground text-center border-t border-border">
-          {{ t('reader.search.resultCount', { count: results.length }, results.length) }}
+          {{ t('reader.search.resultCount', { count: results.length }) }}
         </p>
       </div>
     </div>

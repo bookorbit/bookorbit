@@ -2,7 +2,7 @@
 
 Syncs your KOReader reading life into BookOrbit:
 
-- **Catalog browsing**: a reading-first dashboard on the device with libraries, collections, SmartScopes, authors, series and search. Mosaic or list view, read-status/format filters, downloads and bulk downloads, "On device" indicators, and a "Read" action for books already on the device.
+- **Catalog browsing**: a reading-first dashboard on the device with libraries, collections, SmartScopes, authors, series and search, plus one configurable book row you choose the source of. Mosaic or list view, read-status/format filters, downloads and bulk downloads, "On device" indicators, and a "Read" action for books already on the device.
 - **Progress sync**: pulls progress on book open (with a conflict prompt), pushes periodically and on close/suspend.
 - **Reading statistics**: uploads KOReader's per-page time events; BookOrbit turns them into reading sessions and daily stats.
 - **Two-way highlights**: device highlights appear as native highlights on the web reader; highlights, edits and deletions made on the web come back to the device.
@@ -31,7 +31,8 @@ Re-downloading later (e.g. after changing your password or server address) and r
 1. Tools > BookOrbit > "Auto sync current book" to sync the open book automatically. Leave the stock "Progress sync" plugin unconfigured to avoid double syncing.
 2. Optional: Settings > Sync > "Periodically sync every # pages" (default 10, 0 disables mid-session pushes).
 3. Optional: Settings > Dashboard > "Open dashboard on startup".
-4. Optional: assign "BookOrbit: sync this book" / "sync all books" to gestures.
+4. Optional: Settings > Dashboard > "Show below Continue reading" - pick Discover (the default), Recently added, Want to read, Up next in series, or one of your SmartScopes. Needs a server new enough to advertise the section capability; older servers keep showing Discover.
+5. Optional: assign "BookOrbit: sync this book" / "sync all books" to gestures.
 
 The plugin manages `settings/reader_menu_order.lua` and `settings/filemanager_menu_order.lua` to keep its menu entry pinned below Calibre across updates; delete those files to reset your menu order.
 
@@ -47,23 +48,30 @@ From the dashboard menu, the plugin update check is top-level; from the Tools me
 
 A first sync on a device with years of history uploads in batches of 500 events (roughly 400 requests per 200k events, a few minutes of background work), and is safe to interrupt.
 
-## Two-way highlight sync
+## Two-way highlight and bookmark sync
 
-Requires server 0.4+; against an older server the plugin falls back to upload-only automatically.
+Requires server 0.4+; against an older server the plugin falls back to upload-only automatically. Bookmark sync additionally requires a server that advertises the `bookmarkSync` capability; on an older one the bookmark paths stay dormant and highlights sync exactly as before.
 
 - Device to web: highlight positions (crengine xpointers) convert to reader CFIs, verified against the highlighted text, so they render as native, editable highlights on the web.
 - Web to device: applied on book open (with auto sync on), on manual sync, and during the full sweep for closed books, with positions re-verified/re-anchored against the text.
 - Deletions go both ways through a trash/restore flow, so nothing is lost outright.
 - Identity is the highlight's creation datetime plus position, so extending a highlight on the device is recognized as a move, not a delete-and-recreate.
 - Styles map across formats (e.g. squiggly <-> underline, invert, named colors <-> hex).
-- Toggle via Settings > Sync > "Two-way highlight sync" (uploads keep working either way).
+- Toggle via Settings > Sync > "Two-way highlights & bookmarks" (uploads keep working either way).
+
+Position-only bookmarks (dogears) sync the same way:
+
+- Device to web: the dogear xpointer converts to a reader CFI and shows up in the web reader's bookmark list. Its title is the note you attached, else the chapter, else the page.
+- Web to device: applied on book open, on manual sync, and during the full sweep for closed books. The position is only placed when it resolves; an entry that does not is retried on the next exchange.
+- Deletions and device-side renames propagate; the web has no rename surface yet, so edits flow device to web only.
+- A dogear has no highlighted text to re-anchor against, so a converted position can sit slightly off where a highlight would have been repaired exactly.
 
 ## Limitations
 
 - Web highlight changes reach a closed book only via a manual sweep or its next open.
 - Web-created PDF highlights aren't supported (device PDF highlights sync up but aren't drawn over the PDF).
 - Books with reading stats but no sidecar path sync reading time only, until the full sweep covers them.
-- Position-only bookmarks (no highlighted text) don't sync.
+- PDF bookmarks don't sync in either direction (the web has no PDF bookmark surface).
 - A device clock far in the past can delay edit detection for web-modified highlights.
 - The full sweep is manual-only; books you never reopen only sync when you run it.
 - A cloned device with a different KOReader `device_id` double-counts reading time; clones keeping the same `device_id` deduplicate naturally.

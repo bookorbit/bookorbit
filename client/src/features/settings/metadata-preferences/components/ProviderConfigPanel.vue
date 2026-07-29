@@ -454,7 +454,7 @@ const visibleRows = computed(() => {
                 :data-lpignore="field.type === 'password' ? 'true' : undefined"
                 :data-1p-ignore="field.type === 'password' ? 'true' : undefined"
                 :data-form-type="field.type === 'password' ? 'other' : undefined"
-                class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-xs font-medium placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-40 transition-all md:w-72 lg:w-80"
+                class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-xs font-medium placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-40 transition-all md:w-72 lg:w-80"
               />
               <p v-if="field.helper" class="mt-0.5 max-w-72 text-[10px] leading-snug text-muted-foreground md:text-right">
                 {{ field.helper }}

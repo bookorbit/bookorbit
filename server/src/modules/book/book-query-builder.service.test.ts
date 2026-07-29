@@ -1219,6 +1219,16 @@ describe('read status date filters (startedAt / finishedAt)', () => {
     const rule = getRuleSql(where);
     expect(rule.values[1]).toBe('2025-12-31');
   });
+
+  it('preserves a zero-padded year below 1000', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(
+      wrapRule({ type: 'rule', field: 'finishedAt', operator: 'before', value: '0021-12-31' }) as never,
+      USER_CTX,
+    ) as any;
+    const rule = getRuleSql(where);
+    expect(rule.values[1]).toBe('0021-12-31');
+  });
 });
 
 describe('statusRuleToSql (fileAvailability)', () => {

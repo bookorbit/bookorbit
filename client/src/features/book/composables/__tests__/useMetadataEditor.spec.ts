@@ -207,6 +207,64 @@ describe('useMetadataEditor', () => {
     })
   })
 
+  it('keeps changes made during an in-flight save dirty', async () => {
+    const book = makeBook({ title: 'Original Title', publisher: 'Original Publisher' })
+    let resolveRequest!: (response: { ok: true; json: () => Promise<BookDetail> }) => void
+    apiMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRequest = resolve
+        }),
+    )
+
+    const { form, isDirty, load, save } = useMetadataEditor()
+    load(book)
+    form.title = 'Submitted Title'
+    const savePromise = save(book.id, [])
+
+    await vi.waitFor(() => expect(apiMock).toHaveBeenCalledTimes(1))
+    form.publisher = 'Changed During Save'
+    resolveRequest({ ok: true, json: async () => ({ ...book, title: 'Submitted Title' }) })
+
+    await expect(savePromise).resolves.not.toBeNull()
+    expect(form.publisher).toBe('Changed During Save')
+    expect(isDirty.value).toBe(true)
+
+    apiMock.mockResolvedValue({ ok: true, json: async () => ({ ...book, title: 'Submitted Title', publisher: 'Changed During Save' }) })
+    await save(book.id, [])
+    const [, secondRequest] = apiMock.mock.calls[1] as [string, RequestInit]
+    expect(JSON.parse(String(secondRequest.body))).toEqual({
+      metadata: { publisher: 'Changed During Save' },
+      lockedFields: [],
+    })
+  })
+
+  it('keeps auto-filled form values visible when stale book props arrive during save', async () => {
+    const book = makeBook({ publisher: 'Original Publisher' })
+    const savedBook = makeBook({ publisher: 'Auto-filled Publisher' })
+    let resolveRequest!: (response: { ok: true; json: () => Promise<BookDetail> }) => void
+    apiMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRequest = resolve
+        }),
+    )
+
+    const { form, load, save, syncFromBook } = useMetadataEditor()
+    load(book)
+    form.publisher = 'Auto-filled Publisher'
+    const savePromise = save(book.id, [])
+
+    await vi.waitFor(() => expect(apiMock).toHaveBeenCalledTimes(1))
+    expect(syncFromBook({ ...book, updatedAt: '2026-07-22T01:00:00.000Z' })).toBe(false)
+    expect(form.publisher).toBe('Auto-filled Publisher')
+
+    resolveRequest({ ok: true, json: async () => savedBook })
+    await expect(savePromise).resolves.not.toBeNull()
+    expect(syncFromBook(savedBook)).toBe(true)
+    expect(form.publisher).toBe('Auto-filled Publisher')
+  })
+
   it('saves changed metadata and final locks through the atomic endpoint', async () => {
     const book = makeBook({ providerIds: { goodreads: null } })
     apiMock.mockResolvedValue({ ok: true, json: async () => ({ ...book, lockedFields: ['goodreadsId'] }) })

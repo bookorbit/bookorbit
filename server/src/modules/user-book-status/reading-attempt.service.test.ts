@@ -291,4 +291,67 @@ describe('ReadingAttemptService', () => {
 
     expect(row.endedOn).toBe('2025-01-10');
   });
+
+  describe('closing an attempt that a skewed device clock started in the future', () => {
+    it('ends a completed attempt on its own start date instead of an earlier today', async () => {
+      const active = await fake.repo.createActive({}, { userId: 1, bookId: 10, startedOn: '2026-11-01', origin: 'kobo' });
+
+      const result = await service.applyManualStatus(1, 10, 'read', undefined, undefined, '2026-07-12');
+
+      expect(active.endedOn).toBe('2026-11-01');
+      expect(active.outcome).toBe('completed');
+      expect(result.status).toBe('read');
+    });
+
+    it('ends an implicitly abandoned attempt on its own start date', async () => {
+      const active = await fake.repo.createActive({}, { userId: 1, bookId: 10, startedOn: '2026-11-01', origin: 'kobo' });
+
+      await service.applyManualStatus(1, 10, 'unread', undefined, undefined, '2026-07-12');
+
+      expect(active.endedOn).toBe('2026-11-01');
+      expect(active.outcome).toBe('abandoned');
+    });
+
+    it('ends a newly created closed attempt on its own start date', async () => {
+      await service.applyManualStatus(1, 10, 'read', '2026-11-01', undefined, '2026-07-12');
+
+      expect(fake.rows).toHaveLength(1);
+      expect(fake.rows[0]).toMatchObject({ startedOn: '2026-11-01', endedOn: '2026-11-01', outcome: 'completed' });
+    });
+
+    it('ends an automatic completion on its own start date', async () => {
+      const active = await fake.repo.createActive({}, { userId: 1, bookId: 10, startedOn: '2026-11-01', origin: 'kobo' });
+
+      const result = await service.recordActivity({
+        userId: 1,
+        bookId: 10,
+        occurredOn: '2026-07-12',
+        origin: 'kobo',
+        progress: 100,
+        finishThreshold: 98,
+        strongRereadEvidence: false,
+        meaningfulActivity: true,
+      });
+
+      expect(active.endedOn).toBe('2026-11-01');
+      expect(active.outcome).toBe('completed');
+      expect(result?.status).toBe('read');
+    });
+
+    it('still ends on today when the attempt started in the past', async () => {
+      const active = await fake.repo.createActive({}, { userId: 1, bookId: 10, startedOn: '2026-01-05', origin: 'kobo' });
+
+      await service.applyManualStatus(1, 10, 'read', undefined, undefined, '2026-07-12');
+
+      expect(active.endedOn).toBe('2026-07-12');
+    });
+
+    it('leaves an explicitly supplied end date untouched for upstream validation', async () => {
+      const active = await fake.repo.createActive({}, { userId: 1, bookId: 10, startedOn: '2026-11-01', origin: 'kobo' });
+
+      await service.applyManualStatus(1, 10, 'read', undefined, '2026-07-12', '2026-07-12');
+
+      expect(active.endedOn).toBe('2026-07-12');
+    });
+  });
 });

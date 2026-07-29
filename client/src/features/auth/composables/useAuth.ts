@@ -13,6 +13,7 @@ import { resetLibraries } from '@/features/library/composables/useLibraries'
 import { resetSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
 import { resetCollections } from '@/features/collection/composables/useCollections'
 import { initShelfmark, resetShelfmarkEnabled } from '@/features/book/composables/useGlobalSearch'
+import { resetBrowseCounts } from '@/composables/useBrowseCounts'
 
 const SESSION_REFRESH_INTERVAL_MS = 5 * 60 * 1000
 
@@ -59,6 +60,7 @@ function clearAuth() {
   resetSmartScopes()
   resetCollections()
   resetShelfmarkEnabled()
+  resetBrowseCounts()
   user.value = null
   setAccessToken(null)
   disconnectAuthorEnrichmentSocket()

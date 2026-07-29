@@ -98,9 +98,7 @@ const latestSuccessLabel = computed(() =>
 const latestFailureLabel = computed(() =>
   latestFailedActivity.value ? formatLastSeen(latestFailedActivity.value.createdAt) : t('settings.reader.kobo.activity.none'),
 )
-const recentFailureLabel = computed(() =>
-  t('settings.reader.kobo.activity.failureCount', { count: recentFailureCount.value }, recentFailureCount.value),
-)
+const recentFailureLabel = computed(() => t('settings.reader.kobo.activity.failureCount', { count: recentFailureCount.value }))
 const historyHeaderDetail = computed(() => {
   if (!latestHistoryEntry.value) return t('settings.reader.kobo.activity.noActivityRecorded')
   const parts = [syncHealthLabel.value, t('settings.reader.kobo.activity.lastSuccess', { time: latestSuccessLabel.value })]
@@ -288,7 +286,7 @@ function historyDetailChips(entry: KoboSyncHistoryEntry): string[] {
     }
     case 'book_download': {
       const count = historyCountNumber(entry, 'downloads') || 1
-      return [t('settings.reader.kobo.activity.chip.bookCount', { count }, count)]
+      return [t('settings.reader.kobo.activity.chip.bookCount', { count })]
     }
     case 'progress_update':
       return [progressSyncModeText(entry)]
@@ -340,7 +338,7 @@ function historyItemTitle(item: HistoryDisplayItem): string {
 
 function historyItemOutcomeText(item: HistoryDisplayItem): string {
   return isGroupedHistoryItem(item)
-    ? t('settings.reader.kobo.activity.updateCount', { count: item.entries.length }, item.entries.length)
+    ? t('settings.reader.kobo.activity.updateCount', { count: item.entries.length })
     : historyOutcomeText(item.primary)
 }
 
@@ -371,20 +369,16 @@ function historyItemSummary(item: HistoryDisplayItem): string {
     case 'library_sync': {
       const updates = historyCountNumber(entry, 'entitlements')
       if (updates === 0) return t('settings.reader.kobo.activity.summary.noLibraryUpdatesPending')
-      return t('settings.reader.kobo.activity.summary.libraryUpdatesPrepared', { count: updates }, updates)
+      return t('settings.reader.kobo.activity.summary.libraryUpdatesPrepared', { count: updates })
     }
     case 'book_download':
       if (title) return t('settings.reader.kobo.activity.summary.bookDownloadedBy', { title, device: historyDeviceName(entry) })
-      return t(
-        'settings.reader.kobo.activity.summary.booksDownloaded',
-        { count: historyCountNumber(entry, 'downloads') || 1 },
-        historyCountNumber(entry, 'downloads') || 1,
-      )
+      return t('settings.reader.kobo.activity.summary.booksDownloaded', { count: historyCountNumber(entry, 'downloads') || 1 })
     case 'progress_update':
       if (isGroupedHistoryItem(item)) {
         return title
-          ? t('settings.reader.kobo.activity.summary.progressUpdatesSyncedFor', { count: item.entries.length, title }, item.entries.length)
-          : t('settings.reader.kobo.activity.summary.progressUpdatesSynced', { count: item.entries.length }, item.entries.length)
+          ? t('settings.reader.kobo.activity.summary.progressUpdatesSyncedFor', { count: item.entries.length, title })
+          : t('settings.reader.kobo.activity.summary.progressUpdatesSynced', { count: item.entries.length })
       }
       return title
         ? t('settings.reader.kobo.activity.summary.newReadingPositionFor', { title })
@@ -396,8 +390,8 @@ function historyItemSummary(item: HistoryDisplayItem): string {
           ? t('settings.reader.kobo.activity.summary.noHighlightChangesNeededFor', { title })
           : t('settings.reader.kobo.activity.summary.noHighlightChangesNeeded')
       return title
-        ? t('settings.reader.kobo.activity.summary.highlightsSentToKoboFor', { count: served, title }, served)
-        : t('settings.reader.kobo.activity.summary.highlightsSentToKobo', { count: served }, served)
+        ? t('settings.reader.kobo.activity.summary.highlightsSentToKoboFor', { count: served, title })
+        : t('settings.reader.kobo.activity.summary.highlightsSentToKobo', { count: served })
     }
     case 'annotations_push': {
       const changed = historyCountNumber(entry, 'created') + historyCountNumber(entry, 'updated') + historyCountNumber(entry, 'deleted')
@@ -406,8 +400,8 @@ function historyItemSummary(item: HistoryDisplayItem): string {
           ? t('settings.reader.kobo.activity.summary.noKoboHighlightChangesFor', { title })
           : t('settings.reader.kobo.activity.summary.noKoboHighlightChanges')
       return title
-        ? t('settings.reader.kobo.activity.summary.highlightsImportedFromKoboFor', { count: changed, title }, changed)
-        : t('settings.reader.kobo.activity.summary.highlightsImportedFromKobo', { count: changed }, changed)
+        ? t('settings.reader.kobo.activity.summary.highlightsImportedFromKoboFor', { count: changed, title })
+        : t('settings.reader.kobo.activity.summary.highlightsImportedFromKobo', { count: changed })
     }
   }
 }
@@ -434,7 +428,7 @@ function historyItemTimeTitle(item: HistoryDisplayItem): string {
 }
 
 function historyItemGroupedLabel(item: HistoryDisplayItem): string {
-  return isGroupedHistoryItem(item) ? t('settings.reader.kobo.activity.eventsGrouped', { count: item.entries.length }, item.entries.length) : ''
+  return isGroupedHistoryItem(item) ? t('settings.reader.kobo.activity.eventsGrouped', { count: item.entries.length }) : ''
 }
 
 function historyDeviceName(entry: KoboSyncHistoryEntry): string {
@@ -755,7 +749,7 @@ async function saveSettings() {
 
         <div v-if="devices.length === 0 && !showCreateForm" class="border border-border rounded-lg px-5 py-10 bg-card text-center shadow-xs">
           <div class="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
-            <Tablet :size="18" class="text-muted-foreground/70" />
+            <Tablet :size="18" class="text-muted-foreground" />
           </div>
           <p class="text-sm font-medium text-foreground">{{ t('settings.reader.kobo.noDevicesYet') }}</p>
           <p class="text-xs text-muted-foreground mt-1 max-w-[240px] mx-auto">{{ t('settings.reader.kobo.noDevicesHint') }}</p>
@@ -844,7 +838,7 @@ async function saveSettings() {
               <span
                 v-if="syncHistory.length > 0"
                 class="rounded-full bg-muted-foreground/15 px-1.5 py-0.5 text-[10px] font-semibold"
-                :class="historyFilter === 'all' ? 'text-foreground/80' : 'text-muted-foreground'"
+                :class="historyFilter === 'all' ? 'text-foreground' : 'text-muted-foreground'"
               >
                 {{ syncHistory.length }}
               </span>
@@ -877,7 +871,7 @@ async function saveSettings() {
         </div>
         <div v-else-if="!hasSyncHistory" class="text-center py-4">
           <div class="w-10 h-10 rounded-lg bg-muted flex items-center justify-center mx-auto mb-3">
-            <History :size="18" class="text-muted-foreground/80" />
+            <History :size="18" class="text-muted-foreground" />
           </div>
           <p class="text-sm font-medium text-foreground">{{ t('settings.reader.kobo.activity.noActivityYet') }}</p>
           <p class="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">{{ t('settings.reader.kobo.activity.noActivityHint') }}</p>
@@ -924,14 +918,14 @@ async function saveSettings() {
                         {{ historyItemOutcomeText(item) }}
                       </span>
                     </div>
-                    <span class="text-xs text-muted-foreground/80" :title="historyItemTimeTitle(item)">
+                    <span class="text-xs text-muted-foreground" :title="historyItemTimeTitle(item)">
                       {{ formatLastSeen(item.primary.createdAt) }}
                     </span>
                   </div>
 
                   <!-- Messages / Details -->
                   <div class="min-w-0">
-                    <p class="text-sm text-foreground/80 leading-normal">{{ historyItemSummary(item) }}</p>
+                    <p class="text-sm text-foreground leading-normal">{{ historyItemSummary(item) }}</p>
                     <p v-if="historyItemSecondaryText(item)" class="mt-0.5 text-xs text-muted-foreground leading-normal">
                       {{ historyItemSecondaryText(item) }}
                     </p>
@@ -944,18 +938,18 @@ async function saveSettings() {
                   >
                     <div class="flex flex-col gap-1 min-w-0">
                       <span class="font-semibold">{{ item.primary.errorClass ?? t('settings.reader.kobo.activity.error') }}</span>
-                      <p class="whitespace-pre-wrap break-all leading-normal text-destructive/90">{{ item.primary.error }}</p>
+                      <p class="whitespace-pre-wrap break-all leading-normal text-destructive">{{ item.primary.error }}</p>
                     </div>
                   </div>
 
                   <!-- Footer Metadata row -->
-                  <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground/60">
+                  <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                     <div class="flex items-center gap-1">
-                      <Tablet :size="12" class="text-muted-foreground/40" />
+                      <Tablet :size="12" class="text-muted-foreground" />
                       <span>{{ historyDeviceName(item.primary) }}</span>
                     </div>
                     <div v-if="historyItemGroupedLabel(item)" class="flex items-center gap-1">
-                      <History :size="12" class="text-muted-foreground/40" />
+                      <History :size="12" class="text-muted-foreground" />
                       <span>{{ historyItemGroupedLabel(item) }}</span>
                     </div>
                   </div>

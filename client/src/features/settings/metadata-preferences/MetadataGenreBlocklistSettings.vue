@@ -37,7 +37,7 @@ const filteredBlocklist = computed(() => {
   return draftBlocklist.value.filter((genre) => genre.toLowerCase().includes(filterToken.value))
 })
 const visibleCountLabel = computed(() => {
-  if (!filterToken.value) return t('settings.metadata.genreBlocklist.entryCount', { count: draftBlocklist.value.length }, draftBlocklist.value.length)
+  if (!filterToken.value) return t('settings.metadata.genreBlocklist.entryCount', { count: draftBlocklist.value.length })
   return t('settings.metadata.genreBlocklist.filteredCount', { shown: filteredBlocklist.value.length, total: draftBlocklist.value.length })
 })
 

@@ -1,5 +1,8 @@
 export type ReaderFormatGroup = "epub" | "pdf" | "cbx" | "audio";
 
+export const CBX_SPREAD_GAP_MIN = 0;
+export const CBX_SPREAD_GAP_MAX = 64;
+
 // Formats the reader can actually open. Used to show/hide Read/Open buttons.
 export const READER_OPENABLE_FORMATS = new Set([
   // epub reader (foliate)
@@ -83,6 +86,7 @@ export interface CbxReaderSettings {
   scrollMode: "paginated" | "infinite" | "long-strip";
   direction: "ltr" | "rtl";
   spreadAlignment: "normal" | "shifted";
+  spreadGap: number;
   forceTwoPage: boolean;
   widePageSingletonMode: "auto" | "disable";
   bgColor: "black" | "gray" | "white";
@@ -136,6 +140,7 @@ export const CBX_READER_DEFAULTS: CbxReaderSettings = {
   scrollMode: "paginated",
   direction: "ltr",
   spreadAlignment: "normal",
+  spreadGap: 0,
   forceTwoPage: false,
   widePageSingletonMode: "auto",
   bgColor: "black",

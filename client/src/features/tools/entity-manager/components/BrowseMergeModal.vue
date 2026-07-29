@@ -65,7 +65,7 @@ function handleCancel(): void {
             >
               <div class="flex-1 min-w-0">
                 <span class="text-sm font-medium truncate block">{{ item.name }}</span>
-                <span class="text-xs text-muted-foreground">{{ t('tools.entityManager.bookCount', { count: item.bookCount }, item.bookCount) }}</span>
+                <span class="text-xs text-muted-foreground">{{ t('tools.entityManager.bookCount', { count: item.bookCount }) }}</span>
               </div>
               <Check v-if="selectedTargetId === item.id" class="h-4 w-4 text-primary shrink-0" />
             </div>

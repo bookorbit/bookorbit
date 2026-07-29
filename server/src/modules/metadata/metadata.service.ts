@@ -110,11 +110,7 @@ export class MetadataService {
 
       await Promise.all([this.persistMetadata(bookId, data, format), data.cover ? this.persistCover(bookId, data.cover, true) : Promise.resolve()]);
 
-      this.scoreService.calculateAndSave(bookId).catch((error: Error) => {
-        this.logger.warn(
-          `[metadata.score_calculation] [fail] bookId=${bookId} errorClass=${error.name} error="${sanitizeLogValue(error.message)}" - metadata score calculation failed`,
-        );
-      });
+      await this.scoreService.calculateAndSave(bookId);
 
       this.logger.debug(
         `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} coverExtracted=${data.cover != null} - metadata extraction completed`,
@@ -194,8 +190,6 @@ export class MetadataService {
       }
 
       await this.persistCover(bookId, buffer, true);
-      this.logger.debug(`[${event}] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} saved=true - cover download completed`);
-      return true;
     } catch (error) {
       const errorClass = error instanceof Error ? error.name : 'Error';
       const errorMessage = sanitizeLogValue(error instanceof Error ? error.message : String(error));
@@ -204,10 +198,15 @@ export class MetadataService {
       );
       return false;
     }
+
+    await this.scoreService.calculateAndSave(bookId);
+    this.logger.debug(`[${event}] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} saved=true - cover download completed`);
+    return true;
   }
 
   async saveExtractedCoverBytes(bookId: number, bytes: Buffer): Promise<void> {
     await this.persistCover(bookId, bytes, true);
+    await this.scoreService.calculateAndSave(bookId);
   }
 
   async refreshCoverForBook(bookId: number, absolutePath: string, format: string): Promise<boolean> {
@@ -235,10 +234,6 @@ export class MetadataService {
         return false;
       }
       await this.persistCover(bookId, data.cover, false);
-      this.logger.debug(
-        `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} refreshed=true - cover refresh completed`,
-      );
-      return true;
     } catch (error) {
       const errorClass = error instanceof Error ? error.name : 'Error';
       const errorMessage = sanitizeLogValue(error instanceof Error ? error.message : String(error));
@@ -247,6 +242,12 @@ export class MetadataService {
       );
       return false;
     }
+
+    await this.scoreService.calculateAndSave(bookId);
+    this.logger.debug(
+      `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} refreshed=true - cover refresh completed`,
+    );
+    return true;
   }
 
   // ── Audio helpers ────────────────────────────────────────────────────────────

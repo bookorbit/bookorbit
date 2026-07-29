@@ -10,6 +10,7 @@ local ConfirmBox = require("ui/widget/confirmbox")
 local Device = require("device")
 local InfoMessage = require("ui/widget/infomessage")
 local NetworkMgr = require("ui/network/manager")
+local Trapper = require("ui/trapper")
 local UIManager = require("ui/uimanager")
 local lfs = require("libs/libkoreader-lfs")
 local logger = require("logger")
@@ -17,7 +18,9 @@ local T = require("ffi/util").template
 local _ = require("gettext")
 
 local BookOrbitBookSync = require("bookorbit_book_sync")
+local BookOrbitApi = require("bookorbit_api")
 local BookOrbitSweep = require("bookorbit_sweep")
+local Transfer = require("bookorbit_download_transfer")
 
 local BookOrbitUpdater = {}
 
@@ -50,10 +53,13 @@ end
 --
 -- `api`         BookOrbitApi instance (must be logged in)
 -- `plugin_dir`  Absolute path of the running plugin directory
--- `progress_cb` Optional function(bytes_received) called during download
+-- `opts`        Optional { on_progress = function(received, total) }. The
+--               transfer runs in a subprocess when a Trapper coroutine is
+--               driving, so progress arrives through polled snapshots.
 --
 -- Returns true on success, or nil + error string on failure.
-function BookOrbitUpdater.apply(api, plugin_dir, progress_cb)
+function BookOrbitUpdater.apply(api, plugin_dir, opts)
+    opts = opts or {}
     local dir = plugin_dir:gsub("/+$", "")
     local parent_dir = dir:match("^(.*)/[^/]+$")
     local plugin_name = dir:match("([^/]+)$")
@@ -69,7 +75,17 @@ function BookOrbitUpdater.apply(api, plugin_dir, progress_cb)
     -- Remove any leftover staging dir from a previous failed attempt.
     os.execute("rm -rf " .. sq(staging))
 
-    local ok, err = api:downloadPluginUpdate(tmp_zip, progress_cb)
+    Transfer.sweepStale(parent_dir)
+    local ok, err = Transfer.run{
+        root = parent_dir,
+        destination = tmp_zip,
+        generation = opts.generation or 1,
+        on_progress = opts.on_progress,
+        is_current = opts.is_current,
+        perform = function(download_opts)
+            return api:downloadPluginUpdate(tmp_zip, download_opts)
+        end,
+    }
     if not ok then
         return nil, tostring(err or "download failed")
     end
@@ -162,6 +178,7 @@ end
 
 function UpdateCheck:maybeCheckForUpdate(interactive)
     if not self:isLoggedIn() or self._checking_update or self._updating then return end
+    if not interactive and not NetworkMgr:isConnected() then return end
     if BookOrbitSweep.isRunning() or BookOrbitBookSync.isRunning() then return end
 
     local now = os.time()
@@ -192,11 +209,17 @@ function UpdateCheck:maybeCheckForUpdate(interactive)
 end
 
 function UpdateCheck:doCheckForUpdate()
-    local checking = InfoMessage:new{ text = _("Checking for update...") }
-    UIManager:show(checking)
-
-    local body, err = self:newClient():getPluginVersion()
-    UIManager:close(checking)
+    if self._checking_update or self._updating then return end
+    self._checking_update = true
+    local api_opts = self:apiOpts(false)
+    local completed, result = Trapper:dismissableRunInSubprocess(function()
+        local body, err = BookOrbitApi.new(api_opts):getPluginVersion()
+        return { body = body, err = err }
+    end, _("Checking for update..."))
+    self._checking_update = false
+    if not completed then return end
+    result = result or {}
+    local body, err = result.body, result.err
 
     if not body then
         if self.recordSyncError then
@@ -272,8 +295,15 @@ function UpdateCheck:applyUpdate(new_version)
         return
     end
     self._updating = true
-    self:_doApplyUpdate(new_version)
-    self._updating = false
+    -- The transfer owns a background subprocess, so the whole flow needs a
+    -- Trapper coroutine; the busy flag clears inside it, not when wrap returns.
+    Trapper:wrap(function()
+        local ok, err = pcall(function()
+            self:_doApplyUpdate(new_version)
+        end)
+        self._updating = false
+        if not ok then error(err, 0) end
+    end)
 end
 
 function UpdateCheck:_doApplyUpdate(new_version)
@@ -285,12 +315,33 @@ function UpdateCheck:_doApplyUpdate(new_version)
         return
     end
 
-    local progress = InfoMessage:new{ text = T(_("Downloading BookOrbit v%1..."), new_version) }
-    UIManager:show(progress)
-    UIManager:forceRePaint()
+    local progress
+    local last_bucket = -1
+    local function showProgress(text)
+        if progress then UIManager:close(progress) end
+        progress = InfoMessage:new{ text = text }
+        UIManager:show(progress)
+        UIManager:forceRePaint()
+    end
+    showProgress(T(_("Downloading BookOrbit v%1..."), new_version))
 
-    local ok, err = BookOrbitUpdater.apply(self:newClient(), self.path)
-    UIManager:close(progress)
+    local ok, err = BookOrbitUpdater.apply(self:newClient(), self.path, {
+        on_progress = function(received, total)
+            local bucket, text
+            if total and total > 0 then
+                local pct = math.min(100, math.floor(received / total * 100))
+                bucket = math.floor(pct / 5)
+                text = T(_("Downloading BookOrbit v%1...\n\n%2"), new_version, pct .. "%")
+            else
+                bucket = math.floor((received or 0) / (256 * 1024))
+                text = T(_("Downloading BookOrbit v%1...\n\n%2 KB"), new_version, math.floor((received or 0) / 1024))
+            end
+            if bucket == last_bucket then return end
+            last_bucket = bucket
+            showProgress(text)
+        end,
+    })
+    if progress then UIManager:close(progress) end
 
     if not ok then
         local msg

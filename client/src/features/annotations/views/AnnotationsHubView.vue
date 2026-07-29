@@ -50,8 +50,8 @@ const summaryTexts = computed(() => {
   const stats = hub.stats.value
   if (!stats) return []
   const texts: string[] = []
-  if (stats.books > 0) texts.push(t('annotations.hub.bookCount', { count: stats.books }, stats.books))
-  if (stats.withNotes > 0) texts.push(t('annotations.hub.noteCount', { count: stats.withNotes }, stats.withNotes))
+  if (stats.books > 0) texts.push(t('annotations.hub.bookCount', { count: stats.books }))
+  if (stats.withNotes > 0) texts.push(t('annotations.hub.noteCount', { count: stats.withNotes }))
   return texts
 })
 
@@ -105,22 +105,22 @@ async function handlePurge(id: number) {
 
 async function handleBulkTrash() {
   const affected = await hub.bulk('trash')
-  if (affected > 0) toast.success(t('annotations.hub.toast.bulkTrashed', { count: affected }, affected))
+  if (affected > 0) toast.success(t('annotations.hub.toast.bulkTrashed', { count: affected }))
 }
 
 async function handleBulkRestore() {
   const affected = await hub.bulk('restore')
-  if (affected > 0) toast.success(t('annotations.hub.toast.bulkRestored', { count: affected }, affected))
+  if (affected > 0) toast.success(t('annotations.hub.toast.bulkRestored', { count: affected }))
 }
 
 async function handleBulkRecolor(color: string) {
   const affected = await hub.bulk('restyle', { color })
-  if (affected > 0) toast.success(t('annotations.hub.toast.bulkRecolored', { count: affected }, affected))
+  if (affected > 0) toast.success(t('annotations.hub.toast.bulkRecolored', { count: affected }))
 }
 
 async function handleBulkRestyle(style: string) {
   const affected = await hub.bulk('restyle', { style })
-  if (affected > 0) toast.success(t('annotations.hub.toast.bulkRestyled', { count: affected }, affected))
+  if (affected > 0) toast.success(t('annotations.hub.toast.bulkRestyled', { count: affected }))
 }
 
 function handleExport(format: 'md' | 'csv' | 'json') {

@@ -9,6 +9,7 @@ import { buildContentFilterClauses } from '../../../common/utils/content-filter-
 import { resolveTimeZone } from '../../../common/utils/timezone.utils';
 import { ContentFilterRepository } from '../../user/content-filter.repository';
 import { BookQueryBuilder } from '../../book/book-query-builder.service';
+import { SmartScopeService } from '../../smart-scope/smart-scope.service';
 import { KoboBookAccessService } from './kobo-book-access.service';
 import { KoboBookIdentityService } from './kobo-book-identity.service';
 import { KoboReadingStateService } from './kobo-reading-state.service';
@@ -101,6 +102,7 @@ export class KoboSyncService {
     private readonly contentFilterRepository: ContentFilterRepository,
     private readonly bookIdentityService: KoboBookIdentityService,
     private readonly queryBuilder: BookQueryBuilder,
+    private readonly smartScopeService: SmartScopeService,
   ) {}
 
   async getDelta(
@@ -690,9 +692,7 @@ export class KoboSyncService {
     accessibleLibraryIds: number[] | null,
     timeZone: string,
   ): Promise<Map<number, SmartScopeMatch>> {
-    const scopes = await this.db.query.smartScopes.findMany({
-      where: and(eq(schema.smartScopes.userId, userId), eq(schema.smartScopes.syncToKobo, true)),
-    });
+    const scopes = await this.smartScopeService.findKoboSyncScopes(userId);
 
     if (scopes.length === 0) return new Map();
 

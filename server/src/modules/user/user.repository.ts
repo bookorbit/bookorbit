@@ -1,27 +1,53 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { createHash, randomBytes, randomUUID } from 'crypto';
-import { and, count, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, count, eq, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import type { SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { hash } from 'bcryptjs';
 
 import { Permission } from '@bookorbit/types';
+import type { UserListSortDirection, UserListSortField, UserListState } from '@bookorbit/types';
 import { RequestUser } from '../../common/types/request-user';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
+export interface UserListQuery {
+  page: number;
+  pageSize: number;
+  search?: string;
+  state?: UserListState;
+  provisioningMethod?: string;
+  sortBy: UserListSortField;
+  sortDir: UserListSortDirection;
+}
+
 @Injectable()
 export class UserRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  async findAll(page: number, pageSize: number, provisioningMethod?: string) {
+  async findAll(query: UserListQuery) {
+    const { page, pageSize } = query;
     const offset = page * pageSize;
 
-    const conditions = provisioningMethod ? eq(schema.users.provisioningMethod, provisioningMethod) : undefined;
+    const filters = this.buildListFilters(query);
+    const conditions = filters.length > 0 ? and(...filters) : undefined;
+    const sortColumn = {
+      username: schema.users.username,
+      name: schema.users.name,
+      createdAt: schema.users.createdAt,
+    }[query.sortBy];
+    const direction = query.sortDir === 'desc' ? sql.raw('desc') : sql.raw('asc');
 
     const [userPage, [{ total }]] = await Promise.all([
-      this.db.select({ id: schema.users.id }).from(schema.users).where(conditions).orderBy(schema.users.username).limit(pageSize).offset(offset),
+      this.db
+        .select({ id: schema.users.id })
+        .from(schema.users)
+        .where(conditions)
+        .orderBy(sql`${sortColumn} ${direction} nulls last`, asc(schema.users.username))
+        .limit(pageSize)
+        .offset(offset),
       this.db.select({ total: count() }).from(schema.users).where(conditions),
     ]);
     const normalizedTotal = Number(total);
@@ -104,6 +130,28 @@ export class UserRepository {
 
     const users = userIds.map((id) => usersMap.get(id)).filter((user): user is UserListItem => user !== undefined);
     return { users, total: normalizedTotal };
+  }
+
+  private buildListFilters(query: UserListQuery): SQL[] {
+    const filters: SQL[] = [];
+
+    const search = query.search?.trim();
+    if (search) {
+      const pattern = `%${search.replace(/[\\%_]/g, '\\$&')}%`;
+      filters.push(or(ilike(schema.users.name, pattern), ilike(schema.users.username, pattern), ilike(schema.users.email, pattern))!);
+    }
+    if (query.provisioningMethod) {
+      filters.push(eq(schema.users.provisioningMethod, query.provisioningMethod));
+    }
+    if (query.state === 'admins') {
+      filters.push(eq(schema.users.isSuperuser, true));
+    } else if (query.state === 'active') {
+      filters.push(eq(schema.users.active, true));
+    } else if (query.state === 'inactive') {
+      filters.push(eq(schema.users.active, false));
+    }
+
+    return filters;
   }
 
   async findAssignable() {

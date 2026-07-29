@@ -1,4 +1,4 @@
-import { ACCENT_IDS, BACKGROUND_IDS, RADIUS_IDS, THEME_IDS, type ThemePreferences } from '@bookorbit/types'
+import { ACCENT_IDS, BACKGROUND_IDS, RADIUS_IDS, SURFACE_OPACITY_MAX, SURFACE_OPACITY_MIN, THEME_IDS, type ThemePreferences } from '@bookorbit/types'
 import { watch } from 'vue'
 import { toast } from 'vue-sonner'
 import { useAuth } from '@/features/auth/composables/useAuth'
@@ -19,6 +19,7 @@ function getCurrentPrefs(): ThemePreferences {
     radius: store.radius,
     background: store.background,
     brightness: store.brightness,
+    surfaceOpacity: store.surfaceOpacity,
   }
 }
 
@@ -39,6 +40,14 @@ function sanitizeServerPrefs(raw: unknown): Partial<ThemePreferences> {
   if (BACKGROUND_IDS.includes(obj.background as ThemePreferences['background'])) out.background = obj.background as ThemePreferences['background']
   if (typeof obj.brightness === 'number' && Number.isInteger(obj.brightness) && obj.brightness >= 0 && obj.brightness <= 100) {
     out.brightness = obj.brightness
+  }
+  if (
+    typeof obj.surfaceOpacity === 'number' &&
+    Number.isInteger(obj.surfaceOpacity) &&
+    obj.surfaceOpacity >= SURFACE_OPACITY_MIN &&
+    obj.surfaceOpacity <= SURFACE_OPACITY_MAX
+  ) {
+    out.surfaceOpacity = obj.surfaceOpacity
   }
 
   return out
@@ -83,6 +92,7 @@ export async function loadFromServer(): Promise<void> {
       if (prefs.radius !== undefined) store.setRadius(prefs.radius)
       if (prefs.background !== undefined) store.setBackground(prefs.background)
       if (prefs.brightness !== undefined) store.setBrightness(prefs.brightness)
+      if (prefs.surfaceOpacity !== undefined) store.setSurfaceOpacity(prefs.surfaceOpacity)
     } finally {
       isApplyingServerPrefs = false
     }
@@ -135,7 +145,7 @@ export function initThemeSync(): void {
   const store = useThemeStore()
 
   watch(
-    () => [store.theme, store.accent, store.radius, store.background, store.brightness] as const,
+    () => [store.theme, store.accent, store.radius, store.background, store.brightness, store.surfaceOpacity] as const,
     () => {
       if (isApplyingServerPrefs || !isSyncEnabled()) return
 

@@ -322,7 +322,7 @@ watch(
       </button>
       <i18n-t v-if="notesOpen" keypath="email.templates.notesBody" tag="p" class="px-4 pb-4 text-xs text-muted-foreground">
         <template #variable>
-          <code class="font-mono text-foreground/80">{{ TITLE_VARIABLE }}</code>
+          <code class="font-mono text-foreground">{{ TITLE_VARIABLE }}</code>
         </template>
       </i18n-t>
     </div>

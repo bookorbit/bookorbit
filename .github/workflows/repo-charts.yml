@@ -1,0 +1,142 @@
+name: Repo Charts
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "37 6 * * *"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/repo-charts.yml"
+      - "scripts/star-history/**"
+      - "scripts/crowdin-stats/**"
+
+permissions: {}
+
+concurrency:
+  group: repo-charts
+  cancel-in-progress: false
+
+env:
+  CHARTS_BRANCH: generated-charts
+
+jobs:
+  publish:
+    name: Refresh charts
+    if: github.repository == 'bookorbit/bookorbit'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 24
+
+      - name: Test generators
+        run: node --test scripts/star-history/generate.test.mjs scripts/crowdin-stats/generate.test.mjs
+
+      - name: Restore published charts
+        env:
+          SERIES_PATH: ${{ runner.temp }}/star-history.json
+        run: |
+          restore_series() {
+            for branch in "$CHARTS_BRANCH" star-history; do
+              if git ls-remote --exit-code --heads origin "$branch" >/dev/null &&
+                git fetch --depth 1 origin "+refs/heads/$branch:refs/remotes/origin/$branch" &&
+                git show "origin/$branch:star-history.json" > "$SERIES_PATH" 2>/dev/null; then
+                echo "Restored star history series from $branch"
+                return 0
+              fi
+            done
+
+            echo "No published series found, using the bootstrap snapshot"
+            cp scripts/star-history/bootstrap.json "$SERIES_PATH"
+          }
+
+          restore_series
+
+      - name: Generate star history chart
+        id: star-history
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          STAR_HISTORY_TOKEN: ${{ secrets.STAR_HISTORY_TOKEN }}
+          SERIES_PATH: ${{ runner.temp }}/star-history.json
+          SVG_PATH: ${{ runner.temp }}/star-history.svg
+        run: |
+          node scripts/star-history/generate.mjs \
+            --repo "$GITHUB_REPOSITORY" \
+            --series "$SERIES_PATH" \
+            --bootstrap scripts/star-history/bootstrap.json \
+            --out "$SVG_PATH"
+
+      - name: Generate translation progress chart
+        id: translation-progress
+        continue-on-error: true
+        env:
+          CROWDIN_TOKEN: ${{ secrets.CROWDIN_TOKEN }}
+          SVG_PATH: ${{ runner.temp }}/translation-progress.svg
+        run: |
+          node scripts/crowdin-stats/generate.mjs --out "$SVG_PATH"
+
+      - name: Publish charts
+        env:
+          SERIES_PATH: ${{ runner.temp }}/star-history.json
+          STAR_SVG_PATH: ${{ runner.temp }}/star-history.svg
+          TRANSLATION_SVG_PATH: ${{ runner.temp }}/translation-progress.svg
+          GIT_INDEX_FILE: ${{ runner.temp }}/charts.index
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          parent=$(git rev-parse --verify "refs/remotes/origin/$CHARTS_BRANCH" 2>/dev/null || true)
+
+          rm -f "$GIT_INDEX_FILE"
+          if [ -n "$parent" ]; then
+            git read-tree "$parent"
+          fi
+
+          stage_chart() {
+            if [ ! -s "$2" ]; then
+              echo "Skipping $1, keeping the published copy"
+              return 0
+            fi
+            blob=$(git hash-object -w "$2")
+            git update-index --add --cacheinfo "100644,$blob,$1"
+          }
+
+          stage_chart star-history.svg "$STAR_SVG_PATH"
+          stage_chart star-history.json "$SERIES_PATH"
+          stage_chart translation-progress.svg "$TRANSLATION_SVG_PATH"
+
+          tree=$(git write-tree)
+
+          if [ -n "$parent" ]; then
+            if [ "$tree" = "$(git rev-parse "$parent^{tree}")" ]; then
+              echo "Charts are unchanged"
+              exit 0
+            fi
+            commit=$(printf '%s\n' "chore: update repository charts" | \
+              TZ=UTC git commit-tree "$tree" -p "$parent")
+          else
+            commit=$(printf '%s\n' "chore: initialize repository charts" | \
+              TZ=UTC git commit-tree "$tree")
+          fi
+
+          git push origin "$commit:refs/heads/$CHARTS_BRANCH"
+
+      - name: Fail on generator errors
+        if: steps.star-history.outcome == 'failure' || steps.translation-progress.outcome == 'failure'
+        env:
+          STAR_OUTCOME: ${{ steps.star-history.outcome }}
+          TRANSLATION_OUTCOME: ${{ steps.translation-progress.outcome }}
+        run: |
+          echo "star history: $STAR_OUTCOME"
+          echo "translation progress: $TRANSLATION_OUTCOME"
+          exit 1

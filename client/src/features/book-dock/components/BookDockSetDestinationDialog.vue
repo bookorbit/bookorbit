@@ -95,7 +95,7 @@ function handleClose() {
       <div class="relative z-10 w-full max-w-xl mx-4 bg-card border border-border rounded-lg shadow-2xl overflow-hidden">
         <div class="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 class="text-base font-semibold text-foreground">
-            {{ result ? t('bookDock.setDestination.resultTitle') : t('bookDock.setDestination.title', { count: selectionCount }, selectionCount) }}
+            {{ result ? t('bookDock.setDestination.resultTitle') : t('bookDock.setDestination.title', { count: selectionCount }) }}
           </h2>
           <button
             class="size-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all"

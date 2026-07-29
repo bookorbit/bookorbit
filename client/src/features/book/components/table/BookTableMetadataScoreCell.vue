@@ -53,5 +53,5 @@ const scoreColor = computed(() => {
   >
     {{ display }}
   </span>
-  <span v-else class="text-xs text-muted-foreground/40">-</span>
+  <span v-else class="text-xs text-muted-foreground">-</span>
 </template>

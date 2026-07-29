@@ -42,7 +42,7 @@ function startReading() {
 <template>
   <div class="flex h-full flex-col p-3">
     <div class="mb-3 flex items-center gap-2 self-start">
-      <Clock :size="16" class="text-primary/90" />
+      <Clock :size="16" class="text-primary" />
       <span class="text-[15px] font-semibold text-foreground">{{ t('dashboard.widgets.longWait.title') }}</span>
     </div>
 
@@ -60,7 +60,7 @@ function startReading() {
     <!-- Empty -->
     <div v-else-if="!data" class="flex flex-1 flex-col items-center justify-center gap-2">
       <div class="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-        <Clock :size="16" class="text-muted-foreground/60" />
+        <Clock :size="16" class="text-muted-foreground" />
       </div>
       <p class="text-center text-xs text-muted-foreground">{{ t('dashboard.widgets.longWait.empty') }}</p>
     </div>
@@ -97,7 +97,7 @@ function startReading() {
           <p class="text-[11px] text-muted-foreground">{{ t('dashboard.widgets.longWait.daysWaiting') }}</p>
 
           <div class="mt-2 flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground">
-            <span v-if="data.pageCount" class="shrink-0">{{ t('dashboard.widgets.longWait.pages', { count: data.pageCount }, data.pageCount) }}</span>
+            <span v-if="data.pageCount" class="shrink-0">{{ t('dashboard.widgets.longWait.pages', { count: data.pageCount }) }}</span>
             <span v-if="data.pageCount && data.genre" class="shrink-0">&middot;</span>
             <span v-if="data.genre" class="truncate">{{ data.genre }}</span>
           </div>

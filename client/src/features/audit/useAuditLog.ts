@@ -1,16 +1,21 @@
 import { ref, reactive } from 'vue'
-import type { AuditLogEntry, AuditLogPage } from '@bookorbit/types'
+import { useI18n } from 'vue-i18n'
+import type { AuditActorOption, AuditLogEntry, AuditLogPage } from '@bookorbit/types'
 import { api } from '@/lib/api'
 
 interface AuditFilters {
+  search: string
   action: string
-  userId: string
+  actorUsername: string
+  resource: string
   dateFrom: string
   dateTo: string
 }
 
 export function useAuditLog() {
+  const { t } = useI18n()
   const entries = ref<AuditLogEntry[]>([])
+  const actors = ref<AuditActorOption[]>([])
   const total = ref(0)
   const page = ref(1)
   const pageSize = 50
@@ -18,8 +23,10 @@ export function useAuditLog() {
   const error = ref<string | null>(null)
 
   const filters = reactive<AuditFilters>({
+    search: '',
     action: '',
-    userId: '',
+    actorUsername: '',
+    resource: '',
     dateFrom: '',
     dateTo: '',
   })
@@ -29,44 +36,59 @@ export function useAuditLog() {
     error.value = null
     try {
       const params = new URLSearchParams({ page: String(page.value), pageSize: String(pageSize) })
+      if (filters.search.trim()) params.set('search', filters.search.trim())
       if (filters.action) params.set('action', filters.action)
-      if (filters.userId) params.set('userId', filters.userId)
-      if (filters.dateFrom) params.set('dateFrom', new Date(filters.dateFrom).toISOString())
-      if (filters.dateTo) params.set('dateTo', new Date(filters.dateTo).toISOString())
+      if (filters.actorUsername.trim()) params.set('actorUsername', filters.actorUsername.trim())
+      if (filters.resource) params.set('resource', filters.resource)
+      if (filters.dateFrom) params.set('dateFrom', new Date(`${filters.dateFrom}T00:00:00`).toISOString())
+      if (filters.dateTo) params.set('dateTo', new Date(`${filters.dateTo}T23:59:59.999`).toISOString())
 
       const res = await api(`/api/v1/audit-log?${params.toString()}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data: AuditLogPage = await res.json()
       entries.value = data.data
       total.value = data.total
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to load audit log'
+    } catch {
+      error.value = t('audit.loadError')
     } finally {
       loading.value = false
     }
   }
 
+  async function fetchActors() {
+    try {
+      const res = await api('/api/v1/audit-log/actors?limit=100')
+      if (!res.ok) return
+      actors.value = await res.json()
+    } catch {
+      actors.value = []
+    }
+  }
+
   function applyFilters() {
     page.value = 1
-    fetchPage()
+    return fetchPage()
   }
 
   function clearFilters() {
+    filters.search = ''
     filters.action = ''
-    filters.userId = ''
+    filters.actorUsername = ''
+    filters.resource = ''
     filters.dateFrom = ''
     filters.dateTo = ''
     page.value = 1
-    fetchPage()
+    return fetchPage()
   }
 
   function goToPage(p: number) {
     page.value = p
-    fetchPage()
+    return fetchPage()
   }
 
   return {
     entries,
+    actors,
     total,
     page,
     pageSize,
@@ -74,6 +96,7 @@ export function useAuditLog() {
     error,
     filters,
     fetchPage,
+    fetchActors,
     applyFilters,
     clearFilters,
     goToPage,

@@ -24,6 +24,7 @@ import { BookDockRepository } from './book-dock.repository';
 function makeDb() {
   const selectBuilder = {
     from: vi.fn(),
+    innerJoin: vi.fn(),
     where: vi.fn(),
     orderBy: vi.fn(),
     limit: vi.fn(),
@@ -31,6 +32,7 @@ function makeDb() {
     groupBy: vi.fn(),
   };
   selectBuilder.from.mockReturnValue(selectBuilder);
+  selectBuilder.innerJoin.mockReturnValue(selectBuilder);
   selectBuilder.where.mockReturnValue(selectBuilder);
   selectBuilder.orderBy.mockReturnValue(selectBuilder);
   selectBuilder.offset.mockResolvedValue([]);
@@ -75,6 +77,28 @@ function makeDb() {
 }
 
 describe('BookDockRepository', () => {
+  it('findExistingBooksByAbsolutePaths short-circuits an empty path list', async () => {
+    const { db } = makeDb();
+    const repo = new BookDockRepository(db as never);
+
+    await expect(repo.findExistingBooksByAbsolutePaths([])).resolves.toEqual([]);
+
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('findExistingBooksByAbsolutePaths deduplicates paths in one joined query', async () => {
+    const { db, selectBuilder } = makeDb();
+    const existing = [{ absolutePath: '/library/book.epub', bookId: 12, libraryId: 5 }];
+    selectBuilder.where.mockResolvedValueOnce(existing);
+    const repo = new BookDockRepository(db as never);
+
+    await expect(repo.findExistingBooksByAbsolutePaths(['/library/book.epub', '/library/book.epub'])).resolves.toEqual(existing);
+
+    expect(db.select).toHaveBeenCalledTimes(1);
+    expect(selectBuilder.innerJoin).toHaveBeenCalledTimes(1);
+    expect(selectBuilder.where).toHaveBeenCalledWith(expect.objectContaining({ op: 'inArray', right: ['/library/book.epub'] }));
+  });
+
   it('findByIds/deleteByIds/setTargetsByIds short-circuit empty selections', async () => {
     const { db } = makeDb();
     const repo = new BookDockRepository(db as never);

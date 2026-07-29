@@ -52,11 +52,12 @@ describe('UserController', () => {
   });
 
   it('delegates list and profile update operations', async () => {
-    await controller.findAll(undefined, 25, undefined);
+    const query = { page: 0, pageSize: 25, sortBy: 'username', sortDir: 'asc' } as any;
+    await controller.findAll(query);
     await controller.findAssignable();
     await controller.updateMe({ id: 7 } as any, { name: 'Updated' } as any);
 
-    expect(userService.findAll).toHaveBeenCalledWith(undefined, 25, undefined);
+    expect(userService.findAll).toHaveBeenCalledWith(query);
     expect(userService.findAssignable).toHaveBeenCalled();
     expect(userService.updateMe).toHaveBeenCalledWith(7, { name: 'Updated' });
   });

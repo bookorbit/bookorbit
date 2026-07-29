@@ -30,7 +30,7 @@ onMounted(async () => {
       v-if="!filters.includeTags?.length && !filters.excludeTags?.length && !filters.includeGenres?.length && !filters.excludeGenres?.length"
       class="rounded-lg border border-border bg-muted/30 px-5 py-8 text-center"
     >
-      <ShieldAlert :size="32" class="mx-auto mb-3 text-muted-foreground/60" />
+      <ShieldAlert :size="32" class="mx-auto mb-3 text-muted-foreground" />
       <p class="text-sm font-medium text-foreground">{{ t('settings.account.restrictions.none.title') }}</p>
       <p class="mt-1 text-xs text-muted-foreground">{{ t('settings.account.restrictions.none.description') }}</p>
     </div>

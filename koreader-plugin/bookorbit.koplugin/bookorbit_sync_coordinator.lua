@@ -23,6 +23,7 @@ function SyncCoordinator.new(opts)
         pending = {},
         pending_count = 0,
         next_seq = 0,
+        on_idle = opts.on_idle,
     }, SyncCoordinator)
 end
 
@@ -96,6 +97,9 @@ function SyncCoordinator:start(job)
         if self.current == job then
             self.current = nil
             self:startNext()
+            if not self.current and self.on_idle then
+                pcall(self.on_idle)
+            end
         end
     end
 

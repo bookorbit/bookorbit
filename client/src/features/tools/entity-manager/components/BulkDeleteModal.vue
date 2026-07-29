@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { AlertTriangle, X } from '@lucide/vue'
+import IcuCountText from '@/components/IcuCountText.vue'
 
 const { t } = useI18n()
 
@@ -44,11 +45,11 @@ function handleCancel(): void {
       </div>
       <div class="px-5 py-4 space-y-4">
         <p class="text-sm">
-          <i18n-t keypath="tools.entityManager.bulkDeleteModal.confirm" :plural="count">
-            <template #count>
-              <span class="font-semibold">{{ count }}</span>
+          <IcuCountText keypath="tools.entityManager.bulkDeleteModal.confirm" :count="count">
+            <template #count="{ value }">
+              <span class="font-semibold">{{ value }}</span>
             </template>
-          </i18n-t>
+          </IcuCountText>
         </p>
 
         <div v-if="!isInline" class="space-y-2">

@@ -74,8 +74,8 @@ const canRun = computed(() => {
 })
 
 const scopeSummary = computed(() => {
-  if (scope.value === 'selected') return t('book.export.selectedRowsSummary', { count: selectedCountLabel.value }, props.selectedCount)
-  return t('book.export.matchingRowsSummary', { count: totalCountLabel.value }, props.totalCount)
+  if (scope.value === 'selected') return t('book.export.selectedRowsSummary', { count: props.selectedCount })
+  return t('book.export.matchingRowsSummary', { count: props.totalCount })
 })
 
 const sizeHintClass = computed(() => {

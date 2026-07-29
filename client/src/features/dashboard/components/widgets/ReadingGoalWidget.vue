@@ -87,7 +87,7 @@ function handleCancelEdit() {
 <template>
   <div class="flex h-full flex-col p-3">
     <div class="mb-3 flex items-center gap-2 self-start">
-      <Target :size="16" class="text-primary/90" />
+      <Target :size="16" class="text-primary" />
       <span class="text-[15px] font-semibold text-foreground">{{ t('dashboard.widgets.readingGoal.title', { year: data?.year ?? '' }) }}</span>
     </div>
 
@@ -158,7 +158,7 @@ function handleCancelEdit() {
       <div class="flex items-center justify-between">
         <p class="text-xs text-muted-foreground">{{ t('dashboard.widgets.readingGoal.percentComplete', { percentage }) }}</p>
         <button
-          class="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/50 transition-colors hover:bg-muted hover:text-muted-foreground"
+          class="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-muted-foreground"
           :title="t('dashboard.widgets.readingGoal.editGoal')"
           @click="handleStartEditing"
         >

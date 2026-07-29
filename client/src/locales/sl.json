@@ -70,8 +70,8 @@
         "empty": "Noben skrbnik si še ni ogledal vašega deljenega bralnega profila.",
         "paginationLabel": "Strani zgodovine dostopov do profila"
       },
-      "durationMinutes": "{count} minuta | {count} minuti | {count} minute | {count} minut",
-      "durationHours": "{count} ur",
+      "durationMinutes": "{count, plural, one {# minuta} two {# minuti} few {# minute} other {# minut}}",
+      "durationHours": "{count, plural, one {# ura} two {# uri} few {# ure} other {# ur}}",
       "unknownTitle": "Knjiga brez naslova",
       "errors": {
         "load": "Nastavitev deljenja ni bilo mogoče naložiti.",
@@ -401,13 +401,13 @@
       "icons": {
         "title": "Ikone po meri",
         "uploadIcons": "Naloži ikone",
-        "uploadedCount": "ni naloženih ikon | {count} naložena ikona | {count} naloženih ikon",
+        "uploadedCount": "{count, plural, =0 {ni naloženih ikon} one {# naložena ikona} two {# naloženih ikon} few {# naloženih ikon} other {# naloženih ikon}}",
         "searchPlaceholder": "Iskanje ikon",
         "sort": {
           "newest": "Najnovejše",
           "name": "Ime"
         },
-        "selectedCount": "{count} izbranih",
+        "selectedCount": "{count, plural, one {# izbrana ikona} two {# izbrani ikoni} few {# izbrane ikone} other {# izbranih ikon}}",
         "clear": "Počisti",
         "deleteSelected": "Izbriši izbrano",
         "loading": "Nalaganje ikon...",
@@ -420,19 +420,19 @@
         "rename": "Preimenuj",
         "replace": "Zamenjaj",
         "usage": {
-          "libraries": "brez knjižnic | {count} knjižnica | {count} knjižnic",
-          "collections": "brez zbirk | {count} zbirka | {count} zbirk",
-          "smartScopes": "brez pametnih obsegov | {count} pameten obseg | {count} pametnih obsegov"
+          "libraries": "{count, plural, =0 {brez knjižnic} one {# knjižnica} two {# knjižnic} few {# knjižnic} other {# knjižnic}}",
+          "collections": "{count, plural, =0 {brez zbirk} one {# zbirka} two {# zbirk} few {# zbirk} other {# zbirk}}",
+          "smartScopes": "{count, plural, =0 {brez pametnih obsegov} one {# pameten obseg} two {# pametnih obsegov} few {# pametnih obsegov} other {# pametnih obsegov}}"
         },
         "confirm": {
           "deleteOne": "Izbrišem \"{name}\"? Obstoječe uporabe se bodo vrnile na privzeto ikono.",
-          "deleteMany": "Izbrišem nič ikon? | Izbrišem {count} ikono? Obstoječe uporabe se bodo vrnile na privzeto ikono. | Izbrišem {count} ikon? Obstoječe uporabe se bodo vrnile na privzeto ikono."
+          "deleteMany": "{count, plural, =0 {Izbrišem nič ikon?} one {Izbrišem # ikono? Obstoječe uporabe se bodo vrnile na privzeto ikono.} two {Izbrišem # ikon? Obstoječe uporabe se bodo vrnile na privzeto ikono.} few {Izbrišem # ikon? Obstoječe uporabe se bodo vrnile na privzeto ikono.} other {Izbrišem # ikon? Obstoječe uporabe se bodo vrnile na privzeto ikono.}}"
         },
         "toasts": {
           "saved": "Ikona shranjena",
           "updated": "Ikona posodobljena",
           "deleted": "Ikona izbrisana",
-          "bulkDeleted": "Izbrisanih ni bilo nobenih ikon | Izbrisana {count} ikona | Izbrisanih {count} ikon",
+          "bulkDeleted": "{count, plural, =0 {Izbrisanih ni bilo nobenih ikon} one {Izbrisana # ikona} two {Izbrisanih # ikon} few {Izbrisanih # ikon} other {Izbrisanih # ikon}}",
           "bulkDeletePartial": "Izbrisanih {deleted}, neuspešnih {failed}"
         },
         "errors": {
@@ -467,7 +467,7 @@
       },
       "feedback": {
         "unsavedChanges": "Neshranjene spremembe",
-        "allSaved": "Vse spremembe shranjene"
+        "discard": "Discard"
       },
       "profile": {
         "securityHeading": "Profil in varnost",
@@ -484,7 +484,11 @@
         "accountTypeLocal": "Lokalni",
         "nameRequired": "Ime je obvezno",
         "updateFailed": "Posodobitev profila ni uspela",
-        "updated": "Profil posodobljen"
+        "updated": "Profil posodobljen",
+        "usernameHint": "Your username cannot be changed.",
+        "passwordHint": "Change the password you use to sign in.",
+        "passwordHintOidc": "Your password is managed by your identity provider.",
+        "passwordHintShared": "Shared accounts sign in through a magic link and have no password."
       },
       "readingPreferences": {
         "title": "Bralne nastavitve",
@@ -492,7 +496,10 @@
         "timezone": "Časovni pas",
         "save": "Shrani nastavitve",
         "enableAchievements": "Omogoči dosežke",
-        "enableAchievementsHint": "Spremljajte napredek dosežkov in prikažite z njimi povezane elemente vmesnika. Obvestila o dosežkih upravljajte ločeno v razdelku Obvestila."
+        "enableAchievementsHint": "Spremljajte napredek dosežkov in prikažite z njimi povezane elemente vmesnika. Obvestila o dosežkih upravljajte ločeno v razdelku Obvestila.",
+        "achievementsEnabled": "Achievements enabled",
+        "achievementsDisabled": "Achievements disabled",
+        "achievementsSaveFailed": "Failed to update the achievement preference"
       },
       "preferences": {
         "saveFailed": "Shranjevanje nastavitev ni uspelo",
@@ -534,7 +541,9 @@
           "title": "Prekini povezavo z identiteto {provider}?",
           "description": "Vnesite geslo za potrditev. S tem ponudnikom se ne boste več mogli prijaviti.",
           "currentPassword": "Trenutno geslo"
-        }
+        },
+        "description": "Sign in with an external identity provider linked to this account.",
+        "unlinkAria": "Unlink {provider}"
       },
       "tour": {
         "title": "Vodeni ogled",
@@ -563,6 +572,11 @@
           "title": "Blokirani žanri",
           "description": "Knjige s katerim koli od teh žanrov so pred vami skrite."
         }
+      },
+      "groups": {
+        "profile": "Profile",
+        "preferences": "Preferences",
+        "security": "Security & access"
       }
     },
     "magicLinks": {
@@ -582,7 +596,7 @@
       "expiresOn": "Poteče {date}",
       "revokedOn": "Preklicano {date}",
       "expiredOn": "Poteklo {date}",
-      "usesCount": "brez uporab | ena uporaba | {count} uporab",
+      "usesCount": "{count, plural, =0 {brez uporab} one {ena uporaba} two {# uporab} few {# uporab} other {# uporab}}",
       "copied": "Kopirano!",
       "copyLink": "Kopiraj povezavo",
       "pause": "Ustavi",
@@ -596,10 +610,10 @@
         "createdBy": "Ustvaril",
         "expires": "Poteče",
         "uses": "Uporabe",
-        "lastUsed": "Nazadnje uporabljeno",
         "created": "Ustvarjeno",
         "status": "Stanje",
-        "totalUses": "Skupno uporab"
+        "totalUses": "Skupno uporab",
+        "actions": "Actions"
       },
       "createDialog": {
         "title": "Ustvari čarobno povezavo",
@@ -627,7 +641,12 @@
       "emptyTitle": "Še ni ustvarjenih čarobnih povezav",
       "emptyHint": "Kliknite \"{action}\" za ustvarjanje povezave za prijavo, ki jo lahko delite.",
       "noActiveTitle": "Ni aktivnih čarobnih povezav",
-      "noActiveHint": "Vse ustvarjene čarobne povezave za to stran so potekle ali bile preklicane."
+      "noActiveHint": "Vse ustvarjene čarobne povezave za to stran so potekle ali bile preklicane.",
+      "copyLinkAria": "Copy the link for {label}",
+      "pauseAria": "Pause {label}",
+      "resumeAria": "Resume {label}",
+      "revokeAria": "Revoke {label}",
+      "lastUsedLabel": "Last used {date}"
     },
     "oidc": {
       "title": "OIDC / SSO",
@@ -755,7 +774,7 @@
         "viewDetails": "Prikaži podrobnosti",
         "refreshRecommendationIndex": "Osveži indeks priporočil",
         "refreshRecommendationHint": "Posodobite mehanizem priporočil z najnovejšimi spremembami v vaši knjižnici. Ta proces poteka v ozadju.",
-        "booksQueuedForProcessing": "ni knjig v vrsti za obdelavo | {count} knjiga v vrsti za obdelavo | {count} knjig v vrsti za obdelavo",
+        "booksQueuedForProcessing": "{count, plural, =0 {ni knjig v vrsti za obdelavo} one {# knjiga v vrsti za obdelavo} two {# knjig v vrsti za obdelavo} few {# knjig v vrsti za obdelavo} other {# knjig v vrsti za obdelavo}}",
         "run": "Zaženi",
         "running": "Poteka...",
         "backfillAchievements": "Naknadno izračunaj dosežke",
@@ -767,7 +786,7 @@
         "updateChecksEnabled": "Preverjanje posodobitev omogočeno",
         "updateChecksDisabled": "Preverjanje posodobitev onemogočeno",
         "updateSettingFailed": "Posodobitev nastavitve ni uspela",
-        "booksQueuedForEmbedding": "ni knjig v vrsti za vgrajevanje | {count} knjiga v vrsti za vgrajevanje | {count} knjig v vrsti za vgrajevanje",
+        "booksQueuedForEmbedding": "{count, plural, =0 {ni knjig v vrsti za vgrajevanje} one {# knjiga v vrsti za vgrajevanje} two {# knjig v vrsti za vgrajevanje} few {# knjig v vrsti za vgrajevanje} other {# knjig v vrsti za vgrajevanje}}",
         "failed": "Ni uspelo",
         "unknownError": "Neznana napaka",
         "rebuildEmbeddingsFailed": "Obnovitev vgraditev ni uspela: {error}",
@@ -947,7 +966,7 @@
         "ofCount": "od {count}",
         "targetBookNum": "Ciljna knjiga #{id}",
         "recommended": "Priporočeno",
-        "resolveDuplicatesButton": "Razreši {count} podvojitev | Razreši {count} podvojitev | Razreši {count} podvojitve",
+        "resolveDuplicatesButton": "{count, plural, =0 {Razreši # podvojitev} one {Razreši # podvojitev} two {Razreši # podvojitve} few {Razreši # podvojitve} other {Razreši # podvojitve}}",
         "preflightChecks": "Predhodna preverjanja",
         "allChecksPassed": "Vsa preverjanja uspešna - pripravljeno za migracijo",
         "checkSourceValidated": "Vir preverjen",
@@ -1023,11 +1042,11 @@
         "refreshCovers": "Osveži naslovnice",
         "syncMetadataToFiles": "Sinhroniziraj metapodatke z datotekami",
         "deleteLibrary": "Izbriši knjižnico",
-        "bookCount": "ni knjig | {count} knjiga | {count} knjig",
+        "bookCount": "{count, plural, =0 {ni knjig} one {# knjiga} two {# knjig} few {# knjig} other {# knjig}}",
         "addedDate": "Dodano {date}",
         "fileMode": "Način datotek",
         "folderMode": "Način map",
-        "folderCount": "ni map | {count} mapa | {count} map",
+        "folderCount": "{count, plural, =0 {ni map} one {# mapa} two {# map} few {# map} other {# map}}",
         "watching": "Nadzorovanje",
         "fileWrite": "Zapisovanje datotek",
         "fileRename": "Preimenovanje datotek",
@@ -1050,7 +1069,7 @@
         "scanStartFailed": "Zagon pregleda za \"{name}\" ni uspel",
         "refreshCoversFailed": "Osvežitev naslovnic za \"{name}\" ni uspela",
         "scanStartedAll": "Pregled vseh knjižnic se je začel",
-        "librariesFailedToStart": "nobena knjižnica ni uspela zagnati pregleda | {count} knjižnica ni uspela zagnati pregleda | {count} knjižnice niso uspele zagnati pregleda",
+        "librariesFailedToStart": "{count, plural, =0 {nobena knjižnica ni uspela zagnati pregleda} one {# knjižnica ni uspela zagnati pregleda} two {# knjižnice niso uspele zagnati pregleda} few {# knjižnice niso uspele zagnati pregleda} other {# knjižnice niso uspele zagnati pregleda}}",
         "scansStartFailed": "Zagon pregledov ni uspel",
         "libraryCreated": "Knjižnica \"{name}\" ustvarjena",
         "libraryUpdated": "Knjižnica \"{name}\" posodobljena",
@@ -1219,7 +1238,7 @@
           "eligible": "~{count} upravičenih"
         },
         "trigger": {
-          "queued": "V vrsto uvrščena {count} knjiga | V vrsto uvrščeni {count} knjigi | V vrsto uvrščene {count} knjige | V vrsto uvrščenih {count} knjig",
+          "queued": "{count, plural, one {V vrsto uvrščena # knjiga} two {V vrsto uvrščeni # knjigi} few {V vrsto uvrščene # knjige} other {V vrsto uvrščenih # knjig}}",
           "noneFound": "Ni najdenih upravičenih knjig"
         },
         "lastRun": {
@@ -1227,7 +1246,7 @@
           "minutesAgo": "pred {count} min",
           "hoursAgo": "pred {count} h",
           "yesterday": "včeraj",
-          "daysAgo": "pred {count} dnevi",
+          "daysAgo": "{count, plural, one {pred # dnevom} two {pred # dnevoma} few {pred # dnevi} other {pred # dnevi}}",
           "label": "Zadnji zagon: {when}",
           "labelQueued": "Zadnji zagon: {when} - v vrsto uvrščenih {count} knjig",
           "labelNoneEligible": "Zadnji zagon: {when} - ni upravičenih knjig"
@@ -1250,7 +1269,7 @@
           "missingFields": {
             "label": "Manjkajoča polja",
             "hint": "Pridobi, če je katero od izbranih polj prazno.",
-            "summary": "Manjka {count} polje | Manjkata {count} polji | Manjkajo {count} polja | Manjka {count} polj"
+            "summary": "{count, plural, one {Manjka # polje} two {Manjkata # polji} few {Manjkajo # polja} other {Manjka # polj}}"
           }
         },
         "library": {
@@ -1354,7 +1373,7 @@
         },
         "library": {
           "primary": "Primarno:",
-          "overrideCount": "{count} preglasitev | {count} preglasitev",
+          "overrideCount": "{count, plural, one {# preglasitev} two {# preglasitev} few {# preglasitev} other {# preglasitev}}",
           "unsavedSuffix": "(neshranjeno)",
           "unsavedChanges": "Neshranjene spremembe",
           "globalDefaults": "Globalne privzete vrednosti",
@@ -1414,7 +1433,7 @@
         "duplicate": "Ta žanr je že blokiran.",
         "add": "Dodaj",
         "filterPlaceholder": "Filtriraj seznam blokiranih",
-        "entryCount": "{count} vnos | {count} vnosov",
+        "entryCount": "{count, plural, one {# vnos} two {# vnosov} few {# vnosov} other {# vnosov}}",
         "filteredCount": "{shown} od {total}",
         "noFilterMatch": "Noben blokiran žanr ne ustreza trenutnemu filtru.",
         "emptyTitle": "Ni blokiranih žanrov",
@@ -1427,7 +1446,7 @@
         "labelTooLong": "Oznaka mora imeti 255 znakov ali manj",
         "labelDuplicate": "Polje s to oznako že obstaja",
         "type": "Vrsta",
-        "usage": "Uporablja {count} knjiga | Uporablja {count} knjig",
+        "usage": "{count, plural, one {Uporablja # knjiga} two {Uporablja # knjig} few {Uporablja # knjig} other {Uporablja # knjig}}",
         "newField": {
           "title": "Novo polje",
           "hint": "Določite polje metapodatkov po meri in izberite, katere knjižnice ga uporabljajo."
@@ -1449,7 +1468,7 @@
         "unsaved": "Neshranjeno",
         "archive": "Arhiviraj",
         "archivedFields": "Arhivirana polja",
-        "archivedSummary": "{count} arhivirano polje - obnovite ali trajno izbrišite. | {count} arhiviranih polj - obnovite ali trajno izbrišite.",
+        "archivedSummary": "{count, plural, one {# arhivirano polje - obnovite ali trajno izbrišite.} two {# arhiviranih polj - obnovite ali trajno izbrišite.} few {# arhiviranih polj - obnovite ali trajno izbrišite.} other {# arhiviranih polj - obnovite ali trajno izbrišite.}}",
         "archivedAt": "Arhivirano {when}",
         "restore": "Obnovi",
         "deleteForever": "Izbriši za vedno",
@@ -1609,6 +1628,9 @@
         "spreadAlignmentHint": "Zamik parjenja za eno stran po naslovnici pri neusklajenih skenih",
         "alignmentNormal": "Običajno",
         "alignmentShifted": "Zamaknjeno",
+        "spreadGap": "Spread gap",
+        "spreadGapHint": "Space between pages in two-page view",
+        "spreadGapValue": "{value}px",
         "widePageHandling": "Ravnanje s širokimi stranmi",
         "widePageHandlingHint": "Samodejno prikaže široke skene same v dvostranskem načinu po straneh",
         "widePageAuto": "Samodejno",
@@ -1652,7 +1674,7 @@
         "fontsUsed": "{count} / {max} uporabljenih",
         "noFontsYet": "Še ni naloženih pisav",
         "noFontsHint": "Povlecite datoteko pisave zgoraj, da začnete.",
-        "fileCount": "brez datotek | {count} datoteka | {count} datotek",
+        "fileCount": "{count, plural, =0 {brez datotek} one {# datoteka} two {# datotek} few {# datotek} other {# datotek}}",
         "pangram": "Šerif bo za vajo spet kuhal domače žgance",
         "renameFamily": "Preimenuj družino",
         "deleteFamily": "Izbriši družino",
@@ -1719,9 +1741,6 @@
         "subtitle": "Nadzirajte, kako so datoteke organizirane na disku ob nalaganju in kako so poimenovane ob prenosu z uporabo žetonov za nadomestne oznake.",
         "copy": "Kopiraj",
         "previewLabel": "Predogled:",
-        "fileAsBookPreview": "Predogled Datoteka kot knjiga",
-        "folderAsBookPreview": "Predogled Mapa kot knjiga",
-        "downloadPreview": "Predogled prenosa",
         "globalDefaults": "Globalne privzete nastavitve",
         "crossPlatform": "Medplatformno čiščenje poti",
         "crossPlatformHint": "Naredite ustvarjena imena datotek in map varna za Windows z zamenjavo neveljavnih znakov in rezerviranih imen ter odstranitvijo končnih pik in presledkov. Onemogočite samo za namestitve, izključno za Linux, ki namerno ohranjajo te znake.",
@@ -1738,15 +1757,10 @@
         "orgFolderAsBook": "Mapa kot knjiga",
         "orgFileAsBook": "Datoteka kot knjiga",
         "resetToDefault": "Ponastavi na privzeto",
-        "patternReference": "Referenca vzorcev",
-        "placeholderReference": "Referenca nadomestnih oznak",
-        "placeholderReferenceHint": "- vodnik za ustvarjanje vzorcev poimenovanja po meri",
         "tokens": "Žetoni",
-        "tokensHint": "Hitro kopiranje nadomestnih oznak",
         "clickTokenHint": "Kliknite katerikoli žeton, da ga kopirate v odložišče.",
         "copyValue": "Kopiraj {value}",
         "modifiers": "Modifikatorji",
-        "modifiersHint": "Preoblikuj vrednosti žetonov",
         "modifiersExplain": "Dodajte modifikator znotraj žetona, da preoblikujete njegovo vrednost:",
         "modFirst": "Samo prva vrednost",
         "modSort": "Format Priimek, Ime",
@@ -1755,14 +1769,10 @@
         "folderOnlyPrefix": "Vzorec zaključite s",
         "folderOnlySuffix": "za določitev samo mape. Izvirno ime datoteke bo ohranjeno znotraj nje.",
         "conditionalLogic": "Pogojna logika",
-        "conditionalLogicHint": "Neobvezni segmenti in nadomestne vrednosti",
         "conditionalPart1": "Zavijte v",
         "conditionalPart2": "za preskok segmenta, kadar je njegov žeton prazen. Uporabite",
         "conditionalPart3": "za privzeto vrednost.",
         "examples": "Primeri",
-        "patternExamples": "Primeri vzorcev",
-        "patternExamplesHint": "Vnaprej pripravljeni vzorci za pogoste sloge knjižnic",
-        "copyPatternTooltip": "Kopiraj vzorec v odložišče",
         "exCalibre": "Privzeto v slogu Calibre",
         "exSeriesReader": "Bralnik zbirk",
         "exCleanDownload": "Čisto ime prenesene datoteke",
@@ -1790,7 +1800,37 @@
         "patternCopied": "Vzorec kopiran v odložišče",
         "copyPatternFailed": "Kopiranje vzorca ni uspelo",
         "labelCopied": "{label} kopirano v odložišče",
-        "copyLabelFailed": "Kopiranje {label} ni uspelo"
+        "copyLabelFailed": "Kopiranje {label} ni uspelo",
+        "patternHelp": "Pattern help",
+        "patternHelpDescription": "Tokens, modifiers and ready-made patterns you can copy into any field.",
+        "copyPreview": "Copy {label}",
+        "copyExample": "Copy the {label} pattern",
+        "invalidCharacters": "Pattern contains invalid characters",
+        "fileAsBookSaved": "File as Book default saved",
+        "folderAsBookSaved": "Folder as Book default saved",
+        "downloadPatternSaved": "Download pattern saved",
+        "savePatternFailed": "Failed to save pattern",
+        "saveDownloadPatternFailed": "Failed to save download pattern",
+        "crossPlatformEnabled": "Cross-platform path sanitization enabled",
+        "crossPlatformDisabled": "Cross-platform path sanitization disabled",
+        "crossPlatformSaveFailed": "Failed to save cross-platform path sanitization",
+        "librarySaved": "Pattern saved for {name}",
+        "librarySaveFailed": "Failed to save library pattern",
+        "saveLibraryPattern": "Save pattern for {name}",
+        "resetLibraryPattern": "Reset {name} to the default pattern",
+        "tokenTitle": "Book title",
+        "tokenSubtitle": "Book subtitle",
+        "tokenAuthors": "Author(s), comma-separated",
+        "tokenYear": "Publication year",
+        "tokenSeries": "Series name",
+        "tokenSeriesIndex": "Series index (zero-padded)",
+        "tokenPublisher": "Publisher",
+        "tokenIsbn": "ISBN-13",
+        "tokenLanguage": "Language",
+        "tokenOriginalFilename": "Original filename (without extension)",
+        "tokenExtension": "File extension (without dot)",
+        "patternHelpIntro": "Patterns use tokens like {titleToken} and {authorsToken}, plus modifiers and optional segments.",
+        "browseTokensAndExamples": "Browse tokens and examples"
       },
       "kobo": {
         "title": "Sinhronizacija Kobo",
@@ -1857,7 +1897,7 @@
           "never": "Nikoli",
           "none": "Brez",
           "unknown": "Neznano",
-          "failureCount": "{count} napaka | {count} napaki | {count} napak",
+          "failureCount": "{count, plural, one {# napaka} two {# napaki} few {# napak} other {# napak}}",
           "noActivityRecorded": "Nobena dejavnost sinhronizacije Kobo ni bila zabeležena.",
           "lastSuccess": "Zadnji uspeh {time}",
           "lastFailure": "Zadnja napaka {time}",
@@ -1891,7 +1931,7 @@
           "chip": {
             "morePending": "Več v teku",
             "noUpdatesPending": "Ni čakajočih posodobitev",
-            "bookCount": "{count} knjiga | {count} knjigi | {count} knjig",
+            "bookCount": "{count, plural, one {# knjiga} two {# knjigi} few {# knjig} other {# knjig}}",
             "deletedAnnotations": "{count} izbrisanih opomb",
             "deviceAlreadyCurrent": "Naprava je že posodobljena",
             "freshHighlightData": "Sveži podatki o označbah",
@@ -1903,31 +1943,31 @@
           "readingPositionSyncedTitle": "Položaj branja sinhroniziran: {title}",
           "readingPositionSynced": "Položaj branja sinhroniziran",
           "labelWithTitle": "{label}: {title}",
-          "updateCount": "{count} posodobitev | {count} posodobitvi | {count} posodobitev",
+          "updateCount": "{count, plural, one {# posodobitev} two {# posodobitvi} few {# posodobitev} other {# posodobitev}}",
           "directionToKobo": "BookOrbit -> Kobo",
           "directionToBookOrbit": "Kobo -> BookOrbit",
           "twoWaySyncEnabled": "Dvosmerna sinhronizacija omogočena",
           "deviceProgressSaved": "Napredek naprave shranjen",
           "summary": {
             "noLibraryUpdatesPending": "Za to napravo ni čakajočih posodobitev knjižnice",
-            "libraryUpdatesPrepared": "{count} posodobitev knjižnice pripravljena za napravo | {count} posodobitvi knjižnice pripravljeni za napravo | {count} posodobitev knjižnice pripravljenih za napravo",
+            "libraryUpdatesPrepared": "{count, plural, one {# posodobitev knjižnice pripravljena za napravo} two {# posodobitvi knjižnice pripravljeni za napravo} few {# posodobitev knjižnice pripravljenih za napravo} other {# posodobitev knjižnice pripravljenih za napravo}}",
             "bookDownloadedBy": "{title} je prenesla naprava {device}",
-            "booksDownloaded": "{count} knjiga prenesena | {count} knjigi preneseni | {count} knjig prenesenih",
-            "progressUpdatesSyncedFor": "{count} posodobitev napredka sinhronizirana za {title} | {count} posodobitvi napredka sinhronizirani za {title} | {count} posodobitev napredka sinhroniziranih za {title}",
-            "progressUpdatesSynced": "{count} posodobitev napredka sinhronizirana | {count} posodobitvi napredka sinhronizirani | {count} posodobitev napredka sinhroniziranih",
+            "booksDownloaded": "{count, plural, one {# knjiga prenesena} two {# knjigi preneseni} few {# knjig prenesenih} other {# knjig prenesenih}}",
+            "progressUpdatesSyncedFor": "{count, plural, one {# posodobitev napredka sinhronizirana za {title}} two {# posodobitvi napredka sinhronizirani za {title}} few {# posodobitev napredka sinhroniziranih za {title}} other {# posodobitev napredka sinhroniziranih za {title}}}",
+            "progressUpdatesSynced": "{count, plural, one {# posodobitev napredka sinhronizirana} two {# posodobitvi napredka sinhronizirani} few {# posodobitev napredka sinhroniziranih} other {# posodobitev napredka sinhroniziranih}}",
             "newReadingPositionFor": "Kobo je sporočil nov položaj branja za {title}",
             "newReadingPosition": "Kobo je sporočil nov položaj branja",
             "noHighlightChangesNeededFor": "Za {title} ni potrebnih sprememb označb",
             "noHighlightChangesNeeded": "Ni potrebnih sprememb označb",
-            "highlightsSentToKoboFor": "{count} označba poslana v Kobo za {title} | {count} označbi poslani v Kobo za {title} | {count} označb poslanih v Kobo za {title}",
-            "highlightsSentToKobo": "{count} označba poslana v Kobo | {count} označbi poslani v Kobo | {count} označb poslanih v Kobo",
+            "highlightsSentToKoboFor": "{count, plural, one {# označba poslana v Kobo za {title}} two {# označbi poslani v Kobo za {title}} few {# označb poslanih v Kobo za {title}} other {# označb poslanih v Kobo za {title}}}",
+            "highlightsSentToKobo": "{count, plural, one {# označba poslana v Kobo} two {# označbi poslani v Kobo} few {# označb poslanih v Kobo} other {# označb poslanih v Kobo}}",
             "noKoboHighlightChangesFor": "Ni sprememb označb Kobo za {title}",
             "noKoboHighlightChanges": "Ni sprememb označb Kobo",
-            "highlightsImportedFromKoboFor": "{count} označba uvožena iz Kobo za {title} | {count} označbi uvoženi iz Kobo za {title} | {count} označb uvoženih iz Kobo za {title}",
-            "highlightsImportedFromKobo": "{count} označba uvožena iz Kobo | {count} označbi uvoženi iz Kobo | {count} označb uvoženih iz Kobo"
+            "highlightsImportedFromKoboFor": "{count, plural, one {# označba uvožena iz Kobo za {title}} two {# označbi uvoženi iz Kobo za {title}} few {# označb uvoženih iz Kobo za {title}} other {# označb uvoženih iz Kobo za {title}}}",
+            "highlightsImportedFromKobo": "{count, plural, one {# označba uvožena iz Kobo} two {# označbi uvoženi iz Kobo} few {# označb uvoženih iz Kobo} other {# označb uvoženih iz Kobo}}"
           },
           "timeRange": "{from} do {to}",
-          "eventsGrouped": "{count} dogodek združen | {count} dogodka združena | {count} dogodkov združenih",
+          "eventsGrouped": "{count, plural, one {# dogodek združen} two {# dogodka združena} few {# dogodkov združenih} other {# dogodkov združenih}}",
           "removedDevice": "Naprava odstranjena",
           "loadMoreFailed": "Nalaganje dodatne zgodovine ni uspelo",
           "historyRefreshed": "Zgodovina sinhronizacije Kobo osvežena",
@@ -2026,9 +2066,9 @@
         "progressSyncHint": "Napravam KOReader dovoli sinhronizacijo napredka, dejavnosti branja, označb in brisanj opomb z BookOrbit.",
         "lastSync": "Zadnja sinhronizacija",
         "syncedBooks": "Sinhronizirane knjige",
-        "bookCount": "brez knjig | {count} knjiga | {count} knjigi",
+        "bookCount": "{count, plural, =0 {brez knjig} one {# knjiga} two {# knjigi} few {# knjigi} other {# knjigi}}",
         "devices": "Naprave",
-        "deviceCount": "brez naprav | {count} naprava | {count} naprave",
+        "deviceCount": "{count, plural, =0 {brez naprav} one {# naprava} two {# naprave} few {# naprave} other {# naprave}}",
         "credentialsCreatedLabel": "Poverilnice ustvarjene",
         "setup": "Namestitev",
         "pluginServerUrl": "URL strežnika vtičnika",
@@ -2054,8 +2094,8 @@
         "highlights": "Označbe",
         "syncedTotals": "Sinhronizirane skupne vrednosti",
         "trashedHighlights": "Izbrisane označbe",
-        "pendingDeletes": "ni izbrisanih označb, ki čakajo na potrditev vtičnika KOReader. | {count} izbrisana označba čaka na potrditev vtičnika KOReader. | {count} izbrisanih označb čaka na potrditev vtičnika KOReader.",
-        "failedPositions": "nobena pozicija označbe ne potrebuje pozornosti. | {count} pozicija označbe potrebuje pozornost. | {count} pozicije označb potrebujejo pozornost.",
+        "pendingDeletes": "{count, plural, =0 {ni izbrisanih označb, ki čakajo na potrditev vtičnika KOReader.} one {# izbrisana označba čaka na potrditev vtičnika KOReader.} two {# izbrisanih označb čaka na potrditev vtičnika KOReader.} few {# izbrisanih označb čaka na potrditev vtičnika KOReader.} other {# izbrisanih označb čaka na potrditev vtičnika KOReader.}}",
+        "failedPositions": "{count, plural, =0 {nobena pozicija označbe ne potrebuje pozornosti.} one {# pozicija označbe potrebuje pozornost.} two {# pozicije označb potrebujejo pozornost.} few {# pozicije označb potrebujejo pozornost.} other {# pozicije označb potrebujejo pozornost.}}",
         "setupGuide": "Vodnik za namestitev",
         "setupSteps": "Koraki nastavitve KOReader",
         "setupStepsHint": "Uporabite vtičnik BookOrbit za brskanje po katalogu, prenose, napredek, dogodke branja in označbe. Za samo napredek uporabite vgrajeni vtičnik.",
@@ -2126,7 +2166,7 @@
             "unlinkFailed": "Prekinitev povezave knjige ni uspela",
             "unmatchedDismissed": "Neujemajoča knjiga zavrnjena",
             "dismissFailed": "Zavrnitev neujemajoče knjige ni uspela",
-            "allDismissed": "Zavrnjenih 0 neujemajočih knjig | Zavrnjena {count} neujemajoča knjiga | Zavrnjenih {count} neujemajočih knjig",
+            "allDismissed": "{count, plural, =0 {Zavrnjenih 0 neujemajočih knjig} one {Zavrnjena # neujemajoča knjiga} two {Zavrnjenih # neujemajočih knjig} few {Zavrnjenih # neujemajočih knjig} other {Zavrnjenih # neujemajočih knjig}}",
             "dismissAllFailed": "Zavrnitev vseh neujemajočih knjig ni uspela"
           },
           "modal": {
@@ -2161,7 +2201,7 @@
           "unlinkConfirmBody": "Prihodnje sinhronizacije za to zgoščeno vrednost se ne bodo več razreševale v {title}, dokler ni znova povezana. Že sinhronizirana statistika bo ostala na trenutni knjigi BookOrbit.",
           "dismissConfirmTitle": "Zavrnem {title}?",
           "dismissConfirmBody": "To jo odstrani s seznama vaših neujemajočih knjig. Če katera naprava ponovno sporoči to zgoščeno vrednost, se bo znova pojavila kot nov vnos.",
-          "dismissAllConfirmTitle": "brez neujemajočih knjig | Zavrnem vseh {count} neujemajočo knjigo? | Zavrnem vseh {count} neujemajočih knjig?",
+          "dismissAllConfirmTitle": "{count, plural, =0 {brez neujemajočih knjig} one {Zavrnem vseh # neujemajočo knjigo?} two {Zavrnem vseh # neujemajočih knjig?} few {Zavrnem vseh # neujemajočih knjig?} other {Zavrnem vseh # neujemajočih knjig?}}",
           "dismissAllConfirmBody": "To počisti celoten seznam vaših neujemajočih knjig, ne le trenutne strani. Če katera naprava znova sporoči eno od teh zgoščenih vrednosti, se bo znova pojavila kot nov vnos.",
           "changeLinkTitle": "Spremeni povezavo KOReader",
           "linkBookTitle": "Poveži knjigo KOReader",
@@ -2351,8 +2391,8 @@
       "auditNotice": "Dostop do tega profila se zabeleži in je viden uporabniku.",
       "period": "Obdobje poročila",
       "periodDays": "Zadnjih {count} dni",
-      "durationMinutes": "{count} minuta | {count} minuti | {count} minute | {count} minut",
-      "durationHours": "{count} ur",
+      "durationMinutes": "{count, plural, one {# minuta} two {# minuti} few {# minute} other {# minut}}",
+      "durationHours": "{count, plural, one {# ura} two {# uri} few {# ure} other {# ur}}",
       "metrics": {
         "sessions": "Seje",
         "readingTime": "Čas branja",
@@ -2363,7 +2403,6 @@
       "trend": "Dnevni bralni trend",
       "emptyTitle": "V tem obdobju ni bralne dejavnosti",
       "noData": "Za to obdobje ni zabeleženih podatkov o branju.",
-      "sessionCount": "{count} seja | {count} seji | {count} seje | {count} sej",
       "sourceNames": {
         "web": "Spletni bralnik",
         "koreader": "KOReader",
@@ -2479,22 +2518,18 @@
     },
     "usersPage": {
       "usersTitle": "Uporabniki",
-      "magicLinksTitle": "Čarobne povezave",
       "usersSubtitle": "Upravljajte uporabniške račune in dodelitve dovoljenj.",
-      "magicLinksSubtitle": "Ustvarite deljive prijavne povezave za skupne račune.",
       "createUser": "Ustvari uporabnika",
-      "createLink": "Ustvari povezavo",
-      "usersTab": "Uporabniki",
-      "magicLinksTab": "Čarobne povezave",
       "columns": {
         "name": "Ime",
         "username": "Uporabniško ime",
         "email": "E-pošta",
         "access": "Dostop",
-        "status": "Stanje"
+        "status": "Stanje",
+        "actions": "Actions"
       },
       "adminBadge": "Skrbnik",
-      "permissionCount": "brez dovoljenj | eno dovoljenje | {count} dovoljenj",
+      "permissionCount": "{count, plural, =0 {brez dovoljenj} one {eno dovoljenje} two {# dovoljenj} few {# dovoljenj} other {# dovoljenj}}",
       "filteredBadge": "Filtrirano",
       "contentRestrictionsActive": "Omejitve vsebine aktivne",
       "statusActive": "Aktivno",
@@ -2509,11 +2544,10 @@
       "deleteDialogBody": "Izbriši uporabnika \"{username}\". Tega dejanja ni mogoče razveljaviti.",
       "deleting": "Brisanje ...",
       "errors": {
-        "loadData": "Nalaganje podatkov ni uspelo",
         "load": "Nalaganje ni uspelo",
-        "deleteUser": "Brisanje uporabnika ni uspelo"
+        "deleteUser": "Brisanje uporabnika ni uspelo",
+        "resetPassword": "Failed to create a password reset link"
       },
-      "currentUsers": "Trenutni uporabniki",
       "defaultLibraryAccess": {
         "title": "Privzet dostop do knjižnice",
         "subtitle": "Dostop za ogled, dodeljen samoregistriranim in OIDC-zagotovljenim uporabnikom.",
@@ -2521,9 +2555,37 @@
         "noLibraries": "Ni razpoložljivih knjižnic.",
         "save": "Shrani privzete vrednosti",
         "saving": "Shranjevanje ...",
-        "saved": "Privzet dostop do knjižnice je shranjen.",
         "saveError": "Shranjevanje privzetega dostopa do knjižnice ni uspelo"
-      }
+      },
+      "filters": {
+        "search": "Search users",
+        "searchPlaceholder": "Search by name, username or email",
+        "sort": "Sort users",
+        "usernameAsc": "Username A-Z",
+        "nameAsc": "Name A-Z",
+        "newest": "Newest first",
+        "oldest": "Oldest first",
+        "apply": "Apply",
+        "clear": "Clear",
+        "state": "Filter users",
+        "allUsers": "All users",
+        "admins": "Administrators",
+        "active": "Active",
+        "inactive": "Inactive"
+      },
+      "empty": {
+        "title": "No users yet",
+        "description": "Create the first account to get started.",
+        "filtered": "No users match the current search and filters."
+      },
+      "pagination": {
+        "label": "Users pagination",
+        "page": "Page {page} of {totalPages}"
+      },
+      "editUserAria": "Edit {name}",
+      "resetPasswordAria": "Reset the password for {name}",
+      "deleteUserAria": "Delete {name}",
+      "moreActionsAria": "More actions for {name}"
     }
   },
   "annotations": {
@@ -2543,7 +2605,7 @@
       "noBooksFound": "Ni najdenih knjig"
     },
     "bulk": {
-      "countSelected": "Izbranih: {count}",
+      "countSelected": "{count, plural, one {# izbrana opomba} two {# izbrani opombi} few {# izbrane opombe} other {# izbranih opomb}}",
       "pageSelected": "Stran izbrana",
       "selectPage": "Izberi stran",
       "clear": "Počisti",
@@ -2629,8 +2691,8 @@
     "hub": {
       "title": "Zaznamki",
       "totalCount": "Skupaj: {count}",
-      "bookCount": "brez knjig | {count} knjiga | {count} knjigi",
-      "noteCount": "brez opomb | {count} opomba | {count} opombe",
+      "bookCount": "{count, plural, =0 {brez knjig} one {# knjiga} two {# knjigi} few {# knjigi} other {# knjigi}}",
+      "noteCount": "{count, plural, =0 {brez opomb} one {# opomba} two {# opombe} few {# opombe} other {# opombe}}",
       "export": "Izvozi",
       "exportMarkdown": "Markdown",
       "exportCsv": "CSV",
@@ -2655,10 +2717,10 @@
         "annotationRestored": "Zaznamek obnovljen",
         "annotationDeletedForever": "Zaznamek trajno izbrisan",
         "failedToDelete": "Brisanje ni uspelo",
-        "bulkTrashed": "V koš ni premaknjenih zaznamkov | V koš je premaknjen {count} zaznamek | V koš je premaknjenih {count} zaznamkov",
-        "bulkRestored": "Obnovljenih ni zaznamkov | Obnovljen je {count} zaznamek | Obnovljenih je {count} zaznamkov",
-        "bulkRecolored": "Barva ni spremenjena za noben zaznamek | Barva je spremenjena za {count} zaznamek | Barva je spremenjena za {count} zaznamkov",
-        "bulkRestyled": "Slog ni spremenjen za noben zaznamek | Slog je spremenjen za {count} zaznamek | Slog je spremenjen za {count} zaznamkov"
+        "bulkTrashed": "{count, plural, =0 {V koš ni premaknjenih zaznamkov} one {V koš je premaknjen # zaznamek} two {V koš je premaknjenih # zaznamkov} few {V koš je premaknjenih # zaznamkov} other {V koš je premaknjenih # zaznamkov}}",
+        "bulkRestored": "{count, plural, =0 {Obnovljenih ni zaznamkov} one {Obnovljen je # zaznamek} two {Obnovljenih je # zaznamkov} few {Obnovljenih je # zaznamkov} other {Obnovljenih je # zaznamkov}}",
+        "bulkRecolored": "{count, plural, =0 {Barva ni spremenjena za noben zaznamek} one {Barva je spremenjena za # zaznamek} two {Barva je spremenjena za # zaznamkov} few {Barva je spremenjena za # zaznamkov} other {Barva je spremenjena za # zaznamkov}}",
+        "bulkRestyled": "{count, plural, =0 {Slog ni spremenjen za noben zaznamek} one {Slog je spremenjen za # zaznamek} two {Slog je spremenjen za # zaznamkov} few {Slog je spremenjen za # zaznamkov} other {Slog je spremenjen za # zaznamkov}}"
       }
     }
   },
@@ -2673,32 +2735,220 @@
     "showLess": "Prikaži manj",
     "details": "Podrobnosti",
     "hideDetails": "Skrij podrobnosti",
+    "refresh": "Refresh audit log",
+    "loadError": "Could not load audit events.",
+    "removeFilter": "Remove filter: {value}",
+    "allActions": "All actions",
+    "allResources": "All resources",
+    "quickDates": "Quick dates",
+    "today": "Today",
+    "sevenDays": "7 days",
+    "thirtyDays": "30 days",
+    "userId": "User #{id}",
+    "targetAdditional": "and {count, plural, one {# more target} two {# more targets} few {# more targets} other {# more targets}}",
+    "bookImpact": "{count, plural, one {# book} two {# books} few {# books} other {# books}}",
+    "entryDetailsLabel": "Details for audit event #{id}",
+    "detailEventId": "Event ID",
+    "detailOccurredAt": "Occurred",
+    "detailActor": "Actor",
+    "detailCategory": "Category",
+    "detailActionLabel": "Action",
+    "detailIpLabel": "IP address",
+    "detailResourceLabel": "Resource",
+    "detailResourceIdLabel": "Resource ID",
     "detailAction": "Dejanje: {value}",
     "detailIp": "IP: {value}",
+    "detailResource": "Resource: {value}",
+    "detailResourceId": "Resource ID: {value}",
+    "deletedBooks": "Deleted books",
+    "deletedBookDetail": "{title} (book #{id})",
+    "untitledBook": "Untitled",
+    "deletedBooksOmitted": "{count, plural, one {# additional book omitted} two {# additional books omitted} few {# additional books omitted} other {# additional books omitted}}",
     "showing": "Prikaz {from}-{to} od {total}",
     "prev": "Prejšnje",
     "chips": {
+      "search": "Search: {value}",
       "action": "Dejanje: {value}",
+      "eventType": "Event type: {value}",
+      "actor": "Actor: {value}",
+      "resource": "Resource: {value}",
+      "targetType": "Target type: {value}",
       "user": "Uporabnik: {value}",
       "from": "Od: {value}",
       "to": "Do: {value}"
     },
     "filterLabels": {
+      "search": "Search events",
       "action": "Dejanje",
+      "eventType": "Event type (what happened)",
+      "actor": "Actor",
+      "resource": "Resource",
+      "targetType": "Target type (what was affected)",
       "userId": "ID uporabnika",
       "from": "Od",
       "to": "Do"
     },
     "filterPlaceholders": {
+      "search": "Description, actor, target, or ID",
+      "actor": "Username",
       "action": "npr. auth.login",
       "userId": "npr. 1"
     },
     "columns": {
       "when": "Kdaj",
+      "actor": "Actor",
+      "event": "Event",
+      "target": "Target",
+      "impact": "Impact",
       "user": "Uporabnik",
       "action": "Dejanje",
       "description": "Opis",
       "ip": "IP"
+    },
+    "categories": {
+      "authentication": "Authentication",
+      "books": "Books",
+      "users": "Users",
+      "libraries": "Libraries",
+      "collections": "Collections",
+      "integrations": "Integrations",
+      "settings": "Settings",
+      "other": "Other"
+    },
+    "noActionsFound": "No matching actions",
+    "unknownAction": "Unknown action",
+    "userIdCompact": "#{id}",
+    "allEventTypes": "All event types",
+    "allActors": "All actors",
+    "noActorsFound": "No matching actors",
+    "noResourcesFound": "No matching target types",
+    "unknownResource": "Other target type",
+    "allTargetTypes": "All target types",
+    "detailEventTypeLabel": "Event type",
+    "detailTargetTypeLabel": "Target type",
+    "detailTargetIdLabel": "Target ID",
+    "resourceLabels": {
+      "User": "User",
+      "Library": "Library",
+      "Book": "Book",
+      "Collection": "Collection",
+      "SmartScope": "Smart scope",
+      "BookDockFile": "Book Dock file",
+      "Author": "Author",
+      "AppSettings": "Application settings",
+      "Genre": "Genre",
+      "Tag": "Tag",
+      "KoboDevice": "Kobo device",
+      "EmailProvider": "Email provider",
+      "EmailTemplate": "Email template",
+      "EmailRecipient": "Email recipient",
+      "EmailRecipientGroup": "Email recipient group",
+      "Narrator": "Narrator",
+      "Publisher": "Publisher",
+      "Language": "Language",
+      "Series": "Series",
+      "OidcIdentity": "OIDC identity",
+      "MagicLinkToken": "Magic link",
+      "ReadingInsightsProfile": "Reading insights profile"
+    },
+    "actionLabels": {
+      "AuthRegister": "Register account",
+      "AuthLogin": "Sign in",
+      "AuthLoginFailed": "Failed sign-in",
+      "AuthLogout": "Sign out",
+      "AuthPasswordChange": "Change password",
+      "AuthPasswordResetRequest": "Request password reset",
+      "AuthPasswordReset": "Reset password",
+      "AuthPasswordAdminReset": "Reset user password",
+      "AuthSessionRevoke": "Revoke session",
+      "MagicLinkCreate": "Create magic link",
+      "MagicLinkLogin": "Sign in with magic link",
+      "MagicLinkRevoke": "Revoke magic link",
+      "MagicLinkActivate": "Activate magic link",
+      "MagicLinkDeactivate": "Deactivate magic link",
+      "OidcLogin": "Sign in with OIDC",
+      "OidcUserProvisioned": "Provision OIDC user",
+      "OidcIdentityLinked": "Link OIDC identity",
+      "OidcIdentityUnlinked": "Unlink OIDC identity",
+      "UserCreate": "Create user",
+      "UserUpdate": "Update user",
+      "UserSelfUpdate": "Update own profile",
+      "UserDelete": "Delete user",
+      "UserPermissionSet": "Update user permissions",
+      "UserSuperuserEnable": "Enable superuser access",
+      "UserSuperuserDisable": "Disable superuser access",
+      "UserContentFiltersSet": "Update content filters",
+      "ReadingInsightsSharingUpdate": "Update insight sharing",
+      "ReadingInsightsProfileView": "View shared insights",
+      "LibraryCreate": "Create library",
+      "LibraryUpdate": "Update library",
+      "LibraryDelete": "Delete library",
+      "LibraryFolderAdd": "Add library folder",
+      "LibraryFolderRemove": "Remove library folder",
+      "LibraryAccessGrant": "Grant library access",
+      "LibraryAccessUpdate": "Update library access",
+      "LibraryAccessRevoke": "Revoke library access",
+      "LibraryWriteMetadataToFiles": "Write metadata to files",
+      "LibraryBulkRename": "Rename library files",
+      "BookUpload": "Upload book",
+      "BookMetadataUpdate": "Update book metadata",
+      "BookMetadataLocksUpdate": "Update metadata locks",
+      "BookDelete": "Delete book",
+      "BookBulkMetadataRefresh": "Refresh book metadata",
+      "BookBulkDelete": "Delete books",
+      "BookBulkCoverReextract": "Re-extract book covers",
+      "BookBulkSetStatus": "Set book status",
+      "BookBulkSetRating": "Set book rating",
+      "BookBulkSetMetadata": "Set book metadata",
+      "BookBulkUpdateTags": "Update book tags",
+      "BookBulkSetMetadataLock": "Set metadata locks",
+      "BookBulkEditMetadata": "Edit book metadata",
+      "BookReadingStateReset": "Reset reading state",
+      "BookWriteAndRename": "Write metadata and rename file",
+      "CollectionCreate": "Create collection",
+      "CollectionUpdate": "Update collection",
+      "CollectionDelete": "Delete collection",
+      "CollectionBooksAdd": "Add books to collection",
+      "CollectionBooksRemove": "Remove books from collection",
+      "SmartScopeCreate": "Create smart scope",
+      "SmartScopeUpdate": "Update smart scope",
+      "SmartScopeDelete": "Delete smart scope",
+      "BookDockFinalize": "Finalize Book Dock file",
+      "AuthorUpdate": "Update author",
+      "AuthorDelete": "Delete author",
+      "AuthorMerge": "Merge authors",
+      "AuthorEnrichmentConfigUpdate": "Update author enrichment",
+      "AuthorEnrichmentPause": "Pause author enrichment",
+      "AuthorEnrichmentResume": "Resume author enrichment",
+      "AuthorEnrichmentCancel": "Cancel author enrichment",
+      "EntityManagerMerge": "Merge entities",
+      "EntityManagerRename": "Rename entity",
+      "EntityManagerDelete": "Delete entity",
+      "EntityManagerSplit": "Split entity",
+      "EntityManagerDismiss": "Dismiss duplicate",
+      "EntityManagerUndismiss": "Restore dismissed duplicate",
+      "AppSettingsUpdate": "Update app settings",
+      "KoboDeviceRegister": "Register Kobo device",
+      "KoboDeviceRename": "Rename Kobo device",
+      "KoboDeviceRemove": "Remove Kobo device",
+      "EmailProviderCreate": "Create email provider",
+      "EmailProviderUpdate": "Update email provider",
+      "EmailProviderDelete": "Delete email provider",
+      "EmailProviderSetDefault": "Set default email provider",
+      "EmailProviderSetSystem": "Set system email provider",
+      "EmailProviderClearSystem": "Clear system email provider",
+      "EmailTemplateCreate": "Create email template",
+      "EmailTemplateUpdate": "Update email template",
+      "EmailTemplateDelete": "Delete email template",
+      "EmailTemplateSetDefault": "Set default email template",
+      "EmailRecipientCreate": "Create email recipient",
+      "EmailRecipientUpdate": "Update email recipient",
+      "EmailRecipientDelete": "Delete email recipient",
+      "EmailRecipientGroupCreate": "Create recipient group",
+      "EmailRecipientGroupUpdate": "Update recipient group",
+      "EmailRecipientGroupDelete": "Delete recipient group",
+      "EmailRecipientGroupMemberAdd": "Add recipient to group",
+      "EmailRecipientGroupMemberRemove": "Remove recipient from group"
     }
   },
   "auth": {
@@ -2878,7 +3128,7 @@
         "deleteSelected": "Izbriši izbrane",
         "deleting": "Brisanje ...",
         "exitSelection": "Zapusti izbiro",
-        "confirmDeleteCount": "Izbrišem {count} avtorja? | Izbrišem {count} avtorja? | Izbrišem {count} avtorjev?"
+        "confirmDeleteCount": "{count, plural, =0 {Izbrišem # avtorja?} one {Izbrišem # avtorja?} two {Izbrišem # avtorjev?} few {Izbrišem # avtorjev?} other {Izbrišem # avtorjev?}}"
       },
       "toast": {
         "refreshed": "Metapodatki avtorja so osveženi",
@@ -2887,7 +3137,7 @@
         "bulkRefreshPartial": "Osveženih {updated} avtorjev, neuspešnih {failed}",
         "bulkRefreshSuccess": "Metapodatki osveženi za {updated} avtorjev",
         "bulkRefreshFailed": "Osvežitev izbranih avtorjev ni uspela",
-        "deleteSuccess": "Izbrisan {count} avtor; prizadetih {books} knjig | Izbrisana {count} avtorja; prizadetih {books} knjig | Izbrisanih {count} avtorjev; prizadetih {books} knjig",
+        "deleteSuccess": "{count, plural, =0 {Izbrisanih # avtorjev; prizadetih {books} knjig} one {Izbrisan # avtor; prizadetih {books} knjig} two {Izbrisana # avtorja; prizadetih {books} knjig} few {Izbrisanih # avtorjev; prizadetih {books} knjig} other {Izbrisanih # avtorjev; prizadetih {books} knjig}}",
         "deleteFailed": "Brisanje avtorja(-jev) ni uspelo"
       }
     },
@@ -2914,7 +3164,7 @@
       "merge": {
         "searchPlaceholder": "Iščite avtorje za združitev s tem avtorjem",
         "searching": "Iskanje ...",
-        "bookCount": "brez knjig | {count} knjiga | {count} knjig",
+        "bookCount": "{count, plural, =0 {brez knjig} one {# knjiga} two {# knjig} few {# knjig} other {# knjig}}",
         "selectedSummary": "Izbranih {count} avtorjev, prizadetih pribl. {books} knjig.",
         "merging": "Združevanje ...",
         "mergeSelected": "Združi izbrane",
@@ -2971,7 +3221,7 @@
     "unknownFormat": "neznano",
     "collapsedSeries": {
       "label": "Zbirka",
-      "bookCount": "{count} knjiga | {count} knjigi | {count} knjige | {count} knjig",
+      "bookCount": "{count, plural, =0 {# knjig} one {# knjiga} two {# knjigi} few {# knjige} other {# knjig}}",
       "readCount": "{count} prebranih"
     },
     "card": {
@@ -3061,7 +3311,7 @@
       "description": "S tem boste trajno izbrisali knjigo ter vse njene metapodatke, datoteke, napredek branja in zaznamke. Tega dejanja ni mogoče razveljaviti."
     },
     "bulkEdit": {
-      "title": "Uredi metapodatke - {count} knjiga | Uredi metapodatke - {count} knjiga | Uredi metapodatke - {count} knjig",
+      "title": "{count, plural, =0 {Uredi metapodatke - # knjiga} one {Uredi metapodatke - # knjiga} two {Uredi metapodatke - # knjig} few {Uredi metapodatke - # knjig} other {Uredi metapodatke - # knjig}}",
       "instructions": "Preklopite polja za urejanje, nato nastavite vrednosti. Spremenjena bodo samo preklopljena polja.",
       "invalidYear": "Vnesite veljavno leto (samo številke)",
       "clearWarning": "S tem boste odstranili vse {field} iz izbranih knjig.",
@@ -3101,8 +3351,8 @@
       "estimatedSize": "Ocenjena velikost:",
       "fileLabel": "Datoteka: {fileName}",
       "exportAction": "Izvozi",
-      "selectedRowsSummary": "{count} izbrana vrstica | {count} izbrana vrstica | {count} izbranih vrstic",
-      "matchingRowsSummary": "{count} ujemajoča vrstica | {count} ujemajoča vrstica | {count} ujemajočih vrstic",
+      "selectedRowsSummary": "{count, plural, =0 {# izbrana vrstica} one {# izbrana vrstica} two {# izbranih vrstic} few {# izbranih vrstic} other {# izbranih vrstic}}",
+      "matchingRowsSummary": "{count, plural, =0 {# ujemajoča vrstica} one {# ujemajoča vrstica} two {# ujemajočih vrstic} few {# ujemajočih vrstic} other {# ujemajočih vrstic}}",
       "prepareFailed": "Priprava izvoza ni uspela",
       "exportStarted": "Izvoz metapodatkov se je začel: {fileName}",
       "exportFailed": "Izvoz metapodatkov ni uspel"
@@ -3169,7 +3419,7 @@
       "titleFor": "Hitri pregled za {title}",
       "description": "Predogled podrobnosti knjige in izvedba hitrih dejanj.",
       "openIn": "Odpri v {provider}",
-      "pages": "{count} stran | {count} stran | {count} strani",
+      "pages": "{count, plural, =0 {# stran} one {# stran} two {# strani} few {# strani} other {# strani}}",
       "primaryFile": "Primarna datoteka",
       "fileNumber": "Datoteka #{id}",
       "showLess": "Prikaži manj",
@@ -3185,7 +3435,7 @@
       "openBookDetails": "Odpri podrobnosti knjige",
       "openSeries": "Odpri zbirko",
       "metadataRefreshFailed": "Osveževanje metapodatkov ni uspelo",
-      "booksSelected": "{count} knjiga izbrana | {count} knjiga izbrana | {count} knjig izbranih",
+      "booksSelected": "{count, plural, =0 {# knjiga izbrana} one {# knjiga izbrana} two {# knjig izbranih} few {# knjig izbranih} other {# knjig izbranih}}",
       "loadingMoreBooks": "Nalaganje dodatnih knjig",
       "sort": "Razvrsti",
       "refreshingMetadata": "Osveževanje metapodatkov {processed} / {total}",
@@ -3200,7 +3450,7 @@
       "selectedStatus": "{count} izbranih",
       "filtered": "Filtrirano",
       "loadedStatus": "Naloženih {loaded} od {total}",
-      "bookCount": "{count} knjiga | {count} knjiga | {count} knjig",
+      "bookCount": "{count, plural, =0 {# knjiga} one {# knjiga} two {# knjig} few {# knjig} other {# knjig}}",
       "keyboardShortcutsTitle": "Bližnjice na tipkovnici (?)",
       "showKeyboardShortcuts": "Prikaži bližnjice tabele na tipkovnici",
       "copyHint": "Kopiraj celico: Ctrl/Cmd+C · Kopiraj vrstico: Ctrl/Cmd+Shift+C"
@@ -3233,7 +3483,7 @@
         "moreInSeries": "Več v zbirki {series}"
       },
       "writeRename": {
-        "written": "ni zapisanih polj | Zapisano (eno polje) | Zapisano ({count} polj)",
+        "written": "{count, plural, =0 {ni zapisanih polj} one {Zapisano (eno polje)} two {Zapisano (# polj)} few {Zapisano (# polj)} other {Zapisano (# polj)}}",
         "writeFailed": "Zapisovanje ni uspelo",
         "skipped": "Preskočeno",
         "renamedTo": "Preimenovano v {name}",
@@ -3254,11 +3504,11 @@
           "hint": "epub, pdf, mobi, cbz, m4b in več - do {size} MB vsaka"
         },
         "addMore": "Dodaj več datotek",
-        "fileCount": "brez datotek | ena datoteka | {count} datotek",
+        "fileCount": "{count, plural, =0 {brez datotek} one {ena datoteka} two {# datotek} few {# datotek} other {# datotek}}",
         "clearAll": "Počisti vse",
         "done": "Končano",
         "retry": "Poskusi znova",
-        "filesAdded": "brez dodanih datotek | ena dodana datoteka | {count} dodanih datotek",
+        "filesAdded": "{count, plural, =0 {brez dodanih datotek} one {ena dodana datoteka} two {# dodanih datotek} few {# dodanih datotek} other {# dodanih datotek}}",
         "uploadedFailed": "{done} naloženih, {failed} neuspešnih",
         "uploadingProgress": "{done} od {total} nalaganja...",
         "renameAfter": "Preimenuj vse datoteke knjige po nalaganju",
@@ -3380,7 +3630,7 @@
         "filesNotFoundDescription": "Datotek(e) za to knjigo ni več mogoče najti na disku. Metapodatki so še vedno na voljo. Zaženite pregled knjižnice za potrditev ali odstranite zapis."
       },
       "editMetadata": {
-        "fieldCount": "brez polj | eno polje | {count} polj",
+        "fieldCount": "{count, plural, =0 {brez polj} one {eno polje} two {# polj} few {# polj} other {# polj}}",
         "bookFilesTarget": "datoteke knjige",
         "formatFilesTarget": "datoteke {formats}",
         "noPrimaryFile": "Primarna datoteka ni na voljo",
@@ -3392,8 +3642,8 @@
         "writeManualLibraryDisabled": "Zapiši metapodatke v datoteko in preimenuj na disku; samodejno zapisovanje nazaj je za to knjižnico onemogočeno",
         "writeManualTooltip": "Zapiši {fields} v {target} in preimenuj na disku",
         "applyResult": "{skipped}, {updated}",
-        "skippedLockedFields": "Preskočenih ni bilo nobenih zaklenjenih polj | Preskočeno eno zaklenjeno polje | Preskočenih {count} zaklenjenih polj",
-        "updatedFields": "posodobljenih ni bilo nobenih polj | posodobljeno eno polje | posodobljenih {count} polj",
+        "skippedLockedFields": "{count, plural, =0 {Preskočenih ni bilo nobenih zaklenjenih polj} one {Preskočeno eno zaklenjeno polje} two {Preskočenih # zaklenjenih polj} few {Preskočenih # zaklenjenih polj} other {Preskočenih # zaklenjenih polj}}",
+        "updatedFields": "{count, plural, =0 {posodobljenih ni bilo nobenih polj} one {posodobljeno eno polje} two {posodobljenih # polj} few {posodobljenih # polj} other {posodobljenih # polj}}",
         "wroteFieldsToFile": "Zapisano {fields} v datoteko",
         "fileWriteFailedReason": "Zapisovanje datoteke ni uspelo: {reason}",
         "fileWriteFailed": "Zapisovanje datoteke ni uspelo",
@@ -3406,7 +3656,7 @@
         "savedWriteSkippedReason": "Metapodatki shranjeni, zapisovanje datoteke preskočeno: {reason}",
         "savedWriteSkipped": "Metapodatki shranjeni, zapisovanje datoteke preskočeno",
         "loadFromFileFailed": "Nalaganje metapodatkov iz datoteke ni uspelo",
-        "loadedFieldsFromFile": "Iz datoteke ni bilo naloženo nobeno polje | Iz datoteke naloženo eno polje | Iz datoteke naloženih {count} polj",
+        "loadedFieldsFromFile": "{count, plural, =0 {Iz datoteke ni bilo naloženo nobeno polje} one {Iz datoteke naloženo eno polje} two {Iz datoteke naloženih # polj} few {Iz datoteke naloženih # polj} other {Iz datoteke naloženih # polj}}",
         "noMetadataInFile": "V datoteki ni bilo najdenih metapodatkov",
         "loadFromFile": "Naloži iz datoteke",
         "loadFromFileTooltip": "Naloži metapodatke iz primarne datoteke knjige",
@@ -3467,7 +3717,7 @@
         "diffPanel": {
           "untitled": "Brez naslova",
           "noFieldsSelected": "Nobeno polje ni izbrano",
-          "fieldsSelected": "nobeno polje ni izbrano | eno polje izbrano | {count} polj izbranih",
+          "fieldsSelected": "{count, plural, =0 {nobeno polje ni izbrano} one {eno polje izbrano} two {# polj izbranih} few {# polj izbranih} other {# polj izbranih}}",
           "results": "Rezultati",
           "providerMatches": "Zadetki ponudnika {provider}",
           "selectedOf": "Izbrano {selected} od {total}",
@@ -3528,7 +3778,7 @@
       },
       "files": {
         "title": "Datoteke knjige",
-        "fileCount": "{count} datoteka | {count} datoteki | {count} datoteke | {count} datotek",
+        "fileCount": "{count, plural, =0 {# datotek} one {# datoteka} two {# datoteki} few {# datoteke} other {# datotek}}",
         "synced": "Sinhronizirano {time}",
         "sortAria": "Razvrsti datoteke",
         "syncHistory": "Zgodovina sinhronizacije",
@@ -3555,7 +3805,7 @@
         "hideLog": "Skrij dnevnik",
         "viewSyncLog": "Prikaži dnevnik sinhronizacije",
         "noWriteHistory": "Zgodovine pisanja še ni.",
-        "fieldsWritten": "brez polj | eno polje | {count} polj",
+        "fieldsWritten": "{count, plural, =0 {brez polj} one {eno polje} two {# polj} few {# polj} other {# polj}}",
         "track": "Skladba {number}",
         "primary": "Primarno",
         "read": "Beri",
@@ -3597,9 +3847,9 @@
           "oldest": "Najstarejše najprej"
         },
         "summary": {
-          "highlights": "brez poudarkov | en poudarek | {count} poudarkov",
-          "notes": "brez opomb | ena opomba | {count} opomb",
-          "chapters": "brez poglavij | eno poglavje | {count} poglavij"
+          "highlights": "{count, plural, =0 {brez poudarkov} one {en poudarek} two {# poudarkov} few {# poudarkov} other {# poudarkov}}",
+          "notes": "{count, plural, =0 {brez opomb} one {ena opomba} two {# opomb} few {# opomb} other {# opomb}}",
+          "chapters": "{count, plural, =0 {brez poglavij} one {eno poglavje} two {# poglavij} few {# poglavij} other {# poglavij}}"
         },
         "filterByChapter": "Filtriraj po poglavju",
         "allChapters": "Vsa poglavja",
@@ -3643,7 +3893,6 @@
           "dec": "dec"
         },
         "heatmap": {
-          "subtitle": "{count} aktiven dan · {ratio}% doslednosti | {count} aktiven dan · {ratio}% doslednosti | {count} aktivnih dni · {ratio}% doslednosti",
           "minutesUnit": "min",
           "title": "Aktivnost",
           "empty": "V tem obdobju ni bilo bralne aktivnosti.",
@@ -3657,8 +3906,8 @@
             "minutes": "pred {count}min",
             "hours": "pred {count}h",
             "days": "pred {count}d",
-            "months": "pred {count} mesecem | pred {count} mesecem | pred {count} meseci",
-            "years": "pred {count} letom | pred {count} letom | pred {count} leti"
+            "months": "{count, plural, =0 {pred # mesecem} one {pred # mesecem} two {pred # meseci} few {pred # meseci} other {pred # meseci}}",
+            "years": "{count, plural, =0 {pred # letom} one {pred # letom} two {pred # leti} few {pred # leti} other {pred # leti}}"
           },
           "noSessions": "Brez sej",
           "dateErrors": {
@@ -3849,7 +4098,7 @@
         "unread": "Neprebrano"
       },
       "series": {
-        "bookCount": "(brez knjig) | ({count} knjiga) | ({count} knjige)",
+        "bookCount": "{count, plural, =0 {(brez knjig)} one {(# knjiga)} two {(# knjige)} few {(# knjige)} other {(# knjige)}}",
         "readOfCount": "{read} od {total} prebranih"
       },
       "text": {
@@ -3882,7 +4131,7 @@
       "confirm": "Potrdi preklic",
       "keepRunning": "Nadaljuj izvajanje"
     },
-    "viewFailed": "Prikaži eno neuspešno | Prikaži {count} neuspešnih",
+    "viewFailed": "{count, plural, one {Prikaži eno neuspešno} two {Prikaži # neuspešnih} few {Prikaži # neuspešnih} other {Prikaži # neuspešnih}}",
     "card": {
       "fetchingMetadata": "Pridobivanje metapodatkov",
       "enrichingAuthors": "Obogatitev avtorjev",
@@ -3939,12 +4188,9 @@
     "commaSeparated": "ločeno z vejicami",
     "destinationLibrary": "Ciljna knjižnica",
     "destinationFolder": "Ciljna mapa",
-    "nSelected": "ni izbranih datotek | {count} izbrana | {count} izbranih",
     "nFailed": "{count} neuspešnih",
     "updatedOfFiles": "Posodobljenih {updated} od {total} datotek",
     "errorStatus": "Napaka {status}",
-    "applyFetchedTooltip": "Uveljavi samodejno pridobljene metapodatke ponudnika za {count} datotek | Uveljavi samodejno pridobljene metapodatke ponudnika za {count} datoteko | Uveljavi samodejno pridobljene metapodatke ponudnika za {count} datotek",
-    "retryErrorsTooltip": "Ponovi pridobivanje metapodatkov za {count} datotek z napako | Ponovi pridobivanje metapodatkov za {count} datoteko z napako | Ponovi pridobivanje metapodatkov za {count} datotek z napako",
     "tab": {
       "all": "Vse",
       "pending": "V čakanju",
@@ -4012,21 +4258,21 @@
       "results": "Rezultati"
     },
     "bulkEdit": {
-      "title": "Množično urejanje brez datotek | Množično urejanje {count} datoteke | Množično urejanje {count} datotek",
+      "title": "{count, plural, =0 {Množično urejanje brez datotek} one {Množično urejanje # datoteke} two {Množično urejanje # datotek} few {Množično urejanje # datotek} other {Množično urejanje # datotek}}",
       "resultTitle": "Rezultati množičnega urejanja",
       "instructions": "Preklopite polja, ki jih želite posodobiti. Uporabljena bodo samo omogočena polja.",
       "mergeArrays": "Združi sezname (dodaj k obstoječim vrednostim namesto zamenjave)",
       "failed": "Množično urejanje ni uspelo"
     },
     "setDestination": {
-      "title": "Nastavi cilj za brez datotek | Nastavi cilj za {count} datoteko | Nastavi cilj za {count} datotek",
+      "title": "{count, plural, =0 {Nastavi cilj za brez datotek} one {Nastavi cilj za # datoteko} two {Nastavi cilj za # datotek} few {Nastavi cilj za # datotek} other {Nastavi cilj za # datotek}}",
       "resultTitle": "Cilj posodobljen",
       "failed": "Nastavitev cilja ni uspela"
     },
     "finalizeDialog": {
-      "title": "Zaključi brez datotek | Zaključi {count} datoteko | Zaključi {count} datotek",
+      "title": "{count, plural, =0 {Zaključi brez datotek} one {Zaključi # datoteko} two {Zaključi # datotek} few {Zaključi # datotek} other {Zaključi # datotek}}",
       "resultTitle": "Rezultati zaključka",
-      "needDestination": "{without} od {count} izbranih datotek potrebuje cilj | {without} od {count} izbrane datoteke potrebuje cilj | {without} od {count} izbranih datotek potrebuje cilj",
+      "needDestination": "{count, plural, =0 {{without} od # izbranih datotek potrebuje cilj} one {{without} od # izbrane datoteke potrebuje cilj} two {{without} od # izbranih datotek potrebuje cilj} few {{without} od # izbranih datotek potrebuje cilj} other {{without} od # izbranih datotek potrebuje cilj}}",
       "allHaveDestination": "Vse izbrane datoteke že imajo nastavljen cilj",
       "defaultDestinationLibrary": "Privzeta ciljna knjižnica",
       "defaultDestinationFolder": "Privzeta ciljna mapa",
@@ -4035,18 +4281,17 @@
       "start": "Začni",
       "filesFinalized": "{succeeded} od {total} datotek zaključenih",
       "checking": "Preverjanje izbranih datotek...",
-      "readyCount": "{count} datoteka pripravljena | {count} datoteki pripravljeni | {count} datoteke pripravljene | {count} datotek pripravljenih",
-      "duplicateCount": "{count} je že v knjižnici | {count} sta že v knjižnici | {count} so že v knjižnici | {count} jih je že v knjižnici",
-      "conflictCount": "{count} spor imena datoteke | {count} spora imen datotek | {count} spori imen datotek | {count} sporov imen datotek",
-      "missingDestinationCount": "{count} manjkajoči cilj | {count} manjkajoča cilja | {count} manjkajoči cilji | {count} manjkajočih ciljev",
-      "blockedCount": "{count} datoteka blokirana | {count} datoteki blokirani | {count} datoteke blokirane | {count} datotek blokiranih",
+      "readyCount": "{count, plural, =0 {# datotek pripravljenih} one {# datoteka pripravljena} two {# datoteki pripravljeni} few {# datoteke pripravljene} other {# datotek pripravljenih}}",
+      "duplicateCount": "{count, plural, =0 {# jih je že v knjižnici} one {# je že v knjižnici} two {# sta že v knjižnici} few {# so že v knjižnici} other {# jih je že v knjižnici}}",
+      "conflictCount": "{count, plural, =0 {# sporov imen datotek} one {# spor imena datoteke} two {# spora imen datotek} few {# spori imen datotek} other {# sporov imen datotek}}",
+      "missingDestinationCount": "{count, plural, =0 {# manjkajočih ciljev} one {# manjkajoči cilj} two {# manjkajoča cilja} few {# manjkajoči cilji} other {# manjkajočih ciljev}}",
+      "blockedCount": "{count, plural, =0 {# datotek blokiranih} one {# datoteka blokirana} two {# datoteki blokirani} few {# datoteke blokirane} other {# datotek blokiranih}}",
       "moreDuplicates": "+{count} dodatnih je že v knjižnici",
       "discardDuplicates": "Zavrzi dvojnike",
-      "failedCount": "{count} datoteka neuspešna | {count} datoteki neuspešni | {count} datoteke neuspešne | {count} neuspešnih datotek",
-      "failedWithDuplicates": "{failed} neuspešnih ({count} podvojenih) | {failed} neuspešna ({count} podvojena) | {failed} neuspešnih ({count} podvojenih)",
+      "failedCount": "{count, plural, =0 {# neuspešnih datotek} one {# datoteka neuspešna} two {# datoteki neuspešni} few {# datoteke neuspešne} other {# neuspešnih datotek}}",
+      "failedWithDuplicates": "{count, plural, =0 {{failed} neuspešnih (# podvojenih)} one {{failed} neuspešna (# podvojena)} two {{failed} neuspešnih (# podvojenih)} few {{failed} neuspešnih (# podvojenih)} other {{failed} neuspešnih (# podvojenih)}}",
       "view": "Ogled",
       "viewExisting": "Ogled obstoječega",
-      "importAnyway": "Vseeno uvozi",
       "hide": "Skrij",
       "details": "Podrobnosti",
       "alreadyExistsSaveAs": "Že obstaja - shrani kot:",
@@ -4082,7 +4327,7 @@
     },
     "addToSheet": {
       "title": "Upravljanje zbirk",
-      "selectedCount": "ni izbranih knjig | ena izbrana knjiga | {count} izbranih knjig",
+      "selectedCount": "{count, plural, =0 {ni izbranih knjig} one {ena izbrana knjiga} two {# izbranih knjig} few {# izbranih knjig} other {# izbranih knjig}}",
       "newCollection": "Nova zbirka",
       "namePlaceholder": "Ime zbirke",
       "create": "Ustvari",
@@ -4094,15 +4339,15 @@
       "inCollection": "V tej zbirki",
       "allInCollection": "Vseh {total} je v tej zbirki",
       "partialInCollection": "{partial} od {total} je v tej zbirki",
-      "bookCount": "ni knjig | ena knjiga | {count} knjig",
+      "bookCount": "{count, plural, =0 {ni knjig} one {ena knjiga} two {# knjig} few {# knjig} other {# knjig}}",
       "loadFailed": "Nalaganje zbirk ni uspelo",
-      "createdAndAdded": "Ustvarjeno \"{name}\" in dodanih ni knjig | Ustvarjeno \"{name}\" in dodana ena knjiga | Ustvarjeno \"{name}\" in dodanih {count} knjig",
+      "createdAndAdded": "{count, plural, =0 {Ustvarjeno \"{name}\" in dodanih ni knjig} one {Ustvarjeno \"{name}\" in dodana ena knjiga} two {Ustvarjeno \"{name}\" in dodanih # knjig} few {Ustvarjeno \"{name}\" in dodanih # knjig} other {Ustvarjeno \"{name}\" in dodanih # knjig}}",
       "createdButAddFailed": "Ustvarjeno \"{name}\", vendar dodajanje knjig ni uspelo",
       "createFailed": "Ustvarjanje zbirke ni uspelo",
-      "addedNewWithExisting": "V \"{name}\" je dodana ena nova knjiga ({alreadyHad} jih je že bilo) | V \"{name}\" je dodana ena nova knjiga ({alreadyHad} jih je že bilo) | V \"{name}\" je dodanih {count} novih knjig ({alreadyHad} jih je že bilo)",
-      "addedToCollection": "V \"{name}\" ni dodanih knjig | V \"{name}\" je dodana ena knjiga | V \"{name}\" je dodanih {count} knjig",
+      "addedNewWithExisting": "{count, plural, =0 {V \"{name}\" je dodana ena nova knjiga ({alreadyHad} jih je že bilo)} one {V \"{name}\" je dodana ena nova knjiga ({alreadyHad} jih je že bilo)} two {V \"{name}\" je dodanih # novih knjig ({alreadyHad} jih je že bilo)} few {V \"{name}\" je dodanih # novih knjig ({alreadyHad} jih je že bilo)} other {V \"{name}\" je dodanih # novih knjig ({alreadyHad} jih je že bilo)}}",
+      "addedToCollection": "{count, plural, =0 {V \"{name}\" ni dodanih knjig} one {V \"{name}\" je dodana ena knjiga} two {V \"{name}\" je dodanih # knjig} few {V \"{name}\" je dodanih # knjig} other {V \"{name}\" je dodanih # knjig}}",
       "addFailed": "Dodajanje v zbirko ni uspelo",
-      "removedFromCollection": "Iz \"{name}\" ni odstranjenih knjig | Iz \"{name}\" je odstranjena ena knjiga | Iz \"{name}\" je odstranjenih {count} knjig",
+      "removedFromCollection": "{count, plural, =0 {Iz \"{name}\" ni odstranjenih knjig} one {Iz \"{name}\" je odstranjena ena knjiga} two {Iz \"{name}\" je odstranjenih # knjig} few {Iz \"{name}\" je odstranjenih # knjig} other {Iz \"{name}\" je odstranjenih # knjig}}",
       "removeFailed": "Odstranjevanje iz zbirke ni uspelo"
     }
   },
@@ -4116,9 +4361,9 @@
       "noResults": "Ni rezultatov",
       "loadingMore": "Nalaganje več ...",
       "loadMore": "Naloži več ({loaded}/{total})",
-      "allMatchesShown": "Prikazano vseh 1 ujemanje | Prikazano vseh 1 ujemanje | Prikazanih vseh {count} ujemanj",
-      "bookCount": "ni knjig | {count} knjiga | {count} knjig",
-      "fileCount": "ni datotek | {count} datoteka | {count} datotek",
+      "allMatchesShown": "{count, plural, =0 {Prikazano vseh 1 ujemanje} one {Prikazano vseh 1 ujemanje} two {Prikazanih vseh # ujemanj} few {Prikazanih vseh # ujemanj} other {Prikazanih vseh # ujemanj}}",
+      "bookCount": "{count, plural, =0 {ni knjig} one {# knjiga} two {# knjig} few {# knjig} other {# knjig}}",
+      "fileCount": "{count, plural, =0 {ni datotek} one {# datoteka} two {# datotek} few {# datotek} other {# datotek}}",
       "uploadedToast": "Naloženo {uploaded}",
       "uploadFailedToast": "Nalaganje ni uspelo za {failed}",
       "uploadPartialToast": "Naloženo {uploaded}, {failed} neuspešnih",
@@ -4146,17 +4391,17 @@
         "title": "Vam je BookOrbit všeč?",
         "body": "Če vam BookOrbit pomaga pri urejanju knjižnice, razmislite o oznaki z zvezdico projektu na GitHubu. To pomaga več ljudem odkriti aplikacijo in podpira nadaljnji razvoj.",
         "cta": "Označi BookOrbit z zvezdico na GitHubu"
-      }
+      },
+      "surfaceOpacity": "Surface opacity",
+      "surfaceOpacityValue": "{value}%"
     },
     "sidebar": {
-      "tagline": "Vaš prostor za branje",
       "dashboard": "Nadzorna plošča",
       "authors": "Avtorji",
       "series": "Zbirke",
       "tools": "Orodja",
       "libraries": "Knjižnice",
       "newLibrary": "Nova knjižnica",
-      "libraryScanning": "{name} - Preiskovanje {pct}%",
       "scanProgress": "{processed} / {total} knjig",
       "smartScopes": "Pametni obsegi",
       "newSmartScope": "Nov pameten obseg",
@@ -4164,15 +4409,41 @@
       "collections": "Zbirke",
       "newCollection": "Nova zbirka",
       "noCollections": "Še ni zbirk",
-      "latest": "Najnovejša {version}",
       "newReleaseNotes": "Na voljo so nove opombe ob izdaji",
       "support": "Podprite BookOrbit",
-      "supportShort": "Podpora",
       "supportAria": "Podprite BookOrbit na Ko-fi",
       "sectionHeader": {
-        "add": "Dodaj",
-        "reorder": "Preuredi",
-        "doneReordering": "Preurejanje končano"
+        "add": "Add",
+        "showAll": "Show all",
+        "showCount": "Show {count}",
+        "rowsShown": "Rows shown",
+        "menuAria": "Section options for {section}",
+        "reorder": "Reorder",
+        "doneReordering": "Done reordering"
+      },
+      "noLibraries": "No libraries yet",
+      "clearFilter": "Clear filter",
+      "filterSummary": "{shown} of {total} shown",
+      "filterLibraries": "Filter libraries",
+      "filterLibrariesPlaceholder": "Filter libraries...",
+      "filterSmartScopes": "Filter smart scopes",
+      "filterSmartScopesPlaceholder": "Filter smart scopes...",
+      "filterCollections": "Filter collections",
+      "filterCollectionsPlaceholder": "Filter collections...",
+      "seeAllLibraries": "See all libraries ({count})",
+      "seeAllSmartScopes": "See all smart scopes ({count})",
+      "seeAllCollections": "See all collections ({count})",
+      "updateAvailable": "Update {version}",
+      "zones": {
+        "browse": "Browse"
+      },
+      "reorder": {
+        "gripAria": "Reorder {name}",
+        "lifted": "{name} lifted, position {position} of {total}. Use the arrow keys to move it.",
+        "moved": "{name}, position {position} of {total}",
+        "dropped": "{name} dropped at position {position} of {total}",
+        "cancelled": "Reorder cancelled. {name} returned to position {position} of {total}.",
+        "filteredHint": "Clear the filter to reorder"
       }
     },
     "selectionActionBar": {
@@ -4204,7 +4475,7 @@
       "apply": "Uporabi",
       "fieldPlaceholder": "Pusti prazno za brisanje",
       "fieldPlaceholderArray": "Ločeno z vejicami (pusti prazno za brisanje)",
-      "deleteConfirm": "Izbriši {count} knjigo? | Izbriši {count} knjigi? | Izbriši {count} knjig?",
+      "deleteConfirm": "{count, plural, =0 {Izbriši # knjig?} one {Izbriši # knjigo?} two {Izbriši # knjigi?} few {Izbriši # knjig?} other {Izbriši # knjig?}}",
       "typeDelete": "Vtipkaj DELETE"
     },
     "viewHeader": {
@@ -4272,6 +4543,24 @@
         "typeAndEnter": "Vtipkaj in pritisni Enter za dodajanje",
         "pressEnter": "Pritisni Enter za dodajanje"
       }
+    },
+    "entityIndex": {
+      "sortBy": "Sort by",
+      "sort": {
+        "custom": "Custom order",
+        "name": "Name",
+        "bookCount": "Book count"
+      },
+      "ascending": "Ascending",
+      "descending": "Descending",
+      "clearSearch": "Clear search",
+      "resultCount": "{shown} of {total}",
+      "noMatches": "No matches",
+      "noMatchesHint": "Try a different search term.",
+      "bookCount": "Books: {count}",
+      "librariesEmptyHint": "Create a library to start adding books.",
+      "smartScopesEmptyHint": "Smart scopes save a set of filters you use often.",
+      "collectionsEmptyHint": "Collections group books you pick by hand."
     }
   },
   "customIcons": {
@@ -4294,9 +4583,9 @@
     "uploadCount": "Naloži {count}",
     "onlySvgSupported": "Podprte so samo datoteke SVG",
     "maxStaged": "Hkrati lahko pripraviš največ {max} ikon",
-    "onlyMoreCanStage": "Ni več ikon, ki bi jih lahko pripravili | Pripraviti je mogoče še samo {count} ikono | Pripraviti je mogoče še samo {count} ikon",
+    "onlyMoreCanStage": "{count, plural, =0 {Ni več ikon, ki bi jih lahko pripravili} one {Pripraviti je mogoče še samo # ikono} two {Pripraviti je mogoče še samo # ikon} few {Pripraviti je mogoče še samo # ikon} other {Pripraviti je mogoče še samo # ikon}}",
     "readFailed": "Branje datotek SVG ni uspelo",
-    "uploadedCount": "Ni naloženih ikon | Naložena {count} ikona | Naloženih {count} ikon",
+    "uploadedCount": "{count, plural, =0 {Ni naloženih ikon} one {Naložena # ikona} two {Naloženih # ikon} few {Naloženih # ikon} other {Naloženih # ikon}}",
     "uploadedPartial": "Naloženih {created}, neuspešnih {failed}",
     "noIconsUploaded": "Ni naloženih ikon",
     "uploadFailed": "Nalaganje ikon ni uspelo",
@@ -4328,6 +4617,29 @@
         "widgets": "Gradniki",
         "shelves": "Police"
       },
+      "widgetNames": {
+        "readingStreak": "Bralni niz",
+        "currentlyReading": "Trenutno bereš",
+        "readingGoal": "Reading Goal",
+        "readingDna": "Bralni DNK",
+        "monthlyChallenge": "Mesečni izziv",
+        "highlightOfTheDay": "Poudarek dneva",
+        "neglectedGems": "Zapostavljeni biseri",
+        "readingRhythm": "Bralni ritem",
+        "diversityScore": "Ocena raznolikosti",
+        "libraryOverview": "Pregled knjižnice",
+        "yearProjection": "Letna napoved",
+        "longWait": "Dolgo čakanje"
+      },
+      "shelfNames": {
+        "recentlyAdded": "Recently Added",
+        "continueReading": "Continue Reading",
+        "continueListening": "Continue Listening",
+        "wantToRead": "Want to Read",
+        "upNextInSeries": "Up Next in Series",
+        "random": "Discover Something New",
+        "smartScope": "Smart Scope"
+      },
       "reorderHintWidget": "Povleci za spremembo vrstnega reda. Preklopi za prikaz ali skritje gradnika.",
       "reorderHintShelf": "Povleci za spremembo vrstnega reda. Preklopi za prikaz ali skritje police.",
       "smartScope": "Pametna zbirka",
@@ -4351,7 +4663,7 @@
       "diversityScore": {
         "title": "Ocena raznolikosti",
         "notEnoughData": "Preberi vsaj 3 knjige, da vidiš svojo oceno raznolikosti",
-        "booksAnalyzed": "ni analiziranih knjig | {count} analizirana knjiga | {count} analiziranih knjig",
+        "booksAnalyzed": "{count, plural, =0 {ni analiziranih knjig} one {# analizirana knjiga} two {# analiziranih knjig} few {# analiziranih knjig} other {# analiziranih knjig}}",
         "subScores": {
           "genre": "Žanr",
           "author": "Avtor",
@@ -4378,7 +4690,7 @@
         "title": "Dolgo čakanje",
         "empty": "Ni knjig, ki čakajo. Vse si že začel!",
         "daysWaiting": "dni čakanja",
-        "pages": "ni strani | {count} stran | {count} strani",
+        "pages": "{count, plural, =0 {ni strani} one {# stran} two {# strani} few {# strani} other {# strani}}",
         "startReading": "Začni brati"
       },
       "monthlyChallenge": {
@@ -4397,7 +4709,7 @@
       "readingDna": {
         "title": "Bralni DNK",
         "notEnoughData": "Preberi vsaj 5 knjig, da odkleneš svoj bralni DNK",
-        "basedOn": "Na podlagi 0 knjig | Na podlagi {count} knjige | Na podlagi {count} knjig",
+        "basedOn": "{count, plural, =0 {Na podlagi 0 knjig} one {Na podlagi # knjige} two {Na podlagi # knjig} few {Na podlagi # knjig} other {Na podlagi # knjig}}",
         "traits": {
           "length": "Dolžina",
           "variety": "Raznolikost",
@@ -4418,15 +4730,15 @@
       "readingRhythm": {
         "title": "Bralni ritem",
         "empty": "Začni brati, da se izoblikuje tvoj ritem",
-        "activeDays": "ni aktivnih dni | {count} aktiven dan | {count} aktivnih dni",
+        "activeDays": "{count, plural, =0 {ni aktivnih dni} one {# aktiven dan} two {# aktivnih dni} few {# aktivnih dni} other {# aktivnih dni}}",
         "consistency": "{activeDays} · {percent} % doslednosti",
         "avgPerDay": "povprečno {time}/dan"
       },
       "readingStreak": {
         "title": "Bralni niz",
         "empty": "Beri danes, da začneš svoj niz",
-        "streakLabel": "dni niza | dan niza | dni niza",
-        "best": "Najboljši: {count} dan | Najboljši: {count} dneva | Najboljši: {count} dni",
+        "streakLabel": "{count, plural, =0 {dni niza} one {dan niza} two {dni niza} few {dni niza} other {dni niza}}",
+        "best": "{count, plural, =0 {Najboljši: # dni} one {Najboljši: # dan} two {Najboljši: # dneva} few {Najboljši: # dni} other {Najboljši: # dni}}",
         "lastSevenDays": "Zadnjih 7 dni"
       },
       "yearProjection": {
@@ -4544,7 +4856,7 @@
       "namePlaceholder": "npr. Bralni klub",
       "creating": "Ustvarjanje ...",
       "empty": "Še ni skupin. Ustvarite skupino za pošiljanje več prejemnikom naenkrat.",
-      "memberCount": "brez članov | en član | {count} članov",
+      "memberCount": "{count, plural, =0 {brez članov} one {en član} two {# članov} few {# članov} other {# članov}}",
       "deleteTooltip": "Izbriši skupino",
       "noMembers": "Še ni članov.",
       "removeMember": "Odstrani",
@@ -4613,7 +4925,7 @@
     },
     "send": {
       "title": "Pošlji po e-pošti",
-      "bookCount": "brez knjig | ena knjiga | {count} knjig",
+      "bookCount": "{count, plural, =0 {brez knjig} one {ena knjiga} two {# knjig} few {# knjig} other {# knjig}}",
       "recipients": "Prejemniki",
       "noRecipients": "Ni nastavljenih prejemnikov. Dodajte ga v nastavitvah e-pošte.",
       "groups": "Skupine",
@@ -4627,7 +4939,7 @@
       "default": "Privzeto",
       "send": "Pošlji",
       "sending": "Pošiljanje ...",
-      "queued": "brez e-pošte v vrsti | ena e-pošta v vrsti | {count} e-pošt v vrsti",
+      "queued": "{count, plural, =0 {brez e-pošte v vrsti} one {ena e-pošta v vrsti} two {# e-pošt v vrsti} few {# e-pošt v vrsti} other {# e-pošt v vrsti}}",
       "failed": "Pošiljanje ni uspelo"
     }
   },
@@ -4723,8 +5035,8 @@
       "lastSynced": {
         "justNow": "Pravkar",
         "minutesAgo": "pred {count} min",
-        "hoursAgo": "pred {count} uro | pred {count} uro | pred {count} urami",
-        "daysAgo": "pred {count} dnem | pred {count} dnem | pred {count} dnevi"
+        "hoursAgo": "{count, plural, =0 {pred # uro} one {pred # uro} two {pred # urami} few {pred # urami} other {pred # urami}}",
+        "daysAgo": "{count, plural, =0 {pred # dnem} one {pred # dnem} two {pred # dnevi} few {pred # dnevi} other {pred # dnevi}}"
       }
     },
     "import": {
@@ -4735,9 +5047,9 @@
       "importProgress": "Napredek uvoza",
       "reviewMatches": "Preglej ujemanja",
       "importReady": "Uvoz pripravljen",
-      "exactMatches": "brez natančnih ujemanj, ki bi jih lahko uvozili brez pregleda | {count} natančno ujemanje je mogoče uvoziti brez pregleda | {count} natančnih ujemanj je mogoče uvoziti brez pregleda",
-      "progressAvailable": "ni posodobitev napredka na voljo | {count} posodobitev napredka na voljo | {count} posodobitev napredka na voljo",
-      "progressConflicts": "brez sporov | {count} spor | {count} sporov",
+      "exactMatches": "{count, plural, =0 {brez natančnih ujemanj, ki bi jih lahko uvozili brez pregleda} one {# natančno ujemanje je mogoče uvoziti brez pregleda} two {# natančnih ujemanj je mogoče uvoziti brez pregleda} few {# natančnih ujemanj je mogoče uvoziti brez pregleda} other {# natančnih ujemanj je mogoče uvoziti brez pregleda}}",
+      "progressAvailable": "{count, plural, =0 {ni posodobitev napredka na voljo} one {# posodobitev napredka na voljo} two {# posodobitev napredka na voljo} few {# posodobitev napredka na voljo} other {# posodobitev napredka na voljo}}",
+      "progressConflicts": "{count, plural, =0 {brez sporov} one {# spor} two {# sporov} few {# sporov} other {# sporov}}",
       "unavailable": {
         "permissionDenied": "Nimate dovoljenja za uporabo sinhronizacije s Hardcover.",
         "missingToken": "Pred uvozom povežite Hardcover.",
@@ -4756,8 +5068,8 @@
       },
       "toast": {
         "importFailed": "Uvoz statusa branja s Hardcover ni uspel",
-        "imported": "noben status branja ni bil uvožen{progress} | {count} status branja uvožen{progress} | {count} statusov branja uvoženih{progress}",
-        "progressUpdates": "brez posodobitev napredka | {count} posodobitev napredka | {count} posodobitev napredka"
+        "imported": "{count, plural, =0 {noben status branja ni bil uvožen{progress}} one {# status branja uvožen{progress}} two {# statusov branja uvoženih{progress}} few {# statusov branja uvoženih{progress}} other {# statusov branja uvoženih{progress}}}",
+        "progressUpdates": "{count, plural, =0 {brez posodobitev napredka} one {# posodobitev napredka} two {# posodobitev napredka} few {# posodobitev napredka} other {# posodobitev napredka}}"
       }
     },
     "review": {
@@ -4771,7 +5083,7 @@
       "noRows": "Nobena vrstica se ne ujema s trenutnimi filtri.",
       "selectRowAriaLabel": "Izberi {title}",
       "selectionSummary": "{count} izbranih: {ready} pripravljenih, {reviewed} pregledanih.",
-      "selectedProgress": "brez posodobitev napredka | {count} posodobitev napredka | {count} posodobitev napredka",
+      "selectedProgress": "{count, plural, =0 {brez posodobitev napredka} one {# posodobitev napredka} two {# posodobitev napredka} few {# posodobitev napredka} other {# posodobitev napredka}}",
       "selectReady": "Izberi pripravljene",
       "selectPage": "Izberi stran",
       "clearPage": "Počisti stran",
@@ -4876,10 +5188,8 @@
         "pathNotAccessible": "Pot na strežniku ni dostopna.",
         "pathAccessible": "Pot je dostopna.",
         "pathNotAccessibleShort": "Pot ni dostopna",
-        "bookFilesFound": "ni najdenih nobenih datotek knjig | najdena je {count} datoteka knjige | najdenih je {count} datotek knjig",
         "overlapsWith": "Se prekriva z \"{library}\"",
         "noneAdded": "Še ni dodanih map",
-        "totalFilesFound": "ni najdenih nobenih datotek knjig | najdena je {count} datoteka knjige - dejansko število knjig je lahko manjše, če obstaja več oblik iste knjige | najdenih je {count} datotek knjig - dejansko število knjig je lahko manjše, če obstaja več oblik iste knjige",
         "runPrescanHint": "Pred shranjevanjem zaženite predhodno skeniranje za preverjanje poti.",
         "scanning": "Skeniranje …",
         "prescan": "Predhodno skeniranje"
@@ -4944,6 +5254,11 @@
           "hint": "Zapiše metapodatke v datoteko OPF znotraj arhiva EPUB.",
           "toggleAria": "Zapiši metapodatke EPUB"
         },
+        "fb2": {
+          "title": "FictionBook (FB2)",
+          "hint": "Rewrites the description block inside FB2 files, leaving the book text untouched.",
+          "toggleAria": "Write FB2 metadata"
+        },
         "pdf": {
           "title": "PDF",
           "hint": "Vdela metapodatke v slovar Info datoteke PDF in tok XMP.",
@@ -4953,6 +5268,11 @@
           "title": "Stripovski arhivi (CBX)",
           "hint": "Zapiše ComicInfo.xml v arhive CBZ in CB7.",
           "toggleAria": "Zapiši metapodatke arhiva stripov"
+        },
+        "kindle": {
+          "title": "Kindle (MOBI, AZW3)",
+          "hint": "Writes metadata into the EXTH header of MOBI, AZW3, and AZW files.",
+          "toggleAria": "Write Kindle metadata"
         },
         "audio": {
           "title": "Zvok",
@@ -5044,7 +5364,7 @@
       "empty": "Ta mapa je prazna",
       "emptyHint": "Izberete lahko trenutno mapo ali ustvarite novo.",
       "openFolderAria": "Odpri {name}",
-      "selectedCount": "{count} izbrana mapa | {count} izbrani mapi | {count} izbrane mape | {count} izbranih map",
+      "selectedCount": "{count, plural, =0 {# izbranih map} one {# izbrana mapa} two {# izbrani mapi} few {# izbrane mape} other {# izbranih map}}",
       "noFolders": "Ni najdenih map",
       "selectFolder": "Izberi to mapo",
       "errors": {
@@ -5065,8 +5385,8 @@
       "upload": "Naloži",
       "uploadWithCount": "Naloži ({count})",
       "viewInLibrary": "Prikaži v knjižnici",
-      "fileCount": "brez datotek | {count} datoteka | {count} datotek",
-      "booksAdded": "ni dodanih knjig | {count} knjiga dodana | {count} knjig dodanih",
+      "fileCount": "{count, plural, =0 {brez datotek} one {# datoteka} two {# datotek} few {# datotek} other {# datotek}}",
+      "booksAdded": "{count, plural, =0 {ni dodanih knjig} one {# knjiga dodana} two {# knjig dodanih} few {# knjig dodanih} other {# knjig dodanih}}",
       "uploadedFailed": "{done} naloženih, {failed} neuspelih",
       "progress": "{done} od {total} nalaganje...",
       "header": {
@@ -5082,7 +5402,7 @@
     }
   },
   "metadataScore": {
-    "missingFields": "ni manjkajočih polj - uredi metapodatke | {count} manjkajoče polje - uredi metapodatke | {count} manjkajočih polj - uredi metapodatke"
+    "missingFields": "{count, plural, =0 {ni manjkajočih polj - uredi metapodatke} one {# manjkajoče polje - uredi metapodatke} two {# manjkajočih polj - uredi metapodatke} few {# manjkajočih polj - uredi metapodatke} other {# manjkajočih polj - uredi metapodatke}}"
   },
   "migration": {
     "sidebarTitle": "Uvoz iz Booklore",
@@ -5212,7 +5532,7 @@
       "ofCount": "od {total}",
       "targetBookId": "Ciljna knjiga #{id}",
       "recommended": "Priporočeno",
-      "resolveButton": "Razreši {count} podvojitev | Razreši {count} podvojitev | Razreši {count} podvojitev",
+      "resolveButton": "{count, plural, =0 {Razreši # podvojitev} one {Razreši # podvojitev} two {Razreši # podvojitev} few {Razreši # podvojitev} other {Razreši # podvojitev}}",
       "sourceRecordId": "ID izvornega zapisa #{id}",
       "byAuthor": "avtor {author} (ID: {id})",
       "byFilePath": "{filePath} (ID: {id})",
@@ -5392,7 +5712,61 @@
       "saveFailed": "Shranjevanje nastavitev ni uspelo",
       "savePreferenceFailed": "Shranjevanje nastavitve ni uspelo",
       "whatsNewToggle": "Prikaži \"Novosti\" po posodobitvah",
-      "whatsNewToggleHint": "Pojavno okno, ki po posodobitvi aplikacije izpostavi nove funkcije. Arhiv ostane na voljo v obeh primerih."
+      "whatsNewToggleHint": "Pojavno okno, ki po posodobitvi aplikacije izpostavi nove funkcije. Arhiv ostane na voljo v obeh primerih.",
+      "groups": {
+        "library": "Library",
+        "files": "Files",
+        "integrations": "Integrations",
+        "personal": "Personal",
+        "app": "App updates"
+      },
+      "enabledCount": "{enabled} of {total} enabled",
+      "categories": {
+        "scanning": {
+          "label": "Library scanning",
+          "description": "When a library scan finishes, fails, or finds missing books."
+        },
+        "metadata": {
+          "label": "Metadata fetching",
+          "description": "When metadata lookups for your books complete or fail."
+        },
+        "authorEnrichment": {
+          "label": "Author enrichment",
+          "description": "When author biographies and photos finish being fetched."
+        },
+        "fileWriteBack": {
+          "label": "File write-back",
+          "description": "When edited metadata is written back into book files on disk."
+        },
+        "fileRename": {
+          "label": "File rename",
+          "description": "When a single book file is renamed to match your naming pattern."
+        },
+        "bulkRename": {
+          "label": "Bulk rename",
+          "description": "When a bulk rename across many books completes or fails."
+        },
+        "migration": {
+          "label": "Data migration",
+          "description": "When an import from another library tool completes or fails."
+        },
+        "bookDock": {
+          "label": "Book Dock",
+          "description": "When files dropped into the dock are ready to review or finalized."
+        },
+        "koboSync": {
+          "label": "Kobo sync",
+          "description": "When a Kobo device finishes syncing with your library."
+        },
+        "email": {
+          "label": "Email delivery",
+          "description": "When sending a book to an email address succeeds or fails."
+        },
+        "achievements": {
+          "label": "Achievements",
+          "description": "When you unlock a new reading achievement."
+        }
+      }
     }
   },
   "reader": {
@@ -5486,7 +5860,7 @@
       "tooShort": "Vnesite vsaj {min} znakov",
       "noResults": "Ni najdenih zadetkov",
       "prompt": "Vnesite za iskanje",
-      "resultCount": "ni zadetkov | {count} zadetek | {count} zadetki"
+      "resultCount": "{count, plural, =0 {ni zadetkov} one {# zadetek} two {# zadetki} few {# zadetki} other {# zadetki}}"
     },
     "sidebar": {
       "tabs": {
@@ -5581,6 +5955,8 @@
       "autoFallback": "Samodejni nadomestni način",
       "spreadAlignmentLabel": "Poravnava razpona",
       "spreadAlignmentHint": "Poravnava razpona ni na voljo v samodejnem nadomestnem načinu.",
+      "spreadGap": "Spread gap",
+      "spreadGapValue": "{value}px",
       "focusTwoPageToggle": "Preklop na dvostransko pogled",
       "forceTwoPage": "Vsili dve strani",
       "off": "Izklopljeno",
@@ -5636,7 +6012,7 @@
       "sleep": "Spanje",
       "chapterAbbrev": "Pogl.",
       "sleepTimer": "Časovnik spanja",
-      "minutes": "{count} minut",
+      "minutes": "{count, plural, one {# minuta} two {# minuti} few {# minute} other {# minut}}",
       "endOfChapter": "Konec poglavja",
       "noChaptersAvailable": "Ni razpoložljivih poglavij",
       "extend15": "+ 15 minut",
@@ -5652,7 +6028,7 @@
   },
   "scanner": {
     "filesProgress": "{processed}/{total} datotek",
-    "booksFound": "ni najdenih knjig | {count} najdena knjiga | {count} najdenih knjig"
+    "booksFound": "{count, plural, =0 {ni najdenih knjig} one {# najdena knjiga} two {# najdenih knjig} few {# najdenih knjig} other {# najdenih knjig}}"
   },
   "series": {
     "completion": {
@@ -5696,7 +6072,7 @@
       "pageTitleNamed": "Zbirka · {name}",
       "pageTitleWithId": "Zbirka #{id}",
       "entityName": "Zbirka",
-      "bookCount": "ni knjig | {count} knjiga | {count} knjige",
+      "bookCount": "{count, plural, =0 {ni knjig} one {# knjiga} two {# knjige} few {# knjige} other {# knjige}}",
       "byAuthors": "avtorja: {authors}",
       "moreAuthors": "+{count} več",
       "preparingEditor": "Pripravljanje urejevalnika ...",
@@ -5760,7 +6136,7 @@
       "untitled": "SmartScope brez naslova",
       "subtitle": "Konfigurirajte nastavitve smart scope",
       "counting": "štetje ...",
-      "bookCount": "ni knjig | ena knjiga | {count} knjige",
+      "bookCount": "{count, plural, =0 {ni knjig} one {ena knjiga} two {# knjige} few {# knjige} other {# knjige}}",
       "identity": "Identiteta",
       "filters": "Filtri",
       "noFilters": "Filtri niso nastavljeni. V ta smart scope bodo vključene vse dostopne knjige.",
@@ -5812,7 +6188,7 @@
       "loadError": "Nalaganje podatkov ni uspelo",
       "emptyTitle": "Še ni podatkov",
       "emptyDescription": "Za ta graf ni podatkov",
-      "unknownField": "ni podatkov za to polje | {count} knjiga nima podatkov za to polje | {count} knjige nimajo podatkov za to polje"
+      "unknownField": "{count, plural, =0 {ni podatkov za to polje} one {# knjiga nima podatkov za to polje} two {# knjige nimajo podatkov za to polje} few {# knjige nimajo podatkov za to polje} other {# knjige nimajo podatkov za to polje}}"
     },
     "breakdown": {
       "ariaLabel": "Razčleni po viru ali formatu"
@@ -6008,8 +6384,8 @@
         "label": "Povzetek",
         "toRename": "{count} za preimenovanje",
         "unchanged": "{count} nespremenjenih",
-        "collisions": "{count} trkov | {count} trk | {count} trki",
-        "errors": "{count} napak | {count} napaka | {count} napake"
+        "collisions": "{count, plural, =0 {# trkov} one {# trk} two {# trki} few {# trki} other {# trki}}",
+        "errors": "{count, plural, =0 {# napak} one {# napaka} two {# napake} few {# napake} other {# napake}}"
       },
       "empty": {
         "title": "Izberite knjižnico za začetek",
@@ -6025,8 +6401,8 @@
       },
       "confirmDialog": {
         "title": "Potrdi množično preimenovanje",
-        "body": "To bo preimenovalo {count} knjig na disku. Datoteke s trki ali napakami bodo preskočene. Tega dejanja ni mogoče razveljaviti. | To bo preimenovalo {count} knjigo na disku. Datoteke s trki ali napakami bodo preskočene. Tega dejanja ni mogoče razveljaviti. | To bo preimenovalo {count} knjigi na disku. Datoteke s trki ali napakami bodo preskočene. Tega dejanja ni mogoče razveljaviti.",
-        "renameButton": "Preimenuj {count} knjig | Preimenuj {count} knjigo | Preimenuj {count} knjigi"
+        "body": "{count, plural, =0 {To bo preimenovalo # knjig na disku. Datoteke s trki ali napakami bodo preskočene. Tega dejanja ni mogoče razveljaviti.} one {To bo preimenovalo # knjigo na disku. Datoteke s trki ali napakami bodo preskočene. Tega dejanja ni mogoče razveljaviti.} two {To bo preimenovalo # knjigi na disku. Datoteke s trki ali napakami bodo preskočene. Tega dejanja ni mogoče razveljaviti.} few {To bo preimenovalo # knjigi na disku. Datoteke s trki ali napakami bodo preskočene. Tega dejanja ni mogoče razveljaviti.} other {To bo preimenovalo # knjigi na disku. Datoteke s trki ali napakami bodo preskočene. Tega dejanja ni mogoče razveljaviti.}}",
+        "renameButton": "{count, plural, =0 {Preimenuj # knjig} one {Preimenuj # knjigo} two {Preimenuj # knjigi} few {Preimenuj # knjigi} other {Preimenuj # knjigi}}"
       }
     },
     "bookDuplicates": {
@@ -6044,7 +6420,7 @@
         "queued": "Scan queued",
         "running": "Scanning books"
       },
-      "groupsFound": "No duplicate groups | One duplicate group | {count} duplicate groups",
+      "groupsFound": "{count, plural, =0 {No duplicate groups} one {One duplicate group} two {# duplicate groups} few {# duplicate groups} other {# duplicate groups}}",
       "filter": "Match type",
       "allReasons": "All match types",
       "reasons": {
@@ -6093,10 +6469,10 @@
       },
       "deleteDialog": {
         "title": "Permanently delete duplicate books?",
-        "description": "This will permanently delete {count} selected book and its files. | This will permanently delete {count} selected book and its files. | This will permanently delete {count} selected books and their files.",
+        "description": "{count, plural, =0 {This will permanently delete # selected book and its files.} one {This will permanently delete # selected book and its files.} two {This will permanently delete # selected books and their files.} few {This will permanently delete # selected books and their files.} other {This will permanently delete # selected books and their files.}}",
         "warning": "Metadata, collections, reading data, and device state are not transferred to the kept book. Associated data for other users is also removed.",
-        "confirm": "Delete {count} book | Delete {count} book | Delete {count} books",
-        "success": "No books deleted | One duplicate book deleted | {count} duplicate books deleted"
+        "confirm": "{count, plural, =0 {Delete # book} one {Delete # book} two {Delete # books} few {Delete # books} other {Delete # books}}",
+        "success": "{count, plural, =0 {No books deleted} one {One duplicate book deleted} two {# duplicate books deleted} few {# duplicate books deleted} other {# duplicate books deleted}}"
       },
       "errors": {
         "start": "Could not start the duplicate scan.",
@@ -6112,7 +6488,7 @@
     },
     "entityManager": {
       "unknown": "Neznano",
-      "bookCount": "ni knjig | {count} knjiga | {count} knjige",
+      "bookCount": "{count, plural, =0 {ni knjig} one {# knjiga} two {# knjige} few {# knjige} other {# knjige}}",
       "sortPrefix": "· razvrščanje: {sortName}",
       "selectTargetToKeep": "Izberi cilj za ohranitev",
       "writeToFiles": "Zapiši v datoteke",
@@ -6139,8 +6515,8 @@
         "emptyDescription": "Prilagodite prag podobnosti in kliknite Preglej za zaznavo morebitnih podvojenih zapisov.",
         "noneFoundTitle": "Ni najdenih podvojenih",
         "noneFoundDescription": "Pri trenutnih nastavitvah niso bile zaznane morebitne podvojene entitete.",
-        "clustersFound": "ni najdenih gruč | {count} najdena gruča | {count} najdenih gruč",
-        "plusOthers": "+ {count} drugih | + {count} drug | + {count} druga",
+        "clustersFound": "{count, plural, =0 {ni najdenih gruč} one {# najdena gruča} two {# najdenih gruč} few {# najdenih gruč} other {# najdenih gruč}}",
+        "plusOthers": "{count, plural, =0 {+ # drugih} one {+ # drug} two {+ # druga} few {+ # druga} other {+ # druga}}",
         "percentSimilar": "{percent} % podobno",
         "pairDetails": "Podrobnosti para",
         "dismissEntityTitle": "Opusti vse pare za to entiteto",
@@ -6197,7 +6573,7 @@
       },
       "bulkDeleteModal": {
         "title": "Množično brisanje",
-        "confirm": "Ali ste prepričani, da želite izbrisati {count} izbranih entitet? | Ali ste prepričani, da želite izbrisati {count} izbrano entiteto? | Ali ste prepričani, da želite izbrisati {count} izbrani entiteti?",
+        "confirm": "{count, plural, =0 {Ali ste prepričani, da želite izbrisati # izbranih entitet?} one {Ali ste prepričani, da želite izbrisati # izbrano entiteto?} two {Ali ste prepričani, da želite izbrisati # izbrani entiteti?} few {Ali ste prepričani, da želite izbrisati # izbrani entiteti?} other {Ali ste prepričani, da želite izbrisati # izbrani entiteti?}}",
         "deleteButton": "Izbriši {count}"
       },
       "mergeModal": {
@@ -6275,12 +6651,12 @@
       },
       "retry": {
         "noneToRetry": "Ni datotek z napako za ponovni poskus",
-        "retrying": "Ponovni poskus za {count} datotek | Ponovni poskus ene datoteke | Ponovni poskus {count} datotek"
+        "retrying": "{count, plural, =0 {Ponovni poskus za # datotek} one {Ponovni poskus ene datoteke} two {Ponovni poskus # datotek} few {Ponovni poskus # datotek} other {Ponovni poskus # datotek}}"
       },
       "applyFetched": {
-        "applied": "Uveljavljeno za nobeno datoteko | Uveljavljeno za eno datoteko | Uveljavljeno za {count} datotek",
-        "skippedEdited": "preskočenih {count} datotek, ker imajo ročne spremembe | preskočena ena datoteka, ker ima ročne spremembe | preskočenih {count} datotek, ker imajo ročne spremembe",
-        "skippedNoMetadata": "preskočenih {count} datotek, ker nimajo pridobljenih metapodatkov | preskočena ena datoteka, ker nima pridobljenih metapodatkov | preskočenih {count} datotek, ker nimajo pridobljenih metapodatkov",
+        "applied": "{count, plural, =0 {Uveljavljeno za nobeno datoteko} one {Uveljavljeno za eno datoteko} two {Uveljavljeno za # datotek} few {Uveljavljeno za # datotek} other {Uveljavljeno za # datotek}}",
+        "skippedEdited": "{count, plural, =0 {preskočenih # datotek, ker imajo ročne spremembe} one {preskočena ena datoteka, ker ima ročne spremembe} two {preskočenih # datotek, ker imajo ročne spremembe} few {preskočenih # datotek, ker imajo ročne spremembe} other {preskočenih # datotek, ker imajo ročne spremembe}}",
+        "skippedNoMetadata": "{count, plural, =0 {preskočenih # datotek, ker nimajo pridobljenih metapodatkov} one {preskočena ena datoteka, ker nima pridobljenih metapodatkov} two {preskočenih # datotek, ker nimajo pridobljenih metapodatkov} few {preskočenih # datotek, ker nimajo pridobljenih metapodatkov} other {preskočenih # datotek, ker nimajo pridobljenih metapodatkov}}",
         "noneApplied": "Nobena datoteka ni bila uveljavljena; {reasons}",
         "noneSelected": "Nobena datoteka ni izbrana"
       }
@@ -6293,7 +6669,7 @@
       "showControlsAria": "Prikaži kontrolnike zbirke",
       "loadError": "Te zbirke ni bilo mogoče naložiti",
       "toast": {
-        "removed": "Iz zbirke ni bilo odstranjenih knjig | Iz zbirke je bila odstranjena ena knjiga | Iz zbirke je bilo odstranjenih {count} knjig",
+        "removed": "{count, plural, =0 {Iz zbirke ni bilo odstranjenih knjig} one {Iz zbirke je bila odstranjena ena knjiga} two {Iz zbirke je bilo odstranjenih # knjig} few {Iz zbirke je bilo odstranjenih # knjig} other {Iz zbirke je bilo odstranjenih # knjig}}",
         "removeFailed": "Odstranjevanje knjig iz zbirke ni uspelo"
       },
       "empty": {
@@ -6337,6 +6713,11 @@
       "defaultName": "Pametni obseg",
       "filter": "Filter",
       "edit": "Uredi Smart Scope",
+      "koboSync": {
+        "label": "Sync to my Kobo",
+        "enabledHint": "Books in this shared Smart Scope sync to your Kobo device. Turn off to stop syncing them.",
+        "disabledHint": "Turn on to sync books in this shared Smart Scope to your Kobo device."
+      },
       "showControlsAria": "Prikaži kontrolnike Smart Scope",
       "hideFilter": "Skrij filter",
       "showFilter": "Prikaži filter",
@@ -6344,7 +6725,10 @@
       "loadError": "Tega SmartScope ni bilo mogoče naložiti",
       "toast": {
         "deleted": "\"{name}\" izbrisan",
-        "deleteFailed": "Brisanje \"{name}\" ni uspelo"
+        "deleteFailed": "Brisanje \"{name}\" ni uspelo",
+        "koboSyncEnabled": "\"{name}\" now syncs to your Kobo",
+        "koboSyncDisabled": "\"{name}\" no longer syncs to your Kobo",
+        "koboSyncFailed": "Failed to update Kobo sync for \"{name}\""
       },
       "empty": {
         "noRules": "Ni nastavljenih pravil",
@@ -6360,7 +6744,7 @@
     "title": "Novosti",
     "subtitle": "Vse, kar je bilo izdano, najnovejše najprej.",
     "versionPrefix": "Različica {version}",
-    "newUpdates": "brez novih posodobitev | ena nova posodobitev | {count} novih posodobitev",
+    "newUpdates": "{count, plural, =0 {brez novih posodobitev} one {ena nova posodobitev} two {# novih posodobitev} few {# novih posodobitev} other {# novih posodobitev}}",
     "remindLater": "Opomni me kasneje",
     "gotIt": "Razumem",
     "latest": "Najnovejše",
@@ -6467,6 +6851,8 @@
       "privacy": "Zasebnost in deljenje",
       "notifications": "Obvestila",
       "restrictions": "Omejitve vsebine"
-    }
+    },
+    "smartScopes": "Smart Scopes",
+    "collections": "Collections"
   }
 }

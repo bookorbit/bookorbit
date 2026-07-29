@@ -19,7 +19,7 @@ const traitColors: Record<string, string> = {
 <template>
   <div class="flex h-full flex-col p-3">
     <div class="mb-2 flex items-center gap-2 self-start">
-      <Dna :size="16" class="text-primary/90" />
+      <Dna :size="16" class="text-primary" />
       <span class="text-[15px] font-semibold text-foreground">{{ t('dashboard.widgets.readingDna.title') }}</span>
     </div>
 
@@ -37,7 +37,7 @@ const traitColors: Record<string, string> = {
     <!-- Not enough data -->
     <div v-else-if="!data || data.booksAnalyzed < 5" class="flex flex-1 flex-col items-center justify-center gap-2">
       <div class="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-        <Dna :size="16" class="text-muted-foreground/60" />
+        <Dna :size="16" class="text-muted-foreground" />
       </div>
       <p class="text-center text-xs text-muted-foreground">{{ t('dashboard.widgets.readingDna.notEnoughData') }}</p>
     </div>
@@ -67,7 +67,7 @@ const traitColors: Record<string, string> = {
       </div>
 
       <p class="text-center text-[10px] text-muted-foreground">
-        {{ t('dashboard.widgets.readingDna.basedOn', { count: data.booksAnalyzed }, data.booksAnalyzed) }}
+        {{ t('dashboard.widgets.readingDna.basedOn', { count: data.booksAnalyzed }) }}
       </p>
     </div>
   </div>

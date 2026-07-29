@@ -20,7 +20,7 @@ const label = computed(() => {
   if (!props.progress) return ''
   const p = props.progress
   const parts = [t('scanner.filesProgress', { processed: formatNumber(p.processed), total: formatNumber(p.total) })]
-  if (p.added > 0) parts.push(t('scanner.booksFound', { count: p.added }, p.added))
+  if (p.added > 0) parts.push(t('scanner.booksFound', { count: p.added }))
   return parts.join(' · ')
 })
 </script>

@@ -318,6 +318,19 @@ export class AnnotationSyncRepository {
     await ex.update(annotations).set({ deviceCreatedAt }).where(eq(annotations.id, annotationId));
   }
 
+  async setDeviceIdentitiesSilent(entries: { annotationId: number; deviceCreatedAt: string }[], ex: Executor = this.db): Promise<void> {
+    if (entries.length === 0) return;
+    const values = sql.join(
+      entries.map((entry) => sql`(${entry.annotationId}::int, ${entry.deviceCreatedAt}::varchar)`),
+      sql`, `,
+    );
+    await ex.execute(sql`
+      update ${annotations} set device_created_at = v.device_created_at
+      from (values ${values}) as v(annotation_id, device_created_at)
+      where ${annotations.id} = v.annotation_id
+    `);
+  }
+
   async setDeviceUpdatedAtSilent(annotationId: number, deviceUpdatedAt: string | null, ex: Executor = this.db): Promise<void> {
     await ex.update(annotations).set({ deviceUpdatedAt }).where(eq(annotations.id, annotationId));
   }

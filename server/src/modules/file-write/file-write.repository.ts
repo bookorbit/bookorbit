@@ -68,10 +68,14 @@ export class FileWriteRepository {
         fileWriteWriteCover: libraries.fileWriteWriteCover,
         fileWriteEpubEnabled: libraries.fileWriteEpubEnabled,
         fileWriteEpubMaxFileSizeMb: libraries.fileWriteEpubMaxFileSizeMb,
+        fileWriteFb2Enabled: libraries.fileWriteFb2Enabled,
+        fileWriteFb2MaxFileSizeMb: libraries.fileWriteFb2MaxFileSizeMb,
         fileWritePdfEnabled: libraries.fileWritePdfEnabled,
         fileWritePdfMaxFileSizeMb: libraries.fileWritePdfMaxFileSizeMb,
         fileWriteCbxEnabled: libraries.fileWriteCbxEnabled,
         fileWriteCbxMaxFileSizeMb: libraries.fileWriteCbxMaxFileSizeMb,
+        fileWriteKindleEnabled: libraries.fileWriteKindleEnabled,
+        fileWriteKindleMaxFileSizeMb: libraries.fileWriteKindleMaxFileSizeMb,
         fileWriteAudioEnabled: libraries.fileWriteAudioEnabled,
         fileWriteAudioMaxFileSizeMb: libraries.fileWriteAudioMaxFileSizeMb,
       })
@@ -112,8 +116,11 @@ export class FileWriteRepository {
       .orderBy(asc(books.id));
   }
 
-  async updateFileHash(bookFileId: number, fileHash: string): Promise<void> {
-    await this.db.update(bookFiles).set({ fileHash, updatedAt: new Date() }).where(eq(bookFiles.id, bookFileId));
+  async updateFileStat(bookFileId: number, fields: { fileHash?: string; mtime?: Date; sizeBytes?: number; ino?: bigint }): Promise<void> {
+    await this.db
+      .update(bookFiles)
+      .set({ ...fields, updatedAt: new Date() })
+      .where(eq(bookFiles.id, bookFileId));
   }
 
   async recordHashHistory(bookFileId: number, fileHash: string, reason: string): Promise<void> {

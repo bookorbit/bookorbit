@@ -141,7 +141,7 @@ function onSave() {
               <span class="ml-1" :style="primaryFormatStyle">{{ primaryFormat }}</span>
             </Badge>
             <Badge v-if="overriddenFields.size > 0" variant="secondary" class="h-4.5 px-1.5 text-[10px] font-bold uppercase tracking-tight">
-              {{ t('settings.metadata.fieldRules.library.overrideCount', { count: overriddenFields.size }, overriddenFields.size) }}
+              {{ t('settings.metadata.fieldRules.library.overrideCount', { count: overriddenFields.size }) }}
               <span v-if="isDirty" class="ml-1 opacity-60">{{ t('settings.metadata.fieldRules.library.unsavedSuffix') }}</span>
             </Badge>
             <Badge v-else variant="outline" class="h-4.5 px-1.5 text-[10px] font-bold uppercase tracking-tight opacity-60">

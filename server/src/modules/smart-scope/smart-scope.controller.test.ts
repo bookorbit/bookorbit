@@ -37,6 +37,7 @@ describe('SmartScopeController', () => {
       create: vi.fn().mockResolvedValue({ id: 2 }),
       reorder: vi.fn().mockResolvedValue(undefined),
       update: vi.fn().mockResolvedValue({ id: 1, name: 'Updated' }),
+      setKoboSync: vi.fn().mockResolvedValue({ id: 1, koboSyncEnabled: true }),
       remove: vi.fn().mockResolvedValue(undefined),
       executeSmartScope: vi.fn().mockResolvedValue({ items: [], total: 0, page: 0, size: 50 }),
       queryBooks: vi.fn().mockResolvedValue({ items: [], total: 0, page: 0, size: 50 }),
@@ -50,6 +51,7 @@ describe('SmartScopeController', () => {
     await controller.create({ name: 'New Smart Scope', icon: 'Aperture' } as never, user);
     await controller.reorder({ order: [{ id: 1, displayOrder: 0 }] } as never, user);
     await controller.update(1, { name: 'Updated' } as never, user);
+    await controller.setKoboSync(1, { enabled: true }, user);
     await controller.remove(1, user);
     await controller.executeSmartScope(1, user, 2, 25);
     const query: BookQuery = { sort: [{ field: 'title', dir: 'asc' }], pagination: { page: 0, size: 50 } };
@@ -61,6 +63,7 @@ describe('SmartScopeController', () => {
     expect(smartScopeService.create).toHaveBeenCalledWith({ name: 'New Smart Scope', icon: 'Aperture' }, user);
     expect(smartScopeService.reorder).toHaveBeenCalledWith({ order: [{ id: 1, displayOrder: 0 }] }, user);
     expect(smartScopeService.update).toHaveBeenCalledWith(1, { name: 'Updated' }, user);
+    expect(smartScopeService.setKoboSync).toHaveBeenCalledWith(1, user, true);
     expect(smartScopeService.remove).toHaveBeenCalledWith(1, user);
     expect(smartScopeService.executeSmartScope).toHaveBeenCalledWith(1, user, 2, 25, undefined);
     expect(smartScopeService.queryBooks).toHaveBeenCalledWith(1, user, query);

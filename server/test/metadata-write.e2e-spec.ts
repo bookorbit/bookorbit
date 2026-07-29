@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, readFile, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 
 import { eq } from 'drizzle-orm';
@@ -10,6 +10,7 @@ import { BookService, type MetadataUpdateFailpoint } from '../src/modules/book/b
 import { FileWriteService } from '../src/modules/file-write/file-write.service';
 import { extractCb7Metadata, extractCbzMetadata } from '../src/modules/metadata/lib/cbz-metadata';
 import { extractEpubMetadata } from '../src/modules/metadata/lib/epub';
+import { parseFb2File } from '../src/modules/metadata/lib/fb2-parser';
 import { parsePdfFile } from '../src/modules/metadata/lib/pdf-parser';
 import {
   authHeader,
@@ -30,6 +31,7 @@ import {
   createCb7Fixture,
   createCbzFixture,
   createEpubFixture,
+  createFb2Fixture,
   createPdfFixture,
   writeFixtureFile,
 } from './e2e/metadata-write/metadata-write-fixture-builder';
@@ -1326,6 +1328,74 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
 
       const disabledLog = await getLatestWriteLogEntry(context.db, disabledBook.bookId, 'auto');
       expect(disabledLog).toBeNull();
+    });
+
+    it('writes metadata into an fb2 book without touching its body text', async () => {
+      const library = await createLibraryWithFolder(context, {
+        mode: 'book_per_file',
+        fileWriteEnabled: true,
+        fileWriteFb2Enabled: true,
+      });
+      await createFb2Fixture(library.folderPath, 'per-format/book.fb2', { title: 'FB2 Seed', bodyText: 'untouched chapter text' });
+      await triggerAndWaitForLibraryScan(context, library.libraryId);
+      const book = await locateBookFileByRelPath(context, library.libraryId, 'per-format/book.fb2');
+      const originalBytes = await readFile(book.absolutePath);
+
+      const patchResponse = await context.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/books/${book.bookId}/metadata`,
+        headers: authHeader(context.adminToken),
+        payload: { title: 'FB2 Written Title', seriesName: 'FB2 Series', seriesIndex: 2 },
+      });
+      expect(patchResponse.statusCode).toBe(200);
+
+      const log = await waitForWriteLogEntry(context.db, book.bookId, { triggeredBy: 'auto', status: 'success' });
+      expect(log.format).toBe('fb2');
+      expect(log.fieldsWritten).toEqual(expect.arrayContaining(['title', 'seriesName', 'seriesIndex']));
+
+      const updated = await readFile(book.absolutePath, 'utf8');
+      expect(updated).toContain('<book-title>FB2 Written Title</book-title>');
+      expect(updated).toContain('<sequence name="FB2 Series" number="2"/>');
+
+      const bodyOf = (text: string) => text.slice(text.indexOf('<body'), text.lastIndexOf('</body>') + '</body>'.length);
+      expect(bodyOf(updated)).toBe(bodyOf(originalBytes.toString('utf8')));
+      expect(updated).toContain('untouched chapter text');
+
+      const reparsed = await parseFb2File(book.absolutePath);
+      expect(reparsed?.title).toBe('FB2 Written Title');
+      expect(reparsed?.seriesName).toBe('FB2 Series');
+      expect(reparsed?.seriesIndex).toBe(2);
+    });
+
+    it('skips fb2 book when the fb2 format is disabled for the library', async () => {
+      const library = await createLibraryWithFolder(context, {
+        mode: 'book_per_file',
+        fileWriteEnabled: true,
+        fileWriteFb2Enabled: false,
+      });
+      await createFb2Fixture(library.folderPath, 'per-format/disabled.fb2', { title: 'FB2 Disabled' });
+      await triggerAndWaitForLibraryScan(context, library.libraryId);
+      const book = await locateBookFileByRelPath(context, library.libraryId, 'per-format/disabled.fb2');
+      const originalBytes = await readFile(book.absolutePath);
+
+      await setLibraryFileWriteSettings(context.db, library.libraryId, { fileWriteEnabled: true, fileWriteFb2Enabled: false });
+
+      const syncResponse = await context.app.inject({
+        method: 'POST',
+        url: `/api/v1/libraries/${library.libraryId}/write-metadata-to-files`,
+        headers: authHeader(context.adminToken),
+      });
+      expect(syncResponse.statusCode).toBe(200);
+
+      const doneEvent = parseSseEvents(syncResponse.body).find(
+        (event): event is Extract<LibraryFileSyncProgressEvent, { done: true }> => 'done' in event && event.done === true,
+      );
+      expect(doneEvent).toMatchObject({ processed: 1, succeeded: 0, failed: 0, skipped: 1 });
+
+      const logEntry = await getLatestWriteLogEntry(context.db, book.bookId, 'sync');
+      expect(logEntry?.status).toBe('skipped');
+      expect(logEntry?.errorMessage).toBe('format disabled');
+      expect((await readFile(book.absolutePath)).equals(originalBytes)).toBe(true);
     });
 
     it('skips cbz book when cbx format is disabled for the library', async () => {

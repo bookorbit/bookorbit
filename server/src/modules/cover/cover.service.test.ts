@@ -1,9 +1,9 @@
 import { type LookupAddress, lookup } from 'dns/promises';
-import { mkdir, readdir, readFile, unlink, writeFile } from 'fs/promises';
+import { mkdir, readdir, readFile, rename, unlink, writeFile } from 'fs/promises';
 import type { CoverSearchResult } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
-import { coverDirPath, generateThumbnail, imageExt } from '../metadata/lib/cover';
+import { coverDirPath, generateThumbnail, imageExt, normalizeProgressiveJpeg } from '../metadata/lib/cover';
 import { COVER_CUSTOM_FILE_PREFIX, COVER_PROXY_MAX_IMAGE_BYTES, COVER_PROXY_USER_AGENT, COVER_THUMBNAIL_FILE_NAME } from './constants';
 import { CoverService } from './cover.service';
 import type { CoverProviderRegistry } from './provider-registry';
@@ -19,6 +19,7 @@ vi.mock('fs/promises', () => ({
   mkdir: vi.fn(),
   readdir: vi.fn(),
   readFile: vi.fn(),
+  rename: vi.fn(),
   writeFile: vi.fn(),
   unlink: vi.fn(),
 }));
@@ -27,6 +28,7 @@ vi.mock('../metadata/lib/cover', () => ({
   coverDirPath: vi.fn(),
   generateThumbnail: vi.fn(),
   imageExt: vi.fn(),
+  normalizeProgressiveJpeg: vi.fn(),
 }));
 
 function makeResult(url: string, previewUrl: string): CoverSearchResult {
@@ -103,6 +105,7 @@ function createService(providerRegistry: CoverProviderRegistry, options?: { asse
     { verifyUserAccess: vi.fn().mockResolvedValue(undefined) } as never,
     { get: vi.fn().mockReturnValue('/tmp/books') } as never,
     providerRegistry,
+    { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
   );
 }
 
@@ -114,6 +117,9 @@ function createMutationService(options?: { assertFieldsUnlocked?: ReturnType<typ
   const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
   const update = vi.fn().mockReturnValue({ set: updateSet });
   const mockDb = { insert, update };
+  const scoreService = {
+    calculateAndSave: vi.fn().mockResolvedValue(undefined),
+  };
 
   const service = new CoverService(
     mockDb as never,
@@ -123,9 +129,10 @@ function createMutationService(options?: { assertFieldsUnlocked?: ReturnType<typ
     { verifyUserAccess: vi.fn().mockResolvedValue(undefined) } as never,
     { get: vi.fn().mockReturnValue('/tmp/books') } as never,
     { select: vi.fn().mockReturnValue([]) } as unknown as CoverProviderRegistry,
+    scoreService as never,
   );
 
-  return { service, mockDb, updateSet };
+  return { service, mockDb, updateSet, scoreService };
 }
 
 describe('CoverService', () => {
@@ -134,10 +141,12 @@ describe('CoverService', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     lookupMock.mockReset();
     lookupMock.mockResolvedValue([{ address: '93.184.216.34', family: 4 } as LookupAddress]);
     fetchMock = vi.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
+    vi.mocked(normalizeProgressiveJpeg).mockImplementation((bytes) => Promise.resolve(bytes));
   });
 
   afterEach(() => {
@@ -470,23 +479,108 @@ describe('CoverService', () => {
     });
 
     it('saves custom cover file and thumbnail when unlocked', async () => {
-      const { service, mockDb, updateSet } = createMutationService();
+      const { service, mockDb, updateSet, scoreService } = createMutationService();
+      const source = Buffer.from('image-data');
+      const normalized = Buffer.from('normalized-image');
 
+      vi.mocked(coverDirPath).mockReturnValue('/tmp/books/covers/12');
+      vi.mocked(normalizeProgressiveJpeg).mockResolvedValue(normalized);
+      vi.mocked(imageExt).mockReturnValue('jpg');
+      vi.mocked(generateThumbnail).mockResolvedValue(Buffer.from('thumb'));
+      vi.mocked(readdir).mockResolvedValue([] as never);
+      vi.mocked(mkdir).mockResolvedValue(undefined as never);
+      vi.mocked(writeFile).mockResolvedValue(undefined);
+      vi.mocked(rename).mockResolvedValue(undefined);
+
+      await service.uploadCover(12, source, 'image/jpeg', makeUser());
+
+      expect(normalizeProgressiveJpeg).toHaveBeenCalledWith(source);
+      expect(generateThumbnail).toHaveBeenCalledWith(normalized);
+      expect(mkdir).toHaveBeenCalledWith('/tmp/books/covers/12', { recursive: true });
+      expect(writeFile).toHaveBeenCalledTimes(2);
+      expect(writeFile).toHaveBeenCalledWith(expect.stringMatching(/^\/tmp\/books\/covers\/12\/\.cover-upload-.*\.jpg\.tmp$/), normalized);
+      expect(writeFile).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/tmp\/books\/covers\/12\/\.cover-upload-.*\.thumbnail\.tmp$/),
+        Buffer.from('thumb'),
+      );
+      expect(rename).toHaveBeenNthCalledWith(
+        1,
+        expect.stringMatching(/^\/tmp\/books\/covers\/12\/\.cover-upload-.*\.thumbnail\.tmp$/),
+        `/tmp/books/covers/12/${COVER_THUMBNAIL_FILE_NAME}`,
+      );
+      expect(rename).toHaveBeenNthCalledWith(
+        2,
+        expect.stringMatching(/^\/tmp\/books\/covers\/12\/\.cover-upload-.*\.jpg\.tmp$/),
+        `/tmp/books/covers/12/${COVER_CUSTOM_FILE_PREFIX}jpg`,
+      );
+      expect(mockDb.update).toHaveBeenCalledWith(books);
+      expect(updateSet).toHaveBeenCalledWith({ updatedAt: expect.any(Date) });
+      expect(scoreService.calculateAndSave).toHaveBeenCalledWith(12);
+    });
+
+    it('propagates score persistence failures after updating the cover source', async () => {
+      const { service, scoreService } = createMutationService();
+      scoreService.calculateAndSave.mockRejectedValue(new Error('score failed'));
       vi.mocked(coverDirPath).mockReturnValue('/tmp/books/covers/12');
       vi.mocked(imageExt).mockReturnValue('jpg');
       vi.mocked(generateThumbnail).mockResolvedValue(Buffer.from('thumb'));
       vi.mocked(readdir).mockResolvedValue([] as never);
       vi.mocked(mkdir).mockResolvedValue(undefined as never);
       vi.mocked(writeFile).mockResolvedValue(undefined);
+      vi.mocked(rename).mockResolvedValue(undefined);
+
+      await expect(service.uploadCover(12, Buffer.from('image-data'), 'image/jpeg', makeUser())).rejects.toThrow('score failed');
+    });
+
+    it('preserves the existing cover when image normalization fails', async () => {
+      const { service, mockDb } = createMutationService();
+      vi.mocked(normalizeProgressiveJpeg).mockRejectedValue(new Error('invalid image'));
+
+      await expect(service.uploadCover(12, Buffer.from('invalid'), 'image/jpeg', makeUser())).rejects.toThrow('Invalid image file');
+
+      expect(mkdir).not.toHaveBeenCalled();
+      expect(writeFile).not.toHaveBeenCalled();
+      expect(rename).not.toHaveBeenCalled();
+      expect(unlink).not.toHaveBeenCalled();
+      expect(mockDb.insert).not.toHaveBeenCalled();
+    });
+
+    it('removes obsolete custom-cover formats only after replacing both files', async () => {
+      const { service } = createMutationService();
+
+      vi.mocked(coverDirPath).mockReturnValue('/tmp/books/covers/12');
+      vi.mocked(imageExt).mockReturnValue('jpg');
+      vi.mocked(generateThumbnail).mockResolvedValue(Buffer.from('thumb'));
+      vi.mocked(readdir).mockResolvedValue(['cover_custom.png', 'cover_custom.jpg'] as never);
+      vi.mocked(mkdir).mockResolvedValue(undefined as never);
+      vi.mocked(writeFile).mockResolvedValue(undefined);
+      vi.mocked(rename).mockResolvedValue(undefined);
+      vi.mocked(unlink).mockResolvedValue(undefined);
 
       await service.uploadCover(12, Buffer.from('image-data'), 'image/jpeg', makeUser());
 
-      expect(mkdir).toHaveBeenCalledWith('/tmp/books/covers/12', { recursive: true });
-      expect(writeFile).toHaveBeenCalledTimes(2);
-      expect(writeFile).toHaveBeenCalledWith(`/tmp/books/covers/12/${COVER_CUSTOM_FILE_PREFIX}jpg`, Buffer.from('image-data'));
-      expect(writeFile).toHaveBeenCalledWith(`/tmp/books/covers/12/${COVER_THUMBNAIL_FILE_NAME}`, Buffer.from('thumb'));
-      expect(mockDb.update).toHaveBeenCalledWith(books);
-      expect(updateSet).toHaveBeenCalledWith({ updatedAt: expect.any(Date) });
+      expect(unlink).toHaveBeenCalledWith('/tmp/books/covers/12/cover_custom.png');
+      expect(unlink).not.toHaveBeenCalledWith('/tmp/books/covers/12/cover_custom.jpg');
+      expect(vi.mocked(unlink).mock.invocationCallOrder[0]).toBeGreaterThan(vi.mocked(rename).mock.invocationCallOrder[1]);
+    });
+
+    it('keeps the old custom cover when atomic replacement fails', async () => {
+      const { service, mockDb } = createMutationService();
+
+      vi.mocked(coverDirPath).mockReturnValue('/tmp/books/covers/12');
+      vi.mocked(imageExt).mockReturnValue('jpg');
+      vi.mocked(generateThumbnail).mockResolvedValue(Buffer.from('thumb'));
+      vi.mocked(mkdir).mockResolvedValue(undefined as never);
+      vi.mocked(writeFile).mockResolvedValue(undefined);
+      vi.mocked(rename).mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('rename failed'));
+      vi.mocked(unlink).mockRejectedValue(new Error('cleanup failed'));
+
+      await expect(service.uploadCover(12, Buffer.from('image-data'), 'image/jpeg', makeUser())).rejects.toThrow('rename failed');
+
+      expect(readdir).not.toHaveBeenCalled();
+      expect(unlink).not.toHaveBeenCalledWith('/tmp/books/covers/12/cover_custom.jpg');
+      expect(unlink).toHaveBeenCalledWith(expect.stringMatching(/^\/tmp\/books\/covers\/12\/\.cover-upload-.*\.jpg\.tmp$/));
+      expect(mockDb.insert).not.toHaveBeenCalled();
     });
 
     it('removes custom cover and restores extracted if available', async () => {

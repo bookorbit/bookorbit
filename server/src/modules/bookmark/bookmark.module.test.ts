@@ -8,6 +8,7 @@ import { BookmarkController } from './bookmark.controller';
 import { BookmarkModule } from './bookmark.module';
 import { BookmarkRepository } from './bookmark.repository';
 import { BookmarkService } from './bookmark.service';
+import { BookmarkSyncService } from './bookmark-sync.service';
 
 describe('BookmarkModule', () => {
   it('registers expected controller and providers', () => {
@@ -15,6 +16,7 @@ describe('BookmarkModule', () => {
     const providers = Reflect.getMetadata(MODULE_METADATA.PROVIDERS, BookmarkModule) as Array<unknown>;
 
     expect(controllers).toEqual([BookmarkController]);
-    expect(providers).toEqual(expect.arrayContaining([BookmarkService, BookmarkRepository]));
+    expect(providers).toEqual(expect.arrayContaining([BookmarkService, BookmarkSyncService, BookmarkRepository]));
+    expect(Reflect.getMetadata(MODULE_METADATA.EXPORTS, BookmarkModule)).toEqual([BookmarkSyncService]);
   });
 });

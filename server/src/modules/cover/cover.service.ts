@@ -1,10 +1,11 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CoverSearchResult } from '@bookorbit/types';
+import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { mkdir, readdir, readFile, unlink, writeFile } from 'fs/promises';
-import { join } from 'path';
+import { mkdir, readdir, readFile, rename, unlink, writeFile } from 'fs/promises';
+import { basename, join } from 'path';
 
 import { bookCoverDirPath, bookThumbnailPath, findExtractedBookCoverFileName } from '../../common/book-cover-storage';
 import type { RequestUser } from '../../common/types/request-user';
@@ -17,7 +18,8 @@ import { BookReadService } from '../book/book-read.service';
 import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
 import { FileWriteService } from '../file-write/file-write.service';
 import { LibraryService } from '../library/library.service';
-import { generateThumbnail, imageExt } from '../metadata/lib/cover';
+import { generateThumbnail, imageExt, normalizeProgressiveJpeg } from '../metadata/lib/cover';
+import { MetadataScoreService } from '../metadata-score/metadata-score.service';
 import {
   COVER_CUSTOM_FILE_PREFIX,
   COVER_PROXY_MAX_IMAGE_BYTES,
@@ -53,6 +55,7 @@ export class CoverService {
     private readonly libraryService: LibraryService,
     private readonly config: ConfigService,
     private readonly providerRegistry: CoverProviderRegistry,
+    private readonly metadataScoreService: MetadataScoreService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
@@ -240,14 +243,42 @@ export class CoverService {
   }
 
   private async saveCustomCover(bookId: number, buffer: Buffer): Promise<void> {
+    let coverBytes: Buffer;
+    let thumb: Buffer;
+    try {
+      coverBytes = await normalizeProgressiveJpeg(buffer);
+      thumb = await generateThumbnail(coverBytes);
+    } catch {
+      throw new BadRequestException('Invalid image file');
+    }
+
     const dir = bookCoverDirPath(this.appDataPath, bookId);
     await mkdir(dir, { recursive: true });
-    await this.deleteFilesByPrefix(dir, COVER_CUSTOM_FILE_PREFIX);
 
-    const ext = imageExt(buffer);
-    await writeFile(join(dir, `${COVER_CUSTOM_FILE_PREFIX}${ext}`), buffer);
-    const thumb = await generateThumbnail(buffer);
-    await writeFile(bookThumbnailPath(this.appDataPath, bookId), thumb);
+    const ext = imageExt(coverBytes);
+    const coverPath = join(dir, `${COVER_CUSTOM_FILE_PREFIX}${ext}`);
+    const thumbnailPath = bookThumbnailPath(this.appDataPath, bookId);
+    const tempId = randomUUID();
+    const tempCoverPath = join(dir, `.cover-upload-${tempId}.${ext}.tmp`);
+    const tempThumbnailPath = join(dir, `.cover-upload-${tempId}.thumbnail.tmp`);
+    let tempCoverExists = false;
+    let tempThumbnailExists = false;
+
+    try {
+      await writeFile(tempCoverPath, coverBytes);
+      tempCoverExists = true;
+      await writeFile(tempThumbnailPath, thumb);
+      tempThumbnailExists = true;
+
+      await rename(tempThumbnailPath, thumbnailPath);
+      tempThumbnailExists = false;
+      await rename(tempCoverPath, coverPath);
+      tempCoverExists = false;
+      await this.deleteFilesByPrefix(dir, COVER_CUSTOM_FILE_PREFIX, basename(coverPath));
+    } finally {
+      const cleanupPaths = [...(tempCoverExists ? [tempCoverPath] : []), ...(tempThumbnailExists ? [tempThumbnailPath] : [])];
+      await Promise.all(cleanupPaths.map((path) => this.cleanupTemporaryCoverFile(bookId, path)));
+    }
   }
 
   private async findExtractedCover(bookId: number): Promise<string | null> {
@@ -270,6 +301,7 @@ export class CoverService {
       .values({ bookId, coverSource: source, updatedAt: now })
       .onConflictDoUpdate({ target: bookMetadata.bookId, set: { coverSource: source, updatedAt: now } });
     await this.db.update(books).set({ updatedAt: now }).where(eq(books.id, bookId));
+    await this.metadataScoreService.calculateAndSave(bookId);
   }
 
   private async fetchRemoteImage(rawUrl: string): Promise<{ buffer: Buffer; contentType: string }> {
@@ -395,10 +427,10 @@ export class CoverService {
     }
   }
 
-  private async deleteFilesByPrefix(path: string, prefix: string): Promise<void> {
+  private async deleteFilesByPrefix(path: string, prefix: string, exceptFileName?: string): Promise<void> {
     const files = await this.readDirIfExists(path);
     for (const fileName of files) {
-      if (!fileName.startsWith(prefix)) continue;
+      if (!fileName.startsWith(prefix) || fileName === exceptFileName) continue;
       await this.removeFileIfPresent(join(path, fileName));
     }
   }
@@ -409,6 +441,16 @@ export class CoverService {
     } catch (error) {
       if (hasErrorCode(error, 'ENOENT')) return;
       throw error;
+    }
+  }
+
+  private async cleanupTemporaryCoverFile(bookId: number, path: string): Promise<void> {
+    try {
+      await this.removeFileIfPresent(path);
+    } catch (error) {
+      this.logger.warn(
+        `[cover.upload_cleanup] [fail] bookId=${bookId} errorClass=${errorClass(error)} error="${sanitizeErrorMessage(error)}" - temporary cover upload file cleanup failed`,
+      );
     }
   }
 

@@ -469,7 +469,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
     );
   });
 
-  it('processOne marks done and clears session when metadata pipeline succeeds', async () => {
+  it('processOne marks the queue item failed when score persistence fails', async () => {
     const { service, queueRepo, bookReadService, pipeline, scoreService, session } = makeService();
     session.addToTotal(1);
     bookReadService.findById.mockResolvedValue({
@@ -488,9 +488,9 @@ describe('BookMetadataFetchOrchestratorService', () => {
 
     await (service as any).processOne(90, 'Book');
 
-    expect(queueRepo.markDone).toHaveBeenCalledWith(90);
-    expect(queueRepo.markFailed).not.toHaveBeenCalled();
-    expect(session.getSnapshot().sessionDone).toBe(1);
+    expect(queueRepo.markDone).not.toHaveBeenCalled();
+    expect(queueRepo.markFailed).toHaveBeenCalledWith(90, 'score delayed', undefined);
+    expect(session.getSnapshot().sessionDone).toBe(0);
     expect(session.getSnapshot().currentItemName).toBeNull();
   });
 

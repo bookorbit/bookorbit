@@ -38,6 +38,7 @@ function makeWeights(): MetadataScoreWeights {
     openLibraryId: 1,
     itunesId: 1,
     koboId: 1,
+    aladinId: 1,
   };
 }
 
@@ -128,6 +129,44 @@ describe('MetadataScoreService', () => {
 
     expect(scorer.compute).not.toHaveBeenCalled();
     expect(repo.updateMetadataScore).not.toHaveBeenCalled();
+  });
+
+  it('serializes concurrent score calculations for the same book', async () => {
+    const { service, repo, scorer, appSettings } = makeService();
+    const firstLoad = deferred<Record<string, unknown>>();
+    const firstData = { title: 'Before' };
+    const secondData = { title: 'After' };
+    repo.loadScoreData.mockReturnValueOnce(firstLoad.promise).mockResolvedValueOnce(secondData);
+    appSettings.getMetadataScoreWeights.mockResolvedValue(makeWeights());
+    scorer.compute.mockReturnValueOnce(20).mockReturnValueOnce(90);
+
+    const firstCalculation = service.calculateAndSave(12);
+    const secondCalculation = service.calculateAndSave(12);
+    for (let attempt = 0; attempt < 5 && repo.loadScoreData.mock.calls.length === 0; attempt++) {
+      await Promise.resolve();
+    }
+
+    expect(repo.loadScoreData).toHaveBeenCalledTimes(1);
+    firstLoad.resolve(firstData);
+    await Promise.all([firstCalculation, secondCalculation]);
+
+    expect(repo.loadScoreData).toHaveBeenCalledTimes(2);
+    expect(repo.updateMetadataScore).toHaveBeenNthCalledWith(1, 12, 20);
+    expect(repo.updateMetadataScore).toHaveBeenNthCalledWith(2, 12, 90);
+  });
+
+  it('recalculates unique books in bulk with one weights lookup', async () => {
+    const { service, repo, scorer, appSettings } = makeService();
+    repo.loadScoreData.mockResolvedValue({ title: 'Book' });
+    appSettings.getMetadataScoreWeights.mockResolvedValue(makeWeights());
+    scorer.compute.mockReturnValue(75);
+
+    await service.calculateAndSaveMany([3, 5, 3, 0]);
+
+    expect(appSettings.getMetadataScoreWeights).toHaveBeenCalledTimes(1);
+    expect(repo.loadScoreData).toHaveBeenCalledTimes(2);
+    expect(repo.updateMetadataScore).toHaveBeenCalledWith(3, 75);
+    expect(repo.updateMetadataScore).toHaveBeenCalledWith(5, 75);
   });
 
   it('starts manual recalculation and reports completed status with success/failure counters', async () => {

@@ -10,5 +10,6 @@ import { SeriesService } from './series.service';
   imports: [BookModule, LibraryModule],
   controllers: [SeriesController],
   providers: [SeriesService, SeriesRepository],
+  exports: [SeriesService],
 })
 export class SeriesModule {}

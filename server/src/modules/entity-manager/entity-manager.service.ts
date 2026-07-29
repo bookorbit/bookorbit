@@ -18,6 +18,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { FileWriteService } from '../file-write/file-write.service';
 import { LibraryService } from '../library/library.service';
+import { MetadataScoreService } from '../metadata-score/metadata-score.service';
 import { EntityManagerRepository } from './entity-manager.repository';
 import { DuplicateComputeService } from './duplicate-compute.service';
 import type { EntityBookScope, EntityStrategy, RawCandidatePair } from './strategies/entity-strategy.interface';
@@ -48,6 +49,7 @@ export class EntityManagerService {
     private readonly repo: EntityManagerRepository,
     private readonly libraryService: LibraryService,
     private readonly fileWriteService: FileWriteService,
+    private readonly metadataScoreService: MetadataScoreService,
     private readonly duplicateCompute: DuplicateComputeService,
     authorStrategy: AuthorStrategy,
     genreStrategy: GenreStrategy,
@@ -260,6 +262,7 @@ export class EntityManagerService {
       if (writeFiles) {
         this.scheduleWrites(result.affectedBookIds, user.id);
       }
+      await this.metadataScoreService.calculateAndSaveMany(result.affectedBookIds);
 
       this.logger.log(
         `[${event}] [end] userId=${user.id} entityType=${entityType} durationMs=${Date.now() - startedAt} affectedBooks=${result.affectedBookIds.length} - merge completed`,
@@ -294,6 +297,7 @@ export class EntityManagerService {
       if (writeFiles) {
         this.scheduleWrites(result.affectedBookIds, user.id);
       }
+      await this.metadataScoreService.calculateAndSaveMany(result.affectedBookIds);
 
       this.logger.log(
         `[${event}] [end] userId=${user.id} entityType=${entityType} durationMs=${Date.now() - startedAt} implicitMerge=${result.wasImplicitMerge} - rename completed`,
@@ -343,6 +347,7 @@ export class EntityManagerService {
       if (writeFiles) {
         this.scheduleWrites(result.affectedBookIds, user.id);
       }
+      await this.metadataScoreService.calculateAndSaveMany(result.affectedBookIds);
 
       this.logger.log(
         `[${event}] [end] userId=${user.id} entityType=${entityType} durationMs=${Date.now() - startedAt} affectedBooks=${result.affectedBookIds.length} - delete completed`,
@@ -403,6 +408,7 @@ export class EntityManagerService {
       if (writeFiles) {
         this.scheduleWrites(result.affectedBookIds, user.id);
       }
+      await this.metadataScoreService.calculateAndSaveMany(result.affectedBookIds);
 
       this.logger.log(
         `[${event}] [end] userId=${user.id} entityType=${entityType} durationMs=${Date.now() - startedAt} newEntities=${result.newEntities.length} - split completed`,

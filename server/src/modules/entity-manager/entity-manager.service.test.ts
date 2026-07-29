@@ -43,6 +43,9 @@ function makeService() {
   const fileWriteService = {
     scheduleWrite: vi.fn(),
   };
+  const metadataScoreService = {
+    calculateAndSaveMany: vi.fn().mockResolvedValue(undefined),
+  };
 
   const duplicateCompute = {
     readCandidatePairs: vi.fn().mockResolvedValue([]),
@@ -63,6 +66,7 @@ function makeService() {
     repo as any,
     libraryService as any,
     fileWriteService as any,
+    metadataScoreService as any,
     duplicateCompute as any,
     authorStrategy as any,
     genreStrategy as any,
@@ -78,6 +82,7 @@ function makeService() {
     repo,
     libraryService,
     fileWriteService,
+    metadataScoreService,
     duplicateCompute,
     strategies: {
       author: authorStrategy,
@@ -600,7 +605,7 @@ describe('EntityManagerService', () => {
 
   describe('merge', () => {
     it('calls strategy merge and cleans up dismissed pairs for first-class', async () => {
-      const { service, strategies, repo, duplicateCompute } = makeService();
+      const { service, strategies, repo, duplicateCompute, metadataScoreService } = makeService();
       (strategies.author.merge as any).mockResolvedValue({
         affectedBookIds: [10, 20],
         imagePromoted: true,
@@ -615,6 +620,7 @@ describe('EntityManagerService', () => {
       expect(repo.deleteDismissedPairsForEntity).toHaveBeenCalledWith('author', 3);
       expect(duplicateCompute.invalidateCandidatesForEntities).toHaveBeenCalledTimes(1);
       expect(duplicateCompute.invalidateCandidatesForEntities).toHaveBeenCalledWith('author', [2, 3]);
+      expect(metadataScoreService.calculateAndSaveMany).toHaveBeenCalledWith([10, 20]);
       expect(result).toEqual({
         targetId: 1,
         mergedIds: [2, 3],
@@ -622,6 +628,14 @@ describe('EntityManagerService', () => {
         imagePromoted: true,
         fieldsResolved: ['sortName'],
       });
+    });
+
+    it('propagates score persistence failures', async () => {
+      const { service, strategies, metadataScoreService } = makeService();
+      (strategies.author.merge as any).mockResolvedValue({ affectedBookIds: [10] });
+      metadataScoreService.calculateAndSaveMany.mockRejectedValue(new Error('score failed'));
+
+      await expect(service.merge('author', mockUser, 1, [2], false)).rejects.toThrow('score failed');
     });
 
     it('invalidates candidate rows once for all merged source IDs', async () => {

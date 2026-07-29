@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { CbxReaderSettings } from '@bookorbit/types'
+import { CBX_SPREAD_GAP_MAX, CBX_SPREAD_GAP_MIN, type CbxReaderSettings } from '@bookorbit/types'
 import { useReaderDefaultSettings } from '@/features/reader/shared/composables/useReaderSettings'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 
@@ -17,6 +17,14 @@ const props = withDefaults(
 )
 
 const { effective, load, update, reset } = useReaderDefaultSettings<CbxReaderSettings>('cbx')
+
+function updateSpreadGapFromEvent(event: Event) {
+  const target = event.target
+  if (!(target instanceof HTMLInputElement)) return
+  const spreadGap = Number(target.value)
+  if (!Number.isInteger(spreadGap) || spreadGap < CBX_SPREAD_GAP_MIN || spreadGap > CBX_SPREAD_GAP_MAX) return
+  update({ spreadGap })
+}
 
 onMounted(load)
 </script>
@@ -195,6 +203,29 @@ onMounted(load)
             >
               {{ t('settings.reader.comics.alignmentShifted') }}
             </button>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+          <div>
+            <label for="default-cbz-spread-gap" class="settings-label">{{ t('settings.reader.comics.spreadGap') }}</label>
+            <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:overflow-visible md:whitespace-normal">
+              {{ t('settings.reader.comics.spreadGapHint') }}
+            </p>
+          </div>
+          <div class="flex w-full max-w-72 items-center gap-3 md:w-64">
+            <input
+              id="default-cbz-spread-gap"
+              type="range"
+              :min="CBX_SPREAD_GAP_MIN"
+              :max="CBX_SPREAD_GAP_MAX"
+              :value="effective.spreadGap"
+              class="min-w-0 flex-1 accent-primary"
+              @input="updateSpreadGapFromEvent"
+            />
+            <span class="w-12 text-end text-xs tabular-nums text-muted-foreground">
+              {{ t('settings.reader.comics.spreadGapValue', { value: effective.spreadGap }) }}
+            </span>
           </div>
         </div>
 

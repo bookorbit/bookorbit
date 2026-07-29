@@ -17,6 +17,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { bookFiles } from './books';
+import { bookmarks } from './reader';
 import { users } from './auth';
 
 export const koreaderUsers = pgTable(
@@ -297,3 +298,39 @@ export const koreaderDeviceSweeps = pgTable(
 
 export type KoreaderDeviceSweep = typeof koreaderDeviceSweeps.$inferSelect;
 export type NewKoreaderDeviceSweep = typeof koreaderDeviceSweeps.$inferInsert;
+
+/**
+ * One row per (bookmark, device): what a KOReader device holds locally, and under
+ * which local identity. It is what lets a bookmark absent from a device's key set
+ * be recognised as a device-side deletion, and what stops an already-delivered
+ * bookmark from being pushed again.
+ */
+export const koreaderBookmarkLinks = pgTable(
+  'koreader_bookmark_links',
+  {
+    id: serial('id').primaryKey(),
+    bookmarkId: integer('bookmark_id')
+      .notNull()
+      .references(() => bookmarks.id, { onDelete: 'cascade' }),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    deviceId: varchar('device_id', { length: 100 }).notNull(),
+    // md5 hex of `${deviceDatetime}|${devicePos}` as the device computed it.
+    koreaderKey: varchar('koreader_key', { length: 32 }).notNull(),
+    deviceDatetime: varchar('device_datetime', { length: 19 }),
+    appliedAt: timestamp('applied_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex('koreader_bookmark_links_bookmark_device_uidx').on(t.bookmarkId, t.deviceId),
+    // Non-unique for the same reason annotation_sync_state's key index is: the same
+    // device key can legitimately exist for two books (one file scanned into two
+    // libraries), and lookups are book-scoped anyway.
+    index('koreader_bookmark_links_user_device_key_idx').on(t.userId, t.deviceId, t.koreaderKey),
+    index('koreader_bookmark_links_user_device_idx').on(t.userId, t.deviceId),
+    index('koreader_bookmark_links_bookmark_id_idx').on(t.bookmarkId),
+  ],
+);
+
+export type KoreaderBookmarkLink = typeof koreaderBookmarkLinks.$inferSelect;
+export type NewKoreaderBookmarkLink = typeof koreaderBookmarkLinks.$inferInsert;

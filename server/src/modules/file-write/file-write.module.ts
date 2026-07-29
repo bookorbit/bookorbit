@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 
+import { SelfWriteRegistryModule } from '../../common/self-write-registry.module';
 import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { NotificationModule } from '../notification/notification.module';
 import { BulkRenameRepository } from './bulk-rename.repository';
@@ -14,11 +15,13 @@ import { AudioMetadataEmbedder } from './formats/audio/audio-metadata-embedder';
 import { Cb7FormatWriter } from './formats/cbx/cb7-format-writer';
 import { CbzFormatWriter } from './formats/cbx/cbz-format-writer';
 import { EpubFormatWriter } from './formats/epub/epub-format-writer';
+import { Fb2FormatWriter } from './formats/fb2/fb2-format-writer';
+import { Azw3FormatWriter, AzwFormatWriter, MobiEbookFormatWriter } from './formats/mobi/mobi-format-writer';
 import { PdfFormatWriter } from './formats/pdf/pdf-format-writer';
 import { FORMAT_WRITERS } from './interfaces/format-writer.interface';
 
 @Module({
-  imports: [forwardRef(() => NotificationModule), AppSettingsModule],
+  imports: [forwardRef(() => NotificationModule), AppSettingsModule, SelfWriteRegistryModule],
   providers: [
     FileWriteService,
     FileWriteRepository,
@@ -28,9 +31,13 @@ import { FORMAT_WRITERS } from './interfaces/format-writer.interface';
     BulkRenameRepository,
     AudioMetadataEmbedder,
     EpubFormatWriter,
+    Fb2FormatWriter,
     PdfFormatWriter,
     CbzFormatWriter,
     Cb7FormatWriter,
+    MobiEbookFormatWriter,
+    Azw3FormatWriter,
+    AzwFormatWriter,
     M4bAudioFormatWriter,
     M4aAudioFormatWriter,
     Mp3AudioFormatWriter,
@@ -39,19 +46,27 @@ import { FORMAT_WRITERS } from './interfaces/format-writer.interface';
       provide: FORMAT_WRITERS,
       useFactory: (
         epub: EpubFormatWriter,
+        fb2: Fb2FormatWriter,
         pdf: PdfFormatWriter,
         cbz: CbzFormatWriter,
         cb7: Cb7FormatWriter,
+        mobi: MobiEbookFormatWriter,
+        azw3: Azw3FormatWriter,
+        azw: AzwFormatWriter,
         m4b: M4bAudioFormatWriter,
         m4a: M4aAudioFormatWriter,
         mp3: Mp3AudioFormatWriter,
         flac: FlacAudioFormatWriter,
-      ) => [epub, pdf, cbz, cb7, m4b, m4a, mp3, flac],
+      ) => [epub, fb2, pdf, cbz, cb7, mobi, azw3, azw, m4b, m4a, mp3, flac],
       inject: [
         EpubFormatWriter,
+        Fb2FormatWriter,
         PdfFormatWriter,
         CbzFormatWriter,
         Cb7FormatWriter,
+        MobiEbookFormatWriter,
+        Azw3FormatWriter,
+        AzwFormatWriter,
         M4bAudioFormatWriter,
         M4aAudioFormatWriter,
         Mp3AudioFormatWriter,

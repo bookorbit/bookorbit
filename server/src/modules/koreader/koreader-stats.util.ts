@@ -1,4 +1,6 @@
 export const KOREADER_SESSION_GAP_SECONDS = 1800;
+/** Upper bound accepted for a single page event, used to bound backward window scans. */
+export const KOREADER_MAX_EVENT_DURATION_SECONDS = 86400;
 export const KOREADER_MIN_SESSION_SECONDS = 10;
 export const KOREADER_BACKFILL_EVENT_THRESHOLD = 20;
 

@@ -78,6 +78,7 @@ describe('SystemAllSettings', () => {
     it('renders AuditLogPage when tab=audit-log', () => {
       const wrapper = mountComponent('audit-log', { su: true })
       expect(wrapper.find('[data-testid="audit-log"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="audit-log"]').element.parentElement?.classList.contains('max-w-[96rem]')).toBe(true)
     })
   })
 

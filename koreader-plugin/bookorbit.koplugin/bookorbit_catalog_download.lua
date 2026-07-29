@@ -19,8 +19,9 @@ local util = require("util")
 local T = require("ffi/util").template
 local _ = require("gettext")
 
-local BookOrbitState = require("bookorbit_state")
+local BookOrbitStateManager = require("bookorbit_state_manager")
 local CatalogUtil = require("bookorbit_catalog_util")
+local Transfer = require("bookorbit_download_transfer")
 
 local formatBytes = CatalogUtil.formatBytes
 local safeFilenameBase = CatalogUtil.safeFilenameBase
@@ -274,55 +275,109 @@ function CatalogDownload.install(Catalog)
         end
     end
 
+    -- Cancelling bumps the generation. The child keeps running until its socket
+    -- work ends, but its result is discarded and its temporary file removed, so
+    -- a late completion can never publish over a cancelled download.
+    function Catalog:nextDownloadGeneration()
+        self.download_generation = (self.download_generation or 0) + 1
+        return self.download_generation
+    end
+
+    function Catalog:downloadProgressText(filename, received, total)
+        if total and total > 0 then
+            local pct = math.min(100, math.floor(received / total * 100))
+            return T(_("Downloading:\n%1\n\n%2"), filename, pct .. "%"), math.floor(pct / 5)
+        end
+        return T(_("Downloading:\n%1\n\n%2"), filename, formatBytes(received)),
+            math.floor(received / (256 * 1024))
+    end
+
     function Catalog:downloadFile(local_path, detail, file)
         local filename = local_path:match("[^/]+$") or safeFilenameBase(detail)
         local total = file.sizeBytes
-        local info = InfoMessage:new{ text = T(_("Downloading:\n%1"), filename) }
-        UIManager:show(info)
-        UIManager:forceRePaint()
+        local root = self:getCurrentDownloadDir()
+        local generation = self:nextDownloadGeneration()
+        Transfer.sweepStale(root)
 
-        local last_bucket = -1
-        local function on_progress(received)
-            local text, bucket
-            if total and total > 0 then
-                local pct = math.min(100, math.floor(received / total * 100))
-                bucket = math.floor(pct / 5)
-                if bucket == last_bucket then return end
-                text = T(_("Downloading:\n%1\n\n%2"), filename, pct .. "%")
+        local dialog
+        local function closeDialog()
+            if not dialog then return end
+            UIManager:close(dialog)
+            dialog = nil
+        end
+        local function showStatus(text)
+            if dialog then
+                dialog:setTitle(text)
             else
-                bucket = math.floor(received / (256 * 1024))
-                if bucket == last_bucket then return end
-                text = T(_("Downloading:\n%1\n\n%2"), filename, formatBytes(received))
+                dialog = ButtonDialog:new{
+                    title = text,
+                    buttons = {
+                        {
+                            {
+                                text = _("Cancel"),
+                                callback = function()
+                                    self:nextDownloadGeneration()
+                                    closeDialog()
+                                    UIManager:show(InfoMessage:new{ text = _("Download cancelled."), timeout = 2 })
+                                end,
+                            },
+                        },
+                    },
+                }
+                UIManager:show(dialog)
             end
-            last_bucket = bucket
-            UIManager:close(info)
-            info = InfoMessage:new{ text = text }
-            UIManager:show(info)
             UIManager:forceRePaint()
         end
 
-        local ok, err = self.client:downloadCatalogFile(file.id, local_path, on_progress)
-        UIManager:close(info)
-        if not ok then
-            self:showRetry(err, function()
-                self:downloadFile(local_path, detail, file)
-            end)
-            return
+        local last_bucket = -1
+        local function onProgress(received)
+            -- A poll that lands after cancellation must not resurrect the
+            -- dialog the user just dismissed.
+            if self.download_generation ~= generation then return end
+            local text, bucket = self:downloadProgressText(filename, received or 0, total)
+            if bucket == last_bucket then return end
+            last_bucket = bucket
+            showStatus(text)
         end
 
-        local linked = self:linkDownloadedFile(local_path)
-        if linked then
-            self:refreshOnDevice()
-            if self.markStackDirty then self:markStackDirty() end
-            local on_catalog_page = (self.bookMode and self:bookMode())
-                or (self.dashboardMode and self:dashboardMode())
-            if self.detailMode and self:detailMode() then
-                self:refreshDetailView()
-            elseif self.updateItems and on_catalog_page then
-                self:updateItems()
+        showStatus(T(_("Downloading:\n%1"), filename))
+        self:runOffThread(function()
+            local ok, err = Transfer.run{
+                root = root,
+                destination = local_path,
+                generation = generation,
+                expected_bytes = total,
+                on_progress = onProgress,
+                is_current = function()
+                    return self.download_generation == generation
+                end,
+                perform = function(download_opts)
+                    return self.client:downloadCatalogFile(file.id, local_path, download_opts)
+                end,
+            }
+            closeDialog()
+            if not ok then
+                if err == "cancelled" then return end
+                self:showRetry(err, function()
+                    self:downloadFile(local_path, detail, file)
+                end)
+                return
             end
-        end
-        self:showDownloadedDialog(local_path, linked)
+
+            local linked = self:linkDownloadedFile(local_path)
+            if linked then
+                self:refreshOnDevice()
+                if self.markStackDirty then self:markStackDirty() end
+                local on_catalog_page = (self.bookMode and self:bookMode())
+                    or (self.dashboardMode and self:dashboardMode())
+                if self.detailMode and self:detailMode() then
+                    self:refreshDetailView()
+                elseif self.updateItems and on_catalog_page then
+                    self:updateItems()
+                end
+            end
+            self:showDownloadedDialog(local_path, linked)
+        end)
     end
 
     function Catalog:linkDownloadedFile(local_path)
@@ -337,18 +392,24 @@ function CatalogDownload.install(Catalog)
             logger.warn("BookOrbit: downloaded file match-check failed", err)
             return false
         end
+        BookOrbitStateManager.applyLibraryVersion(body.libraryVersion)
 
-        local state = BookOrbitState.open()
-        state:rememberFile(local_path, digest)
         for _, match in ipairs(body.matches or {}) do
             if match.hash == digest then
-                state:setMatched(digest, match.bookFileId, match.bookId, local_path)
-                state:flush()
+                -- Patches the cached on-device maps forward instead of forcing
+                -- a full matched-library rescan per downloaded file.
+                BookOrbitStateManager.linkFile(digest, match.bookFileId, match.bookId, local_path)
                 return true
             end
         end
-        state:setUnmatched(digest)
-        state:flush()
+        BookOrbitStateManager.mutateScoped({
+            digests = { digest },
+            files = { local_path },
+            global = false,
+        }, function(state)
+            state:rememberFile(local_path, digest)
+            state:setUnmatched(digest)
+        end)
         return false
     end
 

@@ -15,7 +15,7 @@ import { UpdateMeDto } from './dto/update-me.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateMeSettingsDto } from './dto/update-me-settings.dto';
 import { UpdateSeriesCollapsePreferencesDto } from './dto/update-series-collapse-preferences.dto';
-import { UserRepository } from './user.repository';
+import { UserRepository, type UserListQuery } from './user.repository';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 
 @Injectable()
@@ -79,8 +79,8 @@ export class UserService {
     return this.userRepo.create(data);
   }
 
-  findAll(page = 0, pageSize = 50, provisioningMethod?: string) {
-    return this.userRepo.findAll(page, pageSize, provisioningMethod);
+  findAll(query: UserListQuery) {
+    return this.userRepo.findAll(query);
   }
 
   findAssignable() {

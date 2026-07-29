@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { READER_GROUP_DEFAULTS, getFormatGroup, type ReaderFormatGroup } from '@bookorbit/types';
+import { CBX_SPREAD_GAP_MAX, CBX_SPREAD_GAP_MIN, READER_GROUP_DEFAULTS, getFormatGroup, type ReaderFormatGroup } from '@bookorbit/types';
 import { z } from 'zod';
 
 import type { RequestUser } from '../../common/types/request-user';
@@ -46,6 +46,7 @@ const CBX_SETTINGS_SCHEMA = z
     scrollMode: z.enum(['paginated', 'infinite', 'long-strip']),
     direction: z.enum(['ltr', 'rtl']),
     spreadAlignment: z.enum(['normal', 'shifted']),
+    spreadGap: z.number().int().min(CBX_SPREAD_GAP_MIN).max(CBX_SPREAD_GAP_MAX).default(CBX_SPREAD_GAP_MIN),
     forceTwoPage: z.boolean(),
     widePageSingletonMode: z.enum(['auto', 'disable']),
     bgColor: z.enum(['black', 'gray', 'white']),

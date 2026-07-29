@@ -31,18 +31,18 @@ function thumbnailUrl(bookId: number): string {
 
 <template>
   <div v-if="colId === 'lockRow'" class="flex h-6 w-6 items-center justify-center">
-    <LibraryBig :size="13" class="text-muted-foreground/60" />
+    <LibraryBig :size="13" class="text-muted-foreground" />
   </div>
 
   <div v-else-if="colId === 'readStatus'" class="flex w-full items-center px-1 py-0.5">
     <div class="flex w-3 items-center justify-center">
-      <span class="text-[10px] text-muted-foreground/40">-</span>
+      <span class="text-[10px] text-muted-foreground">-</span>
     </div>
   </div>
 
   <div v-else-if="colId === 'read'" class="flex w-full items-center justify-start">
     <div class="mr-auto flex h-7 w-7 items-center justify-center">
-      <span class="text-[10px] text-muted-foreground/40">-</span>
+      <span class="text-[10px] text-muted-foreground">-</span>
     </div>
   </div>
 
@@ -73,18 +73,18 @@ function thumbnailUrl(bookId: number): string {
 
   <div v-else-if="colId === 'title'" class="flex items-center gap-2 min-w-0 h-full px-1">
     <span class="font-medium text-sm truncate block">{{ seriesName }}</span>
-    <span class="text-xs text-muted-foreground shrink-0 mt-0.5">{{ t('book.table.series.bookCount', { count: bookCount }, bookCount) }}</span>
+    <span class="text-xs text-muted-foreground shrink-0 mt-0.5">{{ t('book.table.series.bookCount', { count: bookCount }) }}</span>
     <span v-if="readCount > 0" class="text-xs text-muted-foreground shrink-0 mt-0.5"
       >&middot; {{ t('book.table.series.readOfCount', { read: readCount, total: bookCount }) }}</span
     >
   </div>
 
   <div v-else-if="colId === 'actions'" class="flex h-full w-6 items-center justify-center">
-    <ChevronRight :size="16" class="text-muted-foreground/60 group-hover:text-foreground transition-colors" />
+    <ChevronRight :size="16" class="text-muted-foreground group-hover:text-foreground transition-colors" />
   </div>
 
   <!-- Dash for all other columns -->
   <div v-else class="flex h-full items-center">
-    <span class="text-[10px] text-muted-foreground/20">-</span>
+    <span class="text-[10px] text-muted-foreground">-</span>
   </div>
 </template>

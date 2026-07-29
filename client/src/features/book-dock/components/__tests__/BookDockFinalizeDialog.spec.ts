@@ -1,10 +1,11 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
+import type { BookDockFinalizeResult } from '@bookorbit/types'
 import BookDockFinalizeDialog from '../BookDockFinalizeDialog.vue'
 
 const apiMock = vi.fn<(...args: unknown[]) => Promise<Response>>()
-const finalizeResult = ref(null)
+const finalizeResult = ref<BookDockFinalizeResult | null>(null)
 const finalizeLoading = ref(false)
 const finalizeError = ref<string | null>(null)
 const finalizeMock = vi.fn<(...args: unknown[]) => Promise<void>>()
@@ -97,7 +98,7 @@ describe('BookDockFinalizeDialog', () => {
                     fileName: 'duplicate.epub',
                     status: 'duplicate',
                     existingBookId: 42,
-                    message: 'Duplicate: this book already exists in the library',
+                    message: 'A file with this name already exists at the target location',
                   },
                   { fileId: 11, fileName: 'ready.epub', newName: 'ready.epub', status: 'ready' },
                 ],
@@ -147,5 +148,33 @@ describe('BookDockFinalizeDialog', () => {
       defaultFolderId: 3,
     })
     expect(wrapper.text()).not.toContain('1 already in library')
+  })
+
+  it('offers navigation and rename for an indexed destination collision without an import-anyway action', async () => {
+    finalizeResult.value = {
+      total: 1,
+      succeeded: 0,
+      failed: 1,
+      results: [
+        {
+          fileId: 10,
+          fileName: 'duplicate.epub',
+          newName: 'Author/Title/duplicate.epub',
+          success: false,
+          isDuplicate: true,
+          existingBookId: 42,
+          message: 'A file with this name already exists at the target location',
+        },
+      ],
+    }
+
+    const wrapper = mountDialog()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('View existing')
+    expect(wrapper.text()).toContain('Already exists - save as')
+    expect(wrapper.text()).toContain('Import')
+    expect(wrapper.text()).not.toContain('Import anyway')
+    expect(wrapper.find('input[type="text"]').exists()).toBe(true)
   })
 })

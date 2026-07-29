@@ -12,7 +12,7 @@ import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../../../lib
 import BookCoverPlaceholder from '@/features/book/components/BookCoverPlaceholder.vue'
 import CoverSearchDrawer from './CoverSearchDrawer.vue'
 
-const props = defineProps<{ book: BookDetail; locked?: boolean }>()
+const props = defineProps<{ book: BookDetail; locked?: boolean; disabled?: boolean }>()
 const emit = defineEmits<{ coverChanged: ['extracted' | 'custom' | null]; toggleLock: [] }>()
 
 const { t } = useI18n()
@@ -26,7 +26,7 @@ const { hasPermission } = usePermissions()
 const reExtractingCover = ref(false)
 
 async function reExtractCover() {
-  if (props.locked || reExtractingCover.value) return
+  if (controlsDisabled.value || reExtractingCover.value) return
   reExtractingCover.value = true
   try {
     await fetch(`/api/v1/books/${props.book.id}/re-extract-cover`, { method: 'POST' })
@@ -45,6 +45,7 @@ let debounceTimer: ReturnType<typeof setTimeout>
 
 const activeSrc = computed(() => previewSrc.value ?? coverUrl(props.book.id, 'cover', props.book.updatedAt ?? props.book.addedAt))
 const hasPending = computed(() => !!pendingFile.value || !!pendingUrl.value)
+const controlsDisabled = computed(() => Boolean(props.locked || props.disabled))
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
 const isPrimaryAudio = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
 const hasCover = computed(() => !!props.book.coverSource || !!previewSrc.value)
@@ -57,44 +58,90 @@ function cancelPending() {
 }
 
 function onFileChange(e: Event) {
-  if (props.locked) return
+  if (controlsDisabled.value) return
   const file = (e.target as HTMLInputElement).files?.[0]
   if (file) selectFile(file)
 }
 
 function onUrlInput() {
-  if (props.locked) return
+  if (controlsDisabled.value) return
   clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(() => setUrl(urlInput.value.trim()), 400)
+  debounceTimer = setTimeout(applyPendingUrl, 400)
 }
 
-function switchMode(m: 'file' | 'url') {
-  mode.value = m
+function applyPendingUrl() {
+  if (controlsDisabled.value) return
+  setUrl(urlInput.value.trim())
+}
+
+function switchMode(modeValue: 'file' | 'url') {
+  if (controlsDisabled.value) return
+  mode.value = modeValue
   clearTimeout(debounceTimer)
   clearPending()
   urlInput.value = ''
 }
 
+function handleSelectFileMode() {
+  switchMode('file')
+}
+
+function handleSelectUrlMode() {
+  switchMode('url')
+}
+
 function handleSearchSelect(url: string) {
+  if (controlsDisabled.value) return
   urlInput.value = url
   setUrl(url)
 }
 
+async function confirmPending() {
+  if (controlsDisabled.value || uploading.value) return false
+  return confirm()
+}
+
 async function handleConfirm() {
-  if (props.locked) return
-  const ok = await confirm()
+  const ok = await confirmPending()
   if (ok) emit('coverChanged', 'custom')
 }
 
 async function handleRevert() {
-  if (props.locked) return
+  if (controlsDisabled.value) return
   const result = await revert()
   if (result !== false) emit('coverChanged', result)
 }
 
 const lightboxOpen = ref(false)
 
-defineExpose({ setUrl, hasPending, confirm })
+function handleCoverClick() {
+  if (hasCover.value) lightboxOpen.value = true
+}
+
+function handleCloseLightbox() {
+  lightboxOpen.value = false
+}
+
+function handleToggleLock() {
+  if (props.disabled) return
+  emit('toggleLock')
+}
+
+function handleOpenSearch() {
+  if (controlsDisabled.value) return
+  isSearchOpen.value = true
+}
+
+function handleSearchOpenChange(open: boolean) {
+  isSearchOpen.value = open && !controlsDisabled.value
+}
+
+function setPendingUrl(url: string) {
+  if (controlsDisabled.value) return
+  setUrl(url)
+}
+
+defineExpose({ setUrl: setPendingUrl, hasPending, busy: uploading, confirm: confirmPending })
 
 onUnmounted(() => clearTimeout(debounceTimer))
 </script>
@@ -106,7 +153,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
       class="relative w-36 shrink-0 lg:w-full overflow-hidden rounded-lg bg-muted shadow-md"
       :class="hasCover ? 'cursor-zoom-in' : ''"
       :style="{ aspectRatio: coverAspectRatio }"
-      @click="hasCover ? (lightboxOpen = true) : undefined"
+      @click="handleCoverClick"
     >
       <img v-if="hasCover" :src="activeSrc" :alt="book.title ?? ''" class="w-full h-full object-contain" @error="hideOnError" />
       <BookCoverPlaceholder
@@ -120,9 +167,10 @@ onUnmounted(() => clearTimeout(debounceTimer))
         type="button"
         class="absolute bottom-2 right-2 flex items-center justify-center size-6 rounded-md bg-background/90 shadow-sm border border-input hover:bg-muted transition-colors"
         :title="props.locked ? t('book.detail.coverEditor.unlockCover') : t('book.detail.coverEditor.lockCover')"
-        @click.stop="emit('toggleLock')"
+        :disabled="props.disabled"
+        @click.stop="handleToggleLock"
       >
-        <Lock v-if="props.locked" class="size-3.5 text-primary/70" />
+        <Lock v-if="props.locked" class="size-3.5 text-primary" />
         <LockOpen v-else class="size-3.5 text-muted-foreground" />
       </button>
     </div>
@@ -132,11 +180,11 @@ onUnmounted(() => clearTimeout(debounceTimer))
       <div
         v-if="lightboxOpen && hasCover"
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-        @click="lightboxOpen = false"
+        @click="handleCloseLightbox"
       >
         <button
           class="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
-          @click="lightboxOpen = false"
+          @click="handleCloseLightbox"
         >
           <X class="size-5" />
         </button>
@@ -151,8 +199,8 @@ onUnmounted(() => clearTimeout(debounceTimer))
         <button
           class="flex flex-1 items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           :class="mode === 'file' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
-          :disabled="props.locked"
-          @click="switchMode('file')"
+          :disabled="controlsDisabled"
+          @click="handleSelectFileMode"
         >
           <ImagePlus class="size-3.5" />
           {{ t('book.detail.coverEditor.fileTab') }}
@@ -160,8 +208,8 @@ onUnmounted(() => clearTimeout(debounceTimer))
         <button
           class="flex flex-1 items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           :class="mode === 'url' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
-          :disabled="props.locked"
-          @click="switchMode('url')"
+          :disabled="controlsDisabled"
+          @click="handleSelectUrlMode"
         >
           <Link class="size-3.5" />
           {{ t('book.detail.coverEditor.urlTab') }}
@@ -172,11 +220,11 @@ onUnmounted(() => clearTimeout(debounceTimer))
       <div v-if="mode === 'file'">
         <label
           class="flex items-center gap-2 h-9 px-3 rounded-lg border border-dashed border-input bg-background text-xs text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
-          :class="props.locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'"
+          :class="controlsDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'"
         >
           <Upload class="size-3.5 shrink-0" />
           <span class="truncate">{{ pendingFile ? pendingFile.name : t('book.detail.coverEditor.chooseImage') }}</span>
-          <input type="file" accept="image/*" class="hidden" :disabled="props.locked" @change="onFileChange" />
+          <input type="file" accept="image/*" class="hidden" :disabled="controlsDisabled" @change="onFileChange" />
         </label>
       </div>
 
@@ -185,7 +233,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
         <input
           v-model="urlInput"
           class="w-full h-9 rounded-lg border border-input bg-background px-3 text-xs outline-none focus:ring-1 focus:ring-ring transition-shadow"
-          :disabled="props.locked"
+          :disabled="controlsDisabled"
           @input="onUrlInput"
         />
       </div>
@@ -193,8 +241,8 @@ onUnmounted(() => clearTimeout(debounceTimer))
       <!-- Search Button -->
       <button
         class="flex items-center justify-center gap-2 w-full h-9 rounded-lg border border-input bg-background text-xs font-medium hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        :disabled="props.locked"
-        @click="isSearchOpen = true"
+        :disabled="controlsDisabled"
+        @click="handleOpenSearch"
       >
         <Search class="size-3.5" />
         {{ t('book.detail.coverEditor.findCoverOnline') }}
@@ -206,7 +254,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
         :initial-title="book.title ?? ''"
         :initial-author="book.authors?.[0]?.name ?? ''"
         :is-audiobook="isPrimaryAudio"
-        @update:open="isSearchOpen = $event"
+        @update:open="handleSearchOpenChange"
         @select="handleSearchSelect"
       />
 
@@ -218,7 +266,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
         <button
           v-if="hasPending"
           class="w-full h-8 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-          :disabled="uploading || props.locked"
+          :disabled="uploading || controlsDisabled"
           @click="handleConfirm"
         >
           {{ uploading ? t('book.detail.coverEditor.saving') : t('book.detail.coverEditor.saveCover') }}
@@ -226,7 +274,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
         <button
           v-if="hasPending"
           class="w-full h-8 rounded-lg border border-input bg-background text-xs hover:bg-muted transition-colors disabled:opacity-50"
-          :disabled="uploading || props.locked"
+          :disabled="uploading || controlsDisabled"
           @click="cancelPending"
         >
           {{ t('common.cancel') }}
@@ -234,7 +282,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
         <button
           v-if="book.coverSource === 'custom'"
           class="flex items-center justify-center gap-1.5 w-full h-8 rounded-lg border border-input bg-background text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
-          :disabled="uploading || props.locked"
+          :disabled="uploading || controlsDisabled"
           @click="handleRevert"
         >
           <RotateCcw class="size-3" />
@@ -243,7 +291,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
         <button
           v-if="hasPermission('library_edit_metadata')"
           class="flex items-center justify-center gap-1.5 w-full h-8 rounded-lg border border-input bg-background text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
-          :disabled="reExtractingCover || props.locked"
+          :disabled="reExtractingCover || controlsDisabled"
           @click="reExtractCover"
         >
           <Loader2 v-if="reExtractingCover" class="size-3 animate-spin" />

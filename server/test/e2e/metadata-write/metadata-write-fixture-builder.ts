@@ -26,6 +26,12 @@ interface EpubFixtureInput {
   uid?: string;
 }
 
+interface Fb2FixtureInput {
+  title?: string;
+  language?: string;
+  bodyText?: string;
+}
+
 interface ComicFixtureInput {
   title?: string;
   author?: string;
@@ -114,6 +120,31 @@ export async function createEpubFixture(rootPath: string, relativePath: string, 
   ]);
 
   return absolutePath;
+}
+
+export async function createFb2Fixture(rootPath: string, relativePath: string, input: Fb2FixtureInput = {}): Promise<string> {
+  const title = input.title ?? 'Fixture FB2 Title';
+  const language = input.language ?? 'en';
+  const bodyText = input.bodyText ?? 'fixture body text';
+
+  const xml = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0" xmlns:l="http://www.w3.org/1999/xlink">',
+    '<description>',
+    '  <title-info>',
+    '    <genre>antique</genre>',
+    '    <author><first-name>Fixture</first-name><last-name>Author</last-name></author>',
+    `    <book-title>${escapeXml(title)}</book-title>`,
+    `    <lang>${escapeXml(language)}</lang>`,
+    '  </title-info>',
+    '  <document-info><id>fixture-doc</id></document-info>',
+    '</description>',
+    `<body><section><p>${escapeXml(bodyText)}</p></section></body>`,
+    '</FictionBook>',
+    '',
+  ].join('\n');
+
+  return writeFixtureFile(rootPath, relativePath, Buffer.from(xml, 'utf8'));
 }
 
 export async function createCbzFixture(rootPath: string, relativePath: string, input: ComicFixtureInput = {}): Promise<string> {

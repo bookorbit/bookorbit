@@ -40,7 +40,7 @@ const renameStatusClass = computed(() => {
 
 const writeLabel = computed(() => {
   const { status, reason, fieldsWritten } = props.result.write
-  if (status === 'success') return t('book.detail.writeRename.written', { count: fieldsWritten.length }, fieldsWritten.length)
+  if (status === 'success') return t('book.detail.writeRename.written', { count: fieldsWritten.length })
   if (status === 'failed') return reason ?? t('book.detail.writeRename.writeFailed')
   return reason ?? t('book.detail.writeRename.skipped')
 })

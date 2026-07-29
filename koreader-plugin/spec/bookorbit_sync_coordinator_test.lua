@@ -82,4 +82,17 @@ assertEqual(status.current.age, 15, "status reports current age")
 assertEqual(status.pending_count, 1, "status reports pending count")
 assertEqual(status.next.label, "sweep", "status reports next pending job")
 
+local idle_calls = 0
+coordinator = SyncCoordinator.new{
+    on_idle = function()
+        idle_calls = idle_calls + 1
+    end,
+}
+calls = {}
+done_ref = {}
+coordinator:submit(asyncJob("critical", SyncCoordinator.PRIORITY.lifecycle, calls, done_ref))
+assertEqual(idle_calls, 0, "idle callback waits for critical work")
+done_ref.critical()
+assertEqual(idle_calls, 1, "idle callback runs after critical work")
+
 print("bookorbit_sync_coordinator_test.lua: ok")

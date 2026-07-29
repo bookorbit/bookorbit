@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { formatNumber } from '@/i18n/formatters'
 import { X, Zap } from '@lucide/vue'
 import { api } from '@/lib/api'
 import type { GroupRule, SmartScope, Rule, SortSpec } from '@bookorbit/types'
@@ -170,7 +169,7 @@ async function save() {
               :class="previewLoading ? 'border-border text-muted-foreground' : 'border-primary/30 bg-primary/8 text-primary'"
             >
               <span v-if="previewLoading" class="animate-pulse">{{ t('smartScope.editorPanel.counting') }}</span>
-              <template v-else>{{ t('smartScope.editorPanel.bookCount', { count: formatNumber(previewCount ?? 0) }, previewCount ?? 0) }}</template>
+              <template v-else>{{ t('smartScope.editorPanel.bookCount', { count: previewCount ?? 0 }) }}</template>
             </span>
             <button
               @click="emit('close')"
@@ -188,16 +187,16 @@ async function save() {
             <h3 class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{{ t('smartScope.editorPanel.identity') }}</h3>
             <div class="flex gap-3">
               <div class="flex-1 flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-foreground/70">{{ t('smartScope.dialog.name') }}</label>
+                <label class="text-xs font-medium text-foreground">{{ t('smartScope.dialog.name') }}</label>
                 <input
                   v-model="draftName"
                   type="text"
                   :placeholder="t('smartScope.dialog.namePlaceholder')"
-                  class="h-10 rounded-lg border border-input bg-card text-foreground text-sm px-3 focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-muted-foreground/60"
+                  class="h-10 rounded-lg border border-input bg-card text-foreground text-sm px-3 focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-muted-foreground"
                 />
               </div>
               <div class="flex-1 flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-foreground/70">{{ t('smartScope.dialog.icon') }}</label>
+                <label class="text-xs font-medium text-foreground">{{ t('smartScope.dialog.icon') }}</label>
                 <IconPicker v-model="draftIcon" :placeholder="t('smartScope.dialog.iconPlaceholder')" />
               </div>
             </div>

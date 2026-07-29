@@ -1,6 +1,12 @@
 /* ── Radius presets ──────────────────────────────────────────
    Applied as a class on <html>. Default is :root value.
 ────────────────────────────────────────────────────────────── */
+/* Shell cards follow the radius picker, capped so the pill preset does not
+   round a full-height panel into a lozenge. */
+:root {
+  --shell-radius: min(var(--radius), 1.25rem);
+}
+
 html.radius-sharp {
   --radius: 0rem;
 }

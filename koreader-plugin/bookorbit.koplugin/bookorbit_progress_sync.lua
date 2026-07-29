@@ -68,17 +68,20 @@ function ProgressSync:getDocumentDigest()
     return computed
 end
 
-function ProgressSync:syncToProgress(progress)
-    logger.dbg("BookOrbit: syncing to progress", progress)
+function ProgressSync:syncToProgress(progress, percentage_fallback)
+    logger.dbg("BookOrbit: syncing to progress", progress, "percent", percentage_fallback)
+    local has_position = progress ~= nil and progress ~= ""
+    if not has_position and percentage_fallback then
+        -- No exact position (push came from web/audio sync); jump by percentage.
+        -- kosync percentage is 0-1; GotoPercent expects 0-100.
+        self.ui:handleEvent(Event:new("GotoPercent", percentage_fallback * 100))
+        return
+    end
     if self.ui.document.info.has_pages then
         self.ui:handleEvent(Event:new("GotoPage", tonumber(progress)))
     else
         self.ui:handleEvent(Event:new("GotoXPointer", progress))
     end
-end
-
-local function hasUsableRemoteProgress(progress)
-    return progress ~= nil and progress ~= ""
 end
 
 function ProgressSync:remoteProgressIsNewer(body, local_percentage)
@@ -93,7 +96,7 @@ function ProgressSync:remoteProgressIsNewer(body, local_percentage)
 end
 
 function ProgressSync:applyRemoteProgress(body, on_done)
-    self:syncToProgress(body.progress)
+    self:syncToProgress(body.progress, body.percentage)
     if on_done then
         UIManager:scheduleIn(0.1, function()
             on_done(false)
@@ -142,19 +145,6 @@ function ProgressSync:reconcileProgressBeforeBookSync(digest, on_done)
     end
 
     local remote_newer = self:remoteProgressIsNewer(body, local_percentage)
-    if not hasUsableRemoteProgress(body.progress) then
-        if remote_newer then
-            UIManager:show(InfoMessage:new{
-                text = _("BookOrbit has newer progress but no exact location. Syncing book data without changing progress."),
-                timeout = 4,
-            })
-            on_done(true)
-        else
-            on_done(false)
-        end
-        return true
-    end
-
     local strategy = remote_newer and self.settings.sync_forward or self.settings.sync_backward
     if strategy == SYNC_STRATEGY.SILENT then
         self:applyRemoteProgress(body, on_done)
@@ -203,7 +193,7 @@ function ProgressSync:updateProgress(ensure_networking, interactive, on_suspend)
         return
     end
 
-    if ensure_networking and NetworkMgr:willRerunWhenOnline(function()
+    if ensure_networking and NetworkMgr:willRerunWhenConnected(function()
             self:runInSyncCoroutine(function()
                 self:updateProgress(ensure_networking, interactive, on_suspend)
             end)
@@ -276,7 +266,7 @@ function ProgressSync:getProgress(ensure_networking, interactive)
         return
     end
 
-    if ensure_networking and NetworkMgr:willRerunWhenOnline(function()
+    if ensure_networking and NetworkMgr:willRerunWhenConnected(function()
             self:runInSyncCoroutine(function()
                 self:getProgress(ensure_networking, interactive)
             end)
@@ -331,7 +321,7 @@ function ProgressSync:getProgress(ensure_networking, interactive)
     end
 
     if interactive then
-        self:syncToProgress(body.progress)
+        self:syncToProgress(body.progress, body.percentage)
         if self.recordSyncSuccess then
             self:recordSyncSuccess("progress_pull", _("Progress pulled"))
         end
@@ -348,7 +338,7 @@ function ProgressSync:getProgress(ensure_networking, interactive)
 
     local strategy = self_older and self.settings.sync_forward or self.settings.sync_backward
     if strategy == SYNC_STRATEGY.SILENT then
-        self:syncToProgress(body.progress)
+        self:syncToProgress(body.progress, body.percentage)
         if self.recordSyncSuccess then
             self:recordSyncSuccess("progress_pull", _("Progress pulled"))
         end
@@ -359,7 +349,7 @@ function ProgressSync:getProgress(ensure_networking, interactive)
         UIManager:show(ConfirmBox:new{
             text = T(template, Math.round(body.percentage * 100), body.device),
             ok_callback = function()
-                self:syncToProgress(body.progress)
+                self:syncToProgress(body.progress, body.percentage)
                 if self.recordSyncSuccess then
                     self:recordSyncSuccess("progress_pull", _("Progress pulled"))
                 end

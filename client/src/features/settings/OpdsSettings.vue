@@ -362,10 +362,10 @@ watch(
             class="md:hidden rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground"
           >
             <div class="grid grid-cols-[4.5rem_1fr] gap-y-1.5 gap-x-2">
-              <span class="text-muted-foreground/80">{{ t('settings.reader.opds.usernameLabel') }}</span>
-              <span class="font-mono text-foreground/90 break-all">{{ user.username }}</span>
-              <span class="text-muted-foreground/80">{{ t('settings.reader.opds.sortLabel') }}</span>
-              <span class="text-foreground/90">{{ sortOrderLabel(user.sortOrder) }}</span>
+              <span class="text-muted-foreground">{{ t('settings.reader.opds.usernameLabel') }}</span>
+              <span class="font-mono text-foreground break-all">{{ user.username }}</span>
+              <span class="text-muted-foreground">{{ t('settings.reader.opds.sortLabel') }}</span>
+              <span class="text-foreground">{{ sortOrderLabel(user.sortOrder) }}</span>
             </div>
           </div>
         </div>

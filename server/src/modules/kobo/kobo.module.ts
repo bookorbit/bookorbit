@@ -6,6 +6,7 @@ import { AnnotationModule } from '../annotation/annotation.module';
 import { BookModule } from '../book/book.module';
 import { PositionConverterModule } from '../position-converter/position-converter.module';
 import { ReadingSessionModule } from '../reading-session/reading-session.module';
+import { SmartScopeModule } from '../smart-scope/smart-scope.module';
 import { UserModule } from '../user/user.module';
 import { UserBookStatusModule } from '../user-book-status/user-book-status.module';
 import { KoboAuthController } from './kobo-auth.controller';
@@ -43,6 +44,7 @@ import { KoboAnalyticsService } from './services/kobo-analytics.service';
     UserModule,
     UserBookStatusModule,
     ReadingSessionModule,
+    SmartScopeModule,
   ],
   controllers: [KoboUserController, KoboAuthController, KoboSyncController, KoboDeviceController, KoboReadingServicesController],
   providers: [

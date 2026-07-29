@@ -98,7 +98,7 @@ async function send() {
       templateId: selectedTemplateId.value ?? undefined,
       fileId: selectedFileId.value ?? undefined,
     })
-    toast.success(t('email.send.queued', { count: result.queued }, result.queued))
+    toast.success(t('email.send.queued', { count: result.queued }))
     emit('update:open', false)
     emit('sent')
   } catch (e) {
@@ -126,7 +126,7 @@ function close() {
               <h2 class="text-sm font-semibold text-foreground">{{ t('email.send.title') }}</h2>
               <p v-if="bookTitle" class="text-xs text-muted-foreground mt-0.5 truncate max-w-[280px]">{{ bookTitle }}</p>
               <p v-else-if="selectionCount() > 1" class="text-xs text-muted-foreground mt-0.5">
-                {{ t('email.send.bookCount', { count: selectionCount() }, selectionCount()) }}
+                {{ t('email.send.bookCount', { count: selectionCount() }) }}
               </p>
             </div>
             <button class="text-muted-foreground hover:text-foreground transition-colors" @click="close()">
@@ -182,7 +182,7 @@ function close() {
                   />
                   <div class="flex-1 min-w-0">
                     <p class="text-sm text-foreground">{{ g.name }}</p>
-                    <p class="text-xs text-muted-foreground">{{ t('email.groups.memberCount', { count: g.members.length }, g.members.length) }}</p>
+                    <p class="text-xs text-muted-foreground">{{ t('email.groups.memberCount', { count: g.members.length }) }}</p>
                   </div>
                 </label>
               </div>
@@ -194,7 +194,7 @@ function close() {
                 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-foreground transition-colors list-none flex items-center gap-1"
               >
                 <span>{{ t('email.send.options') }}</span>
-                <span class="text-muted-foreground/70 group-open:rotate-90 transition-transform inline-block">›</span>
+                <span class="text-muted-foreground group-open:rotate-90 transition-transform inline-block">›</span>
               </summary>
               <div class="mt-3 space-y-3">
                 <!-- File picker -->

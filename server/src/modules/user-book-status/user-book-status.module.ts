@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { AchievementModule } from '../achievement/achievement.module';
+import { KoboStatusProjectionRepository } from './kobo-status-projection.repository';
 import { UserBookStatusRepository } from './user-book-status.repository';
 import { UserBookStatusService } from './user-book-status.service';
 import { ReadingAttemptRepository } from './reading-attempt.repository';
@@ -9,7 +10,14 @@ import { ReadingAttemptBackfillService } from './reading-attempt-backfill.servic
 
 @Module({
   imports: [AchievementModule],
-  providers: [UserBookStatusService, UserBookStatusRepository, ReadingAttemptService, ReadingAttemptRepository, ReadingAttemptBackfillService],
+  providers: [
+    UserBookStatusService,
+    UserBookStatusRepository,
+    KoboStatusProjectionRepository,
+    ReadingAttemptService,
+    ReadingAttemptRepository,
+    ReadingAttemptBackfillService,
+  ],
   exports: [UserBookStatusService, ReadingAttemptService],
 })
 export class UserBookStatusModule {}

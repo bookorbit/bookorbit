@@ -78,7 +78,7 @@ const validDisplayPreferences: DisplayPreferences = {
 };
 
 const validLocalePreferences: LocalePreferences = {
-  locale: 'nl',
+  locale: 'it',
 };
 
 const repo = {
@@ -143,6 +143,13 @@ describe('UserPreferencesService', () => {
     expect(repo.upsert).toHaveBeenCalledWith(11, 'locale', validLocalePreferences);
   });
 
+  it.each(['es', 'fr', 'pl'] as const)('upsertLocalePreferences accepts the %s locale', async (locale) => {
+    const preferences: LocalePreferences = { locale };
+
+    await expect(service.upsertLocalePreferences(11, preferences)).resolves.toBeUndefined();
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'locale', preferences);
+  });
+
   it('upsertLocalePreferences rejects unsupported locale', async () => {
     await expect(service.upsertLocalePreferences(11, { locale: 'unsupported' } as never)).rejects.toBeInstanceOf(BadRequestException);
     expect(repo.upsert).not.toHaveBeenCalled();
@@ -174,6 +181,23 @@ describe('UserPreferencesService', () => {
     expect(repo.upsert).toHaveBeenCalledWith(11, 'theme', preferences);
   });
 
+  it('upsertThemePreferences accepts a payload without surfaceOpacity', async () => {
+    await expect(service.upsertThemePreferences(11, { ...validThemePreferences })).resolves.toBeUndefined();
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'theme', validThemePreferences);
+  });
+
+  it.each([80, 92, 100])('upsertThemePreferences accepts surfaceOpacity %i', async (surfaceOpacity) => {
+    const preferences = { ...validThemePreferences, surfaceOpacity };
+
+    await expect(service.upsertThemePreferences(11, preferences)).resolves.toBeUndefined();
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'theme', preferences);
+  });
+
+  it.each([79, 101, 50.5])('upsertThemePreferences rejects surfaceOpacity %s', async (surfaceOpacity) => {
+    await expect(service.upsertThemePreferences(11, { ...validThemePreferences, surfaceOpacity })).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.upsert).not.toHaveBeenCalled();
+  });
+
   it('upsertThemePreferences rejects invalid theme ids', async () => {
     await expect(service.upsertThemePreferences(11, { ...validThemePreferences, theme: 'sepia' } as never)).rejects.toBeInstanceOf(
       BadRequestException,
@@ -195,10 +219,8 @@ describe('UserPreferencesService', () => {
     expect(repo.upsert).not.toHaveBeenCalled();
   });
 
-  it('upsertThemePreferences rejects invalid background ids', async () => {
-    await expect(service.upsertThemePreferences(11, { ...validThemePreferences, background: 'stars' } as never)).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+  it.each(['stars', 'terminal'])('upsertThemePreferences rejects the unsupported %s background id', async (background) => {
+    await expect(service.upsertThemePreferences(11, { ...validThemePreferences, background } as never)).rejects.toBeInstanceOf(BadRequestException);
     expect(repo.upsert).not.toHaveBeenCalled();
   });
 

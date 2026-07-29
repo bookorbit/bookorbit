@@ -5,6 +5,7 @@ vi.mock('chokidar', () => ({
 import { Logger } from '@nestjs/common';
 import type { MockedFunction } from 'vitest';
 import { watch } from 'chokidar';
+import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
 
 import { FileEventProcessorService } from './file-event-processor.service';
 import { FileWatcherService } from './file-watcher.service';
@@ -38,7 +39,7 @@ function makeService(db: any = {}) {
     bufferBooksRestoredNotification: vi.fn(),
   } as unknown as ScannerService;
 
-  const service = new FileWatcherService(db, processor, gateway, scannerService);
+  const service = new FileWatcherService(db, processor, gateway, scannerService, new SelfWriteRegistry());
   return { service, processor, gateway, scannerService };
 }
 

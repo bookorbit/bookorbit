@@ -391,7 +391,7 @@ async function deleteGroupMapping(id: number) {
           </div>
           <div v-else class="px-5 py-10 bg-card text-center">
             <div class="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
-              <ShieldCheck :size="18" class="text-muted-foreground/70" />
+              <ShieldCheck :size="18" class="text-muted-foreground" />
             </div>
             <p class="text-sm font-medium text-foreground">{{ t('settings.oidc.empty.title') }}</p>
             <p class="text-xs text-muted-foreground mt-1 max-w-[240px] mx-auto">{{ t('settings.oidc.empty.description') }}</p>

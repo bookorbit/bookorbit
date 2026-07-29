@@ -80,7 +80,7 @@ function isValid(): boolean {
               <Trash2 class="h-4 w-4" />
             </button>
           </div>
-          <button class="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors" @click="addName">
+          <button class="flex items-center gap-1.5 text-sm text-primary hover:text-primary transition-colors" @click="addName">
             <Plus class="h-4 w-4" />
             {{ t('tools.entityManager.splitModal.addAnother') }}
           </button>

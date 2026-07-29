@@ -5,17 +5,18 @@ import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
-import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    __INTLIFY_PROD_DEVTOOLS__: false,
+    __VUE_I18N_FULL_INSTALL__: true,
+    __VUE_I18N_LEGACY_API__: false,
+  },
   plugins: [
     vue(),
     vueDevTools(),
     tailwindcss(),
-    VueI18nPlugin({
-      include: [fileURLToPath(new URL('./src/locales/**', import.meta.url))],
-    }),
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',

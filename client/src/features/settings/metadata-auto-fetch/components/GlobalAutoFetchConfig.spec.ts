@@ -157,7 +157,7 @@ describe('GlobalAutoFetchConfig', () => {
     await wrapper.find('button.settings-btn-outline').trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('.hidden.md\\:flex span').text()).toBe('Queued 2048 books')
+    expect(wrapper.find('.hidden.md\\:flex span').text()).toBe('Queued 2,048 books')
   })
 
   it('shows "No eligible books found" when trigger returns 0', async () => {

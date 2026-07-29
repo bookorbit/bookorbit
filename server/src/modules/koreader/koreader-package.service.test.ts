@@ -159,6 +159,13 @@ describe('KoreaderPackageService', () => {
       expect(result.serverVersion).toBe('test-server-version');
     });
 
+    it('advertises the wire capabilities the plugin selects routes on', async () => {
+      const result = await service.getVersionInfo();
+
+      expect(result.capabilities).toContain('catalogBulkManifest');
+      expect(result.capabilities).toContain('bookmarkSync');
+    });
+
     it('returns pluginVersion=unknown when the plugin source dir does not exist', async () => {
       service = makeService(join(pluginDir, 'does-not-exist'));
 

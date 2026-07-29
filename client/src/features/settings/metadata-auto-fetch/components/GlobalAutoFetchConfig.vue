@@ -49,9 +49,7 @@ const activeConditionSummary = computed(() => {
   if (c.scoreThreshold.enabled)
     parts.push(t('settings.metadata.autoFetch.conditions.scoreThreshold.summary', { threshold: c.scoreThreshold.threshold }))
   if (c.missingFields.enabled && c.missingFields.fields.length > 0)
-    parts.push(
-      t('settings.metadata.autoFetch.conditions.missingFields.summary', { count: c.missingFields.fields.length }, c.missingFields.fields.length),
-    )
+    parts.push(t('settings.metadata.autoFetch.conditions.missingFields.summary', { count: c.missingFields.fields.length }))
   return parts.length > 0 ? parts.join(' • ') : t('settings.metadata.autoFetch.conditions.noneEnabled')
 })
 
@@ -86,7 +84,7 @@ async function handleTrigger() {
   try {
     const { queued } = await triggerGlobal()
     triggerResult.value =
-      queued > 0 ? t('settings.metadata.autoFetch.trigger.queued', { count: queued }, queued) : t('settings.metadata.autoFetch.trigger.noneFound')
+      queued > 0 ? t('settings.metadata.autoFetch.trigger.queued', { count: queued }) : t('settings.metadata.autoFetch.trigger.noneFound')
     invalidateEligibleCountPreviews()
   } finally {
     triggering.value = false

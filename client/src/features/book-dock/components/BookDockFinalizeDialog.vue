@@ -275,38 +275,6 @@ function goToBook(bookId: number) {
   handleClose()
 }
 
-async function handleReimportDuplicate(fileId: number) {
-  if (!result.value || reimportingIds.has(fileId)) return
-  reimportingIds.add(fileId)
-  try {
-    const payload: Record<string, unknown> = {
-      fileIds: [fileId],
-      overrides: [{ fileId, skipDuplicateCheck: true }],
-    }
-    if (defaultLibraryId.value !== null) payload.defaultLibraryId = defaultLibraryId.value
-    if (defaultFolderId.value !== null) payload.defaultFolderId = defaultFolderId.value
-    const res = await api('/api/v1/book-dock/finalize', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    if (!res.ok) return
-    const newResult = await res.json()
-    const fileResult = (newResult.results as typeof result.value.results)[0]
-    if (!fileResult) return
-    const entry = result.value.results.find((r) => r.fileId === fileId)
-    if (entry) {
-      Object.assign(entry, fileResult)
-      if (fileResult.success) {
-        result.value.succeeded++
-        result.value.failed--
-      }
-    }
-  } finally {
-    reimportingIds.delete(fileId)
-  }
-}
-
 async function discardDuplicateSelection(payload: FinalizePayload): Promise<BookDockDiscardDuplicatesResult | null> {
   const res = await api('/api/v1/book-dock/finalize/discard-duplicates', {
     method: 'POST',
@@ -364,7 +332,7 @@ async function handleDiscardResultDuplicates() {
       <div class="relative z-10 w-full max-w-2xl mx-4 bg-card border border-border rounded-lg shadow-2xl overflow-hidden">
         <div class="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 class="text-base font-semibold text-foreground">
-            {{ result ? 'Finalize Results' : `Finalize ${effectiveSelectionCount} file${effectiveSelectionCount === 1 ? '' : 's'}` }}
+            {{ result ? t('bookDock.finalizeDialog.resultTitle') : t('bookDock.finalizeDialog.title', { count: effectiveSelectionCount }) }}
           </h2>
           <button
             class="size-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
@@ -379,14 +347,10 @@ async function handleDiscardResultDuplicates() {
             <p class="text-xs text-muted-foreground">
               {{
                 requiresDefaultDestination
-                  ? t(
-                      'bookDock.finalizeDialog.needDestination',
-                      {
-                        count: selectionSummary.total,
-                        without: selectionSummary.withoutDestination,
-                      },
-                      selectionSummary.total,
-                    )
+                  ? t('bookDock.finalizeDialog.needDestination', {
+                      count: selectionSummary.total,
+                      without: selectionSummary.withoutDestination,
+                    })
                   : t('bookDock.finalizeDialog.allHaveDestination')
               }}
             </p>
@@ -401,43 +365,35 @@ async function handleDiscardResultDuplicates() {
             <div class="flex flex-wrap items-center gap-2 text-xs">
               <span class="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-1 text-emerald-700 dark:text-emerald-300">
                 <Check class="size-3" />
-                {{ t('bookDock.finalizeDialog.readyCount', { count: finalizePreview.ready }, finalizePreview.ready) }}
+                {{ t('bookDock.finalizeDialog.readyCount', { count: finalizePreview.ready }) }}
               </span>
               <span
                 v-if="finalizePreview.duplicates > 0"
                 class="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-1 text-amber-700 dark:text-amber-300"
               >
                 <Copy class="size-3" />
-                {{ t('bookDock.finalizeDialog.duplicateCount', { count: finalizePreview.duplicates }, finalizePreview.duplicates) }}
+                {{ t('bookDock.finalizeDialog.duplicateCount', { count: finalizePreview.duplicates }) }}
               </span>
               <span
                 v-if="finalizePreview.destinationConflicts > 0"
                 class="inline-flex items-center gap-1 rounded-md bg-red-500/10 px-2 py-1 text-red-600 dark:text-red-400"
               >
                 <AlertCircle class="size-3" />
-                {{
-                  t('bookDock.finalizeDialog.conflictCount', { count: finalizePreview.destinationConflicts }, finalizePreview.destinationConflicts)
-                }}
+                {{ t('bookDock.finalizeDialog.conflictCount', { count: finalizePreview.destinationConflicts }) }}
               </span>
               <span
                 v-if="finalizePreview.missingDestination > 0"
                 class="inline-flex items-center gap-1 rounded-md bg-red-500/10 px-2 py-1 text-red-600 dark:text-red-400"
               >
                 <AlertCircle class="size-3" />
-                {{
-                  t(
-                    'bookDock.finalizeDialog.missingDestinationCount',
-                    { count: finalizePreview.missingDestination },
-                    finalizePreview.missingDestination,
-                  )
-                }}
+                {{ t('bookDock.finalizeDialog.missingDestinationCount', { count: finalizePreview.missingDestination }) }}
               </span>
               <span
                 v-if="finalizePreview.blocked > 0"
                 class="inline-flex items-center gap-1 rounded-md bg-red-500/10 px-2 py-1 text-red-600 dark:text-red-400"
               >
                 <AlertCircle class="size-3" />
-                {{ t('bookDock.finalizeDialog.blockedCount', { count: finalizePreview.blocked }, finalizePreview.blocked) }}
+                {{ t('bookDock.finalizeDialog.blockedCount', { count: finalizePreview.blocked }) }}
               </span>
             </div>
 
@@ -545,8 +501,8 @@ async function handleDiscardResultDuplicates() {
               <p v-if="result.failed > 0" class="text-xs text-muted-foreground mt-0.5">
                 {{
                   resultDuplicateCount > 0
-                    ? t('bookDock.finalizeDialog.failedWithDuplicates', { failed: result.failed, count: resultDuplicateCount }, resultDuplicateCount)
-                    : t('bookDock.finalizeDialog.failedCount', { count: result.failed }, result.failed)
+                    ? t('bookDock.finalizeDialog.failedWithDuplicates', { failed: result.failed, count: resultDuplicateCount })
+                    : t('bookDock.finalizeDialog.failedCount', { count: result.failed })
                 }}
               </p>
             </div>
@@ -577,15 +533,6 @@ async function handleDiscardResultDuplicates() {
                   @click="goToBook(r.existingBookId!)"
                 >
                   {{ t('bookDock.finalizeDialog.viewExisting') }} <ExternalLink class="size-3" />
-                </button>
-                <button
-                  v-if="!r.success && r.isDuplicate"
-                  class="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 shrink-0 transition-colors"
-                  :disabled="reimportingIds.has(r.fileId)"
-                  @click="handleReimportDuplicate(r.fileId)"
-                >
-                  <Loader2 v-if="reimportingIds.has(r.fileId)" class="size-3 animate-spin" />
-                  {{ t('bookDock.finalizeDialog.importAnyway') }}
                 </button>
                 <button
                   v-if="!r.success && !r.isDuplicate && r.message && !isFileExistsError(r.message)"

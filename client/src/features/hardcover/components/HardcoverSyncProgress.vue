@@ -45,8 +45,8 @@ const lastSyncedLabel = computed(() => {
   const days = Math.floor(diff / 86_400_000)
   if (minutes < 1) return t('hardcover.sync.lastSynced.justNow')
   if (minutes < 60) return t('hardcover.sync.lastSynced.minutesAgo', { count: minutes })
-  if (hours < 24) return t('hardcover.sync.lastSynced.hoursAgo', { count: hours }, hours)
-  return t('hardcover.sync.lastSynced.daysAgo', { count: days }, days)
+  if (hours < 24) return t('hardcover.sync.lastSynced.hoursAgo', { count: hours })
+  return t('hardcover.sync.lastSynced.daysAgo', { count: days })
 })
 </script>
 

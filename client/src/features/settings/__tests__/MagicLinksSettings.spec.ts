@@ -97,9 +97,13 @@ describe('MagicLinksSettings', () => {
     expect(createButton?.attributes('disabled')).toBeUndefined()
 
     await createButton?.trigger('click')
+    await flushPromises()
 
-    expect(wrapper.text()).toContain('Create magic link')
-    expect(wrapper.text()).toContain('Demo User (@demo)')
+    // The create form renders through DialogPortal, so it lands outside the wrapper.
+    const dialog = document.body.querySelector('[role="dialog"]')
+    expect(dialog).not.toBeNull()
+    expect(dialog?.textContent).toContain('Create magic link')
+    expect(dialog?.textContent).toContain('Demo User (@demo)')
   })
 
   it('keeps the embedded Create link action disabled until a shared user exists', async () => {

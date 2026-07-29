@@ -127,7 +127,7 @@ function isSortableColumn(col: ColumnDef): boolean {
               <Loader2 v-if="loading && getSortDir(col.sortField!) !== null" :size="11" class="shrink-0 animate-spin text-primary" />
               <ArrowUp v-else-if="getSortDir(col.sortField!) === 'asc'" :size="11" class="shrink-0 text-primary" />
               <ArrowDown v-else-if="getSortDir(col.sortField!) === 'desc'" :size="11" class="shrink-0 text-primary" />
-              <ArrowUpDown v-else :size="11" class="shrink-0 text-muted-foreground/60" />
+              <ArrowUpDown v-else :size="11" class="shrink-0 text-muted-foreground" />
               <span
                 v-if="sort.length > 1 && getSortPriority(col.sortField!) > 0"
                 class="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[9px] font-bold text-primary"

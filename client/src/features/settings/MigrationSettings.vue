@@ -1634,7 +1634,7 @@ function formatSourceCountLabel(key: string) {
                   @click="onResolveDuplicates"
                 >
                   <Loader2 v-if="busy.resolvingDuplicates" class="size-3.5 animate-spin" />
-                  {{ t('settings.admin.migration.resolveDuplicatesButton', { count: duplicateMatches.length }, duplicateMatches.length) }}
+                  {{ t('settings.admin.migration.resolveDuplicatesButton', { count: duplicateMatches.length }) }}
                 </button>
               </div>
             </div>

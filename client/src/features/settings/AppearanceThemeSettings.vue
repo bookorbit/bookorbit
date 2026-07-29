@@ -10,7 +10,7 @@ const { t } = useI18n()
 const themeStore = useThemeStore()
 
 const backgroundGroups = computed<{ label: string; ids: string[] }[]>(() => [
-  { label: t('settings.appearance.theme.backgroundGroups.fundamental'), ids: ['none', 'dots', 'cross', 'terminal', 'millimeter'] },
+  { label: t('settings.appearance.theme.backgroundGroups.fundamental'), ids: ['none', 'dots', 'cross', 'millimeter'] },
   { label: t('settings.appearance.theme.backgroundGroups.structural'), ids: ['blueprint', 'brushed', 'scanlines', 'vinyl', 'carbon', 'perforated'] },
   { label: t('settings.appearance.theme.backgroundGroups.ambient'), ids: ['aurora', 'horizon', 'glow', 'mesh', 'elevation'] },
   { label: t('settings.appearance.theme.backgroundGroups.refractive'), ids: ['prism', 'spectrum', 'spectrum-x', 'spectrum-plus', 'eclipse'] },
@@ -169,7 +169,7 @@ function handleBrightnessInput(event: Event) {
           </div>
           <div class="space-y-5 md:space-y-6">
             <div v-for="group in backgroundGroups" :key="group.label">
-              <p class="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-widest mb-2.5 ml-0.5">{{ group.label }}</p>
+              <p class="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2.5 ml-0.5">{{ group.label }}</p>
               <div
                 class="flex items-center gap-3 md:gap-4 overflow-x-auto md:overflow-visible md:flex-wrap pb-1 pt-0.5 px-0.5 md:pt-0 md:px-0 md:pb-0 no-scrollbar"
               >

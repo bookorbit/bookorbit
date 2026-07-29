@@ -168,7 +168,7 @@ function handleShowScanSettings(): void {
         class="sticky top-0 z-10 mb-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border/70 bg-background/95 px-3 py-2 shadow-sm backdrop-blur-sm"
       >
         <p class="text-sm text-muted-foreground">
-          {{ t('tools.bookDuplicates.groupsFound', { count: duplicates.total.value }, duplicates.total.value) }}
+          {{ t('tools.bookDuplicates.groupsFound', { count: duplicates.total.value }) }}
         </p>
         <div class="flex flex-wrap items-center gap-2">
           <Button variant="ghost" size="sm" @click="handleShowScanSettings">

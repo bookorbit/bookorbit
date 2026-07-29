@@ -292,6 +292,8 @@ export const audiobookProgress = pgTable(
 export type AudiobookProgress = typeof audiobookProgress.$inferSelect;
 export type NewAudiobookProgress = typeof audiobookProgress.$inferInsert;
 
+export type BookmarkOrigin = 'web' | 'koreader';
+
 export const bookmarks = pgTable(
   'bookmarks',
   {
@@ -307,17 +309,33 @@ export const bookmarks = pgTable(
     title: varchar('title', { length: 500 }).notNull(),
     // Audio: absolute book position in seconds (sum of preceding file durations + offset).
     positionSeconds: real('position_seconds'),
+    origin: varchar('origin', { length: 10 }).$type<BookmarkOrigin>().notNull().default('web'),
+    // Canonical KOReader xpointer for a device-created bookmark, kept so it returns
+    // to devices at its original position instead of surviving a double conversion.
+    devicePos: varchar('device_pos', { length: 4000 }),
+    pageno: integer('pageno'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdateFn(() => new Date()),
+    // Tombstone. Web reads filter it out; device exchanges need it to propagate
+    // a deletion to every other linked device before the row can be purged.
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => [
     index('bookmarks_user_book_idx').on(t.userId, t.bookId),
     index('bookmarks_book_id_idx').on(t.bookId),
+    index('bookmarks_deleted_at_idx')
+      .on(t.deletedAt)
+      .where(sql`${t.deletedAt} is not null`),
     uniqueIndex('bookmarks_user_book_cfi_uidx')
       .on(t.userId, t.bookId, t.cfi)
       .where(sql`${t.cfi} is not null`),
     uniqueIndex('bookmarks_user_book_pos_uidx')
       .on(t.userId, t.bookId, t.positionSeconds)
       .where(sql`${t.positionSeconds} is not null and ${t.cfi} is null`),
+    check('bookmarks_origin_chk', sql`${t.origin} in ('web', 'koreader')`),
   ],
 );
 

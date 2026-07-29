@@ -1259,7 +1259,7 @@ watch(
                 loading="lazy"
                 @error="providerIconErrors[badge.key] = true"
               />
-              <span v-else class="text-[8px] font-bold leading-none text-foreground/90">{{ badge.fallback }}</span>
+              <span v-else class="text-[8px] font-bold leading-none text-foreground">{{ badge.fallback }}</span>
             </span>
             <span
               class="flex h-full items-center border-l border-border/60 bg-background/50 px-1.5 text-[11px] font-semibold tabular-nums text-foreground"
@@ -1293,7 +1293,7 @@ watch(
             type="button"
             :aria-label="t('book.detail.details.personalReview.toggleAria')"
             class="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-1 py-1"
-            :class="{ 'text-primary hover:text-primary/80': showPersonalReview }"
+            :class="{ 'text-primary hover:text-primary': showPersonalReview }"
             @click="togglePersonalReview"
           >
             <StickyNote class="size-3.5" />
@@ -1672,7 +1672,7 @@ watch(
             <span class="ml-1 font-medium text-foreground">{{ narratorLine }}</span>
           </p>
           <template v-if="seriesLinks.length">
-            <span class="text-muted-foreground/60 text-xs">·</span>
+            <span class="text-muted-foreground text-xs">·</span>
             <span class="inline-flex flex-wrap items-center gap-1">
               <template v-for="series in seriesLinks" :key="series.key">
                 <RouterLink
@@ -1749,7 +1749,7 @@ watch(
             type="button"
             :aria-label="t('book.detail.details.personalReview.toggleAria')"
             class="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            :class="{ 'text-primary hover:text-primary/80': showPersonalReview }"
+            :class="{ 'text-primary hover:text-primary': showPersonalReview }"
             @click="togglePersonalReview"
           >
             <StickyNote class="size-3.5" />
@@ -1838,7 +1838,7 @@ watch(
           <p v-if="personalNoteError" class="mt-2 text-xs text-rose-500">{{ personalNoteError }}</p>
         </template>
         <template v-else-if="hasPersonalNote">
-          <p class="line-clamp-4 whitespace-pre-line break-words text-sm leading-relaxed text-foreground/80">{{ personalNotePreview }}</p>
+          <p class="line-clamp-4 whitespace-pre-line break-words text-sm leading-relaxed text-foreground">{{ personalNotePreview }}</p>
         </template>
         <button
           v-else
@@ -1888,7 +1888,7 @@ watch(
                 loading="lazy"
                 @error="providerIconErrors[link.key] = true"
               />
-              <span v-else class="text-[8px] font-bold leading-none text-foreground/90">{{ link.fallback }}</span>
+              <span v-else class="text-[8px] font-bold leading-none text-foreground">{{ link.fallback }}</span>
             </span>
             <span
               v-if="communityRatingByProvider[link.key]"
@@ -1913,7 +1913,7 @@ watch(
                 loading="lazy"
                 @error="providerIconErrors[badge.key] = true"
               />
-              <span v-else class="text-[8px] font-bold leading-none text-foreground/90">{{ badge.fallback }}</span>
+              <span v-else class="text-[8px] font-bold leading-none text-foreground">{{ badge.fallback }}</span>
             </span>
             <span
               class="flex h-full items-center border-l border-border/60 bg-background/50 px-1.5 text-xs font-semibold tabular-nums text-foreground"
@@ -1931,14 +1931,14 @@ watch(
             <span
               v-for="(genre, index) in displayedGenres"
               :key="`${genre}-${index}`"
-              class="text-xs px-2.5 py-0.5 rounded-full border border-primary/40 text-primary/85"
+              class="text-xs px-2.5 py-0.5 rounded-full border border-primary/40 text-primary"
             >
               {{ genre }}
             </span>
             <button
               v-if="genreHiddenCount > 0"
               type="button"
-              class="text-xs font-medium text-foreground/75 hover:text-foreground transition-colors whitespace-nowrap"
+              class="text-xs font-medium text-foreground hover:text-foreground transition-colors whitespace-nowrap"
               @click="genresExpanded = !genresExpanded"
             >
               {{ genresExpanded ? t('book.detail.details.showLess') : t('book.detail.details.moreCount', { count: genreHiddenCount }) }}
@@ -1953,7 +1953,7 @@ watch(
               v-for="(genre, index) in book.genres"
               :key="`measure-${genre}-${index}`"
               data-genre-pill="true"
-              class="text-xs px-2.5 py-0.5 rounded-full border border-primary/40 text-primary/85"
+              class="text-xs px-2.5 py-0.5 rounded-full border border-primary/40 text-primary"
             >
               {{ genre }}
             </span>
@@ -2203,7 +2203,7 @@ watch(
         <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">{{ t('book.detail.details.synopsis') }}</p>
         <div v-if="book.description">
           <div
-            class="text-sm leading-relaxed text-foreground/80 transition-all"
+            class="text-sm leading-relaxed text-foreground transition-all"
             :class="descriptionExpanded ? '' : 'line-clamp-2'"
             v-html="safeDescription"
           />

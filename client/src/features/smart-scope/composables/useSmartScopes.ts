@@ -95,6 +95,18 @@ export function useSmartScopes() {
     return updated
   }
 
+  async function setKoboSync(id: number, enabled: boolean): Promise<SmartScope> {
+    const res = await api(`/api/v1/smart-scopes/${id}/kobo-sync`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const updated: SmartScope = await res.json()
+    smartScopes.value = smartScopes.value.map((l) => (l.id === id ? { ...l, ...updated } : l))
+    return updated
+  }
+
   async function deleteSmartScope(id: number): Promise<void> {
     const res = await api(`/api/v1/smart-scopes/${id}`, { method: 'DELETE' })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -119,6 +131,7 @@ export function useSmartScopes() {
     refreshSmartScopes,
     createSmartScope,
     updateSmartScope,
+    setKoboSync,
     deleteSmartScope,
     reorderSmartScopes,
   }

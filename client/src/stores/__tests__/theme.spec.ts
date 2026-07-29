@@ -158,4 +158,65 @@ describe('useThemeStore', () => {
     expect(store.resolvedTheme).toBe('light')
     expect(document.documentElement.classList.contains('dark')).toBe(false)
   })
+
+  it('replaces the removed terminal background preference with dots', () => {
+    const colorScheme = createColorSchemeQuery(false)
+    stubColorScheme(colorScheme.query)
+    localStorage.setItem('background', '"terminal"')
+    setActivePinia(createPinia())
+
+    const store = useThemeStore()
+
+    expect(store.background).toBe('dots')
+    expect(localStorage.getItem('background')).toBe('"dots"')
+  })
+
+  describe('surfaceOpacity', () => {
+    beforeEach(() => {
+      const colorScheme = createColorSchemeQuery(false)
+      stubColorScheme(colorScheme.query)
+      document.documentElement.style.removeProperty('--shell-surface-opacity')
+    })
+
+    it('defaults to 92% and writes the shell CSS variable', () => {
+      setActivePinia(createPinia())
+
+      const store = useThemeStore()
+
+      expect(store.surfaceOpacity).toBe(92)
+      expect(document.documentElement.style.getPropertyValue('--shell-surface-opacity')).toBe('92%')
+      expect(localStorage.getItem('surfaceOpacity')).toBe('92')
+    })
+
+    it.each([
+      { input: 79, expected: 80 },
+      { input: 80, expected: 80 },
+      { input: 100, expected: 100 },
+      { input: 140, expected: 100 },
+      { input: 87.6, expected: 88 },
+    ])('clamps $input to $expected', async ({ input, expected }) => {
+      setActivePinia(createPinia())
+      const store = useThemeStore()
+
+      store.setSurfaceOpacity(input)
+      await nextTick()
+
+      expect(store.surfaceOpacity).toBe(expected)
+      expect(document.documentElement.style.getPropertyValue('--shell-surface-opacity')).toBe(`${expected}%`)
+    })
+
+    it('falls back to the default when the stored value is unusable', () => {
+      localStorage.setItem('surfaceOpacity', '"not-a-number"')
+      setActivePinia(createPinia())
+
+      expect(useThemeStore().surfaceOpacity).toBe(92)
+    })
+
+    it('restores a stored value inside the supported range', () => {
+      localStorage.setItem('surfaceOpacity', '84')
+      setActivePinia(createPinia())
+
+      expect(useThemeStore().surfaceOpacity).toBe(84)
+    })
+  })
 })

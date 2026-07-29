@@ -19,9 +19,7 @@ function toggleBoolean() {
 
 <template>
   <div class="space-y-1">
-    <span class="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-widest">{{
-      t('settings.metadata.customFields.preview')
-    }}</span>
+    <span class="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">{{ t('settings.metadata.customFields.preview') }}</span>
     <input
       v-if="type === 'text' || type === 'url'"
       v-model="textValue"

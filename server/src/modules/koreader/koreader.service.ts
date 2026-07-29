@@ -4,9 +4,10 @@ import { createHash } from 'crypto';
 
 import { DEFAULT_KOREADER_DEVICE_PATTERN, type KoreaderBookSyncInfo, type KoreaderDeviceInfo, type KoreaderSyncStatus } from '@bookorbit/types';
 import { StatsCache } from '../../common/cache/stats-cache';
+import { mapWithConcurrency } from '../../common/utils/batch.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { isSemverNewer } from '../../common/utils/semver.utils';
-import { KoreaderRepository } from './koreader.repository';
+import { KoreaderRepository, type DeviceProgressUpsert } from './koreader.repository';
 import { KoreaderChapterService } from './koreader-chapter.service';
 import { KoreaderChapterExtractorService } from './koreader-chapter-extractor.service';
 import { KoreaderPackageService } from './koreader-package.service';
@@ -23,6 +24,15 @@ const FILE_NAMING_EVENT = 'koreader.file_naming';
 const DEFAULT_DEVICE = 'KOReader';
 const FILE_NAMING_CACHE_TTL_MS = 30_000;
 const FILE_NAMING_CACHE_MAX_ENTRIES = 5_000;
+const SHARED_PROGRESS_CONCURRENCY = 4;
+const CHAPTER_EXTRACTION_CONCURRENCY = 2;
+
+export interface BulkProgressEntry {
+  bookFile: { id: number; bookId: number; libraryId: number };
+  percentage: number;
+  progress?: string;
+  timestamp?: number;
+}
 
 @Injectable()
 export class KoreaderService {
@@ -172,11 +182,118 @@ export class KoreaderService {
 
     if (options?.skipSharedProgress) return;
 
+    const previousPercentage = previousDeviceProgress?.percentage != null ? toBookorbitPercentage(previousDeviceProgress.percentage) : null;
+    await this.applySharedProgress(userId, bookFile, data, previousPercentage);
+  }
+
+  /**
+   * Bulk sibling of applyProgressForResolvedFile for whole-library sweeps. Reads every
+   * file's device and reader progress in bounded batch queries, decides staleness in
+   * memory so later entries observe earlier ones, writes the device rows in one
+   * statement, and runs the remaining per-book work under bounded concurrency.
+   *
+   * A sweep can carry a stale sidecar position from a secondary device (book last opened
+   * there long ago). The per-device row is recorded regardless, but the shared
+   * reading_progress and status updates are skipped when something newer is already
+   * known server-side.
+   */
+  async applyBulkProgress(
+    userId: number,
+    entries: BulkProgressEntry[],
+    device: { device: string; deviceId: string },
+  ): Promise<{ shared: number; stale: number }> {
+    if (entries.length === 0) return { shared: 0, stale: 0 };
+
+    const bookFileIds = entries.map((entry) => entry.bookFile.id);
+    const [deviceRows, readerUpdatedAt] = await Promise.all([
+      this.repo.getDeviceProgressForFiles(bookFileIds, userId),
+      this.repo.getReadingProgressUpdatedAtForFiles(bookFileIds, userId),
+    ]);
+
+    const appliedAt = new Date();
+    const appliedAtSeconds = Math.floor(appliedAt.getTime() / 1000);
+    const fileStates = new Map<number, { otherDevicesNewest: number; ownDeviceNewest: number; latestPercentage: number | null }>();
+    for (const bookFileId of new Set(bookFileIds)) {
+      const rows = deviceRows.get(bookFileId) ?? [];
+      let otherDevicesNewest = 0;
+      let ownDeviceNewest = 0;
+      for (const row of rows) {
+        const rowSeconds = row.syncTimestamp ?? Math.floor((row.updatedAt?.getTime() ?? 0) / 1000);
+        if (row.device === device.device && row.deviceId === device.deviceId) ownDeviceNewest = Math.max(ownDeviceNewest, rowSeconds);
+        else otherDevicesNewest = Math.max(otherDevicesNewest, rowSeconds);
+      }
+      const readerSeconds = readerUpdatedAt.get(bookFileId);
+      if (readerSeconds) otherDevicesNewest = Math.max(otherDevicesNewest, Math.floor(readerSeconds.getTime() / 1000));
+      fileStates.set(bookFileId, { otherDevicesNewest, ownDeviceNewest, latestPercentage: rows[0]?.percentage ?? null });
+    }
+
+    const plans = entries.map((entry) => {
+      const state = fileStates.get(entry.bookFile.id)!;
+      const newestKnown = Math.max(state.otherDevicesNewest, state.ownDeviceNewest);
+      const stale = entry.timestamp ? entry.timestamp < newestKnown : false;
+      const previousPercentage = state.latestPercentage != null ? toBookorbitPercentage(state.latestPercentage) : null;
+      // Mirror the row this batch is about to write, so a later entry for the same file
+      // sees what a sequential apply would have seen.
+      state.ownDeviceNewest = entry.timestamp ?? appliedAtSeconds;
+      state.latestPercentage = entry.percentage;
+      return { entry, stale, previousPercentage };
+    });
+
+    const deviceUpserts = new Map<number, DeviceProgressUpsert>();
+    for (const { entry } of plans) {
+      deviceUpserts.set(entry.bookFile.id, {
+        bookFileId: entry.bookFile.id,
+        userId,
+        device: device.device,
+        deviceId: device.deviceId,
+        percentage: entry.percentage,
+        progress: entry.progress ?? null,
+        chapterIndex: this.chapterService.parseChapterIndexFromProgress(entry.progress ?? null),
+        syncTimestamp: entry.timestamp ?? null,
+      });
+    }
+    await this.repo.upsertDeviceProgressMany([...deviceUpserts.values()], appliedAt);
+
+    const shared = plans.filter((plan) => !plan.stale);
+    // Chapter extraction parses an EPUB per file, so it stays off the request path as it
+    // does for a single sync, but bounded instead of one unawaited call per item.
+    const extractionFileIds = [...new Set(shared.map((plan) => plan.entry.bookFile.id))];
+    void mapWithConcurrency(extractionFileIds, CHAPTER_EXTRACTION_CONCURRENCY, async (bookFileId) => {
+      await this.chapterExtractor.extractAndStoreChapters(bookFileId).catch(() => {});
+    });
+
+    // Several entries can resolve to one book through different files, and the status and
+    // reread heuristics depend on order, so one book's entries stay sequential.
+    const byBook = new Map<number, typeof shared>();
+    for (const plan of shared) {
+      const group = byBook.get(plan.entry.bookFile.bookId);
+      if (group) group.push(plan);
+      else byBook.set(plan.entry.bookFile.bookId, [plan]);
+    }
+    await mapWithConcurrency([...byBook.values()], SHARED_PROGRESS_CONCURRENCY, async (group) => {
+      for (const plan of group) {
+        await this.applySharedProgress(
+          userId,
+          plan.entry.bookFile,
+          { percentage: plan.entry.percentage, progress: plan.entry.progress, timestamp: plan.entry.timestamp },
+          plan.previousPercentage,
+        );
+      }
+    });
+
+    return { shared: shared.length, stale: plans.length - shared.length };
+  }
+
+  private async applySharedProgress(
+    userId: number,
+    bookFile: { id: number; bookId: number; libraryId: number },
+    data: { percentage: number; progress?: string; timestamp?: number },
+    previousPercentage: number | null,
+  ) {
     const bookorbitPercentage = toBookorbitPercentage(data.percentage);
     const cfi = data.progress ? await this.convertProgressToCfi(bookFile.id, data.progress) : null;
     await this.repo.upsertReadingProgress(bookFile.id, userId, bookorbitPercentage, cfi, data.progress ?? null);
     await this.bookService.syncKoboReadingStateForExternalProgress(userId, bookFile.id, bookorbitPercentage).catch(() => undefined);
-    const previousPercentage = previousDeviceProgress?.percentage != null ? toBookorbitPercentage(previousDeviceProgress.percentage) : null;
     const strongRereadEvidence = previousPercentage !== null && previousPercentage - bookorbitPercentage >= 10;
     await this.bookService.autoUpdateReadStatusForProgress(userId, bookFile, bookorbitPercentage, {
       origin: 'koreader',

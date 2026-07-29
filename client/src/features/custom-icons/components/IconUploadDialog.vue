@@ -102,7 +102,7 @@ async function addFiles(files: File[]) {
     return
   }
   const accepted = svgFiles.slice(0, room)
-  if (svgFiles.length > room) toast.warning(t('customIcons.onlyMoreCanStage', { count: room }, room))
+  if (svgFiles.length > room) toast.warning(t('customIcons.onlyMoreCanStage', { count: room }))
 
   staging.value = true
   try {
@@ -150,7 +150,7 @@ async function confirmUpload() {
     const failed = items.length - created
     if (created > 0) emit('uploaded')
     if (created > 0 && failed === 0) {
-      toast.success(t('customIcons.uploadedCount', { count: created }, created))
+      toast.success(t('customIcons.uploadedCount', { count: created }))
       closeDialog()
     } else if (created > 0) {
       toast.warning(t('customIcons.uploadedPartial', { created, failed }))

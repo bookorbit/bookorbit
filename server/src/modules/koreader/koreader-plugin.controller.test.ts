@@ -22,6 +22,10 @@ function makeController() {
     exchange: vi.fn().mockResolvedValue({ books: [] }),
     exchangeAck: vi.fn().mockResolvedValue({ ok: true }),
   };
+  const bookmarkExchangeService = {
+    exchange: vi.fn().mockResolvedValue({ results: [], unmatched: [] }),
+    exchangeAck: vi.fn().mockResolvedValue({ results: [], unmatched: [] }),
+  };
   const packageService = {
     getVersionInfo: vi.fn().mockResolvedValue({ pluginVersion: '0.4.0', serverVersion: '1.0.0' }),
     buildPluginPackage: vi.fn().mockResolvedValue(Buffer.from('fake-zip-content')),
@@ -34,10 +38,12 @@ function makeController() {
       statsService as never,
       annotationService as never,
       annotationExchangeService as never,
+      bookmarkExchangeService as never,
       packageService as never,
     ),
     pluginService,
     statsService,
+    bookmarkExchangeService,
     annotationService,
     annotationExchangeService,
     packageService,
@@ -98,6 +104,26 @@ describe('KoreaderPluginController', () => {
     await controller.exchangeAnnotationsAck(user, dto);
 
     expect(annotationExchangeService.exchangeAck).toHaveBeenCalledWith(user, dto);
+  });
+
+  it('exchangeBookmarks delegates to bookmark exchange service', async () => {
+    const { controller, bookmarkExchangeService } = makeController();
+    const user = { id: 7 } as never;
+    const dto = {} as never;
+
+    await controller.exchangeBookmarks(user, dto);
+
+    expect(bookmarkExchangeService.exchange).toHaveBeenCalledWith(user, dto);
+  });
+
+  it('exchangeBookmarksAck delegates to bookmark exchange service', async () => {
+    const { controller, bookmarkExchangeService } = makeController();
+    const user = { id: 7 } as never;
+    const dto = {} as never;
+
+    await controller.exchangeBookmarksAck(user, dto);
+
+    expect(bookmarkExchangeService.exchangeAck).toHaveBeenCalledWith(user, dto);
   });
 
   it('uploadBookStates delegates to plugin service', async () => {

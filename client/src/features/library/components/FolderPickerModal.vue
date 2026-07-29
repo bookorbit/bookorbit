@@ -131,7 +131,7 @@ useModal({
             <TooltipContent>{{ t('library.folderPicker.parentFolder') }}</TooltipContent>
           </Tooltip>
           <template v-for="(crumb, index) in breadcrumbs" :key="crumb.path">
-            <ChevronRight v-if="index > 0" :size="12" class="shrink-0 text-muted-foreground/60" />
+            <ChevronRight v-if="index > 0" :size="12" class="shrink-0 text-muted-foreground" />
             <button
               type="button"
               class="shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 text-xs transition-colors"
@@ -154,7 +154,7 @@ useModal({
               v-model="search"
               type="text"
               :placeholder="t('library.folderPicker.filterPlaceholder')"
-              class="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
+              class="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
             />
             <button
               v-if="search"
@@ -187,7 +187,7 @@ useModal({
                 v-model="newFolderName"
                 type="text"
                 :placeholder="t('library.folderPicker.newFolderNamePlaceholder')"
-                class="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
+                class="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
                 @keydown="onNewFolderKeydown"
               />
             </label>
@@ -220,7 +220,7 @@ useModal({
           </div>
 
           <div v-else-if="error" class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-            <FolderOpen :size="30" class="text-muted-foreground/60" />
+            <FolderOpen :size="30" class="text-muted-foreground" />
             <p class="text-sm text-muted-foreground">{{ error }}</p>
             <button type="button" class="h-10 rounded-lg border border-border px-4 text-sm font-medium hover:bg-muted" @click="reloadCurrent">
               {{ t('reader.retry') }}
@@ -251,7 +251,7 @@ useModal({
             </label>
 
             <div v-if="filteredEntries.length === 0" class="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-              <Folder :size="28" class="text-muted-foreground/50" />
+              <Folder :size="28" class="text-muted-foreground" />
               <p class="text-sm font-medium text-foreground">
                 {{ search ? t('library.folderPicker.noMatches') : t('library.folderPicker.empty') }}
               </p>
@@ -274,7 +274,7 @@ useModal({
                       :disabled="isSelectionDisabled(entry.path)"
                       @change="toggleSelection(entry.path)"
                     />
-                    <Folder :size="16" class="shrink-0 text-primary/80" />
+                    <Folder :size="16" class="shrink-0 text-primary" />
                     <span class="min-w-0 flex-1">
                       <span class="block truncate text-sm font-medium text-foreground">{{ entry.name }}</span>
                       <span
@@ -306,7 +306,7 @@ useModal({
           </div>
           <div class="flex items-center justify-between gap-3">
             <p class="text-sm text-muted-foreground">
-              {{ t('library.folderPicker.selectedCount', { count: selectedCount }, selectedCount) }}
+              {{ t('library.folderPicker.selectedCount', { count: selectedCount }) }}
             </p>
             <div class="flex shrink-0 items-center gap-2">
               <button

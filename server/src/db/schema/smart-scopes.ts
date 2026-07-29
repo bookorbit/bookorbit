@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgTable, serial, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, jsonb, pgTable, primaryKey, serial, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 import type { GroupRule, SortSpec } from '@bookorbit/types';
 
 import { users } from './auth';
@@ -28,3 +28,24 @@ export const smartScopes = pgTable(
 
 export type SmartScope = typeof smartScopes.$inferSelect;
 export type NewSmartScope = typeof smartScopes.$inferInsert;
+
+/**
+ * Opt-in Kobo sync for shared scopes. `smartScopes.syncToKobo` only governs the
+ * owner's own devices; every other user decides for themselves whether a public
+ * scope reaches their Kobo, so nothing lands on a device without consent.
+ */
+export const smartScopeKoboSubscriptions = pgTable(
+  'smart_scope_kobo_subscriptions',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    smartScopeId: integer('smart_scope_id')
+      .notNull()
+      .references(() => smartScopes.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.smartScopeId] }), index('smart_scope_kobo_subscriptions_smart_scope_id_idx').on(t.smartScopeId)],
+);
+
+export type SmartScopeKoboSubscription = typeof smartScopeKoboSubscriptions.$inferSelect;

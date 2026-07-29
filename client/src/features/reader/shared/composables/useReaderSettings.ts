@@ -3,6 +3,8 @@ import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import {
+  CBX_SPREAD_GAP_MAX,
+  CBX_SPREAD_GAP_MIN,
   CBX_READER_DEFAULTS,
   EPUB_READER_DEFAULTS,
   PDF_READER_DEFAULTS,
@@ -126,6 +128,9 @@ function sanitizeCbxPartialSettings(settings: unknown): Partial<CbxReaderSetting
   }
   if (settings.spreadAlignment === 'normal' || settings.spreadAlignment === 'shifted') {
     out.spreadAlignment = settings.spreadAlignment
+  }
+  if (isIntegerInRange(settings.spreadGap, CBX_SPREAD_GAP_MIN, CBX_SPREAD_GAP_MAX)) {
+    out.spreadGap = settings.spreadGap
   }
   if (typeof settings.forceTwoPage === 'boolean') {
     out.forceTwoPage = settings.forceTwoPage

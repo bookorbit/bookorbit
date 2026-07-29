@@ -894,7 +894,12 @@ describe('BookController', () => {
 
   it('invokes auditable descriptions for bulk and metadata actions', () => {
     const deleteAudit = Reflect.getMetadata(AUDITABLE_KEY, BookController.prototype.deleteBooks) as {
-      description: (req: { body: { bookIds?: number[] } }) => string;
+      getResourceId: (
+        req: unknown,
+        response: { total: number; books: { id: number; title: string | null }[]; omitted: number },
+      ) => number | undefined;
+      getMeta: (req: unknown, response: { total: number; books: { id: number; title: string | null }[]; omitted: number }) => Record<string, unknown>;
+      description: (req: unknown, response: { total: number; books: { id: number; title: string | null }[]; omitted: number }) => string;
     };
     const bulkRefreshAudit = Reflect.getMetadata(AUDITABLE_KEY, BookController.prototype.bulkRefreshMetadata) as {
       description: (req: { body: { bookIds?: number[] } }) => string;
@@ -922,7 +927,13 @@ describe('BookController', () => {
       description: (req: { params: Record<string, string> }) => string;
     };
 
-    expect(deleteAudit.description({ body: { bookIds: [1, 2] } })).toBe('Deleted 2 books');
+    const singleDeletion = { total: 1, books: [{ id: 1, title: 'Dune' }], omitted: 0 };
+    const bulkDeletion = { total: 2, books: [{ id: 1, title: 'Dune' }], omitted: 1 };
+    expect(deleteAudit.description({}, singleDeletion)).toBe('Deleted "Dune" (#1)');
+    expect(deleteAudit.description({}, bulkDeletion)).toBe('Deleted 2 books');
+    expect(deleteAudit.getResourceId({}, singleDeletion)).toBe(1);
+    expect(deleteAudit.getResourceId({}, bulkDeletion)).toBeUndefined();
+    expect(deleteAudit.getMeta({}, bulkDeletion)).toEqual(bulkDeletion);
     expect(bulkRefreshAudit.description({ body: { bookIds: [1] } })).toBe('Bulk refreshed metadata for 1 book');
     expect(bulkCoverAudit.description({ body: { bookIds: [1, 2, 3] } })).toBe('Bulk re-extracted covers for 3 books');
     expect(bulkSetMetadataAudit.description({ body: { bookIds: [1, 2], field: 'language' } })).toBe('Bulk set language for 2 books');

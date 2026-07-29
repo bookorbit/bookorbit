@@ -78,7 +78,7 @@ function moveFormat(index: number, direction: -1 | 1) {
   <div class="px-6 py-6 space-y-6">
     <!-- Source precedence -->
     <div>
-      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-1">
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground mb-1">
         {{ t('library.creator.metadata.sourcePrecedence.title') }}
       </p>
       <p class="text-xs text-muted-foreground mb-3">{{ t('library.creator.metadata.sourcePrecedence.hint') }}</p>
@@ -95,7 +95,7 @@ function moveFormat(index: number, direction: -1 | 1) {
           @drop="metaDrag.onDrop"
           @dragend="metaDrag.onDragEnd"
         >
-          <GripVertical :size="13" class="text-muted-foreground/50 shrink-0" />
+          <GripVertical :size="13" class="text-muted-foreground shrink-0" />
           <span class="flex items-center justify-center w-4 h-4 rounded-full bg-primary/10 text-primary text-[9px] font-bold shrink-0">
             {{ index + 1 }}
           </span>
@@ -126,7 +126,7 @@ function moveFormat(index: number, direction: -1 | 1) {
 
     <!-- Format priority -->
     <div>
-      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-1">
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground mb-1">
         {{ t('library.creator.metadata.formatPriority.title') }}
       </p>
       <p class="text-xs text-muted-foreground mb-3">{{ t('library.creator.metadata.formatPriority.hint') }}</p>
@@ -143,7 +143,7 @@ function moveFormat(index: number, direction: -1 | 1) {
           @drop="fmtDrag.onDrop"
           @dragend="fmtDrag.onDragEnd"
         >
-          <GripVertical :size="13" class="text-muted-foreground/50 shrink-0" />
+          <GripVertical :size="13" class="text-muted-foreground shrink-0" />
           <span class="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-[10.5px] font-bold shrink-0">
             {{ index + 1 }}
           </span>

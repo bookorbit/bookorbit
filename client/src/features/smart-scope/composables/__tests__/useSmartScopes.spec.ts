@@ -17,6 +17,8 @@ function makeSmartScope(overrides: Partial<SmartScope> = {}): SmartScope {
     defaultSort: [],
     isPublic: false,
     syncToKobo: false,
+    koboSyncEnabled: false,
+    isOwner: true,
     displayOrder: 0,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -65,6 +67,39 @@ describe('useSmartScopes', () => {
 
     expect(smartScopes.value).toEqual([updated])
     expect(smartScopes.value).not.toBe(previous)
+  })
+
+  it('sends the Kobo sync opt-in and merges the response without dropping the cached book count', async () => {
+    const shared = { ...makeSmartScope({ id: 11, userId: 4, isOwner: false, isPublic: true }), bookCount: 42 }
+    apiMock
+      .mockResolvedValueOnce(makeResponse([shared]))
+      .mockResolvedValueOnce(makeResponse(makeSmartScope({ id: 11, userId: 4, isOwner: false, isPublic: true, koboSyncEnabled: true })))
+
+    const { useSmartScopes } = await import('../useSmartScopes')
+    const { smartScopes, fetchSmartScopes, setKoboSync } = useSmartScopes()
+
+    await fetchSmartScopes()
+    await setKoboSync(11, true)
+
+    expect(apiMock).toHaveBeenLastCalledWith('/api/v1/smart-scopes/11/kobo-sync', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: true }),
+    })
+    expect(smartScopes.value[0]).toEqual(expect.objectContaining({ id: 11, koboSyncEnabled: true, bookCount: 42 }))
+  })
+
+  it('leaves cached smartScopes untouched when the Kobo sync opt-in fails', async () => {
+    const shared = makeSmartScope({ id: 11, userId: 4, isOwner: false, isPublic: true })
+    apiMock.mockResolvedValueOnce(makeResponse([shared])).mockResolvedValueOnce({ ok: false, status: 403, json: async () => undefined } as Response)
+
+    const { useSmartScopes } = await import('../useSmartScopes')
+    const { smartScopes, fetchSmartScopes, setKoboSync } = useSmartScopes()
+
+    await fetchSmartScopes()
+    await expect(setKoboSync(11, true)).rejects.toThrow('HTTP 403')
+
+    expect(smartScopes.value).toEqual([shared])
   })
 
   it('resets cached smartScopes so the next fetch reloads them', async () => {

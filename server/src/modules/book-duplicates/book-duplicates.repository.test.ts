@@ -69,6 +69,37 @@ describe('BookDuplicatesRepository', () => {
     expect(query).not.toContain('SELECT DISTINCT');
   });
 
+  it('hashes the file-hash signature with md5 so the stored value stays within the btree index limit (regression: #762)', async () => {
+    const execute = vi.fn().mockResolvedValue({ rows: [] });
+    const repo = new BookDuplicatesRepository({ execute } as never);
+
+    await repo.insertFileHashKeys(9, [1, 2], { id: 7, isSuperuser: true, contentFilters: EMPTY_CONTENT_FILTER_RULES } as never);
+
+    const query = renderSql(execute.mock.calls[0]![0]).sql.replace(/\s+/g, ' ');
+    // A book with an arbitrarily large number of content files (e.g. a chapterized
+    // audiobook) must never write its full, unbounded concatenated signature as the
+    // indexed `value` - only its fixed-size md5 digest.
+    expect(query).toMatch(/'file_hash',\s*md5\(\s*array_to_string\(\s*array_agg\(/);
+    expect(query.indexOf('md5(')).toBeLessThan(query.indexOf('array_to_string('));
+    expect(query.match(/\bmd5\(/g)).toHaveLength(1);
+  });
+
+  it('hashes the exact-metadata signature with md5 so an unbounded author list cannot overflow the btree index (regression: #762)', async () => {
+    const execute = vi.fn().mockResolvedValue({ rows: [] });
+    const repo = new BookDuplicatesRepository({ execute } as never);
+
+    await repo.insertExactMetadataKeys(9, [1, 2], { id: 7, isSuperuser: true, contentFilters: EMPTY_CONTENT_FILTER_RULES } as never);
+
+    const query = renderSql(execute.mock.calls[0]![0]).sql.replace(/\s+/g, ' ');
+    // A book with an arbitrarily large author list (e.g. an anthology) must never write
+    // the raw title|authors|family concatenation as the indexed `value` - only its
+    // fixed-size md5 digest.
+    expect(query).toContain(
+      "'exact_metadata', md5(eligible.title_key || chr(31) || array_to_string(eligible.author_keys, chr(30)) || chr(31) || family)",
+    );
+    expect(query.match(/\bmd5\(/g)).toHaveLength(1);
+  });
+
   it('limits identical-file signatures to content files in accessible, non-processing books', async () => {
     const execute = vi.fn().mockResolvedValue({ rows: [] });
     const repo = new BookDuplicatesRepository({ execute } as never);

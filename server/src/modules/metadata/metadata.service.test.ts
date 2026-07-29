@@ -452,7 +452,7 @@ describe('MetadataService', () => {
     await expect(service.extractAndSave(15, '/books/a.pdf', 'pdf')).rejects.toThrow('bad metadata');
   });
 
-  it('extractAndSave logs warning when score calculation or embedding fails', async () => {
+  it('extractAndSave propagates score calculation failures after persisting metadata', async () => {
     const { db } = makeDb();
     const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     const scoreService = {
@@ -492,12 +492,12 @@ describe('MetadataService', () => {
       coverBuffer: null,
     });
 
-    await service.extractAndSave(44, '/tmp/warn-book.pdf', 'pdf');
+    await expect(service.extractAndSave(44, '/tmp/warn-book.pdf', 'pdf')).rejects.toThrow('score failed');
     await Promise.resolve();
 
     expect(scoreService.calculateAndSave).toHaveBeenCalledWith(44);
     expect(failingEmbedder.embedBook).toHaveBeenCalledWith(44);
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[metadata.score_calculation] [fail]'));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[metadata.extract_and_save] [fail]'));
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[metadata.embedding] [fail]'));
   });
 

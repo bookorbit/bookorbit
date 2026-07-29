@@ -106,7 +106,7 @@ function canSave(field: CustomMetadataFieldDefinition): boolean {
 }
 
 function usageLabel(field: CustomMetadataFieldDefinition): string {
-  return t('settings.metadata.customFields.usage', { count: field.usageCount }, field.usageCount)
+  return t('settings.metadata.customFields.usage', { count: field.usageCount })
 }
 
 function toggleCreate() {
@@ -305,7 +305,7 @@ onMounted(() => {
           <div class="flex items-start gap-3">
             <button
               type="button"
-              class="custom-field-handle mt-7 shrink-0 text-muted-foreground/60 hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed cursor-grab active:cursor-grabbing"
+              class="custom-field-handle mt-7 shrink-0 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed cursor-grab active:cursor-grabbing"
               :disabled="reordering || isSearching"
               :title="isSearching ? t('settings.metadata.customFields.clearSearchToReorder') : t('settings.metadata.customFields.dragToReorder')"
               :aria-label="t('settings.metadata.customFields.dragToReorderField')"
@@ -395,7 +395,7 @@ onMounted(() => {
               t('settings.metadata.customFields.archivedFields')
             }}</span>
             <p class="settings-hint">
-              {{ t('settings.metadata.customFields.archivedSummary', { count: archivedFields.length }, archivedFields.length) }}
+              {{ t('settings.metadata.customFields.archivedSummary', { count: archivedFields.length }) }}
             </p>
           </div>
         </div>

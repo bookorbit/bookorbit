@@ -24,7 +24,7 @@ const confirmationFields = computed(() => {
   const summary = ['frequency', 'completion', 'formats', 'genres', 'trend']
   return pendingLevel.value === 'summary' ? summary : [...summary, 'books', 'authors', 'series', 'narrators']
 })
-const historyPages = computed(() => Math.ceil(sharing.history.value.total / sharing.history.value.pageSize))
+const historyPages = computed(() => Math.max(1, Math.ceil(sharing.history.value.total / sharing.history.value.pageSize)))
 
 onMounted(sharing.load)
 
@@ -69,20 +69,19 @@ function handleNextHistoryPage() {
 
 function durationLabel(seconds: number): string {
   const minutes = Math.round(seconds / 60)
-  if (minutes < 60) return t('settings.privacySharing.durationMinutes', { count: minutes }, minutes)
+  if (minutes < 60) return t('settings.privacySharing.durationMinutes', { count: minutes })
   const hours = Math.round((minutes / 60) * 10) / 10
-  return t('settings.privacySharing.durationHours', { count: formatNumber(hours) })
+  return t('settings.privacySharing.durationHours', { count: hours })
 }
 </script>
 
 <template>
-  <section aria-labelledby="privacy-sharing-title" class="space-y-6">
-    <div>
-      <h2 id="privacy-sharing-title" class="text-lg font-semibold text-foreground">{{ t('settings.privacySharing.title') }}</h2>
-      <p class="mt-1 text-sm text-muted-foreground">{{ t('settings.privacySharing.subtitle') }}</p>
-    </div>
-
-    <div v-if="sharing.error.value && !sharing.loaded.value" role="alert" class="space-y-3 rounded-lg border border-destructive/30 p-4">
+  <section aria-labelledby="privacy-sharing-heading" class="space-y-6">
+    <div
+      v-if="sharing.error.value && !sharing.loaded.value"
+      role="alert"
+      class="space-y-3 rounded-lg border border-destructive/30 bg-card p-4 shadow-xs md:p-5"
+    >
       <p class="text-sm text-destructive">
         {{ t(`settings.privacySharing.errors.${sharing.error.value}`) }}
       </p>
@@ -94,85 +93,96 @@ function durationLabel(seconds: number): string {
       <p v-if="sharing.error.value" role="alert" class="text-sm text-destructive">
         {{ t(`settings.privacySharing.errors.${sharing.error.value}`) }}
       </p>
-      <fieldset class="grid gap-3 lg:grid-cols-3">
-        <legend class="sr-only">{{ t('settings.privacySharing.levelLegend') }}</legend>
-        <label
-          v-for="option in options"
-          :key="option.level"
-          class="relative cursor-pointer rounded-lg border bg-card p-4 shadow-xs transition-colors focus-within:ring-2 focus-within:ring-ring"
-          :class="sharing.settings.value.sharingLevel === option.level ? 'border-primary' : 'border-border hover:bg-muted/30'"
-        >
-          <input
-            type="radio"
-            name="reading-insights-sharing"
-            :value="option.level"
-            :checked="sharing.settings.value.sharingLevel === option.level"
-            class="sr-only"
-            @change="selectLevel(option.level)"
-          />
-          <component :is="option.icon" :size="20" class="text-muted-foreground" aria-hidden="true" />
-          <span class="mt-3 block font-medium text-foreground">{{ t(`settings.privacySharing.levels.${option.level}.title`) }}</span>
-          <span class="mt-1 block text-sm leading-5 text-muted-foreground">{{
-            t(`settings.privacySharing.levels.${option.level}.description`)
-          }}</span>
-          <span
-            v-if="sharing.settings.value.sharingLevel === option.level"
-            class="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary"
-          >
-            <ShieldCheck :size="13" aria-hidden="true" />
-            {{ t('settings.privacySharing.current') }}
-          </span>
-        </label>
-      </fieldset>
 
-      <div v-if="sharing.settings.value.sharingLevel !== 'private'" class="rounded-lg border border-border bg-card p-4">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p class="font-medium text-foreground">{{ t('settings.privacySharing.preview.title') }}</p>
-            <p class="mt-1 text-sm text-muted-foreground">{{ t('settings.privacySharing.preview.description') }}</p>
+      <div class="space-y-3">
+        <div>
+          <h2 id="privacy-sharing-heading" class="settings-group-label mb-0">{{ t('settings.privacySharing.title') }}</h2>
+          <p class="settings-hint">{{ t('settings.privacySharing.subtitle') }}</p>
+        </div>
+        <fieldset>
+          <legend class="sr-only">{{ t('settings.privacySharing.levelLegend') }}</legend>
+          <div class="grid gap-3 lg:grid-cols-3">
+            <label
+              v-for="option in options"
+              :key="option.level"
+              class="relative cursor-pointer rounded-lg border bg-card p-4 shadow-xs transition-colors focus-within:ring-2 focus-within:ring-ring md:p-5"
+              :class="sharing.settings.value.sharingLevel === option.level ? 'border-primary' : 'border-border hover:bg-muted/30'"
+            >
+              <input
+                type="radio"
+                name="reading-insights-sharing"
+                :value="option.level"
+                :checked="sharing.settings.value.sharingLevel === option.level"
+                class="sr-only"
+                @change="selectLevel(option.level)"
+              />
+              <component :is="option.icon" :size="18" class="text-muted-foreground" aria-hidden="true" />
+              <span class="settings-label mt-3 block">{{ t(`settings.privacySharing.levels.${option.level}.title`) }}</span>
+              <span class="settings-hint block">{{ t(`settings.privacySharing.levels.${option.level}.description`) }}</span>
+              <span
+                v-if="sharing.settings.value.sharingLevel === option.level"
+                class="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary"
+              >
+                <ShieldCheck :size="13" aria-hidden="true" />
+                {{ t('settings.privacySharing.current') }}
+              </span>
+            </label>
+          </div>
+        </fieldset>
+      </div>
+
+      <section
+        v-if="sharing.settings.value.sharingLevel !== 'private'"
+        aria-labelledby="privacy-preview-heading"
+        class="rounded-lg border border-border bg-card p-4 shadow-xs md:p-5"
+      >
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div class="min-w-0">
+            <h3 id="privacy-preview-heading" class="text-sm font-semibold text-foreground">{{ t('settings.privacySharing.preview.title') }}</h3>
+            <p class="settings-hint">{{ t('settings.privacySharing.preview.description') }}</p>
           </div>
           <button type="button" class="settings-btn-outline shrink-0 justify-center" :disabled="sharing.previewLoading.value" @click="handlePreview">
             {{ sharing.previewLoading.value ? t('common.loading') : t('settings.privacySharing.preview.action') }}
           </button>
         </div>
-        <div v-if="sharing.previewSummary.value" class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div class="rounded-md bg-muted/50 p-3">
-            <p class="text-xs text-muted-foreground">{{ t('settings.privacySharing.preview.readingTime') }}</p>
-            <p class="mt-1 font-semibold text-foreground">{{ durationLabel(sharing.previewSummary.value.readingSeconds) }}</p>
+        <dl v-if="sharing.previewSummary.value" class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div class="rounded-md border border-border/60 bg-muted/40 p-3">
+            <dt class="text-xs text-muted-foreground">{{ t('settings.privacySharing.preview.readingTime') }}</dt>
+            <dd class="settings-value mt-1">{{ durationLabel(sharing.previewSummary.value.readingSeconds) }}</dd>
           </div>
-          <div class="rounded-md bg-muted/50 p-3">
-            <p class="text-xs text-muted-foreground">{{ t('settings.privacySharing.preview.activeDays') }}</p>
-            <p class="mt-1 font-semibold text-foreground">{{ formatNumber(sharing.previewSummary.value.activeDays) }}</p>
+          <div class="rounded-md border border-border/60 bg-muted/40 p-3">
+            <dt class="text-xs text-muted-foreground">{{ t('settings.privacySharing.preview.activeDays') }}</dt>
+            <dd class="settings-value mt-1">{{ formatNumber(sharing.previewSummary.value.activeDays) }}</dd>
           </div>
-          <div class="rounded-md bg-muted/50 p-3">
-            <p class="text-xs text-muted-foreground">{{ t('settings.privacySharing.preview.started') }}</p>
-            <p class="mt-1 font-semibold text-foreground">{{ formatNumber(sharing.previewSummary.value.booksStarted) }}</p>
+          <div class="rounded-md border border-border/60 bg-muted/40 p-3">
+            <dt class="text-xs text-muted-foreground">{{ t('settings.privacySharing.preview.started') }}</dt>
+            <dd class="settings-value mt-1">{{ formatNumber(sharing.previewSummary.value.booksStarted) }}</dd>
           </div>
-          <div class="rounded-md bg-muted/50 p-3">
-            <p class="text-xs text-muted-foreground">{{ t('settings.privacySharing.preview.completed') }}</p>
-            <p class="mt-1 font-semibold text-foreground">{{ formatNumber(sharing.previewSummary.value.booksCompleted) }}</p>
+          <div class="rounded-md border border-border/60 bg-muted/40 p-3">
+            <dt class="text-xs text-muted-foreground">{{ t('settings.privacySharing.preview.completed') }}</dt>
+            <dd class="settings-value mt-1">{{ formatNumber(sharing.previewSummary.value.booksCompleted) }}</dd>
           </div>
-        </div>
+        </dl>
         <div v-if="sharing.previewDetail.value" class="mt-4">
-          <p class="text-sm font-medium text-foreground">{{ t('settings.privacySharing.preview.topBooks') }}</p>
-          <ul class="mt-2 space-y-1 text-sm text-muted-foreground">
+          <p class="settings-label">{{ t('settings.privacySharing.preview.topBooks') }}</p>
+          <ul class="mt-2 space-y-1 text-xs text-muted-foreground">
             <li v-for="book in sharing.previewDetail.value.topBooks" :key="book.bookId">
               {{ book.title ?? t('settings.privacySharing.unknownTitle') }}
             </li>
           </ul>
         </div>
-      </div>
+      </section>
 
-      <div class="rounded-lg border border-border bg-card p-4">
-        <h3 class="font-medium text-foreground">{{ t('settings.privacySharing.history.title') }}</h3>
-        <p class="mt-1 text-sm text-muted-foreground">{{ t('settings.privacySharing.history.description') }}</p>
+      <section aria-labelledby="privacy-history-heading" class="rounded-lg border border-border bg-card p-4 shadow-xs md:p-5">
+        <h3 id="privacy-history-heading" class="text-sm font-semibold text-foreground">{{ t('settings.privacySharing.history.title') }}</h3>
+        <p class="settings-hint">{{ t('settings.privacySharing.history.description') }}</p>
         <p v-if="sharing.history.value.items.length === 0" class="mt-4 text-sm text-muted-foreground">
           {{ t('settings.privacySharing.history.empty') }}
         </p>
         <ul v-else class="mt-4 divide-y divide-border">
           <li v-for="item in sharing.history.value.items" :key="item.id" class="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
             <div class="min-w-0">
-              <p class="truncate text-sm font-medium text-foreground">{{ item.viewerUsername }}</p>
+              <p class="settings-label truncate">{{ item.viewerUsername }}</p>
               <p class="text-xs text-muted-foreground">{{ t(`settings.privacySharing.levels.${item.sharingLevel}.title`) }}</p>
             </div>
             <time :datetime="item.viewedAt" class="shrink-0 text-xs text-muted-foreground">{{ formatDateTime(new Date(item.viewedAt)) }}</time>
@@ -200,12 +210,12 @@ function durationLabel(seconds: number): string {
             {{ t('common.next') }}
           </button>
         </nav>
-      </div>
+      </section>
     </template>
 
     <Sheet :open="confirmationOpen" @update:open="handleConfirmationOpen">
-      <SheetContent side="right" class="w-[90vw] sm:max-w-md">
-        <SheetHeader>
+      <SheetContent side="right" class="w-full gap-0 sm:max-w-md">
+        <SheetHeader class="border-b border-border pr-10">
           <SheetTitle>
             {{
               pendingLevel === 'private'
@@ -221,14 +231,18 @@ function durationLabel(seconds: number): string {
             }}
           </SheetDescription>
         </SheetHeader>
-        <ul v-if="pendingLevel !== 'private'" class="mt-6 space-y-2 text-sm text-foreground">
-          <li v-for="field in confirmationFields" :key="field" class="flex items-start gap-2">
-            <ListChecks :size="16" class="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
-            {{ t(`settings.privacySharing.fields.${field}`) }}
-          </li>
-        </ul>
-        <p class="mt-6 text-sm text-muted-foreground">{{ t('settings.privacySharing.confirm.recordedNotice') }}</p>
-        <SheetFooter class="mt-6 gap-2 sm:gap-2">
+
+        <div class="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+          <ul v-if="pendingLevel !== 'private'" class="space-y-2">
+            <li v-for="field in confirmationFields" :key="field" class="flex items-start gap-2 text-sm text-foreground">
+              <ListChecks :size="16" class="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
+              {{ t(`settings.privacySharing.fields.${field}`) }}
+            </li>
+          </ul>
+          <p class="settings-hint">{{ t('settings.privacySharing.confirm.recordedNotice') }}</p>
+        </div>
+
+        <SheetFooter class="flex-row justify-end border-t border-border">
           <button type="button" class="settings-btn-outline justify-center" @click="cancelChange">{{ t('common.cancel') }}</button>
           <button type="button" class="settings-btn-primary justify-center" :disabled="sharing.saving.value" @click="confirmChange">
             {{ sharing.saving.value ? t('common.loading') : t('common.confirm') }}

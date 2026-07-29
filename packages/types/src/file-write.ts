@@ -109,6 +109,15 @@ export const EPUB_BOOK_FILE_WRITE_FIELDS = [
   "coverBytes",
 ] as const satisfies readonly BookFileWriteField[];
 
+// FB2 keeps managed metadata in <description>: standard slots cover the core
+// fields, and <custom-info info-type="bookorbit:*"> carries the rest.
+export const FB2_BOOK_FILE_WRITE_FIELDS = [
+  ...CORE_BOOK_FILE_WRITE_FIELDS,
+  ...COMMON_PROVIDER_BOOK_FILE_WRITE_FIELDS,
+  "itunesId",
+  "coverBytes",
+] as const satisfies readonly BookFileWriteField[];
+
 export const PDF_BOOK_FILE_WRITE_FIELDS = [
   ...CORE_BOOK_FILE_WRITE_FIELDS,
   ...COMMON_PROVIDER_BOOK_FILE_WRITE_FIELDS,
@@ -119,6 +128,23 @@ export const CBX_BOOK_FILE_WRITE_FIELDS = [
   ...CORE_BOOK_FILE_WRITE_FIELDS,
   ...COMMON_PROVIDER_BOOK_FILE_WRITE_FIELDS,
   ...COMIC_BOOK_FILE_WRITE_FIELDS,
+] as const satisfies readonly BookFileWriteField[];
+
+// MOBI EXTH records are keyed by number and have no extensible string-keyed
+// namespace, so fields without a standard EXTH slot (series, rating, page count,
+// subtitle, provider IDs, comic fields, narrators) cannot be represented at all.
+export const MOBI_BOOK_FILE_WRITE_FIELDS = [
+  "title",
+  "description",
+  "publisher",
+  "publishedDate",
+  "language",
+  "isbn10",
+  "isbn13",
+  "authors",
+  "genres",
+  "tags",
+  "coverBytes",
 ] as const satisfies readonly BookFileWriteField[];
 
 export const AUDIO_BOOK_FILE_WRITE_FIELDS = [
@@ -141,9 +167,13 @@ export const AUDIO_BOOK_FILE_WRITE_FIELDS = [
 
 export const BOOK_FILE_WRITE_FORMAT_FIELDS = {
   epub: EPUB_BOOK_FILE_WRITE_FIELDS,
+  fb2: FB2_BOOK_FILE_WRITE_FIELDS,
   pdf: PDF_BOOK_FILE_WRITE_FIELDS,
   cbz: CBX_BOOK_FILE_WRITE_FIELDS,
   cb7: CBX_BOOK_FILE_WRITE_FIELDS,
+  mobi: MOBI_BOOK_FILE_WRITE_FIELDS,
+  azw3: MOBI_BOOK_FILE_WRITE_FIELDS,
+  azw: MOBI_BOOK_FILE_WRITE_FIELDS,
   m4b: AUDIO_BOOK_FILE_WRITE_FIELDS,
   m4a: AUDIO_BOOK_FILE_WRITE_FIELDS,
   mp3: AUDIO_BOOK_FILE_WRITE_FIELDS,

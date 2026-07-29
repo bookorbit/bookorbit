@@ -325,13 +325,13 @@ const currentStepBadge = computed((): { label: string; cls: string } | null => {
 
 function stepIndicatorClass(index: number): string {
   const step = stepperSteps.value[index]
-  if (!step) return 'bg-muted-foreground/15 text-muted-foreground/60'
+  if (!step) return 'bg-muted-foreground/15 text-muted-foreground'
   if (step.status === 'done') return 'bg-primary text-primary-foreground'
   if (step.status === 'failed') return 'bg-red-500 text-white'
   if (step.status === 'running') return 'bg-sky-500 text-white'
   if (index === currentStep.value) return 'bg-primary/15 text-primary ring-1 ring-primary'
   if (step.status === 'saved') return 'bg-amber-500/15 text-amber-600'
-  return 'bg-muted-foreground/15 text-muted-foreground/60'
+  return 'bg-muted-foreground/15 text-muted-foreground'
 }
 
 const unresolvedSummary = computed(() => Object.entries(plan.value?.summary?.unresolvedByReason ?? {}))
@@ -1737,7 +1737,7 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                         @click="onResolveDuplicates"
                       >
                         <Loader2 v-if="busy.resolvingDuplicates" class="size-3.5 animate-spin" />
-                        {{ t('migration.duplicates.resolveButton', { count: duplicateMatches.length }, duplicateMatches.length) }}
+                        {{ t('migration.duplicates.resolveButton', { count: duplicateMatches.length }) }}
                       </button>
                     </div>
                   </div>

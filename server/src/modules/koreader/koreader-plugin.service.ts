@@ -1,22 +1,24 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 
-import type { ReadStatus } from '@bookorbit/types';
+import type { ReadStatus, UserBookStatus } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
+import { mapWithConcurrency } from '../../common/utils/batch.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED, AchievementEventsService } from '../achievement/achievement-events.service';
-import { UserBookNoteService } from '../user-book-note/user-book-note.service';
+import { UserBookNoteService, type UserBookNoteDto } from '../user-book-note/user-book-note.service';
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
-import type { BookStatesUploadDto, BulkProgressDto, MatchCheckDto, SweepCompleteDto } from './dto';
+import type { BookStateDto, BookStatesUploadDto, BulkProgressDto, MatchCheckDto, SweepCompleteDto } from './dto';
 import { KoreaderPluginRepository } from './koreader-plugin.repository';
 import { KoreaderRepository } from './koreader.repository';
-import { KoreaderService } from './koreader.service';
+import { KoreaderService, type BulkProgressEntry } from './koreader.service';
 
 const MATCH_EVENT = 'koreader.plugin.match_check';
 const BOOK_STATES_EVENT = 'koreader.plugin.book_states';
 const BULK_PROGRESS_EVENT = 'koreader.plugin.bulk_progress';
 const SWEEP_EVENT = 'koreader.plugin.sweep';
 const UNMATCHED_SOURCE_RANK = { statistics: 0, file: 1, current_file: 2 } as const;
+const STATUS_WRITE_CONCURRENCY = 8;
 
 const DEVICE_STATUS_TO_READ_STATUS: Record<string, ReadStatus> = {
   reading: 'reading',
@@ -55,6 +57,20 @@ interface ReviewApplyResult {
   applied: boolean;
   note: string | null;
   updatedAt: string | null;
+}
+
+/**
+ * Server state for one book-states request, read in bounded batches up front and then
+ * advanced in memory so later entries resolving to the same book observe earlier ones.
+ */
+interface BookStateBatch {
+  statuses: Map<number, UserBookStatus>;
+  staleStatusBookIds: Set<number>;
+  ratings: Map<number, { rating: number | null; updatedAt: Date }>;
+  notes: Map<number, UserBookNoteDto>;
+  ratingWrites: Map<number, number | null>;
+  noteWrites: Map<number, string | null>;
+  appliedAt: Date;
 }
 
 export interface BulkProgressResult {
@@ -122,9 +138,8 @@ export class KoreaderPluginService {
       const hashes = [...new Set(dto.books.map((book) => book.hash.toLowerCase()))];
       const matches = await this.koreaderRepo.resolveBookFilesByHashes(hashes, accessibleLibraryIds, user.id);
 
-      const results: BookStatesUploadResult['results'] = [];
+      const entries: { hash: string; book: BookStateDto; bookId: number; index: number }[] = [];
       const unmatched: string[] = [];
-
       for (const book of dto.books) {
         const hash = book.hash.toLowerCase();
         const match = matches.get(hash);
@@ -132,51 +147,47 @@ export class KoreaderPluginService {
           unmatched.push(hash);
           continue;
         }
-
-        let statusApplied = false;
-        if (book.status) {
-          statusApplied = await this.applyStatus(user.id, match.bookId, book.status, book.statusModified);
-        }
-
-        const hasRatingField = Object.prototype.hasOwnProperty.call(book, 'rating');
-        let ratingResult: RatingApplyResult;
-        if (hasRatingField || book.ratingCleared === true) {
-          ratingResult = await this.applyRating(user.id, match.bookId, hasRatingField ? (book.rating ?? null) : null, book.statusModified);
-        } else {
-          const current = await this.pluginRepo.getRating(user.id, match.bookId);
-          ratingResult = { applied: false, rating: current?.rating ?? null, updatedAt: current?.updatedAt ?? null };
-        }
-
-        const hasReviewField = Object.prototype.hasOwnProperty.call(book, 'reviewNote');
-        let reviewResult: ReviewApplyResult;
-        if (hasReviewField || book.reviewCleared === true) {
-          reviewResult = await this.applyReview(
-            user.id,
-            match.bookId,
-            hasReviewField ? (book.reviewNote ?? null) : null,
-            book.reviewModified ?? book.statusModified,
-          );
-        } else {
-          const current = await this.userBookNoteService.findOne(user.id, match.bookId);
-          reviewResult = { applied: false, note: current?.note ?? null, updatedAt: current?.updatedAt ?? null };
-        }
-
-        results.push({
-          hash,
-          statusApplied,
-          ratingApplied: ratingResult.applied,
-          reviewApplied: reviewResult.applied,
-          rating: ratingResult.rating,
-          ratingSet: ratingResult.rating != null,
-          ratingUpdatedAt: ratingResult.updatedAt ? ratingResult.updatedAt.toISOString() : null,
-          reviewNote: reviewResult.note,
-          reviewNoteSet: reviewResult.note != null,
-          reviewUpdatedAt: reviewResult.updatedAt,
-        });
+        entries.push({ hash, book, bookId: match.bookId, index: entries.length });
       }
 
+      const bookIds = [...new Set(entries.map((entry) => entry.bookId))];
+      const [statuses, ratings, notes] = await Promise.all([
+        this.userBookStatusService.findByBookIds(user.id, bookIds),
+        this.pluginRepo.getRatings(user.id, bookIds),
+        this.userBookNoteService.findByBookIds(user.id, bookIds),
+      ]);
+
+      const state: BookStateBatch = {
+        statuses,
+        staleStatusBookIds: new Set<number>(),
+        ratings,
+        notes,
+        ratingWrites: new Map<number, number | null>(),
+        noteWrites: new Map<number, string | null>(),
+        appliedAt: new Date(),
+      };
+
+      // Several input entries can resolve to one book (duplicate hashes, or different
+      // files of the same book), so entries for a book run in input order against the
+      // evolving state while different books run concurrently.
+      const groups = new Map<number, typeof entries>();
+      for (const entry of entries) {
+        const group = groups.get(entry.bookId);
+        if (group) group.push(entry);
+        else groups.set(entry.bookId, [entry]);
+      }
+
+      const results: BookStatesUploadResult['results'] = new Array(entries.length);
+      await mapWithConcurrency([...groups.values()], STATUS_WRITE_CONCURRENCY, async (group) => {
+        for (const entry of group) {
+          results[entry.index] = await this.resolveBookState(user.id, entry.hash, entry.book, entry.bookId, state);
+        }
+      });
+
+      await Promise.all([this.flushRatings(user.id, state), this.flushReviews(user.id, state)]);
+
       this.logger.log(
-        `[${BOOK_STATES_EVENT}] [end] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} applied=${results.filter((r) => r.statusApplied || r.ratingApplied || r.reviewApplied).length} unmatched=${unmatched.length} - book states upload completed`,
+        `[${BOOK_STATES_EVENT}] [end] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} applied=${results.filter((r) => r.statusApplied || r.ratingApplied || r.reviewApplied).length} ratingWrites=${state.ratingWrites.size} reviewWrites=${state.noteWrites.size} unmatched=${unmatched.length} - book states upload completed`,
       );
 
       return { results, unmatched };
@@ -202,6 +213,7 @@ export class KoreaderPluginService {
 
       const results: BulkProgressResult['results'] = [];
       const unmatched: string[] = [];
+      const entries: BulkProgressEntry[] = [];
 
       for (const item of dto.items) {
         const hash = item.hash.toLowerCase();
@@ -211,27 +223,22 @@ export class KoreaderPluginService {
           continue;
         }
 
-        // A sweep can carry a stale sidecar position from a secondary device (book last opened
-        // there long ago). Record the per-device row regardless, but skip the shared
-        // reading_progress/status updates when something newer is already known server-side.
-        const stale = await this.isStaleProgress(user.id, match.bookFileId, item.timestamp);
-        await this.koreaderService.applyProgressForResolvedFile(
-          user.id,
-          { id: match.bookFileId, bookId: match.bookId, libraryId: match.libraryId },
-          {
-            percentage: item.percentage,
-            progress: item.progress,
-            device: dto.deviceModel,
-            deviceId: dto.deviceId,
-            timestamp: item.timestamp,
-          },
-          { skipSharedProgress: stale },
-        );
+        entries.push({
+          bookFile: { id: match.bookFileId, bookId: match.bookId, libraryId: match.libraryId },
+          percentage: item.percentage,
+          progress: item.progress,
+          timestamp: item.timestamp,
+        });
         results.push({ hash, accepted: true });
       }
 
+      const applied = await this.koreaderService.applyBulkProgress(user.id, entries, {
+        device: dto.deviceModel,
+        deviceId: dto.deviceId,
+      });
+
       this.logger.log(
-        `[${BULK_PROGRESS_EVENT}] [end] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} accepted=${results.length} unmatched=${unmatched.length} - bulk progress completed`,
+        `[${BULK_PROGRESS_EVENT}] [end] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} accepted=${results.length} shared=${applied.shared} stale=${applied.stale} unmatched=${unmatched.length} - bulk progress completed`,
       );
 
       return { results, unmatched };
@@ -264,6 +271,13 @@ export class KoreaderPluginService {
     );
 
     return { ok: true, lastSweepAt: lastSweepAt.toISOString(), libraryVersion };
+  }
+
+  // Snapshot token for anything that must notice a library change: bulk
+  // manifest cursors bind to it, and match freshness invalidates on it.
+  async getLibraryVersion(userId: number): Promise<string> {
+    const accessibleLibraryIds = await this.koreaderRepo.getAccessibleLibraryIds(userId);
+    return this.computeLibraryVersion(userId, accessibleLibraryIds);
   }
 
   private async computeLibraryVersion(userId: number, accessibleLibraryIds: number[] | null): Promise<string> {
@@ -313,11 +327,67 @@ export class KoreaderPluginService {
     return hashes.filter((hash) => !matched.has(hash)).map((hash) => metadata.get(hash) ?? { hash, source: 'statistics' as const });
   }
 
-  private async applyStatus(userId: number, bookId: number, deviceStatus: string, statusModified?: string): Promise<boolean> {
+  private async resolveBookState(
+    userId: number,
+    hash: string,
+    book: BookStateDto,
+    bookId: number,
+    state: BookStateBatch,
+  ): Promise<BookStatesUploadResult['results'][number]> {
+    let statusApplied = false;
+    if (book.status) {
+      statusApplied = await this.applyStatus(userId, bookId, book.status, state, book.statusModified);
+    }
+
+    const hasRatingField = Object.prototype.hasOwnProperty.call(book, 'rating');
+    let ratingResult: RatingApplyResult;
+    if (hasRatingField || book.ratingCleared === true) {
+      ratingResult = this.applyRating(bookId, hasRatingField ? (book.rating ?? null) : null, state, book.statusModified);
+    } else {
+      const current = state.ratings.get(bookId);
+      ratingResult = { applied: false, rating: current?.rating ?? null, updatedAt: current?.updatedAt ?? null };
+    }
+
+    const hasReviewField = Object.prototype.hasOwnProperty.call(book, 'reviewNote');
+    let reviewResult: ReviewApplyResult;
+    if (hasReviewField || book.reviewCleared === true) {
+      reviewResult = this.applyReview(bookId, hasReviewField ? (book.reviewNote ?? null) : null, state, book.reviewModified ?? book.statusModified);
+    } else {
+      const current = state.notes.get(bookId);
+      reviewResult = { applied: false, note: current?.note ?? null, updatedAt: current?.updatedAt ?? null };
+    }
+
+    return {
+      hash,
+      statusApplied,
+      ratingApplied: ratingResult.applied,
+      reviewApplied: reviewResult.applied,
+      rating: ratingResult.rating,
+      ratingSet: ratingResult.rating != null,
+      ratingUpdatedAt: ratingResult.updatedAt ? ratingResult.updatedAt.toISOString() : null,
+      reviewNote: reviewResult.note,
+      reviewNoteSet: reviewResult.note != null,
+      reviewUpdatedAt: reviewResult.updatedAt,
+    };
+  }
+
+  /**
+   * Status writes stay on UserBookStatusService because setManual drives reading-attempt
+   * lifecycle bookkeeping that a bulk row write would silently skip. It also projects a
+   * status that can differ from the requested one, so a book written during this batch is
+   * re-read only if a later entry resolves to it again.
+   */
+  private async applyStatus(userId: number, bookId: number, deviceStatus: string, state: BookStateBatch, statusModified?: string): Promise<boolean> {
     const mapped = DEVICE_STATUS_TO_READ_STATUS[deviceStatus];
     if (!mapped) return false;
 
-    const existing = await this.userBookStatusService.findOne(userId, bookId);
+    if (state.staleStatusBookIds.delete(bookId)) {
+      const refreshed = await this.userBookStatusService.findOne(userId, bookId);
+      if (refreshed) state.statuses.set(bookId, refreshed);
+      else state.statuses.delete(bookId);
+    }
+
+    const existing = state.statuses.get(bookId);
     if (existing) {
       if (existing.status === mapped) return true;
       // Newest change wins at date granularity; a same-day tie keeps the server value.
@@ -326,11 +396,12 @@ export class KoreaderPluginService {
     }
 
     await this.userBookStatusService.setManual(userId, bookId, mapped);
+    state.staleStatusBookIds.add(bookId);
     return true;
   }
 
-  private async applyRating(userId: number, bookId: number, rating: number | null, statusModified?: string): Promise<RatingApplyResult> {
-    const current = await this.pluginRepo.getRating(userId, bookId);
+  private applyRating(bookId: number, rating: number | null, state: BookStateBatch, statusModified?: string): RatingApplyResult {
+    const current = state.ratings.get(bookId);
     if (current) {
       if (current.rating === rating) return { applied: true, rating: current.rating, updatedAt: current.updatedAt };
       const serverDate = current.updatedAt.toISOString().slice(0, 10);
@@ -339,46 +410,58 @@ export class KoreaderPluginService {
       }
     }
 
-    const updated = await this.pluginRepo.upsertRating(userId, bookId, rating);
-    this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED, { userId, bookIds: [bookId], rating });
-    return { applied: true, rating: updated.rating, updatedAt: updated.updatedAt };
+    state.ratingWrites.set(bookId, rating);
+    state.ratings.set(bookId, { rating, updatedAt: state.appliedAt });
+    return { applied: true, rating, updatedAt: state.appliedAt };
   }
 
-  private async applyReview(userId: number, bookId: number, reviewNote: string | null, reviewModified?: string): Promise<ReviewApplyResult> {
-    const current = await this.userBookNoteService.findRow(userId, bookId);
+  private applyReview(bookId: number, reviewNote: string | null, state: BookStateBatch, reviewModified?: string): ReviewApplyResult {
+    const current = state.notes.get(bookId);
     const normalized = this.userBookNoteService.normalizeNote(reviewNote);
     if (current) {
       if ((current.note ?? null) === normalized) {
-        return { applied: true, note: current.note ?? null, updatedAt: current.updatedAt.toISOString() };
+        return { applied: true, note: current.note ?? null, updatedAt: current.updatedAt };
       }
-      const serverDate = current.updatedAt.toISOString().slice(0, 10);
+      const serverDate = current.updatedAt.slice(0, 10);
       if (!reviewModified || reviewModified <= serverDate) {
-        return { applied: false, note: current.note ?? null, updatedAt: current.updatedAt.toISOString() };
+        return { applied: false, note: current.note ?? null, updatedAt: current.updatedAt };
       }
     }
 
-    const updated = await this.userBookNoteService.setNote(userId, bookId, normalized);
-    return { applied: true, note: updated.note, updatedAt: updated.updatedAt };
+    state.noteWrites.set(bookId, normalized);
+    state.notes.set(bookId, { note: normalized, updatedAt: state.appliedAt.toISOString() });
+    return { applied: true, note: normalized, updatedAt: state.appliedAt.toISOString() };
   }
 
-  private async isStaleProgress(userId: number, bookFileId: number, timestamp?: number): Promise<boolean> {
-    if (!timestamp) return false;
+  private async flushRatings(userId: number, state: BookStateBatch): Promise<void> {
+    if (state.ratingWrites.size === 0) return;
 
-    const [deviceRows, readingProg] = await Promise.all([
-      this.koreaderRepo.getAllDeviceProgress(bookFileId, userId),
-      this.koreaderRepo.getReadingProgress(bookFileId, userId),
-    ]);
+    await this.pluginRepo.upsertRatings(
+      userId,
+      [...state.ratingWrites].map(([bookId, rating]) => ({ bookId, rating })),
+      state.appliedAt,
+    );
 
-    let newestKnown = 0;
-    for (const row of deviceRows) {
-      const rowTs = row.syncTimestamp ?? Math.floor((row.updatedAt?.getTime() ?? 0) / 1000);
-      newestKnown = Math.max(newestKnown, rowTs);
+    // One event per distinct rating value: the payload carries a book-ID array but a
+    // single rating, and the rating value drives evaluator behavior.
+    const bookIdsByRating = new Map<number | null, number[]>();
+    for (const [bookId, rating] of state.ratingWrites) {
+      const bucket = bookIdsByRating.get(rating);
+      if (bucket) bucket.push(bookId);
+      else bookIdsByRating.set(rating, [bookId]);
     }
-    if (readingProg?.updatedAt) {
-      newestKnown = Math.max(newestKnown, Math.floor(readingProg.updatedAt.getTime() / 1000));
+    for (const [rating, bookIds] of bookIdsByRating) {
+      this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED, { userId, bookIds, rating });
     }
+  }
 
-    return timestamp < newestKnown;
+  private async flushReviews(userId: number, state: BookStateBatch): Promise<void> {
+    if (state.noteWrites.size === 0) return;
+    await this.userBookNoteService.setNotes(
+      userId,
+      [...state.noteWrites].map(([bookId, note]) => ({ bookId, note })),
+      state.appliedAt,
+    );
   }
 }
 

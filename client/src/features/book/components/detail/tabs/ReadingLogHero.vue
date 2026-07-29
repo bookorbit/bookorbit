@@ -71,9 +71,9 @@ function formatRelative(iso: string | null): string {
   const d = Math.floor(h / 24)
   if (d < 30) return t('book.detail.readingLog.hero.relative.days', { count: d })
   const mo = Math.floor(d / 30)
-  if (mo < 12) return t('book.detail.readingLog.hero.relative.months', { count: mo }, mo)
+  if (mo < 12) return t('book.detail.readingLog.hero.relative.months', { count: mo })
   const yr = Math.floor(mo / 12)
-  return t('book.detail.readingLog.hero.relative.years', { count: yr }, yr)
+  return t('book.detail.readingLog.hero.relative.years', { count: yr })
 }
 
 const todayDateInput = computed(() => dateToDateKey(new Date()))

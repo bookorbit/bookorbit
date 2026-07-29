@@ -5,8 +5,11 @@ import type { ComicMetadataFields } from "./metadata-fetch";
 import type { BookFileWriteField, WriteResult } from "./file-write";
 import type { CustomMetadataBookValue } from "./custom-metadata";
 import type { CoverAspectRatio } from "./library";
+import { DEFAULT_FORMAT_PRIORITY } from "./library";
 
-export const BOOK_FORMATS = ["epub", "pdf", "mobi", "azw3", "cbz", "cbr", "cb7", "fb2", "m4b", "mp3", "m4a", "opus", "ogg", "flac"] as const;
+// Derived rather than duplicated: these two lists describe the same set of formats,
+// and maintaining them separately let BOOK_FORMATS fall behind on azw and kepub.
+export const BOOK_FORMATS = DEFAULT_FORMAT_PRIORITY;
 export type BookFormat = (typeof BOOK_FORMATS)[number];
 
 const AUDIO_FORMATS = new Set<string>(["m4b", "mp3", "m4a", "opus", "ogg", "flac"]);

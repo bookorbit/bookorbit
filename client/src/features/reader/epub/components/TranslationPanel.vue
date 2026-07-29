@@ -34,7 +34,7 @@ function handleLangChange(event: Event) {
     <div>
       <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">{{ t('reader.translation.original') }}</p>
       <div class="max-h-20 overflow-y-auto">
-        <p class="text-sm text-foreground/70 leading-relaxed break-words">{{ originalText }}</p>
+        <p class="text-sm text-foreground leading-relaxed break-words">{{ originalText }}</p>
       </div>
     </div>
 

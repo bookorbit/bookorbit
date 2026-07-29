@@ -506,6 +506,86 @@ describe('KoreaderRepository', () => {
       );
     });
 
+    it('upserts many device progress rows in one statement using the excluded values', async () => {
+      const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+      const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
+      db.insert.mockReturnValue({ values });
+      const updatedAt = new Date('2026-06-01T00:00:00.000Z');
+
+      await repo.upsertDeviceProgressMany(
+        [
+          {
+            bookFileId: 10,
+            userId: 42,
+            device: 'Kobo',
+            deviceId: 'device-1',
+            percentage: 0.5,
+            progress: '/body/1',
+            chapterIndex: 2,
+            syncTimestamp: 1,
+          },
+          {
+            bookFileId: 11,
+            userId: 42,
+            device: 'Kobo',
+            deviceId: 'device-1',
+            percentage: 0.1,
+            progress: null,
+            chapterIndex: null,
+            syncTimestamp: null,
+          },
+        ],
+        updatedAt,
+      );
+
+      expect(db.insert).toHaveBeenCalledTimes(1);
+      expect(values).toHaveBeenCalledWith([
+        expect.objectContaining({ bookFileId: 10, orphaned: false, orphanedHash: null, updatedAt }),
+        expect.objectContaining({ bookFileId: 11, syncTimestamp: null, updatedAt }),
+      ]);
+      expect(onConflictDoUpdate).toHaveBeenCalledWith(expect.objectContaining({ targetWhere: expect.any(Object) }));
+    });
+
+    it('issues no statement for an empty device progress batch', async () => {
+      await repo.upsertDeviceProgressMany([]);
+
+      expect(db.insert).not.toHaveBeenCalled();
+    });
+
+    it('groups device progress rows by book file, newest first', async () => {
+      const older = new Date('2026-01-01T00:00:00.000Z');
+      const newer = new Date('2026-02-01T00:00:00.000Z');
+      db.select.mockReturnValue(
+        makeQueryChain([
+          { bookFileId: 10, device: 'Kobo', deviceId: 'device-1', percentage: 0.5, syncTimestamp: 2, updatedAt: newer },
+          { bookFileId: 10, device: 'Kindle', deviceId: 'device-2', percentage: 0.2, syncTimestamp: 1, updatedAt: older },
+          { bookFileId: 11, device: 'Kobo', deviceId: 'device-1', percentage: 0.9, syncTimestamp: null, updatedAt: older },
+        ]),
+      );
+
+      const result = await repo.getDeviceProgressForFiles([10, 11, 10], 42);
+
+      expect(db.select).toHaveBeenCalledTimes(1);
+      expect(result.get(10)).toEqual([
+        { device: 'Kobo', deviceId: 'device-1', percentage: 0.5, syncTimestamp: 2, updatedAt: newer },
+        { device: 'Kindle', deviceId: 'device-2', percentage: 0.2, syncTimestamp: 1, updatedAt: older },
+      ]);
+      expect(result.get(11)).toHaveLength(1);
+    });
+
+    it('returns reading progress timestamps keyed by book file', async () => {
+      const updatedAt = new Date('2026-03-01T00:00:00.000Z');
+      db.select.mockReturnValue(makeQueryChain([{ bookFileId: 10, updatedAt }]));
+
+      await expect(repo.getReadingProgressUpdatedAtForFiles([10, 11], 42)).resolves.toEqual(new Map([[10, updatedAt]]));
+    });
+
+    it('issues no query for an empty book file list', async () => {
+      await expect(repo.getDeviceProgressForFiles([], 42)).resolves.toEqual(new Map());
+      await expect(repo.getReadingProgressUpdatedAtForFiles([], 42)).resolves.toEqual(new Map());
+      expect(db.select).not.toHaveBeenCalled();
+    });
+
     it('returns the latest device progress row or null', async () => {
       const row = { id: 1, bookFileId: 10, userId: 42 };
       db.select.mockReturnValueOnce(makeQueryChain([row])).mockReturnValueOnce(makeQueryChain([]));

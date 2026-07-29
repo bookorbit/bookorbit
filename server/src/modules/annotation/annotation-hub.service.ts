@@ -58,6 +58,11 @@ export class AnnotationHubService {
     return { items: items.map((row) => this.toHubItem(row)), total, page, pageSize, stats };
   }
 
+  /** Total annotations the hub lists by default; trashed rows are excluded. */
+  async countActive(userId: number): Promise<number> {
+    return this.annotationRepo.countHub(userId, { status: 'active' });
+  }
+
   async listBooks(
     userId: number,
     params: { status: 'active' | 'trashed'; q?: string; limit?: number; selectedId?: number },
