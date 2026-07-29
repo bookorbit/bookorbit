@@ -163,10 +163,14 @@ const sectionProps = computed(() => ({
     fileWriteWriteCover: form.fileWriteWriteCover,
     fileWriteEpubEnabled: form.fileWriteEpubEnabled,
     fileWriteEpubMaxFileSizeMb: form.fileWriteEpubMaxFileSizeMb,
+    fileWriteFb2Enabled: form.fileWriteFb2Enabled,
+    fileWriteFb2MaxFileSizeMb: form.fileWriteFb2MaxFileSizeMb,
     fileWritePdfEnabled: form.fileWritePdfEnabled,
     fileWritePdfMaxFileSizeMb: form.fileWritePdfMaxFileSizeMb,
     fileWriteCbxEnabled: form.fileWriteCbxEnabled,
     fileWriteCbxMaxFileSizeMb: form.fileWriteCbxMaxFileSizeMb,
+    fileWriteKindleEnabled: form.fileWriteKindleEnabled,
+    fileWriteKindleMaxFileSizeMb: form.fileWriteKindleMaxFileSizeMb,
     fileWriteAudioEnabled: form.fileWriteAudioEnabled,
     fileWriteAudioMaxFileSizeMb: form.fileWriteAudioMaxFileSizeMb,
   },
@@ -275,10 +279,14 @@ const sectionListeners = {
   'update:fileWriteWriteCover': (value: boolean) => (form.fileWriteWriteCover = value),
   'update:fileWriteEpubEnabled': (value: boolean) => (form.fileWriteEpubEnabled = value),
   'update:fileWriteEpubMaxFileSizeMb': (value: number) => (form.fileWriteEpubMaxFileSizeMb = value),
+  'update:fileWriteFb2Enabled': (value: boolean) => (form.fileWriteFb2Enabled = value),
+  'update:fileWriteFb2MaxFileSizeMb': (value: number) => (form.fileWriteFb2MaxFileSizeMb = value),
   'update:fileWritePdfEnabled': (value: boolean) => (form.fileWritePdfEnabled = value),
   'update:fileWritePdfMaxFileSizeMb': (value: number) => (form.fileWritePdfMaxFileSizeMb = value),
   'update:fileWriteCbxEnabled': (value: boolean) => (form.fileWriteCbxEnabled = value),
   'update:fileWriteCbxMaxFileSizeMb': (value: number) => (form.fileWriteCbxMaxFileSizeMb = value),
+  'update:fileWriteKindleEnabled': (value: boolean) => (form.fileWriteKindleEnabled = value),
+  'update:fileWriteKindleMaxFileSizeMb': (value: number) => (form.fileWriteKindleMaxFileSizeMb = value),
   'update:fileWriteAudioEnabled': (value: boolean) => (form.fileWriteAudioEnabled = value),
   'update:fileWriteAudioMaxFileSizeMb': (value: number) => (form.fileWriteAudioMaxFileSizeMb = value),
   'update:pickerOpen': handleNestedModalChange,
@@ -386,7 +394,7 @@ onMounted(async () => {
                 stepIndex === index
                   ? 'bg-background font-medium text-foreground shadow-sm'
                   : mode === 'create' && index > visitedUpTo
-                    ? 'cursor-not-allowed text-muted-foreground/50'
+                    ? 'cursor-not-allowed text-muted-foreground opacity-50'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground',
               ]"
               :disabled="mode === 'create' && index > visitedUpTo"

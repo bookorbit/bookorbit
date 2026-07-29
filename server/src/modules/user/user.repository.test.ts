@@ -1,10 +1,13 @@
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...clauses: unknown[]) => ({ op: 'and', clauses })),
+  asc: vi.fn((value: unknown) => ({ op: 'asc', value })),
   count: vi.fn(() => ({ op: 'count' })),
   eq: vi.fn((left: unknown, right: unknown) => ({ op: 'eq', left, right })),
+  ilike: vi.fn((left: unknown, right: unknown) => ({ op: 'ilike', left, right })),
   inArray: vi.fn((left: unknown, right: unknown) => ({ op: 'inArray', left, right })),
   isNull: vi.fn((value: unknown) => ({ op: 'isNull', value })),
   ne: vi.fn((left: unknown, right: unknown) => ({ op: 'ne', left, right })),
+  or: vi.fn((...clauses: unknown[]) => ({ op: 'or', clauses })),
   sql: Object.assign(
     vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', text: strings.join(''), values })),
     {
@@ -23,7 +26,7 @@ vi.mock('bcryptjs', () => ({ hash: vi.fn() }));
 
 import { hash } from 'bcryptjs';
 import { createHash, randomBytes, randomUUID } from 'crypto';
-import { sql } from 'drizzle-orm';
+import { eq, ilike, sql } from 'drizzle-orm';
 
 import * as schema from '../../db/schema';
 import { UserRepository } from './user.repository';
@@ -106,7 +109,7 @@ describe('UserRepository', () => {
 
     select.mockReturnValueOnce({ from: idFrom }).mockReturnValueOnce({ from: countFrom });
 
-    const result = await repo.findAll(0, 25);
+    const result = await repo.findAll({ page: 0, pageSize: 25, sortBy: 'username', sortDir: 'asc' });
 
     expect(result).toEqual({ users: [], total: 7 });
     expect(select).toHaveBeenCalledTimes(2);
@@ -165,7 +168,7 @@ describe('UserRepository', () => {
       .mockReturnValueOnce({ from: tagFilterFrom })
       .mockReturnValueOnce({ from: genreFilterFrom });
 
-    const result = await repo.findAll(0, 25);
+    const result = await repo.findAll({ page: 0, pageSize: 25, sortBy: 'username', sortDir: 'asc' });
 
     expect(result.total).toBe(2);
     expect(result.users).toHaveLength(1);
@@ -175,6 +178,47 @@ describe('UserRepository', () => {
       provisioningMethod: 'local',
       permissions: ['library_download', 'kobo_sync'],
     });
+  });
+
+  it('findAll filters by search across name, username and email and escapes wildcards', async () => {
+    const idOffset = vi.fn().mockResolvedValue([]);
+    const idLimit = vi.fn().mockReturnValue({ offset: idOffset });
+    const idOrderBy = vi.fn().mockReturnValue({ limit: idLimit });
+    const idWhere = vi.fn().mockReturnValue({ orderBy: idOrderBy });
+    const idFrom = vi.fn().mockReturnValue({ where: idWhere });
+
+    const countWhere = vi.fn().mockResolvedValue([{ total: 0 }]);
+    const countFrom = vi.fn().mockReturnValue({ where: countWhere });
+
+    select.mockReturnValueOnce({ from: idFrom }).mockReturnValueOnce({ from: countFrom });
+
+    await repo.findAll({ page: 0, pageSize: 25, search: ' 50%_off ', sortBy: 'username', sortDir: 'asc' });
+
+    const patterns = vi.mocked(ilike).mock.calls.map(([, pattern]) => pattern);
+    expect(patterns).toEqual(['%50\\%\\_off%', '%50\\%\\_off%', '%50\\%\\_off%']);
+    expect(vi.mocked(ilike).mock.calls.map(([column]) => column)).toEqual([schema.users.name, schema.users.username, schema.users.email]);
+  });
+
+  it('findAll narrows to administrators, active or inactive accounts by state', async () => {
+    for (const [state, expected] of [
+      ['admins', { column: schema.users.isSuperuser, value: true }],
+      ['active', { column: schema.users.active, value: true }],
+      ['inactive', { column: schema.users.active, value: false }],
+    ] as const) {
+      vi.mocked(eq).mockClear();
+      const idOffset = vi.fn().mockResolvedValue([]);
+      const idLimit = vi.fn().mockReturnValue({ offset: idOffset });
+      const idOrderBy = vi.fn().mockReturnValue({ limit: idLimit });
+      const idWhere = vi.fn().mockReturnValue({ orderBy: idOrderBy });
+      const idFrom = vi.fn().mockReturnValue({ where: idWhere });
+      const countWhere = vi.fn().mockResolvedValue([{ total: 0 }]);
+      const countFrom = vi.fn().mockReturnValue({ where: countWhere });
+      select.mockReturnValueOnce({ from: idFrom }).mockReturnValueOnce({ from: countFrom });
+
+      await repo.findAll({ page: 0, pageSize: 25, state, sortBy: 'username', sortDir: 'asc' });
+
+      expect(vi.mocked(eq)).toHaveBeenCalledWith(expected.column, expected.value);
+    }
   });
 
   it('findByIdWithPermissions returns null when user is missing', async () => {

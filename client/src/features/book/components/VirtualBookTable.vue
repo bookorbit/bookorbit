@@ -675,7 +675,7 @@ defineExpose({
     <!-- Screen-reader live region for dynamic announcements -->
     <div aria-live="polite" aria-atomic="true" class="sr-only">
       <span v-if="selectionMode && selectedCount != null && selectedCount > 0">{{
-        t('book.tableView.booksSelected', { count: selectedCount }, selectedCount)
+        t('book.tableView.booksSelected', { count: selectedCount })
       }}</span>
       <span v-if="loading && initialized">{{ t('book.tableView.loadingMoreBooks') }}</span>
     </div>
@@ -980,14 +980,14 @@ defineExpose({
       <div class="flex items-center gap-2">
         <span v-if="selectionMode && selectedCount">
           {{ t('book.tableView.selectedStatus', { count: formatNumber(selectedCount) }) }}
-          <span class="text-muted-foreground/60">/ </span>
+          <span class="text-muted-foreground">/ </span>
         </span>
         <span v-if="filterActive" class="flex items-center gap-1 text-primary">
           <span class="h-1.5 w-1.5 rounded-full bg-primary" />
           {{ t('book.tableView.filtered') }}
         </span>
         <span v-if="hasMore">{{ t('book.tableView.loadedStatus', { loaded: formatNumber(books.length), total: formatNumber(total ?? 0) }) }}</span>
-        <span v-else>{{ t('book.tableView.bookCount', { count: formatNumber(total ?? books.length) }, total ?? books.length) }}</span>
+        <span v-else>{{ t('book.tableView.bookCount', { count: total ?? books.length }) }}</span>
       </div>
       <div class="flex items-center gap-3">
         <button
@@ -998,7 +998,7 @@ defineExpose({
         >
           ?
         </button>
-        <span class="hidden lg:inline text-[11px] text-muted-foreground/80">{{ t('book.tableView.copyHint') }}</span>
+        <span class="hidden lg:inline text-[11px] text-muted-foreground">{{ t('book.tableView.copyHint') }}</span>
         <span v-if="loading" class="flex items-center gap-1">
           <Loader2 :size="11" class="animate-spin" />
           {{ t('common.loading') }}

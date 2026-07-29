@@ -7,6 +7,7 @@ import type { ScrollerConfig, ScrollerType, WidgetConfig } from '@bookorbit/type
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
 import { DEFAULT_SCROLLERS, SCROLLER_LABELS, useDashboardConfig } from '../composables/useDashboardConfig'
+import { useDashboardLabels } from '../composables/useDashboardLabels'
 import { useDashboardWidgets } from '../composables/useDashboardWidgets'
 import { useDraggableList } from '../composables/useDraggableList'
 
@@ -16,8 +17,9 @@ const emit = defineEmits<{ 'update:open': [value: boolean] }>()
 const { t } = useI18n()
 
 const { scrollers, saveScrollers, MAX_SCROLLERS } = useDashboardConfig()
-const { widgets, saveWidgets, WIDGET_LABELS, DEFAULT_WIDGETS } = useDashboardWidgets()
+const { widgets, saveWidgets, DEFAULT_WIDGETS } = useDashboardWidgets()
 const { smartScopes, fetchSmartScopes } = useSmartScopes()
+const { widgetName, shelfTypeName } = useDashboardLabels()
 
 const activeTab = ref<'widgets' | 'shelves'>('widgets')
 const draft = ref<ScrollerConfig[]>([])
@@ -182,17 +184,17 @@ function resetToDefault() {
               <div class="flex items-center gap-3 px-3 py-2.5">
                 <div class="flex shrink-0 flex-col items-center">
                   <button
-                    class="touch-reorder-btn flex h-5 w-5 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-20"
+                    class="touch-reorder-btn flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-20"
                     :disabled="index === 0"
                     @click="widgetMoveUp(index)"
                   >
                     <ChevronUp :size="13" />
                   </button>
-                  <div class="drag-handle cursor-grab text-muted-foreground/60 hover:text-muted-foreground active:cursor-grabbing">
+                  <div class="drag-handle cursor-grab text-muted-foreground hover:text-muted-foreground active:cursor-grabbing">
                     <GripVertical :size="16" />
                   </div>
                   <button
-                    class="touch-reorder-btn flex h-5 w-5 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-20"
+                    class="touch-reorder-btn flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-20"
                     :disabled="index === widgetDraft.length - 1"
                     @click="widgetMoveDown(index)"
                   >
@@ -211,7 +213,7 @@ function resetToDefault() {
                   />
                 </button>
 
-                <span class="flex-1 text-sm font-medium">{{ WIDGET_LABELS[widget.type] }}</span>
+                <span class="flex-1 text-sm font-medium">{{ widgetName(widget.type) }}</span>
               </div>
             </div>
           </div>
@@ -241,17 +243,17 @@ function resetToDefault() {
                 <!-- Drag handle (desktop) + up/down arrows (mobile fallback) -->
                 <div class="flex shrink-0 flex-col items-center">
                   <button
-                    class="touch-reorder-btn flex h-5 w-5 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-20"
+                    class="touch-reorder-btn flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-20"
                     :disabled="index === 0"
                     @click="moveUp(index)"
                   >
                     <ChevronUp :size="13" />
                   </button>
-                  <div class="drag-handle cursor-grab text-muted-foreground/60 hover:text-muted-foreground active:cursor-grabbing">
+                  <div class="drag-handle cursor-grab text-muted-foreground hover:text-muted-foreground active:cursor-grabbing">
                     <GripVertical :size="16" />
                   </div>
                   <button
-                    class="touch-reorder-btn flex h-5 w-5 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-20"
+                    class="touch-reorder-btn flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-20"
                     :disabled="index === draft.length - 1"
                     @click="moveDown(index)"
                   >
@@ -277,14 +279,14 @@ function resetToDefault() {
                   class="h-8 flex-1 appearance-none rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   @change="onTypeChange(scroller)"
                 >
-                  <option v-for="t in ALL_TYPES" :key="t" :value="t">
-                    {{ SCROLLER_LABELS[t] }}
+                  <option v-for="scrollerType in ALL_TYPES" :key="scrollerType" :value="scrollerType">
+                    {{ shelfTypeName(scrollerType) }}
                   </option>
                 </select>
 
                 <!-- Remove -->
                 <button
-                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-30"
+                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-30"
                   :disabled="draft.length <= 1"
                   @click="removeScroller(index)"
                 >

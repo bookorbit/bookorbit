@@ -305,7 +305,7 @@ async function handleBulkDeleteConfirm(mode: 'soft' | 'hard' | 'inline', writeFi
 
         <div v-if="em.clusters.value.length > 0" class="space-y-3">
           <p class="text-sm text-muted-foreground">
-            {{ t('tools.entityManager.duplicates.clustersFound', { count: em.scanTotal.value }, em.scanTotal.value) }}
+            {{ t('tools.entityManager.duplicates.clustersFound', { count: em.scanTotal.value }) }}
           </p>
           <DuplicateClusterCard
             v-for="(cluster, idx) in em.clusters.value"

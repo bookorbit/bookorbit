@@ -22,11 +22,13 @@ describe('AuthorsService', () => {
     updateAuthorById: vi.fn(),
     findVisibleAuthorIds: vi.fn(),
     countDistinctBooks: vi.fn(),
+    findBookIdsByAuthorIds: vi.fn(),
     mergeAuthors: vi.fn(),
     deleteAuthors: vi.fn(),
     findRelatedLibraryIds: vi.fn(),
     findByIdForEnrichment: vi.fn(),
     updateAuthorDescriptionIfEmpty: vi.fn(),
+    countAuthors: vi.fn(),
   };
 
   const bookRepo = {
@@ -35,6 +37,7 @@ describe('AuthorsService', () => {
 
   const libraryService = {
     findAll: vi.fn(),
+    findAccessibleLibraryIds: vi.fn(),
   };
 
   const authorMetadataFetchService = {
@@ -67,6 +70,9 @@ describe('AuthorsService', () => {
   const appSettings = {
     getAuthorsAutoEnrichmentWriteMode: vi.fn(),
   };
+  const metadataScoreService = {
+    calculateAndSaveMany: vi.fn(),
+  };
 
   let service: AuthorsService;
 
@@ -81,14 +87,31 @@ describe('AuthorsService', () => {
       authorImageStorage as any,
       enrichmentExecutor as any,
       enrichmentOrchestrator as any,
+      metadataScoreService as any,
     );
     libraryService.findAll.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([1, 2]);
     authorImageStorage.getThumbnailUrlIfExists.mockResolvedValue(null);
     authorImageStorage.getImageUrlIfExists.mockResolvedValue(null);
     enrichmentOrchestrator.schedule.mockResolvedValue(1);
     enrichmentOrchestrator.backfillLinkedAuthors.mockResolvedValue(8);
     appSettings.getAuthorsAutoEnrichmentWriteMode.mockResolvedValue('missing_only');
+    metadataScoreService.calculateAndSaveMany.mockResolvedValue(undefined);
     vi.mocked(assembleBookCards).mockReturnValue([]);
+  });
+
+  it('countAll counts authors across the accessible libraries', async () => {
+    authorsRepo.countAuthors.mockResolvedValue(1234);
+
+    await expect(service.countAll(reqUser())).resolves.toBe(1234);
+    expect(authorsRepo.countAuthors).toHaveBeenCalledWith({ libraryIds: [1, 2], contentFilters: undefined });
+  });
+
+  it('countAll skips the query when the user has no library access', async () => {
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([]);
+
+    await expect(service.countAll(reqUser())).resolves.toBe(0);
+    expect(authorsRepo.countAuthors).not.toHaveBeenCalled();
   });
 
   it('merge rejects when sources do not contain any id different from target', async () => {
@@ -114,12 +137,13 @@ describe('AuthorsService', () => {
   it('delete removes authors and returns impacted count', async () => {
     authorsRepo.findVisibleAuthorIds.mockResolvedValue([10, 11]);
     authorsRepo.findRelatedLibraryIds.mockResolvedValue([1, 2]);
-    authorsRepo.countDistinctBooks.mockResolvedValue(6);
+    authorsRepo.findBookIdsByAuthorIds.mockResolvedValue([1, 2, 3, 4, 5, 6]);
     authorsRepo.deleteAuthors.mockResolvedValue(undefined);
 
     const result = await service.delete(reqUser(7, true), { authorIds: [10, 11, 11] });
 
     expect(authorsRepo.deleteAuthors).toHaveBeenCalledWith([10, 11]);
+    expect(metadataScoreService.calculateAndSaveMany).toHaveBeenCalledWith([1, 2, 3, 4, 5, 6]);
     expect(result.deletedAuthorIds).toEqual([10, 11]);
     expect(result.affectedBookCount).toBe(6);
   });
@@ -127,7 +151,7 @@ describe('AuthorsService', () => {
   it('merge deduplicates sources, merges, and returns impacted count', async () => {
     authorsRepo.findVisibleAuthorIds.mockResolvedValue([10, 11, 12]);
     authorsRepo.findRelatedLibraryIds.mockResolvedValue([1, 2]);
-    authorsRepo.countDistinctBooks.mockResolvedValue(8);
+    authorsRepo.findBookIdsByAuthorIds.mockResolvedValue([1, 2, 3, 4, 5, 6, 7, 8]);
     authorsRepo.mergeAuthors.mockResolvedValue(undefined);
     authorsRepo.findById.mockResolvedValue({
       id: 10,
@@ -141,6 +165,7 @@ describe('AuthorsService', () => {
     const result = await service.merge(reqUser(7, true), { targetAuthorId: 10, sourceAuthorIds: [10, 11, 11, 12] });
 
     expect(authorsRepo.mergeAuthors).toHaveBeenCalledWith(10, [11, 12]);
+    expect(metadataScoreService.calculateAndSaveMany).toHaveBeenCalledWith([1, 2, 3, 4, 5, 6, 7, 8]);
     expect(enrichmentOrchestrator.schedule).toHaveBeenCalledWith(10, AUTHOR_ENRICHMENT_REASONS.AUTHOR_MERGE_TARGET);
     expect(result.mergedAuthorIds).toEqual([11, 12]);
     expect(result.affectedBookCount).toBe(8);

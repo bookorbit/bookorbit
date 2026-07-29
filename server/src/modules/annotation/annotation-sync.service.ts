@@ -603,6 +603,42 @@ export class AnnotationSyncService {
     return candidate;
   }
 
+  /**
+   * Batch form of ensureDeviceCreatedAt: reads the book's used device datetimes once and
+   * mints for every annotation that still lacks one, in the order given so a caller
+   * pushing a page of annotations gets the same values a per-annotation loop would.
+   */
+  async ensureDeviceCreatedAtMany(
+    userId: number,
+    bookId: number,
+    annotationRows: AnnotationRow[],
+    deviceClockOffsetMs = 0,
+  ): Promise<Map<number, string>> {
+    const assigned = new Map<number, string>();
+    if (annotationRows.length === 0) return assigned;
+
+    const pending: AnnotationRow[] = [];
+    for (const annotation of annotationRows) {
+      if (annotation.deviceCreatedAt) assigned.set(annotation.id, annotation.deviceCreatedAt);
+      else pending.push(annotation);
+    }
+    if (pending.length === 0) return assigned;
+
+    const used = await this.syncRepo.listDeviceCreatedAtsForBook(userId, bookId);
+    const minted: { annotationId: number; deviceCreatedAt: string }[] = [];
+    for (const annotation of pending) {
+      let candidate = formatDeviceDatetime(new Date(annotation.createdAt.getTime() + deviceClockOffsetMs));
+      while (used.has(candidate)) {
+        candidate = addSeconds(candidate, 1);
+      }
+      used.add(candidate);
+      assigned.set(annotation.id, candidate);
+      minted.push({ annotationId: annotation.id, deviceCreatedAt: candidate });
+    }
+    await this.syncRepo.setDeviceIdentitiesSilent(minted);
+    return assigned;
+  }
+
   async findDevicePositionFor(annotationId: number, format: AnnotationPositionFormat) {
     return this.syncRepo.findDevicePosition(annotationId, format);
   }

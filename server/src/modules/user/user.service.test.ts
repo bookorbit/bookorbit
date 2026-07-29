@@ -90,7 +90,7 @@ describe('UserService', () => {
     await service.incrementTokenVersion(7);
     await service.findByIdWithPermissions(7);
     await service.create({ username: 'new' } as any);
-    await service.findAll(1, 20);
+    await service.findAll({ page: 1, pageSize: 20, sortBy: 'username', sortDir: 'asc' });
     await service.findAssignable();
     await service.setPermissionsDirectly(7, [Permission.LibraryDownload]);
 
@@ -103,7 +103,7 @@ describe('UserService', () => {
     expect(userRepo.incrementTokenVersion).toHaveBeenCalledWith(7);
     expect(userRepo.findByIdWithPermissions).toHaveBeenCalledWith(7);
     expect(userRepo.create).toHaveBeenCalledWith({ username: 'new' });
-    expect(userRepo.findAll).toHaveBeenCalledWith(1, 20, undefined);
+    expect(userRepo.findAll).toHaveBeenCalledWith({ page: 1, pageSize: 20, sortBy: 'username', sortDir: 'asc' });
     expect(userRepo.findAssignable).toHaveBeenCalled();
     expect(userRepo.setPermissions).toHaveBeenCalledWith(7, [Permission.LibraryDownload]);
   });

@@ -79,7 +79,6 @@ export const BACKGROUND_IDS = [
   "none",
   "dots",
   "cross",
-  "terminal",
   "millimeter",
   "blueprint",
   "brushed",
@@ -100,10 +99,18 @@ export const BACKGROUND_IDS = [
 ] as const;
 export type Background = (typeof BACKGROUND_IDS)[number];
 
+/** Shell surface translucency, in percent. The floor keeps the sidebar and header
+ *  readable over the busiest background patterns. */
+export const SURFACE_OPACITY_MIN = 80;
+export const SURFACE_OPACITY_MAX = 100;
+export const SURFACE_OPACITY_DEFAULT = 92;
+
 export interface ThemePreferences {
   theme: Theme;
   accent: Accent;
   radius: Radius;
   background: Background;
   brightness: number;
+  /** Optional so a client that sends it stays valid against a server that predates it. */
+  surfaceOpacity?: number;
 }

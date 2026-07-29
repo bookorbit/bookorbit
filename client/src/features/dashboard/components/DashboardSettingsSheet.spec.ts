@@ -1,7 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import { nextTick, ref, type Ref } from 'vue'
-import type { WidgetConfig } from '@bookorbit/types'
+import { WIDGET_TYPES, type WidgetConfig } from '@bookorbit/types'
+
+import { setI18nLocale } from '@/i18n'
+import en from '@/locales/en.json'
+import pt from '@/locales/pt.json'
 
 type UseSmartScopesMock = () => {
   smartScopes: Ref<unknown[]>
@@ -11,9 +15,10 @@ type UseSmartScopesMock = () => {
 type UseDashboardWidgetsMock = () => {
   widgets: Ref<WidgetConfig[]>
   saveWidgets: (widgets: WidgetConfig[]) => Promise<void>
-  WIDGET_LABELS: Record<string, string>
   DEFAULT_WIDGETS: WidgetConfig[]
 }
+
+const widgetsRef = ref<WidgetConfig[]>([])
 
 vi.mock('@/components/ui/sheet', () => {
   const passthrough = { template: '<div><slot /></div>' }
@@ -34,39 +39,127 @@ vi.mock('@/features/smart-scope/composables/useSmartScopes', () => ({
 
 vi.mock('../composables/useDashboardWidgets', () => ({
   useDashboardWidgets: vi.fn<UseDashboardWidgetsMock>(() => ({
-    widgets: ref<WidgetConfig[]>([]),
+    widgets: widgetsRef,
     saveWidgets: vi.fn<(widgets: WidgetConfig[]) => Promise<void>>(),
-    WIDGET_LABELS: {},
     DEFAULT_WIDGETS: [],
   })),
 }))
 
 import DashboardSettingsSheet from './DashboardSettingsSheet.vue'
 
+const ALL_WIDGETS: WidgetConfig[] = WIDGET_TYPES.map((type, index) => ({
+  id: String(index + 1),
+  type,
+  enabled: true,
+  order: index + 1,
+}))
+
+async function openSheet(): Promise<VueWrapper> {
+  const wrapper = mount(DashboardSettingsSheet, { props: { open: false } })
+  await wrapper.setProps({ open: true })
+  await nextTick()
+  return wrapper
+}
+
+async function openShelvesTab(wrapper: VueWrapper): Promise<void> {
+  const shelvesTab = wrapper.findAll('button').find((button) => button.text() === en.dashboard.settings.tabs.shelves)
+  await shelvesTab?.trigger('click')
+}
+
+function widgetRowLabels(wrapper: VueWrapper): string[] {
+  return wrapper.findAll('span.flex-1').map((span) => span.text())
+}
+
+function shelfOptionLabels(wrapper: VueWrapper): string[] {
+  return wrapper
+    .find('select')
+    .findAll('option')
+    .map((option) => option.text())
+}
+
+beforeEach(async () => {
+  vi.clearAllMocks()
+  localStorage.clear()
+  widgetsRef.value = []
+  await setI18nLocale('en')
+})
+
+afterEach(async () => {
+  await setI18nLocale('en')
+})
+
 describe('DashboardSettingsSheet', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    localStorage.clear()
+  it('includes continue-listening and want-to-read in the shelf selector', async () => {
+    const wrapper = await openSheet()
+    await openShelvesTab(wrapper)
+
+    const optionLabels = shelfOptionLabels(wrapper)
+
+    expect(optionLabels).toContain(en.dashboard.settings.shelfNames.continueListening)
+    expect(optionLabels).toContain(en.dashboard.settings.shelfNames.wantToRead)
   })
 
-  it('includes continue-listening and want-to-read in the shelf selector', async () => {
-    const wrapper = mount(DashboardSettingsSheet, {
-      props: { open: false },
-    })
+  it('lists every shelf type in the selector using catalog names', async () => {
+    const wrapper = await openSheet()
+    await openShelvesTab(wrapper)
 
-    await wrapper.setProps({ open: true })
+    expect(shelfOptionLabels(wrapper).sort()).toEqual(Object.values(en.dashboard.settings.shelfNames).sort())
+  })
+
+  it('translates the shelf selector when the locale changes', async () => {
+    const wrapper = await openSheet()
+    await openShelvesTab(wrapper)
+
+    await setI18nLocale('pt')
     await nextTick()
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'Shelves')
-      ?.trigger('click')
 
-    const optionLabels = wrapper
-      .find('select')
-      .findAll('option')
-      .map((option) => option.text())
+    expect(shelfOptionLabels(wrapper).sort()).toEqual(Object.values(pt.dashboard.settings.shelfNames).sort())
+  })
 
-    expect(optionLabels).toContain('Continue Listening')
-    expect(optionLabels).toContain('Want to Read')
+  it('renders every widget name from the catalog rather than a hardcoded map', async () => {
+    widgetsRef.value = ALL_WIDGETS
+    const wrapper = await openSheet()
+
+    expect(widgetRowLabels(wrapper)).toEqual([
+      en.dashboard.settings.widgetNames.readingStreak,
+      en.dashboard.settings.widgetNames.currentlyReading,
+      en.dashboard.settings.widgetNames.readingGoal,
+      en.dashboard.settings.widgetNames.readingDna,
+      en.dashboard.settings.widgetNames.monthlyChallenge,
+      en.dashboard.settings.widgetNames.highlightOfTheDay,
+      en.dashboard.settings.widgetNames.neglectedGems,
+      en.dashboard.settings.widgetNames.readingRhythm,
+      en.dashboard.settings.widgetNames.diversityScore,
+      en.dashboard.settings.widgetNames.libraryOverview,
+      en.dashboard.settings.widgetNames.yearProjection,
+      en.dashboard.settings.widgetNames.longWait,
+    ])
+  })
+
+  it('translates widget names when the locale changes (issue #796)', async () => {
+    widgetsRef.value = ALL_WIDGETS
+    const wrapper = await openSheet()
+
+    await setI18nLocale('pt')
+    await nextTick()
+
+    const labels = widgetRowLabels(wrapper)
+
+    expect(labels).toEqual([
+      pt.dashboard.settings.widgetNames.readingStreak,
+      pt.dashboard.settings.widgetNames.currentlyReading,
+      pt.dashboard.settings.widgetNames.readingGoal,
+      pt.dashboard.settings.widgetNames.readingDna,
+      pt.dashboard.settings.widgetNames.monthlyChallenge,
+      pt.dashboard.settings.widgetNames.highlightOfTheDay,
+      pt.dashboard.settings.widgetNames.neglectedGems,
+      pt.dashboard.settings.widgetNames.readingRhythm,
+      pt.dashboard.settings.widgetNames.diversityScore,
+      pt.dashboard.settings.widgetNames.libraryOverview,
+      pt.dashboard.settings.widgetNames.yearProjection,
+      pt.dashboard.settings.widgetNames.longWait,
+    ])
+    expect(labels).not.toContain(en.dashboard.settings.widgetNames.readingStreak)
+    expect(labels).not.toContain(en.dashboard.settings.widgetNames.currentlyReading)
   })
 })

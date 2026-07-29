@@ -23,6 +23,7 @@ local Geom = require("ui/geometry")
 local HorizontalGroup = require("ui/widget/horizontalgroup")
 local HorizontalSpan = require("ui/widget/horizontalspan")
 local InfoMessage = require("ui/widget/infomessage")
+local KeyValuePage = require("ui/widget/keyvaluepage")
 local LineWidget = require("ui/widget/linewidget")
 local NetworkMgr = require("ui/network/manager")
 local Screen = require("device").screen
@@ -199,7 +200,173 @@ function DetailPillWidget:onTapSelect()
     return true
 end
 
+-- A plain text line that also answers taps. Used for the hero series line and
+-- the meta line, neither of which gets button chrome: the text is the target.
+local DetailTapLineWidget = InputContainer:extend{
+    text = nil,
+    width = nil,
+    face = nil,
+    callback = nil,
+}
+
+function DetailTapLineWidget:init()
+    local box = TextBoxWidget:new{
+        text = self.text,
+        width = self.width,
+        height = lineHeight(self.face),
+        height_overflow_show_ellipsis = true,
+        face = self.face,
+    }
+    local dimen = Geom:new{ w = self.width, h = box:getSize().h }
+    self.dimen = dimen
+    self.ges_events = {
+        TapSelect = { GestureRange:new{ ges = "tap", range = dimen } },
+    }
+    self[1] = box
+end
+
+function DetailTapLineWidget:onTapSelect()
+    if self.callback then
+        self.callback()
+    end
+    return true
+end
+
 local CatalogDetail = {}
+
+-- A trailing ".0" is noise on a series index: #3, not #3.0.
+function CatalogDetail.formatSeriesIndex(index)
+    local value = tonumber(index)
+    if not value then return nil end
+    if value == math.floor(value) then return tostring(math.floor(value)) end
+    local text = string.format("%.2f", value):gsub("0+$", ""):gsub("%.$", "")
+    return text
+end
+
+-- Dates arrive as ISO-like strings but are display-only, so an unexpected
+-- format falls back to the raw text instead of disappearing.
+local function datePart(value)
+    if type(value) ~= "string" then return nil end
+    local date = value:match("^(%d%d%d%d%-%d%d%-%d%d)")
+    if date then return date end
+    return cleanInlineText(value)
+end
+
+function CatalogDetail.detailSeriesParams(detail)
+    if not detail then return nil end
+    if detail.seriesId then
+        return { seriesId = tonumber(detail.seriesId), sort = "series" }
+    end
+    local name = cleanInlineText(detail.seriesName)
+    if not name then return nil end
+    return { series = name, sort = "series" }
+end
+
+function CatalogDetail.detailSeriesText(detail)
+    local name = detail and cleanInlineText(detail.seriesName)
+    if not name then return nil end
+    local index = CatalogDetail.formatSeriesIndex(detail.seriesIndex)
+    if not index then return name end
+    return T(_("%1 #%2"), name, index)
+end
+
+-- The tappable hero line. The trailing chevron is the whole affordance.
+function CatalogDetail.detailSeriesLine(detail)
+    local text = CatalogDetail.detailSeriesText(detail)
+    if not text then return nil end
+    return text .. "  \u{203A}"
+end
+
+local function fileInfoLabel(file)
+    local label = string.upper(file.format or "file")
+    local extras = {}
+    local size = formatBytes(file.sizeBytes)
+    if size ~= "" then table.insert(extras, size) end
+    local duration = formatDuration(file.durationSeconds)
+    if duration then table.insert(extras, duration) end
+    if #extras == 0 then return label end
+    return label .. " - " .. table.concat(extras, ", ")
+end
+
+--[[--
+The long-tail metadata the detail page deliberately keeps off the hero, as
+key/value rows for the Book info sheet. Pure: it reads the detail table it is
+given and never fetches, so the offline cache renders the same rows.
+
+Genres, tags, rating and status are excluded on purpose; they are already on
+the page or reachable from the action sheet.
+]]
+function CatalogDetail.bookInfoRows(detail)
+    detail = detail or {}
+    local rows = {}
+    local function add(key, value, extra)
+        value = cleanInlineText(value)
+        if not value then return end
+        local row = { key = key, value = value }
+        for name, item in pairs(extra or {}) do row[name] = item end
+        table.insert(rows, row)
+    end
+
+    add(_("Series"), CatalogDetail.detailSeriesText(detail), {
+        series_params = CatalogDetail.detailSeriesParams(detail),
+        series_title = cleanInlineText(detail.seriesName),
+    })
+    add(_("Publisher"), detail.publisher)
+    add(_("Published"), datePart(detail.publishedDate)
+        or (detail.publishedYear and tostring(detail.publishedYear) or nil))
+    add(_("Language"), detail.language)
+    add(_("ISBN-13"), detail.isbn13)
+    add(_("ISBN-10"), detail.isbn10)
+    add(_("Pages"), detail.pageCount and tostring(detail.pageCount) or nil)
+    add(_("Library"), detail.libraryName)
+
+    local collections = {}
+    for _, collection in ipairs(detail.collections or {}) do
+        local name = cleanInlineText(collection.name)
+        if name then table.insert(collections, name) end
+    end
+    if #collections > 0 then
+        add(_("Collections"), table.concat(collections, ", "))
+    end
+
+    -- Hoisted: the loop variable would shadow gettext inside the body.
+    local file_key = _("File")
+    for _, file in ipairs(detail.files or {}) do
+        add(file_key, fileInfoLabel(file))
+    end
+    add(_("Added"), datePart(detail.addedAt))
+
+    return rows
+end
+
+function CatalogDetail:showBookInfo(detail)
+    local rows = CatalogDetail.bookInfoRows(detail)
+    if #rows == 0 then
+        UIManager:show(InfoMessage:new{ text = _("No further book information."), timeout = 2 })
+        return
+    end
+
+    local page
+    local kv_pairs = {}
+    for _, row in ipairs(rows) do
+        local entry = { row.key, row.value }
+        if row.series_params then
+            entry.callback = function()
+                UIManager:close(page)
+                self:loadBooks(row.series_params, row.series_title or _("Series"), true)
+            end
+        end
+        table.insert(kv_pairs, entry)
+    end
+    page = KeyValuePage:new{ title = _("Book info"), kv_pairs = kv_pairs }
+    UIManager:show(page)
+end
+
+function CatalogDetail:openDetailSeries(detail)
+    local params = CatalogDetail.detailSeriesParams(detail)
+    if not params then return end
+    self:loadBooks(params, cleanInlineText(detail.seriesName) or _("Series"), true)
+end
 
 function CatalogDetail:detailReadPath(detail)
     local fallback
@@ -429,6 +596,14 @@ function CatalogDetail:showBookActionSheet(detail, opts)
     end
 
     if include_details then
+        addRow({
+            text = _("Book info"),
+            callback = function()
+                closeThen(function()
+                    self:showBookInfo(detail)
+                end)
+            end,
+        })
         addRow({
             text = _("Genres"),
             enabled = has_genres,
@@ -665,6 +840,12 @@ function CatalogDetail:downloadButtonLabel(supported_files)
     local file = self:nextDownloadFile(supported_files)
     local format = cleanInlineText(file and file.format)
     if not format then return _("Download") end
+    -- Size is what decides whether a download is worth starting over a slow
+    -- connection, so it rides the button when the server knows it.
+    local size = formatBytes(file and file.sizeBytes)
+    if size ~= "" then
+        return T(_("Download %1 - %2"), string.upper(format), size)
+    end
     return T(_("Download (%1)"), string.upper(format))
 end
 
@@ -782,11 +963,12 @@ function CatalogDetail:recalculateDetailDimen()
     }
 end
 
+-- Page count is deliberately absent: the progress line right below already
+-- carries it, and the Book info sheet lists it again.
 function CatalogDetail.detailHeroMetaLine(_unused, detail)
     local parts = {}
     if detail.publishedYear then table.insert(parts, tostring(detail.publishedYear)) end
     if detail.publisher then table.insert(parts, detail.publisher) end
-    if detail.pageCount then table.insert(parts, T(_("%1 pages"), detail.pageCount)) end
     return #parts > 0 and table.concat(parts, " - ") or nil
 end
 
@@ -1082,58 +1264,88 @@ end
 function CatalogDetail:buildDetailHeader(detail, width)
     local cover_w, cover_h = self:detailCoverDimensions()
     local text_w = math.max(1, width - 2 * DETAIL_INSET - cover_w - DETAIL_GAP_M)
-    local path = self:cachedThumbnailPath(detail)
-    local state = self:thumbnailState(detail)
+    local path, state = self:thumbnailDisplay(detail)
 
     self.detail_status_button = nil
     self.detail_read_button = nil
     self.detail_download_button = nil
     self.detail_more_pills_button = nil
+    self.detail_series_line = nil
+    self.detail_meta_line = nil
 
     local title_face = Font:getFace("cfont", 21)
-    local top = VerticalGroup:new{ align = "left" }
-    table.insert(top, TextBoxWidget:new{
-        text = BD.auto(detail.title or _("Untitled")),
-        width = text_w,
-        height = 2 * lineHeight(title_face),
-        height_adjust = true,
-        height_overflow_show_ellipsis = true,
-        bold = true,
-        face = title_face,
-    })
-    table.insert(top, VerticalSpan:new{ width = DETAIL_GAP_XS })
     local author_face = Font:getFace("smallinfofont", 16)
-    table.insert(top, TextBoxWidget:new{
-        text = BD.auto(joinNames(detail.authors) or _("Unknown author")),
-        width = text_w,
-        height = lineHeight(author_face),
-        height_overflow_show_ellipsis = true,
-        face = author_face,
-    })
+    local meta_face = Font:getFace("x_smallinfofont", 13)
+    local series_line = self:detailSeriesLine(detail)
     local meta_line = self:detailHeroMetaLine(detail)
-    if meta_line then
-        local meta_face = Font:getFace("x_smallinfofont", 13)
-        table.insert(top, VerticalSpan:new{ width = DETAIL_GAP_XS })
-        table.insert(top, TextBoxWidget:new{
-            text = meta_line,
+
+    local function buildTop(with_series)
+        self.detail_series_line = nil
+        self.detail_meta_line = nil
+        local group = VerticalGroup:new{ align = "left" }
+        table.insert(group, TextBoxWidget:new{
+            text = BD.auto(detail.title or _("Untitled")),
             width = text_w,
-            height = lineHeight(meta_face),
+            height = 2 * lineHeight(title_face),
+            height_adjust = true,
             height_overflow_show_ellipsis = true,
-            face = meta_face,
+            bold = true,
+            face = title_face,
         })
-    end
-    table.insert(top, VerticalSpan:new{ width = DETAIL_GAP_S })
-    table.insert(top, self:buildDetailRating(detail, text_w))
-    local pills = self:buildDetailPills(detail, text_w)
-    if pills then
-        table.insert(top, VerticalSpan:new{ width = DETAIL_GAP_S })
-        table.insert(top, pills)
+        table.insert(group, VerticalSpan:new{ width = DETAIL_GAP_XS })
+        table.insert(group, TextBoxWidget:new{
+            text = BD.auto(joinNames(detail.authors) or _("Unknown author")),
+            width = text_w,
+            height = lineHeight(author_face),
+            height_overflow_show_ellipsis = true,
+            face = author_face,
+        })
+        if with_series and series_line then
+            self.detail_series_line = DetailTapLineWidget:new{
+                text = BD.auto(series_line),
+                width = text_w,
+                face = author_face,
+                callback = function()
+                    self:openDetailSeries(detail)
+                end,
+            }
+            table.insert(group, VerticalSpan:new{ width = DETAIL_GAP_XS })
+            table.insert(group, self.detail_series_line)
+        end
+        if meta_line then
+            self.detail_meta_line = DetailTapLineWidget:new{
+                text = meta_line,
+                width = text_w,
+                face = meta_face,
+                callback = function()
+                    self:showBookInfo(detail)
+                end,
+            }
+            table.insert(group, VerticalSpan:new{ width = DETAIL_GAP_XS })
+            table.insert(group, self.detail_meta_line)
+        end
+        table.insert(group, VerticalSpan:new{ width = DETAIL_GAP_S })
+        table.insert(group, self:buildDetailRating(detail, text_w))
+        local pills = self:buildDetailPills(detail, text_w)
+        if pills then
+            table.insert(group, VerticalSpan:new{ width = DETAIL_GAP_S })
+            table.insert(group, pills)
+        end
+        return group
     end
 
     local bottom = VerticalGroup:new{ align = "left" }
     table.insert(bottom, self:buildDetailProgress(detail, text_w))
     table.insert(bottom, VerticalSpan:new{ width = DETAIL_GAP_M })
     table.insert(bottom, self:buildDetailButtons(detail, text_w))
+
+    -- The right column is pinned to the cover's top and bottom edges, so the
+    -- optional series line is the first thing to drop when the info block would
+    -- otherwise run into the action block on a small screen.
+    local top = buildTop(true)
+    if series_line and top:getSize().h + bottom:getSize().h > cover_h then
+        top = buildTop(false)
+    end
 
     local flex = math.max(DETAIL_GAP_M, cover_h - top:getSize().h - bottom:getSize().h)
     local right = VerticalGroup:new{ align = "left" }
@@ -1379,6 +1591,8 @@ function CatalogDetail:updateDetailItems(select_number, no_recalculate_dimen)
     local used = DETAIL_GAP_S + header:getSize().h
 
     local focus_row = {}
+    if self.detail_series_line then table.insert(focus_row, self.detail_series_line) end
+    if self.detail_meta_line then table.insert(focus_row, self.detail_meta_line) end
     for _, star in ipairs(self.detail_rating_stars or {}) do
         table.insert(focus_row, star)
     end

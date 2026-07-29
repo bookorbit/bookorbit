@@ -243,7 +243,7 @@ async function handleRemoveFromCollection() {
     resetBooks()
     refreshBuckets()
     exitSelectionMode()
-    toast.success(t('views.collection.toast.removed', { count: ids.length }, ids.length))
+    toast.success(t('views.collection.toast.removed', { count: ids.length }))
   } catch {
     toast.error(t('views.collection.toast.removeFailed'))
   } finally {
@@ -555,14 +555,14 @@ defineOptions({ name: 'CollectionView' })
 
       <section v-if="mobileControlsExpanded" class="mb-3 rounded-lg border border-border/70 bg-card/70 p-2 sm:hidden">
         <div class="mb-2 flex h-9 items-center rounded-md border border-input bg-background px-2.5">
-          <Search :size="13" class="mr-1.5 shrink-0 text-muted-foreground/85" />
+          <Search :size="13" class="mr-1.5 shrink-0 text-muted-foreground" />
           <input
             v-model="searchQuery"
             type="search"
             :placeholder="t('views.bookView.searchPlaceholder')"
-            class="mobile-search-input h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/85"
+            class="mobile-search-input h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
           />
-          <button v-if="searchQuery.trim()" class="ml-1 text-muted-foreground/85 transition-colors hover:text-foreground" @click="clearSearch">
+          <button v-if="searchQuery.trim()" class="ml-1 text-muted-foreground transition-colors hover:text-foreground" @click="clearSearch">
             <X :size="12" />
           </button>
         </div>
@@ -613,7 +613,7 @@ defineOptions({ name: 'CollectionView' })
 
         <div v-else-if="booksInitialized && !loading && books.length === 0" class="flex flex-col items-center justify-center gap-3 py-24 text-center">
           <div class="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-            <FolderOpen :size="28" class="text-muted-foreground/70" />
+            <FolderOpen :size="28" class="text-muted-foreground" />
           </div>
           <p class="text-sm font-medium text-foreground">
             {{ debouncedQuery ? t('views.collection.empty.noSearchMatch') : t('views.collection.empty.noBooks') }}

@@ -41,7 +41,7 @@ async function addToQueue() {
 <template>
   <div class="flex h-full flex-col p-3">
     <div class="mb-3 flex items-center gap-2 self-start">
-      <Gem :size="16" class="text-primary/90" />
+      <Gem :size="16" class="text-primary" />
       <span class="text-[15px] font-semibold text-foreground">{{ t('dashboard.widgets.neglectedGems.title') }}</span>
     </div>
 
@@ -59,7 +59,7 @@ async function addToQueue() {
     <!-- Empty -->
     <div v-else-if="!data || data.gems.length === 0" class="flex flex-1 flex-col items-center justify-center gap-2">
       <div class="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-        <Gem :size="16" class="text-muted-foreground/60" />
+        <Gem :size="16" class="text-muted-foreground" />
       </div>
       <p class="text-center text-xs text-muted-foreground">{{ t('dashboard.widgets.neglectedGems.empty') }}</p>
     </div>

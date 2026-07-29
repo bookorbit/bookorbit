@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { setI18nLocale } from '@/i18n'
 import { formatBytes } from '@/lib/formatting'
-import { formatDate, formatLanguageName, formatNumber } from './formatters'
+import { formatCompactNumber, formatDate, formatLanguageName, formatNumber } from './formatters'
 
 describe('locale formatters', () => {
   afterEach(async () => {
@@ -14,6 +14,18 @@ describe('locale formatters', () => {
 
     await setI18nLocale('nl')
     expect(formatNumber(1234.5)).toBe('1.234,5')
+  })
+
+  it('shortens counts for badges once they reach a thousand', async () => {
+    await setI18nLocale('en')
+    expect(formatCompactNumber(999)).toBe('999')
+    expect(formatCompactNumber(1000)).toBe('1K')
+    expect(formatCompactNumber(1234)).toBe('1.2K')
+    expect(formatCompactNumber(12345)).toBe('12K')
+    expect(formatCompactNumber(1200000)).toBe('1.2M')
+
+    await setI18nLocale('nl')
+    expect(formatCompactNumber(1234)).toBe('1,2K')
   })
 
   it('formats dates with the active BookOrbit locale', async () => {

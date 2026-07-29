@@ -7,6 +7,7 @@ import { MetadataScoreScorer, type ScoreData } from './metadata-score.scorer';
 
 const RECALCULATION_PAGE_SIZE = 200;
 const RECALCULATION_WRITE_CONCURRENCY = 25;
+const ON_DEMAND_WRITE_CONCURRENCY = 25;
 const RECALCULATION_EVENT = 'metadata_score.recalculate_all';
 const RECALCULATION_BOOK_EVENT = 'metadata_score.recalculate_book';
 
@@ -31,6 +32,7 @@ export type MetadataRecalculationStatus = {
 @Injectable()
 export class MetadataScoreService {
   private readonly logger = new Logger(MetadataScoreService.name);
+  private readonly pendingBookCalculations = new Map<number, Promise<void>>();
   private runningPromise: Promise<void> | null = null;
   private status: MetadataRecalculationStatus = this.makeInitialStatus();
 
@@ -66,11 +68,41 @@ export class MetadataScoreService {
     return { started: true, status: this.getRecalculationStatus() };
   }
 
-  async calculateAndSave(bookId: number): Promise<void> {
-    const [data, weights] = await Promise.all([this.repo.loadScoreData(bookId), this.appSettings.getMetadataScoreWeights()]);
+  calculateAndSave(bookId: number): Promise<void> {
+    return this.enqueueBookCalculation(bookId, async () => {
+      const weights = await this.appSettings.getMetadataScoreWeights();
+      await this.calculateAndSaveWithWeights(bookId, weights);
+    });
+  }
+
+  async calculateAndSaveMany(bookIds: number[]): Promise<void> {
+    const uniqueBookIds = [...new Set(bookIds)].filter((bookId) => Number.isInteger(bookId) && bookId > 0);
+    if (uniqueBookIds.length === 0) return;
+
+    const weights = await this.appSettings.getMetadataScoreWeights();
+    for (let index = 0; index < uniqueBookIds.length; index += ON_DEMAND_WRITE_CONCURRENCY) {
+      const chunk = uniqueBookIds.slice(index, index + ON_DEMAND_WRITE_CONCURRENCY);
+      await Promise.all(chunk.map((bookId) => this.enqueueBookCalculation(bookId, () => this.calculateAndSaveWithWeights(bookId, weights))));
+    }
+  }
+
+  private async calculateAndSaveWithWeights(bookId: number, weights: MetadataScoreWeights): Promise<void> {
+    const data = await this.repo.loadScoreData(bookId);
     if (!data) return;
     const score = this.scorer.compute(data, weights);
     await this.repo.updateMetadataScore(bookId, score);
+  }
+
+  private enqueueBookCalculation(bookId: number, calculate: () => Promise<void>): Promise<void> {
+    const previous = this.pendingBookCalculations.get(bookId) ?? Promise.resolve();
+    const calculation = previous.catch(() => undefined).then(calculate);
+    this.pendingBookCalculations.set(bookId, calculation);
+
+    return calculation.finally(() => {
+      if (this.pendingBookCalculations.get(bookId) === calculation) {
+        this.pendingBookCalculations.delete(bookId);
+      }
+    });
   }
 
   private async runRecalculation(trigger: MetadataRecalculationTrigger): Promise<void> {

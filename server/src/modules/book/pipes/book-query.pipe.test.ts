@@ -50,6 +50,17 @@ describe('BookQueryPipe', () => {
     expect(result.filter).toBeDefined();
   });
 
+  it('accepts ISO timestamps supported by date filter rules', () => {
+    const result = pipe.transform({
+      filter: {
+        type: 'group',
+        join: 'AND',
+        rules: [{ type: 'rule', field: 'startedAt', operator: 'before', value: '2026-01-01T02:30:00.000Z' }],
+      },
+    });
+    expect(result.filter).toBeDefined();
+  });
+
   it('throws BadRequestException for invalid sort field', () => {
     expect(() => pipe.transform({ sort: [{ field: 'unknownField', dir: 'asc' }] })).toThrow(BadRequestException);
   });

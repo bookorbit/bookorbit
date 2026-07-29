@@ -41,6 +41,7 @@ const validCbxDefaults = {
   scrollMode: 'paginated',
   direction: 'ltr',
   spreadAlignment: 'normal',
+  spreadGap: 0,
   forceTwoPage: false,
   widePageSingletonMode: 'auto',
   bgColor: 'black',
@@ -118,9 +119,17 @@ describe('ReaderPreferencesService', () => {
     const user = makeUser();
     mockBookService.verifyFileAccess.mockResolvedValueOnce({ format: 'cbz' });
 
-    await service.upsertPreference(user, 11, { fitMode: 'fit-page', direction: 'rtl' });
+    await service.upsertPreference(user, 11, { fitMode: 'fit-page', direction: 'rtl', spreadGap: 24 });
 
-    expect(mockRepo.upsertPreference).toHaveBeenCalledWith(7, 11, { fitMode: 'fit-page', direction: 'rtl' });
+    expect(mockRepo.upsertPreference).toHaveBeenCalledWith(7, 11, { fitMode: 'fit-page', direction: 'rtl', spreadGap: 24 });
+  });
+
+  it('rejects comic spread gaps outside the supported range', async () => {
+    const user = makeUser();
+    mockBookService.verifyFileAccess.mockResolvedValueOnce({ format: 'cbz' });
+
+    await expect(service.upsertPreference(user, 11, { spreadGap: 65 })).rejects.toThrow(BadRequestException);
+    expect(mockRepo.upsertPreference).not.toHaveBeenCalled();
   });
 
   it('rejects per-book settings with unknown keys', async () => {
@@ -163,6 +172,15 @@ describe('ReaderPreferencesService', () => {
 
   it('validates full cbx default payloads including spread settings', async () => {
     await service.upsertDefault(3, 'cbx', validCbxDefaults);
+
+    expect(mockRepo.upsertDefault).toHaveBeenCalledWith(3, 'cbx', validCbxDefaults);
+  });
+
+  it('fills the gapless default for cbx payloads saved before spread gaps were supported', async () => {
+    const legacyCbxDefaults: Partial<typeof validCbxDefaults> = { ...validCbxDefaults };
+    delete legacyCbxDefaults.spreadGap;
+
+    await service.upsertDefault(3, 'cbx', legacyCbxDefaults);
 
     expect(mockRepo.upsertDefault).toHaveBeenCalledWith(3, 'cbx', validCbxDefaults);
   });

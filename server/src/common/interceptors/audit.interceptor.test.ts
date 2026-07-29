@@ -41,6 +41,7 @@ describe('AuditInterceptor', () => {
           action: 'smart_scope.create',
           resource: 'smart_scope',
           getResourceId: (_req: unknown, body: { id: number }) => body.id,
+          getMeta: (_req: unknown, body: { source: string }) => ({ source: body.source }),
           description: (_req: unknown, body: { name: string }) => `Created Smart Scope ${body.name}`,
         };
       }),
@@ -50,7 +51,7 @@ describe('AuditInterceptor', () => {
     };
     const interceptor = new AuditInterceptor(reflector as never, auditEvents as never);
     const next: CallHandler = {
-      handle: vi.fn().mockReturnValue(of({ id: 22, name: 'Favorites' })),
+      handle: vi.fn().mockReturnValue(of({ id: 22, name: 'Favorites', source: 'test' })),
     };
     const context = makeContext({
       ip: '10.0.0.8',
@@ -70,6 +71,7 @@ describe('AuditInterceptor', () => {
       resourceId: 22,
       description: 'Created Smart Scope Favorites',
       ip: '10.0.0.8',
+      meta: { source: 'test' },
     });
   });
 

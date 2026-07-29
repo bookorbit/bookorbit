@@ -79,8 +79,8 @@ function handleShowJumpRailsUpdate(value: boolean) {
   <div class="sticky top-0 z-20 mb-2 mt-2 flex h-10 shrink-0 items-center gap-2 bg-background/80 p-2 backdrop-blur-md transition-all duration-300">
     <div class="flex min-w-0 flex-1 items-center gap-2">
       <AppIcon v-if="icon" :icon="icon" :fallback="fallbackIcon" :size="16" class="shrink-0 text-muted-foreground" />
-      <span class="truncate text-[16px] font-bold tracking-tight text-foreground/90">{{ title }}</span>
-      <span class="shrink-0 tabular-nums text-[12px] font-semibold text-primary/70">({{ formatNumber(total) }})</span>
+      <span class="truncate text-[16px] font-bold tracking-tight text-foreground">{{ title }}</span>
+      <span class="shrink-0 tabular-nums text-[12px] font-semibold text-primary">({{ formatNumber(total) }})</span>
     </div>
 
     <div class="flex shrink-0 items-center gap-2">
@@ -97,7 +97,7 @@ function handleShowJumpRailsUpdate(value: boolean) {
         :class="
           selectionMode
             ? 'text-primary bg-primary/10 hover:bg-primary/20 ring-1 ring-primary/20'
-            : 'text-muted-foreground/80 hover:text-foreground hover:bg-primary/5'
+            : 'text-muted-foreground hover:text-foreground hover:bg-primary/5'
         "
         @click="emit('toggle-selection')"
       >
@@ -114,7 +114,7 @@ function handleShowJumpRailsUpdate(value: boolean) {
           variant="ghost"
           size="icon"
           class="h-8 w-8 rounded-lg"
-          :class="viewMode === 'grid' ? 'text-primary bg-primary/10' : 'text-muted-foreground/70 hover:text-foreground hover:bg-primary/5'"
+          :class="viewMode === 'grid' ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-primary/5'"
           @click="emit('update:viewMode', 'grid')"
         >
           <LayoutGrid :size="14" />
@@ -124,7 +124,7 @@ function handleShowJumpRailsUpdate(value: boolean) {
           variant="ghost"
           size="icon"
           class="h-8 w-8 rounded-lg"
-          :class="viewMode === 'list' ? 'text-primary bg-primary/10' : 'text-muted-foreground/70 hover:text-foreground hover:bg-primary/5'"
+          :class="viewMode === 'list' ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-primary/5'"
           @click="emit('update:viewMode', 'list')"
         >
           <List :size="14" />
@@ -134,7 +134,7 @@ function handleShowJumpRailsUpdate(value: boolean) {
           variant="ghost"
           size="icon"
           class="h-8 w-8 rounded-lg"
-          :class="viewMode === 'table' ? 'text-primary bg-primary/10' : 'text-muted-foreground/70 hover:text-foreground hover:bg-primary/5'"
+          :class="viewMode === 'table' ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-primary/5'"
           @click="emit('update:viewMode', 'table')"
         >
           <Table2 :size="14" />
@@ -146,7 +146,7 @@ function handleShowJumpRailsUpdate(value: boolean) {
           <Button
             variant="ghost"
             size="icon"
-            class="hidden h-8 w-8 rounded-lg text-muted-foreground/70 hover:bg-primary/5 hover:text-foreground md:flex"
+            class="hidden h-8 w-8 rounded-lg text-muted-foreground hover:bg-primary/5 hover:text-foreground md:flex"
           >
             <SlidersHorizontal :size="14" />
           </Button>

@@ -71,7 +71,7 @@ function onConfirm() {
             <FolderInput class="text-primary" :size="18" />
           </div>
           <div>
-            <h2 class="text-base font-semibold text-foreground">{{ t('book.moveDialog.title', { count }, count) }}</h2>
+            <h2 class="text-base font-semibold text-foreground">{{ t('book.moveDialog.title', { count }) }}</h2>
             <p class="text-sm text-muted-foreground mt-1">
               {{ t('book.moveDialog.description') }}
             </p>

@@ -326,9 +326,7 @@ function dismissError(index: number) {
               @click.stop
             />
 
-            <span class="shrink-0 text-xs text-muted-foreground">{{
-              t('settings.reader.fonts.fileCount', { count: family.variants.length }, family.variants.length)
-            }}</span>
+            <span class="shrink-0 text-xs text-muted-foreground">{{ t('settings.reader.fonts.fileCount', { count: family.variants.length }) }}</span>
 
             <div class="flex items-center gap-1 shrink-0">
               <button
@@ -360,7 +358,7 @@ function dismissError(index: number) {
 
           <!-- Preview line -->
           <div
-            class="px-4 pb-3 -mt-1 text-sm text-muted-foreground/90 truncate"
+            class="px-4 pb-3 -mt-1 text-sm text-muted-foreground truncate"
             :style="{ fontFamily: `'${family.cssFamilyName}', sans-serif`, fontSize: '16px' }"
           >
             {{ t('settings.reader.fonts.pangram') }}

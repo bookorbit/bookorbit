@@ -80,7 +80,7 @@ function membershipLabel(collection: Collection): string {
   }
   const partial = partialCount(collection)
   if (partial > 0) return t('collection.addToSheet.partialInCollection', { partial, total })
-  return t('collection.addToSheet.bookCount', { count: collection.bookCount }, collection.bookCount)
+  return t('collection.addToSheet.bookCount', { count: collection.bookCount })
 }
 
 function markCollectionChanged(collectionId: number): void {
@@ -102,7 +102,7 @@ async function handleCreate() {
       const total = selectionCount()
       localCollections.value = localCollections.value.map((c) => (c.id === collection.id ? { ...c, memberCount: total } : c))
       markCollectionChanged(collection.id)
-      toast.success(t('collection.addToSheet.createdAndAdded', { name: collection.name, count: total }, total))
+      toast.success(t('collection.addToSheet.createdAndAdded', { name: collection.name, count: total }))
     } catch {
       toast.error(t('collection.addToSheet.createdButAddFailed', { name: collection.name }))
     }
@@ -125,8 +125,8 @@ async function handleAddTo(collection: Collection) {
     const added = total - alreadyHad
     const msg =
       alreadyHad > 0
-        ? t('collection.addToSheet.addedNewWithExisting', { count: added, name: collection.name, alreadyHad }, added)
-        : t('collection.addToSheet.addedToCollection', { count: total, name: collection.name }, total)
+        ? t('collection.addToSheet.addedNewWithExisting', { count: added, name: collection.name, alreadyHad })
+        : t('collection.addToSheet.addedToCollection', { count: total, name: collection.name })
     toast.success(msg)
   } catch {
     toast.error(t('collection.addToSheet.addFailed'))
@@ -143,7 +143,7 @@ async function handleRemoveFrom(collection: Collection) {
     await removeBooksFromCollection(collection.id, props.selectionPayload)
     markCollectionChanged(collection.id)
     localCollections.value = localCollections.value.map((c) => (c.id === collection.id ? { ...c, memberCount: 0 } : c))
-    toast.success(t('collection.addToSheet.removedFromCollection', { count: total, name: collection.name }, total))
+    toast.success(t('collection.addToSheet.removedFromCollection', { count: total, name: collection.name }))
   } catch {
     toast.error(t('collection.addToSheet.removeFailed'))
   } finally {
@@ -197,7 +197,7 @@ function handleFocusOut(e: FocusEvent) {
 
       <div class="px-4 pb-4 space-y-4">
         <p class="text-xs text-muted-foreground animate-fade-up">
-          {{ t('collection.addToSheet.selectedCount', { count: selectionCount() }, selectionCount()) }}
+          {{ t('collection.addToSheet.selectedCount', { count: selectionCount() }) }}
         </p>
 
         <!-- Create new collection -->

@@ -386,6 +386,41 @@
       "when": 1784079674841,
       "tag": "0054_add_book_duplicate_scans",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1785128574339,
+      "tag": "0055_add_audit_search_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1785208780116,
+      "tag": "0056_add_bookmark_sync_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1785215769241,
+      "tag": "0057_add_kindle_file_write_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1785219732532,
+      "tag": "0058_add_fb2_file_write_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1785272589212,
+      "tag": "0059_add_smart_scope_kobo_subscriptions",
+      "breakpoints": true
     }
   ]
 }

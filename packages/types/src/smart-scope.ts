@@ -8,9 +8,13 @@ export interface SmartScope {
   filter: GroupRule | null;
   defaultSort: SortSpec[];
   isPublic: boolean;
+  /** The owner's own preference. Only the owner's devices follow it. */
   syncToKobo: boolean;
+  /** Whether this scope reaches the requesting user's Kobo: the owner's flag for the owner, an explicit opt-in for everyone else. */
+  koboSyncEnabled: boolean;
+  isOwner: boolean;
   displayOrder: number;
-  bookCount?: number;
+  bookCount?: number | null;
   createdAt: string;
   updatedAt: string;
 }

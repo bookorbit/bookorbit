@@ -271,7 +271,7 @@ async function toggleWriteLog() {
         <div class="min-w-0">
           <h1 class="text-base font-semibold tracking-tight text-foreground">{{ t('book.detail.files.title') }}</h1>
           <p class="truncate text-xs text-muted-foreground">
-            {{ t('book.detail.files.fileCount', { count: book.files.length }, book.files.length) }}
+            {{ t('book.detail.files.fileCount', { count: book.files.length }) }}
             <span class="mx-1 opacity-40">·</span>
             {{ formatBytes(fileSummary.totalBytes) }}
             <template v-if="fileSummary.formats.length"> · {{ fileSummary.formats.join(' · ') }}</template>
@@ -351,7 +351,7 @@ async function toggleWriteLog() {
             entry.errorMessage
           }}</span>
           <span v-else-if="entry.fieldsWritten.length" class="min-w-0 flex-1 basis-full truncate text-muted-foreground sm:basis-auto">{{
-            t('book.detail.files.fieldsWritten', { count: entry.fieldsWritten.length }, entry.fieldsWritten.length)
+            t('book.detail.files.fieldsWritten', { count: entry.fieldsWritten.length })
           }}</span>
         </div>
       </div>

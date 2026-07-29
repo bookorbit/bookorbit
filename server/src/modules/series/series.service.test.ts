@@ -12,6 +12,7 @@ describe('SeriesService', () => {
     findPage: vi.fn(),
     findDetail: vi.fn(),
     findBookIds: vi.fn(),
+    countSeries: vi.fn(),
   };
 
   const bookReadService = {
@@ -20,6 +21,7 @@ describe('SeriesService', () => {
 
   const libraryService = {
     findAll: vi.fn(),
+    findAccessibleLibraryIds: vi.fn(),
   };
 
   let service: SeriesService;
@@ -28,6 +30,23 @@ describe('SeriesService', () => {
     vi.resetAllMocks();
     service = new SeriesService(seriesRepo as any, bookReadService as any, libraryService as any);
     libraryService.findAll.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([1, 2]);
+  });
+
+  describe('countAll', () => {
+    it('counts series across the accessible libraries with the user content filters', async () => {
+      seriesRepo.countSeries.mockResolvedValue(1200);
+
+      await expect(service.countAll(reqUser())).resolves.toBe(1200);
+      expect(seriesRepo.countSeries).toHaveBeenCalledWith({ libraryIds: [1, 2], contentFilters: undefined });
+    });
+
+    it('skips the query when the user has no library access', async () => {
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([]);
+
+      await expect(service.countAll(reqUser())).resolves.toBe(0);
+      expect(seriesRepo.countSeries).not.toHaveBeenCalled();
+    });
   });
 
   describe('findAll', () => {

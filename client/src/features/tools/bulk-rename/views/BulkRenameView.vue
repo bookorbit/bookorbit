@@ -310,10 +310,10 @@ watch(
                 t('tools.bulkRename.summary.unchanged', { count: bulk.totalByStatus.value.unchanged })
               }}</span>
               <span v-if="bulk.totalByStatus.value.collision > 0" class="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-amber-500">
-                {{ t('tools.bulkRename.summary.collisions', { count: bulk.totalByStatus.value.collision }, bulk.totalByStatus.value.collision) }}
+                {{ t('tools.bulkRename.summary.collisions', { count: bulk.totalByStatus.value.collision }) }}
               </span>
               <span v-if="bulk.totalByStatus.value.error > 0" class="rounded-full bg-destructive/15 px-2.5 py-0.5 text-destructive">
-                {{ t('tools.bulkRename.summary.errors', { count: bulk.totalByStatus.value.error }, bulk.totalByStatus.value.error) }}
+                {{ t('tools.bulkRename.summary.errors', { count: bulk.totalByStatus.value.error }) }}
               </span>
             </div>
             <div class="flex items-center gap-2">

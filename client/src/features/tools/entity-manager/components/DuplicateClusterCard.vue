@@ -66,7 +66,7 @@ function toggleExpanded(): void {
         <span class="text-sm font-medium truncate">
           {{ primaryEntityName }}
           <span v-if="otherCount > 0" class="text-muted-foreground font-normal">
-            {{ t('tools.entityManager.duplicates.plusOthers', { count: otherCount }, otherCount) }}</span
+            {{ t('tools.entityManager.duplicates.plusOthers', { count: otherCount }) }}</span
           >
         </span>
         <span class="text-xs px-2 py-0.5 rounded-full shrink-0 transition-colors" :class="getSimilarityColorClass(cluster.averageSimilarity)">
@@ -92,9 +92,7 @@ function toggleExpanded(): void {
               <Check v-if="selectedTargetId === entity.id" class="h-4 w-4 text-primary shrink-0" />
             </div>
             <div class="flex items-center gap-2 mt-0.5">
-              <span class="text-xs text-muted-foreground">{{
-                t('tools.entityManager.bookCount', { count: entity.bookCount }, entity.bookCount)
-              }}</span>
+              <span class="text-xs text-muted-foreground">{{ t('tools.entityManager.bookCount', { count: entity.bookCount }) }}</span>
               <span v-if="entity.sortName" class="text-xs text-muted-foreground">{{
                 t('tools.entityManager.sortPrefix', { sortName: entity.sortName })
               }}</span>
@@ -117,7 +115,7 @@ function toggleExpanded(): void {
         <p class="text-xs text-muted-foreground font-medium uppercase tracking-wider">{{ t('tools.entityManager.duplicates.pairDetails') }}</p>
         <div v-for="(pair, idx) in cluster.pairDetails" :key="idx" class="flex items-center gap-2 text-xs px-2 py-1 rounded bg-muted/30">
           <span class="flex-1 text-muted-foreground truncate">
-            {{ cluster.entities.find((e) => e.id === pair.idA)?.name }} <span class="text-foreground/50">&harr;</span>
+            {{ cluster.entities.find((e) => e.id === pair.idA)?.name }} <span class="text-foreground">&harr;</span>
             {{ cluster.entities.find((e) => e.id === pair.idB)?.name }}
           </span>
           <span class="font-mono shrink-0 px-1.5 py-0.5 rounded-sm" :class="getSimilarityColorClass(pair.similarity)">

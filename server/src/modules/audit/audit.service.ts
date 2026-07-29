@@ -64,6 +64,10 @@ export class AuditService implements OnModuleInit, OnModuleDestroy {
     return this.auditRepository.findAll(query);
   }
 
+  getActors(query: string | undefined, limit: number) {
+    return this.auditRepository.findActors(query, limit);
+  }
+
   record(payload: AuditEventPayload): Promise<void> {
     return this.auditRepository.insert({
       userId: payload.userId,

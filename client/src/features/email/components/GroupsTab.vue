@@ -186,7 +186,7 @@ function availableRecipients(group: EmailGroup) {
           </button>
           <div class="flex-1 min-w-0">
             <span class="text-sm font-medium text-foreground">{{ g.name }}</span>
-            <span class="ml-2 text-xs text-muted-foreground">{{ t('email.groups.memberCount', { count: g.members.length }, g.members.length) }}</span>
+            <span class="ml-2 text-xs text-muted-foreground">{{ t('email.groups.memberCount', { count: g.members.length }) }}</span>
           </div>
           <Tooltip>
             <TooltipTrigger as-child>
@@ -250,7 +250,7 @@ function availableRecipients(group: EmailGroup) {
               <UserPlus :size="12" />
               {{ t('email.groups.addMember') }}
             </button>
-            <p v-else class="text-xs text-muted-foreground/80">{{ t('email.groups.allRecipientsInGroup') }}</p>
+            <p v-else class="text-xs text-muted-foreground">{{ t('email.groups.allRecipientsInGroup') }}</p>
           </div>
         </div>
       </div>

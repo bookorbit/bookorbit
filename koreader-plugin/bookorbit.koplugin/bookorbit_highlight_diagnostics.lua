@@ -26,6 +26,22 @@ function HighlightDiagnostics.lastSyncText(summary, format_time)
     return text
 end
 
+function HighlightDiagnostics.lastBookmarkSyncText(summary, format_time)
+    if type(summary) ~= "table" then return _("never") end
+    local uploaded = count(summary.bm_uploaded)
+    local applied = count(summary.bm_applied)
+    local deleted = count(summary.bm_deleted)
+    local failed = count(summary.bm_failed)
+    if uploaded + applied + deleted + failed == 0 then return _("none") end
+    local text = T(_("%1 uploaded, %2 applied, %3 deleted, %4 failed"), uploaded, applied, deleted, failed)
+    local at = tonumber(summary.at)
+    if at and at > 0 then
+        local when = format_time and format_time(at) or os.date("%H:%M", at)
+        text = T(_("%1 at %2"), text, when)
+    end
+    return text
+end
+
 function HighlightDiagnostics.retryText(status)
     if type(status) == "table" and status.pending then
         return _("pending")

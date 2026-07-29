@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { OidcProviderPublic, UserSettings } from '@bookorbit/types'
-import { ChevronDown, ChevronUp, Clock, KeyRound, Link, LinkIcon, MapPin, Save, Trash2, Trophy, Upload } from '@lucide/vue'
+import { Clock, KeyRound, Link, LinkIcon, MapPin, Save, Trash2, Trophy, Upload } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import UserAvatar from '@/components/UserAvatar.vue'
 import { api } from '@/lib/api'
@@ -12,7 +12,8 @@ import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { MAX_PROFILE_AVATAR_BYTES, useProfileAvatar } from '@/features/auth/composables/useProfileAvatar'
 import { useChangePasswordDialog } from '@/composables/useChangePasswordDialog'
 import SettingsPageHeader from './SettingsPageHeader.vue'
-import { useMediaQuery } from '@vueuse/core'
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import { useOnboardingTour } from '@/features/onboarding/composables/useOnboardingTour'
 
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
@@ -27,15 +28,11 @@ const { resetTour } = useOnboardingTour()
 const fileInput = ref<HTMLInputElement | null>(null)
 const savingProfile = ref(false)
 const profileError = ref<string | null>(null)
-const profileState = ref<'idle' | 'saved'>('idle')
 const removeAvatarConfirmOpen = ref(false)
-const profileCardOpen = ref(true)
-const avatarCardOpen = ref(false)
-const isMobile = useMediaQuery('(max-width: 767px)')
 const formName = ref('')
 const formTimezone = ref('UTC')
-const savingTimezone = ref(false)
-const timezoneChanged = computed(() => formTimezone.value !== ((user.value?.settings as UserSettings | undefined)?.timezone ?? 'UTC'))
+const savedTimezone = computed(() => (user.value?.settings as UserSettings | undefined)?.timezone ?? 'UTC')
+const timezoneChanged = computed(() => formTimezone.value !== savedTimezone.value)
 const savingAchievements = ref(false)
 const achievementsEnabled = computed(() => (user.value?.settings as UserSettings | undefined)?.achievementPreferences?.enabled !== false)
 
@@ -59,21 +56,40 @@ watch(
 const hasAvatar = computed(() => Boolean(user.value?.avatarUrl))
 const busy = computed(() => uploading.value || removing.value)
 const profileBusy = computed(() => busy.value || savingProfile.value)
-const profileChanged = computed(() => {
+const nameChanged = computed(() => {
   const current = user.value
   if (!current) return false
   return formName.value.trim() !== current.name
 })
-const saveFeedback = computed(() => {
-  if (profileError.value) return profileError.value
-  if (profileChanged.value) return t('settings.account.feedback.unsavedChanges')
-  if (profileState.value === 'saved') return t('settings.account.feedback.allSaved')
-  return ''
-})
+const profileChanged = computed(() => nameChanged.value || timezoneChanged.value)
 const accountEditBlocked = computed(() => isDemoRestrictedAccount.value)
 const canChangePassword = computed(
   () => !accountEditBlocked.value && user.value?.provisioningMethod !== 'oidc' && user.value?.provisioningMethod !== 'shared',
 )
+
+const accountTypeLabel = computed(() => {
+  if (user.value?.provisioningMethod === 'oidc') return t('settings.account.profile.accountTypeOidc')
+  if (user.value?.provisioningMethod === 'shared') return t('settings.account.profile.accountTypeShared')
+  return t('settings.account.profile.accountTypeLocal')
+})
+
+const passwordHint = computed(() => {
+  if (user.value?.provisioningMethod === 'oidc') return t('settings.account.profile.passwordHintOidc')
+  if (user.value?.provisioningMethod === 'shared') return t('settings.account.profile.passwordHintShared')
+  return t('settings.account.profile.passwordHint')
+})
+
+function handleChangePassword() {
+  openChangePassword()
+}
+
+function openRemoveAvatarDialog() {
+  removeAvatarConfirmOpen.value = true
+}
+
+function closeRemoveAvatarDialog() {
+  removeAvatarConfirmOpen.value = false
+}
 
 function shouldBlockAccountEdit(): boolean {
   if (!accountEditBlocked.value) return false
@@ -117,12 +133,19 @@ async function onRemoveAvatar() {
   }
 }
 
+function errorMessage(payload: { message?: string | string[] } | null, fallback: string): string {
+  if (Array.isArray(payload?.message)) return payload.message[0] ?? fallback
+  return payload?.message ?? fallback
+}
+
+/** Name and timezone live on different endpoints but save together as one action. */
 async function saveProfile() {
   if (shouldBlockAccountEdit()) return
-  if (!user.value) return
+  if (!user.value || !profileChanged.value) return
   profileError.value = null
+
   const trimmedName = formName.value.trim()
-  if (!trimmedName) {
+  if (nameChanged.value && !trimmedName) {
     profileError.value = t('settings.account.profile.nameRequired')
     toast.error(profileError.value)
     return
@@ -130,60 +153,52 @@ async function saveProfile() {
 
   savingProfile.value = true
   try {
-    const res = await api('/api/v1/users/me', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: trimmedName,
-      }),
-    })
+    if (nameChanged.value) {
+      const res = await api('/api/v1/users/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmedName }),
+      })
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as { message?: string | string[] } | null
+        const message = errorMessage(payload, t('settings.account.profile.updateFailed'))
+        profileError.value = message
+        toast.error(message)
+        return
+      }
+    }
 
-    if (!res.ok) {
-      const payload = (await res.json().catch(() => null)) as { message?: string | string[] } | null
-      const message = Array.isArray(payload?.message)
-        ? (payload.message[0] ?? t('settings.account.profile.updateFailed'))
-        : (payload?.message ?? t('settings.account.profile.updateFailed'))
-      profileError.value = message
-      toast.error(message)
-      return
+    if (timezoneChanged.value) {
+      const res = await api('/api/v1/users/me/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: { timezone: formTimezone.value } }),
+      })
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as { message?: string | string[] } | null
+        const message = errorMessage(payload, t('settings.account.preferences.saveFailed'))
+        profileError.value = message
+        toast.error(message)
+        return
+      }
     }
 
     await me()
-    profileState.value = 'saved'
     toast.success(t('settings.account.profile.updated'))
   } finally {
     savingProfile.value = false
   }
 }
 
-async function saveTimezone() {
-  if (!user.value) return
-  savingTimezone.value = true
-  try {
-    const res = await api('/api/v1/users/me/settings', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ settings: { timezone: formTimezone.value } }),
-    })
-    if (!res.ok) {
-      const payload = (await res.json().catch(() => null)) as { message?: string | string[] } | null
-      const message = Array.isArray(payload?.message)
-        ? (payload.message[0] ?? t('settings.account.preferences.saveFailed'))
-        : (payload?.message ?? t('settings.account.preferences.saveFailed'))
-      toast.error(message)
-      return
-    }
-    await me()
-    toast.success(t('settings.account.preferences.saved'))
-  } finally {
-    savingTimezone.value = false
-  }
+function discardProfileChanges() {
+  formName.value = user.value?.name ?? ''
+  formTimezone.value = savedTimezone.value
+  profileError.value = null
 }
 
-async function handleAchievementsToggle() {
+async function handleAchievementsToggle(enabled: boolean) {
   if (shouldBlockAccountEdit() || !user.value || savingAchievements.value) return
 
-  const enabled = !achievementsEnabled.value
   savingAchievements.value = true
   try {
     const res = await api('/api/v1/users/me/settings', {
@@ -193,33 +208,22 @@ async function handleAchievementsToggle() {
     })
     if (!res.ok) {
       const payload = (await res.json().catch(() => null)) as { message?: string | string[] } | null
-      const message = Array.isArray(payload?.message)
-        ? (payload.message[0] ?? 'Failed to update achievement preference')
-        : (payload?.message ?? 'Failed to update achievement preference')
-      toast.error(message)
+      toast.error(errorMessage(payload, t('settings.account.readingPreferences.achievementsSaveFailed')))
       return
     }
 
     await me()
-    toast.success(`Achievements ${enabled ? 'enabled' : 'disabled'}`)
+    toast.success(
+      enabled ? t('settings.account.readingPreferences.achievementsEnabled') : t('settings.account.readingPreferences.achievementsDisabled'),
+    )
   } finally {
     savingAchievements.value = false
   }
 }
 
-watch([formName], () => {
-  profileState.value = 'idle'
+watch([formName, formTimezone], () => {
   if (profileError.value) profileError.value = null
 })
-
-watch(
-  isMobile,
-  () => {
-    profileCardOpen.value = true
-    avatarCardOpen.value = true
-  },
-  { immediate: true },
-)
 
 interface LinkedIdentity {
   id: number
@@ -336,364 +340,288 @@ function closeUnlinkDialog() {
   <div v-if="!props.embedded" class="md:hidden px-1">
     <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ t('settings.account.title') }}</h1>
     <p
-      class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
+      class="mt-1 overflow-hidden text-ellipsis text-sm leading-5 text-muted-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]"
     >
       {{ t('settings.account.subtitle') }}
     </p>
   </div>
 
-  <div class="mt-5 md:mt-0 space-y-4">
-    <section class="rounded-lg border border-border bg-card p-4 md:p-5 space-y-4 mb-4 shadow-xs">
-      <button class="md:hidden w-full flex items-center justify-between gap-2 text-left" @click="profileCardOpen = !profileCardOpen">
-        <div>
-          <p class="text-sm font-semibold text-foreground">{{ t('settings.account.profile.securityHeading') }}</p>
-          <p class="text-xs text-muted-foreground truncate max-w-[17rem]">@{{ user?.username ?? '' }}</p>
-        </div>
-        <ChevronUp v-if="profileCardOpen" :size="16" class="text-muted-foreground shrink-0" />
-        <ChevronDown v-else :size="16" class="text-muted-foreground shrink-0" />
-      </button>
+  <div class="mt-5 space-y-8 md:mt-0">
+    <p
+      v-if="accountEditBlocked"
+      class="rounded-md border-[var(--pill-warning)]/40 border bg-[var(--pill-warning)]/10 px-3 py-2 text-xs text-[var(--pill-warning)]"
+    >
+      {{ t('settings.account.demoRestricted.notice') }}
+    </p>
 
-      <div v-show="profileCardOpen || !isMobile" class="space-y-4">
-        <p
-          v-if="accountEditBlocked"
-          class="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400"
-        >
-          {{ t('settings.account.demoRestricted.notice') }}
-        </p>
-        <div class="grid gap-4 sm:grid-cols-2">
-          <div class="space-y-1.5 sm:col-span-2">
-            <label class="settings-label">{{ t('settings.account.profile.username') }}</label>
-            <input
-              :value="user?.username ?? ''"
-              type="text"
-              readonly
-              class="w-full rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-muted-foreground truncate"
-            />
-          </div>
-          <div class="space-y-1.5">
-            <label class="settings-label">{{ t('settings.account.profile.fullName') }}</label>
-            <input
-              v-model="formName"
-              type="text"
-              autocomplete="name"
-              :readonly="accountEditBlocked"
-              :class="[
-                'w-full rounded-md border border-input px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50',
-                accountEditBlocked ? 'bg-muted/50 text-muted-foreground cursor-not-allowed' : 'bg-background text-foreground',
-              ]"
-            />
-          </div>
-          <div class="space-y-1.5">
-            <label class="settings-label">{{ t('settings.account.profile.email') }}</label>
-            <input
-              :value="user?.email ?? ''"
-              type="email"
-              readonly
-              class="w-full rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-muted-foreground truncate"
-            />
-            <p class="text-xs text-muted-foreground">{{ t('settings.account.profile.emailHint') }}</p>
-          </div>
-        </div>
+    <section aria-labelledby="account-profile-heading" class="space-y-3">
+      <h2 id="account-profile-heading" class="settings-group-label mb-0">{{ t('settings.account.groups.profile') }}</h2>
 
-        <div class="hidden md:flex flex-wrap items-center gap-2">
-          <button class="settings-btn-primary" :disabled="!profileChanged || profileBusy || accountEditBlocked" @click="saveProfile">
-            <Save :size="14" />
-            {{ savingProfile ? t('settings.account.profile.saving') : t('settings.account.profile.save') }}
-          </button>
-          <button
-            v-if="canChangePassword"
-            class="settings-btn-outline inline-flex items-center gap-2"
-            :disabled="profileBusy || accountEditBlocked"
-            @click="openChangePassword()"
-          >
-            <KeyRound :size="14" />
-            {{ t('settings.account.profile.changePassword') }}
-          </button>
-          <span class="text-xs text-muted-foreground">
-            {{ t('settings.account.profile.accountType') }}
-            {{
-              user?.provisioningMethod === 'oidc'
-                ? t('settings.account.profile.accountTypeOidc')
-                : user?.provisioningMethod === 'shared'
-                  ? t('settings.account.profile.accountTypeShared')
-                  : t('settings.account.profile.accountTypeLocal')
-            }}
-          </span>
+      <div class="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+        <div class="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between md:px-5 md:py-5">
+          <div class="flex min-w-0 items-center gap-4">
+            <UserAvatar :name="user?.name ?? null" :avatar-url="user?.avatarUrl ?? null" size-class="h-16 w-16" text-class="text-lg font-semibold" />
+            <div class="min-w-0">
+              <p class="settings-label truncate">{{ user?.name ?? t('settings.account.avatar.unknownUser') }}</p>
+              <p class="settings-hint truncate">
+                @{{ user?.username ?? '' }}
+                <span aria-hidden="true"> · </span>
+                {{ accountTypeLabel }}
+              </p>
+              <p class="settings-hint">
+                {{ t('settings.account.avatar.formatHint', { size: Math.floor(MAX_PROFILE_AVATAR_BYTES / 1024 / 1024) }) }}
+              </p>
+            </div>
+          </div>
+
+          <div class="flex shrink-0 flex-wrap items-center gap-2">
+            <input
+              ref="fileInput"
+              type="file"
+              accept="image/*"
+              class="hidden"
+              :disabled="profileBusy || accountEditBlocked"
+              @change="onFileSelected"
+            />
+            <button type="button" class="settings-btn-outline" :disabled="profileBusy || accountEditBlocked" @click="triggerFileDialog">
+              <Upload :size="14" aria-hidden="true" />
+              {{
+                uploading
+                  ? t('settings.account.avatar.uploading')
+                  : hasAvatar
+                    ? t('settings.account.avatar.replace')
+                    : t('settings.account.avatar.upload')
+              }}
+            </button>
+            <button
+              type="button"
+              class="settings-btn-outline"
+              :disabled="profileBusy || !hasAvatar || accountEditBlocked"
+              @click="openRemoveAvatarDialog"
+            >
+              <Trash2 :size="14" aria-hidden="true" />
+              {{ removing ? t('settings.account.avatar.removing') : t('settings.account.avatar.remove') }}
+            </button>
+          </div>
         </div>
 
-        <div class="md:hidden flex flex-wrap items-center gap-2">
-          <button
-            v-if="canChangePassword"
-            class="settings-btn-outline inline-flex items-center gap-2"
-            :disabled="profileBusy || accountEditBlocked"
-            @click="openChangePassword()"
-          >
-            <KeyRound :size="14" />
-            {{ t('settings.account.profile.changePassword') }}
-          </button>
-          <span class="text-xs text-muted-foreground">
-            {{ t('settings.account.profile.accountType') }}
-            {{
-              user?.provisioningMethod === 'oidc'
-                ? t('settings.account.profile.accountTypeOidc')
-                : user?.provisioningMethod === 'shared'
-                  ? t('settings.account.profile.accountTypeShared')
-                  : t('settings.account.profile.accountTypeLocal')
-            }}
-          </span>
+        <div class="space-y-4 px-4 py-4 md:px-5 md:py-5">
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div class="space-y-1.5 sm:col-span-2">
+              <label for="account-full-name" class="settings-label">{{ t('settings.account.profile.fullName') }}</label>
+              <input
+                id="account-full-name"
+                v-model="formName"
+                type="text"
+                autocomplete="name"
+                :readonly="accountEditBlocked"
+                class="input-field w-full"
+                :class="accountEditBlocked ? 'cursor-not-allowed bg-muted/50 text-muted-foreground' : ''"
+                :aria-describedby="profileError ? 'account-full-name-error' : undefined"
+                :aria-invalid="profileError ? 'true' : undefined"
+              />
+              <p v-if="profileError" id="account-full-name-error" role="alert" class="text-xs font-medium text-destructive">{{ profileError }}</p>
+            </div>
+            <div class="space-y-1.5">
+              <label for="account-username" class="settings-label">{{ t('settings.account.profile.username') }}</label>
+              <input
+                id="account-username"
+                :value="user?.username ?? ''"
+                type="text"
+                readonly
+                class="input-field w-full truncate bg-muted/50 text-muted-foreground"
+              />
+              <p class="settings-hint">{{ t('settings.account.profile.usernameHint') }}</p>
+            </div>
+            <div class="space-y-1.5">
+              <label for="account-email" class="settings-label">{{ t('settings.account.profile.email') }}</label>
+              <input
+                id="account-email"
+                :value="user?.email ?? ''"
+                type="email"
+                readonly
+                class="input-field w-full truncate bg-muted/50 text-muted-foreground"
+              />
+              <p class="settings-hint">{{ t('settings.account.profile.emailHint') }}</p>
+            </div>
+          </div>
         </div>
-        <p v-if="profileError" class="text-xs text-destructive">{{ profileError }}</p>
       </div>
     </section>
 
-    <section class="rounded-lg border border-border bg-card p-4 md:p-5 space-y-4 shadow-xs">
-      <div class="flex items-center gap-2">
-        <Clock class="h-4 w-4 text-muted-foreground shrink-0" />
-        <div>
-          <p class="text-sm font-semibold text-foreground">{{ t('settings.account.readingPreferences.title') }}</p>
-          <p class="text-xs text-muted-foreground mt-0.5">{{ t('settings.account.readingPreferences.timezoneHint') }}</p>
-        </div>
-      </div>
-      <div class="grid gap-4 sm:grid-cols-2">
-        <div class="space-y-1.5">
-          <label class="settings-label">{{ t('settings.account.readingPreferences.timezone') }}</label>
-          <select
-            v-model="formTimezone"
-            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-          >
+    <section aria-labelledby="account-preferences-heading" class="space-y-3">
+      <h2 id="account-preferences-heading" class="settings-group-label mb-0">{{ t('settings.account.groups.preferences') }}</h2>
+
+      <div class="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+        <div class="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-5 md:py-5">
+          <div class="flex min-w-0 max-w-2xl items-start gap-2.5">
+            <Clock :size="16" class="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <div class="min-w-0">
+              <label for="account-timezone" class="settings-label">{{ t('settings.account.readingPreferences.timezone') }}</label>
+              <p class="settings-hint">{{ t('settings.account.readingPreferences.timezoneHint') }}</p>
+            </div>
+          </div>
+          <select id="account-timezone" v-model="formTimezone" class="select-field w-full md:w-64">
             <option v-for="tz in timezones" :key="tz" :value="tz">{{ tz }}</option>
           </select>
         </div>
+
+        <div class="flex items-center justify-between gap-4 px-4 py-4 md:px-5 md:py-5">
+          <div class="flex min-w-0 max-w-2xl items-start gap-2.5">
+            <Trophy :size="16" class="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <div class="min-w-0">
+              <p class="settings-label">{{ t('settings.account.readingPreferences.enableAchievements') }}</p>
+              <p class="settings-hint">{{ t('settings.account.readingPreferences.enableAchievementsHint') }}</p>
+            </div>
+          </div>
+          <ToggleSwitch
+            :model-value="achievementsEnabled"
+            :disabled="savingAchievements || accountEditBlocked"
+            :aria-label="t('settings.account.readingPreferences.enableAchievements')"
+            class="shrink-0"
+            @update:model-value="handleAchievementsToggle"
+          />
+        </div>
+
+        <div class="hidden items-center justify-between gap-4 px-4 py-4 md:flex md:px-5 md:py-5">
+          <div class="flex min-w-0 max-w-2xl items-start gap-2.5">
+            <MapPin :size="16" class="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <div class="min-w-0">
+              <p class="settings-label">{{ t('settings.account.tour.title') }}</p>
+              <p class="settings-hint">{{ t('settings.account.tour.description') }}</p>
+            </div>
+          </div>
+          <button type="button" class="settings-btn-outline shrink-0" @click="resetTour">{{ t('settings.account.tour.action') }}</button>
+        </div>
       </div>
-      <button class="settings-btn-primary" :disabled="!timezoneChanged || savingTimezone" @click="saveTimezone">
-        <Save :size="14" />
-        {{ savingTimezone ? t('settings.account.profile.saving') : t('settings.account.readingPreferences.save') }}
-      </button>
     </section>
 
-    <section class="rounded-lg border border-border bg-card p-4 md:p-5 shadow-xs">
-      <div class="flex items-center justify-between gap-4 py-1.5">
-        <div class="min-w-0">
-          <div class="flex items-center gap-2">
-            <Trophy :size="16" class="text-muted-foreground shrink-0" />
-            <p class="text-sm font-semibold text-foreground">{{ t('settings.account.readingPreferences.enableAchievements') }}</p>
+    <section aria-labelledby="account-security-heading" class="space-y-3">
+      <h2 id="account-security-heading" class="settings-group-label mb-0">{{ t('settings.account.groups.security') }}</h2>
+
+      <div class="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+        <div class="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-5 md:py-5">
+          <div class="flex min-w-0 max-w-2xl items-start gap-2.5">
+            <KeyRound :size="16" class="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <div class="min-w-0">
+              <p class="settings-label">{{ t('settings.account.profile.changePassword') }}</p>
+              <p class="settings-hint">{{ passwordHint }}</p>
+            </div>
           </div>
-          <p class="mt-1 text-xs text-muted-foreground">
-            {{ t('settings.account.readingPreferences.enableAchievementsHint') }}
+          <button
+            type="button"
+            class="settings-btn-outline shrink-0 self-start md:self-auto"
+            :disabled="!canChangePassword || profileBusy"
+            @click="handleChangePassword"
+          >
+            {{ t('settings.account.profile.changePassword') }}
+          </button>
+        </div>
+
+        <div v-if="!oidcIdentityLoading" class="space-y-3 px-4 py-4 md:px-5 md:py-5">
+          <div class="flex min-w-0 max-w-2xl items-start gap-2.5">
+            <LinkIcon :size="16" class="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <div class="min-w-0">
+              <h3 class="settings-label">{{ t('settings.account.connectedAccounts.title') }}</h3>
+              <p class="settings-hint">{{ t('settings.account.connectedAccounts.description') }}</p>
+            </div>
+          </div>
+
+          <ul v-if="linkedIdentities.length > 0" class="space-y-2">
+            <li
+              v-for="identity in linkedIdentities"
+              :key="identity.id"
+              class="flex items-center gap-3 rounded-md border border-border bg-muted/30 px-3 py-2"
+            >
+              <img v-if="identity.providerIconUrl" :src="identity.providerIconUrl" alt="" class="size-5 shrink-0 rounded object-contain" />
+              <div class="min-w-0 flex-1">
+                <p class="settings-label truncate">{{ identity.providerName }}</p>
+                <p class="settings-hint truncate">{{ identity.oidcSubject }}</p>
+              </div>
+              <button
+                type="button"
+                :disabled="accountEditBlocked"
+                class="shrink-0 rounded-md border border-destructive/40 px-2 py-1 text-xs font-medium text-destructive transition-colors hover:bg-destructive/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                :aria-label="t('settings.account.connectedAccounts.unlinkAria', { provider: identity.providerName })"
+                @click="openUnlinkDialog(identity)"
+              >
+                {{ t('settings.account.connectedAccounts.unlink') }}
+              </button>
+            </li>
+          </ul>
+
+          <div v-if="availableForLinking().length > 0" class="space-y-2">
+            <p class="settings-hint">{{ t('settings.account.connectedAccounts.linkAdditional') }}</p>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="provider in availableForLinking()"
+                :key="provider.slug"
+                type="button"
+                :disabled="linkingSlug !== null || accountEditBlocked"
+                class="settings-btn-outline"
+                @click="initiateOidcLink(provider)"
+              >
+                <img v-if="provider.iconUrl" :src="provider.iconUrl" alt="" class="size-3 shrink-0 object-contain" />
+                <Link v-else :size="12" aria-hidden="true" />
+                {{
+                  linkingSlug === provider.slug
+                    ? t('settings.account.connectedAccounts.redirecting')
+                    : t('settings.account.connectedAccounts.linkProvider', { provider: provider.displayName })
+                }}
+              </button>
+            </div>
+          </div>
+
+          <p v-if="linkedIdentities.length === 0 && availableForLinking().length === 0" class="settings-hint">
+            {{ t('settings.account.connectedAccounts.noneConfigured') }}
           </p>
         </div>
-        <button
-          type="button"
-          role="switch"
-          :aria-checked="achievementsEnabled"
-          :disabled="savingAchievements || accountEditBlocked"
-          class="relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
-          :class="achievementsEnabled ? 'bg-primary' : 'bg-muted-foreground/30'"
-          @click="handleAchievementsToggle"
-        >
-          <span
-            class="pointer-events-none block h-4 w-4 rounded-full bg-white shadow-xs ring-0 transition-transform"
-            :class="achievementsEnabled ? 'translate-x-4' : 'translate-x-0'"
-          />
-        </button>
       </div>
-    </section>
-
-    <section class="rounded-lg border border-border bg-card p-4 md:p-5 space-y-4 shadow-xs">
-      <button class="md:hidden w-full flex items-center justify-between gap-2 text-left" @click="avatarCardOpen = !avatarCardOpen">
-        <div>
-          <p class="text-sm font-semibold text-foreground">{{ t('settings.account.avatar.title') }}</p>
-          <p class="text-xs text-muted-foreground truncate max-w-[17rem]">{{ user?.name ?? t('settings.account.avatar.unknownUser') }}</p>
-        </div>
-        <ChevronUp v-if="avatarCardOpen" :size="16" class="text-muted-foreground shrink-0" />
-        <ChevronDown v-else :size="16" class="text-muted-foreground shrink-0" />
-      </button>
-
-      <div v-show="avatarCardOpen || !isMobile" class="space-y-4">
-        <div class="flex items-center gap-4">
-          <UserAvatar :name="user?.name ?? null" :avatar-url="user?.avatarUrl ?? null" size-class="h-20 w-20" text-class="text-xl font-semibold" />
-          <div class="min-w-0">
-            <p class="text-sm font-medium text-foreground truncate">{{ user?.name ?? t('settings.account.avatar.unknownUser') }}</p>
-            <p class="text-xs text-muted-foreground truncate">{{ user?.username ?? '' }}</p>
-            <p class="mt-1 text-xs text-muted-foreground">
-              {{ t('settings.account.avatar.formatHint', { size: Math.floor(MAX_PROFILE_AVATAR_BYTES / 1024 / 1024) }) }}
-            </p>
-          </div>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2">
-          <input ref="fileInput" type="file" accept="image/*" class="hidden" :disabled="profileBusy || accountEditBlocked" @change="onFileSelected" />
-
-          <button class="settings-btn-primary" :disabled="profileBusy || accountEditBlocked" @click="triggerFileDialog">
-            <Upload :size="14" />
-            {{
-              uploading
-                ? t('settings.account.avatar.uploading')
-                : hasAvatar
-                  ? t('settings.account.avatar.replace')
-                  : t('settings.account.avatar.upload')
-            }}
-          </button>
-
-          <button
-            class="settings-btn-outline inline-flex items-center gap-2"
-            :disabled="profileBusy || !hasAvatar || accountEditBlocked"
-            @click="removeAvatarConfirmOpen = true"
-          >
-            <Trash2 :size="14" />
-            {{ removing ? t('settings.account.avatar.removing') : t('settings.account.avatar.remove') }}
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <div class="md:hidden sticky bottom-2 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
-      <div class="flex items-center gap-2">
-        <button
-          class="settings-btn-primary flex-1 min-h-10 justify-center"
-          :disabled="!profileChanged || profileBusy || accountEditBlocked"
-          @click="saveProfile"
-        >
-          <Save :size="14" />
-          {{ savingProfile ? t('settings.account.profile.saving') : t('settings.account.profile.save') }}
-        </button>
-      </div>
-      <p v-if="saveFeedback" class="mt-1.5 text-xs" :class="profileError ? 'text-destructive' : 'text-muted-foreground'">
-        {{ saveFeedback }}
-      </p>
-    </div>
-  </div>
-
-  <!-- OIDC Identity section -->
-  <div v-if="!oidcIdentityLoading" class="mt-4">
-    <section class="rounded-lg border border-border bg-card p-4 md:p-5 space-y-3 shadow-xs">
-      <div class="flex items-center gap-2">
-        <LinkIcon class="h-4 w-4 text-muted-foreground shrink-0" />
-        <h2 class="text-sm font-semibold text-foreground">{{ t('settings.account.connectedAccounts.title') }}</h2>
-      </div>
-
-      <!-- Linked identities -->
-      <div v-if="linkedIdentities.length > 0" class="space-y-2">
-        <div
-          v-for="identity in linkedIdentities"
-          :key="identity.id"
-          class="flex items-center gap-3 rounded-md border border-border bg-muted/30 px-3 py-2"
-        >
-          <img v-if="identity.providerIconUrl" :src="identity.providerIconUrl" alt="" class="h-5 w-5 shrink-0 rounded object-contain" />
-          <div class="min-w-0 flex-1">
-            <p class="text-sm font-medium text-foreground truncate">{{ identity.providerName }}</p>
-            <p class="text-xs text-muted-foreground truncate">{{ identity.oidcSubject }}</p>
-          </div>
-          <button
-            type="button"
-            :disabled="accountEditBlocked"
-            class="shrink-0 rounded-md border border-destructive/40 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            @click="openUnlinkDialog(identity)"
-          >
-            {{ t('settings.account.connectedAccounts.unlink') }}
-          </button>
-        </div>
-      </div>
-
-      <!-- Link new provider -->
-      <div v-if="availableForLinking().length > 0" class="space-y-2">
-        <p class="text-xs text-muted-foreground">{{ t('settings.account.connectedAccounts.linkAdditional') }}</p>
-        <div class="flex flex-wrap gap-2">
-          <button
-            v-for="provider in availableForLinking()"
-            :key="provider.slug"
-            type="button"
-            :disabled="linkingSlug !== null || accountEditBlocked"
-            class="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50 transition-colors"
-            @click="initiateOidcLink(provider)"
-          >
-            <img v-if="provider.iconUrl" :src="provider.iconUrl" alt="" class="h-3 w-3 shrink-0 object-contain" />
-            <Link class="h-3 w-3" />
-            {{
-              linkingSlug === provider.slug
-                ? t('settings.account.connectedAccounts.redirecting')
-                : t('settings.account.connectedAccounts.linkProvider', { provider: provider.displayName })
-            }}
-          </button>
-        </div>
-      </div>
-
-      <p v-if="linkedIdentities.length === 0 && availableForLinking().length === 0" class="text-sm text-muted-foreground">
-        {{ t('settings.account.connectedAccounts.noneConfigured') }}
-      </p>
     </section>
   </div>
 
   <div
-    v-if="removeAvatarConfirmOpen"
-    class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4"
-    @click.self="removeAvatarConfirmOpen = false"
+    v-if="profileChanged"
+    class="sticky bottom-2 z-20 mt-4 flex items-center justify-between gap-3 rounded-lg border border-border bg-card/95 px-3 py-2 shadow-lg backdrop-blur"
   >
-    <button class="absolute inset-0 bg-black/45" @click="removeAvatarConfirmOpen = false" />
-    <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
-      <p class="text-base font-semibold text-foreground">{{ t('settings.account.avatar.removeConfirm.title') }}</p>
-      <p class="mt-1 text-sm text-muted-foreground">{{ t('settings.account.avatar.removeConfirm.description') }}</p>
-      <div class="mt-4 flex items-center justify-end gap-2">
-        <button
-          class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-          @click="removeAvatarConfirmOpen = false"
-        >
-          {{ t('common.cancel') }}
-        </button>
-        <button
-          :disabled="accountEditBlocked"
-          class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 disabled:cursor-not-allowed"
-          @click="onRemoveAvatar"
-        >
-          {{ t('settings.account.avatar.removeConfirm.confirm') }}
-        </button>
-      </div>
+    <p role="status" class="settings-hint mt-0">{{ t('settings.account.feedback.unsavedChanges') }}</p>
+    <div class="flex shrink-0 items-center gap-2">
+      <button type="button" class="settings-btn-outline" :disabled="profileBusy" @click="discardProfileChanges">
+        {{ t('settings.account.feedback.discard') }}
+      </button>
+      <button type="button" class="settings-btn-primary" :disabled="profileBusy || accountEditBlocked" @click="saveProfile">
+        <Save :size="14" aria-hidden="true" />
+        {{ savingProfile ? t('settings.account.profile.saving') : t('settings.account.profile.save') }}
+      </button>
     </div>
   </div>
 
-  <!-- Guided Tour (desktop only) -->
-  <div class="hidden md:block mt-4">
-    <section class="rounded-lg border border-border bg-card p-4 md:p-5 shadow-xs">
-      <div class="flex items-center justify-between gap-4">
-        <div class="flex items-center gap-2">
-          <MapPin class="h-4 w-4 text-muted-foreground shrink-0" />
-          <div>
-            <p class="text-sm font-semibold text-foreground">{{ t('settings.account.tour.title') }}</p>
-            <p class="text-xs text-muted-foreground mt-0.5">{{ t('settings.account.tour.description') }}</p>
-          </div>
-        </div>
-        <button class="settings-btn-outline shrink-0" @click="resetTour">{{ t('settings.account.tour.action') }}</button>
-      </div>
-    </section>
-  </div>
+  <ConfirmDialog
+    :open="removeAvatarConfirmOpen"
+    :title="t('settings.account.avatar.removeConfirm.title')"
+    :description="t('settings.account.avatar.removeConfirm.description')"
+    :confirm-label="t('settings.account.avatar.removeConfirm.confirm')"
+    :busy="removing"
+    :confirm-disabled="accountEditBlocked"
+    @confirm="onRemoveAvatar"
+    @cancel="closeRemoveAvatarDialog"
+  />
 
-  <!-- Unlink OIDC identity confirmation dialog -->
-  <div v-if="unlinkDialogOpen" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="closeUnlinkDialog">
-    <button class="absolute inset-0 bg-black/45" @click="closeUnlinkDialog" />
-    <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
-      <p class="text-base font-semibold text-foreground">
-        {{ t('settings.account.connectedAccounts.unlinkDialog.title', { provider: unlinkTarget?.providerName ?? 'OIDC' }) }}
-      </p>
-      <p class="mt-1 text-sm text-muted-foreground">{{ t('settings.account.connectedAccounts.unlinkDialog.description') }}</p>
-      <input
-        v-model="unlinkPassword"
-        type="password"
-        :placeholder="t('settings.account.connectedAccounts.unlinkDialog.currentPassword')"
-        autocomplete="current-password"
-        class="input-field mt-3 w-full"
-      />
-      <div class="mt-4 flex items-center justify-end gap-2">
-        <button class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors" @click="closeUnlinkDialog">
-          {{ t('common.cancel') }}
-        </button>
-        <button
-          :disabled="unlinking || !unlinkPassword || accountEditBlocked"
-          class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
-          @click="confirmUnlink"
-        >
-          {{ unlinking ? t('settings.account.connectedAccounts.unlinking') : t('settings.account.connectedAccounts.unlink') }}
-        </button>
-      </div>
+  <ConfirmDialog
+    :open="unlinkDialogOpen"
+    :title="t('settings.account.connectedAccounts.unlinkDialog.title', { provider: unlinkTarget?.providerName ?? 'OIDC' })"
+    :description="t('settings.account.connectedAccounts.unlinkDialog.description')"
+    :confirm-label="unlinking ? t('settings.account.connectedAccounts.unlinking') : t('settings.account.connectedAccounts.unlink')"
+    :busy="unlinking"
+    :confirm-disabled="!unlinkPassword || accountEditBlocked"
+    @confirm="confirmUnlink"
+    @cancel="closeUnlinkDialog"
+  >
+    <div class="mt-3 space-y-1.5">
+      <label for="account-unlink-password" class="settings-label">
+        {{ t('settings.account.connectedAccounts.unlinkDialog.currentPassword') }}
+      </label>
+      <input id="account-unlink-password" v-model="unlinkPassword" type="password" autocomplete="current-password" class="input-field w-full" />
     </div>
-  </div>
+  </ConfirmDialog>
 </template>

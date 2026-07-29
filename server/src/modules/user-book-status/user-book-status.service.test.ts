@@ -35,6 +35,10 @@ const mockRepo = {
 const mockAchievementEvents = {
   emit: vi.fn(),
 };
+const mockKoboProjection = {
+  isEnabled: vi.fn<(...args: [number]) => Promise<boolean>>(),
+  project: vi.fn<(...args: [number, number[], ReadStatus]) => Promise<number[]>>(),
+};
 
 let service: UserBookStatusService;
 
@@ -45,7 +49,9 @@ beforeEach(() => {
   mockRepo.upsert.mockResolvedValue(undefined);
   mockRepo.upsertState.mockResolvedValue(undefined);
   mockRepo.findSessionBoundariesForBook.mockResolvedValue({ firstStartedAt: null, lastEndedAt: null });
-  service = new UserBookStatusService(mockRepo as unknown as UserBookStatusRepository, mockAchievementEvents as never);
+  mockKoboProjection.isEnabled.mockResolvedValue(true);
+  mockKoboProjection.project.mockResolvedValue([]);
+  service = new UserBookStatusService(mockRepo as unknown as UserBookStatusRepository, mockAchievementEvents as never, mockKoboProjection as never);
 });
 
 describe('setManual', () => {
@@ -573,5 +579,133 @@ describe('findByBookIds', () => {
       updatedAt: updated1.toISOString(),
     });
     expect(result.get(20)?.status).toBe('read');
+  });
+});
+
+describe('kobo status projection', () => {
+  it('projects a manual status change so it reaches registered devices', async () => {
+    mockRepo.findOne.mockResolvedValue(makeRow({ bookId: 10, status: 'unread' }));
+
+    await service.setManual(1, 10, 'read');
+
+    expect(mockKoboProjection.isEnabled).toHaveBeenCalledWith(1);
+    expect(mockKoboProjection.project).toHaveBeenCalledWith(1, [10], 'read');
+  });
+
+  it('does not project when the status is unchanged', async () => {
+    mockRepo.findOne.mockResolvedValue(makeRow({ bookId: 10, status: 'read' }));
+
+    await service.setManual(1, 10, 'read');
+
+    expect(mockKoboProjection.project).not.toHaveBeenCalled();
+  });
+
+  it('does not project when only lifecycle dates change', async () => {
+    mockRepo.findOne.mockResolvedValue(makeRow({ bookId: 10, status: 'read' }));
+
+    await service.updateManual(1, 10, { finishedAt: new Date('2026-05-01T00:00:00.000Z') });
+
+    expect(mockKoboProjection.project).not.toHaveBeenCalled();
+  });
+
+  it('skips the projection write when two-way progress sync is disabled', async () => {
+    mockKoboProjection.isEnabled.mockResolvedValue(false);
+    mockRepo.findOne.mockResolvedValue(makeRow({ bookId: 10, status: 'unread' }));
+
+    await service.setManual(1, 10, 'read');
+
+    expect(mockKoboProjection.isEnabled).toHaveBeenCalledWith(1);
+    expect(mockKoboProjection.project).not.toHaveBeenCalled();
+  });
+
+  it('keeps the status change when the projection fails', async () => {
+    mockKoboProjection.project.mockRejectedValue(new Error('kobo unavailable'));
+    mockRepo.findOne.mockResolvedValue(makeRow({ bookId: 10, status: 'unread' }));
+
+    await expect(service.updateManual(1, 10, { status: 'read' })).resolves.toMatchObject({ status: 'read' });
+
+    expect(mockRepo.upsertState).toHaveBeenCalledOnce();
+    expect(mockAchievementEvents.emit).toHaveBeenCalledOnce();
+  });
+
+  it('never projects device-originated automatic status changes', async () => {
+    mockRepo.findOne.mockResolvedValue(makeRow({ bookId: 10, status: 'reading', source: 'auto' }));
+
+    await service.autoUpdate(1, 10, 100);
+
+    expect(mockKoboProjection.isEnabled).not.toHaveBeenCalled();
+    expect(mockKoboProjection.project).not.toHaveBeenCalled();
+  });
+
+  it('projects bulk changes in a single call covering only the books that changed', async () => {
+    mockRepo.findByBookIds.mockResolvedValue([makeRow({ bookId: 10, status: 'unread' }), makeRow({ bookId: 11, status: 'read' })]);
+
+    await service.bulkSetManual(1, [10, 11, 12], 'read');
+
+    expect(mockKoboProjection.isEnabled).toHaveBeenCalledTimes(1);
+    expect(mockKoboProjection.project).toHaveBeenCalledTimes(1);
+    expect(mockKoboProjection.project).toHaveBeenCalledWith(1, [10, 12], 'read');
+  });
+
+  it('does not project a bulk change when nothing changed', async () => {
+    mockRepo.findByBookIds.mockResolvedValue([makeRow({ bookId: 10, status: 'read' }), makeRow({ bookId: 11, status: 'read' })]);
+
+    await service.bulkSetManual(1, [10, 11], 'read');
+
+    expect(mockKoboProjection.isEnabled).not.toHaveBeenCalled();
+    expect(mockKoboProjection.project).not.toHaveBeenCalled();
+  });
+
+  describe('with reading attempts enabled', () => {
+    const mockAttempts = {
+      applyManualStatus: vi.fn(),
+    };
+    let attemptService: UserBookStatusService;
+
+    beforeEach(() => {
+      mockAttempts.applyManualStatus.mockReset();
+      attemptService = new UserBookStatusService(
+        mockRepo as unknown as UserBookStatusRepository,
+        mockAchievementEvents as never,
+        mockKoboProjection as never,
+        mockAttempts as never,
+      );
+    });
+
+    it('projects the status the attempt projection settled on, not the requested one', async () => {
+      mockRepo.findOne.mockResolvedValue(makeRow({ bookId: 10, status: 'read' }));
+      mockAttempts.applyManualStatus.mockResolvedValue({
+        status: 'rereading',
+        source: 'manual',
+        startedAt: null,
+        finishedAt: null,
+        updatedAt: '2026-05-01T00:00:00.000Z',
+      });
+
+      await attemptService.setManual(1, 10, 'reading');
+
+      expect(mockKoboProjection.project).toHaveBeenCalledWith(1, [10], 'rereading');
+    });
+
+    it('groups bulk projections by the resulting status', async () => {
+      mockRepo.findOne.mockImplementation((_userId: number, bookId: number) =>
+        Promise.resolve(makeRow({ bookId, status: bookId === 10 ? 'read' : 'unread' })),
+      );
+      mockAttempts.applyManualStatus.mockImplementation((_userId: number, bookId: number) =>
+        Promise.resolve({
+          status: bookId === 10 ? 'rereading' : 'reading',
+          source: 'manual',
+          startedAt: null,
+          finishedAt: null,
+          updatedAt: '2026-05-01T00:00:00.000Z',
+        }),
+      );
+
+      await attemptService.bulkSetManual(1, [10, 11], 'reading');
+
+      expect(mockKoboProjection.project).toHaveBeenCalledTimes(2);
+      expect(mockKoboProjection.project).toHaveBeenCalledWith(1, [10], 'rereading');
+      expect(mockKoboProjection.project).toHaveBeenCalledWith(1, [11], 'reading');
+    });
   });
 });

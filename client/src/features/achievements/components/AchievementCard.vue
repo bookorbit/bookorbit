@@ -60,7 +60,7 @@ const cardClasses = computed<string>(() => {
     return `border-2 cursor-pointer shadow-sm ${earnedRarityClasses[props.achievement.rarity]}`
   }
 
-  return `border border-dashed cursor-pointer grayscale text-muted-foreground/75 dark:text-muted-foreground/65 bg-card/60 dark:bg-card/45 ${lockedRarityClasses[props.achievement.rarity]}`
+  return `border border-dashed cursor-pointer grayscale text-muted-foreground dark:text-muted-foreground bg-card/60 dark:bg-card/45 ${lockedRarityClasses[props.achievement.rarity]}`
 })
 
 const isLocked = computed<boolean>(() => !props.achievement.earned && !isHiddenAndLocked.value)

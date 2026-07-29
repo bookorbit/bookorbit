@@ -267,7 +267,7 @@ async function removeIcon(icon: CustomIcon) {
 async function deleteSelected() {
   if (bulkDeleting.value || selected.value.size === 0) return
   const slugs = [...selected.value]
-  if (!window.confirm(t('settings.appearance.icons.confirm.deleteMany', { count: slugs.length }, slugs.length))) return
+  if (!window.confirm(t('settings.appearance.icons.confirm.deleteMany', { count: slugs.length }))) return
   bulkDeleting.value = true
   try {
     const result = await bulkDeleteCustomIcons(slugs)
@@ -275,7 +275,7 @@ async function deleteSelected() {
     expandedSlug.value = null
     if (result.failed.length > 0)
       toast.warning(t('settings.appearance.icons.toasts.bulkDeletePartial', { deleted: result.deleted.length, failed: result.failed.length }))
-    else toast.success(t('settings.appearance.icons.toasts.bulkDeleted', { count: result.deleted.length }, result.deleted.length))
+    else toast.success(t('settings.appearance.icons.toasts.bulkDeleted', { count: result.deleted.length }))
     await loadPage()
   } catch (err) {
     toast.error(err instanceof Error ? err.message : t('settings.appearance.icons.errors.bulkDelete'))
@@ -290,9 +290,9 @@ function handleUploaded() {
 
 function usageSummary(usage: CustomIconUsage): string {
   const parts: string[] = []
-  if (usage.libraries) parts.push(t('settings.appearance.icons.usage.libraries', { count: usage.libraries }, usage.libraries))
-  if (usage.collections) parts.push(t('settings.appearance.icons.usage.collections', { count: usage.collections }, usage.collections))
-  if (usage.smartScopes) parts.push(t('settings.appearance.icons.usage.smartScopes', { count: usage.smartScopes }, usage.smartScopes))
+  if (usage.libraries) parts.push(t('settings.appearance.icons.usage.libraries', { count: usage.libraries }))
+  if (usage.collections) parts.push(t('settings.appearance.icons.usage.collections', { count: usage.collections }))
+  if (usage.smartScopes) parts.push(t('settings.appearance.icons.usage.smartScopes', { count: usage.smartScopes }))
   return parts.join(', ')
 }
 </script>
@@ -310,7 +310,7 @@ function usageSummary(usage: CustomIconUsage): string {
         </Button>
         <div class="sm:text-right">
           <p class="settings-group-label mb-0">{{ t('settings.appearance.icons.title') }}</p>
-          <p class="text-xs text-muted-foreground">{{ t('settings.appearance.icons.uploadedCount', { count: total }, total) }}</p>
+          <p class="text-xs text-muted-foreground">{{ t('settings.appearance.icons.uploadedCount', { count: total }) }}</p>
         </div>
       </div>
 
@@ -321,7 +321,7 @@ function usageSummary(usage: CustomIconUsage): string {
             v-model="query"
             type="text"
             :placeholder="t('settings.appearance.icons.searchPlaceholder')"
-            class="w-full min-w-0 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
+            class="w-full min-w-0 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
           />
           <button v-if="query" type="button" class="shrink-0 text-muted-foreground hover:text-foreground" @click="clearQuery">
             <X :size="13" />
@@ -445,7 +445,7 @@ function usageSummary(usage: CustomIconUsage): string {
                         <template v-else-if="expandedUsage">
                           <template v-if="expandedUsage.total > 0">
                             {{ t('settings.appearance.icons.usedBy', { count: expandedUsage.total }) }}
-                            <span class="text-muted-foreground/70">({{ usageSummary(expandedUsage) }})</span>
+                            <span class="text-muted-foreground">({{ usageSummary(expandedUsage) }})</span>
                           </template>
                           <template v-else>{{ t('settings.appearance.icons.notUsedYet') }}</template>
                         </template>

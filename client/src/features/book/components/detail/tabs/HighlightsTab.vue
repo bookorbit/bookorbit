@@ -48,10 +48,10 @@ const hasChapterGroups = computed(() => {
 })
 
 const summaryTexts = computed(() => {
-  const texts = [t('book.detail.highlights.summary.highlights', { count: hl.total.value }, hl.total.value)]
+  const texts = [t('book.detail.highlights.summary.highlights', { count: hl.total.value })]
   if (hl.stats.value) {
-    texts.push(t('book.detail.highlights.summary.notes', { count: hl.stats.value.highlightsWithNotes }, hl.stats.value.highlightsWithNotes))
-    texts.push(t('book.detail.highlights.summary.chapters', { count: hl.stats.value.chaptersWithHighlights }, hl.stats.value.chaptersWithHighlights))
+    texts.push(t('book.detail.highlights.summary.notes', { count: hl.stats.value.highlightsWithNotes }))
+    texts.push(t('book.detail.highlights.summary.chapters', { count: hl.stats.value.chaptersWithHighlights }))
   }
   return texts
 })
@@ -168,7 +168,7 @@ async function handleBulkTrash() {
     <div class="transition-opacity" :class="{ 'opacity-50 pointer-events-none': hl.loading.value && hl.items.value.length > 0 }">
       <div v-if="hl.items.value.length === 0 && !hl.loading.value" class="flex flex-col items-center justify-center py-16 gap-3">
         <div class="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-          <Highlighter :size="20" class="text-muted-foreground/60" />
+          <Highlighter :size="20" class="text-muted-foreground" />
         </div>
         <template v-if="hl.hasActiveFilters.value">
           <p class="text-sm text-muted-foreground">{{ t('book.detail.highlights.empty.noMatch') }}</p>
@@ -183,7 +183,7 @@ async function handleBulkTrash() {
         </template>
         <template v-else>
           <p class="text-sm text-muted-foreground">{{ t('book.detail.highlights.empty.none') }}</p>
-          <p class="text-xs text-muted-foreground/70">{{ t('book.detail.highlights.empty.hint') }}</p>
+          <p class="text-xs text-muted-foreground">{{ t('book.detail.highlights.empty.hint') }}</p>
         </template>
       </div>
 

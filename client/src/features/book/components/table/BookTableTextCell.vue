@@ -227,7 +227,7 @@ function handleClick() {
         class="block min-h-[20px] min-w-0 truncate rounded px-1 text-sm transition-[padding-right] duration-150"
         :class="[
           isReadOnly ? 'text-foreground' : 'cursor-pointer hover:bg-primary/5',
-          value ? 'text-foreground' : 'text-muted-foreground/40',
+          value ? 'text-foreground' : 'text-muted-foreground',
           openLink ? 'pr-1 group-hover/text-cell:pr-6 group-focus-within/text-cell:pr-6' : 'pr-1',
         ]"
         :title="value ?? ''"

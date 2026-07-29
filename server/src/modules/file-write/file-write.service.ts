@@ -1,15 +1,27 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { readdir, readFile } from 'fs/promises';
+import { readdir, readFile, stat } from 'fs/promises';
 import { basename, extname, join } from 'path';
 
 import type { BookFileWriteDisabledReason, BookFileWriteField, BookFileWriteStatus, BookFormat, WriteResult } from '@bookorbit/types';
 import { BOOK_FORMATS, getBookFileWriteFormatFields, isAudioFormat, NotificationType } from '@bookorbit/types';
 import { bookCoverDirPath, findPreferredBookCoverFileName } from '../../common/book-cover-storage';
+import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { NotificationService } from '../notification/notification.service';
 import { computeFileHash } from '../scanner/lib/hash';
-import { AUDIO_WRITE_FORMATS, FORMAT_CB7, FORMAT_CBZ, FORMAT_EPUB, FORMAT_PDF, createBookWriteFieldMask } from './file-write.constants';
+import {
+  AUDIO_WRITE_FORMATS,
+  FORMAT_AZW,
+  FORMAT_AZW3,
+  FORMAT_CB7,
+  FORMAT_CBZ,
+  FORMAT_EPUB,
+  FORMAT_FB2,
+  FORMAT_MOBI,
+  FORMAT_PDF,
+  createBookWriteFieldMask,
+} from './file-write.constants';
 import { FileLockService, bookOperationLockKey } from './file-lock.service';
 import { FileWriteRepository } from './file-write.repository';
 import { FormatWriterRegistry } from './format-writer.registry';
@@ -22,6 +34,8 @@ const FILE_WRITE_COVER_EVENT = 'file_write.cover_load';
 const UNKNOWN_FORMAT = 'unknown';
 const DEFAULT_WRITE_DEBOUNCE_MS = 3_000;
 const DEFAULT_MAX_CONCURRENT_WRITES = 2;
+const FILE_STATE_REFRESH_ATTEMPTS = 3;
+const FILE_STATE_REFRESH_RETRY_MS = 50;
 const BOOK_FORMAT_SET = new Set<string>(BOOK_FORMATS);
 
 type FileWriteTarget = {
@@ -54,6 +68,7 @@ export class FileWriteService implements OnModuleDestroy {
     private readonly lockService: FileLockService,
     private readonly config: ConfigService,
     private readonly notificationService: NotificationService,
+    private readonly selfWriteRegistry: SelfWriteRegistry,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
     this.debounceMs = resolvePositiveInteger(this.config.get('fileWrite.debounceMs'), DEFAULT_WRITE_DEBOUNCE_MS);
@@ -204,22 +219,28 @@ export class FileWriteService implements OnModuleDestroy {
 
       const audioWriteContexts = this.resolveAudioWriteContexts(targets);
       const targetResults: WriteResult[] = [];
-      for (const target of targets) {
-        const result = await this.writeTarget(
-          bookId,
-          target,
-          payload,
-          libConfig,
-          {
-            triggeredBy,
-            userId,
-            dryRun,
-            suppressNotification,
-            startedAt,
-          },
-          audioWriteContexts.get(target.id),
-        );
-        targetResults.push(result);
+      const suppressPaths = dryRun ? [] : targets.map((target) => target.absolutePath);
+      this.selfWriteRegistry.begin(suppressPaths);
+      try {
+        for (const target of targets) {
+          const result = await this.writeTarget(
+            bookId,
+            target,
+            payload,
+            libConfig,
+            {
+              triggeredBy,
+              userId,
+              dryRun,
+              suppressNotification,
+              startedAt,
+            },
+            audioWriteContexts.get(target.id),
+          );
+          targetResults.push(result);
+        }
+      } finally {
+        this.selfWriteRegistry.end(suppressPaths);
       }
 
       const result = aggregateWriteResults(targetResults, Date.now() - startedAt);
@@ -341,28 +362,45 @@ export class FileWriteService implements OnModuleDestroy {
       result = { status: 'failed', fieldsWritten: [], durationMs: 0, reason };
       this.logWriteFail(bookId, format, triggeredBy, userId, dryRun, startedAt, error);
       await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result, triggeredBy });
-
-      if (userId && triggeredBy === 'sync' && !suppressNotification) {
-        this.notificationService
-          .notify({
-            type: NotificationType.FileWriteBackFailed,
-            title: 'File write-back failed',
-            message: reason.slice(0, 200),
-            scope: { kind: 'user', userId },
-            meta: { bookId },
-          })
-          .catch(() => {});
-      }
-
+      this.notifyTargetWriteFailure(bookId, reason, triggeredBy, userId, suppressNotification);
       return result;
     }
 
-    await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result, triggeredBy });
     if (result.status === 'success') {
-      await this.updateTargetHash(bookId, file);
+      const stateRefreshed = await this.updateTargetFileState(bookId, file);
+      if (!stateRefreshed) {
+        const reason = 'post-write file state refresh failed';
+        result = {
+          status: 'failed',
+          fieldsWritten: result.fieldsWritten,
+          durationMs: Date.now() - startedAt,
+          reason,
+        };
+        this.notifyTargetWriteFailure(bookId, reason, triggeredBy, userId, suppressNotification);
+      }
     }
+    await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result, triggeredBy });
 
     return result;
+  }
+
+  private notifyTargetWriteFailure(
+    bookId: number,
+    reason: string,
+    triggeredBy: 'auto' | 'sync',
+    userId: number | undefined,
+    suppressNotification: boolean,
+  ): void {
+    if (!userId || triggeredBy !== 'sync' || suppressNotification) return;
+    this.notificationService
+      .notify({
+        type: NotificationType.FileWriteBackFailed,
+        title: 'File write-back failed',
+        message: reason.slice(0, 200),
+        scope: { kind: 'user', userId },
+        meta: { bookId },
+      })
+      .catch(() => {});
   }
 
   private resolveAudioWriteContexts(targets: FileWriteTarget[]): AudioWriteContextByFileId {
@@ -423,16 +461,37 @@ export class FileWriteService implements OnModuleDestroy {
     await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result, triggeredBy });
   }
 
-  private async updateTargetHash(bookId: number, file: FileWriteTarget): Promise<void> {
+  private async updateTargetFileState(bookId: number, file: FileWriteTarget): Promise<boolean> {
     const newHash = await computeFileHash(file.absolutePath).catch((err: unknown) => {
       this.logger.warn(
         `[file_write.hash_update] [fail] bookId=${bookId} bookFileId=${file.id} errorClass=${err instanceof Error ? err.constructor.name : 'Unknown'} error="${sanitizeErrorMessage(err instanceof Error ? err.message : String(err))}" - post-write hash recompute failed`,
       );
       return null;
     });
-    if (newHash) {
-      await this.fileWriteRepo.updateFileHash(file.id, newHash);
+
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= FILE_STATE_REFRESH_ATTEMPTS; attempt++) {
+      try {
+        const stats = await stat(file.absolutePath, { bigint: true });
+        await this.fileWriteRepo.updateFileStat(file.id, {
+          ...(newHash ? { fileHash: newHash } : {}),
+          mtime: stats.mtime,
+          sizeBytes: Number(stats.size),
+          ino: stats.ino,
+        });
+        return true;
+      } catch (err) {
+        lastError = err;
+        if (attempt < FILE_STATE_REFRESH_ATTEMPTS) {
+          await new Promise((resolve) => setTimeout(resolve, FILE_STATE_REFRESH_RETRY_MS));
+        }
+      }
     }
+
+    this.logger.warn(
+      `[file_write.stat_update] [fail] bookId=${bookId} bookFileId=${file.id} attemptCount=${FILE_STATE_REFRESH_ATTEMPTS} errorClass=${lastError instanceof Error ? lastError.constructor.name : 'Unknown'} error="${sanitizeErrorMessage(lastError instanceof Error ? lastError.message : String(lastError))}" - post-write stat refresh failed`,
+    );
+    return false;
   }
 
   findNonMissingPrimaryFilesByLibrary(libraryId: number) {
@@ -521,10 +580,14 @@ type LibraryFileWriteConfig = {
   fileWriteWriteCover: boolean;
   fileWriteEpubEnabled: boolean;
   fileWriteEpubMaxFileSizeMb: number;
+  fileWriteFb2Enabled: boolean;
+  fileWriteFb2MaxFileSizeMb: number;
   fileWritePdfEnabled: boolean;
   fileWritePdfMaxFileSizeMb: number;
   fileWriteCbxEnabled: boolean;
   fileWriteCbxMaxFileSizeMb: number;
+  fileWriteKindleEnabled: boolean;
+  fileWriteKindleMaxFileSizeMb: number;
   fileWriteAudioEnabled: boolean;
   fileWriteAudioMaxFileSizeMb: number;
 };
@@ -533,11 +596,17 @@ function resolveFormatSettings(config: LibraryFileWriteConfig, format: string): 
   switch (format) {
     case FORMAT_EPUB:
       return { enabled: config.fileWriteEpubEnabled, maxFileSizeBytes: config.fileWriteEpubMaxFileSizeMb * 1024 * 1024 };
+    case FORMAT_FB2:
+      return { enabled: config.fileWriteFb2Enabled, maxFileSizeBytes: config.fileWriteFb2MaxFileSizeMb * 1024 * 1024 };
     case FORMAT_PDF:
       return { enabled: config.fileWritePdfEnabled, maxFileSizeBytes: config.fileWritePdfMaxFileSizeMb * 1024 * 1024 };
     case FORMAT_CBZ:
     case FORMAT_CB7:
       return { enabled: config.fileWriteCbxEnabled, maxFileSizeBytes: config.fileWriteCbxMaxFileSizeMb * 1024 * 1024 };
+    case FORMAT_MOBI:
+    case FORMAT_AZW3:
+    case FORMAT_AZW:
+      return { enabled: config.fileWriteKindleEnabled, maxFileSizeBytes: config.fileWriteKindleMaxFileSizeMb * 1024 * 1024 };
     default:
       if (AUDIO_WRITE_FORMATS.includes(format as (typeof AUDIO_WRITE_FORMATS)[number])) {
         return { enabled: config.fileWriteAudioEnabled, maxFileSizeBytes: config.fileWriteAudioMaxFileSizeMb * 1024 * 1024 };
@@ -594,10 +663,14 @@ function isCompleteLibraryFileWriteConfig(config: FileWriteCapabilityLibraryConf
     typeof config.fileWriteWriteCover === 'boolean' &&
     typeof config.fileWriteEpubEnabled === 'boolean' &&
     typeof config.fileWriteEpubMaxFileSizeMb === 'number' &&
+    typeof config.fileWriteFb2Enabled === 'boolean' &&
+    typeof config.fileWriteFb2MaxFileSizeMb === 'number' &&
     typeof config.fileWritePdfEnabled === 'boolean' &&
     typeof config.fileWritePdfMaxFileSizeMb === 'number' &&
     typeof config.fileWriteCbxEnabled === 'boolean' &&
     typeof config.fileWriteCbxMaxFileSizeMb === 'number' &&
+    typeof config.fileWriteKindleEnabled === 'boolean' &&
+    typeof config.fileWriteKindleMaxFileSizeMb === 'number' &&
     typeof config.fileWriteAudioEnabled === 'boolean' &&
     typeof config.fileWriteAudioMaxFileSizeMb === 'number'
   );

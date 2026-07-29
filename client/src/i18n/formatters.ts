@@ -26,6 +26,15 @@ export function formatNumber(value: number, options: Intl.NumberFormatOptions = 
   return formatter.format(value)
 }
 
+/**
+ * Short form for counts in tight spots such as sidebar badges: 1000 becomes 1K, 1234 becomes 1.2K.
+ * Locales without a short thousands form (German) keep the grouped number, which is the correct
+ * rendering for them.
+ */
+export function formatCompactNumber(value: number): string {
+  return formatNumber(value, { notation: 'compact' })
+}
+
 export function formatDate(value: Date | number, options: Intl.DateTimeFormatOptions = {}): string {
   const locale = activeLocale()
   const key = formatterKey(locale, options)

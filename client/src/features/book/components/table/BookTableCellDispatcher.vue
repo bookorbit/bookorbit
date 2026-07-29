@@ -75,9 +75,9 @@ function asStringArray(v: unknown): string[] {
 }
 
 const lockStateClass = computed(() => {
-  if (props.isFullyLocked) return 'text-primary/90 hover:text-primary'
+  if (props.isFullyLocked) return 'text-primary hover:text-primary'
   if (props.lockedFieldCount > 0) return 'text-amber-600/90 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300'
-  return 'text-muted-foreground/70 hover:text-foreground'
+  return 'text-muted-foreground hover:text-foreground'
 })
 
 const primaryFile = computed(() => props.book.files.find((file) => file.role === 'primary') ?? props.book.files[0] ?? null)

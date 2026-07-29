@@ -162,7 +162,7 @@ function handlePrescan() {
             v-model="manualPath"
             type="text"
             :placeholder="t('library.creator.folders.pathPlaceholder')"
-            class="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm text-foreground placeholder:font-sans placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
+            class="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm text-foreground placeholder:font-sans placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             @input="clearManualError"
           />
           <div class="grid grid-cols-2 gap-2 sm:flex">

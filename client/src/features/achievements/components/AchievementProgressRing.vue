@@ -23,7 +23,7 @@ onMounted(() => {
 
 <template>
   <svg :width="ringSize" :height="ringSize" :viewBox="`0 0 ${ringSize} ${ringSize}`" class="-rotate-90" aria-hidden="true">
-    <circle :cx="ringSize / 2" :cy="ringSize / 2" :r="radius" fill="none" stroke="currentColor" stroke-width="2.5" class="text-muted-foreground/20" />
+    <circle :cx="ringSize / 2" :cy="ringSize / 2" :r="radius" fill="none" stroke="currentColor" stroke-width="2.5" class="text-border" />
     <circle
       :cx="ringSize / 2"
       :cy="ringSize / 2"

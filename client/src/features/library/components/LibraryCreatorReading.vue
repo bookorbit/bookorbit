@@ -29,7 +29,7 @@ function onFinishPercentInput(e: Event) {
     <!-- Reading start -->
     <div>
       <div class="flex items-center justify-between mb-1">
-        <label for="reading-threshold" class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">
+        <label for="reading-threshold" class="text-[11px] font-semibold uppercase tracking-widest text-foreground">
           {{ t('library.creator.reading.readingStart.title') }}
         </label>
         <output for="reading-threshold" class="text-sm font-medium text-foreground tabular-nums">{{ readingThreshold }}%</output>
@@ -57,7 +57,7 @@ function onFinishPercentInput(e: Event) {
     <!-- Mark as finished -->
     <div>
       <div class="flex items-center justify-between mb-1">
-        <label for="finished-threshold" class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">
+        <label for="finished-threshold" class="text-[11px] font-semibold uppercase tracking-widest text-foreground">
           {{ t('library.creator.reading.markAsFinished.title') }}
         </label>
         <output for="finished-threshold" class="text-sm font-medium text-foreground tabular-nums"> {{ markAsFinishedPercentComplete }}% </output>

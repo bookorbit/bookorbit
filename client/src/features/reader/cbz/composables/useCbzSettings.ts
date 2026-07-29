@@ -14,6 +14,7 @@ export function useCbzSettings() {
   const scrollMode = ref<ScrollMode>('paginated')
   const direction = ref<Direction>('ltr')
   const spreadAlignment = ref<SpreadAlignment>('normal')
+  const spreadGap = ref(0)
   const forceTwoPage = ref(false)
   const widePageSingletonMode = ref<WidePageSingletonMode>('auto')
   const bgColor = ref<BgColor>('black')
@@ -45,6 +46,7 @@ export function useCbzSettings() {
     scrollMode,
     direction,
     spreadAlignment,
+    spreadGap,
     forceTwoPage,
     widePageSingletonMode,
     bgColor,

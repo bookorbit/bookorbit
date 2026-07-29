@@ -119,7 +119,7 @@ const widgetSizeClass: Record<DashboardWidgetSize, string> = {
         <component :is="widgetComponents[widget.type]" :size="widgetLayout[widget.type].size" />
         <!-- Drag handle — visible on card hover -->
         <div
-          class="widget-drag-handle absolute right-2 top-2 flex h-6 w-6 cursor-grab items-center justify-center rounded-md text-muted-foreground/0 transition-all duration-150 hover:bg-background/80 hover:text-muted-foreground group-hover/card:text-muted-foreground/60 active:cursor-grabbing"
+          class="widget-drag-handle absolute right-2 top-2 flex h-6 w-6 cursor-grab items-center justify-center rounded-md text-muted-foreground opacity-0 transition-all duration-150 hover:bg-background/80 hover:opacity-100 group-hover/card:opacity-100 active:cursor-grabbing"
         >
           <GripVertical :size="14" />
         </div>

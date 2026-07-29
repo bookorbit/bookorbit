@@ -195,7 +195,7 @@ function emitBulkDiscard() {
         <input
           v-model="searchQuery"
           :placeholder="t('bookDock.searchPlaceholder')"
-          class="h-full w-32 sm:w-44 bg-transparent text-xs outline-none placeholder:text-muted-foreground/80"
+          class="h-full w-32 sm:w-44 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
           @input="onSearchInput"
         />
         <button data-testid="book-dock-search-clear" class="text-muted-foreground hover:text-foreground shrink-0" @click="clearSearch">

@@ -22,6 +22,15 @@ function outcomeForStatus(status: ReadStatus): ReadingAttemptOutcome | null {
   return null;
 }
 
+/**
+ * Closing an attempt on a date earlier than it started violates the reading_attempts range
+ * check. A device reporting a skewed clock can leave startedOn in the future, so the implied
+ * close date has to yield to it. Explicit caller dates are validated upstream and left alone.
+ */
+function notBeforeStart(endedOn: string, startedOn: string | null): string {
+  return startedOn && endedOn < startedOn ? startedOn : endedOn;
+}
+
 @Injectable()
 export class ReadingAttemptService {
   constructor(private readonly repo: ReadingAttemptRepository) {}
@@ -65,9 +74,10 @@ export class ReadingAttemptService {
         const outcome = outcomeForStatus(status);
         if (outcome) {
           if (active) {
+            const effectiveStartedOn = startedOn === undefined ? active.startedOn : startedOn;
             latest = await this.repo.update(tx, userId, bookId, active.id, {
               ...(startedOn !== undefined ? { startedOn } : {}),
-              endedOn: endedOn === undefined ? today : endedOn,
+              endedOn: endedOn === undefined ? notBeforeStart(today, effectiveStartedOn) : endedOn,
               outcome,
             });
             active = null;
@@ -76,14 +86,14 @@ export class ReadingAttemptService {
               userId,
               bookId,
               startedOn: startedOn ?? null,
-              endedOn: endedOn === undefined ? today : endedOn,
+              endedOn: endedOn === undefined ? notBeforeStart(today, startedOn ?? null) : endedOn,
               outcome,
               origin: 'manual',
             });
           }
         } else if (active) {
           latest = await this.repo.update(tx, userId, bookId, active.id, {
-            endedOn: endedOn === undefined ? today : endedOn,
+            endedOn: endedOn === undefined ? notBeforeStart(today, active.startedOn) : endedOn,
             outcome: 'abandoned',
           });
           active = null;
@@ -166,7 +176,7 @@ export class ReadingAttemptService {
       let status: ReadStatus;
       if (active && isFinished) {
         projectionTarget = await this.repo.update(tx, input.userId, input.bookId, active.id, {
-          endedOn: input.occurredOn,
+          endedOn: notBeforeStart(input.occurredOn, active.startedOn),
           outcome: 'completed',
         });
         status = 'read';

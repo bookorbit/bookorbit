@@ -11,6 +11,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 
@@ -23,6 +24,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { BookQueryPipe, JumpBucketsQueryPipe } from '../book/pipes/book-query.pipe';
 import { CreateSmartScopeDto } from './dto/create-smart-scope.dto';
 import { ReorderSmartScopesDto } from './dto/reorder-smart-scopes.dto';
+import { SetKoboSyncDto } from './dto/set-kobo-sync.dto';
 import { UpdateSmartScopeDto } from './dto/update-smart-scope.dto';
 import { SmartScopeService } from './smart-scope.service';
 
@@ -87,6 +89,17 @@ export class SmartScopeController {
   })
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateSmartScopeDto, @CurrentUser() user: RequestUser) {
     return this.smartScopeService.update(id, dto, user);
+  }
+
+  @Put(':id/kobo-sync')
+  @Auditable({
+    action: AuditAction.SmartScopeUpdate,
+    resource: AuditResource.SmartScope,
+    getResourceId: (req) => parseInt(req.params['id'] as string, 10),
+    description: (req) => `Updated Kobo sync for smartScope #${req.params['id']}`,
+  })
+  setKoboSync(@Param('id', ParseIntPipe) id: number, @Body() dto: SetKoboSyncDto, @CurrentUser() user: RequestUser) {
+    return this.smartScopeService.setKoboSync(id, user, dto.enabled);
   }
 
   @Delete(':id')

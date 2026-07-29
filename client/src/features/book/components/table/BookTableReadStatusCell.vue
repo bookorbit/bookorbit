@@ -71,7 +71,7 @@ function handleTab(e: KeyboardEvent) {
         >
           <component :is="CurrentIcon" :size="12" />
           <span class="truncate">{{ currentLabel }}</span>
-          <ChevronDown v-if="!isReadOnly" :size="10" class="ml-auto shrink-0 text-muted-foreground/50" />
+          <ChevronDown v-if="!isReadOnly" :size="10" class="ml-auto shrink-0 text-muted-foreground" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" class="min-w-[140px]" :trap-focus="false" @keydown.tab.prevent="handleTab">

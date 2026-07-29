@@ -234,7 +234,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'system',
             name: 'settings-system',
             component: () => import('@/features/settings/SystemAllSettings.vue'),
-            meta: { maxWidth: 'max-w-7xl', title: resolveSystemTitle },
+            meta: { maxWidth: 'max-w-[96rem]', title: resolveSystemTitle },
           },
           {
             path: 'admin/file-naming',
@@ -298,6 +298,24 @@ export const routes: RouteRecordRaw[] = [
         name: 'achievements',
         component: () => import('@/views/AchievementsView.vue'),
         meta: { title: () => t('titles.achievements') },
+      },
+      {
+        path: '/libraries',
+        name: 'libraries',
+        component: () => import('@/features/library/views/LibrariesView.vue'),
+        meta: { title: () => t('titles.libraries') },
+      },
+      {
+        path: '/smart-scopes',
+        name: 'smart-scopes',
+        component: () => import('@/features/smart-scope/views/SmartScopesView.vue'),
+        meta: { title: () => t('titles.smartScopes') },
+      },
+      {
+        path: '/collections',
+        name: 'collections',
+        component: () => import('@/features/collection/views/CollectionsView.vue'),
+        meta: { title: () => t('titles.collections') },
       },
       {
         path: '/library/:id',

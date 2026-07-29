@@ -186,7 +186,7 @@ describe('SendBookDialog', () => {
     const selectionPayload: BookSelectionPayload = { query: { libraryId: 5, q: 'dune', sort: [{ field: 'title', dir: 'asc' }] } }
     const wrapper = mountDialog({ open: true, selectionPayload, selectedCount: 1833 })
 
-    expect(wrapper.text()).toContain('1833 books')
+    expect(wrapper.text()).toContain('1,833 books')
 
     const recipientCheckbox = wrapper.find('input[type="checkbox"]')
     await recipientCheckbox.trigger('change')

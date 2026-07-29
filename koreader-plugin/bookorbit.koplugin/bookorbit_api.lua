@@ -14,7 +14,12 @@ local socketutil = require("socketutil")
 local logger = require("logger")
 local util = require("util")
 
+local TransferPolicy = require("bookorbit_transfer_policy")
+local TransferProgress = require("bookorbit_transfer_progress")
+
 local MAX_BODY_BYTES = 900 * 1024 -- stays under the server's 1 MiB body limit
+
+local MAX_DOWNLOAD_REDIRECTS = 5
 
 -- Plain empty Lua tables would encode as {} and fail the server's array
 -- validation; every empty table in our payloads is semantically an array.
@@ -45,6 +50,75 @@ local function decodeResponse(parts)
     return scrubNulls(decoded) or {}
 end
 
+local function encodeSubprocessResult(body, err, errbody)
+    local ok, encoded = pcall(rapidjson.encode, {
+        body = body,
+        err = err,
+        errbody = errbody,
+    })
+    if ok and type(encoded) == "string" and encoded ~= "" then
+        return encoded
+    end
+    return '{"err":"subprocess_result_encode_failed"}'
+end
+
+local function decodeSubprocessResult(encoded)
+    if type(encoded) ~= "string" or encoded == "" then
+        return nil, "subprocess_no_result"
+    end
+    local decoded = decodeResponse({ encoded })
+    if type(decoded) ~= "table" then
+        return nil, "subprocess_invalid_result"
+    end
+    return decoded
+end
+
+local function parseHttpUrl(value)
+    local scheme, authority = tostring(value or ""):match("^(https?)://([^/%?#]+)")
+    if not scheme or not authority or authority:find("@", 1, true) then return nil end
+
+    local host, port
+    if authority:sub(1, 1) == "[" then
+        host, port = authority:match("^(%b[]):?(%d*)$")
+    else
+        host, port = authority:match("^([^:]+):?(%d*)$")
+    end
+    if not host or host == "" then return nil end
+    port = port ~= "" and tonumber(port) or (scheme == "https" and 443 or 80)
+    if not port then return nil end
+    return {
+        scheme = scheme,
+        authority = authority,
+        host = host:lower(),
+        port = port,
+    }
+end
+
+local function absoluteUrl(base, location)
+    if location:match("^https?://") then return location end
+    local parsed = parseHttpUrl(base)
+    if not parsed then return nil end
+    if location:sub(1, 2) == "//" then
+        return parsed.scheme .. ":" .. location
+    end
+    local origin = parsed.scheme .. "://" .. parsed.authority
+    if location:sub(1, 1) == "/" then return origin .. location end
+    local directory = base:match("^(.*)/") or origin
+    return directory .. "/" .. location
+end
+
+local function forkSafeServerUrl(value)
+    local scheme, authority, suffix = tostring(value or ""):match("^(https?)://([^/%?#]+)(.*)$")
+    if scheme ~= "http" or not authority then return value end
+    local port = authority:lower():match("^localhost:(%d+)$")
+    if authority:lower() == "localhost" then
+        return "http://127.0.0.1" .. suffix
+    elseif port then
+        return "http://127.0.0.1:" .. port .. suffix
+    end
+    return value
+end
+
 local BookOrbitApi = {}
 BookOrbitApi.__index = BookOrbitApi
 BookOrbitApi.decodeResponse = decodeResponse
@@ -65,7 +139,7 @@ end
 
 function BookOrbitApi.new(opts)
     return setmetatable({
-        server_url = opts.server_url,
+        server_url = forkSafeServerUrl(opts.server_url),
         username = opts.username,
         userkey = opts.userkey,
         device_id = opts.device_id,
@@ -129,29 +203,64 @@ function BookOrbitApi:requestBlocking(method, path, body)
     return decoded or {}
 end
 
-function BookOrbitApi:request(method, path, body)
-    if not self.background_requests then
-        return self:requestBlocking(method, path, body)
-    end
-
+-- True when this call may fork its own background worker: the client is in
+-- background mode, a Trapper coroutine is driving us, and no enclosing
+-- runInSubprocess already owns a child for this work.
+function BookOrbitApi:canForkSubprocess()
+    if not self.background_requests then return false end
+    if (self.subprocess_depth or 0) > 0 then return false end
     local loaded, Trapper = pcall(require, "ui/trapper")
-    if not loaded or not Trapper:isWrapped() then
+    if not loaded or not Trapper:isWrapped() then return false end
+    return true
+end
+
+-- Owns exactly one background subprocess for the duration of fn. Calls that
+-- fn makes back into this client see a non-zero depth in the forked child and
+-- run inline, so a request is never wrapped by two nested workers.
+--
+-- fn must return (body, err, errbody); they are marshalled back through the
+-- subprocess. Returns completed, { body, err, errbody }; completed is false
+-- when the user dismissed the request.
+function BookOrbitApi:runInSubprocess(fn, trap_widget)
+    if not self:canForkSubprocess() then
+        local ok, body, err, errbody = pcall(fn)
+        if not ok then return true, { err = tostring(body) } end
+        return true, { body = body, err = err, errbody = errbody }
+    end
+
+    local Trapper = require("ui/trapper")
+    -- An unmounted widget lets Trapper poll without intercepting reader input.
+    local widget = trap_widget or {}
+    local completed, encoded = Trapper:dismissableRunInSubprocess(function()
+        self.subprocess_depth = (self.subprocess_depth or 0) + 1
+        local ok, body, err, errbody = pcall(fn)
+        self.subprocess_depth = self.subprocess_depth - 1
+        if not ok then
+            return encodeSubprocessResult(nil, tostring(body))
+        end
+        return encodeSubprocessResult(body, err, errbody)
+    end, widget, true)
+    if type(widget) == "table" then widget.dismiss_callback = nil end
+    if not completed then return false end
+    local result, decode_err = decodeSubprocessResult(encoded)
+    if not result then
+        return true, { err = decode_err }
+    end
+    return true, result
+end
+
+function BookOrbitApi:request(method, path, body)
+    if not self:canForkSubprocess() then
         return self:requestBlocking(method, path, body)
     end
 
-    -- An unmounted widget lets Trapper poll without intercepting reader input.
-    local trap_widget = {}
-    local completed, result = Trapper:dismissableRunInSubprocess(function()
-        local response, err, errbody = self:requestBlocking(method, path, body)
-        return { response = response, err = err, errbody = errbody }
-    end, trap_widget)
-    trap_widget.dismiss_callback = nil
+    local completed, result = self:runInSubprocess(function()
+        return self:requestBlocking(method, path, body)
+    end)
     if not completed then
         return nil, "background_request_interrupted"
     end
-
-    result = result or {}
-    return result.response, result.err, result.errbody
+    return result.body, result.err, result.errbody
 end
 
 function BookOrbitApi:query(path, params)
@@ -173,50 +282,170 @@ function BookOrbitApi:query(path, params)
     return path .. "?" .. table.concat(parts, "&")
 end
 
-function BookOrbitApi:download(path, local_path, accept, progress_cb)
-    local out, open_err = io.open(local_path, "w")
-    if not out then
-        return nil, tostring(open_err or "open_error")
+-- Downloads to a temporary file and publishes it with an atomic rename, so a
+-- timeout, an oversized body or a cancelled generation can never leave a
+-- half-written file where a complete one is expected.
+--
+-- opts: accept, progress_cb, progress_path, progress_generation, temp_path,
+-- max_bytes, expect_content_type, block_timeout, total_timeout, expected_bytes,
+-- publish. With publish = "parent" the complete temporary file is handed back
+-- instead of renamed, so a cancelled generation cannot be published by a child
+-- that was already finishing.
+function BookOrbitApi:downloadBlocking(path, local_path, opts)
+    opts = opts or {}
+    local temp_path = opts.temp_path or (local_path .. ".part")
+    local max_bytes = opts.max_bytes or TransferPolicy.maxBytes(opts.expected_bytes)
+    local progress_cb = opts.progress_cb
+    local progress_writer = opts.progress_path and TransferProgress.writer(opts.progress_path, {
+        generation = opts.progress_generation,
+        total = tonumber(opts.expected_bytes) or 0,
+    })
+    local current_url = self.server_url .. path
+    local origin = parseHttpUrl(current_url)
+    local total_received = 0
+
+    local function fail(out, err)
+        if out then pcall(function() out:close() end) end
+        util.removeFile(temp_path)
+        return nil, err
     end
 
-    local file_sink = ltn12.sink.file(out)
-    local sink = file_sink
-    if progress_cb then
+    local function sameOriginRedirect(location)
+        if type(location) ~= "string" or location == "" then return nil end
+        local resolved = absoluteUrl(current_url, location:gsub("%s", ""))
+        local parsed = parseHttpUrl(resolved)
+        if not origin or not parsed
+                or parsed.scheme ~= origin.scheme
+                or parsed.host ~= origin.host
+                or parsed.port ~= origin.port then
+            return nil
+        end
+        return resolved
+    end
+
+    for redirect_count = 0, MAX_DOWNLOAD_REDIRECTS do
+        local out, open_err = io.open(temp_path, "w")
+        if not out then
+            return nil, tostring(open_err or "open_error")
+        end
+
         local received = 0
-        sink = function(chunk, err)
+        local too_large = false
+        local file_sink = ltn12.sink.file(out)
+        local sink = function(chunk, err)
             if chunk and chunk ~= "" then
                 received = received + #chunk
-                progress_cb(received)
+                total_received = total_received + #chunk
+                if received > max_bytes or total_received > max_bytes then
+                    too_large = true
+                    return nil, "response_too_large"
+                end
+                if progress_cb then progress_cb(received) end
+                if progress_writer then progress_writer(received, false) end
             end
             return file_sink(chunk, err)
         end
+
+        local request = {
+            url = current_url,
+            method = "GET",
+            sink = sink,
+            redirect = false,
+            headers = {
+                ["accept"] = opts.accept or "application/octet-stream",
+                ["Accept-Encoding"] = "identity",
+                ["x-auth-user"] = self.username,
+                ["x-auth-key"] = self.userkey,
+            },
+        }
+
+        socketutil:set_timeout(
+            opts.block_timeout or socketutil.FILE_BLOCK_TIMEOUT,
+            opts.total_timeout or socketutil.FILE_TOTAL_TIMEOUT)
+        local code, headers, status = socket.skip(1, http.request(request))
+        socketutil:reset_timeout()
+
+        if too_large then return fail(out, "response_too_large") end
+        if type(code) ~= "number" then
+            return fail(out, tostring(status or code or "network_error"))
+        end
+
+        if code == 301 or code == 302 or code == 303 or code == 307 or code == 308 then
+            pcall(function() out:close() end)
+            util.removeFile(temp_path)
+            if redirect_count >= MAX_DOWNLOAD_REDIRECTS then
+                return nil, "too_many_redirects"
+            end
+            local location = headers and (headers.location or headers.Location)
+            local redirected = sameOriginRedirect(location)
+            if not redirected then return nil, "unsafe_redirect" end
+            current_url = redirected
+        else
+            if code ~= 200 then return fail(out, code) end
+            if received == 0 then return fail(out, "empty_response") end
+
+            local expected_type = opts.expect_content_type
+            if expected_type then
+                local content_type = headers and (headers["content-type"] or headers["Content-Type"])
+                local media_type = content_type and tostring(content_type):lower():match("^%s*([^;]+)")
+                if not media_type or media_type:sub(1, #expected_type) ~= expected_type then
+                    return fail(out, "unexpected_content_type")
+                end
+            end
+
+            if progress_writer then progress_writer(received, true) end
+
+            -- The parent owns publishing for user-cancellable transfers: a
+            -- dismissed subprocess cannot be stopped once it starts renaming,
+            -- which is harmless for a cover but wrong for a cancelled book.
+            if opts.publish == "parent" then
+                local result = { temp_path = temp_path, bytes = received }
+                -- Hashing here keeps the digest off the UI thread and lets the
+                -- caller compare it to the manifest without a match request.
+                if opts.hash == "partial_md5" then
+                    local hashed, digest = pcall(util.partialMD5, temp_path)
+                    result.hash = hashed and digest or nil
+                end
+                return result
+            end
+            if temp_path == local_path then return true end
+            local renamed, rename_err = os.rename(temp_path, local_path)
+            if not renamed then
+                return fail(out, tostring(rename_err or "publish_failed"))
+            end
+            return true
+        end
     end
 
-    local request = {
-        url = self.server_url .. path,
-        method = "GET",
-        sink = sink,
-        headers = {
-            ["accept"] = accept or "application/octet-stream",
-            ["Accept-Encoding"] = "identity",
-            ["x-auth-user"] = self.username,
-            ["x-auth-key"] = self.userkey,
-        },
-    }
+    return nil, "too_many_redirects"
+end
 
-    socketutil:set_timeout(socketutil.FILE_BLOCK_TIMEOUT, socketutil.FILE_TOTAL_TIMEOUT)
-    local code, _, status = socket.skip(1, http.request(request))
-    socketutil:reset_timeout()
-
-    if code == 200 then
-        return true
+-- Runs the transfer in a background subprocess when this client owns no worker
+-- yet. A forked child cannot reach the parent's UI, so live byte progress
+-- travels through the snapshot file named by opts.progress_path; only a caller
+-- that has nothing but an in-process progress_cb stays blocking.
+function BookOrbitApi:download(path, local_path, opts)
+    opts = opts or {}
+    local blocking = opts.background == false
+        or (opts.progress_cb ~= nil and opts.progress_path == nil)
+        or not self:canForkSubprocess()
+    if blocking then
+        return self:downloadBlocking(path, local_path, opts)
     end
 
-    util.removeFile(local_path)
-    if type(code) ~= "number" then
-        return nil, tostring(status or code or "network_error")
+    -- A child's progress_cb would touch parent-only UI state from the forked
+    -- process; the snapshot file is the only channel back.
+    local child_opts = {}
+    for key, value in pairs(opts) do child_opts[key] = value end
+    child_opts.progress_cb = nil
+
+    local completed, result = self:runInSubprocess(function()
+        return self:downloadBlocking(path, local_path, child_opts)
+    end, opts.trap_widget)
+    if not completed then
+        return nil, "cancelled"
     end
-    return nil, code
+    return result.body, result.err
 end
 
 function BookOrbitApi:withDevice(body)
@@ -288,6 +517,14 @@ function BookOrbitApi:exchangeAck(books)
     return self:request("POST", "/koreader/plugin/annotations/exchange-ack", self:withDevice({ books = books }))
 end
 
+function BookOrbitApi:exchangeBookmarks(books)
+    return self:request("POST", "/koreader/plugin/bookmarks/exchange", self:withDevice({ books = books }))
+end
+
+function BookOrbitApi:exchangeBookmarksAck(books)
+    return self:request("POST", "/koreader/plugin/bookmarks/exchange-ack", self:withDevice({ books = books }))
+end
+
 function BookOrbitApi:uploadBookStates(books)
     return self:request("POST", "/koreader/plugin/book-states", self:withDevice({ books = books }))
 end
@@ -310,12 +547,24 @@ function BookOrbitApi:catalogRoot()
     return self:request("GET", "/koreader/plugin/catalog/root")
 end
 
-function BookOrbitApi:catalogDashboard()
-    return self:request("GET", "/koreader/plugin/catalog/dashboard")
+-- Naming a section is opt-in: without it the server returns the pre-section
+-- dashboard, which is what an older server understands.
+function BookOrbitApi:catalogDashboard(section)
+    local params
+    if section and section.type then
+        params = { section = section.type, smartScopeId = section.smartScopeId }
+    end
+    return self:request("GET", self:query("/koreader/plugin/catalog/dashboard", params))
 end
 
 function BookOrbitApi:catalogDiscover()
     return self:request("GET", "/koreader/plugin/catalog/dashboard/discover")
+end
+
+function BookOrbitApi:catalogDashboardSection(section)
+    if not section or not section.type then return nil, 400 end
+    local path = "/koreader/plugin/catalog/dashboard/sections/" .. util.urlEncode(section.type)
+    return self:request("GET", self:query(path, { smartScopeId = section.smartScopeId }))
 end
 
 function BookOrbitApi:catalogSection(section, params)
@@ -335,16 +584,27 @@ function BookOrbitApi:catalogBooks(params)
     return self:request("GET", self:query("/koreader/plugin/catalog/books", params))
 end
 
+-- Cursor-paginated bulk download manifest. One page carries everything
+-- selection and transfer need, so a bulk run issues no per-book detail request.
+function BookOrbitApi:catalogManifest(params)
+    params = params or {}
+    params.deviceId = params.deviceId or self.device_id
+    return self:request("GET", self:query("/koreader/plugin/catalog/manifest", params))
+end
+
 function BookOrbitApi:catalogBook(book_id)
     return self:request("GET", self:query("/koreader/plugin/catalog/books/" .. tostring(book_id), { deviceId = self.device_id }))
 end
 
-function BookOrbitApi:downloadCatalogFile(file_id, local_path, progress_cb)
-    return self:download("/koreader/plugin/catalog/files/" .. tostring(file_id) .. "/download", local_path, nil, progress_cb)
+function BookOrbitApi:downloadCatalogFile(file_id, local_path, opts)
+    return self:download("/koreader/plugin/catalog/files/" .. tostring(file_id) .. "/download", local_path, opts)
 end
 
-function BookOrbitApi:downloadCatalogThumbnail(book_id, local_path)
-    return self:download("/koreader/plugin/catalog/books/" .. tostring(book_id) .. "/thumbnail", local_path, "image/jpeg,image/*")
+function BookOrbitApi:downloadCatalogThumbnail(book_id, local_path, opts)
+    opts = opts or {}
+    opts.accept = "image/jpeg,image/*"
+    opts.expect_content_type = "image/"
+    return self:download("/koreader/plugin/catalog/books/" .. tostring(book_id) .. "/thumbnail", local_path, opts)
 end
 
 -- Plugin self-update endpoints
@@ -353,8 +613,10 @@ function BookOrbitApi:getPluginVersion()
     return self:request("GET", "/koreader/plugin/version")
 end
 
-function BookOrbitApi:downloadPluginUpdate(local_path, progress_cb)
-    return self:download("/koreader/plugin/package", local_path, "application/zip", progress_cb)
+function BookOrbitApi:downloadPluginUpdate(local_path, opts)
+    opts = opts or {}
+    opts.accept = "application/zip"
+    return self:download("/koreader/plugin/package", local_path, opts)
 end
 
 return BookOrbitApi

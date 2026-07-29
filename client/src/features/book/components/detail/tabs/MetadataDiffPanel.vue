@@ -116,7 +116,7 @@ const selectedFieldCount = computed(() => {
 
 const selectedCountLabel = computed(() => {
   if (!selectedFieldCount.value) return t('book.detail.editMetadata.diffPanel.noFieldsSelected')
-  return t('book.detail.editMetadata.diffPanel.fieldsSelected', { count: selectedFieldCount.value }, selectedFieldCount.value)
+  return t('book.detail.editMetadata.diffPanel.fieldsSelected', { count: selectedFieldCount.value })
 })
 
 const providerResultMeta = computed(() => {

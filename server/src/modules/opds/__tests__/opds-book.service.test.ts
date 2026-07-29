@@ -9,16 +9,8 @@ type TestableOpdsBookService = {
   buildCatalogSearchClause(q: string): unknown;
   buildReadStatusClause(userId: number, status: 'unread' | 'reading' | 'finished'): unknown;
   fetchBookEntries(bookIds: number[], options?: unknown): Promise<unknown[]>;
-  getBooksBySmartScope(
-    userId: number,
-    smartScopeId: number,
-    accessibleIds: number[],
-    sortOrder: string,
-    page: number,
-    size: number,
-    contentFilters?: unknown,
-    q?: string,
-  ): Promise<BookPageResult>;
+  buildSmartScopeWhere(userId: number, smartScopeId: number, accessibleIds: number[], contentFilters?: unknown, q?: string): Promise<unknown>;
+  fetchManifestRows(bookIds: number[]): Promise<unknown[]>;
   paginatedBookQuery(where: unknown, sortOrder: string, page: number, size: number, userId?: number, options?: unknown): Promise<BookPageResult>;
 };
 
@@ -89,7 +81,7 @@ describe('OpdsBookService', () => {
     const { service } = makeService([[{ userId: 999 }], [{ userId: 7 }]]);
     const accessSpy = vi.spyOn(service, 'getAccessibleLibraryIds');
     const privateService = testable(service);
-    const smartScopeSpy = vi.spyOn(privateService, 'getBooksBySmartScope');
+    const smartScopeSpy = vi.spyOn(privateService, 'buildSmartScopeWhere');
     const paginatedSpy = vi.spyOn(privateService, 'paginatedBookQuery');
 
     accessSpy.mockResolvedValueOnce([]);
@@ -102,14 +94,20 @@ describe('OpdsBookService', () => {
     await expect(service.getBooksPage(7, 'recent', 1, 50, { collectionId: 11 })).rejects.toThrow(ForbiddenException);
 
     accessSpy.mockResolvedValueOnce([1, 2]);
-    smartScopeSpy.mockResolvedValueOnce({ entries: [{ id: 5 }], total: 1 });
+    smartScopeSpy.mockResolvedValueOnce({ kind: 'scope-where' });
+    paginatedSpy.mockResolvedValueOnce({ entries: [{ id: 5 }], total: 1 });
     await expect(service.getBooksPage(7, 'recent', 3, 25, { smartScopeId: 4 })).resolves.toEqual({ entries: [{ id: 5 }], total: 1 });
-    expect(smartScopeSpy).toHaveBeenCalledWith(7, 4, [1, 2], 'recent', 3, 25, undefined, undefined);
+    expect(smartScopeSpy).toHaveBeenCalledWith(7, 4, [1, 2], undefined, undefined);
 
     accessSpy.mockResolvedValueOnce([1, 2]);
-    smartScopeSpy.mockResolvedValueOnce({ entries: [{ id: 6 }], total: 1 });
+    smartScopeSpy.mockResolvedValueOnce({ kind: 'scope-where' });
+    paginatedSpy.mockResolvedValueOnce({ entries: [{ id: 6 }], total: 1 });
     await expect(service.getBooksPage(7, 'recent', 1, 20, { smartScopeId: 4, q: 'dune' })).resolves.toEqual({ entries: [{ id: 6 }], total: 1 });
-    expect(smartScopeSpy).toHaveBeenCalledWith(7, 4, [1, 2], 'recent', 1, 20, undefined, 'dune');
+    expect(smartScopeSpy).toHaveBeenCalledWith(7, 4, [1, 2], undefined, 'dune');
+
+    accessSpy.mockResolvedValueOnce([1, 2]);
+    smartScopeSpy.mockResolvedValueOnce(null);
+    await expect(service.getBooksPage(7, 'recent', 1, 20, { smartScopeId: 4 })).resolves.toEqual({ entries: [], total: 0 });
 
     accessSpy.mockResolvedValueOnce([1, 2]);
     paginatedSpy.mockResolvedValueOnce({ entries: [{ id: 9 }], total: 1 });
@@ -123,8 +121,34 @@ describe('OpdsBookService', () => {
         q: 'arrakis',
       }),
     ).resolves.toEqual({ entries: [{ id: 9 }], total: 1 });
-    expect(paginatedSpy).toHaveBeenCalledTimes(1);
+    expect(paginatedSpy).toHaveBeenCalledTimes(3);
     expect(searchSpy).toHaveBeenCalledWith('arrakis');
+  });
+
+  it('pages the bulk manifest by book id and reports whether more rows follow', async () => {
+    const { service } = makeService();
+    vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValue([1]);
+    const privateService = testable(service);
+    const fetchSpy = vi.spyOn(privateService, 'fetchManifestRows').mockResolvedValue([{ id: 3 }, { id: 7 }]);
+
+    const chain = makeChain([{ id: 3 }, { id: 7 }, { id: 9 }]);
+    const selectSpy = vi.spyOn(service as unknown as { db: { select: unknown } }, 'db', 'get');
+    selectSpy.mockReturnValue({ select: vi.fn().mockReturnValue(chain) });
+
+    await expect(service.getBookManifestPage(7, { afterId: 2, limit: 2 })).resolves.toEqual({
+      rows: [{ id: 3 }, { id: 7 }],
+      hasNext: true,
+    });
+    // One extra row is fetched purely to answer hasNext without a count query.
+    expect(chain.limit).toHaveBeenCalledWith(3);
+    expect(fetchSpy).toHaveBeenCalledWith([3, 7]);
+  });
+
+  it('returns an empty manifest page when the user can reach no library', async () => {
+    const { service } = makeService();
+    vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValue([]);
+
+    await expect(service.getBookManifestPage(7, { limit: 50 })).resolves.toEqual({ rows: [], hasNext: false });
   });
 
   it('builds catalog search across title, author, series, and normalized ISBN', () => {
@@ -243,35 +267,30 @@ describe('OpdsBookService', () => {
   it('applies text search inside smartScope when q is provided', async () => {
     const { service } = makeService([[{ id: 3, userId: 7, isPublic: false, filter: null }]]);
     const privateService = testable(service);
-    const paginatedSpy = vi.spyOn(privateService, 'paginatedBookQuery').mockResolvedValue({ entries: [], total: 0 });
     const searchSpy = vi.spyOn(privateService, 'buildCatalogSearchClause');
 
-    await privateService.getBooksBySmartScope(7, 3, [1], 'title_asc', 1, 20, undefined, 'dune');
+    const where = await privateService.buildSmartScopeWhere(7, 3, [1], undefined, 'dune');
 
     expect(searchSpy).toHaveBeenCalledWith('dune');
-    expect(paginatedSpy).toHaveBeenCalledTimes(1);
-    const [where] = paginatedSpy.mock.calls[0] as unknown[];
     expect(collectValues(where)).toContain('%dune%');
   });
 
   it('omits text search clause inside smartScope when q is absent', async () => {
     const { service } = makeService([[{ id: 3, userId: 7, isPublic: false, filter: null }]]);
     const privateService = testable(service);
-    const paginatedSpy = vi.spyOn(privateService, 'paginatedBookQuery').mockResolvedValue({ entries: [], total: 0 });
     const searchSpy = vi.spyOn(privateService, 'buildCatalogSearchClause');
 
-    await privateService.getBooksBySmartScope(7, 3, [1], 'title_asc', 1, 20);
+    await expect(privateService.buildSmartScopeWhere(7, 3, [1])).resolves.not.toBeNull();
 
     expect(searchSpy).not.toHaveBeenCalled();
-    expect(paginatedSpy).toHaveBeenCalledTimes(1);
   });
 
   it('returns no smartScope books when smartScope is missing or private to another user', async () => {
     const { service } = makeService([[], [{ id: 5, userId: 99, isPublic: false, filter: null }]]);
     const privateService = testable(service);
 
-    await expect(privateService.getBooksBySmartScope(7, 5, [1], 'recent', 1, 25)).resolves.toEqual({ entries: [], total: 0 });
-    await expect(privateService.getBooksBySmartScope(7, 5, [1], 'recent', 1, 25)).resolves.toEqual({ entries: [], total: 0 });
+    await expect(privateService.buildSmartScopeWhere(7, 5, [1])).resolves.toBeNull();
+    await expect(privateService.buildSmartScopeWhere(7, 5, [1])).resolves.toBeNull();
   });
 
   it('builds smartScope filters and delegates smartScope pagination', async () => {
@@ -280,8 +299,9 @@ describe('OpdsBookService', () => {
     });
     const privateService = testable(service);
     const paginatedSpy = vi.spyOn(privateService, 'paginatedBookQuery').mockResolvedValue({ entries: [{ id: 1 }], total: 1 });
+    vi.spyOn(service, 'getAccessibleLibraryIds').mockResolvedValue([1, 2]);
 
-    await expect(privateService.getBooksBySmartScope(7, 9, [1, 2], 'title_desc', 2, 10)).resolves.toEqual({ entries: [{ id: 1 }], total: 1 });
+    await expect(service.getBooksPage(7, 'title_desc', 2, 10, { smartScopeId: 9 })).resolves.toEqual({ entries: [{ id: 1 }], total: 1 });
     expect(queryBuilder.buildWhere).toHaveBeenCalledWith({ op: 'and' }, { accessibleLibraryIds: [1, 2], userId: 7 });
     expect(paginatedSpy).toHaveBeenCalledTimes(1);
   });

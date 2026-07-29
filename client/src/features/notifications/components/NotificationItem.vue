@@ -95,10 +95,10 @@ function handleDismiss(e: Event) {
 
     <div class="min-w-0 flex-1">
       <div class="flex items-start justify-between gap-2">
-        <p class="truncate text-sm leading-tight" :class="notification.read ? 'text-foreground/80' : 'font-semibold text-foreground'">
+        <p class="truncate text-sm leading-tight" :class="notification.read ? 'text-foreground' : 'font-semibold text-foreground'">
           {{ notification.title }}
         </p>
-        <span class="shrink-0 text-[11px] text-muted-foreground/60">{{ relativeTime }}</span>
+        <span class="shrink-0 text-[11px] text-muted-foreground">{{ relativeTime }}</span>
       </div>
       <p v-if="notification.message" class="mt-1 text-xs text-muted-foreground truncate">
         {{ notification.message }}
@@ -106,7 +106,7 @@ function handleDismiss(e: Event) {
     </div>
 
     <button
-      class="mt-0.5 shrink-0 rounded-md p-1 text-muted-foreground/50 opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
+      class="mt-0.5 shrink-0 rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
       @click="handleDismiss"
     >
       <X :size="14" />

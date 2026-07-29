@@ -570,9 +570,7 @@ defineOptions({ name: 'AuthorDetailView' })
               <label v-for="candidate in mergeCandidates" :key="candidate.id" class="flex items-center gap-2 text-sm">
                 <input type="checkbox" :checked="selectedMergeIds.includes(candidate.id)" @change="onMergeCandidateToggle(candidate.id, $event)" />
                 <span class="min-w-0 flex-1 truncate">{{ candidate.name }}</span>
-                <span class="text-xs text-muted-foreground">{{
-                  t('author.detail.merge.bookCount', { count: candidate.bookCount }, candidate.bookCount)
-                }}</span>
+                <span class="text-xs text-muted-foreground">{{ t('author.detail.merge.bookCount', { count: candidate.bookCount }) }}</span>
               </label>
             </div>
 
@@ -607,7 +605,7 @@ defineOptions({ name: 'AuthorDetailView' })
                       {{ opt.label }}
                     </option>
                   </select>
-                  <ArrowUpDown :size="13" class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/85" />
+                  <ArrowUpDown :size="13" class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 </div>
 
                 <button
@@ -650,7 +648,7 @@ defineOptions({ name: 'AuthorDetailView' })
                     {{ library.name }}
                   </option>
                 </select>
-                <ChevronDown :size="14" class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/85" />
+                <ChevronDown :size="14" class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
               </div>
             </div>
 

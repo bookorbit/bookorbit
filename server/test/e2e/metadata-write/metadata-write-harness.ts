@@ -65,6 +65,8 @@ export type LibraryFileWritePatch = {
   fileWriteWriteCover?: boolean;
   fileWriteEpubEnabled?: boolean;
   fileWriteEpubMaxFileSizeMb?: number;
+  fileWriteFb2Enabled?: boolean;
+  fileWriteFb2MaxFileSizeMb?: number;
   fileWritePdfEnabled?: boolean;
   fileWritePdfMaxFileSizeMb?: number;
   fileWriteCbxEnabled?: boolean;
@@ -132,6 +134,8 @@ export async function createLibraryWithFolder(
     fileWriteEnabled?: boolean;
     fileWriteWriteCover?: boolean;
     fileWriteEpubEnabled?: boolean;
+    fileWriteFb2Enabled?: boolean;
+    fileWriteFb2MaxFileSizeMb?: number;
     fileWritePdfEnabled?: boolean;
     fileWriteCbxEnabled?: boolean;
     fileWriteCbxMaxFileSizeMb?: number;
@@ -155,6 +159,8 @@ export async function createLibraryWithFolder(
       fileWriteEnabled: options.fileWriteEnabled ?? false,
       fileWriteWriteCover: options.fileWriteWriteCover ?? true,
       fileWriteEpubEnabled: options.fileWriteEpubEnabled ?? true,
+      fileWriteFb2Enabled: options.fileWriteFb2Enabled ?? false,
+      fileWriteFb2MaxFileSizeMb: options.fileWriteFb2MaxFileSizeMb ?? 100,
       fileWritePdfEnabled: options.fileWritePdfEnabled ?? true,
       fileWriteCbxEnabled: options.fileWriteCbxEnabled ?? false,
       fileWriteCbxMaxFileSizeMb: options.fileWriteCbxMaxFileSizeMb ?? 500,
@@ -184,6 +190,8 @@ export async function setLibraryFileWriteSettings(db: Db, libraryId: number, pat
   if (patch.fileWriteWriteCover !== undefined) updateValues.fileWriteWriteCover = patch.fileWriteWriteCover;
   if (patch.fileWriteEpubEnabled !== undefined) updateValues.fileWriteEpubEnabled = patch.fileWriteEpubEnabled;
   if (patch.fileWriteEpubMaxFileSizeMb !== undefined) updateValues.fileWriteEpubMaxFileSizeMb = patch.fileWriteEpubMaxFileSizeMb;
+  if (patch.fileWriteFb2Enabled !== undefined) updateValues.fileWriteFb2Enabled = patch.fileWriteFb2Enabled;
+  if (patch.fileWriteFb2MaxFileSizeMb !== undefined) updateValues.fileWriteFb2MaxFileSizeMb = patch.fileWriteFb2MaxFileSizeMb;
   if (patch.fileWritePdfEnabled !== undefined) updateValues.fileWritePdfEnabled = patch.fileWritePdfEnabled;
   if (patch.fileWritePdfMaxFileSizeMb !== undefined) updateValues.fileWritePdfMaxFileSizeMb = patch.fileWritePdfMaxFileSizeMb;
   if (patch.fileWriteCbxEnabled !== undefined) updateValues.fileWriteCbxEnabled = patch.fileWriteCbxEnabled;

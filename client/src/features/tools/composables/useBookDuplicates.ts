@@ -170,7 +170,7 @@ export function useBookDuplicates() {
     try {
       await deleteDuplicateBooks(bookIds)
       await fetchGroups()
-      toast.success(t('tools.bookDuplicates.deleteDialog.success', { count: bookIds.length }, bookIds.length))
+      toast.success(t('tools.bookDuplicates.deleteDialog.success', { count: bookIds.length }))
       return true
     } catch {
       toast.error(t('tools.bookDuplicates.errors.delete'))

@@ -52,6 +52,7 @@ import { SearchBooksDto } from './dto/search-books.dto';
 import { UpdateBookFileDto } from './dto/update-book-file.dto';
 import { SetStatusDto } from '../user-book-status/dto/set-status.dto';
 import { Permission, AuditAction, AuditResource } from '@bookorbit/types';
+import type { BookDeletionAuditMeta } from '@bookorbit/types';
 import type { BookQuery } from '@bookorbit/types';
 import { UpdateBookMetadataLocksDto } from '../book-metadata-lock/dto/update-book-metadata-locks.dto';
 
@@ -111,9 +112,25 @@ export class BookController {
   @Auditable({
     action: AuditAction.BookBulkDelete,
     resource: AuditResource.Book,
-    description: (req) => {
-      const count = (req.body as { bookIds?: number[] })?.bookIds?.length ?? 0;
-      return `Deleted ${count} book${count !== 1 ? 's' : ''}`;
+    getResourceId: (_req, responseBody) => {
+      const result = responseBody as BookDeletionAuditMeta;
+      return result.total === 1 ? result.books[0]?.id : undefined;
+    },
+    getMeta: (_req, responseBody) => {
+      const result = responseBody as BookDeletionAuditMeta;
+      return {
+        total: result.total,
+        books: result.books,
+        omitted: result.omitted,
+      };
+    },
+    description: (_req, responseBody) => {
+      const result = responseBody as BookDeletionAuditMeta;
+      if (result.total === 1) {
+        const book = result.books[0];
+        return book?.title ? `Deleted "${book.title}" (#${book.id})` : `Deleted book #${book?.id ?? 'unknown'}`;
+      }
+      return `Deleted ${result.total} books`;
     },
   })
   async deleteBooks(@Body() dto: DeleteBooksDto, @CurrentUser() user: RequestUser) {

@@ -14,6 +14,8 @@ export const DEFAULT_SCROLLERS: ScrollerConfig[] = [
   { id: '4', type: 'up-next-in-series', label: 'Up Next in Series', enabled: false, order: 6, limit: 20 },
 ]
 
+// Persisted-only. Shelf headings and the type selector resolve their text from the active
+// locale via useDashboardLabels(); these values just keep stored configs shaped as before.
 export const SCROLLER_LABELS: Record<ScrollerType, string> = {
   'continue-reading': 'Continue Reading',
   'continue-listening': 'Continue Listening',

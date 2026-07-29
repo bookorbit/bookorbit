@@ -20,18 +20,18 @@ describe('extractFb2Cover', () => {
         <binary id="img1">AQIDBA==</binary>
       </FictionBook>
     `;
-    mockReadFile.mockResolvedValue(xml as unknown as Awaited<ReturnType<typeof readFile>>);
+    mockReadFile.mockResolvedValue(Buffer.from(xml, 'utf8') as unknown as Awaited<ReturnType<typeof readFile>>);
 
     await expect(extractFb2Cover('/book.fb2')).resolves.toEqual(Buffer.from([1, 2, 3, 4]));
   });
 
   it('returns null when coverpage or referenced binary is missing', async () => {
-    mockReadFile.mockResolvedValue('<FictionBook><description><title-info /></description></FictionBook>' as any);
+    mockReadFile.mockResolvedValue(Buffer.from('<FictionBook><description><title-info /></description></FictionBook>') as any);
     await expect(extractFb2Cover('/book.fb2')).resolves.toBeNull();
   });
 
   it('returns null on malformed XML', async () => {
-    mockReadFile.mockResolvedValue('<not xml' as any);
+    mockReadFile.mockResolvedValue(Buffer.from('<not xml') as any);
     await expect(extractFb2Cover('/book.fb2')).resolves.toBeNull();
   });
 });

@@ -21,6 +21,7 @@ local _ = require("gettext")
 local BookOrbitApi = require("bookorbit_api")
 local BookOrbitHighlightDiagnostics = require("bookorbit_highlight_diagnostics")
 local BookOrbitSweep = require("bookorbit_sweep")
+local DashboardSections = require("bookorbit_dashboard_sections")
 
 -- Assigned from the plugin class on install so menu labels can name the
 -- shared sync strategies.
@@ -145,6 +146,8 @@ end
 function MainMenu:diagnosticsRows()
     local status = BookOrbitSweep.syncStatus()
     local sync_status = self.getSyncCoordinatorStatus and self:getSyncCoordinatorStatus() or { pending_count = 0 }
+    local outbox_status = self.getLifecycleOutboxStatus and self:getLifecycleOutboxStatus()
+        or { count = 0, bytes = 0, blocked = 0 }
     local has_open_book = hasReaderBook(self)
     local digest = safeDocumentDigest(self, has_open_book)
     local scheduler = self.open_annotation_scheduler and self.open_annotation_scheduler:status() or nil
@@ -186,13 +189,16 @@ function MainMenu:diagnosticsRows()
 
     table.insert(rows, "----------------------------")
     table.insert(rows, { _("Auto sync"), formatBool(self.settings.auto_sync) })
-    table.insert(rows, { _("Two-way highlights"), formatBool(self.settings.annotation_sync) })
+    table.insert(rows, { _("Two-way highlights & bookmarks"), formatBool(self.settings.annotation_sync) })
     table.insert(rows, { _("Open highlights"), open_highlight_text })
     table.insert(rows, { _("Highlight apply retry"), BookOrbitHighlightDiagnostics.retryText(self.open_highlight_retry_status) })
     table.insert(rows, { _("Skip offline auto-sync"), formatBool(self.settings.skip_sync_when_offline) })
     table.insert(rows, { _("Current sync"), jobText(sync_status.current) })
     table.insert(rows, { _("Current sync started"), jobStartedText(sync_status.current) })
     table.insert(rows, { _("Pending syncs"), tostring(sync_status.pending_count or 0) })
+    table.insert(rows, { _("Pending lifecycle syncs"), tostring(outbox_status.count or 0) })
+    table.insert(rows, { _("Parked lifecycle syncs"), tostring(outbox_status.blocked or 0) })
+    table.insert(rows, { _("Lifecycle sync storage"), tostring(outbox_status.bytes or 0) .. " B" })
     table.insert(rows, { _("Next sync"), jobText(sync_status.next) })
     table.insert(rows, { _("Last sweep"), formatTime(status.lastSweepAt) })
     table.insert(rows, { _("Matched local books"), tostring(status.matched or 0) })
@@ -200,6 +206,8 @@ function MainMenu:diagnosticsRows()
     table.insert(rows, "----------------------------")
     table.insert(rows, { _("Last sync"), recordText(self.settings.last_sync) })
     table.insert(rows, { _("Last highlight sync"), highlightRecordText(self.settings.last_highlight_sync) })
+    table.insert(rows, { _("Last bookmark sync"),
+        BookOrbitHighlightDiagnostics.lastBookmarkSyncText(self.settings.last_highlight_sync, formatShortTime) })
     table.insert(rows, { _("Last error"), recordText(self.settings.last_error) })
     table.insert(rows, "----------------------------")
     if has_open_book then
@@ -220,6 +228,13 @@ function MainMenu:diagnosticsRows()
             end,
         })
     end
+    table.insert(rows, {
+        _("Recheck all book matches"),
+        _("Run"),
+        callback = function()
+            self:startMatchRecheck()
+        end,
+    })
     table.insert(rows, {
         _("Test connection"),
         _("Run"),
@@ -274,13 +289,127 @@ function MainMenu:testConnection()
     end)
 end
 
-function MainMenu:dashboardSettingsMenu()
+function MainMenu:dashboardSectionLabel()
+    return DashboardSections.headerText(DashboardSections.primary(self.settings))
+end
+
+-- Applies a new choice for the configurable dashboard row. When the dashboard
+-- is open it owns the setting write, so the row and its cache signature move
+-- together; otherwise the setting is written directly.
+function MainMenu:applyDashboardSection(config, catalog, touchmenu_instance)
+    if catalog and catalog.setDashboardSection then
+        catalog:setDashboardSection(config)
+    else
+        self.settings[DashboardSections.SETTING_KEY] = DashboardSections.store(config)
+        G_reader_settings:flush()
+    end
+    if touchmenu_instance then touchmenu_instance:updateItems() end
+end
+
+function MainMenu:dashboardSectionClient(catalog)
+    if catalog and catalog.client then return catalog.client end
+    return BookOrbitApi.new(self:apiOpts())
+end
+
+-- SmartScopes live on the server, so the chooser has to ask for them. The
+-- chosen name is stored beside the id purely so the row can be labelled later
+-- without another request.
+function MainMenu:chooseDashboardSmartScope(catalog, touchmenu_instance)
+    local ButtonDialog = require("ui/widget/buttondialog")
+    if NetworkMgr:willRerunWhenConnected(function() self:chooseDashboardSmartScope(catalog, touchmenu_instance) end) then
+        return
+    end
+
+    Device:setIgnoreInput(true)
+    local body, err = self:dashboardSectionClient(catalog):catalogSection("smart-scopes")
+    Device:setIgnoreInput(false)
+
+    local scopes = body and body.items or nil
+    if not scopes then
+        UIManager:show(InfoMessage:new{
+            text = T(_("Could not load your SmartScopes: %1"), tostring(err)),
+            timeout = 3,
+        })
+        return
+    end
+    if #scopes == 0 then
+        UIManager:show(InfoMessage:new{
+            text = _("You have no SmartScopes yet. Create one in BookOrbit web settings."),
+            timeout = 3,
+        })
+        return
+    end
+
+    local current = DashboardSections.primary(self.settings)
+    local dialog
+    local buttons = {}
+    for _index, scope in ipairs(scopes) do
+        local scope_id = tonumber(scope.id)
+        if scope_id then
+            table.insert(buttons, {
+                {
+                    text = scope.title .. (current.smartScopeId == scope_id and " *" or ""),
+                    callback = function()
+                        UIManager:close(dialog)
+                        self:applyDashboardSection(
+                            { type = "smart-scope", smartScopeId = scope_id, smartScopeName = scope.title },
+                            catalog, touchmenu_instance)
+                    end,
+                },
+            })
+        end
+    end
+    dialog = ButtonDialog:new{
+        title = _("Show which SmartScope?"),
+        buttons = buttons,
+    }
+    UIManager:show(dialog)
+end
+
+function MainMenu:dashboardSectionItems(catalog)
+    local items = {}
+    for _index, section_type in ipairs(DashboardSections.TYPES) do
+        local is_smart_scope = section_type == "smart-scope"
+        table.insert(items, {
+            text_func = function()
+                if is_smart_scope then
+                    local current = DashboardSections.primary(self.settings)
+                    if current.type == "smart-scope" and current.smartScopeName then
+                        return T(_("SmartScope (%1)"), current.smartScopeName)
+                    end
+                end
+                return DashboardSections.label(section_type)
+            end,
+            help_text = DashboardSections.helpText(section_type),
+            checked_func = function()
+                return DashboardSections.primary(self.settings).type == section_type
+            end,
+            keep_menu_open = is_smart_scope,
+            callback = function(touchmenu_instance)
+                if is_smart_scope then
+                    self:chooseDashboardSmartScope(catalog, touchmenu_instance)
+                else
+                    self:applyDashboardSection({ type = section_type }, catalog, touchmenu_instance)
+                end
+            end,
+        })
+    end
+    return items
+end
+
+function MainMenu:dashboardSettingsMenu(catalog)
     return {
         {
             text_func = function()
                 return T(_("Open dashboard on startup (%1)"), self:catalogAutoOpenLabel())
             end,
             sub_item_table = self:catalogAutoOpenMenu(),
+        },
+        {
+            text_func = function()
+                return T(_("Show below Continue reading (%1)"), self:dashboardSectionLabel())
+            end,
+            sub_item_table = self:dashboardSectionItems(catalog),
         },
     }
 end
@@ -325,9 +454,9 @@ If set to 0, updating progress based on page turns will be disabled.]]),
         end,
     })
     table.insert(items, {
-        text = _("Two-way highlight sync"),
+        text = _("Two-way highlights & bookmarks"),
         checked_func = function() return self.settings.annotation_sync end,
-        help_text = _([[Also applies highlights, notes and deletions made in BookOrbit to this device: on book open, after the manual book sync, and during the full sweep for closed books. Turning this off keeps uploads only.]]),
+        help_text = _([[Also applies highlights, notes, bookmarks (dogears) and deletions made in BookOrbit to this device: on book open, after the manual book sync, and during the full sweep for closed books. Turning this off keeps uploads only. Bookmark sync needs a server that supports it, and PDF bookmarks never sync.]]),
         callback = function()
             self.settings.annotation_sync = not self.settings.annotation_sync
         end,
@@ -373,7 +502,7 @@ function MainMenu:settingsMenu(has_open_book, opts)
     local items = {
         {
             text = _("Dashboard"),
-            sub_item_table = self:dashboardSettingsMenu(),
+            sub_item_table = self:dashboardSettingsMenu(opts.catalog),
         },
         {
             text = _("Sync"),
@@ -424,6 +553,7 @@ function MainMenu:addToMainMenu(menu_items)
         end
         table.insert(items, {
             text = _("Sync all books now"),
+            help_text = _([[Syncs reading data, highlights, status and progress for books that changed since the last sync. Use "Recheck all book matches" in diagnostics to re-verify every book against the server.]]),
             callback = function()
                 self:startSweep()
             end,
@@ -504,7 +634,7 @@ function MainMenu:dashboardMenuItems(catalog)
                     id = "settings",
                     text = _("Settings"),
                     separator = item.separator,
-                    sub_item_table = self:settingsMenu(false, { include_plugin = false }),
+                    sub_item_table = self:settingsMenu(false, { include_plugin = false, catalog = catalog }),
                 })
             else
                 table.insert(items, item)
@@ -595,7 +725,7 @@ function MainMenu:setServerAddress()
 end
 
 function MainMenu:login(menu)
-    if NetworkMgr:willRerunWhenOnline(function() self:login(menu) end) then
+    if NetworkMgr:willRerunWhenConnected(function() self:login(menu) end) then
         return
     end
 

@@ -34,6 +34,7 @@ function makeService() {
   const auditRepository = {
     insert: vi.fn().mockResolvedValue(undefined),
     findAll: vi.fn(),
+    findActors: vi.fn(),
     findReadingInsightsAccess: vi.fn(),
     deleteOlderThan: vi.fn().mockResolvedValue(undefined),
   };
@@ -148,6 +149,15 @@ describe('AuditService', () => {
 
     expect(auditRepository.findAll).toHaveBeenCalledWith(query);
     expect(result).toEqual({ data: [{ id: 1 }], total: 1 });
+  });
+
+  it('delegates actor suggestions to the repository', async () => {
+    const { service, auditRepository } = makeService();
+    const actors = [{ userId: 12, username: 'admin' }];
+    auditRepository.findActors.mockResolvedValue(actors);
+
+    await expect(service.getActors('adm', 25)).resolves.toEqual(actors);
+    expect(auditRepository.findActors).toHaveBeenCalledWith('adm', 25);
   });
 
   it('writes critical audit records synchronously', async () => {

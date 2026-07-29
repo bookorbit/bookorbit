@@ -29,8 +29,34 @@ local BookOrbitSidecar = require("bookorbit_sidecar")
 
 local MAX_KEYS_PER_BOOK = 5000
 local MAX_PULL_ROUNDS = 10
+local UPLOAD_CHUNK = 50
 
 local BookOrbitAnnotations = {}
+
+-- An exchange may be skipped only for a short while. It is the sole channel
+-- that delivers server-side highlight changes to the device, and a drained
+-- lifecycle entry can be hours old, so an unbounded skip would park web-created
+-- highlights until the book's next open.
+BookOrbitAnnotations.EXCHANGE_MAX_AGE = 6 * 3600
+
+-- Records that the local set in `signature` was fully exchanged, which is what
+-- lets the next drained lifecycle sync skip a book nothing happened to.
+function BookOrbitAnnotations.rememberExchanged(book, signature, now)
+    if not book or type(signature) ~= "string" or signature == "" then return end
+    book.annSignature = signature
+    book.annExchangedAt = now or os.time()
+end
+
+function BookOrbitAnnotations.canSkipExchange(book, signature, now)
+    if not book then return false end
+    if type(signature) ~= "string" or signature == "" then return false end
+    if book.annSignature ~= signature then return false end
+    local exchanged_at = book.annExchangedAt
+    if type(exchanged_at) ~= "number" then return false end
+    now = now or os.time()
+    if exchanged_at > now then return false end
+    return (now - exchanged_at) <= BookOrbitAnnotations.EXCHANGE_MAX_AGE
+end
 
 function BookOrbitAnnotations.buildKey(datetime, pos0)
     return md5(datetime .. "|" .. pos0)
@@ -94,18 +120,116 @@ local function sameRangeAndText(annotation, entry)
     return true
 end
 
-local function findByIdentity(annotations, entry)
-    local found_index, found_annotation, found_count = nil, nil, 0
-    if type(entry.datetime) == "string" and entry.datetime ~= "" then
-        for index, annotation in ipairs(annotations or {}) do
-            if annotation.datetime == entry.datetime then
-                found_index, found_annotation = index, annotation
-                found_count = found_count + 1
-            end
-        end
-        if found_count == 1 then return found_index, found_annotation end
+local function rangeKey(item)
+    local text = normalizeText(item.text)
+    local pos0 = normalizePos(item.pos0)
+    if text == "" or pos0 == "" then return nil end
+    return text .. "\0" .. pos0
+end
+
+--[[--
+Identity lookup over one annotation list.
+
+A remote batch resolves every entry against the local list, and a plain scan
+per entry makes that quadratic. The index keys both identities the resolver
+uses: the exact datetime and the normalized range plus text. Ambiguous keys
+(the same datetime or the same range on several entries) deliberately stay on
+the scanning path, because that is what the ambiguous case has always resolved
+to and the scan order defines which duplicate wins.
+
+The list is mutated during the same pass, so the index tracks that: an append
+patches in place, anything that shifts positions (an insert elsewhere, a
+removal) marks the index stale and the next lookup rebuilds it.
+]]
+local IdentityIndex = {}
+IdentityIndex.__index = IdentityIndex
+
+local function addSlot(map, key, index, annotation)
+    if not key then return end
+    local slot = map[key]
+    if slot then
+        slot.count = slot.count + 1
+        return
     end
-    for index, annotation in ipairs(annotations or {}) do
+    map[key] = { index = index, annotation = annotation, count = 1 }
+end
+
+function IdentityIndex:rebuild()
+    local by_datetime, by_range = {}, {}
+    for index, annotation in ipairs(self.annotations) do
+        local datetime = annotation.datetime
+        if type(datetime) == "string" and datetime ~= "" then
+            addSlot(by_datetime, datetime, index, annotation)
+        end
+        addSlot(by_range, rangeKey(annotation), index, annotation)
+    end
+    self.by_datetime = by_datetime
+    self.by_range = by_range
+    self.stale = false
+end
+
+function IdentityIndex.new(annotations)
+    local self = setmetatable({ annotations = annotations or {} }, IdentityIndex)
+    self:rebuild()
+    return self
+end
+
+function IdentityIndex:invalidate()
+    self.stale = true
+end
+
+-- Only valid when the annotation really is the new last element; any other
+-- insertion shifts later positions and must invalidate instead.
+function IdentityIndex:noteAppended(annotation)
+    if self.stale then return end
+    local index = #self.annotations
+    if self.annotations[index] ~= annotation then
+        self.stale = true
+        return
+    end
+    local datetime = annotation.datetime
+    if type(datetime) == "string" and datetime ~= "" then
+        addSlot(self.by_datetime, datetime, index, annotation)
+    end
+    addSlot(self.by_range, rangeKey(annotation), index, annotation)
+end
+
+function IdentityIndex:identityOf(annotation)
+    return annotation.datetime, rangeKey(annotation)
+end
+
+-- An applied change can rewrite the datetime or the highlighted text, moving
+-- the entry's keys. Repointing a key that may be shared with another entry is
+-- not safe, so the index is dropped and rebuilt on the next lookup.
+function IdentityIndex:noteMutated(annotation, previous_datetime, previous_range_key)
+    if self.stale then return end
+    if annotation.datetime ~= previous_datetime or rangeKey(annotation) ~= previous_range_key then
+        self.stale = true
+    end
+end
+
+function IdentityIndex:find(entry)
+    if self.stale then self:rebuild() end
+
+    local datetime = entry.datetime
+    if type(datetime) == "string" and datetime ~= "" then
+        local slot = self.by_datetime[datetime]
+        if slot and slot.count == 1 then
+            return slot.index, slot.annotation
+        end
+    end
+
+    local key = rangeKey(entry)
+    if not key then return nil end
+    local slot = self.by_range[key]
+    if not slot then return nil end
+    if slot.count == 1 then
+        if sameRangeAndText(slot.annotation, entry) then
+            return slot.index, slot.annotation
+        end
+        return nil
+    end
+    for index, annotation in ipairs(self.annotations) do
         if sameRangeAndText(annotation, entry) then
             return index, annotation
         end
@@ -206,13 +330,16 @@ function BookOrbitAnnotations.applyLive(ui, to_apply)
     local applied, deleted = {}, {}
     local document = ui.document
     local annotations = ui.annotation.annotations
+    local lookup = IdentityIndex.new(annotations)
     local touched = 0
     local deleted_touched = 0
 
     for _, entry in ipairs(to_apply.add or {}) do
-        local existing_index, existing_annotation = findByIdentity(annotations, entry)
+        local existing_index, existing_annotation = lookup:find(entry)
         if existing_index then
+            local previous_datetime, previous_range = lookup:identityOf(existing_annotation)
             applyIdentityFields(existing_annotation, entry)
+            lookup:noteMutated(existing_annotation, previous_datetime, previous_range)
             ui:handleEvent(Event:new("AnnotationsModified", { existing_annotation, index_modified = existing_index }))
             touched = touched + 1
             table.insert(applied, ackExisting(entry, existing_annotation, true))
@@ -248,6 +375,7 @@ function BookOrbitAnnotations.applyLive(ui, to_apply)
                     pos1 = pos1,
                 }
                 local index = ui.annotation:addItem(item)
+                lookup:noteAppended(item)
                 if ui.view and ui.view.footer and ui.view.footer.maybeUpdateFooter then
                     pcall(ui.view.footer.maybeUpdateFooter, ui.view.footer)
                 end
@@ -269,12 +397,14 @@ function BookOrbitAnnotations.applyLive(ui, to_apply)
     end
 
     for _, entry in ipairs(to_apply.edit or {}) do
-        local index, annotation = findByIdentity(annotations, entry)
+        local index, annotation = lookup:find(entry)
         if not index then
             logger.dbg("BookOrbit: annotation edit target missing:", entry.serverId)
             table.insert(applied, ackApplied(entry, { failed = true }))
         else
+            local previous_datetime, previous_range = lookup:identityOf(annotation)
             applyEditFields(annotation, entry)
+            lookup:noteMutated(annotation, previous_datetime, previous_range)
             ui:handleEvent(Event:new("AnnotationsModified", { annotation, index_modified = index }))
             touched = touched + 1
             table.insert(applied, ackApplied(entry, { verified = true }))
@@ -282,12 +412,13 @@ function BookOrbitAnnotations.applyLive(ui, to_apply)
     end
 
     for _, entry in ipairs(to_apply.delete or {}) do
-        local index, annotation = findByIdentity(annotations, entry)
+        local index, annotation = lookup:find(entry)
         if index then
             if ui.paging then
                 pcall(ui.highlight.writePdfAnnotation, ui.highlight, "delete", annotation)
             end
             ui.bookmark:removeItemByIndex(index)
+            lookup:invalidate()
             touched = touched + 1
             deleted_touched = deleted_touched + 1
         end
@@ -307,6 +438,7 @@ function BookOrbitAnnotations.applySidecar(file, to_apply)
     local applied, deleted = {}, {}
     local doc_settings = DocSettings:open(file)
     local annotations = doc_settings:readSetting("annotations") or {}
+    local lookup = IdentityIndex.new(annotations)
     local touched = 0
     local deleted_touched = 0
 
@@ -314,12 +446,14 @@ function BookOrbitAnnotations.applySidecar(file, to_apply)
         if entry.posFormat ~= "xpointer" then
             table.insert(applied, ackApplied(entry, { failed = true }))
         else
-            local existing_index, existing = findByIdentity(annotations, entry)
+            local existing_index, existing = lookup:find(entry)
             if existing_index then
+                local previous_datetime, previous_range = lookup:identityOf(existing)
                 applyIdentityFields(existing, entry)
+                lookup:noteMutated(existing, previous_datetime, previous_range)
                 touched = touched + 1
             else
-                table.insert(annotations, {
+                local item = {
                     datetime = entry.datetime,
                     datetime_updated = entry.datetimeUpdated,
                     drawer = entry.drawer,
@@ -331,7 +465,9 @@ function BookOrbitAnnotations.applySidecar(file, to_apply)
                     page = entry.pos0,
                     pos0 = entry.pos0,
                     pos1 = entry.pos1,
-                })
+                }
+                table.insert(annotations, item)
+                lookup:noteAppended(item)
                 touched = touched + 1
             end
             -- Unverified until the book is opened; the server keeps it pending.
@@ -344,20 +480,23 @@ function BookOrbitAnnotations.applySidecar(file, to_apply)
     end
 
     for _, entry in ipairs(to_apply.edit or {}) do
-        local index, annotation = findByIdentity(annotations, entry)
+        local index, annotation = lookup:find(entry)
         if not index then
             table.insert(applied, ackApplied(entry, { failed = true }))
         else
+            local previous_datetime, previous_range = lookup:identityOf(annotation)
             applyEditFields(annotation, entry)
+            lookup:noteMutated(annotation, previous_datetime, previous_range)
             touched = touched + 1
             table.insert(applied, ackApplied(entry, {}))
         end
     end
 
     for _, entry in ipairs(to_apply.delete or {}) do
-        local index = findByIdentity(annotations, entry)
+        local index = lookup:find(entry)
         if index then
             table.remove(annotations, index)
+            lookup:invalidate()
             touched = touched + 1
             deleted_touched = deleted_touched + 1
         end
@@ -386,6 +525,7 @@ opts:
 - digest: partial md5 of the book file
 - annotations: normalized annotation list (live or sidecar source)
 - ann_max_datetime: max effective datetime of that list
+- ann_signature: change signal for that list, recorded on a complete exchange
 - apply_mode: "live" | "sidecar" | "skip"
 - ui: ReaderUI (required for apply_mode "live")
 - file: book file path (required for apply_mode "sidecar")
@@ -415,11 +555,15 @@ function BookOrbitAnnotations.exchangeBook(opts)
     local response
     local first_request = true
     local upload_failed = false
+    -- Consumed through a head cursor: removing from the front of a Lua array
+    -- shifts every remaining element, which turns a long delta into O(n^2).
+    local cursor = 1
 
     repeat
         local chunk = {}
-        while #delta > 0 and #chunk < 50 do
-            table.insert(chunk, table.remove(delta, 1))
+        while cursor <= #delta and #chunk < UPLOAD_CHUNK do
+            table.insert(chunk, delta[cursor])
+            cursor = cursor + 1
         end
         local body, err = opts.client:exchangeAnnotations({
             {
@@ -447,18 +591,40 @@ function BookOrbitAnnotations.exchangeBook(opts)
         response = body.results and body.results[1] or nil
         result.uploaded = result.uploaded + #chunk
         first_request = false
-    until #delta == 0
+    until cursor > #delta
 
     if not upload_failed then
         BookOrbitAnnotations.advanceWatermark(book, opts.ann_max_datetime, device_now)
     end
 
+    -- Recorded only when the complete key set went out and nothing was left
+    -- undelivered: the skip rule reads this stamp, so anything the server will
+    -- re-send must keep the next exchange mandatory.
+    local function rememberComplete()
+        if upload_failed or result.had_errors or result.failed > 0 then return end
+        if not keys_complete then return end
+        BookOrbitAnnotations.rememberExchanged(book, opts.ann_signature)
+    end
+
     if opts.apply_mode == "skip" then
+        if response and hasPending(response.toApply) then
+            result.remote_pending = {
+                to_apply = response.toApply,
+                more = response.more == true,
+            }
+        else
+            rememberComplete()
+        end
         return result
     end
 
     local rounds = 0
-    while response and hasPending(response.toApply) and rounds < MAX_PULL_ROUNDS do
+    local pull_complete = true
+    while response and hasPending(response.toApply) do
+        if rounds >= MAX_PULL_ROUNDS then
+            pull_complete = false
+            break
+        end
         rounds = rounds + 1
         local applied, deleted, touched, deleted_touched
         if opts.apply_mode == "live" and opts.ui and opts.ui.document then
@@ -466,6 +632,7 @@ function BookOrbitAnnotations.exchangeBook(opts)
         elseif opts.apply_mode == "sidecar" and opts.file then
             applied, deleted, touched, deleted_touched = BookOrbitAnnotations.applySidecar(opts.file, response.toApply)
         else
+            pull_complete = false
             break
         end
 
@@ -497,6 +664,7 @@ function BookOrbitAnnotations.exchangeBook(opts)
         response = body.results and body.results[1] or nil
     end
 
+    if pull_complete then rememberComplete() end
     return result
 end
 
@@ -505,13 +673,15 @@ end
 function BookOrbitAnnotations.exchangeOpenBook(opts)
     local ui = opts.ui
     if not ui or not ui.document then return nil, "no_document" end
-    local annotations, ann_max = BookOrbitSidecar.normalizeAnnotations(ui.annotation and ui.annotation.annotations)
+    local annotations, ann_max, signature =
+        BookOrbitSidecar.normalizeAnnotations(ui.annotation and ui.annotation.annotations)
     return BookOrbitAnnotations.exchangeBook({
         client = opts.client,
         state = opts.state,
         digest = opts.digest,
         annotations = annotations,
         ann_max_datetime = ann_max,
+        ann_signature = signature,
         apply_mode = "live",
         ui = ui,
     })

@@ -202,6 +202,20 @@ describe('SeriesRepository', () => {
     });
   });
 
+  describe('countSeries', () => {
+    it('returns the distinct series total for the accessible libraries', async () => {
+      const chain = makeChain([{ total: 1200 }]);
+      db.select.mockReturnValue(chain);
+
+      await expect(repo.countSeries({ libraryIds: [1, 2] })).resolves.toBe(1200);
+    });
+
+    it('short-circuits without querying when no library is accessible', async () => {
+      await expect(repo.countSeries({ libraryIds: [] })).resolves.toBe(0);
+      expect(db.select).not.toHaveBeenCalled();
+    });
+  });
+
   describe('findDetail', () => {
     it('returns null when query returns empty rows', async () => {
       const chain = makeChain([]);

@@ -39,7 +39,7 @@ function handleCancel(): void {
               {{ t('tools.bookDuplicates.deleteDialog.title') }}
             </DialogTitle>
             <DialogDescription class="mt-1 text-sm text-muted-foreground">
-              {{ t('tools.bookDuplicates.deleteDialog.description', { count: props.count }, props.count) }}
+              {{ t('tools.bookDuplicates.deleteDialog.description', { count: props.count }) }}
             </DialogDescription>
             <p class="mt-3 text-sm font-medium text-destructive">
               {{ t('tools.bookDuplicates.deleteDialog.warning') }}
@@ -50,7 +50,7 @@ function handleCancel(): void {
           <Button variant="outline" :disabled="props.deleting" @click="handleCancel">{{ t('common.cancel') }}</Button>
           <Button variant="destructive" :disabled="props.deleting" @click="handleConfirm">
             <Loader2 v-if="props.deleting" class="animate-spin" aria-hidden="true" />
-            {{ t('tools.bookDuplicates.deleteDialog.confirm', { count: props.count }, props.count) }}
+            {{ t('tools.bookDuplicates.deleteDialog.confirm', { count: props.count }) }}
           </Button>
         </div>
       </DialogContent>

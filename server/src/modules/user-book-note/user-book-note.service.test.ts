@@ -7,6 +7,7 @@ describe('UserBookNoteService', () => {
     findOne: ReturnType<typeof vi.fn>;
     findByBookIds: ReturnType<typeof vi.fn>;
     upsert: ReturnType<typeof vi.fn>;
+    upsertMany: ReturnType<typeof vi.fn>;
   };
   let service: UserBookNoteService;
 
@@ -15,6 +16,7 @@ describe('UserBookNoteService', () => {
       findOne: vi.fn(),
       findByBookIds: vi.fn(),
       upsert: vi.fn(),
+      upsertMany: vi.fn(),
     };
     service = new UserBookNoteService(repo as never);
   });
@@ -50,12 +52,47 @@ describe('UserBookNoteService', () => {
     await expect(service.findOne(1, 2)).resolves.toBeNull();
   });
 
-  it('findRow returns the raw repository row', async () => {
+  it('setNotes normalizes every entry and writes one row per book', async () => {
     const updatedAt = new Date('2026-07-03T00:00:00.000Z');
-    const row = { userId: 1, bookId: 2, note: 'review', updatedAt };
-    repo.findOne.mockResolvedValue(row);
 
-    await expect(service.findRow(1, 2)).resolves.toEqual(row);
+    await service.setNotes(
+      1,
+      [
+        { bookId: 2, note: '  review  ' },
+        { bookId: 3, note: '   ' },
+      ],
+      updatedAt,
+    );
+
+    expect(repo.upsertMany).toHaveBeenCalledWith(
+      1,
+      [
+        { bookId: 2, note: 'review' },
+        { bookId: 3, note: null },
+      ],
+      updatedAt,
+    );
+  });
+
+  it('setNotes keeps the last entry when several resolve to one book', async () => {
+    const updatedAt = new Date('2026-07-03T00:00:00.000Z');
+
+    await service.setNotes(
+      1,
+      [
+        { bookId: 2, note: 'first' },
+        { bookId: 2, note: 'second' },
+      ],
+      updatedAt,
+    );
+
+    expect(repo.upsertMany).toHaveBeenCalledWith(1, [{ bookId: 2, note: 'second' }], updatedAt);
+  });
+
+  it('setNotes writes nothing for an empty entry list', async () => {
+    await service.setNotes(1, []);
+
+    expect(repo.upsertMany).not.toHaveBeenCalled();
   });
 
   it('findByBookIds maps rows by book id', async () => {

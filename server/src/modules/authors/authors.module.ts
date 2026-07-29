@@ -8,6 +8,7 @@ import { AuthModule } from '../auth/auth.module';
 import { BookModule } from '../book/book.module';
 import { LibraryModule } from '../library/library.module';
 import { MetadataModule } from '../metadata/metadata.module';
+import { MetadataScoreModule } from '../metadata-score/metadata-score.module';
 import { NotificationModule } from '../notification/notification.module';
 import { AuthorImageStorageService } from './author-image-storage.service';
 import { AuthorEnrichmentConfigService } from './author-enrichment-config.service';
@@ -33,6 +34,7 @@ const AUTHOR_PROVIDER_CLASSES = [AudnexusAuthorMetadataProvider];
     LibraryModule,
     AppSettingsModule,
     MetadataModule,
+    MetadataScoreModule,
     forwardRef(() => NotificationModule),
     AuthModule,
     JwtModule.registerAsync({

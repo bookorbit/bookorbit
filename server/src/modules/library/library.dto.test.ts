@@ -131,6 +131,18 @@ describe('Library DTO validation', () => {
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteCbxMaxFileSizeMb: 10001 }))).toBe(true);
     });
 
+    it('CreateLibraryDto validates fileWriteKindleMaxFileSizeMb bounds', async () => {
+      expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteKindleMaxFileSizeMb: 0 }))).toBe(true);
+      expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteKindleMaxFileSizeMb: 1 }))).toBe(false);
+      expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteKindleMaxFileSizeMb: 10000 }))).toBe(false);
+      expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteKindleMaxFileSizeMb: 10001 }))).toBe(true);
+    });
+
+    it('CreateLibraryDto accepts the Kindle enable flag', async () => {
+      expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteKindleEnabled: true }))).toBe(false);
+      expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteKindleEnabled: 'yes' }))).toBe(true);
+    });
+
     it('CreateLibraryDto validates fileWriteAudioMaxFileSizeMb bounds', async () => {
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteAudioMaxFileSizeMb: 0 }))).toBe(true);
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteAudioMaxFileSizeMb: 1 }))).toBe(false);
@@ -142,6 +154,7 @@ describe('Library DTO validation', () => {
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteEpubMaxFileSizeMb: 1.5 }))).toBe(true);
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWritePdfMaxFileSizeMb: 100.9 }))).toBe(true);
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteCbxMaxFileSizeMb: 0.5 }))).toBe(true);
+      expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteKindleMaxFileSizeMb: 0.5 }))).toBe(true);
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteAudioMaxFileSizeMb: 0.5 }))).toBe(true);
     });
 
@@ -152,6 +165,8 @@ describe('Library DTO validation', () => {
       expect(await hasErrors(plainToInstance(UpdateLibraryDto, { fileWritePdfMaxFileSizeMb: 10000 }))).toBe(false);
       expect(await hasErrors(plainToInstance(UpdateLibraryDto, { fileWriteCbxMaxFileSizeMb: 0 }))).toBe(true);
       expect(await hasErrors(plainToInstance(UpdateLibraryDto, { fileWriteCbxMaxFileSizeMb: 500 }))).toBe(false);
+      expect(await hasErrors(plainToInstance(UpdateLibraryDto, { fileWriteKindleMaxFileSizeMb: 0 }))).toBe(true);
+      expect(await hasErrors(plainToInstance(UpdateLibraryDto, { fileWriteKindleMaxFileSizeMb: 100 }))).toBe(false);
       expect(await hasErrors(plainToInstance(UpdateLibraryDto, { fileWriteAudioMaxFileSizeMb: 0 }))).toBe(true);
       expect(await hasErrors(plainToInstance(UpdateLibraryDto, { fileWriteAudioMaxFileSizeMb: 500 }))).toBe(false);
     });

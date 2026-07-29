@@ -50,5 +50,5 @@ const visibleFormats = computed(() => formats.value.slice(0, 2))
       <div v-for="file in formattedFiles" :key="file.id" class="text-xs">{{ file.format ?? t('book.table.format.unknown') }} ({{ file.role }})</div>
     </TooltipContent>
   </Tooltip>
-  <span v-else class="text-xs text-muted-foreground/40">-</span>
+  <span v-else class="text-xs text-muted-foreground">-</span>
 </template>

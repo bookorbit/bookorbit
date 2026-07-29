@@ -22,7 +22,7 @@ function goToBook() {
 <template>
   <div class="flex h-full flex-col p-3">
     <div class="mb-2 flex items-center gap-2 self-start">
-      <Highlighter :size="16" class="text-primary/90" />
+      <Highlighter :size="16" class="text-primary" />
       <span class="text-[15px] font-semibold text-foreground">{{ t('dashboard.widgets.highlightOfTheDay.title') }}</span>
     </div>
 
@@ -40,7 +40,7 @@ function goToBook() {
     <!-- Empty -->
     <div v-else-if="!data" class="flex flex-1 flex-col items-center justify-center gap-2">
       <div class="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-        <Highlighter :size="16" class="text-muted-foreground/60" />
+        <Highlighter :size="16" class="text-muted-foreground" />
       </div>
       <p class="text-center text-xs text-muted-foreground">{{ t('dashboard.widgets.highlightOfTheDay.empty') }}</p>
     </div>
@@ -48,7 +48,7 @@ function goToBook() {
     <!-- Quote -->
     <div v-else class="flex flex-1 flex-col justify-between gap-2 overflow-hidden">
       <blockquote
-        class="overflow-y-auto border-l-2 border-primary/40 py-1 pl-3 text-xs italic leading-relaxed text-foreground/90 [scrollbar-width:thin]"
+        class="overflow-y-auto border-l-2 border-primary/40 py-1 pl-3 text-xs italic leading-relaxed text-foreground [scrollbar-width:thin]"
       >
         "{{ data.text.length > 200 ? data.text.slice(0, 200) + '...' : data.text }}"
       </blockquote>
@@ -69,7 +69,7 @@ function goToBook() {
           <p class="truncate text-[12px] font-medium leading-tight">{{ data.bookTitle ?? t('dashboard.common.untitled') }}</p>
           <p v-if="data.chapterTitle" class="truncate text-[11px] text-muted-foreground">{{ data.chapterTitle }}</p>
         </div>
-        <ExternalLink :size="14" class="mr-1 shrink-0 text-muted-foreground/50" />
+        <ExternalLink :size="14" class="mr-1 shrink-0 text-muted-foreground" />
       </button>
     </div>
   </div>

@@ -171,6 +171,23 @@ describe('useReaderSettings - load() with valid cbx localStorage delta', () => {
     expect(s.bookDelta.value).toMatchObject({ fitMode: 'fit-page', viewMode: 'two-page' })
     expect(s.isCustomized.value).toBe(true)
   })
+
+  it('keeps bounded integer spread gaps and removes invalid values', async () => {
+    localStorage.setItem(`reader:book:${BOOK_FILE_ID}`, JSON.stringify({ spreadGap: 0, viewMode: 'two-page' }))
+
+    const valid = useReaderSettings(BOOK_FILE_ID, 'cbz')
+    await valid.load()
+
+    expect(valid.bookDelta.value).toMatchObject({ spreadGap: 0, viewMode: 'two-page' })
+
+    localStorage.setItem(`reader:book:${BOOK_FILE_ID}`, JSON.stringify({ spreadGap: 65, viewMode: 'two-page' }))
+
+    const invalid = useReaderSettings(BOOK_FILE_ID, 'cbz')
+    await invalid.load()
+
+    expect(invalid.bookDelta.value).toEqual({ viewMode: 'two-page' })
+    expect(JSON.parse(localStorage.getItem(`reader:book:${BOOK_FILE_ID}`) ?? '{}')).toEqual({ viewMode: 'two-page' })
+  })
 })
 
 describe('useReaderSettings - updateBookSettings', () => {

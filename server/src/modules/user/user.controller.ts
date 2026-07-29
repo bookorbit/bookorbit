@@ -31,6 +31,7 @@ import type { MultipartRequest } from '../../common/types/multipart-request';
 import type { RequestUser } from '../../common/types/request-user';
 import { CreateUserDto } from './dto/create-user.dto';
 import { CreateSharedUserDto } from './dto/create-shared-user.dto';
+import { ListUsersDto } from './dto/list-users.dto';
 import { SetLibrariesDto } from './dto/set-libraries.dto';
 import { SetPermissionsDto } from './dto/set-permissions.dto';
 import { SetContentFiltersDto } from './dto/set-content-filters.dto';
@@ -53,12 +54,8 @@ export class UserController {
 
   @Get()
   @RequirePermission(Permission.ManageUsers)
-  findAll(
-    @Query('page', new ParseIntPipe({ optional: true })) page?: number,
-    @Query('pageSize', new ParseIntPipe({ optional: true })) pageSize?: number,
-    @Query('provisioningMethod') provisioningMethod?: string,
-  ) {
-    return this.userService.findAll(page, pageSize, provisioningMethod);
+  findAll(@Query() query: ListUsersDto) {
+    return this.userService.findAll(query);
   }
 
   // Must be before :id routes to avoid named segments being parsed as ints

@@ -45,10 +45,12 @@ import type {
   BookMetadataRefreshPreviewFields,
   BookMetadataRefreshPreviewResponse,
   BookMetadataLockField,
+  BookDeletionAuditMeta,
   BookQuery,
   BookWriteAndRenameResult,
   BooksPage,
   FileRenameResult,
+  GroupRule,
   JumpBucketsResponse,
   JumpBucketsQuery,
   MetadataFetchDiagnostics,
@@ -94,6 +96,10 @@ import type { UpdateBookMetadataAndLocksDto } from './dto/update-book-metadata-a
 import { buildBookDetailSupplementalFields } from './utils/build-book-detail-supplemental-fields';
 import type { SetStatusDto } from '../user-book-status/dto/set-status.dto';
 
+type SeriesCollapseQueryOptions = {
+  seriesSelectionFilter: GroupRule | undefined;
+};
+
 const METADATA_UPDATE_FAILPOINTS = [
   'afterScalarUpdate',
   'afterSeriesMembershipsReplace',
@@ -132,6 +138,8 @@ const EXPORT_LIMITS = {
   MAX_PROJECTED_BYTES: 8 * 1024 * 1024 * 1024,
   MAX_CONCURRENT_PER_USER: 2,
 } as const;
+
+const MAX_DELETION_AUDIT_BOOKS = 25;
 
 type ExportCandidateFile = {
   bookId: number;
@@ -1033,10 +1041,16 @@ export class BookService {
     return this.executeBooksQuery(user.id, where, query);
   }
 
-  async executeBooksQuery(userId: number, where: SQL | undefined, query: BookQuery): Promise<BooksPage> {
+  async executeBooksQuery(
+    userId: number,
+    where: SQL | undefined,
+    query: BookQuery,
+    collapseOptions?: SeriesCollapseQueryOptions,
+  ): Promise<BooksPage> {
     const start = Date.now();
     const { page, size } = query.pagination;
-    const shouldCollapse = query.collapseSeries === true && !BookQueryBuilder.hasSeriesSelectionFilter(query.filter);
+    const seriesSelectionFilter = collapseOptions ? collapseOptions.seriesSelectionFilter : query.filter;
+    const shouldCollapse = query.collapseSeries === true && !BookQueryBuilder.hasSeriesSelectionFilter(seriesSelectionFilter);
 
     if (shouldCollapse) {
       const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows, narratorRows, seriesMembershipRows, total } =
@@ -1124,12 +1138,19 @@ export class BookService {
     return this.executeJumpBucketsQuery(user.id, where, query, timeZone);
   }
 
-  async executeJumpBucketsQuery(userId: number, where: SQL | undefined, query: JumpBucketsQuery, timeZone = 'UTC'): Promise<JumpBucketsResponse> {
+  async executeJumpBucketsQuery(
+    userId: number,
+    where: SQL | undefined,
+    query: JumpBucketsQuery,
+    timeZone = 'UTC',
+    collapseOptions?: SeriesCollapseQueryOptions,
+  ): Promise<JumpBucketsResponse> {
     const event = 'book.jump_buckets';
     const strategy = jumpRailStrategyForSort(query.sort);
     const kind = strategy?.kind ?? null;
     const primary = query.sort[0] ?? { field: 'title' as const, dir: 'asc' as const };
-    const shouldCollapse = query.collapseSeries === true && !BookQueryBuilder.hasSeriesSelectionFilter(query.filter);
+    const seriesSelectionFilter = collapseOptions ? collapseOptions.seriesSelectionFilter : query.filter;
+    const shouldCollapse = query.collapseSeries === true && !BookQueryBuilder.hasSeriesSelectionFilter(seriesSelectionFilter);
     if (!strategy) throw new BadRequestException('jump buckets are not available for this sort');
 
     const start = Date.now();
@@ -1453,16 +1474,25 @@ export class BookService {
     return this.bookRepo.searchAcrossLibraries(libraryIds, q, limit, contentFilters);
   }
 
-  async deleteBooks(bookIds: number[], user: RequestUser): Promise<void> {
+  async deleteBooks(bookIds: number[], user: RequestUser): Promise<BookDeletionAuditMeta> {
     const event = 'book.delete_books';
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] count=${bookIds.length} userId=${user.id} - delete books started`);
     try {
       if (bookIds.length === 0) {
         this.logger.log(`[${event}] [end] count=0 durationMs=${Date.now() - startedAt} deletedBooks=0 deletedFiles=0 - delete books completed`);
-        return;
+        return { total: 0, books: [], omitted: 0 };
       }
       const rows = await this.verifyLibraryAccessForBookIds(bookIds, user);
+      const rowIds = new Set(rows.map((row) => row.id));
+      const deletedBookIds = [...new Set(bookIds)].filter((bookId) => rowIds.has(bookId));
+      const auditedBookIds = deletedBookIds.slice(0, MAX_DELETION_AUDIT_BOOKS);
+      const auditRows = await this.bookRepo.findDeletionAuditBooksByIds(auditedBookIds);
+      const auditRowsById = new Map(auditRows.map((row) => [row.id, row]));
+      const auditBooks = auditedBookIds.flatMap((bookId) => {
+        const row = auditRowsById.get(bookId);
+        return row ? [row] : [];
+      });
       const files = await this.bookRepo.findAllFilesByBookIds(bookIds);
       await this.bookRepo.deleteByIds(bookIds);
       const deleteTargets = [
@@ -1491,6 +1521,11 @@ export class BookService {
       this.logger.log(
         `[${event}] [end] count=${bookIds.length} durationMs=${Date.now() - startedAt} deletedBooks=${rows.length} deletedFiles=${files.length} failedDeletes=${failedDeletes} - delete books completed`,
       );
+      return {
+        total: rows.length,
+        books: auditBooks,
+        omitted: Math.max(0, rows.length - auditBooks.length),
+      };
     } catch (err) {
       const errorClass = err instanceof Error ? err.name : 'Error';
       const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
@@ -1737,7 +1772,7 @@ export class BookService {
           this.fileRenameService?.scheduleRename(id, user.id);
         }
       }
-      this.scoreService.calculateAndSave(id).catch((err: Error) => this.logger.warn(`Score calculation failed for book ${id}: ${err.message}`));
+      await this.scoreService.calculateAndSave(id);
     }
 
     const detail = await this.getDetail(id, user);
@@ -2171,7 +2206,7 @@ export class BookService {
     const updatableIds = bookIds.filter((bookId) => !lockedIds.has(bookId));
     if (updatableIds.length > 0) {
       await this.bookRepo.bulkSetRating(updatableIds, rating, user.id);
-      this.triggerPostMetadataUpdateEffects(updatableIds, user.id);
+      await this.triggerPostMetadataUpdateEffects(updatableIds, user.id);
       this.achievementEvents?.emit(ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED, {
         userId: user.id,
         bookIds: updatableIds,
@@ -2238,7 +2273,7 @@ export class BookService {
           }
         });
       }
-      this.triggerPostMetadataUpdateEffects(updatableIds, user.id);
+      await this.triggerPostMetadataUpdateEffects(updatableIds, user.id);
     }
     this.logger.log(
       `[${event}] [end] userId=${user.id} count=${bookIds.length} field=${field} updated=${updatableIds.length} skippedLocked=${lockedIds.size} durationMs=${Date.now() - startedAt} - bulk set metadata completed`,
@@ -2265,7 +2300,7 @@ export class BookService {
         await this.metadataService.replaceTags(bookId, next, { executor: tx });
       }
     });
-    this.triggerPostMetadataUpdateEffects(bookIds, user.id);
+    await this.triggerPostMetadataUpdateEffects(bookIds, user.id);
 
     this.logger.log(
       `[${event}] [end] userId=${user.id} count=${bookIds.length} mode=${mode} tagCount=${tags.length} durationMs=${Date.now() - startedAt} - bulk update tags completed`,
@@ -2460,7 +2495,7 @@ export class BookService {
     }
 
     if (allUpdatedBookIds.size > 0) {
-      this.triggerPostMetadataUpdateEffects([...allUpdatedBookIds], user.id);
+      await this.triggerPostMetadataUpdateEffects([...allUpdatedBookIds], user.id);
     }
 
     const result: BulkEditMetadataResult = {
@@ -3250,14 +3285,13 @@ export class BookService {
     );
   }
 
-  private triggerPostMetadataUpdateEffects(bookIds: number[], userId: number): void {
+  private async triggerPostMetadataUpdateEffects(bookIds: number[], userId: number): Promise<void> {
     for (const bookId of bookIds) {
       this.fileWriteService?.scheduleWrite(bookId, 'auto', userId);
       this.fileRenameService?.scheduleRename(bookId, userId);
-      void this.scoreService
-        .calculateAndSave(bookId)
-        .catch((err: Error) => this.logger.warn(`Score calculation failed for book ${bookId}: ${err.message}`));
     }
+
+    await this.scoreService.calculateAndSaveMany(bookIds);
   }
 
   private resolveChapters(

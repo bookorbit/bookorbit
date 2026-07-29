@@ -208,7 +208,7 @@ watch(
       <div class="relative z-10 w-full max-w-lg mx-4 max-h-[90vh] bg-card border border-border rounded-lg shadow-2xl flex flex-col">
         <!-- Header -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-          <h2 class="text-base font-semibold text-foreground">{{ t('book.bulkEdit.title', { count: bookCount }, bookCount) }}</h2>
+          <h2 class="text-base font-semibold text-foreground">{{ t('book.bulkEdit.title', { count: bookCount }) }}</h2>
           <button
             type="button"
             class="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"

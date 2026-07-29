@@ -257,13 +257,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
 
       await this.persistResolved(bookId, resolved, providerIds, authorRows, genreRows, narratorRows);
 
-      this.scoreService
-        .calculateAndSave(bookId)
-        .catch((err: Error) =>
-          this.logger.warn(
-            `[book.metadata_fetch.score_recalc] [fail] bookId=${bookId} errorClass=${err.name} error="${sanitizeLogValue(err.message)}" - metadata score recalculation failed`,
-          ),
-        );
+      await this.scoreService.calculateAndSave(bookId);
 
       this.logger.debug(`[book.metadata_fetch] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} - metadata fetch completed`);
       await this.queueRepo.markDone(bookId);

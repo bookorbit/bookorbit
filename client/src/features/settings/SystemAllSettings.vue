@@ -51,10 +51,10 @@ watch(availableTabs, (tabs) => {
 })
 
 const tabWidths: Record<Tab, string> = {
-  'file-naming': 'max-w-7xl',
+  'file-naming': 'max-w-5xl',
   'book-dock': 'max-w-3xl',
   maintenance: 'max-w-3xl',
-  'audit-log': 'max-w-7xl',
+  'audit-log': 'max-w-[96rem]',
 }
 
 function selectTab(tab: Tab) {
@@ -69,7 +69,7 @@ function selectTab(tab: Tab) {
   <div
     :class="[
       tabWidths[activeTab],
-      'flex gap-1 mb-5 md:mb-6 border-b border-border overflow-x-auto md:overflow-visible md:static sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 snap-x',
+      'flex gap-1 mb-5 md:mb-6 border-b border-border overflow-x-auto md:overflow-visible md:static sticky top-0 z-20 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80 snap-x',
     ]"
   >
     <button

@@ -29,7 +29,7 @@ function getDayLabel(dateStr: string): string {
 
 const consistencyLabel = computed(() => {
   if (!data.value) return ''
-  const activeDays = t('dashboard.widgets.readingRhythm.activeDays', { count: data.value.activeDays }, data.value.activeDays)
+  const activeDays = t('dashboard.widgets.readingRhythm.activeDays', { count: data.value.activeDays })
   return t('dashboard.widgets.readingRhythm.consistency', {
     activeDays,
     percent: data.value.consistencyPercent,
@@ -40,7 +40,7 @@ const consistencyLabel = computed(() => {
 <template>
   <div class="flex h-full flex-col p-3">
     <div class="mb-2 flex items-center gap-2 self-start">
-      <HeartPulse :size="16" class="text-primary/90" />
+      <HeartPulse :size="16" class="text-primary" />
       <span class="text-[15px] font-semibold text-foreground">{{ t('dashboard.widgets.readingRhythm.title') }}</span>
     </div>
 
@@ -55,7 +55,7 @@ const consistencyLabel = computed(() => {
 
     <div v-else-if="!data || data.activeDays === 0" class="flex flex-1 flex-col items-center justify-center gap-2">
       <div class="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-        <HeartPulse :size="16" class="text-muted-foreground/60" />
+        <HeartPulse :size="16" class="text-muted-foreground" />
       </div>
       <p class="text-center text-xs text-muted-foreground">{{ t('dashboard.widgets.readingRhythm.empty') }}</p>
     </div>
@@ -73,7 +73,7 @@ const consistencyLabel = computed(() => {
 
       <div class="flex gap-[3px] pb-1 pt-0.5">
         <div v-for="day in data.days" :key="day.date + '-lbl'" class="flex flex-1 justify-center">
-          <span class="text-[8.5px] text-muted-foreground/70">{{ getDayLabel(day.date) }}</span>
+          <span class="text-[8.5px] text-muted-foreground">{{ getDayLabel(day.date) }}</span>
         </div>
       </div>
 

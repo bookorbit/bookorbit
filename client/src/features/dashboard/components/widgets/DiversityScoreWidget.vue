@@ -22,7 +22,7 @@ const subScores = computed(
 <template>
   <div class="flex h-full flex-col p-3">
     <div class="mb-3 flex items-center gap-2 self-start">
-      <Compass :size="16" class="text-primary/90" />
+      <Compass :size="16" class="text-primary" />
       <span class="text-[15px] font-semibold text-foreground">{{ t('dashboard.widgets.diversityScore.title') }}</span>
     </div>
 
@@ -40,7 +40,7 @@ const subScores = computed(
     <!-- Not enough data -->
     <div v-else-if="!data || data.booksAnalyzed < 3" class="flex flex-1 flex-col items-center justify-center gap-2">
       <div class="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-        <Compass :size="16" class="text-muted-foreground/60" />
+        <Compass :size="16" class="text-muted-foreground" />
       </div>
       <p class="text-center text-xs text-muted-foreground">{{ t('dashboard.widgets.diversityScore.notEnoughData') }}</p>
     </div>
@@ -63,7 +63,7 @@ const subScores = computed(
       </div>
 
       <p class="text-[10px] text-muted-foreground">
-        {{ t('dashboard.widgets.diversityScore.booksAnalyzed', { count: data.booksAnalyzed }, data.booksAnalyzed) }}
+        {{ t('dashboard.widgets.diversityScore.booksAnalyzed', { count: data.booksAnalyzed }) }}
       </p>
     </div>
   </div>

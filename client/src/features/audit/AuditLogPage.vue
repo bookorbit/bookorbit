@@ -1,55 +1,86 @@
 <script setup lang="ts">
-import { onMounted, computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { formatDate as formatLocaleDate } from '@/i18n/formatters'
-import { RefreshCw, Search, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from '@lucide/vue'
-import { AuditAction } from '@bookorbit/types'
-import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
-import { useAuditLog } from './useAuditLog'
 import { useMediaQuery } from '@vueuse/core'
+import type { AuditLogEntry } from '@bookorbit/types'
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, RefreshCw, Search, SlidersHorizontal, X } from '@lucide/vue'
+import { formatDateTime, formatRelativeTime } from '@/i18n/formatters'
+import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
+import AuditActionPicker from './AuditActionPicker.vue'
+import AuditActorPicker from './AuditActorPicker.vue'
+import AuditCategoryBadge from './AuditCategoryBadge.vue'
+import AuditEntryDetails from './AuditEntryDetails.vue'
+import AuditResourcePicker from './AuditResourcePicker.vue'
+import { getAuditActionLabelKey } from './audit-actions'
+import { getAuditCategory, getAuditTarget } from './audit-display'
+import { getBookDeletionAuditMeta } from './audit-meta'
+import { getAuditResourceBadgeClass, getAuditResourceLabelKey } from './audit-resources'
+import { useAuditLog } from './useAuditLog'
+
+type FilterKey = 'search' | 'action' | 'actorUsername' | 'resource' | 'dateFrom' | 'dateTo'
 
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
-
-const { entries, total, page, pageSize, loading, error, filters, fetchPage, applyFilters, clearFilters, goToPage } = useAuditLog()
 const { t } = useI18n()
+const { entries, actors, total, page, pageSize, loading, error, filters, fetchPage, fetchActors, applyFilters, clearFilters, goToPage } =
+  useAuditLog()
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize))
-const hasFilters = computed(() => filters.action || filters.userId || filters.dateFrom || filters.dateTo)
 const isMobile = useMediaQuery('(max-width: 767px)')
 const filtersOpen = ref(true)
 const expandedDetailsIds = ref<number[]>([])
-const expandedTextIds = ref<number[]>([])
+const currentTime = ref(Date.now())
+let clockTimer: ReturnType<typeof setInterval> | undefined
 
 const activeFilterChips = computed(() => {
-  const chips: string[] = []
-  if (filters.action) chips.push(t('audit.chips.action', { value: filters.action }))
-  if (filters.userId) chips.push(t('audit.chips.user', { value: filters.userId }))
-  if (filters.dateFrom) chips.push(t('audit.chips.from', { value: filters.dateFrom }))
-  if (filters.dateTo) chips.push(t('audit.chips.to', { value: filters.dateTo }))
+  const chips: { key: FilterKey; label: string; toneClass?: string }[] = []
+  if (filters.search) chips.push({ key: 'search', label: t('audit.chips.search', { value: filters.search }) })
+  if (filters.action) chips.push({ key: 'action', label: t('audit.chips.eventType', { value: t(getAuditActionLabelKey(filters.action)) }) })
+  if (filters.actorUsername) chips.push({ key: 'actorUsername', label: t('audit.chips.actor', { value: filters.actorUsername }) })
+  if (filters.resource) {
+    chips.push({
+      key: 'resource',
+      label: t('audit.chips.targetType', { value: t(getAuditResourceLabelKey(filters.resource)) }),
+      toneClass: getAuditResourceBadgeClass(filters.resource),
+    })
+  }
+  if (filters.dateFrom) chips.push({ key: 'dateFrom', label: t('audit.chips.from', { value: filters.dateFrom }) })
+  if (filters.dateTo) chips.push({ key: 'dateTo', label: t('audit.chips.to', { value: filters.dateTo }) })
   return chips
 })
 
-function formatDate(iso: string) {
-  return formatLocaleDate(new Date(iso), {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  })
+const hasFilters = computed(() => activeFilterChips.value.length > 0)
+
+function relativeTimestamp(value: string): string {
+  const differenceMs = new Date(value).getTime() - currentTime.value
+  const absoluteMs = Math.abs(differenceMs)
+  if (absoluteMs < 60_000) return formatRelativeTime(Math.round(differenceMs / 1000), 'second')
+  if (absoluteMs < 3_600_000) return formatRelativeTime(Math.round(differenceMs / 60_000), 'minute')
+  if (absoluteMs < 86_400_000) return formatRelativeTime(Math.round(differenceMs / 3_600_000), 'hour')
+  if (absoluteMs < 2_592_000_000) return formatRelativeTime(Math.round(differenceMs / 86_400_000), 'day')
+  if (absoluteMs < 31_536_000_000) return formatRelativeTime(Math.round(differenceMs / 2_592_000_000), 'month')
+  return formatRelativeTime(Math.round(differenceMs / 31_536_000_000), 'year')
 }
 
-function isFailedAuth(action: string) {
-  return action === AuditAction.AuthLoginFailed
+function exactTimestamp(value: string): string {
+  return formatDateTime(new Date(value))
 }
 
-function handleSearch() {
-  applyFilters()
+function targetSummary(entry: AuditLogEntry): string {
+  return getAuditTarget(
+    entry,
+    t('audit.untitledBook'),
+    (count) => t('audit.targetAdditional', { count }),
+    (resource) => t(getAuditResourceLabelKey(resource)),
+  )
 }
 
-function handleClear() {
-  clearFilters()
+function impactSummary(entry: AuditLogEntry): string {
+  const deletion = getBookDeletionAuditMeta(entry)
+  return deletion ? t('audit.bookImpact', { count: deletion.total }) : '-'
+}
+
+function detailRegionId(entryId: number, layout: 'desktop' | 'mobile') {
+  return `audit-entry-${entryId}-${layout}-details`
 }
 
 function toggleDetails(id: number) {
@@ -58,25 +89,82 @@ function toggleDetails(id: number) {
     : [...expandedDetailsIds.value, id]
 }
 
-function toggleText(id: number) {
-  expandedTextIds.value = expandedTextIds.value.includes(id)
-    ? expandedTextIds.value.filter((entryId) => entryId !== id)
-    : [...expandedTextIds.value, id]
-}
-
 function isDetailsOpen(id: number) {
   return expandedDetailsIds.value.includes(id)
 }
 
-function isTextOpen(id: number) {
-  return expandedTextIds.value.includes(id)
+function handleSearch() {
+  void applyFilters()
 }
 
-function hasLongText(entry: { action: string; description: string }) {
-  return entry.action.length > 32 || entry.description.length > 100
+function handleClear() {
+  void clearFilters()
 }
 
-onMounted(fetchPage)
+function handleRefresh() {
+  void fetchPage()
+}
+
+function toggleFilters() {
+  filtersOpen.value = !filtersOpen.value
+}
+
+function handlePreviousPage() {
+  void goToPage(page.value - 1)
+}
+
+function handleNextPage() {
+  void goToPage(page.value + 1)
+}
+
+function filterActor(entry: AuditLogEntry) {
+  filters.actorUsername = entry.actorUsername
+  handleSearch()
+}
+
+function removeFilter(key: FilterKey) {
+  filters[key] = ''
+  handleSearch()
+}
+
+function localDateValue(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function applyDatePreset(days: number) {
+  const to = new Date()
+  const from = new Date()
+  from.setDate(from.getDate() - days + 1)
+  filters.dateFrom = localDateValue(from)
+  filters.dateTo = localDateValue(to)
+  handleSearch()
+}
+
+function handleToday() {
+  applyDatePreset(1)
+}
+
+function handleSevenDays() {
+  applyDatePreset(7)
+}
+
+function handleThirtyDays() {
+  applyDatePreset(30)
+}
+
+onMounted(() => {
+  void Promise.all([fetchPage(), fetchActors()])
+  clockTimer = setInterval(() => {
+    currentTime.value = Date.now()
+  }, 60_000)
+})
+
+onUnmounted(() => {
+  if (clockTimer) clearInterval(clockTimer)
+})
 
 watch(
   isMobile,
@@ -89,223 +177,240 @@ watch(
 
 <template>
   <SettingsPageHeader v-if="!props.embedded" class="hidden md:flex" :title="t('audit.pageTitle')" :subtitle="t('audit.pageSubtitle')" />
-  <div v-if="!props.embedded" class="md:hidden px-1">
+  <div v-if="!props.embedded" class="px-1 md:hidden">
     <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ t('audit.pageTitle') }}</h1>
-    <p
-      class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
-    >
-      {{ t('audit.pageSubtitle') }}
-    </p>
+    <p class="mt-1 text-sm leading-5 text-muted-foreground">{{ t('audit.pageSubtitle') }}</p>
   </div>
 
-  <div class="mt-5 md:mt-0 space-y-4">
-    <div class="border border-border rounded-lg bg-card overflow-hidden shadow-xs">
-      <button
-        class="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
-        @click="filtersOpen = !filtersOpen"
-      >
-        <div class="min-w-0">
-          <p class="text-sm font-medium text-foreground">{{ t('audit.filters') }}</p>
-          <p v-if="activeFilterChips.length === 0" class="text-xs text-muted-foreground">{{ t('audit.noActiveFilters') }}</p>
-          <div v-else class="mt-1 flex flex-wrap gap-1.5">
-            <span
-              v-for="chip in activeFilterChips"
-              :key="chip"
-              class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
-            >
-              {{ chip }}
-            </span>
+  <div class="mt-5 space-y-4 md:mt-0">
+    <section class="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+      <div>
+        <button
+          type="button"
+          class="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-controls="audit-filters"
+          :aria-expanded="filtersOpen"
+          @click="toggleFilters"
+        >
+          <div class="flex min-w-0 items-center gap-2">
+            <SlidersHorizontal :size="15" class="text-muted-foreground" aria-hidden="true" />
+            <p class="text-sm font-medium text-foreground">{{ t('audit.filters') }}</p>
+            <span v-if="!hasFilters" class="text-xs text-muted-foreground">{{ t('audit.noActiveFilters') }}</span>
+          </div>
+          <ChevronUp v-if="filtersOpen" :size="15" class="shrink-0 text-muted-foreground" aria-hidden="true" />
+          <ChevronDown v-else :size="15" class="shrink-0 text-muted-foreground" aria-hidden="true" />
+        </button>
+        <div v-if="hasFilters" class="flex flex-wrap gap-1.5 px-3 pb-2.5">
+          <button
+            v-for="chip in activeFilterChips"
+            :key="chip.key"
+            type="button"
+            class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] hover:text-foreground"
+            :class="chip.toneClass ?? 'border-transparent bg-muted text-muted-foreground'"
+            :aria-label="t('audit.removeFilter', { value: chip.label })"
+            @click.stop="removeFilter(chip.key)"
+          >
+            {{ chip.label }}
+            <X :size="11" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      <div v-if="filtersOpen" id="audit-filters" class="space-y-2.5 border-t border-border p-3">
+        <div class="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+          <div>
+            <label for="audit-search" class="text-xs text-muted-foreground">{{ t('audit.filterLabels.search') }}</label>
+            <div class="relative mt-1">
+              <Search :size="15" class="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <input
+                id="audit-search"
+                v-model="filters.search"
+                class="h-9 w-full rounded-md border border-input bg-background ps-9 pe-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                :placeholder="t('audit.filterPlaceholders.search')"
+                @keydown.enter="handleSearch"
+              />
+            </div>
+          </div>
+          <div>
+            <label for="audit-action" class="text-xs text-muted-foreground">{{ t('audit.filterLabels.eventType') }}</label>
+            <AuditActionPicker id="audit-action" v-model="filters.action" />
+          </div>
+          <div>
+            <label for="audit-actor" class="text-xs text-muted-foreground">{{ t('audit.filterLabels.actor') }}</label>
+            <AuditActorPicker id="audit-actor" v-model="filters.actorUsername" :actors="actors" />
+          </div>
+          <div>
+            <label for="audit-resource" class="text-xs text-muted-foreground">{{ t('audit.filterLabels.targetType') }}</label>
+            <AuditResourcePicker id="audit-resource" v-model="filters.resource" />
           </div>
         </div>
-        <ChevronUp v-if="filtersOpen" :size="15" class="text-muted-foreground shrink-0" />
-        <ChevronDown v-else :size="15" class="text-muted-foreground shrink-0" />
-      </button>
 
-      <div v-if="filtersOpen" class="border-t border-border p-4">
-        <div class="grid gap-3 md:flex md:flex-wrap md:items-end md:gap-2">
-          <div class="flex flex-col gap-1 md:w-auto">
-            <label class="text-xs text-muted-foreground">{{ t('audit.filterLabels.action') }}</label>
-            <input
-              v-model="filters.action"
-              class="h-9 md:h-8 rounded-md border border-input bg-background px-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring md:w-44"
-              :placeholder="t('audit.filterPlaceholders.action')"
-              @keydown.enter="handleSearch"
-            />
+        <div class="flex flex-col gap-2.5 lg:flex-row lg:items-end lg:justify-between">
+          <div class="grid flex-1 gap-2.5 sm:grid-cols-2 xl:max-w-3xl xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+            <div>
+              <label for="audit-from" class="text-xs text-muted-foreground">{{ t('audit.filterLabels.from') }}</label>
+              <input
+                id="audit-from"
+                v-model="filters.dateFrom"
+                type="date"
+                class="mt-1 h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+            <div>
+              <label for="audit-to" class="text-xs text-muted-foreground">{{ t('audit.filterLabels.to') }}</label>
+              <input
+                id="audit-to"
+                v-model="filters.dateTo"
+                type="date"
+                class="mt-1 h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+            <div>
+              <span class="text-xs text-muted-foreground">{{ t('audit.quickDates') }}</span>
+              <div class="mt-1 flex gap-1">
+                <button type="button" class="settings-btn-outline h-9 px-2.5" @click="handleToday">{{ t('audit.today') }}</button>
+                <button type="button" class="settings-btn-outline h-9 px-2.5" @click="handleSevenDays">{{ t('audit.sevenDays') }}</button>
+                <button type="button" class="settings-btn-outline h-9 px-2.5" @click="handleThirtyDays">{{ t('audit.thirtyDays') }}</button>
+              </div>
+            </div>
           </div>
-          <div class="flex flex-col gap-1 md:w-auto">
-            <label class="text-xs text-muted-foreground">{{ t('audit.filterLabels.userId') }}</label>
-            <input
-              v-model="filters.userId"
-              class="h-9 md:h-8 rounded-md border border-input bg-background px-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring md:w-28"
-              :placeholder="t('audit.filterPlaceholders.userId')"
-              @keydown.enter="handleSearch"
-            />
-          </div>
-          <div class="flex flex-col gap-1 md:w-auto">
-            <label class="text-xs text-muted-foreground">{{ t('audit.filterLabels.from') }}</label>
-            <input
-              v-model="filters.dateFrom"
-              type="date"
-              class="h-9 md:h-8 rounded-md border border-input bg-background px-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-            />
-          </div>
-          <div class="flex flex-col gap-1 md:w-auto">
-            <label class="text-xs text-muted-foreground">{{ t('audit.filterLabels.to') }}</label>
-            <input
-              v-model="filters.dateTo"
-              type="date"
-              class="h-9 md:h-8 rounded-md border border-input bg-background px-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-            />
-          </div>
-          <div class="hidden md:flex gap-2">
-            <button class="settings-btn-primary h-8" @click="handleSearch">
-              <Search :size="13" />
+          <div class="flex gap-2">
+            <button type="button" class="settings-btn-primary h-9" @click="handleSearch">
+              <Search :size="14" aria-hidden="true" />
               {{ t('common.search') }}
             </button>
-            <button v-if="hasFilters" class="settings-btn-outline h-8" @click="handleClear">
-              <X :size="13" />
+            <button v-if="hasFilters" type="button" class="settings-btn-outline h-9" @click="handleClear">
+              <X :size="14" aria-hidden="true" />
               {{ t('audit.clear') }}
             </button>
-            <button class="settings-btn-outline h-8" :disabled="loading" @click="fetchPage">
-              <RefreshCw :size="13" :class="loading ? 'animate-spin' : ''" />
+            <button type="button" class="settings-btn-outline h-9 px-2.5" :aria-label="t('audit.refresh')" :disabled="loading" @click="handleRefresh">
+              <RefreshCw :size="14" :class="{ 'animate-spin': loading }" aria-hidden="true" />
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="md:hidden sticky top-0 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
-      <div class="flex items-center gap-2">
-        <button class="settings-btn-primary h-9 flex-1 justify-center" @click="handleSearch">
-          <Search :size="13" />
-          {{ t('common.search') }}
-        </button>
-        <button v-if="hasFilters" class="settings-btn-outline h-9" @click="handleClear">
-          <X :size="13" />
-          {{ t('audit.clear') }}
-        </button>
-        <button class="settings-btn-outline h-9 px-2.5" :disabled="loading" @click="fetchPage">
-          <RefreshCw :size="13" :class="loading ? 'animate-spin' : ''" />
-        </button>
-      </div>
-    </div>
+    <p v-if="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
 
-    <div v-if="error" class="text-sm text-destructive">{{ error }}</div>
-
-    <div class="hidden md:block rounded-lg border border-border overflow-hidden shadow-xs">
-      <table class="w-full text-sm">
-        <thead class="bg-muted/50">
+    <div class="hidden overflow-hidden rounded-lg border border-border shadow-xs md:block">
+      <table class="w-full table-fixed text-sm">
+        <thead class="sticky top-0 z-10 bg-muted/70 backdrop-blur">
           <tr>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">{{ t('audit.columns.when') }}</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">{{ t('audit.columns.user') }}</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">{{ t('audit.columns.action') }}</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground">{{ t('audit.columns.description') }}</th>
-            <th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap hidden md:table-cell">{{ t('audit.columns.ip') }}</th>
+            <th class="w-32 px-3 py-2.5 text-start font-medium text-muted-foreground">{{ t('audit.columns.when') }}</th>
+            <th class="w-44 px-3 py-2.5 text-start font-medium text-muted-foreground">{{ t('audit.columns.actor') }}</th>
+            <th class="hidden w-36 px-3 py-2.5 text-start font-medium text-muted-foreground xl:table-cell">{{ t('audit.detailCategory') }}</th>
+            <th class="w-[38%] px-3 py-2.5 text-start font-medium text-muted-foreground xl:w-[30%]">{{ t('audit.columns.event') }}</th>
+            <th class="px-3 py-2.5 text-start font-medium text-muted-foreground">{{ t('audit.columns.target') }}</th>
+            <th class="w-24 px-3 py-2.5 text-start font-medium text-muted-foreground">{{ t('audit.columns.impact') }}</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-border">
           <tr v-if="loading">
-            <td colspan="5" class="px-4 py-8 text-center text-sm text-muted-foreground">{{ t('common.loading') }}</td>
+            <td colspan="6" class="px-4 py-10 text-center text-muted-foreground">{{ t('common.loading') }}</td>
           </tr>
           <tr v-else-if="entries.length === 0">
-            <td colspan="5" class="px-4 py-8 text-center text-sm text-muted-foreground">{{ t('audit.empty') }}</td>
+            <td colspan="6" class="px-4 py-10 text-center text-muted-foreground">{{ t('audit.empty') }}</td>
           </tr>
-          <tr
-            v-else
-            v-for="entry in entries"
-            :key="entry.id"
-            class="transition-colors"
-            :class="isFailedAuth(entry.action) ? 'bg-destructive/5 hover:bg-destructive/10' : 'hover:bg-muted/30'"
-          >
-            <td class="px-4 py-2.5 text-muted-foreground text-xs whitespace-nowrap">{{ formatDate(entry.createdAt) }}</td>
-            <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap">{{ entry.actorUsername }}</td>
-            <td class="px-4 py-2.5 whitespace-nowrap">
-              <span
-                class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium font-mono"
-                :class="isFailedAuth(entry.action) ? 'bg-destructive/15 text-destructive' : 'bg-muted text-muted-foreground'"
-              >
-                {{ entry.action }}
-              </span>
-            </td>
-            <td class="px-4 py-2.5 text-muted-foreground max-w-xs truncate">{{ entry.description }}</td>
-            <td class="px-4 py-2.5 text-muted-foreground font-mono text-xs hidden md:table-cell">{{ entry.ip ?? '-' }}</td>
-          </tr>
+          <template v-else v-for="entry in entries" :key="entry.id">
+            <tr class="group transition-colors hover:bg-muted/30">
+              <td class="px-3 py-2.5 text-xs text-muted-foreground">
+                <time :datetime="entry.createdAt" :title="exactTimestamp(entry.createdAt)">{{ relativeTimestamp(entry.createdAt) }}</time>
+              </td>
+              <td class="px-3 py-2.5">
+                <button
+                  type="button"
+                  class="max-w-28 truncate text-start text-xs font-medium text-foreground hover:text-primary hover:underline"
+                  @click="filterActor(entry)"
+                >
+                  {{ entry.actorUsername }}
+                </button>
+                <span v-if="entry.userId !== null" class="ms-1 text-[11px] text-muted-foreground">{{
+                  t('audit.userIdCompact', { id: entry.userId })
+                }}</span>
+              </td>
+              <td class="hidden px-3 py-2.5 xl:table-cell">
+                <AuditCategoryBadge :category="getAuditCategory(entry.action)" />
+              </td>
+              <td class="px-3 py-2.5">
+                <div class="flex min-w-0 items-center gap-2">
+                  <AuditCategoryBadge class="shrink-0 xl:hidden" :category="getAuditCategory(entry.action)" />
+                  <p class="min-w-0 flex-1 truncate font-medium text-foreground" :title="entry.description">{{ entry.description }}</p>
+                  <button
+                    type="button"
+                    class="shrink-0 rounded px-1.5 py-1 text-xs text-primary hover:bg-muted hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    :aria-expanded="isDetailsOpen(entry.id)"
+                    :aria-controls="detailRegionId(entry.id, 'desktop')"
+                    @click="toggleDetails(entry.id)"
+                  >
+                    {{ isDetailsOpen(entry.id) ? t('audit.hideDetails') : t('audit.details') }}
+                  </button>
+                </div>
+              </td>
+              <td class="px-3 py-2.5 text-sm text-muted-foreground">{{ targetSummary(entry) }}</td>
+              <td class="px-3 py-2.5 text-xs font-medium text-foreground">{{ impactSummary(entry) }}</td>
+            </tr>
+            <tr v-if="isDetailsOpen(entry.id)">
+              <td colspan="6" class="bg-muted/20 px-4 py-3">
+                <AuditEntryDetails :id="detailRegionId(entry.id, 'desktop')" :entry="entry" />
+              </td>
+            </tr>
+          </template>
         </tbody>
       </table>
     </div>
 
-    <div class="md:hidden border border-border rounded-lg bg-card overflow-hidden divide-y divide-border shadow-xs">
-      <div v-if="loading" class="px-4 py-8 text-center text-sm text-muted-foreground">{{ t('common.loading') }}</div>
-      <div v-else-if="entries.length === 0" class="px-4 py-8 text-center text-sm text-muted-foreground">{{ t('audit.empty') }}</div>
-      <div v-else v-for="entry in entries" :key="entry.id" class="px-4 py-3" :class="isFailedAuth(entry.action) ? 'bg-destructive/5' : 'bg-card'">
+    <div class="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card shadow-xs md:hidden">
+      <div v-if="loading" class="px-4 py-10 text-center text-sm text-muted-foreground">{{ t('common.loading') }}</div>
+      <div v-else-if="entries.length === 0" class="px-4 py-10 text-center text-sm text-muted-foreground">{{ t('audit.empty') }}</div>
+      <article v-else v-for="entry in entries" :key="entry.id" class="px-4 py-3">
         <div class="flex items-start justify-between gap-3">
-          <p class="text-xs text-muted-foreground">{{ formatDate(entry.createdAt) }}</p>
-          <span
-            class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium font-mono"
-            :class="isFailedAuth(entry.action) ? 'bg-destructive/15 text-destructive' : 'bg-muted text-muted-foreground'"
-          >
-            <span :class="isTextOpen(entry.id) ? '' : 'line-clamp-2'">{{ entry.action }}</span>
-          </span>
+          <AuditCategoryBadge :category="getAuditCategory(entry.action)" />
+          <time :datetime="entry.createdAt" :title="exactTimestamp(entry.createdAt)" class="text-xs text-muted-foreground">
+            {{ relativeTimestamp(entry.createdAt) }}
+          </time>
         </div>
-        <p class="mt-1 text-xs font-mono text-muted-foreground">@{{ entry.actorUsername }}</p>
-        <p class="mt-2 text-sm text-muted-foreground" :class="isTextOpen(entry.id) ? '' : 'line-clamp-2'">{{ entry.description }}</p>
-        <div class="mt-2 flex items-center gap-3">
-          <button v-if="hasLongText(entry)" class="text-xs text-primary hover:underline" @click="toggleText(entry.id)">
-            {{ isTextOpen(entry.id) ? t('audit.showLess') : t('audit.showMore') }}
+        <p class="mt-2 font-medium text-foreground">{{ entry.description }}</p>
+        <p class="mt-1 text-sm text-muted-foreground">{{ targetSummary(entry) }}</p>
+        <div class="mt-2 flex items-center justify-between gap-3">
+          <button type="button" class="text-xs font-medium text-foreground hover:text-primary hover:underline" @click="filterActor(entry)">
+            {{ entry.actorUsername }}
           </button>
-          <button class="text-xs text-muted-foreground hover:text-foreground" @click="toggleDetails(entry.id)">
+          <button
+            type="button"
+            class="text-xs text-primary hover:underline"
+            :aria-expanded="isDetailsOpen(entry.id)"
+            :aria-controls="detailRegionId(entry.id, 'mobile')"
+            @click="toggleDetails(entry.id)"
+          >
             {{ isDetailsOpen(entry.id) ? t('audit.hideDetails') : t('audit.details') }}
           </button>
         </div>
-        <div
-          v-if="isDetailsOpen(entry.id)"
-          class="mt-2 rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground space-y-1"
-        >
-          <p class="font-mono">{{ t('audit.detailAction', { value: entry.action }) }}</p>
-          <p class="font-mono">{{ t('audit.detailIp', { value: entry.ip ?? '-' }) }}</p>
-        </div>
-      </div>
+        <AuditEntryDetails v-if="isDetailsOpen(entry.id)" :id="detailRegionId(entry.id, 'mobile')" class="mt-2" :entry="entry" />
+      </article>
     </div>
 
-    <div v-if="totalPages > 1" class="hidden md:flex items-center justify-between text-sm text-muted-foreground">
+    <div v-if="totalPages > 1" class="flex items-center justify-between text-sm text-muted-foreground">
       <span>{{ t('audit.showing', { from: (page - 1) * pageSize + 1, to: Math.min(page * pageSize, total), total }) }}</span>
       <div class="flex items-center gap-1">
         <button
-          class="p-1.5 rounded hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          type="button"
+          class="rounded p-1.5 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+          :aria-label="t('audit.prev')"
           :disabled="page <= 1"
-          @click="goToPage(page - 1)"
+          @click="handlePreviousPage"
         >
-          <ChevronLeft :size="16" />
+          <ChevronLeft :size="16" aria-hidden="true" />
         </button>
         <span class="px-2">{{ page }} / {{ totalPages }}</span>
         <button
-          class="p-1.5 rounded hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          type="button"
+          class="rounded p-1.5 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+          :aria-label="t('common.next')"
           :disabled="page >= totalPages"
-          @click="goToPage(page + 1)"
+          @click="handleNextPage"
         >
-          <ChevronRight :size="16" />
-        </button>
-      </div>
-    </div>
-
-    <div v-if="totalPages > 1" class="md:hidden sticky bottom-2 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
-      <div class="flex items-center justify-between gap-2">
-        <button
-          class="rounded-md border border-border px-3 min-h-9 text-sm text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          :disabled="page <= 1"
-          @click="goToPage(page - 1)"
-        >
-          {{ t('audit.prev') }}
-        </button>
-        <span class="text-xs text-muted-foreground text-center">
-          {{ (page - 1) * pageSize + 1 }}-{{ Math.min(page * pageSize, total) }} / {{ total }}
-        </span>
-        <button
-          class="rounded-md border border-border px-3 min-h-9 text-sm text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          :disabled="page >= totalPages"
-          @click="goToPage(page + 1)"
-        >
-          {{ t('common.next') }}
+          <ChevronRight :size="16" aria-hidden="true" />
         </button>
       </div>
     </div>

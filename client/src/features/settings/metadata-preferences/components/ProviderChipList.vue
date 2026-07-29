@@ -120,7 +120,7 @@ function removeProvider(index: number) {
       </div>
     </VueDraggable>
 
-    <span v-if="localProviders.length === 0 && !disabled" class="text-xs text-muted-foreground/60 italic h-6 flex items-center px-1">
+    <span v-if="localProviders.length === 0 && !disabled" class="text-xs text-muted-foreground italic h-6 flex items-center px-1">
       {{ t('settings.metadata.fieldRules.dragProviderHere') }}
     </span>
   </div>

@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 
+import { createPostgresClientConfig } from '../db/postgres-connection-config';
 import { installPostgresExtensions } from './postgres-extensions';
 
 function resolveMigrationsFolder(): string {
@@ -27,12 +28,13 @@ async function runMigrations() {
     throw new Error('DATABASE_URL is required');
   }
 
-  const pool = new Pool({
-    connectionString,
-    max: 3,
-    idleTimeoutMillis: 10_000,
-    connectionTimeoutMillis: 5_000,
-  });
+  const pool = new Pool(
+    createPostgresClientConfig(connectionString, {
+      max: 3,
+      idleTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 5_000,
+    }),
+  );
 
   try {
     await installPostgresExtensions(pool);

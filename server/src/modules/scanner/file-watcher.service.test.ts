@@ -1,8 +1,9 @@
 import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
 
-import { FileWatcherService } from './file-watcher.service';
+import { FileWatcherService, WATCHER_DEBOUNCE_MS } from './file-watcher.service';
 import { FileEventProcessorService } from './file-event-processor.service';
 import { ScanGateway } from './scan.gateway';
 import { ScannerService } from './scanner.service';
@@ -33,8 +34,9 @@ function makeService(db: any = {}) {
     bufferBooksRestoredNotification: vi.fn(),
   } as unknown as ScannerService;
 
-  const service = new FileWatcherService(db, processor, gateway, scannerService);
-  return { service, processor, gateway, scannerService };
+  const selfWriteRegistry = new SelfWriteRegistry();
+  const service = new FileWatcherService(db, processor, gateway, scannerService, selfWriteRegistry);
+  return { service, processor, gateway, scannerService, selfWriteRegistry };
 }
 
 beforeEach(() => vi.useFakeTimers());
@@ -103,9 +105,10 @@ describe('process()', () => {
     expect(gateway.emitBookMissing).not.toHaveBeenCalled();
   });
 
-  it('schedules a folder scan when handleCreate returns noop (genuinely new file)', async () => {
-    const { service, scannerService } = makeService();
+  it('schedules a folder scan when a file event requires scanning', async () => {
+    const { service, processor, scannerService } = makeService();
     const scheduleFolderScanSpy = vi.spyOn(service as any, 'scheduleFolderScan');
+    processor.handleCreate = vi.fn().mockResolvedValue({ type: 'scan-required', scope: 'file' });
 
     await (service as any).process('create', '/books/new.epub', 5);
 
@@ -113,9 +116,10 @@ describe('process()', () => {
     expect(scannerService.startScanAsync).not.toHaveBeenCalled();
   });
 
-  it('schedules a targeted directory scan when handleCreate noop targets a directory', async () => {
-    const { service, scannerService } = makeService();
+  it('schedules a targeted directory scan when a directory event requires scanning', async () => {
+    const { service, processor, scannerService } = makeService();
     const tempDir = await mkdtemp(join(tmpdir(), 'watcher-dir-create-'));
+    processor.handleCreate = vi.fn().mockResolvedValue({ type: 'scan-required', scope: 'directory' });
 
     try {
       await (service as any).process('create', tempDir, 8);
@@ -127,10 +131,14 @@ describe('process()', () => {
   });
 
   it('suppresses folder scan for file creates under a recently created directory while full scan is running', async () => {
-    const { service, scannerService } = makeService();
+    const { service, processor, scannerService } = makeService();
     const scheduleFolderScanSpy = vi.spyOn(service as any, 'scheduleFolderScan');
     const tempDir = await mkdtemp(join(tmpdir(), 'watcher-dir-suppress-'));
     const nestedFile = join(tempDir, 'book.epub');
+    processor.handleCreate = vi
+      .fn()
+      .mockResolvedValueOnce({ type: 'scan-required', scope: 'directory' })
+      .mockResolvedValueOnce({ type: 'scan-required', scope: 'file' });
 
     try {
       await (service as any).process('create', tempDir, 9);
@@ -155,6 +163,16 @@ describe('process()', () => {
     expect((gateway as any).emitBookMoved).toHaveBeenCalledWith({ libraryId: 1, bookIds: [5] });
     expect(scheduleFolderScanSpy).toHaveBeenCalledWith('/books/moved.epub', 1);
     expect(scannerService.startScanAsync).not.toHaveBeenCalled();
+  });
+
+  it('does not schedule a scan when a create event is already reflected in persisted state', async () => {
+    const { service, scannerService } = makeService();
+    const scheduleFolderScanSpy = vi.spyOn(service as any, 'scheduleFolderScan');
+
+    await (service as any).process('create', '/books/already-updated.epub', 1);
+
+    expect(scheduleFolderScanSpy).not.toHaveBeenCalled();
+    expect(scannerService.scanBookDirectoryAsync).not.toHaveBeenCalled();
   });
 
   it('emits book-transferred when an event processor result crosses libraries', async () => {
@@ -225,6 +243,76 @@ describe('schedule() debounce', () => {
     await Promise.resolve();
 
     expect(processSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('defers a self-write event until the write is released', async () => {
+    const { service, selfWriteRegistry } = makeService();
+    const path = '/books/file.epub';
+    (service as any).subscriptions.set(1, []);
+    const processSpy = vi.spyOn(service as any, 'process').mockResolvedValue(undefined);
+    selfWriteRegistry.begin([path]);
+
+    (service as any).schedule('create', path, 1);
+    await vi.advanceTimersByTimeAsync(WATCHER_DEBOUNCE_MS);
+
+    expect(processSpy).not.toHaveBeenCalled();
+    expect((service as any).pendingTimers.has(path)).toBe(true);
+
+    selfWriteRegistry.end([path]);
+    await vi.advanceTimersByTimeAsync(WATCHER_DEBOUNCE_MS);
+
+    expect(processSpy).toHaveBeenCalledTimes(1);
+    expect(processSpy).toHaveBeenCalledWith('create', path, 1);
+    expect((service as any).pendingTimers.has(path)).toBe(false);
+  });
+
+  it('processes the latest event after a self-write is released', async () => {
+    const { service, selfWriteRegistry } = makeService();
+    const path = '/books/file.epub';
+    (service as any).subscriptions.set(1, []);
+    const processSpy = vi.spyOn(service as any, 'process').mockResolvedValue(undefined);
+    selfWriteRegistry.begin([path]);
+
+    (service as any).schedule('delete', path, 1);
+    await vi.advanceTimersByTimeAsync(WATCHER_DEBOUNCE_MS);
+    (service as any).schedule('create', path, 1);
+    selfWriteRegistry.end([path]);
+    await vi.advanceTimersByTimeAsync(WATCHER_DEBOUNCE_MS);
+
+    expect(processSpy).toHaveBeenCalledTimes(1);
+    expect(processSpy).toHaveBeenCalledWith('create', path, 1);
+  });
+
+  it('does not scan a deferred self-write event when persisted state already matches', async () => {
+    const { service, scannerService, selfWriteRegistry } = makeService();
+    const path = '/books/file.epub';
+    (service as any).subscriptions.set(1, []);
+    const scheduleFolderScanSpy = vi.spyOn(service as any, 'scheduleFolderScan');
+    selfWriteRegistry.begin([path]);
+
+    (service as any).schedule('create', path, 1);
+    await vi.advanceTimersByTimeAsync(WATCHER_DEBOUNCE_MS);
+    selfWriteRegistry.end([path]);
+    await vi.advanceTimersByTimeAsync(WATCHER_DEBOUNCE_MS);
+
+    expect(scheduleFolderScanSpy).not.toHaveBeenCalled();
+    expect(scannerService.scanBookDirectoryAsync).not.toHaveBeenCalled();
+  });
+
+  it('scans a deferred event when an external change differs after release', async () => {
+    const { service, processor, selfWriteRegistry } = makeService();
+    const path = '/books/file.epub';
+    (service as any).subscriptions.set(1, []);
+    const scheduleFolderScanSpy = vi.spyOn(service as any, 'scheduleFolderScan');
+    processor.handleCreate = vi.fn().mockResolvedValue({ type: 'scan-required', scope: 'file' });
+    selfWriteRegistry.begin([path]);
+
+    (service as any).schedule('create', path, 1);
+    await vi.advanceTimersByTimeAsync(WATCHER_DEBOUNCE_MS);
+    selfWriteRegistry.end([path]);
+    await vi.advanceTimersByTimeAsync(WATCHER_DEBOUNCE_MS);
+
+    expect(scheduleFolderScanSpy).toHaveBeenCalledWith(path, 1);
   });
 });
 

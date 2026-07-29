@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, inArray, notExists, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+import { chunk } from '../../common/utils/batch.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 
@@ -21,6 +22,19 @@ type KoreaderHashLinkMetadata = {
   authors?: string | null;
   lastOpen?: number | null;
 };
+
+export interface DeviceProgressUpsert {
+  bookFileId: number;
+  userId: number;
+  device: string;
+  deviceId: string;
+  percentage: number;
+  progress: string | null;
+  chapterIndex: number | null;
+  syncTimestamp: number | null;
+}
+
+const BATCH_QUERY_SIZE = 200;
 
 @Injectable()
 export class KoreaderRepository {
@@ -452,6 +466,48 @@ export class KoreaderRepository {
       });
   }
 
+  /**
+   * Entries must already be deduplicated by book file: the partial unique index makes
+   * Postgres reject an ON CONFLICT DO UPDATE that would touch the same row twice.
+   */
+  async upsertDeviceProgressMany(entries: DeviceProgressUpsert[], updatedAt = new Date()) {
+    for (const batch of chunk(entries, BATCH_QUERY_SIZE)) {
+      await this.db
+        .insert(schema.koreaderDeviceProgress)
+        .values(
+          batch.map((entry) => ({
+            bookFileId: entry.bookFileId,
+            userId: entry.userId,
+            device: entry.device,
+            deviceId: entry.deviceId,
+            percentage: entry.percentage,
+            progress: entry.progress,
+            chapterIndex: entry.chapterIndex,
+            syncTimestamp: entry.syncTimestamp,
+            orphaned: false,
+            orphanedHash: null,
+            updatedAt,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [
+            schema.koreaderDeviceProgress.bookFileId,
+            schema.koreaderDeviceProgress.userId,
+            schema.koreaderDeviceProgress.device,
+            schema.koreaderDeviceProgress.deviceId,
+          ],
+          targetWhere: eq(schema.koreaderDeviceProgress.orphaned, false),
+          set: {
+            percentage: sql`excluded.percentage`,
+            progress: sql`excluded.progress`,
+            chapterIndex: sql`excluded.chapter_index`,
+            syncTimestamp: sql`excluded.sync_timestamp`,
+            updatedAt: sql`excluded.updated_at`,
+          },
+        });
+    }
+  }
+
   async getLatestDeviceProgress(bookFileId: number, userId: number) {
     const [row] = await this.db
       .select()
@@ -517,6 +573,62 @@ export class KoreaderRepository {
         ),
       )
       .orderBy(desc(schema.koreaderDeviceProgress.updatedAt));
+  }
+
+  /** Device rows for many files at once, newest first within each file. */
+  async getDeviceProgressForFiles(bookFileIds: number[], userId: number) {
+    const byFile = new Map<
+      number,
+      { device: string; deviceId: string; percentage: number | null; syncTimestamp: number | null; updatedAt: Date }[]
+    >();
+    for (const batch of chunk([...new Set(bookFileIds)], BATCH_QUERY_SIZE)) {
+      const rows = await this.db
+        .select({
+          bookFileId: schema.koreaderDeviceProgress.bookFileId,
+          device: schema.koreaderDeviceProgress.device,
+          deviceId: schema.koreaderDeviceProgress.deviceId,
+          percentage: schema.koreaderDeviceProgress.percentage,
+          syncTimestamp: schema.koreaderDeviceProgress.syncTimestamp,
+          updatedAt: schema.koreaderDeviceProgress.updatedAt,
+        })
+        .from(schema.koreaderDeviceProgress)
+        .where(
+          and(
+            inArray(schema.koreaderDeviceProgress.bookFileId, batch),
+            eq(schema.koreaderDeviceProgress.userId, userId),
+            eq(schema.koreaderDeviceProgress.orphaned, false),
+          ),
+        )
+        .orderBy(desc(schema.koreaderDeviceProgress.updatedAt));
+      for (const row of rows) {
+        if (row.bookFileId == null) continue;
+        const existing = byFile.get(row.bookFileId);
+        const entry = {
+          device: row.device,
+          deviceId: row.deviceId,
+          percentage: row.percentage,
+          syncTimestamp: row.syncTimestamp,
+          updatedAt: row.updatedAt,
+        };
+        if (existing) existing.push(entry);
+        else byFile.set(row.bookFileId, [entry]);
+      }
+    }
+    return byFile;
+  }
+
+  async getReadingProgressUpdatedAtForFiles(bookFileIds: number[], userId: number) {
+    const byFile = new Map<number, Date>();
+    for (const batch of chunk([...new Set(bookFileIds)], BATCH_QUERY_SIZE)) {
+      const rows = await this.db
+        .select({ bookFileId: schema.readingProgress.bookFileId, updatedAt: schema.readingProgress.updatedAt })
+        .from(schema.readingProgress)
+        .where(and(inArray(schema.readingProgress.bookFileId, batch), eq(schema.readingProgress.userId, userId)));
+      for (const row of rows) {
+        if (row.updatedAt) byFile.set(row.bookFileId, row.updatedAt);
+      }
+    }
+    return byFile;
   }
 
   async getDevicesList(userId: number) {

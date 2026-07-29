@@ -213,11 +213,11 @@ async function handleInlineApplyFetched(fileId: number) {
 
 function applyFetchedResultMessage(result: ApplyFetchedResult): string {
   const reasons: string[] = []
-  if (result.skippedEdited > 0) reasons.push(t('views.bookDock.applyFetched.skippedEdited', { count: result.skippedEdited }, result.skippedEdited))
-  if (result.skipped > 0) reasons.push(t('views.bookDock.applyFetched.skippedNoMetadata', { count: result.skipped }, result.skipped))
+  if (result.skippedEdited > 0) reasons.push(t('views.bookDock.applyFetched.skippedEdited', { count: result.skippedEdited }))
+  if (result.skipped > 0) reasons.push(t('views.bookDock.applyFetched.skippedNoMetadata', { count: result.skipped }))
 
   if (result.applied > 0) {
-    const base = t('views.bookDock.applyFetched.applied', { count: result.applied }, result.applied)
+    const base = t('views.bookDock.applyFetched.applied', { count: result.applied })
     return reasons.length ? `${base}; ${reasons.join('; ')}` : base
   }
 
@@ -411,11 +411,7 @@ onUnmounted(() => {
               class="ml-2 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-primary/15 text-primary text-xs font-medium"
             >
               <CheckCircle2 class="size-3.5" />
-              {{
-                retryQueued === 0
-                  ? t('views.bookDock.retry.noneToRetry')
-                  : t('views.bookDock.retry.retrying', { count: retryQueued }, retryQueued ?? 0)
-              }}
+              {{ retryQueued === 0 ? t('views.bookDock.retry.noneToRetry') : t('views.bookDock.retry.retrying', { count: retryQueued }) }}
             </span>
           </Transition>
           <Transition name="fade">
@@ -479,7 +475,7 @@ onUnmounted(() => {
             :key="f.format"
             class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted/50 tabular-nums"
           >
-            <span class="uppercase font-medium text-foreground/70">{{ f.format }}</span>
+            <span class="uppercase font-medium text-foreground">{{ f.format }}</span>
             {{ f.count }} &middot; {{ formatBytes(f.sizeBytes) }}
           </span>
         </div>

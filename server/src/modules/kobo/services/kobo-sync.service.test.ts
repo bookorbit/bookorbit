@@ -86,7 +86,6 @@ function makeDb(state?: Partial<QueueState>) {
       koboSnapshotBooks: { findFirst: vi.fn() },
       koboSyncSettings: { findFirst: vi.fn() },
       collections: { findMany: vi.fn() },
-      smartScopes: { findMany: vi.fn().mockResolvedValue([]) },
     },
     select: vi.fn(() => {
       const chain = makeChain(queue.select.shift() ?? []);
@@ -159,6 +158,9 @@ describe('KoboSyncService', () => {
   const queryBuilder = {
     buildWhere: vi.fn(),
   };
+  const smartScopeService = {
+    findKoboSyncScopes: vi.fn(),
+  };
 
   function makeIdentity(bookId: number, needsLegacyNumericRemoval = false) {
     return {
@@ -181,12 +183,14 @@ describe('KoboSyncService', () => {
       contentFilterRepository as never,
       bookIdentityService as never,
       queryBuilder as never,
+      smartScopeService as never,
     );
   }
 
   beforeEach(() => {
     vi.clearAllMocks();
     bookAccessService.getAccessibleLibraryIds.mockResolvedValue(null);
+    smartScopeService.findKoboSyncScopes.mockResolvedValue([]);
     readingStateService.getRawState.mockResolvedValue(null);
     contentFilterRepository.findByUserId.mockResolvedValue([]);
     bookIdentityService.ensureForBooks.mockImplementation((_userId: number, bookIds: number[], needsLegacyNumericRemoval: boolean) =>
@@ -579,7 +583,7 @@ describe('KoboSyncService', () => {
     });
     db.query.collections.findMany.mockResolvedValue([]);
     const filter = { type: 'group', join: 'AND', rules: [] };
-    db.query.smartScopes.findMany.mockResolvedValue([{ id: 5, name: 'To Read', filter, syncToKobo: true }]);
+    smartScopeService.findKoboSyncScopes.mockResolvedValue([{ id: 5, name: 'To Read', filter, syncToKobo: true }]);
     bookAccessService.getAccessibleLibraryIds.mockResolvedValue([1, 2]);
     queryBuilder.buildWhere.mockReturnValue('WHERE_CLAUSE');
     const service = makeService(db);
@@ -605,7 +609,7 @@ describe('KoboSyncService', () => {
   it('buildTagItems excludes synced smart scopes without a filter instead of matching everything', async () => {
     const db = makeDb();
     db.query.collections.findMany.mockResolvedValue([]);
-    db.query.smartScopes.findMany.mockResolvedValue([{ id: 6, name: 'Empty Scope', filter: null, syncToKobo: true }]);
+    smartScopeService.findKoboSyncScopes.mockResolvedValue([{ id: 6, name: 'Empty Scope', filter: null, syncToKobo: true }]);
     bookAccessService.getAccessibleLibraryIds.mockResolvedValue([1]);
     const service = makeService(db);
 
@@ -625,7 +629,7 @@ describe('KoboSyncService', () => {
     const db = makeDb({ select: [[{ id: 10 }], [{ id: 20 }, { id: 21 }]] });
     const filterA = { type: 'group', join: 'AND', rules: [] };
     const filterB = { type: 'group', join: 'OR', rules: [] };
-    db.query.smartScopes.findMany.mockResolvedValue([
+    smartScopeService.findKoboSyncScopes.mockResolvedValue([
       { id: 1, name: 'Scope A', filter: filterA, syncToKobo: true },
       { id: 2, name: 'Scope B', filter: filterB, syncToKobo: true },
     ]);
@@ -640,10 +644,37 @@ describe('KoboSyncService', () => {
     expect(matches.get(2)).toEqual({ name: 'Scope B', bookIds: [20, 21], where: 'WHERE_CLAUSE' });
   });
 
+  it('syncs a scope owned by another user when the smart scope service resolves it for this user', async () => {
+    const db = makeDb({ select: [[{ id: 30 }]] });
+    db.query.collections.findMany.mockResolvedValue([]);
+    const filter = { type: 'group', join: 'AND', rules: [] };
+    // A shared scope: owned by user 1, opted into by user 9. Ownership and opt-in are the
+    // smart scope module's rules, so sync must not re-filter by owner (issue #795).
+    smartScopeService.findKoboSyncScopes.mockResolvedValue([{ id: 7, userId: 1, name: 'Book Club', filter, isPublic: true, syncToKobo: false }]);
+    bookAccessService.getAccessibleLibraryIds.mockResolvedValue([1]);
+    queryBuilder.buildWhere.mockReturnValue('WHERE_CLAUSE');
+    const service = makeService(db);
+
+    const tags = await (service as any).buildTagItems(9, new Set([30]), new Map());
+
+    expect(smartScopeService.findKoboSyncScopes).toHaveBeenCalledWith(9);
+    expect(tags).toEqual([
+      expect.objectContaining({
+        ChangedTag: expect.objectContaining({
+          Tag: expect.objectContaining({
+            Id: 'ss-7',
+            Name: 'Book Club',
+            Items: [{ RevisionId: 'entitlement-30', Type: 'ProductRevisionTagItem' }],
+          }),
+        }),
+      }),
+    ]);
+  });
+
   it('fetches synced smart scope book ids with the metadata join required by metadata-backed filters', async () => {
     const db = makeDb({ select: [[{ id: 10 }]] });
     const filter = { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }] };
-    db.query.smartScopes.findMany.mockResolvedValue([{ id: 1, name: 'Dune Scope', filter, syncToKobo: true }]);
+    smartScopeService.findKoboSyncScopes.mockResolvedValue([{ id: 1, name: 'Dune Scope', filter, syncToKobo: true }]);
     queryBuilder.buildWhere.mockReturnValue(sql`${schema.bookMetadata.title} ilike ${'%Dune%'}`);
     const service = makeService(db);
 
@@ -658,7 +689,7 @@ describe('KoboSyncService', () => {
       select: [[{ id: 10 }]], // getSyncedSmartScopeMatches' single per-scope book lookup
     });
     db.query.collections.findMany.mockResolvedValue([]);
-    db.query.smartScopes.findMany.mockResolvedValue([
+    smartScopeService.findKoboSyncScopes.mockResolvedValue([
       { id: 5, name: 'To Read', filter: { type: 'group', join: 'AND', rules: [] }, syncToKobo: true },
     ]);
     bookAccessService.getAccessibleLibraryIds.mockResolvedValue([1]);
@@ -670,14 +701,14 @@ describe('KoboSyncService', () => {
     await (service as any).buildEligibleBooksWhereClause(9, cache);
     await (service as any).buildTagItems(9, new Set([10]), cache);
 
-    expect(db.query.smartScopes.findMany).toHaveBeenCalledTimes(1);
+    expect(smartScopeService.findKoboSyncScopes).toHaveBeenCalledTimes(1);
   });
 
   it("buildEligibleBooksWhereClause ORs in each scope's own SQL predicate instead of an inArray of matched book ids", async () => {
     const manyBookIds = Array.from({ length: 500 }, (_, i) => i + 1);
     const db = makeDb({ select: [manyBookIds.map((id) => ({ id }))] });
     db.query.collections.findMany.mockResolvedValue([]);
-    db.query.smartScopes.findMany.mockResolvedValue([
+    smartScopeService.findKoboSyncScopes.mockResolvedValue([
       { id: 5, name: 'To Read', filter: { type: 'group', join: 'AND', rules: [] }, syncToKobo: true },
     ]);
     bookAccessService.getAccessibleLibraryIds.mockResolvedValue([1]);

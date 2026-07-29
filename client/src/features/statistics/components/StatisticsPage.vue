@@ -245,7 +245,7 @@ function setTab(tab: StatisticsTab) {
                 !chart.visible && 'opacity-50',
               ]"
             >
-              <GripVertical class="text-muted-foreground/80 drawer-drag-handle size-4 shrink-0 cursor-grab active:cursor-grabbing" />
+              <GripVertical class="text-muted-foreground drawer-drag-handle size-4 shrink-0 cursor-grab active:cursor-grabbing" />
               <component :is="chartMeta(chart.id).icon" :class="['size-4 shrink-0', chart.visible ? 'text-primary' : 'text-muted-foreground']" />
               <span :class="['flex-1 text-sm', chart.visible ? 'text-foreground' : 'text-muted-foreground']">
                 {{ chartMeta(chart.id).label }}

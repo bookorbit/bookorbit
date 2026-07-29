@@ -11,7 +11,7 @@ const { t } = useI18n()
 <template>
   <div class="flex h-full flex-col p-3">
     <div class="mb-3 flex items-center gap-2 self-start">
-      <Swords :size="16" class="text-primary/90" />
+      <Swords :size="16" class="text-primary" />
       <span class="text-[15px] font-semibold text-foreground">{{ t('dashboard.widgets.monthlyChallenge.title') }}</span>
     </div>
 

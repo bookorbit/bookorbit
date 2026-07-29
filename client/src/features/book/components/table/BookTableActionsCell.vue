@@ -54,7 +54,7 @@ async function handleRefresh() {
   <div class="flex items-center gap-0.5">
     <DropdownMenu>
       <DropdownMenuTrigger as-child>
-        <Button variant="ghost" size="icon" class="h-7 w-7 rounded text-muted-foreground/60 hover:text-foreground">
+        <Button variant="ghost" size="icon" class="h-7 w-7 rounded text-muted-foreground hover:text-foreground">
           <MoreHorizontal :size="14" />
         </Button>
       </DropdownMenuTrigger>

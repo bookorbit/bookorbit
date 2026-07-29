@@ -195,9 +195,7 @@ const emptyOnly = computed(() => props.bookCount === 'empty')
               {{ t('tools.entityManager.browse.sortLabel', { sortName: item.sortName }) }}
             </div>
           </div>
-          <span class="text-xs text-muted-foreground shrink-0">{{
-            t('tools.entityManager.bookCount', { count: item.bookCount }, item.bookCount)
-          }}</span>
+          <span class="text-xs text-muted-foreground shrink-0">{{ t('tools.entityManager.bookCount', { count: item.bookCount }) }}</span>
           <!-- Desktop: inline action buttons -->
           <div class="hidden sm:flex items-center gap-1 shrink-0">
             <button
@@ -214,7 +212,7 @@ const emptyOnly = computed(() => props.bookCount === 'empty')
               {{ t('tools.entityManager.actions.split') }}
             </button>
             <button
-              class="h-7 px-2 text-xs rounded hover:bg-muted text-destructive/70 hover:text-destructive transition-colors"
+              class="h-7 px-2 text-xs rounded hover:bg-muted text-destructive hover:text-destructive transition-colors"
               @click.stop="handleDelete(item)"
             >
               {{ t('common.delete') }}

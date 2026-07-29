@@ -13,6 +13,7 @@ function createThemeStore() {
     radius: 'rounded' as ThemePreferences['radius'],
     background: 'vinyl' as ThemePreferences['background'],
     brightness: 35,
+    surfaceOpacity: 92,
     setTheme(nextTheme: ThemePreferences['theme']) {
       this.theme = nextTheme
     },
@@ -27,6 +28,9 @@ function createThemeStore() {
     },
     setBrightness(nextBrightness: number) {
       this.brightness = nextBrightness
+    },
+    setSurfaceOpacity(nextSurfaceOpacity: number) {
+      this.surfaceOpacity = nextSurfaceOpacity
     },
   })
 }
@@ -92,6 +96,40 @@ describe('useThemeSync', () => {
     expect(themeStore.radius).toBe('pill')
     expect(themeStore.background).toBe('mesh')
     expect(themeStore.brightness).toBe(72)
+  })
+
+  it('loadFromServer applies surfaceOpacity within the supported range', async () => {
+    apiMock.mockResolvedValueOnce(
+      mockJsonResponse({ settings: { theme: 'dark', accent: 'blue', radius: 'rounded', background: 'vinyl', brightness: 35, surfaceOpacity: 80 } }),
+    )
+
+    const { loadFromServer } = await import('../useThemeSync')
+    await loadFromServer()
+
+    expect(themeStore.surfaceOpacity).toBe(80)
+  })
+
+  it.each([79, 101, 92.5, 'full'])('loadFromServer ignores out-of-range surfaceOpacity %s', async (surfaceOpacity) => {
+    apiMock.mockResolvedValueOnce(
+      mockJsonResponse({ settings: { theme: 'dark', accent: 'blue', radius: 'rounded', background: 'vinyl', brightness: 35, surfaceOpacity } }),
+    )
+
+    const { loadFromServer } = await import('../useThemeSync')
+    await loadFromServer()
+
+    expect(themeStore.surfaceOpacity).toBe(92)
+  })
+
+  it('loadFromServer keeps the local surfaceOpacity when the server predates the field', async () => {
+    themeStore.surfaceOpacity = 85
+    apiMock.mockResolvedValueOnce(
+      mockJsonResponse({ settings: { theme: 'light', accent: 'blue', radius: 'rounded', background: 'vinyl', brightness: 35 } }),
+    )
+
+    const { loadFromServer } = await import('../useThemeSync')
+    await loadFromServer()
+
+    expect(themeStore.surfaceOpacity).toBe(85)
   })
 
   it('loadFromServer applies a synchronized system theme selection', async () => {
@@ -242,6 +280,7 @@ describe('useThemeSync', () => {
             radius: 'rounded',
             background: 'vinyl',
             brightness: 35,
+            surfaceOpacity: 92,
           },
         }),
       }),

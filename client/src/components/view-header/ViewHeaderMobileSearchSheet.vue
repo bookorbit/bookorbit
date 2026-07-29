@@ -61,7 +61,7 @@ function handleKeydown(event: KeyboardEvent) {
       </SheetHeader>
       <div class="space-y-3 px-4 pb-6">
         <div class="flex h-9 items-center rounded-md border border-input bg-background px-2.5">
-          <Search :size="13" class="mr-1.5 shrink-0 text-muted-foreground/85" />
+          <Search :size="13" class="mr-1.5 shrink-0 text-muted-foreground" />
           <input
             ref="inputRef"
             :value="searchQuery ?? ''"
@@ -69,11 +69,11 @@ function handleKeydown(event: KeyboardEvent) {
             @keydown="handleKeydown"
             type="search"
             :placeholder="props.placeholder ?? t('components.viewHeader.searchPlaceholder')"
-            class="view-header-mobile-search-input h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/85"
+            class="view-header-mobile-search-input h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
           />
           <button
             v-if="(searchQuery ?? '').trim().length > 0"
-            class="ml-1 text-muted-foreground/85 transition-colors hover:text-foreground"
+            class="ml-1 text-muted-foreground transition-colors hover:text-foreground"
             @click="clear"
           >
             <X :size="12" />

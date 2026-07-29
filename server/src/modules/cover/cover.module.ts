@@ -4,6 +4,7 @@ import { BookMetadataLockModule } from '../book-metadata-lock/book-metadata-lock
 import { FileWriteModule } from '../file-write/file-write.module';
 import { LibraryModule } from '../library/library.module';
 import { MetadataPreferencesModule } from '../metadata-preferences/metadata-preferences.module';
+import { MetadataScoreModule } from '../metadata-score/metadata-score.module';
 import { COVER_PROVIDERS } from './constants';
 import { CoverController } from './cover.controller';
 import { CoverService } from './cover.service';
@@ -16,7 +17,7 @@ import { CoverProviderRegistry } from './provider-registry';
 const PROVIDER_CLASSES = [DuckDuckGoCoverProvider, ITunesCoverProvider, AudiobookCoversCoverProvider];
 
 @Module({
-  imports: [BookModule, BookMetadataLockModule, FileWriteModule, LibraryModule, MetadataPreferencesModule],
+  imports: [BookModule, BookMetadataLockModule, FileWriteModule, LibraryModule, MetadataPreferencesModule, MetadataScoreModule],
   controllers: [CoverController],
   providers: [
     ...PROVIDER_CLASSES,

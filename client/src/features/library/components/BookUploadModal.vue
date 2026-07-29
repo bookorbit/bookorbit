@@ -178,7 +178,7 @@ function formatPillClass(filename: string): string {
     cb7: 'bg-sky-500/15 text-sky-600 dark:text-sky-400',
     fb2: 'bg-teal-500/15 text-teal-600 dark:text-teal-400',
   }
-  return map[ext] ?? 'bg-muted text-muted-foreground/85'
+  return map[ext] ?? 'bg-muted text-muted-foreground'
 }
 </script>
 
@@ -280,9 +280,7 @@ function formatPillClass(filename: string): string {
           <div v-if="hasFiles" class="flex flex-col gap-2">
             <!-- Summary line -->
             <div v-if="fileSummary" class="flex items-center gap-1.5 flex-wrap text-xs text-muted-foreground">
-              <span class="font-medium text-foreground tabular-nums">{{
-                t('library.upload.fileCount', { count: fileSummary.total }, fileSummary.total)
-              }}</span>
+              <span class="font-medium text-foreground tabular-nums">{{ t('library.upload.fileCount', { count: fileSummary.total }) }}</span>
               <span>·</span>
               <span>{{ formatBytes(fileSummary.totalBytes) }}</span>
               <span>·</span>
@@ -331,7 +329,7 @@ function formatPillClass(filename: string): string {
                 <div class="shrink-0 flex items-center gap-0.5">
                   <button
                     v-if="item.status === 'error' && !item.validationError"
-                    class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground/85 hover:text-primary hover:bg-primary/10 transition-colors"
+                    class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
                     :title="t('library.upload.retry')"
                     @click="retryFile(item.id)"
                   >
@@ -339,7 +337,7 @@ function formatPillClass(filename: string): string {
                   </button>
                   <button
                     v-if="item.status !== 'uploading'"
-                    class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground/70 hover:text-foreground hover:bg-muted transition-colors"
+                    class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                     @click="removeFile(item.id)"
                   >
                     <X :size="12" />
@@ -354,7 +352,7 @@ function formatPillClass(filename: string): string {
         <div v-if="allSuccess" class="shrink-0 px-5 py-4 border-t border-border flex items-center justify-between gap-3">
           <div class="flex items-center gap-2">
             <CheckCircle2 class="size-4 text-emerald-500 shrink-0" />
-            <span class="text-sm font-medium text-foreground">{{ t('library.upload.booksAdded', { count: doneCount }, doneCount) }}</span>
+            <span class="text-sm font-medium text-foreground">{{ t('library.upload.booksAdded', { count: doneCount }) }}</span>
           </div>
           <div class="flex items-center gap-2">
             <button

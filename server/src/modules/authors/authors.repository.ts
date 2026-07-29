@@ -115,6 +115,18 @@ export class AuthorsRepository {
     return { items, total: Number(total), page: params.page, size: params.size };
   }
 
+  async countAuthors(params: { libraryIds: number[]; contentFilters?: ContentFilterRules }): Promise<number> {
+    if (params.libraryIds.length === 0) return 0;
+
+    const [row] = await this.db
+      .select({ total: sql<number>`count(distinct ${bookAuthors.authorId})::int` })
+      .from(bookAuthors)
+      .innerJoin(books, eq(books.id, bookAuthors.bookId))
+      .where(this.buildAuthorWhere({ libraryIds: params.libraryIds, contentFilters: params.contentFilters }));
+
+    return Number(row?.total ?? 0);
+  }
+
   async findById(authorId: number, libraryIds: number[], contentFilters?: ContentFilterRules): Promise<AuthorSummaryRow | null> {
     if (libraryIds.length === 0) return null;
 
@@ -247,6 +259,12 @@ export class AuthorsRepository {
       .from(bookAuthors)
       .where(inArray(bookAuthors.authorId, authorIds));
     return Number(total);
+  }
+
+  async findBookIdsByAuthorIds(authorIds: number[]): Promise<number[]> {
+    if (authorIds.length === 0) return [];
+    const rows = await this.db.selectDistinct({ bookId: bookAuthors.bookId }).from(bookAuthors).where(inArray(bookAuthors.authorId, authorIds));
+    return rows.map((row) => row.bookId);
   }
 
   async findRelatedLibraryIds(authorIds: number[]): Promise<number[]> {

@@ -604,7 +604,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                       <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="openFile(file)">
                         <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">{{ t('book.file.audiobook') }}</span>
                         <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
-                        <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">{{
+                        <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary">{{
                           t('book.file.primary')
                         }}</span>
                       </DropdownMenuItem>
@@ -632,7 +632,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                       <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="handleDownloadFile(file)">
                         <span v-if="isMultiTrackAudio && isAudioFile(file)">{{ t('book.download.audiobookZip') }}</span>
                         <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
-                        <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">{{
+                        <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary">{{
                           t('book.file.primary')
                         }}</span>
                       </DropdownMenuItem>
@@ -743,7 +743,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                 <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="openFile(file)">
                   <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">{{ t('book.file.audiobook') }}</span>
                   <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
-                  <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">{{
+                  <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary">{{
                     t('book.file.primary')
                   }}</span>
                 </DropdownMenuItem>
@@ -770,7 +770,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                 <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="handleDownloadFile(file)">
                   <span v-if="isMultiTrackAudio && isAudioFile(file)">{{ t('book.download.audiobookZip') }}</span>
                   <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
-                  <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary/70">{{
+                  <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary">{{
                     t('book.file.primary')
                   }}</span>
                 </DropdownMenuItem>

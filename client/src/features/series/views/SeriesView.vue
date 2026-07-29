@@ -283,14 +283,14 @@ defineOptions({ name: 'SeriesView' })
     >
       <template #toolbar>
         <div class="hidden lg:flex h-8 w-64 items-center rounded-md border border-input bg-background px-2.5">
-          <Search :size="13" class="mr-1.5 shrink-0 text-muted-foreground/85" />
+          <Search :size="13" class="mr-1.5 shrink-0 text-muted-foreground" />
           <input
             v-model="q"
             type="search"
             :placeholder="t('series.list.searchPlaceholder')"
-            class="series-search-input h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/85"
+            class="series-search-input h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
           />
-          <button v-if="q.trim()" class="ml-1 text-muted-foreground/85 transition-colors hover:text-foreground" @click="clearSearchQuery">
+          <button v-if="q.trim()" class="ml-1 text-muted-foreground transition-colors hover:text-foreground" @click="clearSearchQuery">
             <X :size="12" />
           </button>
         </div>
@@ -400,15 +400,15 @@ defineOptions({ name: 'SeriesView' })
     <!-- Mobile controls -->
     <section v-if="mobileControlsExpanded" class="mb-3 space-y-2 rounded-lg border border-border/70 bg-card/70 p-2 sm:hidden">
       <div class="flex items-center gap-1 rounded-md border border-input bg-background px-2.5">
-        <Search :size="13" class="shrink-0 text-muted-foreground/85" />
+        <Search :size="13" class="shrink-0 text-muted-foreground" />
         <input
           ref="mobileSearchInput"
           v-model="q"
           type="search"
           :placeholder="t('series.list.searchPlaceholder')"
-          class="mobile-search-input h-9 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/85"
+          class="mobile-search-input h-9 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
-        <button v-if="q.trim()" class="text-muted-foreground/85 hover:text-foreground" @click="clearSearchQuery">
+        <button v-if="q.trim()" class="text-muted-foreground hover:text-foreground" @click="clearSearchQuery">
           <X :size="12" />
         </button>
       </div>
@@ -424,7 +424,7 @@ defineOptions({ name: 'SeriesView' })
               {{ sortLabels[field] }}
             </option>
           </select>
-          <ArrowUpDown :size="13" class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/85" />
+          <ArrowUpDown :size="13" class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
         </div>
 
         <button

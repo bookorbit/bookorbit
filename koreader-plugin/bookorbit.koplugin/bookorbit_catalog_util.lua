@@ -16,7 +16,9 @@ local CatalogUtil = {}
 
 CatalogUtil.DEFAULT_GRID_COLUMNS = 4
 CatalogUtil.DEFAULT_GRID_ROWS = 3
-CatalogUtil.THUMBNAIL_BATCH_SIZE = 2
+-- Covers fetched per background worker round. One subprocess covers the whole
+-- batch and the page rebuilds once when it lands.
+CatalogUtil.THUMBNAIL_BATCH_SIZE = 3
 CatalogUtil.MAX_RECENT_SEARCHES = 8
 CatalogUtil.ON_DEVICE_MAX_IDS = 200
 
@@ -134,6 +136,13 @@ end
 function CatalogUtil.formatProgress(value)
     if not value then return nil end
     return tostring(math.floor(value + 0.5)) .. "%"
+end
+
+function CatalogUtil.readingStreakDays(dashboard, fallback)
+    local reading_streak = dashboard and dashboard.readingStreak
+    local current_streak = reading_streak and tonumber(reading_streak.currentStreak)
+    if current_streak then return current_streak end
+    return tonumber(fallback) or 0
 end
 
 function CatalogUtil.formatRating(value)

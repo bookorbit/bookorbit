@@ -67,11 +67,11 @@ function handleSearchKeydown(event: KeyboardEvent) {
       class="h-8 text-[13px] transition-all duration-300 focus:outline-none"
       :class="
         searchActive
-          ? 'w-44 cursor-text rounded-lg border border-primary/30 bg-primary/5 pl-8 pr-6 text-foreground placeholder:text-muted-foreground/60 focus:ring-1 focus:ring-primary/30 lg:w-72'
+          ? 'w-44 cursor-text rounded-lg border border-primary/30 bg-primary/5 pl-8 pr-6 text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-primary/30 lg:w-72'
           : 'w-8 cursor-pointer rounded-lg border border-input bg-transparent pl-2.25 pr-0 text-transparent placeholder:text-transparent select-none hover:border-muted-foreground/30 hover:bg-primary/5'
       "
     />
-    <button v-if="searchActive" @click="closeSearch" class="absolute right-1.5 text-muted-foreground/70 transition-colors hover:text-foreground">
+    <button v-if="searchActive" @click="closeSearch" class="absolute right-1.5 text-muted-foreground transition-colors hover:text-foreground">
       <X :size="13" />
     </button>
   </div>

@@ -40,7 +40,7 @@ function updateCoverAspectRatio(event: Event) {
 <template>
   <div class="px-6 py-6 flex flex-col gap-7 h-full min-h-0">
     <div>
-      <label for="library-name" class="mb-3 block text-[11px] font-semibold uppercase tracking-widest text-foreground/80">
+      <label for="library-name" class="mb-3 block text-[11px] font-semibold uppercase tracking-widest text-foreground">
         {{ t('library.creator.details.libraryName') }}
       </label>
       <div class="flex items-center gap-3">
@@ -53,7 +53,7 @@ function updateCoverAspectRatio(event: Event) {
           :value="name"
           :placeholder="t('library.creator.details.namePlaceholder')"
           maxlength="255"
-          class="flex-1 rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
+          class="flex-1 rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           autocomplete="off"
           autofocus
           @input="updateName"
@@ -62,14 +62,14 @@ function updateCoverAspectRatio(event: Event) {
     </div>
 
     <div>
-      <label class="block text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-3">
+      <label class="block text-[11px] font-semibold uppercase tracking-widest text-foreground mb-3">
         {{ t('library.creator.details.icon.label') }}
       </label>
       <IconPicker :model-value="icon ?? ''" :placeholder="t('library.creator.details.icon.placeholder')" @update:model-value="updateIcon" />
     </div>
 
     <fieldset aria-describedby="cover-style-description">
-      <legend class="mb-3 text-[11px] font-semibold uppercase tracking-widest text-foreground/80">
+      <legend class="mb-3 text-[11px] font-semibold uppercase tracking-widest text-foreground">
         {{ t('library.creator.details.coverStyle.title') }}
       </legend>
       <div class="flex flex-wrap gap-2">

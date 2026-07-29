@@ -66,17 +66,6 @@ vi.mock('@/features/library/composables/useLibraryUploadEvents', () => ({
   useLibraryUploadEvents: () => ({ onLibraryUploadCompleted: () => vi.fn<() => void>() }),
 }))
 
-vi.mock('@/features/book-dock/composables/useBookDockSummary', async () => {
-  const { ref: vueRef } = await import('vue')
-  return {
-    useBookDockSummary: () => ({
-      summary: vueRef({ pending: 0, ready: 0, error: 0, total: 0, paused: false }),
-      fetchSummary: vi.fn<() => void>(),
-      subscribe: vi.fn<() => void>(),
-    }),
-  }
-})
-
 vi.mock('@/features/notifications/composables/useNotifications', () => ({
   useNotifications: () => ({ subscribe: vi.fn<() => void>() }),
 }))
@@ -283,12 +272,40 @@ describe('AppHeader global search', () => {
     expect(wrapper.text()).toContain('Prey 60')
   })
 
+  it('does not render the destinations the sidebar now owns', () => {
+    const wrapper = mountHeader()
+    const text = wrapper.text()
+
+    for (const destination of ['Book Dock', 'Annotations']) {
+      expect(text).not.toContain(destination)
+    }
+  })
+
+  it('keeps Statistics and Achievements in the header', () => {
+    const wrapper = mountHeader()
+
+    expect(wrapper.text()).toContain('Statistics')
+    expect(wrapper.text()).toContain('Achievements')
+  })
+
   it('hides achievement entry points when achievements are disabled', () => {
     mocks.user = ref({ provisioningMethod: 'password', settings: { achievementPreferences: { enabled: false } } })
 
     const wrapper = mountHeader()
 
     expect(wrapper.text()).not.toContain('Achievements')
+  })
+
+  it('navigates to statistics from the mobile overflow menu', async () => {
+    const wrapper = mountHeader()
+    const statisticsItem = wrapper.findAllComponents({ name: 'DropdownMenuItem' }).find((item) => item.text().trim() === 'Statistics')
+
+    expect(statisticsItem).toBeDefined()
+    if (!statisticsItem) throw new Error('Expected statistics overflow menu item')
+
+    await statisticsItem.trigger('click')
+
+    expect(mocks.routerPush).toHaveBeenCalledWith({ name: 'statistics', query: { tab: 'library' } })
   })
 
   it('places the desktop language control immediately before settings', () => {
@@ -310,15 +327,15 @@ describe('AppHeader global search', () => {
     expect(settingsControlIndex).toBe(languageControlIndex + 1)
   })
 
-  it('navigates to annotations from the mobile overflow menu', async () => {
+  it('opens settings from the mobile overflow menu', async () => {
     const wrapper = mountHeader()
-    const annotationsItem = wrapper.findAllComponents({ name: 'DropdownMenuItem' }).find((item) => item.text().trim() === 'Annotations')
+    const settingsItem = wrapper.findAllComponents({ name: 'DropdownMenuItem' }).find((item) => item.text().trim() === 'Settings')
 
-    expect(annotationsItem).toBeDefined()
-    if (!annotationsItem) throw new Error('Expected annotations overflow menu item')
+    expect(settingsItem).toBeDefined()
+    if (!settingsItem) throw new Error('Expected settings overflow menu item')
 
-    await annotationsItem.trigger('click')
+    await settingsItem.trigger('click')
 
-    expect(mocks.routerPush).toHaveBeenCalledWith({ name: 'annotations' })
+    expect(mocks.routerPush).toHaveBeenCalledWith({ name: 'settings-libraries' })
   })
 })

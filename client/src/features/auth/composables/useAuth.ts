@@ -12,6 +12,7 @@ import { resetWhatsNew } from '@/features/whats-new/composables/useWhatsNew'
 import { resetLibraries } from '@/features/library/composables/useLibraries'
 import { resetSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
 import { resetCollections } from '@/features/collection/composables/useCollections'
+import { resetBrowseCounts } from '@/composables/useBrowseCounts'
 
 const SESSION_REFRESH_INTERVAL_MS = 5 * 60 * 1000
 
@@ -57,6 +58,7 @@ function clearAuth() {
   resetLibraries()
   resetSmartScopes()
   resetCollections()
+  resetBrowseCounts()
   user.value = null
   setAccessToken(null)
   disconnectAuthorEnrichmentSocket()

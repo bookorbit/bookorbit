@@ -45,9 +45,9 @@ const summaryItems = computed(() => {
 const progressPreviewLabel = computed(() => {
   const summary = preview.value?.summary
   if (!summary) return null
-  const ready = t('hardcover.import.progressAvailable', { count: summary.progressWillUpdate }, summary.progressWillUpdate)
+  const ready = t('hardcover.import.progressAvailable', { count: summary.progressWillUpdate })
   if (summary.progressConflicts === 0) return ready
-  return `${ready}, ${t('hardcover.import.progressConflicts', { count: summary.progressConflicts }, summary.progressConflicts)}`
+  return `${ready}, ${t('hardcover.import.progressConflicts', { count: summary.progressConflicts })}`
 })
 
 const resultLabel = computed(() => {
@@ -90,10 +90,8 @@ async function applyRows(hardcoverUserBookIds?: number[]): Promise<void> {
     return
   }
   reviewOpen.value = false
-  const progress = importProgress.value
-    ? `, ${t('hardcover.import.toast.progressUpdates', { count: applied.progressApplied }, applied.progressApplied)}`
-    : ''
-  toast.success(t('hardcover.import.toast.imported', { count: applied.applied, progress }, applied.applied))
+  const progress = importProgress.value ? `, ${t('hardcover.import.toast.progressUpdates', { count: applied.progressApplied })}` : ''
+  toast.success(t('hardcover.import.toast.imported', { count: applied.applied, progress }))
 }
 </script>
 
@@ -148,7 +146,7 @@ async function applyRows(hardcoverUserBookIds?: number[]): Promise<void> {
 
       <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div class="space-y-2">
-          <p class="text-xs text-muted-foreground">{{ t('hardcover.import.exactMatches', { count: readyRows.length }, readyRows.length) }}</p>
+          <p class="text-xs text-muted-foreground">{{ t('hardcover.import.exactMatches', { count: readyRows.length }) }}</p>
           <label class="flex w-fit items-center gap-2 text-xs text-muted-foreground">
             <input
               v-model="importProgress"

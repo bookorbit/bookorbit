@@ -34,7 +34,7 @@ import { useCbzSettings } from './composables/useCbzSettings'
 import type { BgColor, Direction, FitMode, ScrollMode, SpreadAlignment, ViewMode, WidePageSingletonMode } from './composables/useCbzSettings'
 import { useReaderSettings } from '../shared/composables/useReaderSettings'
 import { useFullscreen } from '../shared/composables/useFullscreen'
-import type { CbxReaderSettings } from '@bookorbit/types'
+import { CBX_SPREAD_GAP_MAX, CBX_SPREAD_GAP_MIN, type CbxReaderSettings } from '@bookorbit/types'
 import { DEFAULT_WIDE_PAGE_RATIO_THRESHOLD, createCbzSpreadLayout } from './lib/spread-layout'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -61,7 +61,7 @@ const { onActivity, elapsedMinutes } = useReadingSession(
 )
 const progress = useReaderProgress(props.bookId, props.fileId, elapsedMinutes, 0, { trackingEnabled })
 const { pageCount, bookTitle, loading, error, pageUrl, load } = useCbz(props.fileId, props.bookId)
-const { fitMode, viewMode, scrollMode, direction, spreadAlignment, forceTwoPage, widePageSingletonMode, bgColor, bgValue, imgFitClass } =
+const { fitMode, viewMode, scrollMode, direction, spreadAlignment, spreadGap, forceTwoPage, widePageSingletonMode, bgColor, bgValue, imgFitClass } =
   useCbzSettings()
 const bookSettings = useReaderSettings(props.fileId, 'cbz')
 
@@ -167,6 +167,13 @@ function setDirection(v: Direction) {
 function setSpreadAlignment(v: SpreadAlignment) {
   spreadAlignment.value = v
 }
+function setSpreadGapFromEvent(event: Event) {
+  const target = event.target
+  if (!(target instanceof HTMLInputElement)) return
+  const value = Number(target.value)
+  if (!Number.isInteger(value) || value < CBX_SPREAD_GAP_MIN || value > CBX_SPREAD_GAP_MAX) return
+  spreadGap.value = value
+}
 function setWidePageMode(v: WidePageSingletonMode) {
   widePageSingletonMode.value = v
 }
@@ -183,6 +190,7 @@ function applySettings(s: CbxReaderSettings) {
   scrollMode.value = s.scrollMode
   direction.value = s.direction
   spreadAlignment.value = s.spreadAlignment
+  spreadGap.value = s.spreadGap
   forceTwoPage.value = s.forceTwoPage
   widePageSingletonMode.value = s.widePageSingletonMode
   bgColor.value = s.bgColor
@@ -233,6 +241,7 @@ const renderSpread = computed(() => currentSpread.value?.kind === 'spread')
 const renderSinglePage = computed(() => (currentSpread.value?.kind === 'single' ? currentSpread.value.singlePage : null))
 const renderLeftPage = computed(() => (currentSpread.value?.kind === 'spread' ? currentSpread.value.leftPage : null))
 const renderRightPage = computed(() => (currentSpread.value?.kind === 'spread' ? currentSpread.value.rightPage : null))
+const spreadContainerStyle = computed(() => ({ columnGap: `${spreadGap.value}px` }))
 const renderKey = computed(() => {
   const spread = currentSpread.value
   if (!spread) return 'none'
@@ -666,6 +675,7 @@ onMounted(async () => {
   watch(scrollMode, (v) => bookSettings.updateBookSettings({ scrollMode: v }))
   watch(direction, (v) => bookSettings.updateBookSettings({ direction: v }))
   watch(spreadAlignment, (v) => bookSettings.updateBookSettings({ spreadAlignment: v }))
+  watch(spreadGap, (v) => bookSettings.updateBookSettings({ spreadGap: v }))
   watch(forceTwoPage, (v) => bookSettings.updateBookSettings({ forceTwoPage: v }))
   watch(widePageSingletonMode, (v) => bookSettings.updateBookSettings({ widePageSingletonMode: v }))
   watch(bgColor, (v) => bookSettings.updateBookSettings({ bgColor: v }))
@@ -798,7 +808,7 @@ onUnmounted(() => {
                 <template v-if="settingsTab === 'view'">
                   <div class="space-y-6">
                     <div>
-                      <p class="mb-2 text-[13px] font-medium text-foreground/90">{{ t('reader.cbz.fitMode') }}</p>
+                      <p class="mb-2 text-[13px] font-medium text-foreground">{{ t('reader.cbz.fitMode') }}</p>
                       <div class="grid grid-cols-2 gap-1 rounded-lg bg-muted/55 p-1">
                         <button
                           v-for="opt in FIT_OPTIONS"
@@ -820,7 +830,7 @@ onUnmounted(() => {
                     <div class="h-px bg-border/70" />
 
                     <div>
-                      <p class="mb-2 text-[13px] font-medium text-foreground/90">{{ t('reader.cbz.background') }}</p>
+                      <p class="mb-2 text-[13px] font-medium text-foreground">{{ t('reader.cbz.background') }}</p>
                       <div class="grid grid-cols-3 gap-1 rounded-lg bg-muted/55 p-1">
                         <button
                           v-for="opt in BG_OPTIONS"
@@ -844,7 +854,7 @@ onUnmounted(() => {
                 <template v-else-if="settingsTab === 'reading'">
                   <div class="space-y-6">
                     <div>
-                      <p class="mb-2 text-[13px] font-medium text-foreground/90">{{ t('reader.cbz.scrollMode') }}</p>
+                      <p class="mb-2 text-[13px] font-medium text-foreground">{{ t('reader.cbz.scrollMode') }}</p>
                       <div class="grid grid-cols-3 gap-1 rounded-lg bg-muted/55 p-1">
                         <button
                           v-for="opt in SCROLL_OPTIONS"
@@ -867,7 +877,7 @@ onUnmounted(() => {
                     <div class="h-px bg-border/70" />
 
                     <div>
-                      <p class="mb-2 text-[13px] font-medium text-foreground/90">{{ t('reader.cbz.readingDirection') }}</p>
+                      <p class="mb-2 text-[13px] font-medium text-foreground">{{ t('reader.cbz.readingDirection') }}</p>
                       <div class="grid grid-cols-2 gap-1 rounded-lg bg-muted/55 p-1">
                         <button
                           v-for="opt in DIRECTION_OPTIONS"
@@ -892,7 +902,7 @@ onUnmounted(() => {
                   <div class="space-y-6">
                     <div>
                       <div class="mb-2 flex items-center justify-between">
-                        <p class="text-[13px] font-medium text-foreground/90">{{ t('reader.cbz.pageView') }}</p>
+                        <p class="text-[13px] font-medium text-foreground">{{ t('reader.cbz.pageView') }}</p>
                         <span
                           v-if="showAutoFallbackBadge"
                           class="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"
@@ -921,8 +931,28 @@ onUnmounted(() => {
 
                     <div class="h-px bg-border/70" />
 
+                    <div v-if="isTwoPagePreferred">
+                      <div class="mb-2 flex items-center justify-between gap-3">
+                        <label for="cbz-spread-gap" class="text-[13px] font-medium text-foreground">{{ t('reader.cbz.spreadGap') }}</label>
+                        <span class="text-[11px] tabular-nums text-muted-foreground">
+                          {{ t('reader.cbz.spreadGapValue', { value: spreadGap }) }}
+                        </span>
+                      </div>
+                      <input
+                        id="cbz-spread-gap"
+                        type="range"
+                        :min="CBX_SPREAD_GAP_MIN"
+                        :max="CBX_SPREAD_GAP_MAX"
+                        :value="spreadGap"
+                        class="w-full accent-primary"
+                        @input="setSpreadGapFromEvent"
+                      />
+                    </div>
+
+                    <div v-if="isTwoPagePreferred" class="h-px bg-border/70" />
+
                     <div v-if="showSpreadAlignmentControl">
-                      <p class="mb-2 text-[13px] font-medium text-foreground/90">{{ t('reader.cbz.spreadAlignmentLabel') }}</p>
+                      <p class="mb-2 text-[13px] font-medium text-foreground">{{ t('reader.cbz.spreadAlignmentLabel') }}</p>
                       <div class="grid grid-cols-2 gap-1 rounded-lg bg-muted/55 p-1">
                         <button
                           v-for="opt in SPREAD_ALIGNMENT_OPTIONS"
@@ -949,7 +979,7 @@ onUnmounted(() => {
                     </div>
 
                     <div>
-                      <p class="mb-2 text-[13px] font-medium text-foreground/90">{{ t('reader.cbz.forceTwoPage') }}</p>
+                      <p class="mb-2 text-[13px] font-medium text-foreground">{{ t('reader.cbz.forceTwoPage') }}</p>
                       <div class="grid grid-cols-2 gap-1 rounded-lg bg-muted/55 p-1">
                         <button
                           ref="forceTwoPageToggleButton"
@@ -979,7 +1009,7 @@ onUnmounted(() => {
                     </div>
 
                     <div>
-                      <p class="mb-2 text-[13px] font-medium text-foreground/90">{{ t('reader.cbz.widePages') }}</p>
+                      <p class="mb-2 text-[13px] font-medium text-foreground">{{ t('reader.cbz.widePages') }}</p>
                       <div class="grid grid-cols-2 gap-1 rounded-lg bg-muted/55 p-1">
                         <button
                           v-for="opt in WIDE_PAGE_OPTIONS"
@@ -1028,29 +1058,35 @@ onUnmounted(() => {
         <div class="w-8 h-8 rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground animate-spin" />
       </div>
 
-      <div class="flex items-center justify-center h-full w-full gap-0.5 px-1">
+      <div
+        data-testid="cbz-paginated-pages"
+        class="flex h-full w-full items-center justify-center px-1"
+        :style="renderSpread ? spreadContainerStyle : undefined"
+      >
         <template v-if="renderSpread">
-          <div class="h-full w-1/2 flex items-center justify-center">
+          <div data-spread-side="left" class="flex h-full min-w-0 flex-1 items-center justify-end">
             <img
               v-if="renderLeftPage !== null"
               :src="pageUrl(renderLeftPage)"
               :class="[imgFitClass, 'pointer-events-none transition-opacity duration-150', currentImageLoaded ? 'opacity-100' : 'opacity-0']"
               :style="{ maxWidth: '100%', maxHeight: '100%' }"
+              alt=""
               draggable="false"
               @load="onPaginatedImageLoad(renderLeftPage, $event)"
             />
-            <div v-else class="h-[92%] w-[92%] rounded-sm border border-border/60 bg-background/30" />
+            <div v-else aria-hidden="true" class="h-[92%] w-[92%] rounded-sm border border-border/60 bg-background/30" />
           </div>
-          <div class="h-full w-1/2 flex items-center justify-center">
+          <div data-spread-side="right" class="flex h-full min-w-0 flex-1 items-center justify-start">
             <img
               v-if="renderRightPage !== null"
               :src="pageUrl(renderRightPage)"
               :class="[imgFitClass, 'pointer-events-none transition-opacity duration-150', currentImageLoaded ? 'opacity-100' : 'opacity-0']"
               :style="{ maxWidth: '100%', maxHeight: '100%' }"
+              alt=""
               draggable="false"
               @load="onPaginatedImageLoad(renderRightPage, $event)"
             />
-            <div v-else class="h-[92%] w-[92%] rounded-sm border border-border/60 bg-background/30" />
+            <div v-else aria-hidden="true" class="h-[92%] w-[92%] rounded-sm border border-border/60 bg-background/30" />
           </div>
         </template>
 
@@ -1058,6 +1094,7 @@ onUnmounted(() => {
           v-else-if="renderSinglePage !== null"
           :src="pageUrl(renderSinglePage)"
           :class="[imgFitClass, 'pointer-events-none transition-opacity duration-150', currentImageLoaded ? 'opacity-100' : 'opacity-0']"
+          alt=""
           draggable="false"
           @load="onPaginatedImageLoad(renderSinglePage, $event)"
         />
@@ -1077,7 +1114,14 @@ onUnmounted(() => {
           :class="[stripFrameClass, scrollMode === 'long-strip' ? '' : 'px-2']"
           :style="{ transform: `translateY(${page.start}px)` }"
         >
-          <img :src="pageUrl(page.index)" :class="stripImageClass" decoding="async" draggable="false" @load="onStripImageLoad(page.index, $event)" />
+          <img
+            :src="pageUrl(page.index)"
+            :class="stripImageClass"
+            alt=""
+            decoding="async"
+            draggable="false"
+            @load="onStripImageLoad(page.index, $event)"
+          />
         </div>
       </div>
     </div>

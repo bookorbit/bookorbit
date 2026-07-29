@@ -90,9 +90,7 @@ const selectedReviewCount = computed(
 const selectedProgressCount = computed(
   () => props.preview.rows.filter((row) => row.progressOutcome === 'will_update' && selectedIds.value.has(row.hardcoverUserBookId)).length,
 )
-const selectedProgressLabel = computed(() =>
-  t('hardcover.review.selectedProgress', { count: selectedProgressCount.value }, selectedProgressCount.value),
-)
+const selectedProgressLabel = computed(() => t('hardcover.review.selectedProgress', { count: selectedProgressCount.value }))
 const visibleImportableRows = computed(() => pagedRows.value.filter(isImportableRow))
 const allVisibleSelected = computed(
   () => visibleImportableRows.value.length > 0 && visibleImportableRows.value.every((row) => selectedIds.value.has(row.hardcoverUserBookId)),

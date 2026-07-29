@@ -24,6 +24,6 @@ function handleError() {
 <template>
   <span class="relative flex shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-muted">
     <img v-if="!failed" :src="src" :alt="title ?? ''" loading="lazy" class="h-full w-full object-cover" @error="handleError" />
-    <BookOpen v-else :size="14" class="text-muted-foreground/60" />
+    <BookOpen v-else :size="14" class="text-muted-foreground" />
   </span>
 </template>

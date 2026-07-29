@@ -14,6 +14,7 @@ export interface AuditableOptions {
   action: AuditAction;
   resource?: AuditResource;
   getResourceId?: (req: AuditRequest, responseBody: unknown) => number | undefined;
+  getMeta?: (req: AuditRequest, responseBody: unknown) => Record<string, unknown> | undefined;
   description: string | ((req: AuditRequest, responseBody: unknown) => string);
 }
 

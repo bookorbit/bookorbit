@@ -51,7 +51,7 @@ function pillClass(filter: FilterState): string {
           <Trophy class="size-6 text-primary" />
         </div>
         <div class="min-w-0">
-          <h1 class="text-base font-semibold tracking-tight text-foreground/90 sm:text-md">{{ t('achievements.title') }}</h1>
+          <h1 class="text-base font-semibold tracking-tight text-foreground sm:text-md">{{ t('achievements.title') }}</h1>
           <span class="text-muted-foreground text-sm tabular-nums">{{
             t('achievements.tiersCount', { earned: totalEarned, total: totalAvailable })
           }}</span>

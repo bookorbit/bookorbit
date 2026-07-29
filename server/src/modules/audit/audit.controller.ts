@@ -2,18 +2,26 @@ import { Controller, Get, Query } from '@nestjs/common';
 import { Permission } from '@bookorbit/types';
 
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
-import { AuditLogQueryDto } from './dto/audit-log-query.dto';
+import { AuditActorQueryDto, AuditLogQueryDto } from './dto/audit-log-query.dto';
 import { AuditService } from './audit.service';
 
 @Controller('audit-log')
 export class AuditController {
   constructor(private readonly auditService: AuditService) {}
 
+  @Get('actors')
+  @RequirePermission(Permission.ViewAuditLog)
+  getActors(@Query() query: AuditActorQueryDto) {
+    return this.auditService.getActors(query.q, query.limit!);
+  }
+
   @Get()
   @RequirePermission(Permission.ViewAuditLog)
   getAuditLogs(@Query() query: AuditLogQueryDto) {
     return this.auditService.getAuditLogs({
       userId: query.userId,
+      search: query.search,
+      actorUsername: query.actorUsername,
       action: query.action,
       resource: query.resource,
       dateFrom: query.dateFrom ? new Date(query.dateFrom) : undefined,

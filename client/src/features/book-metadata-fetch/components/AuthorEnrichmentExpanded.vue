@@ -130,7 +130,7 @@ async function handleCancelConfirm() {
     </div>
 
     <button v-if="props.status.failed > 0" class="text-xs text-emerald-500 hover:underline text-left" @click="emit('openReport')">
-      {{ t('bookMetadataFetch.viewFailed', { count: props.status.failed }, props.status.failed) }}
+      {{ t('bookMetadataFetch.viewFailed', { count: props.status.failed }) }}
     </button>
   </div>
 </template>

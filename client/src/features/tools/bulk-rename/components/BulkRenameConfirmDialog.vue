@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { AlertTriangle } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
+import IcuCountText from '@/components/IcuCountText.vue'
 
 const { t } = useI18n()
 
@@ -34,11 +35,11 @@ function handleCancel(): void {
           <div>
             <h3 class="text-lg font-semibold text-foreground">{{ t('tools.bulkRename.confirmDialog.title') }}</h3>
             <p class="mt-1 text-sm text-muted-foreground">
-              <i18n-t keypath="tools.bulkRename.confirmDialog.body" :plural="renameCount">
-                <template #count>
-                  <strong>{{ renameCount }}</strong>
+              <IcuCountText keypath="tools.bulkRename.confirmDialog.body" :count="renameCount">
+                <template #count="{ value }">
+                  <strong>{{ value }}</strong>
                 </template>
-              </i18n-t>
+              </IcuCountText>
             </p>
           </div>
         </div>
@@ -51,7 +52,7 @@ function handleCancel(): void {
             class="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
             @click="handleConfirm"
           >
-            {{ t('tools.bulkRename.confirmDialog.renameButton', { count: renameCount }, renameCount) }}
+            {{ t('tools.bulkRename.confirmDialog.renameButton', { count: renameCount }) }}
           </button>
         </div>
       </div>
