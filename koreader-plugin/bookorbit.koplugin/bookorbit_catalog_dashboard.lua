@@ -203,36 +203,40 @@ function CatalogDashboard:dashboardRoot(opts)
         return self:cachedDashboardContext(cached)
     end
 
-    local section = self:dashboardSectionRequest()
     local body, err = self:fetch(_("Loading dashboard..."), function()
-        return self.client:catalogDashboard(section)
+        return self.client:catalogDashboard()
     end, opts)
-    -- A server that advertised the capability but rejects the parameter is
-    -- answering definitively, so drop back to the legacy shape for the session
-    -- rather than leaving the dashboard empty.
-    if not body and section and (err == 400 or err == 404) then
-        Capabilities.markUnsupported(self.client, DashboardSections.CAPABILITY)
-        section = nil
-        body, err = self:fetch(_("Loading dashboard..."), function()
-            return self.client:catalogDashboard()
-        end, opts)
-    end
-    if body and body.continueReading then
-        local second_config = DashboardSections.at(self.settings, 2)
-        local second_body
-        if self.client.catalogDashboardSection then
-            second_body = self:fetch(_("Loading dashboard..."), function()
-                return self.client:catalogDashboardSection(second_config)
+    if body and body.continueReading and self.client.catalogDashboardSection then
+        local function fetchSection(config)
+            local response = self:fetch(_("Loading dashboard..."), function()
+                return self.client:catalogDashboardSection(config)
             end, opts)
+            if type(response) ~= "table" then return nil end
+            return type(response.section) == "table" and response.section or response
         end
-        if type(second_body) == "table" then
-            local second_section = type(second_body.section) == "table" and second_body.section or second_body
+
+        local first_config = DashboardSections.at(self.settings, 1)
+        local first_section = fetchSection(first_config)
+        if first_section then
+            body.section = {
+                type = first_section.type or first_config.type,
+                smartScopeId = first_section.smartScopeId or first_config.smartScopeId,
+                books = first_section.books or {},
+            }
+            body.discover = nil
+        end
+
+        local second_config = DashboardSections.at(self.settings, 2)
+        local second_section = fetchSection(second_config)
+        if second_section then
             body.section2 = {
                 type = second_section.type or second_config.type,
                 smartScopeId = second_section.smartScopeId or second_config.smartScopeId,
                 books = second_section.books or {},
             }
         end
+    end
+    if body and body.continueReading then
         self:cacheDashboard(body)
         return self:dashboardContext(body)
     end

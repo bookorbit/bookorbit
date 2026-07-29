@@ -194,23 +194,22 @@ assertEqual(#prefetch, 3, "prefetching covers continue reading and the configure
 -- signature, so a later open recognises it.
 catalog = newCatalog{ section = { type = "want-to-read" }, capabilities = { "catalogDashboardSections" } }
 local _, refreshed = catalog:dashboardRoot()
-assertEqual(last_section.type, "want-to-read", "the configured section reaches the client")
-assertEqual(refreshed.dashboard.section.books[1].id, 9, "the first section body is what gets rendered")
+assertEqual(refreshed.dashboard.section.type, "want-to-read", "the configured first section reaches the dedicated section endpoint")
+assertEqual(refreshed.dashboard.section.books[1].id, 10, "the first section body is what gets rendered")
 assertEqual(refreshed.dashboard.section2.books[1].id, 10, "the second section is fetched and merged into the dashboard")
 assertEqual(catalog.settings.catalog_dashboard_cache_section, "want-to-read", "the cache records which section it holds")
 assertEqual(catalog:dashboardCacheMatchesSection(), true, "the cache matches the configuration it was fetched for")
 
--- A server that advertises the capability but rejects the parameter is a
--- definitive answer: retry once without it rather than show nothing.
+-- The full dashboard is always fetched without a section parameter; configured
+-- rows come from the dedicated section endpoint instead.
 catalog = newCatalog{
     section = { type = "want-to-read" },
     capabilities = { "catalogDashboardSections" },
     reject_section = 400,
 }
 local _, recovered = catalog:dashboardRoot()
-assertEqual(recovered.dashboard ~= nil, true, "a rejected parameter still produces a dashboard")
-assertEqual(recovered.dashboard.section, nil, "the retry falls back to the legacy body")
-assertEqual(Capabilities.supports(catalog.client, DashboardSections.CAPABILITY), false, "the rejection downgrades the session")
+assertEqual(recovered.dashboard ~= nil, true, "the base dashboard still loads")
+assertEqual(recovered.dashboard.section.type, "want-to-read", "the selected row does not depend on the full-dashboard query parameter")
 
 -- A cached body fetched for another section is still shown, but its row is
 -- marked pending so stale books are never presented as the new choice.
