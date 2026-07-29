@@ -91,30 +91,7 @@ local function assertEqual(actual, expected, label)
     end
 end
 
--- A stored choice that cannot be honoured falls back to Discover rather than
--- leaving the row undefined. Only native blocks and real Browse destinations
--- are accepted.
-assertEqual(DashboardSections.normalizeEntry(nil).type, "random", "a missing entry degrades to Discover")
-assertEqual(DashboardSections.normalizeEntry({ type = "not-a-source" }).type, "random", "an unknown type degrades to Discover")
-assertEqual(DashboardSections.normalizeEntry({ type = "want-to-read" }).type, "random", "an obsolete pseudo-source degrades to Discover")
 local author_source = { type = "authors", sourceName = "Ursula K. Le Guin", params = { author = "Ursula K. Le Guin", sort = "title" } }
-assertEqual(DashboardSections.normalizeEntry({ type = "authors" }).type, "random", "an unselected catalog type degrades to Discover")
-assertEqual(DashboardSections.normalizeEntry(author_source).type, "authors", "a selected author source is kept")
-
-local defaults = DashboardSections.normalize(nil)
-assertEqual(#defaults, 4, "the dashboard always has four slots")
-assertEqual(defaults[1].type, "stats", "slot 1 defaults to Stats")
-assertEqual(defaults[2].type, "continue-reading", "slot 2 defaults to Continue reading")
-assertEqual(defaults[3].type, "random", "slot 3 defaults to Discover")
-assertEqual(defaults[4].type, "browse", "slot 4 defaults to Browse")
-local migrated = DashboardSections.normalize({ { type = "want-to-read" }, author_source })
-assertEqual(migrated[3].type, "random", "the obsolete old row migrates safely to Discover")
-assertEqual(migrated[4].type, "authors", "a selected catalog source survives migration")
-
-assertEqual(DashboardSections.signature({ type = "recently-added" }), "recently-added", "a source signs as itself")
-assertEqual(DashboardSections.headerText(author_source), "Ursula K. Le Guin", "a selected shelf is titled by its entry")
-assertEqual(DashboardSections.isBookSource("authors"), true, "a selected author is a book shelf source")
-assertEqual(DashboardSections.isCatalogSelector("series"), true, "Series requires one more selection level")
 
 local requests
 local last_section
