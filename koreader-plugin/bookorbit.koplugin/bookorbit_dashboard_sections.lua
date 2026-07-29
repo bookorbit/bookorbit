@@ -33,8 +33,6 @@ DashboardSections.TYPES = {
     "browse",
     "recently-added",
     "in-progress",
-    "all-books",
-    "on-device",
     "libraries",
     "authors",
     "series",
@@ -92,11 +90,14 @@ local BOOK_SOURCES = {
     ["random"] = true,
     ["recently-added"] = true,
     ["in-progress"] = true,
-    ["all-books"] = true,
+    ["libraries"] = true,
+    ["authors"] = true,
+    ["series"] = true,
+    ["collections"] = true,
+    ["smart-scopes"] = true,
 }
 
-local CATALOG_DESTINATIONS = {
-    ["on-device"] = true,
+local CATALOG_SELECTORS = {
     ["libraries"] = true,
     ["authors"] = true,
     ["series"] = true,
@@ -108,11 +109,14 @@ function DashboardSections.isBookSource(section_type)
     return BOOK_SOURCES[section_type] == true
 end
 
-function DashboardSections.isCatalogDestination(section_type)
-    return CATALOG_DESTINATIONS[section_type] == true
+function DashboardSections.isCatalogSelector(section_type)
+    return CATALOG_SELECTORS[section_type] == true
 end
 
 function DashboardSections.headerText(config)
+    if config and type(config.sourceName) == "string" and config.sourceName ~= "" then
+        return config.sourceName
+    end
     return DashboardSections.label(config and config.type)
 end
 
@@ -126,7 +130,18 @@ function DashboardSections.normalizeEntry(value)
     if type(value) ~= "table" or not DashboardSections.isValid(value.type) then
         return DashboardSections.defaultConfig()
     end
-    return { type = value.type }
+    local entry = { type = value.type }
+    if DashboardSections.isCatalogSelector(value.type) then
+        if type(value.sourceName) ~= "string" or value.sourceName == "" or type(value.params) ~= "table" then
+            return DashboardSections.defaultConfig()
+        end
+        entry.sourceName = value.sourceName
+        entry.params = {}
+        for _, key in ipairs({ "libraryId", "collectionId", "smartScopeId", "author", "seriesId", "series", "sort" }) do
+            if value.params[key] ~= nil then entry.params[key] = value.params[key] end
+        end
+    end
+    return entry
 end
 
 function DashboardSections.normalize(value)
@@ -184,8 +199,12 @@ end
 -- cached under a different choice is not mistaken for the current one.
 function DashboardSections.signature(config)
     config = DashboardSections.normalizeEntry(config)
-    if config.type == "smart-scope" then
-        return "smart-scope:" .. tostring(config.smartScopeId)
+    if DashboardSections.isCatalogSelector(config.type) then
+        local parts = { config.type }
+        for _, key in ipairs({ "libraryId", "collectionId", "smartScopeId", "author", "seriesId", "series", "sort" }) do
+            if config.params[key] ~= nil then table.insert(parts, key .. "=" .. tostring(config.params[key])) end
+        end
+        return table.concat(parts, ":")
     end
     return config.type
 end

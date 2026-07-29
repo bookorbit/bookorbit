@@ -208,8 +208,8 @@ function CatalogDashboard:dashboardRoot(opts)
             elseif config.type == "in-progress" then
                 params.sort = "recently_read"
                 params.readStatus = "reading"
-            elseif config.type == "all-books" then
-                params.sort = "title"
+            elseif DashboardSections.isCatalogSelector(config.type) then
+                for key, value in pairs(config.params or {}) do params[key] = value end
             else
                 return nil
             end
@@ -289,26 +289,6 @@ function CatalogDashboard.dashboardBooks(dashboard)
         end
     end
     return books
-end
-
-function CatalogDashboard:dashboardDestinationEntry(config)
-    local section_type = config and config.type
-    if section_type == "on-device" then
-        return {
-            text = _("Open On device"),
-            icon = "appbar.filebrowser",
-            mandatory = tostring(self:onDeviceCount()),
-            kind = "on-device",
-        }
-    end
-    if DashboardSections.isCatalogDestination(section_type) then
-        return {
-            text = T(_("Open %1"), DashboardSections.label(section_type)),
-            kind = "section",
-            section = section_type,
-        }
-    end
-    return nil
 end
 
 function CatalogDashboard:dashboardActionEntries()
@@ -782,8 +762,6 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
             fixed_h = fixed_h + header_h + inner_gap + hero_h + section_gap
         elseif config.type == "browse" then
             fixed_h = fixed_h + header_h + inner_gap + browse_rows * browse_row_h + section_gap
-        elseif DashboardSections.isCatalogDestination(config.type) then
-            fixed_h = fixed_h + header_h + inner_gap + browse_row_h + section_gap
         else
             grid_count = grid_count + 1
             max_grid_books = math.max(max_grid_books, #self.dashboardSlotBooks(dashboard, index))
@@ -833,12 +811,6 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
             self:addDashboardHeader(DashboardSections.headerText(config))
             self:addDashboardSpacer(inner_gap)
             self:addDashboardBrowseList(action_entries, browse_row_h, browse_cols, browse_rows)
-            self:addDashboardSpacer(section_gap)
-        elseif DashboardSections.isCatalogDestination(config.type) then
-            self:addDashboardHeader(DashboardSections.headerText(config))
-            self:addDashboardSpacer(inner_gap)
-            local entry = self:dashboardDestinationEntry(config)
-            if entry then self:addDashboardBrowseList({ entry }, browse_row_h, 1, 1) end
             self:addDashboardSpacer(section_gap)
         else
             local books = pending and {} or self.dashboardSlotBooks(dashboard, index)

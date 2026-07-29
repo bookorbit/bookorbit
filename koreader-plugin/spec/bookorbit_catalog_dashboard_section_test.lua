@@ -97,7 +97,9 @@ end
 assertEqual(DashboardSections.normalizeEntry(nil).type, "random", "a missing entry degrades to Discover")
 assertEqual(DashboardSections.normalizeEntry({ type = "not-a-source" }).type, "random", "an unknown type degrades to Discover")
 assertEqual(DashboardSections.normalizeEntry({ type = "want-to-read" }).type, "random", "an obsolete pseudo-source degrades to Discover")
-assertEqual(DashboardSections.normalizeEntry({ type = "authors" }).type, "authors", "a Browse destination is kept")
+local author_source = { type = "authors", sourceName = "Ursula K. Le Guin", params = { author = "Ursula K. Le Guin", sort = "title" } }
+assertEqual(DashboardSections.normalizeEntry({ type = "authors" }).type, "random", "an unselected catalog type degrades to Discover")
+assertEqual(DashboardSections.normalizeEntry(author_source).type, "authors", "a selected author source is kept")
 
 local defaults = DashboardSections.normalize(nil)
 assertEqual(#defaults, 4, "the dashboard always has four slots")
@@ -105,14 +107,14 @@ assertEqual(defaults[1].type, "stats", "slot 1 defaults to Stats")
 assertEqual(defaults[2].type, "continue-reading", "slot 2 defaults to Continue reading")
 assertEqual(defaults[3].type, "random", "slot 3 defaults to Discover")
 assertEqual(defaults[4].type, "browse", "slot 4 defaults to Browse")
-local migrated = DashboardSections.normalize({ { type = "want-to-read" }, { type = "authors" } })
+local migrated = DashboardSections.normalize({ { type = "want-to-read" }, author_source })
 assertEqual(migrated[3].type, "random", "the obsolete old row migrates safely to Discover")
-assertEqual(migrated[4].type, "authors", "a real catalog destination survives migration")
+assertEqual(migrated[4].type, "authors", "a selected catalog source survives migration")
 
 assertEqual(DashboardSections.signature({ type = "recently-added" }), "recently-added", "a source signs as itself")
-assertEqual(DashboardSections.headerText({ type = "authors" }), "Authors", "a catalog destination is titled by its source")
-assertEqual(DashboardSections.isBookSource("all-books"), true, "All Books is a book grid source")
-assertEqual(DashboardSections.isCatalogDestination("series"), true, "Series opens the existing catalog")
+assertEqual(DashboardSections.headerText(author_source), "Ursula K. Le Guin", "a selected shelf is titled by its entry")
+assertEqual(DashboardSections.isBookSource("authors"), true, "a selected author is a book shelf source")
+assertEqual(DashboardSections.isCatalogSelector("series"), true, "Series requires one more selection level")
 
 local requests
 local last_section
@@ -197,25 +199,20 @@ local prefetch = CatalogDashboard.dashboardBooks({
 assertEqual(#prefetch, 15, "prefetching covers Continue reading and every grid slot")
 
 -- Real book shelves use the ordinary catalog books endpoint and request twelve
--- items. Existing catalog destinations remain navigation rows rather than empty
--- pseudo-book feeds.
+-- items, including filters selected through the existing catalog lists.
 catalog = newCatalog{
-    sections = { { type = "recently-added" }, { type = "all-books" } },
+    sections = { { type = "recently-added" }, author_source },
 }
 local _, refreshed = catalog:dashboardRoot()
 assertEqual(refreshed.dashboard.dashboardSlots[1].type, "stats", "slot 1 keeps its native Stats renderer")
 assertEqual(refreshed.dashboard.dashboardSlots[2].type, "continue-reading", "slot 2 keeps its native Continue reading renderer")
 assertEqual(refreshed.dashboard.dashboardSlots[3].type, "recently-added", "the first old row migrates to slot 3")
 assertEqual(refreshed.dashboard.dashboardSlots[3].books[1].id, 11, "Recently added loads from catalog books")
-assertEqual(refreshed.dashboard.dashboardSlots[4].books[1].id, 13, "All Books loads independently")
-assertEqual(catalog.settings.catalog_dashboard_cache_section, "stats|continue-reading|recently-added|all-books",
-    "the cache records all four slot sources")
+assertEqual(refreshed.dashboard.dashboardSlots[4].books[1].id, 13, "the selected author loads independently")
+assertEqual(catalog.settings.catalog_dashboard_cache_section,
+    "stats|continue-reading|recently-added|authors:author=Ursula K. Le Guin:sort=title",
+    "the cache records the selected catalog filter")
 assertEqual(catalog:dashboardCacheMatchesSection(), true, "the cache matches the full four-slot configuration")
-
-catalog = newCatalog{ section = { type = "authors" } }
-local _, destination = catalog:dashboardRoot()
-assertEqual(destination.dashboard.dashboardSlots[3].type, "authors", "Authors remains a catalog destination")
-assertEqual(#(destination.dashboard.dashboardSlots[3].books or {}), 0, "Authors is not treated as a book feed")
 
 -- A cached body fetched for another four-slot configuration is still shown, but
 -- its grid shelves are marked pending until the refresh lands.
@@ -250,13 +247,13 @@ local refreshes = 0
 function catalog:dashboardMode() return true end
 function catalog:updateItems() end
 function catalog:refreshCurrent() refreshes = refreshes + 1 end
-catalog:setDashboardSection({ type = "authors" }, 3)
+catalog:setDashboardSection(author_source, 3)
 assertEqual(catalog.settings[DashboardSections.SETTING_KEY][3].type, "authors", "the new slot choice is persisted")
 assertEqual(catalog.current_context.section_stale, true, "the visible dashboard slots are marked pending")
 assertEqual(refreshes, 1, "choosing a slot source refreshes the dashboard")
 
 -- Re-picking the current slot source is a no-op rather than a needless refresh.
-catalog:setDashboardSection({ type = "authors" }, 3)
+catalog:setDashboardSection(author_source, 3)
 assertEqual(refreshes, 1, "re-picking the same slot source does not refresh")
 
 print("bookorbit_catalog_dashboard_section_test.lua: ok")

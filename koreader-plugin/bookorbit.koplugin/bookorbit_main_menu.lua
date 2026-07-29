@@ -309,72 +309,95 @@ function MainMenu:dashboardSectionClient(catalog)
     return BookOrbitApi.new(self:apiOpts())
 end
 
--- SmartScopes live on the server, so the chooser has to ask for them. The
--- chosen name is stored beside the id purely so the row can be labelled later
--- without another request.
-function MainMenu:chooseDashboardSmartScope(index, catalog, touchmenu_instance)
-    local ButtonDialog = require("ui/widget/buttondialog")
-    if NetworkMgr:willRerunWhenConnected(function() self:chooseDashboardSmartScope(index, catalog, touchmenu_instance) end) then
-        return
+function MainMenu:dashboardParamsForEntry(section, entry)
+    local params = { sort = "title" }
+    if section == "libraries" then
+        params.libraryId = tonumber(entry.id)
+    elseif section == "collections" then
+        params.collectionId = tonumber(entry.id)
+    elseif section == "smart-scopes" then
+        params.smartScopeId = tonumber(entry.id)
+    elseif section == "authors" then
+        params.author = entry.id
+    elseif section == "series" then
+        if entry.seriesId then params.seriesId = tonumber(entry.seriesId) else params.series = entry.id end
+        params.sort = "series"
     end
+    return params
+end
+
+function MainMenu:chooseDashboardCatalogSource(index, section, catalog, touchmenu_instance, page)
+    local ButtonDialog = require("ui/widget/buttondialog")
+    page = page or 1
+    if NetworkMgr:willRerunWhenConnected(function()
+        self:chooseDashboardCatalogSource(index, section, catalog, touchmenu_instance, page)
+    end) then return end
 
     Device:setIgnoreInput(true)
-    local body, err = self:dashboardSectionClient(catalog):catalogSection("smart-scopes")
+    local params = (section == "authors" or section == "series") and { page = page } or nil
+    local body, err = self:dashboardSectionClient(catalog):catalogSection(section, params)
     Device:setIgnoreInput(false)
-
-    local scopes = body and body.items or nil
-    if not scopes then
-        UIManager:show(InfoMessage:new{
-            text = T(_("Could not load your SmartScopes: %1"), tostring(err)),
-            timeout = 3,
-        })
-        return
-    end
-    if #scopes == 0 then
-        UIManager:show(InfoMessage:new{
-            text = _("You have no SmartScopes yet. Create one in BookOrbit web settings."),
-            timeout = 3,
-        })
+    local entries = body and body.items or nil
+    if not entries then
+        UIManager:show(InfoMessage:new{ text = T(_("Could not load %1: %2"), DashboardSections.label(section), tostring(err)), timeout = 3 })
         return
     end
 
     local current = DashboardSections.at(self.settings, index)
     local dialog
     local buttons = {}
-    for _index, scope in ipairs(scopes) do
-        local scope_id = tonumber(scope.id)
-        if scope_id then
-            table.insert(buttons, {
-                {
-                    text = scope.title .. (current.smartScopeId == scope_id and " *" or ""),
-                    callback = function()
-                        UIManager:close(dialog)
-                        self:applyDashboardSection(index,
-                            { type = "smart-scope", smartScopeId = scope_id, smartScopeName = scope.title },
-                            catalog, touchmenu_instance)
-                    end,
-                },
-            })
-        end
+    for _, entry in ipairs(entries) do
+        local config = { type = section, sourceName = entry.title, params = self:dashboardParamsForEntry(section, entry) }
+        local checked = DashboardSections.signature(current) == DashboardSections.signature(config)
+        table.insert(buttons, {{
+            text = entry.title .. (checked and " ✓" or ""),
+            callback = function()
+                UIManager:close(dialog)
+                self:applyDashboardSection(index, config, catalog, touchmenu_instance)
+            end,
+        }})
     end
-    dialog = ButtonDialog:new{
-        title = _("Show which SmartScope?"),
-        buttons = buttons,
-    }
+    if #buttons == 0 then
+        table.insert(buttons, {{ text = T(_("No %1 found."), DashboardSections.label(section)), enabled = false }})
+    end
+    if page > 1 or body.hasNext == true then
+        local nav = {}
+        if page > 1 then
+            table.insert(nav, { text = _("Previous"), callback = function()
+                UIManager:close(dialog)
+                self:chooseDashboardCatalogSource(index, section, catalog, touchmenu_instance, page - 1)
+            end })
+        end
+        if body.hasNext == true then
+            table.insert(nav, { text = _("Next"), callback = function()
+                UIManager:close(dialog)
+                self:chooseDashboardCatalogSource(index, section, catalog, touchmenu_instance, page + 1)
+            end })
+        end
+        table.insert(buttons, nav)
+    end
+    dialog = ButtonDialog:new{ title = DashboardSections.label(section), buttons = buttons }
     UIManager:show(dialog)
 end
 
 function MainMenu:dashboardSectionItems(index, catalog)
     local items = {}
     for _index, section_type in ipairs(DashboardSections.TYPES) do
+        local is_selector = DashboardSections.isCatalogSelector(section_type)
         table.insert(items, {
             text = DashboardSections.label(section_type),
+            mandatory = is_selector and ">" or nil,
             help_text = DashboardSections.helpText(section_type),
-            checked_func = function()
+            checked_func = is_selector and nil or function()
                 return DashboardSections.at(self.settings, index).type == section_type
             end,
+            keep_menu_open = is_selector,
             callback = function(touchmenu_instance)
-                self:applyDashboardSection(index, { type = section_type }, catalog, touchmenu_instance)
+                if is_selector then
+                    self:chooseDashboardCatalogSource(index, section_type, catalog, touchmenu_instance)
+                else
+                    self:applyDashboardSection(index, { type = section_type }, catalog, touchmenu_instance)
+                end
             end,
         })
     end
