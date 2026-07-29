@@ -396,26 +396,23 @@ function MainMenu:dashboardSectionItems(index, catalog)
 end
 
 function MainMenu:dashboardSettingsMenu(catalog)
-    return {
+    local items = {
         {
             text_func = function()
                 return T(_("Open dashboard on startup (%1)"), self:catalogAutoOpenLabel())
             end,
             sub_item_table = self:catalogAutoOpenMenu(),
         },
-        {
-            text_func = function()
-                return T(_("Row 1 below Continue reading (%1)"), self:dashboardSectionLabel(1))
-            end,
-            sub_item_table = self:dashboardSectionItems(1, catalog),
-        },
-        {
-            text_func = function()
-                return T(_("Row 2 (%1)"), self:dashboardSectionLabel(2))
-            end,
-            sub_item_table = self:dashboardSectionItems(2, catalog),
-        },
     }
+    for index = 1, DashboardSections.SLOT_COUNT do
+        table.insert(items, {
+            text_func = function()
+                return T(_("Section %1 (%2)"), index, self:dashboardSectionLabel(index))
+            end,
+            sub_item_table = self:dashboardSectionItems(index, catalog),
+        })
+    end
+    return items
 end
 
 function MainMenu:syncSettingsMenu(has_open_book)

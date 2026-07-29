@@ -1,11 +1,10 @@
 --[[--
-Registry for the configurable dashboard row below Continue reading.
+Registry for the four configurable dashboard slots.
 
-Every source renders as the same row of cover cards, so a section is fully
-described by its type plus, for a SmartScope, which scope to run. The stored
-value is an ordered list even though only the first entry is rendered today:
-that way a later release can show more than one configurable row without
-rewriting settings already on the device.
+Each source keeps its native renderer: Stats is a strip, Continue reading is a
+hero row, book sources are cover grids, and Browse is the compact action list.
+A book source is fully described by its type plus, for a SmartScope, which scope
+to run. The stored value is an ordered list matching the four dashboard slots.
 
 The SmartScope name is cached alongside the id purely so the settings menu can
 label the row without a request. It is never sent to the server.
@@ -18,30 +17,46 @@ local DashboardSections = {}
 DashboardSections.SETTING_KEY = "catalog_dashboard_sections"
 DashboardSections.CAPABILITY = "catalogDashboardSections"
 DashboardSections.DEFAULT_TYPE = "random"
+DashboardSections.SLOT_COUNT = 4
+DashboardSections.DEFAULT_SLOTS = {
+    { type = "stats" },
+    { type = "continue-reading" },
+    { type = "random" },
+    { type = "browse" },
+}
 
 -- Order here is the order the picker lists them in.
 DashboardSections.TYPES = {
+    "stats",
+    "continue-reading",
     "random",
     "recently-added",
     "want-to-read",
     "up-next-in-series",
     "smart-scope",
+    "browse",
 }
 
 local LABELS = {
+    ["stats"] = function() return _("Stats") end,
+    ["continue-reading"] = function() return _("Continue reading") end,
     ["random"] = function() return _("Discover") end,
     ["recently-added"] = function() return _("Recently added") end,
     ["want-to-read"] = function() return _("Want to read") end,
     ["up-next-in-series"] = function() return _("Up next in series") end,
     ["smart-scope"] = function() return _("SmartScope") end,
+    ["browse"] = function() return _("Browse") end,
 }
 
 local HELP_TEXT = {
+    ["stats"] = function() return _("Your reading summary shown as a compact horizontal strip.") end,
+    ["continue-reading"] = function() return _("Books currently in progress, shown as the dashboard hero row.") end,
     ["random"] = function() return _("A random selection from your whole library, reshuffled with the button in the section header.") end,
     ["recently-added"] = function() return _("The books most recently added to your library.") end,
     ["want-to-read"] = function() return _("Books you marked as want to read.") end,
     ["up-next-in-series"] = function() return _("The next unread book in each series you have already started.") end,
     ["smart-scope"] = function() return _("Books matching a SmartScope you saved in BookOrbit.") end,
+    ["browse"] = function() return _("Dashboard shortcuts for libraries, collections, search, and other catalog views.") end,
 }
 
 function DashboardSections.isValid(section_type)
@@ -58,6 +73,10 @@ function DashboardSections.helpText(section_type)
     return help and help() or nil
 end
 
+function DashboardSections.isBookSource(section_type)
+    return section_type ~= "stats" and section_type ~= "continue-reading" and section_type ~= "browse"
+end
+
 -- What the section header shows. A SmartScope row is named after the scope
 -- itself; the generic label would tell the reader nothing.
 function DashboardSections.headerText(config)
@@ -68,8 +87,9 @@ function DashboardSections.headerText(config)
     return DashboardSections.label(config.type)
 end
 
-function DashboardSections.defaultConfig()
-    return { type = DashboardSections.DEFAULT_TYPE }
+function DashboardSections.defaultConfig(index)
+    local config = DashboardSections.DEFAULT_SLOTS[index or 3] or { type = DashboardSections.DEFAULT_TYPE }
+    return { type = config.type }
 end
 
 -- An unusable entry degrades to Discover rather than being dropped: the slot
@@ -95,19 +115,35 @@ end
 
 function DashboardSections.normalize(value)
     if type(value) ~= "table" or #value == 0 then
-        return { DashboardSections.defaultConfig() }
+        local defaults = {}
+        for index = 1, DashboardSections.SLOT_COUNT do
+            defaults[index] = DashboardSections.defaultConfig(index)
+        end
+        return defaults
     end
+
     local normalized = {}
-    for _index, entry in ipairs(value) do
-        table.insert(normalized, DashboardSections.normalizeEntry(entry))
+    local legacy_rows = #value <= 2
+        and value[1] and value[1].type ~= "stats" and value[1].type ~= "continue-reading" and value[1].type ~= "browse"
+    if legacy_rows then
+        normalized[1] = DashboardSections.defaultConfig(1)
+        normalized[2] = DashboardSections.defaultConfig(2)
+        normalized[3] = DashboardSections.normalizeEntry(value[1])
+        normalized[4] = value[2] and DashboardSections.normalizeEntry(value[2]) or DashboardSections.defaultConfig(4)
+        return normalized
+    end
+
+    for index = 1, DashboardSections.SLOT_COUNT do
+        normalized[index] = value[index] and DashboardSections.normalizeEntry(value[index]) or DashboardSections.defaultConfig(index)
     end
     return normalized
 end
 
 function DashboardSections.at(settings, index)
+    index = index or 1
     local stored = settings and settings[DashboardSections.SETTING_KEY]
     local sections = DashboardSections.normalize(stored)
-    return sections[index or 1] or DashboardSections.defaultConfig()
+    return sections[index] or DashboardSections.defaultConfig(index)
 end
 
 function DashboardSections.primary(settings)
@@ -136,6 +172,14 @@ function DashboardSections.signature(config)
         return "smart-scope:" .. tostring(config.smartScopeId)
     end
     return config.type
+end
+
+function DashboardSections.settingsSignature(settings)
+    local parts = {}
+    for index = 1, DashboardSections.SLOT_COUNT do
+        parts[index] = DashboardSections.signature(DashboardSections.at(settings, index))
+    end
+    return table.concat(parts, "|")
 end
 
 return DashboardSections

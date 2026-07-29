@@ -2138,7 +2138,7 @@ function BookOrbitCatalog:onMenuSelect(item)
     elseif item.kind == "dashboard-search" then
         self:promptSearch({})
     elseif item.kind == "dashboard-reroll" then
-        self:rerollDiscover()
+        self:rerollDiscover(item.section_index)
     elseif item.kind == "section-filter" then
         self:promptSectionFilter(item.section, item.q)
     elseif item.kind == "section-page" then

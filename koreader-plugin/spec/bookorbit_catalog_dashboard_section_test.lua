@@ -99,6 +99,16 @@ assertEqual(DashboardSections.normalizeEntry({ type = "smart-scope" }).type, "ra
 assertEqual(DashboardSections.normalizeEntry({ type = "want-to-read" }).type, "want-to-read", "a known type is kept")
 assertEqual(DashboardSections.normalizeEntry({ type = "smart-scope", smartScopeId = "4" }).smartScopeId, 4, "a numeric scope id is coerced")
 
+local defaults = DashboardSections.normalize(nil)
+assertEqual(#defaults, 4, "the dashboard always has four slots")
+assertEqual(defaults[1].type, "stats", "slot 1 defaults to Stats")
+assertEqual(defaults[2].type, "continue-reading", "slot 2 defaults to Continue reading")
+assertEqual(defaults[3].type, "random", "slot 3 defaults to Discover")
+assertEqual(defaults[4].type, "browse", "slot 4 defaults to Browse")
+local migrated = DashboardSections.normalize({ { type = "want-to-read" }, { type = "smart-scope", smartScopeId = 4 } })
+assertEqual(migrated[3].type, "want-to-read", "the old first configurable row migrates to slot 3")
+assertEqual(migrated[4].type, "smart-scope", "the old second configurable row migrates to slot 4")
+
 assertEqual(DashboardSections.signature({ type = "recently-added" }), "recently-added", "a plain type signs as itself")
 assertEqual(DashboardSections.signature({ type = "smart-scope", smartScopeId = 4 }), "smart-scope:4", "a scope signs with its id")
 assertEqual(DashboardSections.signature({ type = "smart-scope", smartScopeId = 5 })
@@ -143,8 +153,9 @@ local function newCatalog(opts)
                 return body
             end,
             catalogDashboardSection = function(_, section)
-                table.insert(requests, "section2")
-                return { type = section.type, smartScopeId = section.smartScopeId, books = { { id = 10 } } }
+                table.insert(requests, "section:" .. section.type)
+                local ids = { ["want-to-read"] = 10, ["recently-added"] = 11, ["up-next-in-series"] = 12, ["smart-scope"] = 13 }
+                return { type = section.type, smartScopeId = section.smartScopeId, books = { { id = ids[section.type] or 9 } } }
             end,
         },
     }
@@ -176,34 +187,41 @@ assertEqual(catalog:dashboardSectionRequest().type, "want-to-read", "a missing c
 catalog = newCatalog{ section = { type = "want-to-read" }, capability_error = 503 }
 assertEqual(catalog:dashboardSectionRequest().type, "want-to-read", "a transient capability probe failure does not suppress the selected section")
 
--- The books come from the section when the body carries one, and from the
--- legacy discover field otherwise.
-assertEqual(#CatalogDashboard.dashboardSectionBooks({ discover = { { id = 1 } } }), 1, "a legacy body reads discover")
-assertEqual(CatalogDashboard.dashboardSectionBooks({ discover = { { id = 1 } }, section = { books = { { id = 2 } } } })[1].id, 2,
-    "a section body wins over the legacy field")
-assertEqual(#CatalogDashboard.dashboardSectionBooks(nil), 0, "no body yields no books")
+-- Grid books are stored by slot.
+assertEqual(CatalogDashboard.dashboardSlotBooks({ dashboardSlots = { [3] = { books = { { id = 2 } } } } }, 3)[1].id, 2,
+    "a grid slot exposes its own books")
+assertEqual(#CatalogDashboard.dashboardSlotBooks(nil, 3), 0, "no body yields no books")
 
--- Thumbnail prefetching has to see the configured row's books, not just discover.
+-- Thumbnail prefetching sees every configured grid slot, including all twelve
+-- prefetched items per shelf.
+local twelve = {}
+for id = 1, 12 do twelve[id] = { id = id + 10 } end
 local prefetch = CatalogDashboard.dashboardBooks({
     continueReading = { { id = 1 } },
-    section = { books = { { id = 2 }, { id = 3 } } },
+    dashboardSlots = {
+        [1] = { type = "recently-added", books = twelve },
+        [2] = { type = "want-to-read", books = { { id = 30 }, { id = 31 } } },
+    },
 })
-assertEqual(#prefetch, 3, "prefetching covers continue reading and the configured row")
+assertEqual(#prefetch, 15, "prefetching covers Continue reading and every grid slot")
 
--- Successful requests for two named sections cache both configured rows.
+-- Successful requests for two named sections cache both migrated grid slots.
 catalog = newCatalog{
     sections = { { type = "want-to-read" }, { type = "recently-added" } },
     capabilities = { "catalogDashboardSections" },
 }
 local _, refreshed = catalog:dashboardRoot()
-assertEqual(refreshed.dashboard.section.type, "want-to-read", "the configured first section reaches the dedicated section endpoint")
-assertEqual(refreshed.dashboard.section.books[1].id, 10, "the first section body is what gets rendered")
-assertEqual(refreshed.dashboard.section2.books[1].id, 10, "the second section is fetched and merged into the dashboard")
-assertEqual(catalog.settings.catalog_dashboard_cache_section, "want-to-read", "the cache records which section it holds")
-assertEqual(catalog:dashboardCacheMatchesSection(), true, "the cache matches the configuration it was fetched for")
+assertEqual(refreshed.dashboard.dashboardSlots[1].type, "stats", "slot 1 keeps its native Stats renderer")
+assertEqual(refreshed.dashboard.dashboardSlots[2].type, "continue-reading", "slot 2 keeps its native Continue reading renderer")
+assertEqual(refreshed.dashboard.dashboardSlots[3].type, "want-to-read", "the old first row migrates to grid slot 3")
+assertEqual(refreshed.dashboard.dashboardSlots[3].books[1].id, 10, "slot 3 receives its own books")
+assertEqual(refreshed.dashboard.dashboardSlots[4].books[1].id, 11, "slot 4 is fetched independently")
+assertEqual(catalog.settings.catalog_dashboard_cache_section, "stats|continue-reading|want-to-read|recently-added",
+    "the cache records all four slot sources")
+assertEqual(catalog:dashboardCacheMatchesSection(), true, "the cache matches the full four-slot configuration")
 
 -- The full dashboard is always fetched without a section parameter; configured
--- rows come from the dedicated section endpoint instead.
+-- grid slots come from the dedicated section endpoint instead.
 catalog = newCatalog{
     section = { type = "want-to-read" },
     capabilities = { "catalogDashboardSections" },
@@ -211,26 +229,26 @@ catalog = newCatalog{
 }
 local _, recovered = catalog:dashboardRoot()
 assertEqual(recovered.dashboard ~= nil, true, "the base dashboard still loads")
-assertEqual(recovered.dashboard.section.type, "want-to-read", "the selected row does not depend on the full-dashboard query parameter")
+assertEqual(recovered.dashboard.dashboardSlots[3].type, "want-to-read", "the selected grid slot does not depend on the full-dashboard query parameter")
 
--- A cached body fetched for another section is still shown, but its row is
--- marked pending so stale books are never presented as the new choice.
+-- A cached body fetched for another four-slot configuration is still shown, but
+-- its grid shelves are marked pending until the refresh lands.
 catalog = newCatalog{
     section = { type = "want-to-read" },
-    cache = { continueReading = {}, discover = { { id = 2 } } },
-    cache_section = "random",
+    cache = { continueReading = {}, dashboardSlots = {} },
+    cache_section = "stats|continue-reading|random|browse",
 }
 local _, cached_context = catalog:initialDashboardContext()
 assertEqual(cached_context.dashboard ~= nil, true, "the rest of the cached dashboard is still shown")
-assertEqual(cached_context.section_stale, true, "a cache from another section marks the row pending")
+assertEqual(cached_context.section_stale, true, "a cache from another slot configuration marks grids pending")
 
 catalog = newCatalog{
     section = { type = "want-to-read" },
-    cache = { continueReading = {}, discover = {} },
-    cache_section = "want-to-read",
+    cache = { continueReading = {}, dashboardSlots = {} },
+    cache_section = "stats|continue-reading|want-to-read|browse",
 }
 local _, matching_context = catalog:initialDashboardContext()
-assertEqual(matching_context.section_stale, false, "a cache from the same section is used as is")
+assertEqual(matching_context.section_stale, false, "a cache from the same four-slot configuration is used as is")
 
 -- Only a random row offers a reshuffle; every other source has an order the
 -- server chose.
@@ -238,21 +256,21 @@ catalog = newCatalog{}
 assertEqual(catalog:dashboardSectionSupportsReroll({ type = "random" }), true, "Discover can be rerolled")
 assertEqual(catalog:dashboardSectionSupportsReroll({ type = "recently-added" }), false, "an ordered source cannot be rerolled")
 
--- Choosing a new section persists it and marks the visible row pending until
--- the refresh lands.
+-- Choosing a new slot source persists it and marks all cached grid shelves
+-- pending until the refresh lands.
 catalog = newCatalog{}
-catalog.current_context = { kind = "dashboard", dashboard = { continueReading = {}, discover = {} } }
+catalog.current_context = { kind = "dashboard", dashboard = { continueReading = {}, dashboardSlots = {} } }
 local refreshes = 0
 function catalog:dashboardMode() return true end
 function catalog:updateItems() end
 function catalog:refreshCurrent() refreshes = refreshes + 1 end
-catalog:setDashboardSection({ type = "up-next-in-series" })
-assertEqual(catalog.settings[DashboardSections.SETTING_KEY][1].type, "up-next-in-series", "the new choice is persisted")
-assertEqual(catalog.current_context.section_stale, true, "the visible row is marked pending")
-assertEqual(refreshes, 1, "choosing a section refreshes the dashboard")
+catalog:setDashboardSection({ type = "up-next-in-series" }, 3)
+assertEqual(catalog.settings[DashboardSections.SETTING_KEY][3].type, "up-next-in-series", "the new slot choice is persisted")
+assertEqual(catalog.current_context.section_stale, true, "the visible grid shelves are marked pending")
+assertEqual(refreshes, 1, "choosing a slot source refreshes the dashboard")
 
--- Re-picking the current section is a no-op rather than a needless refresh.
-catalog:setDashboardSection({ type = "up-next-in-series" })
-assertEqual(refreshes, 1, "re-picking the same section does not refresh")
+-- Re-picking the current slot source is a no-op rather than a needless refresh.
+catalog:setDashboardSection({ type = "up-next-in-series" }, 3)
+assertEqual(refreshes, 1, "re-picking the same slot source does not refresh")
 
 print("bookorbit_catalog_dashboard_section_test.lua: ok")
