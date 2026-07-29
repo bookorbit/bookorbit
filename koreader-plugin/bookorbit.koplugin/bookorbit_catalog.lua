@@ -2193,9 +2193,12 @@ function BookOrbitCatalog:onMenuSelect(item)
             dashboard_source_index = context.dashboard_source_index,
         })
     elseif item.kind == "dashboard-source" then
-        self:setDashboardSection(item.dashboard_source, item.dashboard_source_index)
-        self:onReturn()
-        if self:dashboardMode() then self:refreshCurrent() end
+        local source = item.dashboard_source
+        if source and type(source.sourceName) == "string" and source.sourceName ~= "" then
+            self:setDashboardSection(source, item.dashboard_source_index)
+            self:onReturn()
+            if self:dashboardMode() then self:refreshCurrent() end
+        end
     elseif item.kind == "on-device" then
         self:loadOnDevice()
     elseif item.kind == "books" then

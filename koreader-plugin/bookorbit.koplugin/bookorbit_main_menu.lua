@@ -324,7 +324,11 @@ function MainMenu:chooseDashboardCatalogSource(index, section, catalog, touchmen
 
     self:openCatalogBrowser(false)
     UIManager:nextTick(function()
-        if self.catalog_browser then openSelector(self.catalog_browser) end
+        if self.catalog_browser then
+            openSelector(self.catalog_browser)
+        else
+            UIManager:show(InfoMessage:new{ text = _("Could not open the BookOrbit catalog."), timeout = 3 })
+        end
     end)
 end
 

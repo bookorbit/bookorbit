@@ -14,6 +14,8 @@ local _ = require("gettext")
 
 local DashboardSections = {}
 
+local PARAM_KEYS = { "libraryId", "collectionId", "smartScopeId", "author", "seriesId", "series", "sort" }
+
 DashboardSections.SETTING_KEY = "catalog_dashboard_sections"
 DashboardSections.CAPABILITY = "catalogDashboardSections"
 DashboardSections.DEFAULT_TYPE = "random"
@@ -47,8 +49,6 @@ local LABELS = {
     ["browse"] = function() return _("Browse") end,
     ["recently-added"] = function() return _("Recently added") end,
     ["in-progress"] = function() return _("In progress") end,
-    ["all-books"] = function() return _("All Books") end,
-    ["on-device"] = function() return _("On device") end,
     ["libraries"] = function() return _("Libraries") end,
     ["authors"] = function() return _("Authors") end,
     ["series"] = function() return _("Series") end,
@@ -63,8 +63,6 @@ local HELP_TEXT = {
     ["browse"] = function() return _("Dashboard shortcuts for libraries, collections, SmartScopes, authors, series, and books.") end,
     ["recently-added"] = function() return _("The books most recently added to your library.") end,
     ["in-progress"] = function() return _("The catalog view for books currently in progress.") end,
-    ["all-books"] = function() return _("The complete catalog sorted by title.") end,
-    ["on-device"] = function() return _("Books linked to files on this device.") end,
     ["libraries"] = function() return _("The existing Libraries catalog, including its normal navigation and back button.") end,
     ["authors"] = function() return _("The existing Authors catalog, including its normal pagination and back button.") end,
     ["series"] = function() return _("The existing Series catalog, including its normal pagination and back button.") end,
@@ -121,7 +119,7 @@ function DashboardSections.headerText(config)
 end
 
 function DashboardSections.defaultConfig(index)
-    local config = DashboardSections.DEFAULT_SLOTS[index or 3] or { type = DashboardSections.DEFAULT_TYPE }
+    local config = (index and DashboardSections.DEFAULT_SLOTS[index]) or { type = DashboardSections.DEFAULT_TYPE }
     return { type = config.type }
 end
 
@@ -137,7 +135,7 @@ function DashboardSections.normalizeEntry(value)
         end
         entry.sourceName = value.sourceName
         entry.params = {}
-        for _, key in ipairs({ "libraryId", "collectionId", "smartScopeId", "author", "seriesId", "series", "sort" }) do
+        for _, key in ipairs(PARAM_KEYS) do
             if value.params[key] ~= nil then entry.params[key] = value.params[key] end
         end
     end
@@ -201,7 +199,7 @@ function DashboardSections.signature(config)
     config = DashboardSections.normalizeEntry(config)
     if DashboardSections.isCatalogSelector(config.type) then
         local parts = { config.type }
-        for _, key in ipairs({ "libraryId", "collectionId", "smartScopeId", "author", "seriesId", "series", "sort" }) do
+        for _, key in ipairs(PARAM_KEYS) do
             if config.params[key] ~= nil then table.insert(parts, key .. "=" .. tostring(config.params[key])) end
         end
         return table.concat(parts, ":")

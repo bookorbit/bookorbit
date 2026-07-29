@@ -142,18 +142,16 @@ local selectors = {
     SmartScopes = "smart-scopes",
 }
 for label, section in pairs(selectors) do
-    for _, item in ipairs(items) do
-        if item.text == label then
-            resetEvents()
-            loaded = nil
-            item.callback(touchmenu)
-            assertEqual(item.mandatory, ">", label .. " exposes a drill-down indicator")
-            assertEqual(item.keep_menu_open, true, label .. " is marked as a selector")
-            next_ticks[1]()
-            assertEqual(loaded.section, section, label .. " callback opens the matching catalog section")
-            assertEqual(loaded.index, 4, label .. " callback preserves the configured slot")
-        end
-    end
+    local item = findItem(label)
+    assertEqual(item ~= nil, true, label .. " is offered as a slot source")
+    resetEvents()
+    loaded = nil
+    item.callback(touchmenu)
+    assertEqual(item.mandatory, ">", label .. " exposes a drill-down indicator")
+    assertEqual(item.keep_menu_open, true, label .. " is marked as a selector")
+    next_ticks[1]()
+    assertEqual(loaded.section, section, label .. " callback opens the matching catalog section")
+    assertEqual(loaded.index, 4, label .. " callback preserves the configured slot")
 end
 
 print("bookorbit_dashboard_catalog_selection_test.lua: ok")

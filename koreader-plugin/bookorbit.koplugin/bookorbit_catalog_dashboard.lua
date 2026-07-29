@@ -199,6 +199,7 @@ function CatalogDashboard:dashboardRoot(opts)
     end, opts)
     if body and body.continueReading then
         local function fetchSection(config)
+            if not requestIsCurrent() then return nil, "cancelled" end
             if config.type == DashboardSections.DEFAULT_TYPE and type(body.discover) == "table" then
                 return { type = config.type, books = body.discover }
             end
@@ -213,19 +214,21 @@ function CatalogDashboard:dashboardRoot(opts)
             else
                 return nil
             end
-            local response = self:fetch(_("Loading dashboard..."), function()
+            local response, section_err = self:fetch(_("Loading dashboard..."), function()
                 return self.client:catalogBooks(params)
             end, opts)
-            if type(response) ~= "table" then return nil end
+            if section_err or type(response) ~= "table" then return nil, section_err or "invalid response" end
             return { type = config.type, books = response.items or {} }
         end
 
         body.dashboardSlots = {}
         for index = 1, DashboardSections.SLOT_COUNT do
+            if not requestIsCurrent() then return nil, "cancelled" end
             local config = DashboardSections.at(self.settings, index)
-            local slot = { type = config.type, smartScopeId = config.smartScopeId }
+            local slot = { type = config.type, smartScopeId = config.params and config.params.smartScopeId }
             if DashboardSections.isBookSource(config.type) then
-                local section = fetchSection(config)
+                local section, section_err = fetchSection(config)
+                if section_err then return nil, section_err end
                 slot.books = section and section.books or {}
             end
             body.dashboardSlots[index] = slot
@@ -746,10 +749,9 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
     local browse_cols = 3
     local browse_rows = 3
     local hero_h = math.min(px(150), math.max(px(76), math.floor(avail * 0.18)))
-    local stats_widget = self:buildDashboardStatsStrip(summary, dashboard)
-    local stats_h = stats_widget and stats_widget:getSize().h or px(STATS_MIN_BODY_HEIGHT)
 
     local configs = {}
+    local stats_widgets = {}
     local grid_count = 0
     local max_grid_books = 0
     local fixed_h = top_gap
@@ -757,6 +759,9 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
         local config = DashboardSections.at(self.settings, index)
         configs[index] = config
         if config.type == "stats" then
+            local stats_widget = self:buildDashboardStatsStrip(summary, dashboard)
+            stats_widgets[index] = stats_widget
+            local stats_h = stats_widget and stats_widget:getSize().h or px(STATS_MIN_BODY_HEIGHT)
             fixed_h = fixed_h + stats_h + section_gap
         elseif config.type == "continue-reading" then
             fixed_h = fixed_h + header_h + inner_gap + hero_h + section_gap
@@ -782,7 +787,7 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
         local page_id = SECTION_PAGE_PREFIX .. tostring(index)
 
         if config.type == "stats" then
-            self:addDashboardInset(stats_widget)
+            self:addDashboardInset(stats_widgets[index])
             self:addDashboardSpacer(section_gap)
         elseif config.type == "continue-reading" then
             local hero_slots = self:dashboardHeroSlots(#continue_books)
