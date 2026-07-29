@@ -104,14 +104,28 @@ function DashboardSections.normalize(value)
     return normalized
 end
 
--- The one section rendered today.
-function DashboardSections.primary(settings)
+function DashboardSections.at(settings, index)
     local stored = settings and settings[DashboardSections.SETTING_KEY]
-    return DashboardSections.normalize(stored)[1]
+    local sections = DashboardSections.normalize(stored)
+    return sections[index or 1] or DashboardSections.defaultConfig()
+end
+
+function DashboardSections.primary(settings)
+    return DashboardSections.at(settings, 1)
 end
 
 function DashboardSections.store(config)
     return { DashboardSections.normalizeEntry(config) }
+end
+
+function DashboardSections.storeAt(settings, index, config)
+    local stored = settings and settings[DashboardSections.SETTING_KEY]
+    local sections = DashboardSections.normalize(stored)
+    while #sections < index do
+        table.insert(sections, DashboardSections.defaultConfig())
+    end
+    sections[index] = DashboardSections.normalizeEntry(config)
+    return sections
 end
 
 -- Identifies which section a cached dashboard body was fetched for, so a body

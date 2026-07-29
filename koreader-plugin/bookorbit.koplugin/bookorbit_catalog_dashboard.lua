@@ -928,13 +928,16 @@ end
 
 -- Persists a new choice for the configurable row and reloads the dashboard so
 -- the row is fetched for it. Called from the picker.
-function CatalogDashboard:setDashboardSection(config)
+function CatalogDashboard:setDashboardSection(config, index)
+    index = index or 1
     local normalized = DashboardSections.normalizeEntry(config)
-    if DashboardSections.signature(normalized) == DashboardSections.signature(self:dashboardConfiguredSection()) then
+    if DashboardSections.signature(normalized) == DashboardSections.signature(DashboardSections.at(self.settings, index)) then
         return
     end
-    self:persistSetting(DashboardSections.SETTING_KEY, DashboardSections.store(normalized))
-    if not self:dashboardMode() then return end
+    self:persistSetting(DashboardSections.SETTING_KEY, DashboardSections.storeAt(self.settings, index, normalized))
+    -- Row 2 is settings-only in this checkpoint. Row 1 keeps the proven refresh
+    -- and cache path unchanged until the second-row renderer is introduced.
+    if index ~= 1 or not self:dashboardMode() then return end
     local context = self.current_context
     if context then
         context.section_stale = true

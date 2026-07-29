@@ -289,18 +289,16 @@ function MainMenu:testConnection()
     end)
 end
 
-function MainMenu:dashboardSectionLabel()
-    return DashboardSections.headerText(DashboardSections.primary(self.settings))
+function MainMenu:dashboardSectionLabel(index)
+    return DashboardSections.headerText(DashboardSections.at(self.settings, index))
 end
 
--- Applies a new choice for the configurable dashboard row. When the dashboard
--- is open it owns the setting write, so the row and its cache signature move
--- together; otherwise the setting is written directly.
-function MainMenu:applyDashboardSection(config, catalog, touchmenu_instance)
+-- Applies a new choice for one configurable dashboard row.
+function MainMenu:applyDashboardSection(index, config, catalog, touchmenu_instance)
     if catalog and catalog.setDashboardSection then
-        catalog:setDashboardSection(config)
+        catalog:setDashboardSection(config, index)
     else
-        self.settings[DashboardSections.SETTING_KEY] = DashboardSections.store(config)
+        self.settings[DashboardSections.SETTING_KEY] = DashboardSections.storeAt(self.settings, index, config)
         G_reader_settings:flush()
     end
     if touchmenu_instance then touchmenu_instance:updateItems() end
@@ -314,9 +312,9 @@ end
 -- SmartScopes live on the server, so the chooser has to ask for them. The
 -- chosen name is stored beside the id purely so the row can be labelled later
 -- without another request.
-function MainMenu:chooseDashboardSmartScope(catalog, touchmenu_instance)
+function MainMenu:chooseDashboardSmartScope(index, catalog, touchmenu_instance)
     local ButtonDialog = require("ui/widget/buttondialog")
-    if NetworkMgr:willRerunWhenConnected(function() self:chooseDashboardSmartScope(catalog, touchmenu_instance) end) then
+    if NetworkMgr:willRerunWhenConnected(function() self:chooseDashboardSmartScope(index, catalog, touchmenu_instance) end) then
         return
     end
 
@@ -340,7 +338,7 @@ function MainMenu:chooseDashboardSmartScope(catalog, touchmenu_instance)
         return
     end
 
-    local current = DashboardSections.primary(self.settings)
+    local current = DashboardSections.at(self.settings, index)
     local dialog
     local buttons = {}
     for _index, scope in ipairs(scopes) do
@@ -351,7 +349,7 @@ function MainMenu:chooseDashboardSmartScope(catalog, touchmenu_instance)
                     text = scope.title .. (current.smartScopeId == scope_id and " *" or ""),
                     callback = function()
                         UIManager:close(dialog)
-                        self:applyDashboardSection(
+                        self:applyDashboardSection(index,
                             { type = "smart-scope", smartScopeId = scope_id, smartScopeName = scope.title },
                             catalog, touchmenu_instance)
                     end,
@@ -366,14 +364,14 @@ function MainMenu:chooseDashboardSmartScope(catalog, touchmenu_instance)
     UIManager:show(dialog)
 end
 
-function MainMenu:dashboardSectionItems(catalog)
+function MainMenu:dashboardSectionItems(index, catalog)
     local items = {}
     for _index, section_type in ipairs(DashboardSections.TYPES) do
         local is_smart_scope = section_type == "smart-scope"
         table.insert(items, {
             text_func = function()
                 if is_smart_scope then
-                    local current = DashboardSections.primary(self.settings)
+                    local current = DashboardSections.at(self.settings, index)
                     if current.type == "smart-scope" and current.smartScopeName then
                         return T(_("SmartScope (%1)"), current.smartScopeName)
                     end
@@ -382,14 +380,14 @@ function MainMenu:dashboardSectionItems(catalog)
             end,
             help_text = DashboardSections.helpText(section_type),
             checked_func = function()
-                return DashboardSections.primary(self.settings).type == section_type
+                return DashboardSections.at(self.settings, index).type == section_type
             end,
             keep_menu_open = is_smart_scope,
             callback = function(touchmenu_instance)
                 if is_smart_scope then
-                    self:chooseDashboardSmartScope(catalog, touchmenu_instance)
+                    self:chooseDashboardSmartScope(index, catalog, touchmenu_instance)
                 else
-                    self:applyDashboardSection({ type = section_type }, catalog, touchmenu_instance)
+                    self:applyDashboardSection(index, { type = section_type }, catalog, touchmenu_instance)
                 end
             end,
         })
@@ -407,9 +405,15 @@ function MainMenu:dashboardSettingsMenu(catalog)
         },
         {
             text_func = function()
-                return T(_("Show below Continue reading (%1)"), self:dashboardSectionLabel())
+                return T(_("Row 1 below Continue reading (%1)"), self:dashboardSectionLabel(1))
             end,
-            sub_item_table = self:dashboardSectionItems(catalog),
+            sub_item_table = self:dashboardSectionItems(1, catalog),
+        },
+        {
+            text_func = function()
+                return T(_("Row 2 (%1)"), self:dashboardSectionLabel(2))
+            end,
+            sub_item_table = self:dashboardSectionItems(2, catalog),
         },
     }
 end
