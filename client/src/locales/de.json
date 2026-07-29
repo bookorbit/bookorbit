@@ -4584,6 +4584,29 @@
         "widgets": "Widgets",
         "shelves": "Regale"
       },
+      "widgetNames": {
+        "readingStreak": "Reading Streak",
+        "currentlyReading": "Currently Reading",
+        "readingGoal": "Reading Goal",
+        "readingDna": "Reading DNA",
+        "monthlyChallenge": "Monthly Challenge",
+        "highlightOfTheDay": "Highlight of the Day",
+        "neglectedGems": "Neglected Gems",
+        "readingRhythm": "Reading Rhythm",
+        "diversityScore": "Diversity Score",
+        "libraryOverview": "Library Overview",
+        "yearProjection": "Year Projection",
+        "longWait": "The Long Wait"
+      },
+      "shelfNames": {
+        "recentlyAdded": "Recently Added",
+        "continueReading": "Continue Reading",
+        "continueListening": "Continue Listening",
+        "wantToRead": "Want to Read",
+        "upNextInSeries": "Up Next in Series",
+        "random": "Discover Something New",
+        "smartScope": "Smart Scope"
+      },
       "reorderHintWidget": "Ziehen zum Neuanordnen. Umschalten, um ein Widget ein- oder auszublenden.",
       "reorderHintShelf": "Ziehen zum Neuanordnen. Umschalten, um ein Regal ein- oder auszublenden.",
       "smartScope": "Smart Scope",
@@ -6657,6 +6680,11 @@
       "defaultName": "Smart Scope",
       "filter": "Filter",
       "edit": "Smart Scope bearbeiten",
+      "koboSync": {
+        "label": "Sync to my Kobo",
+        "enabledHint": "Books in this shared Smart Scope sync to your Kobo device. Turn off to stop syncing them.",
+        "disabledHint": "Turn on to sync books in this shared Smart Scope to your Kobo device."
+      },
       "showControlsAria": "Smart-Scope-Steuerelemente anzeigen",
       "hideFilter": "Filter ausblenden",
       "showFilter": "Filter anzeigen",
@@ -6664,7 +6692,10 @@
       "loadError": "Dieser SmartScope konnte nicht geladen werden",
       "toast": {
         "deleted": "\"{name}\" gelöscht",
-        "deleteFailed": "Löschen von \"{name}\" fehlgeschlagen"
+        "deleteFailed": "Löschen von \"{name}\" fehlgeschlagen",
+        "koboSyncEnabled": "\"{name}\" now syncs to your Kobo",
+        "koboSyncDisabled": "\"{name}\" no longer syncs to your Kobo",
+        "koboSyncFailed": "Failed to update Kobo sync for \"{name}\""
       },
       "empty": {
         "noRules": "Keine Regeln konfiguriert",
