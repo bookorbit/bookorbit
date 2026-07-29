@@ -864,8 +864,6 @@ function BookOrbitCatalog:loadSection(section, opts)
                 mandatory = entry.count and tostring(entry.count) or nil,
                 kind = "books",
                 params = entry_params,
-                source_entry = entry,
-                source_section = section,
             })
         end
 
@@ -2148,14 +2146,7 @@ function BookOrbitCatalog:onMenuSelect(item)
     elseif item.kind == "on-device" then
         self:loadOnDevice()
     elseif item.kind == "books" then
-        if self.source_select_callback and item.source_entry then
-            local callback = self.source_select_callback
-            self.source_select_callback = nil
-            callback(item.source_entry)
-            self:loadDashboardRoot(true)
-        else
-            self:loadBooks(item.params or {}, item.list_title or item.text)
-        end
+        self:loadBooks(item.params or {}, item.list_title or item.text)
     elseif item.kind == "book" then
         if self:isBulkSelectionActive() then
             self:bulkToggleEntry(item)
