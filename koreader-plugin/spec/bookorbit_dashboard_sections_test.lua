@@ -49,15 +49,27 @@ assertEqual(defaults[3].type, "random", "slot 3 defaults to Discover")
 assertEqual(defaults[4].type, "browse", "slot 4 defaults to Browse")
 assertNotSame(defaults[1], DashboardSections.DEFAULT_SLOTS[1], "default normalization returns copies")
 
-local migrated_one = DashboardSections.normalize({ { type = "recently-added" } })
+local migrated_one = DashboardSections.normalize({
+    { type = "recently-added" },
+    schemaVersion = DashboardSections.LEGACY_SCHEMA_VERSION,
+})
 assertEqual(migrated_one[1].type, "stats", "one-row migration restores Stats")
 assertEqual(migrated_one[2].type, "continue-reading", "one-row migration restores Continue reading")
 assertEqual(migrated_one[3].type, "recently-added", "one-row migration places the old row in slot 3")
 assertEqual(migrated_one[4].type, "browse", "one-row migration restores Browse")
 
-local migrated_two = DashboardSections.normalize({ { type = "want-to-read" }, author_source })
+local migrated_two = DashboardSections.normalize({
+    { type = "want-to-read" },
+    author_source,
+    schemaVersion = DashboardSections.LEGACY_SCHEMA_VERSION,
+})
 assertEqual(migrated_two[3].type, "random", "an obsolete old row migrates safely to Discover")
 assertEqual(migrated_two[4].type, "authors", "a selected catalog source survives migration")
+
+local partial_current = DashboardSections.normalize({ { type = "recently-added" } })
+assertEqual(partial_current[1].type, "recently-added", "an unversioned partial current list keeps slot 1")
+assertEqual(partial_current[2].type, "continue-reading", "missing current slots use their positional defaults")
+assertEqual(partial_current.schemaVersion, DashboardSections.SCHEMA_VERSION, "normalization writes the current schema marker")
 
 local repeated = DashboardSections.normalize({
     { type = "stats" },
@@ -76,6 +88,13 @@ local stored = DashboardSections.storeAt({
 assertEqual(stored[2].type, "authors", "storeAt updates the requested slot")
 assertEqual(stored[1].type, "stats", "storeAt leaves other slots unchanged")
 assertNotSame(stored[2].params, author_source.params, "storeAt does not retain caller-owned parameter tables")
+assertEqual(stored.schemaVersion, DashboardSections.SCHEMA_VERSION, "storeAt persists the current schema marker")
+
+local clamped = DashboardSections.storeAt({
+    [DashboardSections.SETTING_KEY] = { { type = "stats" } },
+}, 9, { type = "recently-added" })
+assertEqual(#clamped, DashboardSections.SLOT_COUNT, "storeAt never grows beyond the supported slot count")
+assertEqual(clamped[4].type, "recently-added", "an oversized index is constrained to the last slot")
 
 assertEqual(DashboardSections.signature({ type = "recently-added" }), "recently-added", "a source signs as itself")
 assertEqual(DashboardSections.signature(author_source), "authors:author=Ursula K. Le Guin:sort=title", "catalog signatures include stable allowed filters")

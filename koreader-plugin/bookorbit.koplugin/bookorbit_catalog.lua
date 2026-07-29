@@ -390,12 +390,7 @@ function BookOrbitCatalog:refreshCurrent()
         self:evictCachedCovers(self.dashboardBooks(context.dashboard))
         self:loadDashboardRoot(true)
     elseif context.kind == "section" then
-        self:loadSection(context.section, {
-            page = context.page,
-            q = context.q,
-            replace = true,
-            dashboard_source_index = context.dashboard_source_index,
-        })
+        self:reloadSection(context.section, { page = context.page })
     elseif context.kind == "detail" and context.detail then
         self:evictCachedCovers(self:detailThumbnailBooks(context.detail))
         self:runConnected(function()
@@ -898,6 +893,20 @@ function BookOrbitCatalog:loadSection(section, opts)
     end)
 end
 
+function BookOrbitCatalog:reloadSection(section, overrides)
+    local context = self.current_context or {}
+    local opts = {
+        q = context.q,
+        replace = true,
+        dashboard_source_index = context.dashboard_source_index,
+    }
+    for key, value in pairs(overrides or {}) do
+        if key ~= "clear_q" then opts[key] = value end
+    end
+    if overrides and overrides.clear_q then opts.q = nil end
+    return self:loadSection(section or context.section, opts)
+end
+
 function BookOrbitCatalog:promptSectionFilter(section, current_q, dashboard_source_index)
     local dialog
     dialog = InputDialog:new{
@@ -917,10 +926,9 @@ function BookOrbitCatalog:promptSectionFilter(section, current_q, dashboard_sour
                     text = _("Clear"),
                     callback = function()
                         UIManager:close(dialog)
-                        self:loadSection(section, {
+                        self:reloadSection(section, {
                             page = 1,
-                            q = nil,
-                            replace = true,
+                            clear_q = true,
                             dashboard_source_index = dashboard_source_index,
                         })
                     end,
@@ -931,10 +939,9 @@ function BookOrbitCatalog:promptSectionFilter(section, current_q, dashboard_sour
                     callback = function()
                         local value = util.trim(dialog:getInputText() or "")
                         UIManager:close(dialog)
-                        self:loadSection(section, {
+                        self:reloadSection(section, {
                             page = 1,
                             q = value ~= "" and value or nil,
-                            replace = true,
                             dashboard_source_index = dashboard_source_index,
                         })
                     end,
@@ -1462,12 +1469,7 @@ function BookOrbitCatalog:showBookActions()
                 enabled = context.q ~= nil,
                 callback = function()
                     UIManager:close(dialog)
-                    self:loadSection(context.section, {
-                        page = 1,
-                        q = nil,
-                        replace = true,
-                        dashboard_source_index = context.dashboard_source_index,
-                    })
+                    self:reloadSection(context.section, { page = 1, clear_q = true })
                 end,
             },
         })
@@ -2050,12 +2052,7 @@ function BookOrbitCatalog:onNextPage()
         end
         local context = self.current_context
         if context.has_next then
-            self:loadSection(context.section, {
-                page = (context.page or 1) + 1,
-                q = context.q,
-                replace = true,
-                dashboard_source_index = context.dashboard_source_index,
-            })
+            self:reloadSection(context.section, { page = (context.page or 1) + 1 })
         end
         return true
     elseif self:detailMode() then
@@ -2087,12 +2084,7 @@ function BookOrbitCatalog:onPrevPage()
         end
         local context = self.current_context
         if (context.page or 1) > 1 then
-            self:loadSection(context.section, {
-                page = (context.page or 1) - 1,
-                q = context.q,
-                replace = true,
-                dashboard_source_index = context.dashboard_source_index,
-            })
+            self:reloadSection(context.section, { page = (context.page or 1) - 1 })
         end
         return true
     elseif self:detailMode() then
@@ -2120,12 +2112,7 @@ function BookOrbitCatalog:onFirstPage()
         end
         local context = self.current_context
         if (context.page or 1) > 1 then
-            self:loadSection(context.section, {
-                page = 1,
-                q = context.q,
-                replace = true,
-                dashboard_source_index = context.dashboard_source_index,
-            })
+            self:reloadSection(context.section, { page = 1 })
         end
         return true
     elseif self:detailMode() then
@@ -2185,12 +2172,9 @@ function BookOrbitCatalog:onMenuSelect(item)
         local context = self.current_context or {}
         self:promptSectionFilter(item.section, item.q, context.dashboard_source_index)
     elseif item.kind == "section-page" then
-        local context = self.current_context or {}
-        self:loadSection(item.section, {
+        self:reloadSection(item.section, {
             page = item.section_page,
             q = item.q,
-            replace = true,
-            dashboard_source_index = context.dashboard_source_index,
         })
     elseif item.kind == "dashboard-source" then
         local source = item.dashboard_source

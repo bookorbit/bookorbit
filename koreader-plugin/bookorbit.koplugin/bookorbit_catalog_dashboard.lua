@@ -135,7 +135,7 @@ function CatalogDashboard:dashboardContext(dashboard, opts)
         stale = opts.stale == true,
         unavailable = opts.unavailable == true,
         loading = opts.loading == true,
-        section_stale = opts.section_stale == true,
+        section_stale = opts.section_stale,
     }
 end
 
@@ -144,7 +144,12 @@ end
 function CatalogDashboard:cachedDashboardContext(cached, opts)
     opts = opts or {}
     opts.stale = true
-    opts.section_stale = not self:dashboardCacheMatchesSection()
+    if not self:dashboardCacheMatchesSection() then
+        opts.section_stale = {}
+        for index = 1, DashboardSections.SLOT_COUNT do
+            opts.section_stale[index] = true
+        end
+    end
     return self:dashboardContext(cached, opts)
 end
 
@@ -200,8 +205,17 @@ function CatalogDashboard:dashboardRoot(opts)
     if body and body.continueReading then
         local function fetchSection(config)
             if not requestIsCurrent() then return nil, "cancelled" end
-            if config.type == DashboardSections.DEFAULT_TYPE and type(body.discover) == "table" then
-                return { type = config.type, books = body.discover }
+            if config.type == DashboardSections.DEFAULT_TYPE then
+                if type(body.discover) == "table" then
+                    return { type = config.type, books = body.discover }
+                end
+                local response, discover_err = self:fetch(_("Loading dashboard..."), function()
+                    return self.client:catalogDiscover()
+                end, opts)
+                if discover_err or type(response) ~= "table" then
+                    return nil, discover_err or "invalid response"
+                end
+                return { type = config.type, books = response.discover or {} }
             end
             local params = { page = 1, size = 12 }
             if config.type == "recently-added" then
@@ -228,8 +242,8 @@ function CatalogDashboard:dashboardRoot(opts)
             local slot = { type = config.type, smartScopeId = config.params and config.params.smartScopeId }
             if DashboardSections.isBookSource(config.type) then
                 local section, section_err = fetchSection(config)
-                if section_err then return nil, section_err end
-                slot.books = section and section.books or {}
+                if section_err == "cancelled" then return nil, section_err end
+                slot.books = section_err and {} or (section and section.books or {})
             end
             body.dashboardSlots[index] = slot
         end
@@ -733,7 +747,7 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
     local continue_books = dashboard.continueReading or {}
     local action_entries = self:dashboardActionEntries()
     local summary = self:dashboardStatsSummary() or { today_seconds = 0, week_seconds = 0, streak_days = 0 }
-    local pending = context.section_stale == true
+    local stale_sections = type(context.section_stale) == "table" and context.section_stale or {}
 
     local function px(n) return Screen:scaleBySize(n) end
     local avail = self.available_height
@@ -818,6 +832,7 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
             self:addDashboardBrowseList(action_entries, browse_row_h, browse_cols, browse_rows)
             self:addDashboardSpacer(section_gap)
         else
+            local pending = stale_sections[index] == true
             local books = pending and {} or self.dashboardSlotBooks(dashboard, index)
             local slots = math.max(1, math.min(grid_slots, math.max(1, #books)))
             local pages = math.max(1, math.ceil(#books / slots))
@@ -860,7 +875,8 @@ function CatalogDashboard:applyDashboardSectionBooks(context, books, index)
     dashboard.dashboardSlots[index] = slot
     context.dash_pages = context.dash_pages or {}
     context.dash_pages[SECTION_PAGE_PREFIX .. tostring(index)] = 1
-    context.section_stale = false
+    context.section_stale = type(context.section_stale) == "table" and context.section_stale or {}
+    context.section_stale[index] = nil
     self:cacheDashboard(dashboard)
     self:scheduleThumbnailDownloads(self.dashboardBooks(dashboard))
     self:updateItems()
@@ -891,7 +907,8 @@ function CatalogDashboard:setDashboardSection(config, index)
     if not self:dashboardMode() then return end
     local context = self.current_context
     if context then
-        context.section_stale = true
+        context.section_stale = type(context.section_stale) == "table" and context.section_stale or {}
+        context.section_stale[index] = true
         context.dash_pages = context.dash_pages or {}
         context.dash_pages[SECTION_PAGE_PREFIX .. tostring(index)] = 1
         self:updateItems()

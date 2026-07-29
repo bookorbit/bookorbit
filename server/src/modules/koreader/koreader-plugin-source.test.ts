@@ -87,24 +87,20 @@ describe('KOReader plugin update source wiring', () => {
     expect(syncSettingsBlock).not.toContain('text = _("Sync all books now")');
   });
 
-  it('keeps tall dashboard adaptation scoped to the measured configurable row', async () => {
+  it('budgets configurable dashboard shelves from the measured native slots', async () => {
     const dashboard = await readPluginFile('bookorbit_catalog_dashboard.lua');
 
-    expect(dashboard).toContain('local DASHBOARD_TALL_ASPECT_RATIO = 1.55');
     expect(dashboard).toContain('local SECTION_COMPACT_GAP = 6');
-    expect(dashboard).toContain('local SECTION_MAX_ROWS = 2');
     expect(dashboard).toContain('local STATS_MIN_BODY_HEIGHT = 56');
-    expect(dashboard).toContain('function CatalogDashboard:dashboardTallLayout()');
     expect(dashboard).toContain('function CatalogDashboard:addDashboardCoverGrid(');
     expect(dashboard).toContain('math.floor((self.content_w - (slots - 1) * gap) / slots)');
     expect(dashboard).toContain('local card_gap = slots > 1 and math.floor(math.max(0, self.content_w - slots * card_w) / (slots - 1)) or 0');
     expect(dashboard).toContain('if slot > 1 then');
     expect(dashboard).not.toContain('(slots + 1) * gap');
-    expect(dashboard).toContain('section_slots, section_card_w, section_row_h = self:sectionRowMetrics(#section_books, section_row_gap)');
-    expect(dashboard).toContain('if fixedHeight() > avail then');
-    expect(dashboard).toContain('section_rows * section_row_h + math.max(0, section_rows - 1) * inner_gap');
-    expect(dashboard).toContain('show_section and not section_pending and self:dashboardTallLayout() and section_slots > 0');
-    expect(dashboard).toContain('local section_page_size = math.max(1, section_slots * section_rows)');
+    expect(dashboard).toContain('local grid_slots, grid_card_w, natural_grid_h = self:sectionRowMetrics(math.max(1, max_grid_books), compact_gap)');
+    expect(dashboard).toContain('local grid_budget = math.max(px(48) * grid_count, avail - fixed_h)');
+    expect(dashboard).toContain('grid_h = math.max(px(48), math.min(natural_grid_h, math.floor(grid_budget / grid_count)))');
+    expect(dashboard).toContain('self:addDashboardCoverGrid(page_id, books, grid_h, false, false, slots, grid_card_w, page, 1)');
     expect(dashboard).not.toContain('catalog_dashboard_max_height');
   });
 
@@ -113,21 +109,24 @@ describe('KOReader plugin update source wiring', () => {
     const sections = await readPluginFile('bookorbit_dashboard_sections.lua');
     const api = await readPluginFile('bookorbit_api.lua');
 
-    // The stored value is a list even though one row is rendered, so adding a
-    // second configurable row later does not invalidate settings on device.
+    // Four ordered slots are persisted with an explicit schema marker so legacy
+    // two-row settings can be migrated without shifting partial current lists.
     expect(sections).toContain('DashboardSections.SETTING_KEY = "catalog_dashboard_sections"');
     expect(sections).toContain('DashboardSections.DEFAULT_TYPE = "random"');
+    expect(sections).toContain('DashboardSections.SCHEMA_VERSION = 2');
+    expect(sections).toContain('schemaVersion = DashboardSections.SCHEMA_VERSION');
     expect(sections).toContain('function DashboardSections.normalize(value)');
     expect(sections).toContain('function DashboardSections.signature(config)');
 
-    // The parameter is capability-gated: an older server rejects unknown query
-    // params outright rather than ignoring them.
-    expect(dashboard).toContain('DashboardSections.CAPABILITY');
-    expect(dashboard).toContain('Capabilities.markUnsupported(self.client, DashboardSections.CAPABILITY)');
+    // Dashboard slots use the normal catalog endpoints and cache signatures for
+    // the complete stored configuration.
+    expect(dashboard).toContain('DashboardSections.settingsSignature(self.settings)');
+    expect(dashboard).toContain('return self.client:catalogBooks(params)');
+    expect(dashboard).toContain('return self.client:catalogDiscover()');
     expect(dashboard).toContain('function CatalogDashboard:dashboardCacheMatchesSection()');
     expect(dashboard).toContain('function CatalogDashboard:dashboardSectionSupportsReroll(config)');
     expect(api).toContain('function BookOrbitApi:catalogDashboard(section)');
-    expect(api).toContain('function BookOrbitApi:catalogDashboardSection(section)');
+    expect(api).toContain('function BookOrbitApi:catalogDiscover()');
   });
 
   it('renders the canonical account reading streak on the device dashboard', async () => {

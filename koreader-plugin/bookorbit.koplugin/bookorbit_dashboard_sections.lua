@@ -19,6 +19,8 @@ local PARAM_KEYS = { "libraryId", "collectionId", "smartScopeId", "author", "ser
 DashboardSections.SETTING_KEY = "catalog_dashboard_sections"
 DashboardSections.CAPABILITY = "catalogDashboardSections"
 DashboardSections.DEFAULT_TYPE = "random"
+DashboardSections.SCHEMA_VERSION = 2
+DashboardSections.LEGACY_SCHEMA_VERSION = 1
 DashboardSections.SLOT_COUNT = 4
 DashboardSections.DEFAULT_SLOTS = {
     { type = "stats" },
@@ -143,18 +145,15 @@ function DashboardSections.normalizeEntry(value)
 end
 
 function DashboardSections.normalize(value)
+    local normalized = { schemaVersion = DashboardSections.SCHEMA_VERSION }
     if type(value) ~= "table" or #value == 0 then
-        local defaults = {}
         for index = 1, DashboardSections.SLOT_COUNT do
-            defaults[index] = DashboardSections.defaultConfig(index)
+            normalized[index] = DashboardSections.defaultConfig(index)
         end
-        return defaults
+        return normalized
     end
 
-    local normalized = {}
-    local legacy_rows = #value <= 2
-        and value[1] and value[1].type ~= "stats" and value[1].type ~= "continue-reading" and value[1].type ~= "browse"
-    if legacy_rows then
+    if value.schemaVersion == DashboardSections.LEGACY_SCHEMA_VERSION then
         normalized[1] = DashboardSections.defaultConfig(1)
         normalized[2] = DashboardSections.defaultConfig(2)
         normalized[3] = DashboardSections.normalizeEntry(value[1])
@@ -180,16 +179,22 @@ function DashboardSections.primary(settings)
 end
 
 function DashboardSections.store(config)
-    return { DashboardSections.normalizeEntry(config) }
+    return {
+        DashboardSections.normalizeEntry(config),
+        schemaVersion = DashboardSections.SCHEMA_VERSION,
+    }
 end
 
 function DashboardSections.storeAt(settings, index, config)
+    index = math.max(1, math.min(DashboardSections.SLOT_COUNT, tonumber(index) or 1))
     local stored = settings and settings[DashboardSections.SETTING_KEY]
     local sections = DashboardSections.normalize(stored)
     while #sections < index do
-        table.insert(sections, DashboardSections.defaultConfig())
+        local slot_index = #sections + 1
+        table.insert(sections, DashboardSections.defaultConfig(slot_index))
     end
     sections[index] = DashboardSections.normalizeEntry(config)
+    sections.schemaVersion = DashboardSections.SCHEMA_VERSION
     return sections
 end
 

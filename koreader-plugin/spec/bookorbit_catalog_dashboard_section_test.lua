@@ -101,12 +101,16 @@ local function newCatalog(opts)
     Capabilities.reset()
     requests = {}
     last_section = nil
+    local stored_sections = opts.sections
+    if opts.section then
+        stored_sections = { opts.section, schemaVersion = DashboardSections.LEGACY_SCHEMA_VERSION }
+    end
     local catalog = {
         title = "BookOrbit",
         settings = {
             catalog_dashboard_cache = opts.cache,
             catalog_dashboard_cache_section = opts.cache_section,
-            [DashboardSections.SETTING_KEY] = opts.sections or (opts.section and { opts.section } or nil),
+            [DashboardSections.SETTING_KEY] = stored_sections,
         },
         client = {
             server_url = opts.server_url or "https://example.test",
@@ -120,7 +124,8 @@ local function newCatalog(opts)
                 table.insert(requests, "dashboard")
                 last_section = section
                 if section and opts.reject_section then return nil, opts.reject_section end
-                local body = { continueReading = {}, discover = {} }
+                local body = { continueReading = {} }
+                if not opts.omit_discover then body.discover = {} end
                 if section then
                     body.section = { type = section.type, smartScopeId = section.smartScopeId, books = { { id = 9 } } }
                     body.discover = {}
@@ -129,8 +134,16 @@ local function newCatalog(opts)
             end,
             catalogBooks = function(_, params)
                 table.insert(requests, "books:" .. tostring(params.sort))
+                if opts.catalog_books_error and opts.catalog_books_error[params.sort] then
+                    return nil, opts.catalog_books_error[params.sort]
+                end
                 local ids = { recently_added = 11, recently_read = 12, title = 13 }
                 return { items = { { id = ids[params.sort] or 9 } }, page = 1, size = params.size, total = 1 }
+            end,
+            catalogDiscover = function()
+                table.insert(requests, "discover")
+                if opts.discover_error then return nil, opts.discover_error end
+                return { discover = { { id = 14 } } }
             end,
         },
     }
@@ -178,7 +191,11 @@ assertEqual(#prefetch, 15, "prefetching covers Continue reading and every grid s
 -- Real book shelves use the ordinary catalog books endpoint and request twelve
 -- items, including filters selected through the existing catalog lists.
 catalog = newCatalog{
-    sections = { { type = "recently-added" }, author_source },
+    sections = {
+        { type = "recently-added" },
+        author_source,
+        schemaVersion = DashboardSections.LEGACY_SCHEMA_VERSION,
+    },
 }
 local _, refreshed = catalog:dashboardRoot()
 assertEqual(refreshed.dashboard.dashboardSlots[1].type, "stats", "slot 1 keeps its native Stats renderer")
@@ -191,6 +208,31 @@ assertEqual(catalog.settings.catalog_dashboard_cache_section,
     "the cache records the selected catalog filter")
 assertEqual(catalog:dashboardCacheMatchesSection(), true, "the cache matches the full four-slot configuration")
 
+-- Discover falls back to the dedicated endpoint when the dashboard payload does
+-- not include a preloaded discover list.
+catalog = newCatalog{ omit_discover = true }
+local _, discovered = catalog:dashboardRoot()
+assertEqual(discovered.dashboard.dashboardSlots[3].books[1].id, 14,
+    "a missing dashboard discover list falls back to catalogDiscover")
+assertEqual(requests[2], "discover", "the dedicated discover endpoint is requested")
+
+-- A failed shelf request only empties that shelf; the dashboard and later slots
+-- remain available.
+catalog = newCatalog{
+    sections = {
+        { type = "stats" },
+        { type = "recently-added" },
+        { type = "in-progress" },
+        { type = "browse" },
+        schemaVersion = DashboardSections.SCHEMA_VERSION,
+    },
+    catalog_books_error = { recently_added = 500 },
+}
+local _, partial = catalog:dashboardRoot()
+assertEqual(partial.dashboard ~= nil, true, "one shelf failure does not discard the dashboard")
+assertEqual(#partial.dashboard.dashboardSlots[2].books, 0, "the failed shelf degrades to an empty list")
+assertEqual(partial.dashboard.dashboardSlots[3].books[1].id, 12, "later shelves continue loading")
+
 -- A cached body fetched for another four-slot configuration is still shown, but
 -- its grid shelves are marked pending until the refresh lands.
 catalog = newCatalog{
@@ -200,7 +242,7 @@ catalog = newCatalog{
 }
 local _, cached_context = catalog:initialDashboardContext()
 assertEqual(cached_context.dashboard ~= nil, true, "the rest of the cached dashboard is still shown")
-assertEqual(cached_context.section_stale, true, "a cache from another slot configuration marks grids pending")
+assertEqual(cached_context.section_stale[3], true, "a cache from another slot configuration marks grid slots pending")
 
 catalog = newCatalog{
     section = { type = "recently-added" },
@@ -208,7 +250,7 @@ catalog = newCatalog{
     cache_section = "stats|continue-reading|recently-added|browse",
 }
 local _, matching_context = catalog:initialDashboardContext()
-assertEqual(matching_context.section_stale, false, "a cache from the same four-slot configuration is used as is")
+assertEqual(matching_context.section_stale, nil, "a cache from the same four-slot configuration is used as is")
 
 -- Only a random row offers a reshuffle; every other source has an order the
 -- server chose.
@@ -226,7 +268,7 @@ function catalog:updateItems() end
 function catalog:refreshCurrent() refreshes = refreshes + 1 end
 catalog:setDashboardSection(author_source, 3)
 assertEqual(catalog.settings[DashboardSections.SETTING_KEY][3].type, "authors", "the new slot choice is persisted")
-assertEqual(catalog.current_context.section_stale, true, "the visible dashboard slots are marked pending")
+assertEqual(catalog.current_context.section_stale[3], true, "only the changed dashboard slot is marked pending")
 assertEqual(refreshes, 1, "choosing a slot source refreshes the dashboard")
 
 -- Re-picking the current slot source is a no-op rather than a needless refresh.
