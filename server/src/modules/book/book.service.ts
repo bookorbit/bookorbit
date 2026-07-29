@@ -37,6 +37,8 @@ import {
   isAudioFormat,
   jumpRailStrategyForSort,
   resolveUploadPath,
+  type BookCard,
+  type MetadataCandidate,
 } from '@bookorbit/types';
 import type {
   AudiobookChapter,
@@ -76,6 +78,10 @@ import { FileWriteService } from '../file-write/file-write.service';
 import { NarratorService } from '../narrator/narrator.service';
 import { UserBookNoteService } from '../user-book-note/user-book-note.service';
 import { UserBookStatusService, type AutoReadingActivity } from '../user-book-status/user-book-status.service';
+import { UserPreferencesService } from '../user-preferences/user-preferences.service';
+import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
+import { ProviderRegistry } from '../metadata-fetch/provider-registry';
+import { MetadataFetchService } from '../metadata-fetch/metadata-fetch.service';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED } from '../achievement/achievement-events.service';
 import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
 import { BookQueryBuilder } from './book-query-builder.service';
@@ -256,6 +262,10 @@ export class BookService {
     private readonly comicMetadataService: ComicMetadataRepository,
     private readonly customMetadataService: CustomMetadataService,
     private readonly bookMetadataLockService: BookMetadataLockService,
+    private readonly userPreferencesService: UserPreferencesService,
+    private readonly providerConfigService: ProviderConfigService,
+    private readonly providerRegistry: ProviderRegistry,
+    private readonly metadataFetchService: MetadataFetchService,
     @Optional() private readonly embedder: BookEmbedderService,
     @Optional() private readonly fileWriteService: FileWriteService,
     @Optional() private readonly fileRenameService: FileRenameService,
@@ -1039,6 +1049,178 @@ export class BookService {
       contentFilters: this.isSuperuser(user) ? undefined : user.contentFilters,
     });
     return this.executeBooksQuery(user.id, where, query);
+  }
+
+  async searchShelfmark(q: string, user: RequestUser, signal?: AbortSignal): Promise<BookCard[]> {
+    const startedAt = Date.now();
+    const cleanQ = sanitizeLogValue(q);
+    this.logger.log(`[book.search_shelfmark] [start] userId=${user.id} query="${cleanQ}" - search shelfmark started`);
+
+    if (!q || q.trim().length < 2) {
+      this.logger.log(
+        `[book.search_shelfmark] [end] userId=${user.id} query="${cleanQ}" durationMs=${Date.now() - startedAt} results=0 - query too short`,
+      );
+      return [];
+    }
+
+    try {
+      const shelfmarkPref = await this.userPreferencesService.getShelfmarkPreferences(user.id);
+      if (!shelfmarkPref?.enabled || !shelfmarkPref.url) {
+        this.logger.log(
+          `[book.search_shelfmark] [end] userId=${user.id} query="${cleanQ}" durationMs=${Date.now() - startedAt} results=0 - shelfmark disabled`,
+        );
+        return [];
+      }
+
+      const externalBooks = await this.searchExternalProviders(q, signal);
+      const newExternalBooks = await this.filterExistingExternalBooks(user, externalBooks, shelfmarkPref.url, shelfmarkPref.externalUrl);
+      this.logger.log(
+        `[book.search_shelfmark] [end] userId=${user.id} query="${cleanQ}" durationMs=${Date.now() - startedAt} results=${newExternalBooks.length} - search shelfmark completed`,
+      );
+      return newExternalBooks;
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.constructor.name : 'Error';
+      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.error(
+        `[book.search_shelfmark] [fail] userId=${user.id} query="${cleanQ}" durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - search shelfmark failed`,
+      );
+      return [];
+    }
+  }
+
+  async searchExternalProviders(queryText: string, signal?: AbortSignal): Promise<MetadataCandidate[]> {
+    const config = await this.providerConfigService.getConfig();
+    const registeredProviders = this.providerRegistry.all();
+    const enabledProviderKeys = registeredProviders.filter((provider) => config[provider.key]?.enabled !== false).map((provider) => provider.key);
+
+    if (enabledProviderKeys.length === 0) return [];
+
+    const internalController = new AbortController();
+
+    const params: MetadataSearchParams = {
+      title: queryText,
+      isAudiobook: false,
+      signal: internalController.signal,
+    };
+
+    return new Promise<MetadataCandidate[]>((resolve) => {
+      const results: MetadataCandidate[] = [];
+      let resolved = false;
+      let timer: NodeJS.Timeout | null = null;
+      let subscription: any = null;
+
+      const cleanup = () => {
+        internalController.abort();
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        if (subscription) {
+          subscription.unsubscribe();
+        }
+        if (signal) {
+          signal.removeEventListener('abort', onAbort);
+        }
+      };
+
+      const resolveResults = () => {
+        if (resolved) return;
+        resolved = true;
+        cleanup();
+        resolve(results);
+      };
+
+      const onAbort = () => {
+        resolveResults();
+      };
+
+      if (signal) {
+        if (signal.aborted) {
+          resolveResults();
+          return;
+        }
+        signal.addEventListener('abort', onAbort);
+      }
+
+      timer = setTimeout(() => {
+        resolveResults();
+      }, 1500);
+
+      subscription = this.metadataFetchService.search(params, enabledProviderKeys).subscribe({
+        next: (candidate) => {
+          if (results.length < 20) {
+            results.push(candidate);
+          }
+          if (results.length === 20) {
+            resolveResults();
+          }
+        },
+        error: () => {
+          resolveResults();
+        },
+        complete: () => {
+          resolveResults();
+        },
+      });
+    });
+  }
+
+  async filterExistingExternalBooks(
+    user: RequestUser,
+    candidates: MetadataCandidate[],
+    shelfmarkUrl: string,
+    externalUrl?: string,
+  ): Promise<BookCard[]> {
+    const results: BookCard[] = [];
+    const linkBaseUrl = (externalUrl || shelfmarkUrl).replace(/\/+$/, '');
+    let count = -1;
+
+    const libs = await this.libraryService.findAll(user);
+    const libraryIds = libs.map((l) => l.id);
+    const existing = await this.bookRepo.checkExistingCandidatesBatch(candidates, libraryIds);
+
+    for (const candidate of candidates) {
+      if (!existing.has(candidate)) {
+        const bookCard: BookCard = {
+          id: count--,
+          status: 'placeholder',
+          title: candidate.title,
+          authors: candidate.authors || [],
+          seriesId: null,
+          seriesName: null,
+          seriesIndex: null,
+          files: [],
+          publishedYear: candidate.publishedYear || null,
+          publishedDate: candidate.publishedDate || null,
+          language: candidate.language || null,
+          genres: candidate.genres || [],
+          rating: null,
+          readingProgress: null,
+          readStatus: null,
+          addedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          metadataScore: null,
+          hasCover: false,
+          hasMetadataLocks: false,
+          lockedFields: [],
+          subtitle: candidate.subtitle || null,
+          publisher: candidate.publisher || null,
+          pageCount: candidate.pageCount || null,
+          isbn13: candidate.isbn13 || null,
+          narrators: candidate.narrators || [],
+          tags: [],
+          customMetadata: [],
+          doesNotExistLocally: true,
+          coverAspectRatio: '2/3',
+          shelfmarkUrl: `${linkBaseUrl}/search?q=${encodeURIComponent(
+            candidate.title + (candidate.authors && candidate.authors.length ? ' ' + candidate.authors.join(' ') : ''),
+          )}`,
+          coverUrl: candidate.coverUrl || undefined,
+        };
+        results.push(bookCard);
+      }
+    }
+    return results;
   }
 
   async executeBooksQuery(

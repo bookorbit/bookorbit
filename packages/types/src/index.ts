@@ -56,4 +56,5 @@ export * from "./hardcover";
 export * from "./readwise";
 export * from "./storygraph";
 export * from "./path";
+export * from "./shelfmark";
 export * from "./sidebar";

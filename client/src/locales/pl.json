@@ -1147,9 +1147,39 @@
         "kobo": "Kobo",
         "koreader": "KOReader",
         "hardcover": "Hardcover",
+        "integrations": "Integrations",
+        "shelfmark": "Shelfmark",
         "admin": "Administrator",
         "system": "Systemu",
         "account": "Konto"
+      }
+    },
+    "shelfmark": {
+      "title": "Shelfmark Integration",
+      "subtitle": "Configure Shelfmark to search and download books that are not in your library.",
+      "enableLabel": "Enable Shelfmark Integration",
+      "enableHint": "Search external metadata providers and show download links to Shelfmark.",
+      "urlLabel": "Shelfmark URL",
+      "urlPlaceholder": "e.g. http://localhost:8080 or http://shelfmark.local",
+      "urlHint": "The URL of your self-hosted Shelfmark instance. Used for metadata search and as the fallback link target.",
+      "testConnection": "Test Connection",
+      "testing": "Testing...",
+      "externalUrlLabel": "External URL",
+      "externalUrlPlaceholder": "e.g. https://shelfmark.example.com",
+      "externalUrlHint": "When set, search results open this URL instead of the Shelfmark URL above. Use it when Shelfmark has a different public address.",
+      "optional": "(optional)",
+      "directoryNoteTitle": "Seamless experience:",
+      "directoryNote": "Configure Shelfmark to download books to the directory mounted as Book Dock in BookOrbit.",
+      "save": "Save Settings",
+      "saving": "Saving...",
+      "toasts": {
+        "loadFailed": "Failed to load Shelfmark settings",
+        "urlRequired": "Enter a Shelfmark URL before testing",
+        "connectionSuccessful": "Connection successful",
+        "connectionFailed": "Connection failed. Check the URL and try again.",
+        "connectionFailedStatus": "Connection failed (HTTP {status})",
+        "saved": "Shelfmark settings saved",
+        "saveFailed": "Failed to save Shelfmark settings"
       }
     },
     "metadata": {
@@ -4324,6 +4354,9 @@
   "components": {
     "appHeader": {
       "searchAllBooks": "Przeszukaj wszystkie książki...",
+      "shelfmarkSubtitle": "Not in Library • Search Shelfmark",
+      "shelfmarkSearching": "Searching Shelfmark for more results...",
+      "shelfmarkProvider": "Shelfmark",
       "searching": "Wyszukiwanie...",
       "noResults": "Brak wyników",
       "loadingMore": "Ładowanie więcej...",
@@ -6743,6 +6776,7 @@
     "opds": "OPDS",
     "koboSync": "Kobo Synchronizacja",
     "koreaderSync": "KOReader Synchronizacja",
+    "shelfmark": "Shelfmark",
     "bookDock": "Book Dock",
     "whatsNew": "Co nowego",
     "annotations": "Adnotacje",

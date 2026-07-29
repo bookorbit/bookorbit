@@ -161,6 +161,7 @@ function makeController() {
     getKoboState: vi.fn(),
     setReadStatus: vi.fn(),
     getDetail: vi.fn(),
+    searchShelfmark: vi.fn(),
     resolveSelectionToIds: vi.fn().mockImplementation((dto: { bookIds?: number[] }) => Promise.resolve(dto.bookIds ?? [])),
   };
   const fileWriteService = {
@@ -1056,6 +1057,75 @@ describe('BookController', () => {
       bookService.writeAndRename.mockRejectedValue(new NotFoundException('Book 999 not found'));
 
       await expect(controller.writeAndRename(999, makeUser())).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('searchShelfmark', () => {
+    it('does not abort signal on normal completion (aborted = false)', async () => {
+      const { controller: testController, bookService } = makeController();
+      const user = makeUser();
+
+      let capturedSignal: AbortSignal | undefined;
+      bookService.searchShelfmark.mockImplementation((q, user, signal) => {
+        capturedSignal = signal;
+        return Promise.resolve([]);
+      });
+
+      const closeListeners: (() => void)[] = [];
+      const req = {
+        raw: {
+          aborted: false,
+          once: vi.fn((event: string, cb: () => void) => {
+            if (event === 'close') {
+              closeListeners.push(cb);
+            }
+          }),
+        },
+      } as any;
+
+      await testController.searchShelfmark({ q: 'Prey' }, user, req);
+
+      // Simulate normal completion close
+      for (const listener of closeListeners) {
+        listener();
+      }
+
+      expect(capturedSignal).toBeDefined();
+      expect(capturedSignal?.aborted).toBe(false);
+    });
+
+    it('aborts signal on client disconnect (aborted = true)', async () => {
+      const { controller: testController, bookService } = makeController();
+      const user = makeUser();
+
+      let capturedSignal: AbortSignal | undefined;
+      bookService.searchShelfmark.mockImplementation((q, user, signal) => {
+        capturedSignal = signal;
+        return Promise.resolve([]);
+      });
+
+      const closeListeners: (() => void)[] = [];
+      const req = {
+        raw: {
+          aborted: false,
+          once: vi.fn((event: string, cb: () => void) => {
+            if (event === 'close') {
+              closeListeners.push(cb);
+            }
+          }),
+        },
+      } as any;
+
+      await testController.searchShelfmark({ q: 'Prey' }, user, req);
+
+      // Simulate client disconnect: set aborted = true and fire close
+      req.raw.aborted = true;
+      for (const listener of closeListeners) {
+        listener();
+      }
+
+      expect(capturedSignal).toBeDefined();
+      expect(capturedSignal?.aborted).toBe(true);
     });
   });
 });

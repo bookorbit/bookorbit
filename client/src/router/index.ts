@@ -170,6 +170,11 @@ export const routes: RouteRecordRaw[] = [
             redirect: (to) => ({ name: 'settings-integrations', query: { ...to.query, tab: 'storygraph' } }),
           },
           {
+            path: 'shelfmark',
+            name: 'settings-shelfmark',
+            redirect: (to) => ({ name: 'settings-integrations', query: { ...to.query, tab: 'shelfmark' } }),
+          },
+          {
             path: 'email',
             name: 'settings-email',
             component: () => import('@/features/email/components/EmailSettings.vue'),

@@ -16,6 +16,28 @@ import { BulkEditFieldsDto } from './dto/bulk-edit-metadata.dto';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookService } from './book.service';
 import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
+import { Test } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
+import { BookRepository } from './book.repository';
+import { LibraryService } from '../library/library.service';
+import { MetadataService } from '../metadata/metadata.service';
+import { MetadataScoreService } from '../metadata-score/metadata-score.service';
+import { MetadataFetchPipeline } from '../metadata-fetch/metadata-fetch-pipeline';
+import { AppSettingsService } from '../app-settings/app-settings.service';
+import { UserBookStatusService } from '../user-book-status/user-book-status.service';
+import { UserBookNoteService } from '../user-book-note/user-book-note.service';
+import { NarratorService } from '../narrator/narrator.service';
+import { ComicMetadataRepository } from '../metadata/comic-metadata.repository';
+import { CustomMetadataService } from '../custom-metadata/custom-metadata.service';
+import { UserPreferencesService } from '../user-preferences/user-preferences.service';
+import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
+import { ProviderRegistry } from '../metadata-fetch/provider-registry';
+import { MetadataFetchService } from '../metadata-fetch/metadata-fetch.service';
+import { BookEmbedderService } from '../embedding/book-embedder.service';
+import { FileWriteService } from '../file-write/file-write.service';
+import { FileRenameService } from '../file-write/file-rename.service';
+import { AchievementEventsService } from '../achievement/achievement-events.service';
+import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 vi.mock('fs/promises', async () => {
@@ -104,7 +126,10 @@ function makeMetadataFetchDiagnostics(overrides: Partial<MetadataFetchDiagnostic
   };
 }
 
-function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
+let compiledService: BookService;
+let compiledMocks: any;
+
+beforeEach(async () => {
   const bookRepo = {
     findCards: vi.fn(),
     countWhere: vi.fn(),
@@ -148,6 +173,7 @@ function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
     findTemporalJumpBuckets: vi.fn(),
     findTemporalJumpBucketsCollapsed: vi.fn(),
     checkBookPassesContentFilters: vi.fn().mockResolvedValue(true),
+    checkExistingCandidatesBatch: vi.fn().mockResolvedValue(new Set()),
   };
   const libraryService = {
     verifyUserAccess: vi.fn().mockResolvedValue(undefined),
@@ -166,6 +192,13 @@ function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
     downloadAndSaveCover: vi.fn().mockResolvedValue(undefined),
     refreshCoverForBook: vi.fn(),
   };
+  const scoreService = {
+    calculateAndSave: vi.fn().mockResolvedValue(undefined),
+    calculateAndSaveMany: vi.fn(),
+  };
+  scoreService.calculateAndSaveMany.mockImplementation((bookIds: number[]) =>
+    Promise.all(bookIds.map((bookId) => scoreService.calculateAndSave(bookId))).then(() => undefined),
+  );
   const pipeline = {
     run: vi.fn(),
     runWithSources: vi.fn(),
@@ -176,31 +209,24 @@ function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
   const appSettings = {
     getDownloadPattern: vi.fn().mockResolvedValue('{originalFilename}'),
   };
-  const scoreService = {
-    calculateAndSave: vi.fn().mockResolvedValue(undefined),
-    calculateAndSaveMany: vi.fn(),
+  const userBookStatusService = {
+    autoUpdate: vi.fn().mockResolvedValue(undefined),
+    setManual: vi.fn().mockResolvedValue(undefined),
+    updateManual: vi.fn().mockResolvedValue({
+      status: 'unread',
+      source: 'manual',
+      startedAt: null,
+      finishedAt: null,
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    }),
+    findOne: vi.fn().mockResolvedValue(null),
+    findByBookIds: vi.fn().mockResolvedValue(new Map()),
   };
-  scoreService.calculateAndSaveMany.mockImplementation((bookIds: number[]) =>
-    Promise.all(bookIds.map((bookId) => scoreService.calculateAndSave(bookId))).then(() => undefined),
-  );
-  const embedder = {
-    embedBook: vi.fn().mockResolvedValue(undefined),
+  const userBookNoteService = {
+    findOne: vi.fn().mockResolvedValue(null),
+    setNote: vi.fn().mockResolvedValue({ note: null, updatedAt: '2026-01-01T00:00:00.000Z' }),
   };
-  const fileWriteService = {
-    scheduleWrite: vi.fn(),
-    cancelPendingWrite: vi.fn(),
-    writeToFile: vi.fn(),
-    findLibraryWriteSettingsForBook: vi.fn().mockResolvedValue({ fileWriteEnabled: false, fileRenameEnabled: false }),
-    resolveBookFileWriteStatus: vi.fn().mockReturnValue({ enabled: false, reason: 'library_disabled', writableFormats: [], writableFields: [] }),
-  };
-  const fileRenameService = {
-    scheduleRename: vi.fn(),
-    cancelPendingRename: vi.fn(),
-    performRename: vi.fn(),
-  };
-  const achievementEvents = {
-    emit: vi.fn(),
-  };
+
   const narratorService = {
     replaceForBook: vi.fn().mockResolvedValue(undefined),
   };
@@ -232,49 +258,70 @@ function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
     getLockedFieldsMap: vi.fn().mockResolvedValue(new Map()),
     replaceLockedFields: vi.fn().mockResolvedValue([]),
   };
-  const userBookStatusService = {
-    autoUpdate: vi.fn().mockResolvedValue(undefined),
-    setManual: vi.fn().mockResolvedValue(undefined),
-    updateManual: vi.fn().mockResolvedValue({
-      status: 'unread',
-      source: 'manual',
-      startedAt: null,
-      finishedAt: null,
-      updatedAt: '2026-01-01T00:00:00.000Z',
-    }),
-    findOne: vi.fn().mockResolvedValue(null),
-    findByBookIds: vi.fn().mockResolvedValue(new Map()),
+  const userPreferencesService = {
+    getShelfmarkPreferences: vi.fn().mockResolvedValue({ enabled: false, url: '' }),
   };
-  const userBookNoteService = {
-    findOne: vi.fn().mockResolvedValue(null),
-    setNote: vi.fn().mockResolvedValue({ note: null, updatedAt: '2026-01-01T00:00:00.000Z' }),
+  const providerConfigService = {
+    getConfig: vi.fn().mockResolvedValue({}),
+  };
+  const providerRegistry = {
+    all: vi.fn().mockReturnValue([]),
+  };
+  const metadataFetchService = {
+    search: vi.fn(),
+  };
+  const embedder = {
+    embedBook: vi.fn().mockResolvedValue(undefined),
+  };
+  const fileWriteService = {
+    scheduleWrite: vi.fn(),
+    cancelPendingWrite: vi.fn(),
+    writeToFile: vi.fn(),
+    findLibraryWriteSettingsForBook: vi.fn().mockResolvedValue({ fileWriteEnabled: false, fileRenameEnabled: false }),
+    resolveBookFileWriteStatus: vi.fn().mockReturnValue({ enabled: false, reason: 'library_disabled', writableFormats: [], writableFields: [] }),
+  };
+  const fileRenameService = {
+    scheduleRename: vi.fn(),
+    cancelPendingRename: vi.fn(),
+    performRename: vi.fn(),
+  };
+  const achievementEvents = {
+    emit: vi.fn(),
   };
 
   bookRepo.withTransaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => callback({}));
 
-  const service = new BookService(
-    bookRepo as never,
-    libraryService as never,
-    queryBuilder as never,
-    metadataService as never,
-    scoreService as never,
-    pipeline as never,
-    config as never,
-    appSettings as never,
-    userBookStatusService as never,
-    userBookNoteService as never,
-    narratorService as never,
-    comicMetadataService as never,
-    customMetadataService as never,
-    (overrides.bookMetadataLockService ?? bookMetadataLockService) as never,
-    embedder as never,
-    fileWriteService as never,
-    fileRenameService as never,
-    achievementEvents as never,
-  );
+  const moduleRef = await Test.createTestingModule({
+    providers: [
+      BookService,
+      { provide: BookRepository, useValue: bookRepo },
+      { provide: LibraryService, useValue: libraryService },
+      { provide: BookQueryBuilder, useValue: queryBuilder },
+      { provide: MetadataService, useValue: metadataService },
+      { provide: MetadataScoreService, useValue: scoreService },
+      { provide: MetadataFetchPipeline, useValue: pipeline },
+      { provide: ConfigService, useValue: config },
+      { provide: AppSettingsService, useValue: appSettings },
+      { provide: UserBookStatusService, useValue: userBookStatusService },
+      { provide: UserBookNoteService, useValue: userBookNoteService },
+      { provide: NarratorService, useValue: narratorService },
+      { provide: ComicMetadataRepository, useValue: comicMetadataService },
+      { provide: CustomMetadataService, useValue: customMetadataService },
+      { provide: BookMetadataLockService, useValue: bookMetadataLockService },
+      { provide: UserPreferencesService, useValue: userPreferencesService },
+      { provide: ProviderConfigService, useValue: providerConfigService },
+      { provide: ProviderRegistry, useValue: providerRegistry },
+      { provide: MetadataFetchService, useValue: metadataFetchService },
+      { provide: BookEmbedderService, useValue: embedder },
+      { provide: FileWriteService, useValue: fileWriteService },
+      { provide: FileRenameService, useValue: fileRenameService },
+      { provide: AchievementEventsService, useValue: achievementEvents },
+      { provide: SeriesMembershipService, useValue: {} },
+    ],
+  }).compile();
 
-  return {
-    service,
+  compiledService = moduleRef.get<BookService>(BookService);
+  compiledMocks = {
     bookRepo,
     libraryService,
     queryBuilder,
@@ -285,14 +332,77 @@ function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
     appSettings,
     userBookStatusService,
     userBookNoteService,
-    embedder,
-    fileWriteService,
-    fileRenameService,
-    achievementEvents,
     narratorService,
     comicMetadataService,
     customMetadataService,
     bookMetadataLockService,
+    userPreferencesService,
+    providerConfigService,
+    providerRegistry,
+    metadataFetchService,
+    embedder,
+    fileWriteService,
+    fileRenameService,
+    achievementEvents,
+  };
+});
+
+function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
+  let service = compiledService;
+  let lockService = compiledMocks.bookMetadataLockService;
+
+  if (overrides.bookMetadataLockService) {
+    lockService = overrides.bookMetadataLockService;
+    service = new BookService(
+      compiledMocks.bookRepo as any,
+      compiledMocks.libraryService as any,
+      compiledMocks.queryBuilder as any,
+      compiledMocks.metadataService as any,
+      compiledMocks.scoreService as any,
+      compiledMocks.pipeline as any,
+      compiledMocks.config as any,
+      compiledMocks.appSettings as any,
+      compiledMocks.userBookStatusService as any,
+      compiledMocks.userBookNoteService as any,
+      compiledMocks.narratorService as any,
+      compiledMocks.comicMetadataService as any,
+      compiledMocks.customMetadataService as any,
+      lockService as any,
+      compiledMocks.userPreferencesService as any,
+      compiledMocks.providerConfigService as any,
+      compiledMocks.providerRegistry as any,
+      compiledMocks.metadataFetchService as any,
+      compiledMocks.embedder as any,
+      compiledMocks.fileWriteService as any,
+      compiledMocks.fileRenameService as any,
+      compiledMocks.achievementEvents as any,
+    );
+  }
+
+  return {
+    service,
+    bookRepo: compiledMocks.bookRepo,
+    libraryService: compiledMocks.libraryService,
+    queryBuilder: compiledMocks.queryBuilder,
+    metadataService: compiledMocks.metadataService,
+    scoreService: compiledMocks.scoreService,
+    pipeline: compiledMocks.pipeline,
+    config: compiledMocks.config,
+    appSettings: compiledMocks.appSettings,
+    userBookStatusService: compiledMocks.userBookStatusService,
+    userBookNoteService: compiledMocks.userBookNoteService,
+    narratorService: compiledMocks.narratorService,
+    comicMetadataService: compiledMocks.comicMetadataService,
+    customMetadataService: compiledMocks.customMetadataService,
+    bookMetadataLockService: lockService,
+    userPreferencesService: compiledMocks.userPreferencesService,
+    providerConfigService: compiledMocks.providerConfigService,
+    providerRegistry: compiledMocks.providerRegistry,
+    metadataFetchService: compiledMocks.metadataFetchService,
+    embedder: compiledMocks.embedder,
+    fileWriteService: compiledMocks.fileWriteService,
+    fileRenameService: compiledMocks.fileRenameService,
+    achievementEvents: compiledMocks.achievementEvents,
   };
 }
 
@@ -4800,6 +4910,10 @@ describe('BookService', () => {
         comicMetadataService,
         customMetadataService,
         bookMetadataLockService,
+        userPreferencesService,
+        providerConfigService,
+        providerRegistry,
+        metadataFetchService,
         embedder,
         fileRenameService,
         achievementEvents,
@@ -4822,6 +4936,10 @@ describe('BookService', () => {
         comicMetadataService as never,
         customMetadataService as never,
         bookMetadataLockService as never,
+        userPreferencesService as never,
+        providerConfigService as never,
+        providerRegistry as never,
+        metadataFetchService as never,
         embedder as never,
         null as never,
         fileRenameService as never,
@@ -4850,6 +4968,10 @@ describe('BookService', () => {
         comicMetadataService,
         customMetadataService,
         bookMetadataLockService,
+        userPreferencesService,
+        providerConfigService,
+        providerRegistry,
+        metadataFetchService,
         embedder,
         fileWriteService,
         achievementEvents,
@@ -4872,6 +4994,10 @@ describe('BookService', () => {
         comicMetadataService as never,
         customMetadataService as never,
         bookMetadataLockService as never,
+        userPreferencesService as never,
+        providerConfigService as never,
+        providerRegistry as never,
+        metadataFetchService as never,
         embedder as never,
         fileWriteService as never,
         null as never,

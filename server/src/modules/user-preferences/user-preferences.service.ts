@@ -22,11 +22,14 @@ import {
   type LocalePreferences,
   type ThemePreferences,
   type WhatsNewPreferences,
+  type ShelfmarkPreferences,
 } from '@bookorbit/types';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { ensureSafeUrl } from '../../common/utils/ssrf.utils';
 import { UserPreferencesRepository } from './user-preferences.repository';
 
 const THEME_PREFERENCES_SCHEMA = z
@@ -92,11 +95,39 @@ const WHATS_NEW_PREFERENCES_SCHEMA = z
 
 const WHATS_NEW_DEFAULTS: WhatsNewPreferences = { lastSeenVersion: null, popupEnabled: true };
 
+const HTTP_URL_SCHEMA = z
+  .string()
+  .url()
+  .refine((value) => {
+    try {
+      const protocol = new URL(value).protocol;
+      return protocol === 'http:' || protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }, 'URL must use http or https');
+
+const SHELFMARK_PREFERENCES_SCHEMA = z
+  .object({
+    enabled: z.boolean(),
+    url: z.string(),
+    externalUrl: HTTP_URL_SCHEMA.optional().or(z.literal('')),
+  })
+  .strict()
+  .superRefine((val, ctx) => {
+    if ((val.enabled || val.url !== '') && !HTTP_URL_SCHEMA.safeParse(val.url).success) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['url'], message: 'URL must use http or https' });
+    }
+  });
+
 @Injectable()
 export class UserPreferencesService {
   private readonly logger = new Logger(UserPreferencesService.name);
 
-  constructor(private readonly repo: UserPreferencesRepository) {}
+  constructor(
+    private readonly repo: UserPreferencesRepository,
+    private readonly config: ConfigService,
+  ) {}
 
   async getWhatsNewPreferences(userId: number): Promise<WhatsNewPreferences> {
     const row = await this.repo.findByCategory(userId, 'whats-new');
@@ -228,6 +259,74 @@ export class UserPreferencesService {
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
       this.logger.error(
         `[user_preferences.upsert_display] [fail] userId=${userId} durationMs=${durationMs} errorClass=${errorClass} error="${error}" - upsert display preferences failed`,
+      );
+      throw err;
+    }
+  }
+
+  async getShelfmarkPreferences(userId: number): Promise<ShelfmarkPreferences> {
+    const row = await this.repo.findByCategory(userId, 'shelfmark');
+    if (!row) return { enabled: false, url: '' };
+    const stored = row.data as Partial<ShelfmarkPreferences>;
+    return {
+      enabled: stored.enabled ?? false,
+      url: stored.url ?? '',
+      externalUrl: stored.externalUrl,
+    };
+  }
+
+  async testShelfmarkConnection(userId: number, url: string): Promise<{ ok: boolean; status?: number; error?: string }> {
+    const start = Date.now();
+    const sanitizedUrl = sanitizeLogValue(url);
+    this.logger.log(
+      `[user_preferences.test_shelfmark_connection] [start] userId=${userId} url="${sanitizedUrl}" - test shelfmark connection started`,
+    );
+    try {
+      const isProduction = this.config.get<string>('app.nodeEnv') === 'production';
+      const allowPrivate = !isProduction || this.config.get<boolean>('app.oidcAllowLocalIssuers') === true;
+
+      await ensureSafeUrl(url, { allowLocal: allowPrivate, allowPrivate: allowPrivate });
+
+      const testUrl = url.replace(/\/+$/, '') + '/api/health';
+      const res = await fetch(testUrl, { signal: AbortSignal.timeout(5000), redirect: 'error' });
+      const durationMs = Date.now() - start;
+      this.logger.log(
+        `[user_preferences.test_shelfmark_connection] [end] userId=${userId} url="${sanitizedUrl}" durationMs=${durationMs} status=${res.status} - test shelfmark connection completed`,
+      );
+      return { ok: res.ok, status: res.status };
+    } catch (err) {
+      const durationMs = Date.now() - start;
+      const errorClass = err instanceof Error ? err.constructor.name : 'UnknownError';
+      const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.error(
+        `[user_preferences.test_shelfmark_connection] [fail] userId=${userId} url="${sanitizedUrl}" durationMs=${durationMs} errorClass=${errorClass} error="${error}" - test shelfmark connection failed`,
+      );
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  async upsertShelfmarkPreferences(userId: number, data: Record<string, unknown>): Promise<void> {
+    const start = Date.now();
+    this.logger.log(`[user_preferences.upsert_shelfmark] [start] userId=${userId} - upsert shelfmark preferences started`);
+
+    const result = SHELFMARK_PREFERENCES_SCHEMA.safeParse(data);
+    if (!result.success) {
+      const firstIssue = result.error.issues[0];
+      const issuePath = firstIssue?.path.length ? firstIssue.path.join('.') : 'settings';
+      const issueMessage = firstIssue?.message ?? 'Invalid settings payload';
+      throw new BadRequestException(`Invalid shelfmark preferences at "${issuePath}": ${issueMessage}`);
+    }
+
+    try {
+      await this.repo.upsert(userId, 'shelfmark', result.data);
+      const durationMs = Date.now() - start;
+      this.logger.log(`[user_preferences.upsert_shelfmark] [end] userId=${userId} durationMs=${durationMs} - upsert shelfmark preferences completed`);
+    } catch (err) {
+      const durationMs = Date.now() - start;
+      const errorClass = err instanceof Error ? err.constructor.name : 'UnknownError';
+      const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.error(
+        `[user_preferences.upsert_shelfmark] [fail] userId=${userId} durationMs=${durationMs} errorClass=${errorClass} error="${error}" - upsert shelfmark preferences failed`,
       );
       throw err;
     }

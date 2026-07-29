@@ -1,8 +1,11 @@
-import { Body, Controller, Get, HttpCode, Put } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Put } from '@nestjs/common';
+import { Permission } from '@bookorbit/types';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { UpsertUserPreferenceDto } from './dto/upsert-user-preference.dto';
+import { TestShelfmarkConnectionDto } from './dto/test-shelfmark-connection.dto';
 import { UserPreferencesService } from './user-preferences.service';
 
 @Controller('user-preferences')
@@ -55,5 +58,23 @@ export class UserPreferencesController {
   @HttpCode(204)
   async upsertWhatsNewPreferences(@Body() dto: UpsertUserPreferenceDto, @CurrentUser() user: RequestUser) {
     await this.userPreferencesService.upsertWhatsNewPreferences(user.id, dto.settings);
+  }
+
+  @Get('shelfmark')
+  async getShelfmarkPreferences(@CurrentUser() user: RequestUser) {
+    const settings = await this.userPreferencesService.getShelfmarkPreferences(user.id);
+    return { settings };
+  }
+
+  @Post('shelfmark/test')
+  @RequirePermission(Permission.ManageAppSettings)
+  async testShelfmarkConnection(@Body() body: TestShelfmarkConnectionDto, @CurrentUser() user: RequestUser) {
+    return this.userPreferencesService.testShelfmarkConnection(user.id, body.url);
+  }
+
+  @Put('shelfmark')
+  @HttpCode(204)
+  async upsertShelfmarkPreferences(@Body() dto: UpsertUserPreferenceDto, @CurrentUser() user: RequestUser) {
+    await this.userPreferencesService.upsertShelfmarkPreferences(user.id, dto.settings);
   }
 }

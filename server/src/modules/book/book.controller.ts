@@ -14,12 +14,13 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   Res,
 } from '@nestjs/common';
 import { ZipArchive } from 'archiver';
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
-import type { FastifyReply } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { contentDispositionHeader } from '../../common/utils/content-disposition.utils';
@@ -139,6 +140,17 @@ export class BookController {
   @Get('search')
   searchBooks(@Query() dto: SearchBooksDto, @CurrentUser() user: RequestUser) {
     return this.bookService.searchAcrossLibraries(dto.q, dto.limit ?? 10, user);
+  }
+
+  @Get('shelfmark')
+  searchShelfmark(@Query() dto: SearchBooksDto, @CurrentUser() user: RequestUser, @Req() req: FastifyRequest) {
+    const controller = new AbortController();
+    req.raw.once('close', () => {
+      if (req.raw.aborted) {
+        controller.abort();
+      }
+    });
+    return this.bookService.searchShelfmark(dto.q, user, controller.signal);
   }
 
   @Post('query')

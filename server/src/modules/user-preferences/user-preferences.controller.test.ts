@@ -1,6 +1,7 @@
 import type { Mocked } from 'vitest';
-import { EMPTY_CONTENT_FILTER_RULES, type DisplayPreferences, type LocalePreferences, type ThemePreferences } from '@bookorbit/types';
+import { EMPTY_CONTENT_FILTER_RULES, Permission, type DisplayPreferences, type LocalePreferences, type ThemePreferences } from '@bookorbit/types';
 
+import { PERMISSION_KEY } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { UserPreferencesController } from './user-preferences.controller';
 import { UserPreferencesService } from './user-preferences.service';
@@ -76,6 +77,12 @@ describe('UserPreferencesController', () => {
     } as unknown as Mocked<UserPreferencesService>;
 
     controller = new UserPreferencesController(service);
+  });
+
+  it('requires app-settings permission to test a Shelfmark connection', () => {
+    const permission = Reflect.getMetadata(PERMISSION_KEY, UserPreferencesController.prototype.testShelfmarkConnection);
+
+    expect(permission).toBe(Permission.ManageAppSettings);
   });
 
   it('GET /theme returns null settings when no saved preferences exist', async () => {

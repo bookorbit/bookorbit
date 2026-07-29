@@ -5,6 +5,7 @@ import SettingsPageHeader from './SettingsPageHeader.vue'
 import HardcoverSettings from '@/features/hardcover/components/HardcoverSettings.vue'
 import ReadwiseSettings from '@/features/readwise/components/ReadwiseSettings.vue'
 import StorygraphSettings from '@/features/storygraph/components/StorygraphSettings.vue'
+import ShelfmarkSettings from './ShelfmarkSettings.vue'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { INTEGRATION_TAB_INFO, INTEGRATION_TABS, normalizeIntegrationTab, type IntegrationTab as Tab } from './lib/integration-tabs'
 
@@ -13,7 +14,10 @@ const router = useRouter()
 const { isSuperuser, userPermissions } = usePermissions()
 
 const availableTabs = computed(() =>
-  INTEGRATION_TABS.filter((id) => isSuperuser.value || userPermissions.value.includes(INTEGRATION_TAB_INFO[id].permission)).map((id) => ({
+  INTEGRATION_TABS.filter((id) => {
+    const perm = INTEGRATION_TAB_INFO[id].permission
+    return !perm || isSuperuser.value || userPermissions.value.includes(perm)
+  }).map((id) => ({
     id,
     label: INTEGRATION_TAB_INFO[id].navLabel,
   })),
@@ -77,6 +81,7 @@ function selectTab(tab: Tab) {
   <HardcoverSettings v-if="activeTab === 'hardcover' && availableTabs.length > 0" embedded />
   <ReadwiseSettings v-else-if="activeTab === 'readwise' && availableTabs.length > 0" embedded />
   <StorygraphSettings v-else-if="activeTab === 'storygraph' && availableTabs.length > 0" embedded />
+  <ShelfmarkSettings v-else-if="activeTab === 'shelfmark' && availableTabs.length > 0" embedded />
   <div v-else class="rounded-lg border border-border bg-card px-4 py-5 text-sm text-muted-foreground">
     You do not have permission to use any integrations.
   </div>

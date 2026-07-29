@@ -80,6 +80,7 @@
     "echarts": "^6.1.0",
     "howler": "^2.2.4",
     "intl-messageformat": "^11.2.12",
+    "lucide-vue-next": "^1.0.0",
     "pinia": "^3.0.4",
     "reka-ui": "^2.10.1",
     "socket.io-client": "^4.8.3",

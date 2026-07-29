@@ -11,9 +11,10 @@ import type {
   SortSpec,
   TemporalJumpBucketPrecision,
   TemporalJumpBucketUnit,
+  MetadataCandidate,
 } from '@bookorbit/types';
 import type { BookRecommendation } from '@bookorbit/types';
-import { isAudioFormat, isComicFormat, normalizeCoverAspectRatio } from '@bookorbit/types';
+import { isAudioFormat, isComicFormat, normalizeCoverAspectRatio, MetadataProviderKey } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
@@ -1383,6 +1384,149 @@ export class BookRepository {
       .where(and(eq(books.id, bookId), ...filterClauses))
       .limit(1);
     return !!row;
+  }
+
+  async checkExistingCandidatesBatch(candidates: MetadataCandidate[], libraryIds: number[]): Promise<Set<MetadataCandidate>> {
+    const existing = new Set<MetadataCandidate>();
+    if (candidates.length === 0 || libraryIds.length === 0) {
+      return existing;
+    }
+
+    const conditions: SQL[] = [];
+    const titles: string[] = [];
+
+    for (const candidate of candidates) {
+      const candidateConditions: SQL[] = [];
+      if (candidate.isbn13) {
+        candidateConditions.push(eq(schema.bookMetadata.isbn13, candidate.isbn13));
+      }
+      if (candidate.isbn10) {
+        candidateConditions.push(eq(schema.bookMetadata.isbn10, candidate.isbn10));
+      }
+      const providerField = this.getProviderField(candidate.provider);
+      if (providerField && candidate.providerId) {
+        candidateConditions.push(eq((schema.bookMetadata as any)[providerField], candidate.providerId));
+      }
+      if (candidate.hardcoverEditionId) {
+        candidateConditions.push(eq(schema.bookMetadata.hardcoverEditionId, candidate.hardcoverEditionId));
+      }
+      if (candidate.audibleId) {
+        candidateConditions.push(eq(schema.bookMetadata.audibleId, candidate.audibleId));
+      }
+
+      if (candidateConditions.length > 0) {
+        conditions.push(...candidateConditions);
+      } else if (candidate.title) {
+        titles.push(candidate.title.toLowerCase());
+      }
+    }
+
+    const whereClauses: SQL[] = [inArray(schema.books.libraryId, libraryIds)];
+    const orClauses: SQL[] = [];
+
+    if (conditions.length > 0) {
+      orClauses.push(...conditions);
+    }
+    if (titles.length > 0) {
+      orClauses.push(inArray(sql`lower(${schema.bookMetadata.title})`, titles));
+    }
+
+    if (orClauses.length === 0) {
+      return existing;
+    }
+    whereClauses.push(or(...orClauses)!);
+
+    const rows = await this.db
+      .select({
+        title: schema.bookMetadata.title,
+        isbn13: schema.bookMetadata.isbn13,
+        isbn10: schema.bookMetadata.isbn10,
+        googleBooksId: schema.bookMetadata.googleBooksId,
+        goodreadsId: schema.bookMetadata.goodreadsId,
+        amazonId: schema.bookMetadata.amazonId,
+        hardcoverId: schema.bookMetadata.hardcoverId,
+        hardcoverEditionId: schema.bookMetadata.hardcoverEditionId,
+        openLibraryId: schema.bookMetadata.openLibraryId,
+        itunesId: schema.bookMetadata.itunesId,
+        koboId: schema.bookMetadata.koboId,
+        audibleId: schema.bookMetadata.audibleId,
+        comicvineId: schema.bookMetadata.comicvineId,
+        ranobedbId: schema.bookMetadata.ranobedbId,
+        aladinId: schema.bookMetadata.aladinId,
+        lubimyczytacId: schema.bookMetadata.lubimyczytacId,
+        librofmId: schema.bookMetadata.librofmId,
+      })
+      .from(schema.bookMetadata)
+      .innerJoin(schema.books, eq(schema.bookMetadata.bookId, schema.books.id))
+      .where(and(...whereClauses));
+
+    for (const candidate of candidates) {
+      const match = rows.find((row) => {
+        if (candidate.isbn13 && row.isbn13 === candidate.isbn13) return true;
+        if (candidate.isbn10 && row.isbn10 === candidate.isbn10) return true;
+
+        const providerField = this.getProviderField(candidate.provider);
+        if (providerField && candidate.providerId) {
+          if ((row as any)[providerField] === candidate.providerId) return true;
+        }
+
+        if (candidate.hardcoverEditionId && row.hardcoverEditionId === candidate.hardcoverEditionId) return true;
+        if (candidate.audibleId && row.audibleId === candidate.audibleId) return true;
+
+        const hasIdentifiers = !!(
+          candidate.isbn13 ||
+          candidate.isbn10 ||
+          (providerField && candidate.providerId) ||
+          candidate.hardcoverEditionId ||
+          candidate.audibleId
+        );
+        if (!hasIdentifiers && candidate.title && row.title && row.title.toLowerCase() === candidate.title.toLowerCase()) {
+          return true;
+        }
+        return false;
+      });
+
+      if (match) {
+        existing.add(candidate);
+      }
+    }
+
+    return existing;
+  }
+
+  private getProviderField(provider: MetadataProviderKey): string | null {
+    switch (provider) {
+      case MetadataProviderKey.GOOGLE:
+        return 'googleBooksId';
+      case MetadataProviderKey.GOODREADS:
+        return 'goodreadsId';
+      case MetadataProviderKey.AMAZON:
+        return 'amazonId';
+      case MetadataProviderKey.HARDCOVER:
+        return 'hardcoverId';
+      case MetadataProviderKey.OPEN_LIBRARY:
+        return 'openLibraryId';
+      case MetadataProviderKey.ITUNES:
+        return 'itunesId';
+      case MetadataProviderKey.KOBO:
+        return 'koboId';
+      case MetadataProviderKey.AUDIBLE:
+        return 'audibleId';
+      case MetadataProviderKey.AUDNEXUS:
+        return 'audibleId';
+      case MetadataProviderKey.COMICVINE:
+        return 'comicvineId';
+      case MetadataProviderKey.RANOBEDB:
+        return 'ranobedbId';
+      case MetadataProviderKey.ALADIN:
+        return 'aladinId';
+      case MetadataProviderKey.LUBIMYCZYTAC:
+        return 'lubimyczytacId';
+      case MetadataProviderKey.LIBROFM:
+        return 'librofmId';
+      default:
+        return null;
+    }
   }
 
   async findFileById(fileId: number) {

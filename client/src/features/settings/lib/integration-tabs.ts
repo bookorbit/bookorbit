@@ -1,13 +1,13 @@
 import { Permission } from '@bookorbit/types'
 
-export const INTEGRATION_TABS = ['hardcover', 'readwise', 'storygraph'] as const
+export const INTEGRATION_TABS = ['hardcover', 'readwise', 'storygraph', 'shelfmark'] as const
 
 export type IntegrationTab = (typeof INTEGRATION_TABS)[number]
 
 type IntegrationTabInfo = {
   navLabel: string
   titleLabel: string
-  permission: Permission
+  permission?: Permission
 }
 
 export const INTEGRATION_TAB_INFO: Record<IntegrationTab, IntegrationTabInfo> = {
@@ -25,6 +25,10 @@ export const INTEGRATION_TAB_INFO: Record<IntegrationTab, IntegrationTabInfo> = 
     navLabel: 'StoryGraph',
     titleLabel: 'StoryGraph',
     permission: Permission.StorygraphSync,
+  },
+  shelfmark: {
+    navLabel: 'Shelfmark',
+    titleLabel: 'Shelfmark',
   },
 }
 

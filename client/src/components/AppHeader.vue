@@ -17,9 +17,11 @@ import {
   Star,
   ExternalLink,
   Sparkles,
+  CloudDownload,
+  Loader,
   Check,
   Languages,
-} from '@lucide/vue'
+} from 'lucide-vue-next'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
@@ -157,6 +159,8 @@ const {
   hasMore: globalSearchHasMore,
   loadMore: loadMoreGlobalSearch,
   clear: clearGlobalSearch,
+  shelfmarkLoading,
+  shelfmarkEnabled,
 } = useGlobalSearch(globalSearchQuery)
 
 const showDropdown = computed(
@@ -250,6 +254,10 @@ function closeGithubStarPopover() {
 function navigateToResult(result: GlobalSearchResult) {
   clearSearch()
   mobileSearchOpen.value = false
+  if (result.doesNotExistLocally && result.shelfmarkUrl) {
+    window.open(result.shelfmarkUrl, '_blank', 'noopener')
+    return
+  }
   router.push({ name: 'book-detail', params: { bookId: result.id } })
 }
 
@@ -412,7 +420,20 @@ function formatBadgeStyle(fmt: string) {
                   selectedIndex === row.index ? 'bg-accent' : 'hover:bg-accent/60',
                 ]"
               >
+                <img
+                  v-if="row.result.doesNotExistLocally && row.result.coverUrl"
+                  :src="row.result.coverUrl"
+                  class="h-16 w-12 object-cover rounded shrink-0 bg-muted border border-border/40"
+                  :alt="row.result.title ?? ''"
+                />
+                <div
+                  v-else-if="row.result.doesNotExistLocally"
+                  class="h-16 w-12 rounded shrink-0 bg-muted/40 flex items-center justify-center text-muted-foreground border border-dashed"
+                >
+                  <CloudDownload :size="18" />
+                </div>
                 <BookCoverImage
+                  v-else
                   :book-id="row.result.id"
                   type="thumbnail"
                   :version="row.result.updatedAt"
@@ -426,7 +447,10 @@ function formatBadgeStyle(fmt: string) {
                       <span v-else>{{ seg.text }}</span>
                     </template>
                   </p>
-                  <p v-if="row.result.authors.length" class="text-[13px] text-muted-foreground truncate mt-0.5">
+                  <p v-if="row.result.doesNotExistLocally" class="text-[13px] font-medium truncate mt-0.5 text-primary">
+                    {{ t('components.appHeader.shelfmarkSubtitle') }}
+                  </p>
+                  <p v-else-if="row.result.authors.length" class="text-[13px] text-muted-foreground truncate mt-0.5">
                     <template v-for="seg in highlightSegments(row.result.authors.join(', '), globalSearchQuery)" :key="seg.text + seg.match">
                       <span v-if="seg.match" class="bg-(--shell-accent-tint) text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
                       <span v-else>{{ seg.text }}</span>
@@ -441,17 +465,32 @@ function formatBadgeStyle(fmt: string) {
                     </template>
                   </p>
                 </div>
-                <div v-if="resultFormats(row.result).length" class="flex shrink-0 gap-1">
+                <div class="flex shrink-0 gap-1">
                   <span
-                    v-for="fmt in resultFormats(row.result)"
-                    :key="fmt"
-                    :class="['text-[11px] font-semibold px-1 py-0.5 rounded border uppercase']"
-                    :style="formatBadgeStyle(fmt)"
+                    v-if="row.result.doesNotExistLocally"
+                    class="text-[11px] font-semibold px-1.5 py-0.5 rounded border uppercase border-primary/35 bg-primary/10 text-primary"
                   >
-                    {{ fmt }}
+                    {{ t('components.appHeader.shelfmarkProvider') }}
                   </span>
+                  <template v-else-if="resultFormats(row.result).length">
+                    <span
+                      v-for="fmt in resultFormats(row.result)"
+                      :key="fmt"
+                      :class="['text-[11px] font-semibold px-1 py-0.5 rounded border uppercase']"
+                      :style="formatBadgeStyle(fmt)"
+                    >
+                      {{ fmt }}
+                    </span>
+                  </template>
                 </div>
               </button>
+            </div>
+            <div
+              v-if="shelfmarkEnabled && shelfmarkLoading"
+              class="border-t border-border p-2 text-center text-[12px] text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/20"
+            >
+              <Loader class="animate-spin text-primary" :size="12" />
+              <span>{{ t('components.appHeader.shelfmarkSearching') }}</span>
             </div>
             <div v-if="globalResults.length > 0" class="border-t border-border px-3 py-2 text-center text-[13px] text-muted-foreground">
               <button
@@ -539,7 +578,20 @@ function formatBadgeStyle(fmt: string) {
                   selectedIndex === row.index ? 'bg-accent' : 'hover:bg-accent/60',
                 ]"
               >
+                <img
+                  v-if="row.result.doesNotExistLocally && row.result.coverUrl"
+                  :src="row.result.coverUrl"
+                  class="h-16 w-12 object-cover rounded shrink-0 bg-muted border border-border/40"
+                  :alt="row.result.title ?? ''"
+                />
+                <div
+                  v-else-if="row.result.doesNotExistLocally"
+                  class="h-16 w-12 rounded shrink-0 bg-muted/40 flex items-center justify-center text-muted-foreground border border-dashed"
+                >
+                  <CloudDownload :size="18" />
+                </div>
                 <BookCoverImage
+                  v-else
                   :book-id="row.result.id"
                   type="thumbnail"
                   :version="row.result.updatedAt"
@@ -553,7 +605,10 @@ function formatBadgeStyle(fmt: string) {
                       <span v-else>{{ seg.text }}</span>
                     </template>
                   </p>
-                  <p v-if="row.result.authors.length" class="text-[13px] text-muted-foreground truncate mt-0.5">
+                  <p v-if="row.result.doesNotExistLocally" class="text-[13px] font-medium truncate mt-0.5 text-primary">
+                    {{ t('components.appHeader.shelfmarkSubtitle') }}
+                  </p>
+                  <p v-else-if="row.result.authors.length" class="text-[13px] text-muted-foreground truncate mt-0.5">
                     <template v-for="seg in highlightSegments(row.result.authors.join(', '), globalSearchQuery)" :key="seg.text + seg.match">
                       <span v-if="seg.match" class="bg-(--shell-accent-tint) text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
                       <span v-else>{{ seg.text }}</span>
@@ -568,17 +623,32 @@ function formatBadgeStyle(fmt: string) {
                     </template>
                   </p>
                 </div>
-                <div v-if="resultFormats(row.result).length" class="flex shrink-0 gap-1">
+                <div class="flex shrink-0 gap-1">
                   <span
-                    v-for="fmt in resultFormats(row.result)"
-                    :key="fmt"
-                    :class="['text-[11px] font-semibold px-1 py-0.5 rounded border uppercase']"
-                    :style="formatBadgeStyle(fmt)"
+                    v-if="row.result.doesNotExistLocally"
+                    class="text-[11px] font-semibold px-1.5 py-0.5 rounded border uppercase border-primary/35 bg-primary/10 text-primary"
                   >
-                    {{ fmt }}
+                    {{ t('components.appHeader.shelfmarkProvider') }}
                   </span>
+                  <template v-else-if="resultFormats(row.result).length">
+                    <span
+                      v-for="fmt in resultFormats(row.result)"
+                      :key="fmt"
+                      :class="['text-[11px] font-semibold px-1 py-0.5 rounded border uppercase']"
+                      :style="formatBadgeStyle(fmt)"
+                    >
+                      {{ fmt }}
+                    </span>
+                  </template>
                 </div>
               </button>
+            </div>
+            <div
+              v-if="shelfmarkEnabled && shelfmarkLoading"
+              class="border-t border-border p-2 text-center text-[12px] text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/20"
+            >
+              <Loader class="animate-spin text-primary" :size="12" />
+              <span>{{ t('components.appHeader.shelfmarkSearching') }}</span>
             </div>
             <div v-if="globalResults.length > 0" class="border-t border-border px-3 py-2 text-center text-[13px] text-muted-foreground">
               <button
