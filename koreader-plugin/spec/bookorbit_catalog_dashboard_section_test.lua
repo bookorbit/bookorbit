@@ -77,7 +77,15 @@ package.loaded["ui/uimanager"] = {
 package.loaded["ui/widget/verticalgroup"] = widgetClass()
 package.loaded["ui/widget/verticalspan"] = widgetClass()
 package.loaded["bookorbit_stats_reader"] = {}
-package.loaded["bookorbit_catalog_widgets"] = {}
+package.loaded["bookorbit_catalog_widgets"] = {
+    DashboardCoverCard = widgetClass(),
+    DashboardHeroCard = widgetClass(),
+    DashboardBrowseRow = widgetClass(),
+    DashboardIconButton = widgetClass(),
+    coverCardHeight = function(card_w)
+        return card_w + 20
+    end,
+}
 
 package.path = "koreader-plugin/bookorbit.koplugin/?.lua;" .. package.path
 
@@ -174,6 +182,22 @@ assertEqual(catalog:dashboardSectionRequest(), nil, "catalog destinations do not
 assertEqual(CatalogDashboard.dashboardSlotBooks({ dashboardSlots = { [3] = { books = { { id = 2 } } } } }, 3)[1].id, 2,
     "a grid slot exposes its own books")
 assertEqual(#CatalogDashboard.dashboardSlotBooks(nil, 3), 0, "no body yields no books")
+
+-- Grid geometry is computed from the measured content width and native slot
+-- count rather than from source-text constants.
+catalog = newCatalog{}
+catalog.content_w = 500
+catalog.dash_inner_gap = 9
+local slots, card_w, grid_h = catalog:sectionRowMetrics(12, 6)
+assertEqual(slots, 5, "a wide dashboard budgets five cover slots")
+assertEqual(card_w, 95, "cover width subtracts only the four inter-card gaps")
+assertEqual(grid_h, 115, "grid height follows the measured cover-card height")
+
+catalog.content_w = 320
+slots, card_w, grid_h = catalog:sectionRowMetrics(12, 6)
+assertEqual(slots, 4, "slot count shrinks until the minimum cover width fits")
+assertEqual(card_w, 75, "the narrower grid recomputes its card width")
+assertEqual(grid_h, 95, "the narrower grid recomputes its card height")
 
 -- Thumbnail prefetching sees every configured grid slot, including all twelve
 -- prefetched items per shelf.
