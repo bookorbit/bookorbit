@@ -4584,6 +4584,29 @@
         "widgets": "Widgets",
         "shelves": "Planken"
       },
+      "widgetNames": {
+        "readingStreak": "Reading Streak",
+        "currentlyReading": "Currently Reading",
+        "readingGoal": "Reading Goal",
+        "readingDna": "Reading DNA",
+        "monthlyChallenge": "Monthly Challenge",
+        "highlightOfTheDay": "Highlight of the Day",
+        "neglectedGems": "Neglected Gems",
+        "readingRhythm": "Reading Rhythm",
+        "diversityScore": "Diversity Score",
+        "libraryOverview": "Library Overview",
+        "yearProjection": "Year Projection",
+        "longWait": "The Long Wait"
+      },
+      "shelfNames": {
+        "recentlyAdded": "Recently Added",
+        "continueReading": "Continue Reading",
+        "continueListening": "Continue Listening",
+        "wantToRead": "Want to Read",
+        "upNextInSeries": "Up Next in Series",
+        "random": "Discover Something New",
+        "smartScope": "Smart Scope"
+      },
       "reorderHintWidget": "Sleep om te herordenen. Schakel in of uit om een widget te tonen of verbergen.",
       "reorderHintShelf": "Sleep om te herordenen. Schakel in of uit om een plank te tonen of verbergen.",
       "smartScope": "Smart Scope",
@@ -6657,6 +6680,11 @@
       "defaultName": "Smart scope",
       "filter": "Filter",
       "edit": "Smart Scope bewerken",
+      "koboSync": {
+        "label": "Sync to my Kobo",
+        "enabledHint": "Books in this shared Smart Scope sync to your Kobo device. Turn off to stop syncing them.",
+        "disabledHint": "Turn on to sync books in this shared Smart Scope to your Kobo device."
+      },
       "showControlsAria": "Smart Scope-bediening tonen",
       "hideFilter": "Filter verbergen",
       "showFilter": "Filter tonen",
@@ -6664,7 +6692,10 @@
       "loadError": "Kan deze SmartScope niet laden",
       "toast": {
         "deleted": "\"{name}\" verwijderd",
-        "deleteFailed": "Verwijderen van \"{name}\" mislukt"
+        "deleteFailed": "Verwijderen van \"{name}\" mislukt",
+        "koboSyncEnabled": "\"{name}\" now syncs to your Kobo",
+        "koboSyncDisabled": "\"{name}\" no longer syncs to your Kobo",
+        "koboSyncFailed": "Failed to update Kobo sync for \"{name}\""
       },
       "empty": {
         "noRules": "Geen regels ingesteld",
