@@ -156,23 +156,21 @@ local function newCatalog(opts)
     return catalog
 end
 
--- Discover is the default, so the common case never probes for the capability
--- and never puts the parameter on the wire.
+-- Discover is the default, so the common case puts no parameter on the wire.
 local catalog = newCatalog{}
 assertEqual(catalog:dashboardSectionRequest(), nil, "the default row sends no section parameter")
 assertEqual(#requests, 0, "the default row does not probe capabilities")
 
--- A non-default choice is only sent to a server that advertises it.
+-- A non-default choice is sent directly. dashboardRoot owns the compatibility
+-- fallback when an older server rejects the section parameter.
 catalog = newCatalog{ section = { type = "want-to-read" }, capabilities = { "catalogDashboardSections" } }
 assertEqual(catalog:dashboardSectionRequest().type, "want-to-read", "an advertised capability sends the section")
 
 catalog = newCatalog{ section = { type = "want-to-read" }, capabilities = {} }
-assertEqual(catalog:dashboardSectionRequest(), nil, "a server without the capability keeps the legacy request")
+assertEqual(catalog:dashboardSectionRequest().type, "want-to-read", "a missing capability advertisement does not suppress the selected section")
 
--- An unknown answer is not treated as a downgrade, but it still cannot select
--- the new route for this request.
 catalog = newCatalog{ section = { type = "want-to-read" }, capability_error = 503 }
-assertEqual(catalog:dashboardSectionRequest(), nil, "a transient probe failure does not select the new route")
+assertEqual(catalog:dashboardSectionRequest().type, "want-to-read", "a transient capability probe failure does not suppress the selected section")
 
 -- The books come from the section when the body carries one, and from the
 -- legacy discover field otherwise.

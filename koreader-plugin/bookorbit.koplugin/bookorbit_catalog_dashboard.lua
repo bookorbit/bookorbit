@@ -180,13 +180,11 @@ function CatalogDashboard:shouldRefreshDashboardOnOpen()
     return true
 end
 
--- The section parameter is only sent to a server that advertises it. Discover
--- needs no parameter at all, so the default configuration never pays for the
--- capability probe.
+-- Discover needs no parameter at all. A non-default choice is sent directly;
+-- older servers safely fall back to the legacy dashboard in dashboardRoot.
 function CatalogDashboard:dashboardSectionRequest()
     local config = self:dashboardConfiguredSection()
     if config.type == DashboardSections.DEFAULT_TYPE then return nil end
-    if Capabilities.supports(self.client, DashboardSections.CAPABILITY) ~= true then return nil end
     return config
 end
 
