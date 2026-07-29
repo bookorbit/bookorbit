@@ -46,6 +46,7 @@ describe('PdfReaderToolbar', () => {
 
     expect(wrapper.text()).toContain('-13')
     expect(wrapper.text()).toContain('/ 240')
+
     ;(input.element as HTMLInputElement).value = '999'
     await input.trigger('change')
 

@@ -39,19 +39,7 @@ export type CustomColumnId = `custom:${number}`
 export type ColumnId = StaticColumnId | CustomColumnId
 
 export type CellType =
-  | 'lockRow'
-  | 'cover'
-  | 'text'
-  | 'number'
-  | 'rating'
-  | 'chips'
-  | 'readStatus'
-  | 'format'
-  | 'read'
-  | 'date'
-  | 'progress'
-  | 'actions'
-  | 'customBoolean'
+  'lockRow' | 'cover' | 'text' | 'number' | 'rating' | 'chips' | 'readStatus' | 'format' | 'read' | 'date' | 'progress' | 'actions' | 'customBoolean'
 
 export type ColumnDef = {
   id: string
