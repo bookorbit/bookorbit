@@ -305,7 +305,13 @@ function MainMenu:applyDashboardSection(index, config, catalog, touchmenu_instan
 end
 
 function MainMenu:chooseDashboardCatalogSource(index, section, catalog, touchmenu_instance)
-    if touchmenu_instance then UIManager:close(touchmenu_instance) end
+    if self.dashboard_menu_container then
+        local menu_container = self.dashboard_menu_container
+        self.dashboard_menu_container = nil
+        UIManager:close(menu_container)
+    elseif touchmenu_instance then
+        UIManager:close(touchmenu_instance)
+    end
 
     local function openSelector(target)
         target:loadSection(section, { dashboard_source_index = index })
