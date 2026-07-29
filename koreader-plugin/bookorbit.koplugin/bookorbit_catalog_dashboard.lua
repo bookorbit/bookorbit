@@ -215,7 +215,10 @@ function CatalogDashboard:hydrateDashboardSections(dashboard)
     return dashboard
 end
 
-function CatalogDashboard:dashboardRoot()
+function CatalogDashboard:dashboardRoot(opts)
+    local function requestIsCurrent()
+        return not opts or not opts.is_current or opts.is_current()
+    end
     local cached = self:dashboardCache()
     if self.prefer_cached_dashboard and cached and not NetworkMgr:isConnected() then
         return self:cachedDashboardContext(cached)
@@ -778,8 +781,17 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
     local dashboard = context.dashboard or {}
     local configured = dashboard.dashboardSections
     if type(configured) ~= "table" then
-        self:hydrateDashboardSections(dashboard)
-        configured = dashboard.dashboardSections
+        configured = {}
+        for index, descriptor in ipairs(DashboardConfig.sections(self.settings)) do
+            local books = {}
+            if descriptor.kind == "continue" then
+                books = dashboard.continueReading or {}
+            elseif descriptor.kind == "discover" then
+                books = dashboard.discover or {}
+            end
+            configured[index] = { descriptor = descriptor, books = books }
+        end
+        dashboard.dashboardSections = configured
     end
 
     local function px(n) return Screen:scaleBySize(n) end
