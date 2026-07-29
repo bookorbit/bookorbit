@@ -1084,7 +1084,8 @@ end
 
 -- Catalog browser
 
-function BookOrbit:openCatalogBrowser(prefer_cached_dashboard)
+function BookOrbit:openCatalogBrowser(prefer_cached_dashboard, opts)
+    opts = opts or {}
     if self.catalog_browser ~= nil then return end
     self.catalog_browser = BookOrbitCatalog:new{
         title = _("BookOrbit"),
@@ -1095,6 +1096,8 @@ function BookOrbit:openCatalogBrowser(prefer_cached_dashboard)
         settings = self.settings,
         path = self.path,
         prefer_cached_dashboard = prefer_cached_dashboard,
+        initial_section = opts.initial_section,
+        source_select_callback = opts.source_select_callback,
         save_settings = function()
             G_reader_settings:flush()
         end,
