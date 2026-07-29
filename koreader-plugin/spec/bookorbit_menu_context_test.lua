@@ -143,6 +143,7 @@ assertEqual(hasItem(file_manager_dashboard_settings.sub_item_table, "Section 1 (
 assertEqual(hasItem(file_manager_dashboard_settings.sub_item_table, "Section 2 (Continue reading)"), true, "file manager dashboard settings has slot 2")
 assertEqual(hasItem(file_manager_dashboard_settings.sub_item_table, "Section 3 (Discover)"), true, "file manager dashboard settings has slot 3")
 assertEqual(hasItem(file_manager_dashboard_settings.sub_item_table, "Section 4 (Browse)"), true, "file manager dashboard settings has slot 4")
+assertEqual(hasItem(file_manager_dashboard_settings.sub_item_table, "Reset to Default"), true, "dashboard settings can restore the four defaults")
 local file_manager_sync_settings = findItem(file_manager_settings.sub_item_table, "Sync")
 assertEqual(hasItem(file_manager_sync_settings.sub_item_table, "Auto sync current book"), false, "file manager sync settings hides reader auto sync")
 assertEqual(hasItem(file_manager_sync_settings.sub_item_table, "Two-way highlights & bookmarks"), true, "file manager sync settings has the two-way toggle")

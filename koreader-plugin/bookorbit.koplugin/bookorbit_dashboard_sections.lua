@@ -25,38 +25,53 @@ DashboardSections.DEFAULT_SLOTS = {
     { type = "browse" },
 }
 
--- Order here is the order the picker lists them in.
+-- Order here mirrors the destinations exposed by the dashboard Browse block.
 DashboardSections.TYPES = {
     "stats",
     "continue-reading",
     "random",
-    "recently-added",
-    "want-to-read",
-    "up-next-in-series",
-    "smart-scope",
     "browse",
+    "recently-added",
+    "in-progress",
+    "all-books",
+    "on-device",
+    "libraries",
+    "authors",
+    "series",
+    "collections",
+    "smart-scopes",
 }
 
 local LABELS = {
     ["stats"] = function() return _("Stats") end,
     ["continue-reading"] = function() return _("Continue reading") end,
     ["random"] = function() return _("Discover") end,
-    ["recently-added"] = function() return _("Recently added") end,
-    ["want-to-read"] = function() return _("Want to read") end,
-    ["up-next-in-series"] = function() return _("Up next in series") end,
-    ["smart-scope"] = function() return _("SmartScope") end,
     ["browse"] = function() return _("Browse") end,
+    ["recently-added"] = function() return _("Recently added") end,
+    ["in-progress"] = function() return _("In progress") end,
+    ["all-books"] = function() return _("All Books") end,
+    ["on-device"] = function() return _("On device") end,
+    ["libraries"] = function() return _("Libraries") end,
+    ["authors"] = function() return _("Authors") end,
+    ["series"] = function() return _("Series") end,
+    ["collections"] = function() return _("Collections") end,
+    ["smart-scopes"] = function() return _("SmartScopes") end,
 }
 
 local HELP_TEXT = {
     ["stats"] = function() return _("Your reading summary shown as a compact horizontal strip.") end,
     ["continue-reading"] = function() return _("Books currently in progress, shown as the dashboard hero row.") end,
     ["random"] = function() return _("A random selection from your whole library, reshuffled with the button in the section header.") end,
+    ["browse"] = function() return _("Dashboard shortcuts for libraries, collections, SmartScopes, authors, series, and books.") end,
     ["recently-added"] = function() return _("The books most recently added to your library.") end,
-    ["want-to-read"] = function() return _("Books you marked as want to read.") end,
-    ["up-next-in-series"] = function() return _("The next unread book in each series you have already started.") end,
-    ["smart-scope"] = function() return _("Books matching a SmartScope you saved in BookOrbit.") end,
-    ["browse"] = function() return _("Dashboard shortcuts for libraries, collections, search, and other catalog views.") end,
+    ["in-progress"] = function() return _("The catalog view for books currently in progress.") end,
+    ["all-books"] = function() return _("The complete catalog sorted by title.") end,
+    ["on-device"] = function() return _("Books linked to files on this device.") end,
+    ["libraries"] = function() return _("The existing Libraries catalog, including its normal navigation and back button.") end,
+    ["authors"] = function() return _("The existing Authors catalog, including its normal pagination and back button.") end,
+    ["series"] = function() return _("The existing Series catalog, including its normal pagination and back button.") end,
+    ["collections"] = function() return _("The existing Collections catalog and its normal back navigation.") end,
+    ["smart-scopes"] = function() return _("The existing SmartScopes catalog. Choose a scope there rather than configuring one directly on the dashboard.") end,
 }
 
 function DashboardSections.isValid(section_type)
@@ -73,18 +88,32 @@ function DashboardSections.helpText(section_type)
     return help and help() or nil
 end
 
+local BOOK_SOURCES = {
+    ["random"] = true,
+    ["recently-added"] = true,
+    ["in-progress"] = true,
+    ["all-books"] = true,
+}
+
+local CATALOG_DESTINATIONS = {
+    ["on-device"] = true,
+    ["libraries"] = true,
+    ["authors"] = true,
+    ["series"] = true,
+    ["collections"] = true,
+    ["smart-scopes"] = true,
+}
+
 function DashboardSections.isBookSource(section_type)
-    return section_type ~= "stats" and section_type ~= "continue-reading" and section_type ~= "browse"
+    return BOOK_SOURCES[section_type] == true
 end
 
--- What the section header shows. A SmartScope row is named after the scope
--- itself; the generic label would tell the reader nothing.
+function DashboardSections.isCatalogDestination(section_type)
+    return CATALOG_DESTINATIONS[section_type] == true
+end
+
 function DashboardSections.headerText(config)
-    config = config or {}
-    if config.type == "smart-scope" and type(config.smartScopeName) == "string" and config.smartScopeName ~= "" then
-        return config.smartScopeName
-    end
-    return DashboardSections.label(config.type)
+    return DashboardSections.label(config and config.type)
 end
 
 function DashboardSections.defaultConfig(index)
@@ -92,25 +121,12 @@ function DashboardSections.defaultConfig(index)
     return { type = config.type }
 end
 
--- An unusable entry degrades to Discover rather than being dropped: the slot
--- always renders something, so a config written by a newer plugin, or a
--- SmartScope deleted on the server, still leaves a working dashboard.
+-- An unusable or obsolete entry degrades to Discover rather than being dropped.
 function DashboardSections.normalizeEntry(value)
     if type(value) ~= "table" or not DashboardSections.isValid(value.type) then
         return DashboardSections.defaultConfig()
     end
-    if value.type ~= "smart-scope" then
-        return { type = value.type }
-    end
-    local scope_id = tonumber(value.smartScopeId)
-    if not scope_id or scope_id <= 0 then
-        return DashboardSections.defaultConfig()
-    end
-    local entry = { type = "smart-scope", smartScopeId = math.floor(scope_id) }
-    if type(value.smartScopeName) == "string" and value.smartScopeName ~= "" then
-        entry.smartScopeName = value.smartScopeName
-    end
-    return entry
+    return { type = value.type }
 end
 
 function DashboardSections.normalize(value)

@@ -367,28 +367,14 @@ end
 function MainMenu:dashboardSectionItems(index, catalog)
     local items = {}
     for _index, section_type in ipairs(DashboardSections.TYPES) do
-        local is_smart_scope = section_type == "smart-scope"
         table.insert(items, {
-            text_func = function()
-                if is_smart_scope then
-                    local current = DashboardSections.at(self.settings, index)
-                    if current.type == "smart-scope" and current.smartScopeName then
-                        return T(_("SmartScope (%1)"), current.smartScopeName)
-                    end
-                end
-                return DashboardSections.label(section_type)
-            end,
+            text = DashboardSections.label(section_type),
             help_text = DashboardSections.helpText(section_type),
             checked_func = function()
                 return DashboardSections.at(self.settings, index).type == section_type
             end,
-            keep_menu_open = is_smart_scope,
             callback = function(touchmenu_instance)
-                if is_smart_scope then
-                    self:chooseDashboardSmartScope(index, catalog, touchmenu_instance)
-                else
-                    self:applyDashboardSection(index, { type = section_type }, catalog, touchmenu_instance)
-                end
+                self:applyDashboardSection(index, { type = section_type }, catalog, touchmenu_instance)
             end,
         })
     end
@@ -412,6 +398,20 @@ function MainMenu:dashboardSettingsMenu(catalog)
             sub_item_table = self:dashboardSectionItems(index, catalog),
         })
     end
+    table.insert(items, {
+        text = _("Reset to Default"),
+        separator = true,
+        callback = function(touchmenu_instance)
+            local defaults = DashboardSections.normalize(nil)
+            self.settings[DashboardSections.SETTING_KEY] = defaults
+            G_reader_settings:flush()
+            if catalog and catalog.dashboardMode and catalog:dashboardMode() then
+                catalog.current_context.section_stale = true
+                catalog:refreshCurrent()
+            end
+            if touchmenu_instance then touchmenu_instance:updateItems() end
+        end,
+    })
     return items
 end
 
