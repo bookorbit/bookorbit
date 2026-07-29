@@ -21,7 +21,6 @@ local _ = require("gettext")
 local BookOrbitApi = require("bookorbit_api")
 local BookOrbitHighlightDiagnostics = require("bookorbit_highlight_diagnostics")
 local BookOrbitSweep = require("bookorbit_sweep")
-local CatalogUtil = require("bookorbit_catalog_util")
 local DashboardConfig = require("bookorbit_dashboard_config")
 
 -- Assigned from the plugin class on install so menu labels can name the
@@ -304,7 +303,7 @@ end
 
 function MainMenu:dashboardSortMenu(index)
     local items = {}
-    for _, sort in ipairs(CatalogUtil.SORTS) do
+    for _, sort in ipairs(DashboardConfig.SORTS) do
         local sort_id = sort.id
         table.insert(items, {
             text = sort.text,
@@ -388,7 +387,7 @@ function MainMenu:dashboardSectionMenu(index)
         table.insert(items, {
             text_func = function()
                 local current = self:dashboardSections()[index]
-                return T(_("Sort (%1)"), CatalogUtil.SORT_LABELS[current.sort or DashboardConfig.defaultSort(current)])
+                return T(_("Sort (%1)"), DashboardConfig.SORT_LABELS[current.sort or DashboardConfig.defaultSort(current)])
             end,
             sub_item_table = self:dashboardSortMenu(index),
         })
@@ -403,12 +402,6 @@ function MainMenu:dashboardSettingsMenu()
                 return T(_("Open dashboard on startup (%1)"), self:catalogAutoOpenLabel())
             end,
             sub_item_table = self:catalogAutoOpenMenu(),
-        },
-        {
-            text_func = function()
-                return T(_("Show below Continue reading (%1)"), self:dashboardSectionLabel())
-            end,
-            sub_item_table = self:dashboardSectionItems(catalog),
         },
     }
     for index = 1, 4 do

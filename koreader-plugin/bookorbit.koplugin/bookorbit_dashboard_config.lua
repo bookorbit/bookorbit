@@ -1,9 +1,25 @@
 local T = require("ffi/util").template
 local _ = require("gettext")
 
-local CatalogUtil = require("bookorbit_catalog_util")
-
 local Config = {}
+
+Config.SORTS = {
+    { id = "title", text = _("Title") },
+    { id = "author", text = _("Author") },
+    { id = "recently_added", text = _("Recently added") },
+    { id = "recently_updated", text = _("Recently updated") },
+    { id = "recently_read", text = _("Recently read") },
+    { id = "series", text = _("Series order") },
+}
+
+Config.SORT_LABELS = {
+    title = _("Title"),
+    author = _("Author"),
+    recently_added = _("Recently added"),
+    recently_updated = _("Recently updated"),
+    recently_read = _("Recently read"),
+    series = _("Series order"),
+}
 
 Config.SHELF_LIMIT = 12
 Config.DEFAULT_SECTIONS = {
@@ -57,7 +73,7 @@ end
 function Config.summary(section)
     local label = Config.label(section)
     if section and Config.isShelf(section) then
-        local sort = CatalogUtil.SORT_LABELS[section.sort or Config.defaultSort(section)]
+        local sort = Config.SORT_LABELS[section.sort or Config.defaultSort(section)]
         if sort then return T(_("%1 — %2"), label, sort) end
     end
     return label
