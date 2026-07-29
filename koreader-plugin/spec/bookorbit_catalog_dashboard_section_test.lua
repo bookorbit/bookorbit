@@ -190,9 +190,11 @@ local prefetch = CatalogDashboard.dashboardBooks({
 })
 assertEqual(#prefetch, 3, "prefetching covers continue reading and the configured row")
 
--- A successful request for a named section caches the body under that section's
--- signature, so a later open recognises it.
-catalog = newCatalog{ section = { type = "want-to-read" }, capabilities = { "catalogDashboardSections" } }
+-- Successful requests for two named sections cache both configured rows.
+catalog = newCatalog{
+    sections = { { type = "want-to-read" }, { type = "recently-added" } },
+    capabilities = { "catalogDashboardSections" },
+}
 local _, refreshed = catalog:dashboardRoot()
 assertEqual(refreshed.dashboard.section.type, "want-to-read", "the configured first section reaches the dedicated section endpoint")
 assertEqual(refreshed.dashboard.section.books[1].id, 10, "the first section body is what gets rendered")

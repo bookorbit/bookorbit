@@ -206,13 +206,29 @@ function CatalogDashboard:dashboardRoot(opts)
     local body, err = self:fetch(_("Loading dashboard..."), function()
         return self.client:catalogDashboard()
     end, opts)
-    if body and body.continueReading and self.client.catalogDashboardSection then
+    if body and body.continueReading then
         local function fetchSection(config)
-            local response = self:fetch(_("Loading dashboard..."), function()
-                return self.client:catalogDashboardSection(config)
-            end, opts)
+            if config.type == DashboardSections.DEFAULT_TYPE and type(body.discover) == "table" then
+                return { type = config.type, books = body.discover }
+            end
+            local response
+            if self.client.catalogDashboardSection then
+                response = self:fetch(_("Loading dashboard..."), function()
+                    return self.client:catalogDashboardSection(config)
+                end, opts)
+            end
+            if type(response) ~= "table" then
+                response = self:fetch(_("Loading dashboard..."), function()
+                    return self.client:catalogDashboard(config)
+                end, opts)
+            end
             if type(response) ~= "table" then return nil end
-            return type(response.section) == "table" and response.section or response
+            if type(response.section) == "table" then return response.section end
+            if type(response.books) == "table" then return response end
+            if config.type == DashboardSections.DEFAULT_TYPE and type(response.discover) == "table" then
+                return { type = config.type, books = response.discover }
+            end
+            return nil
         end
 
         local first_config = DashboardSections.at(self.settings, 1)
@@ -223,7 +239,6 @@ function CatalogDashboard:dashboardRoot(opts)
                 smartScopeId = first_section.smartScopeId or first_config.smartScopeId,
                 books = first_section.books or {},
             }
-            body.discover = nil
         end
 
         local second_config = DashboardSections.at(self.settings, 2)
@@ -235,6 +250,7 @@ function CatalogDashboard:dashboardRoot(opts)
                 books = second_section.books or {},
             }
         end
+        if first_section then body.discover = nil end
     end
     if body and body.continueReading then
         self:cacheDashboard(body)
@@ -739,8 +755,7 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
     -- A cached body fetched for a different section is not rendered as this
     -- one's content; the row waits for the refresh already in flight.
     local section_pending = context.section_stale == true
-    local section_config = section_pending and self:dashboardConfiguredSection()
-        or self:dashboardBodySection(dashboard)
+    local section_config = self:dashboardConfiguredSection()
     local section_books = section_pending and {} or self.dashboardSectionBooks(dashboard)
     local second_config = DashboardSections.at(self.settings, 2)
     local second_books = self.dashboardSecondSectionBooks(dashboard)
