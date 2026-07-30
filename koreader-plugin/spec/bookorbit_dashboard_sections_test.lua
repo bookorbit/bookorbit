@@ -49,14 +49,23 @@ assertEqual(defaults[3].type, "random", "slot 3 defaults to Discover")
 assertEqual(defaults[4].type, "browse", "slot 4 defaults to Browse")
 assertNotSame(defaults[1], DashboardSections.DEFAULT_SLOTS[1], "default normalization returns copies")
 
-local migrated_one = DashboardSections.normalize({
-    { type = "recently-added" },
-    schemaVersion = DashboardSections.LEGACY_SCHEMA_VERSION,
-})
+-- What releases before the four-slot dashboard actually wrote to the device:
+-- a bare list of the configurable rows, with no schema marker at all. Reading
+-- one positionally would drop Stats and leave Discover in two slots, so an
+-- untagged list has to be recognised as the old shape.
+local migrated_one = DashboardSections.normalize({ { type = "recently-added" } })
 assertEqual(migrated_one[1].type, "stats", "one-row migration restores Stats")
 assertEqual(migrated_one[2].type, "continue-reading", "one-row migration restores Continue reading")
 assertEqual(migrated_one[3].type, "recently-added", "one-row migration places the old row in slot 3")
 assertEqual(migrated_one[4].type, "browse", "one-row migration restores Browse")
+assertEqual(migrated_one.schemaVersion, DashboardSections.SCHEMA_VERSION, "normalization writes the current schema marker")
+
+local migrated_scope = DashboardSections.normalize({
+    { type = "smart-scope", smartScopeId = 4, smartScopeName = "Sci-fi" },
+})
+assertEqual(migrated_scope[1].type, "stats", "a stored SmartScope row still restores Stats")
+assertEqual(migrated_scope[3].type, "random", "an obsolete SmartScope row degrades to Discover in its own slot")
+assertEqual(migrated_scope[4].type, "browse", "a stored SmartScope row still restores Browse")
 
 local migrated_two = DashboardSections.normalize({
     { type = "want-to-read" },
@@ -66,16 +75,19 @@ local migrated_two = DashboardSections.normalize({
 assertEqual(migrated_two[3].type, "random", "an obsolete old row migrates safely to Discover")
 assertEqual(migrated_two[4].type, "authors", "a selected catalog source survives migration")
 
-local partial_current = DashboardSections.normalize({ { type = "recently-added" } })
-assertEqual(partial_current[1].type, "recently-added", "an unversioned partial current list keeps slot 1")
-assertEqual(partial_current[2].type, "continue-reading", "missing current slots use their positional defaults")
-assertEqual(partial_current.schemaVersion, DashboardSections.SCHEMA_VERSION, "normalization writes the current schema marker")
+local current = DashboardSections.normalize({
+    { type = "recently-added" },
+    schemaVersion = DashboardSections.SCHEMA_VERSION,
+})
+assertEqual(current[1].type, "recently-added", "a tagged current list is read positionally")
+assertEqual(current[2].type, "continue-reading", "missing current slots use their positional defaults")
 
 local repeated = DashboardSections.normalize({
     { type = "stats" },
     { type = "stats" },
     { type = "browse" },
     { type = "browse" },
+    schemaVersion = DashboardSections.SCHEMA_VERSION,
 })
 assertEqual(repeated[1].type, "stats", "slot types may repeat")
 assertEqual(repeated[2].type, "stats", "a second Stats slot is retained")
@@ -91,7 +103,7 @@ assertNotSame(stored[2].params, author_source.params, "storeAt does not retain c
 assertEqual(stored.schemaVersion, DashboardSections.SCHEMA_VERSION, "storeAt persists the current schema marker")
 
 local clamped = DashboardSections.storeAt({
-    [DashboardSections.SETTING_KEY] = { { type = "stats" } },
+    [DashboardSections.SETTING_KEY] = { { type = "stats" }, schemaVersion = DashboardSections.SCHEMA_VERSION },
 }, 9, { type = "recently-added" })
 assertEqual(#clamped, DashboardSections.SLOT_COUNT, "storeAt never grows beyond the supported slot count")
 assertEqual(clamped[4].type, "recently-added", "an oversized index is constrained to the last slot")

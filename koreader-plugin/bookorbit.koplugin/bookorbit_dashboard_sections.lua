@@ -3,11 +3,12 @@ Registry for the four configurable dashboard slots.
 
 Each source keeps its native renderer: Stats is a strip, Continue reading is a
 hero row, book sources are cover grids, and Browse is the compact action list.
-A book source is fully described by its type plus, for a SmartScope, which scope
-to run. The stored value is an ordered list matching the four dashboard slots.
+A book source is fully described by its type plus, for the sources picked
+through a catalog list, the filter that was selected. The stored value is an
+ordered list matching the four dashboard slots.
 
-The SmartScope name is cached alongside the id purely so the settings menu can
-label the row without a request. It is never sent to the server.
+The selected entry's name is cached alongside its filter purely so the settings
+menu and the section header can label the slot without a request.
 ]]
 
 local _ = require("gettext")
@@ -17,7 +18,6 @@ local DashboardSections = {}
 local PARAM_KEYS = { "libraryId", "collectionId", "smartScopeId", "author", "seriesId", "series", "sort" }
 
 DashboardSections.SETTING_KEY = "catalog_dashboard_sections"
-DashboardSections.CAPABILITY = "catalogDashboardSections"
 DashboardSections.DEFAULT_TYPE = "random"
 DashboardSections.SCHEMA_VERSION = 2
 DashboardSections.LEGACY_SCHEMA_VERSION = 1
@@ -153,7 +153,11 @@ function DashboardSections.normalize(value)
         return normalized
     end
 
-    if value.schemaVersion == DashboardSections.LEGACY_SCHEMA_VERSION then
+    -- Releases before the four-slot dashboard stored the one or two configurable
+    -- rows that sat below Continue reading, and wrote no schema marker at all.
+    -- An untagged list is therefore that older shape, not a short current one:
+    -- reading it positionally would drop Stats and duplicate Discover.
+    if value.schemaVersion == nil or value.schemaVersion == DashboardSections.LEGACY_SCHEMA_VERSION then
         normalized[1] = DashboardSections.defaultConfig(1)
         normalized[2] = DashboardSections.defaultConfig(2)
         normalized[3] = DashboardSections.normalizeEntry(value[1])
@@ -174,25 +178,10 @@ function DashboardSections.at(settings, index)
     return sections[index] or DashboardSections.defaultConfig(index)
 end
 
-function DashboardSections.primary(settings)
-    return DashboardSections.at(settings, 1)
-end
-
-function DashboardSections.store(config)
-    return {
-        DashboardSections.normalizeEntry(config),
-        schemaVersion = DashboardSections.SCHEMA_VERSION,
-    }
-end
-
 function DashboardSections.storeAt(settings, index, config)
     index = math.max(1, math.min(DashboardSections.SLOT_COUNT, tonumber(index) or 1))
     local stored = settings and settings[DashboardSections.SETTING_KEY]
     local sections = DashboardSections.normalize(stored)
-    while #sections < index do
-        local slot_index = #sections + 1
-        table.insert(sections, DashboardSections.defaultConfig(slot_index))
-    end
     sections[index] = DashboardSections.normalizeEntry(config)
     sections.schemaVersion = DashboardSections.SCHEMA_VERSION
     return sections
