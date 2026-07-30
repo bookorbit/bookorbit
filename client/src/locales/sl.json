@@ -467,7 +467,7 @@
       },
       "feedback": {
         "unsavedChanges": "Neshranjene spremembe",
-        "discard": "Discard"
+        "discard": "Zavrzi"
       },
       "profile": {
         "securityHeading": "Profil in varnost",
@@ -485,10 +485,10 @@
         "nameRequired": "Ime je obvezno",
         "updateFailed": "Posodobitev profila ni uspela",
         "updated": "Profil posodobljen",
-        "usernameHint": "Your username cannot be changed.",
-        "passwordHint": "Change the password you use to sign in.",
-        "passwordHintOidc": "Your password is managed by your identity provider.",
-        "passwordHintShared": "Shared accounts sign in through a magic link and have no password."
+        "usernameHint": "Vašega uporabniškega imena ni mogoče spremeniti.",
+        "passwordHint": "Spremenite geslo, ki ga uporabljate za prijavo.",
+        "passwordHintOidc": "Vaše geslo upravlja vaš ponudnik identitete.",
+        "passwordHintShared": "Prijava v skupne račune poteka prek čarobne povezave in nima gesla."
       },
       "readingPreferences": {
         "title": "Bralne nastavitve",
@@ -497,9 +497,9 @@
         "save": "Shrani nastavitve",
         "enableAchievements": "Omogoči dosežke",
         "enableAchievementsHint": "Spremljajte napredek dosežkov in prikažite z njimi povezane elemente vmesnika. Obvestila o dosežkih upravljajte ločeno v razdelku Obvestila.",
-        "achievementsEnabled": "Achievements enabled",
-        "achievementsDisabled": "Achievements disabled",
-        "achievementsSaveFailed": "Failed to update the achievement preference"
+        "achievementsEnabled": "Dosežki omogočeni",
+        "achievementsDisabled": "Dosežki onemogočeni",
+        "achievementsSaveFailed": "Posodobitev nastavitev dosežka ni uspela"
       },
       "preferences": {
         "saveFailed": "Shranjevanje nastavitev ni uspelo",
@@ -542,8 +542,8 @@
           "description": "Vnesite geslo za potrditev. S tem ponudnikom se ne boste več mogli prijaviti.",
           "currentPassword": "Trenutno geslo"
         },
-        "description": "Sign in with an external identity provider linked to this account.",
-        "unlinkAria": "Unlink {provider}"
+        "description": "Prijavite se z zunanjim ponudnikom identitete, povezanim s tem računom.",
+        "unlinkAria": "Prekini povezavo s {provider}"
       },
       "tour": {
         "title": "Vodeni ogled",
@@ -574,9 +574,9 @@
         }
       },
       "groups": {
-        "profile": "Profile",
-        "preferences": "Preferences",
-        "security": "Security & access"
+        "profile": "Profil",
+        "preferences": "Nastavitve",
+        "security": "Varnost in dostop"
       }
     },
     "magicLinks": {
@@ -613,7 +613,7 @@
         "created": "Ustvarjeno",
         "status": "Stanje",
         "totalUses": "Skupno uporab",
-        "actions": "Actions"
+        "actions": "Dejanja"
       },
       "createDialog": {
         "title": "Ustvari čarobno povezavo",
@@ -642,11 +642,11 @@
       "emptyHint": "Kliknite \"{action}\" za ustvarjanje povezave za prijavo, ki jo lahko delite.",
       "noActiveTitle": "Ni aktivnih čarobnih povezav",
       "noActiveHint": "Vse ustvarjene čarobne povezave za to stran so potekle ali bile preklicane.",
-      "copyLinkAria": "Copy the link for {label}",
-      "pauseAria": "Pause {label}",
-      "resumeAria": "Resume {label}",
-      "revokeAria": "Revoke {label}",
-      "lastUsedLabel": "Last used {date}"
+      "copyLinkAria": "Kopiraj povezavo za {label}",
+      "pauseAria": "Začasno ustavi {label}",
+      "resumeAria": "Nadaljuj {label}",
+      "revokeAria": "Prekliči {label}",
+      "lastUsedLabel": "Nazadnje uporabljeno {date}"
     },
     "oidc": {
       "title": "OIDC / SSO",
@@ -1771,36 +1771,36 @@
         "copyPatternFailed": "Kopiranje vzorca ni uspelo",
         "labelCopied": "{label} kopirano v odložišče",
         "copyLabelFailed": "Kopiranje {label} ni uspelo",
-        "patternHelp": "Pattern help",
-        "patternHelpDescription": "Tokens, modifiers and ready-made patterns you can copy into any field.",
-        "copyPreview": "Copy {label}",
-        "copyExample": "Copy the {label} pattern",
-        "invalidCharacters": "Pattern contains invalid characters",
-        "fileAsBookSaved": "File as Book default saved",
-        "folderAsBookSaved": "Folder as Book default saved",
-        "downloadPatternSaved": "Download pattern saved",
-        "savePatternFailed": "Failed to save pattern",
-        "saveDownloadPatternFailed": "Failed to save download pattern",
-        "crossPlatformEnabled": "Cross-platform path sanitization enabled",
-        "crossPlatformDisabled": "Cross-platform path sanitization disabled",
-        "crossPlatformSaveFailed": "Failed to save cross-platform path sanitization",
-        "librarySaved": "Pattern saved for {name}",
-        "librarySaveFailed": "Failed to save library pattern",
-        "saveLibraryPattern": "Save pattern for {name}",
-        "resetLibraryPattern": "Reset {name} to the default pattern",
-        "tokenTitle": "Book title",
-        "tokenSubtitle": "Book subtitle",
-        "tokenAuthors": "Author(s), comma-separated",
-        "tokenYear": "Publication year",
-        "tokenSeries": "Series name",
-        "tokenSeriesIndex": "Series index (zero-padded)",
-        "tokenPublisher": "Publisher",
+        "patternHelp": "Pomoč pri vzorcih",
+        "patternHelpDescription": "Žetone, modifikatorje in že pripravljene vzorce lahko kopirate v katero koli polje.",
+        "copyPreview": "Kopiraj {label}",
+        "copyExample": "Kopiraj vzorec {label}",
+        "invalidCharacters": "Vzorec vsebuje neveljavne znake",
+        "fileAsBookSaved": "Datoteka kot privzeta datoteka knjige shranjena",
+        "folderAsBookSaved": "Mapa kot privzeta za knjigo shranjena",
+        "downloadPatternSaved": "Vzorec za prenos shranjen",
+        "savePatternFailed": "Shranjevanje vzorca ni uspelo",
+        "saveDownloadPatternFailed": "Vzorca imena prenosa ni bilo mogoče shraniti",
+        "crossPlatformEnabled": "Čiščenje poti za združljivost med platformami je omogočeno",
+        "crossPlatformDisabled": "Medplatformsko čiščenje poti onemogočeno",
+        "crossPlatformSaveFailed": "Shranjevanje čiščenja poti med platformami ni uspelo",
+        "librarySaved": "Vzorec shranjen za {name}",
+        "librarySaveFailed": "Shranjevanje vzorca knjižnice ni uspelo",
+        "saveLibraryPattern": "Shrani vzorec za {name}",
+        "resetLibraryPattern": "Ponastavi {name} na privzeti vzorec",
+        "tokenTitle": "Naslov knjige",
+        "tokenSubtitle": "Podnaslov knjige",
+        "tokenAuthors": "Avtor(ji), ločeni z vejicami",
+        "tokenYear": "Leto izdaje",
+        "tokenSeries": "Ime serije",
+        "tokenSeriesIndex": "Zaporedna številka v seriji (z vodilnimi ničlami)",
+        "tokenPublisher": "Založnik",
         "tokenIsbn": "ISBN-13",
-        "tokenLanguage": "Language",
-        "tokenOriginalFilename": "Original filename (without extension)",
-        "tokenExtension": "File extension (without dot)",
-        "patternHelpIntro": "Patterns use tokens like {titleToken} and {authorsToken}, plus modifiers and optional segments.",
-        "browseTokensAndExamples": "Browse tokens and examples"
+        "tokenLanguage": "Jezik",
+        "tokenOriginalFilename": "Izvirno ime datoteke (brez pripone)",
+        "tokenExtension": "Končnica datoteke (brez pike)",
+        "patternHelpIntro": "Vzorci uporabljajo žetone, kot sta {titleToken} in {authorsToken}, ter modifikatorje in neobvezne segmente.",
+        "browseTokensAndExamples": "Brskaj po žetonih in primerih"
       },
       "kobo": {
         "title": "Sinhronizacija Kobo",
@@ -2496,7 +2496,7 @@
         "email": "E-pošta",
         "access": "Dostop",
         "status": "Stanje",
-        "actions": "Actions"
+        "actions": "Dejanja"
       },
       "adminBadge": "Skrbnik",
       "permissionCount": "{count, plural, =0 {brez dovoljenj} one {eno dovoljenje} two {# dovoljenj} few {# dovoljenj} other {# dovoljenj}}",
@@ -2516,7 +2516,7 @@
       "errors": {
         "load": "Nalaganje ni uspelo",
         "deleteUser": "Brisanje uporabnika ni uspelo",
-        "resetPassword": "Failed to create a password reset link"
+        "resetPassword": "Ustvarjanje povezave za ponastavitev gesla ni uspelo"
       },
       "defaultLibraryAccess": {
         "title": "Privzet dostop do knjižnice",
@@ -2528,34 +2528,34 @@
         "saveError": "Shranjevanje privzetega dostopa do knjižnice ni uspelo"
       },
       "filters": {
-        "search": "Search users",
-        "searchPlaceholder": "Search by name, username or email",
-        "sort": "Sort users",
-        "usernameAsc": "Username A-Z",
-        "nameAsc": "Name A-Z",
-        "newest": "Newest first",
-        "oldest": "Oldest first",
-        "apply": "Apply",
-        "clear": "Clear",
-        "state": "Filter users",
-        "allUsers": "All users",
-        "admins": "Administrators",
-        "active": "Active",
-        "inactive": "Inactive"
+        "search": "Iskanje uporabnikov",
+        "searchPlaceholder": "Iskanje po imenu, uporabniškem imenu ali e-pošti",
+        "sort": "Razvrsti uporabnike",
+        "usernameAsc": "Uporabniško ime A-Ž",
+        "nameAsc": "Ime A-Ž",
+        "newest": "Najprej najnovejše",
+        "oldest": "Najprej najstarejše",
+        "apply": "Uporabi",
+        "clear": "Počisti",
+        "state": "Filtriraj uporabnike",
+        "allUsers": "Vsi uporabniki",
+        "admins": "Skrbniki",
+        "active": "Aktivno",
+        "inactive": "Neaktivno"
       },
       "empty": {
-        "title": "No users yet",
-        "description": "Create the first account to get started.",
-        "filtered": "No users match the current search and filters."
+        "title": "Še ni uporabnikov",
+        "description": "Za začetek ustvarite prvi račun.",
+        "filtered": "Noben uporabnik ne ustreza trenutnemu iskanju in filtrom."
       },
       "pagination": {
-        "label": "Users pagination",
-        "page": "Page {page} of {totalPages}"
+        "label": "Številčenje strani seznama uporabnikov",
+        "page": "Stran {page} od {totalPages}"
       },
-      "editUserAria": "Edit {name}",
-      "resetPasswordAria": "Reset the password for {name}",
-      "deleteUserAria": "Delete {name}",
-      "moreActionsAria": "More actions for {name}"
+      "editUserAria": "Uredi {name}",
+      "resetPasswordAria": "Ponastavi geslo za {name}",
+      "deleteUserAria": "Izbriši {name}",
+      "moreActionsAria": "Več dejanj za {name}"
     }
   },
   "annotations": {
@@ -4359,7 +4359,7 @@
         "body": "Če vam BookOrbit pomaga pri urejanju knjižnice, razmislite o oznaki z zvezdico projektu na GitHubu. To pomaga več ljudem odkriti aplikacijo in podpira nadaljnji razvoj.",
         "cta": "Označi BookOrbit z zvezdico na GitHubu"
       },
-      "surfaceOpacity": "Surface opacity",
+      "surfaceOpacity": "Prekrivnost površine",
       "surfaceOpacityValue": "{value}%"
     },
     "sidebar": {
@@ -4381,36 +4381,36 @@
       "supportAria": "Podprite BookOrbit na Ko-fi",
       "sectionHeader": {
         "add": "Dodaj",
-        "showAll": "Show all",
-        "showCount": "Show {count}",
-        "rowsShown": "Rows shown",
-        "menuAria": "Section options for {section}",
+        "showAll": "Prikaži vse",
+        "showCount": "Prikaži {count}",
+        "rowsShown": "Prikazane vrstice",
+        "menuAria": "Možnosti razdelka za {section}",
         "reorder": "Preuredi",
         "doneReordering": "Preurejanje končano"
       },
-      "noLibraries": "No libraries yet",
-      "clearFilter": "Clear filter",
-      "filterSummary": "{shown} of {total} shown",
-      "filterLibraries": "Filter libraries",
-      "filterLibrariesPlaceholder": "Filter libraries...",
-      "filterSmartScopes": "Filter smart scopes",
-      "filterSmartScopesPlaceholder": "Filter smart scopes...",
-      "filterCollections": "Filter collections",
-      "filterCollectionsPlaceholder": "Filter collections...",
-      "seeAllLibraries": "See all libraries ({count})",
-      "seeAllSmartScopes": "See all smart scopes ({count})",
-      "seeAllCollections": "See all collections ({count})",
-      "updateAvailable": "Update {version}",
+      "noLibraries": "Ni še knjižnic",
+      "clearFilter": "Počisti filter",
+      "filterSummary": "{shown} od {total} prikazanih",
+      "filterLibraries": "Filtriraj knjižnice",
+      "filterLibrariesPlaceholder": "Filtriraj knjižnice...",
+      "filterSmartScopes": "Filtriraj pametni obseg",
+      "filterSmartScopesPlaceholder": "Filtriraj pametni obseg...",
+      "filterCollections": "Filtriraj zbirke",
+      "filterCollectionsPlaceholder": "Filtriraj zbirke...",
+      "seeAllLibraries": "Oglej si vse knjižnice ({count})",
+      "seeAllSmartScopes": "Oglej si vse pametne obsege ({count})",
+      "seeAllCollections": "Oglej si vse zbirke ({count})",
+      "updateAvailable": "Posodobi na {version}",
       "zones": {
-        "browse": "Browse"
+        "browse": "Brskaj"
       },
       "reorder": {
-        "gripAria": "Reorder {name}",
-        "lifted": "{name} lifted, position {position} of {total}. Use the arrow keys to move it.",
-        "moved": "{name}, position {position} of {total}",
-        "dropped": "{name} dropped at position {position} of {total}",
-        "cancelled": "Reorder cancelled. {name} returned to position {position} of {total}.",
-        "filteredHint": "Clear the filter to reorder"
+        "gripAria": "Spremeni vrstni red {name}",
+        "lifted": "{name} dvignjeno, položaj {position} od {total}. Za premikanje uporabite puščične tipke.",
+        "moved": "{name}, položaj {position} od {total}",
+        "dropped": "{name} je padlo na {position}. mesto od {total}",
+        "cancelled": "Prerazporeditev preklicana. {name} se je vrnil na položaj {position} od {total}.",
+        "filteredHint": "Počistite filter za spremembo vrstnega reda"
       }
     },
     "selectionActionBar": {
@@ -4512,22 +4512,22 @@
       }
     },
     "entityIndex": {
-      "sortBy": "Sort by",
+      "sortBy": "Razvrsti po",
       "sort": {
-        "custom": "Custom order",
-        "name": "Name",
-        "bookCount": "Book count"
+        "custom": "Vrstni red po meri",
+        "name": "Ime",
+        "bookCount": "Število knjig"
       },
-      "ascending": "Ascending",
-      "descending": "Descending",
-      "clearSearch": "Clear search",
-      "resultCount": "{shown} of {total}",
-      "noMatches": "No matches",
-      "noMatchesHint": "Try a different search term.",
-      "bookCount": "Books: {count}",
-      "librariesEmptyHint": "Create a library to start adding books.",
-      "smartScopesEmptyHint": "Smart scopes save a set of filters you use often.",
-      "collectionsEmptyHint": "Collections group books you pick by hand."
+      "ascending": "Naraščajoče",
+      "descending": "Padajoče",
+      "clearSearch": "Počisti iskanje",
+      "resultCount": "{shown} od {total}",
+      "noMatches": "Ni zadetkov",
+      "noMatchesHint": "Poskusite z drugačno poizvedbo.",
+      "bookCount": "Knjige: {count}",
+      "librariesEmptyHint": "Ustvarite knjižnico, da začnete dodajati knjige.",
+      "smartScopesEmptyHint": "Pametni obsegi shranijo nabor filtrov, ki jih pogosto uporabljate.",
+      "collectionsEmptyHint": "Zbirke združujejo knjige, ki jih izberete ročno."
     }
   },
   "customIcons": {
@@ -4587,10 +4587,10 @@
       "widgetNames": {
         "readingStreak": "Bralni niz",
         "currentlyReading": "Trenutno bereš",
-        "readingGoal": "Reading Goal",
+        "readingGoal": "Bralni cilj",
         "readingDna": "Bralni DNK",
         "monthlyChallenge": "Mesečni izziv",
-        "highlightOfTheDay": "Poudarek dneva",
+        "highlightOfTheDay": "Vrhunec dneva",
         "neglectedGems": "Zapostavljeni biseri",
         "readingRhythm": "Bralni ritem",
         "diversityScore": "Ocena raznolikosti",
@@ -4599,13 +4599,13 @@
         "longWait": "Dolgo čakanje"
       },
       "shelfNames": {
-        "recentlyAdded": "Recently Added",
-        "continueReading": "Continue Reading",
-        "continueListening": "Continue Listening",
-        "wantToRead": "Want to Read",
-        "upNextInSeries": "Up Next in Series",
-        "random": "Discover Something New",
-        "smartScope": "Smart Scope"
+        "recentlyAdded": "Nedavno dodano",
+        "continueReading": "Nadaljuj branje",
+        "continueListening": "Nadaljujte s poslušanjem",
+        "wantToRead": "Želim prebrati",
+        "upNextInSeries": "Naslednje v seriji",
+        "random": "Odkrij nekaj novega",
+        "smartScope": "Pametni obseg"
       },
       "reorderHintWidget": "Povleci za spremembo vrstnega reda. Preklopi za prikaz ali skritje gradnika.",
       "reorderHintShelf": "Povleci za spremembo vrstnega reda. Preklopi za prikaz ali skritje police.",
@@ -5223,8 +5223,8 @@
         },
         "fb2": {
           "title": "FictionBook (FB2)",
-          "hint": "Rewrites the description block inside FB2 files, leaving the book text untouched.",
-          "toggleAria": "Write FB2 metadata"
+          "hint": "Prepiše blok opisa znotraj datotek FB2, pri čemer besedilo knjige ostane nedotaknjeno.",
+          "toggleAria": "Zapiši metapodatke FB2"
         },
         "pdf": {
           "title": "PDF",
@@ -5238,8 +5238,8 @@
         },
         "kindle": {
           "title": "Kindle (MOBI, AZW3)",
-          "hint": "Writes metadata into the EXTH header of MOBI, AZW3, and AZW files.",
-          "toggleAria": "Write Kindle metadata"
+          "hint": "Zapiše metapodatke v glavo EXTH datotek MOBI, AZW3 in AZW.",
+          "toggleAria": "Zapiši metapodatke Kindle"
         },
         "audio": {
           "title": "Zvok",
@@ -5681,57 +5681,57 @@
       "whatsNewToggle": "Prikaži \"Novosti\" po posodobitvah",
       "whatsNewToggleHint": "Pojavno okno, ki po posodobitvi aplikacije izpostavi nove funkcije. Arhiv ostane na voljo v obeh primerih.",
       "groups": {
-        "library": "Library",
-        "files": "Files",
-        "integrations": "Integrations",
-        "personal": "Personal",
-        "app": "App updates"
+        "library": "Knjižnica",
+        "files": "Datoteke",
+        "integrations": "Integracije",
+        "personal": "Osebno",
+        "app": "Posododitve programa"
       },
-      "enabledCount": "{enabled} of {total} enabled",
+      "enabledCount": "{enabled} od {total} omogočenih",
       "categories": {
         "scanning": {
-          "label": "Library scanning",
-          "description": "When a library scan finishes, fails, or finds missing books."
+          "label": "Ponovno pregledovanje knjižnice",
+          "description": "Ko se pregled knjižnice konča, ne uspe ali najde manjkajoče knjige."
         },
         "metadata": {
-          "label": "Metadata fetching",
-          "description": "When metadata lookups for your books complete or fail."
+          "label": "Prenos metapodatkov",
+          "description": "Kdaj se iskanje metapodatkov za vaše knjige zaključi ali ne."
         },
         "authorEnrichment": {
-          "label": "Author enrichment",
-          "description": "When author biographies and photos finish being fetched."
+          "label": "Obogatitev avtorja",
+          "description": "Ko se konča pridobivanje biografij in fotografij avtorjev."
         },
         "fileWriteBack": {
-          "label": "File write-back",
-          "description": "When edited metadata is written back into book files on disk."
+          "label": "Zapisovanje sprememb v datoteko",
+          "description": "Ko se urejeni metapodatki zapišejo nazaj v datoteke knjige na disku."
         },
         "fileRename": {
-          "label": "File rename",
-          "description": "When a single book file is renamed to match your naming pattern."
+          "label": "Preimenovanje datotek",
+          "description": "Ko se posamezna knjižna datoteka preimenuje tako, da se ujema z vašim vzorcem poimenovanja."
         },
         "bulkRename": {
-          "label": "Bulk rename",
-          "description": "When a bulk rename across many books completes or fails."
+          "label": "Množično preimenovanje",
+          "description": "Ko se množično preimenovanje več knjig zaključi ali ne uspe."
         },
         "migration": {
-          "label": "Data migration",
-          "description": "When an import from another library tool completes or fails."
+          "label": "Migracija podatkov",
+          "description": "Ko se uvoz iz drugega knjižničnega orodja zaključi ali ne uspe."
         },
         "bookDock": {
-          "label": "Book Dock",
-          "description": "When files dropped into the dock are ready to review or finalized."
+          "label": "Odložišče knjig",
+          "description": "Ko so datoteke shranjene v odložišče pripravljene za pregled ali dokončanje."
         },
         "koboSync": {
-          "label": "Kobo sync",
-          "description": "When a Kobo device finishes syncing with your library."
+          "label": "Sinhronizacija s Kobo",
+          "description": "Ko naprava Kobo konča sinhronizacijo z vašo knjižnico."
         },
         "email": {
-          "label": "Email delivery",
-          "description": "When sending a book to an email address succeeds or fails."
+          "label": "Dostava e-pošte",
+          "description": "Ko je pošiljanje knjige na e-poštni naslov uspešno ali ne."
         },
         "achievements": {
-          "label": "Achievements",
-          "description": "When you unlock a new reading achievement."
+          "label": "Dosežki",
+          "description": "Ko odklenete nov bralni dosežek."
         }
       }
     }
@@ -6681,9 +6681,9 @@
       "filter": "Filter",
       "edit": "Uredi pametni obseg",
       "koboSync": {
-        "label": "Sync to my Kobo",
-        "enabledHint": "Books in this shared Smart Scope sync to your Kobo device. Turn off to stop syncing them.",
-        "disabledHint": "Turn on to sync books in this shared Smart Scope to your Kobo device."
+        "label": "Sinhroniziraj z mojim Kobo",
+        "enabledHint": "Knjige v deljenem pametnem obsegu se sinhronizirajo z vašo napravo Kobo. Izklopite, da ustavite sinhronizacijo.",
+        "disabledHint": "Vklopite, če želite sinhronizirati knjige v tem deljenem pametnem obsegu z napravo Kobo."
       },
       "showControlsAria": "Prikaži kontrolnike pametnega obsega",
       "hideFilter": "Skrij filter",
@@ -6693,9 +6693,9 @@
       "toast": {
         "deleted": "\"{name}\" izbrisan",
         "deleteFailed": "Brisanje \"{name}\" ni uspelo",
-        "koboSyncEnabled": "\"{name}\" now syncs to your Kobo",
-        "koboSyncDisabled": "\"{name}\" no longer syncs to your Kobo",
-        "koboSyncFailed": "Failed to update Kobo sync for \"{name}\""
+        "koboSyncEnabled": "\"{name}\" se zdaj sinhronizira z vašim Kobo",
+        "koboSyncDisabled": "\"{name}\" se ne sinhronizira več z vašim Kobo računom",
+        "koboSyncFailed": "Posodobitev sinhronizacije Kobo za \"{name}\" ni uspela"
       },
       "empty": {
         "noRules": "Ni nastavljenih pravil",
@@ -6818,7 +6818,7 @@
       "notifications": "Obvestila",
       "restrictions": "Omejitve vsebine"
     },
-    "smartScopes": "Smart Scopes",
-    "collections": "Collections"
+    "smartScopes": "Pametni obsegi",
+    "collections": "Zbirke"
   }
 }
