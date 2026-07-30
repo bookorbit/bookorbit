@@ -64,6 +64,13 @@ local function readStatusBadgeIcon(book)
     return READ_STATUS_BADGE_ICONS[status] or "dogear.reading"
 end
 
+-- The dogear assets are drawn as a top-left page fold, and the badge sits in
+-- the cover's top-right corner, so those need a quarter turn. The rest of the
+-- set are upright glyphs that must not be turned with them.
+local function readStatusBadgeRotation(icon)
+    return icon:match("^dogear%.") and 270 or 0
+end
+
 local function rowFontSize(nominal, max_size, row_h)
     local size = math.floor(nominal * row_h * (1 / 64) / SCALE_BY_SIZE)
     if max_size and size > max_size then return max_size end
@@ -208,7 +215,7 @@ function CatalogWidgets.buildReadStatusBadge(book, max_width)
     local size = math.max(Screen:scaleBySize(12), math.min(max_width, Screen:scaleBySize(20)))
     return IconWidget:new{
         icon = icon,
-        rotation_angle = 270,
+        rotation_angle = readStatusBadgeRotation(icon),
         width = size,
         height = size,
     }
