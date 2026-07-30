@@ -6,9 +6,12 @@ slots. Stats keeps its compact strip, Continue reading keeps its hero row, book
 sources and SmartScopes use cover grids, and Browse keeps its action list.
 
 The renderer measures native slots first, then divides the remaining vertical
-budget evenly among all configured cover-grid shelves. Grid sources carry up to
-twelve books and paginate independently. The mixin also owns offline caching
-and per-slot Discover rerolls.
+budget evenly among all configured cover-grid shelves. Cover cards are always
+sized from their width, so a tight page gives shelves narrower cards rather
+than squashed ones; only when even the narrowest row does not fit is a slot
+dropped, stats first. Grid sources carry up to SHELF_PAGE_SIZE books and
+paginate independently. The mixin also owns offline caching and per-slot
+Discover rerolls.
 ]]
 
 local Blitbuffer = require("ffi/blitbuffer")
@@ -30,7 +33,6 @@ local VerticalSpan = require("ui/widget/verticalspan")
 local T = require("ffi/util").template
 local _ = require("gettext")
 
-local Capabilities = require("bookorbit_capabilities")
 local CatalogUtil = require("bookorbit_catalog_util")
 local CatalogWidgets = require("bookorbit_catalog_widgets")
 local DashboardSections = require("bookorbit_dashboard_sections")
@@ -50,10 +52,13 @@ local BookOrbitDashboardIconButton = CatalogWidgets.DashboardIconButton
 local STATS_CACHE_TTL = 120
 local SECTION_TARGET_SLOTS = 5
 local SECTION_COMPACT_GAP = 6
-local DASHBOARD_TALL_ASPECT_RATIO = 1.55
-local SECTION_MAX_ROWS = 2
 local STATS_MIN_BODY_HEIGHT = 56
 local SECTION_PAGE_PREFIX = "section"
+-- Books requested per shelf. Mirrors DASHBOARD_SECTION_LIMIT on the server so
+-- a shelf and the dashboard body it may be served from hold the same count.
+local SHELF_PAGE_SIZE = 12
+-- Cover cards never get narrower than this, however tight the page is.
+local SHELF_MIN_CARD_WIDTH = 72
 
 local CatalogDashboard = {}
 
@@ -89,22 +94,6 @@ end
 function CatalogDashboard.dashboardSlotBooks(body, index)
     local section = CatalogDashboard.dashboardSlotSection(body, index)
     return section and section.books or {}
-end
-
-function CatalogDashboard:dashboardBodySection(body)
-    local section = CatalogDashboard.dashboardSlotSection(body, 1)
-    if type(section) ~= "table" or not DashboardSections.isValid(section.type) then
-        return DashboardSections.defaultConfig(1)
-    end
-    return DashboardSections.normalizeEntry(section)
-end
-
-function CatalogDashboard.dashboardSectionBooks(body)
-    return CatalogDashboard.dashboardSlotBooks(body, 1)
-end
-
-function CatalogDashboard.dashboardSecondSectionBooks(body)
-    return CatalogDashboard.dashboardSlotBooks(body, 2)
 end
 
 function CatalogDashboard.dashboardItems()
@@ -177,19 +166,6 @@ function CatalogDashboard:shouldRefreshDashboardOnOpen()
     return true
 end
 
--- Compatibility helper for callers that still expect one configurable book
--- source. It returns the first configured grid source, skipping native slots.
-function CatalogDashboard:dashboardSectionRequest()
-    for index = 1, DashboardSections.SLOT_COUNT do
-        local config = self:dashboardConfiguredSection(index)
-        if DashboardSections.isBookSource(config.type) then
-            if config.type == DashboardSections.DEFAULT_TYPE then return nil end
-            return config
-        end
-    end
-    return nil
-end
-
 function CatalogDashboard:dashboardRoot(opts)
     local function requestIsCurrent()
         return not opts or not opts.is_current or opts.is_current()
@@ -217,7 +193,7 @@ function CatalogDashboard:dashboardRoot(opts)
                 end
                 return { type = config.type, books = response.discover or {} }
             end
-            local params = { page = 1, size = 12 }
+            local params = { page = 1, size = SHELF_PAGE_SIZE }
             if config.type == "recently-added" then
                 params.sort = "recently_added"
             elseif config.type == "in-progress" then
@@ -235,15 +211,24 @@ function CatalogDashboard:dashboardRoot(opts)
             return { type = config.type, books = response.items or {} }
         end
 
+        -- Slots pointing at the same source cost one request between them, and
+        -- a source that failed is not retried by the next slot that wants it.
         body.dashboardSlots = {}
+        local shelves = {}
         for index = 1, DashboardSections.SLOT_COUNT do
             if not requestIsCurrent() then return nil, "cancelled" end
             local config = DashboardSections.at(self.settings, index)
             local slot = { type = config.type, smartScopeId = config.params and config.params.smartScopeId }
             if DashboardSections.isBookSource(config.type) then
-                local section, section_err = fetchSection(config)
-                if section_err == "cancelled" then return nil, section_err end
-                slot.books = section_err and {} or (section and section.books or {})
+                local signature = DashboardSections.signature(config)
+                local books = shelves[signature]
+                if not books then
+                    local section, section_err = fetchSection(config)
+                    if section_err == "cancelled" then return nil, section_err end
+                    books = section_err and {} or (section and section.books or {})
+                    shelves[signature] = books
+                end
+                slot.books = books
             end
             body.dashboardSlots[index] = slot
         end
@@ -490,10 +475,6 @@ function CatalogDashboard:dashboardHeroSlots(count)
     return self.content_w >= Screen:scaleBySize(420) and 2 or 1
 end
 
-function CatalogDashboard:dashboardTallLayout()
-    return self.inner_dimen.h / math.max(1, self.inner_dimen.w) >= DASHBOARD_TALL_ASPECT_RATIO
-end
-
 -- The Continue-reading hero row: full-width hero cards side by side, paged
 -- through all in-progress books via the chevrons in the section header (the
 -- e-ink take on a horizontal scroll).
@@ -529,13 +510,30 @@ end
 function CatalogDashboard:sectionRowMetrics(count, gap)
     local slots = math.min(SECTION_TARGET_SLOTS, count)
     gap = gap or self.dash_inner_gap
-    local min_card_w = Screen:scaleBySize(72)
+    local min_card_w = Screen:scaleBySize(SHELF_MIN_CARD_WIDTH)
     while slots > 1
         and math.floor((self.content_w - (slots - 1) * gap) / slots) < min_card_w do
         slots = slots - 1
     end
     local card_w = math.max(min_card_w, math.floor((self.content_w - (slots - 1) * gap) / slots))
     return slots, card_w, CatalogWidgets.coverCardHeight(card_w, false, false)
+end
+
+-- Shelf geometry under a vertical budget. A cover card's height follows from
+-- its width, so a shelf that is too tall gets more, narrower cards per row
+-- rather than cards drawn out of aspect. The row can still exceed max_height
+-- once the cards hit their minimum width; the caller decides what to do then.
+function CatalogDashboard:shelfRowMetrics(count, gap, max_height)
+    local slots, card_w, row_h = self:sectionRowMetrics(count, gap)
+    if not max_height then return slots, card_w, row_h end
+    local min_card_w = Screen:scaleBySize(SHELF_MIN_CARD_WIDTH)
+    while row_h > max_height do
+        local next_card_w = math.floor((self.content_w - slots * gap) / (slots + 1))
+        if next_card_w < min_card_w then break end
+        slots, card_w = slots + 1, next_card_w
+        row_h = CatalogWidgets.coverCardHeight(card_w, false, false)
+    end
+    return slots, card_w, row_h
 end
 
 -- A paged row of cover cards, evenly distributed across the full
@@ -766,94 +764,148 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
 
     local configs = {}
     local stats_widgets = {}
-    local grid_count = 0
-    local max_grid_books = 0
-    local fixed_h = top_gap
+    local hidden = {}
     for index = 1, DashboardSections.SLOT_COUNT do
-        local config = DashboardSections.at(self.settings, index)
-        configs[index] = config
-        if config.type == "stats" then
-            local stats_widget = self:buildDashboardStatsStrip(summary, dashboard)
-            stats_widgets[index] = stats_widget
-            local stats_h = stats_widget and stats_widget:getSize().h or px(STATS_MIN_BODY_HEIGHT)
-            fixed_h = fixed_h + stats_h + section_gap
-        elseif config.type == "continue-reading" then
-            fixed_h = fixed_h + header_h + inner_gap + hero_h + section_gap
-        elseif config.type == "browse" then
-            fixed_h = fixed_h + header_h + inner_gap + browse_rows * browse_row_h + section_gap
-        else
-            grid_count = grid_count + 1
-            max_grid_books = math.max(max_grid_books, #self.dashboardSlotBooks(dashboard, index))
-            fixed_h = fixed_h + header_h + inner_gap + section_gap
+        configs[index] = DashboardSections.at(self.settings, index)
+    end
+
+    local function isShelf(config)
+        return config.type ~= "stats" and config.type ~= "continue-reading" and config.type ~= "browse"
+    end
+
+    -- Slots with a native renderer take the height they need; the shelves share
+    -- whatever is left of the page.
+    local function measureFixed()
+        local fixed = top_gap
+        local shelf_count = 0
+        local max_shelf_books = 0
+        for index = 1, DashboardSections.SLOT_COUNT do
+            if not hidden[index] then
+                local config = configs[index]
+                if config.type == "stats" then
+                    stats_widgets[index] = stats_widgets[index] or self:buildDashboardStatsStrip(summary, dashboard)
+                    local stats_widget = stats_widgets[index]
+                    fixed = fixed + (stats_widget and stats_widget:getSize().h or px(STATS_MIN_BODY_HEIGHT)) + section_gap
+                elseif config.type == "continue-reading" then
+                    fixed = fixed + header_h + inner_gap + hero_h + section_gap
+                elseif config.type == "browse" then
+                    fixed = fixed + header_h + inner_gap + browse_rows * browse_row_h + section_gap
+                else
+                    shelf_count = shelf_count + 1
+                    max_shelf_books = math.max(max_shelf_books, #self.dashboardSlotBooks(dashboard, index))
+                    fixed = fixed + header_h + inner_gap + section_gap
+                end
+            end
+        end
+        return fixed, shelf_count, max_shelf_books
+    end
+
+    local fixed_h, shelf_count, max_shelf_books = measureFixed()
+    local shelf_slots, shelf_card_w, shelf_row_h = 0, 0, 0
+
+    local function pageFits()
+        if shelf_count == 0 then
+            shelf_slots, shelf_card_w, shelf_row_h = 0, 0, 0
+            return fixed_h <= avail
+        end
+        shelf_slots, shelf_card_w, shelf_row_h = self:shelfRowMetrics(
+            math.max(1, max_shelf_books), compact_gap,
+            math.floor(math.max(0, avail - fixed_h) / shelf_count))
+        return fixed_h + shelf_count * shelf_row_h <= avail
+    end
+
+    -- Too many slots for the page: the stats strip goes first, since it only
+    -- summarises what the reader can reach elsewhere, then shelves bottom-up.
+    local function slotToDrop()
+        for index = 1, DashboardSections.SLOT_COUNT do
+            if not hidden[index] and configs[index].type == "stats" then return index end
+        end
+        for index = DashboardSections.SLOT_COUNT, 1, -1 do
+            if not hidden[index] and isShelf(configs[index]) then return index end
         end
     end
 
-    local grid_slots, grid_card_w, natural_grid_h = self:sectionRowMetrics(math.max(1, max_grid_books), compact_gap)
-    local grid_h = natural_grid_h
-    if grid_count > 0 then
-        local grid_budget = math.max(px(48) * grid_count, avail - fixed_h)
-        grid_h = math.max(px(48), math.min(natural_grid_h, math.floor(grid_budget / grid_count)))
+    while not pageFits() do
+        local drop = slotToDrop()
+        if not drop then break end
+        hidden[drop] = true
+        fixed_h, shelf_count, max_shelf_books = measureFixed()
     end
 
     self:addDashboardSpacer(top_gap)
-    for index = 1, DashboardSections.SLOT_COUNT do
-        local config = configs[index]
-        local page_id = SECTION_PAGE_PREFIX .. tostring(index)
+    local function renderStats(index)
+        self:addDashboardInset(stats_widgets[index])
+    end
 
-        if config.type == "stats" then
-            self:addDashboardInset(stats_widgets[index])
-            self:addDashboardSpacer(section_gap)
-        elseif config.type == "continue-reading" then
-            local hero_slots = self:dashboardHeroSlots(#continue_books)
-            local hero_pages = #continue_books > 0 and math.max(1, math.ceil(#continue_books / hero_slots)) or 0
-            local hero_page = hero_pages > 0 and self:dashboardPage("continue" .. tostring(index), hero_pages) or 1
-            local controls
-            if hero_pages > 1 then
-                local prev_button, next_button = self:buildDashboardHeaderNav("continue" .. tostring(index), hero_page, hero_pages)
-                controls = { prev_button, next_button }
-            end
-            self:addDashboardHeader(DashboardSections.headerText(config), controls)
-            self:addDashboardSpacer(inner_gap)
-            if #continue_books > 0 then
-                self:addDashboardHeroRow(continue_books, hero_h, hero_slots, hero_page)
-            elseif context.loading then
-                self:addDashboardEmptyState(_("Loading dashboard..."))
-            elseif context.unavailable then
-                self:addDashboardEmptyState(_("The dashboard could not be loaded."), _("Retry"), function() self:refreshCurrent() end)
-            else
-                self:addDashboardEmptyState(_("Nothing in progress yet."), _("Browse all books"), function()
-                    self:onMenuSelect({ text = _("All Books"), kind = "books", params = { sort = "title" } })
-                end)
-            end
-            self:addDashboardSpacer(section_gap)
-        elseif config.type == "browse" then
-            self:addDashboardHeader(DashboardSections.headerText(config))
-            self:addDashboardSpacer(inner_gap)
-            self:addDashboardBrowseList(action_entries, browse_row_h, browse_cols, browse_rows)
-            self:addDashboardSpacer(section_gap)
+    local function renderContinueReading(index, config)
+        local hero_slots = self:dashboardHeroSlots(#continue_books)
+        local hero_pages = #continue_books > 0 and math.max(1, math.ceil(#continue_books / hero_slots)) or 0
+        local page_id = "continue" .. tostring(index)
+        local hero_page = hero_pages > 0 and self:dashboardPage(page_id, hero_pages) or 1
+        local controls
+        if hero_pages > 1 then
+            local prev_button, next_button = self:buildDashboardHeaderNav(page_id, hero_page, hero_pages)
+            controls = { prev_button, next_button }
+        end
+        self:addDashboardHeader(DashboardSections.headerText(config), controls)
+        self:addDashboardSpacer(inner_gap)
+        if #continue_books > 0 then
+            self:addDashboardHeroRow(continue_books, hero_h, hero_slots, hero_page)
+        elseif context.loading then
+            self:addDashboardEmptyState(_("Loading dashboard..."))
+        elseif context.unavailable then
+            self:addDashboardEmptyState(_("The dashboard could not be loaded."), _("Retry"), function() self:refreshCurrent() end)
         else
-            local pending = stale_sections[index] == true
-            local books = pending and {} or self.dashboardSlotBooks(dashboard, index)
-            local slots = math.max(1, math.min(grid_slots, math.max(1, #books)))
-            local pages = math.max(1, math.ceil(#books / slots))
-            local page = self:dashboardPage(page_id, pages)
-            local controls = {}
-            if pages > 1 then
-                local prev_button, next_button = self:buildDashboardHeaderNav(page_id, page, pages)
-                table.insert(controls, prev_button)
-                table.insert(controls, next_button)
-            end
-            if not pending and self:dashboardSectionSupportsReroll(config) then
-                table.insert(controls, self:buildDashboardRerollButton(index))
-            end
-            self:addDashboardHeader(DashboardSections.headerText(config), controls)
-            self:addDashboardSpacer(inner_gap)
-            if pending or context.loading then
-                self:addDashboardEmptyState(_("Loading..."))
-            elseif #books == 0 then
-                self:addDashboardEmptyState(_("No books found."))
+            self:addDashboardEmptyState(_("Nothing in progress yet."), _("Browse all books"), function()
+                self:onMenuSelect({ text = _("All Books"), kind = "books", params = { sort = "title" } })
+            end)
+        end
+    end
+
+    local function renderBrowse(config)
+        self:addDashboardHeader(DashboardSections.headerText(config))
+        self:addDashboardSpacer(inner_gap)
+        self:addDashboardBrowseList(action_entries, browse_row_h, browse_cols, browse_rows)
+    end
+
+    local function renderShelf(index, config)
+        local page_id = SECTION_PAGE_PREFIX .. tostring(index)
+        local pending = stale_sections[index] == true
+        local books = pending and {} or self.dashboardSlotBooks(dashboard, index)
+        local slots = math.max(1, math.min(shelf_slots, #books))
+        local pages = math.max(1, math.ceil(#books / slots))
+        local page = self:dashboardPage(page_id, pages)
+        local controls = {}
+        if pages > 1 then
+            local prev_button, next_button = self:buildDashboardHeaderNav(page_id, page, pages)
+            table.insert(controls, prev_button)
+            table.insert(controls, next_button)
+        end
+        if not pending and self:dashboardSectionSupportsReroll(config) then
+            table.insert(controls, self:buildDashboardRerollButton(index))
+        end
+        self:addDashboardHeader(DashboardSections.headerText(config), controls)
+        self:addDashboardSpacer(inner_gap)
+        if pending or context.loading then
+            self:addDashboardEmptyState(_("Loading..."))
+        elseif #books == 0 then
+            self:addDashboardEmptyState(_("No books found."))
+        else
+            self:addDashboardCoverGrid(page_id, books, shelf_row_h, false, false, slots, shelf_card_w, page, 1)
+        end
+    end
+
+    for index = 1, DashboardSections.SLOT_COUNT do
+        if not hidden[index] then
+            local config = configs[index]
+            if config.type == "stats" then
+                renderStats(index)
+            elseif config.type == "continue-reading" then
+                renderContinueReading(index, config)
+            elseif config.type == "browse" then
+                renderBrowse(config)
             else
-                self:addDashboardCoverGrid(page_id, books, grid_h, false, false, slots, grid_card_w, page, 1)
+                renderShelf(index, config)
             end
             self:addDashboardSpacer(section_gap)
         end
@@ -897,6 +949,15 @@ function CatalogDashboard:rerollDiscover(index)
     end)
 end
 
+-- Marks one slot as waiting for the refresh in flight, so books fetched for the
+-- previous choice are never presented as the new one.
+local function markSlotPending(context, index)
+    context.section_stale = type(context.section_stale) == "table" and context.section_stale or {}
+    context.section_stale[index] = true
+    context.dash_pages = context.dash_pages or {}
+    context.dash_pages[SECTION_PAGE_PREFIX .. tostring(index)] = 1
+end
+
 function CatalogDashboard:setDashboardSection(config, index)
     index = index or 1
     local normalized = DashboardSections.normalizeEntry(config)
@@ -907,10 +968,27 @@ function CatalogDashboard:setDashboardSection(config, index)
     if not self:dashboardMode() then return end
     local context = self.current_context
     if context then
-        context.section_stale = type(context.section_stale) == "table" and context.section_stale or {}
-        context.section_stale[index] = true
-        context.dash_pages = context.dash_pages or {}
-        context.dash_pages[SECTION_PAGE_PREFIX .. tostring(index)] = 1
+        markSlotPending(context, index)
+        self:updateItems()
+    end
+    self:refreshCurrent()
+end
+
+-- Applies a whole slot configuration at once (the settings menu's reset), so
+-- the dashboard refreshes once rather than once per changed slot.
+function CatalogDashboard:setDashboardSections(sections)
+    local normalized = DashboardSections.normalize(sections)
+    if DashboardSections.settingsSignature({ [DashboardSections.SETTING_KEY] = normalized })
+        == DashboardSections.settingsSignature(self.settings) then
+        return
+    end
+    self:persistSetting(DashboardSections.SETTING_KEY, normalized)
+    if not self:dashboardMode() then return end
+    local context = self.current_context
+    if context then
+        for index = 1, DashboardSections.SLOT_COUNT do
+            markSlotPending(context, index)
+        end
         self:updateItems()
     end
     self:refreshCurrent()
