@@ -20,7 +20,7 @@
     "privacySharing": {
       "title": "Confidentialité et partage",
       "subtitle": "Contrôlez si les administrateurs peuvent voir un résumé identifiable de votre activité de lecture.",
-      "levelLegend": "Niveau de partage des insights sur la lecture",
+      "levelLegend": "Niveau de partage des statistiques de lecture",
       "current": "Paramètre actuel",
       "levels": {
         "private": {
@@ -29,18 +29,18 @@
         },
         "summary": {
           "title": "Partager le résumé",
-          "description": "Partagez vos habitudes globales sans titres de livres, auteurs, séries ou narrateurs."
+          "description": "Partagez des habitudes agrégées sans titres de livres, auteurs, séries ou narrateurs."
         },
         "detailed": {
-          "title": "Partagez des informations détaillées",
+          "title": "Partagez des statistiques détaillées",
           "description": "Partagez également des livres, auteurs, séries, genres et narrateurs récents et de premier ordre."
         }
       },
       "fields": {
         "frequency": "Fréquence de lecture et jours actifs",
-        "completion": "Livres agrégés commencés et terminés",
+        "completion": "Inclure les livres commencés et terminés",
         "formats": "Distribution des formats",
-        "genres": "Large répartition des genres",
+        "genres": "Répartition des genres principaux",
         "trend": "Tendance globale de lecture",
         "books": "Titres de livres actuels, récents et les plus lus",
         "authors": "Meilleurs auteurs",
@@ -1839,10 +1839,10 @@
         "syncPreferences": "Préférences de synchronisation",
         "twoWaySync": "Synchronisation de progression bidirectionnelle",
         "twoWaySyncHint": "Synchronisez la position de lecture entre BookOrbit et Kobo. Nécessite la livraison KEPUB pour des emplacements précis et une restauration de page fiable.",
-        "syncHighlights": "Synchronisez les faits saillants de BookOrbit avec Kobo",
-        "syncHighlightsHint": "Envoyez les faits saillants réalisés en BookOrbit ou KOReader à votre Kobo. Les surbrillances Kobo sont importées dans BookOrbit même lorsque cette option est désactivée. Les annotations liées synchronisent les modifications et les suppressions dans les deux sens. Nécessite la livraison KEPUB ; le livre sur Kobo doit être le KEPUB téléchargé depuis BookOrbit.",
+        "syncHighlights": "Synchronisez les passages surlignés de BookOrbit avec Kobo",
+        "syncHighlightsHint": "Envoyez les passages surlignés réalisés dans BookOrbit ou KOReader à votre Kobo. Les passages surlignés Kobo sont importées dans BookOrbit même lorsque cette option est désactivée. Les annotations liées synchronisent les modifications et les suppressions dans les deux sens. Nécessite la livraison KEPUB ; le livre sur Kobo doit être le KEPUB téléchargé depuis BookOrbit.",
         "convertKepub": "Convertir en KEPUB",
-        "convertKepubHint": "Envoyez des EPUB éligibles en tant que KEPUB. Cela reste activé lorsque la synchronisation de la progression ou les surbrillance BookOrbit-to-Kobo sont activées. Lors de la prochaine synchronisation Kobo, les livres concernés sont à nouveau proposés en téléchargement KEPUB ; supprimez toute ancienne copie de EPUB si Kobo continue de l'ouvrir.",
+        "convertKepubHint": "Envoyez des EPUB éligibles en tant que KEPUB. Cela reste activé lorsque la synchronisation de la progression ou les passages surlignés de BookOrbit-to-Kobo sont activées. Lors de la prochaine synchronisation Kobo, les livres concernés sont à nouveau proposés en téléchargement KEPUB ; supprimez toute ancienne copie de EPUB si Kobo continue de l'ouvrir.",
         "forceHyphenation": "Forcer la césure",
         "forceHyphenationHint": "Garantit une justification cohérente du texte. Cela régénérera les KEPUB mis en cache.",
         "progressThresholds": "Seuils de progression",
@@ -1877,8 +1877,8 @@
             "librarySync": "Bibliothèque vérifiée pour les mises à jour",
             "bookDownload": "Livre téléchargé",
             "progressUpdate": "Position de lecture mise à jour",
-            "annotationsPull": "Points forts envoyés à Kobo",
-            "annotationsPush": "Faits saillants reçus de Kobo"
+            "annotationsPull": "Les passages surlignés envoyés à Kobo",
+            "annotationsPush": "Les passages surlignés reçus de Kobo"
           },
           "outcome": {
             "failed": "Échec",
@@ -1895,8 +1895,8 @@
             "librarySync": "La vérification de la bibliothèque n'a pas été terminée",
             "bookDownload": "Le téléchargement n'a pas été terminé",
             "progressUpdate": "La position de lecture n'a pas été mise à jour",
-            "annotationsPull": "Les faits saillants n'ont pas été envoyés",
-            "annotationsPush": "Les faits saillants n'ont pas été importés"
+            "annotationsPull": "Les passages surlignés n'ont pas été envoyés",
+            "annotationsPush": "Les passages surlignés n'ont pas été importés"
           },
           "chip": {
             "morePending": "Plus en attente",
@@ -1904,7 +1904,7 @@
             "bookCount": "{count, plural, one {# livre} other {# livres} many {# livres}}",
             "deletedAnnotations": "{count} annotations supprimées",
             "deviceAlreadyCurrent": "Appareil déjà actuel",
-            "freshHighlightData": "Données récentes sur les faits saillants",
+            "freshHighlightData": "Données récentes sur les passages surlignés",
             "created": "{count} créé",
             "updated": "{count} mis à jour",
             "deleted": "{count} supprimé",
@@ -1927,14 +1927,14 @@
             "progressUpdatesSynced": "{count, plural, one {# mise à jour de progression synchronisée} other {# mises à jour de progression synchronisées} many {# mises à jour de progression synchronisées}}",
             "newReadingPositionFor": "Kobo a signalé une nouvelle position de lecture pour {title}",
             "newReadingPosition": "Kobo a signalé une nouvelle position de lecture",
-            "noHighlightChangesNeededFor": "Aucune modification de surbrillance n'est nécessaire pour {title}",
-            "noHighlightChangesNeeded": "Aucun changement de surbrillance n'est nécessaire",
-            "highlightsSentToKoboFor": "{count, plural, one {# surbrillance envoyé à Kobo pour {title}} other {# faits saillants envoyés à Kobo pour {title}} many {# faits saillants envoyés à Kobo pour {title}}}",
-            "highlightsSentToKobo": "{count, plural, one {# surbrillance envoyée à Kobo} other {# faits saillants envoyés à Kobo} many {# faits saillants envoyés à Kobo}}",
-            "noKoboHighlightChangesFor": "Aucun changement de mise en évidence de Kobo pour {title}",
-            "noKoboHighlightChanges": "Aucun changement de mise en évidence de Kobo",
-            "highlightsImportedFromKoboFor": "{count, plural, one {# surbrillance importée de Kobo pour {title}} other {# faits saillants importés de Kobo pour {title}} many {# faits saillants importés de Kobo pour {title}}}",
-            "highlightsImportedFromKobo": "{count, plural, one {# surbrillance importée de Kobo} other {# faits saillants importés de Kobo} many {# faits saillants importés de Kobo}}"
+            "noHighlightChangesNeededFor": "Aucune modification des passages surlignés n'est nécessaire pour {title}",
+            "noHighlightChangesNeeded": "Aucun changement des passages surlignés n'est nécessaire",
+            "highlightsSentToKoboFor": "{count, plural, one {# Passage surligné envoyé à Kobo pour {title}} other {# Passages surlignés envoyés à Kobo pour {title}} many {# Passages surlignés envoyés à Kobo pour {title}}}",
+            "highlightsSentToKobo": "{count, plural, one {# Passage surlignéenvoyée à Kobo} other {# Passages surlignés envoyés à Kobo} many {# Passages surlignés envoyés à Kobo}}",
+            "noKoboHighlightChangesFor": "Aucun nouveau passage surligné via Kobo pour {title}",
+            "noKoboHighlightChanges": "Aucun nouveau passage surligné via Kobo",
+            "highlightsImportedFromKoboFor": "{count, plural, one {# Passage surligné importé de Kobo pour {title}} other {# Passages surlignés importés depuis Kobo pour {title}} many {# Passages surlignés importés depuis Kobo pour {title}}}",
+            "highlightsImportedFromKobo": "{count, plural, one {# Passage surligné importée depuis Kobo} other {# Passages surlignés importés depuis Kobo} many {# Passages surlignés importés depuis Kobo}}"
           },
           "timeRange": "{from} à {to}",
           "eventsGrouped": "{count, plural, one {# événement groupé} other {# événements regroupés} many {# événements regroupés}}",
@@ -1969,7 +1969,7 @@
       },
       "koreader": {
         "title": "KOReader Synchronisation",
-        "subtitle": "Parcourez votre catalogue BookOrbit dans KOReader et synchronisez la progression, l'activité de lecture, les faits saillants et les modifications d'annotations.",
+        "subtitle": "Parcourez votre catalogue BookOrbit dans KOReader et synchronisez la progression, l'activité de lecture, les passages surlignés et les modifications d'annotations.",
         "tabs": {
           "sync": "Paramètres de synchronisation",
           "fileNaming": "Nom du fichier"
@@ -2018,7 +2018,7 @@
         "latestPlugin": "Dernier plugin : v{version}",
         "latestPluginUnavailable": "Dernier plugin indisponible",
         "notConfigured": "La synchronisation KOReader n'est pas configurée",
-        "notConfiguredHint": "Créez un ensemble d'informations d'identification de synchronisation, puis utilisez-les avec le plugin BookOrbit KOReader pour la navigation, les téléchargements, la progression, la lecture des événements, les surlignages et les suppressions.",
+        "notConfiguredHint": "Créez un ensemble d'identifiants de synchronisation, puis utilisez-les avec le plugin BookOrbit KOReader pour la navigation, les téléchargements, la progression, la lecture des événements, les passages surlignés et les suppressions.",
         "createCredentials": "Créer des identifiants",
         "createFormTitle": "Créer des informations d'identification de synchronisation KOReader",
         "createFormHint": "Ces informations d'identification authentifient vos appareils KOReader avec BookOrbit.",
@@ -2033,7 +2033,7 @@
         "status": "KOReader Statut",
         "refresh": "Actualiser",
         "progressSync": "Synchronisation de la progression",
-        "progressSyncHint": "Autorisez les appareils KOReader à synchroniser la progression, l'activité de lecture, les surlignages et les suppressions d'annotations avec BookOrbit.",
+        "progressSyncHint": "Autorisez les appareils KOReader à synchroniser la progression, l'activité de lecture, les passages surlignés et les suppressions d'annotations avec BookOrbit.",
         "lastSync": "Dernière synchronisation",
         "syncedBooks": "Livres synchronisés",
         "bookCount": "{count, plural, =0 {pas de livres} one {# livre} other {# livres} many {# livres}}",
@@ -2061,14 +2061,14 @@
         "latestPluginSuffix": "- dernier plugin v{version}",
         "matchedBooks": "Livres assortis",
         "readingEvents": "Événements de lecture",
-        "highlights": "Points forts",
+        "highlights": "Passages surlignés",
         "syncedTotals": "Totaux synchronisés",
-        "trashedHighlights": "Faits saillants saccagés",
-        "pendingDeletes": "{count, plural, =0 {aucun surlignage supprimé en attente de reconnaissance du plugin KOReader.} one {# surbrillance supprimée en attente de confirmation du plugin KOReader.} other {# faits saillants supprimés en attente de reconnaissance du plugin KOReader.} many {# faits saillants supprimés en attente de reconnaissance du plugin KOReader.}}",
-        "failedPositions": "{count, plural, =0 {aucune position de surbrillance ne nécessite d’attention.} one {# La position en surbrillance nécessite une attention particulière.} other {# les positions mises en évidence nécessitent une attention particulière.} many {# les positions mises en évidence nécessitent une attention particulière.}}",
+        "trashedHighlights": "Passages surlignés mis à la corbeille",
+        "pendingDeletes": "{count, plural, =0 {aucun passage surligné supprimé en attente de reconnaissance du plugin KOReader.} one {# passage surligné en attente de confirmation du plugin KOReader.} other {# passages surlignés supprimés en attente de reconnaissance du plugin KOReader.} many {# passages surlignés supprimés en attente de reconnaissance du plugin KOReader.}}",
+        "failedPositions": "{count, plural, =0 {aucune position de passage surligné ne nécessite d’attention.} one {# La position du passage surligné nécessite une attention particulière.} other {# des passages surlignés nécessitent une attention particulière.} many {# des passages surlignés nécessitent une attention particulière.}}",
         "setupGuide": "Guide de configuration",
         "setupSteps": "KOReader étapes de configuration",
-        "setupStepsHint": "Utilisez le plugin BookOrbit pour la navigation dans le catalogue, les téléchargements, la progression, la lecture des événements et les faits saillants. Utilisez le plugin stock pour progresser uniquement.",
+        "setupStepsHint": "Utilisez le plugin BookOrbit pour la navigation dans le catalogue, les téléchargements, la progression, la lecture des événements et les passages surlignés. Utilisez le plugin stock pour progresser uniquement.",
         "pluginGuideTitle": "Plugin BookOrbit",
         "pluginStep1": "Téléchargez le plugin préconfiguré ci-dessus.",
         "pluginStep2Prefix": "Décompressez-le et copiez",
@@ -2561,7 +2561,7 @@
   "annotations": {
     "unknownBook": "Livre inconnu",
     "styles": {
-      "highlight": "Mettre en surbrillance",
+      "highlight": "Surligner",
       "underline": "Souligner",
       "strike": "Barré",
       "squiggle": "Ondulé",
@@ -2673,14 +2673,14 @@
       "bulkTrash": "Corbeille",
       "bulkRestore": "Restaurer",
       "tabs": {
-        "highlights": "Points forts",
+        "highlights": "Passages surlignés",
         "trash": "Corbeille"
       },
       "empty": {
-        "noMatch": "Aucun surlignage ne correspond à vos filtres.",
+        "noMatch": "Aucun passage surligné ne correspond à vos filtres.",
         "resetFilters": "Réinitialiser les filtres",
         "trashEmpty": "La corbeille est vide",
-        "noAnnotations": "Aucune annotation pour l'instant. Les faits saillants que vous créez sur le Web ou sur votre liseuse apparaissent ici."
+        "noAnnotations": "Aucun passage surligné pour l'instant. Vos futurs passages surlignés et notes apparaîtront ici."
       },
       "toast": {
         "movedToTrash": "Déplacé vers la corbeille",
@@ -3439,7 +3439,7 @@
         "editMetadata": "Modifier les métadonnées",
         "files": "Fichiers",
         "readingLog": "Journal de lecture",
-        "highlights": "Points forts"
+        "highlights": "Passages surlignés"
       },
       "discover": {
         "moreInSeries": "Plus en série",
@@ -3817,7 +3817,7 @@
           "oldest": "Le plus ancien en premier"
         },
         "summary": {
-          "highlights": "{count, plural, =0 {pas de faits saillants} one {un point culminant} other {# faits saillants} many {# faits saillants}}",
+          "highlights": "{count, plural, =0 {pas de passages surlignés} one {un passage surligné} other {# passages surlignés} many {# passages surlignés}}",
           "notes": "{count, plural, =0 {pas de notes} one {une note} other {# remarques} many {# remarques}}",
           "chapters": "{count, plural, =0 {pas de chapitres} one {un chapitre} other {# chapitres} many {# chapitres}}"
         },
@@ -3826,13 +3826,13 @@
         "untitled": "Sans titre",
         "trash": "Corbeille",
         "empty": {
-          "noMatch": "Aucun surlignage ne correspond à vos filtres.",
+          "noMatch": "Aucun passage surligné ne correspond à vos filtres.",
           "resetFilters": "Réinitialiser les filtres",
-          "none": "Pas encore de faits saillants",
-          "hint": "Sélectionnez du texte pendant la lecture pour créer des surbrillances"
+          "none": "Pas encore de passages surlignés",
+          "hint": "Sélectionnez du texte pendant la lecture pour créer des passages surlignés"
         },
         "uncategorized": "Non classé",
-        "paginationUnit": "faits saillants"
+        "paginationUnit": "passages surlignés"
       },
       "readingLog": {
         "moreActionsAria": "Plus d'actions de journal de lecture",
@@ -4585,27 +4585,27 @@
         "shelves": "Étagères"
       },
       "widgetNames": {
-        "readingStreak": "Série de lecture",
-        "currentlyReading": "Lecture en cours",
-        "readingGoal": "Reading Goal",
-        "readingDna": "Lire l'ADN",
+        "readingStreak": "Série de lectures",
+        "currentlyReading": "En cours de lecture",
+        "readingGoal": "Objectif de lecture",
+        "readingDna": "ADN de lecteur",
         "monthlyChallenge": "Défi mensuel",
-        "highlightOfTheDay": "Le moment fort de la journée",
-        "neglectedGems": "Joyaux négligés",
+        "highlightOfTheDay": "Passage surligné du jour",
+        "neglectedGems": "Trésors oubliés",
         "readingRhythm": "Rythme de lecture",
         "diversityScore": "Score de diversité",
-        "libraryOverview": "Présentation de la bibliothèque",
-        "yearProjection": "Année projetée",
+        "libraryOverview": "Vue d'ensemble des médiathèques",
+        "yearProjection": "Projection annuelle",
         "longWait": "La longue attente"
       },
       "shelfNames": {
-        "recentlyAdded": "Recently Added",
-        "continueReading": "Continue Reading",
-        "continueListening": "Continue Listening",
-        "wantToRead": "Want to Read",
-        "upNextInSeries": "Up Next in Series",
-        "random": "Discover Something New",
-        "smartScope": "Smart Scope"
+        "recentlyAdded": "Ajouté récemment",
+        "continueReading": "Poursuivre la lecture",
+        "continueListening": "Poursuivre l'écoute",
+        "wantToRead": "À lire",
+        "upNextInSeries": "Suite de la série",
+        "random": "Découvrez quelque chose de nouveau",
+        "smartScope": "Collection Intelligente"
       },
       "reorderHintWidget": "Faites glisser pour réorganiser. Basculez pour afficher ou masquer un widget.",
       "reorderHintShelf": "Faites glisser pour réorganiser. Basculez pour afficher ou masquer une étagère.",
@@ -6681,9 +6681,9 @@
       "filter": "Filtrer",
       "edit": "Modifier la portée intelligente",
       "koboSync": {
-        "label": "Sync to my Kobo",
-        "enabledHint": "Books in this shared Smart Scope sync to your Kobo device. Turn off to stop syncing them.",
-        "disabledHint": "Turn on to sync books in this shared Smart Scope to your Kobo device."
+        "label": "Synchroniser avec Kobo",
+        "enabledHint": "Les livres de cette Collection Intelligente sont synchronisés avec votre appareil Kobo. Désactivez pour arrêter de les synchroniser.",
+        "disabledHint": "Activez pour synchroniser les livres de cette Collection Intelligente sur votre appareil Kobo."
       },
       "showControlsAria": "Afficher les commandes Smart Scope",
       "hideFilter": "Masquer le filtre",
@@ -6693,9 +6693,9 @@
       "toast": {
         "deleted": "\"{name}\" supprimé",
         "deleteFailed": "Échec de la suppression de \"{name}\"",
-        "koboSyncEnabled": "\"{name}\" now syncs to your Kobo",
-        "koboSyncDisabled": "\"{name}\" no longer syncs to your Kobo",
-        "koboSyncFailed": "Failed to update Kobo sync for \"{name}\""
+        "koboSyncEnabled": "\"{name}\" se synchronise maintenant avec votre Kobo",
+        "koboSyncDisabled": "\"{name}\" ne se synchronise plus avec votre Kobo",
+        "koboSyncFailed": "Échec de mise à jour de la synchronisation Kobo pour \"{name}\""
       },
       "empty": {
         "noRules": "Aucune règle configurée",
