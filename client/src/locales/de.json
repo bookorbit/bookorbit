@@ -485,9 +485,9 @@
         "nameRequired": "Name ist erforderlich",
         "updateFailed": "Profil konnte nicht aktualisiert werden",
         "updated": "Profil aktualisiert",
-        "usernameHint": "Your username cannot be changed.",
-        "passwordHint": "Change the password you use to sign in.",
-        "passwordHintOidc": "Your password is managed by your identity provider.",
+        "usernameHint": "Ihr Benutzername kann nicht geändert werden.",
+        "passwordHint": "Ändern Sie das Passwort, das Sie zum Anmelden verwenden.",
+        "passwordHintOidc": "Ihr Passwort wird von Ihrem Identitätsanbieter verwaltet.",
         "passwordHintShared": "Shared accounts sign in through a magic link and have no password."
       },
       "readingPreferences": {
@@ -4585,18 +4585,18 @@
         "shelves": "Regale"
       },
       "widgetNames": {
-        "readingStreak": "Lese-Serie",
-        "currentlyReading": "Aktuell gelesen",
+        "readingStreak": "Reading Streak",
+        "currentlyReading": "Currently Reading",
         "readingGoal": "Reading Goal",
-        "readingDna": "Lese-DNA",
-        "monthlyChallenge": "Monatliche Herausforderung",
-        "highlightOfTheDay": "Highlight des Tages",
-        "neglectedGems": "Vernachlässigte Schätze",
-        "readingRhythm": "Leserhythmus",
-        "diversityScore": "Diversitätswert",
-        "libraryOverview": "Bibliotheksübersicht",
-        "yearProjection": "Jahresprognose",
-        "longWait": "Die lange Wartezeit"
+        "readingDna": "Reading DNA",
+        "monthlyChallenge": "Monthly Challenge",
+        "highlightOfTheDay": "Highlight of the Day",
+        "neglectedGems": "Neglected Gems",
+        "readingRhythm": "Reading Rhythm",
+        "diversityScore": "Diversity Score",
+        "libraryOverview": "Library Overview",
+        "yearProjection": "Year Projection",
+        "longWait": "The Long Wait"
       },
       "shelfNames": {
         "recentlyAdded": "Recently Added",
