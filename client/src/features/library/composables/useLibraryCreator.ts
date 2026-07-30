@@ -38,10 +38,14 @@ function blankForm() {
     fileWriteWriteCover: true,
     fileWriteEpubEnabled: true,
     fileWriteEpubMaxFileSizeMb: 100,
+    fileWriteFb2Enabled: false,
+    fileWriteFb2MaxFileSizeMb: 100,
     fileWritePdfEnabled: true,
     fileWritePdfMaxFileSizeMb: 100,
     fileWriteCbxEnabled: false,
     fileWriteCbxMaxFileSizeMb: 500,
+    fileWriteKindleEnabled: false,
+    fileWriteKindleMaxFileSizeMb: 100,
     fileWriteAudioEnabled: true,
     fileWriteAudioMaxFileSizeMb: 500,
     fileRenameEnabled: false,
@@ -78,6 +82,7 @@ export function useLibraryCreator() {
       form.fileWriteEpubMaxFileSizeMb,
       form.fileWritePdfMaxFileSizeMb,
       form.fileWriteCbxMaxFileSizeMb,
+      form.fileWriteKindleMaxFileSizeMb,
       form.fileWriteAudioMaxFileSizeMb,
     ]
     if (fileSizes.some((value) => !Number.isInteger(value) || value < FILE_SIZE_MIN_MB || value > FILE_SIZE_MAX_MB)) {
@@ -114,10 +119,14 @@ export function useLibraryCreator() {
     form.fileWriteWriteCover = library.fileWriteWriteCover
     form.fileWriteEpubEnabled = library.fileWriteEpubEnabled
     form.fileWriteEpubMaxFileSizeMb = library.fileWriteEpubMaxFileSizeMb
+    form.fileWriteFb2Enabled = library.fileWriteFb2Enabled
+    form.fileWriteFb2MaxFileSizeMb = library.fileWriteFb2MaxFileSizeMb
     form.fileWritePdfEnabled = library.fileWritePdfEnabled
     form.fileWritePdfMaxFileSizeMb = library.fileWritePdfMaxFileSizeMb
     form.fileWriteCbxEnabled = library.fileWriteCbxEnabled
     form.fileWriteCbxMaxFileSizeMb = library.fileWriteCbxMaxFileSizeMb
+    form.fileWriteKindleEnabled = library.fileWriteKindleEnabled
+    form.fileWriteKindleMaxFileSizeMb = library.fileWriteKindleMaxFileSizeMb
     form.fileWriteAudioEnabled = library.fileWriteAudioEnabled
     form.fileWriteAudioMaxFileSizeMb = library.fileWriteAudioMaxFileSizeMb
     form.fileRenameEnabled = library.fileRenameEnabled

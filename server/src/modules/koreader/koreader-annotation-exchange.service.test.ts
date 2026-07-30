@@ -76,8 +76,12 @@ describe('KoreaderAnnotationExchangeService', () => {
       ingestDeviceAnnotations: vi.fn().mockResolvedValue({ created: 0, updated: 0, moved: 0, unchanged: 0, skippedDeleted: 0 }),
       detectDeviceDeletions: vi.fn().mockResolvedValue(0),
       computePushDown: vi.fn().mockResolvedValue({ adds: [], edits: [], deletes: [], more: false }),
-      ensureDeviceCreatedAt: vi.fn().mockResolvedValue('2026-06-08 10:00:00'),
-      findDevicePositionFor: vi.fn().mockResolvedValue(null),
+      ensureDeviceCreatedAtMany: vi
+        .fn()
+        .mockImplementation((_userId: number, _bookId: number, rows: { id: number }[]) =>
+          Promise.resolve(new Map(rows.map((row) => [row.id, '2026-06-08 10:00:00']))),
+        ),
+      findPositions: vi.fn().mockResolvedValue([]),
       upsertGeneratedPosition: vi.fn().mockResolvedValue(undefined),
       applyExchangeAck: vi.fn().mockResolvedValue({ acked: 0 }),
     };
@@ -139,20 +143,17 @@ describe('KoreaderAnnotationExchangeService', () => {
 
   it('builds add entries with projected drawer, named color and minted datetime', async () => {
     annotationSync.computePushDown.mockResolvedValue({ adds: [makeAnnotationRow()], edits: [], deletes: [], more: false });
-    annotationSync.findDevicePositionFor.mockImplementation((_id: number, format: string) =>
-      Promise.resolve(
-        format === 'xpointer'
-          ? {
-              format: 'xpointer',
-              pos0: '/body/DocFragment[1]/body/p/text().0',
-              pos1: '/body/DocFragment[1]/body/p/text().5',
-              status: 'pending',
-              converterVersion: 1,
-              extras: { pageno: 3 },
-            }
-          : null,
-      ),
-    );
+    annotationSync.findPositions.mockResolvedValue([
+      {
+        annotationId: 100,
+        format: 'xpointer',
+        pos0: '/body/DocFragment[1]/body/p/text().0',
+        pos1: '/body/DocFragment[1]/body/p/text().5',
+        status: 'pending',
+        converterVersion: 1,
+        extras: { pageno: 3 },
+      },
+    ]);
 
     const response = await service.exchange(makeUser(), makeExchangeDto([makeBook()]));
 
@@ -173,9 +174,7 @@ describe('KoreaderAnnotationExchangeService', () => {
 
   it('converts missing xpointers within the budget and defers the entry to the next exchange', async () => {
     annotationSync.computePushDown.mockResolvedValue({ adds: [makeAnnotationRow()], edits: [], deletes: [], more: false });
-    annotationSync.findDevicePositionFor.mockImplementation((_id: number, format: string) =>
-      Promise.resolve(format === 'cfi' ? { format: 'cfi', pos0: 'epubcfi(/6/2!/4/2,/1:0,/1:5)', status: 'exact' } : null),
-    );
+    annotationSync.findPositions.mockResolvedValue([{ annotationId: 100, format: 'cfi', pos0: 'epubcfi(/6/2!/4/2,/1:0,/1:5)', status: 'exact' }]);
 
     const response = await service.exchange(makeUser(), makeExchangeDto([makeBook()]));
 
@@ -183,22 +182,80 @@ describe('KoreaderAnnotationExchangeService', () => {
     expect(annotationSync.upsertGeneratedPosition).toHaveBeenCalledWith(
       expect.objectContaining({ format: 'xpointer', status: 'pending', pos0: '/body/DocFragment[1]/body/p/text().0' }),
     );
+    expect(annotationSync.ensureDeviceCreatedAtMany).toHaveBeenCalledWith(7, 20, [expect.objectContaining({ id: 100 })], expect.any(Number));
     expect(response.results[0].toApply.add).toEqual([]);
     expect(response.results[0].skippedNoPosition).toBe(0);
   });
 
   it('marks conversion failures and counts them as skipped without retrying at current version', async () => {
     annotationSync.computePushDown.mockResolvedValue({ adds: [makeAnnotationRow()], edits: [], deletes: [], more: false });
-    annotationSync.findDevicePositionFor.mockImplementation((_id: number, format: string) =>
-      Promise.resolve(
-        format === 'xpointer' ? { format: 'xpointer', pos0: null, pos1: null, status: 'failed', converterVersion: 1, extras: null } : null,
-      ),
-    );
+    annotationSync.findPositions.mockResolvedValue([
+      { annotationId: 100, format: 'xpointer', pos0: null, pos1: null, status: 'failed', converterVersion: 1, extras: null },
+    ]);
 
     const response = await service.exchange(makeUser(), makeExchangeDto([makeBook()]));
 
     expect(positionConverter.cfiToXpointer).not.toHaveBeenCalled();
     expect(response.results[0].skippedNoPosition).toBe(1);
+  });
+
+  it('does not mint a device datetime for an annotation whose conversion failed', async () => {
+    annotationSync.computePushDown.mockResolvedValue({ adds: [makeAnnotationRow()], edits: [], deletes: [], more: false });
+    annotationSync.findPositions.mockResolvedValue([{ annotationId: 100, format: 'cfi', pos0: 'epubcfi(/6/2!/4/2,/1:0,/1:5)', status: 'exact' }]);
+    positionConverter.cfiToXpointer.mockResolvedValue({ status: 'failed', reason: 'chapter_unavailable' });
+
+    await service.exchange(makeUser(), makeExchangeDto([makeBook()]));
+
+    expect(annotationSync.upsertGeneratedPosition).toHaveBeenCalledWith(expect.objectContaining({ format: 'xpointer', status: 'failed' }));
+    expect(annotationSync.ensureDeviceCreatedAtMany).toHaveBeenCalledWith(7, 20, [], expect.any(Number));
+  });
+
+  it('reads every push-down position in one query and mints identities in one batch', async () => {
+    const adds = Array.from({ length: 3 }, (_, index) => makeAnnotationRow({ id: 100 + index }));
+    annotationSync.computePushDown.mockResolvedValue({ adds, edits: [], deletes: [], more: false });
+    annotationSync.findPositions.mockResolvedValue(
+      adds.map((annotation) => ({
+        annotationId: annotation.id,
+        format: 'xpointer',
+        pos0: '/body/DocFragment[1]/body/p/text().0',
+        pos1: '/body/DocFragment[1]/body/p/text().5',
+        status: 'pending',
+        converterVersion: 1,
+        extras: null,
+      })),
+    );
+
+    const response = await service.exchange(makeUser(), makeExchangeDto([makeBook()]));
+
+    expect(annotationSync.findPositions).toHaveBeenCalledTimes(1);
+    expect(annotationSync.findPositions).toHaveBeenCalledWith([100, 101, 102], ['pdf', 'xpointer', 'cfi']);
+    expect(annotationSync.ensureDeviceCreatedAtMany).toHaveBeenCalledTimes(1);
+    expect(response.results[0].toApply.add.map((entry) => entry.serverId)).toEqual([100, 101, 102]);
+  });
+
+  it('prefers a pdf position over an xpointer for the same annotation', async () => {
+    annotationSync.computePushDown.mockResolvedValue({ adds: [makeAnnotationRow()], edits: [], deletes: [], more: false });
+    annotationSync.findPositions.mockResolvedValue([
+      { annotationId: 100, format: 'xpointer', pos0: '/xpointer', pos1: null, status: 'pending', converterVersion: 1, extras: null },
+      { annotationId: 100, format: 'pdf', pos0: 'pdf-pos', pos1: null, status: 'exact', converterVersion: null, extras: { pageno: 7 } },
+    ]);
+
+    const response = await service.exchange(makeUser(), makeExchangeDto([makeBook()]));
+
+    expect(response.results[0].toApply.add[0]).toMatchObject({ posFormat: 'pdf', pos0: 'pdf-pos', pageno: 7 });
+  });
+
+  it('stops converting after the per-request budget and skips the rest', async () => {
+    const adds = Array.from({ length: 22 }, (_, index) => makeAnnotationRow({ id: 200 + index }));
+    annotationSync.computePushDown.mockResolvedValue({ adds, edits: [], deletes: [], more: false });
+    annotationSync.findPositions.mockResolvedValue(
+      adds.map((annotation) => ({ annotationId: annotation.id, format: 'cfi', pos0: 'epubcfi(/6/2!/4/2,/1:0,/1:5)', status: 'exact' })),
+    );
+
+    const response = await service.exchange(makeUser(), makeExchangeDto([makeBook()]));
+
+    expect(positionConverter.cfiToXpointer).toHaveBeenCalledTimes(20);
+    expect(response.results[0].skippedNoPosition).toBe(2);
   });
 
   it('builds edit entries with a datetime_updated ahead of the last device edit', async () => {

@@ -305,7 +305,7 @@ onMounted(() => {
           <div class="flex items-start gap-3">
             <button
               type="button"
-              class="custom-field-handle mt-7 shrink-0 text-muted-foreground/60 hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed cursor-grab active:cursor-grabbing"
+              class="custom-field-handle mt-7 shrink-0 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed cursor-grab active:cursor-grabbing"
               :disabled="reordering || isSearching"
               :title="isSearching ? t('settings.metadata.customFields.clearSearchToReorder') : t('settings.metadata.customFields.dragToReorder')"
               :aria-label="t('settings.metadata.customFields.dragToReorderField')"

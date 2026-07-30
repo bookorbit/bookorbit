@@ -87,6 +87,37 @@ describe('UserBookNoteRepository', () => {
     expect(insertBuilder.onConflictDoUpdate).toHaveBeenCalledWith(expect.objectContaining({ set: { note: 'Great read', updatedAt } }));
   });
 
+  it('upsertMany writes every entry in one statement', async () => {
+    const { db, insertBuilder } = makeDb();
+    const repo = new UserBookNoteRepository(db as never);
+    const updatedAt = new Date('2026-02-03T00:00:00.000Z');
+    insertBuilder.onConflictDoUpdate.mockResolvedValue(undefined);
+
+    await repo.upsertMany(
+      1,
+      [
+        { bookId: 10, note: 'a' },
+        { bookId: 11, note: null },
+      ],
+      updatedAt,
+    );
+
+    expect(db.insert).toHaveBeenCalledTimes(1);
+    expect(insertBuilder.values).toHaveBeenCalledWith([
+      { userId: 1, bookId: 10, note: 'a', updatedAt },
+      { userId: 1, bookId: 11, note: null, updatedAt },
+    ]);
+  });
+
+  it('upsertMany issues no statement for an empty entry list', async () => {
+    const { db } = makeDb();
+    const repo = new UserBookNoteRepository(db as never);
+
+    await repo.upsertMany(1, []);
+
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
   it('upsert supports clearing a note to null', async () => {
     const { db, insertBuilder } = makeDb();
     const repo = new UserBookNoteRepository(db as never);

@@ -808,7 +808,7 @@ onUnmounted(() => {
                 <template v-if="settingsTab === 'view'">
                   <div class="space-y-6">
                     <div>
-                      <p class="mb-2 text-[13px] font-medium text-foreground/90">{{ t('reader.cbz.fitMode') }}</p>
+                      <p class="mb-2 text-[13px] font-medium text-foreground">{{ t('reader.cbz.fitMode') }}</p>
                       <div class="grid grid-cols-2 gap-1 rounded-lg bg-muted/55 p-1">
                         <button
                           v-for="opt in FIT_OPTIONS"
@@ -830,7 +830,7 @@ onUnmounted(() => {
                     <div class="h-px bg-border/70" />
 
                     <div>
-                      <p class="mb-2 text-[13px] font-medium text-foreground/90">{{ t('reader.cbz.background') }}</p>
+                      <p class="mb-2 text-[13px] font-medium text-foreground">{{ t('reader.cbz.background') }}</p>
                       <div class="grid grid-cols-3 gap-1 rounded-lg bg-muted/55 p-1">
                         <button
                           v-for="opt in BG_OPTIONS"
@@ -854,7 +854,7 @@ onUnmounted(() => {
                 <template v-else-if="settingsTab === 'reading'">
                   <div class="space-y-6">
                     <div>
-                      <p class="mb-2 text-[13px] font-medium text-foreground/90">{{ t('reader.cbz.scrollMode') }}</p>
+                      <p class="mb-2 text-[13px] font-medium text-foreground">{{ t('reader.cbz.scrollMode') }}</p>
                       <div class="grid grid-cols-3 gap-1 rounded-lg bg-muted/55 p-1">
                         <button
                           v-for="opt in SCROLL_OPTIONS"
@@ -877,7 +877,7 @@ onUnmounted(() => {
                     <div class="h-px bg-border/70" />
 
                     <div>
-                      <p class="mb-2 text-[13px] font-medium text-foreground/90">{{ t('reader.cbz.readingDirection') }}</p>
+                      <p class="mb-2 text-[13px] font-medium text-foreground">{{ t('reader.cbz.readingDirection') }}</p>
                       <div class="grid grid-cols-2 gap-1 rounded-lg bg-muted/55 p-1">
                         <button
                           v-for="opt in DIRECTION_OPTIONS"
@@ -902,7 +902,7 @@ onUnmounted(() => {
                   <div class="space-y-6">
                     <div>
                       <div class="mb-2 flex items-center justify-between">
-                        <p class="text-[13px] font-medium text-foreground/90">{{ t('reader.cbz.pageView') }}</p>
+                        <p class="text-[13px] font-medium text-foreground">{{ t('reader.cbz.pageView') }}</p>
                         <span
                           v-if="showAutoFallbackBadge"
                           class="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"
@@ -933,7 +933,7 @@ onUnmounted(() => {
 
                     <div v-if="isTwoPagePreferred">
                       <div class="mb-2 flex items-center justify-between gap-3">
-                        <label for="cbz-spread-gap" class="text-[13px] font-medium text-foreground/90">{{ t('reader.cbz.spreadGap') }}</label>
+                        <label for="cbz-spread-gap" class="text-[13px] font-medium text-foreground">{{ t('reader.cbz.spreadGap') }}</label>
                         <span class="text-[11px] tabular-nums text-muted-foreground">
                           {{ t('reader.cbz.spreadGapValue', { value: spreadGap }) }}
                         </span>
@@ -952,7 +952,7 @@ onUnmounted(() => {
                     <div v-if="isTwoPagePreferred" class="h-px bg-border/70" />
 
                     <div v-if="showSpreadAlignmentControl">
-                      <p class="mb-2 text-[13px] font-medium text-foreground/90">{{ t('reader.cbz.spreadAlignmentLabel') }}</p>
+                      <p class="mb-2 text-[13px] font-medium text-foreground">{{ t('reader.cbz.spreadAlignmentLabel') }}</p>
                       <div class="grid grid-cols-2 gap-1 rounded-lg bg-muted/55 p-1">
                         <button
                           v-for="opt in SPREAD_ALIGNMENT_OPTIONS"
@@ -979,7 +979,7 @@ onUnmounted(() => {
                     </div>
 
                     <div>
-                      <p class="mb-2 text-[13px] font-medium text-foreground/90">{{ t('reader.cbz.forceTwoPage') }}</p>
+                      <p class="mb-2 text-[13px] font-medium text-foreground">{{ t('reader.cbz.forceTwoPage') }}</p>
                       <div class="grid grid-cols-2 gap-1 rounded-lg bg-muted/55 p-1">
                         <button
                           ref="forceTwoPageToggleButton"
@@ -1009,7 +1009,7 @@ onUnmounted(() => {
                     </div>
 
                     <div>
-                      <p class="mb-2 text-[13px] font-medium text-foreground/90">{{ t('reader.cbz.widePages') }}</p>
+                      <p class="mb-2 text-[13px] font-medium text-foreground">{{ t('reader.cbz.widePages') }}</p>
                       <div class="grid grid-cols-2 gap-1 rounded-lg bg-muted/55 p-1">
                         <button
                           v-for="opt in WIDE_PAGE_OPTIONS"

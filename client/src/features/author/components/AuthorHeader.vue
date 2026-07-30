@@ -138,15 +138,15 @@ watch(resolvedBio, () => {
               v-if="resolvedBio"
               :class="
                 bioExpanded
-                  ? 'text-sm leading-6 text-foreground/90'
-                  : 'text-sm leading-6 text-foreground/90 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:5] [-webkit-box-orient:vertical]'
+                  ? 'text-sm leading-6 text-foreground'
+                  : 'text-sm leading-6 text-foreground overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:5] [-webkit-box-orient:vertical]'
               "
             >
               {{ resolvedBio }}
             </p>
             <button
               v-if="resolvedBio"
-              class="mt-1 text-xs font-medium text-primary transition-colors hover:text-primary/80"
+              class="mt-1 text-xs font-medium text-primary transition-colors hover:text-primary"
               @click="bioExpanded = !bioExpanded"
             >
               {{ bioExpanded ? t('author.header.showLess') : t('author.header.showMore') }}

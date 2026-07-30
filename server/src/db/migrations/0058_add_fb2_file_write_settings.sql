@@ -1,0 +1,2 @@
+ALTER TABLE "libraries" ADD COLUMN "file_write_fb2_enabled" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "libraries" ADD COLUMN "file_write_fb2_max_file_size_mb" integer DEFAULT 100 NOT NULL;

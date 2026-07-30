@@ -83,7 +83,7 @@ function humanReadableCron(cron: string | null): string {
   <div class="px-6 py-6 space-y-8">
     <!-- Watch folders -->
     <div>
-      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-3">{{ t('library.creator.schedule.fileWatching') }}</p>
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground mb-3">{{ t('library.creator.schedule.fileWatching') }}</p>
       <div class="overflow-hidden rounded-lg border border-border">
         <div class="flex items-center justify-between gap-4 bg-card px-4 py-4 sm:px-5">
           <div>
@@ -97,7 +97,7 @@ function humanReadableCron(cron: string | null): string {
 
     <!-- Auto-scan schedule -->
     <div>
-      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-3">{{ t('library.creator.schedule.autoScanSchedule') }}</p>
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground mb-3">{{ t('library.creator.schedule.autoScanSchedule') }}</p>
       <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
         <button
           v-for="preset in presets"
@@ -125,7 +125,7 @@ function humanReadableCron(cron: string | null): string {
           type="text"
           :value="autoScanCronExpression ?? ''"
           placeholder="0 0 * * *"
-          class="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2"
+          class="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2"
           :class="isCronValid ? 'border-border focus:ring-ring' : 'border-destructive focus:ring-destructive'"
           :aria-invalid="!isCronValid"
           aria-describedby="library-scan-cron-help"

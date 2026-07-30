@@ -358,7 +358,7 @@ function dismissError(index: number) {
 
           <!-- Preview line -->
           <div
-            class="px-4 pb-3 -mt-1 text-sm text-muted-foreground/90 truncate"
+            class="px-4 pb-3 -mt-1 text-sm text-muted-foreground truncate"
             :style="{ fontFamily: `'${family.cssFamilyName}', sans-serif`, fontSize: '16px' }"
           >
             {{ t('settings.reader.fonts.pangram') }}

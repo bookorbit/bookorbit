@@ -35,39 +35,55 @@ export class DashboardService {
     const clampedLimit = Math.min(Math.max(1, limit), MAX_LIMIT);
 
     if (type === ScrollerType.SMART_SCOPE) {
-      if (!smartScopeId || smartScopeId <= 0) {
-        throw new BadRequestException('smartScopeId is required and must be a positive integer when scroller type is smartScope');
-      }
-      const result = await this.smartScopeService.executeSmartScope(smartScopeId, user, 0, clampedLimit);
+      const result = await this.smartScopeService.executeSmartScope(this.assertSmartScopeId(smartScopeId), user, 0, clampedLimit);
       return result.items;
     }
 
+    return this.loadCardsByIds(await this.findScrollerBookIds(type, user, clampedLimit), user.id);
+  }
+
+  // Book-id selection without the web card assembly, so other modules can shape
+  // the same rows into their own response type. Smart scopes are excluded: they
+  // resolve through SmartScopeService, which returns assembled cards directly.
+  async getScrollerBookIds(type: Exclude<ScrollerType, 'smart-scope'>, user: RequestUser, limit: number): Promise<number[]> {
+    return this.findScrollerBookIds(type, user, Math.min(Math.max(1, limit), MAX_LIMIT));
+  }
+
+  async getSmartScopeBookIds(smartScopeId: number | undefined, user: RequestUser, limit: number): Promise<number[]> {
+    const result = await this.smartScopeService.executeSmartScope(
+      this.assertSmartScopeId(smartScopeId),
+      user,
+      0,
+      Math.min(Math.max(1, limit), MAX_LIMIT),
+    );
+    return result.items.map((item) => item.id);
+  }
+
+  private assertSmartScopeId(smartScopeId?: number): number {
+    if (!smartScopeId || smartScopeId <= 0) {
+      throw new BadRequestException('smartScopeId is required and must be a positive integer when scroller type is smartScope');
+    }
+    return smartScopeId;
+  }
+
+  private async findScrollerBookIds(type: Exclude<ScrollerType, 'smart-scope'>, user: RequestUser, clampedLimit: number): Promise<number[]> {
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
     if (accessibleLibraryIds.length === 0) return [];
 
     const contentFilters = user.isSuperuser ? undefined : user.contentFilters;
-    let bookIds: number[];
     switch (type) {
       case ScrollerType.RECENTLY_ADDED:
-        bookIds = await this.dashboardRepo.findRecentlyAddedBookIds(accessibleLibraryIds, clampedLimit, contentFilters);
-        break;
+        return this.dashboardRepo.findRecentlyAddedBookIds(accessibleLibraryIds, clampedLimit, contentFilters);
       case ScrollerType.CONTINUE_READING:
-        bookIds = await this.dashboardRepo.findContinueReadingBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters);
-        break;
+        return this.dashboardRepo.findContinueReadingBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters);
       case ScrollerType.CONTINUE_LISTENING:
-        bookIds = await this.dashboardRepo.findContinueListeningBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters);
-        break;
+        return this.dashboardRepo.findContinueListeningBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters);
       case ScrollerType.WANT_TO_READ:
-        bookIds = await this.dashboardRepo.findWantToReadBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters);
-        break;
+        return this.dashboardRepo.findWantToReadBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters);
       case ScrollerType.UP_NEXT_IN_SERIES:
-        bookIds = await this.dashboardRepo.findUpNextInSeriesBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters);
-        break;
+        return this.dashboardRepo.findUpNextInSeriesBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters);
       case ScrollerType.RANDOM:
-        bookIds = await this.dashboardRepo.findRandomBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters);
-        break;
+        return this.dashboardRepo.findRandomBookIds(accessibleLibraryIds, user.id, clampedLimit, contentFilters);
     }
-
-    return this.loadCardsByIds(bookIds, user.id);
   }
 }

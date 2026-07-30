@@ -448,7 +448,7 @@ function showValueToInput(operator: RuleOperator): boolean {
               class="flex items-center gap-1 h-5 px-1.5 rounded bg-primary/15 text-primary text-xs font-medium shrink-0"
             >
               {{ libraryName }}
-              <button type="button" class="text-primary/60 hover:text-primary leading-none" @click="removeLibraryChip(index, libraryName)">
+              <button type="button" class="text-primary hover:text-primary leading-none" @click="removeLibraryChip(index, libraryName)">
                 <X :size="10" />
               </button>
             </span>
@@ -486,7 +486,7 @@ function showValueToInput(operator: RuleOperator): boolean {
               class="flex items-center gap-1 h-5 px-1.5 rounded bg-primary/15 text-primary text-xs font-medium shrink-0"
             >
               {{ READ_STATUS_LABELS[status] ?? status }}
-              <button type="button" class="text-primary/60 hover:text-primary leading-none" @click="removeStatusChip(index, status)">
+              <button type="button" class="text-primary hover:text-primary leading-none" @click="removeStatusChip(index, status)">
                 <X :size="10" />
               </button>
             </span>
@@ -601,7 +601,7 @@ function showValueToInput(operator: RuleOperator): boolean {
 
         <button
           @click="removeNode(index)"
-          class="ml-auto h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
+          class="ml-auto h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
         >
           <Trash2 :size="13" />
         </button>
@@ -611,13 +611,13 @@ function showValueToInput(operator: RuleOperator): boolean {
       <div v-else-if="node.kind === 'group'" class="flex items-start gap-2">
         <div class="flex-1 rounded-lg border border-primary/20 bg-primary/3 p-3">
           <div class="flex items-center justify-between mb-3">
-            <span class="text-[10px] font-semibold uppercase tracking-widest text-primary/50">{{ t('book.filter.group') }}</span>
+            <span class="text-[10px] font-semibold uppercase tracking-widest text-primary">{{ t('book.filter.group') }}</span>
           </div>
           <BookFilterBuilder :model-value="node.group" :depth="(depth ?? 0) + 1" @update:model-value="onSubGroupUpdate(index, $event)" />
         </div>
         <button
           @click="removeNode(index)"
-          class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0 mt-1"
+          class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0 mt-1"
         >
           <Trash2 :size="13" />
         </button>
@@ -636,7 +636,7 @@ function showValueToInput(operator: RuleOperator): boolean {
       <button
         v-if="(depth ?? 0) < MAX_DEPTH"
         @click="addGroup"
-        class="flex items-center gap-1.5 h-9 px-4 rounded-lg border border-dashed border-primary/30 text-sm text-primary/50 hover:text-primary hover:border-primary hover:bg-primary/5 transition-colors"
+        class="flex items-center gap-1.5 h-9 px-4 rounded-lg border border-dashed border-primary/30 text-sm text-primary hover:text-primary hover:border-primary hover:bg-primary/5 transition-colors"
       >
         <Plus :size="13" />
         {{ t('book.filter.addGroup') }}

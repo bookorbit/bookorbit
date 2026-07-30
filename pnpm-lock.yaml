@@ -427,6 +427,9 @@ importers:
       fastify:
         specifier: ^5.10.0
         version: 5.10.0
+      iconv-lite:
+        specifier: ^0.7.3
+        version: 0.7.3
       jose:
         specifier: ^6.2.4
         version: 6.2.4

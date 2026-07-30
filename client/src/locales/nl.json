@@ -4585,18 +4585,18 @@
         "shelves": "Planken"
       },
       "widgetNames": {
-        "readingStreak": "Reading Streak",
-        "currentlyReading": "Currently Reading",
+        "readingStreak": "Leesreeks",
+        "currentlyReading": "Nu aan het lezen",
         "readingGoal": "Reading Goal",
-        "readingDna": "Reading DNA",
-        "monthlyChallenge": "Monthly Challenge",
-        "highlightOfTheDay": "Highlight of the Day",
-        "neglectedGems": "Neglected Gems",
-        "readingRhythm": "Reading Rhythm",
-        "diversityScore": "Diversity Score",
-        "libraryOverview": "Library Overview",
-        "yearProjection": "Year Projection",
-        "longWait": "The Long Wait"
+        "readingDna": "Lees-DNA",
+        "monthlyChallenge": "Maandelijkse uitdaging",
+        "highlightOfTheDay": "Markering van de dag",
+        "neglectedGems": "Vergeten pareltjes",
+        "readingRhythm": "Leesritme",
+        "diversityScore": "Diversiteitsscore",
+        "libraryOverview": "Bibliotheekoverzicht",
+        "yearProjection": "Jaarprognose",
+        "longWait": "Het lange wachten"
       },
       "shelfNames": {
         "recentlyAdded": "Recently Added",

@@ -980,7 +980,7 @@ defineExpose({
       <div class="flex items-center gap-2">
         <span v-if="selectionMode && selectedCount">
           {{ t('book.tableView.selectedStatus', { count: formatNumber(selectedCount) }) }}
-          <span class="text-muted-foreground/60">/ </span>
+          <span class="text-muted-foreground">/ </span>
         </span>
         <span v-if="filterActive" class="flex items-center gap-1 text-primary">
           <span class="h-1.5 w-1.5 rounded-full bg-primary" />
@@ -998,7 +998,7 @@ defineExpose({
         >
           ?
         </button>
-        <span class="hidden lg:inline text-[11px] text-muted-foreground/80">{{ t('book.tableView.copyHint') }}</span>
+        <span class="hidden lg:inline text-[11px] text-muted-foreground">{{ t('book.tableView.copyHint') }}</span>
         <span v-if="loading" class="flex items-center gap-1">
           <Loader2 :size="11" class="animate-spin" />
           {{ t('common.loading') }}

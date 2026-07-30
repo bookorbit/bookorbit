@@ -1,10 +1,12 @@
-import { Injectable, InternalServerErrorException, Optional } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, Optional } from '@nestjs/common';
 import type { ReadStatus, UserBookStatus } from '@bookorbit/types';
 import { UserBookStatusRepository } from './user-book-status.repository';
 import type { UserBookStatusRow } from '../../db/schema';
 import { isReadStatus, isReadStatusSource } from './user-book-status.constants';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED } from '../achievement/achievement-events.service';
+import { KoboStatusProjectionRepository } from './kobo-status-projection.repository';
 import { ReadingAttemptService } from './reading-attempt.service';
+import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 
 const DEFAULT_FINISH_THRESHOLD = 98;
 const READING_THRESHOLD = 0.25;
@@ -26,9 +28,12 @@ export type AutoReadingActivity = {
 
 @Injectable()
 export class UserBookStatusService {
+  private readonly logger = new Logger(UserBookStatusService.name);
+
   constructor(
     private readonly repo: UserBookStatusRepository,
     private readonly achievementEvents: AchievementEventsService,
+    private readonly koboProjection: KoboStatusProjectionRepository,
     @Optional() private readonly attempts?: ReadingAttemptService,
   ) {}
 
@@ -42,6 +47,19 @@ export class UserBookStatusService {
     patch: ManualStatusPatch,
     dateKeys?: { startedOn?: string | null; endedOn?: string | null },
   ): Promise<UserBookStatus> {
+    const { state, statusChanged } = await this.applyManualStatus(userId, bookId, patch, dateKeys);
+    if (statusChanged) {
+      await this.projectToKobo(userId, [bookId], state.status);
+    }
+    return state;
+  }
+
+  private async applyManualStatus(
+    userId: number,
+    bookId: number,
+    patch: ManualStatusPatch,
+    dateKeys?: { startedOn?: string | null; endedOn?: string | null },
+  ): Promise<{ state: UserBookStatus; statusChanged: boolean }> {
     const existing = await this.repo.findOne(userId, bookId);
     const now = new Date();
     const hasStatus = Object.prototype.hasOwnProperty.call(patch, 'status');
@@ -60,7 +78,8 @@ export class UserBookStatusService {
         today,
       );
       const previousStatus = existing?.status ?? null;
-      if (hasStatus && updated.status !== previousStatus) {
+      const statusChanged = hasStatus && updated.status !== previousStatus;
+      if (statusChanged) {
         this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, {
           userId,
           bookId,
@@ -68,7 +87,7 @@ export class UserBookStatusService {
           previousStatus,
         });
       }
-      return updated;
+      return { state: updated, statusChanged };
     }
 
     const nextStatus = patch.status ?? existing?.status ?? 'unread';
@@ -109,7 +128,8 @@ export class UserBookStatusService {
     }
 
     const previousStatus = existing?.status ?? null;
-    if (hasStatus && nextStatus !== previousStatus) {
+    const statusChanged = hasStatus && nextStatus !== previousStatus;
+    if (statusChanged) {
       this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, {
         userId,
         bookId,
@@ -119,24 +139,41 @@ export class UserBookStatusService {
     }
 
     return {
-      status: nextStatus,
-      source: 'manual',
-      startedAt: nextStartedAt?.toISOString() ?? null,
-      finishedAt: nextFinishedAt?.toISOString() ?? null,
-      updatedAt: now.toISOString(),
+      state: {
+        status: nextStatus,
+        source: 'manual',
+        startedAt: nextStartedAt?.toISOString() ?? null,
+        finishedAt: nextFinishedAt?.toISOString() ?? null,
+        updatedAt: now.toISOString(),
+      },
+      statusChanged,
     };
   }
 
   async bulkSetManual(userId: number, bookIds: number[], status: ReadStatus): Promise<void> {
     if (bookIds.length === 0) return;
+    // Grouped by resulting status because reading-attempt projection can settle on a
+    // different status than requested (a completed book set to "reading" becomes "rereading").
+    const changedByStatus = new Map<ReadStatus, number[]>();
+    const recordChange = (resolved: ReadStatus, bookId: number) => {
+      const ids = changedByStatus.get(resolved);
+      if (ids) ids.push(bookId);
+      else changedByStatus.set(resolved, [bookId]);
+    };
+
     if (this.attempts) {
       const batchSize = 50;
       for (let offset = 0; offset < bookIds.length; offset += batchSize) {
         const batch = bookIds.slice(offset, offset + batchSize);
-        await Promise.all(batch.map((bookId) => this.updateManual(userId, bookId, { status })));
+        const results = await Promise.all(batch.map((bookId) => this.applyManualStatus(userId, bookId, { status })));
+        results.forEach((result, index) => {
+          if (result.statusChanged) recordChange(result.state.status, batch[index]!);
+        });
       }
+      await this.projectGroupsToKobo(userId, changedByStatus);
       return;
     }
+
     const now = new Date();
     const existing = await this.repo.findByBookIds(userId, bookIds);
     const existingMap = new Map(existing.map((row) => [row.bookId, row]));
@@ -162,7 +199,33 @@ export class UserBookStatusService {
           newStatus: status,
           previousStatus,
         });
+        recordChange(status, bookId);
       }
+    }
+    await this.projectGroupsToKobo(userId, changedByStatus);
+  }
+
+  private async projectGroupsToKobo(userId: number, changedByStatus: Map<ReadStatus, number[]>): Promise<void> {
+    for (const [status, ids] of changedByStatus) {
+      await this.projectToKobo(userId, ids, status);
+    }
+  }
+
+  /**
+   * Mirrors the new read status onto the Kobo reading state so devices pick it up on
+   * the next sync. Best-effort: a Kobo projection failure must not fail the status change.
+   */
+  private async projectToKobo(userId: number, bookIds: number[], status: ReadStatus): Promise<void> {
+    if (bookIds.length === 0) return;
+    const startedAt = Date.now();
+    try {
+      if (!(await this.koboProjection.isEnabled(userId))) return;
+      await this.koboProjection.project(userId, bookIds, status);
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.logger.warn(
+        `[user_book_status.kobo_projection] [fail] userId=${userId} count=${bookIds.length} status=${status} durationMs=${Date.now() - startedAt} errorClass=${err.constructor.name} error="${sanitizeLogValue(err.message)}" - kobo status projection failed`,
+      );
     }
   }
 

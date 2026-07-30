@@ -115,7 +115,7 @@ function toggleExpanded(): void {
         <p class="text-xs text-muted-foreground font-medium uppercase tracking-wider">{{ t('tools.entityManager.duplicates.pairDetails') }}</p>
         <div v-for="(pair, idx) in cluster.pairDetails" :key="idx" class="flex items-center gap-2 text-xs px-2 py-1 rounded bg-muted/30">
           <span class="flex-1 text-muted-foreground truncate">
-            {{ cluster.entities.find((e) => e.id === pair.idA)?.name }} <span class="text-foreground/50">&harr;</span>
+            {{ cluster.entities.find((e) => e.id === pair.idA)?.name }} <span class="text-foreground">&harr;</span>
             {{ cluster.entities.find((e) => e.id === pair.idB)?.name }}
           </span>
           <span class="font-mono shrink-0 px-1.5 py-0.5 rounded-sm" :class="getSimilarityColorClass(pair.similarity)">

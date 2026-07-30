@@ -28,6 +28,7 @@ describe('AuthorsService', () => {
     findRelatedLibraryIds: vi.fn(),
     findByIdForEnrichment: vi.fn(),
     updateAuthorDescriptionIfEmpty: vi.fn(),
+    countAuthors: vi.fn(),
   };
 
   const bookRepo = {
@@ -36,6 +37,7 @@ describe('AuthorsService', () => {
 
   const libraryService = {
     findAll: vi.fn(),
+    findAccessibleLibraryIds: vi.fn(),
   };
 
   const authorMetadataFetchService = {
@@ -88,6 +90,7 @@ describe('AuthorsService', () => {
       metadataScoreService as any,
     );
     libraryService.findAll.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([1, 2]);
     authorImageStorage.getThumbnailUrlIfExists.mockResolvedValue(null);
     authorImageStorage.getImageUrlIfExists.mockResolvedValue(null);
     enrichmentOrchestrator.schedule.mockResolvedValue(1);
@@ -95,6 +98,20 @@ describe('AuthorsService', () => {
     appSettings.getAuthorsAutoEnrichmentWriteMode.mockResolvedValue('missing_only');
     metadataScoreService.calculateAndSaveMany.mockResolvedValue(undefined);
     vi.mocked(assembleBookCards).mockReturnValue([]);
+  });
+
+  it('countAll counts authors across the accessible libraries', async () => {
+    authorsRepo.countAuthors.mockResolvedValue(1234);
+
+    await expect(service.countAll(reqUser())).resolves.toBe(1234);
+    expect(authorsRepo.countAuthors).toHaveBeenCalledWith({ libraryIds: [1, 2], contentFilters: undefined });
+  });
+
+  it('countAll skips the query when the user has no library access', async () => {
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([]);
+
+    await expect(service.countAll(reqUser())).resolves.toBe(0);
+    expect(authorsRepo.countAuthors).not.toHaveBeenCalled();
   });
 
   it('merge rejects when sources do not contain any id different from target', async () => {

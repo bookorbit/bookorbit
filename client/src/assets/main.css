@@ -177,16 +177,6 @@
     linear-gradient(to top, color-mix(in oklch, var(--primary) 3%, transparent), transparent 30%);
 }
 
-.pattern-terminal::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  opacity: 0.05;
-  background-image: repeating-linear-gradient(90deg, var(--primary), var(--primary) 1px, transparent 1px, transparent 40px);
-}
-
 .pattern-scanlines::before {
   content: '';
   position: fixed;
@@ -350,11 +340,25 @@
     border: 2px solid transparent;
     background-clip: padding-box;
   }
+
+  /* A 10px scrollbar eats a visible slice of the sidebar's right gutter and makes the
+     shell read as lopsided. Keep it narrow inside the sidebar only. */
+  [data-sidebar='content'] {
+    scrollbar-width: thin;
+  }
+
+  [data-sidebar='content']::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  [data-sidebar='content']::-webkit-scrollbar-thumb {
+    border-width: 1px;
+  }
 }
 
 @layer components {
   .viewer-btn {
-    @apply flex items-center justify-center w-8 h-8 rounded text-foreground/60 hover:text-foreground hover:bg-muted transition-colors shrink-0 disabled:opacity-30 disabled:cursor-not-allowed;
+    @apply flex items-center justify-center w-8 h-8 rounded text-foreground hover:bg-muted transition-colors shrink-0 disabled:opacity-30 disabled:cursor-not-allowed;
   }
   .viewer-sep {
     @apply w-px h-5 mx-1 bg-border shrink-0;
@@ -388,7 +392,7 @@
   ────────────────────────────────────────────────────────────── */
   .input-field {
     @apply h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground
-           placeholder:text-muted-foreground/70
+           placeholder:text-muted-foreground
            focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary
            disabled:opacity-50 transition-colors;
   }

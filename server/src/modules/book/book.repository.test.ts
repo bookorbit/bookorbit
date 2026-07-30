@@ -772,7 +772,7 @@ describe('BookRepository', () => {
     const db = {
       select: vi
         .fn()
-        .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub' }]))
+        .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub', markAsFinishedPercentComplete: 98 }]))
         .mockReturnValueOnce(
           makeSelectChain('limit', [
             {
@@ -839,7 +839,7 @@ describe('BookRepository', () => {
     const db = {
       select: vi
         .fn()
-        .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub' }]))
+        .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub', markAsFinishedPercentComplete: 98 }]))
         .mockReturnValueOnce(
           makeSelectChain('limit', [
             {
@@ -888,7 +888,7 @@ describe('BookRepository', () => {
     const db = {
       select: vi
         .fn()
-        .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub' }]))
+        .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub', markAsFinishedPercentComplete: 98 }]))
         .mockReturnValueOnce(makeSelectChain('limit', [existingState])),
       insert: vi.fn().mockReturnValue(insertChain),
       execute: vi.fn().mockResolvedValue(undefined),
@@ -915,7 +915,7 @@ describe('BookRepository', () => {
     const db = {
       select: vi
         .fn()
-        .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub' }]))
+        .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub', markAsFinishedPercentComplete: 98 }]))
         .mockReturnValueOnce(makeSelectChain('limit', [existingState])),
       insert: vi.fn(),
       execute: vi.fn(),
@@ -930,7 +930,9 @@ describe('BookRepository', () => {
 
   it('does not sync Kobo reading state for non-primary EPUB files', async () => {
     const db = {
-      select: vi.fn().mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 99, format: 'epub' }])),
+      select: vi
+        .fn()
+        .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 99, format: 'epub', markAsFinishedPercentComplete: 98 }])),
       insert: vi.fn(),
       execute: vi.fn(),
     };
@@ -940,6 +942,45 @@ describe('BookRepository', () => {
 
     expect(db.insert).not.toHaveBeenCalled();
     expect(db.execute).not.toHaveBeenCalled();
+  });
+
+  describe('Kobo status derived from the library finished threshold', () => {
+    async function syncStatusFor(percentage: number, markAsFinishedPercentComplete: unknown): Promise<string> {
+      const insertChain = makeInsertChain();
+      const db = {
+        select: vi
+          .fn()
+          .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub', markAsFinishedPercentComplete }]))
+          .mockReturnValueOnce(makeSelectChain('limit', [])),
+        insert: vi.fn().mockReturnValue(insertChain),
+        execute: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await new BookRepository(db as never).syncKoboReadingStateFromProgress(5, 9, percentage);
+
+      return (insertChain.values.mock.calls[0][0] as { statusInfo: { Status: string } }).statusInfo.Status;
+    }
+
+    it.each([
+      { percentage: 0, threshold: 98, expected: 'ReadyToRead' },
+      { percentage: 40, threshold: 98, expected: 'Reading' },
+      { percentage: 97.5, threshold: 98, expected: 'Reading' },
+      { percentage: 98, threshold: 98, expected: 'Finished' },
+      { percentage: 100, threshold: 98, expected: 'Finished' },
+      { percentage: 95, threshold: 95, expected: 'Finished' },
+      { percentage: 99, threshold: 100, expected: 'Reading' },
+    ])('reports $expected at $percentage% with a $threshold% threshold', async ({ percentage, threshold, expected }) => {
+      await expect(syncStatusFor(percentage, threshold)).resolves.toBe(expected);
+    });
+
+    it('never reports an unread book as finished when the threshold is zero', async () => {
+      await expect(syncStatusFor(0, 0)).resolves.toBe('ReadyToRead');
+    });
+
+    it('requires full completion when the threshold is unusable', async () => {
+      await expect(syncStatusFor(98, null)).resolves.toBe('Reading');
+      await expect(syncStatusFor(100, null)).resolves.toBe('Finished');
+    });
   });
 
   it('reads whether Kobo two-way progress sync is enabled', async () => {

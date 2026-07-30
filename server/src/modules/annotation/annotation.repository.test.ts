@@ -379,6 +379,23 @@ describe('AnnotationRepository', () => {
     });
   });
 
+  describe('countHub', () => {
+    it('counts matching annotations without joining the book tables', async () => {
+      const db = makeDb([{ total: 18000 }]);
+      const repo = new AnnotationRepository(db as never);
+
+      await expect(repo.countHub(10, { status: 'active' })).resolves.toBe(18000);
+      expect(db._queries[0].leftJoin).not.toHaveBeenCalled();
+    });
+
+    it('returns zero when the count query yields no row', async () => {
+      const db = makeDb([]);
+      const repo = new AnnotationRepository(db as never);
+
+      await expect(repo.countHub(10, { status: 'trashed' })).resolves.toBe(0);
+    });
+  });
+
   describe('getHubStats', () => {
     it('returns the aggregate row including the notes-only filter', async () => {
       const db = makeDb([{ books: 2, withNotes: 1, web: 1, koreader: 1, kobo: 0 }]);

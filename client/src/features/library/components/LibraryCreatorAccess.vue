@@ -122,13 +122,13 @@ onMounted(loadAccess)
 <template>
   <div class="px-6 py-6 space-y-6">
     <div v-if="!libraryId" class="rounded-lg border border-dashed border-border px-5 py-8 text-center">
-      <UserPlus :size="22" class="text-muted-foreground/60 mx-auto mb-2" />
+      <UserPlus :size="22" class="text-muted-foreground mx-auto mb-2" />
       <p class="text-sm text-muted-foreground">{{ t('library.creator.access.notYetCreated') }}</p>
     </div>
 
     <template v-else>
       <div>
-        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-1">{{ t('library.creator.access.title') }}</p>
+        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground mb-1">{{ t('library.creator.access.title') }}</p>
         <p class="text-xs text-muted-foreground mb-3">{{ t('library.creator.access.description') }}</p>
 
         <p v-if="error" class="text-xs text-destructive mb-3" role="alert">{{ error }}</p>

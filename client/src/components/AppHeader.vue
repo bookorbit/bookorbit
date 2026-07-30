@@ -9,16 +9,14 @@ import {
   KeyRound,
   Settings,
   LogOut,
-  PackageOpen,
+  User,
   BarChart3,
   Trophy,
-  User,
   MoreVertical,
   BadgeQuestionMark,
   Star,
   ExternalLink,
   Sparkles,
-  Highlighter,
   Check,
   Languages,
 } from '@lucide/vue'
@@ -45,6 +43,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import RadiusPicker from '@/components/RadiusPicker.vue'
 import BackgroundPicker from '@/components/BackgroundPicker.vue'
 import ThemePicker from '@/components/ThemePicker.vue'
+import SurfacePicker from '@/components/SurfacePicker.vue'
 import { useGlobalSearch, type GlobalSearchResult } from '@/features/book/composables/useGlobalSearch'
 import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
 import { useAuth } from '@/features/auth/composables/useAuth'
@@ -52,7 +51,6 @@ import { useChangePasswordDialog } from '@/composables/useChangePasswordDialog'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import BookUploadModal from '@/features/library/components/BookUploadModal.vue'
 import { useLibraryUploadEvents } from '@/features/library/composables/useLibraryUploadEvents'
-import { useBookDockSummary } from '@/features/book-dock/composables/useBookDockSummary'
 import NotificationSheet from '@/features/notifications/components/NotificationSheet.vue'
 import { useNotifications } from '@/features/notifications/composables/useNotifications'
 import { useWhatsNew } from '@/features/whats-new/composables/useWhatsNew'
@@ -69,7 +67,6 @@ const { user, logout } = useAuth()
 const { open: openChangePassword } = useChangePasswordDialog()
 const { hasPermission, isDemoRestrictedAccount } = usePermissions()
 const { onLibraryUploadCompleted } = useLibraryUploadEvents()
-const { summary: bookDockSummary, fetchSummary: fetchBookDockSummary, subscribe: subscribeBookDockSummary } = useBookDockSummary()
 const { subscribe: subscribeNotifications } = useNotifications()
 const { hasUnseen: hasUnseenWhatsNew } = useWhatsNew()
 const themeStore = useThemeStore()
@@ -79,36 +76,46 @@ const documentationUrl = 'https://bookorbit.app/what-is-bookorbit'
 const githubRepositoryUrl = 'https://github.com/bookorbit/bookorbit'
 const githubStarPopoverOpen = ref(false)
 
-const isBookDockActive = computed(() => route.name === 'book-dock')
-const isAchievementsActive = computed(() => route.name === 'achievements')
+const iconRadiusClass = computed(() => (themeStore.radius === 'sharp' ? 'rounded-none' : 'rounded-full'))
+
+/**
+ * Every header control shares one ghost treatment; nothing in here outranks anything else.
+ * Interactive chrome sits at full foreground, matching the sidebar nav rows: muted is for
+ * secondary text, not for controls.
+ */
+const controlClass = computed(() => [
+  'h-8 w-8 border border-(--shell-accent-line) text-foreground transition-colors duration-150 hover:bg-(--shell-accent-wash)',
+  iconRadiusClass.value,
+])
+
+/** Same ghost geometry, plus the tinted active state the two destinations need. */
+function destinationClass(isActive: boolean) {
+  return [
+    'h-8 w-8 border transition-colors duration-150',
+    isActive ? 'border-primary bg-(--shell-accent-tint) text-primary' : 'border-(--shell-accent-line) text-foreground hover:bg-(--shell-accent-wash)',
+    iconRadiusClass.value,
+  ]
+}
+
 const isStatisticsActive = computed(() => route.name === 'statistics')
-const isAnnotationsActive = computed(() => route.name === 'annotations')
+const isAchievementsActive = computed(() => route.name === 'achievements')
 const achievementsEnabled = computed(() => user.value?.settings?.achievementPreferences?.enabled !== false)
 
-const iconRadiusClass = computed(() => (themeStore.radius === 'sharp' ? 'rounded-none' : 'rounded-full'))
+function navigateToStatistics() {
+  router.push({ name: 'statistics', query: { tab: 'library' } })
+}
+
+function navigateToAchievements() {
+  router.push({ name: 'achievements' })
+}
+
 const canChangePassword = computed(
   () => !isDemoRestrictedAccount.value && user.value?.provisioningMethod !== 'oidc' && user.value?.provisioningMethod !== 'shared',
 )
 const canAccessNotifications = computed(() => hasPermission('notification_access') && !isDemoRestrictedAccount.value)
 const GLOBAL_SEARCH_ROW_HEIGHT = 84
 const GLOBAL_SEARCH_OVERSCAN = 4
-const GLOBAL_SEARCH_VIEWPORT_HEIGHT = 320
-
-function navigateToBookDock() {
-  router.push({ name: 'book-dock' })
-}
-
-function navigateToStatistics() {
-  router.push({ name: 'statistics', query: { tab: 'library' } })
-}
-
-function navigateToAnnotations() {
-  router.push({ name: 'annotations' })
-}
-
-function navigateToAchievements() {
-  router.push({ name: 'achievements' })
-}
+const GLOBAL_SEARCH_VIEWPORT_HEIGHT = 512
 
 function navigateToAccount() {
   router.push({ name: 'settings-account' })
@@ -286,10 +293,6 @@ function handleGlobalKeydown(e: KeyboardEvent) {
 
 onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown)
-  if (hasPermission('book_dock_access')) {
-    fetchBookDockSummary()
-    subscribeBookDockSummary()
-  }
   if (canAccessNotifications.value) {
     subscribeNotifications()
   }
@@ -351,15 +354,15 @@ function formatBadgeStyle(fmt: string) {
   const color = getFormatColor(fmt)
   return {
     color,
-    backgroundColor: `${color}1A`, // 10% opacity in hex
-    borderColor: `${color}33`, // ~20% opacity in hex
+    backgroundColor: `color-mix(in oklch, ${color} 10%, transparent)`,
+    borderColor: `color-mix(in oklch, ${color} 20%, transparent)`,
   }
 }
 </script>
 
 <template>
   <header
-    class="flex h-12 shrink-0 items-center gap-2 border border-sidebar-border/50 bg-background/90 backdrop-blur-xl px-2 sm:px-3 shadow-lg shadow-black/5 relative mt-2 sm:mt-3 mx-2 sm:mx-4 z-30 rounded-lg transition-all duration-300 flex-none"
+    class="relative z-30 mx-(--shell-gap) mt-(--shell-gap) flex h-12 flex-none shrink-0 items-center gap-2 rounded-(--shell-radius) border border-(--shell-border) bg-(--shell-surface) px-3 shadow-lg backdrop-blur-xl backdrop-saturate-150"
   >
     <!-- Mobile: search active overlay -->
     <template v-if="mobileSearchOpen">
@@ -373,7 +376,7 @@ function formatBadgeStyle(fmt: string) {
           v-model="globalSearchQuery"
           @keydown="handleSearchKeydown"
           :placeholder="t('components.appHeader.searchAllBooks')"
-          class="w-full h-8 pl-8 pr-7 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
+          class="w-full h-8 pl-8 pr-7 text-[14px] rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
         />
         <button v-if="globalSearchQuery" @click="clearSearch()" class="absolute right-2 text-muted-foreground hover:text-foreground">
           <X :size="13" />
@@ -387,14 +390,14 @@ function formatBadgeStyle(fmt: string) {
             data-testid="global-search-dropdown"
             @mousedown.prevent
             @scroll.passive="handleSearchDropdownScroll"
-            class="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-50 overflow-hidden max-h-72 overflow-y-auto"
+            class="absolute top-full left-0 right-0 mt-1 max-h-[min(32rem,calc(100dvh-5rem))] overflow-y-auto overflow-x-hidden rounded-md border border-border bg-background shadow-lg z-50"
           >
-            <div v-if="globalSearchLoading && globalResults.length === 0" class="p-3 text-xs text-muted-foreground text-center">
+            <div v-if="globalSearchLoading && globalResults.length === 0" class="p-3 text-[13px] text-muted-foreground text-center">
               {{ t('components.appHeader.searching') }}
             </div>
             <div
               v-else-if="globalSearchSettled && !globalSearchLoading && globalResults.length === 0"
-              class="p-3 text-xs text-muted-foreground text-center"
+              class="p-3 text-[13px] text-muted-foreground text-center"
             >
               {{ t('components.appHeader.noResults') }}
             </div>
@@ -405,7 +408,7 @@ function formatBadgeStyle(fmt: string) {
                 :style="row.style"
                 @click="navigateToResult(row.result)"
                 :class="[
-                  'absolute left-0 right-0 flex items-center gap-3 border-b border-border/40 px-3 py-2.5 text-left transition-colors',
+                  'absolute left-0 right-0 flex items-center gap-3 border-b border-border px-3 py-2.5 text-left transition-colors',
                   selectedIndex === row.index ? 'bg-accent' : 'hover:bg-accent/60',
                 ]"
               >
@@ -417,21 +420,23 @@ function formatBadgeStyle(fmt: string) {
                   :alt="row.result.title ?? ''"
                 />
                 <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-foreground truncate">
+                  <p class="text-[14px] font-medium text-foreground truncate">
                     <template v-for="seg in highlightSegments(row.result.title, globalSearchQuery)" :key="seg.text + seg.match">
-                      <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
+                      <span v-if="seg.match" class="bg-(--shell-accent-tint) text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
                       <span v-else>{{ seg.text }}</span>
                     </template>
                   </p>
-                  <p v-if="row.result.authors.length" class="text-xs text-muted-foreground truncate mt-0.5">
+                  <p v-if="row.result.authors.length" class="text-[13px] text-muted-foreground truncate mt-0.5">
                     <template v-for="seg in highlightSegments(row.result.authors.join(', '), globalSearchQuery)" :key="seg.text + seg.match">
-                      <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
+                      <span v-if="seg.match" class="bg-(--shell-accent-tint) text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
                       <span v-else>{{ seg.text }}</span>
                     </template>
                   </p>
-                  <p v-if="row.result.seriesName" class="text-xs text-muted-foreground/85 truncate mt-0.5 italic">
+                  <p v-if="row.result.seriesName" class="text-[13px] text-muted-foreground truncate mt-0.5 italic">
                     <template v-for="seg in highlightSegments(row.result.seriesName, globalSearchQuery)" :key="seg.text + seg.match">
-                      <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5 not-italic">{{ seg.text }}</span>
+                      <span v-if="seg.match" class="bg-(--shell-accent-tint) text-foreground font-semibold rounded-sm px-0.5 not-italic">{{
+                        seg.text
+                      }}</span>
                       <span v-else>{{ seg.text }}</span>
                     </template>
                   </p>
@@ -440,7 +445,7 @@ function formatBadgeStyle(fmt: string) {
                   <span
                     v-for="fmt in resultFormats(row.result)"
                     :key="fmt"
-                    :class="['text-[9px] font-semibold px-1 py-0.5 rounded border uppercase']"
+                    :class="['text-[11px] font-semibold px-1 py-0.5 rounded border uppercase']"
                     :style="formatBadgeStyle(fmt)"
                   >
                     {{ fmt }}
@@ -448,11 +453,11 @@ function formatBadgeStyle(fmt: string) {
                 </div>
               </button>
             </div>
-            <div v-if="globalResults.length > 0" class="border-t border-border/60 px-3 py-2 text-center text-xs text-muted-foreground">
+            <div v-if="globalResults.length > 0" class="border-t border-border px-3 py-2 text-center text-[13px] text-muted-foreground">
               <button
                 v-if="globalSearchHasMore"
                 type="button"
-                class="font-medium text-primary transition-colors hover:text-primary/80 disabled:cursor-not-allowed disabled:opacity-60"
+                class="font-medium text-primary transition-colors duration-150 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                 :disabled="globalSearchLoadingMore"
                 @click="loadMoreGlobalSearch"
               >
@@ -468,16 +473,12 @@ function formatBadgeStyle(fmt: string) {
     <!-- Normal state -->
     <template v-else>
       <!-- Left: sidebar trigger -->
-      <SidebarTrigger :class="['-ml-1 text-foreground/70 hover:text-foreground', iconRadiusClass]" />
+      <SidebarTrigger :class="['-ml-1 text-foreground hover:bg-(--shell-accent-wash)', iconRadiusClass]" />
       <Separator orientation="vertical" class="mx-1 h-4" />
 
       <!-- Center: desktop global search -->
-      <div
-        data-tour="global-search"
-        class="hidden md:flex flex-1 mx-4 relative items-center transition-all duration-300"
-        :class="searchFocused || globalSearchQuery ? 'max-w-xl' : 'max-w-sm'"
-      >
-        <Search class="absolute left-3 text-muted-foreground/80 pointer-events-none" :size="14" />
+      <div data-tour="global-search" class="relative mx-4 hidden w-full max-w-2xl items-center md:flex">
+        <Search class="pointer-events-none absolute left-3 text-muted-foreground" :size="14" />
         <input
           ref="desktopSearchInput"
           v-model="globalSearchQuery"
@@ -485,22 +486,26 @@ function formatBadgeStyle(fmt: string) {
           @blur="onSearchBlur"
           @keydown="handleSearchKeydown"
           :placeholder="t('components.appHeader.searchAllBooks')"
-          class="w-full h-8 pl-9 pr-8 text-[13.5px] rounded-full border-none bg-primary/5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1.5 focus:ring-primary/30 transition-all duration-300 shadow-inner shadow-black/5"
+          :class="[
+            'h-8 w-full border border-(--shell-accent-line) bg-(--shell-accent-wash) pl-9 pr-8 text-[14px] text-foreground transition-colors duration-150',
+            'placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring',
+            iconRadiusClass,
+          ]"
         />
         <div class="absolute inset-y-0 right-2.5 flex items-center gap-1.5">
           <button
             v-if="globalSearchQuery"
             @click="clearSearch()"
-            class="flex items-center justify-center text-muted-foreground/75 hover:text-foreground transition-colors"
+            class="flex items-center justify-center text-muted-foreground transition-colors duration-150 hover:text-foreground"
           >
             <X :size="13" />
           </button>
           <kbd
             v-else
-            class="hidden lg:inline-flex h-5.5 select-none items-center gap-1 rounded border border-sidebar-border/50 bg-background/50 px-2 font-mono text-[11px] font-bold text-muted-foreground/85 opacity-100"
+            class="hidden h-5 select-none items-center gap-1 rounded border border-(--shell-accent-line) px-1.5 font-mono text-[11px] font-semibold text-muted-foreground lg:inline-flex"
           >
-            <span class="text-[16px] leading-none">⌘</span>
-            <span class="text-[12px] leading-none">K</span>
+            <span class="leading-none">⌘</span>
+            <span class="leading-none">K</span>
           </kbd>
         </div>
 
@@ -512,14 +517,14 @@ function formatBadgeStyle(fmt: string) {
             data-testid="global-search-dropdown"
             @mousedown.prevent
             @scroll.passive="handleSearchDropdownScroll"
-            class="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-50 overflow-hidden max-h-80 overflow-y-auto"
+            class="absolute top-full left-0 right-0 mt-1 max-h-[min(32rem,calc(100dvh-5rem))] overflow-y-auto overflow-x-hidden rounded-md border border-border bg-background shadow-lg z-50"
           >
-            <div v-if="globalSearchLoading && globalResults.length === 0" class="p-3 text-xs text-muted-foreground text-center">
+            <div v-if="globalSearchLoading && globalResults.length === 0" class="p-3 text-[13px] text-muted-foreground text-center">
               {{ t('components.appHeader.searching') }}
             </div>
             <div
               v-else-if="globalSearchSettled && !globalSearchLoading && globalResults.length === 0"
-              class="p-3 text-xs text-muted-foreground text-center"
+              class="p-3 text-[13px] text-muted-foreground text-center"
             >
               {{ t('components.appHeader.noResults') }}
             </div>
@@ -530,7 +535,7 @@ function formatBadgeStyle(fmt: string) {
                 :style="row.style"
                 @click="navigateToResult(row.result)"
                 :class="[
-                  'absolute left-0 right-0 flex items-center gap-3 border-b border-border/40 px-3 py-2.5 text-left transition-colors',
+                  'absolute left-0 right-0 flex items-center gap-3 border-b border-border px-3 py-2.5 text-left transition-colors',
                   selectedIndex === row.index ? 'bg-accent' : 'hover:bg-accent/60',
                 ]"
               >
@@ -542,21 +547,23 @@ function formatBadgeStyle(fmt: string) {
                   :alt="row.result.title ?? ''"
                 />
                 <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-foreground truncate">
+                  <p class="text-[14px] font-medium text-foreground truncate">
                     <template v-for="seg in highlightSegments(row.result.title, globalSearchQuery)" :key="seg.text + seg.match">
-                      <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
+                      <span v-if="seg.match" class="bg-(--shell-accent-tint) text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
                       <span v-else>{{ seg.text }}</span>
                     </template>
                   </p>
-                  <p v-if="row.result.authors.length" class="text-xs text-muted-foreground truncate mt-0.5">
+                  <p v-if="row.result.authors.length" class="text-[13px] text-muted-foreground truncate mt-0.5">
                     <template v-for="seg in highlightSegments(row.result.authors.join(', '), globalSearchQuery)" :key="seg.text + seg.match">
-                      <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
+                      <span v-if="seg.match" class="bg-(--shell-accent-tint) text-foreground font-semibold rounded-sm px-0.5">{{ seg.text }}</span>
                       <span v-else>{{ seg.text }}</span>
                     </template>
                   </p>
-                  <p v-if="row.result.seriesName" class="text-xs text-muted-foreground/85 truncate mt-0.5 italic">
+                  <p v-if="row.result.seriesName" class="text-[13px] text-muted-foreground truncate mt-0.5 italic">
                     <template v-for="seg in highlightSegments(row.result.seriesName, globalSearchQuery)" :key="seg.text + seg.match">
-                      <span v-if="seg.match" class="bg-primary/20 text-foreground font-semibold rounded-sm px-0.5 not-italic">{{ seg.text }}</span>
+                      <span v-if="seg.match" class="bg-(--shell-accent-tint) text-foreground font-semibold rounded-sm px-0.5 not-italic">{{
+                        seg.text
+                      }}</span>
                       <span v-else>{{ seg.text }}</span>
                     </template>
                   </p>
@@ -565,7 +572,7 @@ function formatBadgeStyle(fmt: string) {
                   <span
                     v-for="fmt in resultFormats(row.result)"
                     :key="fmt"
-                    :class="['text-[9px] font-semibold px-1 py-0.5 rounded border uppercase']"
+                    :class="['text-[11px] font-semibold px-1 py-0.5 rounded border uppercase']"
                     :style="formatBadgeStyle(fmt)"
                   >
                     {{ fmt }}
@@ -573,11 +580,11 @@ function formatBadgeStyle(fmt: string) {
                 </div>
               </button>
             </div>
-            <div v-if="globalResults.length > 0" class="border-t border-border/60 px-3 py-2 text-center text-xs text-muted-foreground">
+            <div v-if="globalResults.length > 0" class="border-t border-border px-3 py-2 text-center text-[13px] text-muted-foreground">
               <button
                 v-if="globalSearchHasMore"
                 type="button"
-                class="font-medium text-primary transition-colors hover:text-primary/80 disabled:cursor-not-allowed disabled:opacity-60"
+                class="font-medium text-primary transition-colors duration-150 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                 :disabled="globalSearchLoadingMore"
                 @click="loadMoreGlobalSearch"
               >
@@ -594,15 +601,7 @@ function formatBadgeStyle(fmt: string) {
         <!-- Mobile: search icon -->
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button
-              variant="ghost"
-              size="icon"
-              :class="[
-                'md:hidden h-8 w-8 border border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground transition-colors',
-                iconRadiusClass,
-              ]"
-              @click="mobileSearchOpen = true"
-            >
+            <Button variant="ghost" size="icon" :class="['md:hidden', controlClass]" @click="mobileSearchOpen = true">
               <Search :size="15" />
             </Button>
           </TooltipTrigger>
@@ -617,32 +616,11 @@ function formatBadgeStyle(fmt: string) {
         <!-- Mobile: Kebab Menu -->
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
-            <Button
-              variant="ghost"
-              size="icon"
-              :class="[
-                'md:hidden h-8 w-8 border border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground transition-colors',
-                iconRadiusClass,
-              ]"
-            >
+            <Button variant="ghost" size="icon" :class="['md:hidden', controlClass]">
               <MoreVertical :size="15" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" class="w-44">
-            <DropdownMenuItem v-if="hasPermission('book_dock_access')" @click="navigateToBookDock">
-              <PackageOpen :size="15" class="mr-2 text-muted-foreground" />
-              {{ t('components.appHeader.bookDock') }}
-              <span
-                v-if="bookDockSummary.total > 0"
-                class="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground tabular-nums leading-none"
-              >
-                {{ bookDockSummary.total }}
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuItem @click="navigateToAnnotations">
-              <Highlighter :size="15" class="mr-2 text-muted-foreground" />
-              {{ t('components.appHeader.annotations') }}
-            </DropdownMenuItem>
             <DropdownMenuItem @click="navigateToStatistics">
               <BarChart3 :size="15" class="mr-2 text-muted-foreground" />
               {{ t('components.appHeader.statistics') }}
@@ -666,19 +644,23 @@ function formatBadgeStyle(fmt: string) {
               <DropdownMenuSubContent class="w-72 p-4">
                 <div class="space-y-4">
                   <div class="space-y-1.5">
-                    <span class="text-xs text-muted-foreground">{{ t('components.appHeader.theme') }}</span>
+                    <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.theme') }}</span>
                     <ThemePicker />
                   </div>
                   <div class="space-y-1.5">
-                    <span class="text-xs text-muted-foreground">{{ t('components.appHeader.accent') }}</span>
+                    <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.accent') }}</span>
                     <AccentPicker />
                   </div>
                   <div class="space-y-1.5">
-                    <span class="text-xs text-muted-foreground">{{ t('components.appHeader.radius') }}</span>
+                    <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.radius') }}</span>
                     <RadiusPicker />
                   </div>
                   <div class="space-y-1.5">
-                    <span class="text-xs text-muted-foreground">{{ t('components.appHeader.background') }}</span>
+                    <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.surfaceOpacity') }}</span>
+                    <SurfacePicker />
+                  </div>
+                  <div class="space-y-1.5">
+                    <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.background') }}</span>
                     <BackgroundPicker />
                   </div>
                 </div>
@@ -721,74 +703,17 @@ function formatBadgeStyle(fmt: string) {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <!-- Group 1: Content (Book Dock, Statistics, Upload) -->
+        <!-- Group 1: Content (Notifications, Statistics, Achievements, Upload) -->
         <div class="hidden md:flex items-center gap-2.5">
-          <!-- Book Dock button -->
-          <Tooltip v-if="hasPermission('book_dock_access')">
-            <TooltipTrigger as-child>
-              <Button
-                data-tour="book-dock-btn"
-                variant="ghost"
-                size="icon"
-                class="relative h-8 w-8 border transition-colors"
-                :class="[
-                  isBookDockActive
-                    ? 'border-primary/80 bg-primary/8 text-primary'
-                    : 'border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground',
-                  iconRadiusClass,
-                ]"
-                @click="navigateToBookDock"
-              >
-                <PackageOpen :size="15" />
-                <span
-                  v-if="bookDockSummary.total > 0"
-                  class="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground tabular-nums leading-none"
-                >
-                  {{ bookDockSummary.total }}
-                </span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{{ t('components.appHeader.bookDock') }}</TooltipContent>
-          </Tooltip>
-
-          <!-- Notifications button -->
           <NotificationSheet v-if="canAccessNotifications" :icon-radius-class="iconRadiusClass" />
 
-          <!-- Annotations button -->
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                variant="ghost"
-                size="icon"
-                class="h-8 w-8 border transition-colors"
-                :class="[
-                  isAnnotationsActive
-                    ? 'border-primary/80 bg-primary/8 text-primary'
-                    : 'border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground',
-                  iconRadiusClass,
-                ]"
-                @click="navigateToAnnotations"
-              >
-                <Highlighter :size="15" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{{ t('components.appHeader.annotations') }}</TooltipContent>
-          </Tooltip>
-
-          <!-- Statistics button -->
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
                 data-tour="statistics-btn"
                 variant="ghost"
                 size="icon"
-                class="h-8 w-8 border transition-colors"
-                :class="[
-                  isStatisticsActive
-                    ? 'border-primary/80 bg-primary/8 text-primary'
-                    : 'border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground',
-                  iconRadiusClass,
-                ]"
+                :class="destinationClass(isStatisticsActive)"
                 @click="navigateToStatistics"
               >
                 <BarChart3 :size="15" />
@@ -797,40 +722,18 @@ function formatBadgeStyle(fmt: string) {
             <TooltipContent>{{ t('components.appHeader.statistics') }}</TooltipContent>
           </Tooltip>
 
-          <!-- Achievements button -->
           <Tooltip v-if="achievementsEnabled">
             <TooltipTrigger as-child>
-              <Button
-                variant="ghost"
-                size="icon"
-                class="h-8 w-8 border transition-colors"
-                :class="[
-                  isAchievementsActive
-                    ? 'border-primary/80 bg-primary/8 text-primary'
-                    : 'border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground',
-                  iconRadiusClass,
-                ]"
-                @click="navigateToAchievements"
-              >
+              <Button variant="ghost" size="icon" :class="destinationClass(isAchievementsActive)" @click="navigateToAchievements">
                 <Trophy :size="15" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>{{ t('components.appHeader.achievements') }}</TooltipContent>
           </Tooltip>
 
-          <!-- Upload button -->
           <Tooltip v-if="hasPermission('library_upload')">
             <TooltipTrigger as-child>
-              <Button
-                data-tour="upload-button"
-                variant="ghost"
-                size="icon"
-                :class="[
-                  'h-8 w-8 border border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground transition-colors',
-                  iconRadiusClass,
-                ]"
-                @click="uploadOpen = true"
-              >
+              <Button data-tour="upload-button" variant="ghost" size="icon" :class="controlClass" @click="uploadOpen = true">
                 <Upload :size="15" />
               </Button>
             </TooltipTrigger>
@@ -838,22 +741,14 @@ function formatBadgeStyle(fmt: string) {
           </Tooltip>
         </div>
 
-        <!-- Group 2: Preferences (Appearance, Settings) -->
-        <div class="hidden md:block h-4 w-px bg-foreground/20" />
+        <!-- Group 2: Preferences (Help, GitHub, Appearance, Language, Settings) -->
+        <Separator orientation="vertical" class="mx-1 hidden h-4 md:block" />
         <div class="hidden md:flex items-center gap-2.5">
           <Tooltip>
             <DropdownMenu>
               <TooltipTrigger as-child>
                 <DropdownMenuTrigger as-child>
-                  <Button
-                    data-tour="documentation-link"
-                    variant="ghost"
-                    size="icon"
-                    :class="[
-                      'relative h-8 w-8 border border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground transition-colors',
-                      iconRadiusClass,
-                    ]"
-                  >
+                  <Button data-tour="documentation-link" variant="ghost" size="icon" :class="['relative', controlClass]">
                     <BadgeQuestionMark :size="15" />
                     <span
                       v-if="hasUnseenWhatsNew"
@@ -885,15 +780,7 @@ function formatBadgeStyle(fmt: string) {
             <Popover :open="githubStarPopoverOpen" @update:open="handleGithubStarPopoverOpenChange">
               <TooltipTrigger as-child>
                 <PopoverTrigger as-child>
-                  <Button
-                    data-tour="github-star-cta"
-                    variant="ghost"
-                    size="icon"
-                    :class="[
-                      'h-8 w-8 border border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground transition-colors',
-                      iconRadiusClass,
-                    ]"
-                  >
+                  <Button data-tour="github-star-cta" variant="ghost" size="icon" :class="controlClass">
                     <Star :size="15" />
                   </Button>
                 </PopoverTrigger>
@@ -909,8 +796,8 @@ function formatBadgeStyle(fmt: string) {
                   <X :size="13" />
                 </Button>
                 <div class="space-y-3 pr-5">
-                  <p class="text-sm font-medium text-foreground">{{ t('components.appHeader.githubStar.title') }}</p>
-                  <p class="text-xs leading-relaxed text-muted-foreground">
+                  <p class="text-[14px] font-medium text-foreground">{{ t('components.appHeader.githubStar.title') }}</p>
+                  <p class="text-[13px] leading-relaxed text-muted-foreground">
                     {{ t('components.appHeader.githubStar.body') }}
                   </p>
                   <Button as-child class="w-full">
@@ -929,33 +816,32 @@ function formatBadgeStyle(fmt: string) {
             <Popover>
               <TooltipTrigger as-child>
                 <PopoverTrigger as-child>
-                  <Button
-                    data-tour="appearance-picker"
-                    variant="ghost"
-                    size="icon"
-                    :class="['h-8 w-8 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors', iconRadiusClass]"
-                  >
+                  <Button data-tour="appearance-picker" variant="ghost" size="icon" :class="controlClass">
                     <Palette :size="15" />
                   </Button>
                 </PopoverTrigger>
               </TooltipTrigger>
               <PopoverContent class="w-72 p-4" align="end">
                 <div class="space-y-4">
-                  <p class="text-xs font-semibold text-foreground uppercase tracking-wider">{{ t('components.appHeader.appearance') }}</p>
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground">{{ t('components.appHeader.appearance') }}</p>
                   <div class="space-y-1.5">
-                    <span class="text-xs text-muted-foreground">{{ t('components.appHeader.theme') }}</span>
+                    <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.theme') }}</span>
                     <ThemePicker />
                   </div>
                   <div class="space-y-1.5">
-                    <span class="text-xs text-muted-foreground">{{ t('components.appHeader.accent') }}</span>
+                    <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.accent') }}</span>
                     <AccentPicker />
                   </div>
                   <div class="space-y-1.5">
-                    <span class="text-xs text-muted-foreground">{{ t('components.appHeader.radius') }}</span>
+                    <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.radius') }}</span>
                     <RadiusPicker />
                   </div>
                   <div class="space-y-1.5">
-                    <span class="text-xs text-muted-foreground">{{ t('components.appHeader.background') }}</span>
+                    <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.surfaceOpacity') }}</span>
+                    <SurfacePicker />
+                  </div>
+                  <div class="space-y-1.5">
+                    <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.background') }}</span>
                     <BackgroundPicker />
                   </div>
                 </div>
@@ -972,8 +858,7 @@ function formatBadgeStyle(fmt: string) {
                     data-testid="language-control"
                     variant="ghost"
                     size="icon"
-                    class="h-8 w-8 border border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground transition-colors"
-                    :class="iconRadiusClass"
+                    :class="controlClass"
                     :aria-label="t('settings.appearance.language.label')"
                   >
                     <Languages :size="15" />
@@ -994,16 +879,7 @@ function formatBadgeStyle(fmt: string) {
 
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button
-                data-tour="settings-nav"
-                variant="ghost"
-                size="icon"
-                :class="[
-                  'h-8 w-8 border border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground transition-colors',
-                  iconRadiusClass,
-                ]"
-                @click="navigateToSettings"
-              >
+              <Button data-tour="settings-nav" variant="ghost" size="icon" :class="controlClass" @click="navigateToSettings">
                 <Settings :size="15" />
               </Button>
             </TooltipTrigger>
@@ -1012,12 +888,12 @@ function formatBadgeStyle(fmt: string) {
         </div>
 
         <!-- Group 3: Identity (Avatar) -->
-        <div class="hidden md:block h-4 w-px bg-foreground/20" />
+        <Separator orientation="vertical" class="mx-1 hidden h-4 md:block" />
         <DropdownMenu v-if="user">
           <DropdownMenuTrigger as-child>
             <button
               :class="[
-                'flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden border border-primary/50 bg-primary/10 hover:bg-primary/15 hover:border-primary/70 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                'flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden border border-(--shell-accent-line) bg-(--shell-accent-tint) transition-colors duration-150 hover:bg-(--shell-accent-wash) focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 iconRadiusClass,
               ]"
             >
@@ -1027,8 +903,8 @@ function formatBadgeStyle(fmt: string) {
           <DropdownMenuContent align="end" class="w-48">
             <DropdownMenuLabel class="font-normal">
               <div class="flex flex-col gap-0.5">
-                <span class="text-xs font-medium text-foreground">{{ user.name }}</span>
-                <span class="text-[10px] text-muted-foreground">{{ user.username }}</span>
+                <span class="text-[13px] font-medium text-foreground">{{ user.name }}</span>
+                <span class="text-[11px] text-muted-foreground">{{ user.username }}</span>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />

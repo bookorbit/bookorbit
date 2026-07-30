@@ -51,7 +51,7 @@ describe('KOReader plugin update source wiring', () => {
     expect(topLevelActionBlock).toContain('self:onBookOrbitToggleAutoSync(nil, true)');
     expect(dashboardSettingsBlock).toContain('return T(_("Open dashboard on startup (%1)"), self:catalogAutoOpenLabel())');
     expect(syncSettingsBlock).not.toContain('text = _("Auto sync current book")');
-    expect(syncSettingsBlock).toContain('text = _("Two-way highlight sync")');
+    expect(syncSettingsBlock).toContain('text = _("Two-way highlights & bookmarks")');
     expect(syncSettingsBlock).toContain('text = _("Skip auto-sync when offline")');
     expect(syncSettingsBlock).not.toContain('return T(_("Open dashboard on startup (%1)"), self:catalogAutoOpenLabel())');
     expect(syncSettingsBlock).toContain('return T(_("Periodically sync every # pages (%1)")');
@@ -87,12 +87,12 @@ describe('KOReader plugin update source wiring', () => {
     expect(syncSettingsBlock).not.toContain('text = _("Sync all books now")');
   });
 
-  it('keeps tall dashboard adaptation scoped to measured Discover rows', async () => {
+  it('keeps tall dashboard adaptation scoped to the measured configurable row', async () => {
     const dashboard = await readPluginFile('bookorbit_catalog_dashboard.lua');
 
     expect(dashboard).toContain('local DASHBOARD_TALL_ASPECT_RATIO = 1.55');
-    expect(dashboard).toContain('local DISCOVER_COMPACT_GAP = 6');
-    expect(dashboard).toContain('local DISCOVER_MAX_ROWS = 2');
+    expect(dashboard).toContain('local SECTION_COMPACT_GAP = 6');
+    expect(dashboard).toContain('local SECTION_MAX_ROWS = 2');
     expect(dashboard).toContain('local STATS_MIN_BODY_HEIGHT = 56');
     expect(dashboard).toContain('function CatalogDashboard:dashboardTallLayout()');
     expect(dashboard).toContain('function CatalogDashboard:addDashboardCoverGrid(');
@@ -100,12 +100,34 @@ describe('KOReader plugin update source wiring', () => {
     expect(dashboard).toContain('local card_gap = slots > 1 and math.floor(math.max(0, self.content_w - slots * card_w) / (slots - 1)) or 0');
     expect(dashboard).toContain('if slot > 1 then');
     expect(dashboard).not.toContain('(slots + 1) * gap');
-    expect(dashboard).toContain('discover_slots, discover_card_w, discover_row_h = self:discoverRowMetrics(#discover_books, discover_gap)');
+    expect(dashboard).toContain('section_slots, section_card_w, section_row_h = self:sectionRowMetrics(#section_books, section_row_gap)');
     expect(dashboard).toContain('if fixedHeight() > avail then');
-    expect(dashboard).toContain('discover_rows * discover_row_h + math.max(0, discover_rows - 1) * inner_gap');
-    expect(dashboard).toContain('show_discover and self:dashboardTallLayout() and discover_slots > 0');
-    expect(dashboard).toContain('local discover_page_size = math.max(1, discover_slots * discover_rows)');
+    expect(dashboard).toContain('section_rows * section_row_h + math.max(0, section_rows - 1) * inner_gap');
+    expect(dashboard).toContain('show_section and not section_pending and self:dashboardTallLayout() and section_slots > 0');
+    expect(dashboard).toContain('local section_page_size = math.max(1, section_slots * section_rows)');
     expect(dashboard).not.toContain('catalog_dashboard_max_height');
+  });
+
+  it('renders the configurable dashboard row from a stored section choice', async () => {
+    const dashboard = await readPluginFile('bookorbit_catalog_dashboard.lua');
+    const sections = await readPluginFile('bookorbit_dashboard_sections.lua');
+    const api = await readPluginFile('bookorbit_api.lua');
+
+    // The stored value is a list even though one row is rendered, so adding a
+    // second configurable row later does not invalidate settings on device.
+    expect(sections).toContain('DashboardSections.SETTING_KEY = "catalog_dashboard_sections"');
+    expect(sections).toContain('DashboardSections.DEFAULT_TYPE = "random"');
+    expect(sections).toContain('function DashboardSections.normalize(value)');
+    expect(sections).toContain('function DashboardSections.signature(config)');
+
+    // The parameter is capability-gated: an older server rejects unknown query
+    // params outright rather than ignoring them.
+    expect(dashboard).toContain('DashboardSections.CAPABILITY');
+    expect(dashboard).toContain('Capabilities.markUnsupported(self.client, DashboardSections.CAPABILITY)');
+    expect(dashboard).toContain('function CatalogDashboard:dashboardCacheMatchesSection()');
+    expect(dashboard).toContain('function CatalogDashboard:dashboardSectionSupportsReroll(config)');
+    expect(api).toContain('function BookOrbitApi:catalogDashboard(section)');
+    expect(api).toContain('function BookOrbitApi:catalogDashboardSection(section)');
   });
 
   it('renders the canonical account reading streak on the device dashboard', async () => {
@@ -281,8 +303,15 @@ describe('KOReader plugin update source wiring', () => {
     expect(bulk).not.toContain('Download Discover');
     expect(bulk).not.toContain('Download dashboard books');
 
+    expect(bulk).toContain('local MANIFEST_FEATURE = "catalogBulkManifest"');
+    expect(bulk).toContain('self.client:catalogManifest(params)');
+    expect(bulk).toContain('function Catalog:bulkCommitCheckpoint(ctx)');
+    expect(bulk).toContain('BookOrbitStateManager.linkFiles(links)');
+    expect(bulk).not.toContain('MAX_PAGES = 200');
+
     expect(download).toContain('local on_catalog_page = (self.bookMode and self:bookMode())');
     expect(download).toContain('elseif self.updateItems and on_catalog_page then');
+    expect(download).toContain('local Transfer = require("bookorbit_download_transfer")');
 
     expect(menu).toContain('text = _("Close BookOrbit")');
     expect(menu).toContain('catalog:onCloseAllMenus()');
@@ -319,7 +348,12 @@ describe('KOReader plugin update source wiring', () => {
     expect(statsReader).toContain('if authors == "" then authors = nil end');
     expect(statsReader).toContain('if title then entry.title = title end');
     expect(statsReader).toContain('if authors then entry.authors = authors end');
-    expect(bookSync).toContain('local metadata = BookOrbitStatsReader.getBook(digest) or {}');
+    // Identity is primed after reader ready so the lifecycle handlers open no
+    // database; a cold cache still resolves through the same lookup.
+    expect(bookSync).toContain('local metadata, cached = BookOrbitStatsReader.cachedIdentity(digest)');
+    expect(bookSync).toContain('metadata = BookOrbitStatsReader.primeIdentity(digest)');
+    expect(statsReader).toContain('function BookOrbitStatsReader.primeIdentity(md5)');
+    expect(statsReader).toContain('local book = BookOrbitStatsReader.getBook(md5)');
     expect(bookSync).toContain('local stats_ambiguous = metadata.metadata_ambiguous == true');
     expect(bookSync).toContain('title = stats_ambiguous and titleFromFile(file) or (metadata.title or titleFromFile(file))');
     expect(bookSync).toContain('authors = stats_ambiguous and nil or metadata.authors');
@@ -342,7 +376,7 @@ describe('KOReader plugin update source wiring', () => {
   it('rechecks matched local hashes during full-library revalidation', async () => {
     const sweep = await readPluginFile('bookorbit_sweep.lua');
 
-    expect(sweep).toContain('if ctx.full_recheck then\n            queue(md5)\n        elseif not ctx.state:getBook(md5) then');
+    expect(sweep).toContain('if ctx.full_recheck then\n            queue(md5)\n        else\n            local book = ctx.state:getBook(md5)');
     expect(sweep).toContain('for md5 in pairs(ctx.state.books) do\n            queue(md5)\n        end');
   });
 
@@ -360,6 +394,6 @@ describe('KOReader plugin update source wiring', () => {
     expect(sweep).toContain('local file_exists = lfs.attributes(file, "mode") == "file"');
     expect(sweep).toContain('cand.source = "file"');
     expect(sweep).toContain('cand.metadata_ambiguous = false');
-    expect(sweep).toContain('if cand.stat_ids and not cand.stats_metadata_ambiguous and ctx.state:getBook(md5) then');
+    expect(sweep).toContain('if cand.stat_ids and not cand.stats_metadata_ambiguous then');
   });
 });

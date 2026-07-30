@@ -1,6 +1,6 @@
 # Localization
 
-BookOrbit uses Vue I18n catalogs under `client/src/locales/`. English is the source language, and Crowdin is the source of truth for German, Dutch, Brazilian Portuguese, and Slovenian translations.
+BookOrbit uses Vue I18n catalogs under `client/src/locales/`. English is the source language, and Crowdin is the source of truth for Dutch, French, German, Italian, Polish, Brazilian Portuguese, Slovenian, and Spanish translations.
 
 ## Supported Catalogs
 
@@ -8,7 +8,11 @@ BookOrbit uses Vue I18n catalogs under `client/src/locales/`. English is the sou
 | -------------------- | ------------------- | --------- |
 | English              | Source language     | `en.json` |
 | German               | `de`                | `de.json` |
+| Spanish              | `es-ES`             | `es.json` |
+| French               | `fr`                | `fr.json` |
+| Italian              | `it`                | `it.json` |
 | Dutch                | `nl`                | `nl.json` |
+| Polish               | `pl`                | `pl.json` |
 | Brazilian Portuguese | `pt-BR`             | `pt.json` |
 | Slovenian            | `sl`                | `sl.json` |
 
@@ -72,7 +76,7 @@ After an English source change reaches `main`:
 2. Translators update target strings in Crowdin.
 3. Crowdin exports the target catalogs to `l10n_main`.
 4. Crowdin opens a pull request to `main`.
-5. CI verifies that the pull request changes only the four target catalogs and runs the normal client checks.
+5. CI verifies that the pull request changes only the eight target catalogs and runs the normal client checks.
 6. A maintainer reviews and squash-merges the pull request.
 7. The `l10n_main` service branch is deleted. Crowdin recreates it for the next export.
 
@@ -116,9 +120,40 @@ The shared locale list automatically updates the language picker, server prefere
 
 Create `client/src/locales/<locale>.json` with the exact key structure from `en.json` and English fallback values. Do not add partial catalogs. Crowdin will replace fallback values as translations are completed.
 
+A catalog may instead arrive already translated, for example from a bulk translation pass. That is allowed, but the translations then exist only in Git and Crowdin will overwrite them unless they are imported first. Follow "Seed existing translations into Crowdin" below before enabling export.
+
 Review `client/src/stores/locale.ts` and add browser-locale matching coverage to `client/src/stores/__tests__/locale.spec.ts`, especially for regional variants. Add every CLDR plural category reported for the locale to each ICU plural message and extend the exhaustive ICU runtime tests in `client/src/i18n/icu.spec.ts`.
 
-### 4. Allow Crowdin export and PR delivery
+### 4. Seed existing translations into Crowdin
+
+Skip this step when the catalog holds English fallback values. It applies only when the catalog already contains real translations.
+
+Crowdin does not import repository translations on its own, and untranslated strings export as English source text. A pre-translated catalog that is never imported is therefore silently reverted to English by the first export.
+
+Order matters, because merging the `crowdin.yml` change enables export for the language:
+
+1. Pause translation synchronization, or keep the language out of `export_languages` until verification passes.
+2. Add the target language in Crowdin.
+3. Import the catalog with Crowdin's translation import, allowing translations that match the source so entries such as product names and identifiers are not dropped.
+4. Verify, reconcile, and only then enable export.
+
+**The progress percentage does not verify anything.** Crowdin's bulk translation import is lossy: it silently skips entries that the per-string translation endpoint accepts. Observed causes include translations that add punctuation the English source lacks, and ICU messages carrying a plural category the source does not use, such as Spanish or Portuguese `many`. A language can report 96 to 98 percent while real translations are missing, and those gaps export as English over good translations in Git.
+
+Verify by building the export and diffing it against the catalog:
+
+```bash
+CROWDIN_TOKEN=... node scripts/crowdin-verify/verify.mjs es-ES es.json
+```
+
+The script exits non-zero while any key differs. Pass `--reconcile` to push the remaining strings through the per-string endpoint, which accepts what the bulk import rejected:
+
+```bash
+CROWDIN_TOKEN=... node scripts/crowdin-verify/verify.mjs es-ES es.json --reconcile
+```
+
+A language is safe to export only when the script reports zero differing keys. Run it for every seeded language before resuming synchronization.
+
+### 5. Allow Crowdin export and PR delivery
 
 Update `crowdin.yml`:
 
@@ -129,7 +164,7 @@ Update `scripts/classify-crowdin-pr.sh` to allow the new target catalog path. Do
 
 Before merging, add the target language in Crowdin while the current `main` configuration still excludes it from `export_languages`, or pause translation synchronization. Merge the repository support before allowing the first export. After merge, run a manual source and translation sync and confirm that the generated PR changes only explicitly allowed target catalogs.
 
-### 5. Verify the new language
+### 6. Verify the new language
 
 Run:
 
@@ -154,6 +189,7 @@ Then verify manually:
 - Representative desktop and mobile screens handle translated text expansion.
 - RTL layout, keyboard navigation, focus states, dialogs, menus, and popovers remain usable when applicable.
 - A manual Crowdin export produces the expected filename and passes all PR checks.
+- For a seeded catalog, `scripts/crowdin-verify/verify.mjs` reports zero differing keys.
 
 Only enable scheduled export for the new language after this manual round trip succeeds.
 

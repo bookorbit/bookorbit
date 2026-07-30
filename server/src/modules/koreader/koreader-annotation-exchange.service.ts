@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
-import type { AnnotationRow } from '../../db/schema';
+import type { AnnotationPosition, AnnotationRow } from '../../db/schema';
 import { drawerFromStyle, koreaderColorFromHex } from '../annotation/annotation-style-map';
 import { AnnotationSyncService, formatDeviceDatetime, type IncomingDeviceAnnotation, type IngestResult } from '../annotation/annotation-sync.service';
 import { PositionConverterService } from '../position-converter/position-converter.service';
@@ -15,6 +15,8 @@ const ACK_EVENT = 'koreader.annotation_exchange_ack';
 const MAX_CHANGES_PER_REQUEST = 50;
 const PUSH_DOWN_PAGE = 100;
 const CONVERSION_BUDGET_PER_REQUEST = 20;
+
+type DevicePositionsByFormat = { pdf?: AnnotationPosition; xpointer?: AnnotationPosition; cfi?: AnnotationPosition };
 
 export interface ExchangeAddEntry {
   serverId: number;
@@ -242,21 +244,7 @@ export class KoreaderAnnotationExchangeService {
       chapter: annotation.chapterTitle,
     }));
 
-    let conversionBudget = CONVERSION_BUDGET_PER_REQUEST;
-    let skippedNoPosition = 0;
-    const addEntries: ExchangeAddEntry[] = [];
-    for (const annotation of pushDown.adds) {
-      const entry = await this.buildAddEntry(userId, bookId, bookFileId, annotation, conversionBudget > 0, deviceClockOffsetMs);
-      if (entry === 'converted') {
-        conversionBudget -= 1;
-        continue;
-      }
-      if (entry == null) {
-        skippedNoPosition += 1;
-        continue;
-      }
-      addEntries.push(entry);
-    }
+    const { addEntries, skippedNoPosition } = await this.buildAddEntries(userId, bookId, bookFileId, pushDown.adds, deviceClockOffsetMs);
 
     return {
       hash,
@@ -269,41 +257,69 @@ export class KoreaderAnnotationExchangeService {
   }
 
   /**
-   * Builds an add entry for the device, converting the CFI position to an xpointer
-   * when needed (bounded per request). Returns null when no usable device position
-   * exists, or the literal 'converted' when a conversion was attempted this round
-   * (the entry is picked up by the next exchange call once stored).
+   * Builds the add entries for one push-down page. Positions for the whole page are read
+   * in one query, and device identity datetimes are minted in one batch, so the page
+   * costs a bounded number of queries instead of several per annotation. Annotations
+   * whose CFI position still needs converting produce no entry this round (bounded per
+   * request); the next exchange call picks them up once the xpointer is stored.
    */
-  private async buildAddEntry(
+  private async buildAddEntries(
     userId: number,
     bookId: number,
     bookFileId: number,
-    annotation: AnnotationRow,
-    mayConvert: boolean,
+    adds: AnnotationRow[],
     deviceClockOffsetMs: number,
-  ): Promise<ExchangeAddEntry | null | 'converted'> {
-    const pdfPosition = await this.annotationSync.findDevicePositionFor(annotation.id, 'pdf');
-    const xpointerPosition = pdfPosition ? null : await this.annotationSync.findDevicePositionFor(annotation.id, 'xpointer');
+  ): Promise<{ addEntries: ExchangeAddEntry[]; skippedNoPosition: number }> {
+    if (adds.length === 0) return { addEntries: [], skippedNoPosition: 0 };
+
+    const positions = await this.loadDevicePositions(adds);
     const converterVersion = this.positionConverter.version;
 
-    const position = pdfPosition ?? xpointerPosition;
-    const usable =
-      position?.pos0 != null && position.status !== 'failed' && (position.converterVersion == null || position.converterVersion >= converterVersion);
-    const retryable = position == null || position.converterVersion == null || position.converterVersion < converterVersion;
+    const pushable: { annotation: AnnotationRow; position: AnnotationPosition }[] = [];
+    const convertible: AnnotationRow[] = [];
+    let conversionBudget = CONVERSION_BUDGET_PER_REQUEST;
+    let skippedNoPosition = 0;
 
-    if (!usable && pdfPosition == null) {
-      if (!mayConvert || !retryable) return null;
-      await this.convertCfiToXpointer(userId, bookId, bookFileId, annotation, deviceClockOffsetMs);
-      return 'converted';
+    for (const annotation of adds) {
+      const formats = positions.get(annotation.id);
+      const pdfPosition = formats?.pdf ?? null;
+      const position = pdfPosition ?? formats?.xpointer ?? null;
+      const usable =
+        position?.pos0 != null &&
+        position.status !== 'failed' &&
+        (position.converterVersion == null || position.converterVersion >= converterVersion);
+      const retryable = position == null || position.converterVersion == null || position.converterVersion < converterVersion;
+
+      if (!usable && pdfPosition == null) {
+        if (conversionBudget > 0 && retryable) {
+          conversionBudget -= 1;
+          convertible.push(annotation);
+        } else {
+          skippedNoPosition += 1;
+        }
+        continue;
+      }
+      if (!usable || !position?.pos0) {
+        skippedNoPosition += 1;
+        continue;
+      }
+      pushable.push({ annotation, position });
     }
-    if (!usable || !position?.pos0) return null;
 
-    const datetime = await this.annotationSync.ensureDeviceCreatedAt(userId, bookId, annotation, deviceClockOffsetMs);
-    const pageno = ((position.extras as { pageno?: number } | null)?.pageno ?? null) as number | null;
-    return {
+    const converted = await this.convertCfiPositions(userId, bookFileId, convertible, positions);
+
+    // Mint in the original push-down order so the values match what a per-annotation
+    // loop would have assigned, and only for annotations that actually reached the device
+    // or stored a usable converted position.
+    const needsIdentity = adds.filter(
+      (annotation) => converted.has(annotation.id) || pushable.some((entry) => entry.annotation.id === annotation.id),
+    );
+    const datetimes = await this.annotationSync.ensureDeviceCreatedAtMany(userId, bookId, needsIdentity, deviceClockOffsetMs);
+
+    const addEntries = pushable.map(({ annotation, position }) => ({
       serverId: annotation.id,
       version: annotation.version,
-      datetime,
+      datetime: datetimes.get(annotation.id)!,
       datetimeUpdated: annotation.deviceUpdatedAt,
       drawer: drawerFromStyle(annotation.style),
       color: koreaderColorFromHex(annotation.color),
@@ -311,66 +327,86 @@ export class KoreaderAnnotationExchangeService {
       note: annotation.note,
       chapter: annotation.chapterTitle,
       posFormat: position.format as 'xpointer' | 'pdf',
-      pos0: position.pos0,
+      pos0: position.pos0!,
       pos1: position.pos1,
-      pageno,
-    };
+      pageno: ((position.extras as { pageno?: number } | null)?.pageno ?? null) as number | null,
+    }));
+
+    return { addEntries, skippedNoPosition };
   }
 
-  private async convertCfiToXpointer(
+  private async loadDevicePositions(adds: AnnotationRow[]): Promise<Map<number, DevicePositionsByFormat>> {
+    const rows = await this.annotationSync.findPositions(
+      adds.map((annotation) => annotation.id),
+      ['pdf', 'xpointer', 'cfi'],
+    );
+    const byAnnotation = new Map<number, DevicePositionsByFormat>();
+    for (const row of rows) {
+      const entry = byAnnotation.get(row.annotationId) ?? {};
+      if (row.format === 'pdf' || row.format === 'xpointer' || row.format === 'cfi') entry[row.format] = row;
+      byAnnotation.set(row.annotationId, entry);
+    }
+    return byAnnotation;
+  }
+
+  /** Returns the annotations whose conversion stored a usable xpointer position. */
+  private async convertCfiPositions(
     userId: number,
-    bookId: number,
     bookFileId: number,
-    annotation: AnnotationRow,
-    deviceClockOffsetMs: number,
-  ): Promise<void> {
-    const cfiPosition = await this.annotationSync.findDevicePositionFor(annotation.id, 'cfi');
-    if (!cfiPosition?.pos0) {
+    annotationRows: AnnotationRow[],
+    positions: Map<number, DevicePositionsByFormat>,
+  ): Promise<Set<number>> {
+    const converted = new Set<number>();
+    for (const annotation of annotationRows) {
+      const cfiPosition = positions.get(annotation.id)?.cfi ?? null;
+      if (!cfiPosition?.pos0) {
+        await this.annotationSync.upsertGeneratedPosition({
+          annotationId: annotation.id,
+          userId,
+          bookFileId,
+          format: 'xpointer',
+          pos0: '',
+          pos1: null,
+          status: 'failed',
+          converterVersion: this.positionConverter.version,
+        });
+        continue;
+      }
+
+      const outcome = await this.positionConverter.cfiToXpointer({
+        bookFileId,
+        cfi: cfiPosition.pos0,
+        text: annotation.text || null,
+      });
+      if (outcome.status === 'failed' || !outcome.pos0 || !outcome.pos1) {
+        await this.annotationSync.upsertGeneratedPosition({
+          annotationId: annotation.id,
+          userId,
+          bookFileId,
+          format: 'xpointer',
+          pos0: '',
+          pos1: null,
+          status: 'failed',
+          converterVersion: this.positionConverter.version,
+          extras: outcome.reason ? { reason: outcome.reason } : null,
+        });
+        continue;
+      }
+
       await this.annotationSync.upsertGeneratedPosition({
         annotationId: annotation.id,
         userId,
         bookFileId,
         format: 'xpointer',
-        pos0: '',
-        pos1: null,
-        status: 'failed',
+        pos0: outcome.pos0,
+        pos1: outcome.pos1,
+        status: 'pending',
         converterVersion: this.positionConverter.version,
+        extras: outcome.chapterIndex != null ? { chapterIndex: outcome.chapterIndex, converterStatus: outcome.status } : null,
       });
-      return;
+      converted.add(annotation.id);
     }
-
-    const outcome = await this.positionConverter.cfiToXpointer({
-      bookFileId,
-      cfi: cfiPosition.pos0,
-      text: annotation.text || null,
-    });
-    if (outcome.status === 'failed' || !outcome.pos0 || !outcome.pos1) {
-      await this.annotationSync.upsertGeneratedPosition({
-        annotationId: annotation.id,
-        userId,
-        bookFileId,
-        format: 'xpointer',
-        pos0: '',
-        pos1: null,
-        status: 'failed',
-        converterVersion: this.positionConverter.version,
-        extras: outcome.reason ? { reason: outcome.reason } : null,
-      });
-      return;
-    }
-
-    await this.annotationSync.ensureDeviceCreatedAt(userId, bookId, annotation, deviceClockOffsetMs);
-    await this.annotationSync.upsertGeneratedPosition({
-      annotationId: annotation.id,
-      userId,
-      bookFileId,
-      format: 'xpointer',
-      pos0: outcome.pos0,
-      pos1: outcome.pos1,
-      status: 'pending',
-      converterVersion: this.positionConverter.version,
-      extras: outcome.chapterIndex != null ? { chapterIndex: outcome.chapterIndex, converterStatus: outcome.status } : null,
-    });
+    return converted;
   }
 
   /**

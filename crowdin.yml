@@ -2,7 +2,11 @@ preserve_hierarchy: true
 
 export_languages:
   - de
+  - es-ES
+  - fr
+  - it
   - nl
+  - pl
   - pt-BR
   - sl
 

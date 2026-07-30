@@ -86,6 +86,13 @@ export class AuthorsService {
     };
   }
 
+  /** Total authors the user can browse; matches the unfiltered total of {@link findAll}. */
+  async countAll(user: RequestUser): Promise<number> {
+    const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    if (libraryIds.length === 0) return 0;
+    return this.authorsRepo.countAuthors({ libraryIds, contentFilters: user.isSuperuser ? undefined : user.contentFilters });
+  }
+
   async findOne(user: RequestUser, authorId: number): Promise<AuthorDetail> {
     const libraryIds = await this.resolveLibraryIds(user);
     const row = await this.authorsRepo.findById(authorId, libraryIds, user.isSuperuser ? undefined : user.contentFilters);

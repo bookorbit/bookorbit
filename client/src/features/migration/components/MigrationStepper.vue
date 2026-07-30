@@ -52,7 +52,7 @@ function handleStepClick(index: number) {
           <span v-else>{{ i + 1 }}</span>
         </span>
         <span class="flex flex-col min-w-0 pt-0.5">
-          <span class="text-xs font-medium leading-snug" :class="i === activeIndex ? 'text-primary' : 'text-foreground/80'">
+          <span class="text-xs font-medium leading-snug" :class="i === activeIndex ? 'text-primary' : 'text-foreground'">
             {{ step.label }}
           </span>
           <span v-if="step.status === 'done' && i !== activeIndex" class="text-[10px] text-emerald-600 mt-0.5 leading-none">{{

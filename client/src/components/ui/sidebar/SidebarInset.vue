@@ -18,9 +18,10 @@ const props = defineProps<{
         'md:peer-data-[variant=sidebar]:peer-data-[collapsible=offcanvas]:pl-0',
         'md:peer-data-[variant=sidebar]:peer-data-[collapsible=icon]:pl-(--sidebar-width-icon)',
         'md:peer-data-[variant=sidebar]:transition-[padding-left] md:peer-data-[variant=sidebar]:duration-200 md:peer-data-[variant=sidebar]:ease-linear',
-        // Floating variant: align with the sidebar container's edge
-        'md:peer-data-[variant=floating]:pl-(--sidebar-width)',
-        'md:peer-data-[variant=floating]:peer-data-[collapsible=icon]:pl-[calc(var(--sidebar-width-icon)+(--spacing(6))+2px)]',
+        // Floating variant: stop at the sidebar card's right edge so the shell gutter
+        // between the two cards comes from the inset's own --shell-gap margins.
+        'md:peer-data-[variant=floating]:pl-[calc(var(--sidebar-width)-var(--shell-gap))]',
+        'md:peer-data-[variant=floating]:peer-data-[collapsible=icon]:pl-[calc(var(--sidebar-width-icon)+var(--shell-gap)+2px)]',
         'md:peer-data-[variant=floating]:transition-[padding-left] md:peer-data-[variant=floating]:duration-200 md:peer-data-[variant=floating]:ease-linear',
         // Inset variant: existing margin-based layout unchanged
         'md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-lg md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2',

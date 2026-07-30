@@ -1,19 +1,36 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, gt, inArray, like, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, inArray, like, lt, lte, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
+import { chunk } from '../../common/utils/batch.utils';
 import {
   aggregateReadingSessionDailyStats,
   getDayRangeForDateKeys,
   getReadingSessionDayKeys,
   type ReadingDailyStatsSegment,
 } from '../../common/utils/reading-daily-stats.utils';
-import { buildSessionIdPrefix, deriveKoreaderSessions, type DerivedKoreaderSession, type KoreaderPageEvent } from './koreader-stats.util';
+import {
+  KOREADER_MAX_EVENT_DURATION_SECONDS,
+  KOREADER_SESSION_GAP_SECONDS,
+  buildSessionIdPrefix,
+  deriveKoreaderSessions,
+  type DerivedKoreaderSession,
+  type KoreaderPageEvent,
+} from './koreader-stats.util';
 
 type Db = NodePgDatabase<typeof schema>;
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+
+const BATCH_QUERY_SIZE = 200;
+
+/** Postgres returns bigint aggregates as strings. */
+function toSeconds(value: string | number | null | undefined): number | null {
+  if (value == null) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
 
 export interface IngestPageStatsResult {
   accepted: number;
@@ -61,7 +78,7 @@ export class KoreaderPluginRepository {
             schema.koreaderPageStats.startTime,
           ],
         })
-        .returning({ id: schema.koreaderPageStats.id });
+        .returning({ startTime: schema.koreaderPageStats.startTime });
 
       const accepted = inserted.length;
       const duplicates = events.length - accepted;
@@ -69,7 +86,17 @@ export class KoreaderPluginRepository {
         return { accepted, duplicates, insertedSessions: [], updatedSessions: 0, deletedSessions: 0 };
       }
 
-      const allEvents = await tx
+      // Only the clusters the new events belong to can change, so derivation reads and
+      // rewrites that window instead of the book's whole history on every batch.
+      const window = await this.findAffectedWindow(tx, {
+        userId,
+        bookFileId,
+        deviceId,
+        firstInsertedStart: Math.min(...inserted.map((row) => row.startTime)),
+        lastInsertedStart: Math.max(...inserted.map((row) => row.startTime)),
+      });
+
+      const windowEvents = await tx
         .select({
           page: schema.koreaderPageStats.page,
           startTime: schema.koreaderPageStats.startTime,
@@ -82,13 +109,17 @@ export class KoreaderPluginRepository {
             eq(schema.koreaderPageStats.userId, userId),
             eq(schema.koreaderPageStats.bookFileId, bookFileId),
             eq(schema.koreaderPageStats.deviceId, deviceId),
+            gte(schema.koreaderPageStats.startTime, window.firstStart),
+            lte(schema.koreaderPageStats.startTime, window.lastStart),
           ),
         )
         .orderBy(schema.koreaderPageStats.startTime, schema.koreaderPageStats.page);
 
-      const desired = deriveKoreaderSessions(allEvents, deviceId, bookFileId);
+      const desired = deriveKoreaderSessions(windowEvents, deviceId, bookFileId);
       const prefix = buildSessionIdPrefix(deviceId, bookFileId);
 
+      // Selected by time overlap rather than by recomputed id: a merged cluster changes
+      // its session id, and the superseded row is only findable by its time range.
       const existing = await tx
         .select({
           id: schema.readingSessions.id,
@@ -105,6 +136,8 @@ export class KoreaderPluginRepository {
             eq(schema.readingSessions.userId, userId),
             eq(schema.readingSessions.bookFileId, bookFileId),
             like(schema.readingSessions.sessionId, `${prefix}%`),
+            lte(schema.readingSessions.startedAt, new Date(window.endSeconds * 1000)),
+            gte(schema.readingSessions.endedAt, new Date(window.firstStart * 1000)),
           ),
         );
 
@@ -198,6 +231,75 @@ export class KoreaderPluginRepository {
     });
   }
 
+  /**
+   * Grows the newly inserted events outward over stored events until a gap strictly
+   * larger than the session gap terminates each side, so the returned start-time range
+   * holds only complete clusters. Sessions outside it cannot change.
+   *
+   * Batches are not guaranteed to be chronological: retries, plugin state resets, and
+   * KOReader's own device-to-device statistics sync can deliver events older than
+   * history the server already holds, and such an insert can merge a preceding and a
+   * following cluster into one session.
+   */
+  private async findAffectedWindow(
+    tx: Tx,
+    params: { userId: number; bookFileId: number; deviceId: string; firstInsertedStart: number; lastInsertedStart: number },
+  ): Promise<{ firstStart: number; lastStart: number; endSeconds: number }> {
+    const { userId, bookFileId, deviceId } = params;
+    const scope = and(
+      eq(schema.koreaderPageStats.userId, userId),
+      eq(schema.koreaderPageStats.bookFileId, bookFileId),
+      eq(schema.koreaderPageStats.deviceId, deviceId),
+    );
+    const eventEnd = sql<string | number | null>`max(${schema.koreaderPageStats.startTime} + ${schema.koreaderPageStats.durationSeconds})`;
+
+    let firstStart = params.firstInsertedStart;
+    for (;;) {
+      const [row] = await tx
+        .select({ earliest: sql<string | number | null>`min(${schema.koreaderPageStats.startTime})` })
+        .from(schema.koreaderPageStats)
+        .where(
+          and(
+            scope,
+            lt(schema.koreaderPageStats.startTime, firstStart),
+            // The duration cap bounds how far back a chaining event can start, keeping
+            // this an index range scan instead of a walk over the book's whole history.
+            gte(schema.koreaderPageStats.startTime, firstStart - KOREADER_SESSION_GAP_SECONDS - KOREADER_MAX_EVENT_DURATION_SECONDS),
+            gte(sql`${schema.koreaderPageStats.startTime} + ${schema.koreaderPageStats.durationSeconds}`, firstStart - KOREADER_SESSION_GAP_SECONDS),
+          ),
+        );
+      const earliest = toSeconds(row?.earliest);
+      if (earliest == null || earliest >= firstStart) break;
+      firstStart = earliest;
+    }
+
+    let lastStart = params.lastInsertedStart;
+    const [seed] = await tx
+      .select({ maxEnd: eventEnd })
+      .from(schema.koreaderPageStats)
+      .where(and(scope, gte(schema.koreaderPageStats.startTime, firstStart), lte(schema.koreaderPageStats.startTime, lastStart)));
+    let endSeconds = toSeconds(seed?.maxEnd) ?? lastStart;
+
+    for (;;) {
+      const [row] = await tx
+        .select({ latest: sql<string | number | null>`max(${schema.koreaderPageStats.startTime})`, maxEnd: eventEnd })
+        .from(schema.koreaderPageStats)
+        .where(
+          and(
+            scope,
+            gt(schema.koreaderPageStats.startTime, lastStart),
+            lte(schema.koreaderPageStats.startTime, endSeconds + KOREADER_SESSION_GAP_SECONDS),
+          ),
+        );
+      const latest = toSeconds(row?.latest);
+      if (latest == null || latest <= lastStart) break;
+      lastStart = latest;
+      endSeconds = Math.max(endSeconds, toSeconds(row?.maxEnd) ?? endSeconds);
+    }
+
+    return { firstStart, lastStart, endSeconds };
+  }
+
   private async recomputeDailyStats(tx: Tx, userId: number, libraryId: number, days: string[], timeZone: string) {
     const affectedDays = [...new Set(days)].sort();
     if (affectedDays.length === 0) return;
@@ -280,25 +382,38 @@ export class KoreaderPluginRepository {
       });
   }
 
-  async getRating(userId: number, bookId: number): Promise<{ rating: number | null; updatedAt: Date } | null> {
-    const [row] = await this.db
-      .select({ rating: schema.userBookRatings.rating, updatedAt: schema.userBookRatings.updatedAt })
-      .from(schema.userBookRatings)
-      .where(and(eq(schema.userBookRatings.userId, userId), eq(schema.userBookRatings.bookId, bookId)))
-      .limit(1);
-    return row ?? null;
+  async getRatings(userId: number, bookIds: number[]): Promise<Map<number, { rating: number | null; updatedAt: Date }>> {
+    const ratings = new Map<number, { rating: number | null; updatedAt: Date }>();
+    for (const batch of chunk([...new Set(bookIds)], BATCH_QUERY_SIZE)) {
+      const rows = await this.db
+        .select({
+          bookId: schema.userBookRatings.bookId,
+          rating: schema.userBookRatings.rating,
+          updatedAt: schema.userBookRatings.updatedAt,
+        })
+        .from(schema.userBookRatings)
+        .where(and(eq(schema.userBookRatings.userId, userId), inArray(schema.userBookRatings.bookId, batch)));
+      for (const row of rows) {
+        ratings.set(row.bookId, { rating: row.rating, updatedAt: row.updatedAt });
+      }
+    }
+    return ratings;
   }
 
-  async upsertRating(userId: number, bookId: number, rating: number | null): Promise<{ rating: number | null; updatedAt: Date }> {
-    const [row] = await this.db
-      .insert(schema.userBookRatings)
-      .values({ userId, bookId, rating })
-      .onConflictDoUpdate({
-        target: [schema.userBookRatings.userId, schema.userBookRatings.bookId],
-        set: { rating, updatedAt: new Date() },
-      })
-      .returning({ rating: schema.userBookRatings.rating, updatedAt: schema.userBookRatings.updatedAt });
-    return row!;
+  /**
+   * Entries must already be deduplicated by book: Postgres rejects an ON CONFLICT
+   * DO UPDATE that would touch the same row twice in one statement.
+   */
+  async upsertRatings(userId: number, entries: { bookId: number; rating: number | null }[], updatedAt: Date): Promise<void> {
+    for (const batch of chunk(entries, BATCH_QUERY_SIZE)) {
+      await this.db
+        .insert(schema.userBookRatings)
+        .values(batch.map((entry) => ({ userId, bookId: entry.bookId, rating: entry.rating, updatedAt })))
+        .onConflictDoUpdate({
+          target: [schema.userBookRatings.userId, schema.userBookRatings.bookId],
+          set: { rating: sql`excluded.rating`, updatedAt: sql`excluded.updated_at` },
+        });
+    }
   }
 
   async upsertSweep(data: {

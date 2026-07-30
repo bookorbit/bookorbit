@@ -187,16 +187,16 @@ async function save() {
             <h3 class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{{ t('smartScope.editorPanel.identity') }}</h3>
             <div class="flex gap-3">
               <div class="flex-1 flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-foreground/70">{{ t('smartScope.dialog.name') }}</label>
+                <label class="text-xs font-medium text-foreground">{{ t('smartScope.dialog.name') }}</label>
                 <input
                   v-model="draftName"
                   type="text"
                   :placeholder="t('smartScope.dialog.namePlaceholder')"
-                  class="h-10 rounded-lg border border-input bg-card text-foreground text-sm px-3 focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-muted-foreground/60"
+                  class="h-10 rounded-lg border border-input bg-card text-foreground text-sm px-3 focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-muted-foreground"
                 />
               </div>
               <div class="flex-1 flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-foreground/70">{{ t('smartScope.dialog.icon') }}</label>
+                <label class="text-xs font-medium text-foreground">{{ t('smartScope.dialog.icon') }}</label>
                 <IconPicker v-model="draftIcon" :placeholder="t('smartScope.dialog.iconPlaceholder')" />
               </div>
             </div>

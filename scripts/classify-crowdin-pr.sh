@@ -20,7 +20,11 @@ fi
 
 allowed_paths=(
   "client/src/locales/de.json"
+  "client/src/locales/es.json"
+  "client/src/locales/fr.json"
+  "client/src/locales/it.json"
   "client/src/locales/nl.json"
+  "client/src/locales/pl.json"
   "client/src/locales/pt.json"
   "client/src/locales/sl.json"
 )

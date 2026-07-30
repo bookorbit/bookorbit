@@ -52,6 +52,8 @@ describe('FileWriteRepository', () => {
       fileWritePdfMaxFileSizeMb: 100,
       fileWriteCbxEnabled: false,
       fileWriteCbxMaxFileSizeMb: 500,
+      fileWriteKindleEnabled: true,
+      fileWriteKindleMaxFileSizeMb: 100,
       fileWriteAudioEnabled: true,
       fileWriteAudioMaxFileSizeMb: 500,
     };

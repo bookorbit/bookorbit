@@ -14,7 +14,7 @@ import { DEFAULT_KOREADER_DEVICE_PATTERN } from '@bookorbit/types';
 import type { MockedFunction } from 'vitest';
 
 import { makeUser } from '../../common/test-utils/make-user';
-import { KoreaderCatalogBooksQueryDto } from './dto/koreader-catalog-query.dto';
+import { KoreaderCatalogBooksQueryDto, KoreaderCatalogManifestQueryDto } from './dto/koreader-catalog-query.dto';
 import { KoreaderCatalogService } from './koreader-catalog.service';
 
 const mockCreateReadStream = createReadStream as MockedFunction<typeof createReadStream>;
@@ -100,6 +100,7 @@ function makeService(
     getDistinctAuthorsPage: vi.fn().mockResolvedValue({ items: [{ name: 'Frank Herbert', bookCount: 2 }], hasNext: false }),
     getDistinctSeriesPage: vi.fn().mockResolvedValue({ items: [{ id: 42, name: 'Dune', bookCount: 6 }], hasNext: false }),
     getBooksPage: vi.fn().mockResolvedValue({ entries: [], total: 0 }),
+    getBookManifestPage: vi.fn().mockResolvedValue({ rows: [], hasNext: false }),
     getRandomBooks: vi.fn().mockResolvedValue([]),
   };
   const bookService = {
@@ -139,6 +140,10 @@ function makeService(
     findOne: vi.fn().mockResolvedValue({ status: 'reading' }),
     findByBookIds: vi.fn().mockResolvedValue(new Map([[10, { status: 'reading' }]])),
     setManual: vi.fn().mockResolvedValue(undefined),
+  };
+  const dashboardService = {
+    getScrollerBookIds: vi.fn().mockResolvedValue([11, 10]),
+    getSmartScopeBookIds: vi.fn().mockResolvedValue([10]),
   };
   const dashboardWidgetService = {
     getReadingGoal: vi.fn().mockResolvedValue({ goalBooks: 24, completedBooks: 6, year: 2026 }),
@@ -206,11 +211,16 @@ function makeService(
     ]),
   };
 
+  const pluginService = {
+    getLibraryVersion: vi.fn().mockResolvedValue('lib-v1'),
+  };
+
   const service = new KoreaderCatalogService(
     opdsBookService as never,
     bookService as never,
     bookReadService as never,
     userBookStatusService as never,
+    dashboardService as never,
     dashboardWidgetService as never,
     recommendationService as never,
     { isCrossPlatformPathSanitizationEnabled: vi.fn().mockResolvedValue(true) } as never,
@@ -218,10 +228,21 @@ function makeService(
       getKoreaderUserDefaultPattern: vi.fn().mockResolvedValue(DEFAULT_KOREADER_DEVICE_PATTERN),
       getDeviceFileNamingPattern: vi.fn().mockResolvedValue(deviceOrganization),
     } as never,
+    pluginService as never,
     { appDataPath: '/data', bookDockPath: '/data/book-dock' },
   );
 
-  return { service, opdsBookService, bookService, bookReadService, userBookStatusService, dashboardWidgetService, recommendationService };
+  return {
+    service,
+    opdsBookService,
+    bookService,
+    bookReadService,
+    userBookStatusService,
+    dashboardService,
+    dashboardWidgetService,
+    recommendationService,
+    pluginService,
+  };
 }
 
 describe('KoreaderCatalogService', () => {
@@ -323,6 +344,96 @@ describe('KoreaderCatalogService', () => {
     expect(dashboardWidgetService.getReadingGoal).toHaveBeenCalledWith(user);
     expect(dashboardWidgetService.getReadingStreak).toHaveBeenCalledWith(user);
     expect(dashboardWidgetService.getHighlightOfTheDay).toHaveBeenCalledWith(user);
+  });
+
+  function makeEntry(id: number, title: string) {
+    return {
+      id,
+      title,
+      folderPath: `/books/${id}`,
+      addedAt: new Date('2026-01-05T00:00:00.000Z'),
+      updatedAt: new Date('2026-02-05T00:00:00.000Z'),
+      description: null,
+      seriesId: null,
+      seriesName: null,
+      seriesIndex: null,
+      language: 'en',
+      publisher: 'Ace',
+      isbn13: null,
+      hasCover: true,
+      authors: ['Someone'],
+      files: [{ id: id * 10, format: 'epub' }],
+    };
+  }
+
+  it('serves a configured section instead of the legacy discover row', async () => {
+    const { service, opdsBookService, dashboardService } = makeService();
+    const user = makeUser({ id: 7 });
+    opdsBookService.getBooksPage.mockResolvedValue({ total: 0, entries: [] });
+
+    const dashboard = await service.getDashboard(user, { type: 'want-to-read' });
+
+    expect(dashboardService.getScrollerBookIds).toHaveBeenCalledWith('want-to-read', user, 10);
+    expect(opdsBookService.getRandomBooks).not.toHaveBeenCalled();
+    expect(dashboard.discover).toEqual([]);
+    expect(dashboard.section).toEqual({ type: 'want-to-read', smartScopeId: null, books: [] });
+  });
+
+  it('omits the section field entirely when no section is named', async () => {
+    const { service, opdsBookService } = makeService();
+    const user = makeUser({ id: 7 });
+    opdsBookService.getBooksPage.mockResolvedValue({ total: 0, entries: [] });
+    opdsBookService.getRandomBooks.mockResolvedValueOnce([]);
+
+    const dashboard = await service.getDashboard(user);
+
+    expect(dashboard.section).toBeUndefined();
+  });
+
+  it('preserves the order the section selected its books in', async () => {
+    const { service, opdsBookService, dashboardService } = makeService();
+    const user = makeUser({ id: 7 });
+    dashboardService.getScrollerBookIds.mockResolvedValueOnce([11, 10]);
+    opdsBookService.getBooksPage.mockResolvedValueOnce({ total: 2, entries: [makeEntry(10, 'Dune'), makeEntry(11, 'Dune Messiah')] });
+
+    const { section } = await service.getDashboardSection(user, { type: 'up-next-in-series' });
+
+    expect(section.books.map((book) => book.id)).toEqual([11, 10]);
+  });
+
+  it('routes a smart-scope section through the smart scope selection', async () => {
+    const { service, opdsBookService, dashboardService } = makeService();
+    const user = makeUser({ id: 7 });
+    opdsBookService.getBooksPage.mockResolvedValue({ total: 0, entries: [] });
+
+    const { section } = await service.getDashboardSection(user, { type: 'smart-scope', smartScopeId: 3 });
+
+    expect(dashboardService.getSmartScopeBookIds).toHaveBeenCalledWith(3, user, 10);
+    expect(dashboardService.getScrollerBookIds).not.toHaveBeenCalled();
+    expect(section.smartScopeId).toBe(3);
+  });
+
+  it('keeps the random section on the original discover implementation', async () => {
+    const { service, opdsBookService, dashboardService } = makeService();
+    const user = makeUser({ id: 7 });
+    opdsBookService.getRandomBooks.mockResolvedValueOnce([makeEntry(22, 'Neuromancer')]);
+
+    const { section } = await service.getDashboardSection(user, { type: 'random' });
+
+    expect(opdsBookService.getRandomBooks).toHaveBeenCalledWith(7, 10, false, user.contentFilters);
+    expect(dashboardService.getScrollerBookIds).not.toHaveBeenCalled();
+    expect(section.books.map((book) => book.id)).toEqual([22]);
+  });
+
+  it('makes no books query when the section selects nothing', async () => {
+    const { service, opdsBookService, dashboardService } = makeService();
+    const user = makeUser({ id: 7 });
+    dashboardService.getScrollerBookIds.mockResolvedValueOnce([]);
+
+    const { section } = await service.getDashboardSection(user, { type: 'recently-added' });
+
+    expect(section.books).toEqual([]);
+    expect(opdsBookService.getBooksPage).not.toHaveBeenCalled();
   });
 
   it('rerolls discover books via getDiscover', async () => {
@@ -767,5 +878,168 @@ describe('KoreaderCatalogService', () => {
     const cleared = await service.setRating(user, 10, null);
     expect(bookService.bulkSetRating).toHaveBeenLastCalledWith([10], null, user);
     expect(cleared).toEqual({ rating: null });
+  });
+
+  describe('bulk download manifest', () => {
+    function makeManifestRow(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 10,
+        title: 'Dune',
+        subtitle: null,
+        authors: ['Frank Herbert'],
+        seriesName: 'Dune',
+        seriesIndex: 1,
+        language: 'en',
+        publisher: 'Ace',
+        publishedYear: 1965,
+        isbn10: null,
+        isbn13: '9780441172719',
+        files: [
+          {
+            id: 100,
+            format: 'EPUB',
+            sizeBytes: 1234,
+            fileHash: 'abcdef0123456789',
+            filename: 'dune.epub',
+            contentVersion: new Date('2026-02-01T00:00:00.000Z'),
+          },
+        ],
+        ...overrides,
+      };
+    }
+
+    function makeQuery(overrides: Record<string, unknown> = {}) {
+      return Object.assign(new KoreaderCatalogManifestQueryDto(), overrides);
+    }
+
+    it('returns everything a bulk transfer needs and no internal path', async () => {
+      const { service, opdsBookService } = makeService();
+      opdsBookService.getBookManifestPage.mockResolvedValueOnce({ rows: [makeManifestRow()], hasNext: false });
+
+      const result = await service.getBulkManifest(makeUser({ id: 7 }), makeQuery({ deviceId: 'device-1' }));
+
+      expect(result.manifestVersion).toBe('lib-v1');
+      expect(result.restartRequired).toBe(false);
+      expect(result.nextCursor).toBeNull();
+      expect(result.items).toHaveLength(1);
+      const [book] = result.items;
+      expect(book.formats).toEqual(['epub']);
+      const [file] = book.files;
+      expect(file).toMatchObject({
+        id: 100,
+        format: 'epub',
+        sizeBytes: 1234,
+        fileHash: 'abcdef0123456789',
+        contentVersion: '2026-02-01T00:00:00.000Z',
+        downloadUrl: '/api/v1/koreader/plugin/catalog/files/100/download',
+      });
+      expect(file.devicePath).not.toContain('/books/');
+      expect(JSON.stringify(result)).not.toContain('absolutePath');
+    });
+
+    it('scopes the query to the requesting user and forwards the filter', async () => {
+      const { service, opdsBookService } = makeService();
+      const user = makeUser({ id: 7 });
+
+      await service.getBulkManifest(user, makeQuery({ q: 'dune', readStatus: 'reading', size: 25 }));
+
+      expect(opdsBookService.getBookManifestPage).toHaveBeenCalledWith(
+        7,
+        { filters: { q: 'dune', readStatus: 'reading' }, afterId: undefined, limit: 25 },
+        false,
+        user.contentFilters,
+      );
+    });
+
+    it('pages through a cursor bound to the user, the filter and the snapshot', async () => {
+      const { service, opdsBookService } = makeService();
+      const user = makeUser({ id: 7 });
+      opdsBookService.getBookManifestPage.mockResolvedValueOnce({ rows: [makeManifestRow({ id: 42 })], hasNext: true });
+
+      const first = await service.getBulkManifest(user, makeQuery());
+      expect(first.hasNext).toBe(true);
+      expect(first.nextCursor).toEqual(expect.any(String));
+
+      opdsBookService.getBookManifestPage.mockResolvedValueOnce({ rows: [], hasNext: false });
+      await service.getBulkManifest(user, makeQuery({ cursor: first.nextCursor! }));
+
+      expect(opdsBookService.getBookManifestPage).toHaveBeenLastCalledWith(7, { filters: {}, afterId: 42, limit: 100 }, false, user.contentFilters);
+    });
+
+    it('refuses a cursor minted for another user or another filter', async () => {
+      const { service, opdsBookService } = makeService();
+      opdsBookService.getBookManifestPage.mockResolvedValueOnce({ rows: [makeManifestRow({ id: 42 })], hasNext: true });
+
+      const { nextCursor } = await service.getBulkManifest(makeUser({ id: 7 }), makeQuery({ q: 'dune' }));
+
+      await expect(service.getBulkManifest(makeUser({ id: 8 }), makeQuery({ q: 'dune', cursor: nextCursor! }))).rejects.toThrow(BadRequestException);
+      await expect(service.getBulkManifest(makeUser({ id: 7 }), makeQuery({ q: 'other', cursor: nextCursor! }))).rejects.toThrow(BadRequestException);
+      await expect(service.getBulkManifest(makeUser({ id: 7 }), makeQuery({ cursor: 'not-a-cursor' }))).rejects.toThrow(BadRequestException);
+    });
+
+    it('continues the cursor and surfaces the new version when the snapshot moves mid-run', async () => {
+      const { service, opdsBookService, pluginService } = makeService();
+      const user = makeUser({ id: 7 });
+      opdsBookService.getBookManifestPage.mockResolvedValueOnce({ rows: [makeManifestRow({ id: 42 })], hasNext: true });
+      const { nextCursor } = await service.getBulkManifest(user, makeQuery());
+
+      pluginService.getLibraryVersion.mockResolvedValueOnce('lib-v2');
+      opdsBookService.getBookManifestPage.mockResolvedValueOnce({ rows: [makeManifestRow({ id: 43 })], hasNext: true });
+      const second = await service.getBulkManifest(user, makeQuery({ cursor: nextCursor! }));
+
+      expect(opdsBookService.getBookManifestPage).toHaveBeenLastCalledWith(7, { filters: {}, afterId: 42, limit: 100 }, false, user.contentFilters);
+      expect(second.restartRequired).toBe(false);
+      expect(second.manifestVersion).toBe('lib-v2');
+      expect(second.items.map((item) => item.id)).toEqual([43]);
+
+      // The run stays bound to the snapshot it started against, so the churn does not
+      // reset enumeration on every following page either.
+      pluginService.getLibraryVersion.mockResolvedValueOnce('lib-v3');
+      opdsBookService.getBookManifestPage.mockResolvedValueOnce({ rows: [], hasNext: false });
+      const third = await service.getBulkManifest(user, makeQuery({ cursor: second.nextCursor! }));
+
+      expect(opdsBookService.getBookManifestPage).toHaveBeenLastCalledWith(7, { filters: {}, afterId: 43, limit: 100 }, false, user.contentFilters);
+      expect(third.restartRequired).toBe(false);
+      expect(third.manifestVersion).toBe('lib-v3');
+    });
+
+    it('signals a restart for a cursor minted under another cursor contract', async () => {
+      const { service, opdsBookService } = makeService();
+      const foreignCursor = Buffer.from(JSON.stringify({ v: 99, u: 7, k: 'whatever', m: 'lib-v1', a: 42 }), 'utf8').toString('base64url');
+
+      const result = await service.getBulkManifest(makeUser({ id: 7 }), makeQuery({ cursor: foreignCursor }));
+
+      expect(result).toEqual({ items: [], hasNext: false, nextCursor: null, manifestVersion: 'lib-v1', restartRequired: true });
+      expect(opdsBookService.getBookManifestPage).not.toHaveBeenCalled();
+    });
+
+    it('accepts an explicit bounded book-id list under the same contract', async () => {
+      const { service, opdsBookService } = makeService();
+      const user = makeUser({ id: 7 });
+      opdsBookService.getBookManifestPage.mockResolvedValueOnce({ rows: [makeManifestRow()], hasNext: false });
+
+      const result = await service.getBulkManifest(user, makeQuery({ ids: [10, 11] }));
+
+      expect(opdsBookService.getBookManifestPage).toHaveBeenCalledWith(
+        7,
+        { filters: { ids: [10, 11] }, afterId: undefined, limit: 100 },
+        false,
+        user.contentFilters,
+      );
+      expect(result.items).toHaveLength(1);
+    });
+
+    it('resolves device paths from the requesting device pattern', async () => {
+      const { service, opdsBookService } = makeService({
+        fileNamingPattern: '{authors}/{title}',
+        seriesFileNamingPattern: '{series}/{seriesIndex} - {title}',
+        standaloneFileNamingPattern: '',
+      });
+      opdsBookService.getBookManifestPage.mockResolvedValueOnce({ rows: [makeManifestRow()], hasNext: false });
+
+      const result = await service.getBulkManifest(makeUser({ id: 7 }), makeQuery({ deviceId: 'device-1' }));
+
+      expect(result.items[0]!.files[0]!.devicePath).toBe('Dune/1 - Dune.epub');
+    });
   });
 });

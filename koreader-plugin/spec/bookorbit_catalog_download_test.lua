@@ -211,4 +211,40 @@ assertContains(dialog.title, "Download filename:\nCustom Name", "folder change p
 dialog.buttons[1][1].callback()
 assertEqual(downloaded_path, "/mnt/onboard/books/Series/Southern Reach/Custom Name.epub", "combined folder and filename changes match preview")
 
+-- Cancelling a transfer bumps the generation, so a child that finishes late
+-- cannot publish and its progress cannot resurrect the dismissed dialog.
+local transfer_opts
+package.loaded["bookorbit_download_transfer"].sweepStale = function() return 0 end
+package.loaded["bookorbit_download_transfer"].run = function(opts)
+    transfer_opts = opts
+    return nil, "cancelled"
+end
+Catalog.runOffThread = function(_, fn) return fn() end
+Catalog.client = {
+    downloadCatalogFile = function() return true end,
+}
+Catalog.showRetry = function()
+    error("a cancelled download must not offer a retry")
+end
+Catalog.linkDownloadedFile = function() return false end
+
+shown_widget = nil
+Catalog:downloadFile("/mnt/onboard/library/Cancelled.epub", detail, { id = 9, sizeBytes = 100 })
+assertContains(shown_widget.title, "Downloading:\nCancelled.epub", "the transfer shows a progress dialog")
+assertEqual(transfer_opts.is_current(), true, "an uncancelled transfer stays publishable")
+
+local generation_before = Catalog.download_generation
+package.loaded["bookorbit_download_transfer"].run = function(opts)
+    transfer_opts = opts
+    opts.on_progress(50)
+    -- The user taps cancel while the child is still transferring.
+    shown_widget.buttons[1][1].callback()
+    opts.on_progress(90)
+    return nil, "cancelled"
+end
+Catalog:downloadFile("/mnt/onboard/library/Cancelled.epub", detail, { id = 9, sizeBytes = 100 })
+assertEqual(Catalog.download_generation > generation_before, true, "cancelling advances the download generation")
+assertEqual(transfer_opts.is_current(), false, "a late child result is refused after cancellation")
+assertEqual(shown_widget.text, "Download cancelled.", "the dismissed dialog is not resurrected by late progress")
+
 print("bookorbit_catalog_download_test.lua: ok")

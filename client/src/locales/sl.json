@@ -4585,18 +4585,18 @@
         "shelves": "Police"
       },
       "widgetNames": {
-        "readingStreak": "Reading Streak",
-        "currentlyReading": "Currently Reading",
+        "readingStreak": "Bralni niz",
+        "currentlyReading": "Trenutno bereš",
         "readingGoal": "Reading Goal",
-        "readingDna": "Reading DNA",
-        "monthlyChallenge": "Monthly Challenge",
-        "highlightOfTheDay": "Highlight of the Day",
-        "neglectedGems": "Neglected Gems",
-        "readingRhythm": "Reading Rhythm",
-        "diversityScore": "Diversity Score",
-        "libraryOverview": "Library Overview",
-        "yearProjection": "Year Projection",
-        "longWait": "The Long Wait"
+        "readingDna": "Bralni DNK",
+        "monthlyChallenge": "Mesečni izziv",
+        "highlightOfTheDay": "Poudarek dneva",
+        "neglectedGems": "Zapostavljeni biseri",
+        "readingRhythm": "Bralni ritem",
+        "diversityScore": "Ocena raznolikosti",
+        "libraryOverview": "Pregled knjižnice",
+        "yearProjection": "Letna napoved",
+        "longWait": "Dolgo čakanje"
       },
       "shelfNames": {
         "recentlyAdded": "Recently Added",

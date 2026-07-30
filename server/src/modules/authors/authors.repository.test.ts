@@ -133,6 +133,7 @@ describe('AuthorsRepository', () => {
     await expect(repo.findVisibleAuthorIds([], [1])).resolves.toEqual([]);
     await expect(repo.findVisibleAuthorIds([1], [])).resolves.toEqual([]);
     await expect(repo.countDistinctBooks([])).resolves.toBe(0);
+    await expect(repo.countAuthors({ libraryIds: [] })).resolves.toBe(0);
     await expect(repo.findBookIdsByAuthorIds([])).resolves.toEqual([]);
     await expect(repo.findRelatedLibraryIds([])).resolves.toEqual([]);
     await expect(repo.mergeAuthors(1, [])).resolves.toBeUndefined();
@@ -162,6 +163,14 @@ describe('AuthorsRepository', () => {
     const repo = new AuthorsRepository(db as never);
 
     await expect(repo.countDistinctBooks([1, 2])).resolves.toBe(4);
+  });
+
+  it('countAuthors returns the distinct author total for the accessible libraries', async () => {
+    const { db, selectBuilder } = makeDb();
+    selectBuilder.where.mockResolvedValueOnce([{ total: '1234' }]);
+    const repo = new AuthorsRepository(db as never);
+
+    await expect(repo.countAuthors({ libraryIds: [1, 2] })).resolves.toBe(1234);
   });
 
   it('findByIdForEnrichment returns null when no row is found', async () => {

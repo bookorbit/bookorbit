@@ -365,7 +365,7 @@ function targetSummary(file: BookDockFile): string {
             >
               {{ file.confidence }}%
             </span>
-            <span v-else class="text-xs text-muted-foreground/60">-</span>
+            <span v-else class="text-xs text-muted-foreground">-</span>
           </div>
 
           <div class="w-7 flex justify-center shrink-0">

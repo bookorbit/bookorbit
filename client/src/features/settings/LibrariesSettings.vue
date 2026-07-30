@@ -354,7 +354,7 @@ function coverRefreshLabel(libraryId: number): string {
                 <span v-else class="min-w-0"></span>
 
                 <!-- Col 3 -->
-                <span v-if="lib.watch" class="flex items-center gap-1 text-xs font-medium text-primary/80 min-w-0">
+                <span v-if="lib.watch" class="flex items-center gap-1 text-xs font-medium text-primary min-w-0">
                   <Eye :size="11" class="shrink-0" />
                   <span class="truncate">{{ t('settings.admin.libraries.watching') }}</span>
                 </span>
@@ -475,7 +475,7 @@ function coverRefreshLabel(libraryId: number): string {
       <!-- Empty state -->
       <div v-if="libraries.length === 0" class="rounded-lg border border-dashed border-border bg-card/50 px-8 py-16 text-center shadow-xs">
         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-muted mx-auto mb-4">
-          <FolderOpen :size="22" class="text-muted-foreground/80" />
+          <FolderOpen :size="22" class="text-muted-foreground" />
         </div>
         <p class="text-sm font-medium text-foreground mb-1">{{ t('settings.admin.libraries.emptyTitle') }}</p>
         <p class="text-sm text-muted-foreground mb-5">{{ t('settings.admin.libraries.emptyHint') }}</p>

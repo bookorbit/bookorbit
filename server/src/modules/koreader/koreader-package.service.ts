@@ -5,6 +5,7 @@ import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { join, resolve } from 'path';
 
+import type { KoreaderPluginCapability, KoreaderPluginVersionInfo } from '@bookorbit/types';
 import { appConfig } from '../../config/config';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { KoreaderRepository } from './koreader.repository';
@@ -12,6 +13,11 @@ import { KoreaderRepository } from './koreader.repository';
 const PACKAGE_EVENT = 'koreader.plugin_package';
 const PLUGIN_FOLDER = 'bookorbit.koplugin';
 const PROVISION_FILE = 'bookorbit_provision.lua';
+
+// Wire features this server advertises. The plugin selects a new route only
+// when its name appears here, so a downgraded server transparently returns the
+// plugin to its legacy path.
+const SERVER_CAPABILITIES: readonly KoreaderPluginCapability[] = ['catalogBulkManifest', 'catalogDashboardSections', 'bookmarkSync'];
 
 @Injectable()
 export class KoreaderPackageService {
@@ -70,10 +76,11 @@ export class KoreaderPackageService {
     }
   }
 
-  async getVersionInfo(): Promise<{ pluginVersion: string; serverVersion: string }> {
+  async getVersionInfo(): Promise<KoreaderPluginVersionInfo> {
     return {
       pluginVersion: await this.readPluginVersion(),
       serverVersion: this.config.version,
+      capabilities: [...SERVER_CAPABILITIES],
     };
   }
 

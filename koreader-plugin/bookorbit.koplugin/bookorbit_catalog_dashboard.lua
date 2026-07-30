@@ -3,12 +3,16 @@ Dashboard mixin for the BookOrbit catalog browser.
 
 Builds and renders the single-page dashboard: a summary stats band, a
 Continue-reading hero row (two hero cards side by side, chevron-paged through
-all in-progress books), the Discover rows and a compact Browse list, including
-the offline cache and the Discover reroll. Installed onto the catalog
+all in-progress books), one configurable book row and a compact Browse list,
+including the offline cache and the Discover reroll. Installed onto the catalog
 controller as regular methods.
 
+The configurable row defaults to Discover and can be pointed at another source
+through bookorbit_dashboard_sections. Every source renders identically, so the
+layout budget does not depend on which one is chosen.
+
 Layout is budget-driven: fixed blocks are measured first. When the page gets
-too tight, the stats strip is dropped first, then Discover itself.
+too tight, the stats strip is dropped first, then the configurable row itself.
 ]]
 
 local Blitbuffer = require("ffi/blitbuffer")
@@ -30,8 +34,10 @@ local VerticalSpan = require("ui/widget/verticalspan")
 local T = require("ffi/util").template
 local _ = require("gettext")
 
+local Capabilities = require("bookorbit_capabilities")
 local CatalogUtil = require("bookorbit_catalog_util")
 local CatalogWidgets = require("bookorbit_catalog_widgets")
+local DashboardSections = require("bookorbit_dashboard_sections")
 local BookOrbitStatsReader = require("bookorbit_stats_reader")
 
 local formatDuration = CatalogUtil.formatDuration
@@ -46,11 +52,12 @@ local BookOrbitDashboardIconButton = CatalogWidgets.DashboardIconButton
 -- How long the local reading-stats summary is reused before re-querying
 -- statistics.sqlite3 (the dashboard re-renders on every row page turn).
 local STATS_CACHE_TTL = 120
-local DISCOVER_TARGET_SLOTS = 5
-local DISCOVER_COMPACT_GAP = 6
+local SECTION_TARGET_SLOTS = 5
+local SECTION_COMPACT_GAP = 6
 local DASHBOARD_TALL_ASPECT_RATIO = 1.55
-local DISCOVER_MAX_ROWS = 2
+local SECTION_MAX_ROWS = 2
 local STATS_MIN_BODY_HEIGHT = 56
+local SECTION_PAGE_ID = "section"
 
 local CatalogDashboard = {}
 
@@ -66,6 +73,46 @@ end
 function CatalogDashboard:cacheDashboard(body)
     if type(body) ~= "table" then return end
     self:persistSetting("catalog_dashboard_cache", body)
+    self:persistSetting("catalog_dashboard_cache_section",
+        DashboardSections.signature(self:dashboardBodySection(body)))
+end
+
+-- True when the cached body holds books for the section the user currently has
+-- configured. A mismatch leaves everything else in the cache usable; only the
+-- configurable row has to wait for the refresh.
+function CatalogDashboard:dashboardCacheMatchesSection()
+    return self.settings.catalog_dashboard_cache_section
+        == DashboardSections.signature(DashboardSections.primary(self.settings))
+end
+
+function CatalogDashboard:dashboardConfiguredSection()
+    return DashboardSections.primary(self.settings)
+end
+
+-- What a response body actually contains, which is not always what is
+-- configured: a server without the capability answers with the legacy Discover
+-- row no matter what the user picked, and the header must not claim otherwise.
+function CatalogDashboard:dashboardBodySection(body)
+    local section = type(body) == "table" and body.section or nil
+    if type(section) ~= "table" or not DashboardSections.isValid(section.type) then
+        return DashboardSections.defaultConfig()
+    end
+    local configured = self:dashboardConfiguredSection()
+    local scope_name
+    if configured.type == "smart-scope" and configured.smartScopeId == section.smartScopeId then
+        scope_name = configured.smartScopeName
+    end
+    return DashboardSections.normalizeEntry({
+        type = section.type,
+        smartScopeId = section.smartScopeId,
+        smartScopeName = scope_name,
+    })
+end
+
+function CatalogDashboard.dashboardSectionBooks(body)
+    if type(body) ~= "table" then return {} end
+    if type(body.section) == "table" then return body.section.books or {} end
+    return body.discover or {}
 end
 
 function CatalogDashboard.dashboardItems()
@@ -95,57 +142,132 @@ function CatalogDashboard:dashboardContext(dashboard, opts)
         dashboard = dashboard,
         stale = opts.stale == true,
         unavailable = opts.unavailable == true,
+        loading = opts.loading == true,
+        section_stale = opts.section_stale == true,
     }
 end
 
-function CatalogDashboard:dashboardRoot()
+-- A cached body is served whole, but its configurable row is only trusted when
+-- it was fetched for the section that is configured now.
+function CatalogDashboard:cachedDashboardContext(cached, opts)
+    opts = opts or {}
+    opts.stale = true
+    opts.section_stale = not self:dashboardCacheMatchesSection()
+    return self:dashboardContext(cached, opts)
+end
+
+-- What the catalog widget opens on, built without touching the network: the
+-- cached dashboard when there is one, otherwise a placeholder the pending
+-- refresh replaces in place.
+function CatalogDashboard:initialDashboardContext()
+    local cached = self:dashboardCache()
+    if cached then
+        return self:cachedDashboardContext(cached)
+    end
+    if self:shouldRefreshDashboardOnOpen() then
+        return self:dashboardContext(nil, { stale = true, loading = true })
+    end
+    return self:dashboardContext(nil, { stale = true, unavailable = true })
+end
+
+-- An offline-tolerant open (auto-open, offline browse) never asks for a
+-- connection on its own; only an explicit browse goes through the connected
+-- gate.
+function CatalogDashboard:shouldRefreshDashboardOnOpen()
+    if self.prefer_cached_dashboard and not NetworkMgr:isConnected() then
+        return false
+    end
+    return true
+end
+
+-- The section parameter is only sent to a server that advertises it. Discover
+-- needs no parameter at all, so the default configuration never pays for the
+-- capability probe.
+function CatalogDashboard:dashboardSectionRequest()
+    local config = self:dashboardConfiguredSection()
+    if config.type == DashboardSections.DEFAULT_TYPE then return nil end
+    if Capabilities.supports(self.client, DashboardSections.CAPABILITY) ~= true then return nil end
+    return config
+end
+
+function CatalogDashboard:dashboardRoot(opts)
+    local function requestIsCurrent()
+        return not opts or not opts.is_current or opts.is_current()
+    end
     local cached = self:dashboardCache()
     if self.prefer_cached_dashboard and cached and not NetworkMgr:isConnected() then
-        return self:dashboardContext(cached, { stale = true })
+        return self:cachedDashboardContext(cached)
     end
 
+    local section = self:dashboardSectionRequest()
     local body, err = self:fetch(_("Loading dashboard..."), function()
-        return self.client:catalogDashboard()
-    end)
+        return self.client:catalogDashboard(section)
+    end, opts)
+    -- A server that advertised the capability but rejects the parameter is
+    -- answering definitively, so drop back to the legacy shape for the session
+    -- rather than leaving the dashboard empty.
+    if not body and section and (err == 400 or err == 404) then
+        Capabilities.markUnsupported(self.client, DashboardSections.CAPABILITY)
+        section = nil
+        body, err = self:fetch(_("Loading dashboard..."), function()
+            return self.client:catalogDashboard()
+        end, opts)
+    end
     if body and body.continueReading then
         self:cacheDashboard(body)
         return self:dashboardContext(body)
     end
 
     if isDashboardUnsupported(err) then
-        UIManager:show(InfoMessage:new{
-            text = _("BookOrbit dashboard needs a newer server. Showing the catalog instead."),
-            timeout = 4,
-        })
+        if requestIsCurrent() then
+            UIManager:show(InfoMessage:new{
+                text = _("BookOrbit dashboard needs a newer server. Showing the catalog instead."),
+                timeout = 4,
+            })
+        end
         return self:rootItems(), { kind = "root", title = self.title }
     end
 
     if cached then
-        return self:dashboardContext(cached, { stale = true })
+        return self:cachedDashboardContext(cached)
     end
 
-    if err ~= "cancelled" then
+    if err ~= "cancelled" and requestIsCurrent() then
         self:showServerError(err)
     end
     return self:dashboardContext(nil, { stale = true, unavailable = true })
 end
 
-function CatalogDashboard:loadDashboardRoot(replace)
+function CatalogDashboard:loadDashboardRoot(replace, opts)
+    self.dashboard_request_generation = (self.dashboard_request_generation or 0) + 1
+    local request_generation = self.dashboard_request_generation
+    local expected_context = self.current_context
+    local request_opts = {}
+    for key, value in pairs(opts or {}) do request_opts[key] = value end
+    request_opts.is_current = function()
+        return not self.catalog_closed
+            and request_generation == self.dashboard_request_generation
+            and self.current_context == expected_context
+    end
     self:runConnected(function()
-        local items, context = self:dashboardRoot()
+        local items, context = self:dashboardRoot(request_opts)
+        if self.catalog_closed or request_generation ~= self.dashboard_request_generation
+                or self.current_context ~= expected_context then
+            return
+        end
         self:switchTo(context.title or self.title, items, context, not replace)
     end)
 end
 
--- All books rendered on the dashboard (continue reading + discover), used for
--- thumbnail prefetching and cover-cache eviction.
+-- All books rendered on the dashboard (continue reading + the configurable
+-- row), used for thumbnail prefetching and cover-cache eviction.
 function CatalogDashboard.dashboardBooks(dashboard)
     dashboard = dashboard or {}
     local books = {}
     for _, book in ipairs(dashboard.continueReading or {}) do
         table.insert(books, book)
     end
-    for _, book in ipairs(dashboard.discover or {}) do
+    for _, book in ipairs(CatalogDashboard.dashboardSectionBooks(dashboard)) do
         table.insert(books, book)
     end
     return books
@@ -244,6 +366,12 @@ function CatalogDashboard:addDashboardHeader(text, controls)
     if controls and #controls > 0 then
         table.insert(self.layout, controls)
     end
+end
+
+-- Reshuffling only means something for a random row; every other source has a
+-- defined order the server chose.
+function CatalogDashboard:dashboardSectionSupportsReroll(config)
+    return (config or {}).type == DashboardSections.DEFAULT_TYPE
 end
 
 function CatalogDashboard:buildDashboardRerollButton()
@@ -363,8 +491,8 @@ function CatalogDashboard:addDashboardHeroRow(books, height, slots, page)
     self.dash_used = self.dash_used + height
 end
 
-function CatalogDashboard:discoverRowMetrics(count, gap)
-    local slots = math.min(DISCOVER_TARGET_SLOTS, count)
+function CatalogDashboard:sectionRowMetrics(count, gap)
+    local slots = math.min(SECTION_TARGET_SLOTS, count)
     gap = gap or self.dash_inner_gap
     local min_card_w = Screen:scaleBySize(72)
     while slots > 1
@@ -428,7 +556,7 @@ function CatalogDashboard:addDashboardCoverGrid(
 end
 
 -- A friendlier empty/unavailable state than a bare status line: a short
--- centered message with a borderless action button underneath.
+-- centered message with an optional borderless action button underneath.
 function CatalogDashboard:addDashboardEmptyState(text, button_text, callback)
     local col = VerticalGroup:new{ align = "center" }
     table.insert(col, TextBoxWidget:new{
@@ -438,6 +566,10 @@ function CatalogDashboard:addDashboardEmptyState(text, button_text, callback)
         fgcolor = Blitbuffer.COLOR_DARK_GRAY,
         face = Font:getFace("cfont", 14),
     })
+    if not button_text then
+        self:addDashboardInset(col)
+        return
+    end
     local button = Button:new{
         text = button_text,
         bordersize = 0,
@@ -574,11 +706,16 @@ end
 
 function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dimen)
     local old_dimen = self:prepareCustomUpdate(no_recalculate_dimen)
-    self:refreshOnDevice()
+    self:ensureOnDeviceCurrent()
     local context = self.current_context or {}
     local dashboard = context.dashboard
     local continue_books = dashboard and dashboard.continueReading or {}
-    local discover_books = dashboard and dashboard.discover or {}
+    -- A cached body fetched for a different section is not rendered as this
+    -- one's content; the row waits for the refresh already in flight.
+    local section_pending = context.section_stale == true
+    local section_config = section_pending and self:dashboardConfiguredSection()
+        or self:dashboardBodySection(dashboard)
+    local section_books = section_pending and {} or self.dashboardSectionBooks(dashboard)
     local action_entries = self:dashboardActionEntries()
     local summary = self:dashboardStatsSummary() or { today_seconds = 0, week_seconds = 0, streak_days = 0 }
 
@@ -603,36 +740,37 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
     local stats_h = stats_widget and stats_widget:getSize().h or 0
 
     local show_stats = stats_widget ~= nil
-    local show_discover = #discover_books > 0
-    local discover_gap = inner_gap
-    local discover_slots = 0
-    local discover_card_w = 0
-    local discover_row_h = 0
-    local discover_rows = 1
+    local show_section = #section_books > 0 or section_pending
+    local section_row_gap = inner_gap
+    local section_slots = 0
+    local section_card_w = 0
+    local section_row_h = 0
+    local section_rows = 1
 
-    local function updateDiscoverMetrics()
-        if show_discover then
-            discover_slots, discover_card_w, discover_row_h = self:discoverRowMetrics(#discover_books, discover_gap)
+    local function updateSectionMetrics()
+        if show_section and #section_books > 0 then
+            section_slots, section_card_w, section_row_h = self:sectionRowMetrics(#section_books, section_row_gap)
         else
-            discover_slots, discover_card_w, discover_row_h = 0, 0, 0
+            section_slots, section_card_w, section_row_h = 0, 0, 0
         end
     end
-    updateDiscoverMetrics()
+    updateSectionMetrics()
 
-    local function discoverGridHeight()
-        if not show_discover then return 0 end
-        return discover_rows * discover_row_h + math.max(0, discover_rows - 1) * inner_gap
+    local function sectionGridHeight()
+        if not show_section then return 0 end
+        if section_pending then return empty_h end
+        return section_rows * section_row_h + math.max(0, section_rows - 1) * inner_gap
     end
 
     -- Fixed blocks are measured up front. If the dashboard gets too tight, the
-    -- stats strip drops first, then Discover.
+    -- stats strip drops first, then the configurable row.
     local function fixedHeight()
         local fixed = top_gap
             + (show_stats and (stats_h + stats_gap) or 0)
             + header_h + inner_gap
             + (has_continue and hero_h or empty_h)
             + section_gap
-            + (show_discover and (header_h + inner_gap + discoverGridHeight() + section_gap) or 0)
+            + (show_section and (header_h + inner_gap + sectionGridHeight() + section_gap) or 0)
             + header_h + inner_gap + browse_rows * browse_row_h
             + inner_gap
         return fixed
@@ -640,35 +778,35 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
     if show_stats and fixedHeight() > avail then
         show_stats = false
     end
-    if show_discover and fixedHeight() > avail then
-        show_discover = false
-        updateDiscoverMetrics()
+    if show_section and fixedHeight() > avail then
+        show_section = false
+        updateSectionMetrics()
     end
-    if show_discover then
-        local compact_gap = px(DISCOVER_COMPACT_GAP)
-        if compact_gap < discover_gap then
-            local previous_gap = discover_gap
-            local previous_slots, previous_card_w, previous_row_h = discover_slots, discover_card_w, discover_row_h
-            discover_gap = compact_gap
-            updateDiscoverMetrics()
+    if show_section and not section_pending then
+        local compact_gap = px(SECTION_COMPACT_GAP)
+        if compact_gap < section_row_gap then
+            local previous_gap = section_row_gap
+            local previous_slots, previous_card_w, previous_row_h = section_slots, section_card_w, section_row_h
+            section_row_gap = compact_gap
+            updateSectionMetrics()
             if fixedHeight() > avail then
-                discover_gap = previous_gap
-                discover_slots, discover_card_w, discover_row_h = previous_slots, previous_card_w, previous_row_h
+                section_row_gap = previous_gap
+                section_slots, section_card_w, section_row_h = previous_slots, previous_card_w, previous_row_h
             end
         end
     end
-    if show_discover and self:dashboardTallLayout() and discover_slots > 0 then
-        local full_rows = math.floor(#discover_books / discover_slots)
-        local remainder = #discover_books % discover_slots
+    if show_section and not section_pending and self:dashboardTallLayout() and section_slots > 0 then
+        local full_rows = math.floor(#section_books / section_slots)
+        local remainder = #section_books % section_slots
         local book_rows = full_rows
-        if remainder >= math.ceil(discover_slots * 0.5) then
+        if remainder >= math.ceil(section_slots * 0.5) then
             book_rows = book_rows + 1
         end
-        local max_rows = math.min(DISCOVER_MAX_ROWS, math.max(1, book_rows))
-        while discover_rows < max_rows do
-            discover_rows = discover_rows + 1
+        local max_rows = math.min(SECTION_MAX_ROWS, math.max(1, book_rows))
+        while section_rows < max_rows do
+            section_rows = section_rows + 1
             if fixedHeight() > avail then
-                discover_rows = discover_rows - 1
+                section_rows = section_rows - 1
                 break
             end
         end
@@ -700,6 +838,8 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
     self:addDashboardSpacer(inner_gap)
     if has_continue then
         self:addDashboardHeroRow(continue_books, hero_h, hero_slots, hero_page)
+    elseif context.loading then
+        self:addDashboardEmptyState(_("Loading dashboard..."))
     elseif context.unavailable then
         self:addDashboardEmptyState(
             _("The dashboard could not be loaded."),
@@ -715,23 +855,32 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
     end
     self:addDashboardSpacer(section_gap)
 
-    if show_discover then
-        discover_slots = math.min(discover_slots, #discover_books)
-        local discover_page_size = math.max(1, discover_slots * discover_rows)
-        local discover_pages = math.max(1, math.ceil(#discover_books / discover_page_size))
-        local discover_page = self:dashboardPage("discover", discover_pages)
-        local discover_controls = {}
-        if discover_pages > 1 then
-            local prev_button, next_button = self:buildDashboardHeaderNav("discover", discover_page, discover_pages)
-            table.insert(discover_controls, prev_button)
-            table.insert(discover_controls, next_button)
+    if show_section then
+        local section_controls = {}
+        local section_page = 1
+        if not section_pending then
+            section_slots = math.min(section_slots, #section_books)
+            local section_page_size = math.max(1, section_slots * section_rows)
+            local section_pages = math.max(1, math.ceil(#section_books / section_page_size))
+            section_page = self:dashboardPage(SECTION_PAGE_ID, section_pages)
+            if section_pages > 1 then
+                local prev_button, next_button = self:buildDashboardHeaderNav(SECTION_PAGE_ID, section_page, section_pages)
+                table.insert(section_controls, prev_button)
+                table.insert(section_controls, next_button)
+            end
+            if self:dashboardSectionSupportsReroll(section_config) then
+                table.insert(section_controls, self:buildDashboardRerollButton())
+            end
         end
-        table.insert(discover_controls, self:buildDashboardRerollButton())
 
-        self:addDashboardHeader(_("Discover"), discover_controls)
+        self:addDashboardHeader(DashboardSections.headerText(section_config), section_controls)
         self:addDashboardSpacer(inner_gap)
-        self:addDashboardCoverGrid("discover", discover_books, discover_row_h, false, false,
-            discover_slots, discover_card_w, discover_page, discover_rows)
+        if section_pending then
+            self:addDashboardEmptyState(_("Loading..."))
+        else
+            self:addDashboardCoverGrid(SECTION_PAGE_ID, section_books, section_row_h, false, false,
+                section_slots, section_card_w, section_page, section_rows)
+        end
         self:addDashboardSpacer(section_gap)
     end
 
@@ -744,8 +893,27 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
     self:finishCustomUpdate(old_dimen, select_number)
 end
 
+-- Replaces the configurable row's books in place, leaving the rest of the page
+-- and its cache entry alone.
+function CatalogDashboard:applyDashboardSectionBooks(context, books)
+    local dashboard = context and context.dashboard
+    if not dashboard then return end
+    if type(dashboard.section) == "table" then
+        dashboard.section.books = books
+    else
+        dashboard.discover = books
+    end
+    context.dash_pages = context.dash_pages or {}
+    context.dash_pages[SECTION_PAGE_ID] = 1
+    context.section_stale = false
+    self:cacheDashboard(dashboard)
+    self:scheduleThumbnailDownloads(self.dashboardBooks(dashboard))
+    self:updateItems()
+end
+
 -- Fetches a fresh set of random Discover books and swaps them into the current
--- dashboard without reloading the rest of the page.
+-- dashboard without reloading the rest of the page. Only reachable while the
+-- configurable row is showing Discover.
 function CatalogDashboard:rerollDiscover()
     if not self:dashboardMode() then return end
     self:runConnected(function()
@@ -753,19 +921,30 @@ function CatalogDashboard:rerollDiscover()
             return self.client:catalogDiscover()
         end)
         if body and body.discover then
-            local context = self.current_context
-            if context and context.dashboard then
-                context.dashboard.discover = body.discover
-                context.dash_pages = context.dash_pages or {}
-                context.dash_pages.discover = 1
-                self:cacheDashboard(context.dashboard)
-                self:scheduleThumbnailDownloads(self.dashboardBooks(context.dashboard))
-                self:updateItems()
-            end
+            self:applyDashboardSectionBooks(self.current_context, body.discover)
         elseif err and err ~= "cancelled" then
             self:showServerError(err)
         end
     end)
+end
+
+-- Persists a new choice for the configurable row and reloads the dashboard so
+-- the row is fetched for it. Called from the picker.
+function CatalogDashboard:setDashboardSection(config)
+    local normalized = DashboardSections.normalizeEntry(config)
+    if DashboardSections.signature(normalized) == DashboardSections.signature(self:dashboardConfiguredSection()) then
+        return
+    end
+    self:persistSetting(DashboardSections.SETTING_KEY, DashboardSections.store(normalized))
+    if not self:dashboardMode() then return end
+    local context = self.current_context
+    if context then
+        context.section_stale = true
+        context.dash_pages = context.dash_pages or {}
+        context.dash_pages[SECTION_PAGE_ID] = 1
+        self:updateItems()
+    end
+    self:refreshCurrent()
 end
 
 function CatalogDashboard.install(Catalog)

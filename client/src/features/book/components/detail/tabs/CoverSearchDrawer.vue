@@ -160,7 +160,7 @@ function handleOpenChange(val: boolean) {
           />
           <span class="text-xs text-muted-foreground">
             {{ t('book.detail.coverSearch.audiobookCovers') }}
-            <span class="text-[10px] font-semibold text-primary/70 ml-0.5">{{ t('book.detail.coverSearch.squareHint') }}</span>
+            <span class="text-[10px] font-semibold text-primary ml-0.5">{{ t('book.detail.coverSearch.squareHint') }}</span>
           </span>
         </label>
 

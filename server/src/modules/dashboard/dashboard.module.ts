@@ -13,6 +13,6 @@ import { DashboardWidgetService } from './dashboard-widget.service';
   imports: [BookModule, LibraryModule, SmartScopeModule],
   controllers: [DashboardController],
   providers: [DashboardService, DashboardRepository, DashboardWidgetService, DashboardWidgetRepository],
-  exports: [DashboardWidgetService],
+  exports: [DashboardService, DashboardWidgetService],
 })
 export class DashboardModule {}

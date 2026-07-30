@@ -69,7 +69,7 @@ const cardClasses = computed<string>(() => {
     return `border-2 cursor-pointer shadow-sm ${earnedRarityClasses[props.group.rarity]}`
   }
 
-  return `border border-dashed cursor-pointer grayscale text-muted-foreground/75 dark:text-muted-foreground/65 bg-card/60 dark:bg-card/45 ${lockedRarityClasses[props.group.rarity]}`
+  return `border border-dashed cursor-pointer grayscale text-muted-foreground dark:text-muted-foreground bg-card/60 dark:bg-card/45 ${lockedRarityClasses[props.group.rarity]}`
 })
 
 const isLocked = computed<boolean>(() => props.group.earnedCount === 0)
@@ -153,7 +153,7 @@ function handleClick(): void {
       </div>
       <span class="shrink-0">{{ t('achievements.tierProgress', { earned: group.earnedCount, total: group.totalTiers }) }}</span>
       <template v-if="progressPercent != null">
-        <span :class="['shrink-0', isLocked ? 'text-current/70' : 'text-muted-foreground/50']">·</span>
+        <span :class="['shrink-0', isLocked ? 'text-current/70' : 'text-border']">·</span>
         <span class="min-w-0">{{
           t('achievements.progressToNext', {
             current: group.currentProgress,

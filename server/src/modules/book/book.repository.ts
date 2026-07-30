@@ -2004,9 +2004,11 @@ export class BookRepository {
         bookId: bookFiles.bookId,
         primaryFileId: books.primaryFileId,
         format: bookFiles.format,
+        markAsFinishedPercentComplete: libraries.markAsFinishedPercentComplete,
       })
       .from(bookFiles)
       .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(libraries, eq(libraries.id, books.libraryId))
       .where(eq(bookFiles.id, fileId))
       .limit(1);
 
@@ -2076,7 +2078,7 @@ export class BookRepository {
     const statusInfo = {
       ...(this.asJsonObj(existing?.statusInfo) ?? {}),
       LastModified: nowIso,
-      Status: this.deriveKoboStatus(clampedPercentage),
+      Status: this.deriveKoboStatus(clampedPercentage, file.markAsFinishedPercentComplete),
     };
     const statistics = this.asJsonObj(existing?.statistics) ?? { LastModified: nowIso };
 
@@ -2223,8 +2225,14 @@ export class BookRepository {
     return existingPercent !== null && Math.abs(existingPercent - percentage) < PROGRESS_EPSILON;
   }
 
-  private deriveKoboStatus(percentage: number): string {
-    if (percentage >= 100) return 'Finished';
+  /**
+   * Uses the library's finished threshold so the device agrees with the read status
+   * BookOrbit derives from the same percentage; requiring 100 left books BookOrbit
+   * calls read showing as Reading on Kobo.
+   */
+  private deriveKoboStatus(percentage: number, markAsFinishedPercentComplete: number): string {
+    const threshold = Number.isFinite(markAsFinishedPercentComplete) ? Math.min(100, Math.max(1, markAsFinishedPercentComplete)) : 100;
+    if (percentage >= threshold) return 'Finished';
     return percentage > 0 ? 'Reading' : 'ReadyToRead';
   }
 

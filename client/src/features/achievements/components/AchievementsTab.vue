@@ -47,7 +47,7 @@ function handleFilterChange(filter: FilterState): void {
 
     <div v-else-if="error" class="flex flex-col items-center gap-3 py-16">
       <p class="text-muted-foreground text-sm">{{ t('achievements.loadFailed') }}</p>
-      <button class="text-primary hover:text-primary/80 text-sm font-medium" @click="reload">{{ t('achievements.tryAgain') }}</button>
+      <button class="text-primary hover:text-primary text-sm font-medium" @click="reload">{{ t('achievements.tryAgain') }}</button>
     </div>
 
     <template v-else>

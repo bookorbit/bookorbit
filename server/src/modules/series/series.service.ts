@@ -62,6 +62,13 @@ export class SeriesService {
     return { items, total: result.total, page: result.page, size: result.size };
   }
 
+  /** Total series the user can browse; matches the unfiltered total of {@link findAll}. */
+  async countAll(user: RequestUser): Promise<number> {
+    const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    if (libraryIds.length === 0) return 0;
+    return this.seriesRepo.countSeries({ libraryIds, contentFilters: user.isSuperuser ? undefined : user.contentFilters });
+  }
+
   async findBooks(user: RequestUser, seriesId: number, dto: ListSeriesBooksDto): Promise<SeriesBooksPage> {
     const page = dto.page ?? 0;
     const size = dto.size ?? 50;

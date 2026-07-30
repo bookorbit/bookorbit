@@ -165,6 +165,20 @@ export class SeriesRepository {
     return { items, total, page: params.page, size: params.size };
   }
 
+  async countSeries(params: { libraryIds: number[]; contentFilters?: ContentFilterRules }): Promise<number> {
+    if (params.libraryIds.length === 0) return 0;
+
+    const filterClauses = params.contentFilters ? buildContentFilterClauses(params.contentFilters, this.db) : [];
+
+    const [row] = await this.db
+      .select({ total: sql<number>`count(distinct ${bookSeriesMemberships.seriesId})::int` })
+      .from(bookSeriesMemberships)
+      .innerJoin(books, eq(books.id, bookSeriesMemberships.bookId))
+      .where(and(this.buildLibraryFilter(params.libraryIds), ...filterClauses));
+
+    return Number(row?.total ?? 0);
+  }
+
   async findDetail(params: {
     seriesId: number;
     userId: number;

@@ -286,12 +286,17 @@ describe('metadata format extractors', () => {
     mockParseFb2File.mockResolvedValue({
       title: 'Roadside Picnic',
       description: 'Sci-fi classic',
+      publishedDate: null,
       publishedYear: 1972,
       language: 'ru',
       seriesName: null,
       seriesIndex: null,
       authors: [{ name: 'Arkady Strugatsky', sortName: null }],
       genres: ['Science Fiction'],
+      tags: [],
+      publisher: null,
+      isbn13: null,
+      custom: {},
     });
     mockExtractFb2Cover.mockRejectedValue(new Error('missing binary'));
 
@@ -302,6 +307,65 @@ describe('metadata format extractors', () => {
         cover: null,
       }),
     );
+  });
+
+  it('fb2 extractor maps namespaced custom-info onto book fields', async () => {
+    mockParseFb2File.mockResolvedValue({
+      title: 'Nemesis',
+      description: null,
+      publishedDate: '2018-03-14',
+      publishedYear: 2018,
+      language: 'en',
+      seriesName: 'Pathway',
+      seriesIndex: 2,
+      authors: [],
+      genres: [],
+      tags: ['favourite'],
+      publisher: 'Painted Quill Press',
+      isbn13: '9781729419007',
+      custom: { subtitle: 'A Tale', rating: '4.5', pageCount: '412', goodreadsId: '12345', isbn10: '1729419001' },
+    });
+    mockExtractFb2Cover.mockResolvedValue(Buffer.from('cover'));
+
+    const result = await new Fb2FormatExtractor().extract('/books/test.fb2');
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        subtitle: 'A Tale',
+        rating: 4.5,
+        pageCount: 412,
+        goodreadsId: '12345',
+        isbn10: '1729419001',
+        isbn13: '9781729419007',
+        publisher: 'Painted Quill Press',
+        publishedDate: '2018-03-14',
+        tags: ['favourite'],
+      }),
+    );
+  });
+
+  it('fb2 extractor leaves numeric custom-info null when the stored value is not a number', async () => {
+    mockParseFb2File.mockResolvedValue({
+      title: 'Nemesis',
+      description: null,
+      publishedDate: null,
+      publishedYear: null,
+      language: null,
+      seriesName: null,
+      seriesIndex: null,
+      authors: [],
+      genres: [],
+      tags: [],
+      publisher: null,
+      isbn13: null,
+      custom: { rating: 'not-a-number', pageCount: '' },
+    });
+    mockExtractFb2Cover.mockResolvedValue(null);
+
+    const result = await new Fb2FormatExtractor().extract('/books/test.fb2');
+
+    expect(result?.rating).toBeNull();
+    expect(result?.pageCount).toBeNull();
   });
 
   it('comic extractor uses filename fallback when embedded metadata is missing', async () => {

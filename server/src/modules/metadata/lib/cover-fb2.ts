@@ -1,6 +1,8 @@
 import { readFile } from 'fs/promises';
 import { XMLParser } from 'fast-xml-parser';
 
+import { decodeFb2Document } from '../../../common/utils/fb2-encoding.utils';
+
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
@@ -27,7 +29,7 @@ function toArray(val: unknown): unknown[] {
  */
 export async function extractFb2Cover(absolutePath: string): Promise<Buffer | null> {
   try {
-    const xml = await readFile(absolutePath, 'utf-8');
+    const { text: xml } = decodeFb2Document(await readFile(absolutePath));
     const doc = parser.parse(xml) as Record<string, unknown>;
 
     const fb = (doc['FictionBook'] ?? doc['fictionbook']) as Record<string, unknown> | undefined;

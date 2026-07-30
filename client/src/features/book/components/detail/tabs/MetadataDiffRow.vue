@@ -267,7 +267,7 @@ watch(
         <p class="text-[10px] font-medium text-muted-foreground mb-0.5 sm:hidden">Current</p>
         <p
           class="wrap-break-word leading-snug text-sm w-full"
-          :class="[!field.currentDisplay ? 'text-muted-foreground/60 italic' : 'text-foreground', currentTextClass]"
+          :class="[!field.currentDisplay ? 'text-muted-foreground italic' : 'text-foreground', currentTextClass]"
         >
           {{ field.currentDisplay || t('book.detail.editMetadata.diff.empty') }}
         </p>
@@ -302,7 +302,7 @@ watch(
           <ArrowLeft v-else class="size-3.5" />
         </button>
         <div v-else-if="field.isCopyable" class="size-8 flex items-center justify-center shrink-0">
-          <CheckCircle2 class="size-3.5 text-muted-foreground/25" />
+          <CheckCircle2 class="size-3.5 text-muted-foreground" />
         </div>
         <div v-else class="size-8 shrink-0" />
 

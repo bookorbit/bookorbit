@@ -549,7 +549,7 @@ defineOptions({ name: 'SeriesDetailView' })
 
               <div class="mt-4 border-t border-border/60 pt-4">
                 <div class="mb-2">
-                  <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/90">{{ t('series.detail.firstInSeries') }}</p>
+                  <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{{ t('series.detail.firstInSeries') }}</p>
                   <p v-if="leadBook" class="mt-1 text-base font-semibold leading-tight text-foreground">
                     {{ leadBook.title ?? t('series.detail.untitled') }}
                     <span v-if="leadBook.seriesIndex != null" class="text-muted-foreground">#{{ leadBook.seriesIndex }}</span>
@@ -568,14 +568,14 @@ defineOptions({ name: 'SeriesDetailView' })
                     <span
                       v-for="(genre, index) in displayedLeadGenres"
                       :key="`${genre}-${index}`"
-                      class="rounded-full border border-primary/40 px-2.5 py-0.5 text-xs text-primary/85"
+                      class="rounded-full border border-primary/40 px-2.5 py-0.5 text-xs text-primary"
                     >
                       {{ genre }}
                     </span>
                     <button
                       v-if="hiddenLeadGenres > 0"
                       type="button"
-                      class="whitespace-nowrap text-xs font-medium text-foreground/75 transition-colors hover:text-foreground"
+                      class="whitespace-nowrap text-xs font-medium text-foreground transition-colors hover:text-foreground"
                       @click="toggleLeadGenresExpanded"
                     >
                       {{ leadGenresExpanded ? t('series.detail.showLess') : t('series.detail.moreGenres', { count: hiddenLeadGenres }) }}
@@ -586,7 +586,7 @@ defineOptions({ name: 'SeriesDetailView' })
                     <p class="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{{ t('series.detail.synopsis') }}</p>
                     <div v-if="leadBook.description">
                       <div
-                        class="text-sm leading-relaxed text-foreground/85"
+                        class="text-sm leading-relaxed text-foreground"
                         :class="leadDescriptionExpanded ? '' : 'line-clamp-3'"
                         v-html="safeLeadDescription"
                       />

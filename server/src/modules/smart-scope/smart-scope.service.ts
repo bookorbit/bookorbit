@@ -66,20 +66,33 @@ export class SmartScopeService {
     }
   }
 
+  private toResponse(smartScope: SmartScope, user: RequestUser, koboSyncEnabled: boolean) {
+    return { ...smartScope, isOwner: smartScope.userId === user.id, koboSyncEnabled };
+  }
+
+  private async resolveKoboSyncEnabled(smartScope: SmartScope, user: RequestUser): Promise<boolean> {
+    if (smartScope.userId === user.id) return smartScope.syncToKobo;
+    const subscribed = await this.smartScopeRepo.findKoboSubscribedScopeIds(user.id, [smartScope.id]);
+    return subscribed.length > 0;
+  }
+
   async findAll(user: RequestUser) {
     const smartScopes = await this.smartScopeRepo.findAllForUser(user.id);
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
     const timeZone = resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
+    const sharedScopeIds = smartScopes.filter((smartScope) => smartScope.userId !== user.id).map((smartScope) => smartScope.id);
+    const subscribedIds = new Set(await this.smartScopeRepo.findKoboSubscribedScopeIds(user.id, sharedScopeIds));
+    const koboSyncEnabledFor = (smartScope: SmartScope) => (smartScope.userId === user.id ? smartScope.syncToKobo : subscribedIds.has(smartScope.id));
     return Promise.all(
       smartScopes.map(async (smartScope) => {
         if (!smartScope.filter) {
-          return { ...smartScope, bookCount: 0 };
+          return { ...this.toResponse(smartScope, user, koboSyncEnabledFor(smartScope)), bookCount: 0 };
         }
         const startedAt = Date.now();
         let where: SQL | undefined;
         try {
           const filter = validateGroupRule(smartScope.filter);
-          if (!filter) return { ...smartScope, bookCount: 0 };
+          if (!filter) return { ...this.toResponse(smartScope, user, koboSyncEnabledFor(smartScope)), bookCount: 0 };
           where = this.queryBuilder.buildWhere(filter, { accessibleLibraryIds, userId: user.id, timeZone });
         } catch (err) {
           if (!(err instanceof BadRequestException)) throw err;
@@ -88,10 +101,10 @@ export class SmartScopeService {
           this.logger.error(
             `[smart_scope.count] [fail] scopeId=${smartScope.id} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${error}" - smart scope filter is invalid`,
           );
-          return { ...smartScope, bookCount: null };
+          return { ...this.toResponse(smartScope, user, koboSyncEnabledFor(smartScope)), bookCount: null };
         }
         const bookCount = await this.bookReadService.countWhere(where);
-        return { ...smartScope, bookCount };
+        return { ...this.toResponse(smartScope, user, koboSyncEnabledFor(smartScope)), bookCount };
       }),
     );
   }
@@ -99,7 +112,36 @@ export class SmartScopeService {
   async findOne(id: number, user: RequestUser) {
     const smartScope = await this.getSmartScopeOrThrow(id);
     this.assertReadAccess(smartScope, user);
-    return smartScope;
+    return this.toResponse(smartScope, user, await this.resolveKoboSyncEnabled(smartScope, user));
+  }
+
+  /**
+   * Scopes whose books belong on this user's Kobo. Exposed for the Kobo module so
+   * shared-scope opt-in stays owned by this feature.
+   */
+  findKoboSyncScopes(userId: number): Promise<SmartScope[]> {
+    return this.smartScopeRepo.findKoboSyncScopesForUser(userId);
+  }
+
+  async setKoboSync(id: number, user: RequestUser, enabled: boolean) {
+    const smartScope = await this.getSmartScopeOrThrow(id);
+    this.assertReadAccess(smartScope, user);
+
+    if (smartScope.userId === user.id) {
+      const [updated] = await this.smartScopeRepo.update(id, user.id, { syncToKobo: enabled });
+      return this.toResponse(updated ?? { ...smartScope, syncToKobo: enabled }, user, enabled);
+    }
+
+    if (!smartScope.isPublic) {
+      throw new ForbiddenException('Cannot sync a smartScope that is not shared');
+    }
+
+    if (enabled) {
+      await this.smartScopeRepo.subscribeToKobo(user.id, id);
+    } else {
+      await this.smartScopeRepo.unsubscribeFromKobo(user.id, id);
+    }
+    return this.toResponse(smartScope, user, enabled);
   }
 
   async create(dto: CreateSmartScopeDto, user: RequestUser) {
@@ -117,7 +159,7 @@ export class SmartScopeService {
       isPublic: dto.isPublic ?? false,
       syncToKobo: dto.syncToKobo ?? false,
     });
-    return smartScope;
+    return this.toResponse(smartScope, user, smartScope.syncToKobo);
   }
 
   async update(id: number, dto: UpdateSmartScopeDto, user: RequestUser) {
@@ -138,7 +180,7 @@ export class SmartScopeService {
       isPublic: dto.isPublic,
       syncToKobo: dto.syncToKobo,
     });
-    return updated;
+    return this.toResponse(updated, user, await this.resolveKoboSyncEnabled(updated, user));
   }
 
   async remove(id: number, user: RequestUser) {

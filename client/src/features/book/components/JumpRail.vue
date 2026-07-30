@@ -224,7 +224,7 @@ function handleAfterLeave() {
         class="jump-rail-slot relative z-10 h-5 shrink-0 items-center px-0.5 text-center text-[11px] font-medium tabular-nums transition-colors duration-150"
         :class="[
           'flex justify-center rounded-full',
-          slot.bucket ? 'text-muted-foreground hover:text-foreground' : 'cursor-default text-muted-foreground/30',
+          slot.bucket ? 'text-muted-foreground hover:text-foreground' : 'cursor-default text-muted-foreground opacity-50',
           index === hoveredIndex && kind === 'letter' ? 'scale-[1.35] font-semibold text-foreground' : '',
         ]"
         :disabled="!slot.bucket"

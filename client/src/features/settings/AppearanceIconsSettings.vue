@@ -321,7 +321,7 @@ function usageSummary(usage: CustomIconUsage): string {
             v-model="query"
             type="text"
             :placeholder="t('settings.appearance.icons.searchPlaceholder')"
-            class="w-full min-w-0 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
+            class="w-full min-w-0 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
           />
           <button v-if="query" type="button" class="shrink-0 text-muted-foreground hover:text-foreground" @click="clearQuery">
             <X :size="13" />
@@ -445,7 +445,7 @@ function usageSummary(usage: CustomIconUsage): string {
                         <template v-else-if="expandedUsage">
                           <template v-if="expandedUsage.total > 0">
                             {{ t('settings.appearance.icons.usedBy', { count: expandedUsage.total }) }}
-                            <span class="text-muted-foreground/70">({{ usageSummary(expandedUsage) }})</span>
+                            <span class="text-muted-foreground">({{ usageSummary(expandedUsage) }})</span>
                           </template>
                           <template v-else>{{ t('settings.appearance.icons.notUsedYet') }}</template>
                         </template>

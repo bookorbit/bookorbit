@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { KoreaderAnnotationExchangeService } from './koreader-annotation-exchange.service';
+import { KoreaderBookmarkExchangeService } from './koreader-bookmark-exchange.service';
+import { KoreaderBookmarkRepository } from './koreader-bookmark.repository';
 import { KoreaderAuthGuard } from './koreader-auth.guard';
 import { KoreaderCatalogController } from './koreader-catalog.controller';
 import { KoreaderCatalogService } from './koreader-catalog.service';
@@ -34,6 +36,8 @@ describe('KoreaderModule', () => {
       KoreaderPluginRepository,
       KoreaderPluginAnnotationService,
       KoreaderAnnotationExchangeService,
+      KoreaderBookmarkExchangeService,
+      KoreaderBookmarkRepository,
       KoreaderStatsService,
     ]);
     expect(Reflect.getMetadata('exports', KoreaderModule)).toEqual([KoreaderService, KoreaderRepository]);

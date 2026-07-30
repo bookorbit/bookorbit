@@ -119,7 +119,7 @@ useModal({
               :href="release.changelogUrl"
               target="_blank"
               rel="noopener noreferrer"
-              class="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:text-primary/85"
+              class="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:text-primary"
             >
               {{ t('whatsNew.fullChangelog') }}
               <ExternalLink :size="12" />
@@ -129,7 +129,7 @@ useModal({
           <RouterLink
             v-if="hasMore"
             to="/whats-new"
-            class="inline-flex items-center gap-1 text-sm font-medium text-primary transition-colors hover:text-primary/85"
+            class="inline-flex items-center gap-1 text-sm font-medium text-primary transition-colors hover:text-primary"
             @click="handleLater"
           >
             {{ t('whatsNew.seeAllReleases') }}

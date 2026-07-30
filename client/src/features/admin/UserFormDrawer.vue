@@ -452,11 +452,11 @@ async function handleSubmit() {
                 <button type="button" @click="applyPreset('standard')" class="text-xs text-muted-foreground hover:text-foreground">
                   {{ t('adminFeature.userForm.presetStandard') }}
                 </button>
-                <span class="text-muted-foreground/30">•</span>
+                <span class="text-border">•</span>
                 <button type="button" @click="applyPreset('admin')" class="text-xs text-muted-foreground hover:text-foreground">
                   {{ t('adminFeature.userForm.presetAdmin') }}
                 </button>
-                <span class="text-muted-foreground/30">•</span>
+                <span class="text-border">•</span>
                 <button type="button" @click="applyPreset('clear')" class="text-xs text-muted-foreground hover:text-foreground">
                   {{ t('adminFeature.userForm.presetClearAll') }}
                 </button>
@@ -499,7 +499,7 @@ async function handleSubmit() {
               <button
                 type="button"
                 @click="restrictionsEnabled = true"
-                class="text-xs font-medium text-primary hover:text-primary/80 bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-md transition-colors"
+                class="text-xs font-medium text-primary hover:text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-md transition-colors"
               >
                 {{ t('adminFeature.userForm.addRestrictions') }}
               </button>

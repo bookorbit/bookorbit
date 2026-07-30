@@ -137,7 +137,7 @@ function coverWidthClass(book: BookCard): string {
     <!-- Empty -->
     <div v-else-if="books.length === 0" class="flex flex-col items-center justify-center py-10 gap-3 text-center animate-fade-up">
       <div class="h-12 w-12 rounded-full bg-muted flex items-center justify-center animate-scale-in">
-        <component :is="typeIcon" :size="20" class="text-muted-foreground/60" />
+        <component :is="typeIcon" :size="20" class="text-muted-foreground" />
       </div>
       <p class="text-sm text-muted-foreground">
         <template v-if="type === 'continue-reading'">{{ t('dashboard.scroller.empty.continueReading') }}</template>

@@ -48,13 +48,13 @@ function handleLoadMore() {
       <Button
         variant="ghost"
         size="icon"
-        class="relative h-8 w-8 border transition-colors border-primary/35 text-foreground/70 hover:border-primary/70 hover:text-foreground"
+        class="relative h-8 w-8 border border-(--shell-accent-line) text-foreground transition-colors duration-150 hover:bg-(--shell-accent-wash)"
         :class="iconRadiusClass"
       >
         <Bell :size="15" />
         <span
           v-if="unreadCount > 0"
-          class="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground tabular-nums leading-none"
+          class="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-semibold text-primary-foreground tabular-nums leading-none"
         >
           {{ unreadCount > 99 ? '99+' : unreadCount }}
         </span>

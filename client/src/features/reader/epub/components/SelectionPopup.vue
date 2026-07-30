@@ -162,7 +162,7 @@ async function onCopy() {
             <Tooltip v-if="overlappingAnnotationId !== null">
               <TooltipTrigger as-child>
                 <button
-                  class="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-muted transition-colors text-destructive hover:text-destructive/80"
+                  class="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-muted transition-colors text-destructive hover:text-destructive"
                   @click="emit('deleteAnnotation', overlappingAnnotationId!)"
                 >
                   <Trash2 :size="15" />

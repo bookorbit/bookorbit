@@ -212,7 +212,7 @@ const emptyOnly = computed(() => props.bookCount === 'empty')
               {{ t('tools.entityManager.actions.split') }}
             </button>
             <button
-              class="h-7 px-2 text-xs rounded hover:bg-muted text-destructive/70 hover:text-destructive transition-colors"
+              class="h-7 px-2 text-xs rounded hover:bg-muted text-destructive hover:text-destructive transition-colors"
               @click.stop="handleDelete(item)"
             >
               {{ t('common.delete') }}

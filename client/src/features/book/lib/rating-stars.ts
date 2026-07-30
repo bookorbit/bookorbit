@@ -22,7 +22,7 @@ export function getRatingFilledClass(rating: number | null | undefined): string 
   return value ? RATING_VALUE_COLOR_CLASSES[value] : 'fill-amber-400 text-amber-400'
 }
 
-export function getRatingStarClass(star: number, rating: number | null | undefined, emptyClass = 'text-muted-foreground/60'): string {
+export function getRatingStarClass(star: number, rating: number | null | undefined, emptyClass = 'text-muted-foreground'): string {
   if ((rating ?? 0) < star) return emptyClass
   return getRatingFilledClass(rating)
 }

@@ -41,20 +41,6 @@ export const NOTIFICATION_CATEGORIES = {
 
 export type NotificationCategory = keyof typeof NOTIFICATION_CATEGORIES;
 
-export const NOTIFICATION_CATEGORY_LABELS: Record<NotificationCategory, string> = {
-  scanning: "Library Scanning",
-  metadata: "Metadata Fetching",
-  bookDock: "Book Dock",
-  authorEnrichment: "Author Enrichment",
-  email: "Email Delivery",
-  koboSync: "Kobo Sync",
-  migration: "Data Migration",
-  fileWriteBack: "File Write-back",
-  fileRename: "File Rename",
-  bulkRename: "Bulk Rename",
-  achievements: "Achievements",
-};
-
 export type NotificationPreferences = {
   [K in NotificationCategory]?: boolean;
 };

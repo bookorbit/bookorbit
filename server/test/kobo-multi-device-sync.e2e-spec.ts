@@ -599,4 +599,142 @@ describe('Kobo multi-device library sync (e2e)', { timeout: 180_000 }, () => {
     });
     expect(retiredLegacySnapshot).toBeUndefined();
   });
+
+  describe('manual read status delivery', () => {
+    let statusBookIds!: number[];
+
+    async function setReadStatus(bookId: number, status: string): Promise<Record<string, unknown>> {
+      const response = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/books/${bookId}/status`,
+        headers: authHeader(ctx.adminToken),
+        payload: { status },
+      });
+      expect(response.statusCode).toBe(200);
+      return response.json() as Record<string, unknown>;
+    }
+
+    async function entitlementIdFor(bookId: number): Promise<string> {
+      const [identity] = await ctx.db
+        .select({ entitlementId: schema.koboBookEntitlements.entitlementId })
+        .from(schema.koboBookEntitlements)
+        .where(and(eq(schema.koboBookEntitlements.userId, userId), eq(schema.koboBookEntitlements.bookId, bookId)));
+      if (!identity) throw new Error(`Book ${bookId} has no Kobo entitlement identity`);
+      return identity.entitlementId;
+    }
+
+    beforeAll(async () => {
+      const paths = await Promise.all(
+        Array.from({ length: 4 }, () =>
+          createEpubFixture(library.folderPath, `kobo-manual-status-${randomUUID()}.epub`, {
+            title: `Kobo Manual Status ${randomUUID().slice(0, 8)}`,
+            uid: `urn:uuid:${randomUUID()}`,
+          }),
+        ),
+      );
+      await triggerAndWaitForLibraryScan(ctx, library.libraryId);
+      statusBookIds = (await Promise.all(paths.map((path) => locateBookByAbsolutePath(ctx, path)))).map((book) => book.bookId);
+
+      const addBooksResponse = await ctx.app.inject({
+        method: 'POST',
+        url: `/api/v1/collections/${collectionId}/books`,
+        headers: authHeader(ctx.adminToken),
+        payload: { bookIds: statusBookIds },
+      });
+      expect([200, 201]).toContain(addBooksResponse.statusCode);
+    }, 180_000);
+
+    beforeEach(async () => {
+      await drainEntries(deviceA);
+      await drainEntries(deviceB);
+    });
+
+    it('delivers Finished for a book marked read that was never opened anywhere', async () => {
+      const targetBookId = statusBookIds[0]!;
+      const existingState = await ctx.db.query.koboReadingStates.findFirst({
+        where: and(eq(schema.koboReadingStates.userId, userId), eq(schema.koboReadingStates.bookId, targetBookId)),
+      });
+      expect(existingState).toBeUndefined();
+      expect((await snapshotState(targetBookId)).every((row) => row.synced)).toBe(true);
+
+      await setReadStatus(targetBookId, 'read');
+
+      expect(await snapshotState(targetBookId)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ deviceId: deviceA.id, synced: false, isNew: false }),
+          expect.objectContaining({ deviceId: deviceB.id, synced: false, isNew: false }),
+        ]),
+      );
+
+      const targetEntitlementId = await entitlementIdFor(targetBookId);
+      const delivered = changedReadingStates(await drainEntries(deviceA));
+      const state = delivered.find((readingState) => readingState.EntitlementId === targetEntitlementId);
+      expect(state).toEqual(expect.objectContaining({ StatusInfo: expect.objectContaining({ Status: 'Finished' }) }));
+    });
+
+    it('keeps the device bookmark when a partly read book is corrected to read', async () => {
+      const targetBookId = statusBookIds[1]!;
+      const targetEntitlementId = await entitlementIdFor(targetBookId);
+      const deviceModified = new Date(Date.now() - 60_000).toISOString();
+      await putReadingState(deviceA, targetEntitlementId, {
+        EntitlementId: targetEntitlementId,
+        LastModified: deviceModified,
+        PriorityTimestamp: deviceModified,
+        CurrentBookmark: { LastModified: deviceModified, ProgressPercent: 42 },
+        Statistics: { LastModified: deviceModified, SpentReadingMinutes: 30 },
+        StatusInfo: { LastModified: deviceModified, Status: 'Reading', TimesStartedReading: 2 },
+      });
+      await drainEntries(deviceB);
+
+      await setReadStatus(targetBookId, 'read');
+
+      const delivered = changedReadingStates(await drainEntries(deviceB));
+      const state = delivered.find((readingState) => readingState.EntitlementId === targetEntitlementId);
+      expect(state).toEqual(
+        expect.objectContaining({
+          StatusInfo: expect.objectContaining({ Status: 'Finished', TimesStartedReading: 2 }),
+          CurrentBookmark: expect.objectContaining({ ProgressPercent: 42 }),
+          Statistics: expect.objectContaining({ SpentReadingMinutes: 30 }),
+        }),
+      );
+    });
+
+    it('does not resync when the manual status leaves the Kobo status unchanged', async () => {
+      const targetBookId = statusBookIds[2]!;
+      await setReadStatus(targetBookId, 'reading');
+      await drainEntries(deviceA);
+      await drainEntries(deviceB);
+
+      await setReadStatus(targetBookId, 'on_hold');
+
+      expect((await snapshotState(targetBookId)).every((row) => row.synced)).toBe(true);
+    });
+
+    it('marks a book read after a skewed device clock started its attempt in the future', async () => {
+      const targetBookId = statusBookIds[3]!;
+      const targetEntitlementId = await entitlementIdFor(targetBookId);
+      const futureModified = new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString();
+      const futureDay = futureModified.slice(0, 10);
+      await putReadingState(deviceA, targetEntitlementId, {
+        EntitlementId: targetEntitlementId,
+        LastModified: futureModified,
+        PriorityTimestamp: futureModified,
+        CurrentBookmark: { LastModified: futureModified, ProgressPercent: 35 },
+        Statistics: { LastModified: futureModified },
+        StatusInfo: { LastModified: futureModified, Status: 'Reading', TimesStartedReading: 1 },
+      });
+      const [attemptBefore] = await ctx.db
+        .select({ startedOn: schema.readingAttempts.startedOn })
+        .from(schema.readingAttempts)
+        .where(and(eq(schema.readingAttempts.userId, userId), eq(schema.readingAttempts.bookId, targetBookId)));
+      expect(attemptBefore?.startedOn).toBe(futureDay);
+
+      const status = await setReadStatus(targetBookId, 'read');
+
+      expect(status).toMatchObject({ status: 'read', finishedAt: futureDay });
+      const delivered = changedReadingStates(await drainEntries(deviceB));
+      const state = delivered.find((readingState) => readingState.EntitlementId === targetEntitlementId);
+      expect(state).toEqual(expect.objectContaining({ StatusInfo: expect.objectContaining({ Status: 'Finished' }) }));
+    });
+  });
 });

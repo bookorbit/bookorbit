@@ -475,7 +475,7 @@ onUnmounted(() => {
             :key="f.format"
             class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted/50 tabular-nums"
           >
-            <span class="uppercase font-medium text-foreground/70">{{ f.format }}</span>
+            <span class="uppercase font-medium text-foreground">{{ f.format }}</span>
             {{ f.count }} &middot; {{ formatBytes(f.sizeBytes) }}
           </span>
         </div>

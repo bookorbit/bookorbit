@@ -69,7 +69,7 @@ const canAddMore = computed(() => props.modelValue.length < SORT_FIELDS.length)
             <button
               @click="move(index, -1)"
               :disabled="index === 0"
-              class="h-5 w-5 flex items-center justify-center rounded text-foreground/60 hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+              class="h-5 w-5 flex items-center justify-center rounded text-foreground hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronUp :size="14" stroke-width="2.5" />
             </button>
@@ -81,7 +81,7 @@ const canAddMore = computed(() => props.modelValue.length < SORT_FIELDS.length)
             <button
               @click="move(index, 1)"
               :disabled="index === modelValue.length - 1"
-              class="h-5 w-5 flex items-center justify-center rounded text-foreground/60 hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+              class="h-5 w-5 flex items-center justify-center rounded text-foreground hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronDown :size="14" stroke-width="2.5" />
             </button>
@@ -114,7 +114,7 @@ const canAddMore = computed(() => props.modelValue.length < SORT_FIELDS.length)
         <TooltipTrigger as-child>
           <button
             @click="remove(index)"
-            class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
+            class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
           >
             <Trash2 :size="13" />
           </button>

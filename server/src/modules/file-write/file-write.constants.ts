@@ -2,6 +2,7 @@ import { BOOK_FILE_WRITE_FIELDS } from '@bookorbit/types';
 import type { BookWritePayloadKey } from './interfaces/book-write-payload.interface';
 
 export const FORMAT_EPUB = 'epub';
+export const FORMAT_FB2 = 'fb2';
 export const FORMAT_PDF = 'pdf';
 export const FORMAT_CBZ = 'cbz';
 export const FORMAT_CB7 = 'cb7';
@@ -9,9 +10,13 @@ export const FORMAT_M4B = 'm4b';
 export const FORMAT_M4A = 'm4a';
 export const FORMAT_MP3 = 'mp3';
 export const FORMAT_FLAC = 'flac';
+export const FORMAT_MOBI = 'mobi';
+export const FORMAT_AZW3 = 'azw3';
+export const FORMAT_AZW = 'azw';
 
 export const CBX_FORMATS = [FORMAT_CBZ, FORMAT_CB7] as const;
 export const AUDIO_WRITE_FORMATS = [FORMAT_M4B, FORMAT_M4A, FORMAT_MP3, FORMAT_FLAC] as const;
+export const KINDLE_WRITE_FORMATS = [FORMAT_MOBI, FORMAT_AZW3, FORMAT_AZW] as const;
 
 export const BOOK_WRITE_FIELD_KEYS = BOOK_FILE_WRITE_FIELDS satisfies readonly BookWritePayloadKey[];
 

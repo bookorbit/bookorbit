@@ -346,6 +346,14 @@ export class AnnotationRepository {
     return { items: items as HubAnnotationRow[], total: totalResult[0]?.count ?? 0 };
   }
 
+  async countHub(userId: number, filters: HubFilters): Promise<number> {
+    const [row] = await this.db
+      .select({ total: count() })
+      .from(annotations)
+      .where(and(...this.buildHubConditions(userId, filters)));
+    return Number(row?.total ?? 0);
+  }
+
   async findHubById(userId: number, annotationId: number): Promise<HubAnnotationRow | null> {
     const [row] = await this.db
       .select(this.hubColumns())

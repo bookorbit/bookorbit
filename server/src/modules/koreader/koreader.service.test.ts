@@ -55,8 +55,11 @@ describe('KoreaderService', () => {
     getAccessibleLibraryIds: ReturnType<typeof vi.fn>;
     resolveBookFileByHash: ReturnType<typeof vi.fn>;
     upsertDeviceProgress: ReturnType<typeof vi.fn>;
+    upsertDeviceProgressMany: ReturnType<typeof vi.fn>;
     upsertReadingProgress: ReturnType<typeof vi.fn>;
     getLatestDeviceProgress: ReturnType<typeof vi.fn>;
+    getDeviceProgressForFiles: ReturnType<typeof vi.fn>;
+    getReadingProgressUpdatedAtForFiles: ReturnType<typeof vi.fn>;
     getReadingProgress: ReturnType<typeof vi.fn>;
     getTotalSyncedBooks: ReturnType<typeof vi.fn>;
     getDevicesList: ReturnType<typeof vi.fn>;
@@ -124,8 +127,11 @@ describe('KoreaderService', () => {
       getAccessibleLibraryIds: vi.fn(),
       resolveBookFileByHash: vi.fn(),
       upsertDeviceProgress: vi.fn(),
+      upsertDeviceProgressMany: vi.fn(),
       upsertReadingProgress: vi.fn(),
       getLatestDeviceProgress: vi.fn(),
+      getDeviceProgressForFiles: vi.fn().mockResolvedValue(new Map()),
+      getReadingProgressUpdatedAtForFiles: vi.fn().mockResolvedValue(new Map()),
       getReadingProgress: vi.fn(),
       getTotalSyncedBooks: vi.fn(),
       getDevicesList: vi.fn().mockResolvedValue([]),
@@ -183,6 +189,7 @@ describe('KoreaderService', () => {
     mockRepo.deleteKoreaderUser.mockResolvedValue(undefined);
     mockRepo.updateKoreaderUser.mockResolvedValue(undefined);
     mockRepo.upsertDeviceProgress.mockResolvedValue(undefined);
+    mockRepo.upsertDeviceProgressMany.mockResolvedValue(undefined);
     mockRepo.upsertReadingProgress.mockResolvedValue(undefined);
     mockRepo.getAccessibleLibraryIds.mockResolvedValue([1, 2]);
     mockChapterService.parseChapterIndexFromProgress.mockReturnValue(null);
@@ -448,6 +455,121 @@ describe('KoreaderService', () => {
           syncTimestamp: null,
         }),
       );
+    });
+  });
+
+  describe('applyBulkProgress', () => {
+    const device = { device: 'Kobo Libra 2', deviceId: 'device-a' };
+
+    function bookFile(id: number, bookId = id * 10) {
+      return { id, bookId, libraryId: 1 };
+    }
+
+    it('reads state once, writes one device statement, and applies shared progress per entry', async () => {
+      const result = await service.applyBulkProgress(
+        7,
+        [
+          { bookFile: bookFile(10), percentage: 0.5, progress: '/body/DocFragment[3]', timestamp: 1700000000 },
+          { bookFile: bookFile(11), percentage: 0.2 },
+        ],
+        device,
+      );
+
+      expect(mockRepo.getDeviceProgressForFiles).toHaveBeenCalledTimes(1);
+      expect(mockRepo.getDeviceProgressForFiles).toHaveBeenCalledWith([10, 11], 7);
+      expect(mockRepo.getReadingProgressUpdatedAtForFiles).toHaveBeenCalledTimes(1);
+      expect(mockRepo.getLatestDeviceProgress).not.toHaveBeenCalled();
+      expect(mockRepo.upsertDeviceProgressMany).toHaveBeenCalledTimes(1);
+      expect(mockRepo.upsertDeviceProgressMany.mock.calls[0]![0]).toEqual([
+        expect.objectContaining({ bookFileId: 10, userId: 7, device: 'Kobo Libra 2', deviceId: 'device-a', syncTimestamp: 1700000000 }),
+        expect.objectContaining({ bookFileId: 11, syncTimestamp: null }),
+      ]);
+      expect(mockRepo.upsertReadingProgress).toHaveBeenCalledTimes(2);
+      expect(result).toEqual({ shared: 2, stale: 0 });
+    });
+
+    it('issues no query for an empty entry list', async () => {
+      await expect(service.applyBulkProgress(7, [], device)).resolves.toEqual({ shared: 0, stale: 0 });
+
+      expect(mockRepo.getDeviceProgressForFiles).not.toHaveBeenCalled();
+      expect(mockRepo.upsertDeviceProgressMany).not.toHaveBeenCalled();
+    });
+
+    it('records the device row but skips shared progress when another device knows something newer', async () => {
+      mockRepo.getDeviceProgressForFiles.mockResolvedValue(
+        new Map([[10, [{ device: 'Kindle', deviceId: 'device-b', percentage: 0.9, syncTimestamp: 1800000000, updatedAt: new Date() }]]]),
+      );
+
+      const result = await service.applyBulkProgress(7, [{ bookFile: bookFile(10), percentage: 0.2, timestamp: 1700000000 }], device);
+
+      expect(mockRepo.upsertDeviceProgressMany).toHaveBeenCalledTimes(1);
+      expect(mockRepo.upsertReadingProgress).not.toHaveBeenCalled();
+      expect(mockChapterExtractor.extractAndStoreChapters).not.toHaveBeenCalled();
+      expect(result).toEqual({ shared: 0, stale: 1 });
+    });
+
+    it('treats the web reader position as newer known state', async () => {
+      mockRepo.getReadingProgressUpdatedAtForFiles.mockResolvedValue(new Map([[10, new Date(1800000000 * 1000)]]));
+
+      const result = await service.applyBulkProgress(7, [{ bookFile: bookFile(10), percentage: 0.2, timestamp: 1700000000 }], device);
+
+      expect(result).toEqual({ shared: 0, stale: 1 });
+    });
+
+    it('never treats an entry without a device timestamp as stale', async () => {
+      mockRepo.getDeviceProgressForFiles.mockResolvedValue(
+        new Map([[10, [{ device: 'Kindle', deviceId: 'device-b', percentage: 0.9, syncTimestamp: 1800000000, updatedAt: new Date() }]]]),
+      );
+
+      const result = await service.applyBulkProgress(7, [{ bookFile: bookFile(10), percentage: 0.2 }], device);
+
+      expect(result).toEqual({ shared: 1, stale: 0 });
+    });
+
+    it('lets a later entry for the same file observe the position this batch already applied', async () => {
+      const result = await service.applyBulkProgress(
+        7,
+        [
+          { bookFile: bookFile(10), percentage: 0.6, timestamp: 1700000000 },
+          { bookFile: bookFile(10), percentage: 0.3, timestamp: 1600000000 },
+        ],
+        device,
+      );
+
+      expect(result).toEqual({ shared: 1, stale: 1 });
+      // One row per file: the last entry wins, exactly as a sequential upsert would leave it.
+      expect(mockRepo.upsertDeviceProgressMany.mock.calls[0]![0]).toEqual([expect.objectContaining({ bookFileId: 10, percentage: 0.3 })]);
+    });
+
+    it('carries the previous percentage of the same file into the reread heuristic', async () => {
+      mockRepo.getDeviceProgressForFiles.mockResolvedValue(
+        new Map([[10, [{ device: 'Kobo Libra 2', deviceId: 'device-a', percentage: 0.8, syncTimestamp: 1600000000, updatedAt: new Date() }]]]),
+      );
+
+      await service.applyBulkProgress(7, [{ bookFile: bookFile(10), percentage: 0.05, timestamp: 1700000000 }], device);
+
+      expect(mockBookService.autoUpdateReadStatusForProgress).toHaveBeenCalledWith(
+        7,
+        { id: 10, bookId: 100, libraryId: 1 },
+        5,
+        expect.objectContaining({ origin: 'koreader', strongRereadEvidence: true }),
+      );
+    });
+
+    it('extracts chapters once per non-stale file', async () => {
+      await service.applyBulkProgress(
+        7,
+        [
+          { bookFile: bookFile(10), percentage: 0.1 },
+          { bookFile: bookFile(10), percentage: 0.2 },
+          { bookFile: bookFile(11), percentage: 0.3 },
+        ],
+        device,
+      );
+
+      expect(mockChapterExtractor.extractAndStoreChapters).toHaveBeenCalledTimes(2);
+      expect(mockChapterExtractor.extractAndStoreChapters).toHaveBeenCalledWith(10);
+      expect(mockChapterExtractor.extractAndStoreChapters).toHaveBeenCalledWith(11);
     });
   });
 

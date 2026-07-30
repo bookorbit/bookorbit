@@ -300,8 +300,7 @@ function MosaicItem:init()
     cover_h = math.max(math.min(Screen:scaleBySize(60), available_cover_h), cover_h)
     local cover_w = math.min(max_cover_w, math.floor(cover_h * 0.68))
 
-    local path = self.menu:cachedThumbnailPath(book)
-    local state = self.menu:thumbnailState(book)
+    local path, state = self.menu:thumbnailDisplay(book)
     local downloaded = self.menu:isOnDevice(book)
     local selected = self.menu.bulkIsBookSelected and self.menu:bulkIsBookSelected(book)
     local content = VerticalGroup:new{ align = "center" }
@@ -403,8 +402,7 @@ function ListItem:init()
     local title_h = math.max(1, math.floor(text_h * 0.52))
     local subtitle_h = math.max(1, text_h - title_h)
 
-    local path = self.menu:cachedThumbnailPath(book)
-    local state = self.menu:thumbnailState(book)
+    local path, state = self.menu:thumbnailDisplay(book)
     local downloaded = self.menu:isOnDevice(book)
     local selected = self.menu.bulkIsBookSelected and self.menu:bulkIsBookSelected(book)
 
@@ -775,8 +773,7 @@ function DashboardCoverCard:init()
     local cover_h = math.max(Screen:scaleBySize(60), inner_h - bar_h - caption_h)
     local cover_w = math.min(inner_w, math.floor(cover_h * COVER_ASPECT))
 
-    local path = self.menu:cachedThumbnailPath(book)
-    local state = self.menu:thumbnailState(book)
+    local path, state = self.menu:thumbnailDisplay(book)
     local downloaded = self.menu:isOnDevice(book)
 
     local col = VerticalGroup:new{ align = "center" }
@@ -863,8 +860,7 @@ function DashboardHeroCard:init()
     local cover_w = math.min(math.floor(inner_w * 0.32), math.floor(cover_h * COVER_ASPECT))
     local text_w = math.max(1, inner_w - cover_w - gap)
 
-    local path = self.menu:cachedThumbnailPath(book)
-    local state = self.menu:thumbnailState(book)
+    local path, state = self.menu:thumbnailDisplay(book)
     local downloaded = self.menu:isOnDevice(book)
 
     local title_face = Font:getFace("cfont", 16)
@@ -957,8 +953,7 @@ function DetailRelatedCard:init()
     local inner_w = math.max(1, self.dimen.w - 2 * pad - 2 * CARD_BORDER)
     local inner_h = math.max(1, self.dimen.h - 2 * pad - 2 * CARD_BORDER)
 
-    local path = self.menu:cachedThumbnailPath(book)
-    local state = self.menu:thumbnailState(book)
+    local path, state = self.menu:thumbnailDisplay(book)
     local downloaded = self.menu:isOnDevice(book)
 
     self[1] = cardFrame(self.dimen.w, self.dimen.h, pad, CenterContainer:new{

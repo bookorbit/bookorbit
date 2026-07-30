@@ -107,6 +107,7 @@ function makeRepo(): RepoMock {
     findDeleteCandidates: vi.fn().mockResolvedValue([]),
     listDeviceCreatedAtsForBook: vi.fn().mockResolvedValue(new Set<string>()),
     setDeviceIdentitySilent: vi.fn().mockResolvedValue(undefined),
+    setDeviceIdentitiesSilent: vi.fn().mockResolvedValue(undefined),
     setDeviceUpdatedAtSilent: vi.fn().mockResolvedValue(undefined),
     bumpVersion: vi.fn().mockResolvedValue(5),
     softDeleteById: vi.fn().mockResolvedValue(undefined),
@@ -531,6 +532,50 @@ describe('AnnotationSyncService', () => {
 
       expect(result).toBe('2026-06-08 10:00:02');
       expect(repo.setDeviceIdentitySilent).toHaveBeenCalledWith(100, '2026-06-08 10:00:02');
+    });
+  });
+
+  describe('ensureDeviceCreatedAtMany', () => {
+    it('reads the used datetimes once and mints unique values in the given order', async () => {
+      repo.listDeviceCreatedAtsForBook.mockResolvedValue(new Set(['2026-06-08 10:00:00']));
+      const rows = [
+        makeAnnotationRow({ id: 100, deviceCreatedAt: null, createdAt: new Date('2026-06-08T10:00:00Z') }),
+        makeAnnotationRow({ id: 101, deviceCreatedAt: null, createdAt: new Date('2026-06-08T10:00:00Z') }),
+      ];
+
+      const result = await service.ensureDeviceCreatedAtMany(USER_ID, BOOK_ID, rows as never);
+
+      expect(repo.listDeviceCreatedAtsForBook).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(
+        new Map([
+          [100, '2026-06-08 10:00:01'],
+          [101, '2026-06-08 10:00:02'],
+        ]),
+      );
+      expect(repo.setDeviceIdentitiesSilent).toHaveBeenCalledWith([
+        { annotationId: 100, deviceCreatedAt: '2026-06-08 10:00:01' },
+        { annotationId: 101, deviceCreatedAt: '2026-06-08 10:00:02' },
+      ]);
+    });
+
+    it('keeps existing identities and queries nothing when every annotation already has one', async () => {
+      const rows = [makeAnnotationRow({ id: 100 }), makeAnnotationRow({ id: 101 })];
+
+      const result = await service.ensureDeviceCreatedAtMany(USER_ID, BOOK_ID, rows as never);
+
+      expect(result).toEqual(
+        new Map([
+          [100, '2026-06-01 21:14:03'],
+          [101, '2026-06-01 21:14:03'],
+        ]),
+      );
+      expect(repo.listDeviceCreatedAtsForBook).not.toHaveBeenCalled();
+      expect(repo.setDeviceIdentitiesSilent).not.toHaveBeenCalled();
+    });
+
+    it('returns an empty map without querying for an empty list', async () => {
+      await expect(service.ensureDeviceCreatedAtMany(USER_ID, BOOK_ID, [])).resolves.toEqual(new Map());
+      expect(repo.listDeviceCreatedAtsForBook).not.toHaveBeenCalled();
     });
   });
 

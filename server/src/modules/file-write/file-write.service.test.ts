@@ -1,7 +1,13 @@
 import { ConfigService } from '@nestjs/config';
 import type { MockedFunction } from 'vitest';
 import { readdir, readFile, stat } from 'fs/promises';
-import { AUDIO_BOOK_FILE_WRITE_FIELDS, EPUB_BOOK_FILE_WRITE_FIELDS, NotificationType } from '@bookorbit/types';
+import {
+  AUDIO_BOOK_FILE_WRITE_FIELDS,
+  EPUB_BOOK_FILE_WRITE_FIELDS,
+  FB2_BOOK_FILE_WRITE_FIELDS,
+  MOBI_BOOK_FILE_WRITE_FIELDS,
+  NotificationType,
+} from '@bookorbit/types';
 import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
 
 const { computeFileHashMock } = vi.hoisted(() => ({
@@ -35,10 +41,14 @@ const DEFAULT_LIB_CONFIG = {
   fileWriteWriteCover: true,
   fileWriteEpubEnabled: true,
   fileWriteEpubMaxFileSizeMb: 100,
+  fileWriteFb2Enabled: true,
+  fileWriteFb2MaxFileSizeMb: 100,
   fileWritePdfEnabled: true,
   fileWritePdfMaxFileSizeMb: 100,
   fileWriteCbxEnabled: true,
   fileWriteCbxMaxFileSizeMb: 500,
+  fileWriteKindleEnabled: true,
+  fileWriteKindleMaxFileSizeMb: 100,
   fileWriteAudioEnabled: true,
   fileWriteAudioMaxFileSizeMb: 500,
 };
@@ -173,6 +183,133 @@ describe('FileWriteService', () => {
         writableFormats: [],
         writableFields: [],
       });
+    });
+
+    it('returns the FB2 field set for fb2 files', () => {
+      const { service, registry } = makeService();
+      registry.supports.mockImplementation((value: string) => value === 'fb2');
+
+      expect(service.resolveBookFileWriteStatus(DEFAULT_LIB_CONFIG, [{ id: 1, format: 'fb2', sizeBytes: 1024 }], 1)).toEqual({
+        enabled: true,
+        reason: null,
+        writableFormats: ['fb2'],
+        writableFields: [...FB2_BOOK_FILE_WRITE_FIELDS],
+      });
+    });
+
+    it('honours the FB2 enable toggle', () => {
+      const { service, registry } = makeService();
+      registry.supports.mockImplementation((value: string) => value === 'fb2');
+
+      expect(
+        service.resolveBookFileWriteStatus({ ...DEFAULT_LIB_CONFIG, fileWriteFb2Enabled: false }, [{ id: 1, format: 'fb2', sizeBytes: 1024 }], 1),
+      ).toEqual({
+        enabled: false,
+        reason: 'format_disabled',
+        writableFormats: [],
+        writableFields: [],
+      });
+    });
+
+    it('honours the FB2 size limit', () => {
+      const { service, registry } = makeService();
+      registry.supports.mockImplementation((value: string) => value === 'fb2');
+
+      expect(
+        service.resolveBookFileWriteStatus(
+          { ...DEFAULT_LIB_CONFIG, fileWriteFb2MaxFileSizeMb: 1 },
+          [{ id: 1, format: 'fb2', sizeBytes: 2 * 1024 * 1024 }],
+          1,
+        ),
+      ).toEqual({
+        enabled: false,
+        reason: 'file_exceeds_size_limit',
+        writableFormats: [],
+        writableFields: [],
+      });
+    });
+
+    it('drops the cover field for FB2 when the library disables cover writing', () => {
+      const { service, registry } = makeService();
+      registry.supports.mockImplementation((value: string) => value === 'fb2');
+
+      const status = service.resolveBookFileWriteStatus(
+        { ...DEFAULT_LIB_CONFIG, fileWriteWriteCover: false },
+        [{ id: 1, format: 'fb2', sizeBytes: 1024 }],
+        1,
+      );
+
+      expect(status.writableFields).not.toContain('coverBytes');
+      expect(status.writableFields).toContain('seriesName');
+    });
+
+    it.each(['mobi', 'azw3', 'azw'])('returns the MOBI field set for %s files', (format) => {
+      const { service, registry } = makeService();
+      registry.supports.mockImplementation((value: string) => value === format);
+
+      expect(service.resolveBookFileWriteStatus(DEFAULT_LIB_CONFIG, [{ id: 1, format, sizeBytes: 1024 }], 1)).toEqual({
+        enabled: true,
+        reason: null,
+        writableFormats: [format],
+        writableFields: [...MOBI_BOOK_FILE_WRITE_FIELDS],
+      });
+    });
+
+    it.each(['mobi', 'azw3', 'azw'])('honours the shared Kindle enable toggle for %s', (format) => {
+      const { service, registry } = makeService();
+      registry.supports.mockImplementation((value: string) => value === format);
+
+      expect(
+        service.resolveBookFileWriteStatus({ ...DEFAULT_LIB_CONFIG, fileWriteKindleEnabled: false }, [{ id: 1, format, sizeBytes: 1024 }], 1),
+      ).toEqual({
+        enabled: false,
+        reason: 'format_disabled',
+        writableFormats: [],
+        writableFields: [],
+      });
+    });
+
+    it('honours the shared Kindle size limit', () => {
+      const { service, registry } = makeService();
+      registry.supports.mockImplementation((value: string) => value === 'azw3');
+
+      expect(
+        service.resolveBookFileWriteStatus(
+          { ...DEFAULT_LIB_CONFIG, fileWriteKindleMaxFileSizeMb: 1 },
+          [{ id: 1, format: 'azw3', sizeBytes: 2 * 1024 * 1024 }],
+          1,
+        ),
+      ).toEqual({
+        enabled: false,
+        reason: 'file_exceeds_size_limit',
+        writableFormats: [],
+        writableFields: [],
+      });
+    });
+
+    it('does not offer series or provider fields for Kindle files, since MOBI has no slot for them', () => {
+      const { service, registry } = makeService();
+      registry.supports.mockImplementation((value: string) => value === 'mobi');
+
+      const status = service.resolveBookFileWriteStatus(DEFAULT_LIB_CONFIG, [{ id: 1, format: 'mobi', sizeBytes: 1024 }], 1);
+
+      expect(status.writableFields).not.toContain('seriesName');
+      expect(status.writableFields).not.toContain('seriesIndex');
+      expect(status.writableFields).not.toContain('goodreadsId');
+      expect(status.writableFields).not.toContain('rating');
+    });
+
+    it('excludes the cover for Kindle files when cover writing is disabled', () => {
+      const { service, registry } = makeService();
+      registry.supports.mockImplementation((value: string) => value === 'mobi');
+
+      const status = service.resolveBookFileWriteStatus(
+        { ...DEFAULT_LIB_CONFIG, fileWriteWriteCover: false },
+        [{ id: 1, format: 'mobi', sizeBytes: 1024 }],
+        1,
+      );
+
+      expect(status.writableFields).toEqual(MOBI_BOOK_FILE_WRITE_FIELDS.filter((field) => field !== 'coverBytes'));
     });
   });
 
@@ -558,6 +695,8 @@ describe('FileWriteService', () => {
       ...DEFAULT_LIB_CONFIG,
       fileWriteCbxEnabled: true,
       fileWriteCbxMaxFileSizeMb: 500,
+      fileWriteKindleEnabled: true,
+      fileWriteKindleMaxFileSizeMb: 100,
     });
 
     const result = await service.writeToFile(10, 'auto');

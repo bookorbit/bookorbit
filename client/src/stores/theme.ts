@@ -7,6 +7,9 @@ import {
   type Accent,
   RADIUS_IDS,
   type Radius,
+  SURFACE_OPACITY_DEFAULT,
+  SURFACE_OPACITY_MAX,
+  SURFACE_OPACITY_MIN,
   THEME_IDS,
   type ResolvedTheme,
   type Theme,
@@ -27,7 +30,6 @@ export const BACKGROUND_OPTIONS: { id: Background; label: string; cssClass: stri
   { id: 'none', label: 'None', cssClass: '' },
   { id: 'dots', label: 'Dots', cssClass: 'pattern-dots' },
   { id: 'cross', label: 'Cross', cssClass: 'pattern-cross' },
-  { id: 'terminal', label: 'Terminal', cssClass: 'pattern-terminal' },
   { id: 'millimeter', label: 'Millimeter', cssClass: 'pattern-millimeter' },
 
   // Structural
@@ -55,6 +57,12 @@ export const BACKGROUND_OPTIONS: { id: Background; label: string; cssClass: stri
 
 const DEFAULT_SURFACE_BRIGHTNESS = 35
 
+export function clampSurfaceOpacity(value: unknown): number {
+  const numeric = typeof value === 'number' ? value : Number.NaN
+  if (!Number.isFinite(numeric)) return SURFACE_OPACITY_DEFAULT
+  return Math.min(SURFACE_OPACITY_MAX, Math.max(SURFACE_OPACITY_MIN, Math.round(numeric)))
+}
+
 export const useThemeStore = defineStore('theme', () => {
   const colorSchemeQuery = window.matchMedia?.('(prefers-color-scheme: dark)')
   const systemTheme = ref<ResolvedTheme>(colorSchemeQuery?.matches ? 'dark' : 'light')
@@ -73,6 +81,8 @@ export const useThemeStore = defineStore('theme', () => {
   const background = ref<Background>(BACKGROUND_IDS.includes(storedBackground) ? storedBackground : 'dots')
 
   const brightness = ref<number>(storage.get<number>('brightness', DEFAULT_SURFACE_BRIGHTNESS))
+
+  const surfaceOpacity = ref<number>(clampSurfaceOpacity(storage.get<number>('surfaceOpacity', SURFACE_OPACITY_DEFAULT)))
 
   function applyTheme(t: ResolvedTheme) {
     document.documentElement.classList.toggle('dark', t === 'dark')
@@ -130,6 +140,14 @@ export const useThemeStore = defineStore('theme', () => {
     brightness.value = Math.min(100, Math.max(0, b))
   }
 
+  function applySurfaceOpacity(value: number) {
+    document.documentElement.style.setProperty('--shell-surface-opacity', `${value}%`)
+  }
+
+  function setSurfaceOpacity(value: number) {
+    surfaceOpacity.value = clampSurfaceOpacity(value)
+  }
+
   colorSchemeQuery?.addEventListener('change', handleColorSchemeChange)
   onScopeDispose(() => colorSchemeQuery?.removeEventListener('change', handleColorSchemeChange))
 
@@ -179,6 +197,29 @@ export const useThemeStore = defineStore('theme', () => {
     },
     { immediate: true },
   )
+  watch(
+    surfaceOpacity,
+    (value) => {
+      applySurfaceOpacity(value)
+      storage.set('surfaceOpacity', value)
+    },
+    { immediate: true },
+  )
 
-  return { theme, resolvedTheme, accent, radius, background, brightness, setTheme, toggleTheme, setAccent, setRadius, setBackground, setBrightness }
+  return {
+    theme,
+    resolvedTheme,
+    accent,
+    radius,
+    background,
+    brightness,
+    surfaceOpacity,
+    setTheme,
+    toggleTheme,
+    setAccent,
+    setRadius,
+    setBackground,
+    setBrightness,
+    setSurfaceOpacity,
+  }
 })

@@ -4585,18 +4585,18 @@
         "shelves": "Scaffali"
       },
       "widgetNames": {
-        "readingStreak": "Reading Streak",
-        "currentlyReading": "Currently Reading",
+        "readingStreak": "Striscia di lettura",
+        "currentlyReading": "Attualmente sto leggendo",
         "readingGoal": "Reading Goal",
-        "readingDna": "Reading DNA",
-        "monthlyChallenge": "Monthly Challenge",
-        "highlightOfTheDay": "Highlight of the Day",
-        "neglectedGems": "Neglected Gems",
-        "readingRhythm": "Reading Rhythm",
-        "diversityScore": "Diversity Score",
-        "libraryOverview": "Library Overview",
-        "yearProjection": "Year Projection",
-        "longWait": "The Long Wait"
+        "readingDna": "Leggere il DNA",
+        "monthlyChallenge": "Sfida mensile",
+        "highlightOfTheDay": "Momento clou della giornata",
+        "neglectedGems": "Gemme trascurate",
+        "readingRhythm": "Ritmo di lettura",
+        "diversityScore": "Punteggio di diversità",
+        "libraryOverview": "Panoramica della biblioteca",
+        "yearProjection": "Proiezione dell'anno",
+        "longWait": "La lunga attesa"
       },
       "shelfNames": {
         "recentlyAdded": "Recently Added",

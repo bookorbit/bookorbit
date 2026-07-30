@@ -86,7 +86,7 @@ function onPatternKeydown(e: KeyboardEvent) {
     <!-- Scan mode -->
     <div>
       <div class="flex items-center gap-2 mb-3">
-        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">{{ t('library.creator.scanner.scanMode.title') }}</p>
+        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground">{{ t('library.creator.scanner.scanMode.title') }}</p>
         <Tooltip v-if="organizationModeLocked">
           <TooltipTrigger as-child>
             <span
@@ -161,7 +161,7 @@ function onPatternKeydown(e: KeyboardEvent) {
       <!-- Allowed formats -->
       <div class="mb-8">
         <div class="flex items-center justify-between mb-1">
-          <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80">
+          <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground">
             {{ t('library.creator.scanner.allowedFormats.title') }}
           </p>
           <button
@@ -204,7 +204,7 @@ function onPatternKeydown(e: KeyboardEvent) {
 
       <!-- Exclude patterns -->
       <div>
-        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground/80 mb-1">
+        <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground mb-1">
           {{ t('library.creator.scanner.excludePatterns.title') }}
         </p>
         <p class="text-xs text-muted-foreground mb-3">
@@ -216,7 +216,7 @@ function onPatternKeydown(e: KeyboardEvent) {
             v-model="newPattern"
             type="text"
             placeholder="**/node_modules/**"
-            class="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-ring"
+            class="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             @keydown="onPatternKeydown"
           />
           <button
@@ -230,7 +230,7 @@ function onPatternKeydown(e: KeyboardEvent) {
           </button>
         </div>
         <div class="min-h-[40px] rounded-md border border-border bg-muted/30 p-2 flex flex-wrap gap-1.5 overflow-y-auto" style="max-height: 80px">
-          <span v-if="excludePatterns.length === 0" class="text-xs text-muted-foreground/50 self-center px-1">
+          <span v-if="excludePatterns.length === 0" class="text-xs text-muted-foreground self-center px-1">
             {{ t('library.creator.scanner.excludePatterns.empty') }}
           </span>
           <span

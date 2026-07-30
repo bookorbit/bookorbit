@@ -1,10 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, or, sql } from 'drizzle-orm';
+import { and, eq, exists, inArray, ne, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { smartScopes } from '../../db/schema';
+import { smartScopeKoboSubscriptions, smartScopes } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 type SmartScopeDisplayOrderUpdate = { id: number; displayOrder: number };
@@ -42,6 +42,51 @@ export class SmartScopeRepository {
       .delete(smartScopes)
       .where(and(eq(smartScopes.id, id), eq(smartScopes.userId, userId)))
       .returning();
+  }
+
+  private koboSubscriptionExists(userId: number) {
+    return exists(
+      this.db
+        .select({ one: sql`1` })
+        .from(smartScopeKoboSubscriptions)
+        .where(and(eq(smartScopeKoboSubscriptions.smartScopeId, smartScopes.id), eq(smartScopeKoboSubscriptions.userId, userId))),
+    );
+  }
+
+  /**
+   * Scopes that must reach this user's Kobo: their own scopes with the flag set,
+   * plus shared scopes they opted into. A scope the owner unshares drops out even
+   * if the subscription row survives.
+   */
+  findKoboSyncScopesForUser(userId: number) {
+    return this.db
+      .select()
+      .from(smartScopes)
+      .where(
+        or(
+          and(eq(smartScopes.userId, userId), eq(smartScopes.syncToKobo, true)),
+          and(ne(smartScopes.userId, userId), eq(smartScopes.isPublic, true), this.koboSubscriptionExists(userId)),
+        ),
+      );
+  }
+
+  async findKoboSubscribedScopeIds(userId: number, smartScopeIds: number[]): Promise<number[]> {
+    if (smartScopeIds.length === 0) return [];
+    const rows = await this.db
+      .select({ smartScopeId: smartScopeKoboSubscriptions.smartScopeId })
+      .from(smartScopeKoboSubscriptions)
+      .where(and(eq(smartScopeKoboSubscriptions.userId, userId), inArray(smartScopeKoboSubscriptions.smartScopeId, smartScopeIds)));
+    return rows.map((row) => row.smartScopeId);
+  }
+
+  async subscribeToKobo(userId: number, smartScopeId: number): Promise<void> {
+    await this.db.insert(smartScopeKoboSubscriptions).values({ userId, smartScopeId }).onConflictDoNothing();
+  }
+
+  async unsubscribeFromKobo(userId: number, smartScopeId: number): Promise<void> {
+    await this.db
+      .delete(smartScopeKoboSubscriptions)
+      .where(and(eq(smartScopeKoboSubscriptions.userId, userId), eq(smartScopeKoboSubscriptions.smartScopeId, smartScopeId)));
   }
 
   updateDisplayOrders(userId: number, order: SmartScopeDisplayOrderUpdate[]): Promise<number> {

@@ -42,9 +42,10 @@ function makeBookmarkRow(overrides?: Record<string, unknown>) {
 function makeService() {
   const bookmarkRepo = {
     findByBookId: vi.fn(),
-    findExistingByLocation: vi.fn(),
+    findLiveByLocation: vi.fn(),
     create: vi.fn(),
-    delete: vi.fn(),
+    restoreAtLocation: vi.fn().mockResolvedValue(null),
+    softDelete: vi.fn(),
   };
   const bookService = {
     verifyBookAccess: vi.fn().mockResolvedValue(undefined),
@@ -83,13 +84,13 @@ describe('BookmarkService', () => {
       const { service, bookmarkRepo, bookService } = makeService();
       const user = makeUser();
       const existing = makeBookmarkRow();
-      bookmarkRepo.findExistingByLocation.mockResolvedValue(existing);
+      bookmarkRepo.findLiveByLocation.mockResolvedValue(existing);
 
       const dto: CreateBookmarkDto = { cfi: 'epubcfi(/6/4!/4/2/1:0)', title: 'Chapter 1' };
       const result = await service.createBookmark(5, user, dto);
 
       expect(bookService.verifyBookAccess).toHaveBeenCalledWith(5, user);
-      expect(bookmarkRepo.findExistingByLocation).toHaveBeenCalledWith(1, 5, {
+      expect(bookmarkRepo.findLiveByLocation).toHaveBeenCalledWith(1, 5, {
         cfi: 'epubcfi(/6/4!/4/2/1:0)',
         positionSeconds: null,
       });
@@ -100,11 +101,11 @@ describe('BookmarkService', () => {
     it('returns an existing bookmark for duplicate audio position requests', async () => {
       const { service, bookmarkRepo } = makeService();
       const existing = makeBookmarkRow({ id: 11, cfi: null, positionSeconds: 93.5, title: '00:01:33' });
-      bookmarkRepo.findExistingByLocation.mockResolvedValue(existing);
+      bookmarkRepo.findLiveByLocation.mockResolvedValue(existing);
 
       const result = await service.createBookmark(5, makeUser(), { title: '00:01:33', positionSeconds: 93.5 });
 
-      expect(bookmarkRepo.findExistingByLocation).toHaveBeenCalledWith(1, 5, { cfi: null, positionSeconds: 93.5 });
+      expect(bookmarkRepo.findLiveByLocation).toHaveBeenCalledWith(1, 5, { cfi: null, positionSeconds: 93.5 });
       expect(bookmarkRepo.create).not.toHaveBeenCalled();
       expect(result.id).toBe(11);
       expect(result.positionSeconds).toBe(93.5);
@@ -113,7 +114,7 @@ describe('BookmarkService', () => {
     it('creates and maps a bookmark when no duplicate exists', async () => {
       const { service, bookmarkRepo } = makeService();
       const createdRow = makeBookmarkRow({ id: 12, cfi: null, positionSeconds: 42, title: '00:00:42' });
-      bookmarkRepo.findExistingByLocation.mockResolvedValue(null);
+      bookmarkRepo.findLiveByLocation.mockResolvedValue(null);
       bookmarkRepo.create.mockResolvedValue(createdRow);
 
       const result = await service.createBookmark(5, makeUser(), { title: '00:00:42', positionSeconds: 42 });
@@ -128,13 +129,31 @@ describe('BookmarkService', () => {
     it('re-reads and returns the existing bookmark when a concurrent duplicate insert is ignored', async () => {
       const { service, bookmarkRepo } = makeService();
       const existing = makeBookmarkRow({ id: 13, cfi: null, positionSeconds: 42, title: '00:00:42' });
-      bookmarkRepo.findExistingByLocation.mockResolvedValueOnce(null).mockResolvedValueOnce(existing);
+      bookmarkRepo.findLiveByLocation.mockResolvedValueOnce(null).mockResolvedValueOnce(existing);
       bookmarkRepo.create.mockResolvedValue(null);
 
       const result = await service.createBookmark(5, makeUser(), { title: '00:00:42', positionSeconds: 42 });
 
-      expect(bookmarkRepo.findExistingByLocation).toHaveBeenNthCalledWith(2, 1, 5, { cfi: null, positionSeconds: 42 });
+      expect(bookmarkRepo.findLiveByLocation).toHaveBeenNthCalledWith(2, 1, 5, { cfi: null, positionSeconds: 42 });
       expect(result.id).toBe(13);
+    });
+
+    it('restores the tombstone that still owns the location instead of failing the insert', async () => {
+      const { service, bookmarkRepo } = makeService();
+      const restored = makeBookmarkRow({ id: 14, deletedAt: null });
+      bookmarkRepo.findLiveByLocation.mockResolvedValue(null);
+      bookmarkRepo.create.mockResolvedValue(null);
+      bookmarkRepo.restoreAtLocation.mockResolvedValue(restored);
+
+      const result = await service.createBookmark(5, makeUser(), { title: 'Chapter 1', cfi: 'epubcfi(/6/4!/4/2/1:0)' });
+
+      expect(bookmarkRepo.restoreAtLocation).toHaveBeenCalledWith(
+        1,
+        5,
+        { cfi: 'epubcfi(/6/4!/4/2/1:0)', positionSeconds: null },
+        { title: 'Chapter 1', origin: 'web', devicePos: null, pageno: null },
+      );
+      expect(result.id).toBe(14);
     });
 
     it('propagates access errors and does not query repository', async () => {
@@ -142,26 +161,26 @@ describe('BookmarkService', () => {
       bookService.verifyBookAccess.mockRejectedValue(new NotFoundException('Book 5 not found'));
 
       await expect(service.createBookmark(5, makeUser(), { title: 'x', cfi: 'epubcfi(/6/2)' })).rejects.toThrow(NotFoundException);
-      expect(bookmarkRepo.findExistingByLocation).not.toHaveBeenCalled();
+      expect(bookmarkRepo.findLiveByLocation).not.toHaveBeenCalled();
       expect(bookmarkRepo.create).not.toHaveBeenCalled();
     });
   });
 
   describe('deleteBookmark', () => {
-    it('verifies access and deletes bookmark', async () => {
+    it('verifies access and soft deletes the bookmark', async () => {
       const { service, bookmarkRepo, bookService } = makeService();
       const user = makeUser();
-      bookmarkRepo.delete.mockResolvedValue(true);
+      bookmarkRepo.softDelete.mockResolvedValue(true);
 
       await expect(service.deleteBookmark(5, 10, user)).resolves.toBeUndefined();
 
       expect(bookService.verifyBookAccess).toHaveBeenCalledWith(5, user);
-      expect(bookmarkRepo.delete).toHaveBeenCalledWith(5, 10, 1);
+      expect(bookmarkRepo.softDelete).toHaveBeenCalledWith(5, 10, 1);
     });
 
     it('throws NotFoundException with stable message when bookmark is missing', async () => {
       const { service, bookmarkRepo } = makeService();
-      bookmarkRepo.delete.mockResolvedValue(false);
+      bookmarkRepo.softDelete.mockResolvedValue(false);
 
       await expect(service.deleteBookmark(5, 99, makeUser())).rejects.toThrow(NotFoundException);
       await expect(service.deleteBookmark(5, 99, makeUser())).rejects.toThrow('Bookmark 99 not found for book 5');
@@ -172,7 +191,7 @@ describe('BookmarkService', () => {
       bookService.verifyBookAccess.mockRejectedValue(new ForbiddenException());
 
       await expect(service.deleteBookmark(5, 10, makeUser())).rejects.toThrow(ForbiddenException);
-      expect(bookmarkRepo.delete).not.toHaveBeenCalled();
+      expect(bookmarkRepo.softDelete).not.toHaveBeenCalled();
     });
   });
 });

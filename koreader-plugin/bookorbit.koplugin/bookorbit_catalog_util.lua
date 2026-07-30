@@ -16,7 +16,9 @@ local CatalogUtil = {}
 
 CatalogUtil.DEFAULT_GRID_COLUMNS = 4
 CatalogUtil.DEFAULT_GRID_ROWS = 3
-CatalogUtil.THUMBNAIL_BATCH_SIZE = 2
+-- Covers fetched per background worker round. One subprocess covers the whole
+-- batch and the page rebuilds once when it lands.
+CatalogUtil.THUMBNAIL_BATCH_SIZE = 3
 CatalogUtil.MAX_RECENT_SEARCHES = 8
 CatalogUtil.ON_DEVICE_MAX_IDS = 200
 

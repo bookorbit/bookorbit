@@ -51,7 +51,7 @@ watch(availableTabs, (tabs) => {
 })
 
 const tabWidths: Record<Tab, string> = {
-  'file-naming': 'max-w-7xl',
+  'file-naming': 'max-w-5xl',
   'book-dock': 'max-w-3xl',
   maintenance: 'max-w-3xl',
   'audit-log': 'max-w-[96rem]',

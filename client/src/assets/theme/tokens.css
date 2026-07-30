@@ -70,6 +70,17 @@
   /* Shape */
   --radius: 0.625rem;
 
+  /* App shell (sidebar + header) — one gutter, one material.
+     --shell-surface-opacity is user-controlled and overwritten on <html>. */
+  --shell-gap: 0.75rem;
+  --shell-surface-opacity: 92%;
+  --shell-surface: color-mix(in oklch, var(--sidebar) var(--shell-surface-opacity), transparent);
+  /* Accent ladder: four steps, used for every tinted fill and border in the shell. */
+  --shell-accent-wash: color-mix(in oklch, var(--primary) 6%, transparent);
+  --shell-accent-tint: color-mix(in oklch, var(--primary) 12%, transparent);
+  --shell-accent-line: color-mix(in oklch, var(--primary) 30%, transparent);
+  --shell-border: var(--shell-accent-line);
+
   --dot-color: oklch(0.82 var(--tint-c-surface) var(--tint-h));
 
   --scrollbar-thumb: oklch(0.8 var(--tint-c) var(--tint-h));
@@ -82,6 +93,11 @@
   --pill-kobo: oklch(0.55 0.1 195);
   --pill-repaired: oklch(0.62 0.14 70);
   --pill-pending: oklch(0.55 0.09 255);
+  --pill-file-as-book: oklch(0.58 0.15 150);
+  --pill-folder-as-book: oklch(0.55 0.16 245);
+  --pill-success: oklch(0.58 0.15 150);
+  --pill-warning: oklch(0.62 0.14 70);
+  --pill-info: oklch(0.55 0.16 245);
 
   --audit-authentication: oklch(0.55 0.17 295);
   --audit-books: oklch(0.55 0.16 245);
@@ -160,6 +176,11 @@
   --pill-kobo: oklch(0.74 0.1 195);
   --pill-repaired: oklch(0.78 0.13 70);
   --pill-pending: oklch(0.72 0.09 255);
+  --pill-file-as-book: oklch(0.75 0.13 150);
+  --pill-folder-as-book: oklch(0.72 0.14 245);
+  --pill-success: oklch(0.75 0.13 150);
+  --pill-warning: oklch(0.78 0.13 70);
+  --pill-info: oklch(0.72 0.14 245);
 
   --audit-authentication: oklch(0.72 0.17 295);
   --audit-books: oklch(0.72 0.14 245);

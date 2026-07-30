@@ -16,6 +16,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { KOREADER_DEVICE_ID_REGEX } from './koreader-device-param.dto';
+import { KOREADER_MAX_EVENT_DURATION_SECONDS } from '../koreader-stats.util';
 
 const MD5_HEX = /^[0-9a-f]{32}$/i;
 const DEVICE_DATETIME = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
@@ -100,7 +101,7 @@ export class PageStatEventDto {
 
   @IsInt()
   @Min(0)
-  @Max(86400)
+  @Max(KOREADER_MAX_EVENT_DURATION_SECONDS)
   durationSeconds!: number;
 
   @IsInt()

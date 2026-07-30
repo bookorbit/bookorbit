@@ -42,6 +42,7 @@ function makeService() {
     restore: vi.fn().mockResolvedValue(makeHubRow({ deletedAt: null })),
     findHubById: vi.fn().mockResolvedValue(makeHubRow()),
     purge: vi.fn().mockResolvedValue('purged'),
+    countHub: vi.fn().mockResolvedValue(18000),
   };
   const exportService = { export: vi.fn().mockResolvedValue({ contentType: 'text/markdown', filename: 'x.md', content: '#' }) };
   const syncRepo = {
@@ -65,6 +66,15 @@ function makeService() {
 }
 
 describe('AnnotationHubService', () => {
+  describe('countActive', () => {
+    it('counts the annotations the hub lists by default, excluding the trash', async () => {
+      const { service, annotationRepo } = makeService();
+
+      await expect(service.countActive(10)).resolves.toBe(18000);
+      expect(annotationRepo.countHub).toHaveBeenCalledWith(10, { status: 'active' });
+    });
+  });
+
   describe('list', () => {
     it('maps the date range to Date objects and the notes-only flag into repository filters', async () => {
       const { service, annotationRepo } = makeService();

@@ -49,8 +49,8 @@ export type ExportScope = 'primary' | 'all' | 'audio'
 
 const ICON_SIZE = 17
 
-const BTN_ICON = 'text-foreground/80 h-9 w-9 shrink-0 flex items-center justify-center rounded-full transition-colors'
-const BTN_DISABLED = 'text-muted-foreground/60 cursor-not-allowed'
+const BTN_ICON = 'text-foreground h-9 w-9 shrink-0 flex items-center justify-center rounded-full transition-colors'
+const BTN_DISABLED = 'text-muted-foreground cursor-not-allowed'
 const BTN_PRIMARY = 'text-foreground hover:bg-primary hover:text-primary-foreground'
 const BTN_MUTED = 'text-foreground hover:bg-muted'
 const BTN_DESTRUCTIVE = 'text-destructive hover:bg-destructive hover:text-destructive-foreground'

@@ -170,7 +170,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
         :disabled="props.disabled"
         @click.stop="handleToggleLock"
       >
-        <Lock v-if="props.locked" class="size-3.5 text-primary/70" />
+        <Lock v-if="props.locked" class="size-3.5 text-primary" />
         <LockOpen v-else class="size-3.5 text-muted-foreground" />
       </button>
     </div>

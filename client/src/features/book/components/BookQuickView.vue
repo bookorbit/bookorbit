@@ -358,17 +358,17 @@ function handleDelete() {
                       loading="lazy"
                       @error="providerIconErrors[link.key] = true"
                     />
-                    <span v-else class="text-[8px] font-bold leading-none text-foreground/90">{{ link.fallback }}</span>
+                    <span v-else class="text-[8px] font-bold leading-none text-foreground">{{ link.fallback }}</span>
                   </a>
                 </div>
-                <p v-if="authorLine" class="text-xs text-foreground/80 mt-2">{{ authorLine }}</p>
+                <p v-if="authorLine" class="text-xs text-foreground mt-2">{{ authorLine }}</p>
                 <p v-if="seriesLine" class="text-xs text-muted-foreground mt-0.5 italic">{{ seriesLine }}</p>
                 <div v-if="detail.rating != null" class="mt-2 flex items-center gap-1">
                   <Star
                     v-for="star in ratingStars"
                     :key="star"
                     class="size-3"
-                    :class="detail.rating >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/60'"
+                    :class="detail.rating >= star ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground'"
                   />
                   <span class="text-[10px] text-muted-foreground ml-1">{{ detail.rating }}/5</span>
                 </div>
@@ -484,7 +484,7 @@ function handleDelete() {
               <div class="border-t pt-4">
                 <div v-if="detail.description">
                   <div
-                    class="text-sm leading-relaxed text-foreground/80 transition-all"
+                    class="text-sm leading-relaxed text-foreground transition-all"
                     :class="descriptionExpanded ? '' : 'line-clamp-4'"
                     v-html="safeDescription"
                   />

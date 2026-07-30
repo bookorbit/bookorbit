@@ -271,7 +271,7 @@ function handleRowClick(event: MouseEvent) {
         {{ authorLine }}
       </button>
       <div class="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-        <LibraryBig class="size-3.5 shrink-0 text-muted-foreground/70" />
+        <LibraryBig class="size-3.5 shrink-0 text-muted-foreground" />
         <span class="truncate">{{ collapsedCountLabel }}</span>
         <span v-if="collapsedReadCount > 0" class="shrink-0">
           &middot; {{ t('book.collapsedSeries.readCount', { count: collapsedReadCount }, collapsedReadCount) }}
@@ -287,7 +287,7 @@ function handleRowClick(event: MouseEvent) {
     </div>
 
     <div v-if="!selectionMode" class="flex shrink-0 items-center gap-2">
-      <ChevronRight class="size-4 text-muted-foreground/60 transition-colors" />
+      <ChevronRight class="size-4 text-muted-foreground transition-colors" />
     </div>
   </div>
   <div

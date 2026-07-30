@@ -44,6 +44,7 @@ import { SeedModule } from './modules/seed/seed.module';
 import { EmailModule } from './modules/email/email.module';
 import { EpubModule } from './modules/reader/epub/epub.module';
 import { BookDockModule } from './modules/book-dock/book-dock.module';
+import { BrowseCountsModule } from './modules/browse-counts/browse-counts.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { UserModule } from './modules/user/user.module';
 import { AuthorsModule } from './modules/authors/authors.module';
@@ -151,6 +152,7 @@ import { BookDuplicatesModule } from './modules/book-duplicates/book-duplicates.
     AccountActivityModule,
     SharedReadingInsightsModule,
     BookDuplicatesModule,
+    BrowseCountsModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },

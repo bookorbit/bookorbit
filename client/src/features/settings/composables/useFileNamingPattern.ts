@@ -1,4 +1,5 @@
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
 import { DEFAULT_DOWNLOAD_PATTERN, EXAMPLE_PATTERN_METADATA, resolveDownloadFilename, resolveUploadPath, validatePattern } from '@bookorbit/types'
@@ -20,15 +21,20 @@ export function previewDownloadName(pattern: string): string {
 }
 
 export function useFileNamingPattern() {
+  const { t } = useI18n()
+
   const globalPattern = ref('')
+  const savedGlobalPattern = ref('')
   const globalError = ref('')
   const loadingGlobal = ref(false)
   const savingGlobal = ref(false)
   const folderPattern = ref('')
+  const savedFolderPattern = ref('')
   const folderError = ref('')
   const loadingFolder = ref(false)
   const savingFolder = ref(false)
   const downloadPattern = ref('')
+  const savedDownloadPattern = ref('')
   const downloadError = ref('')
   const loadingDownload = ref(false)
   const savingDownload = ref(false)
@@ -36,8 +42,13 @@ export function useFileNamingPattern() {
   const loadingCrossPlatformSanitization = ref(false)
   const savingCrossPlatformSanitization = ref(false)
   const savingLibraryId = ref<number | null>(null)
+  const savedLibraryPatterns = ref<Record<number, string>>({})
 
   const { libraries, fetchLibraries } = useLibraries()
+
+  const globalDirty = computed(() => globalPattern.value !== savedGlobalPattern.value)
+  const folderDirty = computed(() => folderPattern.value !== savedFolderPattern.value)
+  const downloadDirty = computed(() => downloadPattern.value !== savedDownloadPattern.value)
 
   async function fetchGlobalPattern() {
     loadingGlobal.value = true
@@ -46,6 +57,7 @@ export function useFileNamingPattern() {
       if (res.ok) {
         const data: { pattern: string } = await res.json()
         globalPattern.value = data.pattern
+        savedGlobalPattern.value = data.pattern
       }
     } finally {
       loadingGlobal.value = false
@@ -59,6 +71,7 @@ export function useFileNamingPattern() {
       if (res.ok) {
         const data: { pattern: string } = await res.json()
         folderPattern.value = data.pattern
+        savedFolderPattern.value = data.pattern
       }
     } finally {
       loadingFolder.value = false
@@ -72,6 +85,7 @@ export function useFileNamingPattern() {
       if (res.ok) {
         const data: { pattern: string } = await res.json()
         downloadPattern.value = data.pattern
+        savedDownloadPattern.value = data.pattern
       }
     } finally {
       loadingDownload.value = false
@@ -91,19 +105,34 @@ export function useFileNamingPattern() {
     }
   }
 
+  async function loadLibraries() {
+    await fetchLibraries()
+    const snapshot: Record<number, string> = {}
+    for (const library of libraries.value) snapshot[library.id] = library.fileNamingPattern ?? ''
+    savedLibraryPatterns.value = snapshot
+  }
+
+  function isLibraryDirty(library: Library): boolean {
+    return (library.fileNamingPattern ?? '') !== (savedLibraryPatterns.value[library.id] ?? '')
+  }
+
+  function patternError(value: string): string {
+    return value && !validatePattern(value) ? t('settings.reader.fileNaming.invalidCharacters') : ''
+  }
+
   function onGlobalPatternInput(value: string) {
     globalPattern.value = value
-    globalError.value = value && !validatePattern(value) ? 'Pattern contains invalid characters' : ''
+    globalError.value = patternError(value)
   }
 
   function onFolderPatternInput(value: string) {
     folderPattern.value = value
-    folderError.value = value && !validatePattern(value) ? 'Pattern contains invalid characters' : ''
+    folderError.value = patternError(value)
   }
 
   function onDownloadPatternInput(value: string) {
     downloadPattern.value = value
-    downloadError.value = value && !validatePattern(value) ? 'Pattern contains invalid characters' : ''
+    downloadError.value = patternError(value)
   }
 
   async function saveGlobalPattern() {
@@ -116,9 +145,10 @@ export function useFileNamingPattern() {
         body: JSON.stringify({ pattern: globalPattern.value }),
       })
       if (res.ok) {
-        toast.success('Default pattern saved')
+        savedGlobalPattern.value = globalPattern.value
+        toast.success(t('settings.reader.fileNaming.fileAsBookSaved'))
       } else {
-        toast.error('Failed to save pattern')
+        toast.error(t('settings.reader.fileNaming.savePatternFailed'))
       }
     } finally {
       savingGlobal.value = false
@@ -135,9 +165,10 @@ export function useFileNamingPattern() {
         body: JSON.stringify({ pattern: folderPattern.value }),
       })
       if (res.ok) {
-        toast.success('Default pattern saved')
+        savedFolderPattern.value = folderPattern.value
+        toast.success(t('settings.reader.fileNaming.folderAsBookSaved'))
       } else {
-        toast.error('Failed to save pattern')
+        toast.error(t('settings.reader.fileNaming.savePatternFailed'))
       }
     } finally {
       savingFolder.value = false
@@ -154,27 +185,32 @@ export function useFileNamingPattern() {
         body: JSON.stringify({ pattern: downloadPattern.value }),
       })
       if (res.ok) {
-        toast.success('Download pattern saved')
+        savedDownloadPattern.value = downloadPattern.value
+        toast.success(t('settings.reader.fileNaming.downloadPatternSaved'))
       } else {
-        toast.error('Failed to save download pattern')
+        toast.error(t('settings.reader.fileNaming.saveDownloadPatternFailed'))
       }
     } finally {
       savingDownload.value = false
     }
   }
 
-  async function saveCrossPlatformSanitization() {
+  async function setCrossPlatformSanitization(enabled: boolean) {
+    if (savingCrossPlatformSanitization.value) return
+    const previous = crossPlatformSanitizationEnabled.value
+    crossPlatformSanitizationEnabled.value = enabled
     savingCrossPlatformSanitization.value = true
     try {
       const res = await api('/api/v1/app-settings/cross-platform-path-sanitization', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: crossPlatformSanitizationEnabled.value }),
+        body: JSON.stringify({ enabled }),
       })
       if (res.ok) {
-        toast.success('Cross-platform path sanitization saved')
+        toast.success(enabled ? t('settings.reader.fileNaming.crossPlatformEnabled') : t('settings.reader.fileNaming.crossPlatformDisabled'))
       } else {
-        toast.error('Failed to save cross-platform path sanitization')
+        crossPlatformSanitizationEnabled.value = previous
+        toast.error(t('settings.reader.fileNaming.crossPlatformSaveFailed'))
       }
     } finally {
       savingCrossPlatformSanitization.value = false
@@ -190,9 +226,10 @@ export function useFileNamingPattern() {
         body: JSON.stringify({ fileNamingPattern: library.fileNamingPattern ?? null }),
       })
       if (res.ok) {
-        toast.success(`Pattern saved for "${library.name}"`)
+        savedLibraryPatterns.value = { ...savedLibraryPatterns.value, [library.id]: library.fileNamingPattern ?? '' }
+        toast.success(t('settings.reader.fileNaming.librarySaved', { name: library.name }))
       } else {
-        toast.error('Failed to save library pattern')
+        toast.error(t('settings.reader.fileNaming.librarySaveFailed'))
       }
     } finally {
       savingLibraryId.value = null
@@ -212,10 +249,13 @@ export function useFileNamingPattern() {
   return {
     globalPattern,
     globalError,
+    globalDirty,
     folderPattern,
     folderError,
+    folderDirty,
     downloadPattern,
     downloadError,
+    downloadDirty,
     crossPlatformSanitizationEnabled,
     libraries,
     loadingGlobal,
@@ -231,14 +271,15 @@ export function useFileNamingPattern() {
     fetchFolderPattern,
     fetchDownloadPattern,
     fetchCrossPlatformSanitization,
-    fetchLibraries,
+    loadLibraries,
+    isLibraryDirty,
     onGlobalPatternInput,
     onFolderPatternInput,
     onDownloadPatternInput,
     saveGlobalPattern,
     saveFolderPattern,
     saveDownloadPattern,
-    saveCrossPlatformSanitization,
+    setCrossPlatformSanitization,
     saveLibraryPattern,
     clearLibraryPattern,
     getEffectivePreview,

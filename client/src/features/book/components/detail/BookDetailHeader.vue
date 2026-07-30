@@ -46,7 +46,7 @@ async function navigateToBook(id: number) {
         @click="prevId && navigateToBook(prevId)"
         :disabled="!prevId"
         class="h-7 w-7 flex items-center justify-center rounded-md transition-colors"
-        :class="prevId ? 'text-foreground hover:bg-muted' : 'text-muted-foreground/60 cursor-not-allowed'"
+        :class="prevId ? 'text-foreground hover:bg-muted' : 'text-muted-foreground cursor-not-allowed'"
         :title="t('book.detail.header.previousBook')"
       >
         <ChevronLeft :size="16" />
@@ -55,7 +55,7 @@ async function navigateToBook(id: number) {
         @click="nextId && navigateToBook(nextId)"
         :disabled="!nextId"
         class="h-7 w-7 flex items-center justify-center rounded-md transition-colors"
-        :class="nextId ? 'text-foreground hover:bg-muted' : 'text-muted-foreground/60 cursor-not-allowed'"
+        :class="nextId ? 'text-foreground hover:bg-muted' : 'text-muted-foreground cursor-not-allowed'"
         :title="t('book.detail.header.nextBook')"
       >
         <ChevronRight :size="16" />

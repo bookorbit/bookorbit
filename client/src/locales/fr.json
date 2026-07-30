@@ -4585,18 +4585,18 @@
         "shelves": "Étagères"
       },
       "widgetNames": {
-        "readingStreak": "Reading Streak",
-        "currentlyReading": "Currently Reading",
+        "readingStreak": "Série de lecture",
+        "currentlyReading": "Lecture en cours",
         "readingGoal": "Reading Goal",
-        "readingDna": "Reading DNA",
-        "monthlyChallenge": "Monthly Challenge",
-        "highlightOfTheDay": "Highlight of the Day",
-        "neglectedGems": "Neglected Gems",
-        "readingRhythm": "Reading Rhythm",
-        "diversityScore": "Diversity Score",
-        "libraryOverview": "Library Overview",
-        "yearProjection": "Year Projection",
-        "longWait": "The Long Wait"
+        "readingDna": "Lire l'ADN",
+        "monthlyChallenge": "Défi mensuel",
+        "highlightOfTheDay": "Le moment fort de la journée",
+        "neglectedGems": "Joyaux négligés",
+        "readingRhythm": "Rythme de lecture",
+        "diversityScore": "Score de diversité",
+        "libraryOverview": "Présentation de la bibliothèque",
+        "yearProjection": "Année projetée",
+        "longWait": "La longue attente"
       },
       "shelfNames": {
         "recentlyAdded": "Recently Added",

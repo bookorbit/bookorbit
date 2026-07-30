@@ -77,7 +77,7 @@ function getTabIndex(star: number): number {
       :aria-pressed="star <= (value ?? 0)"
       type="button"
       class="transition-colors"
-      :class="[isReadOnly ? 'cursor-default' : 'cursor-pointer hover:scale-110', getRatingStarClass(star, value, 'text-muted-foreground/30')]"
+      :class="[isReadOnly ? 'cursor-default' : 'cursor-pointer hover:scale-110', getRatingStarClass(star, value, 'text-border')]"
       @click="handleStarClick"
       @keydown="handleStarKeydown"
     >

@@ -10,7 +10,18 @@ import { SelfWriteRegistry } from '../../common/services/self-write-registry.ser
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { NotificationService } from '../notification/notification.service';
 import { computeFileHash } from '../scanner/lib/hash';
-import { AUDIO_WRITE_FORMATS, FORMAT_CB7, FORMAT_CBZ, FORMAT_EPUB, FORMAT_PDF, createBookWriteFieldMask } from './file-write.constants';
+import {
+  AUDIO_WRITE_FORMATS,
+  FORMAT_AZW,
+  FORMAT_AZW3,
+  FORMAT_CB7,
+  FORMAT_CBZ,
+  FORMAT_EPUB,
+  FORMAT_FB2,
+  FORMAT_MOBI,
+  FORMAT_PDF,
+  createBookWriteFieldMask,
+} from './file-write.constants';
 import { FileLockService, bookOperationLockKey } from './file-lock.service';
 import { FileWriteRepository } from './file-write.repository';
 import { FormatWriterRegistry } from './format-writer.registry';
@@ -569,10 +580,14 @@ type LibraryFileWriteConfig = {
   fileWriteWriteCover: boolean;
   fileWriteEpubEnabled: boolean;
   fileWriteEpubMaxFileSizeMb: number;
+  fileWriteFb2Enabled: boolean;
+  fileWriteFb2MaxFileSizeMb: number;
   fileWritePdfEnabled: boolean;
   fileWritePdfMaxFileSizeMb: number;
   fileWriteCbxEnabled: boolean;
   fileWriteCbxMaxFileSizeMb: number;
+  fileWriteKindleEnabled: boolean;
+  fileWriteKindleMaxFileSizeMb: number;
   fileWriteAudioEnabled: boolean;
   fileWriteAudioMaxFileSizeMb: number;
 };
@@ -581,11 +596,17 @@ function resolveFormatSettings(config: LibraryFileWriteConfig, format: string): 
   switch (format) {
     case FORMAT_EPUB:
       return { enabled: config.fileWriteEpubEnabled, maxFileSizeBytes: config.fileWriteEpubMaxFileSizeMb * 1024 * 1024 };
+    case FORMAT_FB2:
+      return { enabled: config.fileWriteFb2Enabled, maxFileSizeBytes: config.fileWriteFb2MaxFileSizeMb * 1024 * 1024 };
     case FORMAT_PDF:
       return { enabled: config.fileWritePdfEnabled, maxFileSizeBytes: config.fileWritePdfMaxFileSizeMb * 1024 * 1024 };
     case FORMAT_CBZ:
     case FORMAT_CB7:
       return { enabled: config.fileWriteCbxEnabled, maxFileSizeBytes: config.fileWriteCbxMaxFileSizeMb * 1024 * 1024 };
+    case FORMAT_MOBI:
+    case FORMAT_AZW3:
+    case FORMAT_AZW:
+      return { enabled: config.fileWriteKindleEnabled, maxFileSizeBytes: config.fileWriteKindleMaxFileSizeMb * 1024 * 1024 };
     default:
       if (AUDIO_WRITE_FORMATS.includes(format as (typeof AUDIO_WRITE_FORMATS)[number])) {
         return { enabled: config.fileWriteAudioEnabled, maxFileSizeBytes: config.fileWriteAudioMaxFileSizeMb * 1024 * 1024 };
@@ -642,10 +663,14 @@ function isCompleteLibraryFileWriteConfig(config: FileWriteCapabilityLibraryConf
     typeof config.fileWriteWriteCover === 'boolean' &&
     typeof config.fileWriteEpubEnabled === 'boolean' &&
     typeof config.fileWriteEpubMaxFileSizeMb === 'number' &&
+    typeof config.fileWriteFb2Enabled === 'boolean' &&
+    typeof config.fileWriteFb2MaxFileSizeMb === 'number' &&
     typeof config.fileWritePdfEnabled === 'boolean' &&
     typeof config.fileWritePdfMaxFileSizeMb === 'number' &&
     typeof config.fileWriteCbxEnabled === 'boolean' &&
     typeof config.fileWriteCbxMaxFileSizeMb === 'number' &&
+    typeof config.fileWriteKindleEnabled === 'boolean' &&
+    typeof config.fileWriteKindleMaxFileSizeMb === 'number' &&
     typeof config.fileWriteAudioEnabled === 'boolean' &&
     typeof config.fileWriteAudioMaxFileSizeMb === 'number'
   );

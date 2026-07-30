@@ -76,6 +76,7 @@ assertEqual(hasRow(rows, "Last highlight sync"), false, "logged-out diagnostics 
 assertEqual(hasRow(rows, "Retry highlight sync"), false, "logged-out diagnostics hides highlight retry")
 assertEqual(hasRow(rows, "Retry open-book match"), false, "logged-out diagnostics hides match retry")
 assertEqual(hasRow(rows, "Test connection"), false, "logged-out diagnostics hides connection action without credentials")
+assertEqual(hasRow(rows, "Recheck all book matches"), false, "logged-out diagnostics hides the match recheck")
 
 plugin.settings.server_url = "https://bookorbit.example.com"
 plugin.settings.username = "reader"
@@ -90,6 +91,9 @@ assertEqual(hasRow(rows, "Retry open-book match"), false, "file manager diagnost
 assertEqual(hasRow(rows, "Test connection"), true, "file manager diagnostics keeps connection action")
 assertEqual(hasRow(rows, "Open highlights"), true, "logged-in diagnostics shows sync state")
 assertEqual(hasRow(rows, "Last highlight sync"), true, "logged-in diagnostics shows highlight summary")
+-- "Sync all books" is incremental now, so the full rematch lives here as its
+-- own explicit maintenance action.
+assertEqual(hasRow(rows, "Recheck all book matches"), true, "logged-in diagnostics offers the match recheck")
 
 plugin.ui = { document = {} }
 plugin.getDocumentDigest = function()

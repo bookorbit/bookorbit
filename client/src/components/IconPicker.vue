@@ -351,10 +351,10 @@ onUnmounted(() => {
               v-model="query"
               type="text"
               :placeholder="searchPlaceholder"
-              class="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
+              class="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
             />
             <div class="flex items-center gap-2 shrink-0">
-              <span class="text-[11px] text-muted-foreground/80">{{ formatNumber(activeCount) }}</span>
+              <span class="text-[11px] text-muted-foreground">{{ formatNumber(activeCount) }}</span>
               <button v-if="query" type="button" class="text-muted-foreground hover:text-foreground transition-colors" @click="clearQuery">
                 <X :size="13" />
               </button>

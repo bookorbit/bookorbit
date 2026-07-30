@@ -23,9 +23,18 @@
       "levelLegend": "Reading insights sharing level",
       "current": "Current setting",
       "levels": {
-        "private": { "title": "Private", "description": "Only you can see your reading statistics." },
-        "summary": { "title": "Share summary", "description": "Share aggregate habits without book titles, authors, series, or narrators." },
-        "detailed": { "title": "Share detailed insights", "description": "Also share recent and top books, authors, series, genres, and narrators." }
+        "private": {
+          "title": "Private",
+          "description": "Only you can see your reading statistics."
+        },
+        "summary": {
+          "title": "Share summary",
+          "description": "Share aggregate habits without book titles, authors, series, or narrators."
+        },
+        "detailed": {
+          "title": "Share detailed insights",
+          "description": "Also share recent and top books, authors, series, genres, and narrators."
+        }
       },
       "fields": {
         "frequency": "Reading frequency and active days",
@@ -62,7 +71,7 @@
         "paginationLabel": "Profile access history pages"
       },
       "durationMinutes": "{count, plural, one {# minute} other {# minutes}}",
-      "durationHours": "{count} hours",
+      "durationHours": "{count, plural, one {# hour} other {# hours}}",
       "unknownTitle": "Untitled book",
       "errors": {
         "load": "Failed to load sharing settings.",
@@ -398,7 +407,7 @@
           "newest": "Newest",
           "name": "Name"
         },
-        "selectedCount": "{count} selected",
+        "selectedCount": "{count, plural, one {# selected} other {# selected}}",
         "clear": "Clear",
         "deleteSelected": "Delete selected",
         "loading": "Loading icons...",
@@ -458,7 +467,7 @@
       },
       "feedback": {
         "unsavedChanges": "Unsaved changes",
-        "allSaved": "All changes saved"
+        "discard": "Discard"
       },
       "profile": {
         "securityHeading": "Profile & Security",
@@ -475,7 +484,11 @@
         "accountTypeLocal": "Local",
         "nameRequired": "Name is required",
         "updateFailed": "Failed to update profile",
-        "updated": "Profile updated"
+        "updated": "Profile updated",
+        "usernameHint": "Your username cannot be changed.",
+        "passwordHint": "Change the password you use to sign in.",
+        "passwordHintOidc": "Your password is managed by your identity provider.",
+        "passwordHintShared": "Shared accounts sign in through a magic link and have no password."
       },
       "readingPreferences": {
         "title": "Reading Preferences",
@@ -483,7 +496,10 @@
         "timezone": "Timezone",
         "save": "Save preferences",
         "enableAchievements": "Enable achievements",
-        "enableAchievementsHint": "Track achievement progress and show achievement-related interface. Manage achievement notifications separately in Notifications."
+        "enableAchievementsHint": "Track achievement progress and show achievement-related interface. Manage achievement notifications separately in Notifications.",
+        "achievementsEnabled": "Achievements enabled",
+        "achievementsDisabled": "Achievements disabled",
+        "achievementsSaveFailed": "Failed to update the achievement preference"
       },
       "preferences": {
         "saveFailed": "Failed to save preferences",
@@ -525,7 +541,9 @@
           "title": "Unlink {provider} identity?",
           "description": "Enter your password to confirm. You will no longer be able to sign in with this provider.",
           "currentPassword": "Current password"
-        }
+        },
+        "description": "Sign in with an external identity provider linked to this account.",
+        "unlinkAria": "Unlink {provider}"
       },
       "tour": {
         "title": "Guided Tour",
@@ -554,6 +572,11 @@
           "title": "Blocked genres",
           "description": "Books with any of these genres are hidden from you."
         }
+      },
+      "groups": {
+        "profile": "Profile",
+        "preferences": "Preferences",
+        "security": "Security & access"
       }
     },
     "magicLinks": {
@@ -587,10 +610,10 @@
         "createdBy": "Created by",
         "expires": "Expires",
         "uses": "Uses",
-        "lastUsed": "Last used",
         "created": "Created",
         "status": "Status",
-        "totalUses": "Total uses"
+        "totalUses": "Total uses",
+        "actions": "Actions"
       },
       "createDialog": {
         "title": "Create magic link",
@@ -618,7 +641,12 @@
       "emptyTitle": "No magic links created yet",
       "emptyHint": "Click \"{action}\" to generate a shareable login URL.",
       "noActiveTitle": "No active magic links",
-      "noActiveHint": "All generated magic links for this page have expired or been revoked."
+      "noActiveHint": "All generated magic links for this page have expired or been revoked.",
+      "copyLinkAria": "Copy the link for {label}",
+      "pauseAria": "Pause {label}",
+      "resumeAria": "Resume {label}",
+      "revokeAria": "Revoke {label}",
+      "lastUsedLabel": "Last used {date}"
     },
     "oidc": {
       "title": "OIDC / SSO",
@@ -1188,7 +1216,7 @@
           "minutesAgo": "{count}m ago",
           "hoursAgo": "{count}h ago",
           "yesterday": "yesterday",
-          "daysAgo": "{count} days ago",
+          "daysAgo": "{count, plural, one {# day ago} other {# days ago}}",
           "label": "Last run: {when}",
           "labelQueued": "Last run: {when} - queued {count} books",
           "labelNoneEligible": "Last run: {when} - no eligible books"
@@ -1683,9 +1711,6 @@
         "subtitle": "Control how files are organized on disk when uploaded and how they are named when downloaded using placeholder tokens.",
         "copy": "Copy",
         "previewLabel": "Preview:",
-        "fileAsBookPreview": "File as Book preview",
-        "folderAsBookPreview": "Folder as Book preview",
-        "downloadPreview": "Download preview",
         "globalDefaults": "Global Defaults",
         "crossPlatform": "Cross-platform path sanitization",
         "crossPlatformHint": "Make generated file and folder names safe on Windows by replacing invalid characters and reserved names, and removing trailing dots and spaces. Disable only for Linux-only setups that intentionally keep those characters.",
@@ -1702,15 +1727,10 @@
         "orgFolderAsBook": "Folder as Book",
         "orgFileAsBook": "File as Book",
         "resetToDefault": "Reset to default",
-        "patternReference": "Pattern Reference",
-        "placeholderReference": "Placeholder Reference",
-        "placeholderReferenceHint": "- guide for creating custom naming patterns",
         "tokens": "Tokens",
-        "tokensHint": "Copy placeholders quickly",
         "clickTokenHint": "Click any token to copy it to your clipboard.",
         "copyValue": "Copy {value}",
         "modifiers": "Modifiers",
-        "modifiersHint": "Transform token values",
         "modifiersExplain": "Append a modifier inside a token to transform its value:",
         "modFirst": "First value only",
         "modSort": "Last, First format",
@@ -1719,14 +1739,10 @@
         "folderOnlyPrefix": "End a pattern with",
         "folderOnlySuffix": "to specify a folder only. The original filename will be preserved inside it.",
         "conditionalLogic": "Conditional Logic",
-        "conditionalLogicHint": "Optional segments and fallbacks",
         "conditionalPart1": "Wrap in",
         "conditionalPart2": "to skip a segment when its token is empty. Use",
         "conditionalPart3": "for a default value.",
         "examples": "Examples",
-        "patternExamples": "Pattern Examples",
-        "patternExamplesHint": "Ready-made patterns for common library styles",
-        "copyPatternTooltip": "Copy pattern to clipboard",
         "exCalibre": "Calibre-style default",
         "exSeriesReader": "Series reader",
         "exCleanDownload": "Clean download filename",
@@ -1754,7 +1770,37 @@
         "patternCopied": "Pattern copied to clipboard",
         "copyPatternFailed": "Failed to copy pattern",
         "labelCopied": "{label} copied to clipboard",
-        "copyLabelFailed": "Failed to copy {label}"
+        "copyLabelFailed": "Failed to copy {label}",
+        "patternHelp": "Pattern help",
+        "patternHelpDescription": "Tokens, modifiers and ready-made patterns you can copy into any field.",
+        "copyPreview": "Copy {label}",
+        "copyExample": "Copy the {label} pattern",
+        "invalidCharacters": "Pattern contains invalid characters",
+        "fileAsBookSaved": "File as Book default saved",
+        "folderAsBookSaved": "Folder as Book default saved",
+        "downloadPatternSaved": "Download pattern saved",
+        "savePatternFailed": "Failed to save pattern",
+        "saveDownloadPatternFailed": "Failed to save download pattern",
+        "crossPlatformEnabled": "Cross-platform path sanitization enabled",
+        "crossPlatformDisabled": "Cross-platform path sanitization disabled",
+        "crossPlatformSaveFailed": "Failed to save cross-platform path sanitization",
+        "librarySaved": "Pattern saved for {name}",
+        "librarySaveFailed": "Failed to save library pattern",
+        "saveLibraryPattern": "Save pattern for {name}",
+        "resetLibraryPattern": "Reset {name} to the default pattern",
+        "tokenTitle": "Book title",
+        "tokenSubtitle": "Book subtitle",
+        "tokenAuthors": "Author(s), comma-separated",
+        "tokenYear": "Publication year",
+        "tokenSeries": "Series name",
+        "tokenSeriesIndex": "Series index (zero-padded)",
+        "tokenPublisher": "Publisher",
+        "tokenIsbn": "ISBN-13",
+        "tokenLanguage": "Language",
+        "tokenOriginalFilename": "Original filename (without extension)",
+        "tokenExtension": "File extension (without dot)",
+        "patternHelpIntro": "Patterns use tokens like {titleToken} and {authorsToken}, plus modifiers and optional segments.",
+        "browseTokensAndExamples": "Browse tokens and examples"
       },
       "kobo": {
         "title": "Kobo Sync",
@@ -2255,7 +2301,12 @@
       "never": "Never",
       "openInsightsFor": "Open shared reading insights for {name}",
       "permissionLabel": "View user activity",
-      "states": { "recent": "Recently active", "dormant": "Dormant", "never": "No recorded activity", "disabled": "Disabled" },
+      "states": {
+        "recent": "Recently active",
+        "dormant": "Dormant",
+        "never": "No recorded activity",
+        "disabled": "Disabled"
+      },
       "filters": {
         "search": "Search accounts",
         "searchPlaceholder": "Search name or username",
@@ -2273,7 +2324,12 @@
         "apply": "Apply",
         "clear": "Clear"
       },
-      "methods": { "local": "Local", "manual": "Administrator-created", "oidc": "OIDC / SSO", "shared": "Shared magic link" },
+      "methods": {
+        "local": "Local",
+        "manual": "Administrator-created",
+        "oidc": "OIDC / SSO",
+        "shared": "Shared magic link"
+      },
       "columns": {
         "user": "User",
         "state": "Account state",
@@ -2282,10 +2338,22 @@
         "created": "Created",
         "readingInsights": "Reading insights"
       },
-      "sharing": { "private": "Not shared", "summary": "Summary shared", "detailed": "Detailed shared" },
-      "empty": { "title": "No accounts found", "description": "Try changing or clearing the current filters." },
-      "pagination": { "label": "Account activity pages", "page": "Page {page} of {totalPages}" },
-      "errors": { "load": "Failed to load account activity." }
+      "sharing": {
+        "private": "Not shared",
+        "summary": "Summary shared",
+        "detailed": "Detailed shared"
+      },
+      "empty": {
+        "title": "No accounts found",
+        "description": "Try changing or clearing the current filters."
+      },
+      "pagination": {
+        "label": "Account activity pages",
+        "page": "Page {page} of {totalPages}"
+      },
+      "errors": {
+        "load": "Failed to load account activity."
+      }
     },
     "sharedInsights": {
       "title": "Shared reading insights",
@@ -2294,7 +2362,7 @@
       "period": "Reporting period",
       "periodDays": "Last {count} days",
       "durationMinutes": "{count, plural, one {# minute} other {# minutes}}",
-      "durationHours": "{count} hours",
+      "durationHours": "{count, plural, one {# hour} other {# hours}}",
       "metrics": {
         "sessions": "Sessions",
         "readingTime": "Reading time",
@@ -2305,7 +2373,13 @@
       "trend": "Daily reading trend",
       "emptyTitle": "No reading activity in this period",
       "noData": "No recorded reading data for this period.",
-      "sourceNames": { "web": "Web reader", "koreader": "KOReader", "manual": "Manual", "kobo": "Kobo", "unknown": "Unknown" },
+      "sourceNames": {
+        "web": "Web reader",
+        "koreader": "KOReader",
+        "manual": "Manual",
+        "kobo": "Kobo",
+        "unknown": "Unknown"
+      },
       "formats": "Formats",
       "genres": "Genres",
       "broadGenres": {
@@ -2328,7 +2402,12 @@
       "topBooks": "Most-read books",
       "recentBooks": "Recently read",
       "unknownTitle": "Untitled book",
-      "top": { "authors": "Top authors", "genres": "Top genres", "series": "Top series", "narrators": "Top narrators" },
+      "top": {
+        "authors": "Top authors",
+        "genres": "Top genres",
+        "series": "Top series",
+        "narrators": "Top narrators"
+      },
       "errors": {
         "READING_INSIGHTS_PRIVATE": "This user is not sharing reading insights.",
         "READING_INSIGHTS_SUMMARY_ONLY": "This user shares summary insights only.",
@@ -2409,19 +2488,15 @@
     },
     "usersPage": {
       "usersTitle": "Users",
-      "magicLinksTitle": "Magic Links",
       "usersSubtitle": "Manage user accounts and permission assignments.",
-      "magicLinksSubtitle": "Create shareable login links for shared accounts.",
       "createUser": "Create user",
-      "createLink": "Create link",
-      "usersTab": "Users",
-      "magicLinksTab": "Magic Links",
       "columns": {
         "name": "Name",
         "username": "Username",
         "email": "Email",
         "access": "Access",
-        "status": "Status"
+        "status": "Status",
+        "actions": "Actions"
       },
       "adminBadge": "Admin",
       "permissionCount": "{count, plural, =0 {no permissions} one {one permission} other {# permissions}}",
@@ -2439,11 +2514,10 @@
       "deleteDialogBody": "Delete user \"{username}\". This action cannot be undone.",
       "deleting": "Deleting...",
       "errors": {
-        "loadData": "Failed to load data",
         "load": "Failed to load",
-        "deleteUser": "Failed to delete user"
+        "deleteUser": "Failed to delete user",
+        "resetPassword": "Failed to create a password reset link"
       },
-      "currentUsers": "Current Users",
       "defaultLibraryAccess": {
         "title": "Default Library Access",
         "subtitle": "Viewer access granted to self-registered and OIDC-provisioned users.",
@@ -2451,9 +2525,37 @@
         "noLibraries": "No libraries available.",
         "save": "Save defaults",
         "saving": "Saving...",
-        "saved": "Default library access saved.",
         "saveError": "Failed to save default library access"
-      }
+      },
+      "filters": {
+        "search": "Search users",
+        "searchPlaceholder": "Search by name, username or email",
+        "sort": "Sort users",
+        "usernameAsc": "Username A-Z",
+        "nameAsc": "Name A-Z",
+        "newest": "Newest first",
+        "oldest": "Oldest first",
+        "apply": "Apply",
+        "clear": "Clear",
+        "state": "Filter users",
+        "allUsers": "All users",
+        "admins": "Administrators",
+        "active": "Active",
+        "inactive": "Inactive"
+      },
+      "empty": {
+        "title": "No users yet",
+        "description": "Create the first account to get started.",
+        "filtered": "No users match the current search and filters."
+      },
+      "pagination": {
+        "label": "Users pagination",
+        "page": "Page {page} of {totalPages}"
+      },
+      "editUserAria": "Edit {name}",
+      "resetPasswordAria": "Reset the password for {name}",
+      "deleteUserAria": "Delete {name}",
+      "moreActionsAria": "More actions for {name}"
     }
   },
   "annotations": {
@@ -2473,7 +2575,7 @@
       "noBooksFound": "No books found"
     },
     "bulk": {
-      "countSelected": "{count} selected",
+      "countSelected": "{count, plural, one {# selected} other {# selected}}",
       "pageSelected": "Page selected",
       "selectPage": "Select page",
       "clear": "Clear",
@@ -4256,17 +4358,17 @@
         "title": "Enjoying BookOrbit?",
         "body": "If BookOrbit is helping with your library, please consider starring the project on GitHub. It helps more people discover the app and supports ongoing development.",
         "cta": "Star BookOrbit on GitHub"
-      }
+      },
+      "surfaceOpacity": "Surface opacity",
+      "surfaceOpacityValue": "{value}%"
     },
     "sidebar": {
-      "tagline": "Your Reading Space",
       "dashboard": "Dashboard",
       "authors": "Authors",
       "series": "Series",
       "tools": "Tools",
       "libraries": "Libraries",
       "newLibrary": "New Library",
-      "libraryScanning": "{name} - Scanning {pct}%",
       "scanProgress": "{processed} / {total} books",
       "smartScopes": "Smart Scopes",
       "newSmartScope": "New Smart Scope",
@@ -4274,15 +4376,41 @@
       "collections": "Collections",
       "newCollection": "New Collection",
       "noCollections": "No collections yet",
-      "latest": "Latest {version}",
       "newReleaseNotes": "New release notes available",
       "support": "Support BookOrbit",
-      "supportShort": "Support",
       "supportAria": "Support BookOrbit on Ko-fi",
       "sectionHeader": {
         "add": "Add",
+        "showAll": "Show all",
+        "showCount": "Show {count}",
+        "rowsShown": "Rows shown",
+        "menuAria": "Section options for {section}",
         "reorder": "Reorder",
         "doneReordering": "Done reordering"
+      },
+      "noLibraries": "No libraries yet",
+      "clearFilter": "Clear filter",
+      "filterSummary": "{shown} of {total} shown",
+      "filterLibraries": "Filter libraries",
+      "filterLibrariesPlaceholder": "Filter libraries...",
+      "filterSmartScopes": "Filter smart scopes",
+      "filterSmartScopesPlaceholder": "Filter smart scopes...",
+      "filterCollections": "Filter collections",
+      "filterCollectionsPlaceholder": "Filter collections...",
+      "seeAllLibraries": "See all libraries ({count})",
+      "seeAllSmartScopes": "See all smart scopes ({count})",
+      "seeAllCollections": "See all collections ({count})",
+      "updateAvailable": "Update {version}",
+      "zones": {
+        "browse": "Browse"
+      },
+      "reorder": {
+        "gripAria": "Reorder {name}",
+        "lifted": "{name} lifted, position {position} of {total}. Use the arrow keys to move it.",
+        "moved": "{name}, position {position} of {total}",
+        "dropped": "{name} dropped at position {position} of {total}",
+        "cancelled": "Reorder cancelled. {name} returned to position {position} of {total}.",
+        "filteredHint": "Clear the filter to reorder"
       }
     },
     "selectionActionBar": {
@@ -4382,6 +4510,24 @@
         "typeAndEnter": "Type and press Enter to add",
         "pressEnter": "Press Enter to add"
       }
+    },
+    "entityIndex": {
+      "sortBy": "Sort by",
+      "sort": {
+        "custom": "Custom order",
+        "name": "Name",
+        "bookCount": "Book count"
+      },
+      "ascending": "Ascending",
+      "descending": "Descending",
+      "clearSearch": "Clear search",
+      "resultCount": "{shown} of {total}",
+      "noMatches": "No matches",
+      "noMatchesHint": "Try a different search term.",
+      "bookCount": "Books: {count}",
+      "librariesEmptyHint": "Create a library to start adding books.",
+      "smartScopesEmptyHint": "Smart scopes save a set of filters you use often.",
+      "collectionsEmptyHint": "Collections group books you pick by hand."
     }
   },
   "customIcons": {
@@ -4437,6 +4583,29 @@
       "tabs": {
         "widgets": "Widgets",
         "shelves": "Shelves"
+      },
+      "widgetNames": {
+        "readingStreak": "Reading Streak",
+        "currentlyReading": "Currently Reading",
+        "readingGoal": "Reading Goal",
+        "readingDna": "Reading DNA",
+        "monthlyChallenge": "Monthly Challenge",
+        "highlightOfTheDay": "Highlight of the Day",
+        "neglectedGems": "Neglected Gems",
+        "readingRhythm": "Reading Rhythm",
+        "diversityScore": "Diversity Score",
+        "libraryOverview": "Library Overview",
+        "yearProjection": "Year Projection",
+        "longWait": "The Long Wait"
+      },
+      "shelfNames": {
+        "recentlyAdded": "Recently Added",
+        "continueReading": "Continue Reading",
+        "continueListening": "Continue Listening",
+        "wantToRead": "Want to Read",
+        "upNextInSeries": "Up Next in Series",
+        "random": "Discover Something New",
+        "smartScope": "Smart Scope"
       },
       "reorderHintWidget": "Drag to reorder. Toggle to show or hide a widget.",
       "reorderHintShelf": "Drag to reorder. Toggle to show or hide a shelf.",
@@ -5052,6 +5221,11 @@
           "hint": "Writes metadata into the OPF file inside the EPUB archive.",
           "toggleAria": "Write EPUB metadata"
         },
+        "fb2": {
+          "title": "FictionBook (FB2)",
+          "hint": "Rewrites the description block inside FB2 files, leaving the book text untouched.",
+          "toggleAria": "Write FB2 metadata"
+        },
         "pdf": {
           "title": "PDF",
           "hint": "Embeds metadata into PDF Info dictionary and XMP stream.",
@@ -5061,6 +5235,11 @@
           "title": "Comic archives (CBX)",
           "hint": "Writes ComicInfo.xml into CBZ and CB7 archives.",
           "toggleAria": "Write comic archive metadata"
+        },
+        "kindle": {
+          "title": "Kindle (MOBI, AZW3)",
+          "hint": "Writes metadata into the EXTH header of MOBI, AZW3, and AZW files.",
+          "toggleAria": "Write Kindle metadata"
         },
         "audio": {
           "title": "Audio",
@@ -5500,7 +5679,61 @@
       "saveFailed": "Failed to save preferences",
       "savePreferenceFailed": "Failed to save preference",
       "whatsNewToggle": "Show \"What's New\" after updates",
-      "whatsNewToggleHint": "A popup highlighting new features after the app updates. The archive stays available either way."
+      "whatsNewToggleHint": "A popup highlighting new features after the app updates. The archive stays available either way.",
+      "groups": {
+        "library": "Library",
+        "files": "Files",
+        "integrations": "Integrations",
+        "personal": "Personal",
+        "app": "App updates"
+      },
+      "enabledCount": "{enabled} of {total} enabled",
+      "categories": {
+        "scanning": {
+          "label": "Library scanning",
+          "description": "When a library scan finishes, fails, or finds missing books."
+        },
+        "metadata": {
+          "label": "Metadata fetching",
+          "description": "When metadata lookups for your books complete or fail."
+        },
+        "authorEnrichment": {
+          "label": "Author enrichment",
+          "description": "When author biographies and photos finish being fetched."
+        },
+        "fileWriteBack": {
+          "label": "File write-back",
+          "description": "When edited metadata is written back into book files on disk."
+        },
+        "fileRename": {
+          "label": "File rename",
+          "description": "When a single book file is renamed to match your naming pattern."
+        },
+        "bulkRename": {
+          "label": "Bulk rename",
+          "description": "When a bulk rename across many books completes or fails."
+        },
+        "migration": {
+          "label": "Data migration",
+          "description": "When an import from another library tool completes or fails."
+        },
+        "bookDock": {
+          "label": "Book Dock",
+          "description": "When files dropped into the dock are ready to review or finalized."
+        },
+        "koboSync": {
+          "label": "Kobo sync",
+          "description": "When a Kobo device finishes syncing with your library."
+        },
+        "email": {
+          "label": "Email delivery",
+          "description": "When sending a book to an email address succeeds or fails."
+        },
+        "achievements": {
+          "label": "Achievements",
+          "description": "When you unlock a new reading achievement."
+        }
+      }
     }
   },
   "reader": {
@@ -5746,7 +5979,7 @@
       "sleep": "Sleep",
       "chapterAbbrev": "Ch.",
       "sleepTimer": "Sleep timer",
-      "minutes": "{count} minutes",
+      "minutes": "{count, plural, one {# minute} other {# minutes}}",
       "endOfChapter": "End of chapter",
       "noChaptersAvailable": "No chapters available",
       "extend15": "+ 15 minutes",
@@ -6150,7 +6383,10 @@
       "similarityHelp": "Only for Similar title and author matches. At least one author and the book type must also match. Lower finds more possible duplicates; higher requires closer titles. Identical files, ISBN, and exact metadata are checked separately.",
       "runScan": "Run scan",
       "rescan": "Rescan",
-      "status": { "queued": "Scan queued", "running": "Scanning books" },
+      "status": {
+        "queued": "Scan queued",
+        "running": "Scanning books"
+      },
       "groupsFound": "{count, plural, =0 {No duplicate groups} one {One duplicate group} other {# duplicate groups}}",
       "filter": "Match type",
       "allReasons": "All match types",
@@ -6194,7 +6430,10 @@
         "title": "Find duplicate books",
         "description": "Choose a library scope and similarity level, then run a scan. No books are changed until you explicitly confirm a deletion."
       },
-      "empty": { "title": "No duplicate groups found", "description": "No books matched the current scope, similarity level, and match filter." },
+      "empty": {
+        "title": "No duplicate groups found",
+        "description": "No books matched the current scope, similarity level, and match filter."
+      },
       "deleteDialog": {
         "title": "Permanently delete duplicate books?",
         "description": "{count, plural, =0 {This will permanently delete # selected book and its files.} one {This will permanently delete # selected book and its files.} other {This will permanently delete # selected books and their files.}}",
@@ -6209,7 +6448,10 @@
         "results": "Could not load duplicate groups.",
         "delete": "Could not delete the selected duplicate books."
       },
-      "pagination": { "label": "Duplicate groups pages", "page": "Page {page} of {total}" }
+      "pagination": {
+        "label": "Duplicate groups pages",
+        "page": "Page {page} of {total}"
+      }
     },
     "entityManager": {
       "unknown": "Unknown",
@@ -6438,6 +6680,11 @@
       "defaultName": "Smart scope",
       "filter": "Filter",
       "edit": "Edit Smart Scope",
+      "koboSync": {
+        "label": "Sync to my Kobo",
+        "enabledHint": "Books in this shared Smart Scope sync to your Kobo device. Turn off to stop syncing them.",
+        "disabledHint": "Turn on to sync books in this shared Smart Scope to your Kobo device."
+      },
       "showControlsAria": "Show Smart Scope controls",
       "hideFilter": "Hide filter",
       "showFilter": "Show filter",
@@ -6445,7 +6692,10 @@
       "loadError": "Could not load this SmartScope",
       "toast": {
         "deleted": "\"{name}\" deleted",
-        "deleteFailed": "Failed to delete \"{name}\""
+        "deleteFailed": "Failed to delete \"{name}\"",
+        "koboSyncEnabled": "\"{name}\" now syncs to your Kobo",
+        "koboSyncDisabled": "\"{name}\" no longer syncs to your Kobo",
+        "koboSyncFailed": "Failed to update Kobo sync for \"{name}\""
       },
       "empty": {
         "noRules": "No rules configured",
@@ -6567,6 +6817,8 @@
       "privacy": "Privacy & Sharing",
       "notifications": "Notifications",
       "restrictions": "Content Restrictions"
-    }
+    },
+    "smartScopes": "Smart Scopes",
+    "collections": "Collections"
   }
 }

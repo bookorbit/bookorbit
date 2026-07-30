@@ -27,6 +27,6 @@ import { AnnotationSyncService } from './annotation-sync.service';
     AnnotationExportService,
     AnnotationHubService,
   ],
-  exports: [AnnotationSyncService],
+  exports: [AnnotationSyncService, AnnotationHubService],
 })
 export class AnnotationModule {}

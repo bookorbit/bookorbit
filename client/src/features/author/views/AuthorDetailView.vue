@@ -605,7 +605,7 @@ defineOptions({ name: 'AuthorDetailView' })
                       {{ opt.label }}
                     </option>
                   </select>
-                  <ArrowUpDown :size="13" class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/85" />
+                  <ArrowUpDown :size="13" class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 </div>
 
                 <button
@@ -648,7 +648,7 @@ defineOptions({ name: 'AuthorDetailView' })
                     {{ library.name }}
                   </option>
                 </select>
-                <ChevronDown :size="14" class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/85" />
+                <ChevronDown :size="14" class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
               </div>
             </div>
 

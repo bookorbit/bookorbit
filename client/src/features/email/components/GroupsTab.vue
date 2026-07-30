@@ -250,7 +250,7 @@ function availableRecipients(group: EmailGroup) {
               <UserPlus :size="12" />
               {{ t('email.groups.addMember') }}
             </button>
-            <p v-else class="text-xs text-muted-foreground/80">{{ t('email.groups.allRecipientsInGroup') }}</p>
+            <p v-else class="text-xs text-muted-foreground">{{ t('email.groups.allRecipientsInGroup') }}</p>
           </div>
         </div>
       </div>
