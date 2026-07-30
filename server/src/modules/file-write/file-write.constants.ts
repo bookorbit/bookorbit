@@ -31,6 +31,7 @@ export const COMIC_INFO_PROVIDER_ID_KEYS = [
   'googleBooksId',
   'openLibraryId',
   'koboId',
+  'comicvineId',
 ] as const satisfies readonly BookWritePayloadKey[];
 
 export const COMIC_INFO_MANAGED_NOTES_KEYS = [
@@ -57,6 +58,7 @@ export const COMIC_INFO_PROVIDER_WEB_URL_BUILDERS: Record<ComicInfoProviderKey, 
   googleBooksId: (id: string) => `https://books.google.com/books?id=${id}`,
   openLibraryId: (id: string) => `https://openlibrary.org/works/${id}`,
   koboId: (id: string) => `https://www.kobo.com/us/en/ebook/${id}`,
+  comicvineId: (id: string) => `https://comicvine.gamespot.com/-/4000-${id}/`,
 };
 
 export const EPUB_PROVIDER_IDENTIFIER_SCHEMES = {

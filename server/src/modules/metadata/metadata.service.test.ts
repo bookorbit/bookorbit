@@ -86,7 +86,9 @@ import { mkdir, readFile, readdir, rm, writeFile } from 'fs/promises';
 import { Logger } from '@nestjs/common';
 
 import { authors, bookAuthors, bookGenres, bookMetadata, books, bookTags, genres, tags } from '../../db/schema';
+import { extractCbzMetadata } from './lib/cbz-metadata';
 import { generateThumbnail, imageExt } from './lib/cover';
+import { extractCbzCover } from './lib/cover-cbz';
 import { extractEpubCover } from './lib/cover-epub';
 import { extractEpubMetadata } from './lib/epub';
 import { parseBookFilename } from './lib/filename-parser';
@@ -109,6 +111,8 @@ const mockParseMobiFile = parseMobiFile as MockedFunction<typeof parseMobiFile>;
 const mockParsePdfFile = parsePdfFile as MockedFunction<typeof parsePdfFile>;
 const mockExtractEpubCover = extractEpubCover as MockedFunction<typeof extractEpubCover>;
 const mockExtractEpubMetadata = extractEpubMetadata as MockedFunction<typeof extractEpubMetadata>;
+const mockExtractCbzMetadata = extractCbzMetadata as MockedFunction<typeof extractCbzMetadata>;
+const mockExtractCbzCover = extractCbzCover as MockedFunction<typeof extractCbzCover>;
 const mockExtractAudioMetadata = extractAudioMetadata as MockedFunction<typeof extractAudioMetadata>;
 const mockParseAudioDuration = parseAudioDuration as MockedFunction<typeof parseAudioDuration>;
 
@@ -176,6 +180,8 @@ describe('MetadataService', () => {
     mockParseBookFilename.mockReturnValue({ title: 'Fallback Title', publishedYear: 2001 });
     mockParseMobiFile.mockResolvedValue(null);
     mockParsePdfFile.mockResolvedValue(null);
+    mockExtractCbzMetadata.mockResolvedValue(null);
+    mockExtractCbzCover.mockResolvedValue(null);
     mockExtractEpubMetadata.mockResolvedValue(null);
     mockExtractEpubCover.mockResolvedValue(null);
     mockExtractAudioMetadata.mockResolvedValue({
@@ -618,6 +624,53 @@ describe('MetadataService', () => {
     expect(replaceGenresSpy).toHaveBeenCalledWith(22, ['Fantasy']);
     expect(replaceTagsSpy).toHaveBeenCalledWith(22, ['Shelf']);
     expect(embedder.embedBook).toHaveBeenCalledWith(22);
+  });
+
+  it('extractAndSave(cbz) persists comicvineId parsed from the embedded ComicInfo.xml', async () => {
+    const { db, updateSet } = makeDb();
+    const service = makeService(db);
+    vi.spyOn(service, 'replaceAuthors').mockResolvedValue(undefined);
+    vi.spyOn(service, 'replaceGenres').mockResolvedValue(undefined);
+
+    mockExtractCbzMetadata.mockResolvedValue({
+      title: 'Amazing Series',
+      subtitle: null,
+      seriesName: 'Amazing Series',
+      seriesIndex: 1,
+      description: null,
+      publisher: null,
+      publishedDate: null,
+      publishedYear: null,
+      language: null,
+      pageCount: null,
+      rating: null,
+      isbn10: null,
+      isbn13: null,
+      authors: [],
+      genres: [],
+      tags: [],
+      googleBooksId: null,
+      goodreadsId: null,
+      amazonId: null,
+      hardcoverId: null,
+      hardcoverEditionId: null,
+      openLibraryId: null,
+      ranobedbId: null,
+      koboId: null,
+      comicvineId: '140529',
+      lubimyczytacId: null,
+      aladinId: null,
+      itunesId: null,
+      comicMetadata: null,
+    });
+
+    await service.extractAndSave(23, '/tmp/book.cbz', 'cbz');
+
+    expect(updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        comicvineId: '140529',
+      }),
+    );
   });
 
   it('extractAndSave(mobi) ignores malformed publishedDate values from providers', async () => {

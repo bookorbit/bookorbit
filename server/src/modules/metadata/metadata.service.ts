@@ -651,6 +651,7 @@ export class MetadataService {
       openLibraryId: data.openLibraryId,
       ranobedbId: data.ranobedbId,
       koboId: data.koboId,
+      comicvineId: data.comicvineId,
       lubimyczytacId: data.lubimyczytacId,
       aladinId: data.aladinId,
       itunesId: data.itunesId,
@@ -688,6 +689,7 @@ export class MetadataService {
     if (filtered.openLibraryId !== undefined) scalarFields.openLibraryId = filtered.openLibraryId;
     if (filtered.ranobedbId !== undefined) scalarFields.ranobedbId = filtered.ranobedbId;
     if (filtered.koboId !== undefined) scalarFields.koboId = filtered.koboId;
+    if (filtered.comicvineId !== undefined) scalarFields.comicvineId = filtered.comicvineId;
     if (filtered.lubimyczytacId !== undefined) scalarFields.lubimyczytacId = filtered.lubimyczytacId;
     if (filtered.aladinId !== undefined) scalarFields.aladinId = filtered.aladinId;
     if (filtered.itunesId !== undefined) scalarFields.itunesId = filtered.itunesId;

@@ -379,6 +379,7 @@ describe('metadata format extractors', () => {
         publishedYear: 2014,
         authors: [],
         genres: [],
+        comicvineId: null,
       }),
     );
   });
@@ -396,6 +397,7 @@ describe('metadata format extractors', () => {
       genres: ['Comics'],
       tags: ['Superhero'],
       ranobedbId: 'comic-ranobe',
+      comicvineId: '140529',
       comicMetadata: { issueNumber: '55', volumeName: 'Batman' },
     });
     mockExtractCbrCover.mockResolvedValue(null);
@@ -405,6 +407,7 @@ describe('metadata format extractors', () => {
         title: 'Batman',
         genres: ['Comics'],
         ranobedbId: 'comic-ranobe',
+        comicvineId: '140529',
         comicMetadata: { issueNumber: '55', volumeName: 'Batman' },
       }),
     );
