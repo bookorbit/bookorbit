@@ -304,13 +304,27 @@ function MainMenu:applyDashboardSection(index, config, catalog, touchmenu_instan
     if touchmenu_instance then touchmenu_instance:updateItems() end
 end
 
+-- Restores the four default slots in one write, so the dashboard refreshes once
+-- rather than once per slot. The catalog owns the write while it is open, which
+-- keeps the slots and the cache signature in step.
+function MainMenu:resetDashboardSections(catalog, touchmenu_instance)
+    local defaults = DashboardSections.normalize(nil)
+    if catalog and catalog.setDashboardSections then
+        catalog:setDashboardSections(defaults)
+    else
+        self.settings[DashboardSections.SETTING_KEY] = defaults
+        G_reader_settings:flush()
+    end
+    if touchmenu_instance then touchmenu_instance:updateItems() end
+end
+
 function MainMenu:chooseDashboardCatalogSource(index, section, catalog, touchmenu_instance)
     if self.dashboard_menu_container then
         local menu_container = self.dashboard_menu_container
         self.dashboard_menu_container = nil
         UIManager:close(menu_container)
     elseif touchmenu_instance then
-        UIManager:close(touchmenu_instance)
+        touchmenu_instance:closeMenu()
     end
 
     local function openSelector(target)
@@ -377,14 +391,7 @@ function MainMenu:dashboardSettingsMenu(catalog)
         text = _("Reset to Default"),
         separator = true,
         callback = function(touchmenu_instance)
-            local defaults = DashboardSections.normalize(nil)
-            self.settings[DashboardSections.SETTING_KEY] = defaults
-            G_reader_settings:flush()
-            if catalog and catalog.dashboardMode and catalog:dashboardMode() then
-                catalog.current_context.section_stale = true
-                catalog:refreshCurrent()
-            end
-            if touchmenu_instance then touchmenu_instance:updateItems() end
+            self:resetDashboardSections(catalog, touchmenu_instance)
         end,
     })
     return items

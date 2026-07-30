@@ -1,6 +1,6 @@
--- Proves the configurable dashboard row: how a stored choice degrades, when the
--- section parameter is put on the wire, and how a cached body fetched for a
--- different choice is treated.
+-- Proves the configurable dashboard slots: what each shelf costs in requests,
+-- how a failing or repeated source is handled, how shelves are measured, and
+-- how a cached body fetched for a different configuration is treated.
 
 local connected = true
 
@@ -89,7 +89,6 @@ package.loaded["bookorbit_catalog_widgets"] = {
 
 package.path = "koreader-plugin/bookorbit.koplugin/?.lua;" .. package.path
 
-local Capabilities = require("bookorbit_capabilities")
 local CatalogDashboard = require("bookorbit_catalog_dashboard")
 local DashboardSections = require("bookorbit_dashboard_sections")
 
@@ -102,13 +101,12 @@ end
 local author_source = { type = "authors", sourceName = "Ursula K. Le Guin", params = { author = "Ursula K. Le Guin", sort = "title" } }
 
 local requests
-local last_section
+local last_books_params
 
 local function newCatalog(opts)
     opts = opts or {}
-    Capabilities.reset()
     requests = {}
-    last_section = nil
+    last_books_params = nil
     local stored_sections = opts.sections
     if opts.section then
         stored_sections = { opts.section, schemaVersion = DashboardSections.LEGACY_SCHEMA_VERSION }
@@ -123,25 +121,16 @@ local function newCatalog(opts)
         client = {
             server_url = opts.server_url or "https://example.test",
             username = "reader",
-            getPluginVersion = function()
-                table.insert(requests, "version")
-                if opts.capability_error then return nil, opts.capability_error end
-                return { capabilities = opts.capabilities or {} }
-            end,
             catalogDashboard = function(_, section)
                 table.insert(requests, "dashboard")
-                last_section = section
-                if section and opts.reject_section then return nil, opts.reject_section end
+                assertEqual(section, nil, "the dashboard body is requested without a section parameter")
                 local body = { continueReading = {} }
                 if not opts.omit_discover then body.discover = {} end
-                if section then
-                    body.section = { type = section.type, smartScopeId = section.smartScopeId, books = { { id = 9 } } }
-                    body.discover = {}
-                end
                 return body
             end,
             catalogBooks = function(_, params)
                 table.insert(requests, "books:" .. tostring(params.sort))
+                last_books_params = params
                 if opts.catalog_books_error and opts.catalog_books_error[params.sort] then
                     return nil, opts.catalog_books_error[params.sort]
                 end
@@ -167,16 +156,12 @@ local function newCatalog(opts)
     return catalog
 end
 
--- Dashboard shelves no longer use the old pseudo-section endpoint.
+-- The default dashboard is one request: Discover is served from the body that
+-- was already fetched, and no capability is probed.
 local catalog = newCatalog{}
-assertEqual(catalog:dashboardSectionRequest(), nil, "the default dashboard sends no pseudo-section parameter")
-assertEqual(#requests, 0, "the default dashboard does not probe capabilities")
-
-catalog = newCatalog{ section = { type = "recently-added" } }
-assertEqual(catalog:dashboardSectionRequest().type, "recently-added", "the compatibility helper returns a real book source")
-
-catalog = newCatalog{ section = { type = "authors" } }
-assertEqual(catalog:dashboardSectionRequest(), nil, "catalog destinations do not masquerade as book feeds")
+catalog:dashboardRoot()
+assertEqual(#requests, 1, "the default dashboard costs a single request")
+assertEqual(requests[1], "dashboard", "the default dashboard only fetches the dashboard body")
 
 -- Grid books are stored by slot.
 assertEqual(CatalogDashboard.dashboardSlotBooks({ dashboardSlots = { [3] = { books = { { id = 2 } } } } }, 3)[1].id, 2,
@@ -198,6 +183,22 @@ slots, card_w, grid_h = catalog:sectionRowMetrics(12, 6)
 assertEqual(slots, 4, "slot count shrinks until the minimum cover width fits")
 assertEqual(card_w, 75, "the narrower grid recomputes its card width")
 assertEqual(grid_h, 95, "the narrower grid recomputes its card height")
+
+-- A shelf under a height budget gets more, narrower cards. The row height is
+-- always the height those cards need, so covers are never drawn out of aspect.
+catalog.content_w = 500
+slots, card_w, grid_h = catalog:shelfRowMetrics(12, 6, 999)
+assertEqual(slots, 5, "a shelf with room to spare keeps its natural row")
+assertEqual(grid_h, 115, "an unconstrained shelf keeps its natural height")
+
+slots, card_w, grid_h = catalog:shelfRowMetrics(12, 6, 100)
+assertEqual(slots, 6, "a tight shelf fits more cards per row")
+assertEqual(card_w, 78, "the extra card makes every card narrower")
+assertEqual(grid_h, card_w + 20, "the row height is the height the narrower card needs")
+
+slots, card_w, grid_h = catalog:shelfRowMetrics(12, 6, 1)
+assertEqual(card_w, 78, "cards never shrink past their minimum width")
+assertEqual(grid_h, card_w + 20, "an impossible budget still yields an in-aspect row")
 
 -- Thumbnail prefetching sees every configured grid slot, including all twelve
 -- prefetched items per shelf.
@@ -231,6 +232,26 @@ assertEqual(catalog.settings.catalog_dashboard_cache_section,
     "stats|continue-reading|recently-added|authors:author=Ursula K. Le Guin:sort=title",
     "the cache records the selected catalog filter")
 assertEqual(catalog:dashboardCacheMatchesSection(), true, "the cache matches the full four-slot configuration")
+assertEqual(last_books_params.size, 12, "a shelf requests a full page of books")
+assertEqual(last_books_params.page, 1, "a shelf always requests its first page")
+
+-- Slots pointing at the same source share one request rather than fetching the
+-- same books twice.
+catalog = newCatalog{
+    sections = {
+        { type = "random" },
+        { type = "recently-added" },
+        { type = "recently-added" },
+        { type = "random" },
+        schemaVersion = DashboardSections.SCHEMA_VERSION,
+    },
+}
+local _, deduped = catalog:dashboardRoot()
+assertEqual(#requests, 2, "four shelves over two sources cost two requests")
+assertEqual(requests[2], "books:recently_added", "the repeated source is fetched once")
+assertEqual(deduped.dashboard.dashboardSlots[3].books[1].id, 11, "the repeated shelf still gets its books")
+assertEqual(deduped.dashboard.dashboardSlots[1].books, deduped.dashboard.dashboardSlots[4].books,
+    "two Discover slots render the same fetched list")
 
 -- Discover falls back to the dedicated endpoint when the dashboard payload does
 -- not include a preloaded discover list.
@@ -298,5 +319,17 @@ assertEqual(refreshes, 1, "choosing a slot source refreshes the dashboard")
 -- Re-picking the current slot source is a no-op rather than a needless refresh.
 catalog:setDashboardSection(author_source, 3)
 assertEqual(refreshes, 1, "re-picking the same slot source does not refresh")
+
+-- Restoring the defaults rewrites every slot but still refreshes once, and
+-- marks the pending slots as the renderer expects to read them.
+catalog:setDashboardSections(DashboardSections.normalize(nil))
+assertEqual(catalog.settings[DashboardSections.SETTING_KEY][3].type, "random", "the reset restores the default slot sources")
+assertEqual(refreshes, 2, "a reset refreshes the dashboard once, not once per slot")
+for index = 1, DashboardSections.SLOT_COUNT do
+    assertEqual(catalog.current_context.section_stale[index], true, "a reset marks every slot pending")
+end
+
+catalog:setDashboardSections(DashboardSections.normalize(nil))
+assertEqual(refreshes, 2, "resetting an already-default dashboard does not refresh")
 
 print("bookorbit_catalog_dashboard_section_test.lua: ok")

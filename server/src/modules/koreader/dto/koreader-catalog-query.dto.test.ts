@@ -1,16 +1,14 @@
 import 'reflect-metadata';
 
-import { Test } from '@nestjs/testing';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
 import { KoreaderCatalogDashboardQueryDto } from './koreader-catalog-query.dto';
 
+// The current plugin builds its dashboard shelves from the ordinary catalog
+// endpoints and no longer sends this parameter, but devices still on 1.4.x do,
+// so the contract has to keep holding.
 describe('KoreaderCatalogDashboardQueryDto', () => {
-  beforeAll(async () => {
-    await Test.createTestingModule({}).compile();
-  });
-
   it('accepts and transforms a smart-scope dashboard request', async () => {
     const dto = plainToInstance(KoreaderCatalogDashboardQueryDto, {
       section: 'smart-scope',

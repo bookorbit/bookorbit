@@ -44,7 +44,15 @@ package.loaded["bookorbit_sweep"] = {
 
 package.path = "koreader-plugin/bookorbit.koplugin/?.lua;" .. package.path
 
+local flushes = 0
+G_reader_settings = {
+    flush = function()
+        flushes = flushes + 1
+    end,
+}
+
 local MainMenu = require("bookorbit_main_menu")
+local DashboardSections = require("bookorbit_dashboard_sections")
 
 local function assertEqual(actual, expected, label)
     if actual ~= expected then
@@ -55,6 +63,7 @@ end
 local function resetEvents()
     closed = {}
     next_ticks = {}
+    flushes = 0
 end
 
 local function newPlugin()
@@ -68,9 +77,14 @@ end
 
 local plugin = newPlugin()
 local menu_container = { id = "dashboard-menu-container" }
-local touchmenu = { id = "inner-touch-menu", updates = 0 }
+local touchmenu = { id = "inner-touch-menu", updates = 0, menu_closes = 0 }
 function touchmenu:updateItems()
     self.updates = self.updates + 1
+end
+-- A TouchMenu closes itself through closeMenu(), which runs the close_callback
+-- that owns its container. Closing the widget directly would leave that behind.
+function touchmenu:closeMenu()
+    self.menu_closes = self.menu_closes + 1
 end
 
 local loaded
@@ -84,6 +98,7 @@ plugin.dashboard_menu_container = menu_container
 plugin:chooseDashboardCatalogSource(3, "authors", catalog, touchmenu)
 assertEqual(#closed, 1, "catalog selection closes one menu container")
 assertEqual(closed[1], menu_container, "catalog selection closes the outer dashboard menu container")
+assertEqual(touchmenu.menu_closes, 0, "the outer container's close covers the menu inside it")
 assertEqual(plugin.dashboard_menu_container, nil, "the closed dashboard menu container is cleared")
 assertEqual(#next_ticks, 1, "catalog selection is deferred until the menu closes")
 assertEqual(loaded, nil, "the catalog is not opened before the deferred callback")
@@ -95,8 +110,8 @@ resetEvents()
 loaded = nil
 plugin.dashboard_menu_container = nil
 plugin:chooseDashboardCatalogSource(4, "series", catalog, touchmenu)
-assertEqual(#closed, 1, "without an outer container the invoking touch menu is closed")
-assertEqual(closed[1], touchmenu, "the invoking touch menu is the fallback close target")
+assertEqual(#closed, 0, "the invoking touch menu is not closed as a bare widget")
+assertEqual(touchmenu.menu_closes, 1, "without an outer container the invoking touch menu closes itself")
 next_ticks[1]()
 assertEqual(loaded.section, "series", "fallback selection opens the requested section")
 assertEqual(loaded.index, 4, "fallback selection preserves the target slot")
@@ -124,6 +139,26 @@ plugin:applyDashboardSection(1, { type = "stats" }, catalog, touchmenu)
 assertEqual(selected.config.type, "stats", "direct choices are applied through the active catalog")
 assertEqual(selected.index, 1, "direct choices preserve the target slot")
 assertEqual(touchmenu.updates, 1, "the invoking menu refreshes after a direct choice")
+
+-- Restoring the defaults goes through the catalog in one write, so the slots
+-- and the dashboard's cache signature stay in step.
+resetEvents()
+local reset_to
+catalog.setDashboardSections = function(_, sections)
+    reset_to = sections
+end
+plugin:resetDashboardSections(catalog, touchmenu)
+assertEqual(reset_to[1].type, "stats", "the reset restores the default slot 1")
+assertEqual(reset_to[3].type, "random", "the reset restores the default slot 3")
+assertEqual(reset_to.schemaVersion, DashboardSections.SCHEMA_VERSION, "the reset writes the current schema marker")
+assertEqual(touchmenu.updates, 2, "the invoking menu refreshes after a reset")
+
+-- Without an open catalog the reset writes the setting itself.
+resetEvents()
+plugin.settings[DashboardSections.SETTING_KEY] = { { type = "recently-added" } }
+plugin:resetDashboardSections(nil, nil)
+assertEqual(plugin.settings[DashboardSections.SETTING_KEY][3].type, "random", "a reset without a catalog still restores the defaults")
+assertEqual(flushes, 1, "a reset without a catalog persists the settings")
 
 local items = plugin:dashboardSectionItems(4, catalog)
 local function findItem(text)
