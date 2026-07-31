@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createI18n } from 'vue-i18n'
+import type { Locale } from '@bookorbit/types'
 import cs from '@/locales/cs.json'
 import da from '@/locales/da.json'
 import de from '@/locales/de.json'
@@ -7,9 +8,7 @@ import en from '@/locales/en.json'
 import fi from '@/locales/fi.json'
 import spanish from '@/locales/es.json'
 import french from '@/locales/fr.json'
-import hu from '@/locales/hu.json'
 import italian from '@/locales/it.json'
-import ko from '@/locales/ko.json'
 import nl from '@/locales/nl.json'
 import polish from '@/locales/pl.json'
 import pt from '@/locales/pt.json'
@@ -33,6 +32,19 @@ function flattenMessages(value: unknown, prefix = '', output = new Map<string, s
 function messageValues(message: string, count: number): Record<string, string | number> {
   const argumentNames = [...message.matchAll(/\{\s*([\w.-]+)(?:\s*[,}])/g)].map((match) => match[1])
   return Object.fromEntries(argumentNames.map((name) => [name, name === 'count' ? count : 2]))
+}
+
+// Mirrors the production setup in `@/i18n`, where the English catalog is always
+// loaded and `fallbackLocale` points at it. Without that, a key absent from a
+// target catalog resolves to the key name rather than English, so a catalog
+// carrying only translated keys would fail these tests instead of falling back
+// the way the running application does.
+function createCatalogI18n(locale: Locale, catalog: typeof en) {
+  const messages: Record<string, typeof en> = {
+    en: compileIcuCatalog(en, 'en'),
+    [locale]: compileIcuCatalog(catalog, locale),
+  }
+  return createI18n({ legacy: false, locale, fallbackLocale: 'en', messages })
 }
 
 describe('ICU message compilation', () => {
@@ -92,12 +104,7 @@ describe('ICU message compilation', () => {
     ['pt', pt, [0, 1, 2, 1_234]],
     ['sl', sl, [0, 1, 2, 3, 5, 1_234]],
   ] as const)('isolates the styled count in both dialogs for %s', (locale, catalog, counts) => {
-    const messages = compileIcuCatalog(catalog, locale)
-    const testI18n = createI18n({
-      legacy: false,
-      locale,
-      messages: { [locale]: messages },
-    })
+    const testI18n = createCatalogI18n(locale, catalog)
 
     for (const key of ['tools.bulkRename.confirmDialog.body', 'tools.entityManager.bulkDeleteModal.confirm']) {
       for (const count of counts) {
@@ -141,16 +148,8 @@ describe('ICU message compilation', () => {
   })
 
   it('renders reviewed Italian and Polish count messages with the correct grammar', () => {
-    const italianI18n = createI18n({
-      legacy: false,
-      locale: 'it',
-      messages: { it: compileIcuCatalog(italian, 'it') },
-    })
-    const polishI18n = createI18n({
-      legacy: false,
-      locale: 'pl',
-      messages: { pl: compileIcuCatalog(polish, 'pl') },
-    })
+    const italianI18n = createCatalogI18n('it', italian)
+    const polishI18n = createCatalogI18n('pl', polish)
 
     expect(italianI18n.global.t('settings.appearance.icons.selectedCount', { count: 1 })).toBe('1 icona selezionata')
     expect(italianI18n.global.t('settings.appearance.icons.selectedCount', { count: 2 })).toBe('2 icone selezionate')
@@ -186,11 +185,7 @@ describe('ICU message compilation', () => {
   })
 
   it('preserves spacing around collection names in reviewed Italian messages', () => {
-    const testI18n = createI18n({
-      legacy: false,
-      locale: 'it',
-      messages: { it: compileIcuCatalog(italian, 'it') },
-    })
+    const testI18n = createCatalogI18n('it', italian)
 
     expect(testI18n.global.t('collection.addToSheet.createdAndAdded', { count: 2, name: 'Preferiti' })).toBe('Creata "Preferiti" e aggiunti 2 libri')
     expect(testI18n.global.t('collection.addToSheet.addedToCollection', { count: 2, name: 'Preferiti' })).toBe('Aggiunti 2 libri a "Preferiti"')
@@ -212,12 +207,7 @@ describe('ICU message compilation', () => {
     ['pt', pt, [0, 1, 1_000_000], ['Sem grupos duplicados', 'Um grupo duplicado', '1.000.000 grupos duplicados']],
     ['sl', sl, [0, 1, 2, 3, 5], ['No duplicate groups', 'One duplicate group', '2 duplicate groups', '3 duplicate groups', '5 duplicate groups']],
   ] as const)('renders migrated Book Duplicates messages for %s', (locale, catalog, counts, expectedGroups) => {
-    const messages = compileIcuCatalog(catalog, locale)
-    const testI18n = createI18n({
-      legacy: false,
-      locale,
-      messages: { [locale]: messages },
-    })
+    const testI18n = createCatalogI18n(locale, catalog)
 
     expect(counts.map((count) => testI18n.global.t('tools.bookDuplicates.groupsFound', { count }))).toEqual(expectedGroups)
 
@@ -245,12 +235,7 @@ describe('ICU message compilation', () => {
     ['pt', pt, [1, 1_000_000], ['1 falha', '1.000.000 falhas']],
     ['sl', sl, [1, 2, 3, 5], ['1 napaka', '2 napaki', '3 napak', '5 napak']],
   ] as const)('renders migrated Kobo activity plurals for %s', (locale, catalog, counts, expected) => {
-    const messages = compileIcuCatalog(catalog, locale)
-    const testI18n = createI18n({
-      legacy: false,
-      locale,
-      messages: { [locale]: messages },
-    })
+    const testI18n = createCatalogI18n(locale, catalog)
 
     expect(counts.map((count) => testI18n.global.t('settings.reader.kobo.activity.failureCount', { count }))).toEqual(expected)
   })
@@ -276,23 +261,13 @@ describe('ICU message compilation', () => {
       ['0 datotek pripravljenih', '1 datoteka pripravljena', '2 datoteki pripravljeni', '3 datoteke pripravljene', '5 datotek pripravljenih'],
     ],
   ] as const)('renders migrated finalize-dialog counts for %s', (locale, catalog, counts, expected) => {
-    const messages = compileIcuCatalog(catalog, locale)
-    const testI18n = createI18n({
-      legacy: false,
-      locale,
-      messages: { [locale]: messages },
-    })
+    const testI18n = createCatalogI18n(locale, catalog)
 
     expect(counts.map((count) => testI18n.global.t('bookDock.finalizeDialog.readyCount', { count }))).toEqual(expected)
   })
 
   it('uses the reviewed Slovenian zero/one/other mappings in the finalize dialog', () => {
-    const messages = compileIcuCatalog(sl, 'sl')
-    const testI18n = createI18n({
-      legacy: false,
-      locale: 'sl',
-      messages: { sl: messages },
-    })
+    const testI18n = createCatalogI18n('sl', sl)
 
     expect(testI18n.global.t('bookDock.finalizeDialog.title', { count: 0 })).toBe('Zaključi brez datotek')
     expect(testI18n.global.t('bookDock.finalizeDialog.title', { count: 1 })).toBe('Zaključi 1 datoteko')
@@ -308,10 +283,8 @@ describe('ICU message compilation', () => {
     ['de', de, [0, 1, 2]],
     ['es', spanish, [0, 1, 2, 1_000_000]],
     ['fi', fi, [0, 1, 2]],
-    ['hu', hu, [0, 1, 2]],
     ['fr', french, [0, 1, 2, 1_000_000]],
     ['it', italian, [0, 1, 2, 1_000_000]],
-    ['ko', ko, [0, 1, 2]],
     ['nl', nl, [0, 1, 2]],
     // Polish reserves `other` for fractions, exactly as Czech does.
     ['pl', polish, [0, 1, 2, 5, 1.5, 1_000_000]],
@@ -323,12 +296,7 @@ describe('ICU message compilation', () => {
     ['uk', uk, [0, 1, 2, 5, 1.5]],
     ['zh', zh, [0, 1, 2]],
   ] as const)('formats every ICU message for all relevant plural categories in %s', (locale, catalog, counts) => {
-    const messages = compileIcuCatalog(catalog, locale)
-    const testI18n = createI18n({
-      legacy: false,
-      locale,
-      messages: { [locale]: messages },
-    })
+    const testI18n = createCatalogI18n(locale, catalog)
 
     for (const [key, message] of flattenMessages(catalog)) {
       if (!isIcuPluralMessage(message)) continue

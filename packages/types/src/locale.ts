@@ -1,23 +1,4 @@
-export const SUPPORTED_LOCALES = [
-  "en",
-  "cs",
-  "da",
-  "de",
-  "es",
-  "fi",
-  "fr",
-  "hu",
-  "it",
-  "ko",
-  "nl",
-  "pl",
-  "pt",
-  "ru",
-  "sl",
-  "sv",
-  "uk",
-  "zh",
-] as const;
+export const SUPPORTED_LOCALES = ["en", "cs", "da", "de", "es", "fi", "fr", "it", "nl", "pl", "pt", "ru", "sl", "sv", "uk", "zh"] as const;
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
 export const DEFAULT_LOCALE: Locale = "en";
@@ -31,9 +12,7 @@ export const LOCALE_LABELS: Record<Locale, string> = {
   es: "Español",
   fi: "Suomi",
   fr: "Français",
-  hu: "Magyar",
   it: "Italiano",
-  ko: "한국어",
   nl: "Nederlands",
   pl: "Polski",
   pt: "Português",
@@ -52,9 +31,7 @@ export const LOCALE_DIRECTIONS: Record<Locale, "ltr" | "rtl"> = {
   es: "ltr",
   fi: "ltr",
   fr: "ltr",
-  hu: "ltr",
   it: "ltr",
-  ko: "ltr",
   nl: "ltr",
   pl: "ltr",
   pt: "ltr",

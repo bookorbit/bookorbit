@@ -13,9 +13,7 @@ BookOrbit uses Vue I18n catalogs under `client/src/locales/`. English is the sou
 | Spanish              | `es-ES`             | `es.json` |
 | Finnish              | `fi`                | `fi.json` |
 | French               | `fr`                | `fr.json` |
-| Hungarian            | `hu`                | `hu.json` |
 | Italian              | `it`                | `it.json` |
-| Korean               | `ko`                | `ko.json` |
 | Dutch                | `nl`                | `nl.json` |
 | Polish               | `pl`                | `pl.json` |
 | Brazilian Portuguese | `pt-BR`             | `pt.json` |
@@ -89,7 +87,7 @@ After an English source change reaches `main`:
 2. Translators update target strings in Crowdin.
 3. Crowdin exports the target catalogs to `l10n_main`.
 4. Crowdin opens a pull request to `main`.
-5. CI verifies that the pull request changes only the seventeen target catalogs and runs the normal client checks.
+5. CI verifies that the pull request changes only the fifteen target catalogs and runs the normal client checks.
 6. A maintainer reviews and squash-merges the pull request.
 7. The `l10n_main` service branch is deleted. Crowdin recreates it for the next export.
 
