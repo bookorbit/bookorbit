@@ -272,7 +272,10 @@ async function parseEpub(epubPath: string): Promise<EpubBookInfo> {
           if (ol) toc = { label: 'Table of Contents', children: parseNavOl(ol, navDir) };
         }
       }
-    } catch {
+    } catch (error) {
+      // An oversized entry is a rejected file, not a recoverable parse failure, so it must
+      // not silently degrade to the NCX.
+      if (error instanceof UnprocessableEntityException) throw error;
       // fall through to NCX
     }
   }
@@ -289,7 +292,8 @@ async function parseEpub(epubPath: string): Promise<EpubBookInfo> {
           const navMap = ncx['navMap'] as Record<string, unknown> | undefined;
           if (navMap) toc = { label: 'Table of Contents', children: parseNcxNavPoints(navMap, ncxDir) };
         }
-      } catch {
+      } catch (error) {
+        if (error instanceof UnprocessableEntityException) throw error;
         // TOC unavailable
       }
     }

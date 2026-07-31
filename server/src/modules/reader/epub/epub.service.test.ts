@@ -153,18 +153,31 @@ const NAV_EDGE_XHTML = `
 </html>
 `;
 
-function makeEpubArchive(options?: { navBufferError?: boolean; omitChapterFile?: boolean; lowerCasePaths?: boolean }) {
+function oversizedEntry(path: string): ZipEntrySpec {
+  const content = Buffer.alloc(11 * 1024 * 1024, 0x20);
+  return { path, content, uncompressedSize: content.length };
+}
+
+function makeEpubArchive(options?: {
+  navBufferError?: boolean;
+  navOversized?: boolean;
+  ncxOversized?: boolean;
+  omitChapterFile?: boolean;
+  lowerCasePaths?: boolean;
+}) {
   const lower = options?.lowerCasePaths === true;
   const ops = lower ? 'ops' : 'OPS';
-  const navSpec: ZipEntrySpec = options?.navBufferError
-    ? { path: `${ops}/nav.xhtml`, content: NAV_XHTML, bufferError: new Error('bad nav') }
-    : { path: `${ops}/nav.xhtml`, content: NAV_XHTML };
+  let navSpec: ZipEntrySpec = { path: `${ops}/nav.xhtml`, content: NAV_XHTML };
+  if (options?.navOversized) navSpec = oversizedEntry(`${ops}/nav.xhtml`);
+  else if (options?.navBufferError) navSpec = { path: `${ops}/nav.xhtml`, content: NAV_XHTML, bufferError: new Error('bad nav') };
+
+  const ncxSpec: ZipEntrySpec = options?.ncxOversized ? oversizedEntry(`${ops}/toc.ncx`) : { path: `${ops}/toc.ncx`, content: NCX_XML };
 
   return makeArchive([
     { path: 'META-INF/container.xml', content: CONTAINER_XML },
     { path: `${ops}/content.opf`, content: OPF_XML },
     navSpec,
-    { path: `${ops}/toc.ncx`, content: NCX_XML },
+    ncxSpec,
     ...(options?.omitChapterFile
       ? []
       : [{ path: `${ops}/text/ch1.xhtml`, content: '<h1>ch1</h1>', streamContent: 'chapter-one', uncompressedSize: 11 }]),
@@ -259,6 +272,18 @@ describe('EpubService', () => {
     mockOpenFile.mockResolvedValueOnce(
       makeArchive([{ path: 'META-INF/container.xml', content: oversized, uncompressedSize: oversized.length }]) as any,
     );
+
+    await expect(service.getBookInfo(99, undefined, user)).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('rejects an oversized nav entry instead of silently falling back to the NCX', async () => {
+    mockOpenFile.mockResolvedValueOnce(makeEpubArchive({ navOversized: true }) as any);
+
+    await expect(service.getBookInfo(99, undefined, user)).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('rejects an oversized NCX entry instead of returning a book with no TOC', async () => {
+    mockOpenFile.mockResolvedValueOnce(makeEpubArchive({ navBufferError: true, ncxOversized: true }) as any);
 
     await expect(service.getBookInfo(99, undefined, user)).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
