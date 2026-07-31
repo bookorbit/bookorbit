@@ -84,7 +84,7 @@
     "iconv-lite": "^0.7.3",
     "jose": "^6.2.4",
     "ms": "^2.1.3",
-    "mysql2": "^3.23.1",
+    "mysql2": "^3.23.2",
     "nestjs-pino": "^4.6.1",
     "node-unrar-js": "^2.0.2",
     "nodemailer": "^9.0.3",
