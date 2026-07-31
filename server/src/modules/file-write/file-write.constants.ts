@@ -47,6 +47,7 @@ export const COMIC_INFO_MANAGED_NOTES_KEYS = [
   'koboId',
   'lubimyczytacId',
   'aladinId',
+  'comicvineId',
 ] as const satisfies readonly BookWritePayloadKey[];
 
 type ComicInfoProviderKey = (typeof COMIC_INFO_PROVIDER_ID_KEYS)[number];

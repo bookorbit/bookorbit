@@ -263,10 +263,20 @@ describe('extractCbzMetadata', () => {
         expect(r?.comicvineId).toBe('140529');
       });
 
+      it('ignores the Notes fallback when ComicTagger sourced the issue id from another provider', async () => {
+        const xml = `<ComicInfo>
+          <Notes>Tagged with ComicTagger 2.10.0 using info from Metron on 2024-01-02. [Issue ID 55123]</Notes>
+        </ComicInfo>`;
+        mockZipFile(buildZipWithComicInfo(xml));
+
+        const r = await extractCbzMetadata('/book.cbz');
+        expect(r?.comicvineId).toBeNull();
+      });
+
       it('prefers the Web field over the Notes fallback when both are present', async () => {
         const xml = `<ComicInfo>
           <Web>https://comicvine.gamespot.com/amazing-series-1/4000-1/</Web>
-          <Notes>Tagged with ComicTagger. [Issue ID 999999]</Notes>
+          <Notes>Tagged with ComicTagger 1.3.2a5 using info from Comic Vine on 2022-04-16. [Issue ID 999999]</Notes>
         </ComicInfo>`;
         mockZipFile(buildZipWithComicInfo(xml));
 
@@ -279,7 +289,7 @@ describe('extractCbzMetadata', () => {
           <Web>https://comicvine.gamespot.com/amazing-series-1/4000-1/</Web>
           <Notes>
             [bookorbit:comicvineId] 42
-            Tagged with ComicTagger. [Issue ID 999999]
+            Tagged with ComicTagger 1.3.2a5 using info from Comic Vine on 2022-04-16. [Issue ID 999999]
           </Notes>
         </ComicInfo>`;
         mockZipFile(buildZipWithComicInfo(xml));
@@ -298,6 +308,14 @@ describe('extractCbzMetadata', () => {
 
       it('does not confuse a ComicVine volume URL (4050-) with an issue URL (4000-)', async () => {
         const xml = `<ComicInfo><Web>https://comicvine.gamespot.com/amazing-series/4050-9999/</Web></ComicInfo>`;
+        mockZipFile(buildZipWithComicInfo(xml));
+
+        const r = await extractCbzMetadata('/book.cbz');
+        expect(r?.comicvineId).toBeNull();
+      });
+
+      it('only matches 4000- at the start of a path segment', async () => {
+        const xml = `<ComicInfo><Web>https://comicvine.gamespot.com/amazing-series/14000-777/</Web></ComicInfo>`;
         mockZipFile(buildZipWithComicInfo(xml));
 
         const r = await extractCbzMetadata('/book.cbz');

@@ -110,13 +110,15 @@ function parseProviderIdsFromWebUrl(
 function parseComicVineIdFromWebUrl(webUrl: string | null): string | null {
   if (!webUrl) return null;
   // Web may hold multiple space-separated URLs, so scan rather than match a fixed prefix.
-  return /comicvine\.gamespot\.com\/[^\s]*?4000-(\d+)/i.exec(webUrl)?.[1] ?? null;
+  // 4000- must start a path segment, otherwise a segment merely ending in it, such as "14000-777", matches too.
+  return /comicvine\.gamespot\.com\/(?:[^\s]*\/)?4000-(\d+)/i.exec(webUrl)?.[1] ?? null;
 }
 
 function parseComicVineIdFromNotes(notes: string | null): string | null {
   if (!notes) return null;
-  // ComicTagger's auto-tag notes end with "... [Issue ID 140529]"; used as a Web fallback only.
-  return /\[Issue ID (\d+)\]/i.exec(notes)?.[1] ?? null;
+  // ComicTagger writes "using info from <source> on <date>. [Issue ID 140529]" for every metadata
+  // source it supports, so the id only belongs to Comic Vine when that source names it.
+  return /using info from Comic\s*Vine\b[^[]*\[Issue ID (\d+)\]/i.exec(notes)?.[1] ?? null;
 }
 
 function parseCbxRating(value: string | null): number | null {
