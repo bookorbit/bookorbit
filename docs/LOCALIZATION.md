@@ -89,7 +89,9 @@ After an English source change reaches `main`:
 4. Crowdin opens a pull request to `main`.
 5. CI verifies that the pull request changes only the fifteen target catalogs and runs the normal client checks.
 6. A maintainer reviews and squash-merges the pull request.
-7. The `l10n_main` service branch is deleted. Crowdin recreates it for the next export.
+7. The `.github/workflows/crowdin-branch-cleanup.yml` workflow deletes the `l10n_main` service branch. Crowdin recreates it from the current `main` for the next export.
+
+Deleting that branch is required, not tidiness. Crowdin appends every export to the same service branch and never rebases it, so a branch that outlives its pull request keeps its original merge base. Each later export then diverges further from `main` and eventually conflicts on every catalog. The workflow runs when a pull request from `l10n_main` is closed as well as merged, because Crowdin reuses the branch either way.
 
 Crowdin pull requests must retain the configured `i18n(client)` title and commit format. The `i18n` commit type produces a patch release and an Internationalization release-note section. Crowdin's default `[ci skip]` commit suffix is disabled so pull-request validation runs before merge.
 
