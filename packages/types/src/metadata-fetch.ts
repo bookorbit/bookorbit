@@ -63,6 +63,7 @@ export interface MetadataCandidate {
   providerId: string;
   hardcoverEditionId?: string;
   title: string;
+  displayTitle?: string;
   subtitle?: string;
   authors?: string[];
   description?: string;

@@ -41,8 +41,9 @@ function scoreCandidate(candidate: MetadataCandidate, params: MetadataSearchPara
 
   let score = 0;
 
-  if (params.title && candidate.title) {
-    score += scoreTitle(normalize(params.title), normalize(candidate.title));
+  if (params.title) {
+    const matchable = candidate.displayTitle ?? candidate.title;
+    if (matchable) score = scoreTitle(normalize(params.title), normalize(matchable));
   }
 
   // Author only boosts when there is already a positive title signal.

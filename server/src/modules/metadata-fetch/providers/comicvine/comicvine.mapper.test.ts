@@ -51,8 +51,8 @@ describe('mapIssueToCandidate', () => {
       expect.objectContaining({
         provider: MetadataProviderKey.COMICVINE,
         providerId: '777',
-        title: 'Series Name #12.5 - The Origin',
-        subtitle: 'The Origin',
+        title: 'The Origin',
+        displayTitle: 'Series Name #12.5 - The Origin',
         authors: ['Writer A'],
         description: 'Fallback synopsis',
         publishedYear: 2024,
@@ -77,6 +77,48 @@ describe('mapIssueToCandidate', () => {
         storyArcs: ['Arc A'],
       }),
     );
+  });
+
+  it('never sets subtitle - comics have no ComicInfo.xml subtitle concept distinct from title', () => {
+    const withName = mapIssueToCandidate(makeIssue({ name: 'The Origin' }));
+    expect(withName.subtitle).toBeUndefined();
+
+    const withoutName = mapIssueToCandidate(makeIssue({ name: null }));
+    expect(withoutName.subtitle).toBeUndefined();
+  });
+
+  describe('title', () => {
+    it('uses the issue name verbatim, not a series/issue-number concatenation', () => {
+      const candidate = mapIssueToCandidate(makeIssue({ name: 'The Origin', volume: { id: 10, name: 'Series Name' }, issue_number: '12.5' }));
+      expect(candidate.title).toBe('The Origin');
+    });
+
+    it('falls back to "<series> #<issue>" when the issue has no name', () => {
+      const candidate = mapIssueToCandidate(makeIssue({ name: null, volume: { id: 10, name: 'Series Name' }, issue_number: '7' }));
+      expect(candidate.title).toBe('Series Name #7');
+    });
+
+    it('falls back to "<series> #<issue>" when the issue name is an empty string', () => {
+      const candidate = mapIssueToCandidate(makeIssue({ name: '', volume: { id: 10, name: 'Series Name' }, issue_number: '7' }));
+      expect(candidate.title).toBe('Series Name #7');
+    });
+  });
+
+  describe('displayTitle', () => {
+    it('concatenates series, issue number, and name when a name is present', () => {
+      const candidate = mapIssueToCandidate(makeIssue({ name: 'The Origin', volume: { id: 10, name: 'Series Name' }, issue_number: '12.5' }));
+      expect(candidate.displayTitle).toBe('Series Name #12.5 - The Origin');
+    });
+
+    it('omits the name suffix when the issue has no name', () => {
+      const candidate = mapIssueToCandidate(makeIssue({ name: null, volume: { id: 10, name: 'Series Name' }, issue_number: '7' }));
+      expect(candidate.displayTitle).toBe('Series Name #7');
+    });
+
+    it('omits the name suffix when the issue name is an empty string', () => {
+      const candidate = mapIssueToCandidate(makeIssue({ name: '', volume: { id: 10, name: 'Series Name' }, issue_number: '7' }));
+      expect(candidate.displayTitle).toBe('Series Name #7');
+    });
   });
 
   it('uses store_date fallback and treats malformed years as unknown', () => {

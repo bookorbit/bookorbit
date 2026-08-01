@@ -100,6 +100,48 @@ describe('candidate-relevance', () => {
     });
   });
 
+  describe('displayTitle fallback', () => {
+    it('matches a candidate via displayTitle when title alone would not match', () => {
+      const candidates = [{ ...candidate('The Origin'), displayTitle: 'Batman #12.5 - The Origin' }];
+      const result = filterAndRank(candidates, { title: 'Batman' });
+      expect(result).toHaveLength(1);
+    });
+
+    it('still drops candidates when neither title nor displayTitle match', () => {
+      const candidates = [{ ...candidate('The Origin'), displayTitle: 'Superman #1 - The Origin' }];
+      const result = filterAndRank(candidates, { title: 'Batman' });
+      expect(result).toHaveLength(0);
+    });
+
+    it('leaves title-only matching unaffected when displayTitle is absent', () => {
+      const candidates = [candidate('Batman: Year One')];
+      const result = filterAndRank(candidates, { title: 'Batman' });
+      expect(result).toHaveLength(1);
+    });
+
+    it('boosts score with author match when the title signal came from displayTitle', () => {
+      const candidates = [
+        { ...candidate('The Origin', 'Andy Weir'), displayTitle: 'Batman #1 - The Origin' },
+        { ...candidate('The Origin', 'Someone Else'), displayTitle: 'Batman #1 - The Origin' },
+      ];
+      const result = filterAndRank(candidates, { title: 'Batman', author: 'Andy Weir' });
+      expect(result[0].authors).toContain('Andy Weir');
+    });
+
+    it('uses displayTitle exclusively when present, not the better of title and displayTitle', () => {
+      const exactTitleOnly = candidate('Batman');
+      const exactTitleWeakerDisplayTitle = { ...candidate('Batman'), displayTitle: 'Batman Chronicles Vol 1' };
+      const result = filterAndRank([exactTitleWeakerDisplayTitle, exactTitleOnly], { title: 'Batman' });
+      expect(result).toEqual([exactTitleOnly, exactTitleWeakerDisplayTitle]);
+    });
+
+    it('ranks an exact title match above a partial displayTitle-only match', () => {
+      const candidates = [{ ...candidate('Something Else'), displayTitle: 'The Batman Chronicles' }, candidate('Batman')];
+      const result = filterAndRank(candidates, { title: 'Batman' });
+      expect(result[0].title).toBe('Batman');
+    });
+  });
+
   describe('scoreTitle', () => {
     it('gives highest score to exact matches', () => {
       const params: MetadataSearchParams = { title: 'Foundation' };
