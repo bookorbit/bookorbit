@@ -2080,7 +2080,7 @@
         "stockGuideTitle": "Stock progress sync plugin",
         "stockStep1Prefix": "On your KOReader device, go to",
         "stockStep1Suffix": ".",
-        "stockStep2": "Set the custom sync server to the URL shown above.",
+        "stockStep2InlineUrl": "Set the custom sync server to the following URL:",
         "stockStep3": "Enter the username and password you created, then tap Login.",
         "locationNote": "BookOrbit saves KOReader-compatible EPUB locations from the web reader. Restore should land close to the same position, though exact line placement can vary by reader and EPUB layout.",
         "dangerZone": "Danger Zone",

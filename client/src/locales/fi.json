@@ -2080,7 +2080,7 @@
         "stockGuideTitle": "Varaston edistymisen synkronointiliitännäinen",
         "stockStep1Prefix": "KOReader-laitteellasi voit siirtyä osoitteeseen",
         "stockStep1Suffix": ".",
-        "stockStep2": "Aseta mukautettu synkronointipalvelin yllä olevan URL-osoitteen kanssa.",
+        "stockStep2InlineUrl": "Set the custom sync server to the following URL:",
         "stockStep3": "Syötä käyttäjätunnus ja salasana ja napauta sitten Kirjaudu sisään.",
         "locationNote": "BookOrbit tallentaa KOReader-yhteensopivia EPUB-sijainteja web-lukijalta. Palautus pitäisi laskeutua lähellä samaa paikkaa, vaikka tarkka sijoitus voi vaihdella lukijan ja EPUB ulkoasu.",
         "dangerZone": "Vaara Vyöhyke",

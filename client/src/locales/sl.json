@@ -2080,7 +2080,7 @@
         "stockGuideTitle": "Vgrajeni vtičnik za sinhronizacijo napredka",
         "stockStep1Prefix": "Na vaši napravi KOReader pojdite na",
         "stockStep1Suffix": ".",
-        "stockStep2": "Nastavite strežnik za sinhronizacijo po meri na zgoraj prikazani URL.",
+        "stockStep2InlineUrl": "Set the custom sync server to the following URL:",
         "stockStep3": "Vnesite uporabniško ime in geslo, ki ste ju ustvarili, nato tapnite Prijava.",
         "locationNote": "BookOrbit shrani lokacije EPUB, združljive s KOReader, iz spletnega bralnika. Obnovitev naj bi pristala blizu enakega položaja, čeprav se natančna postavitev vrstice lahko razlikuje glede na bralnik in postavitev EPUB.",
         "dangerZone": "Nevarno območje",

@@ -2080,7 +2080,7 @@
         "stockGuideTitle": "Plug-in per la sincronizzazione dell'avanzamento delle scorte",
         "stockStep1Prefix": "Sul tuo dispositivo KOReader, vai a",
         "stockStep1Suffix": ".",
-        "stockStep2": "Imposta il server di sincronizzazione personalizzato su URL mostrato sopra.",
+        "stockStep2InlineUrl": "Set the custom sync server to the following URL:",
         "stockStep3": "Inserisci il nome utente e la password che hai creato, quindi tocca Accedi.",
         "locationNote": "BookOrbit salva posizioni KOReader compatibili con EPUB dal lettore web. Il ripristino dovrebbe arrivare vicino alla stessa posizione, anche se il posizionamento esatto della linea può variare in base al lettore e al layout EPUB.",
         "dangerZone": "Zona pericolosa",

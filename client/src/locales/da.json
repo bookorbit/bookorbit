@@ -2080,7 +2080,7 @@
         "stockGuideTitle": "Plugin til lagerfremdriftssynkronisering",
         "stockStep1Prefix": "Gå til din KOReader enhed",
         "stockStep1Suffix": ".",
-        "stockStep2": "Set the custom sync server to the URL shown above.",
+        "stockStep2InlineUrl": "Set the custom sync server to the following URL:",
         "stockStep3": "Indtast det brugernavn og den adgangskode, du har oprettet, og tryk derefter på Login.",
         "locationNote": "BookOrbit gemmer KOReader-kompatible EPUB-placeringer fra weblæseren. Gendan skal lande tæt på samme position, selvom nøjagtige linje placering kan variere af læser og EPUB layout.",
         "dangerZone": "Fare Zone",

@@ -2080,7 +2080,7 @@
         "stockGuideTitle": "Залишок прогрес синхронізації плагіна",
         "stockStep1Prefix": "На Вашому пристрої KOReader перейдіть на",
         "stockStep1Suffix": ".",
-        "stockStep2": "Встановіть користувацький сервер для URL-адреси, показаної вище.",
+        "stockStep2InlineUrl": "Set the custom sync server to the following URL:",
         "stockStep3": "Введіть логін та пароль, які Ви створили, а потім натисніть \"Вхід\".",
         "locationNote": "BookOrbit зберігає розташування KOReader-сумісних з EPUB від веб-читача. Відновлення має приземлятися біля тієї ж позиції, хоча точне розміщення лінії може відрізнятися від читача і за макетом EPUB.",
         "dangerZone": "Небезпечна зона",

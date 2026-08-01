@@ -2080,7 +2080,7 @@
         "stockGuideTitle": "Standaard voortgangssynchronisatie-plug-in",
         "stockStep1Prefix": "Ga op je KOReader-apparaat naar",
         "stockStep1Suffix": ".",
-        "stockStep2": "Stel de aangepaste synchronisatieserver in op de hierboven getoonde URL.",
+        "stockStep2InlineUrl": "Set the custom sync server to the following URL:",
         "stockStep3": "Voer de gebruikersnaam en het wachtwoord in die je hebt aangemaakt en tik op Inloggen.",
         "locationNote": "BookOrbit slaat KOReader-compatibele EPUB-locaties op vanuit de weblezer. Herstel zou dicht bij dezelfde positie moeten uitkomen, hoewel de exacte regelplaatsing kan variëren per lezer en EPUB-opmaak.",
         "dangerZone": "Gevarenzone",

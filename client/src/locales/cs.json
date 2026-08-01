@@ -2080,7 +2080,7 @@
         "stockGuideTitle": "Synchronizační plugin pro průběh skladu",
         "stockStep1Prefix": "Na vašem zařízení KOReader, přejděte na",
         "stockStep1Suffix": ".",
-        "stockStep2": "Nastavte vlastní synchronizační server na URL zobrazenou výše.",
+        "stockStep2InlineUrl": "Set the custom sync server to the following URL:",
         "stockStep3": "Zadejte uživatelské jméno a heslo, které jste vytvořili, a poté klepněte na Přihlášení.",
         "locationNote": "BookOrbit ukládá místa EPUB kompatibilní s KOReaderem z webové čtečky. Obnova by měla být umístěna v blízkosti stejné polohy, ale přesné umístění čáry se může lišit podle čtečky a grafu EPUB.",
         "dangerZone": "Nebezpečná zóna",

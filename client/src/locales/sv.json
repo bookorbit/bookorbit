@@ -2080,7 +2080,7 @@
         "stockGuideTitle": "Lager framsteg synkronisering plugin",
         "stockStep1Prefix": "På din KOReader enhet, gå till",
         "stockStep1Suffix": ".",
-        "stockStep2": "Ställ in den anpassade synkroniseringsservern till den URL som visas ovan.",
+        "stockStep2InlineUrl": "Set the custom sync server to the following URL:",
         "stockStep3": "Ange det användarnamn och lösenord du skapade, tryck sedan på Logga in.",
         "locationNote": "BookOrbit sparar KOReader-kompatibla EPUB-platser från webbläsaren. Återställning bör landa nära samma position, men exakt radplacering kan variera beroende på läsare och EPUB-layout.",
         "dangerZone": "Fara Zon",

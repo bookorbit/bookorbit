@@ -2080,7 +2080,7 @@
         "stockGuideTitle": "Wtyczka synchronizacji postępu akcji",
         "stockStep1Prefix": "Na urządzeniu KOReader przejdź do",
         "stockStep1Suffix": ".",
-        "stockStep2": "Ustaw niestandardowy serwer synchronizacji na URL pokazany powyżej.",
+        "stockStep2InlineUrl": "Set the custom sync server to the following URL:",
         "stockStep3": "Wprowadź utworzoną nazwę użytkownika i hasło, a następnie dotknij opcji Zaloguj.",
         "locationNote": "BookOrbit zapisuje lokalizacje KOReader kompatybilne z EPUB z czytnika internetowego. Przywrócenie powinno wylądować blisko tej samej pozycji, chociaż dokładne rozmieszczenie linii może się różnić w zależności od czytnika i układu EPUB.",
         "dangerZone": "Strefa zagrożenia",

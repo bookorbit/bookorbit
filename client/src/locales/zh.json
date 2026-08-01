@@ -2080,7 +2080,7 @@
         "stockGuideTitle": "库存进度同步插件",
         "stockStep1Prefix": "在您的 KOReader 设备上，跳转至",
         "stockStep1Suffix": ".",
-        "stockStep2": "设置自定义同步服务器到上面显示的 URL。",
+        "stockStep2InlineUrl": "Set the custom sync server to the following URL:",
         "stockStep3": "输入您创建的用户名和密码，然后点击登录。",
         "locationNote": "BookOrbit从网页阅读器中保存 KOReader 兼容的 EPUB 位置。 如果陆地接近同一位置，还是恢复，虽然精确的线路位置可能会因阅读器和 EPUB 布局而变化。",
         "dangerZone": "危险区域",
