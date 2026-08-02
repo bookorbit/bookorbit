@@ -6,7 +6,7 @@ import * as echarts from 'echarts'
 import { Globe } from '@lucide/vue'
 import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
 import { api } from '@/lib/api'
-import worldJson from '@/../public/maps/world.json'
+import worldJson from '../../../../public/maps/world.json'
 
 import ChartCard from '../ChartCard.vue'
 
@@ -16,17 +16,17 @@ const { md } = useBreakpoints(breakpointsTailwind)
 const rawItems = ref<Array<Record<string, unknown>>>([])
 const isLoading = ref(true)
 const hasError = ref(false)
-const isMapReady = ref(false)
 
-const option = shallowRef({})
-
-// Registro síncrono da topologia garantindo que o mapa exista antes de qualquer renderização
+// Registra o mapa imediatamente de forma síncrona
 try {
-  echarts.registerMap('world', worldJson as Parameters<typeof echarts.registerMap>[1])
-  isMapReady.value = true
+  if (worldJson) {
+    echarts.registerMap('world', worldJson as echarts.GeoJSONSourceInput)
+  }
 } catch {
   hasError.value = true
 }
+
+const option = shallowRef({})
 
 onMounted(async () => {
   isLoading.value = true
@@ -78,8 +78,6 @@ const aggregatedItems = computed(() => {
 })
 
 computed(() => {
-  if (!isMapReady.value) return
-
   const maxVal = aggregatedItems.value.length ? Math.max(...aggregatedItems.value.map((d) => d.value), 5) : 5
 
   option.value = {
@@ -139,9 +137,9 @@ computed(() => {
     :empty="false"
     :error="hasError"
     :icon="Globe"
-    :loading="isLoading || !isMapReady"
+    :loading="isLoading"
     :title="t('statistics.charts.countryDistribution.title')"
   >
-    <VChart v-if="isMapReady" :option="option" autoresize style="height: 100%" />
+    <VChart :option="option" autoresize style="height: 100%" />
   </ChartCard>
 </template>
