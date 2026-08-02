@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, shallowRef, ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import * as echarts from 'echarts'
@@ -17,9 +17,6 @@ const isLoading = ref(true)
 const hasError = ref(false)
 const isMapReady = ref(false)
 
-const option = shallowRef({})
-
-// Carregamento e registro assíncrono blindado do mapa a partir da pasta public
 onMounted(async () => {
   isLoading.value = true
   try {
@@ -76,12 +73,13 @@ const aggregatedItems = computed(() => {
     })
 })
 
-computed(() => {
-  if (!isMapReady.value) return
+const chartOption = computed(() => {
+  // Impede que o ECharts processe propriedades vazias prematuramente
+  if (!isMapReady.value) return {}
 
   const maxVal = aggregatedItems.value.length ? Math.max(...aggregatedItems.value.map((d) => d.value), 5) : 5
 
-  option.value = {
+  return {
     tooltip: {
       trigger: 'item',
       formatter: (params: unknown) => {
@@ -129,7 +127,7 @@ computed(() => {
       },
     ],
   }
-}).value
+})
 </script>
 
 <template>
@@ -141,6 +139,7 @@ computed(() => {
     :loading="isLoading || !isMapReady"
     :title="t('statistics.charts.countryDistribution.title')"
   >
-    <VChart v-if="isMapReady" :option="option" autoresize style="height: 100%" />
+    <!-- O v-if robusto garante que o renderizador canvas só suba com os dados em mãos -->
+    <VChart v-if="isMapReady && chartOption.series" :option="chartOption" autoresize style="height: 100%" />
   </ChartCard>
 </template>
