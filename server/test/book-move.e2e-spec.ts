@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { access } from 'fs/promises';
+import { access, readFile } from 'fs/promises';
 import { join } from 'path';
 
 import { and, eq } from 'drizzle-orm';
@@ -115,13 +115,16 @@ describe('Book move between libraries (e2e)', () => {
 
       const [unchanged] = await ctx.db.select().from(books).where(eq(books.id, book.bookId));
       expect(unchanged.libraryId).toBe(src.libraryId);
+      expect(unchanged.libraryFolderId).toBe(src.libraryFolderId);
       await expect(pathExists(join(src.folderPath, 'dupe/book.epub'))).resolves.toBe(true);
+      // The colliding file in the target must not have been overwritten.
+      await expect(readFile(join(dst.folderPath, 'dupe/book.epub'), 'utf8')).resolves.toBe('already here');
     },
     SCENARIO_TIMEOUT_MS,
   );
 
   it(
-    'rejects a target folder that belongs to a different library',
+    'rejects a target folder that belongs to a different library and leaves the book untouched',
     async () => {
       const src = await createLibraryWithFolder(ctx, { name: `move-src-${randomUUID()}` });
       const dst = await createLibraryWithFolder(ctx, { name: `move-dst-${randomUUID()}` });
@@ -134,12 +137,19 @@ describe('Book move between libraries (e2e)', () => {
       });
 
       expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({ statusCode: 400, message: expect.stringContaining('does not belong to library') });
+
+      const [unchanged] = await ctx.db.select().from(books).where(eq(books.id, book.bookId));
+      expect(unchanged.libraryId).toBe(src.libraryId);
+      expect(unchanged.libraryFolderId).toBe(src.libraryFolderId);
+      await expect(pathExists(join(src.folderPath, 'wrong-folder/book.epub'))).resolves.toBe(true);
+      await expect(pathExists(join(dst.folderPath, 'wrong-folder/book.epub'))).resolves.toBe(false);
     },
     SCENARIO_TIMEOUT_MS,
   );
 
   it(
-    'skips books whose format is not allowed in the target library',
+    'skips books whose format is not allowed in the target library and leaves files in place',
     async () => {
       const src = await createLibraryWithFolder(ctx, { name: `move-src-${randomUUID()}` });
       const dst = await createLibraryWithFolder(ctx, { name: `move-dst-${randomUUID()}`, allowedFormats: ['pdf'] });
@@ -150,6 +160,12 @@ describe('Book move between libraries (e2e)', () => {
       expect(response.statusCode).toBe(201);
       const { results } = response.json() as { results: MoveBookOutcome[] };
       expect(results).toEqual([{ bookId: book.bookId, status: 'skipped', reason: 'format_not_allowed' }]);
+
+      const [unchanged] = await ctx.db.select().from(books).where(eq(books.id, book.bookId));
+      expect(unchanged.libraryId).toBe(src.libraryId);
+      expect(unchanged.libraryFolderId).toBe(src.libraryFolderId);
+      await expect(pathExists(join(src.folderPath, 'format/book.epub'))).resolves.toBe(true);
+      await expect(pathExists(join(dst.folderPath, 'format/book.epub'))).resolves.toBe(false);
     },
     SCENARIO_TIMEOUT_MS,
   );
