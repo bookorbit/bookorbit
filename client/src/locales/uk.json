@@ -3368,6 +3368,7 @@
     "moveDialog": {
       "title": "{count, plural, =0 {Move # book to library} few {Move # books to library} many {Move # books to library} one {Move # book to library} other {Move # books to library}}",
       "description": "Files are moved into the target library's folder. Reading progress, annotations, and collections stay with the books.",
+      "multiLibraryHint": "Books that are already in the selected library are skipped.",
       "targetLibrary": "Target library",
       "targetFolder": "Target folder",
       "selectLibrary": "Select a library…",

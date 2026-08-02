@@ -157,6 +157,18 @@ describe('MoveBooksDialog', () => {
     expect(wrapper.emitted('cancel')).toBeUndefined()
   })
 
+  it('shows the multi-library skip hint when the view has no single current library', () => {
+    const wrapper = mountDialog({ currentLibraryId: null })
+
+    expect(wrapper.find('[data-testid="move-multi-library-hint"]').text()).toBe('Books that are already in the selected library are skipped.')
+  })
+
+  it('hides the skip hint when the current library is known and filtered out', () => {
+    const wrapper = mountDialog({ currentLibraryId: 1 })
+
+    expect(wrapper.find('[data-testid="move-multi-library-hint"]').exists()).toBe(false)
+  })
+
   it('fetches libraries when opened', () => {
     mountDialog()
 

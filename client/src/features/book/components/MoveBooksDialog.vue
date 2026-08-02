@@ -89,6 +89,11 @@ function onConfirm() {
             <DialogDescription class="text-sm text-muted-foreground mt-1">
               {{ t('book.moveDialog.description') }}
             </DialogDescription>
+            <!-- Collection and smart-scope selections can span libraries, so the
+                 books' own library may appear as a target; picking it skips them. -->
+            <p v-if="currentLibraryId == null" data-testid="move-multi-library-hint" class="text-xs text-muted-foreground mt-2">
+              {{ t('book.moveDialog.multiLibraryHint') }}
+            </p>
           </div>
         </div>
 
