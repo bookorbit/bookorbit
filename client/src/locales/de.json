@@ -14,7 +14,9 @@
     "previous": "Vorherige",
     "retry": "Erneut versuchen",
     "yes": "Ja",
-    "no": "Nein"
+    "no": "Nein",
+    "high": "High",
+    "low": "Low"
   },
   "settings": {
     "privacySharing": {

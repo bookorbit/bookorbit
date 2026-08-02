@@ -14,7 +14,9 @@
     "previous": "Предыдущий",
     "retry": "Повторить",
     "yes": "Да",
-    "no": "Нет"
+    "no": "Нет",
+    "high": "High",
+    "low": "Low"
   },
   "settings": {
     "privacySharing": {
@@ -6371,6 +6373,9 @@
       },
       "publicationDecade": {
         "title": "Публикация Десятилетия"
+      },
+      "countryDistribution": {
+        "title": "Geographic Distribution"
       },
       "publicationYearTimeline": {
         "title": "Хронология года публикации"

@@ -14,7 +14,9 @@
     "previous": "Попереднє",
     "retry": "Повторити спробу",
     "yes": "Так",
-    "no": "Ні"
+    "no": "Ні",
+    "high": "High",
+    "low": "Low"
   },
   "settings": {
     "privacySharing": {
@@ -6371,6 +6373,9 @@
       },
       "publicationDecade": {
         "title": "Декларація публікацій"
+      },
+      "countryDistribution": {
+        "title": "Geographic Distribution"
       },
       "publicationYearTimeline": {
         "title": "Хронологія публікації"

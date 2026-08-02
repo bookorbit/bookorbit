@@ -19,6 +19,7 @@ const CHART_COMPONENTS: Record<StatisticsChartId, Component> = {
   'genre-distribution': defineAsyncComponent(() => import('./library/GenreDistributionChart.vue')),
   'genre-cooccurrence': defineAsyncComponent(() => import('./library/GenreCooccurrenceChart.vue')),
   'metadata-score-distribution': defineAsyncComponent(() => import('./library/MetadataScoreDistributionChart.vue')),
+  'country-distribution': defineAsyncComponent(() => import('./library/CountryDistributionChart.vue')), // <--- Integrado limpo
   'library-metadata-completeness': defineAsyncComponent(() => import('./library/LibraryMetadataCompletenessHeatmapChart.vue')),
   'format-share-over-time': defineAsyncComponent(() => import('./library/FormatShareOverTimeChart.vue')),
   'page-count-distribution': defineAsyncComponent(() => import('./library/PageCountDistributionChart.vue')),

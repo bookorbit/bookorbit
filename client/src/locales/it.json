@@ -14,7 +14,9 @@
     "previous": "Precedente",
     "retry": "Riprova",
     "yes": "Sì",
-    "no": "No"
+    "no": "No",
+    "high": "High",
+    "low": "Low"
   },
   "settings": {
     "privacySharing": {
@@ -6371,6 +6373,9 @@
       },
       "publicationDecade": {
         "title": "Decennio di pubblicazioni"
+      },
+      "countryDistribution": {
+        "title": "Geographic Distribution"
       },
       "publicationYearTimeline": {
         "title": "Cronologia dell'anno di pubblicazione"

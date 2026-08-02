@@ -14,7 +14,9 @@
     "previous": "上一个",
     "retry": "重试",
     "yes": "否",
-    "no": "否"
+    "no": "否",
+    "high": "High",
+    "low": "Low"
   },
   "settings": {
     "privacySharing": {
@@ -6371,6 +6373,9 @@
       },
       "publicationDecade": {
         "title": "出版十年"
+      },
+      "countryDistribution": {
+        "title": "Geographic Distribution"
       },
       "publicationYearTimeline": {
         "title": "发布年时间表"

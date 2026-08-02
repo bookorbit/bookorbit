@@ -878,4 +878,31 @@ export class StatisticsRepository {
       .orderBy(desc(sql`count(*)`))
       .limit(50);
   }
+
+  async countryDistribution(userId: number, isSuperuser: boolean, contentFilters?: ContentFilterRules | number[], filterLibraryIds?: number[]) {
+    const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
+    const { contentFilters: resolvedContentFilters, filterLibraryIds: resolvedFilterLibraryIds } = this.resolveOptionalFilters(
+      contentFilters,
+      filterLibraryIds,
+    );
+    const filter = this.libraryFilter(this.intersectLibraryIds(accessible, resolvedFilterLibraryIds));
+    const cfClauses = this.contentFilterClauses(isSuperuser, resolvedContentFilters);
+
+    const items = await this.db
+      .select({
+        country: books.originCountry,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(books)
+      .where(and(isNotNull(books.originCountry), filter, ...cfClauses))
+      .groupBy(books.originCountry)
+      .orderBy(desc(sql<number>`count(*)`));
+
+    const [{ unknownCount }] = await this.db
+      .select({ unknownCount: sql<number>`count(*)::int` })
+      .from(books)
+      .where(and(isNull(books.originCountry), filter, ...cfClauses));
+
+    return { items, unknownCount };
+  }
 }

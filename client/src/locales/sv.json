@@ -14,7 +14,9 @@
     "previous": "Föregående",
     "retry": "Försök igen",
     "yes": "Ja",
-    "no": "Nej"
+    "no": "Nej",
+    "high": "High",
+    "low": "Low"
   },
   "settings": {
     "privacySharing": {
@@ -6371,6 +6373,9 @@
       },
       "publicationDecade": {
         "title": "Publicering decennium"
+      },
+      "countryDistribution": {
+        "title": "Geographic Distribution"
       },
       "publicationYearTimeline": {
         "title": "Tidslinje för publiceringsår"

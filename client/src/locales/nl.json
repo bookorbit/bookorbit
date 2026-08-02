@@ -14,7 +14,9 @@
     "previous": "Vorige",
     "retry": "Opnieuw proberen",
     "yes": "Ja",
-    "no": "Nee"
+    "no": "Nee",
+    "high": "High",
+    "low": "Low"
   },
   "settings": {
     "privacySharing": {
@@ -6371,6 +6373,9 @@
       },
       "publicationDecade": {
         "title": "Publicatiedecennium"
+      },
+      "countryDistribution": {
+        "title": "Geographic Distribution"
       },
       "publicationYearTimeline": {
         "title": "Tijdlijn publicatiejaar"

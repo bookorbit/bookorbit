@@ -109,4 +109,9 @@ export class StatisticsController {
   getTopSeries(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
     return this.statisticsService.getTopSeries(user, query);
   }
+
+  @Get('country-distribution')
+  getCountryDistribution(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
+    return this.statisticsService.getCountryDistribution(user, query);
+  }
 }

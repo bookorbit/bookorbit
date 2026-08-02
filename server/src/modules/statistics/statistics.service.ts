@@ -416,4 +416,12 @@ export class StatisticsService {
       excludeGenreIds: [...new Set(contentFilters.excludeGenreIds)].sort((a, b) => a - b),
     };
   }
+
+  async getCountryDistribution(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<{ country: string; count: number }>> {
+    return this.withStatisticsCache('country-distribution', user, query, async () => {
+      const { items: raw, unknownCount } = await this.repo.countryDistribution(user.id, user.isSuperuser, user.contentFilters, query.libraryIds);
+      const all = raw.flatMap((r) => (r.country ? [{ country: r.country, count: r.count }] : []));
+      return { items: this.clipCountsToTopN(all, (count) => ({ country: OTHER_BUCKET_LABEL, count })), unknownCount };
+    });
+  }
 }
