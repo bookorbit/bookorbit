@@ -38,12 +38,7 @@ import { ReadingAttemptController } from './reading-attempt.controller';
     UserBookNoteModule,
     UserBookStatusModule,
     AchievementModule,
-<<<<<<< HEAD
-=======
-    AuditModule,
-    BookMoveModule,
     StatisticsModule,
->>>>>>> bdb6443a (fix(statistics): ensure real-time stats cache invalidation and full country map distribution)
   ],
   controllers: [BookController, ReadingAttemptController],
   providers: [BookService, BookRepository, BookReadService, BookSortBuilder, BookQueryBuilder, BookAuthorSortKeyBackfillService],

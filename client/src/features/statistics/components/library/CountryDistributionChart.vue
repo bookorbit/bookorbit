@@ -26,7 +26,8 @@ async function fetchMap() {
     const mapRes = await fetch('/maps/world.json', { cache: 'force-cache' })
     if (mapRes.ok) {
       const worldJson = await mapRes.json()
-      echarts.registerMap('world', worldJson as echarts.GeoJSONSourceInput)
+      // Extrai dinamicamente o tipo do segundo argumento de registerMap
+      echarts.registerMap('world', worldJson as Parameters<typeof echarts.registerMap>[1])
       isMapReady.value = true
     } else {
       hasError.value = true

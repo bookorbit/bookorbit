@@ -508,7 +508,7 @@ function applyPatchToForm(formPatch: MetadataPatch, coverUrl: string | undefined
   updatedCount += applyPublishedPatch(formPatch, skippedFields)
   for (const field of DIRECT_PATCH_FIELDS) {
     if (hasSeriesMembershipPatch && (field === 'seriesName' || field === 'seriesIndex')) continue
-    if (applyDirectPatchField(field, formPatch[field], skippedFields)) updatedCount++
+    if (applyDirectPatchField(field, (formPatch as Record<string, unknown>)[field], skippedFields)) updatedCount++
   }
   updatedCount += applyComicPatch(formPatch, skippedFields)
   updatedCount += applyAudioPatch(formPatch, skippedFields)
