@@ -139,6 +139,37 @@ describe('ComicVineProvider', () => {
       expect(results).toHaveLength(1);
     });
 
+    it('falls back to the stored series when the title is a bare issue name', async () => {
+      vi.spyOn(client, 'searchVolumes').mockResolvedValue([mockVolume]);
+      vi.spyOn(client, 'searchIssuesInVolume').mockResolvedValue([mockIssue]);
+
+      const results = await provider.search({ title: 'The Origin', seriesName: 'Batman', seriesIndex: 12.5 });
+
+      expect(client.searchVolumes).toHaveBeenCalledWith('Batman', 'test-key');
+      expect(client.searchIssuesInVolume).toHaveBeenCalledWith(mockVolume.id, '12.5', 'test-key');
+      expect(client.searchIssues).not.toHaveBeenCalled();
+      expect(results).toHaveLength(1);
+    });
+
+    it('prefers a "Series #N" title over the stored series so a typed query wins', async () => {
+      vi.spyOn(client, 'searchVolumes').mockResolvedValue([mockVolume]);
+      vi.spyOn(client, 'searchIssuesInVolume').mockResolvedValue([mockIssue]);
+
+      await provider.search({ title: 'Superman #3', seriesName: 'Batman', seriesIndex: 12.5 });
+
+      expect(client.searchVolumes).toHaveBeenCalledWith('Superman', 'test-key');
+      expect(client.searchIssuesInVolume).toHaveBeenCalledWith(mockVolume.id, '3', 'test-key');
+    });
+
+    it('uses the general search when the stored series has no issue number', async () => {
+      vi.spyOn(client, 'searchIssues').mockResolvedValue([mockIssue]);
+
+      await provider.search({ title: 'The Origin', seriesName: 'Batman' });
+
+      expect(client.searchVolumes).not.toHaveBeenCalled();
+      expect(client.searchIssues).toHaveBeenCalledWith('The Origin', 'test-key');
+    });
+
     it('tries volumes sorted by start_year descending', async () => {
       const older = { ...mockVolume, id: 1, start_year: '1990' };
       const newer = { ...mockVolume, id: 2, start_year: '2016' };

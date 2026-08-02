@@ -8,7 +8,7 @@ export function getProviderLabel(provider: MetadataProviderKey, providers: reado
   return providers.find((p) => p.key === provider)?.label ?? provider
 }
 
-export function resolveCandidateDisplayTitle(candidate: Pick<MetadataCandidate, 'title' | 'displayTitle'>): string {
+export function resolveCandidateDisplayTitle(candidate: Pick<MetadataCandidate, 'title' | 'displayTitle'>): string | undefined {
   return candidate.displayTitle ?? candidate.title
 }
 

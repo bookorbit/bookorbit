@@ -40,7 +40,7 @@ function handleSelect() {
       <img
         v-if="displayCoverUrl"
         :src="displayCoverUrl"
-        :alt="displayTitle"
+        alt=""
         class="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
         @error="hideOnError"
       />

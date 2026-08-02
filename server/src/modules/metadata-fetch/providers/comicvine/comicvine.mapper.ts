@@ -34,8 +34,8 @@ function buildComicMetadata(issue: ComicVineIssue): ComicMetadataFields {
   };
 }
 
-function buildTitle(issue: ComicVineIssue): string {
-  return issue.name || `${issue.volume.name} #${issue.issue_number}`;
+function buildTitle(issue: ComicVineIssue): string | undefined {
+  return issue.name?.trim() || undefined;
 }
 
 function buildDisplayTitle(issue: ComicVineIssue): string {

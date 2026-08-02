@@ -11,4 +11,12 @@ describe('resolveCandidateDisplayTitle', () => {
   it('falls back to title when displayTitle is absent', () => {
     expect(resolveCandidateDisplayTitle({ title: 'The Way of Kings', displayTitle: undefined })).toBe('The Way of Kings')
   })
+
+  it('uses displayTitle when the candidate has no title, as an unnamed comic issue does', () => {
+    expect(resolveCandidateDisplayTitle({ title: undefined, displayTitle: 'Series Name #7' })).toBe('Series Name #7')
+  })
+
+  it('returns undefined when the candidate has neither', () => {
+    expect(resolveCandidateDisplayTitle({ title: undefined, displayTitle: undefined })).toBeUndefined()
+  })
 })

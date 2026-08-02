@@ -93,14 +93,24 @@ describe('mapIssueToCandidate', () => {
       expect(candidate.title).toBe('The Origin');
     });
 
-    it('falls back to "<series> #<issue>" when the issue has no name', () => {
+    it('stays unset when the issue has no name, leaving any existing title alone', () => {
       const candidate = mapIssueToCandidate(makeIssue({ name: null, volume: { id: 10, name: 'Series Name' }, issue_number: '7' }));
-      expect(candidate.title).toBe('Series Name #7');
+      expect(candidate.title).toBeUndefined();
     });
 
-    it('falls back to "<series> #<issue>" when the issue name is an empty string', () => {
+    it('stays unset when the issue name is an empty string', () => {
       const candidate = mapIssueToCandidate(makeIssue({ name: '', volume: { id: 10, name: 'Series Name' }, issue_number: '7' }));
-      expect(candidate.title).toBe('Series Name #7');
+      expect(candidate.title).toBeUndefined();
+    });
+
+    it('stays unset when the issue name is only whitespace', () => {
+      const candidate = mapIssueToCandidate(makeIssue({ name: '   ', volume: { id: 10, name: 'Series Name' }, issue_number: '7' }));
+      expect(candidate.title).toBeUndefined();
+    });
+
+    it('trims surrounding whitespace from the issue name', () => {
+      const candidate = mapIssueToCandidate(makeIssue({ name: '  The Origin  ' }));
+      expect(candidate.title).toBe('The Origin');
     });
   });
 
@@ -138,7 +148,7 @@ describe('mapIssueToCandidate', () => {
         store_date: null,
       }),
     );
-    expect(malformedYear.title).toBe('Series Name #7');
+    expect(malformedYear.displayTitle).toBe('Series Name #7');
     expect(malformedYear.publishedYear).toBeUndefined();
   });
 

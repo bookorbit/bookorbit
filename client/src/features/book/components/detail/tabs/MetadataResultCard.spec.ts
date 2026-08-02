@@ -16,13 +16,12 @@ function makeCandidate(overrides: Partial<MetadataCandidate> = {}): MetadataCand
 }
 
 describe('MetadataResultCard', () => {
-  it('renders displayTitle as the headline and alt text when present', () => {
+  it('renders displayTitle as the headline when present', () => {
     const wrapper = mount(MetadataResultCard, {
       props: { candidate: makeCandidate({ displayTitle: 'Series Name #12.5 - The Origin' }), providers },
     })
 
     expect(wrapper.text()).toContain('Series Name #12.5 - The Origin')
-    expect(wrapper.find('img').attributes('alt')).toBe('Series Name #12.5 - The Origin')
   })
 
   it('falls back to title as the headline when displayTitle is absent', () => {
@@ -31,6 +30,21 @@ describe('MetadataResultCard', () => {
     })
 
     expect(wrapper.text()).toContain('The Way of Kings')
-    expect(wrapper.find('img').attributes('alt')).toBe('The Way of Kings')
+  })
+
+  it('still labels an unnamed comic issue, which has a displayTitle but no title', () => {
+    const wrapper = mount(MetadataResultCard, {
+      props: { candidate: makeCandidate({ title: undefined, displayTitle: 'Series Name #7' }), providers },
+    })
+
+    expect(wrapper.text()).toContain('Series Name #7')
+  })
+
+  it('hides the cover from assistive technology because the headline already names the result', () => {
+    const wrapper = mount(MetadataResultCard, {
+      props: { candidate: makeCandidate({ displayTitle: 'Series Name #12.5 - The Origin' }), providers },
+    })
+
+    expect(wrapper.find('img').attributes('alt')).toBe('')
   })
 })

@@ -62,7 +62,8 @@ export interface MetadataCandidate {
   provider: MetadataProviderKey;
   providerId: string;
   hardcoverEditionId?: string;
-  title: string;
+  /** Absent when the provider has no title of its own for this record, e.g. an unnamed comic issue. */
+  title?: string;
   displayTitle?: string;
   subtitle?: string;
   authors?: string[];

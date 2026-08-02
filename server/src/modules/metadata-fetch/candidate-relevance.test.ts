@@ -140,6 +140,29 @@ describe('candidate-relevance', () => {
       const result = filterAndRank(candidates, { title: 'Batman' });
       expect(result[0].title).toBe('Batman');
     });
+
+    it('ranks a candidate that has only a displayTitle, as an unnamed comic issue does', () => {
+      const unnamedIssue: MetadataCandidate = { provider: 'comicvine', providerId: '1', displayTitle: 'Batman #7' };
+      const result = filterAndRank([unnamedIssue], { title: 'Batman' });
+      expect(result).toEqual([unnamedIssue]);
+    });
+
+    it('drops a candidate with neither title nor displayTitle', () => {
+      const result = filterAndRank([{ provider: 'comicvine', providerId: '1' }], { title: 'Batman' });
+      expect(result).toHaveLength(0);
+    });
+
+    it('applies the skip patterns to the same string it scores, so a named issue survives', () => {
+      const candidates = [{ ...candidate('Guide to Gotham'), displayTitle: 'Batman #4 - Guide to Gotham' }];
+      const result = filterAndRank(candidates, { title: 'Batman' });
+      expect(result).toHaveLength(1);
+    });
+
+    it('still drops a genuine study guide that carries a displayTitle', () => {
+      const candidates = [{ ...candidate('The Great Gatsby'), displayTitle: 'Study Guide for The Great Gatsby' }];
+      const result = filterAndRank(candidates, { title: 'The Great Gatsby' });
+      expect(result).toHaveLength(0);
+    });
   });
 
   describe('scoreTitle', () => {

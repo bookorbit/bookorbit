@@ -28,6 +28,21 @@ function parseIssueTitle(title: string): ParsedIssueTitle | null {
   return { seriesName, issueNumber };
 }
 
+/**
+ * Prefer a "<series> #<issue>" title because that is the user typing an explicit target, and fall
+ * back to the book's stored series. Comic titles hold the issue name alone, so without the fallback
+ * an already-matched comic would re-search through the far looser general issue search.
+ */
+function resolveIssueQuery(params: MetadataSearchParams): ParsedIssueTitle | null {
+  const fromTitle = params.title ? parseIssueTitle(params.title) : null;
+  if (fromTitle) return fromTitle;
+
+  const seriesName = params.seriesName?.trim();
+  const issueNumber = params.seriesIndex;
+  if (!seriesName || issueNumber === undefined || !Number.isFinite(issueNumber) || issueNumber < 0) return null;
+  return { seriesName, issueNumber: String(issueNumber) };
+}
+
 function hasAnyCredits(issue: ComicVineIssue): boolean {
   return (
     (issue.person_credits?.length ?? 0) > 0 ||
@@ -62,7 +77,7 @@ export class ComicVineProvider implements IdentifiableProvider {
 
     try {
       const maxCandidates = normalizeMaxCandidates(params.maxCandidatesPerProvider, PROVIDER_LIMITS.COMICVINE_MAX_RESULTS);
-      const parsed = parseIssueTitle(params.title);
+      const parsed = resolveIssueQuery(params);
       return parsed
         ? await this.structuredSearch(parsed.seriesName, parsed.issueNumber, apiKey, maxCandidates, params.signal)
         : await this.generalSearch(params.title, apiKey, maxCandidates, params.signal);

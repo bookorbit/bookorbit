@@ -2629,6 +2629,8 @@ export class BookService {
         title: meta?.title ?? undefined,
         author: authorRows[0]?.name ?? undefined,
         isbn: meta?.isbn13 ?? meta?.isbn10 ?? undefined,
+        seriesName: meta?.seriesName ?? undefined,
+        seriesIndex: meta?.seriesIndex ?? undefined,
         existingProviderIds: providerIds,
         isAudiobook: (meta?.durationSeconds !== null && meta?.durationSeconds !== undefined) || !!meta?.audibleId || !!meta?.librofmId,
         maxCandidatesPerProvider: 1,
