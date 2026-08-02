@@ -142,10 +142,10 @@ watch(
 <template>
   <div class="fixed inset-0 z-50 flex flex-col" :style="shellStyle">
     <header v-show="headerVisible" class="flex items-center gap-2 border-b border-white/10 bg-black/40 px-3 py-2 text-white backdrop-blur">
-      <button type="button" class="rounded p-2 hover:bg-white/10" :title="t('common.back') || 'Back'" @click="goBack">
+      <button type="button" class="rounded p-2 hover:bg-white/10" :title="t('common.back')" @click="goBack">
         <ArrowLeft class="size-5" />
       </button>
-      <div class="min-w-0 flex-1 truncate text-sm opacity-90">{{ t('reader.txt.title') || 'Text' }}</div>
+      <div class="min-w-0 flex-1 truncate text-sm opacity-90">Text</div>
       <button type="button" class="rounded p-2 hover:bg-white/10" @click="toggleTheme">
         <Moon v-if="!settings.isDark" class="size-5" />
         <Sun v-else class="size-5" />
@@ -165,7 +165,7 @@ watch(
     </div>
 
     <div ref="scrollEl" class="relative min-h-0 flex-1 overflow-y-auto px-4 py-6" @scroll="updateProgressFromScroll" @click="handleMiddleTap">
-      <div v-if="loading" class="opacity-70">{{ t('common.loading') || 'Loading…' }}</div>
+      <div v-if="loading" class="opacity-70">{{ t('common.loading') }}</div>
       <div v-else-if="error" class="text-red-400">{{ error }}</div>
       <pre v-else class="mx-auto whitespace-pre-wrap break-words font-serif" :style="contentStyle" @click.stop="showHeader()">{{ content }}</pre>
     </div>
