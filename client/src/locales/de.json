@@ -6374,6 +6374,9 @@
       "publicationDecade": {
         "title": "Erscheinungsjahrzehnt"
       },
+      "countryDistribution": {
+        "title": "Geographic Distribution"
+      },
       "publicationYearTimeline": {
         "title": "Zeitleiste der Erscheinungsjahre"
       },

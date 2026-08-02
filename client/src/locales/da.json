@@ -6374,6 +6374,9 @@
       "publicationDecade": {
         "title": "Offentliggørelse Decade"
       },
+      "countryDistribution": {
+        "title": "Geographic Distribution"
+      },
       "publicationYearTimeline": {
         "title": "Tidslinje For Udgivelsesår"
       },
